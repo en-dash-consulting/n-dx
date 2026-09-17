@@ -130,6 +130,9 @@ import {
 import {
   collectInstallIdentity,
   formatInstallIdentity,
+  formatWorkIdentityLine,
+  readGitIdentity,
+  shouldPrintWorkIdentity,
 } from "./install-identity.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -1901,6 +1904,16 @@ async function handleWork(rest) {
   requireInit(dir, [".rex", ".hench"]);
   const flags = extractFlags(rest);
 
+  // Which n-dx is about to run, against which checkout. A run is the most
+  // expensive thing this CLI starts and the hardest to attribute afterwards:
+  // the run record says what happened but not which install produced it, and
+  // a dashboard, a terminal and a worktree can each be a different one. One
+  // line, before anything else, so the dashboard's live status hint (which is
+  // the last line of the child's stdout) shows it once at the start.
+  if (shouldPrintWorkIdentity(rest)) {
+    printWorkIdentity(dir);
+  }
+
   // Require explicit vendor selection for n-dx orchestration.
   // This avoids implicit use of whichever local CLI session happens to be active.
   const isDryRun = flags.includes("--dry-run");
@@ -1920,6 +1933,33 @@ async function handleWork(rest) {
     disposeInterrupt();
   }
   exitWithCleanup(0);
+}
+
+/**
+ * Print the `ndx work` identity line. Best-effort throughout — a run must not
+ * fail because its own banner could not be assembled.
+ *
+ * The git identity is read from the PROJECT directory, not the install: the
+ * branch worth naming is the one the work lands on, which is a different
+ * checkout whenever n-dx is run against another repository.
+ *
+ * @param {string} dir  Resolved project directory.
+ */
+function printWorkIdentity(dir) {
+  try {
+    const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+    console.log(formatWorkIdentityLine({
+      version,
+      // From import.meta.url, not NDX_CLI_PATH: that variable is exported for
+      // children and could have been inherited from an unrelated parent —
+      // the same reasoning as `ndx which`.
+      cliPath: fileURLToPath(import.meta.url),
+      projectDir: dir,
+      git: readGitIdentity(dir),
+    }));
+  } catch {
+    // No identity line rather than a failed run.
+  }
 }
 
 async function handleStatus(rest) {

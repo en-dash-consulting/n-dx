@@ -20,6 +20,9 @@ import {
   collectInstallIdentity,
   formatGitIdentity,
   formatInstallIdentity,
+  formatBranchField,
+  formatWorkIdentityLine,
+  shouldPrintWorkIdentity,
 } from "../../packages/core/install-identity.js";
 
 /** Build an existsSync stub that reports exactly `paths` as present. */
@@ -323,5 +326,74 @@ describe("formatInstallIdentity", () => {
     const out = formatInstallIdentity(npm);
     expect(out).toContain("install  npm registry install");
     expect(out).not.toContain("()");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The `ndx work` identity line
+// ---------------------------------------------------------------------------
+
+describe("formatBranchField", () => {
+  it("names the branch, or the detached commit when there is none", () => {
+    expect(formatBranchField({ branch: "main", sha: "a1b2c3d", detached: false })).toBe("main");
+    expect(formatBranchField({ branch: null, sha: "a1b2c3d", detached: true })).toBe("detached@a1b2c3d");
+  });
+
+  it("is null outside a working tree, so the caller can drop the segment", () => {
+    expect(formatBranchField(null)).toBeNull();
+  });
+});
+
+describe("formatWorkIdentityLine", () => {
+  const BASE = {
+    version: "0.6.0",
+    cliPath: WORKSPACE_CLI,
+    projectDir: WORKSPACE_ROOT,
+  };
+
+  it("is one line: version, cli, project, branch", () => {
+    const line = formatWorkIdentityLine({ ...BASE, git: { branch: "feature/x", sha: "a1b2c3d", detached: false } });
+    expect(line).toBe(`ndx 0.6.0 \u00B7 ${WORKSPACE_CLI} \u00B7 ${WORKSPACE_ROOT} \u00B7 feature/x`);
+    // One line is the contract — the dashboard shows the last line of stdout
+    // as its live status hint.
+    expect(line).not.toContain("\n");
+  });
+
+  it("drops the branch segment outside a working tree rather than filling it", () => {
+    const line = formatWorkIdentityLine({ ...BASE, git: null });
+    expect(line).toBe(`ndx 0.6.0 \u00B7 ${WORKSPACE_CLI} \u00B7 ${WORKSPACE_ROOT}`);
+    expect(line).not.toMatch(/\u00B7\s*$/);
+    // Omitting `git` entirely is the same case.
+    expect(formatWorkIdentityLine(BASE)).toBe(line);
+  });
+
+  it("names a detached HEAD by its commit", () => {
+    expect(formatWorkIdentityLine({ ...BASE, git: { branch: null, sha: "9f8e7d6", detached: true } }))
+      .toContain("\u00B7 detached@9f8e7d6");
+  });
+
+  it("resolves the paths it is given", () => {
+    const line = formatWorkIdentityLine({ version: "0.6.0", cliPath: "cli.js", projectDir: "." });
+    expect(line).toContain(resolve("cli.js"));
+    expect(line).toContain(resolve("."));
+  });
+});
+
+describe("shouldPrintWorkIdentity", () => {
+  it("prints for an ordinary run, and for a dry run — which is mostly about which n-dx would run", () => {
+    expect(shouldPrintWorkIdentity([])).toBe(true);
+    expect(shouldPrintWorkIdentity(["--auto", "."])).toBe(true);
+    expect(shouldPrintWorkIdentity(["--dry-run", "."])).toBe(true);
+  });
+
+  it("stays silent where the output is parsed rather than read", () => {
+    expect(shouldPrintWorkIdentity(["--format=json", "."])).toBe(false);
+    expect(shouldPrintWorkIdentity(["--quiet", "."])).toBe(false);
+    expect(shouldPrintWorkIdentity(["-q", "."])).toBe(false);
+  });
+
+  it("does not mistake another format, or a path that merely contains a flag name", () => {
+    expect(shouldPrintWorkIdentity(["--format=text", "."])).toBe(true);
+    expect(shouldPrintWorkIdentity(["/repos/--quiet-project"])).toBe(true);
   });
 });

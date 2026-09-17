@@ -223,6 +223,61 @@ export function formatGitIdentity(git) {
 }
 
 /**
+ * The branch a working tree is on, as one field: the branch name, or
+ * `detached@<sha>` when there is no branch to name. Null when the directory
+ * is not a working tree, so the caller can drop the segment.
+ *
+ * @param {{ branch: string|null, sha: string, detached: boolean }|null} git
+ * @returns {string|null}
+ */
+export function formatBranchField(git) {
+  if (!git) return null;
+  return git.detached ? `detached@${git.sha}` : git.branch;
+}
+
+/**
+ * The one line `ndx work` prints before handing over to the agent:
+ * `ndx <version> · <cliPath> · <projectDir> · <branch>`.
+ *
+ * One line, not the block `ndx which` prints, because the dashboard streams
+ * the run's stdout and shows the last line as its live status hint — a block
+ * would leave the status stuck on whichever of its lines came last. Outside a
+ * working tree the branch segment is dropped rather than filled with a
+ * placeholder.
+ *
+ * @param {object} input
+ * @param {string} input.version
+ * @param {string} input.cliPath
+ * @param {string} input.projectDir
+ * @param {{ branch: string|null, sha: string, detached: boolean }|null} [input.git]
+ * @returns {string}
+ */
+export function formatWorkIdentityLine({ version, cliPath, projectDir, git = null }) {
+  const parts = [`ndx ${version}`, resolve(cliPath), resolve(projectDir)];
+  const branch = formatBranchField(git);
+  if (branch) parts.push(branch);
+  return parts.join(" \u00B7 ");
+}
+
+/**
+ * Whether `ndx work` should print its identity line for these arguments.
+ *
+ * False for the modes whose output is read by something other than a person:
+ * `--format=json` (hench switches itself to quiet for it, and a bare line
+ * before the JSON would break every parser) and the explicit quiet flags.
+ * `--dry-run` deliberately still prints — knowing which n-dx would have run
+ * is most of what a dry run is for.
+ *
+ * @param {string[]} args  Raw CLI arguments after the command.
+ * @returns {boolean}
+ */
+export function shouldPrintWorkIdentity(args) {
+  return !args.some(
+    (arg) => arg === "--quiet" || arg === "-q" || arg === "--format=json",
+  );
+}
+
+/**
  * Render the identity record as human-readable lines.
  *
  * @param {ReturnType<typeof collectInstallIdentity>} info
