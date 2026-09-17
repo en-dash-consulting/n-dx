@@ -10,6 +10,8 @@ import {
   handleGetPrdStatus,
   handleGetNextTask,
   handleUpdateTaskStatus,
+  handleClaimTask,
+  handleReleaseTask,
   handleAddItem,
   handleMoveItem,
   handleMergeItems,
@@ -111,7 +113,29 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       resolutionType: z.enum(["code-change", "config-override", "acknowledgment", "deferred", "unclassified"]).optional().describe("How the task was resolved (required when status is 'completed')"),
       resolutionDetail: z.string().optional().describe("Brief description of how the resolution was achieved"),
     },
-    withMigrationWarning((args) => handleUpdateTaskStatus(store, dir, args)),
+    withMigrationWarning((args) => handleUpdateTaskStatus(store, dir, args, claims)),
+  );
+
+  // Claims are how two worktrees of one repository avoid picking the same
+  // task. `get_next_task` skips what is claimed elsewhere and
+  // `update_task_status` claims on `in_progress`; these two make the hold
+  // explicit for the gap between selecting a task and starting it.
+  server.tool(
+    "claim_task",
+    "Claim a task for this worktree so other worktrees' agents skip it. Use right after selecting a task, before planning or editing. Claims are released by update_task_status when the task reaches a terminal status, or by release_task.",
+    {
+      id: z.string().describe("Task ID to claim"),
+    },
+    withMigrationWarning((args) => handleClaimTask(store, args, claims)),
+  );
+
+  server.tool(
+    "release_task",
+    "Release this worktree's claim on a task without changing its status. Use when abandoning a task you claimed but did not finish.",
+    {
+      id: z.string().describe("Task ID to release"),
+    },
+    withMigrationWarning((args) => handleReleaseTask(args, claims)),
   );
 
   server.tool(

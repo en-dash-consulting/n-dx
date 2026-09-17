@@ -31,7 +31,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import { detectBasePath, projectIdFromBasePath, stripBasePath } from "../shared/index.js";
+import { detectBasePath, projectIdFromBasePath, safeDecodeSegment, stripBasePath } from "../shared/index.js";
 import type { Hub, RegisterProjectInput } from "./hub.js";
 import { buildHubOverview } from "./overview.js";
 import { renderCards } from "./home.js";
@@ -217,7 +217,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
 
   const projectMatch = path.match(/^\/projects\/([^/]+)$/);
   if (projectMatch) {
-    const id = decodeURIComponent(projectMatch[1]);
+    const id = safeDecodeSegment(projectMatch[1]);
     if (method === "GET") {
       const project = hub.getProject(id);
       if (!project) {
@@ -243,15 +243,8 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   // worktree. The project stays up while other worktrees are registered.
   const worktreeMatch = path.match(/^\/projects\/([^/]+)\/worktrees\/([^/]+)$/);
   if (worktreeMatch && method === "DELETE") {
-    let id: string;
-    let worktree: string;
-    try {
-      id = decodeURIComponent(worktreeMatch[1]);
-      worktree = decodeURIComponent(worktreeMatch[2]);
-    } catch {
-      error(res, 400, "Malformed project id or worktree path");
-      return true;
-    }
+    const id = safeDecodeSegment(worktreeMatch[1]);
+    const worktree = safeDecodeSegment(worktreeMatch[2]);
     const result = await hub.removeWorktree(id, worktree);
     if (!result.projectKnown) {
       error(res, 404, `No project registered as "${id}"`);

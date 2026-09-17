@@ -330,4 +330,83 @@ describe("Hench Templates API routes", () => {
     });
     expect(res.status).toBe(404);
   });
+
+  // ── The config-write gate ───────────────────────────────────────────
+  //
+  // Templates are the fourth way into `.hench/config.json`, after the config
+  // editor, the adaptive routes and the workflow apply. The other three go
+  // through `validateConfigKeyValue`; this one took `config` from the request
+  // body verbatim and merged it into the file, so a same-origin caller could
+  // write exactly the three things `hench-config-fields.ts` names as the
+  // reason that gate exists — and the next autonomous run inherited them.
+
+  const postTemplate = (body: unknown) => postRawTemplate(JSON.stringify(body));
+
+  /**
+   * Raw text, because `{ __proto__: … }` in an object literal sets the
+   * prototype rather than a key and `JSON.stringify` then drops it — the
+   * payload under test only exists on the wire.
+   */
+  const postRawTemplate = (body: string) => fetch(`http://127.0.0.1:${port}/api/hench/templates`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+
+  it("refuses a template that invents a config field", async () => {
+    const res = await postTemplate({ id: "sneaky", config: { permissionMode: "bypassPermissions" } });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("permissionMode");
+
+    const stored = await readFile(join(henchDir, "templates.json"), "utf-8").catch(() => "[]");
+    expect(JSON.parse(stored)).toHaveLength(0);
+  });
+
+  it("refuses a prototype-poisoning path, at the top level and nested", async () => {
+    const top = await postRawTemplate('{"id":"proto","config":{"__proto__":{"polluted":true}}}');
+    expect(top.status).toBe(400);
+    const nested = await postRawTemplate('{"id":"proto2","config":{"guard":{"__proto__":{"polluted":true}}}}');
+    expect(nested.status).toBe(400);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it("refuses a writable field given the wrong shape", async () => {
+    const res = await postTemplate({ id: "wrong-shape", config: { guard: { allowedCommands: "rm -rf /" } } });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/must be an array/i);
+  });
+
+  it("accepts a template that only sets allowlisted fields", async () => {
+    const res = await postTemplate({ id: "fine", config: { maxTurns: 12, retry: { maxRetries: 4 } } });
+    expect(res.status).toBe(201);
+
+    const applied = await fetch(`http://127.0.0.1:${port}/api/hench/templates/fine/apply`, { method: "POST" });
+    expect(applied.status).toBe(200);
+    const config = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
+    expect(config.maxTurns).toBe(12);
+    expect(config.retry.maxRetries).toBe(4);
+    expect(config.retry.baseDelayMs, "a nested merge keeps its siblings").toBe(2000);
+  });
+
+  it("refuses to apply a stored template that predates the gate", async () => {
+    // templates.json is a file: one written before this check existed, or by
+    // hand, must not become a config write just because it is already there.
+    await writeFile(
+      join(henchDir, "templates.json"),
+      JSON.stringify([{ id: "legacy", name: "Legacy", description: "", useCases: [], tags: [], config: { permissionMode: "bypassPermissions" }, builtIn: false, createdAt: new Date().toISOString() }]),
+    );
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/legacy/apply`, { method: "POST" });
+    expect(res.status).toBe(400);
+    const config = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
+    expect(config.permissionMode).toBeUndefined();
+  });
+
+  it("every built-in template passes the gate it now enforces", async () => {
+    const list = await (await fetch(`http://127.0.0.1:${port}/api/hench/templates`)).json();
+    for (const template of list.templates as Array<{ id: string; builtIn: boolean }>) {
+      if (!template.builtIn) continue;
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/${template.id}/apply`, { method: "POST" });
+      expect(res.status, `${template.id} must still apply`).toBe(200);
+    }
+  });
 });

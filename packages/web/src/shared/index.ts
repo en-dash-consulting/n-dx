@@ -16,12 +16,14 @@ export {
   detectBasePath,
   detectViewerBasePath,
   projectIdFromBasePath,
+  safeDecodeSegment,
   workspaceKeyFromBasePath,
   stripWorkspaceSlot,
   withBasePath,
   stripBasePath,
   webSocketUrl,
 } from "./base-path.js";
+export { isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
 export {
   SOURCEVISION_SCOPE_VIEWS,
   REX_SCOPE_VIEWS,

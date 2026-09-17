@@ -76,6 +76,32 @@ out.slotBare = { status: bare.status, html: bare.type.includes("text/html") };
 const unknown = await probe("/w/nope/prd");
 out.unknown = { status: unknown.status, html: unknown.type.includes("text/html"), linksHome: unknown.text.includes('href="/"'), namesKey: unknown.text.includes("nope") };
 out.anchorPage = (await probe("/prd")).status;
+
+// The header outranks the slot. This is how the Workspaces board acts on
+// another worktree: its own page is served under a slot, so every fetch it
+// makes carries that slot, and only the header can say which worktree the
+// request is actually about.
+out.headerBeatsSlot = JSON.parse(
+  (await probe("/w/" + key + "/api/status", { "x-ndx-workspace": "app" })).text,
+).projectDir;
+out.slotStillWinsOverNothing = JSON.parse((await probe("/w/" + key + "/api/status")).text).projectDir;
+// An unknown header key falls back rather than 404ing a whole dashboard, and
+// must not promote itself over a slot that does name a worktree.
+out.unknownHeaderKeepsSlot = JSON.parse(
+  (await probe("/w/" + key + "/api/status", { "x-ndx-workspace": "no-such-worktree" })).text,
+).projectDir;
+
+// Snapshot what is known before the next probe: that one can take the whole
+// server down, and an intermediate emit means the earlier results still reach
+// the test instead of the run reporting only "the driver died".
+emit(out);
+
+// A malformed percent-escape in the slot: decoding it throws, and an
+// exception in the request handler is an unhandled rejection that ends the
+// process. It must answer, and the server must still be there afterwards.
+const malformed = await probe("/w/%/api/status");
+out.malformedSlot = malformed.status;
+out.aliveAfterMalformed = (await probe("/api/status")).status;
 emit(out);
 process.exit(0);
 `;
@@ -150,5 +176,19 @@ describe("/w/<key>/ dispatch through the real server", () => {
 
   it("an unknown key is a 404 page that names the key and links to the anchor", () => {
     expect(result.unknown).toEqual({ status: 404, html: true, linksHome: true, namesKey: true });
+  });
+
+  // The Workspaces board is served under its own slot and addresses every
+  // other worktree by header; a slot-first dispatcher sent its Start/Stop to
+  // whichever worktree the board happened to be mounted on.
+  it("X-Ndx-Workspace outranks the /w/<key>/ slot", () => {
+    expect(result.headerBeatsSlot).toBe(repo);
+    expect(result.slotStillWinsOverNothing).toBe(linked);
+    expect(result.unknownHeaderKeepsSlot).toBe(linked);
+  });
+
+  it("a malformed escape in the slot is answered, not fatal", () => {
+    expect(result.malformedSlot).toBe(404);
+    expect(result.aliveAfterMalformed).toBe(200);
   });
 });

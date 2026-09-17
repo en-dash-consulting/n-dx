@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { cmdNext } from "../../src/cli/commands/next.js";
-import { handleGetNextTask } from "../../src/cli/mcp-tools.js";
+import { handleClaimTask, handleGetNextTask, handleReleaseTask, handleUpdateTaskStatus } from "../../src/cli/mcp-tools.js";
 import { openClaimsStore, resolveClaimHolder } from "../../src/store/claims.js";
 import { resolveStore, serializeFolderTree, PRD_TREE_DIRNAME } from "../../src/store/index.js";
 import { findNextTask, collectCompletedIds } from "../../src/core/next-task.js";
@@ -161,5 +161,88 @@ describe("selection across two worktrees", () => {
     expect(body.message).toContain("2 claimed elsewhere");
     expect(body.skippedClaimed).toHaveLength(2);
     for (const id of ["t-high", "t-low"]) await claimsA.release(id, holder.pid!);
+  });
+});
+
+/**
+ * The MCP path must *write* claims, not only read them.
+ *
+ * `get_next_task` has skipped claimed tasks since claims existed, but nothing
+ * on this path ever took one: only `hench run` did. So two assistants in two
+ * worktrees each asked for the next task, each saw it unclaimed, and both
+ * worked it — the exact collision the store was built to prevent, still open
+ * on the `/ndx-work` route.
+ */
+describe("claims on the MCP path", () => {
+  const ctxFor = (wt: string) => ({ store: openClaimsStore(wt), worktreeRoot: resolveClaimHolder(wt).worktreeRoot });
+
+  it("claim_task holds a task, and the other worktree stops being offered it", async () => {
+    const storeA = await resolveStore(join(wtA, ".rex"));
+    const storeB = await resolveStore(join(wtB, ".rex"));
+
+    const before = JSON.parse((await handleGetNextTask(storeB, undefined, ctxFor(wtB))).content[0].text);
+    expect(before.item.id, "B's first choice with nothing claimed").toBe("t-high");
+
+    const claimed = JSON.parse((await handleClaimTask(storeA, { id: "t-high" }, ctxFor(wtA))).content[0].text);
+    expect(claimed).toMatchObject({ id: "t-high", claimed: true, worktreeRoot: wtA });
+
+    const after = JSON.parse((await handleGetNextTask(storeB, undefined, ctxFor(wtB))).content[0].text);
+    expect(after.item.id, "B now passes over the claimed task").toBe("t-low");
+
+    const released = JSON.parse((await handleReleaseTask({ id: "t-high" }, ctxFor(wtA))).content[0].text);
+    expect(released).toEqual({ id: "t-high", released: true });
+    expect(JSON.parse((await handleGetNextTask(storeB, undefined, ctxFor(wtB))).content[0].text).item.id).toBe("t-high");
+  });
+
+  it("update_task_status takes the claim when a task starts and gives it back when it ends", async () => {
+    const storeA = await resolveStore(join(wtA, ".rex"));
+    const storeB = await resolveStore(join(wtB, ".rex"));
+
+    const started = JSON.parse(
+      (await handleUpdateTaskStatus(storeA, wtA, { id: "t-high", status: "in_progress" }, ctxFor(wtA))).content[0].text,
+    );
+    expect(started.claim, "starting work records the claim").toMatchObject({ worktreeRoot: wtA, pid: process.pid });
+    expect(JSON.parse((await handleGetNextTask(storeB, undefined, ctxFor(wtB))).content[0].text).item.id).toBe("t-low");
+
+    await handleUpdateTaskStatus(
+      storeA, wtA,
+      { id: "t-high", status: "completed", resolutionType: "code-change", resolutionDetail: "done" },
+      ctxFor(wtA),
+    );
+    const claimsLeft = await openClaimsStore(wtA).readClaims();
+    expect(claimsLeft.map((c) => c.taskId), "a finished task must not stay claimed for the TTL").not.toContain("t-high");
+
+    // Put the task back for the next test.
+    await handleUpdateTaskStatus(storeA, wtA, { id: "t-high", status: "pending", force: true }, ctxFor(wtA));
+  });
+
+  it("refuses to start a task another worktree is holding, unless forced", async () => {
+    // A live claim from a different pid AND a different worktree: a claim from
+    // this process would count as ours in either checkout.
+    const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" });
+    children.push(holder);
+    const claimsA = openClaimsStore(wtA);
+    expect((await claimsA.claim("t-high", { worktreeRoot: wtA, pid: holder.pid! })).ok).toBe(true);
+
+    const storeB = await resolveStore(join(wtB, ".rex"));
+    const refused = await handleUpdateTaskStatus(storeB, wtB, { id: "t-high", status: "in_progress" }, ctxFor(wtB));
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0].text).toContain(wtA);
+    expect(refused.content[0].text).toContain(String(holder.pid));
+    expect((await storeB.getItem("t-high"))?.status, "and the status is left alone").not.toBe("in_progress");
+
+    // force is the escape hatch for a run the operator knows is finished.
+    const forced = await handleUpdateTaskStatus(storeB, wtB, { id: "t-high", status: "in_progress", force: true }, ctxFor(wtB));
+    expect(forced.isError).toBeFalsy();
+    expect((await storeB.getItem("t-high"))?.status).toBe("in_progress");
+
+    await claimsA.release("t-high", holder.pid!);
+  });
+
+  it("is a no-op outside a repository — no claims context, no refusal", async () => {
+    const storeA = await resolveStore(join(wtA, ".rex"));
+    const out = await handleUpdateTaskStatus(storeA, wtA, { id: "t-low", status: "in_progress" }, undefined);
+    expect(out.isError).toBeFalsy();
+    expect(JSON.parse(out.content[0].text).claim).toBeUndefined();
   });
 });

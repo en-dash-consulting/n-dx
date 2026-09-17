@@ -1,16 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { MAX_REQUEST_BODY_BYTES } from "./response-utils.js";
+import { isLoopbackOriginOnPort } from "../shared/index.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
 
 function singleHeader(value: string | string[] | undefined): string | undefined {
   return typeof value === "string" ? value : undefined;
-}
-
-function effectivePort(url: URL): number {
-  if (url.port) return Number(url.port);
-  return url.protocol === "http:" ? 80 : 443;
 }
 
 /**
@@ -24,15 +19,7 @@ function effectivePort(url: URL): number {
  * broadcast.
  */
 export function isTrustedBrowserOrigin(origin: string, req: IncomingMessage): boolean {
-  try {
-    const url = new URL(origin);
-    return url.protocol === "http:"
-      && LOOPBACK_HOSTNAMES.has(url.hostname)
-      && req.socket.localPort !== undefined
-      && effectivePort(url) === req.socket.localPort;
-  } catch {
-    return false;
-  }
+  return isLoopbackOriginOnPort(origin, req.socket.localPort);
 }
 
 function setCorsHeaders(res: ServerResponse, origin: string): void {

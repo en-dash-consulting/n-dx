@@ -21,6 +21,25 @@ const PROJECT_BASE_PATTERN = /^\/p\/([^/?#]+)/;
 const WORKSPACE_SLOT_PATTERN = /^\/w\/([^/?#]+)/;
 
 /**
+ * `decodeURIComponent` for a URL segment that came off the wire, which cannot
+ * throw. A malformed escape (`/w/%`, `/p/%ZZ/`) is a `URIError`, and these
+ * helpers run inside request handlers on both servers — an exception there is
+ * an unhandled rejection, which takes the process down. Any request can
+ * contain one, so this is a liveness bug, not a decoding nicety.
+ *
+ * The raw segment is the right fallback: an id that cannot be decoded matches
+ * no registered project and no known workspace, so the caller's existing
+ * "unknown key" path answers 404 with the text the client actually sent.
+ */
+export function safeDecodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
+/**
  * The base path a pathname is served under: `/p/<id>` when the pathname
  * starts with a project prefix, otherwise `""` (served at the root).
  */
@@ -47,7 +66,7 @@ export function detectViewerBasePath(pathname: string): string {
 export function workspaceKeyFromBasePath(basePath: string): string | null {
   const project = detectBasePath(basePath);
   const slot = WORKSPACE_SLOT_PATTERN.exec(project ? basePath.slice(project.length) : basePath);
-  return slot ? decodeURIComponent(slot[1]) : null;
+  return slot ? safeDecodeSegment(slot[1]) : null;
 }
 
 /**
@@ -61,13 +80,13 @@ export function stripWorkspaceSlot(url: string): { key: string | null; url: stri
   if (!slot) return { key: null, url };
   const rest = url.slice(slot[0].length);
   const stripped = rest === "" || rest.startsWith("?") || rest.startsWith("#") ? `/${rest}` : rest;
-  return { key: decodeURIComponent(slot[1]), url: stripped };
+  return { key: safeDecodeSegment(slot[1]), url: stripped };
 }
 
 /** The project id inside a base path, or null for the root base path. */
 export function projectIdFromBasePath(basePath: string): string | null {
   const match = PROJECT_BASE_PATTERN.exec(basePath);
-  return match ? decodeURIComponent(match[1]) : null;
+  return match ? safeDecodeSegment(match[1]) : null;
 }
 
 /**

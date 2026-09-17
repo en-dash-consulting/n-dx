@@ -41,6 +41,7 @@ import {
 import type { HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute } from "./routes.js";
 import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
+import { guardHubRequest, upgradeAllowed } from "./request-guard.js";
 
 export const DEFAULT_HUB_PORT = 3117;
 const LOOPBACK_HOST = "127.0.0.1";
@@ -415,13 +416,34 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
   });
 
   const server: Server = createServer((req: IncomingMessage, res: ServerResponse) => {
-    void handleHubRoute(req, res, hub).then((handled) => {
-      // Everything that is not the hub's own API belongs to a project server:
-      // /p/<id>/… explicitly, or the root alias when one project is registered.
-      if (!handled) void handleProxyRequest(req, res, hub);
-    });
+    // The origin gate is the hub's outer boundary and runs before any routing:
+    // registration spawns a process, and the project servers behind the proxy
+    // see a rewritten Origin, so this is where a browser request is judged.
+    if (guardHubRequest(req, res, hub.listeningPort)) return;
+    void handleHubRoute(req, res, hub)
+      .then((handled) => {
+        // Everything that is not the hub's own API belongs to a project server:
+        // /p/<id>/… explicitly, or the root alias when one project is registered.
+        if (!handled) void handleProxyRequest(req, res, hub);
+      })
+      .catch((err: unknown) => {
+        // A throw here is an unhandled rejection, which ends the hub and every
+        // project server it supervises. Answer 500 instead.
+        console.error("[hub] request failed:", err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        }
+        if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
+      });
   });
-  server.on("upgrade", (req, socket, head) => handleProxyUpgrade(req, socket, head, hub));
+  server.on("upgrade", (req, socket, head) => {
+    if (!upgradeAllowed(req, hub.listeningPort)) {
+      socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    handleProxyUpgrade(req, socket, head, hub);
+  });
 
   const port = await new Promise<number>((resolve, reject) => {
     server.once("error", reject);

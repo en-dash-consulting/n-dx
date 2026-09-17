@@ -109,6 +109,36 @@ export async function collectForeignClaims(
   return { excludeIds: new Set(elsewhere.keys()), skipped };
 }
 
+/** Statuses that mean the caller is done with the task and the claim must go. */
+const CLAIM_RELEASING_STATUSES = new Set(["completed", "cancelled", "deferred", "blocked", "failing", "deleted", "pending"]);
+
+/**
+ * Take the cross-worktree claim on a task, or report who holds it.
+ *
+ * `get_next_task` has always *read* claims — it skips tasks another worktree
+ * is working on — but nothing on the MCP path ever *wrote* one, so two
+ * assistants in two worktrees both saw the same task as free and both picked
+ * it. The claim is written where the caller commits to the work: moving a task
+ * to `in_progress`, or an explicit `claim_task`.
+ *
+ * Returns null when the claim is held (or when there is no claims store,
+ * outside a repository), so callers can treat it as "nothing in the way".
+ */
+export async function acquireClaim(
+  claims: ClaimsContext | undefined,
+  taskId: string,
+): Promise<{ ok: true; claim: TaskClaim | null } | { ok: false; heldBy: TaskClaim }> {
+  if (!claims) return { ok: true, claim: null };
+  const result = await claims.store.claim(taskId, { worktreeRoot: claims.worktreeRoot });
+  return result.ok ? { ok: true, claim: result.claim } : { ok: false, heldBy: result.heldBy };
+}
+
+/** How a held claim reads to the caller that could not take it. */
+export function describeHeldClaim(taskId: string, heldBy: TaskClaim): string {
+  return `Task "${taskId}" is claimed by another worktree: ${heldBy.worktreeRoot} (PID ${heldBy.pid}, expires ${heldBy.expiresAt}). `
+    + `Pick another task, or pass force: true if that run is finished.`;
+}
+
 export async function handleGetNextTask(
   store: PRDStore,
   args?: { tags?: string[] },
@@ -161,6 +191,7 @@ export async function handleUpdateTaskStatus(
   store: PRDStore,
   projectDir: string,
   args: { id: string; status: string; force?: boolean; reason?: string; resolutionType?: string; resolutionDetail?: string },
+  claims?: ClaimsContext,
 ): Promise<McpResult> {
   try {
     const { id, status, force, reason, resolutionType, resolutionDetail } = args;
@@ -176,10 +207,25 @@ export async function handleUpdateTaskStatus(
       }
     }
 
+    // Starting work is where the claim is taken: it is the point the caller
+    // commits to the task, and it is a step the ndx-work flow already
+    // performs. Refuse rather than write a status that contradicts a live
+    // claim held by another worktree — that is the double-pick this prevents.
+    let claimed: TaskClaim | null = null;
+    if (status === "in_progress") {
+      const attempt = await acquireClaim(claims, id);
+      if (!attempt.ok) {
+        if (!force) return textResult(describeHeldClaim(id, attempt.heldBy), true);
+      } else {
+        claimed = attempt.claim;
+      }
+    }
+
     // Handle deletion: remove item and children from tree. The transaction
     // holds the PRD lock across the whole read-modify-write so a concurrent
     // writer's item cannot be clobbered by this full-document save.
     if (status === "deleted") {
+      if (claims) await claims.store.release(id);
       const deletedIds = await store.withTransaction(async (doc) => {
         const ids = deleteItem(doc.items, id);
         cleanBlockedByRefs(doc.items, new Set(ids));
@@ -218,6 +264,10 @@ export async function handleUpdateTaskStatus(
       statusUpdates.resolutionDetail = resolutionDetail;
     }
     await store.updateItem(id, statusUpdates, { applyAttribution: true, projectDir });
+    // The task is no longer being worked here, so the claim must not outlive
+    // the run — otherwise the next worktree to ask is told it is taken for the
+    // rest of the TTL.
+    if (claims && CLAIM_RELEASING_STATUSES.has(status)) await claims.store.release(id);
     await store.appendLog({
       timestamp: new Date().toISOString(),
       event: "status_changed",
@@ -267,9 +317,57 @@ export async function handleUpdateTaskStatus(
         title: existing.title,
         previousStatus: existing.status,
         newStatus: status,
+        ...(claimed ? { claim: { worktreeRoot: claimed.worktreeRoot, pid: claimed.pid, expiresAt: claimed.expiresAt } } : {}),
         ...(autoCompleted.length > 0 ? { autoCompleted } : {}),
       }),
     );
+  } catch (err) {
+    return textResult(`Error: ${(err as Error).message}`, true);
+  }
+}
+
+/**
+ * `claim_task` — hold a task for this worktree before the work starts.
+ *
+ * `update_task_status` claims on `in_progress`, but a session selects a task,
+ * plans it and only then starts: without this, that window is exactly when the
+ * other worktree picks the same task. Claiming at selection closes it.
+ */
+export async function handleClaimTask(
+  store: PRDStore,
+  args: { id: string },
+  claims?: ClaimsContext,
+): Promise<McpResult> {
+  try {
+    const existing = await store.getItem(args.id);
+    if (!existing) {
+      return textResult(`Item "${args.id}" not found. Use get_prd_status to see available items.`, true);
+    }
+    if (!claims) {
+      return textResult(JSON.stringify({ id: args.id, claimed: false, reason: "not a git repository — claims are a no-op here" }));
+    }
+    const attempt = await acquireClaim(claims, args.id);
+    if (!attempt.ok) return textResult(describeHeldClaim(args.id, attempt.heldBy), true);
+    return textResult(JSON.stringify({
+      id: args.id,
+      title: existing.title,
+      claimed: true,
+      worktreeRoot: attempt.claim?.worktreeRoot ?? claims.worktreeRoot,
+      expiresAt: attempt.claim?.expiresAt ?? null,
+    }));
+  } catch (err) {
+    return textResult(`Error: ${(err as Error).message}`, true);
+  }
+}
+
+/** `release_task` — give a claim back without moving the task's status. */
+export async function handleReleaseTask(
+  args: { id: string },
+  claims?: ClaimsContext,
+): Promise<McpResult> {
+  try {
+    const released = claims ? await claims.store.release(args.id) : false;
+    return textResult(JSON.stringify({ id: args.id, released }));
   } catch (err) {
     return textResult(`Error: ${(err as Error).message}`, true);
   }

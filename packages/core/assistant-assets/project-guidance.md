@@ -89,7 +89,9 @@ Rex and sourcevision expose MCP servers over stdio (default) and HTTP (`ndx star
 Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files are produced by MCP write operations.
 
 - `get_prd_status` — PRD title, overall stats, and per-epic stats
-- `get_next_task` — next actionable task based on priority and dependencies
+- `get_next_task` — next actionable task based on priority and dependencies (skips tasks another worktree has claimed)
+- `claim_task` — hold a task for this worktree so other worktrees skip it
+- `release_task` — give back a claim without changing the task's status
 - `update_task_status` — update item status
 - `add_item` — add epic/feature/task/subtask
 - `edit_item` — edit item content (title, description, priority, tags)

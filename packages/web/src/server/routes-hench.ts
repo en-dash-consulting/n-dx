@@ -50,6 +50,7 @@ import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import {
   CONFIG_FIELD_META,
   validateFieldValue,
+  validateConfigKeyValue,
   getConfigValue as getNestedValue,
   setConfigValue as setNestedValue,
 } from "./hench-config-fields.js";
@@ -945,6 +946,48 @@ function findTemplate(projectDir: string, id: string): WorkflowTemplateData | nu
   return user.find((t) => t.id === id) ?? null;
 }
 
+/**
+ * Every writable key/value pair a template overlay would set, flattened to the
+ * dotted paths the config gate speaks (`retry.maxRetries`, `guard.blockedPaths`).
+ *
+ * `guard` and `retry` are merged a level down by {@link mergeTemplateConfig},
+ * so their members are validated individually; everything else is a top-level
+ * assignment.
+ */
+function flattenTemplateOverlay(overlay: Record<string, unknown>): Array<[string, unknown]> {
+  const pairs: Array<[string, unknown]> = [];
+  for (const [key, value] of Object.entries(overlay)) {
+    if ((key === "guard" || key === "retry") && value && typeof value === "object" && !Array.isArray(value)) {
+      for (const [inner, innerValue] of Object.entries(value as Record<string, unknown>)) {
+        pairs.push([`${key}.${inner}`, innerValue]);
+      }
+      continue;
+    }
+    pairs.push([key, value]);
+  }
+  return pairs;
+}
+
+/**
+ * Refuse a template overlay that would write a config field the dashboard may
+ * not write. Returns the first problem, or null.
+ *
+ * Templates are the fourth path into `.hench/config.json`, after the config
+ * editor, the adaptive routes and the workflow apply — and the only one that
+ * used to skip the gate those three share. `POST /api/hench/templates` takes
+ * `config` verbatim from the request body and `…/apply` merges it into the
+ * file, so an unvalidated overlay could invent `permissionMode`, reshape
+ * `guard.allowedCommands`, or walk `__proto__` — precisely the three threats
+ * `hench-config-fields.ts` names — and the next autonomous run inherited it.
+ */
+export function validateTemplateOverlay(overlay: Record<string, unknown>): string | null {
+  for (const [key, value] of flattenTemplateOverlay(overlay)) {
+    const problem = validateConfigKeyValue(key, value);
+    if (problem) return problem;
+  }
+  return null;
+}
+
 /** Apply a template config overlay to a config object. */
 function mergeTemplateConfig(
   config: Record<string, unknown>,
@@ -1017,13 +1060,24 @@ async function handleTemplateCreate(
     return true;
   }
 
+  const overlay = (body.config as Record<string, unknown>) || {};
+  if (!overlay || typeof overlay !== "object" || Array.isArray(overlay)) {
+    errorResponse(res, 400, "Template config must be an object");
+    return true;
+  }
+  const overlayProblem = validateTemplateOverlay(overlay);
+  if (overlayProblem) {
+    errorResponse(res, 400, overlayProblem);
+    return true;
+  }
+
   const template: WorkflowTemplateData = {
     id,
     name: (body.name as string) || id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
     description: (body.description as string) || "User-defined workflow template",
     useCases: Array.isArray(body.useCases) ? body.useCases as string[] : [],
     tags: Array.isArray(body.tags) ? body.tags as string[] : [],
-    config: (body.config as Record<string, unknown>) || {},
+    config: overlay,
     builtIn: false,
     createdAt: new Date().toISOString(),
   };
@@ -1058,6 +1112,15 @@ function handleTemplateApply(
   const template = findTemplate(ctx.projectDir, id);
   if (!template) {
     errorResponse(res, 404, `Template "${id}" not found`);
+    return true;
+  }
+
+  // Re-validated on the way out, not just on the way in: `.hench/templates.json`
+  // is a file, and one written before this gate existed (or by hand) must not
+  // become a config write just because it is already stored.
+  const overlayProblem = validateTemplateOverlay(template.config);
+  if (overlayProblem) {
+    errorResponse(res, 400, `Template "${id}" cannot be applied: ${overlayProblem}`);
     return true;
   }
 

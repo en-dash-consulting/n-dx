@@ -35,6 +35,7 @@ import { realpathSync } from "node:fs";
 import { basename, join } from "node:path";
 import { listWorktrees as defaultListWorktrees } from "@n-dx/llm-client";
 import type { GitWorktree } from "@n-dx/llm-client";
+import { safeDecodeSegment } from "../shared/index.js";
 import type { ServerContext } from "./types.js";
 import type { createDataWatcher } from "./routes-data.js";
 
@@ -290,6 +291,23 @@ export class WorkspaceRegistry {
   }
 
   /**
+   * The workspace named by the `X-Ndx-Workspace` header, or null when the
+   * header is absent or names no known worktree.
+   *
+   * Split out from {@link resolveWorkspace} because the header outranks the
+   * `/w/<key>/` slot and the dispatcher has to know *which* of the two
+   * answered: the Workspaces board is served under its own slot and addresses
+   * every other worktree by header, so a slot-first dispatcher sends its
+   * Start/Stop to the worktree the page happens to be mounted on.
+   */
+  workspaceFromHeader(req: Pick<IncomingMessage, "headers">): Workspace | null {
+    const header = req.headers[WORKSPACE_HEADER];
+    const raw = (Array.isArray(header) ? header[0] : header)?.trim();
+    if (!raw) return null;
+    return this.get(raw) ?? null;
+  }
+
+  /**
    * The workspace a request addresses: the `X-Ndx-Workspace` header, else the
    * `/w/<key>/` slot, else the anchor. An unknown key also falls back to the
    * anchor rather than failing — a stale tab must not 404 its whole dashboard.
@@ -298,7 +316,7 @@ export class WorkspaceRegistry {
     const header = req.headers[WORKSPACE_HEADER];
     const fromHeader = Array.isArray(header) ? header[0] : header;
     const fromSlot = WORKSPACE_SLOT_PATTERN.exec(req.url || "/")?.[1];
-    const key = fromHeader?.trim() || (fromSlot ? decodeURIComponent(fromSlot) : "");
+    const key = fromHeader?.trim() || (fromSlot ? safeDecodeSegment(fromSlot) : "");
     if (!key) return this.anchor;
     return this.get(key) ?? this.anchor;
   }

@@ -318,8 +318,15 @@ export const BROADCAST_ALL_WORKSPACES = "*";
  * (see messaging/ws-pipeline.ts). Untagged frames are read as the anchor's,
  * which is what an older server would have meant.
  */
-export function tagBroadcaster(broadcast: WebSocketBroadcaster, workspace: string): WebSocketBroadcaster {
+export function tagBroadcaster(broadcast: WebSocketBroadcaster, workspace: string | null): WebSocketBroadcaster {
   return (data: unknown) => {
+    // null is the anchor, and the anchor's frames go out untagged: that is what
+    // an anchor viewer (workspace key null) accepts and what the Workspaces
+    // board reads as the anchor card's.
+    if (workspace === null) {
+      broadcast(data);
+      return;
+    }
     if (data && typeof data === "object" && !Array.isArray(data) && !("workspace" in data)) {
       broadcast({ ...(data as Record<string, unknown>), workspace });
       return;

@@ -209,9 +209,10 @@ export async function findRelocationPort(
  *
  * @param {number} port
  * @param {number} [timeoutMs]
+ * @param {string} [path]  Endpoint to probe. Default `/api/status`.
  * @returns {Promise<unknown>} Parsed body, or null.
  */
-export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS) {
+export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS, path = "/api/status") {
   return new Promise((res) => {
     let settled = false;
     const done = (value) => {
@@ -221,7 +222,7 @@ export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS) {
     };
 
     const req = httpGet(
-      { host: "127.0.0.1", port, path: "/api/status", timeout: timeoutMs },
+      { host: "127.0.0.1", port, path, timeout: timeoutMs },
       (response) => {
         if (response.statusCode !== 200) {
           response.resume();
@@ -325,6 +326,35 @@ export function classifyPortOccupant(payload, absDir) {
   return resolved === canonicalizePath(absDir)
     ? { kind: "self", projectDir: resolved }
     : { kind: "peer", projectDir: resolved };
+}
+
+/**
+ * Is the n-dx hub listening on `port`?
+ *
+ * The hub must never be killed to free a port. It is a per-user daemon
+ * supervising one server per registered project, so SIGKILLing it to make room
+ * for a single-project `ndx start --here` orphans every child it was running —
+ * other repositories, other worktrees, none of them this invocation's business.
+ *
+ * `/api/status` cannot answer this. With one project registered the hub
+ * *aliases* the root to that project, so the status probe returns that
+ * project's payload and the hub reads as an ordinary dashboard (`self` when it
+ * happens to serve this directory — straight into the kill path); with several
+ * registered, root requests answer 409 and it reads as `unknown`, which is the
+ * kill path too. `/api/hub/health` is the hub's own endpoint and no project
+ * server answers it.
+ *
+ * @param {number} port
+ * @returns {Promise<{pid: number, projects: number} | null>} Hub identity, or null.
+ */
+export async function probeHubEndpoint(port) {
+  const payload = await probeStatusEndpoint(port, PROBE_TIMEOUT_MS, "/api/hub/health");
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  // Shape check against hub/routes.ts `/health`: `registryPath` is the field
+  // no project server has, so an unrelated `ok: true` service is not a hub.
+  if (payload.ok !== true || typeof payload.registryPath !== "string") return null;
+  if (typeof payload.pid !== "number") return null;
+  return { pid: payload.pid, projects: typeof payload.projects === "number" ? payload.projects : 0 };
 }
 
 /**
@@ -1369,22 +1399,38 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       // knows about servers started for THIS directory, so a second project or
       // worktree used to look like a stranger squatting on 3117 and got
       // SIGKILLed — taking a working dashboard down with it.
-      const occupant = classifyPortOccupant(await probeStatusEndpoint(port), absDir);
+      //
+      // The hub is asked about first and is never killed: it supervises other
+      // projects' servers, and it is the default occupant of 3117 now, so a
+      // `--here` run that cleared the port would take unrelated dashboards with
+      // it. Relocating is the same answer as for a peer.
+      const hub = await probeHubEndpoint(port);
+      const occupant = hub ? null : classifyPortOccupant(await probeStatusEndpoint(port), absDir);
 
-      if (occupant.kind === "peer") {
+      // Two occupants must be left alone, and the answer for both is to move:
+      // the hub, which supervises other projects' servers, and a peer
+      // dashboard serving a different directory.
+      const leaveAlone = hub
+        ? `The n-dx hub (PID ${hub.pid}) is on :${port} serving ${hub.projects} project(s)`
+        : occupant.kind === "peer"
+          ? `n-dx dashboard for ${occupant.projectDir} is already on :${port}`
+          : null;
+
+      if (leaveAlone) {
         const next = await findRelocationPort(port);
         if (next === null) {
           console.error(
-            `n-dx dashboard for ${occupant.projectDir} is already on :${port}, and no port near it or in ` +
+            `${leaveAlone}, and no port near it or in ` +
             `${PORT_RANGE_START}–${PORT_RANGE_END} is free. Choose one with --port=N or set web.port in .n-dx.json`,
           );
           return 1;
         }
-        log(`n-dx dashboard for ${occupant.projectDir} is already on :${port}; starting this one on :${next}`);
+        log(`${leaveAlone}; starting this one on :${next}`);
         port = next;
       } else {
-        // Not identifiable as a peer — either a stranger, or this directory's
-        // own untracked server, which `ndx start` restarts by contract.
+        // Not identifiable as the hub or a peer — either a stranger, or this
+        // directory's own untracked server, which `ndx start` restarts by
+        // contract.
         log(`Port ${port} is in use by another process — clearing it…`);
         const freed = await killPortOccupant(port);
         if (!freed) {

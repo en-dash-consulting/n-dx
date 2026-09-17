@@ -99,7 +99,9 @@ Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes 
 | Tool | Description |
 |------|-------------|
 | `get_prd_status` | PRD title, overall stats, and per-epic stats |
-| `get_next_task` | Next actionable task based on priority and dependencies |
+| `get_next_task` | Next actionable task based on priority and dependencies (skips tasks claimed by another worktree) |
+| `claim_task` | Hold a task for this worktree so other worktrees skip it |
+| `release_task` | Give back a claim without changing the task's status |
 | `update_task_status` | Update item status |
 | `add_item` | Add epic/feature/task/subtask |
 | `edit_item` | Edit item content (title, description, priority, tags) |

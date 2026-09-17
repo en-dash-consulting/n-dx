@@ -18,6 +18,7 @@ import { createWorkspaceHooks } from "../../src/server/start.js";
 import { WorkspaceRegistry } from "../../src/server/workspaces.js";
 import { PRD_CACHE_DIR, PRD_CACHE_JSON } from "../../src/server/prd-io.js";
 import type { createWebSocketManager } from "../../src/server/websocket.js";
+import { frameIsForWorkspace } from "../../src/viewer/messaging/ws-pipeline.js";
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync(
@@ -106,6 +107,36 @@ describe("workspace registry with two worktrees", () => {
     );
     expect(broadcast).not.toHaveBeenCalledWith(expect.objectContaining({ type: "rex:prd-changed", workspace: "app" }));
     expect(cachedTitle(repo)).toBe("A");
+  });
+
+  /**
+   * The anchor's viewer is served at `/`, with no `/w/<key>/` slot, so its own
+   * workspace key is null — and `frameIsForWorkspace` accepts an untagged
+   * frame only for that viewer. Tagging the anchor's frames with its directory
+   * basename therefore silenced the plain single-worktree dashboard: every
+   * live update it was sent, it dropped.
+   */
+  it("the anchor's frames are untagged, and its viewer accepts them", async () => {
+    broadcast.mockClear();
+    writeFileSync(join(repo, ".rex", "prd.md"), prdMd("A-edited"));
+
+    await vi.waitFor(() => expect(cachedTitle(repo)).toBe("A-edited"), { timeout: 5_000, interval: 50 });
+    const frame = await vi.waitFor(() => {
+      const call = broadcast.mock.calls
+        .map(([value]) => value as Record<string, unknown>)
+        .find((value) => value?.type === "rex:prd-changed");
+      expect(call, "no rex:prd-changed frame for the anchor").toBeDefined();
+      return call!;
+    }, { timeout: 5_000, interval: 50 });
+
+    expect(frame).not.toHaveProperty("workspace");
+    expect(frameIsForWorkspace(frame, null), "the anchor viewer accepts it").toBe(true);
+    expect(frameIsForWorkspace(frame, "app-feature"), "B's viewer does not").toBe(false);
+
+    // Put the anchor's PRD back: the cache assertions in the test below are
+    // about this same live registry.
+    writeFileSync(join(repo, ".rex", "prd.md"), prdMd("A"));
+    await vi.waitFor(() => expect(cachedTitle(repo)).toBe("A"), { timeout: 5_000, interval: 50 });
   });
 
   it("closeAll removes B's cache and watchers but keeps the anchor's", () => {

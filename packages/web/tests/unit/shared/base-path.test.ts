@@ -8,6 +8,9 @@ import {
   webSocketUrl,
   withBasePath,
   workspaceKeyFromBasePath,
+  safeDecodeSegment,
+  isLoopbackOriginOnPort,
+  loopbackOrigin,
 } from "../../../src/shared/index.js";
 
 describe("base-path", () => {
@@ -98,5 +101,53 @@ describe("workspace slot", () => {
     const base = detectViewerBasePath("/p/app/w/feature/hench-runs/run-1");
     expect(withBasePath(base, "/api/hench/runs")).toBe("/p/app/w/feature/api/hench/runs");
     expect(stripBasePath(base, "/p/app/w/feature/hench-runs/run-1")).toBe("/hench-runs/run-1");
+  });
+});
+
+/**
+ * A malformed percent-escape is a `URIError`, and these helpers run inside the
+ * request handlers of both servers — where a throw is an unhandled rejection
+ * that ends the process. `/w/%/` took the project server down and `/p/%ZZ/`
+ * the hub daemon, along with every project server it supervised.
+ */
+describe("malformed percent-escapes", () => {
+  it("decode a bad escape to the raw segment instead of throwing", () => {
+    expect(safeDecodeSegment("%")).toBe("%");
+    expect(safeDecodeSegment("%ZZ")).toBe("%ZZ");
+    expect(safeDecodeSegment("app%2Dfeature")).toBe("app-feature");
+    expect(safeDecodeSegment("plain")).toBe("plain");
+  });
+
+  it("the path helpers survive one, and report the raw key", () => {
+    expect(() => stripWorkspaceSlot("/w/%/api/status")).not.toThrow();
+    expect(stripWorkspaceSlot("/w/%/api/status")).toEqual({ key: "%", url: "/api/status" });
+    expect(workspaceKeyFromBasePath("/w/%ZZ")).toBe("%ZZ");
+    expect(projectIdFromBasePath("/p/%ZZ")).toBe("%ZZ");
+    // No worktree and no project is named that, so the caller's existing
+    // unknown-key path answers — which is a 404, not a dead server.
+  });
+});
+
+describe("loopback origin trust", () => {
+  it("accepts plain-HTTP loopback on the given port and nothing else", () => {
+    expect(isLoopbackOriginOnPort("http://localhost:3117", 3117)).toBe(true);
+    expect(isLoopbackOriginOnPort("http://127.0.0.1:3117", 3117)).toBe(true);
+    expect(isLoopbackOriginOnPort("http://localhost:3118", 3117)).toBe(false);
+    expect(isLoopbackOriginOnPort("https://localhost:3117", 3117)).toBe(false);
+    expect(isLoopbackOriginOnPort("http://evil.test", 3117)).toBe(false);
+    // A DNS-rebinding origin resolving to loopback still fails: the hostname
+    // is compared, not what it resolves to.
+    expect(isLoopbackOriginOnPort("http://rebind.example:3117", 3117)).toBe(false);
+    expect(isLoopbackOriginOnPort("null", 3117)).toBe(false);
+    expect(isLoopbackOriginOnPort("http://localhost:3117", undefined)).toBe(false);
+  });
+
+  it("states a server's own origin in the form it accepts", () => {
+    expect(isLoopbackOriginOnPort(loopbackOrigin(54321), 54321)).toBe(true);
+  });
+
+  it("defaults the port when the origin omits one", () => {
+    expect(isLoopbackOriginOnPort("http://localhost", 80)).toBe(true);
+    expect(isLoopbackOriginOnPort("http://localhost", 3117)).toBe(false);
   });
 });

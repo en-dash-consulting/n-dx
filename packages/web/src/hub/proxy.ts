@@ -30,7 +30,7 @@ import { connect } from "node:net";
 import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { Duplex } from "node:stream";
-import { detectBasePath, projectIdFromBasePath, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
+import { detectBasePath, loopbackOrigin, projectIdFromBasePath, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 import { buildHubOverview } from "./overview.js";
 import { renderHomePage } from "./home.js";
@@ -238,6 +238,14 @@ export function proxyHttp(
 ): void {
   const headers: OutgoingHttpHeaders = { ...req.headers, host: `${UPSTREAM_HOST}:${port}` };
   if (prefix) headers[FORWARDED_PREFIX_HEADER] = prefix;
+  // The browser's Origin names the HUB's port, and the child compares Origin
+  // against its own ephemeral one — so a verbatim forward made the child read
+  // every dashboard mutation as cross-origin and answer 403. The origin has
+  // already been judged at the hub's boundary (request-guard.ts), so what
+  // reaches here is either trusted or absent; restate a trusted one as the
+  // child's own origin, which is what it is once the proxy hop is accounted
+  // for. Absent stays absent: a CLI request must not acquire one here.
+  if (headers.origin !== undefined) headers.origin = loopbackOrigin(port);
   if (body) {
     headers["content-length"] = String(body.length);
     delete headers["transfer-encoding"];
@@ -297,7 +305,16 @@ export function proxyUpgrade(
     for (let i = 0; i + 1 < raw.length; i += 2) {
       const name = raw[i];
       const value = raw[i + 1];
-      lines.push(name.toLowerCase() === "host" ? `Host: ${UPSTREAM_HOST}:${port}` : `${name}: ${value}`);
+      const lower = name.toLowerCase();
+      if (lower === "host") {
+        lines.push(`Host: ${UPSTREAM_HOST}:${port}`);
+      } else if (lower === "origin") {
+        // Same restatement as proxyHttp: the child's origin check is against
+        // its own port, and the handshake carries no preflight to fall back on.
+        lines.push(`Origin: ${loopbackOrigin(port)}`);
+      } else {
+        lines.push(`${name}: ${value}`);
+      }
     }
     if (prefix) lines.push(`X-Forwarded-Prefix: ${prefix}`);
     upstream.write(`${lines.join("\r\n")}\r\n\r\n`);

@@ -21,6 +21,7 @@ import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { safeDecodeSegment } from "../shared/index.js";
 import {
   validateConfigKeyValue,
   getConfigValue as getNestedValue,
@@ -570,7 +571,7 @@ export function handleAdaptiveRoute(
   // POST /api/hench/adaptive/lock/:key — lock a config key
   const lockMatch = path.match(/^lock\/(.+)$/);
   if (lockMatch && method === "POST") {
-    const key = decodeURIComponent(lockMatch[1]);
+    const key = safeDecodeSegment(lockMatch[1]);
     const state = loadAdaptiveState(ctx.projectDir);
     if (!state.settings.lockedKeys.includes(key)) {
       state.settings.lockedKeys.push(key);
@@ -583,7 +584,7 @@ export function handleAdaptiveRoute(
   // POST /api/hench/adaptive/unlock/:key — unlock a config key
   const unlockMatch = path.match(/^unlock\/(.+)$/);
   if (unlockMatch && method === "POST") {
-    const key = decodeURIComponent(unlockMatch[1]);
+    const key = safeDecodeSegment(unlockMatch[1]);
     const state = loadAdaptiveState(ctx.projectDir);
     state.settings.lockedKeys = state.settings.lockedKeys.filter((k) => k !== key);
     saveAdaptiveState(ctx.projectDir, state);
@@ -599,7 +600,7 @@ export function handleAdaptiveRoute(
   // DELETE /api/hench/adaptive/override/:key — remove a manual override
   const overrideMatch = path.match(/^override\/(.+)$/);
   if (overrideMatch && method === "DELETE") {
-    const key = decodeURIComponent(overrideMatch[1]);
+    const key = safeDecodeSegment(overrideMatch[1]);
     const state = loadAdaptiveState(ctx.projectDir);
     delete state.overrides[key];
     state.settings.lockedKeys = state.settings.lockedKeys.filter((k) => k !== key);

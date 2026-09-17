@@ -264,12 +264,25 @@ interface Broadcasting {
 }
 
 /**
- * The workspace tag for frames about `ctx`. The anchor's context predates the
- * registry (which copies it with `workspace` set), so it falls back to the
- * key the registry gives the anchor: its directory's basename.
+ * The workspace tag for frames about `ctx`, or null to leave them untagged.
+ *
+ * Untagged means the anchor, on both sides of the wire: `frameIsForWorkspace`
+ * accepts an untagged frame only for a viewer whose own key is null, and the
+ * Workspaces board attributes one to the anchor card. The anchor viewer is
+ * served at `/` with no `/w/<key>/` slot, so its key *is* null — tagging the
+ * anchor's frames with its directory basename made every one of them fail
+ * that test, and the plain single-worktree dashboard stopped updating live.
+ *
+ * `ctx.workspace` is set by the registry when it copies the anchor context
+ * for a worktree; the anchor's own context never has it.
  */
-function workspaceTagOf(ctx: ServerContext): string {
-  return ctx.workspace ?? basename(ctx.projectDir);
+function workspaceTagOf(ctx: ServerContext): string | null {
+  return ctx.workspace ?? null;
+}
+
+/** The same rule for a resolved workspace: the anchor's frames carry no tag. */
+function frameTagOf(workspace: { key: string; isAnchor: boolean }): string | null {
+  return workspace.isAnchor ? null : workspace.key;
 }
 
 /**
@@ -511,10 +524,14 @@ function registerWatchers(
 function reregisterProjectWatchers(
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,
-  wsManager: Broadcasting,
+  ws: Broadcasting,
   handles: WatcherHandles,
 ): void {
-  const ws: Broadcasting = { broadcast: tagBroadcaster(wsManager.broadcast, workspaceTagOf(ctx)) };
+  // `ws` arrives already tagged for the request's workspace — the dispatcher
+  // decided that from the resolved workspace, which is the only place that
+  // knows whether it is the anchor. Re-deriving the tag from `ctx` here would
+  // stamp the anchor's frames with its key, and an anchor viewer (whose own
+  // key is null) drops those.
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
   if (sv) handles.watchers.push(sv);
   for (const w of registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws)) {
@@ -704,7 +721,7 @@ async function handleApiRoutes(
   if (await handleScopedRoute(true, () => handleCommandsRoute(req, res, ctx, broadcast, {
     onProjectInitialized: () => {
       clearStatusCache();
-      reregisterProjectWatchers(ctx, watcher, ws, watcherHandles);
+      reregisterProjectWatchers(ctx, watcher, { broadcast }, watcherHandles);
     },
   }))) return true;
   // Ask must be dispatched before the general sourcevision route so
@@ -731,7 +748,13 @@ function escapeHtml(text: string): string {
 
 /** 404 for a `/w/<key>/` that names no known worktree, linking back to the anchor. */
 function respondUnknownWorkspace(res: ServerResponse, key: string, registry: WorkspaceRegistry): void {
-  const known = registry.list().map((w) => `<li><a href="/w/${encodeURIComponent(w.key)}/">${escapeHtml(w.key)}</a>${w.isAnchor ? " (anchor)" : ""}</li>`).join("");
+  // The anchor is listed as `/`, not `/w/<its key>/`: that is the address the
+  // viewer builds for it (workspaceViewUrl) and the one whose workspace key is
+  // null, which is what makes its untagged frames arrive.
+  const known = registry.list().map((w) => {
+    const href = w.isAnchor ? "/" : `/w/${encodeURIComponent(w.key)}/`;
+    return `<li><a href="${href}">${escapeHtml(w.key)}</a>${w.isAnchor ? " (anchor)" : ""}</li>`;
+  }).join("");
   const html =
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Unknown workspace</title></head><body>` +
     `<h1>No workspace named &ldquo;${escapeHtml(key)}&rdquo;</h1>` +
@@ -748,33 +771,57 @@ function createHttpServer(
   wsHealthTracker: WsHealthTracker,
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    if (handleRequestSecurity(req, res)) return;
-    // Request-scoped context. A leading /w/<key>/ names a worktree: strip it
-    // so every route below sees root-relative paths, and refuse an unknown key
-    // with a page that points back at the anchor rather than serving the wrong
-    // tree. Without a slot the X-Ndx-Workspace header may name one; otherwise
-    // the request is the anchor's, exactly as before.
-    const slot = stripWorkspaceSlot(req.url || "/");
-    let workspace;
-    if (slot.key !== null) {
-      const named = registry.get(slot.key);
-      if (!named) {
-        respondUnknownWorkspace(res, slot.key, registry);
-        return;
+    try {
+      if (handleRequestSecurity(req, res)) return;
+      // Request-scoped context. Two things can name a worktree and they do not
+      // rank equally: `X-Ndx-Workspace` wins over a leading `/w/<key>/`.
+      //
+      // The slot says where the *page* is mounted, and the viewer prefixes
+      // every root-relative fetch with it. The header says which worktree this
+      // one request is about, which is how the Workspaces board — itself
+      // served under some slot — starts and stops runs in the others. Reading
+      // the slot first made every such action land on the board's own
+      // worktree; `resolveWorkspace` has documented header-first since it was
+      // written, and the dispatcher was the half that disagreed.
+      //
+      // The slot is stripped from the URL whichever one wins, so routes below
+      // always see root-relative paths; an unknown slot key is still refused
+      // with a page pointing back at the anchor rather than serving the wrong
+      // tree, but only when no header answered.
+      const slot = stripWorkspaceSlot(req.url || "/");
+      const fromHeader = registry.workspaceFromHeader(req);
+      let workspace;
+      if (fromHeader) {
+        workspace = fromHeader;
+      } else if (slot.key !== null) {
+        const named = registry.get(slot.key);
+        if (!named) {
+          respondUnknownWorkspace(res, slot.key, registry);
+          return;
+        }
+        workspace = named;
+      } else {
+        workspace = registry.resolveWorkspace(req);
       }
-      workspace = named;
-      req.url = slot.url;
-    } else {
-      workspace = registry.resolveWorkspace(req);
+      if (slot.key !== null) req.url = slot.url;
+      const { ctx, watcher, handles: watcherHandles } = workspace;
+      // Frames this request causes are about its workspace.
+      const broadcast = tagBroadcaster(ws.broadcast, frameTagOf(workspace));
+      if (handleConfigEndpoint(req, res, ctx)) return;
+      if (handleReloadSignalEndpoint(req, res, ws, broadcast)) return;
+      if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles, registry, broadcast)) return;
+      res.writeHead(404);
+      res.end("Not found");
+    } catch (err) {
+      // An async request handler that throws is an unhandled rejection, and
+      // node's default is to take the process down — one malformed request
+      // would stop the dashboard for every worktree. Answer 500 instead.
+      console.error("[server] request failed:", err);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      }
+      if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
     }
-    const { ctx, watcher, handles: watcherHandles } = workspace;
-    // Frames this request causes are about its workspace.
-    const broadcast = tagBroadcaster(ws.broadcast, workspace.key);
-    if (handleConfigEndpoint(req, res, ctx)) return;
-    if (handleReloadSignalEndpoint(req, res, ws, broadcast)) return;
-    if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles, registry, broadcast)) return;
-    res.writeHead(404);
-    res.end("Not found");
   });
 
   server.on("upgrade", (req, socket, head) => {
