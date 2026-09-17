@@ -168,6 +168,42 @@ describe("ndx export", () => {
   });
 
   describe("output directory hygiene", () => {
+    it("says so when it adds the entry, rather than editing .gitignore silently", () => {
+      const result = ndx(["export", "--deploy=github", "--yes", dir], dir);
+      expect(result.stdout).toContain("added ndx-export/ to .gitignore");
+    });
+
+    it("leaves a git-tracked out-dir alone, and says why", async () => {
+      // `--out-dir=docs/site` feeding someone's own Pages pipeline: a
+      // directory they commit on purpose. Ignoring it would not untrack what
+      // is there, only hide everything written afterwards.
+      await mkdir(join(dir, "docs", "site"), { recursive: true });
+      await writeFile(join(dir, "docs", "site", "index.html"), "<!doctype html>\n");
+      execFileSync("git", ["add", "docs/site/index.html"], { cwd: dir, stdio: "pipe" });
+      execFileSync(
+        "git",
+        ["-c", "user.email=t@example.com", "-c", "user.name=T", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "site"],
+        { cwd: dir, stdio: "pipe" },
+      );
+
+      const result = ndx(["export", "--out-dir=docs/site", "--deploy=github", "--yes", dir], dir);
+      expect(result.stdout).toContain("docs/site is git-tracked — not adding it to .gitignore");
+      expect(result.stdout).not.toContain("added docs/site/ to .gitignore");
+
+      const ignore = await readFile(join(dir, ".gitignore"), "utf-8").catch(() => "");
+      expect(ignore.split("\n")).not.toContain("docs/site/");
+    });
+
+    it("gitignores an untracked out-dir the user chose", async () => {
+      // The same flag, on a directory git knows nothing about: ignoring it is
+      // right, and is still announced.
+      const result = ndx(["export", "--out-dir=build/preview", "--deploy=github", "--yes", dir], dir);
+      expect(result.stdout).toContain("added build/preview/ to .gitignore");
+
+      const ignore = await readFile(join(dir, ".gitignore"), "utf-8").catch(() => "");
+      expect(ignore.split("\n")).toContain("build/preview/");
+    });
+
     it("gitignores the default out-dir when export runs inside the project", async () => {
       // Even a run that stops at the gate must not leave `ndx-export/`
       // committable — the gitignore entry is written before any output is.

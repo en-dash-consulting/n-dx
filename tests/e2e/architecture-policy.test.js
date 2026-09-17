@@ -59,6 +59,10 @@ const ALLOWED = new Set([
   "packages/core/export.js",
   "packages/core/pair-programming.js",
   "packages/core/win-spawn.js",
+  // `git ls-files` — whether a path is already tracked is what decides
+  // whether adding an ignore line for it is right, so the question lives
+  // beside the writer rather than in a caller.
+  "packages/core/gitignore.js",
   "pr-check.js",
   // Development scripts
   "packages/web/dev.js",

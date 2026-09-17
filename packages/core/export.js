@@ -25,7 +25,7 @@ import { fileURLToPath, pathToFileURL } from "url";
 // quoteWindowsToken/ArgvQuote rules and also handles `rex` being a .cmd shim.
 import { execFileSyncCli } from "./win-spawn.js";
 import { buildCommitMessage } from "./commit-trailers.js";
-import { ensureGitignoreEntry } from "./gitignore.js";
+import { ensureGitignoreEntry, isGitTracked } from "./gitignore.js";
 import { createInterface } from "node:readline/promises";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -452,9 +452,22 @@ export async function runExport(args) {
   // inside the project, ignore it so a later `git add -A` cannot commit a
   // second copy. Done before the deploy gate so even a declined deploy leaves
   // the entry behind.
+  //
+  // Unless the directory is already tracked. `--out-dir=docs/site` feeding
+  // someone's own Pages pipeline is a directory they commit on purpose:
+  // ignoring it would not untrack what is there, it would only hide every
+  // file written afterwards from `git status` — and the write was silent, so
+  // nothing would have said why. Either way the decision is now printed,
+  // which is what `ensureGitignoreEntry` returns a boolean for.
   const outRel = relative(dir, outDir);
   if (outRel && !outRel.startsWith("..") && !isAbsolute(outRel)) {
-    ensureGitignoreEntry(dir, outRel.split(/[\\/]/).join("/").replace(/\/?$/, "/"));
+    const posixRel = outRel.split(/[\\/]/).join("/");
+    const entry = posixRel.replace(/\/?$/, "/");
+    if (isGitTracked(posixRel, dir)) {
+      console.log(`[export] ${posixRel} is git-tracked — not adding it to .gitignore`);
+    } else if (ensureGitignoreEntry(dir, entry)) {
+      console.log(`[export] added ${entry} to .gitignore`);
+    }
   }
 
   // ── Deploy confirmation gate ────────────────────────────────────────────

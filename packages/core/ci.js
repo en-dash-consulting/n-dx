@@ -24,6 +24,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
 import { findSharedSecrets, LOCAL_CONFIG_FILE } from "./config.js";
+import { isGitTracked } from "./gitignore.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -1176,27 +1177,6 @@ const ARCHITECTURE_SOURCE_FILES = ["CLAUDE.md", "gateway-rules.json", "PACKAGE_G
  * or orchestration scripts should trigger guide doc review.
  */
 const GUIDE_SOURCE_FILES = ["cli.js", "help.js", "CLAUDE.md"];
-
-/**
- * Is `relPath` tracked by git in `cwd`? False outside a repo or without git.
- *
- * @param {string} relPath  Path relative to `cwd`
- * @param {string} cwd
- * @returns {boolean}
- */
-function isGitTracked(relPath, cwd) {
-  try {
-    const result = spawnSync("git", ["ls-files", "--error-unmatch", "--", relPath], {
-      cwd,
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: "pipe",
-    });
-    return result.status === 0;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Check that no API key is committed, in either config file.
