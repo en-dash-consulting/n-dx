@@ -169,6 +169,43 @@ describe("POST /api/hench/execute", () => {
     }
   });
 
+  it("returns 409 even when the holder's pid is this process — the dashboard's own case", async () => {
+    // The claim the dashboard writes carries the *server's* pid, because one
+    // server process runs a rex MCP server per workspace. So the holder pid
+    // and the asking pid are equal here on purpose: no spawned child, which is
+    // what the test above uses to obtain a distinct pid and what let a
+    // pid-based ownership check pass while this case was broken.
+    await writeFile(
+      join(rexDir, "prd.json"),
+      JSON.stringify(makePRD([
+        { id: "task-1", title: "Shared Task", status: "pending", level: "task" },
+      ]), null, 2),
+    );
+    execFileSync("git", ["init", "--quiet"], { cwd: tmpDir, stdio: "ignore" });
+    await mkdir(join(tmpDir, ".git", "ndx"), { recursive: true });
+    await writeFile(join(tmpDir, ".git", "ndx", "claims.json"), JSON.stringify({
+      version: 1,
+      claims: {
+        "task-1": {
+          taskId: "task-1",
+          worktreeRoot: "/somewhere/else/feature-x",
+          pid: process.pid,
+          host: "test",
+          claimedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        },
+      },
+    }));
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: "task-1" }),
+    });
+    expect(res.status, "a shared pid must not read as the same holder").toBe(409);
+    expect((await res.json()).claimedBy).toMatchObject({ worktreeRoot: "/somewhere/else/feature-x" });
+  });
+
   it("rejects completed task with 409", async () => {
     await writeFile(
       join(rexDir, "prd.json"),

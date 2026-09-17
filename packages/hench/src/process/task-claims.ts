@@ -83,7 +83,7 @@ export class TaskClaims {
   /** Release one claim this run holds. */
   async release(taskId: string): Promise<void> {
     if (!this.held.delete(taskId)) return;
-    await this.store.release(taskId, this.holder.pid);
+    await this.store.release(taskId, this.holder);
   }
 
   /** Release everything this run still holds. Errors are swallowed: the run is already over. */

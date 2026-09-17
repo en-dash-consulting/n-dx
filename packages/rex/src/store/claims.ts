@@ -16,6 +16,13 @@
  * advisory file lock (`claims.lock`, same mechanism as the PRD lock) and an
  * atomic rename, so two processes claiming at once see one winner.
  *
+ * **The worktree is the identity; the pid is only liveness.** One process can
+ * serve several worktrees — the dashboard builds a rex MCP server per
+ * workspace inside one server process — so a pid says nothing about which
+ * checkout is asking. Every ownership decision here (claim, release, "is this
+ * someone else's?") compares `worktreeRoot` alone; the pid is consulted only
+ * by `isLive`. See {@link sameHolder} for what went wrong when it was both.
+ *
  * Outside a git repository there is nothing to share, so the store is a
  * no-op: every claim succeeds and nothing is recorded — behaviour is exactly
  * what it was before claims existed.
@@ -68,6 +75,17 @@ export type ClaimResult =
   | { ok: true; claim: TaskClaim }
   | { ok: false; heldBy: TaskClaim };
 
+/**
+ * Who is asking, for the operations that only need identity.
+ *
+ * Just the worktree: the pid identifies nothing, because one process can serve
+ * several worktrees (see {@link sameHolder}). `ClaimHolder` satisfies this, so
+ * a caller that already has one passes it unchanged.
+ */
+export interface ClaimOwner {
+  worktreeRoot: string;
+}
+
 /** Who is asking: the worktree a process runs in, and the process itself. */
 export interface ClaimHolder {
   worktreeRoot: string;
@@ -91,18 +109,20 @@ export interface ClaimsStore {
   readClaims(): Promise<TaskClaim[]>;
   /**
    * Claim a task. Succeeds when no live claim exists, or when the live claim
-   * belongs to this holder — same pid (refreshed) or same worktree (taken
-   * over: a retry in the checkout that already holds the task is not a
-   * conflict). Otherwise reports who holds it.
+   * belongs to this worktree — a retry in the checkout that already holds the
+   * task is not a conflict. Otherwise reports who holds it.
    */
   claim(taskId: string, options: ClaimOptions): Promise<ClaimResult>;
-  /** Release a claim this pid holds. False when no such claim exists. */
-  release(taskId: string, pid?: number): Promise<boolean>;
   /**
-   * The live claim held from another worktree by another process, or null
-   * when the task is free or held by this worktree / this pid.
+   * Release a claim this worktree holds. False when no such claim exists, or
+   * when it belongs to another worktree.
    */
-  isClaimedByOther(taskId: string, holder: { worktreeRoot: string; pid?: number }): Promise<TaskClaim | null>;
+  release(taskId: string, holder: ClaimOwner): Promise<boolean>;
+  /**
+   * The live claim held by another worktree, or null when the task is free or
+   * held by this one.
+   */
+  isClaimedByOther(taskId: string, holder: ClaimOwner): Promise<TaskClaim | null>;
   /** Live claims held by worktrees other than `worktreeRoot`, keyed by task id. */
   claimedElsewhere(worktreeRoot: string): Promise<Map<string, TaskClaim>>;
 }
@@ -239,7 +259,7 @@ class FileClaimsStore implements ClaimsStore {
     const ttlMs = options.ttlMs ?? DEFAULT_CLAIM_TTL_MS;
     return this.update((claims) => {
       const existing = claims[taskId];
-      if (existing && !sameHolder(existing, options.worktreeRoot, pid)) {
+      if (existing && !sameHolder(existing, options.worktreeRoot)) {
         return { ok: false, heldBy: existing };
       }
       const nowMs = this.now();
@@ -258,21 +278,20 @@ class FileClaimsStore implements ClaimsStore {
     });
   }
 
-  async release(taskId: string, pid: number = process.pid): Promise<boolean> {
+  async release(taskId: string, holder: ClaimOwner): Promise<boolean> {
     return this.update((claims) => {
       const existing = claims[taskId];
-      if (!existing || existing.pid !== pid) return false;
+      if (!existing || !sameHolder(existing, holder.worktreeRoot)) return false;
       delete claims[taskId];
       return true;
     });
   }
 
-  async isClaimedByOther(taskId: string, holder: { worktreeRoot: string; pid?: number }): Promise<TaskClaim | null> {
-    const pid = holder.pid ?? process.pid;
+  async isClaimedByOther(taskId: string, holder: ClaimOwner): Promise<TaskClaim | null> {
     const file = await this.load();
     const claim = file.claims[taskId];
     if (!claim || !this.isLive(claim)) return null;
-    return sameHolder(claim, holder.worktreeRoot, pid) ? null : claim;
+    return sameHolder(claim, holder.worktreeRoot) ? null : claim;
   }
 
   async claimedElsewhere(worktreeRoot: string): Promise<Map<string, TaskClaim>> {
@@ -284,9 +303,36 @@ class FileClaimsStore implements ClaimsStore {
   }
 }
 
-/** Same pid, or same worktree: either way the task is already "ours". */
-function sameHolder(claim: TaskClaim, worktreeRoot: string, pid: number): boolean {
-  return claim.pid === pid || claim.worktreeRoot === worktreeRoot;
+/**
+ * Whose claim it is. The worktree decides — never the pid.
+ *
+ * This read `claim.pid === pid || claim.worktreeRoot === worktreeRoot`, and
+ * the pid arm was safe exactly as long as one process meant one worktree:
+ * `hench run` is a CLI invocation inside a checkout, so its pid tracked its
+ * worktree. The MCP path broke that property. `ndx start` builds one rex MCP
+ * server *per workspace* inside a single server process
+ * (`initMcpRoutes` → `createRexMcpServer(rctx.projectDir)`, reached through
+ * the workspace-resolved ctx), and the MCP handlers claim without passing a
+ * pid, so every worktree's claim carries the same pid — the dashboard's.
+ *
+ * With the pid arm, worktree B claiming a task worktree A holds matched on
+ * `claim.pid === pid`, read as "already ours", and overwrote the claim with
+ * B's worktreeRoot while returning ok. Both were told they held it, the
+ * `in_progress` refusal never fired, either could release the other's claim,
+ * and the dashboard's own "another worktree holds this" 409 went quiet too.
+ * Stdio MCP (`ndx rex mcp .`, one process per worktree) never showed it,
+ * which is what made it easy to miss.
+ *
+ * The pid is still recorded and still load-bearing — `isLive` checks it with
+ * `kill(pid, 0)`, so a crashed holder's claim is pruned rather than wedging
+ * the task for the rest of the TTL. It just has nothing to do with identity.
+ *
+ * Two processes in the *same* worktree remain one holder: a retry in the
+ * checkout that already holds the task is not a conflict, which is the
+ * behaviour this has always documented.
+ */
+function sameHolder(claim: TaskClaim, worktreeRoot: string): boolean {
+  return claim.worktreeRoot === worktreeRoot;
 }
 
 function isClaim(value: unknown): value is TaskClaim {

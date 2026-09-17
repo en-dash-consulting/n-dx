@@ -138,7 +138,7 @@ describe("selection across two worktrees", () => {
     expect(bare.skippedClaimed).toBeUndefined();
 
     // Once A releases, B is offered the task again.
-    await claimsA.release("t-high", holderA.pid!);
+    await claimsA.release("t-high", { worktreeRoot: wtA });
     const after = JSON.parse((await handleGetNextTask(storeB, undefined, {
       store: openClaimsStore(wtB),
       worktreeRoot: resolveClaimHolder(wtB).worktreeRoot,
@@ -160,7 +160,7 @@ describe("selection across two worktrees", () => {
     expect(body.next).toBeNull();
     expect(body.message).toContain("2 claimed elsewhere");
     expect(body.skippedClaimed).toHaveLength(2);
-    for (const id of ["t-high", "t-low"]) await claimsA.release(id, holder.pid!);
+    for (const id of ["t-high", "t-low"]) await claimsA.release(id, { worktreeRoot: wtA });
   });
 });
 
@@ -216,27 +216,41 @@ describe("claims on the MCP path", () => {
     await handleUpdateTaskStatus(storeA, wtA, { id: "t-high", status: "pending", force: true }, ctxFor(wtA));
   });
 
-  it("refuses to start a task another worktree is holding, unless forced", async () => {
-    // A live claim from a different pid AND a different worktree: a claim from
-    // this process would count as ours in either checkout.
-    const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" });
-    children.push(holder);
-    const claimsA = openClaimsStore(wtA);
-    expect((await claimsA.claim("t-high", { worktreeRoot: wtA, pid: holder.pid! })).ok).toBe(true);
-
+  /**
+   * Both contexts in *this* process, with no spawned child.
+   *
+   * That is the dashboard: `ndx start` builds a rex MCP server per workspace
+   * inside one server process, and the handlers claim without passing a pid,
+   * so every worktree's claim carries the same one. An earlier version of this
+   * test spawned a child purely to obtain a distinct pid — which meant it
+   * passed while the production condition stayed broken, because `sameHolder`
+   * read a matching pid as "already ours" whatever worktree it came from.
+   */
+  it("refuses to start a task another worktree is holding, with both servers in one process", async () => {
+    const storeA = await resolveStore(join(wtA, ".rex"));
     const storeB = await resolveStore(join(wtB, ".rex"));
+
+    const held = await handleClaimTask(storeA, { id: "t-high" }, ctxFor(wtA));
+    expect(JSON.parse(held.content[0].text).claimed).toBe(true);
+
     const refused = await handleUpdateTaskStatus(storeB, wtB, { id: "t-high", status: "in_progress" }, ctxFor(wtB));
-    expect(refused.isError).toBe(true);
+    expect(refused.isError, "B must not be allowed to start a task A holds").toBe(true);
     expect(refused.content[0].text).toContain(wtA);
-    expect(refused.content[0].text).toContain(String(holder.pid));
     expect((await storeB.getItem("t-high"))?.status, "and the status is left alone").not.toBe("in_progress");
+
+    // Nor may B take the claim by asking for it directly, or drop A's.
+    const stolen = await handleClaimTask(storeB, { id: "t-high" }, ctxFor(wtB));
+    expect(stolen.isError).toBe(true);
+    expect(JSON.parse((await handleReleaseTask({ id: "t-high" }, ctxFor(wtB))).content[0].text).released).toBe(false);
+    expect((await openClaimsStore(wtA).readClaims())[0]).toMatchObject({ taskId: "t-high", worktreeRoot: wtA });
 
     // force is the escape hatch for a run the operator knows is finished.
     const forced = await handleUpdateTaskStatus(storeB, wtB, { id: "t-high", status: "in_progress", force: true }, ctxFor(wtB));
     expect(forced.isError).toBeFalsy();
     expect((await storeB.getItem("t-high"))?.status).toBe("in_progress");
 
-    await claimsA.release("t-high", holder.pid!);
+    await openClaimsStore(wtA).release("t-high", { worktreeRoot: wtA });
+    await openClaimsStore(wtB).release("t-high", { worktreeRoot: wtB });
   });
 
   it("is a no-op outside a repository — no claims context, no refusal", async () => {

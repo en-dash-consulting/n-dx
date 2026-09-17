@@ -97,9 +97,9 @@ describe("no-op store outside a repository", () => {
     const result = await store.claim("T1", { worktreeRoot: plain });
     expect(result.ok).toBe(true);
     expect(await store.readClaims()).toEqual([]);
-    expect(await store.isClaimedByOther("T1", { worktreeRoot: "/elsewhere", pid: 1 })).toBeNull();
+    expect(await store.isClaimedByOther("T1", { worktreeRoot: "/elsewhere" })).toBeNull();
     expect(await store.claimedElsewhere("/elsewhere")).toEqual(new Map());
-    expect(await store.release("T1")).toBe(true);
+    expect(await store.release("T1", { worktreeRoot: plain })).toBe(true);
     expect(existsSync(join(plain, ".git"))).toBe(false);
   });
 });
@@ -117,17 +117,17 @@ describe("file store", () => {
 
     // The linked worktree reads the same file.
     expect((await theirs.readClaims()).map((c) => c.taskId)).toEqual(["T1"]);
-    expect(await theirs.isClaimedByOther("T1", { worktreeRoot: linked, pid: 424242 })).toMatchObject({ pid: process.pid });
-    // From the holder's own point of view it is not "another" — nor from
-    // another process in the same worktree (a retry there is not a conflict).
+    expect(await theirs.isClaimedByOther("T1", { worktreeRoot: linked })).toMatchObject({ pid: process.pid });
+    // From the holder's own point of view it is not "another" — and that is
+    // decided by the worktree, so another process in the same checkout (a
+    // retry there is not a conflict) sees the same answer.
     expect(await mine.isClaimedByOther("T1", { worktreeRoot: repo })).toBeNull();
-    expect(await mine.isClaimedByOther("T1", { worktreeRoot: repo, pid: 424242 })).toBeNull();
     expect([...(await theirs.claimedElsewhere(linked)).keys()]).toEqual(["T1"]);
     expect(await mine.claimedElsewhere(repo)).toEqual(new Map());
 
-    // Only the holder can release; a stranger's release is a no-op.
-    expect(await theirs.release("T1", 424242)).toBe(false);
-    expect(await mine.release("T1")).toBe(true);
+    // Only the holding worktree can release; another's release is a no-op.
+    expect(await theirs.release("T1", { worktreeRoot: linked })).toBe(false);
+    expect(await mine.release("T1", { worktreeRoot: repo })).toBe(true);
     expect(await theirs.readClaims()).toEqual([]);
     // The file itself is inside .git, never a tracked path.
     expect(git(repo, "status", "--porcelain").trim()).toBe("");
@@ -215,6 +215,42 @@ describe("file store", () => {
     const winner = results.find((r) => r.ok)!;
     const loser = results.find((r) => !r.ok)!;
     if (winner.ok && !loser.ok) expect(loser.heldBy.pid).toBe(winner.claim.pid);
+  });
+
+  /**
+   * One process, two worktrees — the dashboard's shape, and the condition the
+   * pid arm of `sameHolder` silently broke.
+   *
+   * `ndx start` builds a rex MCP server per workspace inside one server
+   * process, and the MCP handlers claim without passing a pid, so every
+   * worktree's claim carries that one pid. No child process here on purpose:
+   * spawning one to get a distinct pid is precisely how a suite can pass while
+   * leaving production broken.
+   */
+  it("one process, two worktrees: the second is refused and cannot release the first's claim", async () => {
+    const fromA = openClaimsStore(repo);
+    const fromB = openClaimsStore(linked);
+
+    // Both claim as this process — exactly what acquireClaim does.
+    const a = await fromA.claim("T1", { worktreeRoot: repo });
+    expect(a.ok).toBe(true);
+
+    const b = await fromB.claim("T1", { worktreeRoot: linked });
+    expect(b.ok, "B must not be told it holds a task A holds").toBe(false);
+    if (b.ok) return;
+    expect(b.heldBy).toMatchObject({ worktreeRoot: repo, pid: process.pid });
+
+    // The claim is untouched: it was not overwritten with B's worktreeRoot.
+    expect((await fromA.readClaims())[0]).toMatchObject({ worktreeRoot: repo });
+
+    // B still sees it as someone else's, and cannot drop it.
+    expect(await fromB.isClaimedByOther("T1", { worktreeRoot: linked })).toMatchObject({ worktreeRoot: repo });
+    expect(await fromB.release("T1", { worktreeRoot: linked })).toBe(false);
+    expect((await fromA.readClaims()).map((c) => c.taskId)).toEqual(["T1"]);
+
+    // A releases its own, and only then is the task free for B.
+    expect(await fromA.release("T1", { worktreeRoot: repo })).toBe(true);
+    expect((await fromB.claim("T1", { worktreeRoot: linked })).ok).toBe(true);
   });
 
   it("ignores a corrupt claims file rather than failing", async () => {

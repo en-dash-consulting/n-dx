@@ -225,7 +225,7 @@ export async function handleUpdateTaskStatus(
     // holds the PRD lock across the whole read-modify-write so a concurrent
     // writer's item cannot be clobbered by this full-document save.
     if (status === "deleted") {
-      if (claims) await claims.store.release(id);
+      if (claims) await claims.store.release(id, { worktreeRoot: claims.worktreeRoot });
       const deletedIds = await store.withTransaction(async (doc) => {
         const ids = deleteItem(doc.items, id);
         cleanBlockedByRefs(doc.items, new Set(ids));
@@ -267,7 +267,7 @@ export async function handleUpdateTaskStatus(
     // The task is no longer being worked here, so the claim must not outlive
     // the run — otherwise the next worktree to ask is told it is taken for the
     // rest of the TTL.
-    if (claims && CLAIM_RELEASING_STATUSES.has(status)) await claims.store.release(id);
+    if (claims && CLAIM_RELEASING_STATUSES.has(status)) await claims.store.release(id, { worktreeRoot: claims.worktreeRoot });
     await store.appendLog({
       timestamp: new Date().toISOString(),
       event: "status_changed",
@@ -366,7 +366,7 @@ export async function handleReleaseTask(
   claims?: ClaimsContext,
 ): Promise<McpResult> {
   try {
-    const released = claims ? await claims.store.release(args.id) : false;
+    const released = claims ? await claims.store.release(args.id, { worktreeRoot: claims.worktreeRoot }) : false;
     return textResult(JSON.stringify({ id: args.id, released }));
   } catch (err) {
     return textResult(`Error: ${(err as Error).message}`, true);
