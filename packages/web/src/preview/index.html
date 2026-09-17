@@ -1,35 +1,36 @@
 <!DOCTYPE html>
 <!--
   ════════════════════════════════════════════════════════════════════════════
-  n-dx dashboard — UI layout proposal
+  n-dx dashboard — UI layout proposal (editable mock-up)
   ════════════════════════════════════════════════════════════════════════════
 
-  This file is a hand-edited mock-up, not the real dashboard. It exists so the
-  dashboard's sections can be reshuffled and argued about before any Preact
-  component moves. Served by:
+      ndx start --preview .        →  http://localhost:3118
 
-      ndx start --preview .          # http://localhost:3118 (live reload)
+  Shuffle the layout in the browser: drag sections, tabs and panels around,
+  rename anything, group sections into named dropdowns, add or remove things.
+  Every change saves to `index.layout.json` next to this file, so a shuffle
+  survives a reload and shows up as a reviewable diff.
 
-  Run it next to the real dashboard (`ndx start .` on :3117) and compare the
-  two side by side. Save this file and the browser reloads on its own.
+  WHAT LIVES WHERE
+  ────────────────
+  • index.layout.json  — the structure: nav tree, panels, names, change marks.
+                         Hand-edit it if you'd rather write than drag; the page
+                         reloads when it changes on disk.
+  • index.html (this)  — the renderer and the editor. Styling and behaviour.
 
-  HOW TO EDIT
-  ───────────
-  • Everything is plain markup — no framework, no build step. Reordering a
-    section means moving its block; nothing else has to change.
-  • Sidebar sections are the <section class="nav-group"> blocks below. Move a
-    whole block to reorder a group; move an <li> to reorder an item.
-  • The content pane is the <div class="panel-grid"> blocks. Each panel is one
-    <article class="panel">.
-  • Mark your changes so reviewers can see the diff without reading HTML:
-        class="panel is-new"       → green rail  + "new" chip
-        class="panel is-moved"     → amber rail  + "moved" chip
-        class="panel is-removed"   → struck out, dimmed
-    The same three classes work on nav <li> and <section class="nav-group">.
-  • Put the reasoning in the "Rationale" tab (search for id="tab-rationale").
+  THE MODEL
+  ─────────
+      folder ─┬─ folder …      a named, collapsible dropdown; nest as deep as
+              │                 you like, so sections can live inside groups
+              └─ item …        a tab in the dashboard, owning panels
+                   └─ panel    a card in that tab's content area
 
-  Colours and spacing are copied from packages/web/src/viewer/styles/tokens.css
-  so the mock reads at the same weight as the real thing.
+  RENAMING is tracked: rename "Tasks" to "Backlog" and it renders as
+  "Backlog (previously Tasks)" until you rename it back. Moves, additions and
+  removals are marked the same way (moved / new / cut), and the Rationale tab
+  collects every mark into a change list for reviewers.
+
+  Press "Present" to hide all editing chrome and show the result to someone.
 -->
 <html lang="en" data-theme="dark">
 <head>
@@ -41,7 +42,7 @@
 :root {
   --brand-teal: #00E5B9;
   --brand-purple: #6c41f0;
-  --sidebar-w: 232px;
+  --sidebar-w: 268px;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px;
@@ -67,257 +68,272 @@
 
 * { box-sizing: border-box; }
 body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 13px/1.5 var(--font-sans);
-  -webkit-font-smoothing: antialiased;
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 13px/1.5 var(--font-sans); -webkit-font-smoothing: antialiased;
 }
+[hidden] { display: none !important; }
 
-/* ── Document chrome (the proposal wrapper, not part of the UI) ─────────── */
+/* ── Document chrome ────────────────────────────────────────────────────── */
 .doc-bar {
   display: flex; align-items: center; gap: var(--space-4);
   padding: var(--space-3) var(--space-5);
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border);
-  position: sticky; top: 0; z-index: 10;
+  background: var(--bg-surface); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 30;
 }
 .doc-mark {
   font: 600 11px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
-  color: #fff; background: var(--purple);
-  padding: 5px var(--space-2); border-radius: var(--radius-sm);
+  color: #fff; background: var(--purple); padding: 5px var(--space-2); border-radius: var(--radius-sm);
 }
 .doc-title { font-weight: 600; font-size: 14px; }
 .doc-sub { color: var(--text-muted); font-size: 12px; }
 .doc-spacer { flex: 1; }
 .doc-tabs { display: flex; gap: var(--space-1); }
-.doc-tab {
+.doc-tab, .btn, .icon-btn {
   font: inherit; color: var(--text-dim); background: transparent;
   border: 1px solid transparent; border-radius: var(--radius-md);
   padding: 5px var(--space-3); cursor: pointer;
 }
-.doc-tab:hover { background: var(--bg-hover); color: var(--text); }
+.btn, .icon-btn { border-color: var(--border); }
+.doc-tab:hover, .btn:hover, .icon-btn:hover { background: var(--bg-hover); color: var(--text); }
 .doc-tab[aria-selected="true"] { background: var(--bg-active); color: var(--text); border-color: var(--border-strong); }
-.icon-btn {
-  font: inherit; color: var(--text-dim); background: transparent;
-  border: 1px solid var(--border); border-radius: var(--radius-md);
-  padding: 5px var(--space-3); cursor: pointer;
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #04121a; font-weight: 600; }
+[data-theme="light"] .btn-primary { color: #fff; }
+.btn[aria-pressed="true"] { background: var(--bg-active); color: var(--text); border-color: var(--border-strong); }
+
+/* Save indicator */
+.save-state {
+  font: 600 10px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  padding: 5px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted);
+  white-space: nowrap;
 }
-.icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+.save-state[data-state="saving"] { color: var(--orange); border-color: var(--orange); }
+.save-state[data-state="saved"] { color: var(--green); border-color: var(--green); }
+.save-state[data-state="error"] { color: var(--red); border-color: var(--red); }
 
 .doc-body { padding: var(--space-5); }
 .doc-note {
-  max-width: 900px; margin: 0 0 var(--space-5);
+  max-width: 940px; margin: 0 0 var(--space-4);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border); border-left: 3px solid var(--accent);
-  border-radius: var(--radius-md); background: var(--bg-surface);
-  color: var(--text-dim);
+  border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-dim);
 }
 .doc-note b { color: var(--text); }
-
-/* ── Change legend ──────────────────────────────────────────────────────── */
-.legend { display: flex; gap: var(--space-4); align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; }
-.chip {
-  font: 600 10px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
-  padding: 4px 7px; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--text-dim);
+.doc-note kbd {
+  font: 11px/1 var(--font-mono); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); padding: 2px 5px; color: var(--text);
 }
-.chip-new { color: var(--green); border-color: var(--green); }
-.chip-moved { color: var(--orange); border-color: var(--orange); }
-.chip-removed { color: var(--red); border-color: var(--red); }
 
-/* ── The app shell mock ─────────────────────────────────────────────────── */
+/* ── Change marks ───────────────────────────────────────────────────────── */
+.chip {
+  font: 600 9px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  padding: 3px 5px; border-radius: 999px; border: 1px solid currentColor; color: var(--text-muted);
+  white-space: nowrap;
+}
+.chip-new { color: var(--green); }
+.chip-moved { color: var(--orange); }
+.chip-removed { color: var(--red); }
+.prev { color: var(--text-muted); font-size: 11px; font-style: italic; white-space: nowrap; }
+
+/* ── Shell ──────────────────────────────────────────────────────────────── */
 .shell {
-  display: flex;
-  height: calc(100vh - 210px);
-  min-height: 560px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-  background: var(--bg);
-  box-shadow: 0 18px 40px rgba(0,0,0,.22);
+  display: flex; height: calc(100vh - 230px); min-height: 600px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-xl);
+  overflow: hidden; background: var(--bg); box-shadow: 0 18px 40px rgba(0,0,0,.22);
 }
 
 /* Sidebar */
 .sidebar {
-  width: var(--sidebar-w); flex-shrink: 0;
-  background: var(--bg-surface); border-right: 1px solid var(--border);
-  display: flex; flex-direction: column; overflow-y: auto;
+  width: var(--sidebar-w); flex-shrink: 0; background: var(--bg-surface);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto;
 }
 .sidebar-header {
   display: flex; align-items: center; gap: var(--space-2);
-  padding: var(--space-4); border-bottom: 1px solid var(--border);
+  padding: var(--space-4); border-bottom: 1px solid var(--border); position: sticky; top: 0;
+  background: var(--bg-surface); z-index: 2;
 }
 .logo-dot {
-  width: 26px; height: 26px; border-radius: var(--radius-md);
-  background: var(--purple); color: #fff;
-  display: grid; place-items: center; font: 700 12px/1 var(--font-mono);
+  width: 26px; height: 26px; border-radius: var(--radius-md); background: var(--purple);
+  color: #fff; display: grid; place-items: center; font: 700 12px/1 var(--font-mono); flex-shrink: 0;
 }
 .project-name { font-weight: 600; }
 .project-path { color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
+.nav-root { padding: var(--space-2) 0 var(--space-4); flex: 1; }
+.sidebar-footer { padding: var(--space-2) var(--space-3) var(--space-4); }
 
-.nav-group { padding: var(--space-3) 0 var(--space-1); }
-.nav-group + .nav-group { border-top: 1px solid var(--border); }
-.nav-label {
-  display: flex; align-items: center; gap: var(--space-2);
-  padding: 0 var(--space-4) var(--space-2);
-  font: 600 10px/1 var(--font-mono); letter-spacing: .1em;
-  color: var(--text-muted); text-transform: uppercase;
+/* A nav row — folder or item, any depth */
+.row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px var(--space-3) 5px 0; color: var(--text-dim);
+  border-top: 1px solid transparent; border-bottom: 1px solid transparent;
+  cursor: default; position: relative; overflow: hidden;
 }
-.nav-group ul { list-style: none; margin: 0; padding: 0; }
-.nav-group li {
-  display: flex; align-items: center; gap: var(--space-2);
-  padding: 6px var(--space-4); color: var(--text-dim); cursor: default;
+.row:hover { background: var(--bg-hover); color: var(--text); }
+.row.active { background: var(--bg-active); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+.row.dragging { opacity: .4; }
+.row.drop-before { border-top-color: var(--accent); }
+.row.drop-after { border-bottom-color: var(--accent); }
+.row.drop-inside { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.row-folder > .label { font-weight: 600; }
+.row-folder.depth-0 > .label {
+  font: 600 10px/1.6 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted);
 }
-.nav-group li:hover { background: var(--bg-hover); color: var(--text); }
-.nav-group li.active {
-  background: var(--bg-active); color: var(--text);
-  box-shadow: inset 2px 0 0 var(--accent);
+.row-folder.depth-0:hover > .label { color: var(--text-dim); }
+
+.handle { cursor: grab; flex-shrink: 0; color: var(--text-muted); opacity: .55; font-size: 11px; padding: 0 2px; }
+.handle:active { cursor: grabbing; }
+.caret {
+  border: none; background: transparent; color: var(--text-muted); cursor: pointer;
+  width: 14px; padding: 0; font-size: 10px; line-height: 1;
 }
-.nav-icon { width: 16px; text-align: center; color: var(--text-muted); }
-.nav-group li.active .nav-icon { color: var(--accent); }
-.flagged { margin-left: auto; font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); }
+.icon { width: 16px; text-align: center; color: var(--text-muted); flex-shrink: 0; }
+.row.active .icon { color: var(--accent); }
+.label { outline: none; min-width: 12px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.label:focus { background: var(--bg); box-shadow: 0 0 0 1px var(--accent); border-radius: var(--radius-sm); padding: 0 3px; }
+.row-actions { margin-left: auto; display: flex; gap: 2px; align-items: center; flex-shrink: 0; opacity: 0; }
+.row:hover .row-actions, .row:focus-within .row-actions { opacity: 1; }
+.mini {
+  border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-dim);
+  border-radius: var(--radius-sm); font: 10px/1 var(--font-mono); padding: 4px 5px; cursor: pointer;
+}
+.mini:hover { background: var(--bg-active); color: var(--text); }
+.mini-danger:hover { color: var(--red); border-color: var(--red); }
+.flag-chip { font: 9px/1 var(--font-mono); color: var(--text-muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 5px; }
+.children { display: block; }
+.row-removed > .label { text-decoration: line-through; }
+.row-removed { opacity: .5; }
 
 /* Main column */
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .topbar {
   display: flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-3) var(--space-5);
-  border-bottom: 1px solid var(--border); background: var(--bg-surface);
+  padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--border); background: var(--bg-surface);
 }
 .crumbs { color: var(--text-muted); font-size: 12px; }
 .crumbs b { color: var(--text); font-weight: 600; }
 .search {
-  margin-left: auto; min-width: 200px;
-  padding: 5px var(--space-3);
-  border: 1px solid var(--border); border-radius: var(--radius-md);
-  background: var(--bg); color: var(--text-muted);
+  margin-left: auto; min-width: 180px; padding: 5px var(--space-3);
+  border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text-muted);
 }
-.btn {
-  padding: 5px var(--space-3); border-radius: var(--radius-md);
-  border: 1px solid var(--border-strong); background: var(--bg-active); color: var(--text);
-  font-size: 12px;
-}
-.btn-primary { background: var(--accent); border-color: var(--accent); color: #04121a; font-weight: 600; }
-[data-theme="light"] .btn-primary { color: #fff; }
-
 .content { flex: 1; overflow-y: auto; padding: var(--space-5); }
-.view-title { margin: 0 0 var(--space-4); font-size: 20px; font-weight: 600; }
+.view-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.view-title { margin: 0; font-size: 20px; font-weight: 600; }
 
-/* Stat tiles */
 .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); margin-bottom: var(--space-5); }
-.stat {
-  background: var(--bg-surface); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: var(--space-4);
-}
+.stat { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-4); }
 .stat-value { font-size: 22px; font-weight: 600; }
 .stat-label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
 
 /* Panels */
 .panel-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--space-4); }
 .panel {
-  grid-column: span 6;
-  background: var(--bg-surface); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: var(--space-4);
-  position: relative;
+  grid-column: span 6; background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4) var(--space-4); position: relative;
 }
-.panel.span-4 { grid-column: span 4; }
-.panel.span-8 { grid-column: span 8; }
-.panel.span-12 { grid-column: span 12; }
-.panel h3 { margin: 0 0 var(--space-3); font-size: 13px; font-weight: 600; }
-.panel p { margin: 0; color: var(--text-muted); }
+.panel[data-width="4"] { grid-column: span 4; }
+.panel[data-width="6"] { grid-column: span 6; }
+.panel[data-width="8"] { grid-column: span 8; }
+.panel[data-width="12"] { grid-column: span 12; }
+.panel.dragging { opacity: .4; }
+.panel.drop-before { box-shadow: -3px 0 0 var(--accent); }
+.panel.drop-after { box-shadow: 3px 0 0 var(--accent); }
+.panel-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-3); }
+/* A 4-column panel is narrower than its own controls. Without min-width:0 and
+   wrapping, the action row overflowed the card and sat on top of the panel to
+   its right — where it intercepted that panel's clicks. */
+.panel-head h3 { margin: 0; font-size: 13px; font-weight: 600; outline: none; flex: 1 1 auto; min-width: 60px; }
+.panel-head h3:focus { background: var(--bg); box-shadow: 0 0 0 1px var(--accent); border-radius: var(--radius-sm); padding: 0 3px; }
+.panel-actions { margin-left: auto; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; flex-shrink: 0; opacity: 0; }
+.panel:hover .panel-actions, .panel:focus-within .panel-actions { opacity: 1; }
+.panel select {
+  font: 11px/1 var(--font-mono); color: var(--text-dim); background: var(--bg-surface);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px 4px; max-width: 110px;
+}
+.panel-status-new { box-shadow: inset 3px 0 0 var(--green); border-color: var(--green); }
+.panel-status-moved { box-shadow: inset 3px 0 0 var(--orange); border-color: var(--orange); }
+.panel-status-removed { opacity: .45; }
+.panel-status-removed .panel-head h3 { text-decoration: line-through; }
 .skeleton { display: grid; gap: 7px; }
 .skeleton span { height: 8px; border-radius: 999px; background: var(--bg-active); display: block; }
 .skeleton span:nth-child(2) { width: 82%; }
 .skeleton span:nth-child(3) { width: 64%; }
 .skeleton span:nth-child(4) { width: 73%; }
-
-/* Change marking — works on .panel, nav li and .nav-group */
-.is-new, .is-moved, .is-removed { position: relative; }
-.panel.is-new { border-color: var(--green); box-shadow: inset 3px 0 0 var(--green); }
-.panel.is-moved { border-color: var(--orange); box-shadow: inset 3px 0 0 var(--orange); }
-.panel.is-removed { opacity: .45; }
-.panel.is-removed h3 { text-decoration: line-through; }
-li.is-new, .nav-group.is-new > .nav-label { box-shadow: inset 2px 0 0 var(--green); }
-li.is-moved, .nav-group.is-moved > .nav-label { box-shadow: inset 2px 0 0 var(--orange); }
-li.is-removed { opacity: .45; text-decoration: line-through; }
-.is-new > h3::after, li.is-new::after { content: "new"; }
-.is-moved > h3::after, li.is-moved::after { content: "moved"; }
-.is-removed > h3::after, li.is-removed::after { content: "cut"; }
-.is-new > h3::after, .is-moved > h3::after, .is-removed > h3::after,
-li.is-new::after, li.is-moved::after, li.is-removed::after {
-  margin-left: var(--space-2);
-  font: 600 9px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
-  padding: 3px 5px; border-radius: 999px; border: 1px solid currentColor; vertical-align: middle;
+.empty-state {
+  grid-column: span 12; border: 1px dashed var(--border-strong); border-radius: var(--radius-lg);
+  padding: var(--space-6); text-align: center; color: var(--text-muted);
 }
-.is-new > h3::after, li.is-new::after { color: var(--green); }
-.is-moved > h3::after, li.is-moved::after { color: var(--orange); }
-.is-removed > h3::after, li.is-removed::after { color: var(--red); }
-li.is-new::after, li.is-moved::after, li.is-removed::after { margin-left: auto; }
 
 /* ── Rationale tab ──────────────────────────────────────────────────────── */
-.prose { max-width: 860px; }
+.prose { max-width: 940px; }
 .prose h2 { font-size: 16px; margin: var(--space-6) 0 var(--space-2); }
 .prose h2:first-child { margin-top: 0; }
 .prose p, .prose li { color: var(--text-dim); }
 .prose code { font-family: var(--font-mono); font-size: 12px; background: var(--bg-active); padding: 1px 5px; border-radius: var(--radius-sm); }
-.prose table { border-collapse: collapse; width: 100%; margin: var(--space-3) 0; }
-.prose th, .prose td { text-align: left; padding: 7px var(--space-3); border-bottom: 1px solid var(--border); }
-.prose th { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
-[hidden] { display: none !important; }
+.notes {
+  width: 100%; min-height: 240px; resize: vertical;
+  background: var(--bg-surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: var(--space-4); font: 13px/1.6 var(--font-sans);
+}
+.notes:focus { outline: none; border-color: var(--accent); }
+.change-list { list-style: none; margin: 0; padding: 0; }
+.change-list li {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 7px var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--bg-surface); margin-bottom: 6px;
+}
+.change-path { color: var(--text-muted); font: 11px/1 var(--font-mono); }
 
-@media (max-width: 900px) {
+/* ── Present mode: hide every editing affordance ────────────────────────── */
+body[data-mode="present"] .handle,
+body[data-mode="present"] .row-actions,
+body[data-mode="present"] .panel-actions,
+body[data-mode="present"] .sidebar-footer,
+body[data-mode="present"] .add-panel,
+body[data-mode="present"] .edit-hint { display: none !important; }
+
+@media (max-width: 960px) {
   .stat-row { grid-template-columns: repeat(2, 1fr); }
   .panel { grid-column: span 12 !important; }
   .sidebar { display: none; }
 }
 </style>
 </head>
-<body>
+<body data-mode="edit">
 
-<!-- ═══ Document chrome — not part of the proposed UI ═══════════════════ -->
 <header class="doc-bar">
   <span class="doc-mark">proposal</span>
   <div>
-    <div class="doc-title">n-dx dashboard — layout v2</div>
-    <div class="doc-sub">Draft · mock-up only, no live data</div>
+    <div class="doc-title" id="doc-title" contenteditable="true">n-dx dashboard — layout</div>
+    <div class="doc-sub" id="doc-subtitle" contenteditable="true">Draft</div>
   </div>
   <div class="doc-spacer"></div>
+  <span class="save-state" id="save-state" data-state="idle">loading</span>
+  <button class="btn" id="mode-toggle" aria-pressed="true" title="Hide editing chrome to show the result">Editing</button>
+  <button class="btn" id="copy-json" title="Copy the layout JSON to the clipboard">Copy JSON</button>
   <div class="doc-tabs" role="tablist">
     <button class="doc-tab" role="tab" aria-selected="true" data-tab="tab-layout">Layout</button>
-    <button class="doc-tab" role="tab" aria-selected="false" data-tab="tab-rationale">Rationale</button>
+    <button class="doc-tab" role="tab" aria-selected="false" data-tab="tab-rationale">Rationale <span id="change-count" class="chip" hidden></span></button>
   </div>
   <button class="icon-btn" id="theme-toggle" title="Toggle light / dark">◐</button>
 </header>
 
 <div class="doc-body">
 
-<!-- ═══════════════════════════════════════════════════════════════════════
-     TAB 1 — LAYOUT
-     This is the part you shuffle. Move blocks, rename labels, mark changes.
-     ═══════════════════════════════════════════════════════════════════════ -->
+<!-- ═══ LAYOUT ══════════════════════════════════════════════════════════ -->
 <section id="tab-layout">
 
-  <p class="doc-note">
-    <b>What this shows.</b> The shell as it stands today: a grouped sidebar, a
-    thin top bar, and a panel grid. Rearrange it here first — this document is
-    the thing reviewers look at, and nothing in it is wired to real data.
+  <p class="doc-note edit-hint">
+    <b>Drag anything.</b> Drop on the top or bottom edge of a row to place it
+    before or after; drop on the middle of a folder to put it <i>inside</i> —
+    that is how sections go into a named dropdown. Click any name to rename it
+    (renames render as “new name <i>(previously old)</i>”). <kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd>
+    moves a focused row among its siblings, <kbd>Alt</kbd>+<kbd>→</kbd> nests it into the row above.
+    Everything saves to <code>index.layout.json</code> as you go.
   </p>
 
-  <div class="legend">
-    <span class="chip">Change marks</span>
-    <span class="chip chip-new">new</span>
-    <span class="chip chip-moved">moved</span>
-    <span class="chip chip-removed">cut</span>
-    <span class="doc-sub">— add <code>is-new</code> / <code>is-moved</code> / <code>is-removed</code> to any panel or nav item.</span>
-  </div>
-
   <div class="shell">
-
-    <!-- ── SIDEBAR ──────────────────────────────────────────────────────
-         Each <section class="nav-group"> is one collapsible group in the
-         real sidebar. Reorder groups by moving these blocks whole.       -->
     <aside class="sidebar">
-
       <div class="sidebar-header">
         <span class="logo-dot">n</span>
         <div>
@@ -325,178 +341,859 @@ li.is-new::after, li.is-moved::after, li.is-removed::after { margin-left: auto; 
           <div class="project-path">~/VSCodeProjects/n-dx</div>
         </div>
       </div>
-
-      <section class="nav-group">
-        <div class="nav-label">Sourcevision</div>
-        <ul>
-          <li class="active"><span class="nav-icon">▣</span> Overview</li>
-          <li><span class="nav-icon">▧</span> Map</li>
-          <li><span class="nav-icon">◧</span> Isometric Map</li>
-          <li><span class="nav-icon">⬢</span> Zones</li>
-          <li><span class="nav-icon">☰</span> Files</li>
-          <li><span class="nav-icon">◇</span> Routes</li>
-          <li><span class="nav-icon">◨</span> Architecture</li>
-          <li><span class="nav-icon">⚠</span> Problems</li>
-          <li><span class="nav-icon">✦</span> Suggestions</li>
-          <li><span class="nav-icon">✍</span> PR Markdown <span class="flagged">flag</span></li>
-          <li><span class="nav-icon">?</span> Ask <span class="flagged">flag</span></li>
-        </ul>
-      </section>
-
-      <section class="nav-group">
-        <div class="nav-label">Rex</div>
-        <ul>
-          <li><span class="nav-icon">▨</span> Dashboard</li>
-          <li><span class="nav-icon">☑</span> Tasks</li>
-          <li><span class="nav-icon">⌗</span> Analyze &amp; Import</li>
-          <li><span class="nav-icon">⧉</span> Context Graph</li>
-          <li><span class="nav-icon">✔</span> Validation</li>
-          <li><span class="nav-icon">⚖</span> Requirements</li>
-          <li><span class="nav-icon">⌚</span> Activity</li>
-          <li><span class="nav-icon">🔗</span> Integrations <span class="flagged">flag</span></li>
-        </ul>
-      </section>
-
-      <section class="nav-group">
-        <div class="nav-label">Hench</div>
-        <ul>
-          <li><span class="nav-icon">▶</span> Runs</li>
-          <li><span class="nav-icon">☸</span> Audit</li>
-          <li><span class="nav-icon">▦</span> Templates</li>
-          <li><span class="nav-icon">⚡</span> Optimization</li>
-          <li><span class="nav-icon">♻</span> Adaptive</li>
-        </ul>
-      </section>
-
-      <section class="nav-group">
-        <div class="nav-label">Commands</div>
-        <ul>
-          <li><span class="nav-icon">⌘</span> All Commands</li>
-        </ul>
-      </section>
-
-      <section class="nav-group">
-        <div class="nav-label">Token Usage</div>
-        <ul>
-          <li><span class="nav-icon">⊚</span> Token Usage</li>
-        </ul>
-      </section>
-
-      <section class="nav-group">
-        <div class="nav-label">Settings</div>
-        <ul>
-          <li><span class="nav-icon">🧠</span> General</li>
-          <li><span class="nav-icon">▣</span> ndx analyze / plan</li>
-          <li><span class="nav-icon">▶</span> ndx work</li>
-          <li><span class="nav-icon">🔌</span> ndx sync <span class="flagged">flag</span></li>
-          <li><span class="nav-icon">📤</span> ndx export / refresh</li>
-          <li><span class="nav-icon">📌</span> Feature Flags</li>
-          <li><span class="nav-icon">⏱</span> CLI Timeouts</li>
-        </ul>
-      </section>
-
+      <div class="nav-root" id="nav-root"></div>
+      <div class="sidebar-footer">
+        <button class="mini" id="add-group">+ group</button>
+        <button class="mini" id="add-tab">+ tab</button>
+      </div>
     </aside>
 
-    <!-- ── MAIN COLUMN ────────────────────────────────────────────────── -->
     <div class="main">
-
       <div class="topbar">
-        <div class="crumbs">Sourcevision / <b>Overview</b></div>
+        <div class="crumbs" id="crumbs"></div>
         <div class="search">Search files, zones, tasks…</div>
         <button class="btn">Refresh</button>
         <button class="btn btn-primary">Analyze</button>
       </div>
-
       <div class="content">
-        <h2 class="view-title">Overview</h2>
-
-        <!-- Stat tiles -->
+        <div class="view-head">
+          <h2 class="view-title" id="view-title">—</h2>
+          <span id="view-prev" class="prev"></span>
+          <span id="view-mark"></span>
+        </div>
         <div class="stat-row">
           <div class="stat"><div class="stat-value">412</div><div class="stat-label">Files</div></div>
           <div class="stat"><div class="stat-value">18</div><div class="stat-label">Zones</div></div>
           <div class="stat"><div class="stat-value">63%</div><div class="stat-label">PRD complete</div></div>
           <div class="stat"><div class="stat-value">4</div><div class="stat-label">Problems</div></div>
         </div>
-
-        <!-- Panels — one <article> per panel. Move these to reshuffle the page.
-             Widths: span-4 / span-6 (default) / span-8 / span-12.          -->
-        <div class="panel-grid">
-
-          <article class="panel span-8">
-            <h3>Architecture Health</h3>
-            <div class="skeleton"><span></span><span></span><span></span><span></span></div>
-          </article>
-
-          <article class="panel span-4">
-            <h3>Next Steps</h3>
-            <div class="skeleton"><span></span><span></span><span></span></div>
-          </article>
-
-          <article class="panel span-4">
-            <h3>Top Zones</h3>
-            <div class="skeleton"><span></span><span></span><span></span></div>
-          </article>
-
-          <article class="panel span-4">
-            <h3>Languages</h3>
-            <div class="skeleton"><span></span><span></span><span></span></div>
-          </article>
-
-          <article class="panel span-4">
-            <h3>Getting Started</h3>
-            <div class="skeleton"><span></span><span></span><span></span></div>
-          </article>
-
-          <article class="panel span-12">
-            <h3>Recent Activity</h3>
-            <div class="skeleton"><span></span><span></span><span></span><span></span></div>
-          </article>
-
-        </div>
+        <div class="panel-grid" id="panel-grid"></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════════════════════════════
-     TAB 2 — RATIONALE
-     Why the layout changes. Keep it short; reviewers read this first.
-     ═══════════════════════════════════════════════════════════════════════ -->
+<!-- ═══ RATIONALE ═══════════════════════════════════════════════════════ -->
 <section id="tab-rationale" hidden>
   <div class="prose">
+    <h2>Changes so far</h2>
+    <p class="doc-sub">Collected from the marks in the Layout tab — nothing to keep in sync by hand.</p>
+    <ul class="change-list" id="change-list"></ul>
 
-    <h2>The problem</h2>
-    <p>
-      The sidebar currently lists every view of all three tools at one level of
-      importance — 30+ entries across six groups. Fill this in with what
-      actually prompted the reshuffle.
-    </p>
-
-    <h2>What moves</h2>
-    <table>
-      <thead><tr><th>Section</th><th>Today</th><th>Proposed</th><th>Why</th></tr></thead>
-      <tbody>
-        <tr><td>—</td><td>—</td><td>—</td><td>fill in as you shuffle the Layout tab</td></tr>
-      </tbody>
-    </table>
-
-    <h2>What stays</h2>
-    <p>Note anything deliberately left alone, so reviewers don't re-litigate it.</p>
-
-    <h2>Open questions</h2>
-    <ul>
-      <li>…</li>
-    </ul>
-
+    <h2>Notes for reviewers</h2>
+    <p class="doc-sub">Why the shuffle. Saved with the layout.</p>
+    <textarea class="notes" id="notes" placeholder="What problem does this layout solve? What deliberately stays put? What is still open?"></textarea>
   </div>
 </section>
 
 </div>
 
 <script>
-// Tabs + theme toggle. Intentionally the only script here: this document is a
-// layout mock-up, and anything more would start being an application.
+/* ════════════════════════════════════════════════════════════════════════
+   Editor.
+
+   The page renders from `layout` (index.layout.json) and writes it straight
+   back — there is no second source of truth and no DOM-to-model parsing. Every
+   mutation goes through one of the mark* helpers so that a move, a rename or an
+   addition is *recorded*, not just applied: the change list in the Rationale
+   tab is what reviewers read, and it only works if nothing mutates the tree
+   behind its back.
+   ════════════════════════════════════════════════════════════════════════ */
 (function () {
+  "use strict";
+
+  var API = "/__preview/layout";
+  var FALLBACK = "./index.layout.json";
+  var SAVE_DEBOUNCE_MS = 400;
+  var POLL_MS = 700;
+
+  var layout = null;
+  var saveTimer = null;
+  var baselineFingerprint = null;
+  var suppressReloadUntil = 0;
+  var dragState = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ── Model helpers ──────────────────────────────────────────────────── */
+
+  function uid(prefix) {
+    return prefix + "-" + Math.random().toString(36).slice(2, 8);
+  }
+
+  /** Depth-first walk; `fn(node, parentArray, index, depth, ancestors)`. */
+  function walk(nodes, fn, depth, ancestors) {
+    depth = depth || 0;
+    ancestors = ancestors || [];
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      fn(node, nodes, i, depth, ancestors);
+      if (node.kind === "folder" && node.children) {
+        walk(node.children, fn, depth + 1, ancestors.concat([node]));
+      }
+    }
+  }
+
+  function find(id) {
+    var hit = null;
+    walk(layout.nav, function (node, siblings, index, depth, ancestors) {
+      if (node.id === id) hit = { node: node, siblings: siblings, index: index, depth: depth, ancestors: ancestors };
+    });
+    return hit;
+  }
+
+  function allItems() {
+    var items = [];
+    walk(layout.nav, function (node, _s, _i, _d, ancestors) {
+      if (node.kind === "item") items.push({ node: node, path: ancestors.map(function (a) { return a.label; }) });
+    });
+    return items;
+  }
+
+  function activeItem() {
+    var items = allItems();
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].node.id === layout.activeItemId) return items[i];
+    }
+    return items[0] || null;
+  }
+
+  /** True when `maybeAncestorId` contains `nodeId` — a folder cannot move into itself. */
+  function contains(maybeAncestorId, nodeId) {
+    var hit = find(nodeId);
+    if (!hit) return false;
+    return hit.ancestors.some(function (a) { return a.id === maybeAncestorId; });
+  }
+
+  /* ── Mutations. Every one of these records what it did. ─────────────── */
+
+  function markMoved(node) {
+    if (node.status !== "new" && node.status !== "removed") node.status = "moved";
+  }
+
+  function rename(node, next) {
+    next = (next || "").replace(/\s+/g, " ").trim();
+    if (!next || next === node.label) return false;
+    // The annotation always points at the ORIGINAL name, not the previous
+    // edit — three renames in a row should still read "(previously Tasks)".
+    var original = node.previousLabel != null ? node.previousLabel : node.label;
+    node.label = next;
+    if (next === original) delete node.previousLabel;
+    else node.previousLabel = original;
+    return true;
+  }
+
+  function removeNode(node) {
+    if (node.status === "removed") {
+      // Second press deletes for real — a cut section stays visible once so a
+      // reviewer can see what went, which is the whole point of the mark.
+      var hit = find(node.id);
+      if (hit) hit.siblings.splice(hit.index, 1);
+      if (node.kind === "item" && layout.activeItemId === node.id) {
+        var first = allItems()[0];
+        layout.activeItemId = first ? first.node.id : null;
+      }
+      return;
+    }
+    node.statusBeforeRemoval = node.status || null;
+    node.status = "removed";
+  }
+
+  function restoreNode(node) {
+    node.status = node.statusBeforeRemoval || null;
+    if (!node.status) delete node.status;
+    delete node.statusBeforeRemoval;
+  }
+
+  function moveNode(dragId, targetId, mode) {
+    if (dragId === targetId) return;
+    if (contains(dragId, targetId)) return;   // no folder inside its own subtree
+    var src = find(dragId);
+    var tgt = find(targetId);
+    if (!src || !tgt) return;
+
+    src.siblings.splice(src.index, 1);
+
+    if (mode === "inside" && tgt.node.kind === "folder") {
+      tgt.node.children = tgt.node.children || [];
+      tgt.node.children.push(src.node);
+      tgt.node.collapsed = false;
+    } else {
+      // Re-find the target: removing the source may have shifted its index.
+      var again = find(targetId);
+      var at = again.index + (mode === "after" ? 1 : 0);
+      again.siblings.splice(at, 0, src.node);
+    }
+    markMoved(src.node);
+  }
+
+  function addFolder(parentFolder) {
+    var node = { id: uid("grp"), kind: "folder", label: "New group", status: "new", children: [] };
+    if (parentFolder) {
+      parentFolder.children = parentFolder.children || [];
+      parentFolder.children.push(node);
+      parentFolder.collapsed = false;
+    } else {
+      layout.nav.push(node);
+    }
+    return node;
+  }
+
+  function addItem(parentFolder) {
+    var node = { id: uid("tab"), kind: "item", icon: "▫", label: "New tab", status: "new", panels: [] };
+    if (parentFolder) {
+      parentFolder.children = parentFolder.children || [];
+      parentFolder.children.push(node);
+      parentFolder.collapsed = false;
+    } else {
+      layout.nav.push(node);
+    }
+    layout.activeItemId = node.id;
+    return node;
+  }
+
+  function addPanel(item) {
+    item.panels = item.panels || [];
+    item.panels.push({ id: uid("pnl"), label: "New panel", width: 6, status: "new" });
+  }
+
+  function movePanel(item, dragId, targetId, mode) {
+    var from = -1, to = -1;
+    item.panels.forEach(function (p, i) {
+      if (p.id === dragId) from = i;
+      if (p.id === targetId) to = i;
+    });
+    if (from < 0 || to < 0 || from === to) return;
+    var moved = item.panels.splice(from, 1)[0];
+    var again = item.panels.findIndex(function (p) { return p.id === targetId; });
+    item.panels.splice(again + (mode === "after" ? 1 : 0), 0, moved);
+    markMoved(moved);
+  }
+
+  function movePanelToItem(fromItem, panelId, toItemId) {
+    var idx = fromItem.panels.findIndex(function (p) { return p.id === panelId; });
+    if (idx < 0) return;
+    var target = null;
+    allItems().forEach(function (entry) { if (entry.node.id === toItemId) target = entry.node; });
+    if (!target || target === fromItem) return;
+    var panel = fromItem.panels.splice(idx, 1)[0];
+    markMoved(panel);
+    target.panels = target.panels || [];
+    target.panels.push(panel);
+  }
+
+  /* ── Rendering ──────────────────────────────────────────────────────── */
+
+  function chipFor(status) {
+    if (!status) return null;
+    var el = document.createElement("span");
+    el.className = "chip chip-" + status;
+    el.textContent = status === "removed" ? "cut" : status;
+    return el;
+  }
+
+  function labelEls(node, into) {
+    var label = document.createElement("span");
+    label.className = "label";
+    label.textContent = node.label;
+    label.contentEditable = "true";
+    label.spellcheck = false;
+    label.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); label.blur(); }
+      if (e.key === "Escape") { label.textContent = node.label; label.blur(); }
+    });
+    label.addEventListener("blur", function () {
+      if (rename(node, label.textContent)) commit();
+      else label.textContent = node.label;
+    });
+    into.appendChild(label);
+
+    if (node.previousLabel) {
+      var prev = document.createElement("span");
+      prev.className = "prev";
+      prev.textContent = "(previously " + node.previousLabel + ")";
+      into.appendChild(prev);
+    }
+    var chip = chipFor(node.status);
+    if (chip) into.appendChild(chip);
+  }
+
+  function mini(text, title, onClick, danger) {
+    var b = document.createElement("button");
+    b.className = "mini" + (danger ? " mini-danger" : "");
+    b.textContent = text;
+    b.title = title;
+    b.addEventListener("click", function (e) { e.stopPropagation(); onClick(); });
+    return b;
+  }
+
+  function navRow(node, depth) {
+    var row = document.createElement("div");
+    row.className = "row " + (node.kind === "folder" ? "row-folder" : "row-item") + " depth-" + depth;
+    if (node.status === "removed") row.classList.add("row-removed");
+    if (node.kind === "item" && node.id === layout.activeItemId) row.classList.add("active");
+    row.dataset.id = node.id;
+    row.draggable = true;
+    row.tabIndex = 0;
+    row.style.paddingLeft = (6 + depth * 12) + "px";
+
+    var handle = document.createElement("span");
+    handle.className = "handle";
+    handle.textContent = "⠿";
+    row.appendChild(handle);
+
+    if (node.kind === "folder") {
+      var caret = document.createElement("button");
+      caret.className = "caret";
+      caret.textContent = node.collapsed ? "▸" : "▾";
+      caret.title = node.collapsed ? "Expand" : "Collapse";
+      caret.addEventListener("click", function (e) {
+        e.stopPropagation();
+        node.collapsed = !node.collapsed;
+        commit();
+      });
+      row.appendChild(caret);
+    } else {
+      var icon = document.createElement("span");
+      icon.className = "icon";
+      icon.textContent = node.icon || "▫";
+      icon.contentEditable = "true";
+      icon.title = "Glyph — edit freely";
+      icon.addEventListener("blur", function () {
+        var next = (icon.textContent || "").trim().slice(0, 2);
+        if (next && next !== node.icon) { node.icon = next; commit(); } else { icon.textContent = node.icon || "▫"; }
+      });
+      row.appendChild(icon);
+    }
+
+    labelEls(node, row);
+
+    if (node.flag) {
+      var flag = document.createElement("span");
+      flag.className = "flag-chip";
+      flag.textContent = "flag";
+      flag.title = "Feature-gated in the real dashboard";
+      row.appendChild(flag);
+    }
+
+    var actions = document.createElement("span");
+    actions.className = "row-actions";
+    if (node.kind === "folder") {
+      actions.appendChild(mini("+tab", "Add a tab in this group", function () { addItem(node); commit(); }));
+      actions.appendChild(mini("+grp", "Add a nested group — this is how sections go into a dropdown", function () { addFolder(node); commit(); }));
+    }
+    if (node.status === "removed") {
+      actions.appendChild(mini("↺", "Restore", function () { restoreNode(node); commit(); }));
+      actions.appendChild(mini("⌫", "Delete permanently", function () { removeNode(node); commit(); }, true));
+    } else {
+      actions.appendChild(mini("×", "Mark as cut", function () { removeNode(node); commit(); }, true));
+    }
+    row.appendChild(actions);
+
+    if (node.kind === "item") {
+      row.addEventListener("click", function (e) {
+        // Clicking the name means "rename", not "switch tab". Selecting a tab
+        // re-renders the whole tree, which would destroy the element the caret
+        // was just placed in and silently swallow everything typed next.
+        if (e.target && e.target.isContentEditable) return;
+        if (node.id === layout.activeItemId) return;
+        layout.activeItemId = node.id;
+        commit();
+      });
+    }
+
+    wireRowDrag(row, node);
+    wireRowKeys(row, node);
+    return row;
+  }
+
+  function renderNav(nodes, depth, into) {
+    nodes.forEach(function (node) {
+      into.appendChild(navRow(node, depth));
+      if (node.kind === "folder" && !node.collapsed) {
+        var children = document.createElement("div");
+        children.className = "children";
+        renderNav(node.children || [], depth + 1, children);
+        into.appendChild(children);
+      }
+    });
+  }
+
+  function panelCard(panel, item) {
+    var card = document.createElement("article");
+    card.className = "panel" + (panel.status ? " panel-status-" + panel.status : "");
+    card.dataset.id = panel.id;
+    card.dataset.width = String(panel.width || 6);
+    card.draggable = true;
+
+    var head = document.createElement("div");
+    head.className = "panel-head";
+
+    var handle = document.createElement("span");
+    handle.className = "handle";
+    handle.textContent = "⠿";
+    head.appendChild(handle);
+
+    var title = document.createElement("h3");
+    title.textContent = panel.label;
+    title.contentEditable = "true";
+    title.spellcheck = false;
+    title.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); title.blur(); }
+    });
+    title.addEventListener("blur", function () {
+      if (rename(panel, title.textContent)) commit();
+      else title.textContent = panel.label;
+    });
+    head.appendChild(title);
+
+    if (panel.previousLabel) {
+      var prev = document.createElement("span");
+      prev.className = "prev";
+      prev.textContent = "(previously " + panel.previousLabel + ")";
+      head.appendChild(prev);
+    }
+    var chip = chipFor(panel.status);
+    if (chip) head.appendChild(chip);
+
+    var actions = document.createElement("span");
+    actions.className = "panel-actions";
+
+    var width = document.createElement("select");
+    width.title = "Column span";
+    [4, 6, 8, 12].forEach(function (w) {
+      var opt = document.createElement("option");
+      opt.value = String(w);
+      opt.textContent = w + "/12";
+      if ((panel.width || 6) === w) opt.selected = true;
+      width.appendChild(opt);
+    });
+    width.addEventListener("change", function () {
+      panel.width = parseInt(width.value, 10);
+      commit();
+    });
+    actions.appendChild(width);
+
+    var moveTo = document.createElement("select");
+    moveTo.title = "Move this panel to another tab";
+    var head0 = document.createElement("option");
+    head0.textContent = "move to…";
+    head0.value = "";
+    moveTo.appendChild(head0);
+    allItems().forEach(function (entry) {
+      if (entry.node.id === item.id) return;
+      var opt = document.createElement("option");
+      opt.value = entry.node.id;
+      opt.textContent = entry.path.concat([entry.node.label]).join(" › ");
+      moveTo.appendChild(opt);
+    });
+    moveTo.addEventListener("change", function () {
+      if (!moveTo.value) return;
+      movePanelToItem(item, panel.id, moveTo.value);
+      commit();
+    });
+    actions.appendChild(moveTo);
+
+    if (panel.status === "removed") {
+      actions.appendChild(mini("↺", "Restore", function () { restorePanel(item, panel); }));
+      actions.appendChild(mini("⌫", "Delete permanently", function () { deletePanel(item, panel); }, true));
+    } else {
+      actions.appendChild(mini("×", "Mark as cut", function () { cutPanel(panel); }, true));
+    }
+    head.appendChild(actions);
+    card.appendChild(head);
+
+    var skeleton = document.createElement("div");
+    skeleton.className = "skeleton";
+    for (var i = 0; i < 4; i++) skeleton.appendChild(document.createElement("span"));
+    card.appendChild(skeleton);
+
+    wirePanelDrag(card, panel, item);
+    return card;
+  }
+
+  function cutPanel(panel) {
+    panel.statusBeforeRemoval = panel.status || null;
+    panel.status = "removed";
+    commit();
+  }
+  function restorePanel(_item, panel) {
+    panel.status = panel.statusBeforeRemoval || null;
+    if (!panel.status) delete panel.status;
+    delete panel.statusBeforeRemoval;
+    commit();
+  }
+  function deletePanel(item, panel) {
+    item.panels = item.panels.filter(function (p) { return p.id !== panel.id; });
+    commit();
+  }
+
+  function renderContent() {
+    var grid = $("panel-grid");
+    grid.textContent = "";
+    var entry = activeItem();
+
+    if (!entry) {
+      $("view-title").textContent = "No tabs";
+      $("crumbs").textContent = "";
+      return;
+    }
+
+    $("view-title").textContent = entry.node.label;
+    $("view-prev").textContent = entry.node.previousLabel ? "(previously " + entry.node.previousLabel + ")" : "";
+    $("view-mark").textContent = "";
+    var mark = chipFor(entry.node.status);
+    if (mark) $("view-mark").appendChild(mark);
+
+    $("crumbs").textContent = "";
+    entry.path.forEach(function (p) {
+      $("crumbs").appendChild(document.createTextNode(p + " / "));
+    });
+    var strong = document.createElement("b");
+    strong.textContent = entry.node.label;
+    $("crumbs").appendChild(strong);
+
+    var panels = entry.node.panels || [];
+    if (panels.length === 0) {
+      var empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "No panels in this tab yet.";
+      grid.appendChild(empty);
+    } else {
+      panels.forEach(function (panel) { grid.appendChild(panelCard(panel, entry.node)); });
+    }
+
+    var add = document.createElement("button");
+    add.className = "mini add-panel";
+    add.textContent = "+ panel";
+    add.style.gridColumn = "span 12";
+    add.style.justifySelf = "start";
+    add.addEventListener("click", function () { addPanel(entry.node); commit(); });
+    grid.appendChild(add);
+  }
+
+  function renderChangeList() {
+    var list = $("change-list");
+    list.textContent = "";
+    var changes = [];
+
+    function record(node, path, kind) {
+      if (!node.status && !node.previousLabel) return;
+      changes.push({ node: node, path: path, kind: kind });
+    }
+
+    walk(layout.nav, function (node, _s, _i, _d, ancestors) {
+      var path = ancestors.map(function (a) { return a.label; }).join(" › ");
+      record(node, path, node.kind === "folder" ? "group" : "tab");
+      if (node.kind === "item") {
+        (node.panels || []).forEach(function (panel) {
+          record(panel, path ? path + " › " + node.label : node.label, "panel");
+        });
+      }
+    });
+
+    var count = $("change-count");
+    if (changes.length === 0) {
+      count.hidden = true;
+      var none = document.createElement("li");
+      none.textContent = "No changes yet — drag, rename or add something.";
+      none.style.color = "var(--text-muted)";
+      list.appendChild(none);
+      return;
+    }
+    count.hidden = false;
+    count.textContent = String(changes.length);
+
+    changes.forEach(function (change) {
+      var li = document.createElement("li");
+      var chip = chipFor(change.node.status || "renamed");
+      if (change.node.status) {
+        li.appendChild(chip);
+      } else {
+        var renamed = document.createElement("span");
+        renamed.className = "chip";
+        renamed.style.color = "var(--purple)";
+        renamed.textContent = "renamed";
+        li.appendChild(renamed);
+      }
+
+      var kind = document.createElement("span");
+      kind.className = "change-path";
+      kind.textContent = change.kind;
+      li.appendChild(kind);
+
+      var name = document.createElement("span");
+      name.textContent = change.node.label;
+      li.appendChild(name);
+
+      if (change.node.previousLabel) {
+        var prev = document.createElement("span");
+        prev.className = "prev";
+        prev.textContent = "(previously " + change.node.previousLabel + ")";
+        li.appendChild(prev);
+      }
+
+      if (change.path) {
+        var path = document.createElement("span");
+        path.className = "change-path";
+        path.style.marginLeft = "auto";
+        path.textContent = change.path;
+        li.appendChild(path);
+      }
+      list.appendChild(li);
+    });
+  }
+
+  function render() {
+    $("doc-title").textContent = layout.meta.title;
+    $("doc-subtitle").textContent = layout.meta.subtitle;
+    var root = $("nav-root");
+    root.textContent = "";
+    renderNav(layout.nav, 0, root);
+    renderContent();
+    renderChangeList();
+    if (document.activeElement !== $("notes")) $("notes").value = layout.rationale || "";
+  }
+
+  /* ── Drag and drop ──────────────────────────────────────────────────── */
+
+  function clearDropMarks() {
+    document.querySelectorAll(".drop-before, .drop-after, .drop-inside").forEach(function (el) {
+      el.classList.remove("drop-before", "drop-after", "drop-inside");
+    });
+  }
+
+  /**
+   * Which third of the row the pointer is in.
+   *
+   * Folders get a wide middle band ("inside") because nesting is the gesture
+   * this document exists for; items only ever get before/after.
+   */
+  function dropMode(e, el, allowInside) {
+    var rect = el.getBoundingClientRect();
+    var ratio = (e.clientY - rect.top) / rect.height;
+    if (allowInside && ratio > 0.3 && ratio < 0.7) return "inside";
+    return ratio < 0.5 ? "before" : "after";
+  }
+
+  function wireRowDrag(row, node) {
+    row.addEventListener("dragstart", function (e) {
+      dragState = { type: "nav", id: node.id };
+      row.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", node.id);
+    });
+    row.addEventListener("dragend", function () {
+      row.classList.remove("dragging");
+      dragState = null;
+      clearDropMarks();
+    });
+    row.addEventListener("dragover", function (e) {
+      if (!dragState || dragState.type !== "nav") return;
+      if (dragState.id === node.id) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      clearDropMarks();
+      row.classList.add("drop-" + dropMode(e, row, node.kind === "folder"));
+    });
+    row.addEventListener("drop", function (e) {
+      if (!dragState || dragState.type !== "nav") return;
+      e.preventDefault();
+      e.stopPropagation();
+      var mode = dropMode(e, row, node.kind === "folder");
+      clearDropMarks();
+      moveNode(dragState.id, node.id, mode);
+      dragState = null;
+      commit();
+    });
+  }
+
+  function wirePanelDrag(card, panel, item) {
+    card.addEventListener("dragstart", function (e) {
+      dragState = { type: "panel", id: panel.id };
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", panel.id);
+    });
+    card.addEventListener("dragend", function () {
+      card.classList.remove("dragging");
+      dragState = null;
+      clearDropMarks();
+    });
+    card.addEventListener("dragover", function (e) {
+      if (!dragState || dragState.type !== "panel" || dragState.id === panel.id) return;
+      e.preventDefault();
+      clearDropMarks();
+      var rect = card.getBoundingClientRect();
+      card.classList.add((e.clientX - rect.left) / rect.width < 0.5 ? "drop-before" : "drop-after");
+    });
+    card.addEventListener("drop", function (e) {
+      if (!dragState || dragState.type !== "panel") return;
+      e.preventDefault();
+      var rect = card.getBoundingClientRect();
+      var mode = (e.clientX - rect.left) / rect.width < 0.5 ? "before" : "after";
+      clearDropMarks();
+      movePanel(item, dragState.id, panel.id, mode);
+      dragState = null;
+      commit();
+    });
+  }
+
+  // Dropping on the empty space below the tree moves a node to the top level.
+  $("nav-root").addEventListener("dragover", function (e) {
+    if (dragState && dragState.type === "nav") e.preventDefault();
+  });
+  $("nav-root").addEventListener("drop", function (e) {
+    if (!dragState || dragState.type !== "nav") return;
+    if (e.target !== $("nav-root")) return;
+    e.preventDefault();
+    var hit = find(dragState.id);
+    if (hit) {
+      hit.siblings.splice(hit.index, 1);
+      layout.nav.push(hit.node);
+      markMoved(hit.node);
+    }
+    dragState = null;
+    clearDropMarks();
+    commit();
+  });
+
+  /** Keyboard moves — drag-and-drop is fiddly for a 30-row tree. */
+  function wireRowKeys(row, node) {
+    row.addEventListener("keydown", function (e) {
+      if (!e.altKey) return;
+      var hit = find(node.id);
+      if (!hit) return;
+      var handled = true;
+
+      if (e.key === "ArrowUp" && hit.index > 0) {
+        hit.siblings.splice(hit.index, 1);
+        hit.siblings.splice(hit.index - 1, 0, node);
+        markMoved(node);
+      } else if (e.key === "ArrowDown" && hit.index < hit.siblings.length - 1) {
+        hit.siblings.splice(hit.index, 1);
+        hit.siblings.splice(hit.index + 1, 0, node);
+        markMoved(node);
+      } else if (e.key === "ArrowRight" && hit.index > 0 && hit.siblings[hit.index - 1].kind === "folder") {
+        var into = hit.siblings[hit.index - 1];
+        hit.siblings.splice(hit.index, 1);
+        into.children = into.children || [];
+        into.children.push(node);
+        into.collapsed = false;
+        markMoved(node);
+      } else if (e.key === "ArrowLeft" && hit.ancestors.length > 0) {
+        var parent = hit.ancestors[hit.ancestors.length - 1];
+        var parentHit = find(parent.id);
+        hit.siblings.splice(hit.index, 1);
+        parentHit.siblings.splice(parentHit.index + 1, 0, node);
+        markMoved(node);
+      } else {
+        handled = false;
+      }
+
+      if (handled) {
+        e.preventDefault();
+        commit(node.id);
+      }
+    });
+  }
+
+  /* ── Persistence ────────────────────────────────────────────────────── */
+
+  function setSaveState(state, detail) {
+    var el = $("save-state");
+    el.dataset.state = state;
+    el.textContent = state === "saving" ? "saving…"
+      : state === "saved" ? "saved"
+      : state === "error" ? "save failed"
+      : state === "local" ? "not saved (no server)"
+      : state;
+    el.title = detail || "";
+  }
+
+  /** Apply the model to the DOM and schedule a write. `focusId` restores focus after a re-render. */
+  function commit(focusId) {
+    render();
+    if (focusId) {
+      var el = document.querySelector('.row[data-id="' + focusId + '"]');
+      if (el) el.focus();
+    }
+    scheduleSave();
+  }
+
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    setSaveState("saving");
+    saveTimer = setTimeout(save, SAVE_DEBOUNCE_MS);
+  }
+
+  function save() {
+    // The poller must not reload the page on the fingerprint change this save
+    // is about to cause — that would drop focus mid-edit for no reason.
+    suppressReloadUntil = Date.now() + 2000;
+    fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(layout, null, 2),
+    }).then(function (r) {
+      if (!r.ok) return r.text().then(function (t) { throw new Error(t || r.status); });
+      return r.json();
+    }).then(function (res) {
+      if (res && res.fingerprint) baselineFingerprint = res.fingerprint;
+      setSaveState("saved", res && res.path ? "Written to " + res.path : "");
+    }).catch(function (err) {
+      // Opened from the filesystem rather than through `ndx start --preview`:
+      // editing still works, it just cannot be written anywhere.
+      setSaveState(location.protocol === "file:" ? "local" : "error", String(err.message || err));
+    });
+  }
+
+  function load() {
+    var tryFallback = function () {
+      return fetch(FALLBACK, { cache: "no-store" }).then(function (r) {
+        if (!r.ok) throw new Error("no layout");
+        return r.json();
+      });
+    };
+    return fetch(API, { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : tryFallback(); })
+      .catch(tryFallback)
+      .then(function (data) {
+        layout = normalize(data);
+        setSaveState("saved");
+        render();
+      })
+      .catch(function () {
+        setSaveState("error", "No layout file found");
+        $("nav-root").textContent = "No layout file — run: ndx start --preview .";
+      });
+  }
+
+  /** Fill in anything a hand-edited layout file left out, so bad JSON degrades rather than blanks the page. */
+  function normalize(data) {
+    data = data || {};
+    data.meta = data.meta || {};
+    if (!data.meta.title) data.meta.title = "n-dx dashboard — layout";
+    if (!data.meta.subtitle) data.meta.subtitle = "Draft";
+    data.nav = Array.isArray(data.nav) ? data.nav : [];
+    if (typeof data.rationale !== "string") data.rationale = "";
+    walk(data.nav, function (node) {
+      if (!node.id) node.id = uid(node.kind === "folder" ? "grp" : "tab");
+      if (!node.kind) node.kind = node.children ? "folder" : "item";
+      if (node.kind === "folder" && !Array.isArray(node.children)) node.children = [];
+      if (node.kind === "item" && !Array.isArray(node.panels)) node.panels = [];
+      if (node.kind === "item") {
+        node.panels.forEach(function (p) {
+          if (!p.id) p.id = uid("pnl");
+          if (!p.width) p.width = 6;
+        });
+      }
+    });
+    return data;
+  }
+
+  /* ── Chrome wiring ──────────────────────────────────────────────────── */
+
   var tabs = document.querySelectorAll(".doc-tab");
   tabs.forEach(function (tab) {
     tab.addEventListener("click", function () {
@@ -509,9 +1206,78 @@ li.is-new::after, li.is-moved::after, li.is-removed::after { margin-left: auto; 
     });
   });
 
-  var root = document.documentElement;
-  document.getElementById("theme-toggle").addEventListener("click", function () {
-    root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  $("theme-toggle").addEventListener("click", function () {
+    var root = document.documentElement;
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("ndx-preview-theme", next); } catch (e) { /* private mode */ }
+  });
+
+  $("mode-toggle").addEventListener("click", function () {
+    var editing = document.body.dataset.mode === "edit";
+    var next = editing ? "present" : "edit";
+    document.body.dataset.mode = next;
+    $("mode-toggle").textContent = next === "edit" ? "Editing" : "Present";
+    $("mode-toggle").setAttribute("aria-pressed", String(next === "edit"));
+    document.querySelectorAll('[contenteditable]').forEach(function (el) {
+      el.contentEditable = next === "edit" ? "true" : "false";
+    });
+    try { localStorage.setItem("ndx-preview-mode", next); } catch (e) { /* private mode */ }
+  });
+
+  $("copy-json").addEventListener("click", function () {
+    var text = JSON.stringify(layout, null, 2);
+    navigator.clipboard.writeText(text).then(function () {
+      $("copy-json").textContent = "Copied";
+      setTimeout(function () { $("copy-json").textContent = "Copy JSON"; }, 1200);
+    }).catch(function () { window.prompt("Copy the layout JSON:", text); });
+  });
+
+  $("add-group").addEventListener("click", function () { addFolder(null); commit(); });
+  $("add-tab").addEventListener("click", function () { addItem(null); commit(); });
+
+  ["doc-title", "doc-subtitle"].forEach(function (id) {
+    $(id).addEventListener("blur", function () {
+      var key = id === "doc-title" ? "title" : "subtitle";
+      var next = $(id).textContent.trim();
+      if (next && next !== layout.meta[key]) { layout.meta[key] = next; scheduleSave(); }
+    });
+  });
+
+  var notesTimer = null;
+  $("notes").addEventListener("input", function () {
+    layout.rationale = $("notes").value;
+    if (notesTimer) clearTimeout(notesTimer);
+    setSaveState("saving");
+    notesTimer = setTimeout(save, 600);
+  });
+
+  /* ── Live reload ────────────────────────────────────────────────────── */
+
+  function poll() {
+    fetch("/__preview/state", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (s) {
+        if (baselineFingerprint === null) { baselineFingerprint = s.fingerprint; return; }
+        if (s.fingerprint === baselineFingerprint) return;
+        if (Date.now() < suppressReloadUntil) return;  // our own save landing
+        location.reload();
+      })
+      .catch(function () { /* server restarting — keep polling */ });
+  }
+
+  /* ── Boot ───────────────────────────────────────────────────────────── */
+
+  try {
+    var savedTheme = localStorage.getItem("ndx-preview-theme");
+    if (savedTheme) document.documentElement.setAttribute("data-theme", savedTheme);
+    var savedMode = localStorage.getItem("ndx-preview-mode");
+    if (savedMode === "present") $("mode-toggle").click();
+  } catch (e) { /* private mode */ }
+
+  load().then(function () {
+    setInterval(poll, POLL_MS);
+    poll();
   });
 })();
 </script>

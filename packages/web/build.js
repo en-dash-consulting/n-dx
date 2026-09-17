@@ -152,11 +152,16 @@ async function buildLanding() {
  * preview server prefers src/preview/index.html so edits are live.
  */
 function copyPreview() {
-  const previewSrc = resolve(__dirname, "src/preview/index.html");
-  if (!existsSync(previewSrc)) return;
+  const previewSrcDir = resolve(__dirname, "src/preview");
+  if (!existsSync(resolve(previewSrcDir, "index.html"))) return;
   const previewOutDir = resolve(__dirname, "dist/preview");
   mkdirSync(previewOutDir, { recursive: true });
-  copyFileSync(previewSrc, resolve(previewOutDir, "index.html"));
+  // index.layout.json carries the structure the document renders; without it a
+  // published install would open to an empty shell.
+  for (const file of ["index.html", "index.layout.json"]) {
+    const src = resolve(previewSrcDir, file);
+    if (existsSync(src)) copyFileSync(src, resolve(previewOutDir, file));
+  }
   console.log("Copied preview: dist/preview/index.html");
 }
 
