@@ -256,7 +256,7 @@ async function handleCaptureNextSteps(
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       steps?: Array<{ title?: string; description?: string; priority?: string; category?: string }>;
     };
@@ -406,7 +406,7 @@ async function handleCaptureAsk(
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body || "{}") as {
       question?: unknown;
       answer?: unknown;
@@ -523,7 +523,7 @@ async function handleAnalyze(
 ): Promise<boolean> {
   let input: { accept?: boolean; noLlm?: boolean; lite?: boolean };
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     input = JSON.parse(body) as typeof input;
   } catch (err) {
     errorResponse(res, 400, String(err));
@@ -598,7 +598,7 @@ async function handleAcceptProposals(
   }
 
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       /** Indices of proposals to accept. If not provided, accept all. */
       indices?: number[];
@@ -741,7 +741,7 @@ async function handleAcceptEditedProposals(
   }
 
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       proposals: EditedProposal[];
       /** If true, only validate — don't commit changes. */
@@ -899,7 +899,7 @@ async function handleSmartAddPreview(
   ctx: ServerContext,
 ): Promise<boolean> {
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       text: string;
       parentId?: string;
@@ -1006,7 +1006,7 @@ async function handleBatchImport(
   }
 
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       items: Array<{
         content: string;

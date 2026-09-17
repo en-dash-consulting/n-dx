@@ -795,7 +795,7 @@ async function handleConfigUpdate(
   // Parse request body
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -998,7 +998,7 @@ async function handleTemplateCreate(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -1262,7 +1262,7 @@ async function handleExecute(
   // Parse request body
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -2673,7 +2673,7 @@ async function handleThrottleUpdate(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -2773,7 +2773,7 @@ async function handleEmergencyStop(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");

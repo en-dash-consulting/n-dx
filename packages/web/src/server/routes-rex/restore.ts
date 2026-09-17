@@ -95,7 +95,7 @@ async function handleRestore(
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       /** Snapshot id from GET /api/rex/backups. Required — this is a destructive, explicit operation. */
       id?: string;

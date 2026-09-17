@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import { connect } from "node:net";
 import { describe, expect, it } from "vitest";
 import { handleRequestSecurity } from "../../src/server/request-security.js";
-import { MAX_REQUEST_BODY_BYTES } from "../../src/server/response-utils.js";
+import { MAX_REQUEST_BODY_BYTES, errorResponse, readBody } from "../../src/server/response-utils.js";
 
 interface MockResponse {
   response: ServerResponse;
@@ -227,4 +227,88 @@ describe("request body size limit (integration)", () => {
       await new Promise<void>((r) => server.close(() => r()));
     }
   });
+
+  /**
+   * A route as they are all written: security guard, then `readBody(req, res)`
+   * inside a try/catch that answers 400. The chunked body carries no
+   * Content-Length, so the guard waves it through and the streamed cap in
+   * readBody is the only thing between it and memory.
+   */
+  function startBodyReadingServer(): Promise<{ server: Server; port: number }> {
+    return new Promise((resolve) => {
+      const server = createServer(async (req, res) => {
+        if (handleRequestSecurity(req, res)) return;
+        try {
+          const body = await readBody(req, res);
+          res.writeHead(200);
+          res.end(`read ${body.length}`);
+        } catch (err) {
+          // What every route does. Once readBody has answered 413 this is a
+          // no-op, which is the point: no route had to change.
+          errorResponse(res, 400, (err as Error).message);
+        }
+      });
+      server.listen(0, "127.0.0.1", () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        resolve({ server, port });
+      });
+    });
+  }
+
+  it("answers 413 on an over-cap chunked body that declares no Content-Length", async () => {
+    const { server, port } = await startBodyReadingServer();
+    try {
+      const { statusLine, body } = await new Promise<{ statusLine: string; body: string }>((resolve, reject) => {
+        const socket = connect({ host: "127.0.0.1", port }, () => {
+          socket.write(
+            `POST /api/anything HTTP/1.1\r\n` +
+            `Host: 127.0.0.1:${port}\r\n` +
+            `Content-Type: application/json\r\n` +
+            `Transfer-Encoding: chunked\r\n` +
+            `\r\n`,
+          );
+          // Chunks until the cap is passed. Writing past it is the point: the
+          // client keeps sending while the server decides.
+          const chunk = "a".repeat(64 * 1024);
+          const chunks = Math.ceil(MAX_REQUEST_BODY_BYTES / chunk.length) + 2;
+          for (let i = 0; i < chunks; i++) {
+            socket.write(`${chunk.length.toString(16)}\r\n${chunk}\r\n`);
+          }
+        });
+
+        let buf = "";
+        socket.on("data", (part: Buffer) => { buf += part.toString("utf-8"); });
+        socket.on("close", () => resolve({ statusLine: buf.split("\r\n")[0], body: buf }));
+        // A destroyed socket surfaces here as ECONNRESET/EPIPE — which is
+        // exactly the bug: the client is entitled to a status line first.
+        socket.on("error", (err) => { if (!buf) reject(err); else resolve({ statusLine: buf.split("\r\n")[0], body: buf }); });
+        setTimeout(() => reject(new Error("timeout")), 5000);
+      });
+
+      expect(statusLine).toContain("413");
+      // The same body the Content-Length guard sends, so a client cannot tell
+      // which of the two refused it.
+      expect(body).toContain(`Request body exceeds the ${MAX_REQUEST_BODY_BYTES}-byte limit.`);
+      // And not the 400 the route's catch would have written.
+      expect(statusLine).not.toContain("400");
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  }, 20_000);
+
+  it("reads a chunked body under the cap normally", async () => {
+    const { server, port } = await startBodyReadingServer();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/anything`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hello: "world" }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(`read ${JSON.stringify({ hello: "world" }).length}`);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  }, 20_000);
 });

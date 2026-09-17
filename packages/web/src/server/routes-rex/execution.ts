@@ -289,7 +289,7 @@ async function handleStartEpicByEpic(
   }
 
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       /** Optional list of epic IDs to execute (in order). If omitted, all non-completed epics. */
       epicIds?: string[];

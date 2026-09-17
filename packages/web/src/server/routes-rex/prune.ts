@@ -402,7 +402,7 @@ async function handlePruneExecute(
   }
 
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       /** Create a backup of the PRD before pruning. */
       backup?: boolean;

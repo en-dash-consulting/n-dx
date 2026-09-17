@@ -187,7 +187,7 @@ async function handleAddRequirement(
   }
 
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       title?: string;
       category?: string;
@@ -282,7 +282,7 @@ async function handleUpdateRequirement(
   }
 
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const updates = JSON.parse(body) as Partial<RequirementRecord>;
 
     // Validate category/validationType if being changed

@@ -576,7 +576,7 @@ export async function handleLlmRoute(
   // POST /api/llm/local-profiles — create or update a named profile
   if (method === "POST" && pathname === LLM_LOCAL_PROFILES) {
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, res);
       const data = JSON.parse(body) as Partial<LocalProfile>;
       if (!data.name || typeof data.name !== "string" || !data.name.trim()) {
         errorResponse(res, 400, "Profile 'name' is required");
@@ -630,7 +630,7 @@ export async function handleLlmRoute(
     let model = typeof llmLocal["model"] === "string" ? llmLocal["model"] : "";
     // Allow body overrides for unsaved edit values
     try {
-      const rawBody = await readBody(req);
+      const rawBody = await readBody(req, res);
       if (rawBody.trim()) {
         const body = JSON.parse(rawBody) as Partial<{ host: string; port: number; model: string }>;
         if (typeof body.host === "string" && body.host) host = body.host;
@@ -670,7 +670,7 @@ export async function handleLlmRoute(
   // PUT /api/llm/config
   if (method === "PUT" && pathname === LLM_PREFIX) {
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, res);
       const parsed = JSON.parse(body) as LlmConfigPutBody;
 
       if (!parsed.changes || typeof parsed.changes !== "object") {

@@ -605,7 +605,7 @@ export async function handleNotionRoute(
 
   if (method === "PUT" && url === "/api/notion/config") {
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, res);
       const data = JSON.parse(body) as { token?: string; databaseId?: string };
 
       // Validate fields
@@ -672,7 +672,7 @@ export async function handleNotionRoute(
 
   if (method === "POST" && url === "/api/notion/test") {
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, res);
       const data = JSON.parse(body) as { token?: string; databaseId?: string };
 
       // If no token provided, try to use the stored one
@@ -731,7 +731,7 @@ export async function handleNotionRoute(
 
   if (method === "POST" && url === "/api/notion/schema") {
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, res);
       const data = JSON.parse(body) as { token?: string; databaseId?: string };
 
       // Resolve credentials (same pattern as /test)
@@ -789,7 +789,7 @@ export async function handleNotionRoute(
 
   if (method === "POST" && url === "/api/notion/schema/fix") {
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, res);
       const data = JSON.parse(body) as {
         token?: string;
         databaseId?: string;

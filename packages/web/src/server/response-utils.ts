@@ -49,12 +49,30 @@ export function errorResponse(
  *
  * A request with a Content-Length header is already refused with 413 by
  * `handleRequestSecurity` before it reaches a route, so this cap is the
- * backstop for a chunked body that declares no length: on overflow it stops
- * buffering, destroys the request, and rejects — the caller's existing
- * try/catch turns that into a 400, and either way the server has bounded how
- * much it will hold in memory.
+ * backstop for a chunked body that declares no length.
+ *
+ * On overflow it stops buffering and answers 413 itself — the same status and
+ * body the Content-Length guard sends — then rejects. It used to call
+ * `req.destroy()` first and leave the answering to the caller's try/catch,
+ * which could not work: destroying the request destroys the socket, so the
+ * caller's `errorResponse` wrote a 400 into a closed connection and the client
+ * got zero bytes and an EPIPE. A cap rejection was indistinguishable from a
+ * crash.
+ *
+ * The rejection still happens, so callers keep their existing `catch`. Nothing
+ * there needs to change: `jsonResponse` and `errorResponse` no-op once the
+ * response is committed, so a caller's follow-up 400 lands on a response that
+ * has already said 413.
+ *
+ * The request is not destroyed. `Connection: close` tells the client this is
+ * the end, and Node closes the socket once the response has flushed — the
+ * remaining bytes are read and discarded rather than buffered, so the memory
+ * bound holds either way. Without `res` (a caller that has none to give) there
+ * is nothing to say, and the old destroy-and-reject is all that is left.
+ *
+ * @param res Response to answer 413 on. Omit only where there is none.
  */
-export function readBody(req: IncomingMessage): Promise<string> {
+export function readBody(req: IncomingMessage, res?: ServerResponse): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let total = 0;
@@ -62,8 +80,18 @@ export function readBody(req: IncomingMessage): Promise<string> {
       total += chunk.length;
       if (total > MAX_REQUEST_BODY_BYTES) {
         req.off("data", onData);
-        req.destroy();
-        reject(new Error(`Request body exceeds the ${MAX_REQUEST_BODY_BYTES}-byte limit.`));
+        const message = `Request body exceeds the ${MAX_REQUEST_BODY_BYTES}-byte limit.`;
+        if (res && !res.headersSent && !res.writableEnded) {
+          res.writeHead(413, {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            Connection: "close",
+          });
+          res.end(JSON.stringify({ error: message }));
+        } else {
+          req.destroy();
+        }
+        reject(new Error(message));
         return;
       }
       chunks.push(chunk);

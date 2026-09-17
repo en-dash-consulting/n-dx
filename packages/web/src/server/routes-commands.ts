@@ -306,7 +306,7 @@ async function handleSvAnalyze(
   let deep = false;
   let targetPass: number | undefined;
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     if (body) {
       const input = JSON.parse(body) as { lite?: boolean; full?: boolean; deep?: boolean; targetPass?: number };
       lite = !!input.lite;
@@ -460,7 +460,7 @@ async function handleSync(
 ): Promise<boolean> {
   let direction: "push" | "pull" | "sync" = "sync";
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     if (body) {
       const input = JSON.parse(body) as { direction?: string };
       if (input.direction === "push" || input.direction === "pull" || input.direction === "sync") {
@@ -571,7 +571,7 @@ async function handleExport(
   let confirmDeploy = false;
   let includeTranscripts = false;
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     if (body) {
       const input = JSON.parse(body) as {
         outDir?: string; basePath?: string; cname?: string; deploy?: string;
@@ -714,7 +714,7 @@ async function handleSelfHeal(
 
   let iterations = 3;
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     if (body) {
       const input = JSON.parse(body) as { iterations?: number };
       if (typeof input.iterations === "number" && input.iterations > 0 && input.iterations <= 10) {
@@ -884,7 +884,7 @@ async function handleInit(
   let localPort: number | undefined;
 
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       assistants?: unknown;
       provider?: unknown;
@@ -1067,7 +1067,7 @@ async function handleRefresh(
 
   let fast = false;
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     if (body) {
       const input = JSON.parse(body) as { fast?: boolean };
       fast = !!input.fast;
@@ -1296,7 +1296,7 @@ async function handleFix(
 ): Promise<boolean> {
   let dryRun = false;
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     if (body) dryRun = (JSON.parse(body) as { dryRun?: boolean }).dryRun === true;
   } catch {
     // Use defaults
@@ -1365,7 +1365,7 @@ async function handleReshape(
 ): Promise<boolean> {
   let accept = false;
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     if (body) accept = (JSON.parse(body) as { accept?: boolean }).accept === true;
   } catch {
     // Preview by default — never restructure the PRD without an explicit accept.

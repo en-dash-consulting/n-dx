@@ -364,7 +364,7 @@ async function handleArchetypeOverride(
   let path = "";
   let archetype = "";
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body || "{}") as { path?: string; archetype?: string };
     path = String(input.path ?? "");
     archetype = String(input.archetype ?? "");

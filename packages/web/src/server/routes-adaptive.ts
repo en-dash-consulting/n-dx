@@ -644,7 +644,7 @@ async function handleUpdateSettings(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -684,7 +684,7 @@ async function handleApplyAdjustment(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -768,7 +768,7 @@ async function handleDismissAdjustment(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -808,7 +808,7 @@ async function handleSetOverride(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");

@@ -108,7 +108,7 @@ async function handleApplyRefinements(
 ): Promise<boolean> {
   let input: { proposals?: unknown };
   try {
-    input = JSON.parse((await readBody(req)) || "{}") as { proposals?: unknown };
+    input = JSON.parse((await readBody(req, res)) || "{}") as { proposals?: unknown };
   } catch {
     errorResponse(res, 400, "Request body must be JSON.");
     return true;

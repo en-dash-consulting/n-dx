@@ -128,7 +128,7 @@ export async function handleProjectSettingsRoute(
   // PUT /api/project-settings
   if (method === "PUT" && url === SETTINGS_PREFIX) {
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, res);
       const parsed = JSON.parse(body) as ProjectSettingsPutBody;
 
       // Validate port
