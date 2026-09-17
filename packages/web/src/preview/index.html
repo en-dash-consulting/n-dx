@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<!--
+  ════════════════════════════════════════════════════════════════════════════
+  n-dx dashboard — UI layout proposal
+  ════════════════════════════════════════════════════════════════════════════
+
+  This file is a hand-edited mock-up, not the real dashboard. It exists so the
+  dashboard's sections can be reshuffled and argued about before any Preact
+  component moves. Served by:
+
+      ndx start --preview .          # http://localhost:3118 (live reload)
+
+  Run it next to the real dashboard (`ndx start .` on :3117) and compare the
+  two side by side. Save this file and the browser reloads on its own.
+
+  HOW TO EDIT
+  ───────────
+  • Everything is plain markup — no framework, no build step. Reordering a
+    section means moving its block; nothing else has to change.
+  • Sidebar sections are the <section class="nav-group"> blocks below. Move a
+    whole block to reorder a group; move an <li> to reorder an item.
+  • The content pane is the <div class="panel-grid"> blocks. Each panel is one
+    <article class="panel">.
+  • Mark your changes so reviewers can see the diff without reading HTML:
+        class="panel is-new"       → green rail  + "new" chip
+        class="panel is-moved"     → amber rail  + "moved" chip
+        class="panel is-removed"   → struck out, dimmed
+    The same three classes work on nav <li> and <section class="nav-group">.
+  • Put the reasoning in the "Rationale" tab (search for id="tab-rationale").
+
+  Colours and spacing are copied from packages/web/src/viewer/styles/tokens.css
+  so the mock reads at the same weight as the real thing.
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>n-dx UI layout proposal</title>
+<style>
+/* ── Tokens (mirrors src/viewer/styles/tokens.css) ─────────────────────── */
+:root {
+  --brand-teal: #00E5B9;
+  --brand-purple: #6c41f0;
+  --sidebar-w: 232px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0c0e1a; --bg-surface: #151829; --bg-hover: #1e2240; --bg-active: #262b4a;
+  --border: #2a2f4a; --border-strong: #3d4470;
+  --text: #e8eaf0; --text-dim: #9ea3bc; --text-muted: #868aaa;
+  --accent: var(--brand-teal); --green: #00bd81; --orange: #ff8060; --red: #ff7f9c;
+  --purple: var(--brand-purple);
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f6fa; --bg-surface: #ffffff; --bg-hover: #eef0f6; --bg-active: #e4e7f0;
+  --border: #d8dce6; --border-strong: #bcc2d4;
+  --text: #1a1d2e; --text-dim: #5c6078; --text-muted: #6b6e88;
+  --accent: #006E4E; --green: #006E4A; --orange: #B03800; --red: #B01A54;
+  --purple: var(--brand-purple);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.5 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Document chrome (the proposal wrapper, not part of the UI) ─────────── */
+.doc-bar {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+}
+.doc-mark {
+  font: 600 11px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
+  color: #fff; background: var(--purple);
+  padding: 5px var(--space-2); border-radius: var(--radius-sm);
+}
+.doc-title { font-weight: 600; font-size: 14px; }
+.doc-sub { color: var(--text-muted); font-size: 12px; }
+.doc-spacer { flex: 1; }
+.doc-tabs { display: flex; gap: var(--space-1); }
+.doc-tab {
+  font: inherit; color: var(--text-dim); background: transparent;
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  padding: 5px var(--space-3); cursor: pointer;
+}
+.doc-tab:hover { background: var(--bg-hover); color: var(--text); }
+.doc-tab[aria-selected="true"] { background: var(--bg-active); color: var(--text); border-color: var(--border-strong); }
+.icon-btn {
+  font: inherit; color: var(--text-dim); background: transparent;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 5px var(--space-3); cursor: pointer;
+}
+.icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+
+.doc-body { padding: var(--space-5); }
+.doc-note {
+  max-width: 900px; margin: 0 0 var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md); background: var(--bg-surface);
+  color: var(--text-dim);
+}
+.doc-note b { color: var(--text); }
+
+/* ── Change legend ──────────────────────────────────────────────────────── */
+.legend { display: flex; gap: var(--space-4); align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; }
+.chip {
+  font: 600 10px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  padding: 4px 7px; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--text-dim);
+}
+.chip-new { color: var(--green); border-color: var(--green); }
+.chip-moved { color: var(--orange); border-color: var(--orange); }
+.chip-removed { color: var(--red); border-color: var(--red); }
+
+/* ── The app shell mock ─────────────────────────────────────────────────── */
+.shell {
+  display: flex;
+  height: calc(100vh - 210px);
+  min-height: 560px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: var(--bg);
+  box-shadow: 0 18px 40px rgba(0,0,0,.22);
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-w); flex-shrink: 0;
+  background: var(--bg-surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow-y: auto;
+}
+.sidebar-header {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-4); border-bottom: 1px solid var(--border);
+}
+.logo-dot {
+  width: 26px; height: 26px; border-radius: var(--radius-md);
+  background: var(--purple); color: #fff;
+  display: grid; place-items: center; font: 700 12px/1 var(--font-mono);
+}
+.project-name { font-weight: 600; }
+.project-path { color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
+
+.nav-group { padding: var(--space-3) 0 var(--space-1); }
+.nav-group + .nav-group { border-top: 1px solid var(--border); }
+.nav-label {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-2);
+  font: 600 10px/1 var(--font-mono); letter-spacing: .1em;
+  color: var(--text-muted); text-transform: uppercase;
+}
+.nav-group ul { list-style: none; margin: 0; padding: 0; }
+.nav-group li {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 6px var(--space-4); color: var(--text-dim); cursor: default;
+}
+.nav-group li:hover { background: var(--bg-hover); color: var(--text); }
+.nav-group li.active {
+  background: var(--bg-active); color: var(--text);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.nav-icon { width: 16px; text-align: center; color: var(--text-muted); }
+.nav-group li.active .nav-icon { color: var(--accent); }
+.flagged { margin-left: auto; font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); }
+
+/* Main column */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border); background: var(--bg-surface);
+}
+.crumbs { color: var(--text-muted); font-size: 12px; }
+.crumbs b { color: var(--text); font-weight: 600; }
+.search {
+  margin-left: auto; min-width: 200px;
+  padding: 5px var(--space-3);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--bg); color: var(--text-muted);
+}
+.btn {
+  padding: 5px var(--space-3); border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong); background: var(--bg-active); color: var(--text);
+  font-size: 12px;
+}
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #04121a; font-weight: 600; }
+[data-theme="light"] .btn-primary { color: #fff; }
+
+.content { flex: 1; overflow-y: auto; padding: var(--space-5); }
+.view-title { margin: 0 0 var(--space-4); font-size: 20px; font-weight: 600; }
+
+/* Stat tiles */
+.stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); margin-bottom: var(--space-5); }
+.stat {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: var(--space-4);
+}
+.stat-value { font-size: 22px; font-weight: 600; }
+.stat-label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+
+/* Panels */
+.panel-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--space-4); }
+.panel {
+  grid-column: span 6;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: var(--space-4);
+  position: relative;
+}
+.panel.span-4 { grid-column: span 4; }
+.panel.span-8 { grid-column: span 8; }
+.panel.span-12 { grid-column: span 12; }
+.panel h3 { margin: 0 0 var(--space-3); font-size: 13px; font-weight: 600; }
+.panel p { margin: 0; color: var(--text-muted); }
+.skeleton { display: grid; gap: 7px; }
+.skeleton span { height: 8px; border-radius: 999px; background: var(--bg-active); display: block; }
+.skeleton span:nth-child(2) { width: 82%; }
+.skeleton span:nth-child(3) { width: 64%; }
+.skeleton span:nth-child(4) { width: 73%; }
+
+/* Change marking — works on .panel, nav li and .nav-group */
+.is-new, .is-moved, .is-removed { position: relative; }
+.panel.is-new { border-color: var(--green); box-shadow: inset 3px 0 0 var(--green); }
+.panel.is-moved { border-color: var(--orange); box-shadow: inset 3px 0 0 var(--orange); }
+.panel.is-removed { opacity: .45; }
+.panel.is-removed h3 { text-decoration: line-through; }
+li.is-new, .nav-group.is-new > .nav-label { box-shadow: inset 2px 0 0 var(--green); }
+li.is-moved, .nav-group.is-moved > .nav-label { box-shadow: inset 2px 0 0 var(--orange); }
+li.is-removed { opacity: .45; text-decoration: line-through; }
+.is-new > h3::after, li.is-new::after { content: "new"; }
+.is-moved > h3::after, li.is-moved::after { content: "moved"; }
+.is-removed > h3::after, li.is-removed::after { content: "cut"; }
+.is-new > h3::after, .is-moved > h3::after, .is-removed > h3::after,
+li.is-new::after, li.is-moved::after, li.is-removed::after {
+  margin-left: var(--space-2);
+  font: 600 9px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  padding: 3px 5px; border-radius: 999px; border: 1px solid currentColor; vertical-align: middle;
+}
+.is-new > h3::after, li.is-new::after { color: var(--green); }
+.is-moved > h3::after, li.is-moved::after { color: var(--orange); }
+.is-removed > h3::after, li.is-removed::after { color: var(--red); }
+li.is-new::after, li.is-moved::after, li.is-removed::after { margin-left: auto; }
+
+/* ── Rationale tab ──────────────────────────────────────────────────────── */
+.prose { max-width: 860px; }
+.prose h2 { font-size: 16px; margin: var(--space-6) 0 var(--space-2); }
+.prose h2:first-child { margin-top: 0; }
+.prose p, .prose li { color: var(--text-dim); }
+.prose code { font-family: var(--font-mono); font-size: 12px; background: var(--bg-active); padding: 1px 5px; border-radius: var(--radius-sm); }
+.prose table { border-collapse: collapse; width: 100%; margin: var(--space-3) 0; }
+.prose th, .prose td { text-align: left; padding: 7px var(--space-3); border-bottom: 1px solid var(--border); }
+.prose th { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+[hidden] { display: none !important; }
+
+@media (max-width: 900px) {
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+  .panel { grid-column: span 12 !important; }
+  .sidebar { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ Document chrome — not part of the proposed UI ═══════════════════ -->
+<header class="doc-bar">
+  <span class="doc-mark">proposal</span>
+  <div>
+    <div class="doc-title">n-dx dashboard — layout v2</div>
+    <div class="doc-sub">Draft · mock-up only, no live data</div>
+  </div>
+  <div class="doc-spacer"></div>
+  <div class="doc-tabs" role="tablist">
+    <button class="doc-tab" role="tab" aria-selected="true" data-tab="tab-layout">Layout</button>
+    <button class="doc-tab" role="tab" aria-selected="false" data-tab="tab-rationale">Rationale</button>
+  </div>
+  <button class="icon-btn" id="theme-toggle" title="Toggle light / dark">◐</button>
+</header>
+
+<div class="doc-body">
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     TAB 1 — LAYOUT
+     This is the part you shuffle. Move blocks, rename labels, mark changes.
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section id="tab-layout">
+
+  <p class="doc-note">
+    <b>What this shows.</b> The shell as it stands today: a grouped sidebar, a
+    thin top bar, and a panel grid. Rearrange it here first — this document is
+    the thing reviewers look at, and nothing in it is wired to real data.
+  </p>
+
+  <div class="legend">
+    <span class="chip">Change marks</span>
+    <span class="chip chip-new">new</span>
+    <span class="chip chip-moved">moved</span>
+    <span class="chip chip-removed">cut</span>
+    <span class="doc-sub">— add <code>is-new</code> / <code>is-moved</code> / <code>is-removed</code> to any panel or nav item.</span>
+  </div>
+
+  <div class="shell">
+
+    <!-- ── SIDEBAR ──────────────────────────────────────────────────────
+         Each <section class="nav-group"> is one collapsible group in the
+         real sidebar. Reorder groups by moving these blocks whole.       -->
+    <aside class="sidebar">
+
+      <div class="sidebar-header">
+        <span class="logo-dot">n</span>
+        <div>
+          <div class="project-name">n-dx</div>
+          <div class="project-path">~/VSCodeProjects/n-dx</div>
+        </div>
+      </div>
+
+      <section class="nav-group">
+        <div class="nav-label">Sourcevision</div>
+        <ul>
+          <li class="active"><span class="nav-icon">▣</span> Overview</li>
+          <li><span class="nav-icon">▧</span> Map</li>
+          <li><span class="nav-icon">◧</span> Isometric Map</li>
+          <li><span class="nav-icon">⬢</span> Zones</li>
+          <li><span class="nav-icon">☰</span> Files</li>
+          <li><span class="nav-icon">◇</span> Routes</li>
+          <li><span class="nav-icon">◨</span> Architecture</li>
+          <li><span class="nav-icon">⚠</span> Problems</li>
+          <li><span class="nav-icon">✦</span> Suggestions</li>
+          <li><span class="nav-icon">✍</span> PR Markdown <span class="flagged">flag</span></li>
+          <li><span class="nav-icon">?</span> Ask <span class="flagged">flag</span></li>
+        </ul>
+      </section>
+
+      <section class="nav-group">
+        <div class="nav-label">Rex</div>
+        <ul>
+          <li><span class="nav-icon">▨</span> Dashboard</li>
+          <li><span class="nav-icon">☑</span> Tasks</li>
+          <li><span class="nav-icon">⌗</span> Analyze &amp; Import</li>
+          <li><span class="nav-icon">⧉</span> Context Graph</li>
+          <li><span class="nav-icon">✔</span> Validation</li>
+          <li><span class="nav-icon">⚖</span> Requirements</li>
+          <li><span class="nav-icon">⌚</span> Activity</li>
+          <li><span class="nav-icon">🔗</span> Integrations <span class="flagged">flag</span></li>
+        </ul>
+      </section>
+
+      <section class="nav-group">
+        <div class="nav-label">Hench</div>
+        <ul>
+          <li><span class="nav-icon">▶</span> Runs</li>
+          <li><span class="nav-icon">☸</span> Audit</li>
+          <li><span class="nav-icon">▦</span> Templates</li>
+          <li><span class="nav-icon">⚡</span> Optimization</li>
+          <li><span class="nav-icon">♻</span> Adaptive</li>
+        </ul>
+      </section>
+
+      <section class="nav-group">
+        <div class="nav-label">Commands</div>
+        <ul>
+          <li><span class="nav-icon">⌘</span> All Commands</li>
+        </ul>
+      </section>
+
+      <section class="nav-group">
+        <div class="nav-label">Token Usage</div>
+        <ul>
+          <li><span class="nav-icon">⊚</span> Token Usage</li>
+        </ul>
+      </section>
+
+      <section class="nav-group">
+        <div class="nav-label">Settings</div>
+        <ul>
+          <li><span class="nav-icon">🧠</span> General</li>
+          <li><span class="nav-icon">▣</span> ndx analyze / plan</li>
+          <li><span class="nav-icon">▶</span> ndx work</li>
+          <li><span class="nav-icon">🔌</span> ndx sync <span class="flagged">flag</span></li>
+          <li><span class="nav-icon">📤</span> ndx export / refresh</li>
+          <li><span class="nav-icon">📌</span> Feature Flags</li>
+          <li><span class="nav-icon">⏱</span> CLI Timeouts</li>
+        </ul>
+      </section>
+
+    </aside>
+
+    <!-- ── MAIN COLUMN ────────────────────────────────────────────────── -->
+    <div class="main">
+
+      <div class="topbar">
+        <div class="crumbs">Sourcevision / <b>Overview</b></div>
+        <div class="search">Search files, zones, tasks…</div>
+        <button class="btn">Refresh</button>
+        <button class="btn btn-primary">Analyze</button>
+      </div>
+
+      <div class="content">
+        <h2 class="view-title">Overview</h2>
+
+        <!-- Stat tiles -->
+        <div class="stat-row">
+          <div class="stat"><div class="stat-value">412</div><div class="stat-label">Files</div></div>
+          <div class="stat"><div class="stat-value">18</div><div class="stat-label">Zones</div></div>
+          <div class="stat"><div class="stat-value">63%</div><div class="stat-label">PRD complete</div></div>
+          <div class="stat"><div class="stat-value">4</div><div class="stat-label">Problems</div></div>
+        </div>
+
+        <!-- Panels — one <article> per panel. Move these to reshuffle the page.
+             Widths: span-4 / span-6 (default) / span-8 / span-12.          -->
+        <div class="panel-grid">
+
+          <article class="panel span-8">
+            <h3>Architecture Health</h3>
+            <div class="skeleton"><span></span><span></span><span></span><span></span></div>
+          </article>
+
+          <article class="panel span-4">
+            <h3>Next Steps</h3>
+            <div class="skeleton"><span></span><span></span><span></span></div>
+          </article>
+
+          <article class="panel span-4">
+            <h3>Top Zones</h3>
+            <div class="skeleton"><span></span><span></span><span></span></div>
+          </article>
+
+          <article class="panel span-4">
+            <h3>Languages</h3>
+            <div class="skeleton"><span></span><span></span><span></span></div>
+          </article>
+
+          <article class="panel span-4">
+            <h3>Getting Started</h3>
+            <div class="skeleton"><span></span><span></span><span></span></div>
+          </article>
+
+          <article class="panel span-12">
+            <h3>Recent Activity</h3>
+            <div class="skeleton"><span></span><span></span><span></span><span></span></div>
+          </article>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     TAB 2 — RATIONALE
+     Why the layout changes. Keep it short; reviewers read this first.
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section id="tab-rationale" hidden>
+  <div class="prose">
+
+    <h2>The problem</h2>
+    <p>
+      The sidebar currently lists every view of all three tools at one level of
+      importance — 30+ entries across six groups. Fill this in with what
+      actually prompted the reshuffle.
+    </p>
+
+    <h2>What moves</h2>
+    <table>
+      <thead><tr><th>Section</th><th>Today</th><th>Proposed</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>—</td><td>—</td><td>—</td><td>fill in as you shuffle the Layout tab</td></tr>
+      </tbody>
+    </table>
+
+    <h2>What stays</h2>
+    <p>Note anything deliberately left alone, so reviewers don't re-litigate it.</p>
+
+    <h2>Open questions</h2>
+    <ul>
+      <li>…</li>
+    </ul>
+
+  </div>
+</section>
+
+</div>
+
+<script>
+// Tabs + theme toggle. Intentionally the only script here: this document is a
+// layout mock-up, and anything more would start being an application.
+(function () {
+  var tabs = document.querySelectorAll(".doc-tab");
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (t) {
+        var panel = document.getElementById(t.dataset.tab);
+        var selected = t === tab;
+        t.setAttribute("aria-selected", String(selected));
+        if (panel) panel.hidden = !selected;
+      });
+    });
+  });
+
+  var root = document.documentElement;
+  document.getElementById("theme-toggle").addEventListener("click", function () {
+    root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  });
+})();
+</script>
+
+</body>
+</html>

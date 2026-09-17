@@ -143,7 +143,25 @@ async function buildLanding() {
   console.log("Built landing: dist/landing/index.html");
 }
 
+/**
+ * Copy the UI layout preview document into dist.
+ *
+ * No bundling: the whole point of that file is that it is hand-edited HTML with
+ * no build step. The copy exists so `ndx start --preview` also works from a
+ * published install, where src/ is not shipped. In a monorepo checkout the
+ * preview server prefers src/preview/index.html so edits are live.
+ */
+function copyPreview() {
+  const previewSrc = resolve(__dirname, "src/preview/index.html");
+  if (!existsSync(previewSrc)) return;
+  const previewOutDir = resolve(__dirname, "dist/preview");
+  mkdirSync(previewOutDir, { recursive: true });
+  copyFileSync(previewSrc, resolve(previewOutDir, "index.html"));
+  console.log("Copied preview: dist/preview/index.html");
+}
+
 async function buildProduction() {
+  copyPreview();
   if (landingOnly) {
     await buildLanding();
   } else if (viewerOnly) {

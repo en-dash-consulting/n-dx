@@ -198,6 +198,7 @@ ndx start .                 # register with the hub; dashboard + MCP at /p/<id>/
 ndx start status .          # hub, project and URL
 ndx start stop .            # unregister this worktree
 ndx start --here .          # single-project server that owns the port instead
+ndx start --preview .       # UI layout mock-up on port 3118, runs alongside the dashboard
 ndx usage .                 # token usage analytics
 ```
 
@@ -230,7 +231,7 @@ ndx config llm.codex.cli_path codex .
 | `ndx add "<desc>" [dir]` | Add PRD items from descriptions, files, or stdin |
 | `ndx work [dir]` | Run next task (`--task=ID`, `--epic=ID`, `--auto`, `--loop`, `--yes`) |
 | `ndx self-heal [N] [dir]` | Iterative improvement loop (analyze + recommend + execute) |
-| `ndx start [dir]` | Start server: dashboard + MCP (`--port=N`, `--background`, `stop`, `status`) |
+| `ndx start [dir]` | Start server: dashboard + MCP (`--port=N`, `--background`, `--preview`, `stop`, `status`) |
 
 ### More
 
