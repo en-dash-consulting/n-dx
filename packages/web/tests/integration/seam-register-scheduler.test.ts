@@ -13,7 +13,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { removeTempDir } from "../helpers/temp-dir.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -37,7 +38,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await rm(tmpDir, { recursive: true, force: true });
+  await removeTempDir(tmpDir);
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
