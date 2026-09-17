@@ -29,4 +29,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Claims store in the git common dir: .git/ndx/claims.json with pid, worktree, task id and expiry](./claims-store-in-the-git-common-671158.md) | completed |
 | [Dashboard shows claimed tasks with the claiming worktree in the PRD tree and the Sessions panel](./dashboard-shows-claimed-tasks-f9e706.md) | completed |
+| [Dry runs observe claims without writing one](./dry-runs-observe-claims-without-e02571.md) | completed |
 | [ndx work claims the task before starting and releases on finish; get_next_task and hench selection skip live claims](./ndx-work-claims-the-task-before-a3e03e.md) | completed |
+| [Refresh task claims for as long as the run lasts](./refresh-task-claims-for-as-long-c3ab0b.md) | completed |

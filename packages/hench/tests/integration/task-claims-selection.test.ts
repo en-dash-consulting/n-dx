@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:f
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { PRDItem } from "@n-dx/rex";
+import { openClaimsStore, resolveClaimHolder } from "@n-dx/rex";
 import { assembleTaskBrief, getActionableTasks } from "../../src/agent/planning/brief.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../src/process/task-claims.js";
 import { mockStoreWithDefaults } from "../helpers/index.js";
@@ -158,5 +159,134 @@ describe("assembleTaskBrief with claims", () => {
     expect(menu.map((t) => t.id)).toEqual(["t-low"]);
     const full = await getActionableTasks(mockStoreWithDefaults(ITEMS));
     expect(full.map((t) => t.id)).toEqual(["t-high", "t-low"]);
+  });
+});
+
+describe("TaskClaims renewal", () => {
+  /** A store whose clock the test controls, so an expiry can be watched moving. */
+  function clockedClaims(worktree: string, now: () => number): TaskClaims {
+    const holder = resolveClaimHolder(worktree);
+    return new TaskClaims(openClaimsStore(worktree, { now }), holder);
+  }
+
+  it("moves the expiry forward without changing when the claim was first taken", async () => {
+    let nowMs = Date.parse("2026-01-01T00:00:00.000Z");
+    const mine = clockedClaims(wtA, () => nowMs);
+    await mine.claim("t-high");
+
+    // The observer reads on the same clock; on the real one this claim would
+    // have expired months ago and been filtered out as dead.
+    const observer = clockedClaims(wtB, () => nowMs);
+    const before = (await observer.foreignClaims()).get("t-high")!;
+
+    // Most of the four-hour life gone, run still going.
+    nowMs += 3 * 60 * 60 * 1000;
+    await mine.renewNow();
+
+    const after = (await observer.foreignClaims()).get("t-high")!;
+    expect(Date.parse(after.expiresAt)).toBeGreaterThan(Date.parse(before.expiresAt));
+    expect(after.claimedAt).toBe(before.claimedAt);
+    expect([...mine.held]).toEqual(["t-high"]);
+  });
+
+  it("keeps a claim alive past its original expiry", async () => {
+    let nowMs = Date.parse("2026-01-01T00:00:00.000Z");
+    const mine = clockedClaims(wtA, () => nowMs);
+    await mine.claim("t-high");
+
+    // Refresh every hour across a run that outlives the default four-hour TTL.
+    for (let hour = 1; hour <= 6; hour++) {
+      nowMs += 60 * 60 * 1000;
+      await mine.renewNow();
+    }
+
+    // Six hours in, another worktree must still be told the task is taken.
+    const observer = new TaskClaims(openClaimsStore(wtB, { now: () => nowMs }), resolveClaimHolder(wtB));
+    expect((await observer.foreignClaims()).has("t-high")).toBe(true);
+    await mine.releaseAll();
+  });
+
+  it("without renewal the same run loses the task once the TTL passes", async () => {
+    let nowMs = Date.parse("2026-01-01T00:00:00.000Z");
+    const mine = clockedClaims(wtA, () => nowMs);
+    await mine.claim("t-high");
+
+    nowMs += 5 * 60 * 60 * 1000;
+
+    const observer = new TaskClaims(openClaimsStore(wtB, { now: () => nowMs }), resolveClaimHolder(wtB));
+    expect((await observer.foreignClaims()).has("t-high")).toBe(false);
+  });
+
+  it("drops a task another worktree took over, so it is never released by us", async () => {
+    let nowMs = Date.parse("2026-01-01T00:00:00.000Z");
+    const mine = clockedClaims(wtA, () => nowMs);
+    await mine.claim("t-high");
+
+    // Our claim lapses, and worktree B — a live process — picks the task up.
+    nowMs += 5 * 60 * 60 * 1000;
+    const b = holderIn(wtB);
+    expect(await b.claim("t-high")).toBeNull();
+
+    await mine.renewNow();
+    expect(mine.held.has("t-high")).toBe(false);
+
+    // B still holds it: our releaseAll must not take away someone else's claim.
+    await mine.releaseAll();
+    expect([...(await TaskClaims.forProject(wtA).foreignClaims()).keys()]).toEqual(["t-high"]);
+  });
+
+  it("startRenewal does not hold the process open, and stops on releaseAll", async () => {
+    const mine = TaskClaims.forProject(wtA);
+    await mine.claim("t-high");
+    mine.startRenewal();
+    mine.startRenewal(); // idempotent
+
+    const timers = process.getActiveResourcesInfo().filter((r) => r === "Timeout");
+    expect(timers.length).toBeGreaterThan(0);
+
+    await mine.releaseAll();
+    expect(mine.held.size).toBe(0);
+  });
+});
+
+describe("TaskClaims in read-only mode", () => {
+  it("reports a free task as free but writes nothing", async () => {
+    const preview = TaskClaims.forProject(wtA, { readOnly: true });
+    expect(await preview.claim("t-high")).toBeNull();
+    expect(preview.held.size).toBe(0);
+
+    // No claim reached the store, so another worktree sees the task as free.
+    expect(await TaskClaims.forProject(wtB).foreignClaims()).toEqual(new Map());
+  });
+
+  it("still reports a task another worktree holds", async () => {
+    const a = holderIn(wtA);
+    await a.claim("t-high");
+
+    const preview = TaskClaims.forProject(wtB, { readOnly: true });
+    const refusedBy = await preview.claim("t-high");
+    expect(refusedBy?.worktreeRoot).toBe(a.holder.worktreeRoot);
+    expect(preview.held.size).toBe(0);
+  });
+
+  it("does not start a renewal timer", async () => {
+    const preview = TaskClaims.forProject(wtA, { readOnly: true });
+    await preview.claim("t-high");
+    preview.startRenewal();
+    await preview.renewNow();
+    expect(preview.held.size).toBe(0);
+    expect(await TaskClaims.forProject(wtB).foreignClaims()).toEqual(new Map());
+  });
+
+  it("a dry run leaves no claim behind for a real run elsewhere", async () => {
+    // The preview selects and "claims" exactly as a real run would...
+    const preview = TaskClaims.forProject(wtA, { readOnly: true });
+    const { taskId } = await assembleTaskBrief(mockStoreWithDefaults(ITEMS), undefined, { claims: preview });
+    expect(taskId).toBe("t-high");
+
+    // ...and a real run in the other worktree is free to take it.
+    const real = TaskClaims.forProject(wtB);
+    expect(await real.claim("t-high")).toBeNull();
+    await real.releaseAll();
   });
 });
