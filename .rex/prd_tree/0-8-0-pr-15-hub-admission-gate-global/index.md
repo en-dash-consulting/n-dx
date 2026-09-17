@@ -23,4 +23,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Admission gate in the hub for execute requests: global cap, memory floor, FIFO queue with position broadcasts, ~/.n-dx/config.json](./admission-gate-in-the-hub-for-execute.md) | pending |
+| [Admission gate in the hub for execute requests: global cap, memory floor, FIFO queue with position broadcasts, ~/.n-dx/config.json](./admission-gate-in-the-hub-for-execute.md) | completed |
+| [Push hub:queue-changed to viewers when the admission queue moves](./push-hub-queue-changed-to-viewers-when.md) | pending |
