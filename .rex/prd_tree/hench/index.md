@@ -36,7 +36,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Mandatory Pre-Commit Full Test Suite Gate](./mandatory-pre-commit-full-test-suite/index.md) | completed |
 | [Reliable work loop](./reliable-work-loop/index.md) | completed |
 | [Rex Run Rolling Log Display and Persistent Log Files](./rex-run-rolling-log-display-and/index.md) | completed |
-| [Run Failure Recovery and Rollback](./run-failure-recovery-and-rollback/index.md) | pending |
+| [Run Failure Recovery and Rollback](./run-failure-recovery-and-rollback/index.md) | completed |
 | [Run Loop Cancellation and Iteration Visibility Refinements](./run-loop-cancellation-and-iteration/index.md) | completed |
 | [Sequential Epic Execution](./sequential-epic-execution/index.md) | completed |
 | [Strict Self-Heal Tag Scoping Enforcement](./strict-self-heal-tag-scoping-enforcement/index.md) | completed |
