@@ -12,8 +12,8 @@
  * - root — the compatibility alias. With exactly one project registered,
  *   `/`, `/api/*`, `/data/*`, `/mcp/*` and the WebSocket upgrade all go to
  *   it unchanged, so a single-project user (and the existing e2e suites)
- *   notice nothing. With several, `/` answers with a plain project list (the
- *   home page proper is PR 9) and everything else is a 409 naming the ids —
+ *   notice nothing. With several, `/` answers with the home page (one card
+ *   per project, see home.ts) and everything else is a 409 naming the ids —
  *   a request that could mean two different repositories must not be
  *   guessed at.
  *
@@ -32,6 +32,8 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 import type { Duplex } from "node:stream";
 import { detectBasePath, projectIdFromBasePath, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
+import { buildHubOverview } from "./overview.js";
+import { renderHomePage } from "./home.js";
 
 const UPSTREAM_HOST = "127.0.0.1";
 /** `ndx refresh --live-server` posts here; with several projects the body's `dir` picks one. */
@@ -47,7 +49,14 @@ const FORWARDED_PREFIX_HEADER = "x-forwarded-prefix";
 export type ProxyDecision =
   | { kind: "proxy"; project: ProjectView; path: string; prefix: string }
   | { kind: "json"; status: number; body: unknown }
-  | { kind: "html"; status: number; html: string };
+  | { kind: "html"; status: number; html: string }
+  /**
+   * The hub's own home page. A decision rather than rendered HTML because the
+   * page joins every child's live status onto the registry, and `decideProxy`
+   * is pure — the rendering happens in {@link handleProxyRequest}, which can
+   * await.
+   */
+  | { kind: "home" };
 
 /**
  * Decide where a request goes. Pure over the hub's project list, so the
@@ -84,7 +93,7 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
   }
 
   if (pathname === "/" && !upgrade) {
-    return { kind: "html", status: 200, html: renderProjectList(projects) };
+    return { kind: "home" };
   }
   if (projects.length === 0) {
     return { kind: "json", status: 404, body: { error: "No project is registered with the hub", projects: [] } };
@@ -213,20 +222,6 @@ async function handleReloadSignal(req: IncomingMessage, res: ServerResponse, hub
   return true;
 }
 
-function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] ?? ch);
-}
-
-/** Minimal project list for `/` when the root alias is ambiguous. Replaced by the PR 9 home page. */
-export function renderProjectList(projects: ProjectView[]): string {
-  const items = projects.length === 0
-    ? "<p>No project is registered. Run <code>ndx start</code> in a repository to register it.</p>"
-    : `<ul>${projects
-      .map((p) => `<li><a href="/p/${encodeURIComponent(p.id)}/">${escapeHtml(p.name)}</a> <code>${escapeHtml(p.repoRoot)}</code> — ${escapeHtml(p.status.state)}</li>`)
-      .join("")}</ul>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>n-dx hub</title></head><body><h1>n-dx hub</h1>${items}</body></html>`;
-}
-
 /**
  * Stream one HTTP request to a project server and its response back.
  *
@@ -339,6 +334,13 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
     case "json":
       writeJson(res, decision.status, decision.body);
       return;
+    case "home": {
+      const overview = await buildHubOverview(hub.listProjects());
+      const html = renderHomePage(overview);
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+      res.end(html);
+      return;
+    }
   }
 }
 

@@ -42,7 +42,19 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
       res.end(text);
     };
 
-    if (url === "/api/status") return json(200, { projectDir: dir });
+    if (url === "/api/status") {
+      // Shaped like a real project server's: the hub's overview reads the
+      // per-tool sections, not just projectDir.
+      return json(200, {
+        projectDir: dir,
+        sv: { analyzedAt: "2026-09-16T09:00:00.000Z" },
+        rex: { exists: true, percentComplete: 37, nextTaskTitle: "Next thing" },
+        hench: { activeRuns: child.running.size },
+      });
+    }
+    if (url === "/api/git/status") {
+      return json(200, { isRepo: true, branch: "main", dirty: false, files: [] });
+    }
     if (url === "/api/hench/execute/status") {
       return json(200, {
         executions: [...child.running].map((taskId) => ({ taskId, status: "running" })),
@@ -275,6 +287,41 @@ describe("hub admission gate", () => {
     alpha.running.delete("task-1");
     await waitFor(() => beta.received.length === 1, 4_000);
     expect((await read()).entries).toEqual([]);
+  });
+
+  it("serves the home page at / with a card per project, from live child data", async () => {
+    const h = await startTestHub(4);
+    alpha.running.add("task-running");
+
+    const res = await fetch(`http://127.0.0.1:${h.port}/`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const html = await res.text();
+
+    // Both projects, each linking to its own dashboard and Runs view.
+    expect(html).toContain(">alpha<");
+    expect(html).toContain(">beta<");
+    expect(html).toContain('href="/p/alpha/hench-runs"');
+    expect(html).toContain('href="/p/beta/"');
+    expect(html).toContain(alpha.dir);
+    // The fake child reports one execution in flight, and the card says so.
+    expect(html).toContain("1 running");
+    // Theme bootstrap is inline, so the page never flashes the wrong one.
+    expect(html).toContain('localStorage.getItem("sv-theme")');
+  });
+
+  it("serves the same cards as JSON plus markup, for the page's refresh tick", async () => {
+    const h = await startTestHub(4);
+    const res = await fetch(`http://127.0.0.1:${h.port}/api/hub/overview`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.projects.map((p: { id: string }) => p.id).sort()).toEqual(["alpha", "beta"]);
+    const card = body.projects.find((p: { id: string }) => p.id === "alpha");
+    expect(card).toMatchObject({ reachable: true, url: "/p/alpha/", state: "healthy" });
+    // The markup the tick swaps in is the server's own, not a second renderer.
+    expect(body.html).toContain('href="/p/alpha/hench-runs"');
+    expect(Date.parse(body.generatedAt)).not.toBeNaN();
   });
 
   it("404s the hub API under an unknown project prefix", async () => {

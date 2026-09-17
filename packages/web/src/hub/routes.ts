@@ -4,6 +4,7 @@
  *   GET    /api/hub/health          — hub liveness: pid, port, uptime, project count
  *   GET    /api/hub/projects        — registered projects with live child status
  *   GET    /api/hub/queue           — admission limits, what is running, what is waiting
+ *   GET    /api/hub/overview        — every project with its child's live status, for the home page
  *
  * Also answered under a project prefix — `/p/<id>/api/hub/queue` — because
  * that is the only address a viewer can reach. The dashboard is served by the
@@ -32,6 +33,8 @@ import { existsSync, statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { detectBasePath, projectIdFromBasePath, stripBasePath } from "../shared/index.js";
 import type { Hub, RegisterProjectInput } from "./hub.js";
+import { buildHubOverview } from "./overview.js";
+import { renderCards } from "./home.js";
 
 const HUB_PREFIX = "/api/hub";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -173,6 +176,15 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
 
   if (path === "/projects" && method === "GET") {
     json(res, 200, { projects: hub.listProjects() });
+    return true;
+  }
+
+  // Feeds the home page, and its refresh tick: `html` is the same markup the
+  // page was served with, rendered once here rather than a second time in the
+  // browser, so there is one renderer and not two that can disagree.
+  if (path === "/overview" && method === "GET") {
+    const overview = await buildHubOverview(hub.listProjects());
+    json(res, 200, { ...overview, html: renderCards(overview) });
     return true;
   }
 

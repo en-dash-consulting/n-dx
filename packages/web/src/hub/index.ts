@@ -47,5 +47,8 @@ export type {
   QueueEntry,
   QueueSnapshot,
 } from "./admission.js";
-export { decideProxy, matchProjectByDir, renderProjectList, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
+export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 export type { ProxyDecision } from "./proxy.js";
+export { buildHubOverview, fetchChildSnapshot, toProjectCard } from "./overview.js";
+export type { HubOverview, ProjectCard, ChildSnapshot } from "./overview.js";
+export { renderHomePage, renderCard, renderCards, cardFacts, dirtyLabel, progressLabel, runningLabel } from "./home.js";
