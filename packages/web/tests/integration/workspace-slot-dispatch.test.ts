@@ -58,8 +58,8 @@ for (;;) {
   await new Promise((r) => setTimeout(r, 100));
 }
 
-async function probe(path, headers = {}) {
-  const res = await fetch(base + path, { headers });
+async function probe(path, headers = {}, method = "GET") {
+  const res = await fetch(base + path, { headers, method, ...(method === "POST" ? { body: "{}" } : {}) });
   const text = await res.text();
   return { status: res.status, type: res.headers.get("content-type") || "", text };
 }
@@ -85,11 +85,17 @@ out.headerBeatsSlot = JSON.parse(
   (await probe("/w/" + key + "/api/status", { "x-ndx-workspace": "app" })).text,
 ).projectDir;
 out.slotStillWinsOverNothing = JSON.parse((await probe("/w/" + key + "/api/status")).text).projectDir;
-// An unknown header key falls back rather than 404ing a whole dashboard, and
-// must not promote itself over a slot that does name a worktree.
-out.unknownHeaderKeepsSlot = JSON.parse(
-  (await probe("/w/" + key + "/api/status", { "x-ndx-workspace": "no-such-worktree" })).text,
-).projectDir;
+
+// A header naming no known worktree is refused rather than quietly answered
+// about the anchor — including on a GET, where the fallback would put the
+// anchor's data under another worktree's name. Only a fetch ever sets this
+// header, so refusing cannot 404 a page load.
+const staleRead = await probe("/api/status", { "x-ndx-workspace": "no-such-worktree" });
+out.staleHeaderRead = { status: staleRead.status, json: staleRead.type.includes("application/json"), body: staleRead.text };
+const staleWrite = await probe("/api/hench/execute", { "x-ndx-workspace": "no-such-worktree" }, "POST");
+out.staleHeaderWrite = staleWrite.status;
+// …and it does not let a slot that *does* name a worktree answer in its place.
+out.staleHeaderOverSlot = (await probe("/w/" + key + "/api/status", { "x-ndx-workspace": "no-such-worktree" })).status;
 
 // Snapshot what is known before the next probe: that one can take the whole
 // server down, and an intermediate emit means the earlier results still reach
@@ -184,7 +190,18 @@ describe("/w/<key>/ dispatch through the real server", () => {
   it("X-Ndx-Workspace outranks the /w/<key>/ slot", () => {
     expect(result.headerBeatsSlot).toBe(repo);
     expect(result.slotStillWinsOverNothing).toBe(linked);
-    expect(result.unknownHeaderKeepsSlot).toBe(linked);
+  });
+
+  it("a header naming no known worktree is refused, on reads as well as writes", () => {
+    expect(result.staleHeaderRead.status).toBe(404);
+    expect(result.staleHeaderRead.json).toBe(true);
+    const body = JSON.parse(result.staleHeaderRead.body);
+    expect(body.error).toContain("no-such-worktree");
+    expect(body.known, "the reply says which keys do exist").toEqual(
+      expect.arrayContaining(["app", "app-feature"]),
+    );
+    expect(result.staleHeaderWrite).toBe(404);
+    expect(result.staleHeaderOverSlot).toBe(404);
   });
 
   it("a malformed escape in the slot is answered, not fatal", () => {

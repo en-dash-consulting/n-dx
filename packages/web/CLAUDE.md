@@ -114,10 +114,23 @@ trees around each write; a route that wrote both would fail it.
 and in one direction only. It is *about* the set of worktrees, so it addresses
 each one explicitly with the `X-Ndx-Workspace` header rather than the `/w/<key>/`
 slot — the slot is already spent on whichever workspace the viewer itself is
-mounted under, and the server reads the header first (`resolveWorkspace`). Three
-endpoints answer for the whole repository and are fetched plainly
+mounted under, and the server reads the header ahead of the slot
+(`workspaceFromHeader` in the dispatcher, not the lenient `resolveWorkspace`).
+Three endpoints answer for the whole repository and are fetched plainly
 (`/api/workspaces`, `/api/worktrees`, `/api/hench/memory`); the rest are per
 workspace.
+
+**A header naming no known worktree is a 404, on reads as much as on writes.**
+Falling back to the anchor would answer under a name the caller did not ask
+for: a write to the wrong tree, or — on the board's per-card polling — the
+anchor's running task painted onto another worktree's card. Refusing is safe
+because only a fetch ever sets this header (`workspaceFetch`,
+`StartTaskButton`), never a navigation, so no page load can 404 on it. The
+dispatcher re-reads the worktree list once before refusing, since the registry
+only rescans every 30s and a worktree created since the last tick would
+otherwise be rejected for no reason. `respondUnknownWorkspaceHeader` answers
+JSON naming the key and the keys that do exist; `StartTaskButton` already
+renders that `error` field.
 
 Two constraints keep this from eroding the rules:
 

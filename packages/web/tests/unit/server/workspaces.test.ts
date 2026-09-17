@@ -156,6 +156,26 @@ describe("WorkspaceRegistry", () => {
     expect(registry.resolveWorkspace({ headers: {}, url: "/w/nope/" })).toBe(registry.anchor);
   });
 
+  // The dispatcher needs the third case the lenient resolver above folds away:
+  // a header that names nothing must be refusable, because answering about the
+  // anchor under a name the caller did not ask for misattributes the answer —
+  // a write to the wrong tree, or another worktree's state on a board card.
+  it("tells an absent header apart from one naming no known worktree", async () => {
+    const { registry } = harness([wt(ANCHOR), wt("/wt/feature", "feature")]);
+    await registry.refresh();
+
+    expect(registry.workspaceFromHeader({ headers: {} })).toEqual({ kind: "absent" });
+    expect(registry.workspaceFromHeader({ headers: { [WORKSPACE_HEADER]: "   " } })).toEqual({ kind: "absent" });
+    expect(registry.workspaceFromHeader({ headers: { [WORKSPACE_HEADER]: "nope" } })).toEqual({ kind: "unknown", key: "nope" });
+
+    const known = registry.workspaceFromHeader({ headers: { [WORKSPACE_HEADER]: " feature " } });
+    expect(known.kind).toBe("known");
+    expect(known.kind === "known" && known.workspace.key).toBe("feature");
+    // `main` is the anchor's alias whatever the anchor directory is called.
+    const anchor = registry.workspaceFromHeader({ headers: { [WORKSPACE_HEADER]: "main" } });
+    expect(anchor.kind === "known" && anchor.workspace.isAnchor).toBe(true);
+  });
+
   it("closeAll releases every non-anchor workspace and leaves the anchor to start.ts", async () => {
     const { registry, teardown, setWorktrees } = harness([wt(ANCHOR), wt("/wt/a", "a"), wt("/wt/b", "b")]);
     await registry.refresh();

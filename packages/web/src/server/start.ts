@@ -746,6 +746,30 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] ?? ch);
 }
 
+/**
+ * 404 for an `X-Ndx-Workspace` naming no known worktree.
+ *
+ * JSON, not the HTML page below: the header is only ever set on a fetch —
+ * `workspaceFetch` in the Workspaces board and `StartTaskButton` — never on a
+ * navigation, so the caller is code and wants a body it can read. Which is
+ * also why refusing is safe: no page load carries this header, so this cannot
+ * 404 anybody's dashboard.
+ *
+ * Refusing beats the anchor fallback on reads as much as on writes. The board
+ * polls `/api/hench/execute/status` per card with this header; answering about
+ * the anchor puts the anchor's running task on a card labelled with someone
+ * else's worktree. A 404 leaves the card's previous value alone (`loadSlice`
+ * keeps it) until the next `/api/workspaces` load drops the card entirely.
+ */
+function respondUnknownWorkspaceHeader(res: ServerResponse, key: string, registry: WorkspaceRegistry): void {
+  res.writeHead(404, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+  res.end(JSON.stringify({
+    error: `No workspace named "${key}" — it may have been removed since this page loaded.`,
+    workspace: key,
+    known: registry.keys(),
+  }));
+}
+
 /** 404 for a `/w/<key>/` that names no known worktree, linking back to the anchor. */
 function respondUnknownWorkspace(res: ServerResponse, key: string, registry: WorkspaceRegistry): void {
   // The anchor is listed as `/`, not `/w/<its key>/`: that is the address the
@@ -785,14 +809,29 @@ function createHttpServer(
       // written, and the dispatcher was the half that disagreed.
       //
       // The slot is stripped from the URL whichever one wins, so routes below
-      // always see root-relative paths; an unknown slot key is still refused
-      // with a page pointing back at the anchor rather than serving the wrong
-      // tree, but only when no header answered.
+      // always see root-relative paths. An unknown key is refused either way,
+      // in the form its caller can use: an HTML page for the slot (a
+      // navigation), JSON for the header (a fetch). Falling back to the anchor
+      // for an unrecognised header would answer about the wrong worktree under
+      // the name the caller asked for — wrong for a write, and on a read it
+      // paints the anchor's state onto another worktree's card.
       const slot = stripWorkspaceSlot(req.url || "/");
-      const fromHeader = registry.workspaceFromHeader(req);
+      let fromHeader = registry.workspaceFromHeader(req);
+      if (fromHeader.kind === "unknown") {
+        // One re-read of the worktree list before refusing: the registry only
+        // rescans every 30s, so a worktree created since the last tick is
+        // unknown here and would be refused for no good reason. `refresh()`
+        // coalesces, so a burst of bad keys costs one `git worktree list`.
+        await registry.refresh();
+        fromHeader = registry.workspaceFromHeader(req);
+      }
       let workspace;
-      if (fromHeader) {
-        workspace = fromHeader;
+      if (fromHeader.kind === "unknown") {
+        respondUnknownWorkspaceHeader(res, fromHeader.key, registry);
+        return;
+      }
+      if (fromHeader.kind === "known") {
+        workspace = fromHeader.workspace;
       } else if (slot.key !== null) {
         const named = registry.get(slot.key);
         if (!named) {

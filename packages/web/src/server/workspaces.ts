@@ -87,6 +87,12 @@ export interface Workspace extends WorkspaceResources {
   createdAt: string;
 }
 
+/** What {@link WorkspaceRegistry.workspaceFromHeader} made of a request's header. */
+export type HeaderWorkspace =
+  | { kind: "absent" }
+  | { kind: "known"; workspace: Workspace }
+  | { kind: "unknown"; key: string };
+
 /** A known worktree, whether or not its resources exist yet. */
 export interface WorkspaceSummary {
   key: string;
@@ -291,26 +297,36 @@ export class WorkspaceRegistry {
   }
 
   /**
-   * The workspace named by the `X-Ndx-Workspace` header, or null when the
-   * header is absent or names no known worktree.
+   * What the `X-Ndx-Workspace` header names: nothing, a known worktree, or a
+   * key this server does not recognise.
    *
-   * Split out from {@link resolveWorkspace} because the header outranks the
-   * `/w/<key>/` slot and the dispatcher has to know *which* of the two
-   * answered: the Workspaces board is served under its own slot and addresses
-   * every other worktree by header, so a slot-first dispatcher sends its
-   * Start/Stop to the worktree the page happens to be mounted on.
+   * Split out from {@link resolveWorkspace} for two reasons. The header
+   * outranks the `/w/<key>/` slot, and the dispatcher has to know *which* of
+   * the two answered — the Workspaces board is served under its own slot and
+   * addresses every other worktree by header, so a slot-first dispatcher sends
+   * its Start/Stop to the worktree the page happens to be mounted on. And an
+   * unrecognised key has to stay distinguishable from an absent one, because
+   * the two deserve opposite answers: see the `unknown` branch in
+   * `createHttpServer`.
    */
-  workspaceFromHeader(req: Pick<IncomingMessage, "headers">): Workspace | null {
+  workspaceFromHeader(req: Pick<IncomingMessage, "headers">): HeaderWorkspace {
     const header = req.headers[WORKSPACE_HEADER];
     const raw = (Array.isArray(header) ? header[0] : header)?.trim();
-    if (!raw) return null;
-    return this.get(raw) ?? null;
+    if (!raw) return { kind: "absent" };
+    const workspace = this.get(raw);
+    return workspace ? { kind: "known", workspace } : { kind: "unknown", key: raw };
   }
 
   /**
    * The workspace a request addresses: the `X-Ndx-Workspace` header, else the
-   * `/w/<key>/` slot, else the anchor. An unknown key also falls back to the
-   * anchor rather than failing — a stale tab must not 404 its whole dashboard.
+   * `/w/<key>/` slot, else the anchor. An unknown key falls back to the anchor
+   * rather than failing.
+   *
+   * The dispatcher does **not** use that fallback for an unrecognised header —
+   * it refuses (see `createHttpServer`), because answering about the anchor
+   * under a name the caller did not ask for misattributes the answer. This
+   * stays lenient for callers that only need a context and have no way to
+   * report a 404.
    */
   resolveWorkspace(req: Pick<IncomingMessage, "headers" | "url">): Workspace {
     const header = req.headers[WORKSPACE_HEADER];
