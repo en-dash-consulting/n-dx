@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { existsSync } from "node:fs";
-import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
+import { DEFAULT_TIMEOUT, removeTmpDir, waitForPidExit } from "./e2e-helpers.js";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 const LOOPBACK_HOST = "127.0.0.1";
@@ -160,14 +160,24 @@ describe("n-dx start", { timeout: 120_000 }, () => {
   });
 
   afterEach(async () => {
-    // Clean up any stale PID files / background processes
+    // Stop any background server the test left behind, through the COMMAND
+    // rather than a raw signal: `stop` tree-kills (taskkill /T on Windows, the
+    // process group on POSIX) and waits, where `process.kill(pid, "SIGTERM")`
+    // reaches one process and returns immediately. The server runs with cwd
+    // inside tmpDir, so anything still alive here makes the rm below fail with
+    // EBUSY on Windows.
+    let pid = null;
     try {
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
-      const raw = await readFile(pidPath, "utf-8");
-      const data = JSON.parse(raw);
-      try { process.kill(data.pid, "SIGTERM"); } catch {}
+      pid = JSON.parse(await readFile(join(tmpDir, ".n-dx-web.pid"), "utf-8")).pid;
     } catch {}
-    await rm(tmpDir, { recursive: true, force: true });
+    if (pid) {
+      runResult(["stop", tmpDir]);
+      if (!(await waitForPidExit(pid))) {
+        try { process.kill(pid, "SIGKILL"); } catch {}
+        await waitForPidExit(pid, 2_000);
+      }
+    }
+    await removeTmpDir(tmpDir);
   });
 
   // ── Port validation ───────────────────────────────────────────────────
@@ -275,12 +285,7 @@ describe("n-dx start", { timeout: 120_000 }, () => {
       expect(stdout).toContain("Stopping previous");
 
       // Clean up
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
-      try {
-        const raw = await readFile(pidPath, "utf-8");
-        const pidData = JSON.parse(raw);
-        process.kill(pidData.pid, "SIGTERM");
-      } catch {}
+      runResult(["stop", tmpDir]);
     });
 
     it("stop subcommand kills background server", async () => {
@@ -326,12 +331,7 @@ describe("n-dx start", { timeout: 120_000 }, () => {
       expect(stdout).toContain("ndx start stop");
 
       // Clean up
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
-      try {
-        const raw = await readFile(pidPath, "utf-8");
-        const pidData = JSON.parse(raw);
-        process.kill(pidData.pid, "SIGTERM");
-      } catch {}
+      runResult(["stop", tmpDir]);
     });
 
     it("uses 'n-dx server' when restarting a previous instance", async () => {
@@ -346,12 +346,7 @@ describe("n-dx start", { timeout: 120_000 }, () => {
       expect(stdout).toContain("Stopping previous n-dx server");
 
       // Clean up
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
-      try {
-        const raw = await readFile(pidPath, "utf-8");
-        const pidData = JSON.parse(raw);
-        process.kill(pidData.pid, "SIGTERM");
-      } catch {}
+      runResult(["stop", tmpDir]);
     });
   });
 

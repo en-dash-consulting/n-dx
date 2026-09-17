@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { sep } from "node:path";
+import { join, resolve, sep } from "node:path";
 import {
   INSTALL_KIND,
   INSTALL_KIND_LABELS,
@@ -28,13 +28,24 @@ function existsOnly(paths) {
   return (p) => set.has(p);
 }
 
+// Fixture paths go through `resolve`/`join` so they come out in the host's
+// native form. The module under test resolves every path it is given, and the
+// `existsSync` stub below matches by exact string — a POSIX literal such as
+// "/home/dev/n-dx/pnpm-workspace.yaml" never equals the "D:\\home\\dev\\…"
+// that `join(resolve(…), …)` produces on Windows, which silently turned every
+// checkout into an "unknown" install in CI there.
+
 /** A workspace checkout laid out the way this monorepo is. */
-const WORKSPACE_ROOT = "/home/dev/n-dx";
-const WORKSPACE_CLI = `${WORKSPACE_ROOT}/packages/core/cli.js`;
-const WORKSPACE_MARKER = `${WORKSPACE_ROOT}/pnpm-workspace.yaml`;
+const WORKSPACE_ROOT = resolve("/home/dev/n-dx");
+const WORKSPACE_CLI = join(WORKSPACE_ROOT, "packages", "core", "cli.js");
+const WORKSPACE_MARKER = join(WORKSPACE_ROOT, "pnpm-workspace.yaml");
+/** A project the CLI is pointed at, distinct from the checkout it runs from. */
+const PROJECT_DIR = resolve("/home/dev/app");
+/** A global bin shim living outside the checkout (`pnpm link --global`). */
+const GLOBAL_SHIM = resolve("/home/dev/.local/share/pnpm/ndx");
 
 /** A global npm install, as produced by `npm i -g @n-dx/core`. */
-const NPM_CLI = "/usr/local/lib/node_modules/@n-dx/core/cli.js";
+const NPM_CLI = resolve("/usr/local/lib/node_modules/@n-dx/core/cli.js");
 
 describe("isUnderNodeModules", () => {
   it("detects a node_modules path segment", () => {
@@ -57,7 +68,7 @@ describe("isUnderNodeModules", () => {
 describe("findWorkspaceRoot", () => {
   it("walks up to the directory holding pnpm-workspace.yaml", () => {
     const deps = { existsSync: existsOnly([WORKSPACE_MARKER]) };
-    expect(findWorkspaceRoot(`${WORKSPACE_ROOT}/packages/core`, deps)).toBe(WORKSPACE_ROOT);
+    expect(findWorkspaceRoot(join(WORKSPACE_ROOT, "packages", "core"), deps)).toBe(WORKSPACE_ROOT);
   });
 
   it("returns the start directory when the marker is already there", () => {
@@ -67,7 +78,7 @@ describe("findWorkspaceRoot", () => {
 
   it("returns null when no marker exists anywhere above", () => {
     const deps = { existsSync: () => false };
-    expect(findWorkspaceRoot(`${WORKSPACE_ROOT}/packages/core`, deps)).toBeNull();
+    expect(findWorkspaceRoot(join(WORKSPACE_ROOT, "packages", "core"), deps)).toBeNull();
   });
 
   it("terminates at the filesystem root", () => {
@@ -99,7 +110,7 @@ describe("classifyInstall", () => {
     // Node leaves argv[1] as the symlink but realpaths import.meta.url, so the
     // two disagreeing is the only signal that a global shim was used.
     const result = classifyInstall(
-      { cliPath: WORKSPACE_CLI, argvPath: "/home/dev/.local/share/pnpm/ndx" },
+      { cliPath: WORKSPACE_CLI, argvPath: GLOBAL_SHIM },
       deps,
     );
     expect(result.kind).toBe(INSTALL_KIND.LINK);
@@ -111,7 +122,7 @@ describe("classifyInstall", () => {
     // node_modules/.bin inside the repo is a local install artifact, not a
     // global link — it still runs the checkout you are standing in.
     const result = classifyInstall(
-      { cliPath: WORKSPACE_CLI, argvPath: `${WORKSPACE_ROOT}/node_modules/.bin/ndx` },
+      { cliPath: WORKSPACE_CLI, argvPath: join(WORKSPACE_ROOT, "node_modules", ".bin", "ndx") },
       deps,
     );
     expect(result.kind).toBe(INSTALL_KIND.WORKSPACE);
@@ -203,7 +214,7 @@ describe("collectInstallIdentity", () => {
   const base = {
     version: "1.2.3",
     cliPath: WORKSPACE_CLI,
-    projectDir: "/home/dev/app",
+    projectDir: PROJECT_DIR,
     argvPath: WORKSPACE_CLI,
   };
   const deps = {
@@ -222,7 +233,7 @@ describe("collectInstallIdentity", () => {
         root: WORKSPACE_ROOT,
       },
       git: { branch: "main", sha: "a1b2c3d", detached: false },
-      projectDir: "/home/dev/app",
+      projectDir: PROJECT_DIR,
     });
   });
 
@@ -289,7 +300,7 @@ describe("formatInstallIdentity", () => {
     cliPath: WORKSPACE_CLI,
     install: { kind: "workspace", label: "workspace checkout", root: WORKSPACE_ROOT },
     git: { branch: "main", sha: "a1b2c3d", detached: false },
-    projectDir: "/home/dev/app",
+    projectDir: PROJECT_DIR,
   };
 
   it("prints all five fields", () => {
@@ -299,7 +310,7 @@ describe("formatInstallIdentity", () => {
     expect(lines[2]).toContain("workspace checkout");
     expect(lines[2]).toContain(WORKSPACE_ROOT);
     expect(lines[3]).toContain("main @ a1b2c3d");
-    expect(lines[4]).toContain("/home/dev/app");
+    expect(lines[4]).toContain(PROJECT_DIR);
     expect(lines).toHaveLength(5);
   });
 

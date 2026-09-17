@@ -26,6 +26,7 @@ import {
   removeTmpDir,
   setupRexDir,
   setupSourcevisionDir,
+  waitForPidExit,
   withSandboxedClaudeConfig,
 } from "./e2e-helpers.js";
 
@@ -125,21 +126,38 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
   }, 60_000);
 
   afterAll(async () => {
-    // Stop the hub (and, through its SIGTERM handler, every project server).
+    // Stop the hub and every project server it spawned.
+    //
+    // On POSIX the hub's SIGTERM handler stops its children itself. On Windows
+    // `process.kill(pid, "SIGTERM")` is TerminateProcess — no handler runs — so
+    // the project servers would survive the hub, each holding its repo as cwd,
+    // and removing tmpRoot would fail with EBUSY on `alpha-app`. Collect their
+    // pids from the hub while it can still answer, then kill them explicitly.
+    const pids = [];
+    if (hubPort) {
+      try {
+        const { body } = await getJson(`http://127.0.0.1:${hubPort}/api/hub/projects`);
+        for (const p of body?.projects ?? []) if (typeof p.pid === "number") pids.push(p.pid);
+      } catch {
+        // hub not answering — nothing registered to collect
+      }
+    }
     try {
       const pidFile = JSON.parse(await readFile(join(home, "hub.pid"), "utf-8"));
-      if (pidFile?.pid && isAlive(pidFile.pid)) {
-        process.kill(pidFile.pid, "SIGTERM");
-        const deadline = Date.now() + 15_000;
-        while (Date.now() < deadline && isAlive(pidFile.pid)) {
-          await new Promise((r) => setTimeout(r, 100));
-        }
-      }
+      if (typeof pidFile?.pid === "number") pids.unshift(pidFile.pid);
     } catch {
       // no hub was started
     }
+    for (const pid of pids) {
+      if (!isAlive(pid)) continue;
+      try { process.kill(pid, "SIGTERM"); } catch {}
+      if (!(await waitForPidExit(pid, 15_000))) {
+        try { process.kill(pid, "SIGKILL"); } catch {}
+        await waitForPidExit(pid, 2_000);
+      }
+    }
     for (const dir of [home, tmpRoot]) if (dir) await removeTmpDir(dir);
-  }, 30_000);
+  }, 60_000);
 
   it("started from a linked worktree, registers the main checkout and lists the worktree", async () => {
     if (!canBindPorts) return;
