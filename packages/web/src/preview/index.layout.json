@@ -4,49 +4,68 @@
     "title": "n-dx dashboard — layout v2",
     "subtitle": "Draft · mock-up only, no live data"
   },
-  "activeItemId": "overview",
   "rationale": "",
   "nav": [
     {
       "id": "grp-sourcevision",
       "kind": "folder",
-      "label": "SOURCEVISION",
+      "label": "Analysis",
       "children": [
         {
           "id": "overview",
           "kind": "item",
           "icon": "▣",
           "label": "Overview",
-          "panels": [
+          "content": [
             {
-              "id": "pnl-arch-health",
-              "label": "Architecture Health",
-              "width": 8
-            },
-            {
-              "id": "pnl-next-steps",
-              "label": "Next Steps",
-              "width": 4
-            },
-            {
-              "id": "pnl-top-zones",
-              "label": "Top Zones",
-              "width": 4
-            },
-            {
-              "id": "pnl-languages",
-              "label": "Languages",
-              "width": 4
-            },
-            {
-              "id": "pnl-getting-started",
-              "label": "Getting Started",
-              "width": 4
-            },
-            {
-              "id": "pnl-recent-activity",
-              "label": "Recent Activity",
-              "width": 12
+              "id": "sec-001",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-arch-health",
+                  "label": "Architecture Health",
+                  "width": 8,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-next-steps",
+                  "label": "Next Steps",
+                  "width": 4,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-top-zones",
+                  "label": "Top Zones",
+                  "width": 4,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-languages",
+                  "label": "Languages",
+                  "width": 4,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-getting-started",
+                  "label": "Getting Started",
+                  "width": 4,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-recent-activity",
+                  "label": "Recent Activity",
+                  "width": 12,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-d1qnh1",
+                  "label": "New panel",
+                  "width": 12,
+                  "status": "new",
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -55,11 +74,21 @@
           "kind": "item",
           "icon": "▧",
           "label": "Map",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-import-graph",
-              "label": "Import Graph",
-              "width": 12
+              "id": "sec-002",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-import-graph",
+                  "label": "Import Graph",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -68,11 +97,21 @@
           "kind": "item",
           "icon": "◧",
           "label": "Isometric Map",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-iso-canvas",
-              "label": "Isometric Canvas",
-              "width": 12
+              "id": "sec-003",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-iso-canvas",
+                  "label": "Isometric Canvas",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -81,16 +120,27 @@
           "kind": "item",
           "icon": "⬢",
           "label": "Zones",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-zone-list",
-              "label": "Zone List",
-              "width": 6
-            },
-            {
-              "id": "pnl-zone-detail",
-              "label": "Zone Detail",
-              "width": 6
+              "id": "sec-004",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-zone-list",
+                  "label": "Zone List",
+                  "width": 6,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-zone-detail",
+                  "label": "Zone Detail",
+                  "width": 6,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -99,11 +149,21 @@
           "kind": "item",
           "icon": "☰",
           "label": "Files",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-file-table",
-              "label": "File Inventory",
-              "width": 12
+              "id": "sec-005",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-file-table",
+                  "label": "File Inventory",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -112,11 +172,21 @@
           "kind": "item",
           "icon": "◇",
           "label": "Routes",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-route-tree",
-              "label": "Route Tree",
-              "width": 12
+              "id": "sec-006",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-route-tree",
+                  "label": "Route Tree",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -125,11 +195,21 @@
           "kind": "item",
           "icon": "◨",
           "label": "Architecture",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-arch-summary",
-              "label": "Architecture Summary",
-              "width": 12
+              "id": "sec-007",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-arch-summary",
+                  "label": "Architecture Summary",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -138,11 +218,21 @@
           "kind": "item",
           "icon": "⚠",
           "label": "Problems",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-findings",
-              "label": "Findings",
-              "width": 12
+              "id": "sec-008",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-findings",
+                  "label": "Findings",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -151,11 +241,21 @@
           "kind": "item",
           "icon": "✦",
           "label": "Suggestions",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-suggestion-list",
-              "label": "Suggestions",
-              "width": 12
+              "id": "sec-009",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-suggestion-list",
+                  "label": "Suggestions",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -165,11 +265,29 @@
           "icon": "✍",
           "label": "PR Markdown",
           "flag": true,
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-pr-preview",
-              "label": "PR Body Preview",
-              "width": 12
+              "id": "sec-010",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-pr-preview",
+                  "label": "PR Body Preview",
+                  "width": 12,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-x4klu9",
+                  "label": "New panel",
+                  "width": 6,
+                  "status": "removed",
+                  "statusBeforeRemoval": "new",
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -179,11 +297,104 @@
           "icon": "?",
           "label": "Ask",
           "flag": true,
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-011",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-ask-panel",
+                  "label": "Ask SourceVision",
+                  "width": 12,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-cb04h7",
+                  "label": "New panel",
+                  "width": 6,
+                  "status": "removed",
+                  "statusBeforeRemoval": "new",
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "previousLabel": "SOURCEVISION",
+      "collapsed": false,
+      "content": [
+        {
+          "id": "sec-general-repo-info",
+          "label": "General Repository Information",
+          "status": "new",
+          "collapsed": false,
           "panels": [
             {
-              "id": "pnl-ask-panel",
-              "label": "Ask SourceVision",
-              "width": 12
+              "id": "pnl-repo-counts",
+              "label": "Counts",
+              "width": 6,
+              "kind": "stats",
+              "status": "new",
+              "stats": [
+                {
+                  "label": "Files",
+                  "value": "412"
+                },
+                {
+                  "label": "Lines",
+                  "value": "58,904"
+                },
+                {
+                  "label": "Zones",
+                  "value": "18",
+                  "info": "A zone is a cluster of files that import each other more than they import the rest of the codebase — found by running Louvain community detection over the import graph, not by folder names. Zones are what the architecture views group, score and check boundaries against."
+                }
+              ]
+            },
+            {
+              "id": "pnl-health-coupling",
+              "label": "Health & coupling",
+              "width": 6,
+              "kind": "stats",
+              "status": "new",
+              "stats": [
+                {
+                  "label": "Health score",
+                  "value": "82"
+                },
+                {
+                  "label": "Avg coupling",
+                  "value": "0.41",
+                  "info": "Share of a zone's imports that cross its own boundary. Higher means the zone is more entangled with the rest of the codebase, so a change inside it has a wider blast radius."
+                },
+                {
+                  "label": "Avg cohesion",
+                  "value": "0.63",
+                  "info": "Share of a zone's imports that stay inside it. Higher means the zone holds together on its own terms; low cohesion with high coupling is the pair worth governing."
+                },
+                {
+                  "label": "Circular deps",
+                  "value": "0"
+                }
+              ]
+            },
+            {
+              "id": "pnl-analysis-top-zones",
+              "label": "Top zones",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new"
+            },
+            {
+              "id": "pnl-analysis-primary-language",
+              "label": "Primary language",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new"
             }
           ]
         }
@@ -192,23 +403,34 @@
     {
       "id": "grp-rex",
       "kind": "folder",
-      "label": "REX",
+      "label": "Plan",
       "children": [
         {
           "id": "rex-dashboard",
           "kind": "item",
           "icon": "▨",
           "label": "Dashboard",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-prd-progress",
-              "label": "PRD Progress",
-              "width": 8
-            },
-            {
-              "id": "pnl-active-tasks",
-              "label": "Active Tasks",
-              "width": 4
+              "id": "sec-012",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-prd-progress",
+                  "label": "PRD Progress",
+                  "width": 8,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-active-tasks",
+                  "label": "Active Tasks",
+                  "width": 4,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -217,11 +439,21 @@
           "kind": "item",
           "icon": "☑",
           "label": "Tasks",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-prd-tree",
-              "label": "PRD Tree",
-              "width": 12
+              "id": "sec-013",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-prd-tree",
+                  "label": "PRD Tree",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -230,11 +462,21 @@
           "kind": "item",
           "icon": "⌗",
           "label": "Analyze & Import",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-proposals",
-              "label": "Proposals",
-              "width": 12
+              "id": "sec-014",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-proposals",
+                  "label": "Proposals",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -243,11 +485,21 @@
           "kind": "item",
           "icon": "⧉",
           "label": "Context Graph",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-merge-graph",
-              "label": "Context Graph",
-              "width": 12
+              "id": "sec-015",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-merge-graph",
+                  "label": "Context Graph",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -256,11 +508,21 @@
           "kind": "item",
           "icon": "✔",
           "label": "Validation",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-validation-report",
-              "label": "Validation Report",
-              "width": 12
+              "id": "sec-016",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-validation-report",
+                  "label": "Validation Report",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -269,11 +531,21 @@
           "kind": "item",
           "icon": "⚖",
           "label": "Requirements",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-requirements",
-              "label": "Requirements Coverage",
-              "width": 12
+              "id": "sec-017",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-requirements",
+                  "label": "Requirements Coverage",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -282,11 +554,21 @@
           "kind": "item",
           "icon": "⌚",
           "label": "Activity",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-activity-log",
-              "label": "Execution Log",
-              "width": 12
+              "id": "sec-018",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-activity-log",
+                  "label": "Execution Log",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -296,36 +578,60 @@
           "icon": "🔗",
           "label": "Integrations",
           "flag": true,
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-integrations",
-              "label": "Connected Services",
-              "width": 12
+              "id": "sec-019",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-integrations",
+                  "label": "Connected Services",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         }
-      ]
+      ],
+      "previousLabel": "REX",
+      "collapsed": true,
+      "content": []
     },
     {
       "id": "grp-hench",
       "kind": "folder",
-      "label": "HENCH",
+      "label": "Work",
       "children": [
         {
           "id": "hench-runs",
           "kind": "item",
           "icon": "▶",
           "label": "Runs",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-run-history",
-              "label": "Run History",
-              "width": 8
-            },
-            {
-              "id": "pnl-live-output",
-              "label": "Live Output",
-              "width": 4
+              "id": "sec-020",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-run-history",
+                  "label": "Run History",
+                  "width": 8,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-live-output",
+                  "label": "Live Output",
+                  "width": 4,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -334,11 +640,21 @@
           "kind": "item",
           "icon": "☸",
           "label": "Audit",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-task-audit",
-              "label": "Task Audit",
-              "width": 12
+              "id": "sec-021",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-task-audit",
+                  "label": "Task Audit",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -347,11 +663,21 @@
           "kind": "item",
           "icon": "▦",
           "label": "Templates",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-templates",
-              "label": "Prompt Templates",
-              "width": 12
+              "id": "sec-022",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-templates",
+                  "label": "Prompt Templates",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -360,11 +686,21 @@
           "kind": "item",
           "icon": "⚡",
           "label": "Optimization",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-workflow-opt",
-              "label": "Workflow Optimization",
-              "width": 12
+              "id": "sec-023",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-workflow-opt",
+                  "label": "Workflow Optimization",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -373,15 +709,28 @@
           "kind": "item",
           "icon": "♻",
           "label": "Adaptive",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-adaptive",
-              "label": "Adaptive Thresholds",
-              "width": 12
+              "id": "sec-024",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-adaptive",
+                  "label": "Adaptive Thresholds",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         }
-      ]
+      ],
+      "previousLabel": "HENCH",
+      "collapsed": true,
+      "content": []
     },
     {
       "id": "grp-commands",
@@ -393,15 +742,25 @@
           "kind": "item",
           "icon": "⌘",
           "label": "All Commands",
-          "panels": [
+          "content": [
             {
-              "id": "pnl-command-ref",
-              "label": "Command Reference",
-              "width": 12
+              "id": "sec-025",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-command-ref",
+                  "label": "Command Reference",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         }
-      ]
+      ],
+      "collapsed": true,
+      "content": []
     },
     {
       "id": "grp-token-usage",
@@ -413,20 +772,35 @@
           "kind": "item",
           "icon": "⊚",
           "label": "Token Usage",
-          "panels": [
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
             {
-              "id": "pnl-usage-summary",
-              "label": "Spend Summary",
-              "width": 4
-            },
-            {
-              "id": "pnl-usage-by-item",
-              "label": "Usage by PRD Item",
-              "width": 8
+              "id": "sec-026",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-usage-summary",
+                  "label": "Spend Summary",
+                  "width": 4,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-usage-by-item",
+                  "label": "Usage by PRD Item",
+                  "width": 8,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         }
-      ]
+      ],
+      "statusBeforeRemoval": null,
+      "status": "removed",
+      "collapsed": true,
+      "content": []
     },
     {
       "id": "grp-settings",
@@ -438,11 +812,19 @@
           "kind": "item",
           "icon": "🧠",
           "label": "General",
-          "panels": [
+          "content": [
             {
-              "id": "pnl-llm-provider",
-              "label": "LLM Provider",
-              "width": 12
+              "id": "sec-027",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-llm-provider",
+                  "label": "LLM Provider",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -451,11 +833,19 @@
           "kind": "item",
           "icon": "▣",
           "label": "ndx analyze / plan",
-          "panels": [
+          "content": [
             {
-              "id": "pnl-analyze-settings",
-              "label": "Analysis Settings",
-              "width": 12
+              "id": "sec-028",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-analyze-settings",
+                  "label": "Analysis Settings",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -464,11 +854,19 @@
           "kind": "item",
           "icon": "▶",
           "label": "ndx work",
-          "panels": [
+          "content": [
             {
-              "id": "pnl-work-settings",
-              "label": "Agent Settings",
-              "width": 12
+              "id": "sec-029",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-work-settings",
+                  "label": "Agent Settings",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -478,11 +876,19 @@
           "icon": "🔌",
           "label": "ndx sync",
           "flag": true,
-          "panels": [
+          "content": [
             {
-              "id": "pnl-sync-settings",
-              "label": "Remote Sync",
-              "width": 12
+              "id": "sec-030",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-sync-settings",
+                  "label": "Remote Sync",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -491,11 +897,19 @@
           "kind": "item",
           "icon": "📤",
           "label": "ndx export / refresh",
-          "panels": [
+          "content": [
             {
-              "id": "pnl-export-settings",
-              "label": "Export & Refresh",
-              "width": 12
+              "id": "sec-031",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-export-settings",
+                  "label": "Export & Refresh",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -504,11 +918,19 @@
           "kind": "item",
           "icon": "📌",
           "label": "Feature Flags",
-          "panels": [
+          "content": [
             {
-              "id": "pnl-feature-flags",
-              "label": "Feature Flags",
-              "width": 12
+              "id": "sec-032",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-feature-flags",
+                  "label": "Feature Flags",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         },
@@ -517,15 +939,26 @@
           "kind": "item",
           "icon": "⏱",
           "label": "CLI Timeouts",
-          "panels": [
+          "content": [
             {
-              "id": "pnl-cli-timeouts",
-              "label": "CLI Timeouts",
-              "width": 12
+              "id": "sec-033",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-cli-timeouts",
+                  "label": "CLI Timeouts",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
             }
           ]
         }
-      ]
+      ],
+      "collapsed": false,
+      "content": []
     }
-  ]
+  ],
+  "activeViewId": "grp-sourcevision"
 }

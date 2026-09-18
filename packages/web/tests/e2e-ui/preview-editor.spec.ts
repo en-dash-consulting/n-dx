@@ -64,6 +64,18 @@ async function waitForReady(url: string): Promise<void> {
   throw new Error(`Preview server never became ready at ${url}`);
 }
 
+/**
+ * Expand a top-level group if it is collapsed.
+ *
+ * Collapsed state is view state that lives in the layout file, so whatever the
+ * last editing session left behind is what a test opens to. Specs expand what
+ * they need rather than assuming.
+ */
+async function expandGroup(page: any, label: string): Promise<void> {
+  const caret = page.locator(`.row-folder:has(.label:text-is("${label}")) .caret`).first();
+  if ((await caret.textContent())?.trim() === "▸") await caret.click();
+}
+
 /** Collapse every top-level group and return the rail to the top. */
 async function collapseAllGroups(page: any): Promise<void> {
   const carets = page.locator("#nav-root > .row-folder.depth-0 .caret");
@@ -124,17 +136,46 @@ test.afterAll(async () => {
 test("renders the shipped section inventory", async ({ page }) => {
   await page.goto(baseUrl, { waitUntil: "networkidle" });
 
-  for (const group of ["SOURCEVISION", "REX", "HENCH", "SETTINGS"]) {
+  for (const group of ["Analysis", "Plan", "Work", "SETTINGS"]) {
     await expect(page.locator(".row-folder", { hasText: group }).first()).toBeVisible();
   }
-  // The active tab's panels render in the content grid.
-  await expect(page.locator("#view-title")).toHaveText("Overview");
-  await expect(page.locator(".panel", { hasText: "Architecture Health" })).toBeVisible();
+  // Renamed sections carry their old name with them.
+  await expect(page.locator('.row-folder:has(.label:text-is("Analysis"))').first().locator(".prev"))
+    .toHaveText("(previously SOURCEVISION)");
+});
+
+test("a section is a page: clicking it shows its own named sections", async ({ page }) => {
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+
+  // Start somewhere else, then click the section header itself.
+  await expandGroup(page, "Analysis");
+  await page.locator('.row-item:has(.label:text-is("Map"))').first().click();
+  await expect(page.locator("#view-title")).toHaveText("Map");
+
+  await page.locator('.row-folder:has(.label:text-is("Analysis"))').first().click();
+  await expect(page.locator("#view-title")).toHaveText("Analysis");
+
+  const section = page.locator('.pgroup:has(.label:text-is("General Repository Information"))');
+  await expect(section).toBeVisible();
+  await expect(section.locator(".panel", { hasText: "Counts" })).toBeVisible();
+  await expect(section.locator(".panel", { hasText: "Health & coupling" })).toBeVisible();
+
+  // The zone count carries a hover explainer — the whole reason that stat needs
+  // one is that "zone" means nothing to a reader who has not met the analyser.
+  const zoneInfo = section.locator(".stat-item", { hasText: "Zones" }).locator(".info");
+  await expect(zoneInfo).toHaveAttribute("data-info", /Louvain community detection/);
+
+  // Collapsing the section hides its panels but keeps the header — that is what
+  // makes it a dropdown rather than a heading.
+  await section.locator(".caret").first().click();
+  await expect(section.locator(".panel")).toHaveCount(0);
+  await expect(section.locator('.label:text-is("General Repository Information")')).toBeVisible();
 });
 
 test("a rename shows '(previously …)' and reaches the layout file", async ({ page }) => {
   await page.goto(baseUrl, { waitUntil: "networkidle" });
 
+  await expandGroup(page, "Plan");
   const label = page.locator('.row-item:has(.label:text-is("Tasks"))').first().locator(".label");
   await label.click({ clickCount: 3 });
   await page.keyboard.type("Backlog");
@@ -162,8 +203,8 @@ test("dropping a section on the middle of a group nests it inside", async ({ pag
   const newGroup = page.locator('.row-folder:has(.label:text-is("New group"))').first();
   await expect(newGroup).toBeVisible();
 
-  const hench = page.locator('.row-folder:has(.label:text-is("HENCH"))').first();
-  await dragOnto(hench, newGroup);
+  const work = page.locator('.row-folder:has(.label:text-is("Work"))').first();
+  await dragOnto(work, newGroup);
 
   await expect
     .poll(
@@ -174,11 +215,11 @@ test("dropping a section on the middle of a group nests it inside", async ({ pag
       },
       { timeout: 5_000 },
     )
-    .toContain("HENCH");
+    .toContain("Work");
 
   // And the nested section is marked as moved, so the change list reports it.
   const saved = await savedLayout();
-  expect(findNode(saved.nav, "HENCH").status).toBe("moved");
+  expect(findNode(saved.nav, "Work").status).toBe("moved");
 });
 
 test("Alt+Right nests a section into the group above it", async ({ page }) => {
@@ -210,6 +251,8 @@ test("Alt+Right nests a section into the group above it", async ({ page }) => {
 test("cutting a panel marks it before deleting it", async ({ page }) => {
   await page.goto(baseUrl, { waitUntil: "networkidle" });
 
+  await expandGroup(page, "Analysis");
+  await page.locator('.row-item:has(.label:text-is("Overview"))').first().click();
   const panel = page.locator(".panel", { hasText: "Languages" }).first();
   await panel.hover();
   await panel.getByTitle("Mark as cut").click();
@@ -220,7 +263,8 @@ test("cutting a panel marks it before deleting it", async ({ page }) => {
     .poll(async () => {
       const saved = await savedLayout();
       const overview = findNode(saved.nav, "Overview");
-      return overview.panels.find((p: any) => p.label === "Languages")?.status;
+      const panels = (overview.content ?? []).flatMap((group: any) => group.panels ?? []);
+      return panels.find((p: any) => p.label === "Languages")?.status;
     }, { timeout: 5_000 })
     .toBe("removed");
 });

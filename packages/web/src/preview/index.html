@@ -264,6 +264,55 @@ body {
   padding: var(--space-6); text-align: center; color: var(--text-muted);
 }
 
+/* ── Content groups (the "dropdowns" inside a page) ─────────────────────── */
+.pgroup { margin-bottom: var(--space-5); }
+.pgroup-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: var(--space-2) 0; margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.pgroup-head .label { font-size: 14px; font-weight: 600; color: var(--text); }
+.pgroup-head .label.is-untitled { color: var(--text-muted); font-weight: 500; font-style: italic; }
+.pgroup-actions { margin-left: auto; display: flex; gap: 4px; align-items: center; flex-shrink: 0; opacity: 0; }
+.pgroup:hover .pgroup-actions, .pgroup:focus-within .pgroup-actions { opacity: 1; }
+.pgroup.drop-before .pgroup-head { box-shadow: 0 -3px 0 var(--accent); }
+.pgroup.drop-after { box-shadow: 0 3px 0 var(--accent); }
+.pgroup.dragging { opacity: .4; }
+.pgroup-status-new .pgroup-head { border-bottom-color: var(--green); }
+.pgroup-status-moved .pgroup-head { border-bottom-color: var(--orange); }
+.pgroup-status-removed { opacity: .45; }
+.pgroup-status-removed .pgroup-head .label { text-decoration: line-through; }
+
+/* ── Stat panels ────────────────────────────────────────────────────────── */
+.stats { display: flex; flex-wrap: wrap; gap: var(--space-5) var(--space-6); }
+.stat-item { min-width: 92px; }
+.stat-item .stat-value { font-size: 22px; font-weight: 600; outline: none; }
+.stat-item .stat-label {
+  display: flex; align-items: center; gap: 4px;
+  color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+}
+.stat-item .stat-label > span[contenteditable]:focus,
+.stat-item .stat-value:focus { background: var(--bg); box-shadow: 0 0 0 1px var(--accent); border-radius: var(--radius-sm); }
+.stat-actions { display: flex; gap: 2px; opacity: 0; }
+.stat-item:hover .stat-actions, .stat-item:focus-within .stat-actions { opacity: 1; }
+
+/* Hover/focus explainer — "what is a zone?" without leaving the page */
+.info {
+  position: relative; cursor: help; color: var(--text-muted);
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  width: 13px; height: 13px; display: inline-grid; place-items: center;
+  font: 9px/1 var(--font-mono); flex-shrink: 0;
+}
+.info:hover, .info:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
+.info:hover::after, .info:focus-visible::after {
+  content: attr(data-info);
+  position: absolute; left: 0; top: 150%; z-index: 20; width: 260px;
+  background: var(--bg-active); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md); padding: var(--space-3);
+  font: 11px/1.5 var(--font-sans); letter-spacing: 0; text-transform: none;
+  color: var(--text); white-space: normal; box-shadow: 0 10px 24px rgba(0,0,0,.3);
+}
+
 /* ── Rationale tab ──────────────────────────────────────────────────────── */
 .prose { max-width: 940px; }
 .prose h2 { font-size: 16px; margin: var(--space-6) 0 var(--space-2); }
@@ -290,6 +339,9 @@ body[data-mode="present"] .row-actions,
 body[data-mode="present"] .panel-actions,
 body[data-mode="present"] .sidebar-footer,
 body[data-mode="present"] .add-panel,
+body[data-mode="present"] .pgroup-actions,
+body[data-mode="present"] .stat-actions,
+body[data-mode="present"] .add-group,
 body[data-mode="present"] .edit-hint { display: none !important; }
 
 @media (max-width: 960px) {
@@ -361,13 +413,7 @@ body[data-mode="present"] .edit-hint { display: none !important; }
           <span id="view-prev" class="prev"></span>
           <span id="view-mark"></span>
         </div>
-        <div class="stat-row">
-          <div class="stat"><div class="stat-value">412</div><div class="stat-label">Files</div></div>
-          <div class="stat"><div class="stat-value">18</div><div class="stat-label">Zones</div></div>
-          <div class="stat"><div class="stat-value">63%</div><div class="stat-label">PRD complete</div></div>
-          <div class="stat"><div class="stat-value">4</div><div class="stat-label">Problems</div></div>
-        </div>
-        <div class="panel-grid" id="panel-grid"></div>
+        <div id="page-content"></div>
       </div>
     </div>
   </div>
@@ -398,6 +444,18 @@ body[data-mode="present"] .edit-hint { display: none !important; }
    addition is *recorded*, not just applied: the change list in the Rationale
    tab is what reviewers read, and it only works if nothing mutates the tree
    behind its back.
+
+   Shape of the model:
+
+     nav: [ node ]
+       node.kind = "folder"  → collapsible dropdown in the rail; may hold
+                               children AND its own content, so clicking a
+                               section shows a page rather than nothing
+       node.kind = "item"    → a tab
+       node.content = [ group ]        a named, collapsible block on the page
+       group.panels = [ panel ]        cards in a 12-column grid
+       panel.kind = "stats"|"blocks"   numbers with hover explainers, or a
+                                       placeholder card
    ════════════════════════════════════════════════════════════════════════ */
 (function () {
   "use strict";
@@ -414,6 +472,7 @@ body[data-mode="present"] .edit-hint { display: none !important; }
   var dragState = null;
 
   var $ = function (id) { return document.getElementById(id); };
+  var editing = function () { return document.body.dataset.mode === "edit"; };
 
   /* ── Model helpers ──────────────────────────────────────────────────── */
 
@@ -421,7 +480,7 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     return prefix + "-" + Math.random().toString(36).slice(2, 8);
   }
 
-  /** Depth-first walk; `fn(node, parentArray, index, depth, ancestors)`. */
+  /** Depth-first walk over the nav tree; `fn(node, siblings, index, depth, ancestors)`. */
   function walk(nodes, fn, depth, ancestors) {
     depth = depth || 0;
     ancestors = ancestors || [];
@@ -442,27 +501,43 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     return hit;
   }
 
-  function allItems() {
-    var items = [];
+  /** Every node that owns a page — folders included, since a section is clickable. */
+  function allViews() {
+    var views = [];
     walk(layout.nav, function (node, _s, _i, _d, ancestors) {
-      if (node.kind === "item") items.push({ node: node, path: ancestors.map(function (a) { return a.label; }) });
+      views.push({ node: node, path: ancestors.map(function (a) { return a.label; }) });
     });
-    return items;
+    return views;
   }
 
-  function activeItem() {
-    var items = allItems();
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].node.id === layout.activeItemId) return items[i];
+  function activeView() {
+    var views = allViews();
+    for (var i = 0; i < views.length; i++) {
+      if (views[i].node.id === layout.activeViewId) return views[i];
     }
-    return items[0] || null;
+    return views[0] || null;
   }
 
-  /** True when `maybeAncestorId` contains `nodeId` — a folder cannot move into itself. */
   function contains(maybeAncestorId, nodeId) {
     var hit = find(nodeId);
     if (!hit) return false;
     return hit.ancestors.some(function (a) { return a.id === maybeAncestorId; });
+  }
+
+  /** A node's content groups, created on demand. */
+  function contentOf(node) {
+    if (!Array.isArray(node.content)) node.content = [];
+    return node.content;
+  }
+
+  function findGroup(groupId) {
+    var hit = null;
+    allViews().forEach(function (view) {
+      contentOf(view.node).forEach(function (group, index) {
+        if (group.id === groupId) hit = { group: group, view: view.node, index: index };
+      });
+    });
+    return hit;
   }
 
   /* ── Mutations. Every one of these records what it did. ─────────────── */
@@ -483,26 +558,25 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     return true;
   }
 
-  function removeNode(node) {
-    if (node.status === "removed") {
-      // Second press deletes for real — a cut section stays visible once so a
-      // reviewer can see what went, which is the whole point of the mark.
-      var hit = find(node.id);
-      if (hit) hit.siblings.splice(hit.index, 1);
-      if (node.kind === "item" && layout.activeItemId === node.id) {
-        var first = allItems()[0];
-        layout.activeItemId = first ? first.node.id : null;
+  /** Mark as cut; a second call on an already-cut thing deletes it. */
+  function cut(holder, list, entry) {
+    if (entry.status === "removed") {
+      var at = list.indexOf(entry);
+      if (at >= 0) list.splice(at, 1);
+      if (holder === "nav" && entry.kind && layout.activeViewId === entry.id) {
+        var first = allViews()[0];
+        layout.activeViewId = first ? first.node.id : null;
       }
       return;
     }
-    node.statusBeforeRemoval = node.status || null;
-    node.status = "removed";
+    entry.statusBeforeRemoval = entry.status || null;
+    entry.status = "removed";
   }
 
-  function restoreNode(node) {
-    node.status = node.statusBeforeRemoval || null;
-    if (!node.status) delete node.status;
-    delete node.statusBeforeRemoval;
+  function restore(entry) {
+    entry.status = entry.statusBeforeRemoval || null;
+    if (!entry.status) delete entry.status;
+    delete entry.statusBeforeRemoval;
   }
 
   function moveNode(dragId, targetId, mode) {
@@ -528,7 +602,7 @@ body[data-mode="present"] .edit-hint { display: none !important; }
   }
 
   function addFolder(parentFolder) {
-    var node = { id: uid("grp"), kind: "folder", label: "New group", status: "new", children: [] };
+    var node = { id: uid("grp"), kind: "folder", label: "New group", status: "new", children: [], content: [] };
     if (parentFolder) {
       parentFolder.children = parentFolder.children || [];
       parentFolder.children.push(node);
@@ -540,7 +614,7 @@ body[data-mode="present"] .edit-hint { display: none !important; }
   }
 
   function addItem(parentFolder) {
-    var node = { id: uid("tab"), kind: "item", icon: "▫", label: "New tab", status: "new", panels: [] };
+    var node = { id: uid("tab"), kind: "item", icon: "▫", label: "New tab", status: "new", content: [] };
     if (parentFolder) {
       parentFolder.children = parentFolder.children || [];
       parentFolder.children.push(node);
@@ -548,38 +622,49 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     } else {
       layout.nav.push(node);
     }
-    layout.activeItemId = node.id;
+    layout.activeViewId = node.id;
     return node;
   }
 
-  function addPanel(item) {
-    item.panels = item.panels || [];
-    item.panels.push({ id: uid("pnl"), label: "New panel", width: 6, status: "new" });
+  function addGroup(view) {
+    contentOf(view).push({ id: uid("sec"), label: "New section", status: "new", collapsed: false, panels: [] });
   }
 
-  function movePanel(item, dragId, targetId, mode) {
-    var from = -1, to = -1;
-    item.panels.forEach(function (p, i) {
-      if (p.id === dragId) from = i;
-      if (p.id === targetId) to = i;
-    });
-    if (from < 0 || to < 0 || from === to) return;
-    var moved = item.panels.splice(from, 1)[0];
-    var again = item.panels.findIndex(function (p) { return p.id === targetId; });
-    item.panels.splice(again + (mode === "after" ? 1 : 0), 0, moved);
+  function addPanel(group) {
+    group.panels = group.panels || [];
+    group.panels.push({ id: uid("pnl"), label: "New panel", width: 6, kind: "blocks", status: "new" });
+  }
+
+  function moveGroup(view, dragId, targetId, mode) {
+    var groups = contentOf(view);
+    var from = groups.findIndex(function (g) { return g.id === dragId; });
+    if (from < 0) return;
+    var moved = groups.splice(from, 1)[0];
+    var to = groups.findIndex(function (g) { return g.id === targetId; });
+    groups.splice(to < 0 ? groups.length : to + (mode === "after" ? 1 : 0), 0, moved);
     markMoved(moved);
   }
 
-  function movePanelToItem(fromItem, panelId, toItemId) {
-    var idx = fromItem.panels.findIndex(function (p) { return p.id === panelId; });
-    if (idx < 0) return;
-    var target = null;
-    allItems().forEach(function (entry) { if (entry.node.id === toItemId) target = entry.node; });
-    if (!target || target === fromItem) return;
-    var panel = fromItem.panels.splice(idx, 1)[0];
+  function movePanel(fromGroupId, panelId, toGroupId, targetPanelId, mode) {
+    var from = findGroup(fromGroupId);
+    var to = findGroup(toGroupId);
+    if (!from || !to) return;
+    var at = from.group.panels.findIndex(function (p) { return p.id === panelId; });
+    if (at < 0) return;
+    var panel = from.group.panels.splice(at, 1)[0];
+    to.group.panels = to.group.panels || [];
+    if (targetPanelId) {
+      var before = to.group.panels.findIndex(function (p) { return p.id === targetPanelId; });
+      to.group.panels.splice(before < 0 ? to.group.panels.length : before + (mode === "after" ? 1 : 0), 0, panel);
+    } else {
+      to.group.panels.push(panel);
+    }
     markMoved(panel);
-    target.panels = target.panels || [];
-    target.panels.push(panel);
+  }
+
+  function addStat(panel) {
+    panel.stats = panel.stats || [];
+    panel.stats.push({ label: "New stat", value: "0" });
   }
 
   /* ── Rendering ──────────────────────────────────────────────────────── */
@@ -592,30 +677,37 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     return el;
   }
 
-  function labelEls(node, into) {
-    var label = document.createElement("span");
-    label.className = "label";
-    label.textContent = node.label;
-    label.contentEditable = "true";
-    label.spellcheck = false;
-    label.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); label.blur(); }
-      if (e.key === "Escape") { label.textContent = node.label; label.blur(); }
+  /**
+   * An inline-editable span.
+   *
+   * Commits on blur and on Enter, reverts on Escape, and is inert in Present
+   * mode. Blur is the commit point on purpose: committing per keystroke would
+   * re-render the tree and yank the caret out of the element being typed in.
+   */
+  function editable(value, className, onCommit) {
+    var el = document.createElement("span");
+    el.className = className;
+    el.textContent = value;
+    el.contentEditable = editing() ? "true" : "false";
+    el.spellcheck = false;
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+      if (e.key === "Escape") { el.textContent = value; el.blur(); }
     });
-    label.addEventListener("blur", function () {
-      if (rename(node, label.textContent)) commit();
-      else label.textContent = node.label;
+    el.addEventListener("blur", function () {
+      var next = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (!next || next === value) { el.textContent = value; return; }
+      onCommit(next);
     });
-    into.appendChild(label);
+    return el;
+  }
 
-    if (node.previousLabel) {
-      var prev = document.createElement("span");
-      prev.className = "prev";
-      prev.textContent = "(previously " + node.previousLabel + ")";
-      into.appendChild(prev);
-    }
-    var chip = chipFor(node.status);
-    if (chip) into.appendChild(chip);
+  function prevLabel(entry) {
+    if (!entry.previousLabel) return null;
+    var el = document.createElement("span");
+    el.className = "prev";
+    el.textContent = "(previously " + entry.previousLabel + ")";
+    return el;
   }
 
   function mini(text, title, onClick, danger) {
@@ -627,11 +719,22 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     return b;
   }
 
+  function infoBadge(text) {
+    var el = document.createElement("span");
+    el.className = "info";
+    el.textContent = "i";
+    el.dataset.info = text;
+    el.tabIndex = 0;
+    el.setAttribute("role", "note");
+    el.setAttribute("aria-label", text);
+    return el;
+  }
+
   function navRow(node, depth) {
     var row = document.createElement("div");
     row.className = "row " + (node.kind === "folder" ? "row-folder" : "row-item") + " depth-" + depth;
     if (node.status === "removed") row.classList.add("row-removed");
-    if (node.kind === "item" && node.id === layout.activeItemId) row.classList.add("active");
+    if (node.id === layout.activeViewId) row.classList.add("active");
     row.dataset.id = node.id;
     row.draggable = true;
     row.tabIndex = 0;
@@ -657,16 +760,23 @@ body[data-mode="present"] .edit-hint { display: none !important; }
       var icon = document.createElement("span");
       icon.className = "icon";
       icon.textContent = node.icon || "▫";
-      icon.contentEditable = "true";
+      icon.contentEditable = editing() ? "true" : "false";
       icon.title = "Glyph — edit freely";
       icon.addEventListener("blur", function () {
         var next = (icon.textContent || "").trim().slice(0, 2);
-        if (next && next !== node.icon) { node.icon = next; commit(); } else { icon.textContent = node.icon || "▫"; }
+        if (next && next !== node.icon) { node.icon = next; commit(); }
+        else icon.textContent = node.icon || "▫";
       });
       row.appendChild(icon);
     }
 
-    labelEls(node, row);
+    row.appendChild(editable(node.label, "label", function (next) {
+      if (rename(node, next)) commit();
+    }));
+    var prev = prevLabel(node);
+    if (prev) row.appendChild(prev);
+    var chip = chipFor(node.status);
+    if (chip) row.appendChild(chip);
 
     if (node.flag) {
       var flag = document.createElement("span");
@@ -683,24 +793,22 @@ body[data-mode="present"] .edit-hint { display: none !important; }
       actions.appendChild(mini("+grp", "Add a nested group — this is how sections go into a dropdown", function () { addFolder(node); commit(); }));
     }
     if (node.status === "removed") {
-      actions.appendChild(mini("↺", "Restore", function () { restoreNode(node); commit(); }));
-      actions.appendChild(mini("⌫", "Delete permanently", function () { removeNode(node); commit(); }, true));
+      actions.appendChild(mini("↺", "Restore", function () { restore(node); commit(); }));
+      actions.appendChild(mini("⌫", "Delete permanently", function () { cut("nav", find(node.id).siblings, node); commit(); }, true));
     } else {
-      actions.appendChild(mini("×", "Mark as cut", function () { removeNode(node); commit(); }, true));
+      actions.appendChild(mini("×", "Mark as cut", function () { cut("nav", find(node.id).siblings, node); commit(); }, true));
     }
     row.appendChild(actions);
 
-    if (node.kind === "item") {
-      row.addEventListener("click", function (e) {
-        // Clicking the name means "rename", not "switch tab". Selecting a tab
-        // re-renders the whole tree, which would destroy the element the caret
-        // was just placed in and silently swallow everything typed next.
-        if (e.target && e.target.isContentEditable) return;
-        if (node.id === layout.activeItemId) return;
-        layout.activeItemId = node.id;
-        commit();
-      });
-    }
+    // Clicking a row opens its page — folders included, so a section is a
+    // destination rather than only a container. The name is excluded: clicking
+    // it means "rename", and re-rendering would swallow what gets typed next.
+    row.addEventListener("click", function (e) {
+      if (e.target && e.target.isContentEditable) return;
+      if (node.id === layout.activeViewId) return;
+      layout.activeViewId = node.id;
+      commit();
+    });
 
     wireRowDrag(row, node);
     wireRowKeys(row, node);
@@ -719,7 +827,42 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     });
   }
 
-  function panelCard(panel, item) {
+  function statBlock(stat, panel) {
+    var wrap = document.createElement("div");
+    wrap.className = "stat-item";
+
+    wrap.appendChild(editable(String(stat.value), "stat-value", function (next) {
+      stat.value = next;
+      commit();
+    }));
+
+    var label = document.createElement("div");
+    label.className = "stat-label";
+    label.appendChild(editable(stat.label, "", function (next) {
+      stat.label = next;
+      commit();
+    }));
+    if (stat.info) label.appendChild(infoBadge(stat.info));
+
+    var actions = document.createElement("span");
+    actions.className = "stat-actions";
+    actions.appendChild(mini("i", stat.info ? "Edit the hover explainer" : "Add a hover explainer", function () {
+      var next = window.prompt("Explainer shown on hover:", stat.info || "");
+      if (next === null) return;
+      if (next.trim()) stat.info = next.trim(); else delete stat.info;
+      commit();
+    }));
+    actions.appendChild(mini("×", "Remove this stat", function () {
+      panel.stats = panel.stats.filter(function (s) { return s !== stat; });
+      commit();
+    }, true));
+    label.appendChild(actions);
+
+    wrap.appendChild(label);
+    return wrap;
+  }
+
+  function panelCard(panel, group) {
     var card = document.createElement("article");
     card.className = "panel" + (panel.status ? " panel-status-" + panel.status : "");
     card.dataset.id = panel.id;
@@ -735,24 +878,13 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     head.appendChild(handle);
 
     var title = document.createElement("h3");
-    title.textContent = panel.label;
-    title.contentEditable = "true";
-    title.spellcheck = false;
-    title.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); title.blur(); }
-    });
-    title.addEventListener("blur", function () {
-      if (rename(panel, title.textContent)) commit();
-      else title.textContent = panel.label;
-    });
+    title.appendChild(editable(panel.label, "", function (next) {
+      if (rename(panel, next)) commit();
+    }));
     head.appendChild(title);
 
-    if (panel.previousLabel) {
-      var prev = document.createElement("span");
-      prev.className = "prev";
-      prev.textContent = "(previously " + panel.previousLabel + ")";
-      head.appendChild(prev);
-    }
+    var prev = prevLabel(panel);
+    if (prev) head.appendChild(prev);
     var chip = chipFor(panel.status);
     if (chip) head.appendChild(chip);
 
@@ -774,67 +906,144 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     });
     actions.appendChild(width);
 
-    var moveTo = document.createElement("select");
-    moveTo.title = "Move this panel to another tab";
-    var head0 = document.createElement("option");
-    head0.textContent = "move to…";
-    head0.value = "";
-    moveTo.appendChild(head0);
-    allItems().forEach(function (entry) {
-      if (entry.node.id === item.id) return;
+    var kind = document.createElement("select");
+    kind.title = "What this panel shows";
+    [["blocks", "content"], ["stats", "numbers"]].forEach(function (pair) {
       var opt = document.createElement("option");
-      opt.value = entry.node.id;
-      opt.textContent = entry.path.concat([entry.node.label]).join(" › ");
-      moveTo.appendChild(opt);
+      opt.value = pair[0];
+      opt.textContent = pair[1];
+      if ((panel.kind || "blocks") === pair[0]) opt.selected = true;
+      kind.appendChild(opt);
+    });
+    kind.addEventListener("change", function () {
+      panel.kind = kind.value;
+      if (panel.kind === "stats" && !panel.stats) panel.stats = [{ label: "Stat", value: "0" }];
+      commit();
+    });
+    actions.appendChild(kind);
+
+    var moveTo = document.createElement("select");
+    moveTo.title = "Move this panel to another section";
+    var first = document.createElement("option");
+    first.textContent = "move to…";
+    first.value = "";
+    moveTo.appendChild(first);
+    allViews().forEach(function (view) {
+      contentOf(view.node).forEach(function (target) {
+        if (target.id === group.id) return;
+        var opt = document.createElement("option");
+        opt.value = target.id;
+        opt.textContent = view.node.label + " › " + (target.label || "untitled");
+        moveTo.appendChild(opt);
+      });
     });
     moveTo.addEventListener("change", function () {
       if (!moveTo.value) return;
-      movePanelToItem(item, panel.id, moveTo.value);
+      movePanel(group.id, panel.id, moveTo.value, null, "after");
       commit();
     });
     actions.appendChild(moveTo);
 
     if (panel.status === "removed") {
-      actions.appendChild(mini("↺", "Restore", function () { restorePanel(item, panel); }));
-      actions.appendChild(mini("⌫", "Delete permanently", function () { deletePanel(item, panel); }, true));
+      actions.appendChild(mini("↺", "Restore", function () { restore(panel); commit(); }));
+      actions.appendChild(mini("⌫", "Delete permanently", function () { cut("panel", group.panels, panel); commit(); }, true));
     } else {
-      actions.appendChild(mini("×", "Mark as cut", function () { cutPanel(panel); }, true));
+      actions.appendChild(mini("×", "Mark as cut", function () { cut("panel", group.panels, panel); commit(); }, true));
     }
     head.appendChild(actions);
     card.appendChild(head);
 
-    var skeleton = document.createElement("div");
-    skeleton.className = "skeleton";
-    for (var i = 0; i < 4; i++) skeleton.appendChild(document.createElement("span"));
-    card.appendChild(skeleton);
+    if ((panel.kind || "blocks") === "stats") {
+      var stats = document.createElement("div");
+      stats.className = "stats";
+      (panel.stats || []).forEach(function (stat) { stats.appendChild(statBlock(stat, panel)); });
+      card.appendChild(stats);
+      var addStatBtn = mini("+ stat", "Add a number to this panel", function () { addStat(panel); commit(); });
+      addStatBtn.classList.add("add-panel");
+      addStatBtn.style.marginTop = "12px";
+      card.appendChild(addStatBtn);
+    } else {
+      var skeleton = document.createElement("div");
+      skeleton.className = "skeleton";
+      for (var i = 0; i < 4; i++) skeleton.appendChild(document.createElement("span"));
+      card.appendChild(skeleton);
+    }
 
-    wirePanelDrag(card, panel, item);
+    wirePanelDrag(card, panel, group);
     return card;
   }
 
-  function cutPanel(panel) {
-    panel.statusBeforeRemoval = panel.status || null;
-    panel.status = "removed";
-    commit();
-  }
-  function restorePanel(_item, panel) {
-    panel.status = panel.statusBeforeRemoval || null;
-    if (!panel.status) delete panel.status;
-    delete panel.statusBeforeRemoval;
-    commit();
-  }
-  function deletePanel(item, panel) {
-    item.panels = item.panels.filter(function (p) { return p.id !== panel.id; });
-    commit();
+  function groupBlock(group, view) {
+    var section = document.createElement("section");
+    section.className = "pgroup" + (group.status ? " pgroup-status-" + group.status : "");
+    section.dataset.id = group.id;
+
+    var head = document.createElement("div");
+    head.className = "pgroup-head";
+    head.draggable = true;
+
+    var handle = document.createElement("span");
+    handle.className = "handle";
+    handle.textContent = "⠿";
+    head.appendChild(handle);
+
+    var caret = document.createElement("button");
+    caret.className = "caret";
+    caret.textContent = group.collapsed ? "▸" : "▾";
+    caret.title = group.collapsed ? "Expand" : "Collapse";
+    caret.addEventListener("click", function () {
+      group.collapsed = !group.collapsed;
+      commit();
+    });
+    head.appendChild(caret);
+
+    var groupLabel = editable(group.label || "Untitled section", "label", function (next) {
+      if (rename(group, next)) commit();
+    });
+    if (!group.label) groupLabel.classList.add("is-untitled");
+    head.appendChild(groupLabel);
+    var prev = prevLabel(group);
+    if (prev) head.appendChild(prev);
+    var chip = chipFor(group.status);
+    if (chip) head.appendChild(chip);
+
+    var actions = document.createElement("span");
+    actions.className = "pgroup-actions";
+    actions.appendChild(mini("+ panel", "Add a panel to this section", function () { addPanel(group); commit(); }));
+    if (group.status === "removed") {
+      actions.appendChild(mini("↺", "Restore", function () { restore(group); commit(); }));
+      actions.appendChild(mini("⌫", "Delete permanently", function () { cut("group", contentOf(view), group); commit(); }, true));
+    } else {
+      actions.appendChild(mini("×", "Mark as cut", function () { cut("group", contentOf(view), group); commit(); }, true));
+    }
+    head.appendChild(actions);
+    section.appendChild(head);
+
+    if (!group.collapsed) {
+      var grid = document.createElement("div");
+      grid.className = "panel-grid";
+      (group.panels || []).forEach(function (panel) { grid.appendChild(panelCard(panel, group)); });
+      if ((group.panels || []).length === 0) {
+        var empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = "No panels in this section yet.";
+        grid.appendChild(empty);
+      }
+      wireGridDrop(grid, group);
+      section.appendChild(grid);
+    }
+
+    wireGroupDrag(section, head, group, view);
+    return section;
   }
 
   function renderContent() {
-    var grid = $("panel-grid");
-    grid.textContent = "";
-    var entry = activeItem();
+    var host = $("page-content");
+    host.textContent = "";
+    var entry = activeView();
 
     if (!entry) {
-      $("view-title").textContent = "No tabs";
+      $("view-title").textContent = "Nothing selected";
       $("crumbs").textContent = "";
       return;
     }
@@ -846,30 +1055,28 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     if (mark) $("view-mark").appendChild(mark);
 
     $("crumbs").textContent = "";
-    entry.path.forEach(function (p) {
-      $("crumbs").appendChild(document.createTextNode(p + " / "));
-    });
+    entry.path.forEach(function (p) { $("crumbs").appendChild(document.createTextNode(p + " / ")); });
     var strong = document.createElement("b");
     strong.textContent = entry.node.label;
     $("crumbs").appendChild(strong);
 
-    var panels = entry.node.panels || [];
-    if (panels.length === 0) {
+    var groups = contentOf(entry.node);
+    if (groups.length === 0) {
       var empty = document.createElement("div");
       empty.className = "empty-state";
-      empty.textContent = "No panels in this tab yet.";
-      grid.appendChild(empty);
+      empty.style.gridColumn = "auto";
+      empty.textContent = "This page has no sections yet.";
+      host.appendChild(empty);
     } else {
-      panels.forEach(function (panel) { grid.appendChild(panelCard(panel, entry.node)); });
+      groups.forEach(function (group) { host.appendChild(groupBlock(group, entry.node)); });
     }
 
-    var add = document.createElement("button");
-    add.className = "mini add-panel";
-    add.textContent = "+ panel";
-    add.style.gridColumn = "span 12";
-    add.style.justifySelf = "start";
-    add.addEventListener("click", function () { addPanel(entry.node); commit(); });
-    grid.appendChild(add);
+    var add = mini("+ section", "Add a named, collapsible section to this page", function () {
+      addGroup(entry.node);
+      commit();
+    });
+    add.classList.add("add-group");
+    host.appendChild(add);
   }
 
   function renderChangeList() {
@@ -877,19 +1084,21 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     list.textContent = "";
     var changes = [];
 
-    function record(node, path, kind) {
-      if (!node.status && !node.previousLabel) return;
-      changes.push({ node: node, path: path, kind: kind });
+    function record(entry, path, kind) {
+      if (!entry.status && !entry.previousLabel) return;
+      changes.push({ entry: entry, path: path, kind: kind });
     }
 
     walk(layout.nav, function (node, _s, _i, _d, ancestors) {
       var path = ancestors.map(function (a) { return a.label; }).join(" › ");
       record(node, path, node.kind === "folder" ? "group" : "tab");
-      if (node.kind === "item") {
-        (node.panels || []).forEach(function (panel) {
-          record(panel, path ? path + " › " + node.label : node.label, "panel");
+      var here = path ? path + " › " + node.label : node.label;
+      contentOf(node).forEach(function (group) {
+        record(group, here, "section");
+        (group.panels || []).forEach(function (panel) {
+          record(panel, here + " › " + (group.label || "untitled"), "panel");
         });
-      }
+      });
     });
 
     var count = $("change-count");
@@ -906,9 +1115,8 @@ body[data-mode="present"] .edit-hint { display: none !important; }
 
     changes.forEach(function (change) {
       var li = document.createElement("li");
-      var chip = chipFor(change.node.status || "renamed");
-      if (change.node.status) {
-        li.appendChild(chip);
+      if (change.entry.status) {
+        li.appendChild(chipFor(change.entry.status));
       } else {
         var renamed = document.createElement("span");
         renamed.className = "chip";
@@ -923,15 +1131,11 @@ body[data-mode="present"] .edit-hint { display: none !important; }
       li.appendChild(kind);
 
       var name = document.createElement("span");
-      name.textContent = change.node.label;
+      name.textContent = change.entry.label;
       li.appendChild(name);
 
-      if (change.node.previousLabel) {
-        var prev = document.createElement("span");
-        prev.className = "prev";
-        prev.textContent = "(previously " + change.node.previousLabel + ")";
-        li.appendChild(prev);
-      }
+      var prev = prevLabel(change.entry);
+      if (prev) li.appendChild(prev);
 
       if (change.path) {
         var path = document.createElement("span");
@@ -964,10 +1168,10 @@ body[data-mode="present"] .edit-hint { display: none !important; }
   }
 
   /**
-   * Which third of the row the pointer is in.
+   * Which band of the row the pointer is in.
    *
    * Folders get a wide middle band ("inside") because nesting is the gesture
-   * this document exists for; items only ever get before/after.
+   * this document exists for; everything else only gets before/after.
    */
   function dropMode(e, el, allowInside) {
     var rect = el.getBoundingClientRect();
@@ -989,8 +1193,7 @@ body[data-mode="present"] .edit-hint { display: none !important; }
       clearDropMarks();
     });
     row.addEventListener("dragover", function (e) {
-      if (!dragState || dragState.type !== "nav") return;
-      if (dragState.id === node.id) return;
+      if (!dragState || dragState.type !== "nav" || dragState.id === node.id) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       clearDropMarks();
@@ -1008,12 +1211,44 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     });
   }
 
-  function wirePanelDrag(card, panel, item) {
+  function wireGroupDrag(section, head, group, view) {
+    head.addEventListener("dragstart", function (e) {
+      dragState = { type: "group", id: group.id, viewId: view.id };
+      section.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", group.id);
+      e.stopPropagation();
+    });
+    head.addEventListener("dragend", function () {
+      section.classList.remove("dragging");
+      dragState = null;
+      clearDropMarks();
+    });
+    section.addEventListener("dragover", function (e) {
+      if (!dragState || dragState.type !== "group" || dragState.id === group.id) return;
+      e.preventDefault();
+      clearDropMarks();
+      section.classList.add("drop-" + dropMode(e, section, false));
+    });
+    section.addEventListener("drop", function (e) {
+      if (!dragState || dragState.type !== "group") return;
+      e.preventDefault();
+      e.stopPropagation();
+      var mode = dropMode(e, section, false);
+      clearDropMarks();
+      moveGroup(view, dragState.id, group.id, mode);
+      dragState = null;
+      commit();
+    });
+  }
+
+  function wirePanelDrag(card, panel, group) {
     card.addEventListener("dragstart", function (e) {
-      dragState = { type: "panel", id: panel.id };
+      dragState = { type: "panel", id: panel.id, groupId: group.id };
       card.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", panel.id);
+      e.stopPropagation();
     });
     card.addEventListener("dragend", function () {
       card.classList.remove("dragging");
@@ -1023,6 +1258,7 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     card.addEventListener("dragover", function (e) {
       if (!dragState || dragState.type !== "panel" || dragState.id === panel.id) return;
       e.preventDefault();
+      e.stopPropagation();
       clearDropMarks();
       var rect = card.getBoundingClientRect();
       card.classList.add((e.clientX - rect.left) / rect.width < 0.5 ? "drop-before" : "drop-after");
@@ -1030,11 +1266,28 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     card.addEventListener("drop", function (e) {
       if (!dragState || dragState.type !== "panel") return;
       e.preventDefault();
+      e.stopPropagation();
       var rect = card.getBoundingClientRect();
       var mode = (e.clientX - rect.left) / rect.width < 0.5 ? "before" : "after";
       clearDropMarks();
-      movePanel(item, dragState.id, panel.id, mode);
+      movePanel(dragState.groupId, dragState.id, group.id, panel.id, mode);
       dragState = null;
+      commit();
+    });
+  }
+
+  /** Dropping on a section's empty space appends the panel to that section. */
+  function wireGridDrop(grid, group) {
+    grid.addEventListener("dragover", function (e) {
+      if (dragState && dragState.type === "panel") e.preventDefault();
+    });
+    grid.addEventListener("drop", function (e) {
+      if (!dragState || dragState.type !== "panel") return;
+      if (e.target !== grid) return;
+      e.preventDefault();
+      movePanel(dragState.groupId, dragState.id, group.id, null, "after");
+      dragState = null;
+      clearDropMarks();
       commit();
     });
   }
@@ -1058,7 +1311,7 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     commit();
   });
 
-  /** Keyboard moves — drag-and-drop is fiddly for a 30-row tree. */
+  /** Keyboard moves — drag-and-drop is fiddly once the rail is long enough to scroll. */
   function wireRowKeys(row, node) {
     row.addEventListener("keydown", function (e) {
       if (!e.altKey) return;
@@ -1169,7 +1422,11 @@ body[data-mode="present"] .edit-hint { display: none !important; }
       });
   }
 
-  /** Fill in anything a hand-edited layout file left out, so bad JSON degrades rather than blanks the page. */
+  /**
+   * Fill in anything a hand-edited layout file left out, so bad JSON degrades
+   * rather than blanking the page. Also migrates the older shape, where panels
+   * hung directly off a tab, into the named-section shape.
+   */
   function normalize(data) {
     data = data || {};
     data.meta = data.meta || {};
@@ -1177,18 +1434,37 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     if (!data.meta.subtitle) data.meta.subtitle = "Draft";
     data.nav = Array.isArray(data.nav) ? data.nav : [];
     if (typeof data.rationale !== "string") data.rationale = "";
+    if (!data.activeViewId && data.activeItemId) data.activeViewId = data.activeItemId;
+    delete data.activeItemId;
+
     walk(data.nav, function (node) {
-      if (!node.id) node.id = uid(node.kind === "folder" ? "grp" : "tab");
+      if (!node.id) node.id = uid(node.children ? "grp" : "tab");
       if (!node.kind) node.kind = node.children ? "folder" : "item";
       if (node.kind === "folder" && !Array.isArray(node.children)) node.children = [];
-      if (node.kind === "item" && !Array.isArray(node.panels)) node.panels = [];
-      if (node.kind === "item") {
-        node.panels.forEach(function (p) {
-          if (!p.id) p.id = uid("pnl");
-          if (!p.width) p.width = 6;
-        });
+
+      if (Array.isArray(node.panels)) {
+        node.content = (node.content || []).concat([{ id: uid("sec"), label: "", collapsed: false, panels: node.panels }]);
+        delete node.panels;
       }
+      if (!Array.isArray(node.content)) node.content = [];
+      node.content.forEach(function (group) {
+        if (!group.id) group.id = uid("sec");
+        if (typeof group.label !== "string") group.label = "";
+        if (!Array.isArray(group.panels)) group.panels = [];
+        group.panels.forEach(function (panel) {
+          if (!panel.id) panel.id = uid("pnl");
+          if (!panel.width) panel.width = 6;
+          if (!panel.kind) panel.kind = Array.isArray(panel.stats) ? "stats" : "blocks";
+          if (panel.kind === "stats" && !Array.isArray(panel.stats)) panel.stats = [];
+        });
+      });
     });
+
+    if (!data.activeViewId) {
+      var first = null;
+      walk(data.nav, function (node) { if (!first) first = node; });
+      data.activeViewId = first ? first.id : null;
+    }
     return data;
   }
 
@@ -1214,15 +1490,12 @@ body[data-mode="present"] .edit-hint { display: none !important; }
   });
 
   $("mode-toggle").addEventListener("click", function () {
-    var editing = document.body.dataset.mode === "edit";
-    var next = editing ? "present" : "edit";
+    var next = document.body.dataset.mode === "edit" ? "present" : "edit";
     document.body.dataset.mode = next;
     $("mode-toggle").textContent = next === "edit" ? "Editing" : "Present";
     $("mode-toggle").setAttribute("aria-pressed", String(next === "edit"));
-    document.querySelectorAll('[contenteditable]').forEach(function (el) {
-      el.contentEditable = next === "edit" ? "true" : "false";
-    });
     try { localStorage.setItem("ndx-preview-mode", next); } catch (e) { /* private mode */ }
+    if (layout) render();
   });
 
   $("copy-json").addEventListener("click", function () {
