@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<!--
+  ════════════════════════════════════════════════════════════════════════════
+  n-dx dashboard — option 1, filled in
+  ════════════════════════════════════════════════════════════════════════════
+
+  A hand-built rendering of the layout in option1.json as if it were the live
+  dashboard. Every number, name and list on these pages comes from THIS repo's
+  own analysis, PRD and run history as of 2026-09-17 — nothing is invented and
+  no feature is shown that the dashboard does not already have. What changed
+  is only where things sit:
+
+    Analysis  ← SourceVision's Overview / Zones / Map / Isometric Map / Files /
+                Architecture / Problems, plus Rex's dashboard stats and the
+                Token Usage view, all as dropdown sections on ONE page
+    Plan      ← Rex: Analyze & Import, Activity, the command runner + reference,
+                and the analyze/plan settings shortcut
+    Work      ← Hench: Runs (next task + start), run modes, Templates, the
+                command runner + reference, and usage totals
+
+  The 2D / 3D zone graph is one panel with a toggle: the same 15 zones and the
+  same measured crossings, drawn as a node-link map or as an isometric block
+  map. Static, not a build artefact — edit and save, the page reloads.
+
+  Served next to the editor:  ndx start --preview .  →  /option1-demo.html
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>n-dx · option 1 demo</title>
+<style>
+:root {
+  --brand-teal: #00E5B9; --brand-purple: #6c41f0; --brand-orange: #ff5926; --brand-green: #00bd81;
+  --sidebar-w: 236px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0c0e1a; --bg-surface: #151829; --bg-hover: #1e2240; --bg-active: #262b4a;
+  --border: #2a2f4a; --border-strong: #3d4470;
+  --text: #e8eaf0; --text-dim: #9ea3bc; --text-muted: #868aaa;
+  --accent: var(--brand-teal); --green: #00bd81; --orange: #ff8060; --red: #ff7f9c; --purple: var(--brand-purple); --blue: #6ea8ff;
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f6fa; --bg-surface: #ffffff; --bg-hover: #eef0f6; --bg-active: #e4e7f0;
+  --border: #d8dce6; --border-strong: #bcc2d4;
+  --text: #1a1d2e; --text-dim: #5c6078; --text-muted: #6b6e88;
+  --accent: #006E4E; --green: #006E4A; --orange: #B03800; --red: #B01A54; --purple: var(--brand-purple); --blue: #2f66d0;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.5 var(--font-sans); -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
+[hidden] { display: none !important; }
+a { color: var(--accent); }
+
+/* ── demo banner (the only thing here that is not "the dashboard") ─────── */
+.demo-bar {
+  display: flex; align-items: center; gap: var(--space-3); padding: 6px var(--space-4);
+  background: var(--purple); color: #fff; font-size: 12px;
+}
+.demo-bar b { font-family: var(--font-mono); letter-spacing: .06em; text-transform: uppercase; font-size: 10px; border: 1px solid rgba(255,255,255,.5); border-radius: 999px; padding: 2px 7px; }
+.demo-bar a { color: #fff; margin-left: auto; }
+.demo-bar button { font: inherit; background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer; }
+
+/* ── shell ──────────────────────────────────────────────────────────────── */
+.shell { display: flex; flex: 1; min-height: 0; }
+.sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--bg-surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+.sidebar-header { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-4); border-bottom: 1px solid var(--border); }
+.logo-dot { width: 26px; height: 26px; border-radius: var(--radius-md); background: var(--purple); color: #fff; display: grid; place-items: center; font: 700 12px/1 var(--font-mono); }
+.project-name { font-weight: 600; }
+.project-path { color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
+.nav { padding: var(--space-2) 0; flex: 1; }
+.nav-section { display: flex; align-items: center; gap: 8px; padding: 9px var(--space-4); color: var(--text-dim); cursor: pointer; border-left: 2px solid transparent; }
+.nav-section:hover { background: var(--bg-hover); color: var(--text); }
+.nav-section.active { background: var(--bg-active); color: var(--text); border-left-color: var(--accent); }
+.nav-section .glyph { width: 18px; text-align: center; color: var(--text-muted); }
+.nav-section.active .glyph { color: var(--accent); }
+.nav-section .name { font-weight: 600; letter-spacing: .02em; }
+.nav-section .hint { margin-left: auto; font: 10px/1 var(--font-mono); color: var(--text-muted); }
+.nav-group { border-top: 1px solid var(--border); margin-top: var(--space-2); padding-top: var(--space-2); }
+.nav-group-label { display: flex; align-items: center; gap: 6px; padding: 6px var(--space-4); font: 600 10px/1.6 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); cursor: pointer; }
+.nav-group-label .caret { width: 12px; font-size: 10px; }
+.nav-item { display: flex; align-items: center; gap: 8px; padding: 5px var(--space-4) 5px 28px; color: var(--text-dim); cursor: pointer; }
+.nav-item:hover { background: var(--bg-hover); color: var(--text); }
+.nav-item.active { background: var(--bg-active); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+.nav-item .glyph { width: 16px; text-align: center; color: var(--text-muted); }
+.sidebar-footer { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); color: var(--text-muted); font-size: 11px; display: flex; gap: 10px; align-items: center; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; }
+
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--border); background: var(--bg-surface); }
+.crumbs { color: var(--text-muted); font-size: 12px; }
+.crumbs b { color: var(--text); font-weight: 600; }
+.search { margin-left: auto; min-width: 220px; padding: 5px var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text-muted); display: flex; justify-content: space-between; }
+kbd { font: 10px/1 var(--font-mono); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 2px 5px; color: var(--text-dim); }
+.btn { font: inherit; font-size: 12px; padding: 5px var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: var(--bg-active); color: var(--text); cursor: pointer; }
+.btn:hover { background: var(--bg-hover); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #04121a; font-weight: 600; }
+[data-theme="light"] .btn-primary { color: #fff; }
+.btn-sm { padding: 3px 9px; font-size: 11px; }
+.content { flex: 1; overflow-y: auto; padding: var(--space-5) var(--space-5) 60px; }
+.page-head { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-4); }
+.page-head h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.page-head .sub { color: var(--text-muted); font-size: 12px; }
+
+/* ── sections ("dropdowns") ─────────────────────────────────────────────── */
+.sec { margin-bottom: var(--space-5); }
+.sec-head { display: flex; align-items: center; gap: 8px; padding: 6px 0; margin-bottom: var(--space-3); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+.sec-head .caret { width: 14px; color: var(--text-muted); font-size: 11px; }
+.sec-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.sec-head .meta { margin-left: auto; color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
+.sec.plain .sec-head { display: none; }
+.grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--space-4); }
+.sec.collapsed .grid { display: none; }
+.sec.collapsed .sec-head .caret::before { content: "▸"; }
+.sec:not(.collapsed) .sec-head .caret::before { content: "▾"; }
+
+/* ── panels ─────────────────────────────────────────────────────────────── */
+.panel { grid-column: span 6; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4) var(--space-4); min-width: 0; }
+.w4 { grid-column: span 4; } .w6 { grid-column: span 6; } .w8 { grid-column: span 8; } .w12 { grid-column: span 12; }
+.panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: var(--space-3); }
+.panel-head h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.panel-head .meta { margin-left: auto; color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
+.muted { color: var(--text-muted); }
+.dim { color: var(--text-dim); }
+.mono { font-family: var(--font-mono); font-size: 11px; }
+.stats { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-6); }
+.stat { min-width: 96px; }
+.stat .v { font-size: 22px; font-weight: 600; line-height: 1.2; }
+.stat .k { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.stat .s { color: var(--text-muted); font-size: 11px; }
+
+.info { position: relative; cursor: help; color: var(--text-muted); border: 1px solid var(--border-strong); border-radius: 999px; width: 13px; height: 13px; display: inline-grid; place-items: center; font: 9px/1 var(--font-mono); flex-shrink: 0; }
+.info:hover, .info:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
+.info:hover::after, .info:focus-visible::after {
+  content: attr(data-info); position: absolute; left: 0; top: 150%; z-index: 20; width: 280px;
+  background: var(--bg-active); border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: var(--space-3);
+  font: 11px/1.5 var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--text); white-space: normal; box-shadow: 0 10px 24px rgba(0,0,0,.3);
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; color: var(--text-muted); font-weight: 500; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+td { padding: 5px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11px; }
+.bar { height: 6px; background: var(--bg-active); border-radius: 999px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.bar.thin { height: 4px; }
+.stack { display: flex; height: 10px; border-radius: 999px; overflow: hidden; gap: 1px; margin: 6px 0 8px; }
+.stack > i { display: block; height: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--text-dim); }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.badge { display: inline-block; font: 600 9px/1 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; padding: 3px 6px; border-radius: 999px; border: 1px solid currentColor; }
+.b-green { color: var(--green); } .b-orange { color: var(--orange); } .b-red { color: var(--red); } .b-blue { color: var(--blue); } .b-purple { color: var(--purple); } .b-muted { color: var(--text-muted); }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.list li:last-child { border-bottom: none; }
+.list .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card { border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-3); background: var(--bg); }
+.card + .card { margin-top: var(--space-2); }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--space-3); }
+.field label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.field input, .field textarea, .field select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 6px 8px; }
+.field textarea { min-height: 84px; resize: vertical; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 12px; }
+.kv dt { color: var(--text-muted); } .kv dd { margin: 0; font-family: var(--font-mono); font-size: 11px; }
+.toggle { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 999px; overflow: hidden; margin-left: auto; }
+.toggle button { font: 600 11px/1 var(--font-mono); letter-spacing: .06em; padding: 5px 12px; border: none; background: transparent; color: var(--text-dim); cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--accent); color: #04121a; }
+[data-theme="light"] .toggle button[aria-pressed="true"] { color: #fff; }
+.graph { width: 100%; height: 340px; display: block; }
+.graph text { font: 10px var(--font-mono); fill: var(--text-dim); }
+.graph .lbl { font: 11px var(--font-sans); fill: var(--text); }
+.graph line, .graph path.edge { stroke: var(--text-muted); stroke-opacity: .35; fill: none; }
+.hotkeys li { justify-content: space-between; }
+.log time { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+@media (max-width: 960px) { .panel { grid-column: span 12 !important; } .sidebar { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="demo-bar">
+  <b>demo</b>
+  <span>Option 1 layout, filled with this repo's real analysis, PRD and run history (as of 2026-09-17). Nothing here is new — only moved.</span>
+  <button id="theme">◐ theme</button>
+  <a href="./">← back to the editor</a>
+</div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="logo-dot">n</span>
+      <div><div class="project-name">n-dx</div><div class="project-path">~/VSCodeProjects/n-dx</div></div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section" data-page="analysis"><span class="glyph">▣</span><span class="name">Analysis</span><span class="hint">sv</span></div>
+      <div class="nav-section" data-page="plan"><span class="glyph">☑</span><span class="name">Plan</span><span class="hint">rex</span></div>
+      <div class="nav-section" data-page="work"><span class="glyph">▶</span><span class="name">Work</span><span class="hint">hench</span></div>
+      <div class="nav-group">
+        <div class="nav-group-label"><span class="caret">▾</span> Commands</div>
+        <div class="nav-item" data-page="commands"><span class="glyph">⌘</span> All Commands</div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label" id="settings-label"><span class="caret">▸</span> Settings</div>
+        <div id="settings-items" hidden>
+          <div class="nav-item" data-page="s-general"><span class="glyph">🧠</span> General</div>
+          <div class="nav-item" data-page="s-plan"><span class="glyph">▣</span> ndx analyze / plan</div>
+          <div class="nav-item" data-page="s-work"><span class="glyph">▶</span> ndx work</div>
+          <div class="nav-item" data-page="s-sync"><span class="glyph">🔌</span> ndx sync</div>
+          <div class="nav-item" data-page="s-export"><span class="glyph">📤</span> ndx export / refresh</div>
+          <div class="nav-item" data-page="s-flags"><span class="glyph">📌</span> Feature Flags</div>
+          <div class="nav-item" data-page="s-timeouts"><span class="glyph">⏱</span> CLI Timeouts</div>
+        </div>
+      </div>
+    </nav>
+    <div class="sidebar-footer"><span class="dot"></span> server :3117 · analysis fresh · 1 run live</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs" id="crumbs"></div>
+      <div class="search"><span>Search files, zones, tasks…</span><kbd>⌘K</kbd></div>
+      <button class="btn">Refresh</button>
+      <button class="btn btn-primary">Analyze</button>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ═══ Real data, gathered 2026-09-17 from .sourcevision, .rex, .hench ═══ */
+
+  var REPO = {
+    files: 1933, lines: 577854, zones: 30, edges: 5622, external: 31, circular: 9, crossings: 2457,
+    languages: [["TypeScript", 1707], ["JavaScript", 206], ["Go", 19], ["Python", 1]],
+    roles: [["source", 805], ["test", 1106], ["build", 13], ["config", 8], ["docs", 1]],
+    packages: [["web", 592], ["rex", 453], ["hench", 335], ["sourcevision", 217], ["tests", 188], ["llm-client", 92], ["core", 39], ["scripts", 11]],
+    findings: { info: 56, warning: 23, critical: 1 },
+    avgCohesion: 0.89, avgCoupling: 0.02, dualFragility: 0,
+    warnings: [
+      "9 circular dependency chains — see imports.json",
+      "Bidirectional coupling: web-server ↔ web-viewer (8+8 crossings)",
+      "Fan-in hotspot: web/src/server/response-utils.ts is called from 34 files",
+      "rex-cli: 158 entry points — wide API surface",
+      "hench: 112 entry points — wide API surface",
+    ],
+    externals: ["@anthropic-ai/sdk", "@modelcontextprotocol/sdk", "preact", "zod", "d3-force", "d3-selection", "esbuild", "vitest"],
+    cycles: [
+      ["rex/src/store/file-adapter.ts", "rex/src/store/prd-md-migration.ts"],
+      ["rex/src/store/index.ts", "rex/src/store/ensure-legacy-prd-migrated.ts"],
+      ["web/src/hub/hub.ts", "web/src/hub/proxy.ts"],
+      ["web/src/hub/hub.ts", "web/src/hub/routes.ts", "web/src/hub/overview.ts"],
+    ],
+    profile: { primary: "TypeScript", frameworks: ["vitest"], build: "pnpm workspace", ci: "GitHub Actions ×3 (ci, docs, release)", release: "changesets" },
+  };
+
+  // id, label, files, cohesion, coupling, family, 2D position, 3D grid cell
+  var ZONES = [
+    { id: "tests-unit",        label: "tests-unit",        files: 722, coh: 1,    coup: 0,    fam: "tests", x: 360, y: 60,  gx: 2, gy: 0 },
+    { id: "web-viewer",        label: "web-viewer",        files: 231, coh: 0.98, coup: 0.02, fam: "web",   x: 610, y: 150, gx: 4, gy: 1 },
+    { id: "rex-cli",           label: "rex-cli",           files: 190, coh: 1,    coup: 0,    fam: "rex",   x: 200, y: 170, gx: 1, gy: 2 },
+    { id: "tests-integration", label: "tests-integration", files: 155, coh: 1,    coup: 0,    fam: "tests", x: 120, y: 60,  gx: 0, gy: 0 },
+    { id: "hench",             label: "hench",             files: 128, coh: 1,    coup: 0,    fam: "hench", x: 330, y: 210, gx: 2, gy: 2 },
+    { id: "tests-e2e",         label: "tests-e2e",         files: 103, coh: 1,    coup: 0,    fam: "tests", x: 600, y: 50,  gx: 4, gy: 0 },
+    { id: "sourcevision",      label: "sourcevision",      files: 90,  coh: 1,    coup: 0,    fam: "sv",    x: 470, y: 230, gx: 3, gy: 2 },
+    { id: "tests-fixtures",    label: "tests-fixtures",    files: 79,  coh: 1,    coup: 0,    fam: "tests", x: 40,  y: 150, gx: 0, gy: 1 },
+    { id: "web-server",        label: "web-server",        files: 77,  coh: 0.97, coup: 0.03, fam: "web",   x: 620, y: 280, gx: 4, gy: 2 },
+    { id: "llm-client",        label: "llm-client",        files: 41,  coh: 1,    coup: 0,    fam: "core",  x: 330, y: 320, gx: 2, gy: 3 },
+    { id: "core",              label: "core",              files: 40,  coh: 1,    coup: 0,    fam: "core",  x: 500, y: 330, gx: 3, gy: 3 },
+    { id: "tests-helpers",     label: "tests-helpers",     files: 14,  coh: 1,    coup: 0,    fam: "tests", x: 200, y: 290, gx: 1, gy: 3 },
+    { id: "web-hub",           label: "web-hub",           files: 10,  coh: 0.93, coup: 0.07, fam: "web",   x: 690, y: 210, gx: 5, gy: 2 },
+    { id: "viewer-message-pipeline", label: "viewer-msg-pipeline", files: 7, coh: 1, coup: 0, fam: "web", x: 700, y: 100, gx: 5, gy: 1 },
+    { id: "chunked",           label: "chunked",           files: 5,   coh: 0.67, coup: 0.33, fam: "rex",   x: 90,  y: 250, gx: 0, gy: 2 },
+  ];
+  // Measured cross-zone import counts (zones.json crossings, aggregated).
+  var CROSSINGS = [
+    ["tests-unit", "rex-cli", 528], ["tests-unit", "hench", 347], ["tests-unit", "web-viewer", 327],
+    ["tests-integration", "rex-cli", 212], ["tests-unit", "web-server", 203], ["tests-unit", "sourcevision", 189],
+    ["tests-integration", "hench", 154], ["tests-unit", "llm-client", 100], ["tests-unit", "tests-helpers", 47],
+    ["tests-integration", "tests-helpers", 42], ["tests-integration", "web-server", 36], ["tests-e2e", "core", 34],
+    ["tests-unit", "core", 33], ["tests-integration", "sourcevision", 30], ["tests-e2e", "rex-cli", 18],
+    ["tests-integration", "web-viewer", 14], ["web-server", "web-viewer", 8], ["web-viewer", "web-server", 8], ["chunked", "rex-cli", 5],
+  ];
+  var FAMILY_COLOR = { tests: "#868aaa", web: "#6ea8ff", rex: "#00E5B9", hench: "#ff8060", sv: "#00bd81", core: "#a98bff" };
+
+  var PRD = {
+    total: 1548, completed: 1493, pending: 54, inProgress: 1,
+    levels: [["epics", 32], ["features", 371], ["tasks", 1105], ["subtasks", 40]],
+    next: {
+      title: "Windows orphan-child E2E fixture can start without its grandchild",
+      epic: "Autonomous run reliability: four defects found running wave 1",
+      id: "8174c84e", priority: "high", status: "in_progress", criteria: 6,
+      why: "CLI Smoke (Windows) run 34735894891 failed stop-orphan-children.test.js:159 — the detached stand-in server's shell-launched Node grandchild never wrote child.pid or a tick file.",
+    },
+    epics: [
+      ["Autonomous run reliability: four defects found running wave 1", 26, 30, "critical"],
+      ["0.6.0 / PR 5 · Worktree awareness in the dashboard (read-only)", 0, 4, "high"],
+      ["0.6.0 / PR 6 · Cross-worktree task claims (may slip to 0.7.0)", 0, 3, "high"],
+      ["0.6.0 / PR 7 · ndx which and version identity everywhere", 0, 3, "high"],
+      ["0.7.0 / PR 8 · ndx hub daemon: registry, per-repo servers, reverse proxy", 0, 3, "high"],
+      ["0.7.0 / PR 9 · Hub home page with one card per project", 0, 1, "medium"],
+      ["0.7.0 / PR 10 · ndx start registers with the hub; --here keeps the legacy server", 0, 3, "high"],
+      ["0.8.0 / PR 11 · Repo server anchored at the main worktree", 0, 2, "high"],
+      ["0.8.0 / PR 12 · /w/:wt/ URL slot, workspace-tagged WebSocket frames", 0, 2, "high"],
+      ["0.8.0 / PR 13 · Workspaces Overview view, PRD delta versus the anchor", 0, 3, "high"],
+      ["0.8.0 / PR 14 · MCP shim: ndx mcp <server> . forwards to the hub", 0, 1, "medium"],
+      ["0.8.0 / PR 15 · Hub admission gate: session cap, memory headroom", 0, 1, "medium"],
+    ],
+    log: [
+      ["03:54:48", "task_completed", "Windows stale-lock contention regression test can deadlock — fixtures behave correctly"],
+      ["03:54:48", "auto_completed", "epic: CLI & Developer Tools"],
+      ["03:54:47", "auto_completed", "feature: Child Process Cleanup"],
+      ["03:54:46", "status_updated", "→ completed by hench agent"],
+      ["03:46:50", "status_updated", "→ in_progress by hench agent"],
+    ],
+  };
+
+  var USAGE = {
+    runs: 1146, completed: 943, failed: 201, cancelled: 1, running: 1,
+    input: 64050, output: 9140418, cacheWrite: 35844664, cacheRead: 3245254952,
+    cost: 1245.29, costInput: 0.19, costOutput: 137.11,
+    models: [["sonnet", 990], ["claude-opus-5", 109], ["claude-fable-5-1", 24], ["claude-opus-4-8", 8], ["claude-fable-5", 7], ["opus", 3]],
+    recent: [
+      ["terminateTree and terminateTreeByPid are never exercised against a real process tree", "claude-opus-5", 45, 8, 11404096, "completed"],
+      ["rex status tells the operator to run rex fix for parents rex fix will not touch", "claude-opus-5", 32, 6, 4623418, "completed"],
+      ["Hench task display branches on rex prose, so a reworded selection summary breaks it", "claude-opus-5", 64, 12, 11966563, "completed"],
+      ["readBody destroys an over-cap chunked request before any response", "claude-opus-5", 30, 4, 27458979, "completed"],
+      ["ndx export silently appends its out-dir to .gitignore", "claude-opus-5", 24, 5, 21481292, "completed"],
+    ],
+  };
+
+  var HENCH = { provider: "cli", model: "opus", permissionMode: "acceptEdits", maxTurns: 50, maxTokens: 8192, autoCommit: true, livelockThreshold: 6, commandTimeout: 30000,
+    allowed: ["npm", "npx", "node", "git", "tsc", "vitest"], blocked: [".hench/**", ".rex/**", ".git/**", "node_modules/**"] };
+  var TEMPLATES = [
+    ["quick-iteration", "Quick Iteration", "Short, fast runs for rapid prototyping and small fixes"],
+    ["thorough-execution", "Thorough Execution", "Extended runs with generous limits for complex multi-file tasks"],
+    ["budget-conscious", "Budget Conscious", "Optimized for minimal token usage while maintaining quality"],
+    ["strict-safety", "Strict Safety", "Maximum guard rails for sensitive codebases and production-adjacent work"],
+    ["api-direct", "API Direct", "Use the Anthropic API directly instead of the Claude Code CLI for headless environments"],
+    ["go-project", "Go Project", "Tuned for Go codebases: Go toolchain commands, vendor blocking, make support"],
+  ];
+  var COMMANDS = [
+    ["init", "Initialize all tools (sourcevision + rex + hench)", "setup"],
+    ["analyze", "Run SourceVision codebase analysis", "analysis"],
+    ["recommend", "Show or accept SourceVision-based recommendations", "plan"],
+    ["plan", "Analyze codebase and generate PRD proposals", "plan"],
+    ["add", "Add items to the PRD from descriptions or files", "plan"],
+    ["refresh", "Refresh SourceVision data and dashboard UI artifacts", "analysis"],
+    ["work", "Execute the next task autonomously with hench agent", "work"],
+    ["status", "Show PRD status tree with completion stats", "plan"],
+    ["usage", "Token usage analytics and cost estimation", "work"],
+    ["sync", "Sync local PRD with remote adapter (e.g. Notion)", "plan"],
+    ["start", "Start dashboard and MCP server", "setup"],
+    ["dev", "Start dev server with live reload", "setup"],
+    ["ci", "Run analysis pipeline and validate PRD health", "analysis"],
+    ["config", "View and edit settings across all packages", "setup"],
+    ["auth", "Verify LLM provider credentials for the active vendor", "setup"],
+    ["export", "Export static deployable dashboard", "setup"],
+    ["prd", "Export or import the PRD as a portable bundle", "plan"],
+    ["self-heal", "Iterative codebase improvement loop", "work"],
+    ["pair-programming", "Run agent then cross-vendor review (alias: bicker)", "work"],
+    ["validate", "Check PRD integrity (DAG, schema, references)", "plan"],
+    ["fix", "Auto-fix common PRD issues", "plan"],
+    ["health", "Show PRD health summary", "plan"],
+    ["verify", "Run tests for acceptance criteria", "plan"],
+    ["update", "Update item status, priority, or title", "plan"],
+    ["move", "Reparent an item in the PRD tree", "plan"],
+    ["reshape", "LLM-powered PRD restructuring", "plan"],
+    ["reorganize", "Reorganize PRD structure", "plan"],
+    ["prune", "Remove completed subtrees from PRD", "plan"],
+    ["next", "Print next actionable task", "work"],
+    ["tree", "Show full PRD hierarchy with color-coded status", "plan"],
+    ["show", "Show full details of a hench run", "work"],
+  ];
+
+  var INFO = {
+    zone: "A zone is a cluster of files that import each other more than they import the rest of the codebase — found by running Louvain community detection over the import graph, not by folder names. Zones are what the architecture views group, score and check boundaries against. This repo pins a few (web-server, web-viewer, rex-cli…) in .n-dx.json so they survive re-analysis.",
+    coupling: "Share of a zone's imports that cross its own boundary. Higher means the zone is more entangled with the rest of the codebase — a change inside it has a wider blast radius.",
+    cohesion: "Share of a zone's imports that stay inside it. Higher means the zone holds together on its own terms; low cohesion together with high coupling is the pair worth governing.",
+    crossings: "One import whose source file and target file sit in different zones. 2,457 of the 5,622 import edges cross a zone boundary; almost all of them are tests importing the code they test.",
+  };
+
+  /* ═══ tiny DOM helpers ═══ */
+  function h(tag, attrs, children) {
+    var el = document.createElement(tag);
+    if (attrs) for (var k in attrs) {
+      if (k === "class") el.className = attrs[k];
+      else if (k === "html") el.innerHTML = attrs[k];
+      else if (k.slice(0, 2) === "on") el.addEventListener(k.slice(2), attrs[k]);
+      else if (attrs[k] != null) el.setAttribute(k, attrs[k]);
+    }
+    (Array.isArray(children) ? children : children == null ? [] : [children]).forEach(function (c) {
+      if (c == null) return;
+      el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return el;
+  }
+  function fmt(n) { return Number(n).toLocaleString("en-US"); }
+  function short(n) { return n >= 1e9 ? (n / 1e9).toFixed(2) + "B" : n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n); }
+  function pct(a, b) { return (100 * a / b).toFixed(1) + "%"; }
+  function info(text) { return h("span", { class: "info", "data-info": text, tabindex: "0", role: "note", "aria-label": text }, "i"); }
+  function stat(value, label, sub, tip) {
+    return h("div", { class: "stat" }, [
+      h("div", { class: "v" }, value),
+      h("div", { class: "k" }, [label, tip ? info(tip) : null]),
+      sub ? h("div", { class: "s" }, sub) : null,
+    ]);
+  }
+  function panel(width, title, meta, body) {
+    return h("article", { class: "panel w" + width }, [
+      h("div", { class: "panel-head" }, [h("h3", null, title), meta ? h("span", { class: "meta" }, meta) : null]),
+    ].concat(body));
+  }
+  function section(title, meta, panels, opts) {
+    opts = opts || {};
+    var sec = h("section", { class: "sec" + (opts.plain ? " plain" : "") + (opts.collapsed ? " collapsed" : "") });
+    var head = h("div", { class: "sec-head", onclick: function () { sec.classList.toggle("collapsed"); } }, [
+      h("span", { class: "caret" }), h("h2", null, title), meta ? h("span", { class: "meta" }, meta) : null,
+    ]);
+    sec.appendChild(head);
+    sec.appendChild(h("div", { class: "grid" }, panels));
+    return sec;
+  }
+  function bar(ratio, color, thin) {
+    var b = h("div", { class: "bar" + (thin ? " thin" : "") }, h("i"));
+    b.firstChild.style.width = Math.max(0, Math.min(100, ratio * 100)) + "%";
+    if (color) b.firstChild.style.background = color;
+    return b;
+  }
+  function stackBar(parts, colors) {
+    var total = parts.reduce(function (a, p) { return a + p[1]; }, 0);
+    var s = h("div", { class: "stack" }, parts.map(function (p, i) {
+      var seg = h("i", { title: p[0] + " · " + fmt(p[1]) });
+      seg.style.width = (100 * p[1] / total) + "%";
+      seg.style.background = colors[i % colors.length];
+      return seg;
+    }));
+    var legend = h("div", { class: "legend" }, parts.map(function (p, i) {
+      var sw = h("i"); sw.style.background = colors[i % colors.length];
+      return h("span", null, [sw, p[0] + " ", h("span", { class: "muted mono" }, fmt(p[1]) + " · " + pct(p[1], total))]);
+    }));
+    return [s, legend];
+  }
+  function badge(text, cls) { return h("span", { class: "badge " + cls }, text); }
+  function table(headers, rows) {
+    return h("table", null, [
+      h("thead", null, h("tr", null, headers.map(function (x) { return h("th", { class: x.num ? "num" : null }, x.label || x); }))),
+      h("tbody", null, rows.map(function (r) { return h("tr", null, r.map(function (c, i) {
+        var hd = headers[i]; return h("td", { class: hd && hd.num ? "num" : null }, c);
+      })); })),
+    ]);
+  }
+  var PALETTE = ["#00E5B9", "#6ea8ff", "#a98bff", "#ff8060", "#00bd81", "#ffd166", "#868aaa", "#ff7f9c"];
+
+  /* ═══ Zone graph: one panel, two projections of the same data ═══ */
+  function zoneById(id) { return ZONES.filter(function (z) { return z.id === id; })[0]; }
+  function radius(files) { return 6 + Math.sqrt(files) * 1.1; }
+
+  function svg(tag, attrs) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
+  function graph2D() {
+    var g = svg("svg", { class: "graph", viewBox: "0 0 760 360" });
+    CROSSINGS.forEach(function (c) {
+      var a = zoneById(c[0]), b = zoneById(c[1]);
+      if (!a || !b) return;
+      var w = 0.6 + Math.log(c[2]) * 0.55;
+      var line = svg("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, "stroke-width": w.toFixed(1) });
+      line.appendChild(svg("title", {})).textContent = c[0] + " → " + c[1] + " · " + c[2] + " imports";
+      g.appendChild(line);
+    });
+    ZONES.forEach(function (z) {
+      var r = radius(z.files);
+      var node = svg("g", { transform: "translate(" + z.x + "," + z.y + ")" });
+      var circle = svg("circle", { r: r, fill: FAMILY_COLOR[z.fam], "fill-opacity": "0.85", stroke: "var(--bg)", "stroke-width": "2" });
+      circle.appendChild(svg("title", {})).textContent = z.label + " · " + z.files + " files · cohesion " + z.coh + " · coupling " + z.coup;
+      node.appendChild(circle);
+      var t = svg("text", { class: "lbl", x: 0, y: r + 12, "text-anchor": "middle" }); t.textContent = z.label; node.appendChild(t);
+      var n = svg("text", { x: 0, y: 3, "text-anchor": "middle", fill: "#04121a", "font-weight": "600" }); n.textContent = z.files; if (r > 12) node.appendChild(n);
+      g.appendChild(node);
+    });
+    return g;
+  }
+
+  function graph3D() {
+    var S = 58, ORIGIN_X = 380, ORIGIN_Y = 70;
+    var cos = Math.cos(Math.PI / 6), sin = Math.sin(Math.PI / 6);
+    function iso(x, y, z) { return [ORIGIN_X + (x - y) * cos * S, ORIGIN_Y + (x + y) * sin * S - z]; }
+    function pt(p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }
+    function shade(hex, f) {
+      var n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, gch = (n >> 8) & 255, b = n & 255;
+      return "rgb(" + Math.round(r * f) + "," + Math.round(gch * f) + "," + Math.round(b * f) + ")";
+    }
+    var g = svg("svg", { class: "graph", viewBox: "0 0 760 360" });
+
+    // ground grid
+    for (var i = 0; i <= 6; i++) {
+      var a = iso(i, 0, 0), b = iso(i, 4, 0), c = iso(0, i, 0), d = iso(6, i, 0);
+      g.appendChild(svg("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], "stroke-width": "0.5" }));
+      if (i <= 4) g.appendChild(svg("line", { x1: c[0], y1: c[1], x2: d[0], y2: d[1], "stroke-width": "0.5" }));
+    }
+
+    var W = 0.62;
+    function heightOf(files) { return 10 + Math.sqrt(files) * 3.2; }
+    function topCenter(z) { return iso(z.gx + 0.5, z.gy + 0.5, heightOf(z.files)); }
+
+    // edges between block tops, drawn before blocks so blocks occlude them
+    CROSSINGS.forEach(function (c) {
+      var a = zoneById(c[0]), b = zoneById(c[1]);
+      if (!a || !b) return;
+      var p = topCenter(a), q = topCenter(b);
+      var mid = [(p[0] + q[0]) / 2, Math.min(p[1], q[1]) - 18];
+      var path = svg("path", { class: "edge", d: "M" + pt(p) + " Q" + pt(mid) + " " + pt(q), "stroke-width": (0.5 + Math.log(c[2]) * 0.4).toFixed(1) });
+      path.appendChild(svg("title", {})).textContent = c[0] + " → " + c[1] + " · " + c[2] + " imports";
+      g.appendChild(path);
+    });
+
+    // blocks, painted back to front
+    ZONES.slice().sort(function (a, b) { return (a.gx + a.gy) - (b.gx + b.gy); }).forEach(function (z) {
+      var hgt = heightOf(z.files), col = FAMILY_COLOR[z.fam];
+      var x0 = z.gx + (1 - W) / 2, y0 = z.gy + (1 - W) / 2, x1 = x0 + W, y1 = y0 + W;
+      var top = [iso(x0, y0, hgt), iso(x1, y0, hgt), iso(x1, y1, hgt), iso(x0, y1, hgt)];
+      var left = [iso(x0, y1, hgt), iso(x1, y1, hgt), iso(x1, y1, 0), iso(x0, y1, 0)];
+      var right = [iso(x1, y0, hgt), iso(x1, y1, hgt), iso(x1, y1, 0), iso(x1, y0, 0)];
+      var block = svg("g", {});
+      block.appendChild(svg("polygon", { points: left.map(pt).join(" "), fill: shade(col, 0.55) }));
+      block.appendChild(svg("polygon", { points: right.map(pt).join(" "), fill: shade(col, 0.75) }));
+      block.appendChild(svg("polygon", { points: top.map(pt).join(" "), fill: col }));
+      block.appendChild(svg("title", {})).textContent = z.label + " · " + z.files + " files · cohesion " + z.coh + " · coupling " + z.coup;
+      var tc = topCenter(z);
+      var t = svg("text", { class: "lbl", x: tc[0], y: tc[1] - 6, "text-anchor": "middle" }); t.textContent = z.label;
+      block.appendChild(t);
+      g.appendChild(block);
+    });
+    return g;
+  }
+
+  function zoneGraphPanel() {
+    var mode = "2d";
+    try { mode = localStorage.getItem("ndx-demo-zone-mode") || "2d"; } catch (e) {}
+    var host = h("div");
+    var b2 = h("button", { onclick: function () { set("2d"); } }, "2D");
+    var b3 = h("button", { onclick: function () { set("3d"); } }, "3D");
+    function set(m) {
+      mode = m;
+      b2.setAttribute("aria-pressed", String(m === "2d"));
+      b3.setAttribute("aria-pressed", String(m === "3d"));
+      host.textContent = "";
+      host.appendChild(m === "2d" ? graph2D() : graph3D());
+      try { localStorage.setItem("ndx-demo-zone-mode", m); } catch (e) {}
+    }
+    var legend = h("div", { class: "legend" }, Object.keys(FAMILY_COLOR).map(function (f) {
+      var sw = h("i"); sw.style.background = FAMILY_COLOR[f];
+      return h("span", null, [sw, { tests: "tests", web: "web", rex: "rex", hench: "hench", sv: "sourcevision", core: "core / llm-client" }[f]]);
+    }));
+    var head = h("div", { class: "panel-head" }, [
+      h("h3", null, "Zone graph"),
+      h("span", { class: "meta" }, "15 zones · 20 measured crossings · size = files"),
+      info(INFO.crossings),
+      h("div", { class: "toggle", role: "group", "aria-label": "Projection" }, [b2, b3]),
+    ]);
+    set(mode);
+    return h("article", { class: "panel w12" }, [head, host, legend]);
+  }
+
+  /* ═══ Pages ═══ */
+
+  function analysisPage() {
+    var langColors = ["#6ea8ff", "#ffd166", "#00E5B9", "#a98bff"];
+    var fam = REPO.findings;
+    return [
+      section("General Repository Information", fmt(REPO.files) + " files · " + REPO.zones + " zones · analysed 2026-09-17", [
+        panel(6, "Counts", "inventory.json", [
+          h("div", { class: "stats" }, [
+            stat(fmt(REPO.files), "Files"),
+            stat(fmt(REPO.lines), "Lines"),
+            stat(String(REPO.zones), "Zones", "0 unzoned files", INFO.zone),
+          ]),
+        ]),
+        panel(6, "Health & coupling", "zones.json · imports.json", [
+          h("div", { class: "stats" }, [
+            stat(String(REPO.findings.info + REPO.findings.warning + REPO.findings.critical), "Findings", fam.critical + " critical · " + fam.warning + " warnings · " + fam.info + " info"),
+            stat(REPO.avgCohesion.toFixed(2), "Avg cohesion", null, INFO.cohesion),
+            stat(REPO.avgCoupling.toFixed(2), "Avg coupling", null, INFO.coupling),
+            stat(String(REPO.circular), "Circular deps", "chains in imports.json"),
+            stat(String(REPO.dualFragility), "Dual-fragility zones", "cohesion < 0.5 and coupling > 0.5"),
+          ]),
+        ]),
+        panel(6, "Top zones", "by file count", [
+          table([ "Zone", { label: "Files", num: true }, "Cohesion", "Coupling" ], ZONES.slice(0, 9).map(function (z) {
+            return [h("span", { class: "mono" }, z.label), fmt(z.files), [bar(z.coh, "var(--green)", true), h("span", { class: "muted mono" }, z.coh.toFixed(2))], [bar(z.coup, "var(--orange)", true), h("span", { class: "muted mono" }, z.coup.toFixed(2))]];
+          })),
+        ]),
+        panel(6, "Codebase", "by package · by role", [
+          h("div", { class: "muted", style: "font-size:11px;margin-bottom:2px" }, "Files per package"),
+        ].concat(stackBar(REPO.packages, PALETTE), [
+          h("div", { class: "muted", style: "font-size:11px;margin:12px 0 2px" }, "Files per role"),
+        ], stackBar(REPO.roles, ["#00E5B9", "#868aaa", "#ffd166", "#a98bff", "#6ea8ff"]))),
+      ]),
+
+      section("Repository Map", fmt(REPO.edges) + " import edges · " + fmt(REPO.crossings) + " cross zones", [
+        panel(12, "Context Graph", "PRD epics linked by release · 32 epics, showing the open chain", [contextGraph()]),
+        panel(6, "Primary language", "project-profile.json", [
+          h("div", { class: "stats", style: "margin-bottom:10px" }, [
+            stat("TypeScript", "Primary", pct(1707, 1933) + " of files"),
+            stat("vitest", "Framework"),
+            stat("pnpm", "Workspace", "changesets releases"),
+          ]),
+        ].concat(stackBar(REPO.languages, langColors), [
+          h("dl", { class: "kv", style: "margin-top:12px" }, [h("dt", null, "CI"), h("dd", null, REPO.profile.ci), h("dt", null, "Build"), h("dd", null, REPO.profile.build), h("dt", null, "Release"), h("dd", null, REPO.profile.release)]),
+        ])),
+        panel(6, "Import", "imports.json", [
+          h("div", { class: "stats", style: "margin-bottom:10px" }, [
+            stat(fmt(REPO.edges), "Edges"), stat(String(REPO.external), "External packages"), stat(String(REPO.circular), "Circular chains"),
+          ]),
+          h("div", { class: "muted", style: "font-size:11px;margin-bottom:4px" }, "Most-imported externals"),
+          h("div", { class: "row" }, REPO.externals.map(function (x) { return h("code", { class: "mono", style: "background:var(--bg-active);padding:2px 6px;border-radius:4px" }, x); })),
+          h("div", { class: "muted", style: "font-size:11px;margin:12px 0 4px" }, "Circular chains (first 4 of 9)"),
+          h("ul", { class: "list" }, REPO.cycles.map(function (c) { return h("li", null, [badge("cycle", "b-orange"), h("span", { class: "grow mono" }, c.join(" ↔ "))]); })),
+        ]),
+        zoneGraphPanel(),
+      ]),
+
+      section("PRD Items", fmt(PRD.total) + " items · " + pct(PRD.completed, PRD.total) + " complete", [
+        panel(6, "Up Next", "rex next", [
+          h("div", { class: "card" }, [
+            h("div", { class: "muted", style: "font-size:11px;margin-bottom:4px" }, PRD.next.epic),
+            h("div", { style: "font-weight:600;font-size:14px;margin-bottom:6px" }, PRD.next.title),
+            h("div", { class: "row", style: "margin-bottom:8px" }, [badge(PRD.next.status.replace("_", " "), "b-blue"), badge(PRD.next.priority, "b-orange"), h("span", { class: "muted mono" }, PRD.next.id), h("span", { class: "muted" }, PRD.next.criteria + " acceptance criteria")]),
+            h("p", { class: "dim", style: "margin:0 0 10px;font-size:12px" }, PRD.next.why),
+            h("div", { class: "row" }, [h("button", { class: "btn btn-primary btn-sm" }, "▶ Start task"), h("button", { class: "btn btn-sm" }, "Open in tree"), h("button", { class: "btn btn-sm" }, "Verify criteria")]),
+          ]),
+        ]),
+        panel(6, "Progress", "rex status", [
+          h("div", { class: "stats", style: "margin-bottom:8px" }, [stat(pct(PRD.completed, PRD.total), "Complete", fmt(PRD.completed) + " of " + fmt(PRD.total))]),
+          bar(PRD.completed / PRD.total, "var(--green)"),
+          h("div", { class: "muted", style: "font-size:11px;margin:12px 0 2px" }, "Items by level"),
+        ].concat(stackBar(PRD.levels, ["#a98bff", "#6ea8ff", "#00E5B9", "#868aaa"]))),
+        panel(6, "Completed / In Progress / Pending", "open epics", [
+          h("div", { class: "stats", style: "margin-bottom:10px" }, [
+            stat(fmt(PRD.completed), "Completed"), stat(String(PRD.inProgress), "In progress"), stat(String(PRD.pending), "Pending"),
+          ]),
+          h("ul", { class: "list" }, PRD.epics.slice(0, 7).map(function (e) {
+            return h("li", null, [badge(e[3], e[3] === "critical" ? "b-red" : e[3] === "high" ? "b-orange" : "b-muted"), h("span", { class: "grow" }, e[0]), h("span", { style: "width:90px" }, bar(e[1] / e[2], null, true)), h("span", { class: "muted mono" }, e[1] + "/" + e[2])]);
+          })),
+          h("div", { class: "muted", style: "font-size:11px;margin-top:6px" }, "+ " + (PRD.epics.length - 7) + " more pending epics"),
+        ]),
+        panel(12, "History", ".rex/execution-log.jsonl · 2026-09-17", [
+          h("ul", { class: "list log" }, PRD.log.map(function (e) {
+            return h("li", null, [h("time", null, e[0]), badge(e[1].replace("_", " "), e[1] === "task_completed" ? "b-green" : e[1] === "auto_completed" ? "b-purple" : "b-blue"), h("span", { class: "grow" }, e[2])]);
+          })),
+        ]),
+      ]),
+
+      section("Token Usage", fmt(USAGE.runs) + " runs · est. $" + USAGE.cost.toFixed(2), [
+        panel(4, "Total Tokens", "ndx usage", [
+          h("div", { class: "stats" }, [stat(short(USAGE.input + USAGE.output + USAGE.cacheWrite + USAGE.cacheRead), "All classes", "across " + fmt(USAGE.runs) + " runs")]),
+          h("dl", { class: "kv", style: "margin-top:12px" }, [
+            h("dt", null, "Input"), h("dd", null, fmt(USAGE.input)), h("dt", null, "Output"), h("dd", null, fmt(USAGE.output)),
+            h("dt", null, "Cache write"), h("dd", null, fmt(USAGE.cacheWrite)), h("dt", null, "Cache read"), h("dd", null, fmt(USAGE.cacheRead)),
+          ]),
+        ]),
+        panel(4, "Cost estimate", "list prices", [
+          h("div", { class: "stats" }, [stat("$" + fmt(USAGE.cost.toFixed(2)), "Estimated total")]),
+          h("dl", { class: "kv", style: "margin-top:12px" }, [
+            h("dt", null, "Output"), h("dd", null, "$" + USAGE.costOutput.toFixed(2)), h("dt", null, "Input"), h("dd", null, "$" + USAGE.costInput.toFixed(2)),
+            h("dt", null, "Cache"), h("dd", null, "$" + (USAGE.cost - USAGE.costOutput - USAGE.costInput).toFixed(2)),
+          ]),
+        ]),
+        panel(4, "Major Models used", "runs per model", [
+          h("ul", { class: "list" }, USAGE.models.map(function (m) {
+            return h("li", null, [h("span", { class: "grow mono" }, m[0]), h("span", { style: "width:80px" }, bar(m[1] / USAGE.runs, null, true)), h("span", { class: "muted mono" }, fmt(m[1]))]);
+          })),
+        ]),
+      ], { collapsed: false }),
+    ];
+  }
+
+  function contextGraph() {
+    var g = svg("svg", { class: "graph", viewBox: "0 0 760 150", style: "height:150px" });
+    var chain = [["0.6.0", ["PR 5 worktree awareness", "PR 6 cross-worktree claims", "PR 7 ndx which"]], ["0.7.0", ["PR 8 hub daemon", "PR 9 hub home", "PR 10 start registers"]], ["0.8.0", ["PR 11 repo server", "PR 12 /w/:wt/", "PR 13 workspaces view", "PR 14 MCP shim", "PR 15 admission gate"]]];
+    var x = 90;
+    var prev = null;
+    var rel = svg("g", {});
+    var reliability = [70, 75];
+    rel.appendChild(svg("circle", { cx: reliability[0], cy: reliability[1], r: 14, fill: "#ff7f9c", "fill-opacity": ".9" }));
+    var rt = svg("text", { class: "lbl", x: reliability[0], y: reliability[1] + 30, "text-anchor": "middle" }); rt.textContent = "run reliability 26/30"; rel.appendChild(rt);
+    g.appendChild(rel);
+    chain.forEach(function (rel, i) {
+      var cx = 230 + i * 220, cy = 75;
+      if (prev) g.appendChild(svg("line", { x1: prev[0] + 16, y1: prev[1], x2: cx - 16, y2: cy, "stroke-width": "1.5" }));
+      else g.appendChild(svg("line", { x1: reliability[0] + 14, y1: reliability[1], x2: cx - 16, y2: cy, "stroke-width": "1.5", "stroke-dasharray": "3 3" }));
+      g.appendChild(svg("circle", { cx: cx, cy: cy, r: 16, fill: "#6ea8ff", "fill-opacity": ".9" }));
+      var t = svg("text", { class: "lbl", x: cx, y: cy + 4, "text-anchor": "middle", fill: "#04121a", "font-weight": "600" }); t.textContent = rel[0]; g.appendChild(t);
+      rel[1].forEach(function (pr, j) {
+        var px = cx - 80 + j * (160 / Math.max(1, rel[1].length - 1)), py = cy + 45;
+        g.appendChild(svg("line", { x1: cx, y1: cy + 16, x2: px, y2: py - 6, "stroke-width": "0.8" }));
+        g.appendChild(svg("circle", { cx: px, cy: py, r: 5, fill: "var(--bg-active)", stroke: "#6ea8ff" }));
+        var l = svg("text", { x: px, y: py + 16, "text-anchor": "middle" }); l.textContent = pr; g.appendChild(l);
+      });
+      prev = [cx, cy];
+    });
+    return g;
+  }
+
+  function commandRunner(cmds) {
+    return [
+      h("div", { class: "field" }, [h("label", null, "Command"), h("select", null, cmds.map(function (c) { return h("option", null, "ndx " + c); }))]),
+      h("div", { class: "field" }, [h("label", null, "Options"), h("input", { placeholder: "--accept  --deep  --format=json", value: "" })]),
+      h("div", { class: "field" }, [h("label", null, "Directory"), h("input", { value: "." })]),
+      h("div", { class: "row" }, [h("button", { class: "btn btn-primary btn-sm" }, "▶ Run"), h("button", { class: "btn btn-sm" }, "Dry run"), h("span", { class: "muted", style: "font-size:11px" }, "output streams below via WebSocket")]),
+    ];
+  }
+  function commandReference(filter) {
+    return [h("ul", { class: "list" }, COMMANDS.filter(function (c) { return !filter || filter.indexOf(c[2]) >= 0; }).map(function (c) {
+      return h("li", null, [h("code", { class: "mono", style: "min-width:120px" }, "ndx " + c[0]), h("span", { class: "grow dim" }, c[1])]);
+    }))];
+  }
+
+  function planPage() {
+    return [
+      section("", null, [
+        panel(6, "Add Items", "ndx add", [
+          h("div", { class: "field" }, [h("label", null, "Describe what to add"), h("textarea", { placeholder: "e.g. The dashboard should warn when two worktrees claim the same task…" })]),
+          h("div", { class: "row" }, [h("button", { class: "btn btn-primary btn-sm" }, "Add to PRD"), h("button", { class: "btn btn-sm" }, "Import file…"), h("span", { class: "muted", style: "font-size:11px" }, "smart-add proposes epic / feature / task placement before writing")]),
+        ]),
+        panel(6, "Hotkeys / Work by epic", "ndx work --epic", [
+          h("ul", { class: "list" }, PRD.epics.slice(0, 5).map(function (e) {
+            return h("li", null, [h("span", { class: "grow" }, e[0]), h("span", { class: "muted mono" }, e[1] + "/" + e[2]), h("button", { class: "btn btn-sm" }, "▶ Work epic")]);
+          })),
+          h("ul", { class: "list hotkeys", style: "margin-top:8px" }, [
+            h("li", null, [h("span", { class: "dim" }, "Search files, zones, tasks"), h("kbd", null, "⌘ K")]),
+            h("li", null, [h("span", { class: "dim" }, "Step through graph nodes"), h("span", null, [h("kbd", null, "←"), " ", h("kbd", null, "→")])]),
+          ]),
+        ]),
+      ], { plain: true }),
+      section("History", "5 most recent of " + fmt(USAGE.runs) + " runs", [
+        panel(12, "Runs", ".hench/runs", [runsTable()]),
+      ]),
+      section("CLI help", null, [
+        panel(6, "CLI buttons to run commands", "with options and text fields", commandRunner(["plan", "plan --accept", "recommend", "add", "analyze --deep", "status", "validate", "fix"])),
+        panel(6, "CLI reference", "planning commands", commandReference(["plan", "analysis"])),
+      ]),
+      section("Basic Planning Settings", null, [
+        panel(12, "Planning specific Settings shortcut", ".n-dx.json · .rex/config.json", [
+          h("div", { class: "grid" }, [
+            h("div", { class: "w4" }, h("dl", { class: "kv" }, [h("dt", null, "LLM vendor"), h("dd", null, "claude"), h("dt", null, "Model"), h("dd", null, "claude-opus-5"), h("dt", null, "Rex adapter"), h("dd", null, "file"), h("dt", null, "SourceVision"), h("dd", null, "auto")])),
+            h("div", { class: "w4" }, h("dl", { class: "kv" }, [h("dt", null, "Zone merge threshold"), h("dd", null, "5"), h("dt", null, "Pinned zones"), h("dd", null, "web-server · viewer-message-pipeline · web-viewer · rex-cli"), h("dt", null, "Import graph"), h("dd", null, "rich")])),
+            h("div", { class: "w4", style: "display:flex;align-items:flex-start;justify-content:flex-end" }, h("button", { class: "btn btn-sm", onclick: function () { go("s-plan"); } }, "Open ndx analyze / plan settings →")),
+          ]),
+        ]),
+      ]),
+    ];
+  }
+
+  function runsTable() {
+    return table(["Task", "Model", { label: "Turns", num: true }, { label: "Min", num: true }, { label: "Tokens", num: true }, "Status"], USAGE.recent.map(function (r) {
+      return [h("span", { style: "display:block;max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, r[0]), h("span", { class: "mono" }, r[1]), String(r[2]), String(r[3]), short(r[4]), badge(r[5], "b-green")];
+    }));
+  }
+
+  function workPage() {
+    return [
+      section("", null, [
+        panel(8, "Up Next Task", "with run button", [
+          h("div", { class: "card" }, [
+            h("div", { class: "muted", style: "font-size:11px;margin-bottom:4px" }, PRD.next.epic),
+            h("div", { style: "font-weight:600;font-size:14px;margin-bottom:6px" }, PRD.next.title),
+            h("div", { class: "row", style: "margin-bottom:10px" }, [badge(PRD.next.status.replace("_", " "), "b-blue"), badge(PRD.next.priority, "b-orange"), h("span", { class: "muted mono" }, PRD.next.id)]),
+            h("div", { class: "row" }, [
+              h("button", { class: "btn btn-primary" }, "▶ Run this task with the agent"),
+              h("span", { class: "muted", style: "font-size:11px" }, "model " + HENCH.model + " · " + HENCH.permissionMode + " · max " + HENCH.maxTurns + " turns · auto-commit " + (HENCH.autoCommit ? "on" : "off")),
+            ]),
+          ]),
+        ]),
+        panel(4, "Auto run", "epic / next task, etc.", [
+          h("div", { class: "field" }, [h("label", null, "Mode"), h("select", null, [h("option", null, "Next task (ndx work)"), h("option", null, "Loop until none left (--loop)"), h("option", null, "Epic by epic (--epic-by-epic)"), h("option", null, "Autonomous (--auto)")])]),
+          h("div", { class: "field" }, [h("label", null, "Iterations"), h("input", { value: "1" })]),
+          h("div", { class: "field" }, [h("label", null, "Permission mode"), h("select", null, [h("option", null, "acceptEdits"), h("option", null, "default"), h("option", null, "bypassPermissions")])]),
+          h("button", { class: "btn btn-sm" }, "▶ Start"),
+        ]),
+      ], { plain: true }),
+      section("Templates", TEMPLATES.length + " built-in", [
+        panel(12, "Copy of templates options", "hench templates", [
+          h("div", { class: "grid" }, TEMPLATES.map(function (t) {
+            return h("div", { class: "w4 card" }, [h("div", { style: "font-weight:600" }, t[1]), h("div", { class: "muted mono", style: "margin:2px 0 6px" }, t[0]), h("div", { class: "dim", style: "font-size:12px;margin-bottom:8px" }, t[2]), h("button", { class: "btn btn-sm" }, "Apply")]);
+          })),
+        ]),
+      ]),
+      section("Commands", null, [
+        panel(6, "Buttons and fields", "ndx work", commandRunner(["work", "work --task=ID", "work --auto --iterations=N", "work --loop", "work --epic-by-epic", "self-heal 3", "pair-programming", "usage"])),
+        panel(6, "Reference", "work commands", commandReference(["work"])),
+      ]),
+      section("Usage", fmt(USAGE.runs) + " runs", [
+        panel(4, "Runs", "outcomes", [h("div", { class: "stats" }, [stat(fmt(USAGE.runs), "Total")])].concat(stackBar([["completed", USAGE.completed], ["failed", USAGE.failed], ["running", USAGE.running], ["cancelled", USAGE.cancelled]], ["#00bd81", "#ff7f9c", "#6ea8ff", "#868aaa"]))),
+        panel(4, "Output tokens", "generated", [h("div", { class: "stats" }, [stat(short(USAGE.output), "Output", fmt(USAGE.output))])]),
+        panel(4, "Cache read", "prompt cache", [h("div", { class: "stats" }, [stat(short(USAGE.cacheRead), "Read", short(USAGE.cacheWrite) + " written")])]),
+        panel(6, "Estimated total cost", "current, list prices", [
+          h("div", { class: "stats" }, [stat("$" + fmt(USAGE.cost.toFixed(2)), "So far", "$" + (USAGE.cost / USAGE.runs).toFixed(2) + " per run")]),
+        ]),
+      ]),
+    ];
+  }
+
+  function commandsPage() {
+    return [section("", null, [panel(12, "All Commands", COMMANDS.length + " orchestrator commands", commandReference(null))], { plain: true })];
+  }
+
+  function settingsPage(id) {
+    var forms = {
+      "s-general": ["General", [["LLM vendor", "claude"], ["Model", "claude-opus-5"], ["Codex model", "—"], ["Web port", "3117"]]],
+      "s-plan": ["ndx analyze / plan", [["Zone merge threshold", "5"], ["Pinned zones", "4"], ["Analysis depth", "--deep"], ["SourceVision", "auto"]]],
+      "s-work": ["ndx work", [["Provider", HENCH.provider], ["Model", HENCH.model], ["Permission mode", HENCH.permissionMode], ["Max turns", String(HENCH.maxTurns)], ["Max tokens", String(HENCH.maxTokens)], ["Auto-commit", String(HENCH.autoCommit)], ["Livelock threshold", String(HENCH.livelockThreshold)], ["Allowed commands", HENCH.allowed.join(", ")], ["Blocked paths", HENCH.blocked.join(", ")]]],
+      "s-sync": ["ndx sync", [["Adapter", "file"], ["Notion", "disabled (rex.notionSync flag off)"]]],
+      "s-export": ["ndx export / refresh", [["Export out-dir", "—"], ["Deploy target", "github"], ["Refresh", "--ui-only · --data-only · --no-build"]]],
+      "s-flags": ["Feature Flags", [["rex.notionSync", "off"], ["rex.integrations", "off"], ["sourcevision.prMarkdown", "off"], ["sourcevision.ask", "off"]]],
+      "s-timeouts": ["CLI Timeouts", [["Command timeout", HENCH.commandTimeout + " ms"], ["Stop grace", "2000 ms"], ["Shutdown", "30000 ms"]]],
+    };
+    var f = forms[id];
+    return [section("", null, [panel(8, f[0], "settings", f[1].map(function (kv) {
+      return h("div", { class: "field" }, [h("label", null, kv[0]), h("input", { value: kv[1] })]);
+    }).concat([h("div", { class: "row" }, [h("button", { class: "btn btn-primary btn-sm" }, "Save"), h("button", { class: "btn btn-sm" }, "Reset")])]))], { plain: true })];
+  }
+
+  var PAGES = {
+    analysis: { title: "Analysis", sub: "SourceVision · zones, imports, PRD state and spend on one page", crumbs: ["Analysis"], render: analysisPage },
+    plan: { title: "Plan", sub: "Rex · add work, run planning commands, see what happened", crumbs: ["Plan"], render: planPage },
+    work: { title: "Work", sub: "Hench · run the next task, pick a template, watch spend", crumbs: ["Work"], render: workPage },
+    commands: { title: "All Commands", sub: "every ndx orchestrator command", crumbs: ["Commands", "All Commands"], render: commandsPage },
+  };
+  ["s-general", "s-plan", "s-work", "s-sync", "s-export", "s-flags", "s-timeouts"].forEach(function (id) {
+    PAGES[id] = { title: null, sub: null, crumbs: ["Settings"], render: function () { return settingsPage(id); } };
+  });
+
+  function go(id) {
+    if (!PAGES[id]) id = "analysis";
+    location.hash = id;
+    var page = PAGES[id];
+    document.querySelectorAll("[data-page]").forEach(function (el) { el.classList.toggle("active", el.dataset.page === id); });
+    if (id.slice(0, 2) === "s-") { document.getElementById("settings-items").hidden = false; document.querySelector("#settings-label .caret").textContent = "▾"; }
+    var content = document.getElementById("content");
+    content.textContent = "";
+    var body = page.render();
+    var title = page.title || document.querySelector('[data-page="' + id + '"] ').textContent.trim();
+    document.getElementById("crumbs").textContent = "";
+    page.crumbs.forEach(function (c, i) {
+      var last = i === page.crumbs.length - 1;
+      document.getElementById("crumbs").appendChild(last ? h("b", null, page.title || title) : document.createTextNode(c + " / "));
+    });
+    content.appendChild(h("div", { class: "page-head" }, [h("h1", null, page.title || title), page.sub ? h("span", { class: "sub" }, page.sub) : null]));
+    body.forEach(function (b) { content.appendChild(b); });
+    content.scrollTop = 0;
+  }
+
+  document.querySelectorAll("[data-page]").forEach(function (el) {
+    el.addEventListener("click", function () { go(el.dataset.page); });
+  });
+  document.getElementById("settings-label").addEventListener("click", function () {
+    var items = document.getElementById("settings-items");
+    items.hidden = !items.hidden;
+    document.querySelector("#settings-label .caret").textContent = items.hidden ? "▸" : "▾";
+  });
+  document.getElementById("theme").addEventListener("click", function () {
+    var root = document.documentElement;
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("ndx-preview-theme", next); } catch (e) {}
+  });
+  try { var t = localStorage.getItem("ndx-preview-theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+
+  window.addEventListener("hashchange", function () { go(location.hash.slice(1)); });
+  go(location.hash.slice(1) || "analysis");
+})();
+</script>
+</body>
+</html>
