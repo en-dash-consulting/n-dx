@@ -241,11 +241,17 @@ describe("TaskClaims renewal", () => {
     mine.startRenewal();
     mine.startRenewal(); // idempotent
 
-    const timers = process.getActiveResourcesInfo().filter((r) => r === "Timeout");
-    expect(timers.length).toBeGreaterThan(0);
+    // Unref'd timers never appear in process.getActiveResourcesInfo(), so the
+    // only reliable observation is the handle itself: scheduled, but not
+    // keeping the event loop alive.
+    const timerOf = (c: TaskClaims) =>
+      (c as unknown as { renewalTimer: NodeJS.Timeout | null }).renewalTimer;
+    expect(timerOf(mine)).not.toBeNull();
+    expect(timerOf(mine)!.hasRef()).toBe(false);
 
     await mine.releaseAll();
     expect(mine.held.size).toBe(0);
+    expect(timerOf(mine)).toBeNull();
   });
 });
 

@@ -202,7 +202,10 @@ export async function spawnOrphanedProcessTree({ withGrandchild = true, ignoreSi
   const launcher = spawn(process.execPath, ["-e", [
     "const { spawn } = require('node:child_process');",
     `const target = spawn(process.execPath, ['-e', ${JSON.stringify(targetScript)}], {`,
-    `  detached: true, stdio: ['ignore', ${withGrandchild ? "'pipe'" : "'ignore'"}, 'ignore'],`,
+    // windowsHide keeps the detached tree from opening a visible console window —
+    // it does not change kill semantics, and an orphan left by a failed test
+    // would otherwise sit on screen as a blank console until closed by hand.
+    `  detached: true, windowsHide: true, stdio: ['ignore', ${withGrandchild ? "'pipe'" : "'ignore'"}, 'ignore'],`,
     "});",
     "target.unref();",
     withGrandchild

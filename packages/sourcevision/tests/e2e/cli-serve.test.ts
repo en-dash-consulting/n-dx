@@ -113,6 +113,8 @@ describe.skipIf(!canBindLoopbackSync())("sourcevision serve (e2e)", () => {
     serverProc = spawn(process.execPath, [CLI_PATH, "serve", tmpDir, `--port=${port}`], {
       stdio: ["ignore", "pipe", "pipe"],
       detached: true,
+      // On Windows, detached without windowsHide opens a visible console window.
+      windowsHide: true,
     });
 
     await waitForServer(port);

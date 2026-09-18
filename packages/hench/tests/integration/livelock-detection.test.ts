@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { commitGitFixtureBaseline } from "../helpers/index.js";
+import { commitGitFixtureBaseline, disableMemoryGuard } from "../helpers/index.js";
 import { initConfig } from "../../src/store/config.js";
 import { defaultRegistry } from "../../src/prd/llm-gateway.js";
 import type {
@@ -31,6 +31,7 @@ describe("livelock detection in the agent loop", () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-test-livelock-"));
     henchDir = join(projectDir, ".hench");
     await initConfig(henchDir);
+    await disableMemoryGuard(henchDir);
 
     const rexDir = join(projectDir, ".rex");
     await mkdir(rexDir, { recursive: true });
