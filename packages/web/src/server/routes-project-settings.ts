@@ -4,7 +4,7 @@
  * Reads and writes project-level settings from `.n-dx.json`:
  * - web.port (dashboard server port)
  * - language (project language override)
- * - sourcevision.zones.mergeThreshold (zone merge sensitivity)
+ * - sourcevision.zones.mergeThreshold (small-zone merge threshold, in files)
  * - sourcevision.zones.pins (file → zone override map)
  *
  * GET /api/project-settings   — current project settings
@@ -27,7 +27,7 @@ export interface ProjectSettingsResponse {
   port: number | null;
   /** Project language override (null = auto-detect). */
   language: string | null;
-  /** Sourcevision zone merge threshold, 0–1 (null = default 0.5). */
+  /** Sourcevision small-zone merge threshold — minimum zone size in files (null = default 3). */
   sourcevisionMergeThreshold: number | null;
   /** Sourcevision zone pin overrides: file path → zone ID. */
   sourcevisionPins: Record<string, string>;
@@ -155,12 +155,12 @@ export async function handleProjectSettingsRoute(
         }
       }
 
-      // Validate mergeThreshold
+      // Validate mergeThreshold (minimum zone size in files — a count, not a ratio)
       if ("sourcevisionMergeThreshold" in parsed) {
         const v = parsed.sourcevisionMergeThreshold;
         if (v !== null && v !== undefined) {
-          if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 1) {
-            errorResponse(res, 400, "sourcevisionMergeThreshold must be a number between 0 and 1");
+          if (typeof v !== "number" || !Number.isInteger(v) || v < 0) {
+            errorResponse(res, 400, "sourcevisionMergeThreshold must be a non-negative integer (minimum zone size in files)");
             return true;
           }
         }
