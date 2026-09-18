@@ -1,0 +1,1270 @@
+{
+  "version": 1,
+  "meta": {
+    "title": "n-dx dashboard — layout v2",
+    "subtitle": "Draft · mock-up only, no live data"
+  },
+  "rationale": "",
+  "nav": [
+    {
+      "id": "grp-sourcevision",
+      "kind": "folder",
+      "label": "Analysis",
+      "children": [
+        {
+          "id": "overview",
+          "kind": "item",
+          "icon": "▣",
+          "label": "Overview",
+          "content": [
+            {
+              "id": "sec-001",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-arch-health",
+                  "label": "Architecture Health",
+                  "width": 8,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-next-steps",
+                  "label": "Next Steps",
+                  "width": 4,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-top-zones",
+                  "label": "Top Zones",
+                  "width": 4,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-languages",
+                  "label": "Languages",
+                  "width": 4,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-getting-started",
+                  "label": "Getting Started",
+                  "width": 4,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-recent-activity",
+                  "label": "Recent Activity",
+                  "width": 12,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-d1qnh1",
+                  "label": "New panel",
+                  "width": 12,
+                  "status": "new",
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "graph",
+          "kind": "item",
+          "icon": "▧",
+          "label": "Map",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-002",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-import-graph",
+                  "label": "Import Graph",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "iso-map",
+          "kind": "item",
+          "icon": "◧",
+          "label": "Isometric Map",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-003",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-iso-canvas",
+                  "label": "Isometric Canvas",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "zones",
+          "kind": "item",
+          "icon": "⬢",
+          "label": "Zones",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-004",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-zone-list",
+                  "label": "Zone List",
+                  "width": 6,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-zone-detail",
+                  "label": "Zone Detail",
+                  "width": 6,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "files",
+          "kind": "item",
+          "icon": "☰",
+          "label": "Files",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-005",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-file-table",
+                  "label": "File Inventory",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "routes",
+          "kind": "item",
+          "icon": "◇",
+          "label": "Routes",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-006",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-route-tree",
+                  "label": "Route Tree",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "architecture",
+          "kind": "item",
+          "icon": "◨",
+          "label": "Architecture",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-007",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-arch-summary",
+                  "label": "Architecture Summary",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "problems",
+          "kind": "item",
+          "icon": "⚠",
+          "label": "Problems",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-008",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-findings",
+                  "label": "Findings",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "suggestions",
+          "kind": "item",
+          "icon": "✦",
+          "label": "Suggestions",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-009",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-suggestion-list",
+                  "label": "Suggestions",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "pr-markdown",
+          "kind": "item",
+          "icon": "✍",
+          "label": "PR Markdown",
+          "flag": true,
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-010",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-pr-preview",
+                  "label": "PR Body Preview",
+                  "width": 12,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-x4klu9",
+                  "label": "New panel",
+                  "width": 6,
+                  "status": "removed",
+                  "statusBeforeRemoval": "new",
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ask",
+          "kind": "item",
+          "icon": "?",
+          "label": "Ask",
+          "flag": true,
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-011",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-ask-panel",
+                  "label": "Ask SourceVision",
+                  "width": 12,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-cb04h7",
+                  "label": "New panel",
+                  "width": 6,
+                  "status": "removed",
+                  "statusBeforeRemoval": "new",
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "previousLabel": "SOURCEVISION",
+      "collapsed": true,
+      "content": [
+        {
+          "id": "sec-general-repo-info",
+          "label": "General Repository Information",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-repo-counts",
+              "label": "Counts",
+              "width": 6,
+              "kind": "stats",
+              "status": "new",
+              "stats": [
+                {
+                  "label": "Files",
+                  "value": "412"
+                },
+                {
+                  "label": "Lines",
+                  "value": "58,904"
+                },
+                {
+                  "label": "Zones",
+                  "value": "18",
+                  "info": "A zone is a cluster of files that import each other more than they import the rest of the codebase — found by running Louvain community detection over the import graph, not by folder names. Zones are what the architecture views group, score and check boundaries against."
+                }
+              ]
+            },
+            {
+              "id": "pnl-health-coupling",
+              "label": "Health & coupling",
+              "width": 6,
+              "kind": "stats",
+              "status": "new",
+              "stats": [
+                {
+                  "label": "Health score",
+                  "value": "82"
+                },
+                {
+                  "label": "Avg coupling",
+                  "value": "0.41",
+                  "info": "Share of a zone's imports that cross its own boundary. Higher means the zone is more entangled with the rest of the codebase, so a change inside it has a wider blast radius."
+                },
+                {
+                  "label": "Avg cohesion",
+                  "value": "0.63",
+                  "info": "Share of a zone's imports that stay inside it. Higher means the zone holds together on its own terms; low cohesion with high coupling is the pair worth governing."
+                },
+                {
+                  "label": "Circular deps",
+                  "value": "0"
+                }
+              ]
+            },
+            {
+              "id": "pnl-analysis-top-zones",
+              "label": "Top zones",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new"
+            },
+            {
+              "id": "pnl-stkqng",
+              "label": "Codebase",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ]
+        },
+        {
+          "id": "sec-zo3db5",
+          "label": "Repository Map",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-60rdvz",
+              "label": "Context Graph",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-analysis-primary-language",
+              "label": "Primary language",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new"
+            },
+            {
+              "id": "pnl-pyw05n",
+              "label": "Import",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-p8l8eg",
+              "label": "2D/3D Zone graph",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-9666ef",
+          "label": "PRD Items",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-jg9pim",
+              "label": "Up Next",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-ou83gw",
+              "label": "Progress",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-t9tzgv",
+              "label": "Completed/In Progress/Pending",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-650ha7",
+              "label": "History",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-igz3rl",
+          "label": "Token Usage",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-x4yvsi",
+              "label": "Total Tokens",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-18rqlj",
+              "label": "Cost estimate",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-iy557j",
+              "label": "Major Models used",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        }
+      ]
+    },
+    {
+      "id": "grp-rex",
+      "kind": "folder",
+      "label": "Plan",
+      "children": [
+        {
+          "id": "rex-dashboard",
+          "kind": "item",
+          "icon": "▨",
+          "label": "Dashboard",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-012",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-prd-progress",
+                  "label": "PRD Progress",
+                  "width": 8,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-active-tasks",
+                  "label": "Active Tasks",
+                  "width": 4,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "prd",
+          "kind": "item",
+          "icon": "☑",
+          "label": "Tasks",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-013",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-prd-tree",
+                  "label": "PRD Tree",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "analysis",
+          "kind": "item",
+          "icon": "⌗",
+          "label": "Analyze & Import",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-014",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-proposals",
+                  "label": "Proposals",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "merge-graph",
+          "kind": "item",
+          "icon": "⧉",
+          "label": "Context Graph",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-015",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-merge-graph",
+                  "label": "Context Graph",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "validation",
+          "kind": "item",
+          "icon": "✔",
+          "label": "Validation",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-016",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-validation-report",
+                  "label": "Validation Report",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "requirements",
+          "kind": "item",
+          "icon": "⚖",
+          "label": "Requirements",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-017",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-requirements",
+                  "label": "Requirements Coverage",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "activity",
+          "kind": "item",
+          "icon": "⌚",
+          "label": "Activity",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-018",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-activity-log",
+                  "label": "Execution Log",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "integrations",
+          "kind": "item",
+          "icon": "🔗",
+          "label": "Integrations",
+          "flag": true,
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-019",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-integrations",
+                  "label": "Connected Services",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "previousLabel": "REX",
+      "collapsed": true,
+      "content": [
+        {
+          "id": "sec-vz7ne0",
+          "label": "(Won't be a dropdown)",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-vryi43",
+              "label": "Add Items",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-yiiogp",
+              "label": "Hotkeys/Work by epic",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-9odfb1",
+          "label": "History",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-84w07v",
+              "label": "Runs",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-scvnmh",
+          "label": "CLI help",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-7cygyz",
+              "label": "CLI buttons to run commands (with options and text fields)",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-2vtwba",
+              "label": "CLI reference",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-ya5hme",
+          "label": "Basic Planning Settings",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-lip0ih",
+              "label": "Planning specific Settings shortcut",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        }
+      ]
+    },
+    {
+      "id": "grp-hench",
+      "kind": "folder",
+      "label": "Work",
+      "children": [
+        {
+          "id": "hench-runs",
+          "kind": "item",
+          "icon": "▶",
+          "label": "Runs",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-020",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-run-history",
+                  "label": "Run History",
+                  "width": 8,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-live-output",
+                  "label": "Live Output",
+                  "width": 4,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hench-audit",
+          "kind": "item",
+          "icon": "☸",
+          "label": "Audit",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-021",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-task-audit",
+                  "label": "Task Audit",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hench-templates",
+          "kind": "item",
+          "icon": "▦",
+          "label": "Templates",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-022",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-templates",
+                  "label": "Prompt Templates",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hench-optimization",
+          "kind": "item",
+          "icon": "⚡",
+          "label": "Optimization",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-023",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-workflow-opt",
+                  "label": "Workflow Optimization",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hench-adaptive",
+          "kind": "item",
+          "icon": "♻",
+          "label": "Adaptive",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-024",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-adaptive",
+                  "label": "Adaptive Thresholds",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "previousLabel": "HENCH",
+      "collapsed": true,
+      "content": [
+        {
+          "id": "sec-ablwib",
+          "label": "(Won't be a dropdown)",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-jjt7rm",
+              "label": "Up Next Task (with run button)",
+              "width": 8,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-q4ni3y",
+              "label": "Auto run (epic/next task, etc.)",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-dl9r8w",
+          "label": "Templates",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-8uuual",
+              "label": "Copy of templates options",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-1pwefj",
+          "label": "Commands",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-ip895s",
+              "label": "Buttons and fields",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-drt9lu",
+              "label": "Reference",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-v3o62b",
+          "label": "Usage",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-0t6qql",
+              "label": "New panel",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new"
+            },
+            {
+              "id": "pnl-30kc4g",
+              "label": "New panel",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new"
+            },
+            {
+              "id": "pnl-fmmrdu",
+              "label": "New panel",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new"
+            },
+            {
+              "id": "pnl-2htbx0",
+              "label": "***Estimated total cost (curr/Estimate)?",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        }
+      ]
+    },
+    {
+      "id": "grp-commands",
+      "kind": "folder",
+      "label": "COMMANDS",
+      "children": [
+        {
+          "id": "command-reference",
+          "kind": "item",
+          "icon": "⌘",
+          "label": "All Commands",
+          "content": [
+            {
+              "id": "sec-025",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-command-ref",
+                  "label": "Command Reference",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "collapsed": true,
+      "content": []
+    },
+    {
+      "id": "grp-token-usage",
+      "kind": "folder",
+      "label": "TOKEN USAGE",
+      "children": [
+        {
+          "id": "token-usage",
+          "kind": "item",
+          "icon": "⊚",
+          "label": "Token Usage",
+          "statusBeforeRemoval": null,
+          "status": "removed",
+          "content": [
+            {
+              "id": "sec-026",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-usage-summary",
+                  "label": "Spend Summary",
+                  "width": 4,
+                  "kind": "blocks"
+                },
+                {
+                  "id": "pnl-usage-by-item",
+                  "label": "Usage by PRD Item",
+                  "width": 8,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "statusBeforeRemoval": null,
+      "status": "removed",
+      "collapsed": true,
+      "content": []
+    },
+    {
+      "id": "grp-settings",
+      "kind": "folder",
+      "label": "SETTINGS",
+      "children": [
+        {
+          "id": "llm-provider",
+          "kind": "item",
+          "icon": "🧠",
+          "label": "General",
+          "content": [
+            {
+              "id": "sec-027",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-llm-provider",
+                  "label": "LLM Provider",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "project-settings",
+          "kind": "item",
+          "icon": "▣",
+          "label": "ndx analyze / plan",
+          "content": [
+            {
+              "id": "sec-028",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-analyze-settings",
+                  "label": "Analysis Settings",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hench-config",
+          "kind": "item",
+          "icon": "▶",
+          "label": "ndx work",
+          "content": [
+            {
+              "id": "sec-029",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-work-settings",
+                  "label": "Agent Settings",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "notion-config",
+          "kind": "item",
+          "icon": "🔌",
+          "label": "ndx sync",
+          "flag": true,
+          "content": [
+            {
+              "id": "sec-030",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-sync-settings",
+                  "label": "Remote Sync",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "commands",
+          "kind": "item",
+          "icon": "📤",
+          "label": "ndx export / refresh",
+          "content": [
+            {
+              "id": "sec-031",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-export-settings",
+                  "label": "Export & Refresh",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "feature-toggles",
+          "kind": "item",
+          "icon": "📌",
+          "label": "Feature Flags",
+          "content": [
+            {
+              "id": "sec-032",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-feature-flags",
+                  "label": "Feature Flags",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "cli-timeouts",
+          "kind": "item",
+          "icon": "⏱",
+          "label": "CLI Timeouts",
+          "content": [
+            {
+              "id": "sec-033",
+              "label": "",
+              "collapsed": false,
+              "panels": [
+                {
+                  "id": "pnl-cli-timeouts",
+                  "label": "CLI Timeouts",
+                  "width": 12,
+                  "kind": "blocks"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "collapsed": false,
+      "content": []
+    }
+  ],
+  "activeViewId": "grp-hench"
+}
