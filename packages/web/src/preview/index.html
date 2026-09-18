@@ -474,6 +474,65 @@ body[data-mode="present"] .edit-hint { display: none !important; }
   var $ = function (id) { return document.getElementById(id); };
   var editing = function () { return document.body.dataset.mode === "edit"; };
 
+  /* ── Keeping your place ─────────────────────────────────────────────────
+     Every edit re-renders the whole tree, which by default drops the rail and
+     the page back to the top — unusable when the thing you are dragging is 20
+     rows down. Both scroll containers and the focused control are captured
+     before a render and put back after it, and the same positions are mirrored
+     into sessionStorage so an external change to the layout file (or a reload
+     for a document change) also comes back where you were. */
+
+  var SCROLL_KEY = "ndx-preview-scroll";
+
+  function scrollBoxes() {
+    return { sidebar: document.querySelector(".sidebar"), content: document.querySelector(".content") };
+  }
+
+  function captureScroll() {
+    var box = scrollBoxes();
+    return {
+      win: window.scrollY,
+      sidebar: box.sidebar ? box.sidebar.scrollTop : 0,
+      content: box.content ? box.content.scrollTop : 0,
+    };
+  }
+
+  function restoreScroll(pos) {
+    if (!pos) return;
+    var box = scrollBoxes();
+    if (box.sidebar) box.sidebar.scrollTop = pos.sidebar || 0;
+    if (box.content) box.content.scrollTop = pos.content || 0;
+    window.scrollTo(0, pos.win || 0);
+  }
+
+  function rememberScroll() {
+    try { sessionStorage.setItem(SCROLL_KEY, JSON.stringify(captureScroll())); } catch (e) { /* private mode */ }
+  }
+
+  function rememberedScroll() {
+    try { return JSON.parse(sessionStorage.getItem(SCROLL_KEY) || "null"); } catch (e) { return null; }
+  }
+
+  /**
+   * Identify the focused control well enough to find it again after the DOM is
+   * rebuilt: which row/panel/section it was in, and which button it was.
+   */
+  function captureFocus() {
+    var el = document.activeElement;
+    if (!el || el === document.body) return null;
+    var host = el.closest ? el.closest("[data-id]") : null;
+    if (!host) return null;
+    return { id: host.dataset.id, title: el.tagName === "BUTTON" ? el.title : null };
+  }
+
+  function restoreFocus(mark) {
+    if (!mark) return;
+    var host = document.querySelector('[data-id="' + mark.id + '"]');
+    if (!host) return;
+    var target = mark.title ? host.querySelector('button[title="' + mark.title + '"]') : host;
+    (target || host).focus({ preventScroll: true });
+  }
+
   /* ── Model helpers ──────────────────────────────────────────────────── */
 
   function uid(prefix) {
@@ -801,13 +860,12 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     row.appendChild(actions);
 
     // Clicking a row opens its page — folders included, so a section is a
-    // destination rather than only a container. The name is excluded: clicking
-    // it means "rename", and re-rendering would swallow what gets typed next.
-    row.addEventListener("click", function (e) {
-      if (e.target && e.target.isContentEditable) return;
+    // destination rather than only a container. Clicking the NAME navigates
+    // too and still places the caret, because selecting a view swaps the page
+    // instead of rebuilding the rail the click came from.
+    row.addEventListener("click", function () {
       if (node.id === layout.activeViewId) return;
-      layout.activeViewId = node.id;
-      commit();
+      setActiveView(node.id);
     });
 
     wireRowDrag(row, node);
@@ -1148,7 +1206,10 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     });
   }
 
-  function render() {
+  function render(keepPlace) {
+    var pos = keepPlace === false ? null : captureScroll();
+    var focus = keepPlace === false ? null : captureFocus();
+
     $("doc-title").textContent = layout.meta.title;
     $("doc-subtitle").textContent = layout.meta.subtitle;
     var root = $("nav-root");
@@ -1157,6 +1218,12 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     renderContent();
     renderChangeList();
     if (document.activeElement !== $("notes")) $("notes").value = layout.rationale || "";
+
+    restoreScroll(pos);
+    restoreFocus(focus);
+    // A second pass after layout settles: collapsing a section changes the
+    // scroll height, and the browser clamps scrollTop until it knows the new one.
+    if (pos) requestAnimationFrame(function () { restoreScroll(pos); });
   }
 
   /* ── Drag and drop ──────────────────────────────────────────────────── */
@@ -1364,12 +1431,32 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     el.title = detail || "";
   }
 
-  /** Apply the model to the DOM and schedule a write. `focusId` restores focus after a re-render. */
+  /**
+   * Open a view without a full render.
+   *
+   * Navigation changes exactly two things — which row is highlighted and what
+   * the page shows — so it touches exactly those. Re-rendering the tree here
+   * would destroy the element that was clicked, which is what made clicking a
+   * name swallow a rename and made the rail jump.
+   */
+  function setActiveView(id) {
+    layout.activeViewId = id;
+    document.querySelectorAll("#nav-root .row").forEach(function (row) {
+      row.classList.toggle("active", row.dataset.id === id);
+    });
+    renderContent();
+    // A new page starts at its own top; the rail keeps its position.
+    var content = document.querySelector(".content");
+    if (content) content.scrollTop = 0;
+    scheduleSave();
+  }
+
+  /** Apply the model to the DOM and schedule a write. `focusId` refocuses a row the keyboard just moved. */
   function commit(focusId) {
     render();
     if (focusId) {
       var el = document.querySelector('.row[data-id="' + focusId + '"]');
-      if (el) el.focus();
+      if (el) el.focus({ preventScroll: true });
     }
     scheduleSave();
   }
@@ -1527,6 +1614,12 @@ body[data-mode="present"] .edit-hint { display: none !important; }
 
   /* ── Live reload ────────────────────────────────────────────────────── */
 
+  /** The fingerprint is "<document stamp>|<layout stamp>" — the halves mean different things. */
+  function fingerprintParts(value) {
+    var bits = String(value || "").split("|");
+    return { doc: bits[0], layout: bits[1] };
+  }
+
   function poll() {
     fetch("/__preview/state", { cache: "no-store" })
       .then(function (r) { return r.json(); })
@@ -1534,7 +1627,31 @@ body[data-mode="present"] .edit-hint { display: none !important; }
         if (baselineFingerprint === null) { baselineFingerprint = s.fingerprint; return; }
         if (s.fingerprint === baselineFingerprint) return;
         if (Date.now() < suppressReloadUntil) return;  // our own save landing
-        location.reload();
+
+        var now = fingerprintParts(s.fingerprint);
+        var was = fingerprintParts(baselineFingerprint);
+
+        if (now.doc !== was.doc) {
+          // The document itself changed — styles or behaviour — so the page has
+          // to be re-fetched. Leave a breadcrumb so it comes back in place.
+          rememberScroll();
+          location.reload();
+          return;
+        }
+
+        // Only the layout changed: someone hand-edited the JSON, or another
+        // window saved. Swap the model and re-render — reloading here would
+        // throw away the scroll position for a change that does not need it.
+        baselineFingerprint = s.fingerprint;
+        fetch(API, { cache: "no-store" })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (data) {
+            if (!data) return;
+            layout = normalize(data);
+            render();
+            setSaveState("saved", "Reloaded from disk");
+          })
+          .catch(function () { /* next poll retries */ });
       })
       .catch(function () { /* server restarting — keep polling */ });
   }
@@ -1548,7 +1665,17 @@ body[data-mode="present"] .edit-hint { display: none !important; }
     if (savedMode === "present") $("mode-toggle").click();
   } catch (e) { /* private mode */ }
 
+  // Mirror the scroll position out to sessionStorage so a reload for a changed
+  // document lands where the reader was, not at the top.
+  var scrollTick = null;
+  document.addEventListener("scroll", function () {
+    if (scrollTick) return;
+    scrollTick = setTimeout(function () { scrollTick = null; rememberScroll(); }, 200);
+  }, true);
+  window.addEventListener("beforeunload", rememberScroll);
+
   load().then(function () {
+    restoreScroll(rememberedScroll());
     setInterval(poll, POLL_MS);
     poll();
   });
