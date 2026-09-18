@@ -1,5 +1,282 @@
 # @n-dx/core
 
+## 0.7.0
+
+### Minor Changes
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - New `ndx mcp <server> [dir]`: one MCP command that works whether or not the hub is running. When a hub is up and the repository is registered, it bridges stdio JSON-RPC frames to `/p/<id>/mcp/<server>` with `X-Ndx-Workspace` naming the worktree the editor was opened in, so one server per repository serves every editor, every worktree and the dashboard, and a tool call lands in the tree the editor is actually on. Otherwise it serves MCP in this process exactly as `ndx rex mcp .` always has — which is also what happens for an unregistered repository, outside a repository, or when the hub stops answering. The hub's port and project id come from the marker `ndx start` leaves in the directory, falling back to `~/.n-dx/config.json` and a registry lookup, so a hub started on a non-default port is still found. Diagnostics go to stderr only; stdout is the protocol.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx start` now registers the repository with the per-user hub by default and serves it at `http://localhost:3117/p/<id>/`; `--here` (or `web.mode: "here"`) gets the single-project server that owns the port. `ndx start stop` unregisters the worktree it runs in through the new `DELETE /api/hub/projects/:id/worktrees/:path` — the project keeps being served while another worktree is registered, and the last one unregisters the project and stops its server. A hub left with no projects exits, unless `hub.keepAlive` is set in `~/.n-dx/config.json`. `ndx start status` reports the hub (pid, port, uptime), the project (id, state, server pid and port, repository, registered worktrees) and the URL. New `ndx hub status` and `ndx hub stop` address the hub itself from any directory.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx start --hub` now writes `.n-dx-web.port` (the hub's port) and `.n-dx-web.pid` (`{ pid, port, startedAt, via: "hub", projectId }`) in the started directory, so `ndx refresh --live-server` keeps working unchanged: its reload signal reaches the hub, which forwards it to the project's own server. The reload body now carries `dir`; with several projects registered the hub matches it against each project's repository root and worktrees (deepest match wins), answering 409 without a directory and 404 for an unregistered one. `ndx start stop`, `ndx start status` and refresh's pre-flight recognise the hub marker and never stop the hub through it; `ndx start --here` over a marker takes the files over instead of killing the hub.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx start --hub` (or `web.mode: "hub"` in `.n-dx.json`) registers the repository with the per-user hub instead of starting a single-project server: it resolves the repository through `git worktree list` (main checkout as `repoRoot`, the started directory's checkout as the worktree), derives a stable project id from `.rex/config.json`'s `project` (hash-suffixed only on a clash with a different repository), starts the hub detached if `~/.n-dx/hub.pid` / `GET /api/hub/health` do not answer, registers via `POST /api/hub/projects`, and prints the `/p/<id>/` URL and MCP endpoints (`--open` opens the browser). `--here` forces today's single-project server, which remains the default until `stop`/`status` learn hub mode. `$N_DX_HOME` overrides `~/.n-dx`; `~/.n-dx/config.json` `hub.port` overrides 3117.
+
+### Patch Changes
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Write API keys to `.n-dx.local.json`, never to the shared `.n-dx.json`.
+  
+  `ndx config claude.api_key` (and `llm.claude/codex/google.api_key`) wrote the
+  key into `.n-dx.json` — the file that carries zone pins, the vendor and the
+  dashboard port, that the gitignore template calls safe to commit, and that
+  `ndx init` never gitignores. Only `*.cli_path` was routed to the gitignored
+  `.n-dx.local.json`; the help text itself said "stored in .n-dx.json — add to
+  .gitignore". One `git add -A` put the key on the remote. The 0600 chmod on the
+  file defends against other local users, not against git.
+  
+  `*.api_key` now joins `*.cli_path` in the local-only set. Every reader already
+  merged the local layer over the shared one (core `config.js`, `@n-dx/llm-client`
+  `loadClaudeConfig`/`loadLLMConfig`), so resolution is unchanged; the dashboard's
+  `/api/ndx-config` auth-method detection was the one reader that looked at
+  `.n-dx.json` alone and now merges too, so the footer keeps its ✓.
+  
+  For projects configured before this: every `ndx config` run warns on stderr
+  when `.n-dx.json` holds an `api_key`, naming the key and the fix. Re-setting the
+  key is the migration — it lands in the local file and the shared copy (and the
+  legacy `claude.*` mirror of an `llm.claude.*` key) is removed. `ndx ci` gains a
+  `config-secrets` step that fails when a git-tracked `.n-dx.json` contains an
+  `api_key` and warns when an untracked one does.
+  
+  Found by the 2026-09-11 adversarial security review (finding A).
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix eight defects found reviewing this branch: the hub's API now checks the
+  browser origin before registering a project (registration spawns a process);
+  the hub restates the forwarded `Origin` so dashboard mutations and WebSocket
+  upgrades work through the proxy in hub mode; the anchor's frames go out
+  untagged so the single-worktree dashboard updates live again;
+  `X-Ndx-Workspace` outranks the `/w/<key>/` slot, so the Workspaces board acts
+  on the worktree it names; `ndx start --here` relocates rather than SIGKILLing
+  the hub; the rex MCP path writes task claims (`claim_task`, `release_task`, and
+  on `in_progress`) instead of only reading them; workflow-template config
+  overlays go through the same allowlist as every other config writer; and a
+  malformed percent-escape in a URL no longer ends either server.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Prove the child-lifecycle kill paths against real OS processes.
+  
+  Every kill path in `packages/core/child-lifecycle.js` was covered exclusively by
+  `tests/unit/child-lifecycle.test.js`, which drives them through a fake
+  ChildProcess and injected signallers and asserts *which strategy ran*. Replace
+  any of those implementations with one that records the right signal and delivers
+  nothing and the suite still passes — so the module whose one job is not leaking
+  processes had no test proving it does not leak one. Two earlier items chose that
+  scope deliberately; the accumulated result was a foundation nothing verified.
+  
+  `tests/integration/terminate-tree-liveness.test.js` now watches real pids stop
+  answering `kill(pid, 0)`: `terminateTree` kills a detached child *and* its
+  grandchild through the process group; the direct-child fallback kills a child
+  leading no group; fixtures that install an empty SIGTERM handler prove the
+  escalation delivers a real SIGKILL rather than merely reaching its second phase;
+  and `terminateTreeByPid` kills a process, and a whole tree, addressed only by pid
+  with no ChildProcess handle held anywhere in the test process — a short-lived
+  launcher spawns the tree detached and exits, so it is reparented to init exactly
+  like the background server whose pid `ndx start stop` reads out of a file. Each
+  case was verified red against a no-op mutant of its own delivery site.
+  
+  The Windows `taskkill /T /F` path keeps its injected-argv assertions, and the
+  module header now says why: libuv puts a node-spawns-node tree in a global job
+  object that reaps it regardless, so a liveness assertion there would pass without
+  proving a kill reached anyone. That header also records which test proves which
+  path, so the next reviewer reads the coverage map instead of re-deriving it.
+  
+  No production behaviour changes. The real-process fixtures move to
+  `tests/helpers/real-process-tree.js`, shared with the late-arrival suite that had
+  its own copies.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx ci` now fails its config-secrets step when git is tracking `.n-dx.local.json`. That file holds every API key `ndx config` writes, and nothing protects it but the `.gitignore` entry — so trimming that line, negating it, or one `git add -f` put every vendor key on the remote while the step reported "no API keys in .n-dx.json" and passed. A tracked local file now fails on the fact of being tracked, whatever it holds, and the detail says to `git rm --cached` it, restore the ignore line and rotate any key it held. The step also no longer prints a tick above a failing run.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx export` no longer adds a git-tracked out-dir to `.gitignore`, and says what it decided either way. Exporting into a directory you commit on purpose — `--out-dir=docs/site` feeding your own Pages pipeline — used to append `docs/site/` to `.gitignore` with no output at all: the tracked files stayed tracked, but everything written there afterwards became invisible to `git status` and nothing said why. A tracked directory is now left alone with a notice, and an entry that is added is announced. `isGitTracked` moved to `gitignore.js`, beside the writer whose decision it governs.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx export` resolves the rex CLI from the installed package instead of spawning a bare `rex` from PATH. Without a globally linked binary the export failed at "pre-rendering PRD data" with `spawn rex ENOENT` before publishing any run record — in every clean install and in CI.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Ship `gitignore.js` in the published `@n-dx/core` tarball.
+  
+  `cli.js` and `export.js` import `./gitignore.js` (the shared
+  `ensureGitignoreEntry` helper), but the file was missing from `package.json`'s
+  `files` array, so an installed `@n-dx/core` would fail to load those modules.
+  Added it to `files`; `published-imports-resolved` now passes.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx work` prints one identity line before handing over to the agent: `ndx <version> · <cliPath> · <projectDir> · <branch>`. A run is the most expensive thing the CLI starts and the hardest to attribute afterwards — the run record says what happened but not which install produced it. The branch is read from the project directory, so it names the checkout the work lands on rather than the one n-dx runs from, and it is dropped outside a working tree. `--dry-run` prints it too; `--format=json`, `--quiet` and `-q` do not, since their output is parsed rather than read.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Make the explicit dashboard-port relocation test deterministic under concurrent CI port allocation.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx export` now publishes run records through an allowlist, not a denylist.
+  
+  `sanitizeRunForExport` deleted five named fields (`toolCalls`, `events`,
+  `error`, `diagnostics.promptSections`, `testGate.error`) and published
+  everything else verbatim. Everything else included the raw test-runner output
+  (`testGate.packages[].failureOutput`), post-run test output and error
+  (`structuredSummary.postRunTests.output` / `.error`), the literal command lines
+  the agent ran (`structuredSummary.commandsExecuted[].command`,
+  `testsRun[].command`), dependency-audit and cleanup error text, and
+  `diagnostics.notes[]`. The `runs.json` index was worse: it copied the whole
+  `structuredSummary` plus `error`. A failing test that printed an env dump, or an
+  agent `curl -H "Authorization: Bearer …"`, ended up in the static site while the
+  deploy manifest said transcripts were excluded — and `--deploy=github --yes`
+  force-pushed it.
+  
+  - `sanitizeRunForExport` copies only fields named in an explicit allowlist, so a
+    free-text field added to `RunRecord` later is excluded by default rather than
+    published by default. It keeps what the deployed viewer renders: identity,
+    timestamps, status, turns, summary, model/vendor/weight/`ndxVersion`, token
+    usage and per-turn totals, `structuredSummary.counts` and
+    `fileChangesWithStatus`, diagnostic labels, the test-gate verdict, review
+    counts.
+  - A new `summarizeRunForExport` builds the `runs.json` entries, mirroring the
+    live server's `toRunSummary`. It drops `error` (published only under
+    `--include-transcripts`) and stamps `transcriptOmitted`, and it now carries
+    `vendor`, `tokenDiagnosticStatus` and `invocationContext`, which the runs list
+    renders and the export previously omitted.
+  - `cliPath` (an absolute path on the operator's machine), `actor` (git name and
+    email) and `host` are no longer published.
+  - The deploy manifest and `ndx export --help` describe what is actually
+    withheld, including that the record is allowlisted.
+  - `tests/unit/export-sanitize.test.js` replaces every string leaf of a full
+    run-record fixture with a sentinel naming its own path and asserts the exact
+    set that survives, so a new leak fails without anyone remembering to deny it.
+    `tests/e2e/cli-export.test.js` asserts on the bytes actually written to
+    `api/hench/runs/<id>.json` and `api/hench/runs.json`.
+  
+  Found by the 2026-09-15 adversarial review of the September security fix branch.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx export` no longer publishes agent transcripts by default, and `--deploy=github` confirms before pushing.
+  
+  Every `.hench/runs/*.json` was copied verbatim into the static site —
+  `toolCalls[].input/output`, `events`, `error` bodies — and `--deploy=github`
+  force-pushed the result to `origin/n-dx-dashboard` with no prompt. A run that
+  had `cat`'d a `.env` or printed `process.env` put that on the remote; the
+  project's own discovery notes had already called this a blocker. The default
+  out-dir `./ndx-export` sat inside the repo and was not gitignored either.
+  
+  - Exported run records are passed through `sanitizeRunForExport`, which drops
+    `toolCalls`, `events`, `error`, `diagnostics.promptSections` and
+    `testGate.error`, keeps summaries and token usage, and stamps
+    `transcriptOmitted: true` so the static Task Audit view can say why the
+    transcript is absent. `--include-transcripts` opts back in.
+  - `--deploy=github` builds a manifest (remote, branch, run count, PRD item
+    count, transcript inclusion) and asks before doing any work. Without a TTY
+    it stops with exit 1 unless `--yes` is passed — nothing is written or pushed.
+  - `ndx init` and `ndx export` both add `ndx-export/` to `.gitignore`; the
+    shipped template carries it too. `ensureGitignoreEntry` moved to
+    `packages/core/gitignore.js` so both callers share it.
+  - The dashboard's `POST /api/commands/export` forwards `--yes` only when the
+    body carries `confirmDeploy: true` (set by the viewer's confirmation step)
+    and refuses a deploy request without it; `includeTranscripts: true` maps to
+    `--include-transcripts`. The confirmation dialog now says what is published.
+  
+  Found by the 2026-09-11 adversarial security review (finding B).
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Send the Gemini API key in the `x-goog-api-key` header, not the URL.
+  
+  Every Gemini request built the key into the URL query string
+  (`…/models/<model>:generateContent?key=<API_KEY>`, and `…/models?key=…` for
+  auth validation), where proxies, corporate egress logs, and any future
+  URL-logging path record it. The `n-dx config llm.google.api_key` validation
+  preflight (`packages/core/config.js`) did the same.
+  
+  All Gemini fetches — completions, streaming, tool calls, `validateAuth`, and the
+  config preflight — now pass the key as the `x-goog-api-key` request header and
+  build a key-free URL (streaming keeps `?alt=sse`). Same endpoints, same auth, no
+  behaviour change. A test asserts no request URL contains `key=` and the header
+  carries the key.
+  
+  Found by the 2026-09-11 adversarial security review (finding G).
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the local (LM Studio) per-request timeout configurable via `llm.local.timeoutMs`
+  
+  Local completions were bounded by a hardcoded 5-minute abort in three places — the
+  local API provider, hench's local tool loop, and the second-model verifier (60 s) —
+  so a slow local model failed with `NDX_CLI_TIMEOUT` no matter what the CLI-timeout
+  settings said. `cli.timeoutMs` / the "CLI Timeouts" page bound a whole command, not
+  an individual HTTP request, so setting them to unlimited had no effect on this path.
+  
+  All three now read `llm.local.timeoutMs` (default 300000, `0` = no timeout), settable
+  via `ndx config llm.local.timeoutMs <ms>` or the LLM Provider settings page. The
+  timeout error message now names the key to change.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `ndx which [dir]` — report which copy of n-dx is actually running.
+  
+  The package version is the same string in every checkout and every install, so `ndx --version` cannot distinguish a globally installed `ndx` from the worktree you are standing in. `ndx which` prints five fields instead: the version, the absolute path of the `cli.js` executing, the install kind (npm registry install, pnpm global link, or workspace checkout), the branch and short SHA of the install checkout when it is a git working tree, and the resolved project directory. `--json` emits the same record as one object, and `ndx --version --verbose` prints the identical report.
+  
+  Install kind distinguishes a globally linked checkout from one invoked directly by comparing `process.argv[1]` against the realpathed entry point — Node leaves the former as the symlink, so a global bin shim makes the two disagree. The command always exits 0: a missing `git`, or an install that is not a working tree, reports no git identity rather than failing.
+  
+  `which` is registered in `ndx --help`, has its own `ndx which --help` page, and appears in the dashboard's All Commands view under Setup — ungated, since identifying the CLI is most useful on a project that is not initialized yet.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Make the detached process-tree regression fixture use the active Node executable,
+  report shell launch errors, and clean up Windows fixture processes reliably.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Make the detached process-tree test wait for server startup before diagnosing its shell-launched child.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Surface the real grandchild launch failure in the detached process-tree test: the
+  fixture's shell now carries its background job's exit status (`wait` with no
+  operand always exits 0) and persists shell stderr, so a Node that the Windows
+  shell cannot start is reported as the executable error rather than a readiness
+  timeout. Fixture paths are absolute and `/`-separated, and the temp directory is
+  removed even when a fixture process survives teardown.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Prove cleanup-gated late child termination with real OS processes, including a
+  detached POSIX process group and its grandchild.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Reap child processes spawned after the cleanup gate has already run.
+  
+  `createChildProcessTracker`'s `cleanup()` terminated the children it knew about
+  at the moment it was called, then the process exited. But terminating the
+  in-flight child is precisely what unblocks whatever was awaiting it — so the
+  caller promptly spawned the next one, and that child was adopted into a set
+  nobody would drain again.
+  
+  `ndx ci` leaked one orphan per Ctrl-C this way: the gate SIGKILLed `sourcevision
+  analyze`, `runCapture` resolved, `runCI` advanced to `sourcevision validate`, and
+  the parent exited leaving that child reparented to PID 1. A sweep of one dev
+  machine found 31 of them across seven worktrees, holding 431 MB, the oldest alive
+  for over 11 hours — enough to push hench's memory monitor toward throttling later
+  autonomous runs.
+  
+  `register()` now refuses to adopt a child once cleanup has started and SIGKILLs
+  it instead — synchronously, and without the SIGTERM grace period, because the
+  grace period is exactly the window in which the parent exits first. This was a
+  production defect, not only a test-side leak; the test fix is the backstop.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A review pass that could not run no longer reports a completed, reviewed task
+  
+  `ndx work --review` is a gate, but a reviewer whose spawn failed (a stale vendor
+  CLI, a `--review-model` the installed binary rejects) left a run that reported
+  `completed`, committed, and said nothing — indistinguishable from a reviewer that
+  read the diff and found nothing.
+  
+  A reviewer that never started now refuses the completion: the run fails naming the
+  missing review, the task returns to `pending` (not deferred), the validated work is
+  left in the tree rather than rolled back, and the run does not count toward
+  stuck-task detection, because the usual cause is a config line rather than a defect
+  in the task. `--review-optional` downgrades the refusal to a warning.
+  
+  A reviewer that *did* run and only lost its report still warns, as before. Both the
+  end-of-run summary and `hench show` now carry a review line, so a run that was never
+  reviewed says so where the terminal output does not survive.
+  
+  Also fixes `run.review` being silently dropped whenever a run record was read back
+  from disk: the run-record schema did not declare the field, and zod strips what it
+  does not declare. `hench show` could not report whether a run was reviewed, and the
+  stuck-task exemption above could not see its own marker.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Stop an autonomous run that repeats the same tool call, and report its real counters while it runs (GH [#362](https://github.com/en-dash-consulting/n-dx/issues/362))
+  
+  A run could spend eighty minutes and sixteen million cache-read tokens repeating one cycle — relaunch the test suite, sleep, block on a background task whose process had died, re-read the same unchanged diff — and nothing caught it. `lastActivityAt` advances on every tool call and polling is a tool call, so the heartbeat monitor saw maximal activity, while the run record still said 0 turns and 0 tokens, so the dashboard drew it as idle.
+  
+  Both halves are fixed:
+  
+  - **Livelock detection.** Identical tool calls — same name, same arguments, and the same result where the provider exposes one — counted inside a sliding window, with any file-mutating call clearing the count. Six repeats with nothing written in between stops the run and names the repeated call. A fix loop that edits between two identical test runs is unaffected. Tunable via `hench.livelockThreshold` (0 disables).
+  - **Truthful heartbeats.** The CLI loop's in-flight turn and token counters are now folded onto the run record on every heartbeat, so a running task is no longer reported as 0/0.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Tree-kill descendants of children registered after cleanup has begun on Windows.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Skill runs measure their token usage from a mark written by code, not a timestamp typed by the model. New `hench usage mark --task=<id>` snapshots the Claude Code session transcript's cumulative usage and position when a task starts (`hench usage marks` lists pending ones); `hench record --task=<id>` then claims exactly the difference between that snapshot and the transcript at record time, per token class, printing both positions and a fresh-work subtotal beside the cache-read total. `--startedAt` is now the run's start time only (defaulting to the mark's) and never selects usage; `--since` remains an explicit window; `--mark=<id>` consumes a mark taken under another name. Without a mark the record falls back to the session watermark and warns, naming the mark command. Every shipped skill that records a run now marks at its first step instead of noting the time.
+- Updated dependencies [[`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`107e8c6`](https://github.com/en-dash-consulting/n-dx/commit/107e8c6a84cc9c23c41f9e6175e260b9dde07b8d), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`107e8c6`](https://github.com/en-dash-consulting/n-dx/commit/107e8c6a84cc9c23c41f9e6175e260b9dde07b8d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3)]:
+  - @n-dx/web@0.7.0
+  - @n-dx/hench@0.7.0
+  - @n-dx/rex@0.7.0
+  - @n-dx/llm-client@0.7.0
+  - @n-dx/sourcevision@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes

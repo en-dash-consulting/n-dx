@@ -1,5 +1,55 @@
 # @n-dx/llm-client
 
+## 0.7.0
+
+### Patch Changes
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Export `hasPosixShell` and `resolveShellKind` from `@n-dx/llm-client`. `resolveShellKind` is now the single source of the sh-vs-cmd.exe decision — `buildShellInvocation` derives its `kind` from it — so a caller that validates a command string before `execShellCmd` runs it (hench's command guard) asks the same question the same way.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Send the Gemini API key in the `x-goog-api-key` header, not the URL.
+  
+  Every Gemini request built the key into the URL query string
+  (`…/models/<model>:generateContent?key=<API_KEY>`, and `…/models?key=…` for
+  auth validation), where proxies, corporate egress logs, and any future
+  URL-logging path record it. The `n-dx config llm.google.api_key` validation
+  preflight (`packages/core/config.js`) did the same.
+  
+  All Gemini fetches — completions, streaming, tool calls, `validateAuth`, and the
+  config preflight — now pass the key as the `x-goog-api-key` request header and
+  build a key-free URL (streaming keeps `?alt=sse`). Same endpoints, same auth, no
+  behaviour change. A test asserts no request URL contains `key=` and the header
+  carries the key.
+  
+  Found by the 2026-09-11 adversarial security review (finding G).
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `listWorktrees(cwd)` to `@n-dx/llm-client`: an async helper that parses `git worktree list --porcelain` into `{ path, branch, head, isMain, detached, bare }` entries with realpath-resolved paths, returning `[]` when git is missing or `cwd` is not a repository. Re-exported through hench's `llm-gateway`.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - fix(llm-client): stop dropping documented llm.local settings at load time
+  
+  `extractLocalConfig` whitelists keys, and it only copied `host`, `port`,
+  `model`, and `lightModel`. Every other documented `llm.local` setting —
+  `timeoutMs`, `maxContextTokens`, `reviewModel`, and the `verifier` block —
+  was silently discarded on load: operators set them in `.n-dx.json`, the
+  loader dropped them, and the local loop ran on its defaults with no error
+  anywhere. Notably this made `llm.local.timeoutMs` (the configurable request
+  timeout for slow local models) inert when set via config.
+  
+  All documented `LocalConfig` fields now survive the load, including
+  `timeoutMs: 0` (wait indefinitely), which must not be dropped by a truthiness
+  check. The verifier block is validated field-by-field like the rest.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the local (LM Studio) per-request timeout configurable via `llm.local.timeoutMs`
+  
+  Local completions were bounded by a hardcoded 5-minute abort in three places — the
+  local API provider, hench's local tool loop, and the second-model verifier (60 s) —
+  so a slow local model failed with `NDX_CLI_TIMEOUT` no matter what the CLI-timeout
+  settings said. `cli.timeoutMs` / the "CLI Timeouts" page bound a whole command, not
+  an individual HTTP request, so setting them to unlimited had no effect on this path.
+  
+  All three now read `llm.local.timeoutMs` (default 300000, `0` = no timeout), settable
+  via `ndx config llm.local.timeoutMs <ms>` or the LLM Provider settings page. The
+  timeout error message now names the key to change.
+
 ## 0.6.0
 
 ### Patch Changes

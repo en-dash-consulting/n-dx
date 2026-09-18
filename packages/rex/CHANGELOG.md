@@ -1,5 +1,317 @@
 # @n-dx/rex
 
+## 0.7.0
+
+### Minor Changes
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Add a cross-worktree task claims store, `openClaimsStore(projectDir)`, kept at `<git common dir>/ndx/claims.json` so every worktree of a repository sees the same claims (and git never tracks it). A claim carries the task id, the worktree root, the holder's pid, host and expiry (default 4 h); it is live while the pid exists and has not expired, and dead or expired claims are ignored by readers and pruned by the next writer. Writes hold an advisory `claims.lock` and land by atomic rename, so two processes claiming at once see one winner. Outside a git repository the store is a no-op and behaviour is unchanged.
+
+### Patch Changes
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix eight defects found reviewing this branch: the hub's API now checks the
+  browser origin before registering a project (registration spawns a process);
+  the hub restates the forwarded `Origin` so dashboard mutations and WebSocket
+  upgrades work through the proxy in hub mode; the anchor's frames go out
+  untagged so the single-worktree dashboard updates live again;
+  `X-Ndx-Workspace` outranks the `/w/<key>/` slot, so the Workspaces board acts
+  on the worktree it names; `ndx start --here` relocates rather than SIGKILLing
+  the hub; the rex MCP path writes task claims (`claim_task`, `release_task`, and
+  on `in_progress`) instead of only reading them; workflow-template config
+  overlays go through the same allowlist as every other config writer; and a
+  malformed percent-escape in a URL no longer ends either server.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Calibrate the uncommitted-work guards so autonomous runs stop refusing their own PRD writes.
+  
+  Three defects, all of which made a run refuse on dirt its own code had just
+  produced.
+  
+  **The between-task guard stopped every loop at its first failed task.** It
+  discounted nothing but hench's runtime artifacts, on the premise that an
+  uncommitted `.rex/prd_tree/` meant the previous task's status write never
+  landed. That only holds for a task that *succeeded*: every failure path writes
+  a `deferred`/`pending` status and commits nothing, because both committers run
+  only for a completed run and the rollback never reverts unattended. So the
+  first deferred, failed or timed-out task stopped the loop outright, and the
+  consecutive-failure counter and stuck-task skipping were unreachable. The
+  guard now discounts the PRD paths; the completion gate in `finalizeRun` still
+  covers the case that is real leakage.
+  
+  **`.rex/tree-meta.json` refused every completion.** Every folder-tree save
+  rewrites the tracked sidecar, and where the committed copy predates the schema
+  marker the rewrite changes its bytes. It is not a hench runtime artifact and
+  not under `.rex/prd_tree/`, so it was discounted by neither gate and staged by
+  neither committer — the first PRD write of any run left it dirty and the
+  completion gate refused every task from then on. It is now a PRD commit path
+  everywhere the tree is, off a single `TREE_META_FILENAME` constant exported by
+  rex so the staging, discounting and skipping sites cannot drift apart.
+  
+  **`--epic-by-epic` had no between-task guard at all.** It iterates tasks in its
+  own loop, which was never wired to the guard, so the work-tangling the guard
+  exists to prevent still happened there. It now runs the same check before every
+  task but the first of the invocation, counted across epics.
+  
+  Also fixes the porcelain reader underneath all three. `git status --porcelain`
+  output was split with `output.trim()`, which strips the leading space of the
+  *first* line only — and that space is the blank index column of an unstaged
+  change. The first entry's path parsed one character short, matching no discount
+  rule, and its worktree column was read as the index column, so a ` M` file
+  masqueraded as staged and was discounted outright. Whichever entry git listed
+  first was the one corrupted, which is why it looked intermittent.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Completion no longer cascades over an in_progress parent or outside the run's subtree ([#368](https://github.com/en-dash-consulting/n-dx/issues/368))
+  
+  A run that hit the account session limit on turn 1 — status failed, 1 turn,
+  zero tool calls, no changes; the agent never ran — nonetheless closed a task
+  and an epic belonging to another user, in an epic it had never touched, and
+  rewrote `lastModifiedBy` on both to whoever was running the command. The task
+  was an open investigation with unmet acceptance criteria whose single subtask
+  happened to be completed. It was caught only because the run left the tree
+  dirty and someone read the diff.
+  
+  Three independent things had to be true for that to happen, and all three are
+  now fixed:
+  
+  - **An `in_progress` parent is no longer auto-completed by a child
+    transition.** `AUTO_COMPLETABLE_STATUSES` is `{pending}`;
+    `in_progress` is a deliberate claim that the parent has work of its own.
+    `remove-task.ts` now imports that set rather than keeping a second copy.
+    `rex status`'s auto-completable *hint* still lists `in_progress` parents, so
+    one that really has finished is surfaced for a human to confirm.
+  - **A cascade cannot leave the subtree the run is operating on.**
+    `reconcileAutoCompletions` takes `{ ancestorsOf }`, which confines its
+    whole-tree self-healing sweep to that item's ancestor chain; an unrecognised
+    id contains it to nothing rather than degrading to a full sweep. Hench's
+    `rex_update_status` passes the task it was asked to update.
+  - **A cascade no longer rewrites authorship.** New
+    `WriteOptions.preserveModifiedBy` keeps an item's existing `lastModifiedBy`
+    while still stamping `lastModified`; every cascade write site (hench's tool,
+    `rex update`, the `update_task_status` MCP tool, `rex remove`) sets it. Both
+    local stores and all four remote adapters honour it, and it survives the
+    transaction-level stamp in `stampChangedItems`.
+  
+  This is distinct from [#364](https://github.com/en-dash-consulting/n-dx/issues/364), which narrowed which *child* statuses count as
+  done. Here the child genuinely is completed, so that predicate was satisfied
+  and the cascade still fired. Both guards are needed; the module header of
+  `core/parent-completion.ts` records why they must not be merged.
+  
+  Also declares `lastModified` / `lastModifiedBy` on `PRDItem`. Both were
+  already written by every store adapter but reached readers as `unknown`
+  through the index signature.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix cross-worktree task claims under the dashboard and hub MCP endpoints. A
+  claim's owner is now its worktree alone; the pid is only a liveness check.
+  `ndx start` runs one rex MCP server per workspace inside a single process, so
+  every worktree's claim carried that one pid — and an ownership test that
+  accepted a matching pid let two worktrees hold the same task, let either
+  release the other's claim, and silenced the dashboard's own "another worktree
+  is working on this" refusal. `ClaimsStore.release` and `isClaimedByOther` now
+  take the asking worktree rather than a pid.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Ensure retried PRD snapshots cannot retain entries from failed partial copies.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Task selection is claim-aware across worktrees. `hench run` (what `ndx work` spawns) claims the task it selects — before the brief and any LLM turn — and releases it when the run ends (completed, failed, cancelled by Ctrl-C, or thrown); an explicit `--task` another worktree holds is refused with the holder's worktree, and a retry in the worktree that already holds a task takes the claim over. `rex next`, the `get_next_task` MCP tool and hench's autoselection pass over tasks other worktrees hold (`skippedClaimed` in JSON output, one line per task under `--verbose`), and `findNextTask` / `findActionableTasks` accept `excludeIds`. The dashboard's execute route answers 409 with `claimedBy` when another worktree holds the task. Outside a git repository nothing changes.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Share the update-stamping rule across the six store adapters, and stop `rex next`
+  calling a deferred child "completed".
+  
+  Every `updateItem` implementation carried a pasted copy of the same three lines:
+  merge `updates` onto the existing item, then stamp it, choosing the author with
+  a `options?.preserveModifiedBy ? existing.lastModifiedBy : undefined` ternary.
+  Six copies — the folder-tree store, the Asana, Jira, GitHub Projects and Notion
+  adapters, and a partial-update variant in the file adapter, which had already
+  diverged. `stampUpdatedItem` and `stampUpdatedFields` in `core/sync.ts` now hold
+  it once, over a single private `updateActor` rule, so the `preserveModifiedBy`
+  behaviour ([#368](https://github.com/en-dash-consulting/n-dx/issues/368)) can be corrected in one place.
+  
+  `explainSelection` announced "all children completed, ready to finalize" off an
+  inline `completed || deferred` check. That is the [#364](https://github.com/en-dash-consulting/n-dx/issues/364) misreport exactly: [#364](https://github.com/en-dash-consulting/n-dx/issues/364)
+  narrowed `SUCCESSFUL_CHILD_STATUSES` to `{completed}` precisely so a deferred
+  child would stop counting as done, and this copy was missed. It now calls
+  `allChildrenSuccessful`, so a parent with a deferred child is described at its
+  priority rather than as ready to finalize.
+  
+  No behaviour change beyond that one summary line.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Fall back to atomic directory lock publication on filesystems without hard-link support.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - fix(rex): close two cross-process TOCTOU holes in the PRD file lock
+  
+  Follow-up to the dead-PID-only staleness fix: auditing the flaky
+  `import-bundle-transaction` failure surfaced two remaining ways a live
+  writer's lock could be deleted under full-suite load, each admitting a second
+  writer into the critical section — the exact lost-update the stale-save guard
+  keeps catching.
+  
+  - **Mid-creation reads.** `tryAcquire` creates the lock with `writeFile(…,
+    {flag:"wx"})` — open, then write. A waiter reading between the two syscalls
+    saw an empty file, decoded it as "malformed = stale", and unlinked a live
+    writer's lock. Malformed is now confirmed after a 100ms grace re-read: a
+    corpse stays malformed, a mid-creation lock becomes valid.
+  
+  - **Cleanup races.** Two waiters could both judge the same corpse stale; the
+    faster one unlinked it and created its own lock, and the slower one's
+    unlink then landed on the fresh lock. Stale removal is now claim-by-rename
+    to a waiter-unique tombstone (exactly one racing rename succeeds) with
+    content verification against the bytes the staleness judgment was made on —
+    a removal armed with a stale judgment can no longer delete a lock that has
+    since been replaced.
+  
+  Both paths are pinned by new unit tests in `file-lock.test.ts`, including the
+  late-cleaner regression and the mid-creation window frozen in place.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex fix` now reopens parents to `pending` and can heal stuck parents.
+  
+  Two follow-ups from the PR [#370](https://github.com/en-dash-consulting/n-dx/issues/370) review:
+  
+  - **Reopen to `pending`, not `in_progress`.** Since [#368](https://github.com/en-dash-consulting/n-dx/issues/368) made `in_progress` an explicit claim that auto-completion refuses to touch, a parent the repair tool reopened to `in_progress` could never close again when its last child finished. `rex fix` now uses the codebase's reopen convention, matching `cascadeParentReset`.
+  - **`fix/` shares the real child predicate.** It kept a private terminal-status set that still counted `deferred` as done, so `rex validate` warned about a completed parent with a deferred child while `rex fix` proposed nothing for it. Both now read `SUCCESSFUL_CHILD_STATUSES`, so fix repairs exactly what validate warns about.
+  - **New `stuck_parent` fix kind.** A `pending` parent whose children are all `completed` is now completed (with `completedAt`), bottom-up. This is the operator-facing path to the whole-tree reconciliation that agent runs stopped performing when [#368](https://github.com/en-dash-consulting/n-dx/issues/368) scoped every run-path sweep to the run's own ancestors.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - PRD lock release now deletes only on positive proof of ownership. It previously
+  unlinked the lock whenever its content failed to decode, which would remove a
+  replacement lock published by a build whose lock shape this one cannot parse —
+  an unlink of a live foreign holder, from the one code path in the module that
+  still deletes a lock it had not verified as its own. Undecodable content is
+  absence of evidence, not evidence of ownership, so such a lock is now left in
+  place for the same manual cleanup every other unowned lock gets.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Do not auto-complete an epic that still has deferred, blocked, or failing children ([#364](https://github.com/en-dash-consulting/n-dx/issues/364))
+  
+  Auto-completion treated `deferred` as terminal alongside `completed`, so an
+  epic with a deferred child could be reported done while the work was not.
+  That happened live: an epic was marked completed with three of five children
+  in `deferred` after a session-limit interruption, while one of the deferred
+  tasks left a half-finished MCP-registration migration in place — reported as
+  done.
+  
+  Auto-completion now treats only `completed` as a successful terminal state.
+  `deferred`, `blocked`, and `failing` children all block a parent from
+  auto-completing. The predicate (`SUCCESSFUL_CHILD_STATUSES` /
+  `allChildrenSuccessful` in `core/parent-completion.ts`) is now the single
+  source of truth, reused by `findAutoCompletions`, `reconcileAutoCompletions`,
+  `removeTask`'s post-removal auto-completion check, the `rex status`
+  auto-completable section, and the structural health check that flags a
+  completed parent with non-terminal children.
+  
+  Also closed a related gap: `findAutoCompletions` unconditionally treated its
+  triggering item as done, even when that item's own new status was `deferred`
+  rather than `completed` — reintroducing the same bug through a different
+  path. It now only seeds the cascade when the triggering item actually
+  completed successfully.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Publish PRD lock files atomically so concurrent writers cannot enter the same
+  critical section.
+  
+  The lock was created directly with `writeFile(..., {flag: "wx"})`, which made
+  its public name visible before the JSON body was written. A competing process
+  could read that transient empty file as malformed, reclaim the live lock, and
+  write alongside its owner. Lock acquisition now writes the complete body to a
+  unique sibling file and atomically links it into place; an existing public lock
+  still reports contention through `EEXIST`.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Stop automatically deleting stale PRD lock files because a concurrent writer can replace the inspected lock before path-based cleanup runs. Crashed-writer locks now fail loudly with the existing manual-cleanup guidance.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Retry lock acquisition when a contending lock is released during inspection.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `rex fix` now repairs nested parent/child misalignment in one run. On epic(completed) → feature(completed) → task(pending) it judged the epic while the feature still read `completed`, so it reopened only the feature, reported "Fixed 1 issue", and left the epic completed above a pending child — the very inconsistency it exists to find, needing a second run to reach the epic and a third to confirm clean. Misalignment is now decided bottom-up, reading each child's status as the same pass will leave it, so every falsely-completed ancestor is found together and the dry-run plan matches what the run does however deep the nesting goes.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix a PRD-lock race that let two concurrent writers interleave.
+  
+  `acquireLock` creates the lock file with `O_EXCL` and then writes its JSON, so
+  for a microsecond the lock file exists but is empty. A second process that hit
+  `EEXIST` and read it in that window got `""`, and `isLockStale` treated
+  unparseable content as stale — so it unlinked the live writer's lock and
+  entered the critical section alongside it. Two concurrent `rex import-bundle`
+  runs then interleaved and the second save was rejected by the stale-save guard
+  ("this save would delete 1 item written after the document being saved was
+  loaded"), the intermittent `pnpm test` failure tracked as the rex flake.
+  
+  `isLockStale` no longer treats an empty or unparseable lock as stale: a lock
+  mid-creation becomes readable within a retry, and a genuinely corrupt one keeps
+  failing to parse so the waiter times out loudly (naming the file to delete)
+  rather than interleaving silently — the same "reclaim only on proof the owner
+  is gone" rule the dead-PID path already follows. Reproduced 1-in-~15 before,
+  0-in-60 after; two regression tests pin that an empty and a garbage lock file
+  are waited on, not stolen.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Make next-task parent selection use the shared completed-child predicate.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `SelectionExplanation` now carries a machine-readable `reason` (`in_progress` | `ready_to_finalize` | `priority`) alongside its rendered `summary`. Hench's task header branches on that code instead of substring-matching rex's prose, so rewording the summary no longer silently degrades a finalize-ready parent's label to "medium priority".
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - PRD tree snapshots no longer abort when another process is mid-write.
+  
+  `snapshotPRDTree` copies `.rex/prd_tree/` before the PRD lock is taken, so a
+  concurrent writer can change the tree under it. An atomic writer's
+  `<file>.<pid>.<uuid>.tmp` that existed when `cp` read the directory and was
+  renamed away before it stat'd the entry raised `ENOENT`, and the snapshot guard
+  turned that into a refused command — `rex import-bundle` failing because some
+  unrelated process had finished a write.
+  
+  The copy now filters those temp files out of the walk (they are not PRD content
+  and must never appear in a rollback point), and re-walks the tree if any other
+  entry vanishes mid-copy, so a save's stale-directory sweep cannot fail a
+  snapshot either. A persistent error still fails loudly rather than producing an
+  incomplete rollback point.
+  
+  The temp-path shape is now built and recognised by one pair of helpers next to
+  the atomic writer (`atomicWriteTempPath` / `isAtomicWriteTempPath`), replacing
+  three hand-rolled copies of the same template string.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - Stale-save guard: a relocation cleanup must match the file's load-time identity
+  
+  The guard's relocation exemption admitted any newer deletion candidate whose item id
+  appeared in the document being saved. That covered same-writer leaf-to-folder promotion,
+  but also let a stale mover delete a source file another writer had edited since the
+  snapshot loaded — the stale copy landed at the destination and the edit was lost with no
+  error. `parseFolderTree` now records a content digest per item file, `serializeFolderTree`
+  accepts it as `loadedFiles` and requires the source file to still match before allowing
+  the relocation, and returns fresh digests after each save so a same-writer follow-up save
+  needs no reload. Both stores carry the map between load and save.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - fix(rex): stale-save guard no longer fires on same-writer leaf promotions
+  
+  Root cause of the intermittent web-route 400s (`capture-next-steps`,
+  `capture-ask`, `accept-edited` flaking under the full suite): the stale-save
+  guard judged deletions by mtime alone. When a handler adds an epic and then
+  its first child in back-to-back transactions, the promotion from `<slug>.md`
+  to `<slug>/index.md` removes a file the same writer created milliseconds
+  earlier — and under Windows timestamp granularity that leaf's mtime can
+  postdate the second transaction's load, so the guard vetoed a save that
+  deleted nothing and the route returned 400.
+  
+  The guard now flags an entry only when it contains a file that is both newer
+  than the load AND carries an item id absent from the document being saved —
+  a relocation keeps its item, a genuine concurrent write does not. Newer files
+  with no parseable id stay protected by mtime alone, and directory mtimes are
+  ignored (they bump on any child rename and identify nothing). All existing
+  guard contracts hold; the promotion case and the id-absent case are pinned by
+  new tests with the pathological clock frozen in place via `utimes`.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `rex status` no longer tells you to run `rex fix` for parents `rex fix` will not touch. The auto-completable hint now splits pending parents (which `rex fix` closes) from `in_progress` ones (an explicit claim only a human should close), so a PRD whose only auto-completable parents are `in_progress` gets the `rex update` instruction instead of a repair that reports "No issues found."
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - feat(rex): `rex status` (and `ndx status`) shows the last work cycle
+  
+  The status tree now ends with a "Last work cycle" section: which tasks the
+  most recent `ndx work` / `--auto` / `--loop` invocation completed, failed
+  (labelled with timeout / budget exceeded / transient error where that is the
+  reason), and skipped (cancelled), plus a counts line. Previously the operator
+  had to dig through `.hench/runs/` JSON or `.run-logs/` to reconstruct what
+  the last cycle actually did.
+  
+  The section is derived from the run records hench already persists under
+  `.hench/runs/` — read as data files, following the precedent in
+  `core/token-usage.ts` — so history survives across sessions with no new
+  state. Records carry no batch id, so a cycle is reconstructed from timing:
+  runs cluster while the gap from one run's finish to the next run's start
+  stays within 30 minutes (loop pauses are seconds; separate invocations are
+  usually hours apart).
+  
+  Human tree view only — the JSON, `--quiet`, `--tree`, and `--group-by`
+  output contracts are unchanged, and a project with no run history shows no
+  section at all.
+- Updated dependencies [[`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d)]:
+  - @n-dx/llm-client@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes
