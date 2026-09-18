@@ -284,15 +284,24 @@ test("an external layout edit refreshes in place instead of reloading", async ({
     return el.scrollTop;
   });
 
-  // Hand-edit the layout file the way someone would in an editor.
-  const layout = await savedLayout();
+  // Hand-edit the layout file the way someone would in an editor. The rail is
+  // asserted rather than a page section: the rail is visible whatever view the
+  // layout last saved as active, so the test does not depend on where the
+  // previous editing session left off.
+  const original = await savedLayout();
+  const layout = JSON.parse(JSON.stringify(original));
   const analysis = findNode(layout.nav, "Analysis");
-  analysis.content[0].label = "Repository facts";
+  analysis.label = "Analysis (from disk)";
   await writeFile(join(dir, "index.layout.json"), JSON.stringify(layout, null, 2), "utf-8");
 
-  await expect(page.locator('.pgroup .label:text-is("Repository facts")')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('.row-folder .label:text-is("Analysis (from disk)")')).toBeVisible({ timeout: 8_000 });
   expect(navigations).toBe(1);   // the initial goto, and nothing since
   expect(await page.locator(".content").evaluate((el: HTMLElement) => el.scrollTop)).toBe(scrolled);
+
+  // Put the name back: tests in the same worker share this server and its
+  // layout file, and the others look the section up by its shipped name.
+  await writeFile(join(dir, "index.layout.json"), JSON.stringify(original, null, 2), "utf-8");
+  await expect(page.locator('.row-folder .label:text-is("Analysis")')).toBeVisible({ timeout: 8_000 });
 });
 
 test("cutting a panel marks it before deleting it", async ({ page }) => {

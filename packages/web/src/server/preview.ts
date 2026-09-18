@@ -19,7 +19,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { writeFile, rename, unlink } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -139,7 +139,28 @@ function stamp(path: string): string {
  * it just produced and the page adopts it as the new baseline.
  */
 function docFingerprint(docPath: string): string {
-  return `${stamp(docPath)}|${stamp(layoutPathFor(docPath))}`;
+  return `${stamp(docPath)}${siblingPagesStamp(docPath)}|${stamp(layoutPathFor(docPath))}`;
+}
+
+/**
+ * Stamps of the other HTML pages beside the document, so editing a sibling
+ * demo page reloads a browser that has it open. Folded into the "document"
+ * half of the fingerprint: to the main page a sibling change looks like a code
+ * change, and a reload there is harmless — it only happens while someone is
+ * actively editing that sibling.
+ */
+function siblingPagesStamp(docPath: string): string {
+  try {
+    const dir = dirname(docPath);
+    const self = basename(docPath);
+    return readdirSync(dir)
+      .filter((name) => name !== self && name.toLowerCase().endsWith(".html"))
+      .sort()
+      .map((name) => `+${stamp(join(dir, name))}`)
+      .join("");
+  } catch {
+    return "";
+  }
 }
 
 /** The polling reload snippet injected into the served document. */
@@ -333,6 +354,13 @@ export async function startPreviewServer(
     const sibling = resolveSibling(docDir, urlPath);
     if (sibling) {
       try {
+        // A sibling HTML page (a second mock-up, a filled-in demo of the same
+        // layout) gets the same live reload as the main document, so iterating
+        // on it works the same way. Non-HTML assets are served as-is.
+        if (extname(sibling).toLowerCase() === ".html") {
+          send(res, 200, withReloadSnippet(readFileSync(sibling, "utf-8"), reloadIntervalMs), MIME_TYPES[".html"]);
+          return;
+        }
         send(res, 200, readFileSync(sibling), MIME_TYPES[extname(sibling).toLowerCase()] ?? "application/octet-stream");
       } catch (err) {
         send(res, 500, `Failed to read ${sibling}: ${(err as Error).message}`, "text/plain; charset=utf-8");

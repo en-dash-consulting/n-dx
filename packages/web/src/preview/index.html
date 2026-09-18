@@ -89,7 +89,7 @@ body {
 .doc-spacer { flex: 1; }
 .doc-tabs { display: flex; gap: var(--space-1); }
 .doc-tab, .btn, .icon-btn {
-  font: inherit; color: var(--text-dim); background: transparent;
+  font: inherit; color: var(--text-dim); background: transparent; text-decoration: none;
   border: 1px solid transparent; border-radius: var(--radius-md);
   padding: 5px var(--space-3); cursor: pointer;
 }
@@ -363,6 +363,7 @@ body[data-mode="present"] .edit-hint { display: none !important; }
   <span class="save-state" id="save-state" data-state="idle">loading</span>
   <button class="btn" id="mode-toggle" aria-pressed="true" title="Hide editing chrome to show the result">Editing</button>
   <button class="btn" id="copy-json" title="Copy the layout JSON to the clipboard">Copy JSON</button>
+  <a class="btn" href="./option1-demo.html" target="_blank" rel="noopener" title="The option 1 layout filled with this repo's real data, as if it were live">Demo ↗</a>
   <div class="doc-tabs" role="tablist">
     <button class="doc-tab" role="tab" aria-selected="true" data-tab="tab-layout">Layout</button>
     <button class="doc-tab" role="tab" aria-selected="false" data-tab="tab-rationale">Rationale <span id="change-count" class="chip" hidden></span></button>

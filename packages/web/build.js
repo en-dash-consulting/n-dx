@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -156,13 +156,15 @@ function copyPreview() {
   if (!existsSync(resolve(previewSrcDir, "index.html"))) return;
   const previewOutDir = resolve(__dirname, "dist/preview");
   mkdirSync(previewOutDir, { recursive: true });
-  // index.layout.json carries the structure the document renders; without it a
-  // published install would open to an empty shell.
-  for (const file of ["index.html", "index.layout.json"]) {
-    const src = resolve(previewSrcDir, file);
-    if (existsSync(src)) copyFileSync(src, resolve(previewOutDir, file));
+  // Every page and data file in the folder ships: index.layout.json carries the
+  // structure the editor renders (without it a published install opens to an
+  // empty shell), and sibling pages such as option1-demo.html are reachable
+  // from the editor's header.
+  for (const file of readdirSync(previewSrcDir)) {
+    if (!/\.(html|json)$/.test(file)) continue;
+    copyFileSync(resolve(previewSrcDir, file), resolve(previewOutDir, file));
   }
-  console.log("Copied preview: dist/preview/index.html");
+  console.log("Copied preview: dist/preview/");
 }
 
 async function buildProduction() {

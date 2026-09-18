@@ -723,17 +723,19 @@
           "panels": [
             {
               "id": "pnl-vryi43",
-              "label": "New panel",
+              "label": "Add Items",
               "width": 6,
               "kind": "blocks",
-              "status": "new"
+              "status": "new",
+              "previousLabel": "New panel"
             },
             {
               "id": "pnl-yiiogp",
-              "label": "New panel",
+              "label": "Hotkeys/Work by epic",
               "width": 6,
               "kind": "blocks",
-              "status": "new"
+              "status": "new",
+              "previousLabel": "New panel"
             }
           ],
           "previousLabel": "New section"
@@ -747,6 +749,48 @@
             {
               "id": "pnl-84w07v",
               "label": "Runs",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-scvnmh",
+          "label": "CLI help",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-7cygyz",
+              "label": "CLI buttons to run commands (with options and text fields)",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-2vtwba",
+              "label": "CLI reference",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-ya5hme",
+          "label": "Basic Planning Settings",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-lip0ih",
+              "label": "Planning specific Settings shortcut",
               "width": 12,
               "kind": "blocks",
               "status": "new",
@@ -886,7 +930,113 @@
       ],
       "previousLabel": "HENCH",
       "collapsed": true,
-      "content": []
+      "content": [
+        {
+          "id": "sec-ablwib",
+          "label": "(Won't be a dropdown)",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-jjt7rm",
+              "label": "Up Next Task (with run button)",
+              "width": 8,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-q4ni3y",
+              "label": "Auto run (epic/next task, etc.)",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-dl9r8w",
+          "label": "Templates",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-8uuual",
+              "label": "Copy of templates options",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-1pwefj",
+          "label": "Commands",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-ip895s",
+              "label": "Buttons and fields",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-drt9lu",
+              "label": "Reference",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-v3o62b",
+          "label": "Usage",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-0t6qql",
+              "label": "New panel",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new"
+            },
+            {
+              "id": "pnl-30kc4g",
+              "label": "New panel",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new"
+            },
+            {
+              "id": "pnl-fmmrdu",
+              "label": "New panel",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new"
+            },
+            {
+              "id": "pnl-2htbx0",
+              "label": "***Estimated total cost (curr/Estimate)?",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        }
+      ]
     },
     {
       "id": "grp-commands",
@@ -1116,5 +1266,5 @@
       "content": []
     }
   ],
-  "activeViewId": "grp-rex"
+  "activeViewId": "grp-hench"
 }
