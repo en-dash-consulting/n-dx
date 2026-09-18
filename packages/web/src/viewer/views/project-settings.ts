@@ -4,7 +4,7 @@
  * Surfaces the following fields from `.n-dx.json`:
  * - web.port           — dashboard server port (numeric, 1–65535)
  * - language           — project language override (select)
- * - sourcevision.zones.mergeThreshold — zone merge sensitivity (0–1)
+ * - sourcevision.zones.mergeThreshold — small-zone merge threshold (min zone size in files)
  * - sourcevision.zones.pins           — file → zone override map (key-value)
  *
  * Data comes from GET /api/project-settings (read) and
@@ -244,7 +244,7 @@ export function ProjectSettingsView() {
   const validateMerge = useCallback((raw: string): string | null => {
     if (raw === "") return null;
     const n = Number(raw);
-    if (isNaN(n) || n < 0 || n > 1) return "Must be a number between 0 and 1";
+    if (!Number.isInteger(n) || n < 0) return "Must be a non-negative integer (zone size in files)";
     return null;
   }, []);
 
@@ -289,7 +289,7 @@ export function ProjectSettingsView() {
       }
       if (mergeDirty) {
         body["sourcevisionMergeThreshold"] =
-          mergeThreshold === "" ? null : parseFloat(mergeThreshold);
+          mergeThreshold === "" ? null : parseInt(mergeThreshold, 10);
       }
       if (pinsDirty) {
         body["sourcevisionPins"] = pinUpdates;
@@ -437,8 +437,9 @@ export function ProjectSettingsView() {
           mergeDirty ? h("span", { class: "ps-dirty-indicator" }, " \u2022") : null,
         ),
         h("p", { class: "ps-field-desc" },
-          "Louvain modularity threshold for zone merging (0\u20131). ",
-          "Lower values produce more zones; higher values produce fewer. Default: 0.5.",
+          "Minimum zone size in files: zones with fewer files are merged into ",
+          "their closest neighbor by import affinity. Higher values produce fewer, ",
+          "larger zones. Default: 3.",
         ),
         h("div", { class: "ps-field-row" },
           h("input", {
@@ -447,13 +448,12 @@ export function ProjectSettingsView() {
             class: `ps-number-input${mergeError ? " ps-input-error" : ""}`,
             value: mergeThreshold,
             min: 0,
-            max: 1,
-            step: 0.05,
-            placeholder: "0.5",
+            step: 1,
+            placeholder: "3",
             onInput: (e: Event) => handleMergeChange((e.target as HTMLInputElement).value),
           }),
           mergeThreshold === "" && !mergeDirty
-            ? h("span", { class: "ps-field-default" }, "Using default (0.5)")
+            ? h("span", { class: "ps-field-default" }, "Using default (3)")
             : null,
         ),
         mergeError ? h("p", { class: "ps-field-error" }, mergeError) : null,
