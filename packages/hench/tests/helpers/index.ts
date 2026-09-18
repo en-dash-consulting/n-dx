@@ -17,7 +17,7 @@ import type { CliRunResult } from "../../src/agent/lifecycle/event-accumulator.j
 import type { RunRecord } from "../../src/schema/v1.js";
 import type { PromptEnvelope } from "../../src/schema/v1.js";
 import { createPromptEnvelope } from "../../src/prd/llm-gateway.js";
-import { initConfig } from "../../src/store/config.js";
+import { initConfig, loadConfig, saveConfig } from "../../src/store/config.js";
 
 /**
  * Creates a minimal mock PRDStore with all methods mocked.
@@ -430,6 +430,22 @@ export function commitGitFixtureBaseline(dir: string, message = "baseline"): str
     throw new Error(`commitGitFixtureBaseline: no commit was created in ${dir}`);
   }
   return head;
+}
+
+/**
+ * Disable the pre-spawn system memory guard in a fixture's hench config.
+ *
+ * The guard reads REAL host memory before every process-spawning tool, so any
+ * test that drives the agent loop through a `git`/`run_command` dispatch is
+ * host-environment-dependent without this: on a machine above the default 90%
+ * threshold the spawn is refused, the run ends `failed`, and the failure reads
+ * as a loop defect rather than what it is — the developer's RAM at that moment.
+ * Call after initConfig in any test whose fake agent must spawn processes.
+ */
+export async function disableMemoryGuard(henchDir: string): Promise<void> {
+  const config = await loadConfig(henchDir);
+  config.guard = { ...config.guard, memoryMonitor: { enabled: false } };
+  await saveConfig(henchDir, config);
 }
 
 /**
