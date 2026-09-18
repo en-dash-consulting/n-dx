@@ -72,6 +72,32 @@ describe("preview server", () => {
     expect(afterEdit.fingerprint).not.toBe(beforeEdit.fingerprint);
   });
 
+  it("leaves a self-polling document's reload handling alone", async () => {
+    const dir = await scratch();
+
+    // A plain document gets the injected poller.
+    const plain = join(dir, "plain.html");
+    await writeFile(plain, "<html><body>plain</body></html>", "utf-8");
+    handle = await startPreviewServer(dir, 0, { file: plain });
+    const plainHtml = await (await fetch(`http://127.0.0.1:${handle.port}/`)).text();
+    expect(plainHtml).toContain("/__preview/state");
+    expect(plainHtml).toContain("location.reload()");
+    await handle.close();
+
+    // One that already watches the endpoint does not: it decides for itself
+    // when a change needs a reload and when it can refresh in place. A second
+    // injected poller would reload it on every layout save.
+    const own = join(dir, "own.html");
+    await writeFile(
+      own,
+      '<html><body>own<script>fetch("/__preview/state")</' + 'script></body></html>',
+      "utf-8",
+    );
+    handle = await startPreviewServer(dir, 0, { file: own });
+    const ownHtml = await (await fetch(`http://127.0.0.1:${handle.port}/`)).text();
+    expect(ownHtml).not.toContain("location.reload()");
+  });
+
   it("refuses to serve files outside the document's directory", async () => {
     const dir = await scratch();
     const doc = join(dir, "mock.html");

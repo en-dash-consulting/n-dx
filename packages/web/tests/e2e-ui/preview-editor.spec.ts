@@ -26,7 +26,7 @@
 
 import { test, expect } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtemp, copyFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, copyFile, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -246,6 +246,53 @@ test("Alt+Right nests a section into the group above it", async ({ page }) => {
       { timeout: 5_000 },
     )
     .toContain("SETTINGS");
+});
+
+test("editing keeps the rail where it was", async ({ page }) => {
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  for (const group of ["Analysis", "Plan", "Work", "SETTINGS"]) await expandGroup(page, group);
+
+  // Scroll the rail down to something well below the fold and act on it there.
+  const row = page.locator('.row-item:has(.label:text-is("CLI Timeouts"))').first();
+  await row.scrollIntoViewIfNeeded();
+  const before = await page.locator(".sidebar").evaluate((el: HTMLElement) => el.scrollTop);
+  expect(before).toBeGreaterThan(0);
+
+  await row.click();                                   // selecting re-renders the whole tree
+  await expect(page.locator("#view-title")).toHaveText("CLI Timeouts");
+
+  const after = await page.locator(".sidebar").evaluate((el: HTMLElement) => el.scrollTop);
+  expect(Math.abs(after - before)).toBeLessThanOrEqual(2);
+  await expect(row).toBeInViewport();
+});
+
+test("an external layout edit refreshes in place instead of reloading", async ({ page }) => {
+  // Counting main-frame navigations is the direct assertion: a reload is a
+  // navigation, an in-place refresh is not.
+  let navigations = 0;
+  page.on("framenavigated", (frame) => { if (frame === page.mainFrame()) navigations += 1; });
+
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+
+  // Nothing is touched in the page first: an edit of its own would start the
+  // save debounce, and a save landing after the external write would overwrite
+  // it — a race in the test, not in the editor. Give the poller time to record
+  // its baseline, so the write is seen as a change rather than as the start.
+  await page.waitForTimeout(1_500);
+  const scrolled = await page.locator(".content").evaluate((el: HTMLElement) => {
+    el.scrollTop = 120;
+    return el.scrollTop;
+  });
+
+  // Hand-edit the layout file the way someone would in an editor.
+  const layout = await savedLayout();
+  const analysis = findNode(layout.nav, "Analysis");
+  analysis.content[0].label = "Repository facts";
+  await writeFile(join(dir, "index.layout.json"), JSON.stringify(layout, null, 2), "utf-8");
+
+  await expect(page.locator('.pgroup .label:text-is("Repository facts")')).toBeVisible({ timeout: 8_000 });
+  expect(navigations).toBe(1);   // the initial goto, and nothing since
+  expect(await page.locator(".content").evaluate((el: HTMLElement) => el.scrollTop)).toBe(scrolled);
 });
 
 test("cutting a panel marks it before deleting it", async ({ page }) => {

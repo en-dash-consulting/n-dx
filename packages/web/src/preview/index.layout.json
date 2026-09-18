@@ -325,7 +325,7 @@
         }
       ],
       "previousLabel": "SOURCEVISION",
-      "collapsed": false,
+      "collapsed": true,
       "content": [
         {
           "id": "sec-general-repo-info",
@@ -390,13 +390,128 @@
               "status": "new"
             },
             {
+              "id": "pnl-stkqng",
+              "label": "Codebase",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ]
+        },
+        {
+          "id": "sec-zo3db5",
+          "label": "Repository Map",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-60rdvz",
+              "label": "Context Graph",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
               "id": "pnl-analysis-primary-language",
               "label": "Primary language",
               "width": 6,
               "kind": "blocks",
               "status": "new"
+            },
+            {
+              "id": "pnl-pyw05n",
+              "label": "Import",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-p8l8eg",
+              "label": "2D/3D Zone graph",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
             }
-          ]
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-9666ef",
+          "label": "PRD Items",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-jg9pim",
+              "label": "Up Next",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-ou83gw",
+              "label": "Progress",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-t9tzgv",
+              "label": "Completed/In Progress/Pending",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-650ha7",
+              "label": "History",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-igz3rl",
+          "label": "Token Usage",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-x4yvsi",
+              "label": "Total Tokens",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-18rqlj",
+              "label": "Cost estimate",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            },
+            {
+              "id": "pnl-iy557j",
+              "label": "Major Models used",
+              "width": 4,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
         }
       ]
     },
@@ -599,7 +714,48 @@
       ],
       "previousLabel": "REX",
       "collapsed": true,
-      "content": []
+      "content": [
+        {
+          "id": "sec-vz7ne0",
+          "label": "(Won't be a dropdown)",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-vryi43",
+              "label": "New panel",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new"
+            },
+            {
+              "id": "pnl-yiiogp",
+              "label": "New panel",
+              "width": 6,
+              "kind": "blocks",
+              "status": "new"
+            }
+          ],
+          "previousLabel": "New section"
+        },
+        {
+          "id": "sec-9odfb1",
+          "label": "History",
+          "status": "new",
+          "collapsed": false,
+          "panels": [
+            {
+              "id": "pnl-84w07v",
+              "label": "Runs",
+              "width": 12,
+              "kind": "blocks",
+              "status": "new",
+              "previousLabel": "New panel"
+            }
+          ],
+          "previousLabel": "New section"
+        }
+      ]
     },
     {
       "id": "grp-hench",
@@ -960,5 +1116,5 @@
       "content": []
     }
   ],
-  "activeViewId": "grp-sourcevision"
+  "activeViewId": "grp-rex"
 }

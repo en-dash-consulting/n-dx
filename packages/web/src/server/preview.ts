@@ -35,6 +35,9 @@ const LOOPBACK_HOST = "127.0.0.1";
 /** How often the browser asks whether the document changed on disk. */
 const DEFAULT_RELOAD_INTERVAL_MS = 600;
 
+/** The endpoint the reload poller reads — also the marker for "this document polls for itself". */
+const STATE_ROUTE = "/__preview/state";
+
 /**
  * Cap on a layout save.
  *
@@ -145,7 +148,7 @@ function reloadSnippet(intervalMs: number): string {
 (function () {
   var current = null;
   function poll() {
-    fetch("/__preview/state", { cache: "no-store" })
+    fetch("${STATE_ROUTE}", { cache: "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (s) {
         if (current === null) { current = s.fingerprint; return; }
@@ -159,8 +162,17 @@ function reloadSnippet(intervalMs: number): string {
 </script>`;
 }
 
-/** Append the reload snippet, preferring just before `</body>`. */
+/**
+ * Append the reload snippet, preferring just before `</body>`.
+ *
+ * A document that already polls `/__preview/state` is left alone: the shipped
+ * layout document watches that endpoint itself so it can tell a layout change
+ * (swap the model in place, keeping scroll and selection) from a change to its
+ * own code (a real reload). Injecting a second, dumber poller alongside it
+ * reloaded the page for every layout save and undid exactly that.
+ */
 function withReloadSnippet(html: string, intervalMs: number): string {
+  if (html.includes(STATE_ROUTE)) return html;
   const snippet = reloadSnippet(intervalMs);
   if (html.includes("</body>")) return html.replace("</body>", `${snippet}\n</body>`);
   return html + snippet;
@@ -263,7 +275,7 @@ export async function startPreviewServer(
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const urlPath = (req.url ?? "/").split("?")[0];
 
-    if (urlPath === "/__preview/state") {
+    if (urlPath === STATE_ROUTE) {
       send(res, 200, JSON.stringify({ fingerprint: docFingerprint(docPath) }), MIME_TYPES[".json"]);
       return;
     }
