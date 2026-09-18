@@ -1,5 +1,12 @@
 # @n-dx/rex
 
+## 0.7.1
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @n-dx/llm-client@0.7.1
+
 ## 0.7.0
 
 ### Minor Changes

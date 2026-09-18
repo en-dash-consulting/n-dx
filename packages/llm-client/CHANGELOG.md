@@ -1,5 +1,7 @@
 # @n-dx/llm-client
 
+## 0.7.1
+
 ## 0.7.0
 
 ### Patch Changes

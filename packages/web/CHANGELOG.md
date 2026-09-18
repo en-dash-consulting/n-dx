@@ -1,5 +1,15 @@
 # @n-dx/web
 
+## 0.7.1
+
+### Patch Changes
+
+- [#378](https://github.com/en-dash-consulting/n-dx/pull/378) [`daef846`](https://github.com/en-dash-consulting/n-dx/commit/daef846d95ffbbd0ca3517e88139d1493dccf4f0) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix project-settings validation of `sourcevision.zones.mergeThreshold`: the dashboard capped it to 0–1 as if it were a Louvain modularity ratio, but it is the small-zone merge threshold — a minimum zone size in files, default 3. The server route and settings view now accept any non-negative integer, and the field's description, placeholder, and default hint describe the real semantics.
+- Updated dependencies []:
+  - @n-dx/llm-client@0.7.1
+  - @n-dx/rex@0.7.1
+  - @n-dx/sourcevision@0.7.1
+
 ## 0.7.0
 
 ### Minor Changes
