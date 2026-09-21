@@ -278,6 +278,8 @@ describe("n-dx refresh", () => {
     const child = spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
       detached: true,
       stdio: "ignore",
+      // On Windows, detached without windowsHide opens a visible console window.
+      windowsHide: true,
     });
     child.unref();
     const pid = child.pid;
