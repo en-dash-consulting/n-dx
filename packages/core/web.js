@@ -1194,6 +1194,9 @@ function openBrowser(url) {
     const child = spawn(cmd, args, {
       stdio: "ignore",
       detached: true,
+      // windowsHide suppresses the cmd.exe console flash; `start` still opens
+      // the browser in its own window regardless.
+      windowsHide: true,
       ...(process.platform === "win32" ? { windowsVerbatimArguments: true } : {}),
     });
     child.on("error", () => {});

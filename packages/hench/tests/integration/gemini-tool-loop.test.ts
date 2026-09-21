@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { commitGitFixtureBaseline } from "../helpers/index.js";
+import { commitGitFixtureBaseline, disableMemoryGuard } from "../helpers/index.js";
 import { initConfig } from "../../src/store/config.js";
 import { defaultRegistry } from "../../src/prd/llm-gateway.js";
 import type {
@@ -38,6 +38,7 @@ describe("Gemini agentic tool-use loop", () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-test-gemini-loop-"));
     henchDir = join(projectDir, ".hench");
     await initConfig(henchDir);
+    await disableMemoryGuard(henchDir);
 
     const rexDir = join(projectDir, ".rex");
     await mkdir(rexDir, { recursive: true });
