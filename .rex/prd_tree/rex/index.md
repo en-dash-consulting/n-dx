@@ -19,8 +19,8 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Duplicate-aware Proposal Override for rex add](./duplicate-aware-proposal-override-for/index.md) | completed |
 | [Enhanced Rex Recommend Selective PRD Creation](./enhanced-rex-recommend-selective-prd/index.md) | completed |
 | [Fix observation in rex (2 findings)](./fix-observation-in-rex-2-findings/index.md) | completed |
-| [Fix observation in rex-recommend (1 finding)](./fix-observation-in-rex-recommend-1/index.md) | completed |
 | [Fix observation in rex-core (1 finding)](./fix-observation-in-rex-core-1-finding/index.md) | completed |
+| [Fix observation in rex-recommend (1 finding)](./fix-observation-in-rex-recommend-1/index.md) | completed |
 | [Fix suggestion in rex (1 finding)](./fix-suggestion-in-rex-1-finding/index.md) | completed |
 | [Hash-Suffixed Duplicate Title Consolidation in Reshape](./hash-suffixed-duplicate-title/index.md) | completed |
 | [Interactive Workflow Shaping and Requirements Integration](./interactive-workflow-shaping-and/index.md) | completed |

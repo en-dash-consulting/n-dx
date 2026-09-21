@@ -23,8 +23,8 @@ description: "Defects found by running `/ndx-adversarial-review` against its own
 
 | Title | Status |
 |-------|--------|
-| [/ndx-adversarial-review hardcodes `main` as the branch-diff base](./ndx-adversarial-review-hardcodes-main.md) | completed |
 | [/ndx-adversarial-review does not map findings onto add_item's level, priority, and acceptanceCriteria fields](./ndx-adversarial-review-does-not-map.md) | completed |
+| [/ndx-adversarial-review hardcodes `main` as the branch-diff base](./ndx-adversarial-review-hardcodes-main.md) | completed |
 | [/ndx-adversarial-review records tokens without --startedAt, so the first record claims the whole session](./ndx-adversarial-review-records-tokens.md) | completed |
 | [/ndx-adversarial-review Step 1 executes the test suite via verify_criteria's default runTests: true](./ndx-adversarial-review-step-1-executes.md) | completed |
 | [/ndx-adversarial-review topic mode guesses slugs against get_item, which has no search](./ndx-adversarial-review-topic-mode.md) | completed |

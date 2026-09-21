@@ -1,0 +1,20 @@
+---
+id: "27471579-2181-486c-836b-e6730c5b7980"
+level: "task"
+title: "Lead Next Steps and Problems titles with plain language before the metric"
+status: "pending"
+priority: "medium"
+tags:
+  - "0.7.1"
+  - "trust-copy"
+  - "wm-2042"
+source: "caos work management: WM2042 (Lead Next Steps and Problems titles with plain language before the metric); 0.7.1 execution plan PR group"
+acceptanceCriteria:
+  - "Every generated Next Steps and Problems title begins with a plain-language sentence; the metric appears in the detail, not the title."
+  - "packages/sourcevision/tests/unit/analyzers/next-steps.test.ts and packages/web/tests/unit/viewer/next-steps-panel.test.ts are updated and pass."
+  - "CONTEXT.md and llms.txt keep their section structure; only the wording of titles changes."
+  - "No change to the findings JSON schema fields."
+description: "SourceVision's Next Steps and Problems present the metric first ('cohesion < 0.4, coupling > 0.6') and the meaning second or not at all. Generated finding titles should say what is wrong in plain words first ('7 zones are fragile: they hold loosely related files and depend heavily on other zones') and keep the metric in the detail line. The text is generated in packages/sourcevision/src/analyzers/next-steps.ts and rendered by the Overview Next Steps panel in the web viewer; the same text reaches CONTEXT.md and llms.txt, so their structure must not change.\n\nImplementation notes: In packages/sourcevision/src/analyzers/next-steps.ts (and the findings generators it draws from), rewrite the title templates so each starts with a plain-language statement of the problem and its count, and move threshold expressions like 'cohesion < 0.4, coupling > 0.6' into the detail or rationale field. Keep the JSON shape of findings and next steps unchanged. Update the sourcevision and web unit tests named in the acceptance criteria, and regenerate the fixture outputs they compare against. Check the Overview Next Steps panel in packages/web/src/viewer and the generated .sourcevision/CONTEXT.md and llms.txt on a sample project to confirm the new titles read correctly. Constraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (hench: src/prd/rex-gateway.ts and src/prd/llm-gateway.ts; web: src/server/rex-gateway.ts and src/server/domain-gateway.ts) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name (@n-dx/hench, @n-dx/rex, @n-dx/web, @n-dx/core, @n-dx/sourcevision, @n-dx/llm-client) with a patch bump; run pnpm preflight before opening the PR."
+lastModified: "2026-09-21T17:24:13.825Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
