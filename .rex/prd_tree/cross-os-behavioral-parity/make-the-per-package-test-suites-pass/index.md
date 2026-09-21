@@ -1,0 +1,38 @@
+---
+id: "214f5636-f4c2-426b-af58-ba24c4e49a76"
+level: "feature"
+title: "Make the per-package test suites pass on Windows"
+status: "completed"
+priority: "high"
+tags:
+  - "cross-os"
+  - "windows"
+  - "testing"
+  - "hench"
+  - "web"
+source: "exploration-2026-08-17"
+startedAt: "2026-08-18T20:39:08.283Z"
+completedAt: "2026-08-18T20:39:08.283Z"
+endedAt: "2026-08-18T20:39:08.283Z"
+acceptanceCriteria:
+  - "@n-dx/hench passes on Windows with no test weakened to achieve it"
+  - "@n-dx/web passes on Windows (after its own triage) with the same constraint"
+  - "Every platform-conditional assertion covers BOTH the POSIX and Windows shape, not just whichever one the current machine produces"
+  - "No production code was changed to accommodate a test, unless a genuine cross-OS defect was found and recorded as such"
+  - "The per-package suites run in the Windows CI job rather than remaining ubuntu-only"
+description: "The sibling CI-matrix task (da8af67a) put the ROOT suite on windows-latest but deliberately left `pnpm -r run test` ubuntu-only, because the per-package suites are red on Windows and a permanently-red job gets disabled. This feature closes that gap so per-package tests can join the Windows job.\n\nMeasured on Windows 11 after the masking fix made every package visible for the first time:\n  @n-dx/hench   2851 passed,  32 FAILED  (12 of 151 files)\n  @n-dx/web     2864 passed,   7 FAILED  (4 of 176 files)\n  @n-dx/rex     4416 passed,   2 FAILED  (the ambient-load set, task 676af18f)\n  llm-client and sourcevision are fully green on Windows.\n\nCORRECTION 2026-08-19 — ubuntu CI REFUTED PART OF THE CLASSIFICATION BELOW. Recorded by task 4a63ef64; read this before working any fix task scoped on the original wording.\n\n  1. \"ALL 32 are test-side and Windows-specific\" is WRONG for at least 3 of them.\n     Three hench test-runner cases FAILED ON UBUNTU (first run after the masking fix,\n     GitHub run 32188420459, ubuntu \"Run unit tests\" step). Cause per the fix commit\n     (a29966f9, pre-rebase 764e3ef1): toCommandPath splits on `sep`, which is\n     deliberately the identity on POSIX because a backslash is a legal character in a\n     POSIX filename — and the tests fed HARDCODED BACKSLASH PATHS and expected\n     normalization, so they could only ever pass on Windows.\n  2. Specifically, root cause group 1 (\"POSIX path separators hardcoded in\n     assertions\", 15 cases) carried the structural argument that it \"passes on POSIX by\n     construction because node's join() yields forward slashes there\". That argument is\n     unsound: it holds for paths the code BUILDS, not for paths a test hands in as a\n     literal. Do not reuse it.\n  3. \"Zero production bugs\" did not survive the same run either, though outside hench's\n     32: ubuntu CI found llm-client's POSIX tree kill had NEVER WORKED — execFile builds\n     its own spawn options and silently drops `detached`, so the child was never a\n     process-group leader, kill(-pid) failed with ESRCH, and only `sh` was killed. CI\n     observed the grandchild write 13 more files after the timeout was reported. This is\n     a THIRD category the Windows-only triage could not surface, because Windows passes\n     regardless: taskkill /T walks the tree by PID and needs no group.\n\n  The transferable lesson, and the reason this correction is worth its length: a\n  Windows-only triage can only classify failures it can SEE. A test that asserts\n  Windows semantics unconditionally, and a POSIX-only production defect, are both\n  invisible from Windows and both showed up on the first ubuntu run.\n\nhench's 32 have been triaged in full (see the triage log on task 741bacf1). The headline as originally written: ALL 32 are test-side and Windows-specific — zero production bugs. The suite encodes POSIX assumptions in fixtures and assertions while the code under test behaves correctly. Confidence was described as structural rather than inferred from CI: `C:\\\\` drive-qualified paths, `\\\\r\n`, EBUSY on rmdir, and cmd.exe not stripping single quotes cannot occur on POSIX, and the path-separator group passes on POSIX by construction because node's join() yields forward slashes there. See the CORRECTION above for which parts of that held.\n\nSeven root causes, each with its own task below except where trivially grouped:\n  1. POSIX path separators hardcoded in assertions ....... 15  (see CORRECTION: 3 failed on ubuntu)\n  2. Windows prompt-delivery asserted as universal ........ 7\n  3. CRLF from git's core.autocrlf ........................ 3\n  4. POSIX-only fixtures (/tmp, single-quoted echo) ....... 2\n  5. POSIX shell quoting in git fixtures .................. 2\n  6. Windows file locking on temp cleanup (EBUSY) ......... 2\n  7. POSIX absolute-path assumption (startsWith(\"/\")) ..... 1\n\nGOVERNING RULE for this feature: do not make a failure disappear by weakening what the test checks. Two of these groups protect real contracts — prompt delivery (group 2) and rollback file content (group 3) — and a substring match or a stripped assertion would keep the test green while removing its value. Where a platform genuinely behaves differently, assert BOTH shapes rather than neither.\n\nweb's 7 are not yet triaged; they belong under this feature once they are."
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Add the per-package suites to the Windows CI job](./add-the-per-package-suites-to-the.md) | completed |
+| [Cover both prompt-delivery shapes per platform in hench adapter tests](./cover-both-prompt-delivery-shapes-per.md) | completed |
+| [Fix POSIX fixture assumptions in hench and web tests (/tmp, git quoting, absolute-path check)](./fix-posix-fixture-assumptions-in-hench.md) | completed |
+| [Fix the hardcoded "/" after join() in web's boundary-check exemptions](./fix-the-hardcoded-after-join-in-web-s.md) | completed |
+| [Give web's graph-view tests a getBoundingClientRect stub (jsdom returns 0x0)](./give-web-s-graph-view-tests-a.md) | completed |
+| [Make hench and web temp-dir cleanup survive Windows file locking (EBUSY)](./make-hench-and-web-temp-dir-cleanup.md) | completed |
+| [Normalize POSIX path-separator assertions in hench test-runner and guard tests](./normalize-posix-path-separator.md) | completed |
+| [Stop git's autocrlf breaking hench rollback and sigint fixtures](./stop-git-s-autocrlf-breaking-hench.md) | completed |
+| [Windows mtime granularity defeats the incremental usage aggregator's change detection](./windows-mtime-granularity-defeats-the.md) | completed |
