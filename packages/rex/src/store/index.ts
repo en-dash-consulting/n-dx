@@ -34,7 +34,8 @@ export {
   resolveSiblingSlugs,
 } from "./folder-tree-serializer.js";
 export { findNonConformingSlugs, findTreeIdentityFaults, SLUG_RULE_VERSION } from "./folder-tree-serializer.js";
-export { assertSlugRuleWritable, readSlugRuleMarker, SlugRuleMismatchError } from "./slug-rule-guard.js";
+export { assertSlugRuleWritable, checkTreeConformance, readSlugRuleMarker, SlugRuleMismatchError } from "./slug-rule-guard.js";
+export type { TreeConformanceRefusal } from "./slug-rule-guard.js";
 export type { SlugMismatch } from "./folder-tree-serializer.js";
 export type { SerializeResult } from "./folder-tree-serializer.js";
 export { parseFolderTree } from "./folder-tree-parser.js";

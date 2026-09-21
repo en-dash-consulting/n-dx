@@ -31,6 +31,12 @@ export type { LegacyPrdMigrationResult } from "@n-dx/rex";
 export { PRD_TREE_DIRNAME, resolveStore, cascadeParentReset } from "@n-dx/rex";
 export type { PRDStore } from "@n-dx/rex";
 
+// ---- Rex PRD tree slug conformance ------------------------------------------
+// The Execute route's pre-run gate. The run it spawns writes the PRD when it
+// completes, so a tree this build would re-slug must stop the run before it
+// starts rather than after it has already made its code changes.
+export { checkTreeConformance } from "@n-dx/rex";
+
 // ---- Rex schema version contract --------------------------------------------
 export { SCHEMA_VERSION, isCompatibleSchema } from "@n-dx/rex";
 

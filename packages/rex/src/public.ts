@@ -88,9 +88,11 @@ export {
 } from "./store/folder-tree-serializer.js";
 export {
   assertSlugRuleWritable,
+  checkTreeConformance,
   readSlugRuleMarker,
   SlugRuleMismatchError,
 } from "./store/slug-rule-guard.js";
+export type { TreeConformanceRefusal } from "./store/slug-rule-guard.js";
 export type {
   SerializeResult,
   TreeIdentityFault,

@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
-import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION, SELF_HEAL_TAG } from "../../prd/rex-gateway.js";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
@@ -361,6 +361,49 @@ function countTasksByStatus(items: PRDItem[], statuses: string[]): number {
   };
   walk(items);
   return count;
+}
+
+/**
+ * Refuse the run when this build's first PRD write would re-slug the tree.
+ *
+ * An autonomous run is a PRD writer: it records the status transition when it
+ * finishes the task. So a run started with a build whose slug rule disagrees
+ * with the tree does not merely fail — it succeeds, and ships a whole-tree
+ * rewrite inside a feature branch under a "task completed" message. That is
+ * the 2026-09-17 incident (1,570 renamed files) with the agent as the sweeper.
+ *
+ * The store's write guard would refuse that write, but only after the run had
+ * claimed the task, spent its tokens and edited the code. This gate asks the
+ * same question first, and answers it by not starting.
+ *
+ * There is deliberately **no override flag**. A sweep is never an acceptable
+ * thing to do from inside a run, so an escape hatch would only ever be used to
+ * cause the damage the gate exists to prevent; the fix is always
+ * `rex migrate-slugs` on the default branch, run on its own.
+ *
+ * Applies to `--dry-run` too: a preview whose refusal is hidden is a preview
+ * that tells you the run would have worked.
+ *
+ * @throws {CLIError} When the tree does not match this build's slug rule.
+ */
+export async function assertPrdTreeConformant(rexDir: string): Promise<void> {
+  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
+  // No folder tree, nothing to be non-conformant. Checked before the load
+  // because loading a project that has no PRD at all throws, and reporting
+  // that is the job of the task selection this gate runs ahead of.
+  if (!existsSync(treeRoot)) return;
+
+  const store = await resolveStore(rexDir);
+  const doc = await store.loadDocument();
+  const refusal = await checkTreeConformance(rexDir, treeRoot, doc.items);
+  if (!refusal) return;
+
+  throw new CLIError(
+    refusal.message,
+    "This run would write the PRD when it completed the task, carrying the rewrite " +
+      "into your branch under a 'task completed' commit. Nothing has been claimed or " +
+      "written. Migrate the tree on the default branch, then start the run again.",
+  );
 }
 
 export interface ResetDeferredOptions {
@@ -1270,6 +1313,12 @@ export async function cmdRun(
         "before the commit.\n(The diff-approval gate that used to be --review is now --approve-diff.)",
     );
   }
+
+  // Refuse a tree this build would re-slug, before anything is claimed, reset
+  // or written — `--reset-deferred` below is the run's first PRD write, and the
+  // claims store is opened later still. Unconditional: a dry run that hid the
+  // refusal would report that the real run was going to be fine.
+  await assertPrdTreeConformant(rexDir);
 
   // --reset-deferred: reset all deferred/failing tasks to pending before running.
   // This lets the user retry tasks that were deferred by infrastructure failures

@@ -49,6 +49,25 @@ import { TREE_META_FILENAME } from "./paths.js";
 const SAMPLE_LIMIT = 5;
 
 /**
+ * Render up to {@link SAMPLE_LIMIT} offending paths, with an "and N more" tail.
+ *
+ * A refusal that named no paths would be unactionable — "the tree is wrong"
+ * gives the operator nothing to look at — and one that named all 1,570 would
+ * be scrolled past. Five is enough to recognise the shape of the rewrite.
+ */
+function samplePaths(mismatches: readonly SlugMismatch[]): string {
+  const sample = mismatches
+    .slice(0, SAMPLE_LIMIT)
+    .map((m) => `  ${m.parentDir}/${m.found} should be ${m.expected} (${m.title})`)
+    .join("\n");
+  const more =
+    mismatches.length > SAMPLE_LIMIT
+      ? `\n  …and ${mismatches.length - SAMPLE_LIMIT} more.`
+      : "";
+  return `${sample}${more}`;
+}
+
+/**
  * A save refused because the tree was written under a different slug rule.
  *
  * Typed so callers can tell a guard refusal from an I/O failure — a refusal
@@ -135,24 +154,95 @@ export async function assertSlugRuleWritable(
   const mismatches = await findNonConformingSlugs(items, treeRoot);
   if (mismatches.length === 0) return;
 
-  const sample = mismatches
-    .slice(0, SAMPLE_LIMIT)
-    .map((m) => `  ${m.parentDir}/${m.found} should be ${m.expected} (${m.title})`)
-    .join("\n");
-  const more =
-    mismatches.length > SAMPLE_LIMIT
-      ? `\n  …and ${mismatches.length - SAMPLE_LIMIT} more.`
-      : "";
-
   throw new SlugRuleMismatchError(
     `Refusing to write the PRD tree: it carries no slug-rule marker and ` +
       `${mismatches.length} path${mismatches.length === 1 ? " does" : "s do"} not match ` +
       `slug rule ${SLUG_RULE_VERSION}, which this build implements. ` +
-      `Saving would rewrite them.\n${sample}${more}\n` +
+      `Saving would rewrite them.\n${samplePaths(mismatches)}\n` +
       `Run 'rex migrate-slugs' on the default branch to bring the tree onto ` +
       `rule ${SLUG_RULE_VERSION} and record the marker.`,
     undefined,
     SLUG_RULE_VERSION,
     mismatches,
   );
+}
+
+/**
+ * Why this build must not write the PRD tree as it stands.
+ *
+ * Returned rather than thrown because the callers are gates, not writers: they
+ * decide whether to *start* something, and a refusal is an ordinary outcome
+ * they report rather than an exception they recover from.
+ */
+export interface TreeConformanceRefusal {
+  /**
+   * Complete, operator-facing explanation, ending in the `rex migrate-slugs`
+   * instruction. Surfaces emit this verbatim so the CLI and the dashboard say
+   * the same thing about the same tree.
+   */
+  message: string;
+  /** Offending paths. Empty when the marker alone was enough to refuse. */
+  mismatches: readonly SlugMismatch[];
+  /** `slugRule` found in `tree-meta.json`, or `undefined` when absent. */
+  markerFound: number | undefined;
+}
+
+/**
+ * Report whether a write from this build would re-slug the tree at `treeRoot`.
+ *
+ * This is the read-only counterpart to {@link assertSlugRuleWritable}, for
+ * callers that must decide something *before* any writer is reached: `ndx work`
+ * and the dashboard's Execute both start an agent that writes the PRD when it
+ * finishes, so a run begun against a tree this build disagrees with is exactly
+ * how a whole-tree rewrite lands inside a feature branch under a "task
+ * completed" commit. The store guard would refuse that write, but only after
+ * the run had already spent its tokens and made its code changes.
+ *
+ * It differs from the write guard in one way that matters: **both** checks
+ * always run. `assertSlugRuleWritable` returns as soon as a matching marker
+ * proves the tree is this build's own, which is sound for a writer — a matching
+ * marker means this build's rule produced those paths. A gate answers the
+ * broader question `rex validate` asks, so a tree whose marker agrees but whose
+ * paths were disturbed (an interrupted migration, a hand-edited directory) is
+ * still refused rather than run against.
+ *
+ * @param rexDir   The `.rex/` directory holding `tree-meta.json`.
+ * @param treeRoot The folder tree itself, for the path scan.
+ * @param items    The document on disk, supplying the expected slugs.
+ * @returns `null` when the tree is this build's to write, else the refusal.
+ */
+export async function checkTreeConformance(
+  rexDir: string,
+  treeRoot: string,
+  items: PRDItem[],
+): Promise<TreeConformanceRefusal | null> {
+  const markerFound = await readSlugRuleMarker(rexDir);
+
+  if (markerFound !== undefined && markerFound !== SLUG_RULE_VERSION) {
+    return {
+      markerFound,
+      mismatches: [],
+      message:
+        `The PRD tree was written under slug rule ${markerFound}, but this build ` +
+        `implements slug rule ${SLUG_RULE_VERSION}. Every path in the tree would be ` +
+        `rewritten by the first write this run makes.\n` +
+        `Run 'rex migrate-slugs' on the default branch to bring the tree onto rule ` +
+        `${SLUG_RULE_VERSION}, or use a rex build that implements rule ${markerFound}.`,
+    };
+  }
+
+  const mismatches = await findNonConformingSlugs(items, treeRoot);
+  if (mismatches.length === 0) return null;
+
+  const one = mismatches.length === 1;
+  return {
+    markerFound,
+    mismatches,
+    message:
+      `${mismatches.length} path${one ? "" : "s"} in the PRD tree do${one ? "es" : ""} not ` +
+      `match slug rule ${SLUG_RULE_VERSION}, which this build implements. They would be ` +
+      `rewritten by the first write this run makes.\n${samplePaths(mismatches)}\n` +
+      `Run 'rex migrate-slugs' on the default branch to bring the tree onto rule ` +
+      `${SLUG_RULE_VERSION}.`,
+  };
 }
