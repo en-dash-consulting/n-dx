@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readdirSync, renameSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { cmdValidate } from "../../../../src/cli/commands/validate.js";
 import { writePRD, writeConfig } from "../../../helpers/rex-dir-test-support.js";
 import { serializeFolderTree } from "../../../../src/store/folder-tree-serializer.js";
+import { FileStore } from "../../../../src/store/file-adapter.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
 import { PRD_TREE_DIRNAME } from "../../../../src/store/index.js";
 
@@ -254,6 +255,88 @@ describe("cmdValidate", () => {
 
       await expect(cmdValidate(tmpDir, {})).rejects.toThrow("process.exit");
       expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
+
+  // ── Slug conformance ──────────────────────────────────────────────────────
+  // A tree a foreign-slug-rule build rewrote must fail validate, not warn: the
+  // next write rewrites it again. See findNonConformingSlugs (issue: a
+  // 1,570-file re-slug merged to main because this check was severity "warn").
+
+  describe("slug conformance", () => {
+    const SLUG_DOC = {
+      schema: "rex/v1" as const,
+      title: "Slug Conformance",
+      items: [
+        {
+          id: "epic-abc123",
+          title: "Child Process Cleanup And Exit Hygiene",
+          level: "epic" as const,
+          status: "pending" as const,
+          // A child makes the epic a directory (not a bare leaf `.md`), which
+          // is the shape findNonConformingSlugs' id-qualified fixture needs.
+          children: [
+            { id: "task-def456", title: "Harden the runner", level: "task" as const, status: "pending" as const },
+          ],
+        },
+      ],
+    };
+
+    it("exits 1 when a path was written by a foreign slug rule", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      await new FileStore(join(tmpDir, ".rex")).saveDocument(SLUG_DOC);
+
+      const treeRoot = join(tmpDir, ".rex", PRD_TREE_DIRNAME);
+      const current = readdirSync(treeRoot).filter((e) => e !== "tree-meta.json")[0];
+      // Exactly what a build on the other side of the id-suffix change
+      // produces: the same content under the superseded id-qualified name.
+      renameSync(join(treeRoot, current), join(treeRoot, "child-process-cleanup-and-exit-epicab"));
+
+      await expect(cmdValidate(tmpDir, {})).rejects.toThrow("process.exit");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+
+      const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(output).toContain("✗ tree slug convention");
+      expect(output).toContain("child-process-cleanup-and-exit-epicab");
+      expect(output).toContain("rex migrate-slugs");
+    });
+
+    it("reports the slug check as severity=error in JSON output", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      await new FileStore(join(tmpDir, ".rex")).saveDocument(SLUG_DOC);
+
+      const treeRoot = join(tmpDir, ".rex", PRD_TREE_DIRNAME);
+      const current = readdirSync(treeRoot).filter((e) => e !== "tree-meta.json")[0];
+      renameSync(join(treeRoot, current), join(treeRoot, "child-process-cleanup-and-exit-epicab"));
+
+      await expect(cmdValidate(tmpDir, { format: "json" })).rejects.toThrow("process.exit");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+
+      const jsonCall = stdoutSpy.mock.calls.find((c) => {
+        try {
+          JSON.parse(c[0]);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      const report = JSON.parse(jsonCall![0]);
+      const slugCheck = report.checks.find((c: { name: string }) => c.name === "tree slug convention");
+      expect(slugCheck).toBeDefined();
+      expect(slugCheck.pass).toBe(false);
+      expect(slugCheck.severity).toBe("error");
+      expect(report.ok).toBe(false);
+    });
+
+    it("exits 0 with no slug output on a conformant tree", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      await new FileStore(join(tmpDir, ".rex")).saveDocument(SLUG_DOC);
+
+      await cmdValidate(tmpDir, {});
+      expect(exitSpy).not.toHaveBeenCalled();
+
+      const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(output).not.toContain("tree slug convention");
     });
   });
 

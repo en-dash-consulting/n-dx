@@ -83,10 +83,12 @@ export {
   slugifyTitle,
   resolveSiblingSlugs,
   findTreeIdentityFaults,
+  findNonConformingSlugs,
 } from "./store/folder-tree-serializer.js";
 export type {
   SerializeResult,
   TreeIdentityFault,
+  SlugMismatch,
 } from "./store/folder-tree-serializer.js";
 
 // ---- Title-to-filename normalization ----------------------------------------

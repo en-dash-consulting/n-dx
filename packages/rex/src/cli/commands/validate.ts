@@ -259,7 +259,9 @@ export async function cmdValidate(
     // Slug conformance: catch a tree rewritten by a foreign rex build. Every
     // other check reads item fields, so a whole-tree re-slug — lossless
     // renames, untouched content — passes them all and shows up only as an
-    // 800-file diff in whatever branch is open.
+    // 800-file diff in whatever branch is open. This is an error, not a
+    // warning: a non-conformant tree means the *next* write rewrites it again,
+    // so silence here is exactly what let a 1,570-file re-slug merge to main.
     const slugMismatches = await findNonConformingSlugs(
       doc.items,
       join(dir, REX_DIR, PRD_TREE_DIRNAME),
@@ -268,14 +270,15 @@ export async function cmdValidate(
       checks.push({
         name: "tree slug convention",
         pass: false,
-        severity: "warn",
-        errors: slugMismatches.slice(0, 10).map(
-          (m) =>
-            `Path does not match the current slug rule: "${m.found}" should be ` +
-            `"${m.expected}" in ${m.parentDir} (${m.title}). ` +
-            `A rex build using a different slug rule may have rewritten the tree; ` +
-            `run 'rex migrate-slugs' to restore it.`,
-        ),
+        severity: "error",
+        errors: [
+          ...slugMismatches.slice(0, 10).map(
+            (m) =>
+              `Path does not match the current slug rule: "${m.found}" should be ` +
+              `"${m.expected}" in ${m.parentDir} (${m.title}).`,
+          ),
+          `A rex build using a different slug rule wrote this tree; run rex migrate-slugs on the default branch.`,
+        ],
       });
     }
   }
