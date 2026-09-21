@@ -36,11 +36,15 @@ After merging PRs with changeset files to `main`:
 3. Review the PR — it shows exactly what version bump and changelog entries will be created
 4. **Merge the "Version Packages" PR** → the workflow runs `changeset publish`, which:
    - Publishes all packages to npm (using `pnpm publish`, which resolves `workspace:*` to real versions)
-   - Creates git tags
+   - Creates git tags on the runner and reports them to `changesets/action@v2` through the `CHANGESETS_OUTPUT` NDJSON file
+5. `changesets/action@v2` pushes every reported tag to origin and creates one **GitHub release per package** (`@n-dx/core@0.7.0`, `@n-dx/rex@0.7.0`, …), using that package's `CHANGELOG.md` section as the release body
+6. A final **"Verify tags and GitHub releases match npm"** step fails the job if npm has the version but origin lacks any tag or GitHub lacks any release — so npm and GitHub cannot drift silently
 
 ### Required secrets
 
-The release workflow needs an `NPM_TOKEN` secret in the GitHub repo settings. Create one at [npmjs.com/settings/tokens](https://www.npmjs.com/settings/tokens) with publish permission scoped to `@n-dx/*`.
+None for npm. Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC): each `@n-dx/*` package has a Trusted Publisher configured at npmjs.com pointing at this repo, `release.yml`, and the `npm` GitHub environment. The workflow's `id-token: write` permission lets npm mint a short-lived publish credential per run; there is no long-lived token to rotate. Trusted publisher config is per package, so a new package needs its own entry before its first publish. To check the config without publishing, run the Release workflow manually with mode `validate-oidc`.
+
+Git tags, GitHub releases, and the "Version Packages" PR use the workflow's built-in `GITHUB_TOKEN` (`contents: write`, `pull-requests: write`).
 
 ## What gets published
 
@@ -65,6 +69,21 @@ When users run `npm i -g @n-dx/core`, these commands become available:
 | `hench` | `bin/hench.js` → `packages/hench/dist/cli/index.js` |
 | `sourcevision` / `sv` | `bin/sourcevision.js` → `packages/sourcevision/dist/cli/index.js` |
 
-## Git tags
+## Git tags and GitHub releases
 
-Created automatically by `changeset publish`. Format: `@n-dx/core@0.2.0`. No manual tagging needed.
+Created automatically on every publish. One annotated tag and one GitHub release per package, both named `@n-dx/<package>@<version>` (for example `@n-dx/core@0.7.0`), pointing at the merged "Version Packages" commit. No manual tagging needed.
+
+The mechanism: `changeset publish` (CLI v3) writes a `{"type":"git-tag", …}` line per published package to the file named by `CHANGESETS_OUTPUT`; `changesets/action@v2` sets that variable, reads the file afterwards, pushes the tags, and creates the releases. The action **must** be v2 — v1 recognised published packages only by scraping `New tag:` lines from stdout, which CLI v3 no longer prints.
+
+### Backfilling missing tags and releases
+
+If the verify step fails, or a version is on npm with no tag or release, run the backfill script from a checkout with `gh auth status` passing:
+
+```sh
+node scripts/backfill-release-tags.mjs            # dry run: prints every tag and release it would create
+node scripts/backfill-release-tags.mjs --execute  # creates them
+```
+
+The script holds a table of `version → "chore: version packages" commit`. Add a row for the missing version (find the commit with `git log --oneline --grep="version packages"` and confirm with `git show <sha>:packages/core/package.json`). It creates annotated tags at that commit, pushes them, and creates releases whose body is the package's `CHANGELOG.md` section for that version — the same shape the action produces. It skips anything that already exists, so re-running is safe.
+
+**Incident record.** Versions 0.5.0, 0.5.1, 0.5.2, 0.6.0 and 0.7.0 (2026-08-21 to 2026-09-18) were published to npm with no tags and no GitHub releases while every Release run stayed green. PR #334 had moved `@changesets/cli` to v3 on the day 0.5.0 shipped, and the workflow was still on `changesets/action@v1`, which silently matched nothing. Those thirty tags and releases were backfilled with the script above; the workflow moved to v2 and gained the verify step so the failure mode is now loud.

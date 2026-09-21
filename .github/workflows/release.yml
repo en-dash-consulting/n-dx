@@ -3,7 +3,17 @@
 # Flow:
 # 1. PRs merged to main with .changeset/ files trigger this workflow
 # 2. The "Version Packages" PR is auto-created/updated with bumped versions + changelog
-# 3. Merging the "Version Packages" PR triggers npm publish + git tags
+# 3. Merging the "Version Packages" PR triggers npm publish + git tags + GitHub releases
+# 4. A final step fails the job if npm has the version but GitHub lacks its
+#    tags or releases (see "Verify tags and GitHub releases match npm").
+#
+# History: 0.5.0 through 0.7.0 (Aug–Sep 2026) reached npm with no tags and no
+# GitHub releases while every run stayed green. PR #334 moved @changesets/cli
+# to v3, whose `publish` output no longer prints the `New tag:` lines that
+# changesets/action@v1 regex-scraped to learn what was published — so v1
+# matched nothing, pushed nothing, and reported published=false. v2 of the
+# action reads the CLI's CHANGESETS_OUTPUT NDJSON side-channel instead, and
+# the verify step below makes a repeat impossible to miss.
 #
 # Publishes via npm Trusted Publishing (OIDC) — no long-lived token. Each
 # @n-dx/* package must have a Trusted Publisher configured at npmjs.com
@@ -167,16 +177,79 @@ jobs:
       - name: Create Release PR or Publish
         if: github.event_name == 'push' || inputs.mode == 'publish'
         id: changesets
-        uses: changesets/action@v1
+        # v2 is the line compatible with @changesets/cli v3 (v1 only
+        # understands CLI v2 output). v2 renamed every input: version →
+        # version-script, publish → publish-script, title → pr-title,
+        # commit → commit-message, commitMode → push-with-git-cli.
+        #
+        # v2 learns which packages were published from the NDJSON file the
+        # CLI writes to $CHANGESETS_OUTPUT — the action sets that variable in
+        # the publish-script's environment and `pnpm exec` passes it through,
+        # so nothing extra is needed here. It then pushes each tag and creates
+        # a GitHub release per package (defaults: create-github-releases=true,
+        # push-git-tags=true, push-with-git-cli=false — tags and the version
+        # commit are pushed through the GitHub API and signed by GitHub; set
+        # push-with-git-cli: true to go back to plain `git push`).
+        uses: changesets/action@v2
         with:
-          version: pnpm exec changeset version
-          publish: pnpm exec changeset publish
-          title: "chore: version packages"
-          commit: "chore: version packages"
+          version-script: pnpm exec changeset version
+          publish-script: pnpm exec changeset publish
+          pr-title: "chore: version packages"
+          commit-message: "chore: version packages"
+          # v2 ignores a GITHUB_TOKEN env var; the token must arrive through
+          # this input. This is the default value, spelled out on purpose.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # No NODE_AUTH_TOKEN — auth comes from GitHub OIDC. id-token: write
-          # above grants the runner permission to mint the OIDC token that
-          # pnpm/npm exchange with the registry for a short-lived publish
-          # credential.
+          # No NODE_AUTH_TOKEN / NPM_TOKEN — auth comes from GitHub OIDC.
+          # id-token: write above grants the runner permission to mint the
+          # OIDC token that pnpm/npm exchange with the registry for a
+          # short-lived publish credential. (v2 also dropped v1's .npmrc
+          # handling, so an NPM_TOKEN would be ignored anyway.)
           NPM_CONFIG_PROVENANCE: true
+
+      - name: Verify tags and GitHub releases match npm
+        # Runs only on publish-mode runs (no pending changesets); the
+        # Version-PR path has nothing to verify. Fails the job when npm has
+        # the current fixed-group version but origin lacks a tag or GitHub
+        # lacks a release for any package — the exact symptom that stayed
+        # green for five releases before this step existed.
+        if: >-
+          (github.event_name == 'push' || inputs.mode == 'publish') &&
+          steps.changesets.outputs.has-changesets == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGES: "core rex sourcevision hench llm-client web"
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+
+          # All six packages share one version (Changesets fixed group), so
+          # @n-dx/core stands in for the group. Only enforce when this version
+          # is actually on npm — otherwise this run had nothing to publish.
+          if ! npm view "@n-dx/core@${VERSION}" version >/dev/null 2>&1; then
+            echo "@n-dx/core@${VERSION} is not on npm; nothing to verify."
+            exit 0
+          fi
+
+          FAILED=0
+          for pkg in ${PACKAGES}; do
+            TAG="@n-dx/${pkg}@${VERSION}"
+            if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+              echo "✓ tag ${TAG}"
+            else
+              echo "::error::missing git tag ${TAG} on origin"
+              FAILED=1
+            fi
+            if gh release view "${TAG}" >/dev/null 2>&1; then
+              echo "✓ release ${TAG}"
+            else
+              echo "::error::missing GitHub release ${TAG}"
+              FAILED=1
+            fi
+          done
+
+          if [ "${FAILED}" -ne 0 ]; then
+            echo "::error::npm has ${VERSION} but GitHub is out of sync — see RELEASING.md, 'Backfilling missing tags and releases'"
+            exit 1
+          fi
+          echo "All ${VERSION} tags and releases present."

@@ -73,6 +73,11 @@ const ALLOWED = new Set([
   // reimplementing git's index and object store, and the mtime shortcut can
   // report clean after a `touch` — a false clean being the exact bug it fixes.
   "scripts/prompt-census.mjs",
+  // One-off release repair run by an operator, not by any package: drives the
+  // `git` and `gh` CLIs (tag, push, release create) and must not depend on
+  // llm-client being built, since it is used when the release pipeline itself
+  // is broken.
+  "scripts/backfill-release-tags.mjs",
   // Process monitoring — needs raw execFile for system commands (vm_stat, sysctl)
   "packages/hench/src/process/memory-monitor.ts",
   // Git operations — need execFileSync/execFile for git CLI calls
