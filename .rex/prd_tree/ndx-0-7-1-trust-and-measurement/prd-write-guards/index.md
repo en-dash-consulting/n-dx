@@ -23,5 +23,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Fail rex validate and CI when the PRD tree does not match the slug rule](./fail-rex-validate-and-ci-when-the-prd.md) | pending |
-| [Record the slug rule version in tree-meta.json and refuse writes from a build with a different rule](./record-the-slug-rule-version-in-tree.md) | pending |
+| [Record the slug rule version in tree-meta.json and refuse writes from a build with a different rule](./record-the-slug-rule-version-in-tree.md) | completed |
 | [Refuse to start ndx work or a dashboard Execute on a non-conformant PRD tree](./refuse-to-start-ndx-work-or-a.md) | pending |

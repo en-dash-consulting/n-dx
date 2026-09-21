@@ -13,7 +13,9 @@ import { resolveStore, ensureLegacyPrdMigrated, LegacyPrdMigrationError } from "
 import {
   findNonConformingSlugs,
   findTreeIdentityFaults,
+  readSlugRuleMarker,
   PRD_TREE_DIRNAME,
+  SLUG_RULE_VERSION,
 } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { REX_DIR } from "./constants.js";
@@ -278,6 +280,25 @@ export async function cmdValidate(
               `"${m.expected}" in ${m.parentDir} (${m.title}).`,
           ),
           `A rex build using a different slug rule wrote this tree; run rex migrate-slugs on the default branch.`,
+        ],
+      });
+    }
+
+    // Slug-rule marker: the same fault as above, caught by declaration rather
+    // than by inspection. The path scan can only see a rule it can reproduce —
+    // a tree written by a *future* rule looks conformant to nothing this build
+    // knows how to compute, so the recorded version is the only evidence. This
+    // is an error for the same reason: the tree's next writer rewrites it.
+    const slugRuleMarker = await readSlugRuleMarker(join(dir, REX_DIR));
+    if (slugRuleMarker !== undefined && slugRuleMarker !== SLUG_RULE_VERSION) {
+      checks.push({
+        name: "tree slug rule marker",
+        pass: false,
+        severity: "error",
+        errors: [
+          `Tree was written under slug rule ${slugRuleMarker}, but this build implements slug rule ${SLUG_RULE_VERSION}.`,
+          `Every write from this build would rewrite every path. Run rex migrate-slugs on the default branch, ` +
+            `or use a rex build that implements rule ${slugRuleMarker}.`,
         ],
       });
     }

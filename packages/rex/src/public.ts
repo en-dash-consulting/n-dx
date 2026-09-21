@@ -84,7 +84,13 @@ export {
   resolveSiblingSlugs,
   findTreeIdentityFaults,
   findNonConformingSlugs,
+  SLUG_RULE_VERSION,
 } from "./store/folder-tree-serializer.js";
+export {
+  assertSlugRuleWritable,
+  readSlugRuleMarker,
+  SlugRuleMismatchError,
+} from "./store/slug-rule-guard.js";
 export type {
   SerializeResult,
   TreeIdentityFault,

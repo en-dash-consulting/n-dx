@@ -15,6 +15,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { cmdMigrateSlugs } from "../../src/cli/commands/migrate-slugs.js";
 import { FolderTreeStore } from "../../src/store/folder-tree-store.js";
+import {
+  readSlugRuleMarker,
+  SlugRuleMismatchError,
+  SLUG_RULE_VERSION,
+  TREE_META_FILENAME,
+} from "../../src/store/index.js";
 
 /** Write a legacy title-only-slug tree by hand: one branch epic, one leaf task, one leaf epic. */
 async function writeLegacyTree(treeRoot: string): Promise<void> {
@@ -127,6 +133,42 @@ describe("rex migrate-slugs", () => {
     const second = await listTree(treeRoot);
 
     expect(second).toEqual(first);
+  });
+
+  // This command is the only writer allowed to re-slug a tree, so it is also
+  // the only one that may set the marker. Rename and marker land in the same
+  // locked write: a marker recorded ahead of a rename that then failed would
+  // disarm the guard on exactly the tree it was protecting.
+  it("records the slug-rule marker in the same run that renames the tree", async () => {
+    // The hand-written fixture predates the marker entirely.
+    expect(await readSlugRuleMarker(rexDir)).toBeUndefined();
+
+    await cmdMigrateSlugs(projectDir, {});
+
+    expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
+    // And the migrated tree is now writable by an ordinary save.
+    const store = new FolderTreeStore(rexDir);
+    await expect(store.saveDocument(await store.loadDocument())).resolves.toBeUndefined();
+  });
+
+  it("migrates a tree whose marker names a superseded rule, which ordinary saves refuse", async () => {
+    await writeFile(
+      join(rexDir, TREE_META_FILENAME),
+      JSON.stringify({ title: "Legacy", slugRule: SLUG_RULE_VERSION - 1 }),
+      "utf-8",
+    );
+
+    // Precondition: an ordinary save is refused. Without this the test could
+    // pass against a build that never armed the guard at all.
+    const blocked = new FolderTreeStore(rexDir);
+    await expect(blocked.saveDocument(await blocked.loadDocument())).rejects.toThrow(
+      SlugRuleMismatchError,
+    );
+
+    await cmdMigrateSlugs(projectDir, {});
+
+    expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
+    expect(await listTree(treeRoot)).toContain("auth-feature/login-task.md");
   });
 
   it("reports the rename as verified lossless", async () => {

@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readdirSync, renameSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, renameSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { cmdValidate } from "../../../../src/cli/commands/validate.js";
 import { writePRD, writeConfig } from "../../../helpers/rex-dir-test-support.js";
 import { serializeFolderTree } from "../../../../src/store/folder-tree-serializer.js";
 import { FileStore } from "../../../../src/store/file-adapter.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
-import { PRD_TREE_DIRNAME } from "../../../../src/store/index.js";
+import { SCHEMA_VERSION } from "../../../../src/schema/index.js";
+import { PRD_TREE_DIRNAME, TREE_META_FILENAME, SLUG_RULE_VERSION } from "../../../../src/store/index.js";
+import { parseTreeMeta } from "../../../../src/store/tree-meta.js";
 
 const VALID_CONFIG = {
   schema: "rex/v1",
@@ -337,6 +339,88 @@ describe("cmdValidate", () => {
 
       const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
       expect(output).not.toContain("tree slug convention");
+    });
+
+    // The path scan above can only recognise a rule it can itself compute. A
+    // tree written by a *future* rule has paths this build cannot derive, so
+    // the recorded marker is the only evidence that anything is wrong.
+    it("exits 1 when the recorded slug rule is not this build's", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      const rexDir = join(tmpDir, ".rex");
+      await new FileStore(rexDir).saveDocument(SLUG_DOC);
+
+      const metaPath = join(rexDir, TREE_META_FILENAME);
+      const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+      writeFileSync(metaPath, JSON.stringify({ ...meta, slugRule: SLUG_RULE_VERSION + 1 }));
+
+      await expect(cmdValidate(tmpDir, {})).rejects.toThrow("process.exit");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+
+      const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(output).toContain("✗ tree slug rule marker");
+      expect(output).toContain(`slug rule ${SLUG_RULE_VERSION + 1}`);
+      expect(output).toContain(`slug rule ${SLUG_RULE_VERSION}`);
+      expect(output).toContain("rex migrate-slugs");
+    });
+
+    it("reports the marker check as severity=error in JSON output", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      const rexDir = join(tmpDir, ".rex");
+      await new FileStore(rexDir).saveDocument(SLUG_DOC);
+
+      const metaPath = join(rexDir, TREE_META_FILENAME);
+      const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+      writeFileSync(metaPath, JSON.stringify({ ...meta, slugRule: 1 }));
+
+      await expect(cmdValidate(tmpDir, { format: "json" })).rejects.toThrow("process.exit");
+
+      const jsonCall = stdoutSpy.mock.calls.find((c) => {
+        try {
+          JSON.parse(c[0]);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      const report = JSON.parse(jsonCall![0]);
+      const check = report.checks.find((c: { name: string }) => c.name === "tree slug rule marker");
+      expect(check).toBeDefined();
+      expect(check.pass).toBe(false);
+      expect(check.severity).toBe("error");
+      expect(report.ok).toBe(false);
+    });
+
+    it("stays silent when the marker matches this build", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      const rexDir = join(tmpDir, ".rex");
+      await new FileStore(rexDir).saveDocument(SLUG_DOC);
+
+      // The save above records the marker; nothing further is needed.
+      const meta = JSON.parse(readFileSync(join(rexDir, TREE_META_FILENAME), "utf-8"));
+      expect(meta.slugRule).toBe(SLUG_RULE_VERSION);
+
+      await cmdValidate(tmpDir, {});
+      expect(exitSpy).not.toHaveBeenCalled();
+
+      const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(output).not.toContain("tree slug rule marker");
+    });
+
+    // The sidecar is a `.passthrough()`-style read on purpose: an older rex
+    // must keep loading a tree a newer one marked, or the marker would break
+    // every checkout it was meant to protect.
+    it("leaves the rest of the sidecar parse untouched by the extra key", async () => {
+      const raw = JSON.stringify({
+        title: "Slug Conformance",
+        schema: SCHEMA_VERSION,
+        slugRule: SLUG_RULE_VERSION,
+        unknownFutureKey: "ignored",
+      });
+      expect(parseTreeMeta(raw)).toEqual({
+        title: "Slug Conformance",
+        schema: SCHEMA_VERSION,
+        slugRule: SLUG_RULE_VERSION,
+      });
     });
   });
 

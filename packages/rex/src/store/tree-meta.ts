@@ -6,6 +6,7 @@
  *
  * - **title**, which belongs to the document rather than to any item.
  * - **schema**, the version the tree was written at.
+ * - **slugRule**, the version of the path rule the tree was written under.
  *
  * The schema marker exists because omitting it defeated forward compatibility
  * at one remove. The tree load path used to report the *running*
@@ -26,11 +27,26 @@
  */
 
 import { SCHEMA_VERSION } from "../schema/index.js";
+import { SLUG_RULE_VERSION } from "./folder-tree-serializer.js";
 
 /** The document-level facts the tree cannot hold on its own. */
 export interface TreeMeta {
   title: string;
   schema: string;
+  /**
+   * Version of the slug rule that produced the paths in this tree.
+   *
+   * Unlike `schema`, this is never carried on the in-memory document: it
+   * describes the *writing build*, not the document, and the build is always
+   * this one. A tree whose marker disagrees with `SLUG_RULE_VERSION` is a tree
+   * this build must not write — see `assertSlugRuleWritable`.
+   *
+   * Deliberately a named field rather than a positional or derived one: the
+   * 1.0.0 storage change folds this whole sidecar into the root `index.md`
+   * frontmatter, and a named field moves there as-is. Anything that inferred
+   * the rule from the file's shape would have to be rewritten instead.
+   */
+  slugRule: number;
 }
 
 /**
@@ -39,9 +55,19 @@ export interface TreeMeta {
  * `schema` falls back to the running version for a document assembled in
  * memory without one — a bundle import or a legacy migration, neither of which
  * has a tree to have read it from.
+ *
+ * `slugRule` is unconditionally the running version, because the serializer
+ * about to run *is* the running version — there is no way to write a tree
+ * under any other rule. What stops that from quietly re-slugging someone
+ * else's tree is the guard in the save path, which refuses before this file is
+ * written; by the time the shape is built, the write has already been allowed.
  */
 export function treeMetaContents(doc: { title: string; schema?: string }): TreeMeta {
-  return { title: doc.title, schema: doc.schema ?? SCHEMA_VERSION };
+  return {
+    title: doc.title,
+    schema: doc.schema ?? SCHEMA_VERSION,
+    slugRule: SLUG_RULE_VERSION,
+  };
 }
 
 /**
@@ -74,5 +100,13 @@ export function parseTreeMeta(raw: string): Partial<TreeMeta> {
   const out: Partial<TreeMeta> = {};
   if (typeof meta["title"] === "string") out.title = meta["title"];
   if (typeof meta["schema"] === "string") out.schema = meta["schema"];
+  // Absent on every tree written before the guard, which is the case the guard
+  // is built to handle rather than an error. A non-integer is treated the same
+  // as absent: the marker is only ever written from `SLUG_RULE_VERSION`, so a
+  // string or a float is corruption, and the conformance fallback checks the
+  // paths themselves — a stricter answer than trusting a damaged number.
+  if (typeof meta["slugRule"] === "number" && Number.isInteger(meta["slugRule"])) {
+    out.slugRule = meta["slugRule"];
+  }
   return out;
 }

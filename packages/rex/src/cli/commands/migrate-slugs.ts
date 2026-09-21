@@ -79,8 +79,18 @@ export async function cmdMigrateSlugs(
   await ensureSnapshot(rexDir, "migrate-slugs", flags);
 
   // Load + save under one lock: the serializer emits current-rule paths and
-  // removes the entries it loaded from the superseded ones.
-  await store.withTransaction(async () => {});
+  // removes the entries it loaded from the superseded ones, and the same write
+  // records the slug-rule marker. This is the only call that may go past the
+  // write guard — an ordinary save against a tree on a superseded rule is
+  // refused, because re-slugging is exactly what this command exists to do
+  // deliberately and no other command should do at all.
+  if (!store.adoptSlugRule) {
+    throw new CLIError(
+      "This PRD backend cannot migrate slugs.",
+      `Slugs are a property of the local folder tree; the resolved store is a remote adapter with no paths to rename.`,
+    );
+  }
+  await store.adoptSlugRule();
 
   // Prove the rename was lossless by reading the tree back. Git similarity
   // scores cannot do this: a container's index.md lists its children's paths,
