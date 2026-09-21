@@ -10,7 +10,7 @@
  */
 
 import { join } from "node:path";
-import { serializeFolderTree, parseFolderTree, PRD_TREE_DIRNAME, prdLockPath, withLock } from "../../store/index.js";
+import { serializeFolderTree, parseFolderTree, PRD_TREE_DIRNAME, prdLockPath, withLock, assertSlugRuleWritable } from "../../store/index.js";
 import { walkTree } from "../../core/tree.js";
 import type { PRDStore } from "../../store/index.js";
 import type { PRDItem } from "../../schema/index.js";
@@ -44,6 +44,15 @@ export async function syncFolderTree(rexDir: string, store: PRDStore): Promise<v
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
   await withLock(prdLockPath(rexDir), async () => {
     const doc = await store.loadDocument();
+    // This is a full-tree rewrite that calls the serializer directly rather
+    // than going through a store, so it does not inherit the store's
+    // slug-rule guard and must apply it itself. Today every caller happens to
+    // perform a guarded store write first, which is the only reason a foreign
+    // build is not already re-slugging the tree here — a shield made of
+    // sixteen call sites, each of which has to keep holding for the guard to
+    // mean anything. Checking here makes the guarantee a property of the
+    // write instead of a property of who happened to call it.
+    await assertSlugRuleWritable(rexDir, treeRoot, doc.items);
     await serializeFolderTree(doc.items, treeRoot);
   });
 }

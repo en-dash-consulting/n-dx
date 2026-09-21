@@ -22,6 +22,7 @@ import { FileStore } from "../../../src/store/file-adapter.js";
 import { SlugRuleMismatchError, readSlugRuleMarker } from "../../../src/store/slug-rule-guard.js";
 import { SLUG_RULE_VERSION } from "../../../src/store/folder-tree-serializer.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
+import { syncFolderTree } from "../../../src/cli/commands/folder-tree-sync.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
 import type { PRDDocument, PRDItem, PRDStore } from "../../../src/store/index.js";
 
@@ -229,6 +230,60 @@ describe("slug-rule write guard", () => {
 
       // And the guard is armed again for ordinary writers.
       await expect(make(rexDir).saveDocument(doc())).resolves.toBeUndefined();
+    });
+  });
+
+  // `syncFolderTree` calls the serializer directly instead of going through a
+  // store, so it does not inherit the store's guard. Every one of its sixteen
+  // callers happens to perform a guarded store write first, which means a
+  // command-level test passes whether or not this path is guarded — the shield
+  // is the callers, not the write. These tests aim at the function itself,
+  // because that is where the guarantee has to hold for the next caller too.
+  describe("syncFolderTree", () => {
+    it("refuses a mismatched marker instead of re-slugging the tree", async () => {
+      const store = new FolderTreeStore(rexDir);
+      await store.saveDocument(doc());
+      const meta = JSON.parse(await readFile(join(rexDir, TREE_META), "utf-8"));
+      await writeFile(
+        join(rexDir, TREE_META),
+        JSON.stringify({ ...meta, slugRule: 1 }),
+        "utf-8",
+      );
+      const before = await snapshotTree(rexDir);
+
+      await expect(syncFolderTree(rexDir, new FolderTreeStore(rexDir))).rejects.toThrow(
+        SlugRuleMismatchError,
+      );
+
+      expect(await snapshotTree(rexDir)).toEqual(before);
+    });
+
+    it("refuses an unmarked tree whose paths follow a foreign rule", async () => {
+      const store = new FolderTreeStore(rexDir);
+      await store.saveDocument(doc());
+      await writeFile(
+        join(rexDir, TREE_META),
+        JSON.stringify({ title: "Guarded PRD", schema: SCHEMA_VERSION }),
+        "utf-8",
+      );
+      // The superseded rule's shape: an unconditional `-{id6}` suffix.
+      const body = await readFile(join(treeRoot, "add-sso-support.md"), "utf-8");
+      await rm(join(treeRoot, "add-sso-support.md"));
+      await writeFile(join(treeRoot, "add-sso-support-aaaaaa.md"), body, "utf-8");
+      const before = await snapshotTree(rexDir);
+
+      await expect(syncFolderTree(rexDir, new FolderTreeStore(rexDir))).rejects.toThrow(
+        SlugRuleMismatchError,
+      );
+
+      expect(await snapshotTree(rexDir)).toEqual(before);
+    });
+
+    it("still syncs a tree this build owns", async () => {
+      const store = new FolderTreeStore(rexDir);
+      await store.saveDocument(doc());
+
+      await expect(syncFolderTree(rexDir, new FolderTreeStore(rexDir))).resolves.toBeUndefined();
     });
   });
 
