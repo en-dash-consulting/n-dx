@@ -1487,10 +1487,17 @@ export async function cmdRun(
   // is opened later still. Unconditional: a dry run that hid the refusal would
   // report that the real run was going to be fine.
   //
-  // This answers the question for the first task only. `gateTree` re-asks it
-  // before every task after that, inside runOne — see createPerTaskTreeGate.
+  // This check cannot be the one the first task relies on, so `gateTree` is
+  // built without consuming it: every task re-asks inside runOne, the first
+  // included. Between here and that first task sit `--reset-deferred` below
+  // and the commit gate further down, and the commit gate blocks on an
+  // operator prompt — unbounded wall-clock time. An operator who starts a run,
+  // is asked about uncommitted changes, and answers an hour later would
+  // otherwise execute task one against a tree last verified an hour ago, and
+  // task one's completion write would be the sweeper. The cost of re-asking is
+  // one extra loadDocument, ~0.33s on a 405-item tree, once per run.
   await assertPrdTreeConformant(rexDir);
-  const gateTree = createPerTaskTreeGate(rexDir, true);
+  const gateTree = createPerTaskTreeGate(rexDir);
 
   // --reset-deferred: reset all deferred/failing tasks to pending before running.
   // This lets the user retry tasks that were deferred by infrastructure failures
