@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 22003,
-    "uniqueTokens": 13516,
+    "perCallTokens": 22010,
+    "uniqueTokens": 13523,
     "skills": 13,
     "skillTokens": 17483
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 3846,
-      "uniqueTokens": 3846
+      "perCallTokens": 3853,
+      "uniqueTokens": 3853
     },
     "core": {
       "surfaces": 1,
@@ -775,9 +775,9 @@
       "inline": false,
       "literals": 140,
       "constants": {},
-      "ownTokens": 1653,
-      "fixedChars": 6612,
-      "fixedTokens": 1653
+      "ownTokens": 1660,
+      "fixedChars": 6639,
+      "fixedTokens": 1660
     },
     {
       "pkg": "hench",
@@ -985,8 +985,8 @@
       }
     ]
   },
-  "contentHash": "f6bff532909b348d",
-  "recordedAt": "2026-09-22T17:19:00.439Z",
-  "commit": "641c6b762167",
+  "contentHash": "d0c6ca883220f832",
+  "recordedAt": "2026-09-22T17:53:44.991Z",
+  "commit": "86a1214ed464",
   "dirty": false
 }
