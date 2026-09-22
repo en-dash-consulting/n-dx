@@ -17,7 +17,18 @@ import { PRD_TREE_DIRNAME, SLUG_RULE_VERSION, resolveSiblingSlugs } from "../../
  * folder tree cannot represent (e.g., a non-epic item at the root, used to exercise
  * orphan/structural validation) is still loadable via the FileStore legacy fallback.
  */
-export function writePRD(dir: string, doc: PRDDocument): void {
+export interface WritePRDOptions {
+  /**
+   * Leave `slugRule` out of `tree-meta.json`, as every tree written before the
+   * guard shipped has it. Without this the marker short-circuits the guard and
+   * no fixture reaches the path-scan branch that a real upgrade takes — which
+   * is exactly how the guard's false refusal of the writer's own rename got
+   * past the suite.
+   */
+  omitSlugRuleMarker?: boolean;
+}
+
+export function writePRD(dir: string, doc: PRDDocument, options: WritePRDOptions = {}): void {
   mkdirSync(join(dir, ".rex"), { recursive: true });
 
   // Write tree-meta.json with the document title and the slug-rule marker.
@@ -25,7 +36,11 @@ export function writePRD(dir: string, doc: PRDDocument): void {
   // paths, and a fixture is only as conformant as this helper makes it.
   writeFileSync(
     join(dir, ".rex", "tree-meta.json"),
-    JSON.stringify({ title: doc.title, slugRule: SLUG_RULE_VERSION }),
+    JSON.stringify(
+      options.omitSlugRuleMarker
+        ? { title: doc.title }
+        : { title: doc.title, slugRule: SLUG_RULE_VERSION },
+    ),
   );
 
   // Persist the full document for the legacy read fallback. This is the only

@@ -18,7 +18,7 @@ import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import { atomicWrite } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
 import { parseTreeMeta, treeMetaContents } from "./tree-meta.js";
-import { assertSlugRuleWritable } from "./slug-rule-guard.js";
+import { assertSlugRuleWritable, assertSlugRuleAdoptable } from "./slug-rule-guard.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
 import {
   PRD_MARKDOWN_FILENAME,
@@ -496,7 +496,7 @@ export class FileStore implements PRDStore {
     // to leave the tree byte-identical, which it only does if nothing has been
     // written yet.
     if (!adoptSlugRule) {
-      await assertSlugRuleWritable(this.rexDir, this.treeRoot, doc.items);
+      await assertSlugRuleWritable(this.rexDir, this.treeRoot);
     }
     await mkdir(this.treeRoot, { recursive: true });
     await atomicWrite(
@@ -551,8 +551,12 @@ export class FileStore implements PRDStore {
    * Rewrite and marker land in the same locked write, so there is no window in
    * which the marker claims a rule the paths do not yet follow — a crash
    * between the two would disarm the guard on a tree it was meant to protect.
+   *
+   * Bounded to the adopt-older direction by {@link assertSlugRuleAdoptable},
+   * checked before the transaction opens so a refusal writes nothing at all.
    */
   async adoptSlugRule(): Promise<void> {
+    await assertSlugRuleAdoptable(this.rexDir);
     await this.runTransaction(async () => {}, true);
   }
 

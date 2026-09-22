@@ -161,6 +161,97 @@ describe("slug-rule write guard", () => {
       expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
     });
 
+    // Every tree written before this guard shipped is unmarked, so the
+    // path-scan branch is the one a real upgrade takes — and it used to judge
+    // the tree by the document *about to be written*, which already carries
+    // the mutation. Any slug-changing write therefore looked exactly like a
+    // foreign build's re-slug, and was refused with that accusation. It bit
+    // once per repository: the first such write after upgrading.
+    describe("a slug-changing write on an unmarked tree", () => {
+      /** Save through the store, then strip the marker the save recorded. */
+      async function unmarkedTree(items: PRDItem[] = ITEMS): Promise<void> {
+        await make(rexDir).saveDocument(doc(items));
+        await writeFile(
+          join(rexDir, TREE_META),
+          JSON.stringify({ title: "Guarded PRD", schema: SCHEMA_VERSION }),
+          "utf-8",
+        );
+        expect(await readSlugRuleMarker(rexDir)).toBeUndefined();
+      }
+
+      it("renames rather than refusing, and stamps the marker", async () => {
+        await unmarkedTree();
+
+        await make(rexDir).withTransaction(async (d) => {
+          d.items[0]!.title = "Renamed Support";
+        });
+
+        expect(await readdir(treeRoot)).toEqual(["renamed-support.md"]);
+        expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
+      });
+
+      // The nastiest shape of the same bug: nobody edited a title, but adding
+      // a same-titled sibling moves *both* siblings onto `-{id6}` paths, so
+      // the pending document disagreed with the tree about an item the caller
+      // never touched.
+      it("allows an add that forces a colliding sibling onto an id suffix", async () => {
+        await unmarkedTree();
+
+        await make(rexDir).withTransaction(async (d) => {
+          d.items.push(task("bbbbbbbb-2222-4222-8222-222222222222", "Add SSO Support"));
+        });
+
+        expect((await readdir(treeRoot)).sort()).toEqual([
+          "add-sso-support-aaaaaa.md",
+          "add-sso-support-bbbbbb.md",
+        ]);
+        expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
+      });
+
+      // A move or a merge only trips the guard when it changes the slug of an
+      // item it did not touch: taking one of two same-titled siblings away
+      // leaves the other unique, so the survivor drops its `-{id6}` suffix.
+      // Moving a *uniquely* titled item proves nothing here — the mismatch
+      // scan only reports a rival entry found in the same directory, and a
+      // moved item simply leaves its old directory, so that version of this
+      // test passed against the unfixed guard.
+      it("allows a move that re-slugs the twin left behind", async () => {
+        const epic: PRDItem = {
+          id: "dddddddd-4444-4444-8444-444444444444",
+          title: "Alpha Epic",
+          status: "pending",
+          level: "epic",
+          description: "",
+          priority: "medium",
+          children: [
+            task("eeeeeeee-5555-4555-8555-555555555555", "Shared Title"),
+            task("ffffffff-6666-4666-8666-666666666666", "Shared Title"),
+          ],
+        } as PRDItem;
+        await unmarkedTree([epic]);
+        // Both twins carry the suffix while they are siblings.
+        expect((await readdir(join(treeRoot, "alpha-epic"))).sort()).toEqual([
+          "index.md",
+          "shared-title-eeeeee.md",
+          "shared-title-ffffff.md",
+        ]);
+
+        await make(rexDir).withTransaction(async (d) => {
+          const moved = d.items[0]!.children!.pop()!;
+          (moved as PRDItem).level = "epic";
+          d.items.push(moved);
+        });
+
+        // The survivor is unique now, so it sheds the suffix — the rename the
+        // guard used to read as a foreign build's work.
+        expect((await readdir(join(treeRoot, "alpha-epic"))).sort()).toEqual([
+          "index.md",
+          "shared-title.md",
+        ]);
+        expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
+      });
+    });
+
     it("refuses an unmarked tree whose paths follow a foreign rule", async () => {
       await make(rexDir).saveDocument(doc());
       await writeFile(
@@ -231,6 +322,49 @@ describe("slug-rule write guard", () => {
       // And the guard is armed again for ordinary writers.
       await expect(make(rexDir).saveDocument(doc())).resolves.toBeUndefined();
     });
+
+    // A migration can only move a tree onto the rule this build implements,
+    // so adopt-newer is a downgrade wearing a migration's name. Left
+    // unbounded it made the guard's own advice into a loop: the newer build
+    // refuses the downgraded tree, tells the operator to migrate, and the two
+    // builds trade whole-tree renames forever.
+    describe("a tree marked with a newer rule", () => {
+      async function markNewer(): Promise<void> {
+        await make(rexDir).saveDocument(doc());
+        const meta = JSON.parse(await readFile(join(rexDir, TREE_META), "utf-8"));
+        await writeFile(
+          join(rexDir, TREE_META),
+          JSON.stringify({ ...meta, slugRule: SLUG_RULE_VERSION + 1 }),
+          "utf-8",
+        );
+      }
+
+      it("is refused by adoptSlugRule, which writes nothing", async () => {
+        await markNewer();
+        const before = await snapshotTree(rexDir);
+
+        await expect(make(rexDir).adoptSlugRule!()).rejects.toThrow(SlugRuleMismatchError);
+
+        expect(await snapshotTree(rexDir)).toEqual(before);
+        expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION + 1);
+      });
+
+      it("is refused with an upgrade instruction, not a migration one", async () => {
+        await markNewer();
+
+        const err = await make(rexDir)
+          .saveDocument(doc())
+          .then(
+            () => undefined,
+            (e: unknown) => e as SlugRuleMismatchError,
+          );
+
+        expect(err).toBeInstanceOf(SlugRuleMismatchError);
+        expect(err!.found).toBe(SLUG_RULE_VERSION + 1);
+        expect(err!.message).toContain("Upgrade rex");
+        expect(err!.message).not.toMatch(/Run 'rex migrate-slugs'/);
+      });
+    });
   });
 
   // `syncFolderTree` calls the serializer directly instead of going through a
@@ -285,6 +419,45 @@ describe("slug-rule write guard", () => {
 
       await expect(syncFolderTree(rexDir, new FolderTreeStore(rexDir))).resolves.toBeUndefined();
     });
+  });
+
+  // The refusal exists to be read. `parentDir` is built with `path.join`, so
+  // concatenating a hardcoded "/" onto it rendered a nested offender as the
+  // mixed `epic-x\feature-y/task.md` on Windows — a path the operator cannot
+  // paste anywhere.
+  it("renders a nested offender with the platform separator", async () => {
+    const epic: PRDItem = {
+      id: "dddddddd-4444-4444-8444-444444444444",
+      title: "Alpha Epic",
+      status: "pending",
+      level: "epic",
+      description: "",
+      priority: "medium",
+      children: [task("eeeeeeee-5555-4555-8555-555555555555", "Nested Task")],
+    } as PRDItem;
+    await new FolderTreeStore(rexDir).saveDocument(doc([epic]));
+    await writeFile(
+      join(rexDir, TREE_META),
+      JSON.stringify({ title: "Guarded PRD", schema: SCHEMA_VERSION }),
+      "utf-8",
+    );
+
+    // Re-slug the *nested* entry the superseded rule's way, so the offender
+    // has a parent directory in its rendered path.
+    const epicDir = join(treeRoot, "alpha-epic");
+    const body = await readFile(join(epicDir, "nested-task.md"), "utf-8");
+    await rm(join(epicDir, "nested-task.md"));
+    await writeFile(join(epicDir, "nested-task-eeeeee.md"), body, "utf-8");
+
+    const err = await new FolderTreeStore(rexDir)
+      .saveDocument(doc([epic]))
+      .then(
+        () => undefined,
+        (e: unknown) => e as SlugRuleMismatchError,
+      );
+
+    expect(err).toBeInstanceOf(SlugRuleMismatchError);
+    expect(err!.message).toContain(join("alpha-epic", "nested-task-eeeeee.md"));
   });
 
   it("treats a damaged sidecar as unmarked rather than as permission to write", async () => {

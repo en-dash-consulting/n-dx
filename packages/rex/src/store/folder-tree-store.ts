@@ -27,7 +27,7 @@ import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
 import { parseTreeMeta, treeMetaContents } from "./tree-meta.js";
-import { assertSlugRuleWritable } from "./slug-rule-guard.js";
+import { assertSlugRuleWritable, assertSlugRuleAdoptable } from "./slug-rule-guard.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 import {
@@ -109,7 +109,7 @@ export class FolderTreeStore implements PRDStore {
     // to leave the tree byte-identical, which it only does if nothing has been
     // written yet.
     if (!adoptSlugRule) {
-      await assertSlugRuleWritable(this.rexDir, this.treeRoot, doc.items);
+      await assertSlugRuleWritable(this.rexDir, this.treeRoot);
     }
     await mkdir(this.treeRoot, { recursive: true });
     await writeFile(this.path(TREE_META_FILENAME), JSON.stringify(treeMetaContents(doc)), "utf-8");
@@ -290,8 +290,12 @@ export class FolderTreeStore implements PRDStore {
    * Rewrite and marker land in the same locked write, so there is no window in
    * which the marker claims a rule the paths do not yet follow — a crash
    * between the two would disarm the guard on a tree it was meant to protect.
+   *
+   * Bounded to the adopt-older direction by {@link assertSlugRuleAdoptable},
+   * checked before the transaction opens so a refusal writes nothing at all.
    */
   async adoptSlugRule(): Promise<void> {
+    await assertSlugRuleAdoptable(this.rexDir);
     await this.runTransaction(async () => {}, undefined, true);
   }
 

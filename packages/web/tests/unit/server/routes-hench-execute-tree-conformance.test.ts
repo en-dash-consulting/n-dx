@@ -143,14 +143,36 @@ describe("POST /api/hench/execute — PRD tree conformance gate", () => {
     expect(await execute("task-nope")).toMatchObject({ status: 412 });
   });
 
-  it("refuses a foreign slug-rule marker even when every path conforms", async () => {
+  /** Rewrite the marker to `slugRule`, leaving every path conformant. */
+  async function markRule(offset: number): Promise<void> {
     const metaPath = join(rexDir, TREE_META);
     const meta = JSON.parse(await readFile(metaPath, "utf-8"));
-    await writeFile(metaPath, JSON.stringify({ ...meta, slugRule: meta.slugRule + 1 }), "utf-8");
+    await writeFile(
+      metaPath,
+      JSON.stringify({ ...meta, slugRule: meta.slugRule + offset }),
+      "utf-8",
+    );
+  }
+
+  it("refuses a foreign slug-rule marker even when every path conforms", async () => {
+    await markRule(-1);
 
     const { status, error } = await execute("task-def456");
 
     expect(status).toBe(412);
     expect(error).toMatch(/rex migrate-slugs/);
+  });
+
+  // `migrate-slugs` rewrites the tree under *this* build's rule, so advising
+  // it for a newer tree walks the operator into a downgrade — and the newer
+  // build, refused in turn, is advised to migrate it back.
+  it("advises an upgrade, not a migration, when the tree's rule is newer", async () => {
+    await markRule(1);
+
+    const { status, error } = await execute("task-def456");
+
+    expect(status).toBe(412);
+    expect(error).toMatch(/Upgrade rex/);
+    expect(error).not.toMatch(/Run 'rex migrate-slugs'/);
   });
 });

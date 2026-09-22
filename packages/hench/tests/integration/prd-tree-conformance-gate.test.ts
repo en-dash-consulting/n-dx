@@ -118,14 +118,36 @@ describe("the pre-run PRD tree conformance gate", () => {
     await expect(assertPrdTreeConformant(rexDir)).rejects.toThrow(/rex migrate-slugs/);
   });
 
-  it("refuses a foreign slug-rule marker even when every path conforms", async () => {
-    // A tree written by a *future* rule looks conformant to nothing this build
-    // can compute, so the recorded marker is the only evidence there is.
+  /** Rewrite the marker to `slugRule`, leaving every path conformant. */
+  async function markRule(slugRule: number): Promise<void> {
     const metaPath = join(rexDir, TREE_META_FILENAME);
     const meta = JSON.parse(await readFile(metaPath, "utf-8"));
-    await writeFile(metaPath, JSON.stringify({ ...meta, slugRule: meta.slugRule + 1 }), "utf-8");
+    await writeFile(metaPath, JSON.stringify({ ...meta, slugRule }), "utf-8");
+  }
+
+  it("refuses a foreign slug-rule marker even when every path conforms", async () => {
+    // A tree written by a rule this build does not implement looks conformant
+    // to nothing it can compute, so the marker is the only evidence there is.
+    const { slugRule } = JSON.parse(await readFile(join(rexDir, TREE_META_FILENAME), "utf-8"));
+    await markRule(slugRule - 1);
 
     await expect(assertPrdTreeConformant(rexDir)).rejects.toThrow(/rex migrate-slugs/);
+  });
+
+  // Direction matters in the advice, not just in the refusal: `migrate-slugs`
+  // rewrites the tree under *this* build's rule, so recommending it for a
+  // newer tree walks the operator into a downgrade.
+  it("tells the operator to upgrade, not to migrate, when the tree is newer", async () => {
+    const { slugRule } = JSON.parse(await readFile(join(rexDir, TREE_META_FILENAME), "utf-8"));
+    await markRule(slugRule + 1);
+
+    const err = await assertPrdTreeConformant(rexDir).then(
+      () => undefined,
+      (e: unknown) => e as Error,
+    );
+
+    expect(err?.message).toMatch(/Upgrade rex/);
+    expect(err?.message).not.toMatch(/Run 'rex migrate-slugs'/);
   });
 
   it("names the offending path so the operator can see the shape of the rewrite", async () => {

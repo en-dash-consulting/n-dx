@@ -52,7 +52,7 @@ export async function syncFolderTree(rexDir: string, store: PRDStore): Promise<v
     // sixteen call sites, each of which has to keep holding for the guard to
     // mean anything. Checking here makes the guarantee a property of the
     // write instead of a property of who happened to call it.
-    await assertSlugRuleWritable(rexDir, treeRoot, doc.items);
+    await assertSlugRuleWritable(rexDir, treeRoot);
     await serializeFolderTree(doc.items, treeRoot);
   });
 }
