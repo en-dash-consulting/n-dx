@@ -848,6 +848,15 @@ export interface FinalizeRunOptions {
    */
   autonomous?: boolean;
   /**
+   * Cross-worktree claims for this run, when it has any.
+   *
+   * Finalization is where the uncommitted-work gate refuses a completion, and
+   * that refusal is the one outcome that must *hold* the task's claim rather
+   * than let the run's `finally` release it. Without this the refusal path
+   * could not reach the claims it needed to hold. See `process/task-claims.ts`.
+   */
+  claims?: TaskClaims;
+  /**
    * PRD store used to reset task status to pending on failure.
    * When provided, if the run fails and the task is still in_progress,
    * it is reset to pending so it reappears as actionable. This occurs

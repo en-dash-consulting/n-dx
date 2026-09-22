@@ -48,8 +48,16 @@ export interface ClaimReport {
   mine: boolean;
 }
 
-/** What a claim is doing, in one word: the held reason, or "running". */
-export function claimState(claim: Pick<TaskClaim, "reason">): string {
+/**
+ * What a claim is doing, in one word: the held reason, or "running".
+ *
+ * Takes a loose `string` rather than {@link ClaimHoldReason}: the value has
+ * been read back off disk, where the store validates it as a string and
+ * nothing more. A claims file written by a newer build carrying a reason this
+ * one does not know about should print that reason, not crash or call a held
+ * claim "running".
+ */
+export function claimState(claim: { reason?: string | null }): string {
   return claim.reason ?? "running";
 }
 
