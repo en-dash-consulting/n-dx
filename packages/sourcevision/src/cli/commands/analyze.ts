@@ -44,7 +44,7 @@ import { generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger } from "../../analyzers/run-ledger.js";
 import { configureJudgmentCache } from "../../analyzers/judgment-cache.js";
-import { cmdNarrate, NARRATION_LOG } from "./narrate.js";
+import { carryNarration, cmdNarrate, NARRATION_LOG, takeOverNarration } from "./narrate.js";
 import type { NarrateDeps } from "./narrate.js";
 import type { Manifest } from "../sourcevision-core.js";
 
@@ -268,6 +268,15 @@ async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds:
   }
 }
 
+function currentZoneIds(svDir: string): Set<string> {
+  try {
+    const zones = JSON.parse(readFileSync(join(svDir, DATA_FILES.zones), "utf-8")) as { zones?: { id: string }[] };
+    return new Set((zones.zones ?? []).map((z) => z.id));
+  } catch {
+    return new Set();
+  }
+}
+
 /** Runs kept in `.sourcevision/.cache/analyses.jsonl`; older lines are dropped. */
 const ANALYSIS_HISTORY_MAX = 200;
 
@@ -344,12 +353,34 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     inventoryResult: null,
   };
 
+  // Stop a narrator still working on the previous analysis before this one
+  // rewrites zones.json; whatever it had not finished is queued again below.
+  const takenOver = takeOverNarration(absDir);
+  if (takenOver.stopped !== undefined) {
+    info(dim(`  [narrate] stopped the previous background narrator (pid ${takenOver.stopped}); its unfinished work is carried into this run`));
+  }
+
   await runDeepSubAnalyses(absDir, extraArgs);
 
   info(`${bold("Analyzing:")} ${dim(absDir)}`);
   info("");
 
   await executePhases(ctx, filter, extraArgs);
+
+  // A --fast run makes no LLM calls, so it leaves the carried work recorded
+  // (as a retryable failure) for the next full run instead of spawning for it.
+  if (!ctx.fastMode && takenOver.zones.length + takenOver.names.length > 0) {
+    const merged = carryNarration(
+      takenOver,
+      { zones: ctx.pendingNarration, names: ctx.pendingNames },
+      currentZoneIds(svDir),
+    );
+    ctx.pendingNarration = merged.zones;
+    ctx.pendingNames = merged.names;
+    if (merged.carried + merged.dropped > 0) {
+      info(dim(`  [narrate] ${merged.carried} unfinished item(s) from the previous narration carried forward${merged.dropped > 0 ? `, ${merged.dropped} dropped (zone no longer exists)` : ""}`));
+    }
+  }
 
   // --wait: narrate the escalated zones (and generate pending names) now,
   // before the outputs are written.

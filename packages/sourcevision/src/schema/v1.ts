@@ -46,6 +46,8 @@ export interface AnalysisRun {
     byTaskClass: Record<string, LLMClassUsage>;
     judgmentCache?: { hits: number; misses: number };
   };
+  /** This run's partition review, when a previous partition existed; `reused` says whether its zones were kept verbatim. */
+  partition?: PartitionReview & { reused: boolean };
 }
 
 /** See `Manifest.narration`. */
@@ -438,6 +440,36 @@ export interface Zones {
   lastReset?: { from: number; to: number };
   /** Zone stability metrics compared to the previous analysis run. */
   stability?: ZoneStability;
+  /** Whether the previous partition was judged fit to reuse (see `analyzers/partition-review.ts`). */
+  partitionReview?: PartitionReview;
+}
+
+/** Deterministic signals of how fragmented a zone partition is. */
+export interface PartitionHealth {
+  zones: number;
+  /** Zones holding two files or fewer. */
+  smallZones: number;
+  smallShare: number;
+  /** Zone ids ending in a numeric suffix (`routes-7`). */
+  numericIds: number;
+  /** Largest zone's share of all zoned files. */
+  largestShare: number;
+  verdict: "healthy" | "borderline" | "fragmented";
+  reasons?: string[];
+}
+
+/** The partition review recorded with the zones it produced. */
+export interface PartitionReview {
+  /** `inputFingerprint` the review was made for. */
+  fingerprint: string;
+  /** Health of the partition that was reviewed (the previous one). */
+  health: PartitionHealth;
+  /** True when the reviewed partition was discarded and re-derived without stability bias. */
+  rejected: boolean;
+  /** Jev's probability that the map is sensible, when it was asked. */
+  mapProbability?: number;
+  /** Health of the partition this run produced, when it re-partitioned. */
+  after?: PartitionHealth;
 }
 
 /** Zone stability metrics: how much the zone topology changed between runs. */

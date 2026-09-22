@@ -129,6 +129,7 @@ export function sortZonesData(zones: Zones): Zones {
     ...(zones.zoneContentHashes ? { zoneContentHashes: zones.zoneContentHashes } : {}),
     ...(zones.lastReset ? { lastReset: zones.lastReset } : {}),
     ...(zones.stability ? { stability: zones.stability } : {}),
+    ...(zones.partitionReview ? { partitionReview: zones.partitionReview } : {}),
   };
 }
 

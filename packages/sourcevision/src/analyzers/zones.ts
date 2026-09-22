@@ -32,8 +32,10 @@ import type {
   AnalyzeTokenUsage,
   SubAnalysisRef,
   ProjectProfile,
+  PartitionReview,
 } from "../schema/index.js";
 import type { SubAnalysis } from "./workspace.js";
+import { assessPartitionHealth, formatPartitionLine, reviewPreviousPartition } from "./partition-review.js";
 import {
   buildPackageMap,
   computeCrossRepoCrossings,
@@ -60,7 +62,7 @@ import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
 import { judgeFindings, judgeZoneFragility, judgeHeuristicFindings, judgeMoves } from "./enrich-judge.js";
 import { cascadeEnrichment } from "./enrich-cascade.js";
 import { getJudgmentRoute } from "./claude-client.js";
-import { setRunMode } from "./run-ledger.js";
+import { recordPartitionReview, setRunMode } from "./run-ledger.js";
 import { emptyAnalyzeTokenUsage } from "./token-usage.js";
 import { deduplicateFindings, enforceSeverityRules } from "./enrich-parsing.js";
 import { detectPinDivergence, detectImportNeighborMoves } from "./move-recommendations.js";
@@ -253,6 +255,14 @@ function addStabilityEdges(
  * a large merged zone cannot inherit the identity of a tiny prior zone it
  * happens to fully contain. */
 const ZONE_OVERLAP_THRESHOLD = 0.5;
+
+/**
+ * Overlap required to inherit identity from a partition the review rejected.
+ * Its ids and names were derived from fragments; at the default 0.5 a new
+ * zone that merges two fragments takes one fragment's label. Only a zone that
+ * is substantially the same set of files keeps the old identity.
+ */
+const REJECTED_PARTITION_OVERLAP_THRESHOLD = 0.8;
 
 /**
  * Preserve previous zone IDs and names when a new zone has high file overlap
@@ -2820,11 +2830,13 @@ function buildAnalyzeZonesResult(opts: {
   stability?: ZoneStability;
   pendingNarration?: string[];
   pendingNames?: string[];
+  partitionReview?: PartitionReview;
 }): AnalyzeZonesResult {
   const {
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
     previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration, pendingNames,
+    partitionReview,
   } = opts;
 
   const prevMetaCount = previousZones?.metaEvaluationCount ?? 0;
@@ -2850,6 +2862,7 @@ function buildAnalyzeZonesResult(opts: {
       zoneContentHashes: remappedContentHashes,
       ...(lastReset ? { lastReset } : {}),
       ...(stability ? { stability } : {}),
+      ...(partitionReview ? { partitionReview } : {}),
     }),
     tokenUsage: enrichTokenUsage,
     structureChanged,
@@ -2949,7 +2962,21 @@ export async function analyzeZones(
     !!previousZones?.zones?.length &&
     !!previousZones.structureHash &&
     previousZones.inputFingerprint === inputFingerprint;
-  const reuseStructure = (options?.reuseStructure ?? false) || inputsUnchanged;
+
+  // A previous partition is reused (inputs unchanged) or seeds Louvain
+  // (inputs changed) only after it passes review — otherwise a fragmented
+  // partition is frozen across runs and upgrades. An explicit reuse request
+  // (--full passes within one analyze) skips the review.
+  let partitionReview: PartitionReview | undefined = previousZones?.partitionReview;
+  let trustPrevious = true;
+  let freshReview = false;
+  if (previousZones?.zones?.length && !options?.reuseStructure) {
+    const decision = await reviewPreviousPartition(previousZones, inputFingerprint);
+    partitionReview = decision.review;
+    trustPrevious = decision.trustPrevious;
+    freshReview = decision.fresh;
+  }
+  const reuseStructure = (options?.reuseStructure ?? false) || (inputsUnchanged && trustPrevious);
 
   if (reuseStructure && previousZones) {
     // Reuse existing zone structure — skip Louvain to avoid non-deterministic
@@ -2962,7 +2989,7 @@ export async function analyzeZones(
   } else {
     // ── Build previous zone assignment for stability bias ──
     let previousZoneAssignment: Map<string, string> | undefined;
-    if (previousZones?.zones) {
+    if (previousZones?.zones && trustPrevious) {
       previousZoneAssignment = new Map<string, string>();
       for (const zone of previousZones.zones) {
         for (const file of zone.files) {
@@ -2998,6 +3025,14 @@ export async function analyzeZones(
     // ── Structure hash & change detection ──
     structureHash = computeStructureHash(expandedZones);
     structureChanged = previousZones?.structureHash !== structureHash;
+    if (partitionReview?.rejected && !trustPrevious) {
+      partitionReview = { ...partitionReview, after: assessPartitionHealth(expandedZones) };
+    }
+  }
+  if (partitionReview && freshReview) {
+    const line = formatPartitionLine(partitionReview);
+    if (line) console.log(line);
+    recordPartitionReview({ ...partitionReview, reused: reuseStructure });
   }
 
   const validPrevious = structureChanged ? undefined : previousZones;
@@ -3022,7 +3057,11 @@ export async function analyzeZones(
 
   // ── Preserve previous zone identity for high-overlap zones ──
   let finalZones = previousZones
-    ? preservePreviousZoneIdentity(enrichedZones, previousZones.zones)
+    ? preservePreviousZoneIdentity(
+        enrichedZones,
+        previousZones.zones,
+        trustPrevious ? ZONE_OVERLAP_THRESHOLD : REJECTED_PARTITION_OVERLAP_THRESHOLD,
+      )
     : enrichedZones;
   if (enrichResult.cascade && previousZones) {
     finalZones = reapplyCascadeLabels(finalZones, enrichedZones);
@@ -3162,5 +3201,6 @@ export async function analyzeZones(
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
     previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration, pendingNames,
+    partitionReview,
   });
 }

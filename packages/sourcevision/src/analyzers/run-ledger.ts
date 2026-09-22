@@ -36,6 +36,7 @@ let _phases: Record<string, number> = {};
 let _byTaskClass: Record<string, LLMClassUsage> = {};
 let _cacheHits = 0;
 let _cacheMisses = 0;
+let _partition: AnalysisRun["partition"];
 
 /** Reset the ledger and start the run clock. */
 export function startRunLedger(mode: AnalysisRun["mode"] = "generative"): void {
@@ -45,6 +46,7 @@ export function startRunLedger(mode: AnalysisRun["mode"] = "generative"): void {
   _byTaskClass = {};
   _cacheHits = 0;
   _cacheMisses = 0;
+  _partition = undefined;
 }
 
 /**
@@ -86,6 +88,11 @@ export function recordLLMCall(rec: LLMCallRecord): void {
   bucket.model = rec.model;
 }
 
+/** The zone phase's partition review; the last one recorded wins. */
+export function recordPartitionReview(partition: NonNullable<AnalysisRun["partition"]>): void {
+  _partition = partition;
+}
+
 export function recordJudgmentCache(hits: number, misses: number): void {
   _cacheHits += hits;
   _cacheMisses += misses;
@@ -103,6 +110,7 @@ export function snapshotRunLedger(): AnalysisRun {
   if (_cacheHits + _cacheMisses > 0) {
     run.llm.judgmentCache = { hits: _cacheHits, misses: _cacheMisses };
   }
+  if (_partition) run.partition = structuredClone(_partition);
   return run;
 }
 

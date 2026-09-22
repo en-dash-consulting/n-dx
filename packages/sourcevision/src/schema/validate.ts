@@ -22,6 +22,24 @@ const LLMClassUsageSchema = z.object({
   model: z.string(),
 });
 
+const PartitionHealthSchema = z.object({
+  zones: z.number().int().nonnegative(),
+  smallZones: z.number().int().nonnegative(),
+  smallShare: z.number().min(0).max(1),
+  numericIds: z.number().int().nonnegative(),
+  largestShare: z.number().min(0).max(1),
+  verdict: z.enum(["healthy", "borderline", "fragmented"]),
+  reasons: z.array(z.string()).optional(),
+});
+
+const PartitionReviewSchema = z.object({
+  fingerprint: z.string(),
+  health: PartitionHealthSchema,
+  rejected: z.boolean(),
+  mapProbability: z.number().min(0).max(1).optional(),
+  after: PartitionHealthSchema.optional(),
+});
+
 const AnalysisRunSchema = z.object({
   at: z.string(),
   mode: z.enum(["fast", "generative", "narrate", "cascade", "narration"]),
@@ -31,6 +49,7 @@ const AnalysisRunSchema = z.object({
     byTaskClass: z.record(z.string(), LLMClassUsageSchema),
     judgmentCache: z.object({ hits: z.number().int().nonnegative(), misses: z.number().int().nonnegative() }).optional(),
   }),
+  partition: PartitionReviewSchema.extend({ reused: z.boolean() }).optional(),
 });
 
 export const ManifestSchema = z.object({
@@ -249,6 +268,7 @@ export const ZonesSchema = z.object({
   structureHash: z.string().optional(),
   zoneContentHashes: z.record(z.string()).optional(),
   lastReset: z.object({ from: z.number().int().positive(), to: z.number().int().positive() }).optional(),
+  partitionReview: PartitionReviewSchema.optional(),
 });
 
 // ── Components ──────────────────────────────────────────────────────────────

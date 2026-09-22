@@ -29,6 +29,20 @@ export interface Manifest {
   zoneOutputs?: boolean;
   /** Incorporated sub-analyses (nested .sourcevision/ directories). */
   children?: SubAnalysisRef[];
+  /** Background `sv narrate` state — zone names and insights still landing while `pending`. */
+  narration?: NarrationState;
+}
+
+/** Mirrors sourcevision's `NarrationState`. */
+export interface NarrationState {
+  status: "pending" | "done" | "failed";
+  zones: string[];
+  names?: string[];
+  startedAt: string;
+  finishedAt?: string;
+  pid?: number;
+  log?: string;
+  reason?: string;
 }
 
 /** Reference to an incorporated sub-analysis. */

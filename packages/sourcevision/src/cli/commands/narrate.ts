@@ -102,6 +102,89 @@ export function mergeNarration(
   };
 }
 
+/** Reasons a narration is worth retrying on the next analyze; a failed narration call is not. */
+const RETRYABLE_NARRATION_REASONS = [
+  "superseded by a newer analysis",
+  "narrator exited without finishing",
+  "could not spawn narrator",
+];
+
+export interface NarrationTakeover {
+  /** Zone ids still awaiting narration. */
+  zones: string[];
+  /** Zone ids still awaiting generated names. */
+  names: string[];
+  /** Pid of a live narrator this call stopped. */
+  stopped?: number;
+}
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // EPERM: the process exists but belongs to someone else.
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/**
+ * Called at the start of `analyze`: take over whatever the previous narrator
+ * left unfinished. A live narrator is stopped — it would otherwise race this
+ * analysis for zones.json and then discard its own result as superseded — and
+ * a pending one whose process is gone is recorded as failed. Either way its
+ * zones and names come back so this analysis can queue them again; nothing a
+ * narrator was asked to do is lost to a second analyze.
+ */
+export function takeOverNarration(
+  absDir: string,
+  deps: { isAlive?: (pid: number) => boolean; kill?: (pid: number) => void } = {},
+): NarrationTakeover {
+  const manifest = readManifest(absDir);
+  const n = manifest.narration;
+  if (!n || n.status === "done") return { zones: [], names: [] };
+  const isAlive = deps.isAlive ?? pidAlive;
+  const kill = deps.kill ?? ((pid: number) => { try { process.kill(pid, "SIGTERM"); } catch { /* gone already */ } });
+
+  let stopped: number | undefined;
+  if (n.status === "pending") {
+    let reason = "narrator exited without finishing";
+    if (n.pid !== undefined && isAlive(n.pid)) {
+      kill(n.pid);
+      stopped = n.pid;
+      reason = "superseded by a newer analysis";
+    }
+    manifest.narration = { ...n, status: "failed", finishedAt: new Date().toISOString(), reason };
+    writeManifest(absDir, manifest);
+  } else if (!RETRYABLE_NARRATION_REASONS.some((r) => n.reason?.startsWith(r))) {
+    return { zones: [], names: [] };
+  }
+  return { zones: [...n.zones], names: [...(n.names ?? [])], ...(stopped !== undefined ? { stopped } : {}) };
+}
+
+/**
+ * Fold taken-over work into this run's pending sets, keeping only zone ids
+ * that still exist. Returns the merged sets and how many carried ids were
+ * dropped because their zone is gone.
+ */
+export function carryNarration(
+  carried: NarrationTakeover,
+  pending: { zones?: string[]; names?: string[] },
+  currentZoneIds: ReadonlySet<string>,
+): { zones: string[]; names: string[]; carried: number; dropped: number } {
+  const zones = new Set(pending.zones ?? []);
+  const names = new Set(pending.names ?? []);
+  let carriedCount = 0;
+  let dropped = 0;
+  for (const [from, into] of [[carried.zones, zones], [carried.names, names]] as const) {
+    for (const id of from) {
+      if (!currentZoneIds.has(id)) { dropped++; continue; }
+      if (!into.has(id)) { into.add(id); carriedCount++; }
+    }
+  }
+  return { zones: [...zones], names: [...names], carried: carriedCount, dropped };
+}
+
 /** True when another analysis finished after this narration began. */
 export function isSuperseded(startedAnalyzedAt: string | undefined, current: Manifest): boolean {
   return startedAnalyzedAt !== undefined && current.analyzedAt !== startedAnalyzedAt;
@@ -164,6 +247,8 @@ export async function cmdNarrate(targetDir: string, opts: NarrateOptions): Promi
       writeFileSync(join(svDir, DATA_FILES.zones), toCanonicalJSON(stored));
       info(`  ${applied.renamed.length} zone(s) renamed → ${dim(join(svDir, DATA_FILES.zones))}`);
     }
+    // Names are done: a later takeover must not queue them again.
+    if (!opts.inline) setNarration(absDir, { names: [] });
   }
 
   const targets = stored.zones.filter((z) => zoneIds.includes(z.id));
