@@ -26,3 +26,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Lead Next Steps and Problems titles with plain language before the metric](./lead-next-steps-and-problems-titles.md) | pending |
 | [Make CLI progress monotonic and print retries on their own line](./make-cli-progress-monotonic-and-print.md) | pending |
 | [Show analysed, inventoried-only and skipped languages with counts on the Files page](./show-analysed-inventoried-only-and.md) | pending |
+| [Print how to stop the server on the ndx start success block](./print-how-to-stop-the-server-on-the.md) | pending |
