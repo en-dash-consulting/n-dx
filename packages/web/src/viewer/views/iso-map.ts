@@ -45,6 +45,7 @@ import {
   type IsoMapControls,
   type IsoMapSource,
 } from "./iso-map-url.js";
+import { appUrl } from "../base-path.js";
 
 type LoadState = "loading" | "ready" | "empty" | "error";
 
@@ -256,15 +257,18 @@ export function IsoMapView() {
         }, state === "loading"
           ? "Generating…"
           : html !== null ? "Regenerate" : "Generate"),
+        // The in-app fetch is base-path aware (installBasePathFetch); a raw
+        // href is not, and under the hub `/api/iso-map` at the root answers
+        // 409 "several projects are registered". Prefix it here.
         h("a", {
           class: "cmd-btn cmd-btn-secondary",
-          href: appliedUrl,
+          href: appUrl(appliedUrl),
           target: "_blank",
           rel: "noopener noreferrer",
         }, "Open in new tab"),
         h("a", {
           class: "cmd-btn cmd-btn-secondary",
-          href: appliedUrl,
+          href: appUrl(appliedUrl),
           download: isoMapDownloadName(applied),
         }, "Download HTML"),
       ),

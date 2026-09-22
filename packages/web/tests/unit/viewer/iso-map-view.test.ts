@@ -12,6 +12,7 @@ import { act } from "preact/test-utils";
 import { IsoMapView } from "../../../src/viewer/views/iso-map.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 import { ISO_MAP_EMPTY_HEADER } from "../../../src/viewer/views/iso-map-url.js";
+import { setBasePathForTests } from "../../../src/viewer/base-path.js";
 import { SOURCEVISION_TABS } from "../../../src/viewer/views/index.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import { buildValidViews } from "../../../src/shared/index.js";
@@ -159,6 +160,24 @@ describe("IsoMapView", () => {
     expect(links[0].getAttribute("target")).toBe("_blank");
     expect(links[0].getAttribute("rel")).toBe("noopener noreferrer");
     expect(links[1].getAttribute("download")).toBe("iso-map-auto-40.html");
+  });
+
+  it("prefixes the new-tab and download links with the hub base path", async () => {
+    // The in-app fetch is rewritten by installBasePathFetch; a raw href is
+    // what the browser follows, and under the hub the root /api/iso-map
+    // answers 409 when several projects are registered.
+    setBasePathForTests("/p/beergame");
+    try {
+      mount();
+      await settle();
+      const links = Array.from(root.querySelectorAll("a.cmd-btn")) as HTMLAnchorElement[];
+      expect(links).toHaveLength(2);
+      for (const link of links) {
+        expect(link.getAttribute("href")).toBe("/p/beergame/api/iso-map?source=auto&maxNodes=40&externals=1");
+      }
+    } finally {
+      setBasePathForTests(null);
+    }
   });
 
   // ── Controls → URL ─────────────────────────────────────────────────
