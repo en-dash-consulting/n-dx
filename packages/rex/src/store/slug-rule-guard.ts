@@ -20,15 +20,27 @@
  * - **Marker differs.** Refuse the whole save. Whether the build or the tree
  *   is the stale one does not change the refusal, but it does change the
  *   advice — see {@link markerAdvice}.
- * - **Marker absent.** Every tree written before this guard existed. Refusing
- *   these outright would break every existing checkout, so the tree is judged
- *   on its paths instead: conformant means adopt it and write the marker,
- *   non-conformant means refuse exactly as a mismatch would. The tree is read
- *   from disk for this, never taken from the document about to be written —
- *   that document already carries the mutation, so judging by it made the
- *   guard refuse the caller's own rename. The path scan is the expensive
- *   branch, and it runs at most once per tree: the save it permits writes the
- *   marker, and every save after that takes the cheap one.
+ * - **Marker absent.** Refuse, unless the tree holds no items — a tree that
+ *   does not exist yet has nothing to protect, and that is the branch a first
+ *   save and `rex init` take.
+ *
+ * The absent case used to be adopted when the paths looked right, on the
+ * reading that no marker meant a tree older than the guard. That reading died
+ * the first time it was tested: a rex MCP server started before the marker
+ * existed saved the PRD and rewrote `tree-meta.json` from a type with no
+ * `slugRule` field, erasing the record while moving no path at all. From then
+ * on "absent" covers two states — a tree older than the guard, and a tree
+ * whose guard was disarmed by a build that could not know better — and nothing
+ * on disk tells them apart. Adopting on a path scan is not a sound tiebreak
+ * either: the scan can only recognise a rule this build can reproduce, so a
+ * tree re-slugged by a *future* build scans clean and gets this build's marker
+ * stamped on paths it did not write. So absence is refused, and the operator
+ * runs `rex migrate-slugs`, which re-records the marker after bringing every
+ * path onto rule {@link SLUG_RULE_VERSION} rather than assuming they are
+ * already there.
+ *
+ * This costs every repository one `rex migrate-slugs` on upgrade, once. That
+ * is the price of the marker meaning anything at all.
  *
  * `rex migrate-slugs` is the sole sanctioned way past a refusal: it rewrites
  * the tree under this build's rule and adopts the marker in the same locked
@@ -52,6 +64,33 @@ import { TREE_META_FILENAME } from "./paths.js";
 
 /** How many offending paths a refusal lists before it stops. */
 const SAMPLE_LIMIT = 5;
+
+/**
+ * The sentence every surface says about a tree carrying no slug-rule marker.
+ *
+ * Shared rather than repeated so the store, `rex validate`, `ndx work` and the
+ * dashboard's Execute cannot describe the same tree three different ways — an
+ * operator who hits the refusal in one surface and searches for it in another
+ * must land on the same instruction.
+ */
+export const SLUG_RULE_MARKER_MISSING = "slug rule marker missing; run rex migrate-slugs";
+
+/**
+ * Why an absent marker is refused rather than adopted, and what fixes it.
+ *
+ * Appended to {@link SLUG_RULE_MARKER_MISSING} by surfaces with room for it.
+ */
+function missingMarkerExplanation(): string {
+  return (
+    `The tree records the rule it was written under in ${TREE_META_FILENAME}, and this ` +
+    `one carries no such record. An absent marker used to mean a tree older than the ` +
+    `guard, and was adopted when the paths scanned clean. It no longer can be: a build ` +
+    `that predates the field rewrites the sidecar without it, erasing the record while ` +
+    `moving no path — so absence is equally a guard someone disarmed, and nothing on ` +
+    `disk separates the two. 'rex migrate-slugs' re-records the marker after bringing ` +
+    `every path onto rule ${SLUG_RULE_VERSION}, which is the verification adoption skipped.`
+  );
+}
 
 /**
  * Render up to {@link SAMPLE_LIMIT} offending paths, with an "and N more" tail.
@@ -157,26 +196,16 @@ function markerAdvice(found: number): string {
  * any file** — the contract is that a refused save leaves the tree byte for
  * byte as it was, which is only true if nothing has been written yet.
  *
- * A tree that does not exist yet passes: {@link findNonConformingSlugs}
- * reports nothing for an absent directory, so a first save writes the marker
- * rather than being refused for having none.
- *
- * **The path scan reads the tree from disk rather than taking the document
- * about to be written.** It once took the pending document, and that made the
- * guard refuse the writer's own rename: the pending document already carries
- * the mutation, so `rex update <id> --title="Beta epic"` against an unmarked
- * tree compared the slug `beta-epic` — which the write was about to create —
- * against the `alpha-epic` still on disk, and reported a foreign build. Every
- * tree written before this guard existed is unmarked, so on upgrade the first
- * slug-changing write in a repository was refused and blamed on someone else.
- * The question this branch must answer is whether the *tree* was written by
- * another rule, which is a fact about disk alone; what the pending document
- * wants the paths to become is precisely the thing under test and cannot be
- * evidence in its own trial.
+ * A tree that does not exist yet passes: {@link parseFolderTree} reports no
+ * items for an absent directory, so a first save writes the marker rather than
+ * being refused for having none. That emptiness is read from **disk**, never
+ * from the document about to be written — a pending document is full of items
+ * on the very first save, and judging by it would refuse every new project.
  *
  * @param rexDir   The `.rex/` directory holding `tree-meta.json`.
- * @param treeRoot The folder tree itself, for the path scan.
- * @throws {SlugRuleMismatchError} When the tree belongs to another rule.
+ * @param treeRoot The folder tree itself, for the emptiness check.
+ * @throws {SlugRuleMismatchError} When the tree belongs to another rule, or
+ *   carries no marker at all.
  */
 export async function assertSlugRuleWritable(
   rexDir: string,
@@ -196,23 +225,16 @@ export async function assertSlugRuleWritable(
     );
   }
 
-  // No marker: a tree older than the guard. Judge it by its paths — and by the
-  // titles those paths are stored with, both read from disk, so the comparison
-  // is the tree against itself rather than against the pending mutation.
+  // No marker. An empty tree has nothing a marker could be wrong about, so a
+  // first save proceeds and records one; anything else is refused.
   const { items } = await parseFolderTree(treeRoot);
-  const mismatches = await findNonConformingSlugs(items, treeRoot);
-  if (mismatches.length === 0) return;
+  if (items.length === 0) return;
 
   throw new SlugRuleMismatchError(
-    `Refusing to write the PRD tree: it carries no slug-rule marker and ` +
-      `${mismatches.length} path${mismatches.length === 1 ? " does" : "s do"} not match ` +
-      `slug rule ${SLUG_RULE_VERSION}, which this build implements. ` +
-      `Saving would rewrite them.\n${samplePaths(mismatches)}\n` +
-      `Run 'rex migrate-slugs' on the default branch to bring the tree onto ` +
-      `rule ${SLUG_RULE_VERSION} and record the marker.`,
+    `Refusing to write the PRD tree: ${SLUG_RULE_MARKER_MISSING}. ` +
+      missingMarkerExplanation(),
     undefined,
     SLUG_RULE_VERSION,
-    mismatches,
   );
 }
 
@@ -311,6 +333,21 @@ export async function checkTreeConformance(
         `implements slug rule ${SLUG_RULE_VERSION}. Every path in the tree would be ` +
         `rewritten by the first write this run makes.\n` +
         markerAdvice(markerFound),
+    };
+  }
+
+  // An absent marker is refused for the same reason the write guard refuses it
+  // — see {@link assertSlugRuleWritable}. The gate reaches it only on a tree
+  // that has items: `items` comes from a loaded document, and both callers
+  // skip the gate entirely when there is no tree, so an empty list here is a
+  // project with nothing to protect rather than one this gate should stop.
+  if (markerFound === undefined && items.length > 0) {
+    return {
+      markerFound,
+      mismatches: [],
+      message:
+        `The PRD tree carries no slug-rule marker — ${SLUG_RULE_MARKER_MISSING}. ` +
+        missingMarkerExplanation(),
     };
   }
 

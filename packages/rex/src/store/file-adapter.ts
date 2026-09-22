@@ -499,10 +499,8 @@ export class FileStore implements PRDStore {
       await assertSlugRuleWritable(this.rexDir, this.treeRoot);
     }
     await mkdir(this.treeRoot, { recursive: true });
-    await atomicWrite(
-      this.path(TREE_META_FILENAME),
-      JSON.stringify(treeMetaContents(doc)),
-    );
+    const metaPath = this.path(TREE_META_FILENAME);
+    await atomicWrite(metaPath, JSON.stringify(await treeMetaContents(metaPath, doc)));
     const written = await serializeFolderTree(doc.items, this.treeRoot, {
       loadedAt: this.loadedAt,
       loadedFiles: this.loadedFiles,

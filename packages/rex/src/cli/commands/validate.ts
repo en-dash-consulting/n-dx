@@ -16,6 +16,7 @@ import {
   readSlugRuleMarker,
   PRD_TREE_DIRNAME,
   SLUG_RULE_VERSION,
+  SLUG_RULE_MARKER_MISSING,
 } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { REX_DIR } from "./constants.js";
@@ -299,6 +300,30 @@ export async function cmdValidate(
           `Tree was written under slug rule ${slugRuleMarker}, but this build implements slug rule ${SLUG_RULE_VERSION}.`,
           `Every write from this build would rewrite every path. Run rex migrate-slugs on the default branch, ` +
             `or use a rex build that implements rule ${slugRuleMarker}.`,
+        ],
+      });
+    }
+
+    // Absent marker. Reported as an error rather than adopted, for the reason
+    // spelled out in `slug-rule-guard.ts`: a build older than the field erases
+    // the marker without moving a path, so absence is as likely to be a
+    // disarmed guard as an old tree. This check is what makes the store's
+    // refusal reviewable — a tree that no longer says who wrote it fails CI
+    // here rather than surfacing as a refused save mid-run.
+    //
+    // Guarded on a non-empty tree so a freshly initialised project, which has
+    // a `.rex/` and no items yet, does not fail its own first validate.
+    if (slugRuleMarker === undefined && doc.items.length > 0) {
+      checks.push({
+        name: "tree slug rule marker",
+        pass: false,
+        severity: "error",
+        errors: [
+          `The PRD tree carries no slug-rule marker — ${SLUG_RULE_MARKER_MISSING}.`,
+          `An absent marker no longer adopts silently: a rex build older than the marker ` +
+            `rewrites tree-meta.json without it, erasing the record while moving no path, ` +
+            `so this tree may be one whose guard was disarmed rather than one that predates it. ` +
+            `rex migrate-slugs re-records the marker after bringing every path onto rule ${SLUG_RULE_VERSION}.`,
         ],
       });
     }

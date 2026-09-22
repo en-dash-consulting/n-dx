@@ -134,6 +134,25 @@ describe("the pre-run PRD tree conformance gate", () => {
     await expect(assertPrdTreeConformant(rexDir)).rejects.toThrow(/rex migrate-slugs/);
   });
 
+  // An absent marker is what a rex build older than the field leaves behind:
+  // it rewrites the sidecar without `slugRule`, erasing the record while moving
+  // no path. The paths therefore scan clean, and the gate has to refuse on the
+  // absence itself or a run starts against a tree with no guard on it.
+  it("refuses a missing slug-rule marker even when every path conforms", async () => {
+    const metaPath = join(rexDir, TREE_META_FILENAME);
+    const meta = JSON.parse(await readFile(metaPath, "utf-8"));
+    delete meta.slugRule;
+    await writeFile(metaPath, JSON.stringify(meta), "utf-8");
+    const before = await snapshotTree(treeRoot);
+
+    await expect(assertPrdTreeConformant(rexDir)).rejects.toThrow(
+      /slug rule marker missing; run rex migrate-slugs/,
+    );
+
+    // Refusing is all it does — the run has not begun, so nothing has moved.
+    expect(await snapshotTree(treeRoot)).toEqual(before);
+  });
+
   // Direction matters in the advice, not just in the refusal: `migrate-slugs`
   // rewrites the tree under *this* build's rule, so recommending it for a
   // newer tree walks the operator into a downgrade.

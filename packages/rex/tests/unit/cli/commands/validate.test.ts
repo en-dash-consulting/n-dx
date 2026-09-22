@@ -363,6 +363,57 @@ describe("cmdValidate", () => {
       expect(output).toContain("rex migrate-slugs");
     });
 
+    // Absence used to be tolerated as "a tree older than the marker". It is
+    // reported as an error now because a build older than the field rewrites
+    // the sidecar without it — erasing the record while moving no path — so a
+    // missing marker is as likely to be a disarmed guard as an old tree, and
+    // CI is where that has to be caught rather than mid-run.
+    it("exits 1 when the tree carries no slug-rule marker at all", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      const rexDir = join(tmpDir, ".rex");
+      await new FileStore(rexDir).saveDocument(SLUG_DOC);
+
+      const metaPath = join(rexDir, TREE_META_FILENAME);
+      const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+      delete meta.slugRule;
+      writeFileSync(metaPath, JSON.stringify(meta));
+
+      await expect(cmdValidate(tmpDir, {})).rejects.toThrow("process.exit");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+
+      const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(output).toContain("✗ tree slug rule marker");
+      expect(output).toContain("slug rule marker missing; run rex migrate-slugs");
+    });
+
+    it("reports the missing-marker check as severity=error in JSON output", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      const rexDir = join(tmpDir, ".rex");
+      await new FileStore(rexDir).saveDocument(SLUG_DOC);
+
+      const metaPath = join(rexDir, TREE_META_FILENAME);
+      const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+      delete meta.slugRule;
+      writeFileSync(metaPath, JSON.stringify(meta));
+
+      await expect(cmdValidate(tmpDir, { format: "json" })).rejects.toThrow("process.exit");
+
+      const jsonCall = stdoutSpy.mock.calls.find((c) => {
+        try {
+          JSON.parse(c[0]);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      const report = JSON.parse(jsonCall![0]);
+      const check = report.checks.find((c: { name: string }) => c.name === "tree slug rule marker");
+      expect(check).toBeDefined();
+      expect(check.pass).toBe(false);
+      expect(check.severity).toBe("error");
+      expect(report.ok).toBe(false);
+    });
+
     it("reports the marker check as severity=error in JSON output", async () => {
       writeConfig(tmpDir, VALID_CONFIG);
       const rexDir = join(tmpDir, ".rex");
@@ -792,6 +843,19 @@ describe("cmdValidate — folder tree read path", () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
 
+  /**
+   * `serializeFolderTree` writes the tree but not the sidecar, and a tree with
+   * no slug-rule marker is now a validate error in its own right. Without
+   * this, every test below would fail on the marker rather than on whatever it
+   * set out to check.
+   */
+  function seedTreeMeta(title: string): void {
+    writeFileSync(
+      join(tmpDir, ".rex", TREE_META_FILENAME),
+      JSON.stringify({ title, schema: SCHEMA_VERSION, slugRule: SLUG_RULE_VERSION }),
+    );
+  }
+
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), "rex-validate-tree-test-"));
     mkdirSync(join(tmpDir, ".rex"), { recursive: true });
@@ -811,6 +875,7 @@ describe("cmdValidate — folder tree read path", () => {
     writeFileSync(join(tmpDir, ".rex", "config.json"), JSON.stringify(VALID_CONFIG_FOR_TREE));
     writeFileSync(join(tmpDir, ".rex", "prd.json"), JSON.stringify(VALID_PRD_FOR_TREE));
     await serializeFolderTree(VALID_PRD_FOR_TREE.items, join(tmpDir, ".rex", PRD_TREE_DIRNAME));
+    seedTreeMeta(VALID_PRD_FOR_TREE.title);
 
     await cmdValidate(tmpDir, {});
     expect(exitSpy).not.toHaveBeenCalled();
@@ -844,6 +909,7 @@ describe("cmdValidate — folder tree read path", () => {
     writeFileSync(join(tmpDir, ".rex", "config.json"), JSON.stringify(VALID_CONFIG_FOR_TREE));
     writeFileSync(join(tmpDir, ".rex", "prd.json"), JSON.stringify(prdWithEmptyEpic));
     await serializeFolderTree(prdWithEmptyEpic.items, join(tmpDir, ".rex", PRD_TREE_DIRNAME));
+    seedTreeMeta(prdWithEmptyEpic.title);
 
     await cmdValidate(tmpDir, { format: "json" });
 
