@@ -3,21 +3,85 @@
  * Performance benchmarks for large PRD trees.
  *
  * Validates that core tree operations (rendering, diffing, filtering,
- * statistics computation, progressive slicing) meet performance targets
- * at scale: 500, 1000, and 2000+ item trees.
+ * statistics computation, progressive slicing) stay linear in tree size at
+ * scale: 500, 1000, 2000 and 4000 item trees.
  *
- * Metrics measured:
- * - DOM node count after render
- * - Render time (wall-clock via performance.now)
- * - Memory usage (via performance.memory mock)
- * - Algorithm execution time for pure functions
+ * ──────────────────────────────────────────────────────────────────────────────
+ * WHY THIS FILE NO LONGER USES A CLOCK
+ * ──────────────────────────────────────────────────────────────────────────────
  *
- * Performance targets are intentionally generous (2–5× expected) to
- * avoid flaky CI while still catching genuine regressions.
+ * Every assertion here used to compare `performance.now()` elapsed time against
+ * an absolute millisecond budget scaled by a hardcoded `BUDGET_MULTIPLIER = 10`
+ * — 24 such assertions. The file's own header described the budgets as
+ * "intentionally generous (2–5x expected) to avoid flaky CI while still catching
+ * genuine regressions", which is a complexity claim written as a wall-clock
+ * number. Under full-suite load three of these tests failed on unchanged code
+ * and passed on a serial rerun. A generous absolute budget does not stop being
+ * machine-dependent; it just fails less often.
+ *
+ * TESTING.md, Family 2, ranks the alternatives and puts "count work, not time"
+ * first. Every claim in this file turned out to be countable, so there is now no
+ * clock in it at all.
+ *
+ * Growth-ratio timing (technique 2) was tried here first and rejected on
+ * measurement, not on taste: a min-of-7-batches timing of `diffItems` across an
+ * 8x size step read 7.7x on an idle machine and 46.5x on a loaded one, because
+ * the small-size batch is short enough to fit inside a clean scheduler slice and
+ * the large-size batch is not. A ratio only cancels load when both readings face
+ * the same preemption risk, and these operations are far too cheap for that.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * WHAT IS COUNTED
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ * Two counters, both from `tests/helpers/tree-work-count.ts`:
+ *
+ *  - `countTreeReads` — reads of the fixture's `children` arrays. For these
+ *    functions the tree is the input and walking it is the algorithm, so this is
+ *    the traversal step count.
+ *  - `countRenderWork` — vnodes Preact diffed and DOM records observed, via
+ *    Preact's `options.diffed` addon hook and a MutationObserver.
+ *
+ * MEASURED, `children` reads per node (identical on repeat runs, and identical
+ * again with every core saturated — these are counts, not timings):
+ *
+ *   operation              n=502    n=1000   n=2003   n=4002   growth over 7.97x
+ *   computeBranchStats     1.177    1.170    1.170    1.169        7.92x
+ *   countVisibleNodes      1.177    1.170    1.170    1.169        7.92x
+ *   sliceVisibleTree       1.297    1.230    1.200    1.184        7.28x
+ *   filterTree             1.082    1.073    1.074    1.074        7.92x
+ *   diffItems              0.392    0.390    0.390    0.390        7.92x
+ *   diffDocument           0.392    0.390    0.390    0.390        7.92x
+ *   applyItemUpdate        1.576    1.562    1.561    1.560        7.89x
+ *   findItemById (miss)    0.785    0.780    0.780    0.780        7.92x
+ *   getAncestorIds         0.402    0.396    0.392    0.390        7.73x
+ *   countDescendants       1.177    1.170    1.170    1.169        7.92x
+ *   collectSubtreeIds          8        8        8        8 (absolute — one epic)
+ *   ── injected O(n²) ──   197.8    390.8    781.8   1560.8       62.91x
+ *
+ * MEASURED, render work by tree size (`defaultExpandDepth: 1`):
+ *
+ *   size    rows    DOM nodes   vnode diffs   DOM/row   diffs/row
+ *      0       0            9            10         —           —
+ *    500      65        1 410         2 257     21.69       34.72
+ *   1000     127        2 710         4 353     21.34       34.28
+ *   2000     254        5 378         8 537     21.17       33.61
+ *   4000     507       10 690        16 921     21.08       33.37
+ *
+ * The last two columns are the point: per-row cost is flat, so render work is
+ * linear in the number of *visible* rows rather than in total tree size.
+ *
+ * The empty-tree row also retires a wrong constant. The DOM-per-item test used
+ * to subtract a hardcoded `overheadEstimate = 200` for "header, toolbar,
+ * filters, summary bar, spacers". The real chrome is 9 nodes. Subtracting 200
+ * from 1 410 across 65 rows reported 18.6 nodes per row when the true figure is
+ * 21.7 — the assertion passed, but not for the reason it stated. It now measures
+ * the chrome in the same process instead of guessing at it.
  *
  * @see ./progressive-loader.test.ts — unit tests for progressive loading
  * @see ./tree-differ.test.ts — unit tests for structural sharing
  * @see ./prd-tree-compute.test.ts — unit tests for stats computation
+ * @see ../../helpers/tree-work-count.ts — the counters, and their blind spots
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -45,6 +109,7 @@ import {
   collectSubtreeIds,
 } from "../../../src/viewer/components/prd-tree/tree-utils.js";
 import { PRDTree } from "../../../src/viewer/components/prd-tree/prd-tree.js";
+import { countTreeReads, countRenderWork, instrumentTreeReads } from "../../helpers/tree-work-count.js";
 import type {
   PRDItemData,
   PRDDocumentData,
@@ -57,6 +122,46 @@ import type {
 /** Tree sizes under test. */
 const TREE_SIZES = [500, 1000, 2000] as const;
 
+/**
+ * The pair of sizes the growth assertions use: ~502 and ~4002 nodes, a 7.97x
+ * step.
+ *
+ * Widest span the fixtures offer, and the span matters. Linear scaling lands at
+ * 7.97x and quadratic at 63.5x, so there is a factor of 8 to place a bound in.
+ * The adjacent 500→2000 pair only offers 4x vs 16x, which is not enough room to
+ * put meaningful headroom on.
+ */
+const GROWTH_SIZES = [500, 4000] as const;
+
+/**
+ * How far above linear a traversal may grow between the two growth sizes.
+ *
+ * Derived in both directions per TESTING.md rule 3, on counts rather than
+ * timings, so the "clean" column has no spread at all:
+ *
+ *   worst clean growth      7.92x  (every linear operation; linear is 7.97x)
+ *   injected O(n²) growth  62.91x  (re-walk the whole tree once per node)
+ *
+ * A bound of 2x linear (15.94x) sits 2.01x above the worst clean reading and
+ * 3.95x below the injected regression. The injection was run, not assumed.
+ */
+const SCALING_HEADROOM = 2;
+
+/**
+ * Ceiling on `children` reads per node for a single-pass operation.
+ *
+ * The heaviest linear operation measured is `applyItemUpdate` at 1.576 reads per
+ * node, so 4 leaves a 2.5x constant-factor margin. What it catches: any
+ * operation that starts re-traversing the tree per node, which reads 197.8 times
+ * per node at the smallest gated size — a 49x overshoot, not a marginal one.
+ *
+ * What it deliberately does not catch is a constant-factor increase inside that
+ * 2.5x margin (one extra full pass over the tree, say). That is the growth
+ * assertions' job: they bound each operation to 2x linear across an 8x span,
+ * which is far tighter per operation than this shared ceiling can be.
+ */
+const MAX_READS_PER_NODE = 4;
+
 /** All statuses — matches everything. */
 const ALL_STATUSES: Set<ItemStatus> = new Set([
   "pending", "in_progress", "completed", "failing", "deferred", "blocked", "deleted",
@@ -64,16 +169,6 @@ const ALL_STATUSES: Set<ItemStatus> = new Set([
 
 /** Active work filter (most common dashboard filter). */
 const ACTIVE_WORK: Set<ItemStatus> = new Set(["pending", "in_progress", "blocked"]);
-
-/**
- * Performance budget multiplier. Targets are set relative to a baseline
- * and multiplied by this factor to avoid CI flakiness.
- *
- * jsdom and parallel monorepo runs are ~10× slower than native browser
- * execution. The multiplier gives headroom without masking genuine
- * algorithmic regressions (O(n²) produces 10–20× overhead, not just 10×).
- */
-const BUDGET_MULTIPLIER = 10;
 
 // ── Tree generators ───────────────────────────────────────────────────────────
 
@@ -170,6 +265,18 @@ function generateRealisticTree(targetCount: number): PRDItemData[] {
   return epics;
 }
 
+/**
+ * A tree whose `children` reads are counted.
+ *
+ * Always build measured fixtures through this, never through
+ * `generateRealisticTree` directly, or `countTreeReads` silently returns 0 and
+ * the assertion becomes vacuous. The `expect(reads).toBeGreaterThan(0)` guard in
+ * `readsPerNode` exists to catch exactly that mistake.
+ */
+function generateMeasuredTree(targetCount: number): PRDItemData[] {
+  return instrumentTreeReads(generateRealisticTree(targetCount));
+}
+
 /** Count all nodes in a tree (including container nodes). */
 function countAllNodes(items: PRDItemData[]): number {
   let count = 0;
@@ -220,6 +327,60 @@ function findDeepNestedId(items: PRDItemData[]): string {
   const lastTask = lastFeature?.children?.[lastFeature.children.length - 1];
   const lastSubtask = lastTask?.children?.[lastTask.children.length - 1];
   return lastSubtask?.id ?? lastTask?.id ?? lastFeature?.id ?? midEpic.id;
+}
+
+// ── Work-count helpers ────────────────────────────────────────────────────────
+
+/**
+ * Traversal steps per node for one operation on one fixture size.
+ *
+ * Returns reads/nodeCount so the figure is comparable across sizes: a linear
+ * operation holds it constant, and one that re-traverses grows it with n.
+ */
+function readsPerNode(items: PRDItemData[], op: () => void): number {
+  const reads = countTreeReads(op);
+  // A fixture built without `instrumentTreeReads` reads zero, which would make
+  // every bound below trivially true.
+  expect(reads, "operation read no children arrays — is the fixture instrumented?").toBeGreaterThan(0);
+  return reads / countAllNodes(items);
+}
+
+/**
+ * Assert an operation's traversal grows no faster than ~linearly between the
+ * two `GROWTH_SIZES`.
+ *
+ * `build` receives a fresh instrumented tree of the requested size and returns
+ * the closure to measure, so each size gets its own fixture — a shared fixture
+ * would let the first size's traversal warm structures the second reuses, which
+ * is the confound that made the `add-auto-reshape` gate unusable before it was
+ * given one store per size.
+ */
+function expectLinearTraversalGrowth(
+  label: string,
+  build: (tree: PRDItemData[]) => () => void,
+): void {
+  const [smallSize, largeSize] = GROWTH_SIZES;
+  const small = generateMeasuredTree(smallSize);
+  const large = generateMeasuredTree(largeSize);
+
+  const smallNodes = countAllNodes(small);
+  const largeNodes = countAllNodes(large);
+  const sizeRatio = largeNodes / smallNodes;
+  const bound = sizeRatio * SCALING_HEADROOM;
+
+  const smallReads = countTreeReads(build(small));
+  const largeReads = countTreeReads(build(large));
+  expect(smallReads, `${label} read no children arrays — is the fixture instrumented?`).toBeGreaterThan(0);
+
+  const growth = largeReads / smallReads;
+  expect(
+    growth,
+    `${label} traversal grew ${growth.toFixed(2)}x for a ${sizeRatio.toFixed(2)}x size increase ` +
+    `(${smallNodes} nodes: ${smallReads} reads, ${largeNodes} nodes: ${largeReads} reads). ` +
+    `Linear is ~${sizeRatio.toFixed(0)}x and quadratic ~${(sizeRatio ** 2).toFixed(0)}x, so this ` +
+    `indicates the operation started re-traversing the tree rather than walking it once. ` +
+    `Counts are exact and machine-independent: a change here is a change in the code.`,
+  ).toBeLessThan(bound);
 }
 
 // ── jsdom polyfills ───────────────────────────────────────────────────────────
@@ -273,68 +434,9 @@ function installMockIntersectionObserver() {
   };
 }
 
-// ── Timing helper ─────────────────────────────────────────────────────────────
-
-/**
- * Run a function and return [result, elapsedMs].
- * Uses performance.now() for sub-millisecond precision.
- */
-function timed<T>(fn: () => T): [T, number] {
-  const start = performance.now();
-  const result = fn();
-  const elapsed = performance.now() - start;
-  return [result, elapsed];
-}
-
-/**
- * Run fn many times and return the median per-call elapsed time in ms.
- *
- * Iterations are batched inside each timed block: sub-millisecond calls
- * have per-sample noise (OS scheduling, JIT, GC) comparable to the work
- * itself, so timing individual calls makes the median wobble enough to
- * flake the linear-scaling ratio assertions. Batching amortizes that
- * noise across many runs and keeps each measurement in a range
- * `performance.now()` can resolve cleanly.
- */
-function timedMedian(fn: () => void, iterations = 20): number {
-  // Warmup — let JIT settle.
-  for (let i = 0; i < 3; i++) fn();
-
-  const BATCHES = 7;
-  const ITERS_PER_BATCH = Math.max(iterations, 50);
-  const times: number[] = [];
-  for (let b = 0; b < BATCHES; b++) {
-    const start = performance.now();
-    for (let i = 0; i < ITERS_PER_BATCH; i++) fn();
-    times.push((performance.now() - start) / ITERS_PER_BATCH);
-  }
-  times.sort((a, b) => a - b);
-  return times[Math.floor(times.length / 2)];
-}
-
-// ── Memory tracking mock ──────────────────────────────────────────────────────
-
-interface MemorySnapshot {
-  usedJSHeapSize: number;
-  totalJSHeapSize: number;
-  jsHeapSizeLimit: number;
-}
-
-function mockPerformanceMemory(snapshot: MemorySnapshot): void {
-  Object.defineProperty(performance, "memory", {
-    value: snapshot,
-    writable: true,
-    configurable: true,
-  });
-}
-
-function clearPerformanceMemory(): void {
-  Object.defineProperty(performance, "memory", {
-    value: undefined,
-    writable: true,
-    configurable: true,
-  });
-}
+// (A `performance.memory` mock lived here and was never called by any test —
+// the memory section uses `process.memoryUsage()`. Removed rather than left to
+// suggest coverage that does not exist.)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tree generation validation
@@ -378,21 +480,49 @@ describe("tree generation", () => {
     // Should use at least 4 different statuses
     expect(statuses.size).toBeGreaterThanOrEqual(4);
   });
+
+  it("instrumented fixtures do not change what the code under test sees", () => {
+    // The instrument replaces `children` with a getter. If it did that on leaves
+    // too, `"children" in item` would become newly true for every leaf and the
+    // fixture would stop resembling real PRD data. Guard the shape it relies on.
+    const plain = generateRealisticTree(500);
+    const measured = generateMeasuredTree(500);
+
+    expect(countAllNodes(measured)).toBe(countAllNodes(plain));
+    expect(computeBranchStats(measured)).toEqual(computeBranchStats(plain));
+    expect(countVisibleNodes(measured, ALL_STATUSES)).toBe(countVisibleNodes(plain, ALL_STATUSES));
+
+    const leaves: PRDItemData[] = [];
+    (function collect(items: PRDItemData[]) {
+      for (const item of items) {
+        if (item.children) collect(item.children);
+        else leaves.push(item);
+      }
+    })(measured);
+    expect(leaves.length).toBeGreaterThan(0);
+    for (const leaf of leaves.slice(0, 20)) {
+      expect(Object.getOwnPropertyDescriptor(leaf, "children")?.get).toBeUndefined();
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// computeBranchStats performance
+// computeBranchStats
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("computeBranchStats performance", () => {
+describe("computeBranchStats work", () => {
   for (const size of TREE_SIZES) {
-    it(`computes stats for ${size}-node tree under ${size <= 500 ? 5 : size <= 1000 ? 10 : 20}ms`, () => {
-      const tree = generateRealisticTree(size);
-      const budget = (size <= 500 ? 5 : size <= 1000 ? 10 : 20) * BUDGET_MULTIPLIER;
+    it(`computes stats for a ${size}-node tree in a single traversal`, () => {
+      const tree = generateMeasuredTree(size);
 
-      const [stats, elapsed] = timed(() => computeBranchStats(tree));
+      let stats!: ReturnType<typeof computeBranchStats>;
+      const perNode = readsPerNode(tree, () => { stats = computeBranchStats(tree); });
 
-      expect(elapsed).toBeLessThan(budget);
+      // Catches: a stats pass that re-walks the tree per node (197.8 reads per
+      // node when injected). Measures 1.17 clean at every size.
+      expect(perNode, `computeBranchStats read ${perNode.toFixed(3)} children arrays per node`)
+        .toBeLessThan(MAX_READS_PER_NODE);
+
       expect(stats.total).toBeGreaterThan(0);
       // Sanity: completed + pending + other = total
       const sum = stats.completed + stats.inProgress + stats.pending +
@@ -414,26 +544,29 @@ describe("computeBranchStats performance", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// countVisibleNodes & sliceVisibleTree performance
+// countVisibleNodes & sliceVisibleTree
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("countVisibleNodes performance", () => {
+describe("countVisibleNodes work", () => {
   for (const size of TREE_SIZES) {
-    it(`counts ${size}-node tree under ${size <= 500 ? 5 : size <= 1000 ? 10 : 20}ms`, () => {
-      const tree = generateRealisticTree(size);
-      const budget = (size <= 500 ? 5 : size <= 1000 ? 10 : 20) * BUDGET_MULTIPLIER;
+    it(`counts a ${size}-node tree in a single traversal`, () => {
+      const tree = generateMeasuredTree(size);
 
-      const [count, elapsed] = timed(() => countVisibleNodes(tree, ALL_STATUSES));
+      let count = 0;
+      const perNode = readsPerNode(tree, () => { count = countVisibleNodes(tree, ALL_STATUSES); });
 
-      expect(elapsed).toBeLessThan(budget);
+      // Catches: a per-node visibility check that re-descends the subtree it is
+      // already inside. Measures 1.17 clean at every size.
+      expect(perNode, `countVisibleNodes read ${perNode.toFixed(3)} children arrays per node`)
+        .toBeLessThan(MAX_READS_PER_NODE);
       expect(count).toBeGreaterThan(0);
     });
 
     it(`counts ${size}-node tree with active-work filter`, () => {
       const tree = generateRealisticTree(size);
 
-      const [allCount] = timed(() => countVisibleNodes(tree, ALL_STATUSES));
-      const [filteredCount] = timed(() => countVisibleNodes(tree, ACTIVE_WORK));
+      const allCount = countVisibleNodes(tree, ALL_STATUSES);
+      const filteredCount = countVisibleNodes(tree, ACTIVE_WORK);
 
       // Filtered count should be less than or equal to all
       expect(filteredCount).toBeLessThanOrEqual(allCount);
@@ -443,17 +576,22 @@ describe("countVisibleNodes performance", () => {
   }
 });
 
-describe("sliceVisibleTree performance", () => {
+describe("sliceVisibleTree work", () => {
   for (const size of TREE_SIZES) {
-    it(`slices ${size}-node tree into first chunk under ${size <= 500 ? 10 : size <= 1000 ? 20 : 40}ms`, () => {
-      const tree = generateRealisticTree(size);
-      const budget = (size <= 500 ? 10 : size <= 1000 ? 20 : 40) * BUDGET_MULTIPLIER;
+    it(`slices a ${size}-node tree into the first chunk in a single traversal`, () => {
+      const tree = generateMeasuredTree(size);
 
-      const [slice, elapsed] = timed(() =>
-        sliceVisibleTree(tree, ALL_STATUSES, PROGRESSIVE_THRESHOLD),
-      );
+      let slice!: ReturnType<typeof sliceVisibleTree>;
+      const perNode = readsPerNode(tree, () => {
+        slice = sliceVisibleTree(tree, ALL_STATUSES, PROGRESSIVE_THRESHOLD);
+      });
 
-      expect(elapsed).toBeLessThan(budget);
+      // Catches: a slice that counts the remaining tree afresh at every node it
+      // emits. Measures 1.18–1.30 clean, falling slightly as size grows because
+      // the traversal stops early once the chunk is full.
+      expect(perNode, `sliceVisibleTree read ${perNode.toFixed(3)} children arrays per node`)
+        .toBeLessThan(MAX_READS_PER_NODE);
+
       expect(slice.renderedCount).toBeLessThanOrEqual(PROGRESSIVE_THRESHOLD);
       expect(slice.totalCount).toBeGreaterThan(PROGRESSIVE_THRESHOLD);
     });
@@ -473,51 +611,64 @@ describe("sliceVisibleTree performance", () => {
   }
 
   it("incremental chunk loading maintains performance", () => {
-    const tree = generateRealisticTree(2000);
+    const tree = generateMeasuredTree(2000);
     const chunkSize = 50;
     const chunks = Math.ceil(2000 / chunkSize);
 
-    // Simulate loading chunks progressively
-    const chunkTimes: number[] = [];
+    // Simulate loading chunks progressively, counting the traversal each one costs.
+    const chunkReads: number[] = [];
     for (let i = 1; i <= Math.min(chunks, 10); i++) {
       const limit = i * chunkSize;
-      const [, elapsed] = timed(() =>
-        sliceVisibleTree(tree, ALL_STATUSES, limit),
-      );
-      chunkTimes.push(elapsed);
+      chunkReads.push(countTreeReads(() => {
+        sliceVisibleTree(tree, ALL_STATUSES, limit);
+      }));
     }
 
-    // Each chunk should complete in reasonable time
-    for (const time of chunkTimes) {
-      expect(time).toBeLessThan(200 * BUDGET_MULTIPLIER);
+    const nodeCount = countAllNodes(tree);
+    const lastChunk = chunkReads[chunkReads.length - 1];
+
+    // Catches: a chunk loader whose per-chunk cost is proportional to the chunks
+    // already loaded (the O(n²) shape you get by re-slicing from the root and
+    // re-counting what was emitted). Slicing to a larger limit legitimately walks
+    // further, so the bound is one traversal of the tree, not the previous
+    // chunk's reading — a comparison between two chunk costs was the old
+    // formulation and it needed a `Math.max(firstChunk, 10)` clamp plus a "+10"
+    // fudge precisely because the first chunk's cost is near zero.
+    expect(
+      lastChunk,
+      `slicing to ${chunks > 10 ? 10 * chunkSize : chunks * chunkSize} items read ${lastChunk} ` +
+      `children arrays on a ${nodeCount}-node tree; chunk costs were ${chunkReads.join(", ")}`,
+    ).toBeLessThan(nodeCount * MAX_READS_PER_NODE);
+
+    // Each chunk is bounded the same way, so no single chunk can hide a blow-up.
+    for (const reads of chunkReads) {
+      expect(reads).toBeLessThan(nodeCount * MAX_READS_PER_NODE);
     }
 
-    // Later chunks should not be dramatically slower than first
-    // (would indicate O(n²) or worse degradation)
-    const firstChunk = chunkTimes[0];
-    const lastChunk = chunkTimes[chunkTimes.length - 1];
-    const normalizedFirstChunk = Math.max(firstChunk, 10);
-    // Allow 10× variance between first and last chunk
-    // (some increase is expected as more nodes are counted). Clamp the
-    // first sample so a near-zero warm cache / timer-resolution artifact
-    // does not create an unrealistically tiny ceiling in jsdom.
-    expect(lastChunk).toBeLessThan(normalizedFirstChunk * 10 + 10);
+    // Costs must be non-decreasing in the limit and never exceed the full walk:
+    // a chunk that costs *less* as the limit grows would mean the slice stopped
+    // honouring the limit.
+    expect(chunkReads[chunkReads.length - 1]).toBeGreaterThanOrEqual(chunkReads[0]);
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// filterTree performance
+// filterTree
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("filterTree performance", () => {
+describe("filterTree work", () => {
   for (const size of TREE_SIZES) {
-    it(`filters ${size}-node tree under ${size <= 500 ? 10 : size <= 1000 ? 20 : 40}ms`, () => {
-      const tree = generateRealisticTree(size);
-      const budget = (size <= 500 ? 10 : size <= 1000 ? 20 : 40) * BUDGET_MULTIPLIER;
+    it(`filters a ${size}-node tree in a single traversal`, () => {
+      const tree = generateMeasuredTree(size);
 
-      const [filtered, elapsed] = timed(() => filterTree(tree, ACTIVE_WORK));
+      let filtered!: PRDItemData[];
+      const perNode = readsPerNode(tree, () => { filtered = filterTree(tree, ACTIVE_WORK); });
 
-      expect(elapsed).toBeLessThan(budget);
+      // Catches: a filter that decides each node's fate by re-scanning its
+      // subtree from the root. Measures 1.07–1.08 clean at every size.
+      expect(perNode, `filterTree read ${perNode.toFixed(3)} children arrays per node`)
+        .toBeLessThan(MAX_READS_PER_NODE);
+
       // Filtered tree should be smaller
       const filteredCount = countAllNodes(filtered);
       const totalCount = countAllNodes(tree);
@@ -527,12 +678,16 @@ describe("filterTree performance", () => {
   }
 
   it("single-status filter is efficient at 2000 nodes", () => {
-    const tree = generateRealisticTree(2000);
+    const tree = generateMeasuredTree(2000);
     const singleStatus: Set<ItemStatus> = new Set(["completed"]);
 
-    const [filtered, elapsed] = timed(() => filterTree(tree, singleStatus));
+    let filtered!: PRDItemData[];
+    const perNode = readsPerNode(tree, () => { filtered = filterTree(tree, singleStatus); });
 
-    expect(elapsed).toBeLessThan(100 * BUDGET_MULTIPLIER);
+    // Catches: a narrow filter costing more per node than a wide one, which
+    // would mean the rejection path re-walks rather than short-circuits.
+    expect(perNode).toBeLessThan(MAX_READS_PER_NODE);
+
     const filteredCount = countAllNodes(filtered);
     expect(filteredCount).toBeGreaterThan(0);
     expect(filteredCount).toBeLessThan(countAllNodes(tree));
@@ -540,33 +695,42 @@ describe("filterTree performance", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// diffItems / structural sharing performance
+// diffItems / structural sharing
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("diffItems performance", () => {
+describe("diffItems work", () => {
   for (const size of TREE_SIZES) {
-    it(`diffs identical ${size}-node trees (fast path) under ${size <= 500 ? 10 : size <= 1000 ? 20 : 40}ms`, () => {
-      const tree = generateRealisticTree(size);
+    it(`diffs identical ${size}-node trees (fast path) in a single traversal`, () => {
+      const tree = generateMeasuredTree(size);
       // Create a "new" tree with identical content but fresh objects
       const next = cloneWithOneChange(tree, "__nonexistent__", "completed");
-      const budget = (size <= 500 ? 10 : size <= 1000 ? 20 : 40) * BUDGET_MULTIPLIER;
 
-      const [result, elapsed] = timed(() => diffItems(tree, next));
+      let result!: PRDItemData[];
+      const perNode = readsPerNode(tree, () => { result = diffItems(tree, next); });
 
-      expect(elapsed).toBeLessThan(budget);
+      // Catches: an equality check that compares each node against the whole
+      // other tree instead of its positional counterpart. Measures 0.39 clean.
+      expect(perNode, `diffItems (identical) read ${perNode.toFixed(3)} children arrays per node`)
+        .toBeLessThan(MAX_READS_PER_NODE);
+
       // Should return the original reference (nothing changed)
       expect(result).toBe(tree);
     });
 
-    it(`diffs ${size}-node tree with single change under ${size <= 500 ? 15 : size <= 1000 ? 30 : 60}ms`, () => {
-      const tree = generateRealisticTree(size);
+    it(`diffs a ${size}-node tree with a single change in a single traversal`, () => {
+      const tree = generateMeasuredTree(size);
       const targetId = findMiddleLeafId(tree);
       const next = cloneWithOneChange(tree, targetId, "completed");
-      const budget = (size <= 500 ? 15 : size <= 1000 ? 30 : 60) * BUDGET_MULTIPLIER;
 
-      const [result, elapsed] = timed(() => diffItems(tree, next));
+      let result!: PRDItemData[];
+      const perNode = readsPerNode(tree, () => { result = diffItems(tree, next); });
 
-      expect(elapsed).toBeLessThan(budget);
+      // Catches: the same regression on the changed path — a single edit must not
+      // cost more traversal than a no-op diff. Measures 0.39 clean, identical to
+      // the fast path above, which is the property worth holding.
+      expect(perNode, `diffItems (one change) read ${perNode.toFixed(3)} children arrays per node`)
+        .toBeLessThan(MAX_READS_PER_NODE);
+
       // Should create a new array (something changed)
       expect(result).not.toBe(tree);
     });
@@ -590,33 +754,43 @@ describe("diffItems performance", () => {
   }
 });
 
-describe("diffDocument performance", () => {
-  it("diffs 2000-node documents efficiently", () => {
-    const tree = generateRealisticTree(2000);
+describe("diffDocument work", () => {
+  it("diffs 2000-node documents in a single traversal", () => {
+    const tree = generateMeasuredTree(2000);
     const prev: PRDDocumentData = { schema: "rex/v1", title: "Test", items: tree };
     const nextItems = cloneWithOneChange(tree, findMiddleLeafId(tree), "completed");
     const next: PRDDocumentData = { schema: "rex/v1", title: "Test", items: nextItems };
 
-    const [result, elapsed] = timed(() => diffDocument(prev, next));
+    let result!: PRDDocumentData;
+    const perNode = readsPerNode(tree, () => { result = diffDocument(prev, next); });
 
-    expect(elapsed).toBeLessThan(100 * BUDGET_MULTIPLIER);
+    // Catches: a document-level diff that walks the item tree more than once —
+    // for instance recomputing document stats after diffing. Measures 0.39 clean.
+    expect(perNode).toBeLessThan(MAX_READS_PER_NODE);
+
     expect(result).not.toBe(prev);
     expect(result.title).toBe("Test");
   });
 });
 
-describe("applyItemUpdate performance", () => {
+describe("applyItemUpdate work", () => {
   for (const size of TREE_SIZES) {
-    it(`applies single update in ${size}-node tree under ${size <= 500 ? 5 : size <= 1000 ? 10 : 20}ms`, () => {
-      const tree = generateRealisticTree(size);
+    it(`applies a single update in a ${size}-node tree in a bounded traversal`, () => {
+      const tree = generateMeasuredTree(size);
       const targetId = findDeepNestedId(tree);
-      const budget = (size <= 500 ? 5 : size <= 1000 ? 10 : 20) * BUDGET_MULTIPLIER;
 
-      const [result, elapsed] = timed(() =>
-        applyItemUpdate(tree, targetId, { status: "completed" }),
-      );
+      let result!: PRDItemData[];
+      const perNode = readsPerNode(tree, () => {
+        result = applyItemUpdate(tree, targetId, { status: "completed" });
+      });
 
-      expect(elapsed).toBeLessThan(budget);
+      // Catches: an update that searches for the target once and then rebuilds by
+      // searching again per level. Measures 1.56 clean at every size — the
+      // heaviest linear operation in this file, which is why MAX_READS_PER_NODE
+      // is 4 rather than 2.
+      expect(perNode, `applyItemUpdate read ${perNode.toFixed(3)} children arrays per node`)
+        .toBeLessThan(MAX_READS_PER_NODE);
+
       expect(result).not.toBe(tree);
     });
   }
@@ -626,60 +800,86 @@ describe("applyItemUpdate performance", () => {
 // Tree utility functions at scale
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("tree-utils performance", () => {
-  const tree2000 = generateRealisticTree(2000);
-  const deepId = findDeepNestedId(tree2000);
+describe("tree-utils work", () => {
+  it("findItemById walks a 2000-node tree once for a deep hit", () => {
+    const tree = generateMeasuredTree(2000);
+    const deepId = findDeepNestedId(tree);
 
-  it("findItemById scales linearly for 2000 nodes", () => {
-    const [found, elapsed] = timed(() => findItemById(tree2000, deepId));
+    let found: PRDItemData | null = null;
+    const perNode = readsPerNode(tree, () => { found = findItemById(tree, deepId); });
 
-    expect(elapsed).toBeLessThan(20 * BUDGET_MULTIPLIER);
+    // Catches: a search that restarts from the root at each level. A hit stops
+    // early, so this reads less than a full walk.
+    expect(perNode).toBeLessThan(MAX_READS_PER_NODE);
     expect(found).not.toBeNull();
     expect(found!.id).toBe(deepId);
   });
 
-  it("findItemById returns null quickly for missing ID", () => {
-    const [found, elapsed] = timed(() => findItemById(tree2000, "nonexistent-id"));
+  it("findItemById walks a 2000-node tree once for a missing ID", () => {
+    const tree = generateMeasuredTree(2000);
 
-    expect(elapsed).toBeLessThan(20 * BUDGET_MULTIPLIER);
+    let found: PRDItemData | null = null;
+    const perNode = readsPerNode(tree, () => { found = findItemById(tree, "nonexistent-id"); });
+
+    // The exhaustive case — no early exit — so this is the tightest read on
+    // `findItemById`. Measures 0.78 clean at every size.
+    expect(perNode, `findItemById (miss) read ${perNode.toFixed(3)} children arrays per node`)
+      .toBeLessThan(MAX_READS_PER_NODE);
     expect(found).toBeNull();
   });
 
   it("getAncestorIds finds path in 2000-node tree", () => {
-    const [ancestors, elapsed] = timed(() => getAncestorIds(tree2000, deepId));
+    const tree = generateMeasuredTree(2000);
+    const deepId = findDeepNestedId(tree);
 
-    expect(elapsed).toBeLessThan(20 * BUDGET_MULTIPLIER);
+    let ancestors: string[] = [];
+    const perNode = readsPerNode(tree, () => { ancestors = getAncestorIds(tree, deepId); });
+
+    // Catches: a path lookup that re-walks from the root once per ancestor
+    // returned. Measures 0.39–0.40 clean.
+    expect(perNode).toBeLessThan(MAX_READS_PER_NODE);
     expect(ancestors.length).toBeGreaterThanOrEqual(2); // At least epic → feature
   });
 
-  it("collectSubtreeIds handles large subtrees", () => {
-    const bigEpic = tree2000[0];
-    const [ids, elapsed] = timed(() => collectSubtreeIds(bigEpic));
+  it("collectSubtreeIds cost follows the subtree, not the whole tree", () => {
+    const small = generateMeasuredTree(500);
+    const large = generateMeasuredTree(4000);
 
-    expect(elapsed).toBeLessThan(20 * BUDGET_MULTIPLIER);
-    expect(ids.size).toBe(1 + countDescendants(bigEpic));
+    const smallReads = countTreeReads(() => { collectSubtreeIds(small[0]); });
+    const largeReads = countTreeReads(() => { collectSubtreeIds(large[0]); });
+    const ids = collectSubtreeIds(large[0]);
+
+    // The first epic is the same shape in both fixtures, so this reads 8 either
+    // way. Catches: a subtree walk that touches nodes outside the subtree — the
+    // reading would then grow with total tree size. This is the one operation
+    // here whose cost must NOT scale with n, so it gets an equality check rather
+    // than a growth bound.
+    expect(largeReads, `collectSubtreeIds read ${largeReads} on a 4000-node tree vs ${smallReads} on a 500-node one`)
+      .toBe(smallReads);
+    expect(ids.size).toBe(1 + countDescendants(large[0]));
   });
 
   it("countDescendants handles deep trees", () => {
-    const [count, elapsed] = timed(() => {
-      let total = 0;
-      for (const epic of tree2000) {
-        total += countDescendants(epic);
-      }
-      return total;
+    const tree = generateMeasuredTree(2000);
+
+    let count = 0;
+    const perNode = readsPerNode(tree, () => {
+      count = 0;
+      for (const epic of tree) count += countDescendants(epic);
     });
 
-    expect(elapsed).toBeLessThan(20 * BUDGET_MULTIPLIER);
+    // Catches: a descendant count that re-descends per node. Measures 1.17 clean.
+    expect(perNode).toBeLessThan(MAX_READS_PER_NODE);
     // Total descendants should be close to 2000 minus top-level items
-    expect(count).toBeGreaterThan(tree2000.length);
+    expect(count).toBeGreaterThan(tree.length);
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DOM rendering performance
+// DOM rendering
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("DOM rendering performance", () => {
+describe("DOM rendering work", () => {
   beforeEach(() => {
     installMockIntersectionObserver();
   });
@@ -689,19 +889,30 @@ describe("DOM rendering performance", () => {
     delete (globalThis as any).IntersectionObserver;
   });
 
-  /**
-   * Render a tree and measure DOM metrics.
-   *
-   * In jsdom (containerHeight=0), virtual scrolling renders all visible
-   * items. Visible items are bounded by defaultExpandDepth (1), not by
-   * the total tree size.
-   */
-  function renderAndMeasure(tree: PRDItemData[]): {
+  interface RenderMeasurement {
     domNodeCount: number;
     treeItemCount: number;
-    renderTimeMs: number;
-    root: HTMLDivElement;
-  } {
+    vnodeDiffs: number;
+    domMutations: number;
+  }
+
+  /**
+   * Render a tree, measure DOM and render-work metrics, then unmount.
+   *
+   * Unmounting is not tidiness. `useLiveTick` starts a real 1s `setInterval` as
+   * soon as an in-progress row is visible, and these fixtures always contain
+   * in-progress items. Before this, every render in this file left a live
+   * interval re-rendering a 500–2000 row tree for the remainder of the run, so a
+   * later test could be interrupted mid-measurement by an earlier test's tree.
+   * That is the most likely reason the two *non-timing* assertions here — the
+   * DOM-per-item bound and the unmount check — were also seen failing under load
+   * and passing on a serial rerun.
+   *
+   * In jsdom (containerHeight=0), virtual scrolling renders all visible items.
+   * Visible items are bounded by defaultExpandDepth (1), not by the total tree
+   * size.
+   */
+  function renderAndMeasure(tree: PRDItemData[]): RenderMeasurement {
     const doc: PRDDocumentData = {
       schema: "rex/v1",
       title: "Benchmark PRD",
@@ -710,11 +921,11 @@ describe("DOM rendering performance", () => {
 
     const root = document.createElement("div");
 
-    const start = performance.now();
-    act(() => {
-      render(h(PRDTree, { document: doc, defaultExpandDepth: 1 }), root);
+    const work = countRenderWork(root, () => {
+      act(() => {
+        render(h(PRDTree, { document: doc, defaultExpandDepth: 1 }), root);
+      });
     });
-    const renderTimeMs = performance.now() - start;
 
     // Count all DOM nodes in the rendered tree
     function countDomNodes(node: Node): number {
@@ -728,18 +939,45 @@ describe("DOM rendering performance", () => {
     const domNodeCount = countDomNodes(root);
     const treeItemCount = root.querySelectorAll("[role='treeitem']").length;
 
-    return { domNodeCount, treeItemCount, renderTimeMs, root };
+    act(() => {
+      render(null, root);
+    });
+
+    return { domNodeCount, treeItemCount, vnodeDiffs: work.vnodeDiffs, domMutations: work.domMutations };
+  }
+
+  /**
+   * DOM nodes the tree's own chrome contributes, measured in this process.
+   *
+   * Rendering an empty document exercises header, toolbar, filters and summary
+   * bar with no rows, so whatever it produces is exactly the fixed overhead. It
+   * measures 9. The previous version of this file guessed 200.
+   */
+  function measureChromeNodes(): number {
+    return renderAndMeasure([]).domNodeCount;
   }
 
   for (const size of TREE_SIZES) {
     describe(`${size}-node tree`, () => {
-      it("renders within time budget", () => {
+      it("render work is proportional to visible rows, not tree size", () => {
         const tree = generateRealisticTree(size);
-        const budget = (size <= 500 ? 300 : size <= 1000 ? 500 : 900) * BUDGET_MULTIPLIER;
 
-        const { renderTimeMs } = renderAndMeasure(tree);
+        const { vnodeDiffs, treeItemCount } = renderAndMeasure(tree);
 
-        expect(renderTimeMs).toBeLessThan(budget);
+        expect(treeItemCount).toBeGreaterThan(0);
+        const diffsPerRow = vnodeDiffs / treeItemCount;
+
+        // Catches: a render whose per-row cost grows with the size of the tree —
+        // the thing the old `renderTimeMs < 300..900 * 10` budget was standing in
+        // for, minus the machine. Measures 33.4–34.7 diffs per row flat from 500
+        // to 4000 nodes; a render that stopped culling collapsed subtrees would
+        // multiply this by the average subtree size.
+        expect(
+          diffsPerRow,
+          `rendering ${countAllNodes(tree)} nodes diffed ${vnodeDiffs} vnodes across ` +
+          `${treeItemCount} visible rows (${diffsPerRow.toFixed(2)} per row); ` +
+          `a clean tree measures 33.4–34.7 per row at every size`,
+        ).toBeLessThan(60);
       });
 
       it("virtual scroll limits visible items by expand depth", () => {
@@ -763,18 +1001,21 @@ describe("DOM rendering performance", () => {
         // Virtual scrolling renders flat NodeRow elements without the
         // recursive CulledNode and LazyChildren wrapper divs, keeping
         // the DOM nodes per item bounded to a small constant.
+        const chromeNodes = measureChromeNodes();
         const tree = generateRealisticTree(size);
         const { domNodeCount, treeItemCount } = renderAndMeasure(tree);
 
-        if (treeItemCount > 0) {
-          // Overhead includes header, toolbar, filters, summary bar, spacers.
-          // Subtract fixed overhead (~200 nodes) and check per-item cost.
-          const overheadEstimate = 200;
-          const perItemNodes = (domNodeCount - overheadEstimate) / treeItemCount;
-          // Each NodeRow produces ~15-25 DOM nodes (spans, divs, text nodes).
-          // Without CulledNode/LazyChildren wrappers, this should be < 30.
-          expect(perItemNodes).toBeLessThan(30);
-        }
+        expect(treeItemCount).toBeGreaterThan(0);
+        // Measured chrome, not an estimate — see measureChromeNodes.
+        const perItemNodes = (domNodeCount - chromeNodes) / treeItemCount;
+        // Each NodeRow produces ~15-25 DOM nodes (spans, divs, text nodes).
+        // Without CulledNode/LazyChildren wrappers, this should be < 30.
+        // Measures 21.1–21.7 at every size.
+        expect(
+          perItemNodes,
+          `${domNodeCount} DOM nodes minus ${chromeNodes} of chrome across ` +
+          `${treeItemCount} rows = ${perItemNodes.toFixed(2)} per row`,
+        ).toBeLessThan(30);
       });
     });
   }
@@ -804,24 +1045,46 @@ describe("DOM rendering performance", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Memory usage tracking
+// Memory usage
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("memory usage at scale", () => {
-  it("tree data structures have bounded memory footprint", () => {
-    // Measure approximate memory of tree generation
-    const before = process.memoryUsage().heapUsed;
-    const tree = generateRealisticTree(2000);
-    const after = process.memoryUsage().heapUsed;
+  it("tree data structures have a memory footprint linear in node count", () => {
+    // `heapUsed` deltas depend on when GC happens to run, so an absolute "under
+    // 10 MB" bound is machine-state dependent in the same way an elapsed-time
+    // budget is. Comparing per-node cost at two sizes measured back-to-back keeps
+    // the GC conditions shared between the two readings, so the claim being
+    // asserted — memory is linear in node count, not quadratic — survives.
+    function bytesPerNode(size: number): { bytes: number; nodes: number } {
+      const before = process.memoryUsage().heapUsed;
+      const tree = generateRealisticTree(size);
+      const after = process.memoryUsage().heapUsed;
+      const nodes = countAllNodes(tree);
+      // Keep `tree` reachable across the measurement so it cannot be collected
+      // before `after` is read.
+      expect(nodes).toBeGreaterThan(size * 0.9);
+      return { bytes: after - before, nodes };
+    }
 
-    const memoryUsedBytes = after - before;
-    const memoryUsedMB = memoryUsedBytes / (1024 * 1024);
+    const small = bytesPerNode(500);
+    const large = bytesPerNode(2000);
 
-    // 2000-node tree should use less than 10 MB of heap
-    expect(memoryUsedMB).toBeLessThan(10);
+    // A GC landing inside either window can make a delta small or even negative;
+    // that is a measurement artifact, not a regression, so only a growing
+    // per-node cost is treated as a failure.
+    if (small.bytes > 0 && large.bytes > 0) {
+      const smallPerNode = small.bytes / small.nodes;
+      const largePerNode = large.bytes / large.nodes;
+      expect(
+        largePerNode / smallPerNode,
+        `per-node heap grew from ${smallPerNode.toFixed(0)} to ${largePerNode.toFixed(0)} bytes ` +
+        `between ${small.nodes} and ${large.nodes} nodes; a quadratic structure ` +
+        `(a per-node copy of the tree, say) would grow this with n`,
+      ).toBeLessThan(4);
+    }
 
-    // Verify tree was actually created
-    expect(countAllNodes(tree)).toBeGreaterThan(1800);
+    // Independent of GC: the node count itself.
+    expect(large.nodes).toBeGreaterThan(1800);
   });
 
   it("structural sharing reduces memory for incremental updates", () => {
@@ -864,127 +1127,121 @@ describe("memory usage at scale", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Performance regression detection
+// Complexity regression detection
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("performance regression detection", () => {
-  it("core operations scale linearly (not quadratically)", () => {
-    const small = generateRealisticTree(500);
-    const large = generateRealisticTree(2000);
-
-    // Measure computeBranchStats at both sizes using median of multiple runs
-    // to avoid flaky results from sub-millisecond single-run timing.
-    const smallTime = timedMedian(() => computeBranchStats(small));
-    const largeTime = timedMedian(() => computeBranchStats(large));
-
-    // If O(n), large should be ~4× small. If O(n²), it would be ~16×.
-    // We accept up to 8× to account for cache effects and timing variance.
-    // Floor smallTime at 1ms to avoid ratio blowup on sub-millisecond runs
-    // (common when tests execute under parallel monorepo load).
-    const ratio = (largeTime + 0.01) / (Math.max(smallTime, 1) + 0.01);
-    expect(ratio).toBeLessThan(8);
+/**
+ * The per-operation sensitivity layer.
+ *
+ * The per-size tests above bound each operation against a shared ceiling of
+ * MAX_READS_PER_NODE, which is deliberately loose enough to survive a
+ * constant-factor change. These bound each operation's growth across a 7.97x
+ * size step to 2x linear, which is tight per operation and is what actually
+ * separates linear from quadratic. Both layers are counts, so neither can flake.
+ */
+describe("complexity regression detection", () => {
+  it("computeBranchStats traversal scales linearly (not quadratically)", () => {
+    expectLinearTraversalGrowth("computeBranchStats", (tree) => () => { computeBranchStats(tree); });
   });
 
-  it("diffItems scales linearly with tree size", () => {
-    const small = generateRealisticTree(500);
-    const large = generateRealisticTree(2000);
-    const smallNext = cloneWithOneChange(small, findMiddleLeafId(small), "completed");
-    const largeNext = cloneWithOneChange(large, findMiddleLeafId(large), "completed");
-
-    const smallTime = timedMedian(() => diffItems(small, smallNext));
-    const largeTime = timedMedian(() => diffItems(large, largeNext));
-
-    const ratio = (largeTime + 0.01) / (Math.max(smallTime, 1) + 0.01);
-    expect(ratio).toBeLessThan(8);
+  it("diffItems traversal scales linearly with tree size", () => {
+    expectLinearTraversalGrowth("diffItems", (tree) => {
+      const next = cloneWithOneChange(tree, findMiddleLeafId(tree), "completed");
+      return () => { diffItems(tree, next); };
+    });
   });
 
-  it("filterTree scales linearly with tree size", () => {
-    const small = generateRealisticTree(500);
-    const large = generateRealisticTree(2000);
-
-    const smallTime = timedMedian(() => filterTree(small, ACTIVE_WORK));
-    const largeTime = timedMedian(() => filterTree(large, ACTIVE_WORK));
-
-    const ratio = (largeTime + 0.01) / (Math.max(smallTime, 1) + 0.01);
-    expect(ratio).toBeLessThan(8);
+  it("filterTree traversal scales linearly with tree size", () => {
+    expectLinearTraversalGrowth("filterTree", (tree) => () => { filterTree(tree, ACTIVE_WORK); });
   });
 
-  it("countVisibleNodes scales linearly with tree size", () => {
-    const small = generateRealisticTree(500);
-    const large = generateRealisticTree(2000);
-
-    const smallTime = timedMedian(() => countVisibleNodes(small, ALL_STATUSES));
-    const largeTime = timedMedian(() => countVisibleNodes(large, ALL_STATUSES));
-
-    const ratio = (largeTime + 0.01) / (Math.max(smallTime, 1) + 0.01);
-    expect(ratio).toBeLessThan(8);
+  it("countVisibleNodes traversal scales linearly with tree size", () => {
+    expectLinearTraversalGrowth("countVisibleNodes", (tree) => () => { countVisibleNodes(tree, ALL_STATUSES); });
   });
 
-  it("sliceVisibleTree scales linearly with tree size", () => {
-    const small = generateRealisticTree(500);
-    const large = generateRealisticTree(2000);
-
-    const smallTime = timedMedian(() =>
-      sliceVisibleTree(small, ALL_STATUSES, PROGRESSIVE_THRESHOLD),
-    );
-    const largeTime = timedMedian(() =>
-      sliceVisibleTree(large, ALL_STATUSES, PROGRESSIVE_THRESHOLD),
-    );
-
-    const ratio = (largeTime + 0.01) / (Math.max(smallTime, 1) + 0.01);
-    expect(ratio).toBeLessThan(8);
+  it("sliceVisibleTree traversal scales linearly with tree size", () => {
+    expectLinearTraversalGrowth("sliceVisibleTree", (tree) => () => {
+      sliceVisibleTree(tree, ALL_STATUSES, PROGRESSIVE_THRESHOLD);
+    });
   });
 
-  it("applyItemUpdate is constant-time relative to tree depth", () => {
-    const tree = generateRealisticTree(2000);
+  it("applyItemUpdate traversal scales linearly with tree size", () => {
+    expectLinearTraversalGrowth("applyItemUpdate", (tree) => {
+      const id = findDeepNestedId(tree);
+      return () => { applyItemUpdate(tree, id, { status: "completed" }); };
+    });
+  });
+
+  it("findItemById traversal scales linearly with tree size", () => {
+    expectLinearTraversalGrowth("findItemById", (tree) => () => { findItemById(tree, "nonexistent-id"); });
+  });
+
+  it("applyItemUpdate costs the same traversal at any depth", () => {
+    const tree = generateMeasuredTree(2000);
 
     // Update a shallow item (first epic's first feature)
     const shallowId = tree[0].children![0].id;
-    const [, shallowTime] = timed(() =>
-      applyItemUpdate(tree, shallowId, { status: "completed" }),
-    );
+    const shallowReads = countTreeReads(() => {
+      applyItemUpdate(tree, shallowId, { status: "completed" });
+    });
 
     // Update a deep item (nested subtask)
     const deepId = findDeepNestedId(tree);
-    const [, deepTime] = timed(() =>
-      applyItemUpdate(tree, deepId, { status: "completed" }),
-    );
+    const deepReads = countTreeReads(() => {
+      applyItemUpdate(tree, deepId, { status: "completed" });
+    });
 
-    // Both should be fast (under 50ms with budget)
-    expect(shallowTime).toBeLessThan(50 * BUDGET_MULTIPLIER);
-    expect(deepTime).toBeLessThan(50 * BUDGET_MULTIPLIER);
+    expect(shallowReads).toBeGreaterThan(0);
 
-    // Deep update should not be dramatically slower than shallow
-    // (both walk the tree, so times should be similar)
-    expect(deepTime).toBeLessThan((shallowTime + 1) * 5);
+    // Catches: an update whose cost depends on where the target sits — for
+    // instance one that rebuilds ancestors by re-searching from the root per
+    // level, which would make the deep case cost multiples of the shallow one.
+    // Both walk the tree once, so the readings should be close. This replaces
+    // `deepTime < (shallowTime + 1) * 5`, whose `+1` existed only to stop a
+    // sub-millisecond shallow reading producing a near-zero ceiling.
+    expect(
+      deepReads / shallowReads,
+      `updating a deep item read ${deepReads} children arrays vs ${shallowReads} for a shallow one`,
+    ).toBeLessThan(2);
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Sustained operation benchmarks
+// Sustained operations
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("sustained operations", () => {
   it("handles 100 consecutive diffItems calls on 1000-node tree", () => {
-    const tree = generateRealisticTree(1000);
+    const tree = generateMeasuredTree(1000);
     const iterations = 100;
     let current = tree;
 
-    const start = performance.now();
-    for (let i = 0; i < iterations; i++) {
-      const targetId = `task-${i % 5}-${i % 3}-${i % 4}`;
-      const next = cloneWithOneChange(current, targetId, "completed");
-      current = diffItems(current, next);
-    }
-    const totalMs = performance.now() - start;
-    const avgMs = totalMs / iterations;
+    // Catches: per-call cost that grows as the tree accumulates edits — a diff
+    // that retains and re-scans previous versions, say. The old form averaged
+    // wall-clock across the loop, which measured the machine; the per-iteration
+    // traversal count does not.
+    const totalReads = countTreeReads(() => {
+      for (let i = 0; i < iterations; i++) {
+        const targetId = `task-${i % 5}-${i % 3}-${i % 4}`;
+        const next = cloneWithOneChange(current, targetId, "completed");
+        current = diffItems(current, next);
+      }
+    });
 
-    // Average per-diff should be under 50ms
-    expect(avgMs).toBeLessThan(50 * BUDGET_MULTIPLIER);
+    const nodeCount = countAllNodes(tree);
+    // Only the original instrumented fixture is counted; each diff result is a
+    // fresh clone with plain properties. So this bounds the fixture reads across
+    // the whole loop, which is the reading that would blow up if a diff held on
+    // to the original and re-walked it per call.
+    expect(
+      totalReads,
+      `${iterations} successive diffs read the original ${nodeCount}-node fixture ` +
+      `${totalReads} times in total`,
+    ).toBeLessThan(nodeCount * MAX_READS_PER_NODE * iterations);
   });
 
   it("handles 100 consecutive applyItemUpdate calls on 1000-node tree", () => {
-    const tree = generateRealisticTree(1000);
+    const tree = generateMeasuredTree(1000);
     const iterations = 100;
     let current = tree;
 
@@ -999,20 +1256,29 @@ describe("sustained operations", () => {
     }
     collectIds(tree);
 
-    const start = performance.now();
-    for (let i = 0; i < iterations; i++) {
-      const targetId = ids[i % ids.length];
-      current = applyItemUpdate(current, targetId, { status: "completed" });
-    }
-    const totalMs = performance.now() - start;
-    const avgMs = totalMs / iterations;
+    const firstReads = countTreeReads(() => {
+      current = applyItemUpdate(current, ids[0], { status: "completed" });
+    });
+    const restReads = countTreeReads(() => {
+      for (let i = 1; i < iterations; i++) {
+        current = applyItemUpdate(current, ids[i % ids.length], { status: "completed" });
+      }
+    });
 
-    // Average per-update should be under 10ms
-    expect(avgMs).toBeLessThan(10 * BUDGET_MULTIPLIER);
+    expect(firstReads).toBeGreaterThan(0);
+    // After the first update, `current` is a partially rebuilt tree whose changed
+    // spine no longer carries the instrument, so the fixture reads fall away.
+    // Catches: an update that keeps reaching back into the original tree on every
+    // call — the reading would then stay at firstReads × 99 instead of dropping.
+    expect(
+      restReads,
+      `updates 2..${iterations} read the original fixture ${restReads} times; ` +
+      `the first update alone read it ${firstReads} times`,
+    ).toBeLessThan(firstReads * (iterations - 1));
   });
 
   it("handles rapid filter toggles on 2000-node tree", () => {
-    const tree = generateRealisticTree(2000);
+    const tree = generateMeasuredTree(2000);
     const filters: Set<ItemStatus>[] = [
       ALL_STATUSES,
       ACTIVE_WORK,
@@ -1021,15 +1287,19 @@ describe("sustained operations", () => {
       ALL_STATUSES,
     ];
 
-    const times: number[] = [];
-    for (const filter of filters) {
-      const [, elapsed] = timed(() => filterTree(tree, filter));
-      times.push(elapsed);
+    const reads = filters.map((filter) => countTreeReads(() => { filterTree(tree, filter); }));
+    const nodeCount = countAllNodes(tree);
+
+    // Catches: a filter that caches per-status results and rebuilds the cache by
+    // re-walking on every toggle, or one whose cost depends on the previous
+    // filter. Each toggle costs one traversal regardless of order or selectivity.
+    for (const r of reads) {
+      expect(r, `filter toggles read ${reads.join(", ")} on a ${nodeCount}-node tree`)
+        .toBeLessThan(nodeCount * MAX_READS_PER_NODE);
     }
 
-    // Each filter operation should be under 100ms
-    for (const t of times) {
-      expect(t).toBeLessThan(100 * BUDGET_MULTIPLIER);
-    }
+    // Toggling back to ALL_STATUSES must cost what it did the first time — an
+    // exact check, since the same filter on the same tree is the same traversal.
+    expect(reads[reads.length - 1]).toBe(reads[0]);
   });
 });
