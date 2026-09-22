@@ -26,6 +26,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Count hench runs, not turns, in ndx usage](./count-hench-runs-not-turns-in-ndx-usage.md) | pending |
 | [Make prompt-census record the real commit when run from a worktree](./make-prompt-census-record-the-real.md) | pending |
 | [Price dashboard token usage per model and show the split](./price-dashboard-token-usage-per-model.md) | pending |
-| [Rebase PR #353 onto main and merge it](./rebase-pr-353-onto-main-and-merge-it.md) | pending |
+| [Rebase PR #353 onto main and merge it](./rebase-pr-353-onto-main-and-merge-it.md) | completed |
 | [Run the post-merge measurement batch and record the comparison with the baseline](./run-the-post-merge-measurement-batch.md) | pending |
 | [Write the 0.7.1 release note explaining the reported-cost change](./write-the-0-7-1-release-note.md) | pending |
