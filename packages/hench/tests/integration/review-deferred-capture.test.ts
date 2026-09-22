@@ -7,6 +7,22 @@ import { resolveReviewDispositions } from "../../src/agent/lifecycle/cli-loop.js
 import type { ReviewReport } from "../../src/agent/analysis/adversarial-review.js";
 import { parseReviewReport } from "../../src/agent/analysis/adversarial-review.js";
 
+/** Minimal parked-report input for cases that only need *a* report. */
+const parkedReportInput = (): ReviewReport => ({
+  taskId: "task-42",
+  fixesApplied: false,
+  summary: "s",
+  findings: [
+    {
+      title: "A",
+      severity: "high",
+      verdict: "should-fix",
+      scenario: "x -> y",
+      action: "dropped",
+    },
+  ],
+});
+
 /**
  * The deferral round trip, across the disk boundary the CLI reads back over.
  *
@@ -120,6 +136,98 @@ describe("autonomous review deferral", () => {
     await resolveReviewDispositions(reportPath, reviewerReport(), true);
 
     expect((await readBack()).findings[1].disposition).toBe("deferred");
+  });
+
+  /**
+   * The write-back must not become a second way to lose findings.
+   *
+   * `parseReviewReport` is a lossy projection — ten known fields per finding,
+   * and non-object entries filtered out entirely. An earlier cut of this
+   * feature re-serialized that projection over the reviewer's file, which
+   * erased a `proposedSolutions` array (the skill asks for solutions; this
+   * brief has no field for them), a top-level note, and a finding the reviewer
+   * had written as a bare string — 2 findings on disk became 1.
+   */
+  describe("write-back preserves what the parser cannot model", () => {
+    /** A report carrying keys and an entry shape the schema never named. */
+    const richReport = () => ({
+      taskId: "task-42",
+      fixesApplied: true,
+      summary: "Attacked the claim refresh path.",
+      reviewerNotes: "context the reviewer judged worth keeping",
+      findings: [
+        {
+          title: "Stale claim survives a crashed worktree",
+          severity: "high",
+          verdict: "should-fix",
+          scenario: "Worktree is SIGKILLed -> the task is never picked up",
+          action: "dropped",
+          proposedSolutions: ["option 1: expire on pid loss", "option 2: lease with a TTL"],
+        },
+        "a finding the reviewer wrote as a bare string",
+        {
+          title: "Log line repeats the run id",
+          severity: "low",
+          verdict: "not-worth-fixing",
+          scenario: "Two ids on one line -> noisier log, no wrong behaviour",
+          action: "dropped",
+        },
+      ],
+    });
+
+    const parkRich = async () => {
+      await writeFile(reportPath, JSON.stringify(richReport(), null, 2), "utf-8");
+      const parsed = parseReviewReport(await readFile(reportPath, "utf-8"));
+      if (!parsed) throw new Error("fixture is not parseable");
+      return resolveReviewDispositions(reportPath, parsed, true);
+    };
+
+    it("keeps a finding the parser skipped as malformed", async () => {
+      await parkRich();
+
+      const onDisk = JSON.parse(await readFile(reportPath, "utf-8"));
+      expect(onDisk.findings).toHaveLength(3);
+      expect(onDisk.findings[1]).toBe("a finding the reviewer wrote as a bare string");
+    });
+
+    it("keeps per-finding and top-level keys the schema never named", async () => {
+      await parkRich();
+
+      const onDisk = JSON.parse(await readFile(reportPath, "utf-8"));
+      expect(onDisk.reviewerNotes).toBe("context the reviewer judged worth keeping");
+      expect(onDisk.findings[0].proposedSolutions).toEqual([
+        "option 1: expire on pid loss",
+        "option 2: lease with a TTL",
+      ]);
+    });
+
+    it("lands each disposition on the finding it belongs to across the skipped entry", async () => {
+      // The trap: the parsed array is the raw array minus the bare string, so
+      // the two stop sharing indices at position 1. A naive index-for-index
+      // patch would write the not-worth-fixing entry's `dropped` onto the
+      // string's neighbour and leave the real one unmarked.
+      await parkRich();
+
+      const onDisk = JSON.parse(await readFile(reportPath, "utf-8"));
+      expect(onDisk.findings[0].disposition).toBe("deferred");
+      expect(onDisk.findings[2].disposition).toBe("dropped");
+    });
+
+    it("leaves the file alone rather than overwrite it with something lossy", async () => {
+      // If the merge cannot align, not writing is the correct outcome: a
+      // recorded disposition is worth less than the findings it would cost.
+      await writeFile(reportPath, JSON.stringify({ taskId: "t", findings: "not-an-array" }), "utf-8");
+      const before = await readFile(reportPath, "utf-8");
+
+      const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+      try {
+        await resolveReviewDispositions(reportPath, parkedReportInput(), true);
+      } finally {
+        spy.mockRestore();
+      }
+
+      expect(await readFile(reportPath, "utf-8")).toBe(before);
+    });
   });
 
   it("leaves an interactive run's report exactly as the reviewer wrote it", async () => {

@@ -63,6 +63,7 @@ export {
   parkDeferredFindings,
   deferredFindings,
   formatDeferredFindings,
+  mergeDispositionsIntoRaw,
   reviewFindingId,
   REVIEW_SEVERITIES,
   REVIEW_VERDICTS,

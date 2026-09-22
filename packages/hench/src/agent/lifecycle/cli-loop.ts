@@ -42,6 +42,7 @@ import {
   formatUnresolvedWarning,
   parkDeferredFindings,
   deferredFindings,
+  mergeDispositionsIntoRaw,
 } from "../analysis/adversarial-review.js";
 import type {
   ReviewPassOutcome,
@@ -68,7 +69,7 @@ import {
   type SpawnReason,
 } from "./spawn-budget.js";
 import { DEFAULT_TASKS_PER_SESSION } from "./session-cache.js";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
   loadLLMConfig,
@@ -1478,7 +1479,15 @@ export async function resolveReviewDispositions(
   const deferred = deferredFindings(report);
 
   try {
-    await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
+    // Patch the reviewer's own JSON rather than re-serializing the parsed
+    // projection — see mergeDispositionsIntoRaw. Writing the projection back
+    // would erase every key the parser does not model, including findings it
+    // skipped as malformed.
+    const merged = mergeDispositionsIntoRaw(await readFile(reportPath, "utf-8"), report);
+    if (merged === null) {
+      throw new Error("the report on disk is no longer a findings array the merge can align to");
+    }
+    await writeFile(reportPath, merged, "utf-8");
   } catch (err) {
     info(
       `⚠ Could not record finding dispositions to ${reportPath} (${(err as Error).message}).`,

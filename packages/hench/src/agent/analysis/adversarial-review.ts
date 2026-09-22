@@ -447,6 +447,19 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
+/**
+ * The entries {@link parseReviewReport} models — a plain JSON object.
+ *
+ * Shared with {@link mergeDispositionsIntoRaw} on purpose. That merge walks the
+ * *raw* findings array and has to skip exactly the entries the parser skipped,
+ * or every disposition after the first malformed entry lands on the wrong
+ * finding. A second copy of this predicate is a second definition of which
+ * entries are findings, free to drift from the one the parser uses.
+ */
+function isFindingObject(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
 function coerceEnum<T extends string>(
   value: unknown,
   allowed: readonly T[],
@@ -499,7 +512,7 @@ export function parseReviewReport(raw: string): ReviewReport | null {
   if (!Array.isArray(obj.findings)) return null;
 
   const findings: ReviewFinding[] = obj.findings
-    .filter((f): f is Record<string, unknown> => !!f && typeof f === "object" && !Array.isArray(f))
+    .filter(isFindingObject)
     .map((f) => ({
       title: isNonEmptyString(f.title) ? f.title : "(untitled finding)",
       location: isNonEmptyString(f.location) ? f.location : undefined,
@@ -519,6 +532,58 @@ export function parseReviewReport(raw: string): ReviewReport | null {
     fixesApplied: obj.fixesApplied === true,
     summary: isNonEmptyString(obj.summary) ? obj.summary : "(no summary recorded)",
   };
+}
+
+/**
+ * Patch derived dispositions into the reviewer's own JSON, returning the text
+ * to write back.
+ *
+ * **Why not just re-serialize the parsed report.** {@link parseReviewReport} is
+ * a lossy projection: it keeps ten known fields per finding and drops
+ * everything else, and it filters out entries that are not JSON objects.
+ * Writing that projection back over the reviewer's file destroys whatever it
+ * could not model — a `proposedSolutions` array the skill asked for but this
+ * brief has no field for, a top-level note, and, worst of all, a finding the
+ * reviewer wrote in a shape the parser skipped. A malformed finding is still a
+ * finding a human can read; erasing it to record a disposition would lose
+ * review findings in the name of a feature built to stop losing them.
+ *
+ * So the merge edits the parsed-from-disk structure in place and re-emits it:
+ * every key the reviewer wrote survives, and only `disposition` is added.
+ *
+ * **Index alignment is the trap.** The parsed report's findings are the raw
+ * array *minus* the entries {@link isFindingObject} rejects, so the two arrays
+ * do not share indices once a malformed entry exists. The cursor below
+ * advances only on entries the parser also kept, which is why both sides must
+ * use the same predicate.
+ *
+ * @returns the JSON text to write, or `null` when the raw text is no longer a
+ *   report the merge can align against — in which case the caller must leave
+ *   the file alone rather than overwrite it with something lossy.
+ */
+export function mergeDispositionsIntoRaw(
+  rawText: string,
+  parked: ReviewReport,
+): string | null {
+  let data: unknown;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    return null;
+  }
+  if (!isFindingObject(data)) return null;
+
+  const rawFindings = data.findings;
+  if (!Array.isArray(rawFindings)) return null;
+
+  let cursor = 0;
+  for (const entry of rawFindings) {
+    if (!isFindingObject(entry)) continue;
+    const disposition = parked.findings[cursor++]?.disposition;
+    if (disposition) entry.disposition = disposition;
+  }
+
+  return `${JSON.stringify(data, null, 2)}\n`;
 }
 
 /**
