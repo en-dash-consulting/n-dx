@@ -6,6 +6,13 @@
 
 Price token usage at each model's own rates instead of Claude Sonnet's.
 
+**Reported costs rise on upgrade — typically by about a third.** Dashboard
+and CLI cost figures go up because runs are now priced at each model's own
+rates instead of a flat Sonnet rate; no tokens were added and nothing runs
+more expensively. On this repo's baseline batch the same runs moved from
+$161.08 (flat Sonnet) to $247.53 (per model). Budget alerts or dashboards
+keyed to the old under-reported figures will see a one-time jump.
+
 `estimateCost` took a `ModelPricing` parameter that every caller left at a
 single hardcoded Sonnet default (3/15 per MTok, cache write 3.75, cache read
 0.30). A project configured for Opus (5/25) therefore had its spend
