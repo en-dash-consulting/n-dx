@@ -27,6 +27,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Cascade follow-ups: heuristic real-problem Noul, move-file Choice, escalation band tuning, --per-zone passthrough](./cascade-follow-ups-heuristic-real.md) | completed |
+| [Cascade re-run idempotence: no repeated name fallbacks, unchanged escalated zones carried forward, stable judgment keys, naming progress](./cascade-re-run-idempotence-no-repeated.md) | in_progress |
 | [Cascade robustness: model-alias expansion and config warning, visible CLI errors, ladder stops on non-retryable failures, --full skipped after the cascade, naming progress and concurrency](./cascade-robustness-model-alias.md) | deferred |
 | [Finding cascade: Jev gates, verifies and anchors enrichment; free-text generation becomes --narrate](./finding-cascade-jev-gates-verifies-and.md) | completed |
 | [Finding severity, finding category and zone fragility as Jev judgments](./finding-severity-finding-category-and.md) | completed |
