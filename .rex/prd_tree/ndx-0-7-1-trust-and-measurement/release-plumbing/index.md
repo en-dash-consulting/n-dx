@@ -22,7 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Backfill git tags and GitHub releases for 0.5.x and 0.6.0](./backfill-git-tags-and-github-releases.md) | pending |
+| [Backfill git tags and GitHub releases for 0.5.x and 0.6.0](./backfill-git-tags-and-github-releases.md) | completed |
 | [Close the issues fixed by #370 and triage #375 and #367](./close-the-issues-fixed-by-370-and.md) | pending |
 | [Commit the PRD storage migration design document](./commit-the-prd-storage-migration.md) | pending |
-| [Diagnose and fix the release workflow so publishes create git tags and GitHub releases](./diagnose-and-fix-the-release-workflow.md) | pending |
+| [Diagnose and fix the release workflow so publishes create git tags and GitHub releases](./diagnose-and-fix-the-release-workflow.md) | in_progress |
