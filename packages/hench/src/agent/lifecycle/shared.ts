@@ -61,6 +61,7 @@ import {
   findUncommittedWork,
   formatUncommittedWorkRefusal,
   listDirtyPaths,
+  partitionDirtyPaths,
   renderPaths,
 } from "./uncommitted-work-gate.js";
 import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
@@ -570,10 +571,16 @@ export async function runReviewGate(
       // Reuse the shared rollback path: it prompts for confirmation in
       // interactive sessions and scopes untracked removal to agent-created
       // files via the baseline.
+      //
+      // `scope: "all"` because this path is the one exception to the PRD-only
+      // default. A failed run must not discard the agent's work; a *rejected
+      // review* must, since that diff is exactly what the reviewer turned
+      // down and leaving it in place would ignore the rejection.
       await performRollbackIfNeeded(projectDir, {
         yes: options.yes,
         autonomous: options.autonomous,
         baselineUntracked: options.baselineUntracked,
+        scope: "all",
       });
     }
 
@@ -1025,19 +1032,46 @@ async function askYesNoWithSuspendedSigint(
 /**
  * Ask the user to confirm the revert via stdin (TTY only).
  *
- * Names the paths and says what they are — hench's own status writes from
- * this run, not code the operator staged deliberately — because leaving them
- * in place is the actual damage: the PRD tree keeps whatever this run last
- * wrote instead of its pre-run state. The prompt defaults to Yes, so a bare
- * Enter reverts and restores that pre-run state; only an explicit 'n'/'no'
- * keeps the dirty files. The first Ctrl-C prints a hint and keeps the prompt
- * open; a second Ctrl-C aborts the prompt and exits.
+ * Names the paths, and they are only ever hench's own PRD writes — never the
+ * agent's source edits, which this prompt is not entitled to discard. That
+ * pairing is the whole reason the default can be Yes: leaving hench's dirty
+ * writes in place is the actual damage (the PRD tree keeps whatever this run
+ * last wrote instead of its pre-run state), while leaving the agent's work in
+ * place is not damage at all.
+ *
+ * `otherCount` is the rest of the dirty tree, named as a count so the operator
+ * can see it was noticed and deliberately left alone. When the prompt listed
+ * those paths too, under a sentence calling them hench's writes, a bare Enter
+ * reverted them: `TESTING.md` and a finished test file, ten minutes of work,
+ * one keystroke.
+ *
+ * Only an explicit 'n'/'no' keeps the dirty PRD files. The first Ctrl-C prints
+ * a hint and keeps the prompt open; a second Ctrl-C aborts the prompt and exits.
  */
-export async function promptRollbackConfirm(paths: string[]): Promise<boolean> {
+export async function promptRollbackConfirm(
+  paths: string[],
+  otherCount = 0,
+  scope: RollbackScope = "prd",
+): Promise<boolean> {
+  if (scope === "all") {
+    // The review-rejection path. Here the diff *is* what was just rejected,
+    // so the whole dirty tree is the subject and reverting it is the point.
+    return askYesNoWithSuspendedSigint(
+      `\n${paths.length} uncommitted file(s) from this run:\n` +
+        `${renderPaths(paths)}\n` +
+        `Revert them and restore the pre-run state? [Y/n] `,
+      { interruptMode: "hold-then-exit", defaultYes: true },
+    );
+  }
+  const others =
+    otherCount > 0
+      ? `${otherCount} other uncommitted file(s) are your work — hench leaves those alone.\n`
+      : "";
   return askYesNoWithSuspendedSigint(
-    `\n${paths.length} uncommitted file(s) — hench's status writes from this run:\n` +
+    `\n${paths.length} uncommitted PRD file(s) — hench's own status writes from this run:\n` +
       `${renderPaths(paths)}\n` +
-      `Revert them and restore the pre-run PRD state? [Y/n] `,
+      others +
+      `Revert hench's writes and restore the pre-run PRD state? [Y/n] `,
     { interruptMode: "hold-then-exit", defaultYes: true },
   );
 }
@@ -1049,22 +1083,43 @@ export async function promptRollbackConfirm(paths: string[]): Promise<boolean> {
  *
  * Skips silently when the working tree is already clean.
  *
+ * Only hench's own writes are ever in scope. The PRD paths are what hench
+ * wrote; the agent's source edits and the operator's own dirty files are
+ * reported and left alone. Before that split, the prompt offered the whole
+ * dirty tree as "hench's status writes" and the revert ran `git checkout .`,
+ * so accepting it — which a bare Enter does — reverted the agent's finished
+ * work along with the bookkeeping.
+ *
  * The revert is prompt-only:
  * - Interactive TTY (stdin is a terminal, --yes not passed, not autonomous):
- *   names the dirty paths and prompts `Revert them and restore the pre-run
- *   PRD state? [Y/n]`, defaulting to Yes — leaving hench's own uncommitted
- *   writes in place is the damage, so a bare Enter reverts them. Only an
- *   explicit 'n'/'no' keeps the dirty files. Even on revert, the scope is
- *   limited: tracked changes are reverted, but untracked removal is limited
- *   to files absent from the pre-run baseline (agent-created), never
- *   pre-existing work.
+ *   names the dirty PRD paths and prompts `Revert hench's writes and restore
+ *   the pre-run PRD state? [Y/n]`, defaulting to Yes — leaving hench's own
+ *   uncommitted writes in place is the damage, so a bare Enter reverts them.
+ *   Only an explicit 'n'/'no' keeps them. Even then the scope narrows twice
+ *   more: tracked changes are reverted only under the PRD paths, and
+ *   untracked removal is limited to files absent from the pre-run baseline
+ *   (agent-created) *and* inside those paths, never pre-existing work.
  * - Non-interactive (CI, pipe, --yes, or any autonomous mode): there is no
  *   channel for a per-run confirmation, so the working tree is left exactly
  *   as-is and the uncommitted files are reported. Nothing is discarded.
  */
+/**
+ * What a rollback is allowed to touch.
+ *
+ * - `"prd"` — only hench's own PRD writes. The default, and what a *failed
+ *   run* gets: the agent's source edits are finished work with an owner, and
+ *   discarding them is the bug this whole gate exists to prevent.
+ * - `"all"` — the whole dirty tree, as before. Only the review-rejection path
+ *   asks for this, because there the agent's diff is precisely what the
+ *   reviewer rejected; leaving it in place would be ignoring the rejection.
+ */
+export type RollbackScope = "prd" | "all";
+
 interface PerformRollbackOptions {
   /** True when --yes was passed. There is no prompt channel, so no revert. */
   yes?: boolean;
+  /** Which dirty paths the revert may touch. Defaults to `"prd"`. */
+  scope?: RollbackScope;
   /** True in autonomous modes (--auto/--loop). Same effect as `yes`. */
   autonomous?: boolean;
   /**
@@ -1079,12 +1134,23 @@ async function performRollbackIfNeeded(
   options: PerformRollbackOptions = {},
 ): Promise<void> {
   // Same exclusion as the pre-run gate: hench's own lock and run files are not
-  // the agent's work, so they must not make a rollback look necessary.
-  const dirtyPaths = await excludeHenchRuntimeArtifacts(
-    await listDirtyPaths(projectDir),
-    projectDir,
-  );
-  if (dirtyPaths.length === 0) {
+  // the agent's work, so they must not make a rollback look necessary. What
+  // survives that is then split by author — only hench's half is revertable.
+  const scope = options.scope ?? "prd";
+  const { prd, other } = await partitionDirtyPaths(projectDir);
+  if (prd.length === 0 && other.length === 0) {
+    return;
+  }
+
+  const candidates = scope === "all" ? [...prd, ...other] : prd;
+
+  // Nothing of hench's is dirty, so there is nothing this prompt may offer.
+  // The rest is the agent's work and the operator's own edits: report it and
+  // stop, rather than asking a question whose only honest answer is no.
+  if (candidates.length === 0) {
+    info(
+      `${other.length} uncommitted file(s) left in place — none of them are hench's own writes.`,
+    );
     return;
   }
 
@@ -1093,33 +1159,45 @@ async function performRollbackIfNeeded(
   // mode (--auto/--loop/--epic-by-epic) was supplied. Everything else leaves
   // the working tree untouched.
   const isInteractive = Boolean(process.stdin.isTTY) && !options.yes && !options.autonomous;
+  const label = scope === "all" ? "uncommitted file(s)" : "uncommitted PRD file(s)";
   if (!isInteractive) {
     info(
-      `${dirtyPaths.length} uncommitted file(s) left in place — a rollback only runs after an interactive confirmation.`,
+      `${candidates.length} ${label} left in place — a rollback only runs after an interactive confirmation.`,
     );
     return;
   }
 
-  const confirmed = await promptRollbackConfirm(dirtyPaths);
+  const confirmed = await promptRollbackConfirm(
+    candidates,
+    scope === "all" ? 0 : other.length,
+    scope,
+  );
   if (!confirmed) {
-    info(`Changes preserved — ${dirtyPaths.length} uncommitted file(s) left unchanged.`);
+    info(`Changes preserved — ${candidates.length} ${label} left unchanged.`);
     return;
   }
 
-  info(`\nRolling back ${dirtyPaths.length} uncommitted file(s) after failed run…`);
+  info(`\nRolling back ${candidates.length} ${label} after failed run…`);
   // Defensive: the git helpers (execStdout) already swallow errors, but guard
   // the call site too so a corrupt git state can never throw here and prevent
   // the caller (finalizeRun) from saving the run record.
   try {
     const result = await revertChanges(projectDir, {
       baselineUntracked: options.baselineUntracked,
+      ...(scope === "prd" ? { scope: PRD_COMMIT_PATHS } : {}),
     });
     const removed = result.removedUntracked.length;
     const kept = result.keptUntracked.length;
+    const reverted = scope === "all" ? "reverted tracked changes" : "reverted hench's PRD writes";
+    const leftAlone =
+      scope === "prd" && other.length > 0
+        ? `; left ${other.length} file(s) of your work untouched.`
+        : ".";
     info(
-      `Rollback complete — reverted tracked changes` +
+      `Rollback complete — ${reverted}` +
         `; removed ${removed} agent-created file(s)` +
-        (kept > 0 ? `, preserved ${kept} pre-existing untracked file(s).` : "."),
+        (kept > 0 ? `, preserved ${kept} untracked file(s)` : "") +
+        leftAlone,
     );
   } catch (err) {
     info(`Rollback encountered an error (continuing): ${(err as Error).message}`);

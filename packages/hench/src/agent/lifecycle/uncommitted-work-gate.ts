@@ -210,6 +210,47 @@ export async function listUncommittedPrdPaths(
     .filter((path) => matchesProjectPath(path, PRD_COMMIT_PATHS, repoPrefix));
 }
 
+/** The dirty working tree, split by who wrote each path. */
+export interface DirtyPathPartition {
+  /** Dirty paths hench itself writes — {@link PRD_COMMIT_PATHS}. */
+  prd: string[];
+  /** Everything else dirty: the agent's work and the operator's own edits. */
+  other: string[];
+}
+
+/**
+ * Split the dirty working tree into the PRD paths hench writes and everything
+ * else, in one `git status`.
+ *
+ * The rollback prompt is the caller that needs this distinction, and it needs
+ * it to be exact. It used to offer the whole dirty tree under the sentence
+ * "hench's status writes from this run" and, since the default became Yes, a
+ * bare Enter reverted every tracked change in the repository — including the
+ * agent's finished source edits, which are not hench's to discard. Two of the
+ * four paths in the prompt that surfaced this were the agent's work.
+ *
+ * Hench's own runtime artifacts are excluded, as everywhere else: they are not
+ * anyone's work.
+ */
+export async function partitionDirtyPaths(
+  projectDir: string,
+  deps: { listDirty?: (dir: string) => Promise<string[]> } = {},
+): Promise<DirtyPathPartition> {
+  const listDirty = deps.listDirty ?? listDirtyPaths;
+  const lines = await excludeHenchRuntimeArtifacts(await listDirty(projectDir), projectDir);
+  if (lines.length === 0) return { prd: [], other: [] };
+
+  const repoPrefix = await repoRelativePrefix(projectDir);
+  const prd: string[] = [];
+  const other: string[] = [];
+  for (const line of lines) {
+    const path = parsePorcelainPath(line);
+    if (matchesProjectPath(path, PRD_COMMIT_PATHS, repoPrefix)) prd.push(path);
+    else other.push(path);
+  }
+  return { prd, other };
+}
+
 /**
  * Render a path list, truncated so it stays readable. Shared beyond this
  * module's own refusal messages by {@link promptRollbackConfirm} in
