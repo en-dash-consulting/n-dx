@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "nod
 import { join } from "node:path";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -2374,6 +2374,46 @@ export function deriveTokenDiagnosticStatus(turns: TurnTokenUsage[]): "complete"
 }
 
 /**
+ * List the commits this run produced, from the HEAD captured at run start
+ * ({@link RunRecord.startHead}) to the current HEAD.
+ *
+ * Reading git history rather than tracking a list at each commit call site
+ * means every commit shows up here the same way regardless of which path
+ * landed it — the agent's own `git commit` on the autoCommit path, the
+ * interactive commit prompt, the review-repair commit, the
+ * completion-metadata commit — with nothing to keep in sync as those paths
+ * change.
+ *
+ * Returns an empty array outside a git repository, when no starting HEAD was
+ * captured (a record written before {@link RunRecord.startHead} existed), or
+ * when nothing was committed.
+ */
+async function collectRunCommits(projectDir: string, startHead: string | undefined): Promise<RunCommitRecord[]> {
+  if (!startHead) return [];
+  try {
+    // Unit separator (\x1f) between hash and subject: a commit subject can
+    // contain almost anything else a simpler delimiter might collide with.
+    // --reverse lists oldest first, so the work commit precedes the record
+    // commit that followed it.
+    const output = await execStdout(
+      "git",
+      ["log", "--reverse", `--format=%H%x1f%s`, `${startHead}..HEAD`],
+      { cwd: projectDir, timeout: 10_000 },
+    );
+    const trimmed = output.trim();
+    if (!trimmed) return [];
+    return trimmed.split("\n").map((line) => {
+      const [sha, ...rest] = line.split("\x1f");
+      return { sha, subject: rest.join("\x1f") };
+    });
+  } catch {
+    // Best-effort: a run whose commits cannot be enumerated still reports
+    // status/summary normally, just without a Commits: line.
+    return [];
+  }
+}
+
+/**
  * Finalize a run: build structured summary, capture memory stats,
  * run post-task tests, retrieve Codex tokens if applicable, set timestamps,
  * and persist. Called at the end of both loops.
@@ -2745,7 +2785,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     if (run.status === "completed") {
       const completionMetadata = await commitCompletionMetadata(projectDir, run.taskId, run);
       if (completionMetadata.error) {
+        // The task's own work already succeeded (checked above) — only the
+        // follow-up PRD record commit failed to land. `status` still flips to
+        // "failed" (the two outcomes share one field today), but this flag is
+        // set at the exact point of the failure so the run summary can tell
+        // the difference instead of reporting an indistinguishable failure.
         run.status = "failed";
+        run.recordCommitPending = true;
         run.error = `Could not commit completion metadata: ${completionMetadata.error.message}`;
         info(`\n${run.error}`);
         if (opts.store) {
@@ -2800,6 +2846,24 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   if (opts.store) {
     await resetInProgressTaskIfFailed(opts.store, run);
   }
+
+  // Name every commit this run produced, so the run summary can report what
+  // actually landed instead of inferring it from `status` alone. Computed
+  // from git history rather than tracked per call site: it is the one place
+  // that sees a commit regardless of which path made it (the agent's own
+  // `git commit` on the autoCommit path, the interactive commit prompt, the
+  // review-repair commit, the completion-metadata commit), and rollback above
+  // only ever reverts uncommitted working-tree changes, never a landed commit.
+  run.commits = await collectRunCommits(projectDir, run.startHead);
+
+  // …and name what the run left behind uncommitted. Computed here, after the
+  // rollback above, so it describes the tree as the run actually ends up:
+  // neither the commit list nor the tool-call heuristic can see an edit that
+  // was never committed, so without this the summary reported
+  // "Changes: none" directly beneath a refusal listing seven dirty paths.
+  // `findUncommittedWork` (no discounts) is the same view the completion gate
+  // takes, minus hench's own runtime artifacts.
+  run.uncommittedPaths = (await findUncommittedWork({ projectDir })).paths;
 
   run.finishedAt = new Date().toISOString();
   run.lastActivityAt = run.finishedAt;
