@@ -471,6 +471,11 @@ export const DEFAULT_ROUTES: Record<string, TaskTier> = {
   "zone.enrich-scan": "light",
   "zone.enrich-deep": "standard",
   "zone.meta-eval": "standard",
+  // Judgment classes (DEFAULT_JUDGMENT_ROUTES). Answered by Jev when a
+  // judgment route resolves; the tier here is what resolveTaskModel reports
+  // for them and has no text-model call site behind it.
+  "finding.judge": "light",
+  "zone.judge": "light",
   // web
   "sourcevision.ask": "standard",
 };
