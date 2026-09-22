@@ -13,9 +13,10 @@
  *    naming `rex migrate-slugs`
  *  - the refusal lands before the claim and before the agent loop is entered,
  *    so the second task is never started rather than started and abandoned
- *  - both multi-task modes are covered. `--iterations` and `--loop` are
- *    separate functions with separate `runOne` call sites, and a fix that
- *    covered one would pass a test written against the other
+ *  - all three multi-task modes are covered. `--iterations`, `--loop` and
+ *    `--epic-by-epic` are separate functions with separate `runOne` call
+ *    sites, and a fix that covered one would pass a test written against
+ *    another
  *  - the first task is not double-gated: the per-task gate consumes the
  *    pre-flight check, so a single-task run parses the tree once as before
  *
@@ -190,7 +191,21 @@ describe("the PRD tree gate between tasks", () => {
     expect(mockedAgentLoop).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses before claiming the second task, and rewrites nothing", async () => {
+  it("refuses the next --epic-by-epic task, naming rex migrate-slugs", async () => {
+    // The third runOne call site. The gate sits inside runOne so this path is
+    // covered by construction, and only tsc enforces that runEpicByEpic still
+    // threads the gate through — which is the shape of coverage that let a
+    // previous fix go green against a path it never ran.
+    tamperAfterFirstTask();
+
+    await expect(
+      cmdRun(projectDir, { "epic-by-epic": "true" }),
+    ).rejects.toThrow(/rex migrate-slugs/);
+
+    expect(mockedAgentLoop).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses before claiming the second task", async () => {
     const claimSpy = vi.spyOn(TaskClaims, "forProject");
     tamperAfterFirstTask();
 
@@ -204,7 +219,6 @@ describe("the PRD tree gate between tasks", () => {
   });
 
   it("leaves the drifted tree exactly as it found it", async () => {
-    tamperAfterFirstTask();
     let afterTamper: Map<string, string> | undefined;
     mockedAgentLoop.mockImplementation(async () => {
       if (mockedAgentLoop.mock.calls.length === 1) {
