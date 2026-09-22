@@ -22,7 +22,12 @@
 
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
-import { resolveStore, PRD_TREE_DIRNAME } from "../../store/index.js";
+import {
+  resolveStore,
+  PRD_TREE_DIRNAME,
+  SLUG_RULE_VERSION,
+  readSlugRuleMarker,
+} from "../../store/index.js";
 import {
   findUnresolvableSiblingCollisions,
   fingerprintTree,
@@ -55,6 +60,21 @@ export async function cmdMigrateSlugs(
     );
   }
 
+  // Refuse a downgrade before anything is written, including the snapshot.
+  // This command rewrites the tree under *this* build's rule, so it can only
+  // move a tree forwards or hold it still. Pointed at a tree written by a
+  // newer rule it would rename every path backwards and stamp the older
+  // marker over the newer one — and since the newer build then refuses the
+  // tree in turn, the two can trade whole-tree renames indefinitely.
+  const markerBefore = await readSlugRuleMarker(rexDir);
+  if (markerBefore !== undefined && markerBefore > SLUG_RULE_VERSION) {
+    throw new CLIError(
+      `The PRD tree was written under slug rule ${markerBefore}, which is newer than the rule ${SLUG_RULE_VERSION} this build implements.`,
+      `Migrating would rewrite every path under the superseded rule and record rule ${SLUG_RULE_VERSION} over the newer marker. ` +
+        `Upgrade rex to a build that implements slug rule ${markerBefore} instead.`,
+    );
+  }
+
   // Refuse before touching anything if the tree holds a collision the slug
   // rule cannot resolve. Same-titled siblings are ordinary — they take an
   // `-{id6}` suffix. Siblings sharing a title *and* an id are not: the
@@ -79,8 +99,18 @@ export async function cmdMigrateSlugs(
   await ensureSnapshot(rexDir, "migrate-slugs", flags);
 
   // Load + save under one lock: the serializer emits current-rule paths and
-  // removes the entries it loaded from the superseded ones.
-  await store.withTransaction(async () => {});
+  // removes the entries it loaded from the superseded ones, and the same write
+  // records the slug-rule marker. This is the only call that may go past the
+  // write guard — an ordinary save against a tree on a superseded rule is
+  // refused, because re-slugging is exactly what this command exists to do
+  // deliberately and no other command should do at all.
+  if (!store.adoptSlugRule) {
+    throw new CLIError(
+      "This PRD backend cannot migrate slugs.",
+      `Slugs are a property of the local folder tree; the resolved store is a remote adapter with no paths to rename.`,
+    );
+  }
+  await store.adoptSlugRule();
 
   // Prove the rename was lossless by reading the tree back. Git similarity
   // scores cannot do this: a container's index.md lists its children's paths,
@@ -125,7 +155,15 @@ export async function cmdMigrateSlugs(
   }
 
   if (renamed === 0) {
-    result("PRD tree already uses the current slug rule — nothing to rename.");
+    // "Nothing to rename" is only the whole story when nothing changed at all.
+    // A run that recorded the marker on a previously unmarked tree did the
+    // other half of this command's job, and reporting it as a no-op hides the
+    // one write that unblocks every subsequent save.
+    result(
+      markerBefore === SLUG_RULE_VERSION
+        ? "PRD tree already uses the current slug rule — nothing to rename."
+        : `PRD tree paths already match slug rule ${SLUG_RULE_VERSION} — nothing to rename; recorded the slug-rule marker.`,
+    );
     return;
   }
   result(`Renamed ${renamed} entr${renamed === 1 ? "y" : "ies"} to readable slugs (${unchanged} already canonical).`);

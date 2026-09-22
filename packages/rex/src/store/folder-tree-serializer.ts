@@ -556,6 +556,38 @@ function escapeForRegExp(value: string): string {
 }
 
 /**
+ * Version of the slug rule implemented below.
+ *
+ * "The rule" is the three functions that follow — {@link slugifyTitle},
+ * {@link resolvePositionalSiblingSlugs} and {@link appendShortIdSuffix} — plus
+ * the constants they read (`MAX_SLUG_LENGTH`, `SHORT_ID_LENGTH`,
+ * `EMPTY_TITLE_SLUG`). Together they decide, for any document, every path in
+ * the tree. Two builds that disagree on any part of it disagree on every path.
+ *
+ * The number is recorded in `tree-meta.json` as `slugRule` by whichever build
+ * writes the tree, and `assertSlugRuleWritable` refuses a save when the tree's
+ * marker is not this value. That is the whole point of versioning a rule that
+ * is otherwise pure: a foreign build cannot be asked to notice that its output
+ * differs, because from inside that build the output is correct. It can only
+ * be told that the tree in front of it was written by something else.
+ *
+ * **Bump this whenever any of those functions or constants changes.** The pin
+ * test in `slug-rule-version.test.ts` fails until you do — it holds expected
+ * slugs for a fixture, so a rule change breaks it, and the fix is to bump this
+ * number and update the fixture in the same commit.
+ *
+ * - `1` — implicit; every tree written before the marker existed. Covers both
+ *   the original title-only rule and the unconditional `-{id6}` rule that
+ *   briefly replaced it, because neither recorded itself and the two cannot be
+ *   told apart from a tree alone.
+ * - `2` — title-only, with `-{id6}` added only where siblings collide on a
+ *   normalised title. Landed 2026-08-26; the first version to be recorded.
+ *
+ * @see {@link file://./slug-rule-guard.ts} for the write-time enforcement.
+ */
+export const SLUG_RULE_VERSION = 2;
+
+/**
  * Convert a title into the slug it would use before ID-based uniqueness rules.
  * This is deterministic for a title alone and never returns an empty string.
  */

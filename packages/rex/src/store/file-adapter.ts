@@ -18,6 +18,7 @@ import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import { atomicWrite } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
 import { parseTreeMeta, treeMetaContents } from "./tree-meta.js";
+import { assertSlugRuleWritable, assertSlugRuleAdoptable } from "./slug-rule-guard.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
 import {
   PRD_MARKDOWN_FILENAME,
@@ -272,19 +273,7 @@ export class FileStore implements PRDStore {
       if (!valid.ok) {
         throw new Error(`Invalid document after mutation: ${valid.errors.message}`);
       }
-      await mkdir(this.treeRoot, { recursive: true });
-      await atomicWrite(
-        this.path(TREE_META_FILENAME),
-        JSON.stringify(treeMetaContents(doc)),
-      );
-      const written = await serializeFolderTree(doc.items, this.treeRoot, {
-        loadedAt: this.loadedAt,
-        loadedFiles: this.loadedFiles,
-      });
-      // A completed save makes this instance's view current again — see writeFolderTree.
-      this.loadedAt = Date.now();
-      this.loadedFiles = written.fileDigests;
-      this.rebuildOwnershipFromItems(doc);
+      await this.writeFolderTree(doc);
       return result;
     });
   }
@@ -495,8 +484,20 @@ export class FileStore implements PRDStore {
     );
   }
 
-  /** Serialize the document to the folder tree. Callers must hold the tree lock. */
-  private async writeFolderTree(doc: PRDDocument): Promise<void> {
+  /**
+   * Serialize the document to the folder tree. Callers must hold the tree lock.
+   *
+   * @param adoptSlugRule Skip the slug-rule guard and take ownership of the
+   *   tree under this build's rule. Only `rex migrate-slugs` may pass this —
+   *   see {@link adoptSlugRule}.
+   */
+  private async writeFolderTree(doc: PRDDocument, adoptSlugRule = false): Promise<void> {
+    // Before mkdir, before the sidecar, before the serializer: a refusal has
+    // to leave the tree byte-identical, which it only does if nothing has been
+    // written yet.
+    if (!adoptSlugRule) {
+      await assertSlugRuleWritable(this.rexDir, this.treeRoot);
+    }
     await mkdir(this.treeRoot, { recursive: true });
     await atomicWrite(
       this.path(TREE_META_FILENAME),
@@ -536,6 +537,39 @@ export class FileStore implements PRDStore {
   }
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
+    return this.runTransaction(fn);
+  }
+
+  /**
+   * Rewrite the whole tree under this build's slug rule and record the marker.
+   *
+   * The one sanctioned way past {@link assertSlugRuleWritable}, and the reason
+   * `rex migrate-slugs` can do its job at all: every other writer is refused
+   * precisely because it would re-slug the tree, which is what this command
+   * exists to do deliberately.
+   *
+   * Rewrite and marker land in the same locked write, so there is no window in
+   * which the marker claims a rule the paths do not yet follow — a crash
+   * between the two would disarm the guard on a tree it was meant to protect.
+   *
+   * Bounded to the adopt-older direction by {@link assertSlugRuleAdoptable},
+   * checked before the transaction opens so a refusal writes nothing at all.
+   */
+  async adoptSlugRule(): Promise<void> {
+    await assertSlugRuleAdoptable(this.rexDir);
+    await this.runTransaction(async () => {}, true);
+  }
+
+  /**
+   * `withTransaction` plus the knob the public contract has no place for.
+   *
+   * `adoptSlugRule` suppresses the slug-rule guard for this one write. It is
+   * passed by {@link adoptSlugRule} and nothing else.
+   */
+  private async runTransaction<T>(
+    fn: (doc: PRDDocument) => Promise<T>,
+    adoptSlugRule = false,
+  ): Promise<T> {
     const folderTreeLockPath = prdLockPath(this.rexDir);
     // Resolved before the lock is taken: the first call in a process shells
     // out to git, and that is not work to do while holding the PRD lock. The
@@ -557,7 +591,7 @@ export class FileStore implements PRDStore {
       // would deadlock on the in-process mutex, and an instance flag to skip
       // its lock would let a concurrent direct saveDocument bypass the lock
       // while a transaction is open.
-      await this.writeFolderTree(doc);
+      await this.writeFolderTree(doc, adoptSlugRule);
       return result;
     });
   }
