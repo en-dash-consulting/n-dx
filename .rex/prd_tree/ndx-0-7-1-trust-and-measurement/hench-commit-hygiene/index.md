@@ -22,7 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Expose the PRD serializer's written and deleted file list through the rex gateway](./expose-the-prd-serializer-s-written.md) | pending |
-| [Filter gitignored paths out of the hench PRD staging list](./filter-gitignored-paths-out-of-the.md) | pending |
+| [Filter gitignored paths out of the hench PRD staging list](./filter-gitignored-paths-out-of-the.md) | completed |
 | [Keep a completed task completed when only the record commit fails](./keep-a-completed-task-completed-when.md) | pending |
 | [Make the rollback prompt say what it reverts and default to restoring](./make-the-rollback-prompt-say-what-it.md) | pending |
 | [Make the run summary distinguish work failure from record failure and name the commits](./make-the-run-summary-distinguish-work.md) | pending |
