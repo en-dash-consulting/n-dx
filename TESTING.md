@@ -250,6 +250,17 @@ signal exit code against the expected one, which reads as a product failure.
   to a deterministic assertion failure.
 - Assert on exit codes you expect, and treat `143`/`137` as evidence of a
   killed process rather than a product result.
+- When the guardrail is a per-test `testTimeout` rather than an elapsed-time
+  assertion, scale it with the same `BUDGET_MULTIPLIER` pattern used elsewhere
+  in this document (declare
+  `const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20)`
+  and multiply) rather than hand-picking a larger constant, so the ceiling
+  grows with the same signal that inflates the spawn. Worked example:
+  `packages/sourcevision/tests/e2e/cli-hints.test.ts`'s two-spawn
+  "validate after init" case measured 25.8s against a hand-picked 15s cap
+  under a concurrent `pnpm build`, while finishing in 2.4s isolated — the fix
+  scaled that cap by `BUDGET_MULTIPLIER` instead of raising it to a new fixed
+  number.
 
 ### Family 2 — Wall-clock and render-order assumptions
 

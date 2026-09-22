@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "nod
 import { join } from "node:path";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -61,6 +61,8 @@ import {
   findUncommittedWork,
   formatUncommittedWorkRefusal,
   listDirtyPaths,
+  partitionDirtyPaths,
+  renderPaths,
 } from "./uncommitted-work-gate.js";
 import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
 
@@ -569,10 +571,16 @@ export async function runReviewGate(
       // Reuse the shared rollback path: it prompts for confirmation in
       // interactive sessions and scopes untracked removal to agent-created
       // files via the baseline.
+      //
+      // `scope: "all"` because this path is the one exception to the PRD-only
+      // default. A failed run must not discard the agent's work; a *rejected
+      // review* must, since that diff is exactly what the reviewer turned
+      // down and leaving it in place would ignore the rejection.
       await performRollbackIfNeeded(projectDir, {
         yes: options.yes,
         autonomous: options.autonomous,
         baselineUntracked: options.baselineUntracked,
+        scope: "all",
       });
     }
 
@@ -926,8 +934,8 @@ interface AskYesNoOptions {
   interruptMode?: "decline" | "hold-then-exit";
   /**
    * Which way an empty answer (bare Enter) resolves. Defaults to `true`
-   * (`[Y/n]` prompts). Set `false` for destructive prompts that should
-   * default to No (`[y/N]`), e.g. the rollback confirmation.
+   * (`[Y/n]` prompts). Set `false` for prompts where leaving the default
+   * choice in place is safer than acting (`[y/N]`).
    */
   defaultYes?: boolean;
 }
@@ -1023,38 +1031,95 @@ async function askYesNoWithSuspendedSigint(
 
 /**
  * Ask the user to confirm the revert via stdin (TTY only).
- * Reverting is a destructive git action, so the prompt defaults to No —
- * a bare Enter preserves the working tree; only an explicit 'y'/'yes'
- * accepts. The first Ctrl-C prints a hint and keeps the prompt open; a
- * second Ctrl-C aborts the prompt and exits.
+ *
+ * Names the paths, and they are only ever hench's own PRD writes — never the
+ * agent's source edits, which this prompt is not entitled to discard. That
+ * pairing is the whole reason the default can be Yes: leaving hench's dirty
+ * writes in place is the actual damage (the PRD tree keeps whatever this run
+ * last wrote instead of its pre-run state), while leaving the agent's work in
+ * place is not damage at all.
+ *
+ * `otherCount` is the rest of the dirty tree, named as a count so the operator
+ * can see it was noticed and deliberately left alone. When the prompt listed
+ * those paths too, under a sentence calling them hench's writes, a bare Enter
+ * reverted them: `TESTING.md` and a finished test file, ten minutes of work,
+ * one keystroke.
+ *
+ * Only an explicit 'n'/'no' keeps the dirty PRD files. The first Ctrl-C prints
+ * a hint and keeps the prompt open; a second Ctrl-C aborts the prompt and exits.
  */
-async function promptRollbackConfirm(count: number): Promise<boolean> {
+export async function promptRollbackConfirm(
+  paths: string[],
+  otherCount = 0,
+  scope: RollbackScope = "prd",
+): Promise<boolean> {
+  if (scope === "all") {
+    // The review-rejection path. Here the diff *is* what was just rejected,
+    // so the whole dirty tree is the subject and reverting it is the point.
+    return askYesNoWithSuspendedSigint(
+      `\n${paths.length} uncommitted file(s) from this run:\n` +
+        `${renderPaths(paths)}\n` +
+        `Revert them and restore the pre-run state? [Y/n] `,
+      { interruptMode: "hold-then-exit", defaultYes: true },
+    );
+  }
+  const others =
+    otherCount > 0
+      ? `${otherCount} other uncommitted file(s) are your work — hench leaves those alone.\n`
+      : "";
   return askYesNoWithSuspendedSigint(
-    `\nRevert ${count} uncommitted file(s)? [y/N] `,
-    { interruptMode: "hold-then-exit", defaultYes: false },
+    `\n${paths.length} uncommitted PRD file(s) — hench's own status writes from this run:\n` +
+      `${renderPaths(paths)}\n` +
+      others +
+      `Revert hench's writes and restore the pre-run PRD state? [Y/n] `,
+    { interruptMode: "hold-then-exit", defaultYes: true },
   );
 }
 
 /**
  * Revert uncommitted changes introduced during a failed run — but only
- * after an express, per-run confirmation. A revert NEVER occurs without the
- * user explicitly saying yes each time.
+ * after an express, per-run confirmation. A revert NEVER occurs
+ * non-interactively; on a TTY the operator can always decline it.
  *
  * Skips silently when the working tree is already clean.
  *
+ * Only hench's own writes are ever in scope. The PRD paths are what hench
+ * wrote; the agent's source edits and the operator's own dirty files are
+ * reported and left alone. Before that split, the prompt offered the whole
+ * dirty tree as "hench's status writes" and the revert ran `git checkout .`,
+ * so accepting it — which a bare Enter does — reverted the agent's finished
+ * work along with the bookkeeping.
+ *
  * The revert is prompt-only:
  * - Interactive TTY (stdin is a terminal, --yes not passed, not autonomous):
- *   prompts `Revert N uncommitted file(s)? [y/N]`, defaulting to No. Only an
- *   explicit yes reverts — and even then the revert is scoped: tracked
- *   changes are reverted, but untracked removal is limited to files absent
- *   from the pre-run baseline (agent-created), never pre-existing work.
+ *   names the dirty PRD paths and prompts `Revert hench's writes and restore
+ *   the pre-run PRD state? [Y/n]`, defaulting to Yes — leaving hench's own
+ *   uncommitted writes in place is the damage, so a bare Enter reverts them.
+ *   Only an explicit 'n'/'no' keeps them. Even then the scope narrows twice
+ *   more: tracked changes are reverted only under the PRD paths, and
+ *   untracked removal is limited to files absent from the pre-run baseline
+ *   (agent-created) *and* inside those paths, never pre-existing work.
  * - Non-interactive (CI, pipe, --yes, or any autonomous mode): there is no
  *   channel for a per-run confirmation, so the working tree is left exactly
  *   as-is and the uncommitted files are reported. Nothing is discarded.
  */
+/**
+ * What a rollback is allowed to touch.
+ *
+ * - `"prd"` — only hench's own PRD writes. The default, and what a *failed
+ *   run* gets: the agent's source edits are finished work with an owner, and
+ *   discarding them is the bug this whole gate exists to prevent.
+ * - `"all"` — the whole dirty tree, as before. Only the review-rejection path
+ *   asks for this, because there the agent's diff is precisely what the
+ *   reviewer rejected; leaving it in place would be ignoring the rejection.
+ */
+export type RollbackScope = "prd" | "all";
+
 interface PerformRollbackOptions {
   /** True when --yes was passed. There is no prompt channel, so no revert. */
   yes?: boolean;
+  /** Which dirty paths the revert may touch. Defaults to `"prd"`. */
+  scope?: RollbackScope;
   /** True in autonomous modes (--auto/--loop). Same effect as `yes`. */
   autonomous?: boolean;
   /**
@@ -1069,12 +1134,23 @@ async function performRollbackIfNeeded(
   options: PerformRollbackOptions = {},
 ): Promise<void> {
   // Same exclusion as the pre-run gate: hench's own lock and run files are not
-  // the agent's work, so they must not make a rollback look necessary.
-  const dirtyPaths = await excludeHenchRuntimeArtifacts(
-    await listDirtyPaths(projectDir),
-    projectDir,
-  );
-  if (dirtyPaths.length === 0) {
+  // the agent's work, so they must not make a rollback look necessary. What
+  // survives that is then split by author — only hench's half is revertable.
+  const scope = options.scope ?? "prd";
+  const { prd, other } = await partitionDirtyPaths(projectDir);
+  if (prd.length === 0 && other.length === 0) {
+    return;
+  }
+
+  const candidates = scope === "all" ? [...prd, ...other] : prd;
+
+  // Nothing of hench's is dirty, so there is nothing this prompt may offer.
+  // The rest is the agent's work and the operator's own edits: report it and
+  // stop, rather than asking a question whose only honest answer is no.
+  if (candidates.length === 0) {
+    info(
+      `${other.length} uncommitted file(s) left in place — none of them are hench's own writes.`,
+    );
     return;
   }
 
@@ -1083,33 +1159,45 @@ async function performRollbackIfNeeded(
   // mode (--auto/--loop/--epic-by-epic) was supplied. Everything else leaves
   // the working tree untouched.
   const isInteractive = Boolean(process.stdin.isTTY) && !options.yes && !options.autonomous;
+  const label = scope === "all" ? "uncommitted file(s)" : "uncommitted PRD file(s)";
   if (!isInteractive) {
     info(
-      `${dirtyPaths.length} uncommitted file(s) left in place — a rollback only runs after an interactive confirmation.`,
+      `${candidates.length} ${label} left in place — a rollback only runs after an interactive confirmation.`,
     );
     return;
   }
 
-  const confirmed = await promptRollbackConfirm(dirtyPaths.length);
+  const confirmed = await promptRollbackConfirm(
+    candidates,
+    scope === "all" ? 0 : other.length,
+    scope,
+  );
   if (!confirmed) {
-    info(`Changes preserved — ${dirtyPaths.length} uncommitted file(s) left unchanged.`);
+    info(`Changes preserved — ${candidates.length} ${label} left unchanged.`);
     return;
   }
 
-  info(`\nRolling back ${dirtyPaths.length} uncommitted file(s) after failed run…`);
+  info(`\nRolling back ${candidates.length} ${label} after failed run…`);
   // Defensive: the git helpers (execStdout) already swallow errors, but guard
   // the call site too so a corrupt git state can never throw here and prevent
   // the caller (finalizeRun) from saving the run record.
   try {
     const result = await revertChanges(projectDir, {
       baselineUntracked: options.baselineUntracked,
+      ...(scope === "prd" ? { scope: PRD_COMMIT_PATHS } : {}),
     });
     const removed = result.removedUntracked.length;
     const kept = result.keptUntracked.length;
+    const reverted = scope === "all" ? "reverted tracked changes" : "reverted hench's PRD writes";
+    const leftAlone =
+      scope === "prd" && other.length > 0
+        ? `; left ${other.length} file(s) of your work untouched.`
+        : ".";
     info(
-      `Rollback complete — reverted tracked changes` +
+      `Rollback complete — ${reverted}` +
         `; removed ${removed} agent-created file(s)` +
-        (kept > 0 ? `, preserved ${kept} pre-existing untracked file(s).` : "."),
+        (kept > 0 ? `, preserved ${kept} untracked file(s)` : "") +
+        leftAlone,
     );
   } catch (err) {
     info(`Rollback encountered an error (continuing): ${(err as Error).message}`);
@@ -1427,14 +1515,31 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
 
 /** The legacy flat-markdown PRD. Read-only for years; still staged if present. */
 const PRD_MARKDOWN_FILENAME = "prd.md";
-/** Append-only task-status audit log written by every PRD adapter. */
-const PRD_EXECUTION_LOG_FILENAME = "execution-log.jsonl";
-/** Single rotated execution-log backup retained by the file adapter. */
-const PRD_EXECUTION_LOG_BACKUP_FILENAME = "execution-log.1.jsonl";
 
 /**
- * The project-relative PRD paths that exist in `projectDir` and should be
- * staged by a commit that lands a PRD write.
+ * Whether `git` considers `relativePath` (relative to `projectDir`) ignored.
+ *
+ * `git add` errors on an ignored path — the append-only execution log
+ * (`.rex/execution-log.jsonl` / `.rex/execution-log.1.jsonl`) used to be a
+ * hardcoded staging candidate below while `rex init` writes
+ * `.rex/execution-log*.jsonl` into `.gitignore`
+ * (packages/rex/src/cli/commands/init.ts), so the first `git add` in the loop
+ * threw, the whole staging attempt aborted, and no PRD path was staged at
+ * all. Filtering every candidate through `check-ignore` keeps any future
+ * ignored path from being fatal the same way, instead of special-casing this
+ * one pair of filenames.
+ */
+async function isGitIgnored(projectDir: string, relativePath: string): Promise<boolean> {
+  const result = await exec("git", ["check-ignore", "--quiet", "--", relativePath], {
+    cwd: projectDir,
+    timeout: 10_000,
+  });
+  return result.exitCode === 0;
+}
+
+/**
+ * The project-relative PRD paths that exist in `projectDir`, are not
+ * gitignored, and should be staged by a commit that lands a PRD write.
  *
  * One helper for both staging sites — {@link commitPrdTreeIfStaged} and the
  * commit prompt — because the set they stage has to stay equal to what the
@@ -1444,7 +1549,9 @@ const PRD_EXECUTION_LOG_BACKUP_FILENAME = "execution-log.1.jsonl";
  *
  * Each path is existence-checked: `git add` errors on a missing path, and in a
  * fresh project the legacy markdown (and, before the first PRD write, the tree
- * itself) is absent.
+ * itself) is absent. Each surviving path is then checked with
+ * {@link isGitIgnored}; an ignored path is dropped with a debug line rather
+ * than passed to `git add`.
  */
 async function prdPathsToStage(
   projectDir: string,
@@ -1455,13 +1562,20 @@ async function prdPathsToStage(
   const candidates = [
     PRD_TREE_DIRNAME,
     TREE_META_FILENAME,
-    PRD_EXECUTION_LOG_FILENAME,
-    PRD_EXECUTION_LOG_BACKUP_FILENAME,
     ...(opts.includeLegacyMarkdown ? [PRD_MARKDOWN_FILENAME] : []),
   ];
-  return candidates
-    .filter((name) => existsSync(join(projectDir, ".rex", name)))
-    .map((name) => join(".rex", name));
+  const existing = candidates.filter((name) => existsSync(join(projectDir, ".rex", name)));
+
+  const staged: string[] = [];
+  for (const name of existing) {
+    const relativePath = join(".rex", name);
+    if (await isGitIgnored(projectDir, relativePath)) {
+      detail(`Skipping gitignored PRD path: ${relativePath}`);
+      continue;
+    }
+    staged.push(relativePath);
+  }
+  return staged;
 }
 
 /**
@@ -2338,6 +2452,46 @@ export function deriveTokenDiagnosticStatus(turns: TurnTokenUsage[]): "complete"
 }
 
 /**
+ * List the commits this run produced, from the HEAD captured at run start
+ * ({@link RunRecord.startHead}) to the current HEAD.
+ *
+ * Reading git history rather than tracking a list at each commit call site
+ * means every commit shows up here the same way regardless of which path
+ * landed it — the agent's own `git commit` on the autoCommit path, the
+ * interactive commit prompt, the review-repair commit, the
+ * completion-metadata commit — with nothing to keep in sync as those paths
+ * change.
+ *
+ * Returns an empty array outside a git repository, when no starting HEAD was
+ * captured (a record written before {@link RunRecord.startHead} existed), or
+ * when nothing was committed.
+ */
+async function collectRunCommits(projectDir: string, startHead: string | undefined): Promise<RunCommitRecord[]> {
+  if (!startHead) return [];
+  try {
+    // Unit separator (\x1f) between hash and subject: a commit subject can
+    // contain almost anything else a simpler delimiter might collide with.
+    // --reverse lists oldest first, so the work commit precedes the record
+    // commit that followed it.
+    const output = await execStdout(
+      "git",
+      ["log", "--reverse", `--format=%H%x1f%s`, `${startHead}..HEAD`],
+      { cwd: projectDir, timeout: 10_000 },
+    );
+    const trimmed = output.trim();
+    if (!trimmed) return [];
+    return trimmed.split("\n").map((line) => {
+      const [sha, ...rest] = line.split("\x1f");
+      return { sha, subject: rest.join("\x1f") };
+    });
+  } catch {
+    // Best-effort: a run whose commits cannot be enumerated still reports
+    // status/summary normally, just without a Commits: line.
+    return [];
+  }
+}
+
+/**
  * Finalize a run: build structured summary, capture memory stats,
  * run post-task tests, retrieve Codex tokens if applicable, set timestamps,
  * and persist. Called at the end of both loops.
@@ -2709,7 +2863,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     if (run.status === "completed") {
       const completionMetadata = await commitCompletionMetadata(projectDir, run.taskId, run);
       if (completionMetadata.error) {
+        // The task's own work already succeeded (checked above) — only the
+        // follow-up PRD record commit failed to land. `status` still flips to
+        // "failed" (the two outcomes share one field today), but this flag is
+        // set at the exact point of the failure so the run summary can tell
+        // the difference instead of reporting an indistinguishable failure.
         run.status = "failed";
+        run.recordCommitPending = true;
         run.error = `Could not commit completion metadata: ${completionMetadata.error.message}`;
         info(`\n${run.error}`);
         if (opts.store) {
@@ -2764,6 +2924,24 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   if (opts.store) {
     await resetInProgressTaskIfFailed(opts.store, run);
   }
+
+  // Name every commit this run produced, so the run summary can report what
+  // actually landed instead of inferring it from `status` alone. Computed
+  // from git history rather than tracked per call site: it is the one place
+  // that sees a commit regardless of which path made it (the agent's own
+  // `git commit` on the autoCommit path, the interactive commit prompt, the
+  // review-repair commit, the completion-metadata commit), and rollback above
+  // only ever reverts uncommitted working-tree changes, never a landed commit.
+  run.commits = await collectRunCommits(projectDir, run.startHead);
+
+  // …and name what the run left behind uncommitted. Computed here, after the
+  // rollback above, so it describes the tree as the run actually ends up:
+  // neither the commit list nor the tool-call heuristic can see an edit that
+  // was never committed, so without this the summary reported
+  // "Changes: none" directly beneath a refusal listing seven dirty paths.
+  // `findUncommittedWork` (no discounts) is the same view the completion gate
+  // takes, minus hench's own runtime artifacts.
+  run.uncommittedPaths = (await findUncommittedWork({ projectDir })).paths;
 
   run.finishedAt = new Date().toISOString();
   run.lastActivityAt = run.finishedAt;

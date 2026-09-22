@@ -28,6 +28,28 @@ async function makeInitialCommit(dir: string, file: string, content: string): Pr
   await execAsync('git commit -m "initial"', { cwd: dir });
 }
 
+/** hench's own PRD write — the only thing the rollback prompt may offer. */
+const PRD_FILE = ".rex/prd_tree/task-slug/index.md";
+
+/**
+ * The working tree a failed run leaves: hench's PRD write dirty, and the
+ * agent's source edit dirty beside it.
+ *
+ * The PRD file is what makes the prompt open at all — the rollback offers only
+ * hench's own writes, so a tree holding just `src.ts` produces no prompt and
+ * these tests would hang waiting for one. `src.ts` stays in the fixture as the
+ * control: whatever the answer, it must survive.
+ */
+async function seedFailedRunTree(dir: string): Promise<void> {
+  await mkdir(join(dir, ".rex", "prd_tree", "task-slug"), { recursive: true });
+  await writeFile(join(dir, PRD_FILE), "status: pending\n", "utf-8");
+  await writeFile(join(dir, "src.ts"), "export const x = 1;\n", "utf-8");
+  await execAsync("git add .", { cwd: dir });
+  await execAsync('git commit -m "initial"', { cwd: dir });
+  await writeFile(join(dir, PRD_FILE), "status: completed\n", "utf-8");
+  await writeFile(join(dir, "src.ts"), "export const x = 999;\n", "utf-8");
+}
+
 function buildFailedRun(): RunRecord {
   return {
     id: randomUUID(),
@@ -198,8 +220,7 @@ describe("prompt SIGINT suspension", () => {
     fakes = fakeReadline.fakes;
     vi.resetModules();
 
-    await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
-    await writeFile(join(projectDir, "src.ts"), "export const x = 999;\n", "utf-8");
+    await seedFailedRunTree(projectDir);
 
     // Simulate the run-loop's force-exit handler from run.ts by
     // registering a marker listener. The prompt must detach it while
@@ -251,8 +272,7 @@ describe("prompt SIGINT suspension", () => {
     fakes = fakeReadline.fakes;
     vi.resetModules();
 
-    await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
-    await writeFile(join(projectDir, "src.ts"), "export const x = 999;\n", "utf-8");
+    await seedFailedRunTree(projectDir);
 
     const priorListeners = detachExistingSigintListeners();
     const outerHandler = vi.fn();
@@ -294,9 +314,9 @@ describe("prompt SIGINT suspension", () => {
       expect(outerHandler).not.toHaveBeenCalled();
       expect(fakes[0].closed).toBe(true);
 
-      // Accept path still reverts the modified file.
-      const content = await readFile(join(projectDir, "src.ts"), "utf-8");
-      expect(content).toBe("export const x = 1;\n");
+      // Accept path still reverts hench's own PRD write, and still only that.
+      expect(await readFile(join(projectDir, PRD_FILE), "utf-8")).toBe("status: pending\n");
+      expect(await readFile(join(projectDir, "src.ts"), "utf-8")).toBe("export const x = 999;\n");
     } finally {
       await settlePromptOperations(fakes);
       restoreSigintListeners(priorListeners);
@@ -317,8 +337,7 @@ describe("prompt SIGINT suspension", () => {
     fakes = fakeReadline.fakes;
     vi.resetModules();
 
-    await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
-    await writeFile(join(projectDir, "src.ts"), "export const x = 999;\n", "utf-8");
+    await seedFailedRunTree(projectDir);
 
     // Spy on process.exit so the assertion can state the behavior in
     // the exact language of the acceptance criterion.
@@ -395,8 +414,7 @@ describe("prompt SIGINT suspension", () => {
     fakes = fakeReadline.fakes;
     vi.resetModules();
 
-    await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
-    await writeFile(join(projectDir, "src.ts"), "export const x = 999;\n", "utf-8");
+    await seedFailedRunTree(projectDir);
 
     const priorListeners = detachExistingSigintListeners();
     const outerHandler = vi.fn();
@@ -441,8 +459,7 @@ describe("prompt SIGINT suspension", () => {
     fakes = fakeReadline.fakes;
     vi.resetModules();
 
-    await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
-    await writeFile(join(projectDir, "src.ts"), "export const x = 999;\n", "utf-8");
+    await seedFailedRunTree(projectDir);
 
     const priorListeners = detachExistingSigintListeners();
     const outerHandler = vi.fn();
@@ -471,9 +488,10 @@ describe("prompt SIGINT suspension", () => {
       expect(process.listeners("SIGINT")).toContain(outerHandler);
       expect(outerHandler).not.toHaveBeenCalled();
 
-      // Accept path reverts the modified file back to the committed version.
-      const content = await readFile(join(projectDir, "src.ts"), "utf-8");
-      expect(content).toBe("export const x = 1;\n");
+      // Accept path reverts hench's own PRD write to the committed version…
+      expect(await readFile(join(projectDir, PRD_FILE), "utf-8")).toBe("status: pending\n");
+      // …and leaves the agent's work alone on that same accepted answer.
+      expect(await readFile(join(projectDir, "src.ts"), "utf-8")).toBe("export const x = 999;\n");
     } finally {
       await settlePromptOperations(fakes);
       restoreSigintListeners(priorListeners);

@@ -813,10 +813,30 @@ function hasPrdStatusUpdate(toolCalls: ToolCallRecord[]): boolean {
  *   "Changes: 3 files (2 code, 1 test) + PRD status update"
  *   "Changes: PRD status update only (no code changes)"
  *   "Changes: 1 file (1 docs)"
+ *   "Changes: 2 commits"
+ *   "Changes: 7 uncommitted paths"
+ *   "Changes: 1 commit, 1 uncommitted path"
+ *
+ * `commits` and `uncommittedPaths` are both authoritative over the
+ * toolCalls-derived heuristic below, which only recognizes changes it can
+ * infer from tool calls: a run can land a commit it does not recognize (no
+ * `rex_update`/`rex_add` tool call, e.g. a bookkeeping-only commit), and a
+ * run driven through a CLI provider can edit seven files without the
+ * heuristic seeing one of them. Reporting "none" in either case is the bug
+ * this guards — "none" is printed only when no source found anything, which
+ * means no commit landed and the tree came out clean.
+ *
+ * Exported for testing.
  */
-function formatChangeClassification(toolCalls: ToolCallRecord[]): string {
+export function formatChangeClassification(
+  toolCalls: ToolCallRecord[],
+  commits?: RunRecord["commits"],
+  uncommittedPaths?: RunRecord["uncommittedPaths"],
+): string {
   const classified = classifyChangedFiles(toolCalls);
   const prdUpdate = hasPrdStatusUpdate(toolCalls);
+  const commitCount = commits?.length ?? 0;
+  const uncommittedCount = uncommittedPaths?.length ?? 0;
 
   // Remove metadata from the classified map for display purposes
   // (metadata = prd.json, shown separately as "PRD status update")
@@ -829,7 +849,15 @@ function formatChangeClassification(toolCalls: ToolCallRecord[]): string {
   }
 
   if (totalFiles === 0 && !prdUpdate) {
-    return "Changes: none";
+    const parts: string[] = [];
+    if (commitCount > 0) {
+      parts.push(`${commitCount} commit${commitCount === 1 ? "" : "s"}`);
+    }
+    if (uncommittedCount > 0) {
+      parts.push(`${uncommittedCount} uncommitted path${uncommittedCount === 1 ? "" : "s"}`);
+    }
+    if (parts.length === 0) return "Changes: none";
+    return `Changes: ${parts.join(", ")}`;
   }
 
   // Build category breakdown
@@ -847,6 +875,89 @@ function formatChangeClassification(toolCalls: ToolCallRecord[]): string {
   const prdSuffix = prdUpdate ? " + PRD status update" : "";
 
   return `Changes: ${totalFiles} ${fileLabel} (${breakdown})${prdSuffix}`;
+}
+
+// ---------------------------------------------------------------------------
+// Run outcome — distinguish work failure from record (bookkeeping) failure
+// ---------------------------------------------------------------------------
+
+/**
+ * The three outcomes a finished run can report. `run.status` alone conflates
+ * the last two: `commitCompletionMetadata` (in the lifecycle) sets
+ * `status: "failed"` when the task's own work already succeeded and only the
+ * follow-up PRD record commit failed to land, which used to print
+ * "Status: failed" beside "Summary: Task complete" — a bookkeeping failure
+ * reading as a failed task.
+ */
+export type RunOutcome = "work_failed" | "work_completed" | "work_completed_record_pending";
+
+/**
+ * Classify a finished run into one of the three outcomes. Reads
+ * `run.recordCommitPending` rather than `run.status` alone so a record-commit
+ * failure — which still flips `status` to `"failed"` — is told apart from a
+ * genuine task failure. Exported for testing.
+ */
+export function classifyRunOutcome(run: RunRecord): RunOutcome {
+  if (run.recordCommitPending) return "work_completed_record_pending";
+  return run.status === "completed" ? "work_completed" : "work_failed";
+}
+
+/**
+ * Format the run's "Status:" line so it always agrees with the outcome
+ * {@link classifyRunOutcome} computes, rather than printing the raw
+ * (possibly misleading) `run.status` value directly. Exported for testing.
+ */
+export function formatRunStatusLine(run: RunRecord): string {
+  if (classifyRunOutcome(run) === "work_completed_record_pending") {
+    return `Status: ${colorStatus("completed")} ${colorWarn("(record commit pending)")}`;
+  }
+  return `Status: ${colorStatus(run.status)}`;
+}
+
+/**
+ * Format the "Commits:" block naming every commit the run produced (work
+ * commit, review-repair commit, completion-metadata commit — whichever
+ * landed), oldest first. Returns an empty array when the run produced no
+ * commits, so callers can splice the result in unconditionally.
+ * Exported for testing.
+ */
+export function formatRunCommitsLines(commits: RunRecord["commits"]): string[] {
+  if (!commits || commits.length === 0) return [];
+  return ["Commits:", ...commits.map((c) => `  ${c.sha.slice(0, 8)} ${c.subject}`)];
+}
+
+/**
+ * Format the run's "Summary:" line (the LLM's own account of the run).
+ * Unconditional on outcome — a failed run's summary can still describe what
+ * was attempted before the failure, which is real signal. Exported for
+ * testing.
+ */
+export function formatRunSummaryLine(run: RunRecord): string | undefined {
+  return run.summary ? `\nSummary: ${run.summary}` : undefined;
+}
+
+/**
+ * Format the run's error/record line so it names what actually failed:
+ *
+ * - `work_failed`: `run.error`, as before.
+ * - `work_completed`: nothing — the run succeeded outright.
+ * - `work_completed_record_pending`: a "Record:" line saying the work is
+ *   done and only the PRD bookkeeping commit is still pending, instead of an
+ *   "Error:" line that would contradict "Summary: Task complete".
+ *
+ * Exported for testing.
+ */
+export function formatRunErrorLine(run: RunRecord): string | undefined {
+  const outcome = classifyRunOutcome(run);
+  if (outcome === "work_completed") return undefined;
+  if (outcome === "work_completed_record_pending") {
+    const reason = run.error ? ` (${run.error})` : "";
+    return (
+      `\n${colorWarn("Record:")} the task's work is complete, but the PRD record commit ` +
+      `did not land${reason}. Rerun the task to retry recording it.`
+    );
+  }
+  return run.error ? `\n${red("Error:")} ${run.error}` : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -964,7 +1075,8 @@ async function runOne(
   info(`\n${bold("=== Run Complete ===")}`);
   output(`Run ID: ${run.id}`);
   output(`Task: ${colorPink(run.taskTitle)}`);
-  output(`Status: ${colorStatus(run.status)}`);
+  output(formatRunStatusLine(run));
+  for (const line of formatRunCommitsLines(run.commits)) output(line);
   if (run.actor) output(`Actor: ${run.actor}${run.host ? ` @ ${run.host}` : ""}`);
 
   // Invocation context
@@ -1019,14 +1131,12 @@ async function runOne(
   for (const line of formatRunReviewStatus(run.review)) info(line);
 
   // Change classification
-  info(formatChangeClassification(run.toolCalls));
+  info(formatChangeClassification(run.toolCalls, run.commits, run.uncommittedPaths));
 
-  if (run.summary) {
-    info(`\nSummary: ${run.summary}`);
-  }
-  if (run.error) {
-    output(`\n${red("Error:")} ${run.error}`);
-  }
+  const summaryLine = formatRunSummaryLine(run);
+  if (summaryLine) info(summaryLine);
+  const errorLine = formatRunErrorLine(run);
+  if (errorLine) output(errorLine);
 
   return { status: run.status, taskTitle: run.taskTitle, selectedTaskId: run.taskId };
 }

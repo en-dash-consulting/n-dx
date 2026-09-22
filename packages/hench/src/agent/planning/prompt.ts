@@ -144,6 +144,25 @@ export function buildSystemPrompt(
     lines.push("## Plan Mode Invariant");
     lines.push("Do not enter plan mode. Do not call ExitPlanMode. Do not produce plan-only responses.");
     lines.push("If you have a plan, execute it. If uncertain, read the codebase and proceed with the most consistent approach.\n");
+
+    // Same shape as the plan-mode invariant above, and for the same reason: a
+    // habit the CLI agent brings from interactive sessions, where it is
+    // correct, and which silently ends an autonomous run. Backgrounding a long
+    // command and then parking on a notification works in a session a human
+    // (or a loop) will resume. Nothing resumes this one — the turn ends, the
+    // agent never reaches its commit step, and the completion gate then
+    // refuses the task because its own finished work is sitting uncommitted.
+    // Three of three runs failed exactly this way on 2026-09-22, ~13 minutes
+    // each, every one finished by hand.
+    //
+    // Deliberately does not name the configured validate/test command: the
+    // assembled envelope states each of those exactly once (see
+    // prompt-non-redundancy.test.ts) and this section is about how to run a
+    // command, not which one.
+    lines.push("## Foreground Invariant");
+    lines.push("Run validation and tests in the foreground and wait for them to exit. Never background one.");
+    lines.push("Never end your turn waiting for a notification, a scheduled wake-up, or a later check-back — nothing will resume this session, so the run ends with your work uncommitted and the task reset.");
+    lines.push(`The full suite is run again after you finish, by ${cliName} itself — finishing is not skipping validation, and re-running the whole suite to double-check only spends the run's time twice.\n`);
   }
 
   if (!isCli) {

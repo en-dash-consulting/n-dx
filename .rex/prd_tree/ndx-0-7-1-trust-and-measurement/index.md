@@ -23,6 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Autonomous review capture](./autonomous-review-capture/index.md) | pending |
 | [Claims hardening](./claims-hardening/index.md) | pending |
 | [Cost measurement lands](./cost-measurement-lands/index.md) | pending |
 | [Hench commit hygiene](./hench-commit-hygiene/index.md) | pending |

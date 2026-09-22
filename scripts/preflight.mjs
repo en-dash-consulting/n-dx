@@ -14,6 +14,13 @@
  *   5. pnpm pr-check
  *   6. pnpm test
  *   7. changeset presence check
+ *
+ * Each step is timed and a `── timing ──` summary prints at the end, in run
+ * order, with each step's share of the wall clock. The question it exists to
+ * answer is "which step is the four minutes?" — asked once too often from a
+ * transcript that showed only the total, and unanswerable after the fact
+ * because the steps stream their output and scroll away. The summary prints on
+ * failure too, covering the steps that did run.
  */
 
 import { spawnCli } from "../packages/llm-client/dist/public.js";
@@ -23,6 +30,20 @@ const STEP_TIMEOUT_MS = 600_000;
 
 /** Grace period before escalating SIGTERM → SIGKILL on timeout. */
 const KILL_ESCALATION_MS = 5_000;
+
+/**
+ * `1m 04s` past a minute, `4.3s` below it, `540ms` below a second.
+ *
+ * Minutes and seconds rather than raw seconds because the steps that matter
+ * here run in minutes, and "247.31s" is a number the reader has to divide.
+ */
+function formatDuration(ms) {
+  if (ms < 1_000) return `${Math.round(ms)}ms`;
+  const seconds = ms / 1_000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m ${String(Math.round(seconds - minutes * 60)).padStart(2, "0")}s`;
+}
 
 /**
  * Run one preflight step, inheriting stdio so the child's output streams live.
@@ -76,19 +97,29 @@ const steps = [
 
 let failed = false;
 
+/** One `{ name, ms, ok }` per step that ran, in run order. */
+const timings = [];
+const startedAt = Date.now();
+
 for (const { name, cmd } of steps) {
   process.stdout.write(`\n── ${name} ──\n`);
+  const stepStartedAt = Date.now();
   try {
     const [tool, ...args] = cmd.split(" ");
     const exitCode = await runStep(tool, args);
     if (exitCode !== 0) {
       throw new Error(`${cmd} exited with code ${exitCode}`);
     }
-    console.log(`  ✓ ${name}`);
+    timings.push({ name, ms: Date.now() - stepStartedAt, ok: true });
+    console.log(`  ✓ ${name} (${formatDuration(Date.now() - stepStartedAt)})`);
   } catch (err) {
+    // A failed step's duration is worth as much as a passing one's — a
+    // typecheck that fails in 4s and one that fails after a 9m timeout are
+    // different problems.
+    timings.push({ name, ms: Date.now() - stepStartedAt, ok: false });
     // Surface the reason — a swallowed message here made a spawn failure look
     // identical to a genuine step failure.
-    console.error(`  ✗ ${name} FAILED — ${err?.message ?? err}`);
+    console.error(`  ✗ ${name} FAILED — ${err?.message ?? err} (${formatDuration(Date.now() - stepStartedAt)})`);
     failed = true;
     break;
   }
@@ -107,6 +138,20 @@ if (!failed) {
   } else {
     console.log(`  ✓ changeset (${files.join(", ")})`);
   }
+}
+
+if (timings.length > 0) {
+  const totalMs = Date.now() - startedAt;
+  process.stdout.write("\n── timing ──\n");
+  for (const { name, ms, ok } of timings) {
+    const share = totalMs > 0 ? `${Math.round((ms / totalMs) * 100)}%` : "";
+    console.log(
+      `  ${ok ? " " : "✗"} ${name.padEnd(16)}${formatDuration(ms).padStart(8)}${share.padStart(6)}`,
+    );
+  }
+  // Wall clock, so the shares above account for everything the run spent,
+  // including the changeset check and this script's own overhead.
+  console.log(`    ${"total".padEnd(16)}${formatDuration(totalMs).padStart(8)}`);
 }
 
 console.log(failed ? "\nPreflight FAILED" : "\nPreflight passed ✓");
