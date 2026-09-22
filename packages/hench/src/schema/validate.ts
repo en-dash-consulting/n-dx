@@ -202,6 +202,7 @@ const RunDiagnosticsSchema = z.object({
   vendor: z.string().optional(),
   sandbox: z.string().optional(),
   approvals: z.string().optional(),
+  testGateOutputTail: z.string().optional(),
 });
 
 const PersistedRuntimeEventSchema = z.object({
