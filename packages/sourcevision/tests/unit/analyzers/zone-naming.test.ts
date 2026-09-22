@@ -220,3 +220,52 @@ describe("nameZonesBySelection", () => {
     expect(res.calls).toBe(0);
   });
 });
+
+describe("nameZonesBySelection — fallback skipping and progress", () => {
+  const a = zone("core", ["core/web/x.ts", "core/web/y.ts"]);
+  const c = zone("other", ["other/q.ts"]);
+
+  it("skips the generated-name fallback for zones in skipGeneratedNames and says so", async () => {
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: {
+        "name-z0": { type: "choice", choice: "none", probabilities: {}, confidence: 0.9 },
+        "name-z1": { type: "choice", choice: "none", probabilities: {}, confidence: 0.9 },
+      },
+    });
+    mockedCallClaude.mockResolvedValue({ text: '["Alpha","Beta","Gamma"]' });
+    mockedAskJev.mockResolvedValueOnce({ model: "jev", answers: { pick: { type: "choice", choice: "none", probabilities: {}, confidence: 0.9 } } });
+
+    const res = await nameZonesBySelection([a, c], { crossings: [], skipGeneratedNames: new Set(["core"]) });
+
+    expect(res.skippedFallback).toBe(1);
+    expect(res.escalated).toBe(1);
+    expect(mockedCallClaude).toHaveBeenCalledTimes(1);
+    const lines = vi.mocked(console.log).mock.calls.map((c) => String(c[0]));
+    expect(lines.some((l) => l.includes("asking Jev about 2 zone(s)"))).toBe(true);
+    expect(lines.some((l) => l.includes('generating names for "other" (1/1)'))).toBe(true);
+    expect(lines.some((l) => l.includes("1 zone(s) keep their algorithmic name"))).toBe(true);
+  });
+
+  it("runs every fallback and applies each verified name regardless of batch order", async () => {
+    const many = Array.from({ length: 5 }, (_, i) => zone(`z${i}`, [`z${i}/a.ts`]));
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: Object.fromEntries(many.map((_, i) => [`name-z${i}`, { type: "choice", choice: "none", probabilities: {}, confidence: 0.9 }])),
+    });
+    mockedCallClaude.mockImplementation(async (prompt: string) => {
+      const id = /Files:\n\s+(z\d)\//.exec(prompt)?.[1] ?? "x";
+      return { text: JSON.stringify([`Name ${id}`, "B", "C"]) };
+    });
+    mockedAskJev.mockImplementation(async () => ({
+      model: "jev",
+      answers: { pick: { type: "choice", choice: "g0", probabilities: {}, confidence: 0.9 }, fits0: { type: "noul", noul: 0.9 }, fits1: { type: "noul", noul: 0.1 }, fits2: { type: "noul", noul: 0.1 } },
+    }));
+
+    const res = await nameZonesBySelection(many, { crossings: [] });
+
+    expect(res.escalated).toBe(5);
+    expect(mockedCallClaude).toHaveBeenCalledTimes(5);
+    expect(res.zones.map((z) => z.name)).toEqual(["Name z0", "Name z1", "Name z2", "Name z3", "Name z4"]);
+  });
+});

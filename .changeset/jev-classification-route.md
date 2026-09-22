@@ -11,3 +11,5 @@ With the key present, `analyze` now runs a judgment-first cascade by default: zo
 
 Follow-ups: the escalation band narrows to 0.4–0.6 with a cap of six zones per run (measured on three repositories); warning-level heuristic findings are judged real-problem-or-artifact and demoted to `info` below 0.3; the most cross-linked files get a `move-file` finding (`moveReason: "zone-judgment"`) when Jev places them confidently in another zone; a finding emitted under both a zone and `global` is kept once; `--per-zone` now reaches the analyzer.
 
+Re-runs are idempotent: a zone whose generated-name fallback already failed on the same files is not asked again, an escalated zone the previous run narrated on (nearly) the same files keeps its insights instead of being narrated again, and judged state carries no zone names so cache keys are stable across renames. Naming prints progress per Jev batch and per generated-name fallback, and fallbacks run three at a time.
+

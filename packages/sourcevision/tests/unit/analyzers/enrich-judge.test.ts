@@ -291,7 +291,7 @@ describe("buildZoneFragilityRequest", () => {
     expect(req.questions.u0.instructions).toContain("`zones.z0`");
     expect(req.ids.get("d1")).toMatchObject({ zone: zones[1], kind: "overdependent" });
     expect((req.state as { zones: Record<string, unknown> }).zones.z0).toEqual({
-      id: "web-viewer", name: "Web Viewer", description: "UI", fileCount: 2, files: ["a.ts", "b.ts"],
+      id: "web-viewer", fileCount: 2, files: ["a.ts", "b.ts"],
       cohesion: 0.3, coupling: 0.8, importsTo: { rex: 2 }, importedFrom: {},
     });
     expect((req.state as { zones: Record<string, { importedFrom: object }> }).zones.z1.importedFrom).toEqual({ "web-viewer": 2 });
@@ -321,7 +321,8 @@ describe("buildFindingJudgeRequest — with evidence", () => {
     );
     expect(Object.keys(req.questions).sort()).toEqual(["a0", "c0", "c1", "r0", "s0", "s1", "t0", "t1", "v0", "v1", "z0", "z1"]);
     const state = req.state as { zones: Record<string, unknown>; heuristics: Record<string, string[]> };
-    expect(state.zones["web-viewer"]).toMatchObject({ name: "Web Viewer", fileCount: 3, files: ["ui/app.ts", "ui/hub.ts", "ui/store.ts"], importsTo: { rex: 1 } });
+    expect(state.zones["web-viewer"]).toMatchObject({ fileCount: 3, files: ["ui/app.ts", "ui/hub.ts", "ui/store.ts"], importsTo: { rex: 1 } });
+    expect(state.zones["web-viewer"]).not.toHaveProperty("name");
     // No projectDir → no headers, but the field is present so instructions can reference it.
     expect((state.zones["web-viewer"] as { headers: object }).headers).toEqual({});
     expect(state.zones.rex).toBeUndefined(); // only scopes the batch references
@@ -476,7 +477,7 @@ describe("judgeMoves", () => {
     expect(req.ids.get("m0")).toEqual({ path: "ui/hub.ts", zoneId: "web", edges: { rex: 3 } });
     // rex/store.ts is an import target on two of those edges — below the minimum, so not asked.
     expect(Object.keys((req.questions.m0 as { criteria: object }).criteria)).toEqual(["web", "rex", "stay"]);
-    expect((req.state as { zones: Record<string, unknown> }).zones.rex).toMatchObject({ name: "Rex", directory: "rex", fileCount: 3 });
+    expect((req.state as { zones: Record<string, unknown> }).zones.rex).toEqual({ directory: "rex", fileCount: 3, files: rex.files });
   });
 
   it("emits a move-file finding for a confident other-zone choice, nothing for stay or a weak choice", async () => {
@@ -512,5 +513,19 @@ describe("judgeMoves", () => {
     mockedRoute.mockReturnValue(undefined);
     expect(await judgeMoves([web, rex], edgesFor(5), 1)).toEqual({ findings: [], calls: 0 });
     expect(mockedAskJev).not.toHaveBeenCalled();
+  });
+});
+
+// ── Judged state is independent of zone names ────────────────────────────────
+
+describe("judged state carries no zone names", () => {
+  it("fragility, evidence and move requests are identical when only names and descriptions differ", () => {
+    const renamed = zones.map((z) => ({ ...z, name: `${z.name} Renamed`, description: `${z.description} (new)` }));
+    expect(JSON.stringify(buildZoneFragilityRequest(renamed, crossings).state)).toBe(JSON.stringify(buildZoneFragilityRequest(zones, crossings).state));
+    const f = [finding("x", { scope: "web-viewer" })];
+    const renamedEvidence = { ...evidence, zones: evidence.zones.map((z) => ({ ...z, name: `${z.name} Renamed`, description: "changed" })) };
+    expect(JSON.stringify(buildFindingJudgeRequest(f, renamedEvidence).state)).toBe(JSON.stringify(buildFindingJudgeRequest(f, evidence).state));
+    const moveCrossings: ZoneCrossing[] = Array.from({ length: 3 }, () => ({ from: "a.ts", to: "c.ts", fromZone: "web-viewer", toZone: "rex" }));
+    expect(JSON.stringify(buildMoveJudgeRequest(renamed, moveCrossings).state)).toBe(JSON.stringify(buildMoveJudgeRequest(zones, moveCrossings).state));
   });
 });

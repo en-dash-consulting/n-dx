@@ -186,8 +186,10 @@ function buildZoneEvidence(scopes: string[], evidence: FindingEvidence): Record<
   const zoneState: Record<string, JsonValue> = {};
   for (const id of new Set(scopes.filter((s) => zonesById.has(s)))) {
     const zone = zonesById.get(id)!;
+    // No name or description here: both change between runs (selection,
+    // identity preservation, partner renames) and would make the cache key
+    // differ for identical evidence. Files, metrics and imports are the evidence.
     zoneState[id] = {
-      name: zone.name,
       fileCount: zone.files.length,
       files: zone.files.slice(0, ZONE_FILE_SAMPLE),
       headers: collectFileHeaders(zone.files.slice(0, ZONE_FILE_SAMPLE), evidence.projectDir),
@@ -514,10 +516,9 @@ export function buildZoneFragilityRequest(
   const ids = new Map<string, { zone: Zone; kind: FragilityKind }>();
   zones.forEach((zone, i) => {
     const id = `z${i}`;
+    // Name and description are omitted on purpose — see buildZoneEvidence.
     zState[id] = {
       id: zone.id,
-      name: zone.name,
-      description: zone.description,
       fileCount: zone.files.length,
       files: zone.files.slice(0, ZONE_FILE_SAMPLE),
       cohesion: zone.cohesion,
@@ -784,7 +785,7 @@ export function buildMoveJudgeRequest(zones: Zone[], crossings: ZoneCrossing[]):
     if (zState[id]) return;
     const z = zonesById.get(id);
     if (!z) return;
-    zState[id] = { name: z.name, fileCount: z.files.length, directory: majorityDirectory(z), files: z.files.slice(0, 12) };
+    zState[id] = { fileCount: z.files.length, directory: majorityDirectory(z), files: z.files.slice(0, 12) };
   };
   ranked.forEach(({ path, e }, i) => {
     const zoneId = zoneOf.get(path)!;
@@ -797,7 +798,7 @@ export function buildMoveJudgeRequest(zones: Zone[], crossings: ZoneCrossing[]):
     const criteria: Record<string, JsonValue> = {};
     for (const zid of [zoneId, ...partners]) {
       const z = zonesById.get(zid)!;
-      criteria[zid] = `${z.name} (${majorityDirectory(z)}/, ${z.files.length} files)`;
+      criteria[zid] = `${majorityDirectory(z)}/ (${z.files.length} files)`;
     }
     criteria[STAY] = "The file is where it belongs; its cross-zone imports are expected for what it does.";
     questions[`m${i}`] = choice(

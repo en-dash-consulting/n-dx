@@ -148,7 +148,16 @@ export interface NamingContext {
   projectDir?: string;
   fileArchetypes?: Map<string, string | null>;
   crossings: ZoneCrossing[];
+  /**
+   * Zones whose generated-name fallback was already tried on this exact file
+   * set and did not stick. The Jev Choice still runs (it is cached); the
+   * text-model calls do not, until the zone's files change.
+   */
+  skipGeneratedNames?: Set<string>;
 }
+
+/** Generated-name fallbacks in flight at once; matches per-zone narration. */
+const NAME_FALLBACK_CONCURRENCY = 3;
 
 /** Deterministic name candidates for a zone, deduplicated by name. */
 export function buildNameCandidates(zone: Zone, ctx: NamingContext): NameCandidate[] {
@@ -345,6 +354,8 @@ export interface ZoneNamingResult {
   merged: number;
   /** Zones sent to the generative fallback. */
   escalated: number;
+  /** Zones that would have been escalated but were tried on the same files before. */
+  skippedFallback: number;
 }
 
 function addUsage(total: TokenUsage, more?: TokenUsage): void {
@@ -358,7 +369,7 @@ function addUsage(total: TokenUsage, more?: TokenUsage): void {
  * `zone.judge` route: returns the zones untouched.
  */
 export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): Promise<ZoneNamingResult> {
-  const result: ZoneNamingResult = { zones, findings: [], calls: 0, renamed: 0, merged: 0, escalated: 0 };
+  const result: ZoneNamingResult = { zones, findings: [], calls: 0, renamed: 0, merged: 0, escalated: 0, skippedFallback: 0 };
   if (zones.length === 0 || getJudgmentRoute("zone.judge") !== "typesafe") return result;
 
   const usage: TokenUsage = { input: 0, output: 0 };
@@ -372,6 +383,7 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
     const batchIds = new Set(batch.map((z) => z.id));
     const req = buildZoneNamingRequest(batch, ctx, pairs.filter(([a, b]) => batchIds.has(a.id) && batchIds.has(b.id)));
     if (Object.keys(req.questions).length === 0) continue;
+    console.log(`  [cascade] naming: asking Jev about ${batch.length} zone(s), ${req.pairs.size} candidate pair(s)`);
     let response;
     try {
       response = await askJev({ state: req.state, questions: req.questions }, { taskClass: "zone.judge" });
@@ -389,7 +401,11 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
       const a = response.answers[qid];
       if (a?.type !== "choice") continue;
       if (a.choice === NONE || a.confidence < NAMING_MIN_CONFIDENCE) {
-        escalate.push(zone);
+        if (ctx.skipGeneratedNames?.has(zone.id)) {
+          result.skippedFallback++;
+        } else {
+          escalate.push(zone);
+        }
         continue;
       }
       const k = Number(a.choice.slice(1));
@@ -418,11 +434,15 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
     }
   }
 
-  // Generated fallback, verified by Jev.
-  for (const zone of escalate) {
-    result.escalated++;
+  // Generated fallback, verified by Jev. A few text-model calls run at once;
+  // each zone's outcome is independent.
+  if (result.skippedFallback > 0) {
+    console.log(`  [cascade] naming: ${result.skippedFallback} zone(s) keep their algorithmic name — generated names were already tried on these files`);
+  }
+  const fallback = async (zone: Zone, index: number): Promise<void> => {
+    console.log(`  [cascade] naming: generating names for "${zone.id}" (${index + 1}/${escalate.length})`);
     const proposed = await proposeZoneNames(zone);
-    if (proposed.length === 0) continue;
+    if (proposed.length === 0) return;
     const criteria: Record<string, JsonValue> = {};
     proposed.forEach((n, k) => { criteria[`g${k}`] = n; });
     criteria[NONE] = "None of these names describes the files.";
@@ -440,18 +460,22 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
         { taskClass: "zone.judge" },
       );
     } catch (err) {
-      if (err instanceof ClaudeClientError) continue;
+      if (err instanceof ClaudeClientError) return;
       throw err;
     }
     result.calls++;
     addUsage(usage, response.tokenUsage);
     const pick = response.answers[qid];
-    if (pick?.type !== "choice" || pick.choice === NONE) continue;
+    if (pick?.type !== "choice" || pick.choice === NONE) return;
     const k = Number(pick.choice.slice(1));
     const fits = response.answers[`fits${k}`];
     if (fits?.type === "noul" && fits.noul >= GENERATED_NAME_MIN_PROBABILITY && proposed[k]) {
       named.set(zone.id, proposed[k]);
     }
+  };
+  result.escalated = escalate.length;
+  for (let i = 0; i < escalate.length; i += NAME_FALLBACK_CONCURRENCY) {
+    await Promise.all(escalate.slice(i, i + NAME_FALLBACK_CONCURRENCY).map((z, k) => fallback(z, i + k)));
   }
 
   // Apply names, then merges (mergeZonesByName merges by equal name).

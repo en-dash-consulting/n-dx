@@ -86,8 +86,16 @@ export interface CascadeResult extends EnrichResult {
   prejudgedFindings: Finding[];
 }
 
+/**
+ * An escalated zone whose previous match overlaps at least this much and
+ * already has insights is not narrated again. Structure hashes cannot carry
+ * this decision: the cascade sees zones before pins move files, the
+ * previous run stored them after, so the hashes never agree.
+ */
+const UNCHANGED_ESCALATION_OVERLAP = 0.9;
+
 /** The previous zone this one continues, if their files overlap enough both ways. */
-function previousMatch(zone: Zone, previous: Zone[] | undefined): Zone | undefined {
+function previousMatch(zone: Zone, previous: Zone[] | undefined): { zone: Zone; overlap: number } | undefined {
   if (!previous) return undefined;
   const files = new Set(zone.files);
   let best: { zone: Zone; overlap: number } | undefined;
@@ -100,7 +108,7 @@ function previousMatch(zone: Zone, previous: Zone[] | undefined): Zone | undefin
     );
     if (overlap >= PREVIOUS_NAME_OVERLAP && (!best || overlap > best.overlap)) best = { zone: prev, overlap };
   }
-  return best?.zone;
+  return best;
 }
 
 /**
@@ -170,18 +178,24 @@ export async function cascadeEnrichment(
   const prejudgedFindings: Finding[] = [];
   const inherited = new Map<string, string>();
   const toName: Zone[] = [];
+  // A zone still carrying its algorithmic name on exactly the same files as
+  // last run already had its generated-name fallback tried; asking the text
+  // model again would spend the same calls for the same answer.
+  const skipGeneratedNames = new Set<string>();
   for (const zone of candidates) {
     const prev = previousMatch(zone, previousZones?.zones);
-    if (prev && prev.name && prev.name !== algorithmicZoneName(prev.id)) {
-      inherited.set(zone.id, prev.name);
+    if (prev && prev.zone.name && prev.zone.name !== algorithmicZoneName(prev.zone.id)) {
+      inherited.set(zone.id, prev.zone.name);
     } else {
       toName.push(zone);
+      if (prev && prev.overlap === 1) skipGeneratedNames.add(zone.id);
     }
   }
   const naming = await nameZonesBySelection(toName, {
     projectDir: projectProfile?.projectDir,
     fileArchetypes,
     crossings,
+    skipGeneratedNames,
   });
   addUsage(tokenUsage, naming.calls, naming.tokenUsage);
   prejudgedFindings.push(...naming.findings);
@@ -241,7 +255,26 @@ export async function cascadeEnrichment(
   const newZoneInsights = new Map<string, string[]>();
   let finalNamed = named;
   const escalatedZoneIds = new Set(escalated.map((z) => z.id));
-  if (escalated.length > 0) {
+  // Escalated zones the previous run already narrated on (nearly) the same
+  // files keep that narration; only the rest are sent to the text model.
+  const carried = new Map<string, Zone>();
+  const toNarrate: Zone[] = [];
+  for (const z of escalated) {
+    const prev = previousMatch(z, previousZones?.zones);
+    if (prev && prev.overlap >= UNCHANGED_ESCALATION_OVERLAP && prev.zone.insights && prev.zone.insights.length > 0) {
+      carried.set(z.id, prev.zone);
+    } else {
+      toNarrate.push(z);
+    }
+  }
+  if (carried.size > 0) {
+    console.log(`  [cascade] ${carried.size} escalated zone(s) unchanged since the previous run — insights carried forward`);
+    finalNamed = finalNamed.map((z) => {
+      const prev = carried.get(z.id);
+      return prev ? { ...z, insights: prev.insights, structureHash: prev.structureHash, tokenUsage: prev.tokenUsage } : z;
+    });
+  }
+  if (toNarrate.length > 0) {
     const prevById = new Map((previousZones?.zones ?? []).map((z) => [z.id, z]));
     const synthetic: Zones = {
       zones: named.map((z) => {
@@ -256,7 +289,7 @@ export async function cascadeEnrichment(
       findings: previousZones?.findings ?? [],
     };
     const narrated = await enrichZonesPerZone(
-      escalated, remapped, inventory, imports, synthetic, fileArchetypes, hints,
+      toNarrate, remapped, inventory, imports, synthetic, fileArchetypes, hints,
     );
     if (narrated.tokenUsage) {
       addUsage(tokenUsage, narrated.tokenUsage.calls, {
@@ -267,7 +300,7 @@ export async function cascadeEnrichment(
     newFindings.push(...narrated.newFindings);
     for (const [id, insights] of narrated.newZoneInsights) newZoneInsights.set(id, insights);
     const narratedById = new Map(narrated.zones.map((z) => [z.id, z]));
-    finalNamed = named.map((z) => {
+    finalNamed = finalNamed.map((z) => {
       const n = narratedById.get(z.id);
       // Keep the cascade's name and description; take the narrated insights.
       return n ? { ...z, insights: n.insights, structureHash: n.structureHash, tokenUsage: n.tokenUsage } : z;

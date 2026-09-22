@@ -56,6 +56,7 @@ beforeEach(() => {
     renamed: zones.length,
     merged: 0,
     escalated: 0,
+    skippedFallback: 0,
   }));
 });
 
@@ -116,7 +117,21 @@ describe("cascadeEnrichment", () => {
     expect(res.tokenUsage).toMatchObject({ calls: 3, inputTokens: 980, outputTokens: 87 });
   });
 
-  it("carries previous structure hashes into the synthetic previous so unchanged escalated zones are not regenerated", async () => {
+  it("does not narrate an escalated zone the previous run already narrated on the same files, and keeps its insights", async () => {
+    mockedFragility.mockResolvedValueOnce({
+      probabilities: new Map([["core", { unrelated: 0.5 }]]),
+      calls: 1,
+    });
+    const previous = { zones: [{ ...src, structureHash: "prev-hash", insights: ["old"] }], crossings: [], unzoned: [], enrichmentPass: 1 };
+
+    const res = await cascadeEnrichment([src], [], inventory, imports, previous);
+
+    expect(mockedPerZone).not.toHaveBeenCalled();
+    expect(res.zones.find((z) => z.id === "core")).toMatchObject({ insights: ["old"], structureHash: "prev-hash" });
+    expect(res.escalatedZoneIds).toEqual(new Set(["core"]));
+  });
+
+  it("narrates an escalated zone whose previous match has different files, with the previous hashes in the synthetic previous", async () => {
     mockedFragility.mockResolvedValueOnce({
       probabilities: new Map([["core", { unrelated: 0.5 }]]),
       calls: 1,
@@ -124,10 +139,12 @@ describe("cascadeEnrichment", () => {
     mockedPerZone.mockResolvedValueOnce({
       zones: [], newZoneInsights: new Map(), newGlobalInsights: [], newFindings: [], pass: 2,
     });
-    const previous = { zones: [{ ...src, structureHash: "prev-hash", insights: ["old"] }], crossings: [], unzoned: [], enrichmentPass: 1 };
+    // Same id, but only one of two files in common → 50% overlap: below the carry threshold.
+    const previous = { zones: [{ ...src, files: ["src/a.ts", "src/z.ts"], structureHash: "prev-hash", insights: ["old"] }], crossings: [], unzoned: [], enrichmentPass: 1 };
 
     await cascadeEnrichment([src], [], inventory, imports, previous);
 
+    expect(mockedPerZone).toHaveBeenCalledTimes(1);
     const synthetic = mockedPerZone.mock.calls[0][4];
     expect(synthetic?.zones.find((z) => z.id === "core")).toMatchObject({ structureHash: "prev-hash", insights: ["old"] });
   });
@@ -147,8 +164,21 @@ describe("cascadeEnrichment — previous names", () => {
     const res = await cascadeEnrichment([src, ui], crossings, inventory, imports, previous);
 
     expect(mockedNaming.mock.calls[0][0].map((z) => z.id)).toEqual(["ui"]);
+    // ui kept its algorithmic name on exactly these files last run: no generated-name fallback again.
+    expect(mockedNaming.mock.calls[0][1].skipGeneratedNames).toEqual(new Set(["ui"]));
     expect(res.zones.find((z) => z.id === "core")!.name).toBe("Core Orchestration");
     expect(res.zones.find((z) => z.id === "ui")!.name).toBe("Named ui");
+  });
+
+  it("allows the generated-name fallback again once the zone's files change", async () => {
+    mockedFragility.mockResolvedValueOnce({ probabilities: new Map(), calls: 0 });
+    const grown = zone("ui", ["ui/x.ts", "ui/y.ts", "ui/z.ts"]);
+    const inv = makeInventory([makeFileEntry("ui/x.ts"), makeFileEntry("ui/y.ts"), makeFileEntry("ui/z.ts")]);
+    const previous = { zones: [{ ...ui, name: "Ui" }], crossings: [], unzoned: [], enrichmentPass: 1 };
+
+    await cascadeEnrichment([grown], [], inv, imports, previous);
+
+    expect(mockedNaming.mock.calls[0][1].skipGeneratedNames).toEqual(new Set());
   });
 });
 
