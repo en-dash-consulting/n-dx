@@ -1427,14 +1427,31 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
 
 /** The legacy flat-markdown PRD. Read-only for years; still staged if present. */
 const PRD_MARKDOWN_FILENAME = "prd.md";
-/** Append-only task-status audit log written by every PRD adapter. */
-const PRD_EXECUTION_LOG_FILENAME = "execution-log.jsonl";
-/** Single rotated execution-log backup retained by the file adapter. */
-const PRD_EXECUTION_LOG_BACKUP_FILENAME = "execution-log.1.jsonl";
 
 /**
- * The project-relative PRD paths that exist in `projectDir` and should be
- * staged by a commit that lands a PRD write.
+ * Whether `git` considers `relativePath` (relative to `projectDir`) ignored.
+ *
+ * `git add` errors on an ignored path — the append-only execution log
+ * (`.rex/execution-log.jsonl` / `.rex/execution-log.1.jsonl`) used to be a
+ * hardcoded staging candidate below while `rex init` writes
+ * `.rex/execution-log*.jsonl` into `.gitignore`
+ * (packages/rex/src/cli/commands/init.ts), so the first `git add` in the loop
+ * threw, the whole staging attempt aborted, and no PRD path was staged at
+ * all. Filtering every candidate through `check-ignore` keeps any future
+ * ignored path from being fatal the same way, instead of special-casing this
+ * one pair of filenames.
+ */
+async function isGitIgnored(projectDir: string, relativePath: string): Promise<boolean> {
+  const result = await exec("git", ["check-ignore", "--quiet", "--", relativePath], {
+    cwd: projectDir,
+    timeout: 10_000,
+  });
+  return result.exitCode === 0;
+}
+
+/**
+ * The project-relative PRD paths that exist in `projectDir`, are not
+ * gitignored, and should be staged by a commit that lands a PRD write.
  *
  * One helper for both staging sites — {@link commitPrdTreeIfStaged} and the
  * commit prompt — because the set they stage has to stay equal to what the
@@ -1444,7 +1461,9 @@ const PRD_EXECUTION_LOG_BACKUP_FILENAME = "execution-log.1.jsonl";
  *
  * Each path is existence-checked: `git add` errors on a missing path, and in a
  * fresh project the legacy markdown (and, before the first PRD write, the tree
- * itself) is absent.
+ * itself) is absent. Each surviving path is then checked with
+ * {@link isGitIgnored}; an ignored path is dropped with a debug line rather
+ * than passed to `git add`.
  */
 async function prdPathsToStage(
   projectDir: string,
@@ -1455,13 +1474,20 @@ async function prdPathsToStage(
   const candidates = [
     PRD_TREE_DIRNAME,
     TREE_META_FILENAME,
-    PRD_EXECUTION_LOG_FILENAME,
-    PRD_EXECUTION_LOG_BACKUP_FILENAME,
     ...(opts.includeLegacyMarkdown ? [PRD_MARKDOWN_FILENAME] : []),
   ];
-  return candidates
-    .filter((name) => existsSync(join(projectDir, ".rex", name)))
-    .map((name) => join(".rex", name));
+  const existing = candidates.filter((name) => existsSync(join(projectDir, ".rex", name)));
+
+  const staged: string[] = [];
+  for (const name of existing) {
+    const relativePath = join(".rex", name);
+    if (await isGitIgnored(projectDir, relativePath)) {
+      detail(`Skipping gitignored PRD path: ${relativePath}`);
+      continue;
+    }
+    staged.push(relativePath);
+  }
+  return staged;
 }
 
 /**
