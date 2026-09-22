@@ -147,13 +147,23 @@ describe("stale .hench-commit-msg.txt quarantine", () => {
     // does, and why it must not be left behind.
     await stageWorkWithMessage("feat: task A\n\nN-DX-Status: task-a pending → completed\n");
 
+    // Wait on the outcome, not a fixed sleep: the commit is a git child
+    // process, and on Windows runners it can outlast any short delay — the
+    // assertion then reads false and afterEach's rm hits EBUSY on the dir
+    // git still holds open.
     const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 30 });
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    watcher.cancel();
+    try {
+      await vi.waitFor(() => expect(watcher.didAutoCommit()).toBe(true), {
+        timeout: 15_000,
+        interval: 50,
+      });
+    } finally {
+      watcher.cancel();
+    }
 
     expect(watcher.didAutoCommit()).toBe(true);
     expect(await headSubject()).toBe("feat: task A");
-  });
+  }, 20_000);
 
   it("leaves a completed run's sentinel alone — the commit prompt owns that file", async () => {
     // Every exit inside the commit prompt removes the sentinel itself,
