@@ -127,6 +127,7 @@ function summarizeActions(actions: FixAction[]): string {
 function kindIcon(kind: FixKind): string {
   switch (kind) {
     case "missing_timestamp": return "🕐";
+    case "inverted_timestamps": return "⏪";
     case "orphan_blocked_by": return "🔗";
     case "parent_child_alignment": return "🔄";
     case "stuck_parent": return "✅";
@@ -137,6 +138,7 @@ function kindIcon(kind: FixKind): string {
 function kindLabel(kind: FixKind): string {
   switch (kind) {
     case "missing_timestamp": return "timestamp fix(es)";
+    case "inverted_timestamps": return "inverted timestamp(s)";
     case "orphan_blocked_by": return "orphan ref(s)";
     case "parent_child_alignment": return "parent alignment(s)";
     case "stuck_parent": return "stuck parent(s)";

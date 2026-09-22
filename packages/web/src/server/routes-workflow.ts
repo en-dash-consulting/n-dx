@@ -15,6 +15,7 @@ import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { completeConfigGroups } from "./hench-config-fields.js";
 
 const WORKFLOW_PREFIX = "/api/hench/workflow/";
 
@@ -686,6 +687,9 @@ async function handleApplySuggestion(
   for (const [key, value] of Object.entries(changes)) {
     setNestedValue(config, key, value);
   }
+  // Writing retry.maxRetries into a config with no retry block creates a
+  // one-member group hench's schema refuses — complete it before serializing.
+  completeConfigGroups(config);
 
   try {
     writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");

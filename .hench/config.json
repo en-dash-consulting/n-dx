@@ -30,5 +30,11 @@
   },
   "claudePath": "claude",
   "autoCommit": true,
-  "livelockThreshold": 6
+  "livelockThreshold": 6,
+  "maxFailedAttempts": 5,
+  "retry": {
+    "maxRetries": 3,
+    "baseDelayMs": 2000,
+    "maxDelayMs": 30000
+  }
 }
