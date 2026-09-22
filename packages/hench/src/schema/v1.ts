@@ -71,6 +71,17 @@ export interface RetryConfig {
 }
 
 /**
+ * Canonical retry defaults — the single source for {@link DEFAULT_HENCH_CONFIG}
+ * and the per-field defaults in `validate.ts`'s RetryConfigSchema, so a config
+ * carrying only some retry members loads with the same values init would write.
+ */
+export const DEFAULT_RETRY_CONFIG: Readonly<RetryConfig> = {
+  maxRetries: 3,
+  baseDelayMs: 2000,
+  maxDelayMs: 30000,
+};
+
+/**
  * Git-safety configuration embedded in {@link HenchConfig}.
  *
  * Governs how checkpoint decisions (currently the pre-run commit gate) react
@@ -398,11 +409,7 @@ export function DEFAULT_HENCH_CONFIG(language?: ProjectLanguage): HenchConfig {
     rexDir: PROJECT_DIRS.REX,
     apiKeyEnv: "ANTHROPIC_API_KEY",
     guard: guardDefaultsForLanguage(language),
-    retry: {
-      maxRetries: 3,
-      baseDelayMs: 2000,
-      maxDelayMs: 30000,
-    },
+    retry: { ...DEFAULT_RETRY_CONFIG },
     loopPauseMs: 2000,
     maxFailedAttempts: 3,
     autoCommit: false,

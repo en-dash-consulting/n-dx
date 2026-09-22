@@ -74,7 +74,8 @@ describe("formatCLIError", () => {
     const err = new Error("Invalid hench config: missing required field 'provider'");
     const result = formatCLIError(err);
     expect(result).toContain(`[${CLI_ERROR_CODES.INVALID_CONFIGURATION}]`);
-    expect(result).toContain("corrupted or has an invalid format");
+    // The original message passes through so the user sees which fields failed
+    expect(result).toContain("missing required field 'provider'");
     expect(result).toContain("Hint:");
     expect(result).toContain(".hench/config.json");
   });

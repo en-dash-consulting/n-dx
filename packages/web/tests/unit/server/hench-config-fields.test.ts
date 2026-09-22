@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   CONFIG_FIELD_META,
+  CONFIG_GROUP_DEFAULTS,
+  completeConfigGroups,
   validateConfigKeyValue,
   validateFieldValue,
   type ConfigFieldInfo,
@@ -152,5 +154,48 @@ describe("validateConfigKeyValue", () => {
       expect(validateFieldValue(synthetic, "true")).toBeTruthy();
       expect(validateFieldValue(synthetic, true)).toBeNull();
     });
+  });
+});
+
+describe("completeConfigGroups", () => {
+  it("fills the missing members of a partial retry group", () => {
+    // The failure this exists for: writing retry.maxRetries into a config
+    // with no retry block left `{ "retry": { "maxRetries": 3 } }` on disk,
+    // which hench's schema refused — bricking the next `ndx work`.
+    const config: Record<string, unknown> = { retry: { maxRetries: 3 } };
+    const filled = completeConfigGroups(config);
+    expect(config.retry).toEqual(CONFIG_GROUP_DEFAULTS.retry);
+    expect(filled.sort()).toEqual(["retry.baseDelayMs", "retry.maxDelayMs"]);
+  });
+
+  it("leaves a complete group untouched", () => {
+    const retry = { maxRetries: 5, baseDelayMs: 1000, maxDelayMs: 60000 };
+    const config: Record<string, unknown> = { retry: { ...retry } };
+    expect(completeConfigGroups(config)).toEqual([]);
+    expect(config.retry).toEqual(retry);
+  });
+
+  it("does not invent an absent group (hench applies its own defaults)", () => {
+    const config: Record<string, unknown> = { model: "sonnet" };
+    expect(completeConfigGroups(config)).toEqual([]);
+    expect(config.retry).toBeUndefined();
+  });
+
+  it("leaves a non-object group value for the schema to refuse", () => {
+    const config: Record<string, unknown> = { retry: "aggressive" };
+    expect(completeConfigGroups(config)).toEqual([]);
+    expect(config.retry).toBe("aggressive");
+  });
+
+  it("every group member is a writable field, so the gate and the completer agree", () => {
+    for (const [group, defaults] of Object.entries(CONFIG_GROUP_DEFAULTS)) {
+      for (const member of Object.keys(defaults)) {
+        const path = `${group}.${member}`;
+        expect(
+          CONFIG_FIELD_META.some((f) => f.path === path),
+          `${path} has a group default but no CONFIG_FIELD_META entry`,
+        ).toBe(true);
+      }
+    }
   });
 });

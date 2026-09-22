@@ -27,7 +27,7 @@ import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.j
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
-import { info, result as output, setQuiet } from "../output.js";
+import { info, result as output, setQuiet, warn } from "../output.js";
 import { section, detail } from "../../types/output.js";
 import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
 import {
@@ -834,7 +834,9 @@ async function runOne(
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
 ): Promise<{ status: string; taskTitle: string; selectedTaskId?: string }> {
-  const config = await loadConfig(henchDir);
+  // Lenient without a warning: cmdRun already loaded the same file leniently
+  // and warned once — repeating it per task would spam loop mode.
+  const config = await loadConfig(henchDir, { onInvalid: "use-defaults" });
   const store = await resolveStore(rexDir);
   await assertSchemaCompatibility(store);
 
@@ -1061,7 +1063,13 @@ export async function cmdRun(
   flags: Record<string, string>,
 ): Promise<void> {
   const henchDir = join(dir, HENCH_DIR);
-  const config = await loadConfig(henchDir);
+  // An invalid field in .hench/config.json must not refuse the whole run —
+  // fall back to that field's default and say so, so a bad edit (often made
+  // from the dashboard) degrades to a warning instead of blocking `ndx work`.
+  const config = await loadConfig(henchDir, {
+    onInvalid: "use-defaults",
+    onWarning: (message) => warn(message),
+  });
   const rexDir = join(dir, config.rexDir);
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
