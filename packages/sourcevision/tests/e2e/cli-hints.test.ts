@@ -16,6 +16,12 @@ const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
 const SMALL_FIXTURE = join(import.meta.dirname, "../fixtures/small-ts-project");
 const UNKNOWN_COMMAND_CODE = "NDX_CLI_UNKNOWN_COMMAND";
 
+// TESTING.md "Flake Resistance" Family 3 (subprocess guardrails too tight for
+// a loaded machine): this is a hang-guardrail ceiling, not a latency SLA, so
+// it scales with the same env-driven multiplier as elapsed-time budgets
+// elsewhere in the suite rather than a hand-picked constant.
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
 function runResult(
   args: string[],
   timeout = 10_000,
@@ -53,14 +59,23 @@ describe("sourcevision CLI hint surfacing and follow-through", () => {
       expect(stderr).toContain("validate");
     });
 
-    it("follow-through: hinted 'validate' exits 0 after init", () => {
-      // init creates manifest.json; validate checks all data files and skips
-      // missing ones, so it exits 0 with only manifest present.
-      const init = runResult(["init", tmpDir]);
-      expect(init.code).toBe(0);
-      const { code } = runResult(["validate", tmpDir]);
-      expect(code).toBe(0);
-    }, 15_000);
+    it(
+      "follow-through: hinted 'validate' exits 0 after init",
+      () => {
+        // init creates manifest.json; validate checks all data files and skips
+        // missing ones, so it exits 0 with only manifest present.
+        const init = runResult(["init", tmpDir]);
+        expect(init.code).toBe(0);
+        const { code } = runResult(["validate", tmpDir]);
+        expect(code).toBe(0);
+      },
+      // Two cold-start node spawns back to back. A hand-picked 15s cap
+      // measured 25.8s under a concurrent `pnpm build` (2.4s isolated) —
+      // Family 3: the guardrail was sized for an idle machine. Scaled by
+      // BUDGET_MULTIPLIER instead of a new fixed number so it grows with
+      // the same signal that inflates the spawn.
+      15_000 * BUDGET_MULTIPLIER,
+    );
 
     it(
       "hint text matches valid command: 'analyzee' → 'analyze'",
