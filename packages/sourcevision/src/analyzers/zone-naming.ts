@@ -154,10 +154,15 @@ export interface NamingContext {
    * text-model calls do not, until the zone's files change.
    */
   skipGeneratedNames?: Set<string>;
+  /**
+   * Do not call the text model at all; zones that would have been escalated
+   * are reported in `fallbackZoneIds` for a later `sv narrate` to name.
+   */
+  deferGeneratedNames?: boolean;
 }
 
-/** Generated-name fallbacks in flight at once; matches per-zone narration. */
-const NAME_FALLBACK_CONCURRENCY = 3;
+/** Zones per name-proposal prompt; the answer is a map keyed by zone id. */
+const NAME_PROPOSAL_CHUNK = 20;
 
 /** Deterministic name candidates for a zone, deduplicated by name. */
 export function buildNameCandidates(zone: Zone, ctx: NamingContext): NameCandidate[] {
@@ -322,24 +327,45 @@ export function buildZoneNamingRequest(zones: Zone[], ctx: NamingContext, pairs:
 
 // ── Generated fallback ───────────────────────────────────────────────────────
 
-/** Ask the text model for three names; returns [] on any failure. */
-export async function proposeZoneNames(zone: Zone): Promise<string[]> {
+/**
+ * Ask the text model for three names per zone, all zones in one prompt. The
+ * answer is a map keyed by zone id; a zone missing from it gets no names.
+ * Returns an empty map on any client failure.
+ */
+export async function proposeZoneNamesFor(zones: Zone[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (zones.length === 0) return out;
+  const blocks = zones.map((z) =>
+    `Zone "${z.id}" (${z.files.length} files):\n${z.files.slice(0, ZONE_FILE_SAMPLE).map((f) => `  ${f}`).join("\n")}`,
+  ).join("\n\n");
   const prompt = [
-    "Propose three short Title Case names (2–4 words) for a code module containing these files. Name what the files do, not where they are.",
+    `Propose three short Title Case names (2–4 words) for each of these ${zones.length} code modules. Name what the files do, not where they are.`,
     "",
-    `Files:\n${zone.files.slice(0, ZONE_FILE_SAMPLE).map((f) => `  ${f}`).join("\n")}`,
+    blocks,
     "",
-    'Respond with ONLY a JSON array of three strings: ["Name One","Name Two","Name Three"]',
+    `Respond with ONLY a JSON object keyed by zone id, three strings per zone: {"${zones[0].id}":["Name One","Name Two","Name Three"]}`,
   ].join("\n");
+  let text: string;
   try {
-    const { text } = await callClaude(prompt, undefined, { taskClass: "zone.enrich-scan" });
-    const parsed = tryParseJSON(text);
-    const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.names) ? parsed.names : [];
-    return arr.filter((n: unknown): n is string => typeof n === "string" && n.trim().length > 0).slice(0, 3);
+    ({ text } = await callClaude(prompt, undefined, { taskClass: "zone.enrich-scan" }));
   } catch (err) {
-    if (err instanceof ClaudeClientError) return [];
+    if (err instanceof ClaudeClientError) return out;
     throw err;
   }
+  const parsed = tryParseJSON(text);
+  if (!parsed || typeof parsed !== "object") return out;
+  for (const z of zones) {
+    const arr = (parsed as Record<string, unknown>)[z.id];
+    if (!Array.isArray(arr)) continue;
+    const names = arr.filter((n: unknown): n is string => typeof n === "string" && n.trim().length > 0).slice(0, 3);
+    if (names.length > 0) out.set(z.id, names);
+  }
+  return out;
+}
+
+/** Single-zone form, kept for callers that have one zone in hand. */
+export async function proposeZoneNames(zone: Zone): Promise<string[]> {
+  return (await proposeZoneNamesFor([zone])).get(zone.id) ?? [];
 }
 
 // ── Orchestration ────────────────────────────────────────────────────────────
@@ -356,6 +382,8 @@ export interface ZoneNamingResult {
   escalated: number;
   /** Zones that would have been escalated but were tried on the same files before. */
   skippedFallback: number;
+  /** Zones whose Choice came back none/unsure and that were not skipped — the fallback's input. */
+  fallbackZoneIds: string[];
 }
 
 function addUsage(total: TokenUsage, more?: TokenUsage): void {
@@ -369,7 +397,7 @@ function addUsage(total: TokenUsage, more?: TokenUsage): void {
  * `zone.judge` route: returns the zones untouched.
  */
 export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): Promise<ZoneNamingResult> {
-  const result: ZoneNamingResult = { zones, findings: [], calls: 0, renamed: 0, merged: 0, escalated: 0, skippedFallback: 0 };
+  const result: ZoneNamingResult = { zones, findings: [], calls: 0, renamed: 0, merged: 0, escalated: 0, skippedFallback: 0, fallbackZoneIds: [] };
   if (zones.length === 0 || getJudgmentRoute("zone.judge") !== "typesafe") return result;
 
   const usage: TokenUsage = { input: 0, output: 0 };
@@ -434,48 +462,62 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
     }
   }
 
-  // Generated fallback, verified by Jev. A few text-model calls run at once;
-  // each zone's outcome is independent.
+  // Generated fallback, verified by Jev: one text-model call per chunk of
+  // zones, then one Jev request per chunk carrying every zone's pick and fit
+  // questions. Each zone's outcome is still independent.
   if (result.skippedFallback > 0) {
     console.log(`  [cascade] naming: ${result.skippedFallback} zone(s) keep their algorithmic name — generated names were already tried on these files`);
   }
-  const fallback = async (zone: Zone, index: number): Promise<void> => {
-    console.log(`  [cascade] naming: generating names for "${zone.id}" (${index + 1}/${escalate.length})`);
-    const proposed = await proposeZoneNames(zone);
-    if (proposed.length === 0) return;
-    const criteria: Record<string, JsonValue> = {};
-    proposed.forEach((n, k) => { criteria[`g${k}`] = n; });
-    criteria[NONE] = "None of these names describes the files.";
-    const qid = "pick";
+  result.fallbackZoneIds = escalate.map((z) => z.id);
+  if (ctx.deferGeneratedNames && escalate.length > 0) {
+    console.log(`  [cascade] naming: ${escalate.length} zone(s) left for background name generation`);
+    escalate.length = 0;
+  }
+  result.escalated = escalate.length;
+  for (let start = 0; start < escalate.length; start += NAME_PROPOSAL_CHUNK) {
+    const chunk = escalate.slice(start, start + NAME_PROPOSAL_CHUNK);
+    console.log(`  [cascade] naming: generating names for ${chunk.length} zone(s) in one call (${escalate.map((z) => z.id).slice(start, start + NAME_PROPOSAL_CHUNK).join(", ")})`);
+    const proposed = await proposeZoneNamesFor(chunk);
+    const withNames = chunk.filter((z) => (proposed.get(z.id)?.length ?? 0) > 0);
+    if (withNames.length === 0) continue;
+
+    const state: Record<string, JsonValue> = {};
+    const questions: Record<string, JevQuestion> = {};
+    withNames.forEach((zone, i) => {
+      const names = proposed.get(zone.id)!;
+      const id = `z${i}`;
+      state[id] = { files: zone.files.slice(0, ZONE_FILE_SAMPLE), entryPoints: zone.entryPoints.slice(0, 5), names };
+      const criteria: Record<string, JsonValue> = {};
+      names.forEach((n, k) => { criteria[`g${k}`] = n; });
+      criteria[NONE] = "None of these names describes the files.";
+      questions[`pick-${id}`] = choice(`Which of the proposed names in \`${id}.names\` best describes the module whose files are \`${id}.files\`?`, criteria);
+      names.forEach((_, k) => {
+        questions[`fits-${id}-${k}`] = noul(`Does the name \`${id}.names[${k}]\` accurately describe the files in \`${id}.files\`?`);
+      });
+    });
     let response;
     try {
-      response = await askJev(
-        {
-          state: { zone: { files: zone.files.slice(0, ZONE_FILE_SAMPLE), entryPoints: zone.entryPoints.slice(0, 5) }, names: proposed },
-          questions: {
-            [qid]: choice("Which of the proposed names best describes the module in `zone`?", criteria),
-            ...Object.fromEntries(proposed.map((_, k) => [`fits${k}`, noul(`Does the name \`names[${k}]\` accurately describe the files in \`zone\`?`)])),
-          },
-        },
-        { taskClass: "zone.judge" },
-      );
+      response = await askJev({ state, questions }, { taskClass: "zone.judge" });
     } catch (err) {
-      if (err instanceof ClaudeClientError) return;
+      if (err instanceof ClaudeClientError) {
+        console.warn(`  [judge] generated-name verification failed (${err.reason}) — keeping algorithmic names for ${withNames.length} zone(s)`);
+        continue;
+      }
       throw err;
     }
     result.calls++;
     addUsage(usage, response.tokenUsage);
-    const pick = response.answers[qid];
-    if (pick?.type !== "choice" || pick.choice === NONE) return;
-    const k = Number(pick.choice.slice(1));
-    const fits = response.answers[`fits${k}`];
-    if (fits?.type === "noul" && fits.noul >= GENERATED_NAME_MIN_PROBABILITY && proposed[k]) {
-      named.set(zone.id, proposed[k]);
-    }
-  };
-  result.escalated = escalate.length;
-  for (let i = 0; i < escalate.length; i += NAME_FALLBACK_CONCURRENCY) {
-    await Promise.all(escalate.slice(i, i + NAME_FALLBACK_CONCURRENCY).map((z, k) => fallback(z, i + k)));
+    withNames.forEach((zone, i) => {
+      const id = `z${i}`;
+      const names = proposed.get(zone.id)!;
+      const pick = response.answers[`pick-${id}`];
+      if (pick?.type !== "choice" || pick.choice === NONE) return;
+      const k = Number(pick.choice.slice(1));
+      const fits = response.answers[`fits-${id}-${k}`];
+      if (fits?.type === "noul" && fits.noul >= GENERATED_NAME_MIN_PROBABILITY && names[k]) {
+        named.set(zone.id, names[k]);
+      }
+    });
   }
 
   // Apply names, then merges (mergeZonesByName merges by equal name).

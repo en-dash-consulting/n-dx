@@ -72,6 +72,10 @@ export interface AnalyzeZonesResult {
   tokenUsage?: AnalyzeTokenUsage;
   /** True when zone structure changed and enrichment pass was reset to 1 */
   structureChanged: boolean;
+  /** Final ids of zones the cascade left for `sv narrate` (with `deferNarration`). */
+  pendingNarration?: string[];
+  /** Final ids of zones whose generated names `sv narrate` still has to produce. */
+  pendingNames?: string[];
 }
 
 /** Options for the reusable zone detection pipeline. */
@@ -1920,6 +1924,10 @@ interface EnrichmentResult {
   cascade?: boolean;
   /** Judgment-made findings that bypass the support/paraphrase judgment. */
   prejudgedFindings?: Finding[];
+  /** Files of zones whose narration was deferred; mapped to final ids after pins. */
+  deferredFiles?: Set<string>;
+  /** Files of zones whose generated names were deferred; mapped to final ids after pins. */
+  deferredNameFiles?: Set<string>;
 }
 
 /**
@@ -1938,6 +1946,7 @@ async function applyEnrichment(
   hints?: string,
   projectProfile?: ProjectProfile,
   narrate = false,
+  deferNarration = false,
 ): Promise<EnrichmentResult> {
   let finalZones = expandedZones;
   let aiZoneInsights = new Map<string, string[]>();
@@ -1951,6 +1960,8 @@ async function applyEnrichment(
   let fragilityJudged = false;
   let cascadeRan = false;
   let prejudgedFindings: Finding[] | undefined;
+  let deferredFiles: Set<string> | undefined;
+  let deferredNameFiles: Set<string> | undefined;
 
   if (enrich) {
     // Build pre-enrichment crossings for prompt context
@@ -1981,7 +1992,14 @@ async function applyEnrichment(
       setRunMode("cascade");
       const result = await cascadeEnrichment(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes, hints, projectProfile,
+        { deferNarration },
       );
+      if (result.deferredZoneIds.size > 0) {
+        deferredFiles = new Set(result.zones.filter((z) => result.deferredZoneIds.has(z.id)).flatMap((z) => z.files));
+      }
+      if (result.deferredNameZoneIds.size > 0) {
+        deferredNameFiles = new Set(result.zones.filter((z) => result.deferredNameZoneIds.has(z.id)).flatMap((z) => z.files));
+      }
       finalZones = result.zones;
       aiZoneInsights = result.newZoneInsights;
       aiGlobalInsights = result.newGlobalInsights;
@@ -2067,6 +2085,8 @@ async function applyEnrichment(
     fragilityJudged,
     cascade: cascadeRan,
     prejudgedFindings,
+    deferredFiles,
+    deferredNameFiles,
   };
 }
 
@@ -2798,11 +2818,13 @@ function buildAnalyzeZonesResult(opts: {
   structureChanged: boolean;
   enrichTokenUsage: AnalyzeTokenUsage | undefined;
   stability?: ZoneStability;
+  pendingNarration?: string[];
+  pendingNames?: string[];
 }): AnalyzeZonesResult {
   const {
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
-    previousZones, structureChanged, enrichTokenUsage, stability,
+    previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration, pendingNames,
   } = opts;
 
   const prevMetaCount = previousZones?.metaEvaluationCount ?? 0;
@@ -2831,6 +2853,8 @@ function buildAnalyzeZonesResult(opts: {
     }),
     tokenUsage: enrichTokenUsage,
     structureChanged,
+    ...(pendingNarration && pendingNarration.length > 0 ? { pendingNarration } : {}),
+    ...(pendingNames && pendingNames.length > 0 ? { pendingNames } : {}),
   };
 }
 
@@ -2883,6 +2907,8 @@ export async function analyzeZones(
      * judgment route would otherwise select the cascade (`--narrate`).
      */
     narrate?: boolean;
+    /** Cascade only: leave escalated zones for `sv narrate`; their final ids come back in `pendingNarration`. */
+    deferNarration?: boolean;
     /**
      * Detected project profile (frameworks, release infra, import-graph quality).
      * Forwarded to the AI enrichment prompt so the LLM can suppress
@@ -2988,6 +3014,7 @@ export async function analyzeZones(
   const enrichResult = await applyEnrichment(
     expandedZones, imports, inventory, validPrevious, enrich, perZone, options?.fileArchetypes,
     zoneContentHashes, options?.hints, options?.projectProfile, options?.narrate === true,
+    options?.deferNarration === true,
   );
   const { finalZones: enrichedZones, aiZoneInsights, aiGlobalInsights,
     enrichmentPass, metaUpdatedFindings, enrichedFiles, fragilityJudged } = enrichResult;
@@ -3122,9 +3149,18 @@ export async function analyzeZones(
   }
 
   // ── Build result ──
+  // Deferred narration: the cascade knew the zones by their pre-pin ids;
+  // hand the narrator the final ids by file membership.
+  const byFiles = (files: Set<string> | undefined): string[] | undefined =>
+    files && files.size > 0
+      ? pinnedFinalZones.filter((z) => z.files.some((f) => files.has(f))).map((z) => z.id)
+      : undefined;
+  const pendingNarration = byFiles(enrichResult.deferredFiles);
+  const pendingNames = byFiles(enrichResult.deferredNameFiles);
+
   return buildAnalyzeZonesResult({
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
-    previousZones, structureChanged, enrichTokenUsage, stability,
+    previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration, pendingNames,
   });
 }

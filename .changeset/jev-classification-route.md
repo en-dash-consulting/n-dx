@@ -13,3 +13,5 @@ Follow-ups: the escalation band narrows to 0.4–0.6 with a cap of six zones per
 
 Re-runs are idempotent: a zone whose generated-name fallback already failed on the same files is not asked again, an escalated zone the previous run narrated on (nearly) the same files keeps its insights instead of being narrated again, and judged state carries no zone names so cache keys are stable across renames. Naming prints progress per Jev batch and per generated-name fallback, and fallbacks run three at a time.
 
+Generation is now one call per kind and off the critical path: `zone-naming` proposes names for every `none` zone in one prompt and verifies them in one Jev request; `enrich-multiplex` narrates every escalated zone in one prompt; and `analyze` returns once its judged results are written, leaving narration to a detached `sv narrate` child (`manifest.narration`, `.sourcevision/.cache/narration.log`; `--wait` narrates inline).
+

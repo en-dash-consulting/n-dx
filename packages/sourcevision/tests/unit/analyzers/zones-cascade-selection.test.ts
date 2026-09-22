@@ -55,7 +55,7 @@ beforeEach(() => {
   mockedGenerative.mockReset();
   vi.spyOn(console, "log").mockImplementation(() => {});
   mockedGenerative.mockImplementation(async (zones) => passThrough(zones));
-  mockedCascade.mockImplementation(async (zones) => ({ ...passThrough(zones), fragilityJudged: true as const, escalatedZoneIds: new Set<string>() }));
+  mockedCascade.mockImplementation(async (zones) => ({ ...passThrough(zones), fragilityJudged: true as const, escalatedZoneIds: new Set<string>(), deferredZoneIds: new Set<string>(), deferredNameZoneIds: new Set<string>(), prejudgedFindings: [] }));
   startRunLedger("generative");
 });
 
@@ -80,6 +80,21 @@ describe("analyzeZones enrichment selection", () => {
     await analyzeZones(inventory, imports, { enrich: true });
     expect(mockedCascade).not.toHaveBeenCalled();
     expect(mockedGenerative).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes deferNarration to the cascade and maps deferred zones to their final ids", async () => {
+    mockedRoute.mockReturnValue("typesafe");
+    mockedCascade.mockImplementationOnce(async (zones) => ({
+      ...passThrough(zones), fragilityJudged: true as const, prejudgedFindings: [],
+      escalatedZoneIds: new Set([zones[0].id]), deferredZoneIds: new Set([zones[0].id]), deferredNameZoneIds: new Set([zones[1].id]),
+    }));
+    const res = await analyzeZones(inventory, imports, { enrich: true, deferNarration: true });
+    expect(mockedCascade.mock.calls[0][8]).toEqual({ deferNarration: true });
+    expect(res.pendingNarration).toHaveLength(1);
+    expect(res.pendingNames).toHaveLength(1);
+    expect(res.zones.zones.map((z) => z.id)).toContain(res.pendingNarration![0]);
+    expect(res.zones.zones.map((z) => z.id)).toContain(res.pendingNames![0]);
+    expect(res.pendingNames![0]).not.toBe(res.pendingNarration![0]);
   });
 
   it("does neither in fast mode", async () => {

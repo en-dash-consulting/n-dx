@@ -164,7 +164,7 @@ describe("nameZonesBySelection", () => {
     expect(res.findings[0]).toMatchObject({ category: "structural", severity: "info", confidence: 0.5, scope: "core", related: ["core-2"] });
   });
 
-  it("escalates none or low-confidence choices to generated names and verifies them", async () => {
+  it("escalates none or low-confidence choices to one generated-names call and one verification request", async () => {
     mockedAskJev
       .mockResolvedValueOnce({
         model: "jev",
@@ -173,31 +173,29 @@ describe("nameZonesBySelection", () => {
           "name-z1": { type: "choice", choice: "n0", probabilities: {}, confidence: NAMING_MIN_CONFIDENCE - 0.01 },
         },
       })
-      // zone a: pick g1, which fits
+      // one verification request for both zones: core picks g1 (fits), other picks g0 (does not fit)
       .mockResolvedValueOnce({
         model: "jev",
         answers: {
-          pick: { type: "choice", choice: "g1", probabilities: {}, confidence: 0.8 },
-          fits0: { type: "noul", noul: 0.2 }, fits1: { type: "noul", noul: GENERATED_NAME_MIN_PROBABILITY }, fits2: { type: "noul", noul: 0.1 },
-        },
-      })
-      // zone c: pick g0, which does not fit → algorithmic name kept
-      .mockResolvedValueOnce({
-        model: "jev",
-        answers: {
-          pick: { type: "choice", choice: "g0", probabilities: {}, confidence: 0.8 },
-          fits0: { type: "noul", noul: GENERATED_NAME_MIN_PROBABILITY - 0.01 }, fits1: { type: "noul", noul: 0.1 }, fits2: { type: "noul", noul: 0.1 },
+          "pick-z0": { type: "choice", choice: "g1", probabilities: {}, confidence: 0.8 },
+          "fits-z0-0": { type: "noul", noul: 0.2 }, "fits-z0-1": { type: "noul", noul: GENERATED_NAME_MIN_PROBABILITY }, "fits-z0-2": { type: "noul", noul: 0.1 },
+          "pick-z1": { type: "choice", choice: "g0", probabilities: {}, confidence: 0.8 },
+          "fits-z1-0": { type: "noul", noul: GENERATED_NAME_MIN_PROBABILITY - 0.01 }, "fits-z1-1": { type: "noul", noul: 0.1 }, "fits-z1-2": { type: "noul", noul: 0.1 },
         },
       });
-    mockedCallClaude.mockResolvedValue({ text: '["Alpha Module","Beta Module","Gamma Module"]' });
+    mockedCallClaude.mockResolvedValue({ text: JSON.stringify({ core: ["Alpha Module", "Beta Module", "Gamma Module"], other: ["One", "Two", "Three"] }) });
 
     const res = await nameZonesBySelection([a, c], { crossings: [] });
 
     expect(res.escalated).toBe(2);
-    expect(mockedCallClaude).toHaveBeenCalledTimes(2);
+    expect(mockedCallClaude).toHaveBeenCalledTimes(1);
+    expect(mockedCallClaude.mock.calls[0][0]).toContain('Zone "core"');
+    expect(mockedCallClaude.mock.calls[0][0]).toContain('Zone "other"');
+    expect(mockedAskJev).toHaveBeenCalledTimes(2);
+    expect(Object.keys(mockedAskJev.mock.calls[1][0].questions)).toEqual(["pick-z0", "fits-z0-0", "fits-z0-1", "fits-z0-2", "pick-z1", "fits-z1-0", "fits-z1-1", "fits-z1-2"]);
     expect(res.zones.find((z) => z.id === "core")!.name).toBe("Beta Module");
     expect(res.zones.find((z) => z.id === "other")!.name).toBe("other");
-    expect(res.calls).toBe(3);
+    expect(res.calls).toBe(2);
   });
 
   it("keeps algorithmic names when the generative fallback fails", async () => {
@@ -233,39 +231,81 @@ describe("nameZonesBySelection — fallback skipping and progress", () => {
         "name-z1": { type: "choice", choice: "none", probabilities: {}, confidence: 0.9 },
       },
     });
-    mockedCallClaude.mockResolvedValue({ text: '["Alpha","Beta","Gamma"]' });
-    mockedAskJev.mockResolvedValueOnce({ model: "jev", answers: { pick: { type: "choice", choice: "none", probabilities: {}, confidence: 0.9 } } });
+    mockedCallClaude.mockResolvedValue({ text: JSON.stringify({ other: ["Alpha", "Beta", "Gamma"] }) });
+    mockedAskJev.mockResolvedValueOnce({ model: "jev", answers: { "pick-z0": { type: "choice", choice: "none", probabilities: {}, confidence: 0.9 } } });
 
     const res = await nameZonesBySelection([a, c], { crossings: [], skipGeneratedNames: new Set(["core"]) });
 
     expect(res.skippedFallback).toBe(1);
     expect(res.escalated).toBe(1);
     expect(mockedCallClaude).toHaveBeenCalledTimes(1);
+    expect(mockedCallClaude.mock.calls[0][0]).not.toContain('Zone "core"');
     const lines = vi.mocked(console.log).mock.calls.map((c) => String(c[0]));
     expect(lines.some((l) => l.includes("asking Jev about 2 zone(s)"))).toBe(true);
-    expect(lines.some((l) => l.includes('generating names for "other" (1/1)'))).toBe(true);
+    expect(lines.some((l) => l.includes("generating names for 1 zone(s) in one call (other)"))).toBe(true);
     expect(lines.some((l) => l.includes("1 zone(s) keep their algorithmic name"))).toBe(true);
   });
 
-  it("runs every fallback and applies each verified name regardless of batch order", async () => {
+  it("proposes names for every escalated zone in one call and applies each verified name", async () => {
     const many = Array.from({ length: 5 }, (_, i) => zone(`z${i}`, [`z${i}/a.ts`]));
     mockedAskJev.mockResolvedValueOnce({
       model: "jev",
       answers: Object.fromEntries(many.map((_, i) => [`name-z${i}`, { type: "choice", choice: "none", probabilities: {}, confidence: 0.9 }])),
     });
-    mockedCallClaude.mockImplementation(async (prompt: string) => {
-      const id = /Files:\n\s+(z\d)\//.exec(prompt)?.[1] ?? "x";
-      return { text: JSON.stringify([`Name ${id}`, "B", "C"]) };
-    });
-    mockedAskJev.mockImplementation(async () => ({
+    mockedCallClaude.mockResolvedValue({ text: JSON.stringify(Object.fromEntries(many.map((z) => [z.id, [`Name ${z.id}`, "B", "C"]]))) });
+    mockedAskJev.mockImplementation(async (req) => ({
       model: "jev",
-      answers: { pick: { type: "choice", choice: "g0", probabilities: {}, confidence: 0.9 }, fits0: { type: "noul", noul: 0.9 }, fits1: { type: "noul", noul: 0.1 }, fits2: { type: "noul", noul: 0.1 } },
+      answers: Object.fromEntries(Object.keys(req.questions).map((q) =>
+        q.startsWith("pick-")
+          ? [q, { type: "choice", choice: "g0", probabilities: {}, confidence: 0.9 }]
+          : [q, { type: "noul", noul: q.endsWith("-0") ? 0.9 : 0.1 }])),
     }));
 
     const res = await nameZonesBySelection(many, { crossings: [] });
 
     expect(res.escalated).toBe(5);
-    expect(mockedCallClaude).toHaveBeenCalledTimes(5);
+    expect(mockedCallClaude).toHaveBeenCalledTimes(1);
+    expect(res.calls).toBe(2);
     expect(res.zones.map((z) => z.name)).toEqual(["Name z0", "Name z1", "Name z2", "Name z3", "Name z4"]);
+  });
+
+  it("keeps the algorithmic name for a zone the proposal answer omits", async () => {
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: {
+        "name-z0": { type: "choice", choice: "none", probabilities: {}, confidence: 0.9 },
+        "name-z1": { type: "choice", choice: "none", probabilities: {}, confidence: 0.9 },
+      },
+    });
+    mockedCallClaude.mockResolvedValue({ text: JSON.stringify({ other: ["Only", "Two", "Three"] }) });
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: { "pick-z0": { type: "choice", choice: "g0", probabilities: {}, confidence: 0.9 }, "fits-z0-0": { type: "noul", noul: 0.9 }, "fits-z0-1": { type: "noul", noul: 0.1 }, "fits-z0-2": { type: "noul", noul: 0.1 } },
+    });
+
+    const res = await nameZonesBySelection([a, c], { crossings: [] });
+
+    expect(res.zones.find((z) => z.id === "core")!.name).toBe("core");
+    expect(res.zones.find((z) => z.id === "other")!.name).toBe("Only");
+  });
+});
+
+describe("nameZonesBySelection — deferred generated names", () => {
+  it("reports fallback zones and makes no text-model call when deferGeneratedNames is set", async () => {
+    const a = zone("core", ["core/web/x.ts"]);
+    const c = zone("other", ["other/q.ts"]);
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: {
+        "name-z0": { type: "choice", choice: "none", probabilities: {}, confidence: 0.9 },
+        "name-z1": { type: "choice", choice: "n0", probabilities: {}, confidence: 0.9 },
+      },
+    });
+    const res = await nameZonesBySelection([a, c], { crossings: [], deferGeneratedNames: true });
+    expect(res.fallbackZoneIds).toEqual(["core"]);
+    expect(res.escalated).toBe(0);
+    expect(mockedCallClaude).not.toHaveBeenCalled();
+    expect(res.zones.find((z) => z.id === "core")!.name).toBe("core");
+    expect(res.zones.find((z) => z.id === "other")!.name).toBe("Other");
   });
 });

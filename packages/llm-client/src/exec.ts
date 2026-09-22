@@ -32,7 +32,7 @@
 
 import { execFile, execFileSync, spawn } from "node:child_process";
 import type { ChildProcess, StdioOptions } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, realpathSync, openSync, closeSync } from "node:fs";
 // Aliased: `resolve` is the conventional name for a Promise executor argument
 // throughout this file, and the import would be shadowed inside every one.
 import { isAbsolute, resolve as resolvePath } from "node:path";
@@ -1047,9 +1047,17 @@ export interface SpawnToolOptions {
   /**
    * When true, spawn the process detached and un-ref it so the parent
    * can exit without waiting. Implies `stdio: "ignore"` (overrides
-   * the `stdio` option). Returns immediately with `exitCode: 0`.
+   * the `stdio` option) unless `detachedLogFile` is set. Returns
+   * immediately with `exitCode: 0` and the child's `pid`.
    */
   detached?: boolean;
+  /**
+   * Detached mode only: append the child's stdout and stderr to this file
+   * instead of discarding them, so a background job (e.g. sourcevision's
+   * narrator) leaves a readable log behind. The parent opens the file and
+   * closes its own descriptor once the child holds it.
+   */
+  detachedLogFile?: string;
   /**
    * Timeout in milliseconds. When elapsed, the child is killed (SIGTERM,
    * then SIGKILL after 5 s) and the result resolves with `exitCode: null`.
@@ -1075,6 +1083,8 @@ export interface SpawnToolOptions {
 /** Result from {@link spawnTool}. */
 export interface SpawnToolResult {
   exitCode: number | null;
+  /** The child's pid; set in detached mode, where the caller may want to record it. */
+  pid?: number;
   /** Populated only when `stdio: "pipe"`. */
   stdout: string;
   /** Populated only when `stdio: "pipe"`. */
@@ -1119,18 +1129,21 @@ export function spawnTool(
 ): Promise<SpawnToolResult> {
   const { cwd, env, detached = false, timeout } = opts;
 
-  // Detached mode: fire and forget
+  // Detached mode: fire and forget, optionally leaving a log behind.
   if (detached) {
+    const logFd = opts.detachedLogFile ? openSync(opts.detachedLogFile, "a") : undefined;
     const child = spawn(cmd, args, {
       cwd,
       env,
-      stdio: "ignore",
+      stdio: logFd === undefined ? "ignore" : ["ignore", logFd, logFd],
       detached: true,
       windowsHide: opts.windowsHide ?? false,
     });
+    if (logFd !== undefined) closeSync(logFd);
     child.unref();
     return Promise.resolve({
       exitCode: 0,
+      pid: child.pid,
       stdout: "",
       stderr: "",
     });

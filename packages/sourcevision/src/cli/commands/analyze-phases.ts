@@ -68,6 +68,12 @@ export interface AnalyzeContext {
   fastMode: boolean;
   /** `--narrate`: generative prompts over every zone even when the cascade would apply. */
   narrate: boolean;
+  /** `--wait`: narrate escalated zones inline instead of in a detached child. */
+  wait: boolean;
+  /** Final zone ids the cascade left for `sv narrate`; set by the zones phase. */
+  pendingNarration?: string[];
+  /** Final zone ids whose generated names `sv narrate` still has to produce. */
+  pendingNames?: string[];
   /** Run enrichment passes up to this pass (2–4). `--full` implies 4. */
   targetPass?: number;
   tokenUsage: AnalyzeTokenUsage;
@@ -353,6 +359,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     let zonesResult = await analyzeZones(inventory, importsData, {
       enrich, previousZones, perZone, subAnalyses, fileArchetypes, onReset, hints,
       narrate: ctx.narrate,
+      deferNarration: !ctx.narrate && !ctx.wait,
       zonePins: pinCount > 0 ? zonePins : undefined,
       zoneAnchors: zoneAnchors.length > 0 ? zoneAnchors : undefined,
       smallZoneMergeThreshold,
@@ -361,6 +368,12 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     let zones = zonesResult.zones;
     if (zonesResult.tokenUsage) {
       accumulateFromAggregate(ctx.tokenUsage, zonesResult.tokenUsage);
+    }
+    if (zonesResult.pendingNarration && zonesResult.pendingNarration.length > 0) {
+      ctx.pendingNarration = zonesResult.pendingNarration;
+    }
+    if (zonesResult.pendingNames && zonesResult.pendingNames.length > 0) {
+      ctx.pendingNames = zonesResult.pendingNames;
     }
     const outPath = join(ctx.svDir, DATA_FILES.zones);
     writeFileSync(outPath, toCanonicalJSON(zones));
@@ -454,7 +467,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
   }
 }
 
-function loadFileArchetypes(svDir: string): Map<string, string | null> | undefined {
+export function loadFileArchetypes(svDir: string): Map<string, string | null> | undefined {
   const classPath = join(svDir, DATA_FILES.classifications);
   if (!existsSync(classPath)) return undefined;
   try {

@@ -24,7 +24,7 @@ const LLMClassUsageSchema = z.object({
 
 const AnalysisRunSchema = z.object({
   at: z.string(),
-  mode: z.enum(["fast", "generative", "narrate", "cascade"]),
+  mode: z.enum(["fast", "generative", "narrate", "cascade", "narration"]),
   durationMs: z.number().nonnegative(),
   phases: z.record(z.string(), z.number().nonnegative()),
   llm: z.object({
@@ -42,6 +42,16 @@ export const ManifestSchema = z.object({
   targetPath: z.string(),
   modules: z.record(z.string(), ModuleInfoSchema),
   lastAnalysis: AnalysisRunSchema.optional(),
+  narration: z.object({
+    status: z.enum(["pending", "done", "failed"]),
+    zones: z.array(z.string()),
+    names: z.array(z.string()).optional(),
+    startedAt: z.string(),
+    finishedAt: z.string().optional(),
+    pid: z.number().int().optional(),
+    log: z.string().optional(),
+    reason: z.string().optional(),
+  }).optional(),
 });
 
 // ── Inventory ───────────────────────────────────────────────────────────────

@@ -35,7 +35,7 @@ import type {
 } from "../schema/index.js";
 import type { EnrichResult } from "./enrich-parsing.js";
 import { isStructuralZone, applyStructuralTemplate } from "./enrich.js";
-import { enrichZonesPerZone } from "./enrich-per-zone.js";
+import { narrateZones } from "./enrich-multiplex.js";
 import { assessZoneFragility, fragilityFindings } from "./enrich-judge.js";
 import { nameZonesBySelection, describeZoneFromFacts, algorithmicZoneName } from "./zone-naming.js";
 import { emptyAnalyzeTokenUsage } from "./token-usage.js";
@@ -73,11 +73,24 @@ const CASCADE_PASS = 1;
  */
 const PREVIOUS_NAME_OVERLAP = 0.66;
 
+export interface CascadeOptions {
+  /**
+   * Leave the escalated zones un-narrated and report them in
+   * `deferredZoneIds`, so `analyze` can return and narrate in a detached
+   * child. Zones carried from a previous run keep their insights either way.
+   */
+  deferNarration?: boolean;
+}
+
 export interface CascadeResult extends EnrichResult {
   /** Fragility was judged here; the zones.ts hook must not ask again. */
   fragilityJudged: true;
   /** Zones the text model was asked to look at. */
   escalatedZoneIds: Set<string>;
+  /** Escalated zones left for `sv narrate` (only with `deferNarration`). */
+  deferredZoneIds: Set<string>;
+  /** Zones whose generated names were left for `sv narrate` (only with `deferNarration`). */
+  deferredNameZoneIds: Set<string>;
   /**
    * Findings produced by judgments (fragility, undecided merges). They carry
    * their own probability and are not prose, so they bypass the support and
@@ -154,6 +167,7 @@ export async function cascadeEnrichment(
   fileArchetypes?: Map<string, string | null>,
   hints?: string,
   projectProfile?: ProjectProfile,
+  options: CascadeOptions = {},
 ): Promise<CascadeResult> {
   const tokenUsage = emptyAnalyzeTokenUsage();
   const newFindings: Finding[] = [];
@@ -196,7 +210,9 @@ export async function cascadeEnrichment(
     fileArchetypes,
     crossings,
     skipGeneratedNames,
+    deferGeneratedNames: options.deferNarration === true,
   });
+  const deferredNameZoneIds = new Set(options.deferNarration ? naming.fallbackZoneIds : []);
   addUsage(tokenUsage, naming.calls, naming.tokenUsage);
   prejudgedFindings.push(...naming.findings);
   if (inherited.size > 0) {
@@ -274,36 +290,28 @@ export async function cascadeEnrichment(
       return prev ? { ...z, insights: prev.insights, structureHash: prev.structureHash, tokenUsage: prev.tokenUsage } : z;
     });
   }
-  if (toNarrate.length > 0) {
-    const prevById = new Map((previousZones?.zones ?? []).map((z) => [z.id, z]));
-    const synthetic: Zones = {
-      zones: named.map((z) => {
-        const prev = prevById.get(z.id);
-        return prev
-          ? { ...z, structureHash: prev.structureHash, insights: prev.insights, tokenUsage: prev.tokenUsage }
-          : z;
-      }),
+  const deferredZoneIds = new Set<string>();
+  if (toNarrate.length > 0 && options.deferNarration) {
+    for (const z of toNarrate) deferredZoneIds.add(z.id);
+    console.log(`  [cascade] ${toNarrate.length} zone(s) left for background narration`);
+  } else if (toNarrate.length > 0) {
+    // One call for all of them (enrich-multiplex.ts); the escalated zones are
+    // judged together and the CLI spawn floor is paid once.
+    const narrated = await narrateZones(toNarrate, {
+      allZones: [...named, ...templated],
       crossings: remapped,
-      unzoned: [],
-      enrichmentPass: 1,
-      findings: previousZones?.findings ?? [],
-    };
-    const narrated = await enrichZonesPerZone(
-      toNarrate, remapped, inventory, imports, synthetic, fileArchetypes, hints,
-    );
-    if (narrated.tokenUsage) {
-      addUsage(tokenUsage, narrated.tokenUsage.calls, {
-        input: narrated.tokenUsage.inputTokens,
-        output: narrated.tokenUsage.outputTokens,
-      });
-    }
+      fileArchetypes,
+      hints,
+      projectProfile,
+    });
+    addUsage(tokenUsage, narrated.tokenUsage.calls, narrated.tokenUsage);
     newFindings.push(...narrated.newFindings);
     for (const [id, insights] of narrated.newZoneInsights) newZoneInsights.set(id, insights);
     const narratedById = new Map(narrated.zones.map((z) => [z.id, z]));
     finalNamed = finalNamed.map((z) => {
       const n = narratedById.get(z.id);
       // Keep the cascade's name and description; take the narrated insights.
-      return n ? { ...z, insights: n.insights, structureHash: n.structureHash, tokenUsage: n.tokenUsage } : z;
+      return n ? { ...z, insights: n.insights, structureHash: n.structureHash } : z;
     });
   }
 
@@ -317,6 +325,8 @@ export async function cascadeEnrichment(
     enrichedZoneIds: new Set(finalNamed.map((z) => z.id)),
     fragilityJudged: true,
     escalatedZoneIds,
+    deferredZoneIds,
+    deferredNameZoneIds,
     prejudgedFindings,
   };
 }

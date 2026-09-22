@@ -14,18 +14,18 @@ vi.mock("../../../src/analyzers/enrich-judge.js", async () => {
   const actual = await import("../../../src/analyzers/enrich-judge.js");
   return { ...actual, assessZoneFragility: vi.fn() };
 });
-vi.mock("../../../src/analyzers/enrich-per-zone.js", () => ({
-  enrichZonesPerZone: vi.fn(),
+vi.mock("../../../src/analyzers/enrich-multiplex.js", () => ({
+  narrateZones: vi.fn(),
 }));
 
 import { nameZonesBySelection } from "../../../src/analyzers/zone-naming.js";
 import { assessZoneFragility } from "../../../src/analyzers/enrich-judge.js";
-import { enrichZonesPerZone } from "../../../src/analyzers/enrich-per-zone.js";
+import { narrateZones } from "../../../src/analyzers/enrich-multiplex.js";
 import { cascadeEnrichment, dedupeZoneNames, ESCALATION_BAND, ESCALATION_MAX_ZONES } from "../../../src/analyzers/enrich-cascade.js";
 
 const mockedNaming = vi.mocked(nameZonesBySelection);
 const mockedFragility = vi.mocked(assessZoneFragility);
-const mockedPerZone = vi.mocked(enrichZonesPerZone);
+const mockedPerZone = vi.mocked(narrateZones);
 
 function zone(id: string, files: string[]): Zone {
   return { id, name: id, description: "algo", files, entryPoints: [], cohesion: 0.5, coupling: 0.5 };
@@ -57,6 +57,7 @@ beforeEach(() => {
     merged: 0,
     escalated: 0,
     skippedFallback: 0,
+    fallbackZoneIds: [],
   }));
 });
 
@@ -90,10 +91,9 @@ describe("cascadeEnrichment", () => {
     mockedPerZone.mockResolvedValueOnce({
       zones: [{ ...ui, name: "Named ui", insights: ["hub does too much"], structureHash: "h1" }],
       newZoneInsights: new Map([["ui", ["hub does too much"]]]),
-      newGlobalInsights: [],
       newFindings: [narratedFinding],
-      pass: 2,
-      tokenUsage: { calls: 1, inputTokens: 900, outputTokens: 80 },
+      tokenUsage: { calls: 1, input: 900, output: 80 },
+      success: true,
     });
 
     const res = await cascadeEnrichment([src, ui], crossings, inventory, imports, undefined, undefined, "hint");
@@ -105,10 +105,10 @@ describe("cascadeEnrichment", () => {
     expect(res.prejudgedFindings.find((f) => f.scope === "core")).toMatchObject({ category: "structural", confidence: 0.9 });
     expect(res.newFindings.filter((f) => f.scope === "core")).toHaveLength(0);
     expect(mockedPerZone).toHaveBeenCalledTimes(1);
-    const [escalated, , , , synthetic, , hints] = mockedPerZone.mock.calls[0];
+    const [escalated, narrateOpts] = mockedPerZone.mock.calls[0];
     expect(escalated.map((z) => z.id)).toEqual(["ui"]);
-    expect(synthetic?.enrichmentPass).toBe(1); // runs as pass 2 → names preserved
-    expect(hints).toBe("hint");
+    expect(narrateOpts.hints).toBe("hint");
+    expect(narrateOpts.allZones.map((z) => z.id).sort()).toEqual(["core", "ui"]);
     expect(res.escalatedZoneIds).toEqual(new Set(["ui"]));
     // Narrated output flows through: findings, insights, but the cascade's name and description stay.
     expect(res.newFindings).toContainEqual(narratedFinding);
@@ -131,13 +131,13 @@ describe("cascadeEnrichment", () => {
     expect(res.escalatedZoneIds).toEqual(new Set(["core"]));
   });
 
-  it("narrates an escalated zone whose previous match has different files, with the previous hashes in the synthetic previous", async () => {
+  it("narrates an escalated zone whose previous match has different files", async () => {
     mockedFragility.mockResolvedValueOnce({
       probabilities: new Map([["core", { unrelated: 0.5 }]]),
       calls: 1,
     });
     mockedPerZone.mockResolvedValueOnce({
-      zones: [], newZoneInsights: new Map(), newGlobalInsights: [], newFindings: [], pass: 2,
+      zones: [], newZoneInsights: new Map(), newFindings: [], tokenUsage: { calls: 1, input: 0, output: 0 }, success: true,
     });
     // Same id, but only one of two files in common → 50% overlap: below the carry threshold.
     const previous = { zones: [{ ...src, files: ["src/a.ts", "src/z.ts"], structureHash: "prev-hash", insights: ["old"] }], crossings: [], unzoned: [], enrichmentPass: 1 };
@@ -145,8 +145,32 @@ describe("cascadeEnrichment", () => {
     await cascadeEnrichment([src], [], inventory, imports, previous);
 
     expect(mockedPerZone).toHaveBeenCalledTimes(1);
-    const synthetic = mockedPerZone.mock.calls[0][4];
-    expect(synthetic?.zones.find((z) => z.id === "core")).toMatchObject({ structureHash: "prev-hash", insights: ["old"] });
+    expect(mockedPerZone.mock.calls[0][0].map((z) => z.id)).toEqual(["core"]);
+  });
+
+  it("with deferNarration, leaves escalated zones un-narrated and reports their ids", async () => {
+    mockedFragility.mockResolvedValueOnce({
+      probabilities: new Map([["core", { unrelated: 0.5 }], ["ui", { unrelated: 0.1 }]]),
+      calls: 1,
+    });
+
+    const res = await cascadeEnrichment([src, ui], crossings, inventory, imports, undefined, undefined, undefined, undefined, { deferNarration: true });
+
+    expect(mockedPerZone).not.toHaveBeenCalled();
+    expect(res.deferredZoneIds).toEqual(new Set(["core"]));
+    expect(res.escalatedZoneIds).toEqual(new Set(["core"]));
+    expect(res.zones.find((z) => z.id === "core")!.insights).toBeUndefined();
+    // Naming was told to leave generated names for the narrator too.
+    expect(mockedNaming.mock.calls[0][1].deferGeneratedNames).toBe(true);
+  });
+
+  it("with deferNarration, reports the zones whose generated names were deferred", async () => {
+    mockedFragility.mockResolvedValueOnce({ probabilities: new Map(), calls: 0 });
+    mockedNaming.mockImplementationOnce(async (zones) => ({
+      zones, findings: [], calls: 1, renamed: 0, merged: 0, escalated: 0, skippedFallback: 0, fallbackZoneIds: ["ui"],
+    }));
+    const res = await cascadeEnrichment([src, ui], crossings, inventory, imports, undefined, undefined, undefined, undefined, { deferNarration: true });
+    expect(res.deferredNameZoneIds).toEqual(new Set(["ui"]));
   });
 });
 
@@ -203,7 +227,7 @@ describe("cascadeEnrichment — escalation cap", () => {
     // z0 highest in band … last lowest; all inside the band.
     const probs = new Map(many.map((z, i) => [z.id, { unrelated: hi - 0.001 - i * ((hi - lo) / (many.length + 1)), overdependent: 0.1 }]));
     mockedFragility.mockResolvedValueOnce({ probabilities: probs, calls: 1 });
-    mockedPerZone.mockResolvedValueOnce({ zones: [], newZoneInsights: new Map(), newGlobalInsights: [], newFindings: [], pass: 2 });
+    mockedPerZone.mockResolvedValueOnce({ zones: [], newZoneInsights: new Map(), newFindings: [], tokenUsage: { calls: 1, input: 0, output: 0 }, success: true });
 
     const res = await cascadeEnrichment(many, [], inv, imports);
 

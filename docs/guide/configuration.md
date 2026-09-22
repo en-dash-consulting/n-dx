@@ -149,6 +149,8 @@ Some sourcevision calls are judgments, not text generation, and those go to [Typ
 
 With the key present, `ndx analyze` runs the **cascade** by default: facts are computed, Jev judges them, and the text model is asked only about what a judgment left uncertain. Fragility probabilities at or above 0.7 become templated findings; a zone whose probability falls in 0.4–0.6 is **escalated** — the per-zone generative prompt runs for that zone alone (at most six zones per run, highest probability first), and its findings are then judged like any other. Zone descriptions are templated from facts. `PRIMER.md` is not regenerated in this mode (a cached one is still served).
 
+Generation is one call per kind and off the critical path: the zones that need generated names go to the text model in one prompt, the escalated zones are narrated in one prompt, and `analyze` returns as soon as the judged results are on disk — narration continues in a detached `sv narrate` child (log at `.sourcevision/.cache/narration.log`; `manifest.narration` is `pending` until its insights and findings are merged into `zones.json`, then `done` or `failed` with a reason). Pass `--wait` to narrate before returning (CI), or run `sv narrate .` by hand to retry.
+
 A re-run with no changes is cache hits and no text-model calls: judged state carries no zone names, a zone whose generated-name fallback already failed on the same files is not asked again, and an escalated zone narrated on the same files last time keeps its insights.
 
 Two more judgments run over the heuristics on every keyed run, whichever mode: each warning-level pass 0 finding is asked whether it is a real problem or a detection artifact (≤ 0.3 demotes it to `info`, in between records its confidence), and the files with the most cross-zone imports are asked which zone they belong in — a confident answer for another zone becomes a `move-file` finding with `moveReason: "zone-judgment"`.
@@ -157,7 +159,8 @@ Two more judgments run over the heuristics on every keyed run, whichever mode: e
 
 ```sh
 export TYPESAFE_API_KEY=...
-ndx analyze .              # cascade: judgments first, generation only on escalation
+ndx analyze .              # cascade: judgments first, narration in the background
+ndx analyze --wait .       # cascade, narration before returning
 ndx analyze --narrate .    # the full generative pass over every zone, as before the key
 ndx analyze --fast .       # no LLM at all
 

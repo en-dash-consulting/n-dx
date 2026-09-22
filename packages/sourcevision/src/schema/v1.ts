@@ -38,7 +38,7 @@ export interface AnalysisRun {
    * forced by `--narrate`. `cascade`: deterministic facts plus Jev judgments,
    * generation only where a judgment was uncertain.
    */
-  mode: "fast" | "generative" | "narrate" | "cascade";
+  mode: "fast" | "generative" | "narrate" | "cascade" | "narration";
   durationMs: number;
   /** Phase name → wall-clock ms. */
   phases: Record<string, number>;
@@ -46,6 +46,22 @@ export interface AnalysisRun {
     byTaskClass: Record<string, LLMClassUsage>;
     judgmentCache?: { hits: number; misses: number };
   };
+}
+
+/** See `Manifest.narration`. */
+export interface NarrationState {
+  status: "pending" | "done" | "failed";
+  /** Zone ids awaiting (or given) narration. */
+  zones: string[];
+  /** Zone ids whose generated names are still to be produced. */
+  names?: string[];
+  startedAt: string;
+  finishedAt?: string;
+  /** Detached narrator's pid while pending. */
+  pid?: number;
+  /** Path of the narrator's log, relative to the project root. */
+  log?: string;
+  reason?: string;
 }
 
 export interface Manifest {
@@ -60,6 +76,13 @@ export interface Manifest {
   tokenUsage?: AnalyzeTokenUsage;
   /** Per-phase and per-task-class cost of the most recent analyze run. */
   lastAnalysis?: AnalysisRun;
+  /**
+   * Narration the cascade deferred past the end of `analyze`: the escalated
+   * zones the text model still has to describe. `pending` while the detached
+   * `sv narrate` child runs (its log is at `log`); `done` once insights and
+   * findings were merged into zones.json; `failed` with `reason` otherwise.
+   */
+  narration?: NarrationState;
   /** Whether per-zone output files were emitted to zones/ directory. */
   zoneOutputs?: boolean;
   /** Incorporated sub-analyses (nested .sourcevision/ directories). */

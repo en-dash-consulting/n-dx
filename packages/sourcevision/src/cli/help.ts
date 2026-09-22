@@ -56,6 +56,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--only=<module>", description: "Run only a named module: inventory, imports, zones, components" },
       { flag: "--fast", description: "Skip AI zone-name enrichment (algorithmic names only)" },
       { flag: "--narrate", description: "Generative prompts over every zone, even when TYPESAFE_API_KEY selects the judgment cascade" },
+      { flag: "--wait", description: "Narrate escalated zones before returning instead of in a background child (cascade mode)" },
       { flag: "--full", description: "Run all 4 enrichment passes in sequence" },
       { flag: "--target-pass=<N>", description: "Run enrichment passes up to pass N (2–4)" },
       { flag: "--deep", description: "Re-analyze sub-packages before root analysis" },
@@ -69,6 +70,22 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "sv analyze --only=zones .", description: "Re-run zone detection only" },
     ],
     related: ["validate", "serve"],
+  },
+  narrate: {
+    tool: "sourcevision",
+    command: "narrate",
+    usage: "sourcevision narrate [dir]",
+    summary: "Narrate the zones a cascade analysis left pending",
+    description:
+      "With TYPESAFE_API_KEY set, `analyze` returns as soon as its judged results\n" +
+      "are on disk and narrates the escalated zones in a detached child running\n" +
+      "this command. Run it by hand to retry a failed or interrupted narration;\n" +
+      "the pending zone ids are read from manifest.narration.",
+    options: [],
+    examples: [
+      { command: "sourcevision narrate .", description: "Narrate the zones listed in manifest.narration" },
+    ],
+    related: ["analyze"],
   },
   serve: {
     tool: "sourcevision",
@@ -288,6 +305,7 @@ export function usage(): void {
         items: [
           { name: "sourcevision init [dir]", description: "Set up .sourcevision/ in the current project" },
           { name: "sourcevision analyze [dir]", description: "Run analysis pipeline (default: .)" },
+          { name: "sourcevision narrate [dir]", description: "Narrate zones a cascade analysis left pending" },
           { name: "sourcevision serve [dir]", description: "Start local viewer (default: .)" },
           { name: "sourcevision validate [dir]", description: "Validate .sourcevision/ output files" },
           { name: "sourcevision export-pdf [dir]", description: "Export analysis as a PDF report" },
