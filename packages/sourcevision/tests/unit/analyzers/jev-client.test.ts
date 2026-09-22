@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { askJev, choice, JEV_ENDPOINT, JEV_MODEL } from "../../../src/analyzers/jev-client.js";
+import { askJev, choice, noul, score, JEV_ENDPOINT, JEV_MODEL } from "../../../src/analyzers/jev-client.js";
 import { ClaudeClientError } from "@n-dx/llm-client";
 
 const env = { TYPESAFE_API_KEY: "tsk_test" } as NodeJS.ProcessEnv;
@@ -107,5 +107,51 @@ describe("askJev — error mapping", () => {
     expect(err.reason).toBe("unknown");
     expect(err.retryable).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("askJev — noul and score answers", () => {
+  const mixed = {
+    state: { finding: { text: "Zone A imports Zone B's internals" } },
+    questions: {
+      sev: score("How severe is `finding`?", ["no action", "costs time later", "fix now"]),
+      frag: noul("Does `finding` describe a boundary violation?"),
+    },
+  };
+
+  it("parses a score with an array distribution and a noul probability", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(200, {
+      model: "jev-1.13.0",
+      answers: {
+        sev: { type: "score", score: 1.2, probabilities: [0.1, 0.6, 0.3], confidence: 0.55, legend: { 0: "no action", 1: "costs time later", 2: "fix now" } },
+        frag: { type: "noul", noul: 0.87 },
+      },
+    }));
+    const res = await askJev(mixed, { fetchImpl, env, sleep: noSleep });
+    expect(res.answers.sev).toEqual({ type: "score", score: 1.2, probabilities: [0.1, 0.6, 0.3], confidence: 0.55 });
+    expect(res.answers.frag).toEqual({ type: "noul", noul: 0.87 });
+  });
+
+  it("accepts a score distribution keyed by level index", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(200, {
+      model: "jev",
+      answers: {
+        sev: { type: "score", score: 0.4, probabilities: { "1": 0.3, "0": 0.6, "2": 0.1 }, confidence: 0.5 },
+        frag: { type: "noul", noul: 0.1 },
+      },
+    }));
+    const res = await askJev(mixed, { fetchImpl, env, sleep: noSleep });
+    expect((res.answers.sev as { probabilities: number[] }).probabilities).toEqual([0.6, 0.3, 0.1]);
+  });
+
+  it("rejects an answer whose type does not match its question", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(200, {
+      model: "jev",
+      answers: { sev: { type: "noul", noul: 0.5 }, frag: { type: "noul", noul: 0.5 } },
+    }));
+    await expect(askJev(mixed, { fetchImpl, env, sleep: noSleep })).rejects.toMatchObject({
+      reason: "unknown",
+      message: expect.stringContaining('score answer for question "sev"'),
+    });
   });
 });

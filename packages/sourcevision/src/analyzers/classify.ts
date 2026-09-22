@@ -598,6 +598,7 @@ async function classifyBatchWithJev(
   const results: FileClassification[] = [];
   for (const [id, file] of ids) {
     const answer = response.answers[id];
+    if (answer.type !== "choice") continue;
     const p = answer.probabilities[answer.choice] ?? 0;
     if (answer.choice === JEV_NONE || !validIds.has(answer.choice) || p < JEV_MIN_PROBABILITY) continue;
     const confidence = Math.round(p * 100) / 100;

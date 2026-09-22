@@ -21,7 +21,7 @@ import {
   buildMetaPrompt,
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
-import { callClaude, ClaudeClientError } from "./claude-client.js";
+import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import {tryParseJSON, extractFindings, formatFileLabel} from "./enrich-parsing.js";import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
@@ -33,7 +33,10 @@ import {
   JSON_OBJECT_ONLY,
   ONLY_NEW_INSIGHTS,
   findingsContract,
+  stripJudgedFields,
+  outputLines,
 } from "./prompt-envelope.js";
+import { judgeFindings } from "./enrich-judge.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,7 +75,8 @@ export async function runMetaEvaluation(
   const metaSpinner = startSpinner(
     `  [enrich] Meta-evaluation pass (reviewing ${existingFindings.length} existing findings)...`,
   );
-  const metaPrompt = buildMetaPrompt(zones, existingFindings, crossings, hints);
+  const judged = getJudgmentRoute("finding.judge") === "typesafe";
+  const metaPrompt = buildMetaPrompt(zones, existingFindings, crossings, hints, judged);
   const metaTokenUsage = emptyAnalyzeTokenUsage();
 
   let metaText: string;
@@ -101,9 +105,19 @@ export async function runMetaEvaluation(
     return null;
   }
 
-  // Apply severity updates to existing findings
-  const updatedFindings = [...existingFindings];
-  if (Array.isArray(parsed.severityUpdates)) {
+  // Re-rate existing findings. With the judgment route active Jev grades
+  // every pass ≥ 1 finding directly (pass 0 severities are code-calibrated and
+  // left alone); otherwise the text model's severityUpdates are applied.
+  let updatedFindings = [...existingFindings];
+  if (judged) {
+    const rerated = await judgeFindings(existingFindings);
+    updatedFindings = rerated.findings;
+    if (rerated.calls > 0) {
+      metaTokenUsage.calls += rerated.calls;
+      metaTokenUsage.inputTokens += rerated.tokenUsage?.input ?? 0;
+      metaTokenUsage.outputTokens += rerated.tokenUsage?.output ?? 0;
+    }
+  } else if (Array.isArray(parsed.severityUpdates)) {
     const validSeverities = ["info", "warning", "critical"];
     for (const update of parsed.severityUpdates) {
       if (
@@ -198,6 +212,9 @@ export async function enrichBatch(
 
   const batchLabel = totalBatches > 1 ? ` batch ${batchIndex + 1}/${totalBatches}` : "";
   const batchTokenUsage = emptyAnalyzeTokenUsage();
+  // Severity and category are graded by Jev after parsing when this route is
+  // active (enrich-judge.ts), so the prompt should not ask the text model for them.
+  const judged = getJudgmentRoute("finding.judge") === "typesafe";
 
   for (let attempt = 0; attempt < ATTEMPT_CONFIGS.length; attempt++) {
     const config = ATTEMPT_CONFIGS[attempt];
@@ -208,8 +225,8 @@ export async function enrichBatch(
       .join("\n");
 
     const envelope = isFirstPass
-      ? buildFirstPassEnvelope(batchZones, config, otherContext, priorNames, crossingLines, globalPromptNote, passConfig, fileArchetypes, hints, projectProfile)
-      : buildLaterPassEnvelope(batchZones, config, otherContext, crossingLines, passNumber, passConfig, previousZones, globalPromptNote, fileArchetypes, hints, projectProfile);
+      ? buildFirstPassEnvelope(batchZones, config, otherContext, priorNames, crossingLines, globalPromptNote, passConfig, fileArchetypes, hints, projectProfile, judged)
+      : buildLaterPassEnvelope(batchZones, config, otherContext, crossingLines, passNumber, passConfig, previousZones, globalPromptNote, fileArchetypes, hints, projectProfile, judged);
     const prompt = svPrompt(envelope);
 
     const promptLevel = config.maxFiles >= 8 ? "full" : config.maxFiles > 0 ? "compact" : "minimal";
@@ -530,6 +547,8 @@ export function buildFirstPassEnvelope(
   fileArchetypes?: Map<string, string | null>,
   hints?: string,
   projectProfile?: ProjectProfile,
+  /** True when Jev grades severity/category (enrich-judge.ts), so the prompt stops asking for them. */
+  judged = false,
 ): PromptEnvelope {
   const projectShape = projectProfile ? formatProjectShape(projectProfile) : "";
   if (config.maxFiles > 0) {
@@ -572,14 +591,14 @@ export function buildFirstPassEnvelope(
       section("global-note", globalPromptNote),
       section(
         "output",
-        [
-          findingsContract(true),
+        outputLines([
+          findingsContract(true, judged),
           "",
           JSON_OBJECT_ONLY,
-          '{"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":["actionable insight"],"findings":[{"type":"observation","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["cross-zone observation"],"findings":[{"type":"observation","scope":"global","text":"finding text","severity":"info","category":"code"}]}',
+          stripJudgedFields('{"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":["actionable insight"],"findings":[{"type":"observation","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["cross-zone observation"],"findings":[{"type":"observation","scope":"global","text":"finding text","severity":"info","category":"code"}]}', judged),
           "",
           `Return exactly ${batchZones.length} zone entries. Use finding types: ${passConfig.expectedTypes.join(", ")}.`,
-        ].join("\n"),
+        ]),
       ),
     ]);
   }
@@ -632,6 +651,8 @@ export function buildLaterPassEnvelope(
   fileArchetypes?: Map<string, string | null>,
   hints?: string,
   projectProfile?: ProjectProfile,
+  /** See {@link buildFirstPassEnvelope}. */
+  judged = false,
 ): PromptEnvelope {
   const projectShape = projectProfile ? formatProjectShape(projectProfile) : "";
   const prevZones = previousZones?.zones ?? [];
@@ -669,16 +690,16 @@ export function buildLaterPassEnvelope(
       section("global-note", globalPromptNote),
       section(
         "output",
-        [
+        outputLines([
           ONLY_NEW_INSIGHTS,
           "",
-          findingsContract(true),
+          findingsContract(true, judged),
           "",
           JSON_OBJECT_ONLY,
-          `{"zones":[{"id":"existing-zone-id","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["new cross-zone observation"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"global","text":"finding text","severity":"info","category":"code"}]}`,
+          stripJudgedFields(`{"zones":[{"id":"existing-zone-id","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["new cross-zone observation"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"global","text":"finding text","severity":"info","category":"code"}]}`, judged),
           "",
           `Return one entry per zone. Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine if nothing new to add.`,
-        ].join("\n"),
+        ]),
       ),
     ]);
   }

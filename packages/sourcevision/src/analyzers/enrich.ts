@@ -420,5 +420,6 @@ function applyEnrichResults(
     newFindings,
     pass: passNumber,
     tokenUsage: totalTokenUsage,
+    enrichedZoneIds: new Set(enriched.map((z) => z.id)),
   };
 }

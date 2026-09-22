@@ -600,7 +600,11 @@ export const TYPESAFE_API_KEY_ENV = "TYPESAFE_API_KEY";
  * judgment-shaped implementation — an enum-constrained answer per item with
  * no free text to parse — not merely that the class is cheap.
  */
-export const DEFAULT_JUDGMENT_ROUTES: ReadonlySet<string> = new Set(["code.classify"]);
+export const DEFAULT_JUDGMENT_ROUTES: ReadonlySet<string> = new Set([
+  "code.classify",
+  "finding.judge",
+  "zone.judge",
+]);
 
 /**
  * Decide whether a task class should be answered by a judgment model.

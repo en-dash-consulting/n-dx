@@ -137,7 +137,13 @@ ndx config rex.model gpt-5.6-terra .
 
 ## TypeSafe Jev for Judgment Calls
 
-Some sourcevision calls are judgments, not text generation — file archetype classification picks one id from a fixed catalog. Those can go to [TypeSafe's Jev](https://docs.typesafe.ai), which answers a typed Choice with a probability per option, so the classification's confidence is the model's own probability rather than a fixed value and there is no free-text JSON to parse.
+Some sourcevision calls are judgments, not text generation, and those can go to [TypeSafe's Jev](https://docs.typesafe.ai), which answers typed questions with a probability per option instead of free-text JSON:
+
+| Task class | Judgment | What changes |
+|---|---|---|
+| `code.classify` | Choice over the archetype catalog | A file's classification confidence is Jev's probability for that archetype, not a fixed 0.7; a `none` or sub-threshold answer leaves it unclassified |
+| `finding.judge` | Score for severity, Choice for category | Enrichment prompts stop asking the text model for `severity`/`category`; Jev grades each pass ≥ 1 finding and its confidence lands in `Finding.confidence`. The meta pass re-rates existing findings the same way instead of returning `severityUpdates` |
+| `zone.judge` | Two Nouls per enriched zone | Zones whose files serve unrelated purposes, or that depend on more of the codebase than their size warrants, get a structural observation carrying the probability |
 
 ```sh
 # Opt in: the key's presence is the switch
@@ -145,10 +151,10 @@ export TYPESAFE_API_KEY=...
 
 # Send a class back to the vendor tier, or name the route explicitly
 ndx config llm.routes.code.classify light .
-ndx config llm.routes.code.classify typesafe .
+ndx config llm.routes.finding.judge typesafe .
 ```
 
-Zone names, descriptions, insights and `CONTEXT.md` stay on `llm.vendor` — Jev does not generate text. Without the key every class uses the vendor tier from `llm.routes`/the built-in registry, and a class explicitly routed to `typesafe` prints one notice naming the fallback.
+Zone names, descriptions, insights and `CONTEXT.md` stay on `llm.vendor` — Jev does not generate text. Without the key every class uses the vendor tier from `llm.routes`/the built-in registry, prompts are unchanged, and a class explicitly routed to `typesafe` prints one notice naming the fallback. Thresholds (0.4 classification probability, 0.5 finding confidence, 0.7 fragility probability) live in code, not config. `enforceSeverityRules` still runs last and pass 0 heuristic findings are never re-graded.
 
 ## Hench Configuration
 

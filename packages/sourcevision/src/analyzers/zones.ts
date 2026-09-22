@@ -57,6 +57,8 @@ import {
 } from "./louvain.js";
 import type { MergeLogEntry } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
+import { judgeFindings, judgeZoneFragility } from "./enrich-judge.js";
+import { emptyAnalyzeTokenUsage } from "./token-usage.js";
 import { deduplicateFindings, enforceSeverityRules } from "./enrich-parsing.js";
 import { detectPinDivergence, detectImportNeighborMoves } from "./move-recommendations.js";
 import type { MoveContext } from "./move-recommendations.js";
@@ -1915,6 +1917,7 @@ async function applyEnrichment(
   let enrichmentPass = 0;
   let metaUpdatedFindings: Finding[] | null = null;
   let enrichTokenUsage: AnalyzeTokenUsage | undefined;
+  let enrichedZoneIds: Set<string> | undefined;
 
   if (enrich) {
     // Build pre-enrichment crossings for prompt context
@@ -1946,6 +1949,7 @@ async function applyEnrichment(
       aiFindings = result.newFindings;
       enrichmentPass = result.pass;
       enrichTokenUsage = result.tokenUsage;
+      enrichedZoneIds = result.enrichedZoneIds;
     } else {
       const result = await enrichZonesWithAI(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes,
@@ -1957,9 +1961,33 @@ async function applyEnrichment(
       aiFindings = result.newFindings;
       enrichmentPass = result.pass;
       enrichTokenUsage = result.tokenUsage;
+      enrichedZoneIds = result.enrichedZoneIds;
       if (result._updatedFindings) {
         metaUpdatedFindings = result._updatedFindings;
       }
+    }
+
+    // Judgment step (enrich-judge.ts). Runs after extraction and before
+    // assembleFindings' enforceSeverityRules, for every enrichment mode at
+    // once. Inert without a judgment route: both calls return their input.
+    // Fragility is asked only of zones the LLM saw this pass, over crossings
+    // rebuilt against the post-rename zone ids.
+    const judged = await judgeFindings(aiFindings);
+    const fragilityZones = enrichedZoneIds
+      ? finalZones.filter((z) => enrichedZoneIds!.has(z.id))
+      : [];
+    const fragility = await judgeZoneFragility(
+      fragilityZones,
+      fragilityZones.length > 0 ? buildCrossings(finalZones, imports, []) : [],
+      enrichmentPass,
+    );
+    aiFindings = [...judged.findings, ...fragility.findings];
+    for (const r of [judged, fragility]) {
+      if (r.calls === 0) continue;
+      enrichTokenUsage ??= emptyAnalyzeTokenUsage();
+      enrichTokenUsage.calls += r.calls;
+      enrichTokenUsage.inputTokens += r.tokenUsage?.input ?? 0;
+      enrichTokenUsage.outputTokens += r.tokenUsage?.output ?? 0;
     }
   } else if (validPrevious) {
     // --fast with unchanged structure: apply previous AI names, preserve insights

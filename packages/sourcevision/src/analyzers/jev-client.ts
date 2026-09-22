@@ -54,8 +54,29 @@ export interface ChoiceQuestion {
   criteria: Record<string, JsonValue>;
 }
 
-/** The question types this client sends. Noul and Score follow with the finding judgments. */
-export type JevQuestion = ChoiceQuestion;
+/**
+ * A Noul: does a condition hold? Answered as the probability of yes. Optional
+ * `criteria` sharpens the boundary when yes/no is subtle.
+ */
+export interface NoulQuestion {
+  type: "noul";
+  instructions: string;
+  criteria?: Record<string, JsonValue>;
+}
+
+/**
+ * A Score: where on an ordered scale does the content sit? `criteria` is 2–10
+ * level descriptions, lowest first; each must describe a concrete situation
+ * that stands on its own, because the model rates every level independently.
+ */
+export interface ScoreQuestion {
+  type: "score";
+  instructions: string;
+  criteria: JsonValue[];
+}
+
+/** The question types this client sends. */
+export type JevQuestion = ChoiceQuestion | NoulQuestion | ScoreQuestion;
 
 /** Build a Choice question. */
 export function choice(
@@ -63,6 +84,19 @@ export function choice(
   criteria: Record<string, JsonValue>,
 ): ChoiceQuestion {
   return { type: "choice", instructions, criteria };
+}
+
+/** Build a Noul question. */
+export function noul(
+  instructions: string,
+  criteria?: Record<string, JsonValue>,
+): NoulQuestion {
+  return { type: "noul", instructions, ...(criteria ? { criteria } : {}) };
+}
+
+/** Build a Score question over ordered levels, lowest first. */
+export function score(instructions: string, levels: JsonValue[]): ScoreQuestion {
+  return { type: "score", instructions, criteria: levels };
 }
 
 // ── Answers ──────────────────────────────────────────────────────────────────
@@ -77,7 +111,23 @@ export interface ChoiceAnswer {
   confidence: number;
 }
 
-export type JevAnswer = ChoiceAnswer;
+export interface NoulAnswer {
+  type: "noul";
+  /** Probability that the answer is yes. Near 0.5 means undecided, not "medium". */
+  noul: number;
+}
+
+export interface ScoreAnswer {
+  type: "score";
+  /** Probability-weighted mean of the level indexes; fractional. */
+  score: number;
+  /** Distribution across the levels, in level order. */
+  probabilities: number[];
+  /** 0–1, from the spread of the distribution. */
+  confidence: number;
+}
+
+export type JevAnswer = ChoiceAnswer | NoulAnswer | ScoreAnswer;
 
 export interface JevRequest {
   /** What the questions are about. Prefer named fields; reference them in instructions as `path.to.field`. */
@@ -163,7 +213,7 @@ export async function askJev(
     }
 
     if (res.ok) {
-      return parseResponse(await res.json(), Object.keys(request.questions));
+      return parseResponse(await res.json(), request.questions);
     }
 
     const detail = await safeText(res);
@@ -194,24 +244,19 @@ export async function askJev(
 
 // ── Parsing ──────────────────────────────────────────────────────────────────
 
-function parseResponse(raw: unknown, questionIds: string[]): JevResponse {
+function parseResponse(raw: unknown, questions: Record<string, JevQuestion>): JevResponse {
   const obj = asRecord(raw);
   const answersRaw = obj ? asRecord(obj.answers) : undefined;
   if (!obj || !answersRaw) {
     throw new ClaudeClientError("TypeSafe response has no answers object", "unknown", false);
   }
   const answers: Record<string, JevAnswer> = {};
-  for (const id of questionIds) {
-    const a = asRecord(answersRaw[id]);
-    if (!a || a.type !== "choice" || typeof a.choice !== "string" || !asRecord(a.probabilities)) {
-      throw new ClaudeClientError(`TypeSafe response is missing a choice answer for question "${id}"`, "unknown", false);
+  for (const [id, question] of Object.entries(questions)) {
+    const answer = parseAnswer(asRecord(answersRaw[id]), question.type);
+    if (!answer) {
+      throw new ClaudeClientError(`TypeSafe response is missing a ${question.type} answer for question "${id}"`, "unknown", false);
     }
-    answers[id] = {
-      type: "choice",
-      choice: a.choice,
-      probabilities: a.probabilities as Record<string, number>,
-      confidence: typeof a.confidence === "number" ? a.confidence : 0,
-    };
+    answers[id] = answer;
   }
   const usage = asRecord(obj.usage);
   const tokenUsage: TokenUsage | undefined = usage
@@ -225,6 +270,34 @@ function parseResponse(raw: unknown, questionIds: string[]): JevResponse {
     answers,
     ...(tokenUsage ? { tokenUsage } : {}),
   };
+}
+
+/** Validate one answer against the type its question asked for. */
+function parseAnswer(a: Record<string, unknown> | undefined, expected: JevQuestion["type"]): JevAnswer | undefined {
+  if (!a || a.type !== expected) return undefined;
+  const confidence = typeof a.confidence === "number" ? a.confidence : 0;
+  switch (expected) {
+    case "choice":
+      if (typeof a.choice !== "string" || !asRecord(a.probabilities)) return undefined;
+      return { type: "choice", choice: a.choice, probabilities: a.probabilities as Record<string, number>, confidence };
+    case "noul":
+      if (typeof a.noul !== "number") return undefined;
+      return { type: "noul", noul: a.noul };
+    case "score": {
+      if (typeof a.score !== "number") return undefined;
+      // The API documents the distribution "across all levels"; accept either
+      // an array in level order or an object keyed by level index.
+      const raw = a.probabilities;
+      const probabilities = Array.isArray(raw)
+        ? raw.map((p) => (typeof p === "number" ? p : 0))
+        : asRecord(raw)
+          ? Object.entries(raw as Record<string, unknown>)
+              .sort(([x], [y]) => Number(x) - Number(y))
+              .map(([, p]) => (typeof p === "number" ? p : 0))
+          : [];
+      return { type: "score", score: a.score, probabilities, confidence };
+    }
+  }
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

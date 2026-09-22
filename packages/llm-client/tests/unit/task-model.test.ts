@@ -209,7 +209,10 @@ describe("resolveJudgmentRoute", () => {
 
   it("routes a default judgment class to typesafe when the key is present", () => {
     expect(resolveJudgmentRoute("code.classify", {}, withKey)).toBe("typesafe");
-    expect(DEFAULT_JUDGMENT_ROUTES.has("code.classify")).toBe(true);
+    for (const cls of ["code.classify", "finding.judge", "zone.judge"]) {
+      expect(DEFAULT_JUDGMENT_ROUTES.has(cls), cls).toBe(true);
+      expect(resolveJudgmentRoute(cls, {}, withKey), cls).toBe("typesafe");
+    }
   });
 
   it("returns undefined for every class when the key is absent or blank", () => {
@@ -225,9 +228,9 @@ describe("resolveJudgmentRoute", () => {
   });
 
   it("lets llm.routes name typesafe explicitly for a class outside the default set", () => {
-    const config: LLMConfig = { routes: { "finding.judge": "typesafe" } };
-    expect(resolveJudgmentRoute("finding.judge", config, withKey)).toBe("typesafe");
-    expect(resolveJudgmentRoute("finding.judge", {}, withKey)).toBeUndefined();
+    const config: LLMConfig = { routes: { "prd.assess": "typesafe" } };
+    expect(resolveJudgmentRoute("prd.assess", config, withKey)).toBe("typesafe");
+    expect(resolveJudgmentRoute("prd.assess", {}, withKey)).toBeUndefined();
   });
 
   it("applies the same exact-then-longest-glob matching as resolveTaskModel", () => {

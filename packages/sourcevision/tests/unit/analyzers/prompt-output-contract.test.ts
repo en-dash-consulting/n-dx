@@ -44,8 +44,8 @@ import {
   buildSingleZoneFirstPassEnvelope,
   buildSingleZoneLaterPassEnvelope,
 } from "../../../src/analyzers/enrich-per-zone.js";
-import { getPassConfig } from "../../../src/analyzers/enrich-config.js";
-import type { Zone, Zones } from "../../../src/schema/index.js";
+import { getPassConfig, buildMetaPrompt } from "../../../src/analyzers/enrich-config.js";
+import type { Finding, Zone, Zones } from "../../../src/schema/index.js";
 
 function zone(id: string, files: string[]): Zone {
   return {
@@ -138,5 +138,77 @@ describe("the severity contract differs by pass only where intended", () => {
 
   it("the two forms differ only by the category clause", () => {
     expect(findingsContract(true)).toContain(findingsContract(false).replace(/\.$/, ""));
+  });
+});
+
+/**
+ * When Jev grades severity and category (enrich-judge.ts), every builder stops
+ * asking the text model for them: the contract line goes, the example loses
+ * the two keys, and the meta prompt drops its severityUpdates channel and the
+ * re-rating task. The inactive path is pinned byte-for-byte by
+ * prompt-text-identity.test.ts, so only the judged form is asserted here.
+ */
+function outputOf(envelope: { sections: ReadonlyArray<{ name: string; content: string }> }): string {
+  return envelope.sections.find((x) => x.name === "output")!.content;
+}
+
+/** The batch prompts' output sections, in the plain or judged form. */
+function batchOutputs(judged: boolean): string[] {
+  return [
+    buildFirstPassEnvelope(ZONES, ATTEMPT, "", "", "", "", getPassConfig(1, 0), undefined, undefined, undefined, judged),
+    buildLaterPassEnvelope(ZONES, ATTEMPT, "", "", 2, getPassConfig(2, 0), PREVIOUS, "", undefined, undefined, undefined, judged),
+  ].map(outputOf);
+}
+
+/** The per-zone prompts' output sections, in the plain or judged form. */
+function perZoneOutputs(judged: boolean): string[] {
+  return [
+    buildSingleZoneFirstPassEnvelope(singleZoneCtx({ judged })),
+    buildSingleZoneLaterPassEnvelope(singleZoneCtx({ passNumber: 2, previousZone: ZONES[0], judged })),
+  ].map(outputOf);
+}
+
+const metaZones = ZONES;
+const metaFindings: Finding[] = [
+  { type: "observation", pass: 1, scope: "api", text: "Routes call billing directly.", severity: "info" },
+];
+
+describe("the judged form of every enrichment prompt", () => {
+  const judgedSections = () => [
+    ...batchOutputs(true),
+    ...perZoneOutputs(true),
+  ];
+
+  it("omits the severity/category contract and the example keys", () => {
+    for (const text of judgedSections()) {
+      expect(text).not.toContain("Findings: severity");
+      expect(text).not.toContain('"severity":');
+      expect(text).not.toContain('"category":');
+      expect(text).toContain(JSON_OBJECT_ONLY);
+      expect(text).not.toMatch(/\n\n\n/);
+      expect(text.startsWith("\n")).toBe(false);
+    }
+  });
+
+  it("keeps the inactive form when judged is false", () => {
+    for (const text of [...batchOutputs(false), ...perZoneOutputs(false)]) {
+      expect(text).toContain("Findings: severity");
+      expect(text).toContain('"severity":"info"');
+    }
+  });
+
+  it("meta prompt drops severityUpdates and the re-rating task when judged", () => {
+    const judged = buildMetaPrompt(metaZones, metaFindings, [], undefined, true);
+    const plain = buildMetaPrompt(metaZones, metaFindings, [], undefined, false);
+    expect(plain).toContain('"severityUpdates"');
+    expect(plain).toContain("1. Reassess severities");
+    expect(plain).toContain("Findings: severity");
+    expect(judged).not.toContain('"severityUpdates"');
+    expect(judged).not.toContain("Reassess severities");
+    expect(judged).not.toContain("Findings: severity");
+    expect(judged).not.toContain('"severity":');
+    expect(judged).toContain("1. Find meta-patterns");
+    expect(judged).toContain("3. Flag contradictory findings.");
+    expect(judged).toContain("Preserve exact metric values");
   });
 });

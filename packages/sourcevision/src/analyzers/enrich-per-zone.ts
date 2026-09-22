@@ -26,7 +26,7 @@ import {
   computePerZoneAttemptConfigs,
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
-import { callClaude, ClaudeClientError } from "./claude-client.js";
+import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { tryParseJSON, extractFindings, deduplicateZoneIds, formatFileLabel, extractZoneInsights, findPrevZone } from "./enrich-parsing.js";
 import {emptyAnalyzeTokenUsage} from "./token-usage.js";import { startSpinner } from "../cli/output.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
@@ -38,6 +38,8 @@ import {
   JSON_OBJECT_ONLY,
   ONLY_NEW_INSIGHTS,
   findingsContract,
+  stripJudgedFields,
+  outputLines,
 } from "./prompt-envelope.js";
 
 // ── Per-zone structure hash ──────────────────────────────────────────────────
@@ -80,6 +82,8 @@ interface SingleZonePromptContext {
   passNumber?: number;
   /** What the previous pass concluded about this zone (later-pass only). */
   previousZone?: Zone;
+  /** True when Jev grades severity (enrich-judge.ts); the prompt then stops asking for it. */
+  judged?: boolean;
 }
 
 /**
@@ -115,14 +119,14 @@ export function buildSingleZoneFirstPassEnvelope(
     section("crossings", `Boundary crossings:\n${ctx.crossingLines || "  (none)"}`),
     section(
       "output",
-      [
-        findingsContract(false),
+      outputLines([
+        findingsContract(false, ctx.judged),
         "",
         JSON_OBJECT_ONLY,
-        `{"id":"kebab-case-id","name":"Title Case Name","description":"One sentence describing the zone's purpose.","insights":["actionable insight about this zone"],"findings":[{"type":"observation","scope":"${zone.id}","text":"finding text","severity":"info"}]}`,
+        stripJudgedFields(`{"id":"kebab-case-id","name":"Title Case Name","description":"One sentence describing the zone's purpose.","insights":["actionable insight about this zone"],"findings":[{"type":"observation","scope":"${zone.id}","text":"finding text","severity":"info"}]}`, ctx.judged === true),
         "",
         `Use finding types: ${passConfig.expectedTypes.join(", ")}.`,
-      ].join("\n"),
+      ]),
     ),
   ]);
 }
@@ -157,18 +161,18 @@ export function buildSingleZoneLaterPassEnvelope(
     ),
     section(
       "output",
-      [
+      outputLines([
         ONLY_NEW_INSIGHTS,
         "",
-        findingsContract(false),
+        findingsContract(false, ctx.judged),
         "",
         // Was "Respond with ONLY a JSON object:" — the one builder of four that
         // dropped the parenthetical, so this path alone did not forbid markdown.
         JSON_OBJECT_ONLY,
-        `{"id":"${zone.id}","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"${zone.id}","text":"finding text","severity":"info"}]}`,
+        stripJudgedFields(`{"id":"${zone.id}","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"${zone.id}","text":"finding text","severity":"info"}]}`, ctx.judged === true),
         "",
         `Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine if nothing new to add.`,
-      ].join("\n"),
+      ]),
     ),
   ]);
 }
@@ -184,6 +188,8 @@ async function enrichSingleZone(
   fileArchetypes?: Map<string, string | null>,
   hints?: string,
 ): Promise<SingleZoneResult> {
+  // Jev grades severity after parsing when this route is active (enrich-judge.ts).
+  const judged = getJudgmentRoute("finding.judge") === "typesafe";
   const ATTEMPT_CONFIGS = computePerZoneAttemptConfigs(zone.files.length, passNumber);
   const isFirstPass = passNumber === 1;
   const zoneTokenUsage: ZoneTokenUsage = { calls: 0, input: 0, output: 0 };
@@ -233,6 +239,7 @@ async function enrichSingleZone(
         otherContext,
         crossingLines,
         hints,
+        judged,
       })
       : buildSingleZoneLaterPassEnvelope({
         zone,
@@ -244,6 +251,7 @@ async function enrichSingleZone(
         crossingLines,
         previousZone,
         hints,
+        judged,
       });
     const prompt = svPrompt(envelope);
 
@@ -318,6 +326,8 @@ export interface PerZoneEnrichResult {
   newFindings: Finding[];
   pass: number;
   tokenUsage?: AnalyzeTokenUsage;
+  /** Ids (post-rename) of the zones the LLM actually enriched this pass. */
+  enrichedZoneIds?: Set<string>;
 }
 
 /**
@@ -458,5 +468,6 @@ export async function enrichZonesPerZone(
     newFindings: allNewFindings,
     pass: passNumber,
     tokenUsage: totalTokenUsage,
+    enrichedZoneIds: new Set(results.filter((r) => r.success).map((r) => r.zone.id)),
   };
 }

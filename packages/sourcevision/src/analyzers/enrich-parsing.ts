@@ -563,6 +563,8 @@ export interface EnrichResult {
   pass: number;
   /** Updated findings with reassessed severities from meta-evaluation */
   _updatedFindings?: Finding[];
+  /** Ids (post-rename) of the zones the LLM actually enriched this pass — the ones worth a fragility judgment. */
+  enrichedZoneIds?: Set<string>;
   /** Aggregated token usage across all LLM calls in this enrichment */
   tokenUsage?: AnalyzeTokenUsage;
 }

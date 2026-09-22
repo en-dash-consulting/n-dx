@@ -9,7 +9,15 @@ import type {
   FindingType,
 } from "../schema/index.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
-import { section, svPromptEnvelope, svPrompt } from "./prompt-envelope.js";
+import {
+  section,
+  svPromptEnvelope,
+  svPrompt,
+  findingsContract,
+  stripJudgedFields,
+  outputLines,
+  JSON_OBJECT_ONLY,
+} from "./prompt-envelope.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -129,6 +137,8 @@ export function buildMetaEnvelope(
   findings: Finding[],
   crossings: ZoneCrossing[],
   hints?: string,
+  /** True when Jev grades severity/category (enrich-judge.ts); the prompt then stops asking for them. */
+  judged = false,
 ): PromptEnvelope {
   // Group findings by zone
   const findingsByZone = new Map<string, Finding[]>();
@@ -173,32 +183,50 @@ export function buildMetaEnvelope(
     section("hints", hints ? `Project context from the developer:\n${hints}` : ""),
     section(
       "rules",
-      `Constraints:
-- Never escalate "pass 0: automated heuristic" findings to "critical" without multiple corroborating findings.
-- Do NOT escalate their severity unless corroborated by MULTIPLE independent findings.
-- No decomposition suggestions unless metric exceeds 2× threshold.
-- Do NOT generate specific file decomposition suggestions unless a metric exceeds 2x its detection threshold.
-- Preserve exact metric values from existing findings; do not round or modify.
-- When referencing heuristic findings, preserve the exact numeric values as written.
-- Good architecture → "info". Problems/risks → "warning"/"critical".
-- Positive findings describing good architecture, clean patterns, or successful design choices must have severity "info".
-- Test-to-implementation coupling is expected; do not flag it.
-- Test files coupling to implementation internals is expected by design.
-
-Tasks:
-1. Reassess severities from cumulative evidence; upgrade to "critical" only with multiple corroborating findings.
-2. Find meta-patterns across all findings (systemic issues, architectural concerns).
-3. Make suggestions concrete — name files/zones; decomposition only if metric exceeds 2× threshold.
-4. Flag contradictory findings.`,
+      [
+        "Constraints:",
+        // Severity rules and the re-rating task drop out when Jev grades
+        // severity (enrich-judge.ts): asking the text model to do it too would
+        // spend tokens on a verdict the pipeline overwrites.
+        ...(judged ? [] : [
+          '- Never escalate "pass 0: automated heuristic" findings to "critical" without multiple corroborating findings.',
+          "- Do NOT escalate their severity unless corroborated by MULTIPLE independent findings.",
+        ]),
+        "- No decomposition suggestions unless metric exceeds 2× threshold.",
+        "- Do NOT generate specific file decomposition suggestions unless a metric exceeds 2x its detection threshold.",
+        "- Preserve exact metric values from existing findings; do not round or modify.",
+        "- When referencing heuristic findings, preserve the exact numeric values as written.",
+        ...(judged ? [] : [
+          '- Good architecture → "info". Problems/risks → "warning"/"critical".',
+          '- Positive findings describing good architecture, clean patterns, or successful design choices must have severity "info".',
+        ]),
+        "- Test-to-implementation coupling is expected; do not flag it.",
+        "- Test files coupling to implementation internals is expected by design.",
+        "",
+        "Tasks:",
+        ...[
+          ...(judged ? [] : ['Reassess severities from cumulative evidence; upgrade to "critical" only with multiple corroborating findings.']),
+          "Find meta-patterns across all findings (systemic issues, architectural concerns).",
+          "Make suggestions concrete — name files/zones; decomposition only if metric exceeds 2× threshold.",
+          "Flag contradictory findings.",
+        ].map((task, i) => `${i + 1}. ${task}`),
+      ].join("\n"),
     ),
     section(
       "output",
-      `Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
-
-Respond with ONLY a JSON object (no markdown, no explanation):
-{"severityUpdates":[{"findingIndex":0,"newSeverity":"warning"}],"zones":[{"id":"zone-id","newInsights":[],"findings":[{"type":"suggestion","scope":"zone-id","text":"...","severity":"warning","category":"code"}]}],"insights":["meta-observation"],"findings":[{"type":"pattern","scope":"global","text":"...","severity":"info","category":"code"}]}
-
-Empty arrays are fine. Do NOT repeat existing findings.`,
+      outputLines([
+        findingsContract(true, judged),
+        "",
+        JSON_OBJECT_ONLY,
+        stripJudgedFields(
+          judged
+            ? '{"zones":[{"id":"zone-id","newInsights":[],"findings":[{"type":"suggestion","scope":"zone-id","text":"...","severity":"warning","category":"code"}]}],"insights":["meta-observation"],"findings":[{"type":"pattern","scope":"global","text":"...","severity":"info","category":"code"}]}'
+            : '{"severityUpdates":[{"findingIndex":0,"newSeverity":"warning"}],"zones":[{"id":"zone-id","newInsights":[],"findings":[{"type":"suggestion","scope":"zone-id","text":"...","severity":"warning","category":"code"}]}],"insights":["meta-observation"],"findings":[{"type":"pattern","scope":"global","text":"...","severity":"info","category":"code"}]}',
+          judged,
+        ),
+        "",
+        "Empty arrays are fine. Do NOT repeat existing findings.",
+      ]),
     ),
   ]);
 }
@@ -209,8 +237,9 @@ export function buildMetaPrompt(
   findings: Finding[],
   crossings: ZoneCrossing[],
   hints?: string,
+  judged = false,
 ): string {
-  return svPrompt(buildMetaEnvelope(zones, findings, crossings, hints));
+  return svPrompt(buildMetaEnvelope(zones, findings, crossings, hints, judged));
 }
 
 // ── Attempt configuration ────────────────────────────────────────────────────
