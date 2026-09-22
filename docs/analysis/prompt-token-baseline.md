@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-09-17T17:04:11.456Z
-- **Commit** — `bde2835c906d`
-- **Content hash** — `6f1202b784078109` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-09-22T15:05:59.802Z
+- **Commit** — `2bc114932381`
+- **Content hash** — `cf9040fb1f99a452` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 36
-- **Per-call total** — 21,688 tokens (what every surface costs, summed)
-- **Unique fixed text** — 13,201 tokens (distinct text a rewrite has to edit)
+- **Per-call total** — 21,810 tokens (what every surface costs, summed)
+- **Unique fixed text** — 13,323 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -113,11 +113,11 @@ so a jump is never mistaken for a regression or a win.
 | `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 19 | 91 | — | 91 |
 | `buildPrimerEnvelope` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 21 | 229 | — | 229 |
 
-## hench — 3,531 per-call / 3,531 unique, 9 surfaces
+## hench — 3,653 per-call / 3,653 unique, 9 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
-| `buildSystemPrompt` | `packages/hench/src/agent/planning/prompt.ts` | The agent's system prompt — role, rules, workflow, error handling. | 62 | 768 | — | 768 |
+| `buildSystemPrompt` | `packages/hench/src/agent/planning/prompt.ts` | The agent's system prompt — role, rules, workflow, error handling. | 66 | 890 | — | 890 |
 | `buildGoLanguageContext` | `packages/hench/src/agent/planning/prompt.ts` | Go toolchain and convention context, added when the project is Go. | 26 | 278 | — | 278 |
 | `formatTaskBrief` | `packages/hench/src/agent/planning/brief.ts` | Render the task brief section — task, parent chain, requirements. | 42 | 214 | — | 214 |
 | `buildReviewSystemPrompt` | `packages/hench/src/agent/analysis/adversarial-review.ts` | System prompt for the adversarial review pass. | 27 | 331 | — | 331 |
@@ -169,7 +169,7 @@ reproducible without a model call. Dump any of them with `--dump <package>`.
 |---|---|---|---:|---:|---:|
 | rex | `buildAssessmentEnvelope` | Granularity assessment over one two-task proposal. | 497 | 245 | 742 |
 | sourcevision | `buildPrimerEnvelope` | Primer distillation over a fixed 3-zone CONTEXT.md excerpt. | 229 | 137 | 366 |
-| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 982 | n/a — 398 of the fixed text is on another branch | 584 |
+| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,104 | n/a — 398 of the fixed text is on another branch | 706 |
 | core | `buildReviewerPrompt` | Pair-programming reviewer prompt over three changed files. | 281 | 16 | 297 |
 
 A `fixed` figure above the assembled length is not an error: the fixed column counts
@@ -216,8 +216,8 @@ per section rather than as one literal. These are the same sections
 
 | Section | Chars | Tokens | Share |
 |---|---:|---:|---:|
-| `system` | 1,663 | 416 | 71.4% |
-| `brief` | 668 | 167 | 28.6% |
+| `system` | 2,152 | 538 | 76.3% |
+| `brief` | 668 | 167 | 23.7% |
 
 ## Workflow skills — 17,483 tokens, 13 skills
 

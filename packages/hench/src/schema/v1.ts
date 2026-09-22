@@ -1124,6 +1124,57 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   host?: string;
+  /**
+   * Commits this run produced — the task's own work commit, the
+   * review-repair commit, and the completion-metadata ("record") commit,
+   * whichever landed — in the order git created them.
+   *
+   * Read by the run summary printer to name what actually happened instead of
+   * inferring it from `status` alone: a run can land two commits and still
+   * report `status: "failed"` when only the follow-up record commit failed
+   * (see {@link recordCommitPending}), and without this list the summary had
+   * nothing to point at.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  commits?: RunCommitRecord[];
+  /**
+   * True when the task's own work already succeeded but the follow-up PRD
+   * "record" commit (completion metadata) could not be committed.
+   *
+   * `status` still becomes `"failed"` when this happens — the record commit
+   * and the task's own outcome share one status field today — but this flag
+   * is set at the exact point that failure happens, so a reader (or the run
+   * summary printer) can tell "the work failed" apart from "the work
+   * succeeded and only the bookkeeping commit is pending" without guessing
+   * from the error text.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  recordCommitPending?: boolean;
+  /**
+   * Operator-visible paths still dirty in the working tree when the run
+   * finished, after any rollback — what the run actually left behind rather
+   * than what it touched along the way. Hench's own runtime artifacts are
+   * discounted, the same list the pre-run gate discounts.
+   *
+   * Read by the run summary beside {@link commits} so "Changes: none" means
+   * it: a run that lands no commit and whose edits the tool-call heuristic
+   * does not recognize used to report "none" while its finished work sat
+   * uncommitted in the tree — the very state the completion gate had just
+   * refused on, printed two lines below the refusal.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  uncommittedPaths?: string[];
+}
+
+/** A single commit a run produced. See {@link RunRecord.commits}. */
+export interface RunCommitRecord {
+  /** Full commit SHA. */
+  sha: string;
+  /** First line of the commit message. */
+  subject: string;
 }
 
 export interface TaskBriefTask {

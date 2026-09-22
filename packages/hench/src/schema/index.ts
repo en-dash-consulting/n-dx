@@ -33,6 +33,7 @@ export type {
   PersistedRuntimeEvent,
   RunReviewRecord,
   RunRecord,
+  RunCommitRecord,
   TaskBrief,
   TaskBriefTask,
   TaskBriefParent,
