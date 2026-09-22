@@ -61,6 +61,7 @@
           "inputTokens": 2100,
           "outputTokens": 700,
           "calls": 2,
+          "runs": 2,
           "cacheCreationTokens": 0,
           "cacheReadTokens": 0,
           "byModel": {
@@ -131,6 +132,7 @@
           "inputTokens": 900,
           "outputTokens": 300,
           "calls": 1,
+          "runs": 1,
           "cacheCreationTokens": 0,
           "cacheReadTokens": 0,
           "byModel": {
