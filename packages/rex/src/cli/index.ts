@@ -499,6 +499,18 @@ async function dispatchCommand(
       await postWriteHealthWarning(resolveDir(positional), flags.format === "json");
       break;
     }
+    case "claim": {
+      const { cmdClaim } = await import("./commands/claim.js");
+      // Where the optional [dir] sits depends on the subcommand:
+      // `claim list [dir]` and `claim release --all [dir]` put it second,
+      // `claim release <taskId> [dir]` third. Slicing wrong would read the
+      // task id as a directory.
+      const dirArgs = positional[0] === "release" && flags.all !== "true"
+        ? positional.slice(2)
+        : positional.slice(1);
+      await cmdClaim(resolveDir(dirArgs), positional, flags);
+      break;
+    }
     case "adapter": {
       const dir = resolveDir(positional);
       const { cmdAdapter } = await import("./commands/adapter.js");
