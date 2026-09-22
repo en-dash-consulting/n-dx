@@ -22,5 +22,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add a disposition field to review records](./add-a-disposition-field-to-review.md) | pending |
+| [Add a disposition field to review records](./add-a-disposition-field-to-review.md) | in_progress |
 | [Park deferred review findings as a pending-capture queue in autonomous mode](./park-deferred-review-findings-as-a.md) | pending |

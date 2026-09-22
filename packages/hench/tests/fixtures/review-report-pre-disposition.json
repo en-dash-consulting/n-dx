@@ -1,0 +1,25 @@
+{
+  "taskId": "task-legacy-1",
+  "fixesApplied": true,
+  "summary": "Attacked the retry path and the config loader before disposition existed.",
+  "findings": [
+    {
+      "title": "Hot loop on 429 without Retry-After",
+      "location": "src/fetch.ts:88",
+      "severity": "high",
+      "verdict": "must-fix",
+      "scenario": "Server returns 429 with no Retry-After -> delay stays 0 -> hot loop",
+      "action": "fixed",
+      "note": "Added a floor delay and a regression test."
+    },
+    {
+      "title": "Config loader silently ignores a malformed override",
+      "location": "src/config.ts:40",
+      "severity": "low",
+      "verdict": "not-worth-fixing",
+      "scenario": "Malformed override -> falls back to default -> no crash, no data loss",
+      "action": "dropped",
+      "note": "Unreachable from any documented config path."
+    }
+  ]
+}

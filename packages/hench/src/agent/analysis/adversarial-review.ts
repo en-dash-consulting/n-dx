@@ -68,6 +68,26 @@ export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
 export const REVIEW_ACTIONS = ["fixed", "captured", "dropped", "failed"] as const;
 export type ReviewAction = (typeof REVIEW_ACTIONS)[number];
 
+/**
+ * A finding's recorded fate — the small closed set nothing downstream has to
+ * guess about. Distinct from {@link ReviewAction}: `action` is what the pass
+ * *did* (and can be `failed`, an execution outcome), while `disposition` is
+ * the terminal category a finding's story ends in:
+ *
+ * - `fixed` — repaired in this pass (a `must-fix`, done).
+ * - `dropped` — decided outright not worth acting on (`not-worth-fixing`),
+ *   with no capture ever offered to anyone.
+ * - `offered` — put in front of a capture decision, whether that decision was
+ *   an interactive human prompt or an autonomous `add_item` call standing in
+ *   for one. `action` and `itemId` say whether it was actually captured or
+ *   declined; `reason` says why, when known.
+ * - `deferred` — neither fixed nor offered yet: parked for the operator to
+ *   see after the run instead of being lost. No decision has been made about
+ *   it, which is what distinguishes it from `dropped`.
+ */
+export const REVIEW_DISPOSITIONS = ["fixed", "dropped", "offered", "deferred"] as const;
+export type ReviewDisposition = (typeof REVIEW_DISPOSITIONS)[number];
+
 /** One triaged finding. */
 export interface ReviewFinding {
   /** The defect, stated as a defect — not as an activity. */
@@ -84,6 +104,18 @@ export interface ReviewFinding {
   itemId?: string;
   /** Free-text note — why it was dropped, what the fix changed, why capture failed. */
   note?: string;
+  /**
+   * The finding's recorded fate — see {@link ReviewDisposition}. Set at the
+   * moment the fate is decided, not inferred later from `action`.
+   *
+   * Optional so a report written before this field existed still parses:
+   * {@link parseReviewReport} leaves it `undefined` on an absent or
+   * unrecognized value rather than guessing one, which is what lets an old
+   * `.hench/reviews/<run>.json` keep loading unchanged.
+   */
+  disposition?: ReviewDisposition;
+  /** Why: declined by the user, why deferred, what "not worth fixing" meant. */
+  reason?: string;
 }
 
 /** The full report a review pass writes. */
@@ -308,16 +340,25 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
   lines.push("## What to do with each finding");
   lines.push("");
   lines.push(
-    "| Verdict | Action | Record as |",
-    "|---|---|---|",
-    "| `must-fix` | Fix it now, in this session. Add or update the test that would have caught it. Re-run the project's checks after the fix. | `fixed` |",
+    "| Verdict | Action | Record as | disposition |",
+    "|---|---|---|---|",
+    "| `must-fix` | Fix it now, in this session. Add or update the test that would have caught it. Re-run the project's checks after the fix. | `fixed` | `fixed` |",
     ctx.autonomous
-      ? "| `should-fix` | Capture as a PRD task with `add_item` (rex MCP). Do not fix it here. | `captured` |"
-      : "| `should-fix` | Offer to capture; capture only what the user selects. | `captured`, else `dropped` |",
+      ? "| `should-fix` | Capture as a PRD task with `add_item` (rex MCP). Do not fix it here. | `captured` | `offered` |"
+      : "| `should-fix` | Offer to capture; capture only what the user selects. | `captured`, else `dropped` | `offered` |",
     ctx.autonomous
-      ? "| `out-of-scope` | Capture under the area it actually belongs to, never under this change. | `captured` |"
-      : "| `out-of-scope` | Offer to capture under its own area; capture only what the user selects. | `captured`, else `dropped` |",
-    "| `not-worth-fixing` | Nothing. Report it with the reason — unreachable, already covered, or fix costs more than the defect. | `dropped` |",
+      ? "| `out-of-scope` | Capture under the area it actually belongs to, never under this change. | `captured` | `offered` |"
+      : "| `out-of-scope` | Offer to capture under its own area; capture only what the user selects. | `captured`, else `dropped` | `offered` |",
+    "| `not-worth-fixing` | Nothing. Report it with the reason — unreachable, already covered, or fix costs more than the defect. | `dropped` | `dropped` |",
+    "",
+    "`disposition` records a finding's fate on its own closed scale of",
+    "`fixed | dropped | offered | deferred`, set at the moment you decide it —",
+    "every finding needs one. `offered` covers both a capture that succeeded",
+    "and one the user declined; `action` and `itemId` already carry that",
+    "distinction, and `reason` should say which (e.g. \"declined by user\", or",
+    "left unset when captured). Use `reason` on `dropped` too, for why. You will",
+    "not need `deferred` from this brief — it exists for a non-interactive",
+    "parking mechanism this pass does not yet drive.",
     "",
     "Before creating any PRD item, check whether one already tracks the same",
     "defect: list the directories under `.rex/prd_tree/` and read the `index.md`",
@@ -376,18 +417,20 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     '      "scenario": "Concrete inputs or state -> the wrong result that follows",',
     '      "action": "fixed | captured | dropped | failed",',
     '      "itemId": "rex item id, when captured",',
-    '      "note": "Why dropped / what the fix changed / why capture failed"',
+    '      "note": "Why dropped / what the fix changed / why capture failed",',
+    '      "disposition": "fixed | dropped | offered | deferred",',
+    '      "reason": "Why dropped, or why declined, when known"',
     "    }",
     "  ]",
     "}",
     "```",
     "",
     "`findings` must account for every finding that survived Pass 1, including",
-    "the ones you dropped — a finding that vanishes without a verdict and an",
-    "action is a review hiding its own result. An empty array is a valid and",
-    "useful report when the attack genuinely found nothing; say what you",
-    "attacked in `summary` so the next reader can judge whether it was aimed",
-    "correctly.",
+    "the ones you dropped — a finding that vanishes without a verdict, an",
+    "action, and a `disposition` is a review hiding its own result. An empty",
+    "array is a valid and useful report when the attack genuinely found",
+    "nothing; say what you attacked in `summary` so the next reader can judge",
+    "whether it was aimed correctly.",
     "",
     "Set `fixesApplied` to true only if you actually edited a file.",
     "",
@@ -412,6 +455,21 @@ function coerceEnum<T extends string>(
   return typeof value === "string" && (allowed as readonly string[]).includes(value)
     ? (value as T)
     : fallback;
+}
+
+/**
+ * Like {@link coerceEnum} but for an optional field with no safe fallback to
+ * guess: an absent or unrecognized `disposition` becomes `undefined` rather
+ * than a value that would claim a fate nobody recorded. This is what keeps a
+ * pre-disposition `.hench/reviews/<run>.json` loading unchanged.
+ */
+function coerceOptionalEnum<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+): T | undefined {
+  return typeof value === "string" && (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : undefined;
 }
 
 /**
@@ -451,6 +509,8 @@ export function parseReviewReport(raw: string): ReviewReport | null {
       action: coerceEnum(f.action, REVIEW_ACTIONS, "failed"),
       itemId: isNonEmptyString(f.itemId) ? f.itemId : undefined,
       note: isNonEmptyString(f.note) ? f.note : undefined,
+      disposition: coerceOptionalEnum(f.disposition, REVIEW_DISPOSITIONS),
+      reason: isNonEmptyString(f.reason) ? f.reason : undefined,
     }));
 
   return {
@@ -532,6 +592,9 @@ export function formatReviewSummary(report: ReviewReport): string[] {
     lines.push(`    ${f.scenario}`);
     if (f.itemId) lines.push(`    captured as ${f.itemId}`);
     if (f.note) lines.push(`    ${f.note}`);
+    if (f.disposition) {
+      lines.push(`    disposition: ${f.disposition}${f.reason ? ` — ${f.reason}` : ""}`);
+    }
   }
 
   lines.push("", report.summary);

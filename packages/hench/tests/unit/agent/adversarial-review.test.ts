@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -27,6 +27,7 @@ import {
   formatMissingReviewRefusal,
   formatRunReviewStatus,
   REVIEW_REPORT_SUBDIR,
+  REVIEW_DISPOSITIONS,
 } from "../../../src/agent/analysis/adversarial-review.js";
 import type { RunReviewRecord } from "../../../src/schema/index.js";
 import type {
@@ -139,9 +140,20 @@ describe("buildReviewBrief", () => {
     const brief = buildReviewBrief(BASE_CTX);
 
     expect(brief).toContain("/proj/.hench/reviews/run-1.json");
-    for (const field of ["findings", "fixesApplied", "summary", "severity", "verdict", "action"]) {
+    for (const field of ["findings", "fixesApplied", "summary", "severity", "verdict", "action", "disposition", "reason"]) {
       expect(brief).toContain(`"${field}"`);
     }
+  });
+
+  it("documents disposition as its own closed set, mapped from verdict", () => {
+    const brief = buildReviewBrief(BASE_CTX);
+
+    expect(brief).toMatch(/fixed \| dropped \| offered \| deferred/);
+    expect(brief).toMatch(/every finding needs one/);
+    // The autonomous should-fix row records an `offered` disposition even
+    // though it captures automatically — `action`/`itemId` carry accept vs
+    // decline, not `disposition`.
+    expect(brief).toMatch(/`should-fix`.*`captured`.*`offered`/);
   });
 
   it("forbids the state-mutating operations that would collide with the run", () => {
@@ -235,6 +247,75 @@ describe("parseReviewReport", () => {
     const parsed = parseReviewReport(JSON.stringify({ findings: [], fixesApplied: "yes" }));
 
     expect(parsed!.fixesApplied).toBe(false);
+  });
+
+  describe("disposition", () => {
+    it.each(REVIEW_DISPOSITIONS)("parses a %s disposition, with its reason", (disposition) => {
+      const parsed = parseReviewReport(
+        JSON.stringify({
+          findings: [
+            {
+              title: "x",
+              severity: "low",
+              verdict: "not-worth-fixing",
+              scenario: "s",
+              action: "dropped",
+              disposition,
+              reason: `why it is ${disposition}`,
+            },
+          ],
+        }),
+      );
+
+      expect(parsed!.findings[0].disposition).toBe(disposition);
+      expect(parsed!.findings[0].reason).toBe(`why it is ${disposition}`);
+    });
+
+    it("leaves disposition undefined rather than guessing, on a report predating the field", () => {
+      // Old reports never wrote `disposition` or `reason` at all — the absent
+      // case, distinct from the present-but-invalid case below.
+      const parsed = parseReviewReport(
+        JSON.stringify({
+          findings: [{ title: "x", severity: "low", verdict: "must-fix", scenario: "s", action: "fixed" }],
+        }),
+      );
+
+      expect(parsed!.findings[0].disposition).toBeUndefined();
+      expect(parsed!.findings[0].reason).toBeUndefined();
+    });
+
+    it("leaves disposition undefined on an unrecognized value, rather than coercing to an alarming default", () => {
+      // Unlike severity/verdict/action, there is no fallback that is safe to
+      // guess here — an old-format record and a garbled new one must both
+      // come through as "unknown", not as a fabricated fate.
+      const parsed = parseReviewReport(
+        JSON.stringify({
+          findings: [
+            { title: "x", severity: "low", verdict: "must-fix", scenario: "s", action: "fixed", disposition: "ignored" },
+          ],
+        }),
+      );
+
+      expect(parsed!.findings[0].disposition).toBeUndefined();
+    });
+
+    it("loads a pre-disposition record fixture unchanged", async () => {
+      const raw = await readFile(
+        join(import.meta.dirname, "../../fixtures/review-report-pre-disposition.json"),
+        "utf-8",
+      );
+
+      const parsed = parseReviewReport(raw);
+
+      expect(parsed).not.toBeNull();
+      expect(parsed!.findings).toHaveLength(2);
+      for (const f of parsed!.findings) {
+        expect(f.disposition).toBeUndefined();
+        expect(f.reason).toBeUndefined();
+      }
+      expect(parsed!.findings[0].action).toBe("fixed");
+      expect(parsed!.findings[1].action).toBe("dropped");
+    });
   });
 });
 
@@ -449,6 +530,31 @@ describe("formatReviewSummary", () => {
     ).join("\n");
 
     expect(rendered).toContain("captured as itm-42");
+  });
+
+  it("prints the disposition and reason when the finding carries one", () => {
+    const rendered = formatReviewSummary(
+      report({
+        findings: [
+          finding({
+            action: "captured",
+            verdict: "should-fix",
+            disposition: "offered",
+            reason: "declined by user",
+          }),
+        ],
+      }),
+    ).join("\n");
+
+    expect(rendered).toContain("disposition: offered — declined by user");
+  });
+
+  it("omits the disposition line entirely on a pre-disposition finding", () => {
+    const rendered = formatReviewSummary(report({ findings: [finding({ action: "fixed" })] })).join(
+      "\n",
+    );
+
+    expect(rendered).not.toContain("disposition:");
   });
 });
 
