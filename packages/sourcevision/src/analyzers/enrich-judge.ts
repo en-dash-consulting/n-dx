@@ -22,10 +22,12 @@ import type {
   Finding,
   FindingCategory,
   FindingType,
+  MoveFileFinding,
   TokenUsage,
   Zone,
   ZoneCrossing,
 } from "../schema/index.js";
+import { dirname } from "node:path";
 import { ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { askJev, choice, noul, score } from "./jev-client.js";
 import type { JevQuestion, JevResponse, JsonValue } from "./jev-client.js";
@@ -172,6 +174,29 @@ export interface FindingJudgeRequest {
   anchorFiles: Map<string, string[]>;
 }
 
+/** The evidence state for the zones a set of scopes names: file sample, headers, imports. */
+function buildZoneEvidence(scopes: string[], evidence: FindingEvidence): Record<string, JsonValue> {
+  const zonesById = new Map(evidence.zones.map((z) => [z.id, z]));
+  const crossingCounts = new Map<string, Record<string, number>>();
+  for (const c of evidence.crossings ?? []) {
+    const out = crossingCounts.get(c.fromZone) ?? {};
+    out[c.toZone] = (out[c.toZone] ?? 0) + 1;
+    crossingCounts.set(c.fromZone, out);
+  }
+  const zoneState: Record<string, JsonValue> = {};
+  for (const id of new Set(scopes.filter((s) => zonesById.has(s)))) {
+    const zone = zonesById.get(id)!;
+    zoneState[id] = {
+      name: zone.name,
+      fileCount: zone.files.length,
+      files: zone.files.slice(0, ZONE_FILE_SAMPLE),
+      headers: collectFileHeaders(zone.files.slice(0, ZONE_FILE_SAMPLE), evidence.projectDir),
+      importsTo: crossingCounts.get(id) ?? {},
+    };
+  }
+  return zoneState;
+}
+
 /**
  * One Score (severity) and one Choice (category) per finding, over one state
  * object. The model is not shown the severity or category the generative pass
@@ -199,26 +224,9 @@ export function buildFindingJudgeRequest(
     list.push(h.text);
     heuristicsByScope.set(h.scope, list);
   }
-  const zoneState: Record<string, JsonValue> = {};
-  if (evidence) {
-    const crossingCounts = new Map<string, Record<string, number>>();
-    for (const c of evidence.crossings ?? []) {
-      const out = crossingCounts.get(c.fromZone) ?? {};
-      out[c.toZone] = (out[c.toZone] ?? 0) + 1;
-      crossingCounts.set(c.fromZone, out);
-    }
-    const scopesNeeded = new Set(findings.map((f) => f.scope).filter((s) => zonesById.has(s)));
-    for (const id of scopesNeeded) {
-      const zone = zonesById.get(id)!;
-      zoneState[id] = {
-        name: zone.name,
-        fileCount: zone.files.length,
-        files: zone.files.slice(0, ZONE_FILE_SAMPLE),
-        headers: collectFileHeaders(zone.files.slice(0, ZONE_FILE_SAMPLE), evidence.projectDir),
-        importsTo: crossingCounts.get(id) ?? {},
-      };
-    }
-  }
+  const zoneState: Record<string, JsonValue> = evidence
+    ? buildZoneEvidence(findings.map((f) => f.scope), evidence)
+    : {};
   const scopeCriteria: Record<string, JsonValue> = {};
   if (evidence) {
     for (const z of evidence.zones) scopeCriteria[z.id] = `${z.name}: ${z.files.length} files`;
@@ -632,4 +640,234 @@ export async function judgeZoneFragility(
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+
+// ── Heuristic findings: real problem or detection artifact? ─────────────────
+
+/**
+ * Bands for the pass 0 judgment. Pass 0 severities are calibrated by global
+ * thresholds (`enforceSeverityRules` never touches them); this is the one
+ * deliberate exception, because Jev sees the specific files a threshold
+ * cannot: a residual cluster, a pinned directory, a test tree counted as
+ * source. At or below the first band the finding is demoted to `info`;
+ * between them its confidence is recorded; at or above the second it stands.
+ */
+export const HEURISTIC_ARTIFACT_MAX_PROBABILITY = 0.3;
+export const HEURISTIC_REAL_MIN_PROBABILITY = 0.7;
+
+/**
+ * Ask Jev, per zone-scoped pass 0 finding at `warning` or above, whether it
+ * describes a real problem. Move-file findings are left to {@link judgeMoves}.
+ */
+export async function judgeHeuristicFindings(
+  findings: Finding[],
+  evidence: FindingEvidence,
+): Promise<JudgeResult> {
+  const zoneIds = new Set(evidence.zones.map((z) => z.id));
+  const candidates = findings
+    .map((f, index) => ({ f, index }))
+    .filter(({ f }) => f.pass === 0 && f.type !== "move-file" && (f.severity === "warning" || f.severity === "critical") && zoneIds.has(f.scope));
+  if (candidates.length === 0 || getJudgmentRoute("finding.judge") !== "typesafe") {
+    return { findings, calls: 0 };
+  }
+
+  const out = [...findings];
+  const usage: TokenUsage = { input: 0, output: 0 };
+  let calls = 0;
+  let demoted = 0;
+  let uncertain = 0;
+
+  for (let start = 0; start < candidates.length; start += FINDINGS_PER_REQUEST_WITH_EVIDENCE) {
+    const slice = candidates.slice(start, start + FINDINGS_PER_REQUEST_WITH_EVIDENCE);
+    const fState: Record<string, JsonValue> = {};
+    const questions: Record<string, JevQuestion> = {};
+    slice.forEach(({ f }, i) => {
+      fState[`f${i}`] = { text: f.text, type: f.type, scope: f.scope, related: f.related ?? [] };
+      questions[`h${i}`] = noul(
+        `Given the files in \`zones.${f.scope}\`, does \`findings.f${i}\` describe a real maintainability problem, rather than an artifact of how zones were detected (a residual cluster, a pinned directory, a build or test tree counted as source, a metric that is high by design for this kind of module)?`,
+      );
+    });
+    const state: JsonValue = { findings: fState, zones: buildZoneEvidence(slice.map(({ f }) => f.scope), evidence) };
+    let response;
+    try {
+      response = await askJev({ state, questions }, { taskClass: "finding.judge" });
+    } catch (err) {
+      if (!(err instanceof ClaudeClientError)) throw err;
+      console.warn(`  [judge] heuristic judgment failed (${err.reason}) — keeping calibrated severities: ${err.message.slice(0, 160)}`);
+      break;
+    }
+    calls++;
+    if (response.tokenUsage) {
+      usage.input += response.tokenUsage.input;
+      usage.output += response.tokenUsage.output;
+    }
+    slice.forEach(({ f, index }, i) => {
+      const a = response.answers[`h${i}`];
+      if (a?.type !== "noul") return;
+      const p = round2(a.noul);
+      if (p <= HEURISTIC_ARTIFACT_MAX_PROBABILITY) {
+        out[index] = { ...f, severity: "info", confidence: p };
+        demoted++;
+      } else {
+        out[index] = { ...f, confidence: p };
+        if (p < HEURISTIC_REAL_MIN_PROBABILITY) uncertain++;
+      }
+    });
+  }
+
+  if (calls > 0) {
+    console.log(
+      `  [judge] heuristic findings: ${candidates.length} judged in ${calls} request(s) — ` +
+        `${demoted} demoted to info, ${uncertain} kept with low confidence (${usage.input} in / ${usage.output} out)`,
+    );
+  }
+  return { findings: out, tokenUsage: calls > 0 ? usage : undefined, calls };
+}
+
+// ── Moves: which zone should this file live in? ──────────────────────────────
+
+/** A move is emitted only when the Choice lands on another zone this confidently. */
+export const MOVE_MIN_PROBABILITY = 0.7;
+/** Files with fewer cross-zone edges than this are not asked about. */
+const MOVE_CANDIDATE_MIN_EDGES = 3;
+/** Files asked about per run, most cross-zone edges first. */
+const MOVE_CANDIDATES_MAX = 40;
+const STAY = "stay";
+
+/** Most common directory among a zone's files. */
+function majorityDirectory(zone: Zone): string {
+  const counts = new Map<string, number>();
+  for (const f of zone.files) {
+    const d = dirname(f);
+    counts.set(d, (counts.get(d) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ".";
+}
+
+export interface MoveJudgeRequest {
+  state: JsonValue;
+  questions: Record<string, JevQuestion>;
+  /** question id → the file, its zone, and its edge counts per partner zone. */
+  ids: Map<string, { path: string; zoneId: string; edges: Record<string, number> }>;
+}
+
+/**
+ * Candidates are the files with the most cross-zone edges; each gets a Choice
+ * over its own zone, the zones it exchanges edges with, and `stay`.
+ */
+export function buildMoveJudgeRequest(zones: Zone[], crossings: ZoneCrossing[]): MoveJudgeRequest {
+  const zoneOf = new Map<string, string>();
+  for (const z of zones) for (const f of z.files) zoneOf.set(f, z.id);
+  const zonesById = new Map(zones.map((z) => [z.id, z]));
+  const edges = new Map<string, Record<string, number>>();
+  const bump = (file: string, partner: string) => {
+    const e = edges.get(file) ?? {};
+    e[partner] = (e[partner] ?? 0) + 1;
+    edges.set(file, e);
+  };
+  for (const c of crossings) {
+    bump(c.from, c.toZone);
+    bump(c.to, c.fromZone);
+  }
+  const ranked = [...edges.entries()]
+    .map(([path, e]) => ({ path, e, total: Object.values(e).reduce((a, b) => a + b, 0) }))
+    .filter((x) => x.total >= MOVE_CANDIDATE_MIN_EDGES && zoneOf.has(x.path))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, MOVE_CANDIDATES_MAX);
+
+  const fState: Record<string, JsonValue> = {};
+  const zState: Record<string, JsonValue> = {};
+  const questions: Record<string, JevQuestion> = {};
+  const ids = new Map<string, { path: string; zoneId: string; edges: Record<string, number> }>();
+  const describe = (id: string) => {
+    if (zState[id]) return;
+    const z = zonesById.get(id);
+    if (!z) return;
+    zState[id] = { name: z.name, fileCount: z.files.length, directory: majorityDirectory(z), files: z.files.slice(0, 12) };
+  };
+  ranked.forEach(({ path, e }, i) => {
+    const zoneId = zoneOf.get(path)!;
+    const partners = Object.keys(e).filter((id) => id !== zoneId && zonesById.has(id));
+    if (partners.length === 0) return;
+    const id = `f${i}`;
+    fState[id] = { path, zone: zoneId, edgesToZones: e };
+    describe(zoneId);
+    for (const pz of partners) describe(pz);
+    const criteria: Record<string, JsonValue> = {};
+    for (const zid of [zoneId, ...partners]) {
+      const z = zonesById.get(zid)!;
+      criteria[zid] = `${z.name} (${majorityDirectory(z)}/, ${z.files.length} files)`;
+    }
+    criteria[STAY] = "The file is where it belongs; its cross-zone imports are expected for what it does.";
+    questions[`m${i}`] = choice(
+      `Which zone should the file \`files.${id}\` live in, judging by what it does and where its imports go? Its current zone is \`files.${id}.zone\`.`,
+      criteria,
+    );
+    ids.set(`m${i}`, { path, zoneId, edges: e });
+  });
+  return { state: { files: fState, zones: zState }, questions, ids };
+}
+
+/**
+ * Ask Jev where the most cross-linked files belong. A confident answer for a
+ * different zone becomes a `move-file` finding with `moveReason:
+ * "zone-judgment"`, the target zone's majority directory as `to`, and the
+ * file's edges into that zone as the predicted impact.
+ */
+export async function judgeMoves(
+  zones: Zone[],
+  crossings: ZoneCrossing[],
+  passNumber: number,
+): Promise<JudgeResult> {
+  if (zones.length === 0 || getJudgmentRoute("zone.judge") !== "typesafe") {
+    return { findings: [], calls: 0 };
+  }
+  const { state, questions, ids } = buildMoveJudgeRequest(zones, crossings);
+  if (ids.size === 0) return { findings: [], calls: 0 };
+
+  let response;
+  try {
+    response = await askJev({ state, questions }, { taskClass: "zone.judge" });
+  } catch (err) {
+    if (!(err instanceof ClaudeClientError)) throw err;
+    console.warn(`  [judge] move judgment failed (${err.reason}) — no judged moves: ${err.message.slice(0, 160)}`);
+    return { findings: [], calls: 0 };
+  }
+  const zonesById = new Map(zones.map((z) => [z.id, z]));
+  const findings: Finding[] = [];
+  let stays = 0;
+  for (const [qid, { path, zoneId, edges }] of ids) {
+    const a = response.answers[qid];
+    if (a?.type !== "choice") continue;
+    if (a.choice === STAY || a.choice === zoneId) {
+      stays++;
+      continue;
+    }
+    const p = a.probabilities[a.choice] ?? 0;
+    const target = zonesById.get(a.choice);
+    if (!target || p < MOVE_MIN_PROBABILITY) continue;
+    const toDir = majorityDirectory(target);
+    const impact = edges[a.choice] ?? 0;
+    const move: MoveFileFinding = {
+      type: "move-file",
+      pass: passNumber,
+      scope: zoneId,
+      text: `File "${path}" belongs with ${target.name}: ${impact} of its cross-zone imports go there — consider moving it to ${toDir}/`,
+      severity: "info",
+      category: "structural",
+      related: [a.choice],
+      confidence: round2(p),
+      from: path,
+      to: `${toDir}/`,
+      moveReason: "zone-judgment",
+      predictedImpact: impact,
+    };
+    findings.push(move);
+  }
+  console.log(
+    `  [judge] moves: ${ids.size} file(s) judged — ${findings.length} move(s), ${stays} stay ` +
+      `(${response.tokenUsage?.input ?? 0} in / ${response.tokenUsage?.output ?? 0} out)`,
+  );
+  return { findings, tokenUsage: response.tokenUsage, calls: 1 };
 }

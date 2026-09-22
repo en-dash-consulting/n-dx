@@ -147,7 +147,11 @@ Some sourcevision calls are judgments, not text generation, and those go to [Typ
 
 ### The cascade
 
-With the key present, `ndx analyze` runs the **cascade** by default: facts are computed, Jev judges them, and the text model is asked only about what a judgment left uncertain. Fragility probabilities at or above 0.7 become templated findings, at or below 0.3 nothing, and a zone in between is **escalated** — the per-zone generative prompt runs for that zone alone, and its findings are then judged like any other. Zone descriptions are templated from facts. `PRIMER.md` is not regenerated in this mode (a cached one is still served).
+With the key present, `ndx analyze` runs the **cascade** by default: facts are computed, Jev judges them, and the text model is asked only about what a judgment left uncertain. Fragility probabilities at or above 0.7 become templated findings; a zone whose probability falls in 0.4–0.6 is **escalated** — the per-zone generative prompt runs for that zone alone (at most six zones per run, highest probability first), and its findings are then judged like any other. Zone descriptions are templated from facts. `PRIMER.md` is not regenerated in this mode (a cached one is still served).
+
+Two more judgments run over the heuristics on every keyed run, whichever mode: each warning-level pass 0 finding is asked whether it is a real problem or a detection artifact (≤ 0.3 demotes it to `info`, in between records its confidence), and the files with the most cross-zone imports are asked which zone they belong in — a confident answer for another zone becomes a `move-file` finding with `moveReason: "zone-judgment"`.
+
+`--narrate` keeps the multi-pass generative machinery (`--full`, `--target-pass`, the meta pass); it is the whole pipeline for repositories without a key, so it is not reduced to the cascade's per-zone prompt.
 
 ```sh
 export TYPESAFE_API_KEY=...
@@ -160,7 +164,7 @@ ndx config llm.routes.code.classify light .
 ndx config llm.routes.finding.judge typesafe .
 ```
 
-Thresholds — 0.4 classification probability, 0.5 finding confidence, the 0.3/0.7 support bands, 0.7 paraphrase, 0.8 rescope, 0.8 merge, 0.6 generated-name fit, and the 0.3–0.7 escalation band — live in code, not config. `enforceSeverityRules` still runs last and pass 0 heuristic findings are never re-graded. A class explicitly routed to `typesafe` without the key prints one notice naming the fallback.
+Thresholds — 0.4 classification probability, 0.5 finding confidence, the 0.3/0.7 support bands, 0.7 paraphrase, 0.8 rescope, 0.8 merge, 0.6 generated-name fit, 0.3/0.7 heuristic bands, 0.7 move, and the 0.4–0.6 escalation band with its cap of six — live in code, not config. `enforceSeverityRules` still runs last and pass 0 heuristic findings are never re-graded. A class explicitly routed to `typesafe` without the key prints one notice naming the fallback.
 
 ### What a run records
 

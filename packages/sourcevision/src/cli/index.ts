@@ -60,7 +60,7 @@ for (const a of args.slice(1)) {
     help = true;
   } else if (
     a.startsWith("--phase=") || a.startsWith("--only=") || a.startsWith("--target-pass=")
-    || a === "--fast" || a === "--full" || a === "--deep" || a === "--lite" || a === "--narrate"
+    || a === "--fast" || a === "--full" || a === "--deep" || a === "--lite" || a === "--narrate" || a === "--per-zone"
   ) {
     passthrough.push(a);
   }

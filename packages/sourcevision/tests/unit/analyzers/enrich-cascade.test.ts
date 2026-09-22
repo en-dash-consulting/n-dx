@@ -21,7 +21,7 @@ vi.mock("../../../src/analyzers/enrich-per-zone.js", () => ({
 import { nameZonesBySelection } from "../../../src/analyzers/zone-naming.js";
 import { assessZoneFragility } from "../../../src/analyzers/enrich-judge.js";
 import { enrichZonesPerZone } from "../../../src/analyzers/enrich-per-zone.js";
-import { cascadeEnrichment, dedupeZoneNames, ESCALATION_BAND } from "../../../src/analyzers/enrich-cascade.js";
+import { cascadeEnrichment, dedupeZoneNames, ESCALATION_BAND, ESCALATION_MAX_ZONES } from "../../../src/analyzers/enrich-cascade.js";
 
 const mockedNaming = vi.mocked(nameZonesBySelection);
 const mockedFragility = vi.mocked(assessZoneFragility);
@@ -162,5 +162,23 @@ describe("dedupeZoneNames", () => {
   it("is identity when names are unique", () => {
     const zones = [zone("a", ["x"]), zone("b", ["y"])].map((z, i) => ({ ...z, name: ["A", "B"][i] }));
     expect(dedupeZoneNames(zones)).toBe(zones);
+  });
+});
+
+describe("cascadeEnrichment — escalation cap", () => {
+  it("escalates at most ESCALATION_MAX_ZONES zones, the highest in-band probability first", async () => {
+    const many = Array.from({ length: ESCALATION_MAX_ZONES + 2 }, (_, i) => zone(`z${i}`, [`z${i}/a.ts`]));
+    const inv = makeInventory(many.map((z) => makeFileEntry(z.files[0])));
+    const lo = ESCALATION_BAND[0], hi = ESCALATION_BAND[1];
+    // z0 highest in band … last lowest; all inside the band.
+    const probs = new Map(many.map((z, i) => [z.id, { unrelated: hi - 0.001 - i * ((hi - lo) / (many.length + 1)), overdependent: 0.1 }]));
+    mockedFragility.mockResolvedValueOnce({ probabilities: probs, calls: 1 });
+    mockedPerZone.mockResolvedValueOnce({ zones: [], newZoneInsights: new Map(), newGlobalInsights: [], newFindings: [], pass: 2 });
+
+    const res = await cascadeEnrichment(many, [], inv, imports);
+
+    const escalated = mockedPerZone.mock.calls[0][0].map((z) => z.id);
+    expect(escalated).toEqual(many.slice(0, ESCALATION_MAX_ZONES).map((z) => z.id));
+    expect(res.escalatedZoneIds.size).toBe(ESCALATION_MAX_ZONES);
   });
 });

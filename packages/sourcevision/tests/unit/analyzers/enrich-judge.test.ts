@@ -27,6 +27,12 @@ import {
   FINDING_RESTATES_MAX_PROBABILITY,
   FINDING_RESCOPE_MIN_CONFIDENCE,
   ZONE_FRAGILITY_MIN_PROBABILITY,
+  judgeHeuristicFindings,
+  judgeMoves,
+  buildMoveJudgeRequest,
+  HEURISTIC_ARTIFACT_MAX_PROBABILITY,
+  HEURISTIC_REAL_MIN_PROBABILITY,
+  MOVE_MIN_PROBABILITY,
 } from "../../../src/analyzers/enrich-judge.js";
 import type { FindingEvidence } from "../../../src/analyzers/enrich-judge.js";
 import { enforceSeverityRules } from "../../../src/analyzers/enrich-parsing.js";
@@ -410,5 +416,101 @@ describe("judgeFindings — with evidence", () => {
     });
     const res = await judgeFindings([finding("x", { scope: "web-viewer" })], evidence);
     expect(res.findings[0].scope).toBe("web-viewer");
+  });
+});
+
+// ── Heuristic findings ───────────────────────────────────────────────────────
+
+describe("judgeHeuristicFindings", () => {
+  const heuristics = [
+    finding("hub: 41 outgoing calls", { pass: 0, scope: "web-viewer", severity: "warning" }),
+    finding("cohesion 0.3", { pass: 0, scope: "web-viewer", severity: "critical" }),
+    finding("informational", { pass: 0, scope: "web-viewer", severity: "info" }),
+    finding("model finding", { pass: 2, scope: "web-viewer", severity: "warning" }),
+    { ...finding("move", { pass: 0, scope: "web-viewer", severity: "warning" }), type: "move-file" as const },
+    finding("no zone", { pass: 0, scope: "global", severity: "warning" }),
+  ];
+
+  it("asks only about zone-scoped warning+ pass 0 findings and bands the answers", async () => {
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: { h0: noulAnswer(HEURISTIC_ARTIFACT_MAX_PROBABILITY), h1: noulAnswer((HEURISTIC_ARTIFACT_MAX_PROBABILITY + HEURISTIC_REAL_MIN_PROBABILITY) / 2) },
+      tokenUsage: { input: 40, output: 2 },
+    });
+
+    const res = await judgeHeuristicFindings(heuristics, evidence);
+
+    expect(Object.keys(mockedAskJev.mock.calls[0][0].questions)).toEqual(["h0", "h1"]);
+    expect((mockedAskJev.mock.calls[0][0].state as { zones: Record<string, unknown> }).zones["web-viewer"]).toBeDefined();
+    expect(res.findings[0]).toMatchObject({ severity: "info", confidence: HEURISTIC_ARTIFACT_MAX_PROBABILITY });
+    expect(res.findings[1]).toMatchObject({ severity: "critical", confidence: 0.5 });
+    expect(res.findings[2]).toBe(heuristics[2]);
+    expect(res.findings[3]).toBe(heuristics[3]);
+    expect(res.findings[4]).toBe(heuristics[4]);
+    expect(res.findings[5]).toBe(heuristics[5]);
+    expect(res.calls).toBe(1);
+  });
+
+  it("keeps a real problem as stated with its confidence, and is inert without a route", async () => {
+    mockedAskJev.mockResolvedValueOnce({ model: "jev", answers: { h0: noulAnswer(0.92), h1: noulAnswer(0.8) } });
+    const res = await judgeHeuristicFindings(heuristics, evidence);
+    expect(res.findings[0]).toMatchObject({ severity: "warning", confidence: 0.92 });
+
+    mockedRoute.mockReturnValue(undefined);
+    const inert = await judgeHeuristicFindings(heuristics, evidence);
+    expect(inert.findings).toBe(heuristics);
+    expect(inert.calls).toBe(0);
+  });
+});
+
+// ── Moves ────────────────────────────────────────────────────────────────────
+
+describe("judgeMoves", () => {
+  const web = { id: "web", name: "Web", description: "", files: ["ui/hub.ts", "ui/app.ts"], entryPoints: [], cohesion: 0.5, coupling: 0.5 };
+  const rex = { id: "rex", name: "Rex", description: "", files: ["rex/store.ts", "rex/tree.ts", "rex/serializer.ts"], entryPoints: [], cohesion: 0.9, coupling: 0.1 };
+  const edgesFor = (n: number): ZoneCrossing[] => Array.from({ length: n }, (_, i) => ({ from: "ui/hub.ts", to: rex.files[i % 3], fromZone: "web", toZone: "rex" }));
+
+  it("asks only about files with enough cross-zone edges, offering own zone, partner zones and stay", () => {
+    const req = buildMoveJudgeRequest([web, rex], [...edgesFor(3), { from: "ui/app.ts", to: "rex/store.ts", fromZone: "web", toZone: "rex" }]);
+    expect(Object.keys(req.questions)).toEqual(["m0"]);
+    expect(req.ids.get("m0")).toEqual({ path: "ui/hub.ts", zoneId: "web", edges: { rex: 3 } });
+    // rex/store.ts is an import target on two of those edges — below the minimum, so not asked.
+    expect(Object.keys((req.questions.m0 as { criteria: object }).criteria)).toEqual(["web", "rex", "stay"]);
+    expect((req.state as { zones: Record<string, unknown> }).zones.rex).toMatchObject({ name: "Rex", directory: "rex", fileCount: 3 });
+  });
+
+  it("emits a move-file finding for a confident other-zone choice, nothing for stay or a weak choice", async () => {
+    const crossings = [...edgesFor(4), ...Array.from({ length: 3 }, () => ({ from: "ui/app.ts", to: "rex/tree.ts", fromZone: "web", toZone: "rex" }))];
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: {
+        m0: { type: "choice", choice: "rex", probabilities: { rex: MOVE_MIN_PROBABILITY, web: 0.2, stay: 0.1 }, confidence: 0.6 },
+        m1: { type: "choice", choice: "stay", probabilities: { stay: 0.9 }, confidence: 0.9 },
+      },
+      tokenUsage: { input: 80, output: 4 },
+    });
+
+    const res = await judgeMoves([web, rex], crossings, 1);
+
+    expect(res.findings).toHaveLength(1);
+    expect(res.findings[0]).toMatchObject({
+      type: "move-file", pass: 1, scope: "web", from: "ui/hub.ts", to: "rex/", moveReason: "zone-judgment",
+      predictedImpact: 4, confidence: MOVE_MIN_PROBABILITY, related: ["rex"], category: "structural",
+    });
+    expect(res.findings[0].text).toContain("belongs with Rex");
+
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: { m0: { type: "choice", choice: "rex", probabilities: { rex: MOVE_MIN_PROBABILITY - 0.01 }, confidence: 0.5 }, m1: { type: "choice", choice: "rex", probabilities: { rex: 0.9 }, confidence: 0.9 } },
+    });
+    // Import targets count too: rex/tree.ts (4 edges) ranks above ui/app.ts (3).
+    expect((await judgeMoves([web, rex], crossings, 1)).findings).toEqual([]);
+  });
+
+  it("makes no request when no file qualifies or no route resolves", async () => {
+    expect(await judgeMoves([web, rex], edgesFor(2), 1)).toEqual({ findings: [], calls: 0 });
+    mockedRoute.mockReturnValue(undefined);
+    expect(await judgeMoves([web, rex], edgesFor(5), 1)).toEqual({ findings: [], calls: 0 });
+    expect(mockedAskJev).not.toHaveBeenCalled();
   });
 });

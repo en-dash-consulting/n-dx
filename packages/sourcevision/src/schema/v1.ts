@@ -255,7 +255,7 @@ export interface Finding {
 }
 
 /** Reason a file-move is recommended. */
-export type MoveFileReason = "zone-pin-override" | "import-neighbor-majority" | "directory-consolidation";
+export type MoveFileReason = "zone-pin-override" | "import-neighbor-majority" | "directory-consolidation" | "zone-judgment";
 
 /**
  * Concrete file-move recommendation with predicted metric impact.

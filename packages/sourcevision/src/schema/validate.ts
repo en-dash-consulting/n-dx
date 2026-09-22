@@ -189,6 +189,7 @@ const FindingTypeSchema = z.enum([
 
 const MoveFileReasonSchema = z.enum([
   "zone-pin-override",
+  "zone-judgment",
   "import-neighbor-majority",
   "directory-consolidation",
 ]);

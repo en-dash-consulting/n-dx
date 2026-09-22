@@ -26,7 +26,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Cascade follow-ups: heuristic real-problem Noul, move-file Choice, escalation band tuning, --per-zone passthrough](./cascade-follow-ups-heuristic-real.md) | pending |
+| [Cascade follow-ups: heuristic real-problem Noul, move-file Choice, escalation band tuning, --per-zone passthrough](./cascade-follow-ups-heuristic-real.md) | completed |
 | [Finding cascade: Jev gates, verifies and anchors enrichment; free-text generation becomes --narrate](./finding-cascade-jev-gates-verifies-and.md) | completed |
 | [Finding severity, finding category and zone fragility as Jev judgments](./finding-severity-finding-category-and.md) | completed |
 | [Jev client and code.classify as a Choice over the archetype catalog](./jev-client-and-code-classify-as-a.md) | completed |

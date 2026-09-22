@@ -57,7 +57,7 @@ import {
 } from "./louvain.js";
 import type { MergeLogEntry } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
-import { judgeFindings, judgeZoneFragility } from "./enrich-judge.js";
+import { judgeFindings, judgeZoneFragility, judgeHeuristicFindings, judgeMoves } from "./enrich-judge.js";
 import { cascadeEnrichment } from "./enrich-cascade.js";
 import { getJudgmentRoute } from "./claude-client.js";
 import { setRunMode } from "./run-ledger.js";
@@ -3041,6 +3041,17 @@ export async function analyzeZones(
     ...computeEmptyAnchorFindings(emptyAnchors),
   );
 
+  // ── Move judgment (enrich-judge.ts) ──
+  // Where do the most cross-linked files belong? Inert without a route.
+  const moves = await judgeMoves(pinnedFinalZones, crossings, Math.max(1, enrichmentPass));
+  structural.findings.push(...moves.findings);
+  if (moves.calls > 0) {
+    enrichTokenUsage ??= emptyAnalyzeTokenUsage();
+    enrichTokenUsage.calls += moves.calls;
+    enrichTokenUsage.inputTokens += moves.tokenUsage?.input ?? 0;
+    enrichTokenUsage.outputTokens += moves.tokenUsage?.output ?? 0;
+  }
+
   // ── Judgment step (enrich-judge.ts) ──
   // After extraction, before assembleFindings' enforceSeverityRules, for every
   // enrichment mode at once. Inert without a judgment route. Here — not inside
@@ -3072,10 +3083,29 @@ export async function analyzeZones(
   );
 
   // ── Assemble findings ──
-  const allFindings = assembleFindings(
+  let allFindings = assembleFindings(
     pinnedFinalZones, structural, aiFindings, metaUpdatedFindings,
     validPrevious, previousZones, remappedContentHashes, globalContentHash
   );
+
+  // ── Heuristic judgment (enrich-judge.ts) ──
+  // After assembly, because assembleFindings builds the per-zone heuristic
+  // warnings itself (entry-point width, cohesion/coupling) on top of
+  // `structural.findings`. Is each warning a real problem or a detection
+  // artifact? Inert without a route; only demotes, never escalates, so
+  // running after enforceSeverityRules changes nothing that rule guards.
+  const heuristicJudged = await judgeHeuristicFindings(allFindings, {
+    zones: pinnedFinalZones,
+    crossings,
+    projectDir: options?.projectProfile?.projectDir,
+  });
+  allFindings = heuristicJudged.findings;
+  if (heuristicJudged.calls > 0) {
+    enrichTokenUsage ??= emptyAnalyzeTokenUsage();
+    enrichTokenUsage.calls += heuristicJudged.calls;
+    enrichTokenUsage.inputTokens += heuristicJudged.tokenUsage?.input ?? 0;
+    enrichTokenUsage.outputTokens += heuristicJudged.tokenUsage?.output ?? 0;
+  }
 
   // ── Back-populate findings into insights for backward compatibility ──
   backPopulateInsights(pinnedFinalZones, allFindings, allGlobalInsights);

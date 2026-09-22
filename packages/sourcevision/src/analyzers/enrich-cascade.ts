@@ -45,8 +45,22 @@ import type { AnalyzeTokenUsage } from "../schema/index.js";
  * Fragility probabilities inside this band are neither a finding nor a
  * clean bill: the zone is handed to the text model with its file headers.
  * Above it enrich-judge.ts already emits the templated finding.
+ *
+ * Measured 2026-09-22 over two fragility Nouls per zone on this repository
+ * (27 zones), medium-app (7) and toy-app (3): three quarters of answers sit
+ * below 0.3, and the 0.3–0.4 sliver held zones that were almost certainly
+ * fine. `[0.3, 0.7)` escalated 10 / 4 / 1 zones; `[0.4, 0.6)` escalates
+ * 7 / 1 / 1.
  */
-export const ESCALATION_BAND: [number, number] = [0.3, 0.7];
+export const ESCALATION_BAND: [number, number] = [0.4, 0.6];
+
+/**
+ * At most this many zones are narrated per run, the ones with the higher
+ * fragility probability first — closest to being a real finding. Each
+ * narration is a text-model call of 20–30 s; the band alone let 13 through
+ * on this repository before it was narrowed.
+ */
+export const ESCALATION_MAX_ZONES = 6;
 
 /** The cascade is one judged pass; it does not iterate. */
 const CASCADE_PASS = 1;
@@ -202,15 +216,21 @@ export async function cascadeEnrichment(
   addUsage(tokenUsage, assessment.calls, assessment.tokenUsage);
   const fragility = fragilityFindings(named, assessment, CASCADE_PASS);
   prejudgedFindings.push(...fragility);
-  const escalated = named.filter((z) => {
-    const probs = assessment.probabilities.get(z.id);
-    if (!probs) return false;
-    return Object.values(probs).some((p) => p !== undefined && p >= ESCALATION_BAND[0] && p < ESCALATION_BAND[1]);
-  });
+  const inBand = named
+    .map((z) => {
+      const probs = assessment.probabilities.get(z.id);
+      const ps = probs ? Object.values(probs).filter((p): p is number => p !== undefined) : [];
+      const inside = ps.filter((p) => p >= ESCALATION_BAND[0] && p < ESCALATION_BAND[1]);
+      return { zone: z, top: inside.length > 0 ? Math.max(...inside) : -1 };
+    })
+    .filter((e) => e.top >= 0)
+    .sort((a, b) => b.top - a.top);
+  const escalated = inBand.slice(0, ESCALATION_MAX_ZONES).map((e) => e.zone);
   if (assessment.calls > 0) {
     console.log(
       `  [cascade] fragility: ${named.length} zone(s) judged — ${fragility.length} finding(s), ` +
-        `${escalated.length} escalated to the text model (${assessment.tokenUsage?.input ?? 0} in / ${assessment.tokenUsage?.output ?? 0} out)`,
+        `${inBand.length} in the ${ESCALATION_BAND[0]}–${ESCALATION_BAND[1]} band, ${escalated.length} escalated to the text model ` +
+        `(${assessment.tokenUsage?.input ?? 0} in / ${assessment.tokenUsage?.output ?? 0} out)`,
     );
   }
 

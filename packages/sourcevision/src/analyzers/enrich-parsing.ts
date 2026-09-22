@@ -515,7 +515,20 @@ export function deduplicateFindings(findings: Finding[]): Finding[] {
     }
   }
 
-  return result;
+  // Cross-scope duplicates: the per-zone prompt emits the same finding under
+  // its zone and again under `global`, and the type judgment can grade the
+  // two copies differently, so the (scope, type) grouping above keeps both.
+  // The zone-scoped copy is the useful one; the global copy goes.
+  const byText = new Map<string, Finding[]>();
+  for (const f of result) {
+    const key = normalizeText(f.text);
+    byText.set(key, [...(byText.get(key) ?? []), f]);
+  }
+  return result.filter((f) => {
+    if (f.scope !== "global") return true;
+    const twins = byText.get(normalizeText(f.text)) ?? [];
+    return !twins.some((o) => o !== f && o.scope !== "global");
+  });
 }
 
 // ── Zone ID deduplication ────────────────────────────────────────────────────
