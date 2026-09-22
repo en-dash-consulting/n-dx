@@ -16,9 +16,9 @@ const execAsync = promisify(execCb);
  * revert (finalizeRun → performRollbackIfNeeded).
  *
  * Contract:
- * - Interactive TTY failed run prompts before reverting and defaults to No,
- *   so an empty answer (bare Enter) preserves the working tree.
- * - An explicit 'y' reverts.
+ * - Interactive TTY failed run prompts before reverting and defaults to Yes,
+ *   so an empty answer (bare Enter) reverts and restores the pre-run state.
+ * - An explicit 'n' preserves the working tree.
  * - Autonomous runs never prompt and keep the unattended auto-revert.
  */
 
@@ -169,7 +169,7 @@ describe("rollbackOnFailure express-prompt gate", () => {
     }
   });
 
-  it("defaults to No — a bare Enter preserves the working tree", async () => {
+  it("defaults to Yes — a bare Enter reverts and restores the pre-run state", async () => {
     const { fakes } = installFakeReadline();
     vi.resetModules();
 
@@ -189,12 +189,13 @@ describe("rollbackOnFailure express-prompt gate", () => {
       await waitForFakePrompt(fakes);
       expect(fakes).toHaveLength(1);
 
-      // Empty answer == default. For a destructive revert the default is No.
+      // Empty answer == default. Leaving hench's own dirty writes in place is
+      // the damage, so the default reverts and restores the pre-run state.
       fakes[0].answer("");
       await finalizePromise;
 
       const content = await readFile(join(projectDir, "src.ts"), "utf-8");
-      expect(content).toBe("export const x = 999;\n");
+      expect(content).toBe("export const x = 1;\n");
     } finally {
       restoreSigintListeners(priorListeners);
     }

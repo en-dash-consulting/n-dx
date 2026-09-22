@@ -210,8 +210,12 @@ export async function listUncommittedPrdPaths(
     .filter((path) => matchesProjectPath(path, PRD_COMMIT_PATHS, repoPrefix));
 }
 
-/** Render the path list of a refusal, truncated so it stays readable. */
-function renderPaths(paths: string[]): string {
+/**
+ * Render a path list, truncated so it stays readable. Shared beyond this
+ * module's own refusal messages by {@link promptRollbackConfirm} in
+ * `shared.ts`, which lists the same kind of dirty paths in its revert prompt.
+ */
+export function renderPaths(paths: string[]): string {
   const shown = paths.slice(0, MAX_REPORTED_PATHS).map((p) => `  ${p}`);
   if (paths.length > MAX_REPORTED_PATHS) {
     shown.push(`  …and ${paths.length - MAX_REPORTED_PATHS} more`);

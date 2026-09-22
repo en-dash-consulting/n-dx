@@ -61,6 +61,7 @@ import {
   findUncommittedWork,
   formatUncommittedWorkRefusal,
   listDirtyPaths,
+  renderPaths,
 } from "./uncommitted-work-gate.js";
 import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
 
@@ -926,8 +927,8 @@ interface AskYesNoOptions {
   interruptMode?: "decline" | "hold-then-exit";
   /**
    * Which way an empty answer (bare Enter) resolves. Defaults to `true`
-   * (`[Y/n]` prompts). Set `false` for destructive prompts that should
-   * default to No (`[y/N]`), e.g. the rollback confirmation.
+   * (`[Y/n]` prompts). Set `false` for prompts where leaving the default
+   * choice in place is safer than acting (`[y/N]`).
    */
   defaultYes?: boolean;
 }
@@ -1023,31 +1024,40 @@ async function askYesNoWithSuspendedSigint(
 
 /**
  * Ask the user to confirm the revert via stdin (TTY only).
- * Reverting is a destructive git action, so the prompt defaults to No —
- * a bare Enter preserves the working tree; only an explicit 'y'/'yes'
- * accepts. The first Ctrl-C prints a hint and keeps the prompt open; a
- * second Ctrl-C aborts the prompt and exits.
+ *
+ * Names the paths and says what they are — hench's own status writes from
+ * this run, not code the operator staged deliberately — because leaving them
+ * in place is the actual damage: the PRD tree keeps whatever this run last
+ * wrote instead of its pre-run state. The prompt defaults to Yes, so a bare
+ * Enter reverts and restores that pre-run state; only an explicit 'n'/'no'
+ * keeps the dirty files. The first Ctrl-C prints a hint and keeps the prompt
+ * open; a second Ctrl-C aborts the prompt and exits.
  */
-async function promptRollbackConfirm(count: number): Promise<boolean> {
+export async function promptRollbackConfirm(paths: string[]): Promise<boolean> {
   return askYesNoWithSuspendedSigint(
-    `\nRevert ${count} uncommitted file(s)? [y/N] `,
-    { interruptMode: "hold-then-exit", defaultYes: false },
+    `\n${paths.length} uncommitted file(s) — hench's status writes from this run:\n` +
+      `${renderPaths(paths)}\n` +
+      `Revert them and restore the pre-run PRD state? [Y/n] `,
+    { interruptMode: "hold-then-exit", defaultYes: true },
   );
 }
 
 /**
  * Revert uncommitted changes introduced during a failed run — but only
- * after an express, per-run confirmation. A revert NEVER occurs without the
- * user explicitly saying yes each time.
+ * after an express, per-run confirmation. A revert NEVER occurs
+ * non-interactively; on a TTY the operator can always decline it.
  *
  * Skips silently when the working tree is already clean.
  *
  * The revert is prompt-only:
  * - Interactive TTY (stdin is a terminal, --yes not passed, not autonomous):
- *   prompts `Revert N uncommitted file(s)? [y/N]`, defaulting to No. Only an
- *   explicit yes reverts — and even then the revert is scoped: tracked
- *   changes are reverted, but untracked removal is limited to files absent
- *   from the pre-run baseline (agent-created), never pre-existing work.
+ *   names the dirty paths and prompts `Revert them and restore the pre-run
+ *   PRD state? [Y/n]`, defaulting to Yes — leaving hench's own uncommitted
+ *   writes in place is the damage, so a bare Enter reverts them. Only an
+ *   explicit 'n'/'no' keeps the dirty files. Even on revert, the scope is
+ *   limited: tracked changes are reverted, but untracked removal is limited
+ *   to files absent from the pre-run baseline (agent-created), never
+ *   pre-existing work.
  * - Non-interactive (CI, pipe, --yes, or any autonomous mode): there is no
  *   channel for a per-run confirmation, so the working tree is left exactly
  *   as-is and the uncommitted files are reported. Nothing is discarded.
@@ -1090,7 +1100,7 @@ async function performRollbackIfNeeded(
     return;
   }
 
-  const confirmed = await promptRollbackConfirm(dirtyPaths.length);
+  const confirmed = await promptRollbackConfirm(dirtyPaths);
   if (!confirmed) {
     info(`Changes preserved — ${dirtyPaths.length} uncommitted file(s) left unchanged.`);
     return;
