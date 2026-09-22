@@ -237,8 +237,10 @@ describe("revertChanges", () => {
     await revertChanges("/project", { baselineUntracked: [] });
 
     const args = mockExecFile.mock.calls.map((c) => c[1] as string[]);
-    expect(args).toContainEqual(["reset", "HEAD", "."]);
-    expect(args).toContainEqual(["checkout", "."]);
+    // `--` separates the pathspec: an unscoped revert still means the whole
+    // tree, and a scoped one passes its paths in the same position.
+    expect(args).toContainEqual(["reset", "HEAD", "--", "."]);
+    expect(args).toContainEqual(["checkout", "--", "."]);
     // reset must precede checkout
     const resetIdx = args.findIndex((a) => a[0] === "reset");
     const checkoutIdx = args.findIndex((a) => a[0] === "checkout");

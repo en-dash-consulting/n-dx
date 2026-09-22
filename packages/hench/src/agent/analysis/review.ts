@@ -108,6 +108,19 @@ export interface RevertOptions {
    * scratch files from the user's own uncommitted work, so we delete nothing.
    */
   baselineUntracked?: string[];
+  /**
+   * Path prefixes the revert is confined to. When set, tracked changes are
+   * reverted only under these paths and only agent-created untracked files
+   * under them are removed; everything outside is left exactly as it is.
+   *
+   * The rollback caller passes the PRD paths, because those are the only
+   * files hench writes — an unscoped revert also discarded the agent's
+   * finished source edits, which it was never entitled to touch.
+   *
+   * Omitted means the whole working tree, which is what a review repair
+   * wants: there the changes under review *are* the agent's.
+   */
+  scope?: readonly string[];
   /** Timeout for each git invocation (ms). */
   timeout?: number;
 }
@@ -153,6 +166,29 @@ export async function listUntrackedPaths(
 }
 
 /**
+ * The subset of `scope` that git has at least one tracked file under.
+ *
+ * See the call site: an unmatched entry makes `git checkout` fail as a whole,
+ * so the filter is what keeps a scoped revert working in a project that does
+ * not have every scoped path committed.
+ */
+async function trackedPathspec(
+  projectDir: string,
+  scope: string[],
+  timeout: number,
+): Promise<string[]> {
+  const kept: string[] = [];
+  for (const entry of scope) {
+    const listed = await execStdout("git", ["ls-files", "--", entry], {
+      cwd: projectDir,
+      timeout,
+    });
+    if (listed.trim().length > 0) kept.push(entry);
+  }
+  return kept;
+}
+
+/**
  * Revert the agent's uncommitted work — safely.
  *
  * Tracked changes are reverted with `git reset` + `git checkout`; because those
@@ -175,14 +211,32 @@ export async function revertChanges(
   options: RevertOptions = {},
 ): Promise<RevertResult> {
   const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+  const scope = options.scope && options.scope.length > 0 ? [...options.scope] : undefined;
+  const inScope = (path: string): boolean =>
+    scope === undefined ||
+    scope.some((entry) => {
+      const prefix = entry.endsWith("/") ? entry : `${entry}/`;
+      return path === entry || path === entry.replace(/\/$/, "") || path.startsWith(prefix);
+    });
 
-  // 1. Unstage everything and revert modifications to TRACKED files only.
+  // 1. Unstage and revert modifications to TRACKED files only, within scope.
   //    reset/checkout never touch untracked files, and tracked content is
   //    recoverable from git history — so there is no unrecoverable data loss.
-  await execStdout("git", ["reset", "HEAD", "."], { cwd: projectDir, timeout });
-  await execStdout("git", ["checkout", "."], { cwd: projectDir, timeout });
+  //
+  //    The pathspec is filtered to entries git actually tracks first. `git
+  //    checkout -- a b` where `b` matches nothing known to git fails the whole
+  //    command and reverts neither — so one scope entry for a file this
+  //    project has never committed (`.rex/tree-meta.json` in a fresh fixture,
+  //    say) would silently turn the entire revert into a no-op.
+  const pathspec = scope ? await trackedPathspec(projectDir, scope, timeout) : ["."];
+  if (pathspec.length > 0) {
+    await execStdout("git", ["reset", "HEAD", "--", ...pathspec], { cwd: projectDir, timeout });
+    await execStdout("git", ["checkout", "--", ...pathspec], { cwd: projectDir, timeout });
+  }
 
-  // 2. Untracked files: remove ONLY the ones the agent created this run.
+  // 2. Untracked files: remove ONLY the ones the agent created this run, and
+  //    only inside the scope. An agent-created file outside it is still the
+  //    agent's work — out of scope means out of reach, in both directions.
   const current = await listUntrackedPaths(projectDir, timeout);
 
   if (options.baselineUntracked === undefined) {
@@ -191,8 +245,8 @@ export async function revertChanges(
   }
 
   const baseline = new Set(options.baselineUntracked);
-  const agentCreated = current.filter((p) => !baseline.has(p));
-  const preExisting = current.filter((p) => baseline.has(p));
+  const agentCreated = current.filter((p) => !baseline.has(p) && inScope(p));
+  const preExisting = current.filter((p) => baseline.has(p) || !inScope(p));
 
   if (agentCreated.length > 0) {
     // Scoped clean: the pathspec after `--` limits removal to exactly the

@@ -23,9 +23,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Autonomous review capture](./autonomous-review-capture/index.md) | pending |
+| [Autonomous review capture](./autonomous-review-capture/index.md) | completed |
 | [Claims hardening](./claims-hardening/index.md) | pending |
 | [Cost measurement lands](./cost-measurement-lands/index.md) | pending |
 | [Hench commit hygiene](./hench-commit-hygiene/index.md) | pending |
+| [PRD write guards](./prd-write-guards/index.md) | completed |
 | [Release plumbing](./release-plumbing/index.md) | pending |
 | [Trust copy](./trust-copy/index.md) | pending |

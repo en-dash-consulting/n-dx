@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
 import { parseDocument } from "../../src/store/markdown-parser.js";
 import { titleToFilename } from "../../src/store/title-to-filename.js";
-import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
+import { PRD_TREE_DIRNAME, SLUG_RULE_VERSION, resolveSiblingSlugs } from "../../src/store/index.js";
 
 /**
  * Write a test PRD by creating the folder tree structure synchronously.
@@ -17,13 +17,30 @@ import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
  * folder tree cannot represent (e.g., a non-epic item at the root, used to exercise
  * orphan/structural validation) is still loadable via the FileStore legacy fallback.
  */
-export function writePRD(dir: string, doc: PRDDocument): void {
+export interface WritePRDOptions {
+  /**
+   * Leave `slugRule` out of `tree-meta.json`, as every tree written before the
+   * guard shipped has it. Without this the marker short-circuits the guard and
+   * no fixture reaches the path-scan branch that a real upgrade takes — which
+   * is exactly how the guard's false refusal of the writer's own rename got
+   * past the suite.
+   */
+  omitSlugRuleMarker?: boolean;
+}
+
+export function writePRD(dir: string, doc: PRDDocument, options: WritePRDOptions = {}): void {
   mkdirSync(join(dir, ".rex"), { recursive: true });
 
-  // Write tree-meta.json with the document title
+  // Write tree-meta.json with the document title and the slug-rule marker.
+  // The marker matters: without it the write guard falls back to scanning the
+  // paths, and a fixture is only as conformant as this helper makes it.
   writeFileSync(
     join(dir, ".rex", "tree-meta.json"),
-    JSON.stringify({ title: doc.title }),
+    JSON.stringify(
+      options.omitSlugRuleMarker
+        ? { title: doc.title }
+        : { title: doc.title, slugRule: SLUG_RULE_VERSION },
+    ),
   );
 
   // Persist the full document for the legacy read fallback. This is the only
@@ -59,6 +76,13 @@ export function writePRD(dir: string, doc: PRDDocument): void {
   // Create minimal folder tree structure for tests
   mkdirSync(join(dir, ".rex", PRD_TREE_DIRNAME), { recursive: true });
 
+  // Directory names come from the production slug rule, not from item ids.
+  // A fixture named by id is a tree no rex build would ever write, and the
+  // slug-rule write guard refuses it on the first save — correctly, because
+  // that is indistinguishable from a foreign build's output.
+  const slugFor = (siblings: PRDItem[], item: PRDItem): string =>
+    resolveSiblingSlugs(siblings).get(item.id) ?? item.id;
+
   const writeItem = (itemDir: string, item: PRDItem): void => {
     mkdirSync(itemDir, { recursive: true });
     writeFileSync(join(itemDir, titleToFilename(item.title)), createMinimalMarkdown(item));
@@ -67,37 +91,43 @@ export function writePRD(dir: string, doc: PRDDocument): void {
   // Write each epic as a directory with a title-named markdown file
   for (const epic of doc.items) {
     if (epic.level !== "epic") continue;
-    const epicDir = join(dir, ".rex", PRD_TREE_DIRNAME, epic.id);
+    const epicDir = join(dir, ".rex", PRD_TREE_DIRNAME, slugFor(doc.items, epic));
     writeItem(epicDir, epic);
 
+    const epicChildren = epic.children || [];
+
     // Write features
-    for (const feature of epic.children || []) {
+    for (const feature of epicChildren) {
       if (feature.level !== "feature") continue;
-      const featureDir = join(epicDir, feature.id);
+      const featureDir = join(epicDir, slugFor(epicChildren, feature));
       writeItem(featureDir, feature);
 
+      const featureChildren = feature.children || [];
+
       // Write tasks
-      for (const task of feature.children || []) {
+      for (const task of featureChildren) {
         if (task.level !== "task") continue;
-        const taskDir = join(featureDir, task.id);
+        const taskDir = join(featureDir, slugFor(featureChildren, task));
         writeItem(taskDir, task);
 
-        for (const subtask of task.children || []) {
+        const taskChildren = task.children || [];
+        for (const subtask of taskChildren) {
           if (subtask.level !== "subtask") continue;
-          writeItem(join(taskDir, subtask.id), subtask);
+          writeItem(join(taskDir, slugFor(taskChildren, subtask)), subtask);
         }
       }
     }
 
     // Also handle tasks directly under epics
-    for (const task of epic.children || []) {
+    for (const task of epicChildren) {
       if (task.level !== "task") continue;
-      const taskDir = join(epicDir, task.id);
+      const taskDir = join(epicDir, slugFor(epicChildren, task));
       writeItem(taskDir, task);
 
-      for (const subtask of task.children || []) {
+      const taskChildren = task.children || [];
+      for (const subtask of taskChildren) {
         if (subtask.level !== "subtask") continue;
-        writeItem(join(taskDir, subtask.id), subtask);
+        writeItem(join(taskDir, slugFor(taskChildren, subtask)), subtask);
       }
     }
   }

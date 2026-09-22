@@ -63,6 +63,9 @@ import {
   aggregateItemDurations,
   openClaimsStore,
   resolveClaimHolder,
+  checkTreeConformance,
+  resolveStore,
+  PRD_TREE_DIRNAME,
 } from "./rex-gateway.js";
 import type {
   PRDDocument,
@@ -1226,6 +1229,48 @@ function loadPRDForExecute(ctx: ServerContext): Record<string, unknown> | null {
 }
 
 /**
+ * Refuse the Execute request when this build would re-slug the PRD tree.
+ *
+ * The same gate `ndx work` applies, for the same reason: the run this route
+ * spawns writes the PRD when it completes its task, so starting one against a
+ * tree written under a different slug rule turns a whole-tree rewrite into a
+ * "task completed" commit. Refusing here rather than letting the spawned run
+ * refuse means the dashboard can say why — a run that exits non-zero a second
+ * after it starts reads as a crash.
+ *
+ * Goes to the store rather than `loadPRDSync`, which answers from
+ * `.rex/.cache/prd.json` and the legacy flat files. The question here is about
+ * the tree on disk, so the tree is what has to be read: a cache hit would let
+ * the gate pass on a repository whose `.rex/prd_tree/` it never looked at.
+ *
+ * @returns `true` when a refusal was written to `res` and the caller must stop.
+ */
+async function refuseNonConformantTree(
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  // No folder tree, nothing to be non-conformant. Checked before the load
+  // because loading a project that has no PRD at all throws, and "there is no
+  // PRD" is the caller's 404 to report, not this gate's failure.
+  if (!existsSync(join(ctx.rexDir, PRD_TREE_DIRNAME))) return false;
+
+  const store = await resolveStore(ctx.rexDir);
+  const doc = await store.loadDocument();
+
+  const refusal = await checkTreeConformance(
+    ctx.rexDir,
+    join(ctx.rexDir, PRD_TREE_DIRNAME),
+    doc.items,
+  );
+  if (!refusal) return false;
+
+  // 412 Precondition Failed: the request is well-formed and the task is fine;
+  // the repository is in a state that forbids acting on it.
+  errorResponse(res, 412, refusal.message);
+  return true;
+}
+
+/**
  * Wire shape for per-item rollup consumed by the tree view.
  *
  * Combines token totals (self/descendants/total with runCount) with a
@@ -1346,6 +1391,11 @@ async function handleExecute(
     errorResponse(res, 400, "taskId is required");
     return true;
   }
+
+  // Tree-level fault first: on a tree this build would re-slug, no task is
+  // runnable, so reporting it before the per-task checks keeps the operator
+  // from reading a repository fault as a problem with the task they picked.
+  if (await refuseNonConformantTree(res, ctx)) return true;
 
   // Validate task exists in PRD
   const doc = loadPRDForExecute(ctx);

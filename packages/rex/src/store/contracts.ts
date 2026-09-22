@@ -220,6 +220,19 @@ export interface PRDStore {
    */
   withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T>;
 
+  /**
+   * Rewrite the whole tree under this build's slug rule and record the marker.
+   *
+   * Optional, and implemented only by the two local folder-tree stores: a
+   * remote adapter has no slugs and nothing to migrate. `rex migrate-slugs` is
+   * the only caller, and it is the only sanctioned way past the slug-rule
+   * write guard — every ordinary writer is refused precisely because it would
+   * re-slug someone else's tree, which is what this does deliberately.
+   *
+   * @see {@link file://./slug-rule-guard.ts}
+   */
+  adoptSlugRule?(): Promise<void>;
+
   // ---- Introspection -------------------------------------------------------
 
   /**

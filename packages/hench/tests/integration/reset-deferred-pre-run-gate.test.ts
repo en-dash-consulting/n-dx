@@ -171,6 +171,34 @@ describe("--reset-deferred vs the pre-run commit gate", () => {
     expect(log.trim().split("\n")).toHaveLength(1); // only the initial commit
   });
 
+  it("skips a gitignored PRD candidate instead of aborting the whole commit", async () => {
+    const { getCapturedLines, resetCapturedLines } = await import("../../src/types/output.js");
+    resetCapturedLines();
+
+    // Any staging candidate can end up gitignored — the execution log
+    // already is, by rex init. tree-meta.json stands in for "some future
+    // candidate" here; the point under test is the general filter, not this
+    // one file. Before the fix, `git add` on an ignored path threw and the
+    // reset's own write (task-slug/index.md) was never staged either.
+    await writeFile(join(projectDir, ".gitignore"), ".rex/tree-meta.json\n", "utf-8");
+    await writeFile(join(projectDir, ".rex", "tree-meta.json"), "{}", "utf-8");
+
+    const store = buildStore();
+    const resetCount = await resetDeferredTasks(store as never);
+    expect(resetCount).toBe(1);
+
+    const result = await commitResetDeferredChanges(projectDir, resetCount);
+    expect(result.error).toBeUndefined();
+    expect(result.staged).toBeGreaterThan(0);
+
+    const { stdout: committed } = await execFile(
+      "git", ["show", "--name-only", "--format=", "HEAD"], { cwd: projectDir },
+    );
+    expect(committed).toContain(`.rex/${PRD_TREE_DIRNAME}/task-slug/index.md`);
+    expect(committed).not.toContain("tree-meta.json");
+    expect(getCapturedLines().join("\n")).toContain("tree-meta.json");
+  });
+
   async function commitCount(): Promise<number> {
     const { stdout } = await execFile("git", ["log", "--oneline"], { cwd: projectDir });
     return stdout.trim().split("\n").filter(Boolean).length;

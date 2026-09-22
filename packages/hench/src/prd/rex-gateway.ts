@@ -65,6 +65,8 @@
  * - Requirements validation (verify task acceptance criteria)
  * - Level helpers (isRootLevel, isWorkItem — classify items)
  * - Finding acknowledgment (load/save/acknowledge sourcevision findings)
+ * - PRD tree conformance (checkTreeConformance — refuse to start a run whose
+ *   completion write would re-slug the whole tree)
  *
  * **Out-of-scope (must NOT be re-exported):**
  * - PRD mutation (insertChild, updateInTree, removeFromTree — hench
@@ -96,6 +98,12 @@ export { resolveStore } from "@n-dx/rex";
 
 // ---- Folder-tree storage path -----------------------------------------------
 export { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "@n-dx/rex";
+
+// ---- PRD tree slug conformance ----------------------------------------------
+// The pre-run gate. A run writes the PRD when it completes, so starting one
+// against a tree this build would re-slug is how a whole-tree rewrite lands in
+// a feature branch under a "task completed" commit.
+export { checkTreeConformance } from "@n-dx/rex";
 
 // ---- Tree utilities ---------------------------------------------------------
 export { findItem, walkTree } from "@n-dx/rex";

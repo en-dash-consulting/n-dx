@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 21688,
-    "uniqueTokens": 13201,
+    "perCallTokens": 22010,
+    "uniqueTokens": 13523,
     "skills": 13,
     "skillTokens": 17483
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 3531,
-      "uniqueTokens": 3531
+      "perCallTokens": 3853,
+      "uniqueTokens": 3853
     },
     "core": {
       "surfaces": 1,
@@ -725,11 +725,11 @@
       "builder": "buildSystemPrompt",
       "purpose": "The agent's system prompt — role, rules, workflow, error handling.",
       "inline": false,
-      "literals": 62,
+      "literals": 66,
       "constants": {},
-      "ownTokens": 768,
-      "fixedChars": 3072,
-      "fixedTokens": 768
+      "ownTokens": 890,
+      "fixedChars": 3557,
+      "fixedTokens": 890
     },
     {
       "pkg": "hench",
@@ -773,11 +773,11 @@
       "builder": "buildReviewBrief",
       "purpose": "Brief handed to the reviewer — what to attack and where to report.",
       "inline": false,
-      "literals": 129,
+      "literals": 140,
       "constants": {},
-      "ownTokens": 1460,
-      "fixedChars": 5838,
-      "fixedTokens": 1460
+      "ownTokens": 1660,
+      "fixedChars": 6639,
+      "fixedTokens": 1660
     },
     {
       "pkg": "hench",
@@ -914,13 +914,13 @@
     "hench": {
       "surface": "buildPromptEnvelope",
       "describe": "Full agent envelope (system + brief) for a CLI-provider run.",
-      "chars": 2333,
-      "tokens": 584,
+      "chars": 2822,
+      "tokens": 706,
       "sections": [
         {
           "name": "system",
-          "chars": 1663,
-          "tokens": 416
+          "chars": 2152,
+          "tokens": 538
         },
         {
           "name": "brief",
@@ -928,7 +928,7 @@
           "tokens": 167
         }
       ],
-      "fixedTokens": 982,
+      "fixedTokens": 1104,
       "branchConditional": true,
       "unreachedTokens": 398
     },
@@ -985,8 +985,8 @@
       }
     ]
   },
-  "contentHash": "6f1202b784078109",
-  "recordedAt": "2026-09-17T17:04:11.456Z",
-  "commit": "bde2835c906d",
+  "contentHash": "d0c6ca883220f832",
+  "recordedAt": "2026-09-22T17:53:44.991Z",
+  "commit": "86a1214ed464",
   "dirty": false
 }

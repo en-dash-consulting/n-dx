@@ -267,6 +267,12 @@ const RunReviewRecordSchema = z
  */
 const OpaqueRunSectionSchema = z.object({}).passthrough();
 
+/** A single commit a run produced. See `RunRecord.commits`. */
+const RunCommitRecordSchema = z.object({
+  sha: z.string(),
+  subject: z.string(),
+});
+
 export const RunRecordSchema = z.object({
   id: z.string(),
   taskId: z.string(),
@@ -299,6 +305,9 @@ export const RunRecordSchema = z.object({
   review: RunReviewRecordSchema.optional(),
   actor: z.string().optional(),
   host: z.string().optional(),
+  commits: z.array(RunCommitRecordSchema).optional(),
+  recordCommitPending: z.boolean().optional(),
+  uncommittedPaths: z.array(z.string()).optional(),
   // Fields the record has gained over time that this schema had not been
   // told about. Zod strips what it does not declare, so each was written to
   // disk by `saveRun` and then dropped by every `loadRun` that read it back

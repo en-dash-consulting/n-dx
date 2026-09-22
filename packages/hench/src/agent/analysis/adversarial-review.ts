@@ -68,6 +68,26 @@ export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
 export const REVIEW_ACTIONS = ["fixed", "captured", "dropped", "failed"] as const;
 export type ReviewAction = (typeof REVIEW_ACTIONS)[number];
 
+/**
+ * A finding's recorded fate — the small closed set nothing downstream has to
+ * guess about. Distinct from {@link ReviewAction}: `action` is what the pass
+ * *did* (and can be `failed`, an execution outcome), while `disposition` is
+ * the terminal category a finding's story ends in:
+ *
+ * - `fixed` — repaired in this pass (a `must-fix`, done).
+ * - `dropped` — decided outright not worth acting on (`not-worth-fixing`),
+ *   with no capture ever offered to anyone.
+ * - `offered` — put in front of a capture decision, whether that decision was
+ *   an interactive human prompt or an autonomous `add_item` call standing in
+ *   for one. `action` and `itemId` say whether it was actually captured or
+ *   declined; `reason` says why, when known.
+ * - `deferred` — neither fixed nor offered yet: parked for the operator to
+ *   see after the run instead of being lost. No decision has been made about
+ *   it, which is what distinguishes it from `dropped`.
+ */
+export const REVIEW_DISPOSITIONS = ["fixed", "dropped", "offered", "deferred"] as const;
+export type ReviewDisposition = (typeof REVIEW_DISPOSITIONS)[number];
+
 /** One triaged finding. */
 export interface ReviewFinding {
   /** The defect, stated as a defect — not as an activity. */
@@ -84,6 +104,18 @@ export interface ReviewFinding {
   itemId?: string;
   /** Free-text note — why it was dropped, what the fix changed, why capture failed. */
   note?: string;
+  /**
+   * The finding's recorded fate — see {@link ReviewDisposition}. Set at the
+   * moment the fate is decided, not inferred later from `action`.
+   *
+   * Optional so a report written before this field existed still parses:
+   * {@link parseReviewReport} leaves it `undefined` on an absent or
+   * unrecognized value rather than guessing one, which is what lets an old
+   * `.hench/reviews/<run>.json` keep loading unchanged.
+   */
+  disposition?: ReviewDisposition;
+  /** Why: declined by the user, why deferred, what "not worth fixing" meant. */
+  reason?: string;
 }
 
 /** The full report a review pass writes. */
@@ -308,16 +340,25 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
   lines.push("## What to do with each finding");
   lines.push("");
   lines.push(
-    "| Verdict | Action | Record as |",
-    "|---|---|---|",
-    "| `must-fix` | Fix it now, in this session. Add or update the test that would have caught it. Re-run the project's checks after the fix. | `fixed` |",
+    "| Verdict | Action | Record as | disposition |",
+    "|---|---|---|---|",
+    "| `must-fix` | Fix it now, in this session. Add or update the test that would have caught it. Re-run the project's checks after the fix. | `fixed` | `fixed` |",
     ctx.autonomous
-      ? "| `should-fix` | Capture as a PRD task with `add_item` (rex MCP). Do not fix it here. | `captured` |"
-      : "| `should-fix` | Offer to capture; capture only what the user selects. | `captured`, else `dropped` |",
+      ? "| `should-fix` | Capture as a PRD task with `add_item` (rex MCP). Do not fix it here. | `captured` | `offered` |"
+      : "| `should-fix` | Offer to capture; capture only what the user selects. | `captured`, else `dropped` | `offered` |",
     ctx.autonomous
-      ? "| `out-of-scope` | Capture under the area it actually belongs to, never under this change. | `captured` |"
-      : "| `out-of-scope` | Offer to capture under its own area; capture only what the user selects. | `captured`, else `dropped` |",
-    "| `not-worth-fixing` | Nothing. Report it with the reason — unreachable, already covered, or fix costs more than the defect. | `dropped` |",
+      ? "| `out-of-scope` | Capture under the area it actually belongs to, never under this change. | `captured` | `offered` |"
+      : "| `out-of-scope` | Offer to capture under its own area; capture only what the user selects. | `captured`, else `dropped` | `offered` |",
+    "| `not-worth-fixing` | Nothing. Report it with the reason — unreachable, already covered, or fix costs more than the defect. | `dropped` | `dropped` |",
+    "",
+    "`disposition` records a finding's fate on its own closed scale of",
+    "`fixed | dropped | offered | deferred`, set at the moment you decide it —",
+    "every finding needs one. `offered` covers both a capture that succeeded",
+    "and one the user declined; `action` and `itemId` already carry that",
+    "distinction, and `reason` should say which (e.g. \"declined by user\", or",
+    "left unset when captured). Use `reason` on `dropped` too, for why. Do not",
+    "write `deferred` yourself: the run sets it, on any finding it cannot see a",
+    "decision behind. Record what you actually did and let it park the rest.",
     "",
     "Before creating any PRD item, check whether one already tracks the same",
     "defect: list the directories under `.rex/prd_tree/` and read the `index.md`",
@@ -376,18 +417,20 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     '      "scenario": "Concrete inputs or state -> the wrong result that follows",',
     '      "action": "fixed | captured | dropped | failed",',
     '      "itemId": "rex item id, when captured",',
-    '      "note": "Why dropped / what the fix changed / why capture failed"',
+    '      "note": "Why dropped / what the fix changed / why capture failed",',
+    '      "disposition": "fixed | dropped | offered | deferred",',
+    '      "reason": "Why dropped, or why declined, when known"',
     "    }",
     "  ]",
     "}",
     "```",
     "",
     "`findings` must account for every finding that survived Pass 1, including",
-    "the ones you dropped — a finding that vanishes without a verdict and an",
-    "action is a review hiding its own result. An empty array is a valid and",
-    "useful report when the attack genuinely found nothing; say what you",
-    "attacked in `summary` so the next reader can judge whether it was aimed",
-    "correctly.",
+    "the ones you dropped — a finding that vanishes without a verdict, an",
+    "action, and a `disposition` is a review hiding its own result. An empty",
+    "array is a valid and useful report when the attack genuinely found",
+    "nothing; say what you attacked in `summary` so the next reader can judge",
+    "whether it was aimed correctly.",
     "",
     "Set `fixesApplied` to true only if you actually edited a file.",
     "",
@@ -404,6 +447,19 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
+/**
+ * The entries {@link parseReviewReport} models — a plain JSON object.
+ *
+ * Shared with {@link mergeDispositionsIntoRaw} on purpose. That merge walks the
+ * *raw* findings array and has to skip exactly the entries the parser skipped,
+ * or every disposition after the first malformed entry lands on the wrong
+ * finding. A second copy of this predicate is a second definition of which
+ * entries are findings, free to drift from the one the parser uses.
+ */
+function isFindingObject(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
 function coerceEnum<T extends string>(
   value: unknown,
   allowed: readonly T[],
@@ -412,6 +468,21 @@ function coerceEnum<T extends string>(
   return typeof value === "string" && (allowed as readonly string[]).includes(value)
     ? (value as T)
     : fallback;
+}
+
+/**
+ * Like {@link coerceEnum} but for an optional field with no safe fallback to
+ * guess: an absent or unrecognized `disposition` becomes `undefined` rather
+ * than a value that would claim a fate nobody recorded. This is what keeps a
+ * pre-disposition `.hench/reviews/<run>.json` loading unchanged.
+ */
+function coerceOptionalEnum<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+): T | undefined {
+  return typeof value === "string" && (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : undefined;
 }
 
 /**
@@ -441,7 +512,7 @@ export function parseReviewReport(raw: string): ReviewReport | null {
   if (!Array.isArray(obj.findings)) return null;
 
   const findings: ReviewFinding[] = obj.findings
-    .filter((f): f is Record<string, unknown> => !!f && typeof f === "object" && !Array.isArray(f))
+    .filter(isFindingObject)
     .map((f) => ({
       title: isNonEmptyString(f.title) ? f.title : "(untitled finding)",
       location: isNonEmptyString(f.location) ? f.location : undefined,
@@ -451,6 +522,8 @@ export function parseReviewReport(raw: string): ReviewReport | null {
       action: coerceEnum(f.action, REVIEW_ACTIONS, "failed"),
       itemId: isNonEmptyString(f.itemId) ? f.itemId : undefined,
       note: isNonEmptyString(f.note) ? f.note : undefined,
+      disposition: coerceOptionalEnum(f.disposition, REVIEW_DISPOSITIONS),
+      reason: isNonEmptyString(f.reason) ? f.reason : undefined,
     }));
 
   return {
@@ -459,6 +532,58 @@ export function parseReviewReport(raw: string): ReviewReport | null {
     fixesApplied: obj.fixesApplied === true,
     summary: isNonEmptyString(obj.summary) ? obj.summary : "(no summary recorded)",
   };
+}
+
+/**
+ * Patch derived dispositions into the reviewer's own JSON, returning the text
+ * to write back.
+ *
+ * **Why not just re-serialize the parsed report.** {@link parseReviewReport} is
+ * a lossy projection: it keeps ten known fields per finding and drops
+ * everything else, and it filters out entries that are not JSON objects.
+ * Writing that projection back over the reviewer's file destroys whatever it
+ * could not model — a `proposedSolutions` array the skill asked for but this
+ * brief has no field for, a top-level note, and, worst of all, a finding the
+ * reviewer wrote in a shape the parser skipped. A malformed finding is still a
+ * finding a human can read; erasing it to record a disposition would lose
+ * review findings in the name of a feature built to stop losing them.
+ *
+ * So the merge edits the parsed-from-disk structure in place and re-emits it:
+ * every key the reviewer wrote survives, and only `disposition` is added.
+ *
+ * **Index alignment is the trap.** The parsed report's findings are the raw
+ * array *minus* the entries {@link isFindingObject} rejects, so the two arrays
+ * do not share indices once a malformed entry exists. The cursor below
+ * advances only on entries the parser also kept, which is why both sides must
+ * use the same predicate.
+ *
+ * @returns the JSON text to write, or `null` when the raw text is no longer a
+ *   report the merge can align against — in which case the caller must leave
+ *   the file alone rather than overwrite it with something lossy.
+ */
+export function mergeDispositionsIntoRaw(
+  rawText: string,
+  parked: ReviewReport,
+): string | null {
+  let data: unknown;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    return null;
+  }
+  if (!isFindingObject(data)) return null;
+
+  const rawFindings = data.findings;
+  if (!Array.isArray(rawFindings)) return null;
+
+  let cursor = 0;
+  for (const entry of rawFindings) {
+    if (!isFindingObject(entry)) continue;
+    const disposition = parked.findings[cursor++]?.disposition;
+    if (disposition) entry.disposition = disposition;
+  }
+
+  return `${JSON.stringify(data, null, 2)}\n`;
 }
 
 /**
@@ -532,9 +657,131 @@ export function formatReviewSummary(report: ReviewReport): string[] {
     lines.push(`    ${f.scenario}`);
     if (f.itemId) lines.push(`    captured as ${f.itemId}`);
     if (f.note) lines.push(`    ${f.note}`);
+    if (f.disposition) {
+      lines.push(`    disposition: ${f.disposition}${f.reason ? ` — ${f.reason}` : ""}`);
+    }
   }
 
   lines.push("", report.summary);
+  return lines;
+}
+
+// ── Deferred findings (the non-interactive capture queue) ────────────────
+
+/**
+ * A deferred finding paired with the id the operator addresses it by.
+ *
+ * The id is positional within the report's `findings` array, which is safe
+ * precisely because that array is written once and never appended to: the
+ * report file is the record of a single pass. Numbering over the *full* array
+ * rather than over the deferred subset is deliberate — `f3` must mean the same
+ * finding whether the reader filtered for deferrals or read the whole report,
+ * or the id stops being an address.
+ */
+export interface DeferredFinding {
+  /** `f<1-based index>` within {@link ReviewReport#findings}. */
+  id: string;
+  finding: ReviewFinding;
+}
+
+/** The id a finding at `index` in the report's findings array is addressed by. */
+export function reviewFindingId(index: number): string {
+  return `f${index + 1}`;
+}
+
+/**
+ * The fate a finding actually earned, derived from what the pass *did*.
+ *
+ * Deliberately ignores any `disposition` the reviewer wrote. The reviewer's
+ * bookkeeping is the thing that failed here: told to offer a `should-fix` and
+ * left with nobody to offer it to, it records `dropped` — a decision word for
+ * a decision nobody made — and the finding is then indistinguishable from one
+ * that was reasoned away. So the run re-derives the fate from `action` and
+ * `verdict`, the two fields the reviewer has always emitted and that
+ * {@link classifyUnresolved} already trusts.
+ *
+ * Only three outcomes are evidence of a decision: a repair in the tree, an
+ * item id in the PRD, and a `not-worth-fixing` verdict carrying its own
+ * reasoning. Everything else — a capture with no item to show for it, an
+ * action that failed, a verdict above `not-worth-fixing` that ended in
+ * `dropped` — is a finding nobody ruled on, and becomes `deferred`.
+ */
+export function deriveDisposition(f: ReviewFinding): ReviewDisposition {
+  if (f.action === "fixed") return "fixed";
+  if (f.action === "captured" && f.itemId) return "offered";
+  if (f.action === "dropped" && f.verdict === "not-worth-fixing") return "dropped";
+  return "deferred";
+}
+
+/**
+ * Give every finding in a report the fate it earned, parking the undecided
+ * ones as `deferred`.
+ *
+ * Returns a new report; the input is left alone so a caller can still show
+ * what the reviewer claimed alongside what the run concluded.
+ *
+ * Applied only on the autonomous path. An interactive run has a human at the
+ * capture prompt, so its `dropped` findings really were declined and
+ * rewriting them to `deferred` would invent a queue nobody needs.
+ */
+export function parkDeferredFindings(report: ReviewReport): ReviewReport {
+  return {
+    ...report,
+    findings: report.findings.map((f) => ({ ...f, disposition: deriveDisposition(f) })),
+  };
+}
+
+/**
+ * The parked findings of a report, with their ids.
+ *
+ * Reads the recorded `disposition` rather than re-deriving it: by the time
+ * anything calls this the report on disk has already been rewritten by
+ * {@link parkDeferredFindings}, and a second derivation here would be a second
+ * definition of what "deferred" means, free to drift from the first.
+ */
+export function deferredFindings(report: ReviewReport): DeferredFinding[] {
+  return report.findings
+    .map((finding, index) => ({ id: reviewFindingId(index), finding }))
+    .filter((entry) => entry.finding.disposition === "deferred");
+}
+
+/**
+ * Render the parked findings as the lines `hench review pending` prints.
+ *
+ * Carries the full failure scenario, not just the title. The operator reading
+ * this is deciding whether to spend a PRD item on the finding, and a title
+ * alone ("Claim refresh drops the holder pid") cannot support that decision —
+ * the scenario is the evidence, and it is the part that would otherwise have
+ * to be reconstructed from a review that has long since scrolled away.
+ */
+export function formatDeferredFindings(
+  runId: string,
+  reportPath: string,
+  deferred: readonly DeferredFinding[],
+): string[] {
+  if (deferred.length === 0) {
+    return [`No deferred findings for run ${runId}.`, `Review record: ${reportPath}`];
+  }
+
+  const lines = [
+    `${deferred.length} deferred finding(s) from run ${runId}:`,
+    `Review record: ${reportPath}`,
+    "",
+  ];
+
+  for (const { id, finding: f } of deferred) {
+    lines.push(`  ${id}  [${f.severity}/${f.verdict}] ${f.title}`);
+    if (f.location) lines.push(`      ${f.location}`);
+    lines.push(`      ${f.scenario}`);
+    if (f.reason) lines.push(`      reason: ${f.reason}`);
+    if (f.note) lines.push(`      ${f.note}`);
+    lines.push("");
+  }
+
+  lines.push(
+    "Capture what is worth tracking with the /ndx-adversarial-review skill,",
+    `naming the run and the ids above (e.g. "capture ${deferred[0].id} from run ${runId}").`,
+  );
   return lines;
 }
 
@@ -658,8 +905,16 @@ export function formatMissingReviewRefusal(review: FailedReviewRecord): string {
  * prompt, so a run that was never reviewed looked identical at the bottom of
  * the terminal to one that was. This is the line that tells them apart, and it
  * is printed on the best-effort path too — where the run *does* complete.
+ *
+ * @param runId  The run these lines describe. Optional only because the two
+ *   call sites that have it are not the only conceivable ones; when given, the
+ *   deferred block can name the exact command that lists the parked findings
+ *   instead of leaving the reader to work out the id.
  */
-export function formatRunReviewStatus(review: RunReviewRecord | undefined): string[] {
+export function formatRunReviewStatus(
+  review: RunReviewRecord | undefined,
+  runId?: string,
+): string[] {
   if (!review) return [];
 
   if (review.failed !== undefined) {
@@ -673,5 +928,17 @@ export function formatRunReviewStatus(review: RunReviewRecord | undefined): stri
   const model = review.model || "the loaded model";
   const unresolved =
     review.unresolvedCount > 0 ? `, ${review.unresolvedCount} unresolved` : "";
-  return [`Review: ${review.findingCount} finding(s)${unresolved} (${model})`];
+  const lines = [`Review: ${review.findingCount} finding(s)${unresolved} (${model})`];
+
+  // Only when something was actually parked. A "0 deferred" line on a record
+  // that predates the field would claim the run considered a question it never
+  // asked, and on a clean interactive run it is simply noise.
+  if (review.deferredCount) {
+    lines.push(
+      `        ${review.deferredCount} deferred for capture — ${review.reportPath}`,
+      `        List them: hench review pending ${runId ?? "<run-id>"}`,
+    );
+  }
+
+  return lines;
 }
