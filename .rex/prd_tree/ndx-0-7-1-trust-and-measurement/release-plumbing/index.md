@@ -26,6 +26,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Close the issues fixed by #370 and triage #375 and #367](./close-the-issues-fixed-by-370-and.md) | completed |
 | [Commit the PRD storage migration design document](./commit-the-prd-storage-migration.md) | pending |
 | [Diagnose and fix the release workflow so publishes create git tags and GitHub releases](./diagnose-and-fix-the-release-workflow.md) | in_progress |
-| [Fix rex fix timestamp backfill inverting startedAt/completedAt (#375)](./fix-rex-fix-timestamp-backfill.md) | pending |
+| [Fix rex fix timestamp backfill inverting startedAt/completedAt (#375)](./fix-rex-fix-timestamp-backfill.md) | completed |
 | [Reproduce Windows near-port relocation never engaging (#367)](./reproduce-windows-near-port-relocation.md) | pending |
 | [Stop the sourcevision cli-hints e2e test timing out under preflight load](./stop-the-sourcevision-cli-hints-e2e.md) | pending |
