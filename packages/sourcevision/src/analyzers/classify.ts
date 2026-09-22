@@ -25,7 +25,9 @@ import type {
 } from "../schema/index.js";
 import { BUILTIN_ARCHETYPES } from "./archetypes.js";
 import { sortClassifications } from "../util/sort.js";
-import { callClaude, ClaudeClientError } from "./claude-client.js";
+import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
+import { askJev, choice } from "./jev-client.js";
+import type { ChoiceQuestion, JsonValue } from "./jev-client.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
@@ -344,12 +346,19 @@ export async function enrichClassificationsWithLLM(
     return { updatedFiles, tokenUsage };
   }
 
-  // Build archetype catalog for the prompt
-  const archetypeCatalog = classifications.archetypes.map((a) => ({
-    id: a.id,
-    name: a.name,
-    description: a.description,
-  }));
+  // The full definitions: the text prompt reads id/name/description, the Jev
+  // criteria also cite each archetype's signal patterns as examples.
+  const archetypeCatalog = classifications.archetypes;
+
+  // Judgment route decided once per pass, not per batch, so the notice below
+  // prints once and every batch takes the same path.
+  const judgmentRoute = getJudgmentRoute("code.classify");
+  if (judgmentRoute === "typesafe") {
+    console.log(`  [classify] code.classify routed to TypeSafe Jev (${JEV_MODEL})`);
+  }
+  const projectLanguages = Object.entries(inventory.summary.byLanguage)
+    .sort((a, b) => b[1] - a[1])
+    .map(([lang]) => lang);
 
   // Batch unclassified files
   const batches: FileClassification[][] = [];
@@ -364,13 +373,9 @@ export async function enrichClassificationsWithLLM(
     const batch = batches[batchIdx];
     const batchLabel = batches.length > 1 ? ` batch ${batchIdx + 1}/${batches.length}` : "";
 
-    const result = await classifyBatchWithLLM(
-      batch,
-      archetypeCatalog,
-      validIds,
-      batchLabel,
-      tokenUsage,
-    );
+    const result = judgmentRoute === "typesafe"
+      ? await classifyBatchWithJev(batch, archetypeCatalog, batchLabel, tokenUsage, projectLanguages)
+      : await classifyBatchWithLLM(batch, archetypeCatalog, validIds, batchLabel, tokenUsage);
 
     if (result === "auth-error") {
       // Stop all batches on auth/not-found error
@@ -405,7 +410,7 @@ function computeLLMClassifyAttempts(batchSize: number): LLMClassifyAttemptConfig
  */
 async function classifyBatchWithLLM(
   batch: FileClassification[],
-  archetypeCatalog: { id: string; name: string; description: string }[],
+  archetypeCatalog: ArchetypeDefinition[],
   validIds: Set<string>,
   batchLabel: string,
   tokenUsage: AnalyzeTokenUsage,
@@ -485,6 +490,131 @@ async function classifyBatchWithLLM(
 
   console.warn(`  [classify]${batchLabel} All attempts exhausted — leaving files unclassified`);
   return null;
+}
+
+// ── Jev (judgment) classification ────────────────────────────────────────────
+
+/** Model tag reported in the notice and in `AnalyzeTokenUsage.model`. */
+const JEV_MODEL = "jev-latest";
+
+/**
+ * Minimum probability Jev must place on its chosen archetype. Deliberately the
+ * same bar as the heuristic pass's `PRIMARY_THRESHOLD`: a file the signals
+ * could not classify at 0.4 should not be classified by a judgment the model
+ * holds at less than 0.4 either.
+ */
+const JEV_MIN_PROBABILITY = PRIMARY_THRESHOLD;
+
+/** The no-match option; every Choice needs one because the catalog is not exhaustive. */
+const JEV_NONE = "none";
+
+export interface JevClassifyRequest {
+  state: JsonValue;
+  questions: Record<string, ChoiceQuestion>;
+  /** question id → the file it asks about. */
+  ids: Map<string, FileClassification>;
+}
+
+/**
+ * One Choice per file over the archetype catalog, all asked over one state
+ * object so a batch is a single request. Question ids are never shown to the
+ * model, so each instruction names its file by state path (`files.f3`).
+ */
+export function buildJevClassifyRequest(
+  files: FileClassification[],
+  archetypes: ArchetypeDefinition[],
+  projectLanguages: string[],
+): JevClassifyRequest {
+  const criteria: Record<string, JsonValue> = {};
+  for (const a of archetypes) {
+    criteria[a.id] = {
+      what: a.description,
+      examples: a.signals.slice(0, 4).map((sig) => `${sig.kind} matches ${sig.pattern}`),
+    };
+  }
+  criteria[JEV_NONE] = "No archetype in this catalog describes the file's role.";
+
+  const fileState: Record<string, JsonValue> = {};
+  const questions: Record<string, ChoiceQuestion> = {};
+  const ids = new Map<string, FileClassification>();
+  files.forEach((f, i) => {
+    const id = `f${i}`;
+    ids.set(id, f);
+    fileState[id] = {
+      path: f.path,
+      partialSignals: (f.evidence ?? []).slice(0, 3).map((e) => `${e.archetypeId} (${e.weight})`),
+    };
+    questions[id] = choice(
+      `Which archetype best describes the source file at \`files.${id}\`? Judge by its path, name, and any partial signals; choose ${JEV_NONE} when no archetype fits.`,
+      criteria,
+    );
+  });
+
+  return {
+    state: { project: { languages: projectLanguages }, files: fileState },
+    questions,
+    ids,
+  };
+}
+
+/**
+ * Classify a batch by asking Jev. No attempt ladder: the answer is an option
+ * id with a probability, so there is no free text to fail to parse. A file
+ * whose answer is `none`, names an id outside the catalog, or falls under
+ * {@link JEV_MIN_PROBABILITY} simply stays unclassified.
+ */
+async function classifyBatchWithJev(
+  batch: FileClassification[],
+  archetypes: ArchetypeDefinition[],
+  batchLabel: string,
+  tokenUsage: AnalyzeTokenUsage,
+  projectLanguages: string[],
+): Promise<FileClassification[] | null | "auth-error"> {
+  const { state, questions, ids } = buildJevClassifyRequest(batch, archetypes, projectLanguages);
+  const spinner = startSpinner(`  [classify]${batchLabel} Asking Jev (${batch.length} files)...`);
+
+  let response;
+  try {
+    response = await askJev({ state, questions });
+  } catch (err) {
+    spinner.stop();
+    if (err instanceof ClaudeClientError) {
+      accumulateTokenUsage(tokenUsage, undefined);
+      if (err.reason === "auth") {
+        console.warn("  [classify] TypeSafe authentication error — check TYPESAFE_API_KEY");
+        console.warn(`  [classify]   ${err.message.slice(0, 200)}`);
+        return "auth-error";
+      }
+      console.warn(`  [classify]${batchLabel} Jev request failed (${err.reason}) — leaving files unclassified`);
+      return null;
+    }
+    throw err;
+  }
+  spinner.stop();
+  accumulateTokenUsage(tokenUsage, response.tokenUsage);
+  tokenUsage.model = response.model;
+
+  const validIds = new Set(archetypes.map((a) => a.id));
+  const results: FileClassification[] = [];
+  for (const [id, file] of ids) {
+    const answer = response.answers[id];
+    const p = answer.probabilities[answer.choice] ?? 0;
+    if (answer.choice === JEV_NONE || !validIds.has(answer.choice) || p < JEV_MIN_PROBABILITY) continue;
+    const confidence = Math.round(p * 100) / 100;
+    results.push({
+      path: file.path,
+      archetype: answer.choice,
+      confidence,
+      source: "llm" as const,
+      evidence: [{
+        archetypeId: answer.choice,
+        signalKind: "path" as const,
+        detail: `Jev ${response.model} chose with probability ${confidence}`,
+        weight: confidence,
+      }],
+    });
+  }
+  return results;
 }
 
 /**

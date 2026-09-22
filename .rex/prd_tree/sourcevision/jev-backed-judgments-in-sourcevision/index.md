@@ -25,4 +25,4 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Finding severity, finding category and zone fragility as Jev judgments](./finding-severity-finding-category-and.md) | pending |
-| [Jev client and code.classify as a Choice over the archetype catalog](./jev-client-and-code-classify-as-a.md) | pending |
+| [Jev client and code.classify as a Choice over the archetype catalog](./jev-client-and-code-classify-as-a.md) | completed |

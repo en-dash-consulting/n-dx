@@ -9,6 +9,7 @@ import type {
   CompletionResult,
   LLMConfig,
   LLMVendor,
+  JudgmentRoute,
 } from "@n-dx/llm-client";
 import {
   DEFAULT_LLM_VENDOR,
@@ -18,6 +19,8 @@ import {
   NEWEST_MODELS,
   resolveVendorModel,
   resolveTaskModel,
+  resolveJudgmentRoute,
+  TYPESAFE_API_KEY_ENV,
 } from "@n-dx/llm-client";
 import type { TokenUsage } from "../schema/index.js";
 
@@ -132,6 +135,31 @@ export function getAuthMode(): AuthMode | undefined {
   }
   return undefined;
 }
+
+/**
+ * Decide whether a task class is answered by a judgment model (TypeSafe Jev)
+ * instead of the completion vendor. Thin wrapper over `resolveJudgmentRoute`
+ * with the module's config, so call sites never handle `LLMConfig` directly.
+ * `undefined` means: call `callClaude` exactly as before.
+ */
+export function getJudgmentRoute(taskClass: string): JudgmentRoute | undefined {
+  const config = _llmConfig ?? {};
+  const route = resolveJudgmentRoute(taskClass, config);
+  if (route === undefined && !_judgmentFallbackNoticed.has(taskClass)) {
+    // Re-resolve with a stand-in key: if that says "typesafe", the only thing
+    // keeping this class on text completion is the missing key. Say so once —
+    // a silent fallback on an explicitly configured route is a support call.
+    const wanted = resolveJudgmentRoute(taskClass, config, { [TYPESAFE_API_KEY_ENV]: "x" } as NodeJS.ProcessEnv);
+    if (wanted === "typesafe" && config.routes && Object.values(config.routes).includes("typesafe")) {
+      console.warn(`  [llm] ${taskClass} is routed to typesafe but ${TYPESAFE_API_KEY_ENV} is not set — using the ${resolveVendor()} vendor instead`);
+    }
+    _judgmentFallbackNoticed.add(taskClass);
+  }
+  return route;
+}
+
+/** Task classes whose missing-key fallback has already been announced this process. */
+const _judgmentFallbackNoticed = new Set<string>();
 
 /** Return the active LLM vendor for enrichment/classification calls. */
 export function getLLMVendor(): LLMVendor | undefined {

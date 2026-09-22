@@ -163,6 +163,10 @@ export {
   resolveReviewModel,
   resolveTaskModel,
   DEFAULT_ROUTES,
+  resolveJudgmentRoute,
+  DEFAULT_JUDGMENT_ROUTES,
+  JUDGMENT_ROUTE_TYPESAFE,
+  TYPESAFE_API_KEY_ENV,
   NEWEST_MODELS,
   TIER_MODELS,
   REVIEW_MODELS,
@@ -171,7 +175,7 @@ export {
   MODEL_CONTEXT_WINDOWS,
   MODEL_COSTS,
 } from "./config.js";
-export type { TaskModelResolution, ModelCost } from "./config.js";
+export type { TaskModelResolution, JudgmentRoute, ModelCost } from "./config.js";
 
 // Model-aware token pricing (the single price table for every cost surface)
 export {

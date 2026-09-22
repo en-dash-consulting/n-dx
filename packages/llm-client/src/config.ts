@@ -548,7 +548,14 @@ export function resolveTaskModel(
   const vendor = opts?.vendor ?? config?.vendor ?? DEFAULT_LLM_VENDOR;
   const effort = matchTaskClass(taskClass, config?.effort);
 
-  const routed = matchTaskClass(taskClass, config?.routes) ?? DEFAULT_ROUTES[taskClass];
+  const configured = matchTaskClass(taskClass, config?.routes);
+  // A judgment route names a System One model, not a tier. When the call
+  // site falls back to text completion (no TYPESAFE_API_KEY), it should land
+  // on the tier the registry would have picked, not on `standard`.
+  const routed =
+    configured === undefined || configured === JUDGMENT_ROUTE_TYPESAFE
+      ? DEFAULT_ROUTES[taskClass]
+      : configured;
   let tier: TaskTier = routed !== undefined && isTaskTier(routed) ? routed : "standard";
 
   if (opts?.model?.trim()) {
@@ -567,6 +574,59 @@ export function resolveTaskModel(
   }
 
   return { model: resolveVendorModel(vendor, config, tier), tier, effort };
+}
+
+// ── Judgment routes ──────────────────────────────────────────────────────────
+
+/**
+ * Route value naming TypeSafe's Jev, a System One model that answers typed
+ * questions (choice / noul / score) with calibrated probabilities instead of
+ * generating text. It is not an {@link LLMVendor}: it cannot serve a
+ * completion, so it never appears in `LLM_VENDOR`, `TIER_MODELS`, or
+ * `ClaudeClient.complete`. A call site that can phrase its work as a judgment
+ * checks {@link resolveJudgmentRoute} before falling back to `resolveTaskModel`.
+ */
+export const JUDGMENT_ROUTE_TYPESAFE = "typesafe" as const;
+
+/** The judgment routes a call site can be sent to. */
+export type JudgmentRoute = typeof JUDGMENT_ROUTE_TYPESAFE;
+
+/** Environment variable holding the TypeSafe API key; its presence is the opt-in. */
+export const TYPESAFE_API_KEY_ENV = "TYPESAFE_API_KEY";
+
+/**
+ * Task classes that go to Jev whenever the key is present and `llm.routes`
+ * does not redirect them to a tier. Membership means the call site has a
+ * judgment-shaped implementation — an enum-constrained answer per item with
+ * no free text to parse — not merely that the class is cheap.
+ */
+export const DEFAULT_JUDGMENT_ROUTES: ReadonlySet<string> = new Set(["code.classify"]);
+
+/**
+ * Decide whether a task class should be answered by a judgment model.
+ *
+ * Returns `"typesafe"` when all of:
+ * 1. `TYPESAFE_API_KEY` is non-blank in `env` — without it the helper is
+ *    inert, so an exported key is the only thing that changes behavior;
+ * 2. `llm.routes[<class>]` (exact match, then longest glob prefix, the same
+ *    rules as `resolveTaskModel`) is `"typesafe"`, **or** the class is in
+ *    {@link DEFAULT_JUDGMENT_ROUTES} and `llm.routes` does not send it to a
+ *    tier. An explicit tier always wins, so `llm.routes["*"] = "standard"`
+ *    opts a whole project out.
+ *
+ * Returns `undefined` otherwise; the caller then resolves a completion model
+ * through `resolveTaskModel` exactly as before.
+ */
+export function resolveJudgmentRoute(
+  taskClass: string,
+  config?: LLMConfig,
+  env: NodeJS.ProcessEnv = process.env,
+): JudgmentRoute | undefined {
+  if (!env[TYPESAFE_API_KEY_ENV]?.trim()) return undefined;
+  const configured = matchTaskClass(taskClass, config?.routes);
+  if (configured === JUDGMENT_ROUTE_TYPESAFE) return JUDGMENT_ROUTE_TYPESAFE;
+  if (configured !== undefined) return undefined;
+  return DEFAULT_JUDGMENT_ROUTES.has(taskClass) ? JUDGMENT_ROUTE_TYPESAFE : undefined;
 }
 
 /**

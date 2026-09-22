@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { analyzeClassifications, buildClassificationMap, enrichClassificationsWithLLM, mergeClassificationResults } from "../../../src/analyzers/classify.js";
-import { callClaude } from "../../../src/analyzers/claude-client.js";
+import { callClaude, getJudgmentRoute } from "../../../src/analyzers/claude-client.js";
+import { askJev } from "../../../src/analyzers/jev-client.js";
 import type { Inventory, Imports, Classifications, ArchetypeDefinition } from "../../../src/schema/index.js";
 
 vi.mock("../../../src/analyzers/claude-client.js", async () => {
   const actual = await import("@n-dx/llm-client");
   return {
     callClaude: vi.fn(),
+    getJudgmentRoute: vi.fn(() => undefined),
     ClaudeClientError: actual.ClaudeClientError,
     setClaudeConfig: vi.fn(),
     setClaudeClient: vi.fn(),
@@ -14,7 +16,14 @@ vi.mock("../../../src/analyzers/claude-client.js", async () => {
   };
 });
 
+vi.mock("../../../src/analyzers/jev-client.js", async () => {
+  const actual = await import("../../../src/analyzers/jev-client.js");
+  return { ...actual, askJev: vi.fn() };
+});
+
 const mockedCallClaude = vi.mocked(callClaude);
+const mockedGetJudgmentRoute = vi.mocked(getJudgmentRoute);
+const mockedAskJev = vi.mocked(askJev);
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -631,5 +640,143 @@ describe("buildClassificationMap", () => {
 
   it("returns empty map for undefined input", () => {
     expect(buildClassificationMap(undefined).size).toBe(0);
+  });
+});
+
+// ── Jev (judgment) classification ────────────────────────────────────────────
+
+import { buildJevClassifyRequest } from "../../../src/analyzers/classify.js";
+
+describe("enrichClassificationsWithLLM — Jev route", () => {
+  beforeEach(() => {
+    mockedCallClaude.mockReset();
+    mockedAskJev.mockReset();
+    mockedGetJudgmentRoute.mockReset();
+    mockedGetJudgmentRoute.mockReturnValue("typesafe");
+  });
+
+  function makeBase(unclassifiedPaths: string[]): Classifications {
+    return analyzeClassifications(makeInventory([...unclassifiedPaths, "src/index.ts"]), emptyImports);
+  }
+
+  function jevResponse(answers: Record<string, { choice: string; probabilities: Record<string, number> }>) {
+    return {
+      model: "jev-1.13.0",
+      answers: Object.fromEntries(
+        Object.entries(answers).map(([id, a]) => [id, { type: "choice" as const, confidence: 0.6, ...a }]),
+      ),
+      tokenUsage: { input: 300, output: 12 },
+    };
+  }
+
+  it("uses Jev's probability for the chosen archetype as confidence, not 0.7", async () => {
+    const base = makeBase(["src/analyzer.ts", "src/processor.ts"]);
+    mockedAskJev.mockResolvedValueOnce(jevResponse({
+      f0: { choice: "service", probabilities: { service: 0.82, utility: 0.1, none: 0.08 } },
+      f1: { choice: "utility", probabilities: { utility: 0.55, service: 0.3, none: 0.15 } },
+    }));
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/analyzer.ts", "src/processor.ts", "src/index.ts"]), emptyImports);
+
+    expect(mockedCallClaude).not.toHaveBeenCalled();
+    expect(mockedAskJev).toHaveBeenCalledTimes(1);
+    const analyzer = result.updatedFiles.find((f) => f.path === "src/analyzer.ts")!;
+    expect(analyzer.archetype).toBe("service");
+    expect(analyzer.confidence).toBe(0.82);
+    expect(analyzer.source).toBe("llm");
+    expect(analyzer.evidence?.[0].detail).toContain("jev-1.13.0");
+    expect(result.updatedFiles.find((f) => f.path === "src/processor.ts")!.confidence).toBe(0.55);
+    expect(result.tokenUsage).toMatchObject({ calls: 1, inputTokens: 300, outputTokens: 12, model: "jev-1.13.0" });
+  });
+
+  it("leaves a file unclassified on a none answer or a sub-threshold probability", async () => {
+    const base = makeBase(["src/a.ts", "src/b.ts", "src/c.ts"]);
+    mockedAskJev.mockResolvedValueOnce(jevResponse({
+      f0: { choice: "none", probabilities: { none: 0.9, service: 0.1 } },
+      f1: { choice: "service", probabilities: { service: 0.39, utility: 0.31, none: 0.3 } },
+      f2: { choice: "service", probabilities: { service: 0.4, utility: 0.3, none: 0.3 } },
+    }));
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/a.ts", "src/b.ts", "src/c.ts", "src/index.ts"]), emptyImports);
+
+    expect(result.updatedFiles.map((f) => f.path)).toEqual(["src/c.ts"]);
+  });
+
+  it("drops an archetype id outside the catalog for that file only", async () => {
+    const base = makeBase(["src/a.ts", "src/b.ts"]);
+    mockedAskJev.mockResolvedValueOnce(jevResponse({
+      f0: { choice: "made-up", probabilities: { "made-up": 0.9 } },
+      f1: { choice: "service", probabilities: { service: 0.7 } },
+    }));
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/a.ts", "src/b.ts", "src/index.ts"]), emptyImports);
+
+    expect(result.updatedFiles.map((f) => f.path)).toEqual(["src/b.ts"]);
+  });
+
+  it("stops the pass on an auth error, matching the text path", async () => {
+    const { ClaudeClientError } = await import("@n-dx/llm-client");
+    const base = makeBase(["src/a.ts"]);
+    mockedAskJev.mockRejectedValueOnce(new ClaudeClientError("bad key", "auth", false));
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/a.ts", "src/index.ts"]), emptyImports);
+
+    expect(result.updatedFiles).toHaveLength(0);
+    expect(mockedAskJev).toHaveBeenCalledTimes(1);
+    expect(mockedCallClaude).not.toHaveBeenCalled();
+  });
+
+  it("leaves the batch unclassified on a transient failure without falling back to text", async () => {
+    const { ClaudeClientError } = await import("@n-dx/llm-client");
+    const base = makeBase(["src/a.ts"]);
+    mockedAskJev.mockRejectedValueOnce(new ClaudeClientError("rate limited", "rate-limit", true));
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/a.ts", "src/index.ts"]), emptyImports);
+
+    expect(result.updatedFiles).toHaveLength(0);
+    expect(result.tokenUsage.calls).toBe(1);
+    expect(mockedCallClaude).not.toHaveBeenCalled();
+  });
+
+  it("takes the text path untouched when no judgment route is resolved", async () => {
+    mockedGetJudgmentRoute.mockReturnValue(undefined);
+    const base = makeBase(["src/analyzer.ts"]);
+    mockedCallClaude.mockResolvedValueOnce({
+      text: JSON.stringify([{ path: "src/analyzer.ts", archetype: "service", reason: "x" }]),
+    });
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/analyzer.ts", "src/index.ts"]), emptyImports);
+
+    expect(mockedAskJev).not.toHaveBeenCalled();
+    expect(result.updatedFiles[0]).toMatchObject({ archetype: "service", confidence: 0.7, source: "llm" });
+  });
+});
+
+describe("buildJevClassifyRequest", () => {
+  const archetypes: ArchetypeDefinition[] = [
+    { id: "service", name: "Service", description: "Domain logic", signals: [{ kind: "directory", pattern: "/services/", weight: 0.8 }] },
+    { id: "utility", name: "Utility", description: "Helpers", signals: [] },
+  ];
+
+  it("asks one Choice per file over the same state with a none option and signal examples", () => {
+    const files = [
+      { path: "src/x.ts", archetype: null, confidence: 0, source: "algorithmic" as const, evidence: [{ archetypeId: "utility", signalKind: "path" as const, detail: "d", weight: 0.3 }] },
+      { path: "src/y.ts", archetype: null, confidence: 0, source: "algorithmic" as const },
+    ];
+    const req = buildJevClassifyRequest(files, archetypes, ["TypeScript"]);
+
+    expect(Object.keys(req.questions)).toEqual(["f0", "f1"]);
+    expect(req.ids.get("f1")?.path).toBe("src/y.ts");
+    expect(req.questions.f0.type).toBe("choice");
+    expect(req.questions.f0.instructions).toContain("`files.f0`");
+    expect(Object.keys(req.questions.f0.criteria)).toEqual(["service", "utility", "none"]);
+    expect(req.questions.f0.criteria.service).toEqual({ what: "Domain logic", examples: ["directory matches /services/"] });
+    expect(req.state).toEqual({
+      project: { languages: ["TypeScript"] },
+      files: {
+        f0: { path: "src/x.ts", partialSignals: ["utility (0.3)"] },
+        f1: { path: "src/y.ts", partialSignals: [] },
+      },
+    });
   });
 });

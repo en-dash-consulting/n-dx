@@ -135,6 +135,21 @@ ndx config llm.codex.cli_path /path/to/codex .
 ndx config rex.model gpt-5.6-terra .
 ```
 
+## TypeSafe Jev for Judgment Calls
+
+Some sourcevision calls are judgments, not text generation — file archetype classification picks one id from a fixed catalog. Those can go to [TypeSafe's Jev](https://docs.typesafe.ai), which answers a typed Choice with a probability per option, so the classification's confidence is the model's own probability rather than a fixed value and there is no free-text JSON to parse.
+
+```sh
+# Opt in: the key's presence is the switch
+export TYPESAFE_API_KEY=...
+
+# Send a class back to the vendor tier, or name the route explicitly
+ndx config llm.routes.code.classify light .
+ndx config llm.routes.code.classify typesafe .
+```
+
+Zone names, descriptions, insights and `CONTEXT.md` stay on `llm.vendor` — Jev does not generate text. Without the key every class uses the vendor tier from `llm.routes`/the built-in registry, and a class explicitly routed to `typesafe` prints one notice naming the fallback.
+
 ## Hench Configuration
 
 ```sh
