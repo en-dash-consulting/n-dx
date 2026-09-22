@@ -136,6 +136,83 @@ describe("cmdFix", () => {
       expect(doc.items[0].startedAt).toBeDefined();
     });
 
+    // GitHub #375's reproduction: a task completed days ago, missing startedAt.
+    // The backfill must derive from the item's own completedAt, not the clock.
+    it("backfills startedAt from completedAt, never inverting the pair", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      writePRD(tmpDir, {
+        schema: "rex/v1",
+        title: "Test",
+        items: [
+          {
+            id: "t1",
+            title: "Sample task",
+            level: "task",
+            status: "completed",
+            completedAt: "2026-09-07T23:58:00.000Z",
+          },
+        ],
+      });
+
+      await cmdFix(tmpDir, {});
+      const doc = readPRD(tmpDir);
+      expect(doc.items[0].startedAt).toBe("2026-09-07T23:58:00.000Z");
+    });
+
+    it("repairs an inverted pair and renders its icon and label", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      writePRD(tmpDir, {
+        schema: "rex/v1",
+        title: "Test",
+        items: [
+          {
+            id: "t1",
+            title: "Inverted task",
+            level: "task",
+            status: "completed",
+            startedAt: "2026-09-17T16:25:42.231Z",
+            completedAt: "2026-09-07T23:58:00.000Z",
+          },
+        ],
+      });
+
+      await cmdFix(tmpDir, {});
+      const doc = readPRD(tmpDir);
+      expect(doc.items[0].startedAt).toBe("2026-09-07T23:58:00.000Z");
+
+      const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(output).toContain("⏪");
+      expect(output).toContain("Clamp startedAt back to completedAt");
+
+      const logContent = readFileSync(join(tmpDir, ".rex", "execution-log.jsonl"), "utf-8");
+      expect(logContent).toContain("inverted timestamp(s)");
+    });
+
+    it("reports inverted_timestamps in the JSON summary", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      writePRD(tmpDir, {
+        schema: "rex/v1",
+        title: "Test",
+        items: [
+          {
+            id: "t1",
+            title: "Inverted task",
+            level: "task",
+            status: "completed",
+            startedAt: "2026-09-17T16:25:42.231Z",
+            completedAt: "2026-09-07T23:58:00.000Z",
+          },
+        ],
+      });
+
+      await cmdFix(tmpDir, { format: "json" });
+      const jsonCall = stdoutSpy.mock.calls.find((c) => {
+        try { JSON.parse(c[0]); return true; } catch { return false; }
+      });
+      const report = JSON.parse(jsonCall![0]);
+      expect(report.summary.byKind.inverted_timestamps).toBe(1);
+    });
+
     it("clears stale completedAt from non-completed items", async () => {
       writeConfig(tmpDir, VALID_CONFIG);
       writePRD(tmpDir, {
