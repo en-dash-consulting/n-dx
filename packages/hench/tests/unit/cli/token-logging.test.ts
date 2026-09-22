@@ -216,3 +216,72 @@ describe("Token logging standardization", () => {
     });
   });
 });
+
+/**
+ * A cached run's `tokens_in` counts only the *uncached* input. On the runs that
+ * exposed this it was 534 against 34.1M read from cache — the summary
+ * understated input by ~65,000x and made a ~$24 run look free. The counts were
+ * always on the run record; only this report dropped them.
+ */
+describe("formatTokenReport — cache tokens", () => {
+  const cached = {
+    input: 534,
+    output: 41_502,
+    cacheCreationInput: 875_730,
+    cacheReadInput: 34_103_792,
+  };
+
+  it("reports both cache halves alongside the uncached counts", () => {
+    const output = formatTokenReport(cached);
+
+    expect(output).toContain("875,730");
+    expect(output).toContain("34,103,792");
+    expect(output).toContain("cache_write:");
+    expect(output).toContain("cache_read:");
+  });
+
+  it("marks the headline as uncached so it cannot be read as total input", () => {
+    expect(formatTokenReport(cached)).toMatch(/tokens_in:\s+534\s+\(uncached\)/);
+  });
+
+  it("keeps tokens_in and tokens_out on the first two lines", () => {
+    // Cache lines are appended, not interleaved, so line offsets stay stable
+    // for anything reading this block.
+    const lines = formatTokenReport(cached).split("\n");
+
+    expect(lines).toHaveLength(4);
+    expect(lines[0]).toContain("tokens_in:");
+    expect(lines[1]).toContain("tokens_out:");
+    expect(lines[2]).toContain("cache_write:");
+    expect(lines[3]).toContain("cache_read:");
+  });
+
+  it("aligns every value on the widest count", () => {
+    // Labels are padded to a common width and values right-aligned in a shared
+    // field, so once the "(uncached)" suffix is removed every line is the same
+    // length — which is only true if the columns line up.
+    const lines = formatTokenReport(cached)
+      .split("\n")
+      .map((line) => line.replace("  (uncached)", ""));
+
+    expect(new Set(lines.map((line) => line.length)).size).toBe(1);
+    // And the field is wide enough for the largest value, not the 8-char default.
+    expect(lines[3]).toMatch(/cache_read:\s+34,103,792$/);
+  });
+
+  it("is byte-identical to the two-line report when no cache was used", () => {
+    const plain = { input: 1500, output: 300 };
+
+    expect(formatTokenReport(plain)).toBe(
+      formatTokenReport({ ...plain, cacheCreationInput: 0, cacheReadInput: 0 }),
+    );
+    expect(formatTokenReport(plain).split("\n")).toHaveLength(2);
+  });
+
+  it("treats a cache-only run as available rather than as missing data", () => {
+    const cacheOnly = { input: 0, output: 0, cacheReadInput: 29_944 };
+
+    expect(getTokenAvailability(cacheOnly)).toBe("available");
+    expect(formatTokenReport(cacheOnly)).toContain("29,944");
+  });
+});

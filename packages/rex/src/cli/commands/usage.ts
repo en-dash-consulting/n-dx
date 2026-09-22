@@ -16,6 +16,7 @@ import type {
   AggregateTokenUsage,
   TokenUsageFilter,
   CommandTokenUsage,
+  CostEstimate,
   TimePeriod,
   PeriodBucket,
 } from "../../core/token-usage.js";
@@ -80,6 +81,28 @@ function formatCommandDetail(commands: CommandTokenUsage[]): string[] {
     lines.push(
       `  ${cmd.package} ${cmd.command}: ${fmt(total)} tokens (${splitTokens(cmd)}) — ${cmd.calls} ${unit}`,
     );
+  }
+
+  return lines;
+}
+
+/**
+ * Format the per-model cost split.
+ *
+ * This replaces a flat "(based on Sonnet pricing)" caveat. That caveat was
+ * honest but useless: it told the reader the number was wrong without telling
+ * them by how much or for which runs. Naming the model behind each line, and
+ * marking the ones that had to be guessed, says the same thing usefully.
+ */
+function formatCostDetail(cost: CostEstimate): string[] {
+  const lines: string[] = [];
+
+  for (const line of cost.byModel) {
+    if (line.totalRaw === 0) continue;
+    const label = line.known
+      ? line.model
+      : `${line.model} (priced as ${line.pricedAs})`;
+    lines.push(`  ${label}: $${line.totalRaw.toFixed(2)} — ${fmt(line.tokens)} tokens`);
   }
 
   return lines;
@@ -164,6 +187,12 @@ export async function cmdUsage(
       total: cost.total,
       inputCost: cost.inputCost,
       outputCost: cost.outputCost,
+      cacheWriteCost: cost.cacheWriteCost,
+      cacheReadCost: cost.cacheReadCost,
+      // Which model each dollar came from — the point of the whole estimate
+      // once more than one model is in play.
+      byModel: cost.byModel,
+      fullyAttributed: cost.fullyAttributed,
     };
 
     // Per-command breakdown
@@ -248,7 +277,10 @@ export async function cmdUsage(
 
     // Cost estimation
     info("");
-    info(`Estimated cost: ${cost.total} (based on Sonnet pricing)`);
+    info(`Estimated cost: ${cost.total}`);
+    for (const line of formatCostDetail(cost)) {
+      info(line);
+    }
   }
 
   // Filter notice

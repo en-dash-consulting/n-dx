@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-09-22T17:53:44.991Z
-- **Commit** — `86a1214ed464`
-- **Content hash** — `d0c6ca883220f832` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-09-22T20:09:18.021Z
+- **Commit** — `55f2d5b4b584`
+- **Content hash** — `d989f195ee4062d0` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 36
-- **Per-call total** — 22,010 tokens (what every surface costs, summed)
-- **Unique fixed text** — 13,523 tokens (distinct text a rewrite has to edit)
+- **Per-call total** — 22,194 tokens (what every surface costs, summed)
+- **Unique fixed text** — 13,707 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -113,7 +113,7 @@ so a jump is never mistaken for a regression or a win.
 | `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 19 | 91 | — | 91 |
 | `buildPrimerEnvelope` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 21 | 229 | — | 229 |
 
-## hench — 3,853 per-call / 3,853 unique, 9 surfaces
+## hench — 4,037 per-call / 4,037 unique, 9 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
@@ -123,7 +123,7 @@ so a jump is never mistaken for a regression or a win.
 | `buildReviewSystemPrompt` | `packages/hench/src/agent/analysis/adversarial-review.ts` | System prompt for the adversarial review pass. | 27 | 331 | — | 331 |
 | `buildReviewBrief` | `packages/hench/src/agent/analysis/adversarial-review.ts` | Brief handed to the reviewer — what to attack and where to report. | 140 | 1,660 | — | 1,660 |
 | `buildOrientationSystemPrompt` | `packages/hench/src/agent/lifecycle/orientation.ts` | System prompt for the one-off repository orientation pass. | 9 | 114 | — | 114 |
-| `buildOrientationPrompt` | `packages/hench/src/agent/lifecycle/orientation.ts` | Orientation task prompt — what to establish about the repo. | 15 | 191 | — | 191 |
+| `buildOrientationPrompt` | `packages/hench/src/agent/lifecycle/orientation.ts` | Orientation task prompt — what to establish about the repo. | 36 | 375 | — | 375 |
 | `buildRetryNotice` | `packages/hench/src/agent/lifecycle/cli-loop.ts` | Notice appended on retry telling a fresh session what is on disk. | 4 | 55 | — | 55 |
 | `formatPlanModeAppendix` | `packages/hench/src/agent/lifecycle/plan-mode-prompt.ts` | Appendix re-spawning a session that stalled in plan mode. | 12 | 120 | — | 120 |
 

@@ -131,7 +131,15 @@ export interface HenchConfig {
   model: string;
   maxTurns: number;
   maxTokens: number;
-  /** Total token budget per run (input + output). 0 = unlimited. */
+  /**
+   * Total token budget per run. 0 = unlimited.
+   *
+   * Counts every token the run processed at face value: uncached input,
+   * cache-write input, cache-read input, and output. Cached input counts
+   * toward the budget — otherwise a prompt-cached run would bound only its
+   * output, since caching moves nearly all input tokens out of the uncached
+   * `input` field.
+   */
   tokenBudget: number;
   rexDir: string;
   apiKeyEnv: string;
@@ -546,6 +554,15 @@ export interface RunDiagnostics {
    * v1 additive field — old records without this field load normally.
    */
   approvals?: string;
+  /**
+   * Last 200 lines of the full test suite gate's combined stdout/stderr,
+   * copied from `RunRecord.testGate.outputTail` when the gate fails or
+   * cannot be launched. Kept here too (not just on `testGate`) so gate
+   * output is discoverable wherever diagnostics are already being read.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  testGateOutputTail?: string;
 }
 
 /**
@@ -709,6 +726,12 @@ export interface TestGateResult {
   totalDurationMs?: number;
   /** Why the gate could not produce a verdict (never launched, or timed out) */
   error?: string;
+  /**
+   * Last 200 lines of the gate's combined stdout/stderr, for post-hoc
+   * diagnosis. Only populated when the gate did not pass (or could not be
+   * launched) and produced some output — a green gate needs no post-mortem.
+   */
+  outputTail?: string;
 }
 
 export interface DependencyVulnerability {
