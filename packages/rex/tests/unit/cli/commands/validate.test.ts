@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { cmdValidate } from "../../../../src/cli/commands/validate.js";
 import { writePRD, writeConfig } from "../../../helpers/rex-dir-test-support.js";
 import { serializeFolderTree } from "../../../../src/store/folder-tree-serializer.js";
+import { serializeDocument } from "../../../../src/store/markdown-serializer.js";
 import { FileStore } from "../../../../src/store/file-adapter.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
 import { SCHEMA_VERSION } from "../../../../src/schema/index.js";
@@ -384,6 +385,42 @@ describe("cmdValidate", () => {
       const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
       expect(output).toContain("✗ tree slug rule marker");
       expect(output).toContain("slug rule marker missing; run rex migrate-slugs");
+    });
+
+    // The marker describes the folder tree, so a project that has no folder
+    // tree cannot be missing one. `ensureLegacyPrdMigrated` only converts a
+    // `prd.json` source, so a checkout still on `prd.md` reaches validate with
+    // items and no tree — and judging the check by `doc.items` failed it, with
+    // advice (`rex migrate-slugs`) that refuses a project with no tree to
+    // migrate. An error with no way out, on a checkout with nothing wrong.
+    it("does not demand a marker from a legacy prd.md project with no tree", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      writeFileSync(
+        join(tmpDir, ".rex", "prd.md"),
+        serializeDocument({
+          schema: "rex/v1",
+          title: "Legacy PRD",
+          items: [
+            {
+              id: "e1",
+              title: "Alpha Epic",
+              level: "epic",
+              status: "pending",
+              priority: "medium",
+              children: [
+                { id: "t1", title: "Alpha Task", level: "task", status: "pending", priority: "medium" },
+              ],
+            },
+          ],
+        } as PRDDocument),
+      );
+      expect(existsSync(join(tmpDir, ".rex", PRD_TREE_DIRNAME))).toBe(false);
+
+      await cmdValidate(tmpDir, {});
+
+      expect(exitSpy).not.toHaveBeenCalled();
+      const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(output).not.toContain("tree slug rule marker");
     });
 
     it("reports the missing-marker check as severity=error in JSON output", async () => {

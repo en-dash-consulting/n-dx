@@ -14,6 +14,7 @@ import {
   findNonConformingSlugs,
   findTreeIdentityFaults,
   readSlugRuleMarker,
+  parseFolderTree,
   PRD_TREE_DIRNAME,
   SLUG_RULE_VERSION,
   SLUG_RULE_MARKER_MISSING,
@@ -311,9 +312,21 @@ export async function cmdValidate(
     // refusal reviewable — a tree that no longer says who wrote it fails CI
     // here rather than surfacing as a refused save mid-run.
     //
-    // Guarded on a non-empty tree so a freshly initialised project, which has
-    // a `.rex/` and no items yet, does not fail its own first validate.
-    if (slugRuleMarker === undefined && doc.items.length > 0) {
+    // Guarded on the items **the folder tree itself holds**, not on
+    // `doc.items`, and the difference is the whole correctness of this check.
+    // `doc` may have been loaded from a legacy `prd.md` or a branch-scoped
+    // file, which `ensureLegacyPrdMigrated` above only converts when the
+    // source is `prd.json` — so a project still on `prd.md` reaches here with
+    // items and no tree at all. Judged by `doc.items` it failed validation and
+    // was told to run `rex migrate-slugs`, which refuses a project with no
+    // tree: an error with no way out of it, on a checkout that had nothing
+    // wrong with it.
+    //
+    // Reading the tree makes the predicate identical to the store guard's, so
+    // validate is a faithful preview of what the next write will do rather
+    // than a second opinion that can disagree with it.
+    const { items: treeItems } = await parseFolderTree(join(dir, REX_DIR, PRD_TREE_DIRNAME));
+    if (slugRuleMarker === undefined && treeItems.length > 0) {
       checks.push({
         name: "tree slug rule marker",
         pass: false,
