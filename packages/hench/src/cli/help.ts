@@ -237,6 +237,33 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["status"],
   },
+  review: {
+    tool: "hench",
+    command: "review",
+    summary: "inspect what an adversarial review pass left behind",
+    usage: "hench review pending <run-id> [options] [dir]",
+    description:
+      "Lists the findings an autonomous `--review` run deferred instead of\n" +
+      "capturing. Autonomous runs have nobody at the capture prompt, so a\n" +
+      "finding the reviewer would have offered is parked with a `deferred`\n" +
+      "disposition and an id rather than being dropped into scrollback.\n" +
+      "\n" +
+      "Each finding is listed with its id, severity, verdict and failure\n" +
+      "scenario. To capture one, run the /ndx-adversarial-review skill and\n" +
+      "name the run and the ids — it owns the duplicate check and the choice\n" +
+      "of parent that turning a finding into a PRD item requires.",
+    options: [
+      { flag: "--format=json", description: "Output as JSON" },
+    ],
+    examples: [
+      { command: "hench review pending abc123", description: "List deferred findings for a run" },
+      {
+        command: "hench review pending abc123 --format=json",
+        description: "Machine-readable output",
+      },
+    ],
+    related: ["show", "status"],
+  },
   config: {
     tool: "hench",
     command: "config",

@@ -57,7 +57,7 @@ export async function cmdShow(
   // Whether this run was reviewed, next to the status it qualifies. The run
   // record is the only copy that outlives the terminal, so a run that was
   // never reviewed has to say so here or it reads as one that was.
-  for (const line of formatRunReviewStatus(run.review)) result(line);
+  for (const line of formatRunReviewStatus(run.review, run.id)) result(line);
 
   if (run.summary) {
     info(`\nSummary:\n${run.summary}`);

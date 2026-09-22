@@ -916,6 +916,19 @@ export type RunReviewRecord =
        * counts under `unrepairedMustFixCount`, never here.
        */
       failedActionCount: number;
+      /**
+       * Findings an autonomous run parked for the operator instead of
+       * dropping, because no human was at the capture prompt to rule on them.
+       * See `deriveDisposition` in `agent/analysis/adversarial-review.ts` for
+       * what earns a deferral; `hench review pending <run-id>` lists them.
+       *
+       * v1 additive field, and orthogonal to `unresolvedCount` rather than a
+       * slice of it: an unrepaired must-fix is counted by both, while a
+       * should-fix nobody answered for is deferred but not unresolved. Absent
+       * on records written before the field existed and on interactive runs,
+       * which have a human to decide and so park nothing.
+       */
+      deferredCount?: number;
       /** True when the reviewer edited a file. */
       fixesApplied: boolean;
       /** Absolute path of the JSON report the reviewer wrote. */

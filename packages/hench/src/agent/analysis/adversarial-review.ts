@@ -356,9 +356,9 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "every finding needs one. `offered` covers both a capture that succeeded",
     "and one the user declined; `action` and `itemId` already carry that",
     "distinction, and `reason` should say which (e.g. \"declined by user\", or",
-    "left unset when captured). Use `reason` on `dropped` too, for why. You will",
-    "not need `deferred` from this brief — it exists for a non-interactive",
-    "parking mechanism this pass does not yet drive.",
+    "left unset when captured). Use `reason` on `dropped` too, for why. Do not",
+    "write `deferred` yourself: the run sets it, on any finding it cannot see a",
+    "decision behind. Record what you actually did and let it park the rest.",
     "",
     "Before creating any PRD item, check whether one already tracks the same",
     "defect: list the directories under `.rex/prd_tree/` and read the `index.md`",
@@ -601,6 +601,125 @@ export function formatReviewSummary(report: ReviewReport): string[] {
   return lines;
 }
 
+// ── Deferred findings (the non-interactive capture queue) ────────────────
+
+/**
+ * A deferred finding paired with the id the operator addresses it by.
+ *
+ * The id is positional within the report's `findings` array, which is safe
+ * precisely because that array is written once and never appended to: the
+ * report file is the record of a single pass. Numbering over the *full* array
+ * rather than over the deferred subset is deliberate — `f3` must mean the same
+ * finding whether the reader filtered for deferrals or read the whole report,
+ * or the id stops being an address.
+ */
+export interface DeferredFinding {
+  /** `f<1-based index>` within {@link ReviewReport#findings}. */
+  id: string;
+  finding: ReviewFinding;
+}
+
+/** The id a finding at `index` in the report's findings array is addressed by. */
+export function reviewFindingId(index: number): string {
+  return `f${index + 1}`;
+}
+
+/**
+ * The fate a finding actually earned, derived from what the pass *did*.
+ *
+ * Deliberately ignores any `disposition` the reviewer wrote. The reviewer's
+ * bookkeeping is the thing that failed here: told to offer a `should-fix` and
+ * left with nobody to offer it to, it records `dropped` — a decision word for
+ * a decision nobody made — and the finding is then indistinguishable from one
+ * that was reasoned away. So the run re-derives the fate from `action` and
+ * `verdict`, the two fields the reviewer has always emitted and that
+ * {@link classifyUnresolved} already trusts.
+ *
+ * Only three outcomes are evidence of a decision: a repair in the tree, an
+ * item id in the PRD, and a `not-worth-fixing` verdict carrying its own
+ * reasoning. Everything else — a capture with no item to show for it, an
+ * action that failed, a verdict above `not-worth-fixing` that ended in
+ * `dropped` — is a finding nobody ruled on, and becomes `deferred`.
+ */
+export function deriveDisposition(f: ReviewFinding): ReviewDisposition {
+  if (f.action === "fixed") return "fixed";
+  if (f.action === "captured" && f.itemId) return "offered";
+  if (f.action === "dropped" && f.verdict === "not-worth-fixing") return "dropped";
+  return "deferred";
+}
+
+/**
+ * Give every finding in a report the fate it earned, parking the undecided
+ * ones as `deferred`.
+ *
+ * Returns a new report; the input is left alone so a caller can still show
+ * what the reviewer claimed alongside what the run concluded.
+ *
+ * Applied only on the autonomous path. An interactive run has a human at the
+ * capture prompt, so its `dropped` findings really were declined and
+ * rewriting them to `deferred` would invent a queue nobody needs.
+ */
+export function parkDeferredFindings(report: ReviewReport): ReviewReport {
+  return {
+    ...report,
+    findings: report.findings.map((f) => ({ ...f, disposition: deriveDisposition(f) })),
+  };
+}
+
+/**
+ * The parked findings of a report, with their ids.
+ *
+ * Reads the recorded `disposition` rather than re-deriving it: by the time
+ * anything calls this the report on disk has already been rewritten by
+ * {@link parkDeferredFindings}, and a second derivation here would be a second
+ * definition of what "deferred" means, free to drift from the first.
+ */
+export function deferredFindings(report: ReviewReport): DeferredFinding[] {
+  return report.findings
+    .map((finding, index) => ({ id: reviewFindingId(index), finding }))
+    .filter((entry) => entry.finding.disposition === "deferred");
+}
+
+/**
+ * Render the parked findings as the lines `hench review pending` prints.
+ *
+ * Carries the full failure scenario, not just the title. The operator reading
+ * this is deciding whether to spend a PRD item on the finding, and a title
+ * alone ("Claim refresh drops the holder pid") cannot support that decision —
+ * the scenario is the evidence, and it is the part that would otherwise have
+ * to be reconstructed from a review that has long since scrolled away.
+ */
+export function formatDeferredFindings(
+  runId: string,
+  reportPath: string,
+  deferred: readonly DeferredFinding[],
+): string[] {
+  if (deferred.length === 0) {
+    return [`No deferred findings for run ${runId}.`, `Review record: ${reportPath}`];
+  }
+
+  const lines = [
+    `${deferred.length} deferred finding(s) from run ${runId}:`,
+    `Review record: ${reportPath}`,
+    "",
+  ];
+
+  for (const { id, finding: f } of deferred) {
+    lines.push(`  ${id}  [${f.severity}/${f.verdict}] ${f.title}`);
+    if (f.location) lines.push(`      ${f.location}`);
+    lines.push(`      ${f.scenario}`);
+    if (f.reason) lines.push(`      reason: ${f.reason}`);
+    if (f.note) lines.push(`      ${f.note}`);
+    lines.push("");
+  }
+
+  lines.push(
+    "Capture what is worth tracking with the /ndx-adversarial-review skill,",
+    `naming the run and the ids above (e.g. "capture ${deferred[0].id} from run ${runId}").`,
+  );
+  return lines;
+}
+
 /**
  * Unresolved findings split by *why* they are unresolved.
  *
@@ -721,8 +840,16 @@ export function formatMissingReviewRefusal(review: FailedReviewRecord): string {
  * prompt, so a run that was never reviewed looked identical at the bottom of
  * the terminal to one that was. This is the line that tells them apart, and it
  * is printed on the best-effort path too — where the run *does* complete.
+ *
+ * @param runId  The run these lines describe. Optional only because the two
+ *   call sites that have it are not the only conceivable ones; when given, the
+ *   deferred block can name the exact command that lists the parked findings
+ *   instead of leaving the reader to work out the id.
  */
-export function formatRunReviewStatus(review: RunReviewRecord | undefined): string[] {
+export function formatRunReviewStatus(
+  review: RunReviewRecord | undefined,
+  runId?: string,
+): string[] {
   if (!review) return [];
 
   if (review.failed !== undefined) {
@@ -736,5 +863,17 @@ export function formatRunReviewStatus(review: RunReviewRecord | undefined): stri
   const model = review.model || "the loaded model";
   const unresolved =
     review.unresolvedCount > 0 ? `, ${review.unresolvedCount} unresolved` : "";
-  return [`Review: ${review.findingCount} finding(s)${unresolved} (${model})`];
+  const lines = [`Review: ${review.findingCount} finding(s)${unresolved} (${model})`];
+
+  // Only when something was actually parked. A "0 deferred" line on a record
+  // that predates the field would claim the run considered a question it never
+  // asked, and on a clean interactive run it is simply noise.
+  if (review.deferredCount) {
+    lines.push(
+      `        ${review.deferredCount} deferred for capture — ${review.reportPath}`,
+      `        List them: hench review pending ${runId ?? "<run-id>"}`,
+    );
+  }
+
+  return lines;
 }

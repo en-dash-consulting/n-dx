@@ -26,6 +26,10 @@ import {
   reviewNeverRan,
   formatMissingReviewRefusal,
   formatRunReviewStatus,
+  deriveDisposition,
+  parkDeferredFindings,
+  deferredFindings,
+  formatDeferredFindings,
   REVIEW_REPORT_SUBDIR,
   REVIEW_DISPOSITIONS,
 } from "../../../src/agent/analysis/adversarial-review.js";
@@ -559,6 +563,175 @@ describe("formatReviewSummary", () => {
 });
 
 /**
+ * The parking mechanism autonomous runs use instead of a capture prompt.
+ *
+ * The defect these cover: a reviewer that offers a should-fix and gets no
+ * answer records it as `dropped`, and the finding then exists only in
+ * scrollback. The run must not take the reviewer's word for a fate nobody
+ * decided, so the disposition is derived from `action` + `verdict` — the two
+ * fields the reviewer has always emitted and that `classifyUnresolved`
+ * already trusts — rather than read off the reviewer's own bookkeeping.
+ */
+describe("deriveDisposition", () => {
+  it("calls a repaired finding fixed", () => {
+    expect(deriveDisposition(finding({ action: "fixed" }))).toBe("fixed");
+  });
+
+  it("calls a finding that reached the PRD offered", () => {
+    expect(
+      deriveDisposition(finding({ action: "captured", verdict: "should-fix", itemId: "itm-7" })),
+    ).toBe("offered");
+  });
+
+  it("calls a reasoned-away finding dropped", () => {
+    expect(deriveDisposition(finding({ action: "dropped", verdict: "not-worth-fixing" }))).toBe(
+      "dropped",
+    );
+  });
+
+  it.each([
+    ["a should-fix nobody answered for", { action: "dropped", verdict: "should-fix" }],
+    ["an out-of-scope nobody answered for", { action: "dropped", verdict: "out-of-scope" }],
+    ["an unrepaired must-fix", { action: "dropped", verdict: "must-fix" }],
+    ["a capture with no item to show for it", { action: "captured", verdict: "should-fix" }],
+    ["an action that failed", { action: "failed", verdict: "should-fix" }],
+  ] as const)("defers %s", (_label, over) => {
+    expect(deriveDisposition(finding(over))).toBe("deferred");
+  });
+
+  it("ignores a reviewer-written disposition that contradicts what it did", () => {
+    // The reviewer's bookkeeping is the thing that failed. A `dropped` claimed
+    // on a should-fix that was never answered for is exactly the fabrication
+    // this derivation exists to overrule.
+    expect(
+      deriveDisposition(
+        finding({ action: "dropped", verdict: "should-fix", disposition: "dropped" }),
+      ),
+    ).toBe("deferred");
+  });
+});
+
+describe("parkDeferredFindings", () => {
+  it("leaves every finding with a disposition", () => {
+    const parked = parkDeferredFindings(
+      report({
+        findings: [
+          finding({ action: "fixed" }),
+          finding({ action: "dropped", verdict: "should-fix" }),
+          finding({ action: "dropped", verdict: "not-worth-fixing" }),
+        ],
+      }),
+    );
+
+    expect(parked.findings.map((f) => f.disposition)).toEqual(["fixed", "deferred", "dropped"]);
+  });
+
+  it("keeps the severity and text of a deferred finding intact", () => {
+    const parked = parkDeferredFindings(
+      report({
+        findings: [
+          finding({
+            title: "Claim refresh drops the holder pid",
+            location: "src/process/claims.ts:88",
+            severity: "high",
+            verdict: "should-fix",
+            scenario: "Two worktrees refresh at once -> both believe they hold the task",
+            action: "dropped",
+            reason: "no answer",
+          }),
+        ],
+      }),
+    );
+
+    expect(parked.findings[0]).toMatchObject({
+      title: "Claim refresh drops the holder pid",
+      location: "src/process/claims.ts:88",
+      severity: "high",
+      verdict: "should-fix",
+      scenario: "Two worktrees refresh at once -> both believe they hold the task",
+      disposition: "deferred",
+      reason: "no answer",
+    });
+  });
+
+  it("does not mutate the report it was handed", () => {
+    const original = report({ findings: [finding({ action: "dropped", verdict: "should-fix" })] });
+
+    parkDeferredFindings(original);
+
+    expect(original.findings[0].disposition).toBeUndefined();
+  });
+});
+
+describe("deferredFindings", () => {
+  it("numbers ids over every finding, not over the deferred subset", () => {
+    // The id has to address the report, because that is what the operator and
+    // the capture path both read. Numbering the filtered list would make `f1`
+    // mean a different finding depending on which filter produced it.
+    const parked = parkDeferredFindings(
+      report({
+        findings: [
+          finding({ action: "fixed" }),
+          finding({ action: "dropped", verdict: "not-worth-fixing" }),
+          finding({ title: "Third", action: "dropped", verdict: "should-fix" }),
+        ],
+      }),
+    );
+
+    const deferred = deferredFindings(parked);
+
+    expect(deferred).toHaveLength(1);
+    expect(deferred[0].id).toBe("f3");
+    expect(deferred[0].finding.title).toBe("Third");
+  });
+
+  it("is empty when nothing was parked", () => {
+    expect(deferredFindings(report({ findings: [finding({ action: "fixed" })] }))).toEqual([]);
+  });
+});
+
+describe("formatDeferredFindings", () => {
+  it("prints the id, severity, verdict, location and scenario of each finding", () => {
+    const parked = parkDeferredFindings(
+      report({
+        findings: [
+          finding({
+            title: "Claim refresh drops the holder pid",
+            location: "src/process/claims.ts:88",
+            severity: "high",
+            verdict: "should-fix",
+            scenario: "Two worktrees refresh at once -> both run the task",
+            action: "dropped",
+          }),
+        ],
+      }),
+    );
+
+    const text = formatDeferredFindings(
+      "run-1",
+      "/proj/.hench/reviews/run-1.json",
+      deferredFindings(parked),
+    ).join("\n");
+
+    expect(text).toContain("1 deferred finding(s)");
+    expect(text).toContain("run-1");
+    expect(text).toContain("/proj/.hench/reviews/run-1.json");
+    expect(text).toContain("f1");
+    expect(text).toContain("high/should-fix");
+    expect(text).toContain("Claim refresh drops the holder pid");
+    expect(text).toContain("src/process/claims.ts:88");
+    expect(text).toContain("Two worktrees refresh at once -> both run the task");
+  });
+
+  it("says so plainly when there is nothing parked", () => {
+    const text = formatDeferredFindings("run-1", "/p/r.json", []).join("\n");
+
+    expect(text).toContain("No deferred findings");
+    expect(text).not.toContain("deferred finding(s)");
+  });
+});
+
+/**
  * The classification the missing-review gate rests on.
  *
  * Only two of the four failure reasons mean nobody attacked the change. Widen
@@ -624,5 +797,43 @@ describe("reviewNeverRan", () => {
 
   it("prints nothing when --review was not passed", () => {
     expect(formatRunReviewStatus(undefined)).toEqual([]);
+  });
+
+  /**
+   * The end-of-run line is the only place a deferred finding is announced.
+   * Without it the parking mechanism would move findings from "lost in
+   * scrollback" to "lost in a file nobody is told about".
+   */
+  describe("deferred findings", () => {
+    const withDeferred: RunReviewRecord = {
+      ...clean,
+      findingCount: 4,
+      unresolvedCount: 1,
+      deferredCount: 2,
+    };
+
+    it("names the count and the record path", () => {
+      const text = formatRunReviewStatus(withDeferred).join("\n");
+
+      expect(text).toContain("2 deferred");
+      expect(text).toContain("/proj/.hench/reviews/run-1.json");
+    });
+
+    it("gives the command that lists them when the run id is known", () => {
+      const text = formatRunReviewStatus(withDeferred, "run-1").join("\n");
+
+      expect(text).toContain("hench review pending run-1");
+    });
+
+    it("stays silent about deferral on a record that predates the field", () => {
+      // Existing .hench/runs/*.json carry no deferredCount. They must not
+      // grow a "0 deferred" line that implies the run considered the question.
+      expect(formatRunReviewStatus(clean, "run-1")).toEqual([
+        "Review: 0 finding(s) (claude-opus-5)",
+      ]);
+      expect(formatRunReviewStatus({ ...clean, deferredCount: 0 }, "run-1")).toEqual([
+        "Review: 0 finding(s) (claude-opus-5)",
+      ]);
+    });
   });
 });

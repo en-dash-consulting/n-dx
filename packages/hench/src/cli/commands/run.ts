@@ -1128,7 +1128,7 @@ async function runOne(
   // mid-run line is long gone behind the test gate and the commit prompt by
   // the time anyone reads the result, and "completed" with no review line
   // beneath it is precisely the ambiguity `--review` exists to remove.
-  for (const line of formatRunReviewStatus(run.review)) info(line);
+  for (const line of formatRunReviewStatus(run.review, run.id)) info(line);
 
   // Change classification
   info(formatChangeClassification(run.toolCalls, run.commits, run.uncommittedPaths));

@@ -87,7 +87,7 @@ async function main(): Promise<void> {
     return process.cwd();
   };
 
-  const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template"];
+  const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template", "review"];
 
   // Orchestration commands that belong to ndx, not hench directly
   const NDX_ONLY_COMMANDS: Record<string, string> = {
@@ -123,9 +123,15 @@ async function main(): Promise<void> {
     const usageDir = (): string =>
       positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
 
+    // `review <sub> <run-id> [dir]`: two positionals precede the directory, so
+    // the trailing arg is only a path once there are more than two of them.
+    const reviewDir = (): string =>
+      positional.length > 2 ? resolve(positional[positional.length - 1]) : process.cwd();
+
     // Ensure .hench/ exists for all known commands except init
     if (command !== "init") {
-      requireHenchDir(command === "usage" ? usageDir() : resolveDir());
+      const dirFor: Record<string, () => string> = { usage: usageDir, review: reviewDir };
+      requireHenchDir((dirFor[command] ?? resolveDir)());
     }
 
     switch (command) {
@@ -166,6 +172,11 @@ async function main(): Promise<void> {
           positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
         const { cmdShow } = await import("./commands/show.js");
         await cmdShow(dir, runId, flags);
+        break;
+      }
+      case "review": {
+        const { cmdReview } = await import("./commands/review.js");
+        await cmdReview(reviewDir(), positional, flags);
         break;
       }
       case "config": {
