@@ -30,3 +30,4 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Finding cascade: Jev gates, verifies and anchors enrichment; free-text generation becomes --narrate](./finding-cascade-jev-gates-verifies-and.md) | completed |
 | [Finding severity, finding category and zone fragility as Jev judgments](./finding-severity-finding-category-and.md) | completed |
 | [Jev client and code.classify as a Choice over the archetype catalog](./jev-client-and-code-classify-as-a.md) | completed |
+| [Re-run judgments: Jev decides what needs re-enrichment and which findings still hold](./re-run-judgments-jev-decides-what.md) | pending |
