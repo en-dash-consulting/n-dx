@@ -10,7 +10,10 @@
  * - the moment a task is selected — explicitly or automatically — claim it,
  *   before the pre-run gate, the brief, or any LLM turn;
  * - refresh what it holds for as long as it runs;
- * - when the run ends, however it ends, release what it claimed.
+ * - when the run ends, however it ends, release what it claimed — with one
+ *   exception: a completion refused because the run's work is still
+ *   uncommitted *holds* the claim instead, so another worktree cannot pick
+ *   the task up and redo work that already exists. See {@link TaskClaims.hold}.
  *
  * A claim from the same worktree is never a conflict: a retry in the checkout
  * that already holds the task (after a crash, or a second attempt in a loop)
@@ -40,7 +43,7 @@
  */
 
 import { openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
-import type { ClaimsStore, ClaimHolder, TaskClaim } from "../prd/rex-gateway.js";
+import type { ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason } from "../prd/rex-gateway.js";
 import { CLIError } from "../prd/llm-gateway.js";
 
 /** Thrown when an explicitly requested task is being worked on in another worktree. */
@@ -50,10 +53,18 @@ export class TaskClaimedElsewhereError extends CLIError {
 
   constructor(taskId: string, claim: TaskClaim, title?: string) {
     const label = title ? `"${title}" (${taskId})` : taskId;
-    super(
-      `Task ${label} is being worked on in another worktree: ${claim.worktreeRoot} (pid ${claim.pid}, claim expires ${claim.expiresAt}).`,
-      "Pick a different task, wait for that run to finish, or run from that worktree — a run there takes the claim over.",
-    );
+    // A held claim is not a running one, and saying "is being worked on"
+    // about a run that ended hours ago sends the reader looking for a process
+    // that is not there. Name what actually happened instead.
+    const message = claim.reason === "uncommitted-work"
+      ? `Task ${label} is claimed by another worktree: ${claim.worktreeRoot}. ` +
+        `A run there refused to complete it because its work is still uncommitted, ` +
+        `so the claim is held until someone deals with that work (expires ${claim.expiresAt}).`
+      : `Task ${label} is being worked on in another worktree: ${claim.worktreeRoot} (pid ${claim.pid}, claim expires ${claim.expiresAt}).`;
+    const hint = claim.reason === "uncommitted-work"
+      ? `Commit or discard the work in ${claim.worktreeRoot} and re-run the task there, or free the task with 'ndx claim release ${taskId}'.`
+      : "Pick a different task, wait for that run to finish, or run from that worktree — a run there takes the claim over.";
+    super(message, hint);
     this.name = "TaskClaimedElsewhereError";
     this.taskId = taskId;
     this.claim = claim;
@@ -133,6 +144,29 @@ export class TaskClaims {
     // pending timer was aimed at, so re-aim it.
     if (this.renewalActive) this.scheduleRenewal();
     return null;
+  }
+
+  /**
+   * Keep a claim this run holds instead of releasing it on the way out, and
+   * record why.
+   *
+   * The one caller is the completion gate refusing to mark a task done
+   * because the run's work is still uncommitted (`agent/lifecycle`). The work
+   * is real and it is in this worktree, so releasing would invite a second
+   * worktree to redo it. Dropping the task from {@link held} is what makes the
+   * hold stick: {@link releaseAll} in the run's `finally` only releases what is
+   * still held, and renewal stops caring about a claim it no longer tracks.
+   *
+   * A no-op in read-only mode, and when this run does not hold the task.
+   */
+  async hold(taskId: string, reason: ClaimHoldReason): Promise<TaskClaim | null> {
+    if (this.readOnly || !this.held.has(taskId)) return null;
+    const claim = await this.store.hold(taskId, this.holder, reason);
+    this.held.delete(taskId);
+    this.expiries.delete(taskId);
+    // Re-aim the timer at whatever is left, or stand it down when nothing is.
+    if (this.renewalActive) this.scheduleRenewal();
+    return claim;
   }
 
   /** Release one claim this run holds. */

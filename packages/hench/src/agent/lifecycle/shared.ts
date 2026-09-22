@@ -2796,6 +2796,19 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       if (opts.store) {
         await withdrawCompletionClaim(opts.store, run, run.error);
       }
+      // Hold the cross-worktree claim rather than letting the run's `finally`
+      // release it. The refusal means finished work is sitting uncommitted in
+      // *this* worktree; a free task is an invitation for another worktree to
+      // claim it and do the same work again. The hold outlives this process
+      // and lapses at the claim's existing TTL. See process/task-claims.ts.
+      if (opts.claims && run.taskId) {
+        try {
+          await opts.claims.hold(run.taskId, "uncommitted-work");
+        } catch {
+          // A claims-store failure must not change the run's outcome. The
+          // claim then dies with this pid, as it did before holds existed.
+        }
+      }
     }
   }
 

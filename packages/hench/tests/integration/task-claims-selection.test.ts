@@ -296,3 +296,98 @@ describe("TaskClaims in read-only mode", () => {
     await real.releaseAll();
   });
 });
+
+// ── Held claims (0.7.1 PR D) ────────────────────────────────────────────────
+//
+// A run that ends by refusing to complete its task — because the work it did
+// is still uncommitted in this worktree — must not hand the task back. The
+// work exists; a second worktree claiming it would redo it. So the claim is
+// held instead of released, and unlike an ordinary claim it outlives the
+// process that took it.
+
+describe("TaskClaims.hold", () => {
+  /** Reads the shared claims file as a later process would: every holder dead. */
+  function afterTheRunExits(worktree: string): TaskClaims {
+    const base = TaskClaims.forProject(worktree);
+    return new TaskClaims(
+      openClaimsStore(worktree, { isPidAlive: () => false }),
+      base.holder,
+    );
+  }
+
+  it("survives releaseAll, where an ordinary claim does not", async () => {
+    const run = TaskClaims.forProject(wtA);
+    await run.claim("t-high");
+    await run.claim("t-low");
+
+    const held = await run.hold("t-high", "uncommitted-work");
+    expect(held).toMatchObject({ taskId: "t-high", reason: "uncommitted-work" });
+    // Dropped from `held`, which is what stops the run's own `finally`
+    // releasing it on the way out.
+    expect([...run.held]).toEqual(["t-low"]);
+
+    await run.releaseAll();
+
+    const later = afterTheRunExits(wtA);
+    expect((await later.store.readClaims()).map((c) => c.taskId)).toEqual(["t-high"]);
+  });
+
+  it("keeps the other worktree off the task after the holding run is gone", async () => {
+    const run = TaskClaims.forProject(wtA);
+    await run.claim("t-high");
+    await run.hold("t-high", "uncommitted-work");
+    await run.releaseAll();
+
+    const other = afterTheRunExits(wtB);
+    expect([...(await other.foreignClaims()).keys()]).toEqual(["t-high"]);
+
+    const brief = await assembleTaskBrief(mockStoreWithDefaults(ITEMS), undefined, { claims: other });
+    expect(brief.taskId).not.toBe("t-high");
+  });
+
+  it("refuses an explicit request naming the reason, the worktree and how to clear it", async () => {
+    const run = TaskClaims.forProject(wtA);
+    await run.claim("t-high");
+    await run.hold("t-high", "uncommitted-work");
+    await run.releaseAll();
+
+    const other = afterTheRunExits(wtB);
+    await expect(
+      assembleTaskBrief(mockStoreWithDefaults(ITEMS), "t-high", { claims: other }),
+    ).rejects.toThrow(TaskClaimedElsewhereError);
+
+    const claim = await other.heldElsewhere("t-high");
+    expect(claim).not.toBeNull();
+    const err = new TaskClaimedElsewhereError("t-high", claim!, "High priority");
+    // Not "is being worked on": that run ended, and sending the reader to look
+    // for a live process is the confusion this wording exists to avoid.
+    expect(err.message).not.toContain("is being worked on");
+    expect(err.message).toContain("still uncommitted");
+    expect(err.message).toContain(run.holder.worktreeRoot);
+    expect(String(err.suggestion ?? "")).toContain("ndx claim release t-high");
+  });
+
+  it("does nothing for a task this run does not hold, or in read-only mode", async () => {
+    const run = TaskClaims.forProject(wtA);
+    expect(await run.hold("t-high", "uncommitted-work")).toBeNull();
+
+    const preview = TaskClaims.forProject(wtA, { readOnly: true });
+    await preview.claim("t-high");
+    expect(await preview.hold("t-high", "uncommitted-work")).toBeNull();
+    expect(await TaskClaims.forProject(wtB).foreignClaims()).toEqual(new Map());
+  });
+
+  it("is cleared by re-running the task in the worktree that left the work", async () => {
+    const first = TaskClaims.forProject(wtA);
+    await first.claim("t-high");
+    await first.hold("t-high", "uncommitted-work");
+    await first.releaseAll();
+
+    // The operator commits the work and runs the task again, here.
+    const second = TaskClaims.forProject(wtA);
+    expect(await second.claim("t-high")).toBeNull();
+    const claims = await second.store.readClaims();
+    expect(claims[0]!.reason).toBeUndefined();
+    await second.releaseAll();
+  });
+});
