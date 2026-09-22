@@ -240,10 +240,22 @@ function normalizeEventMetadata(value: unknown): string | undefined {
 // ---------------------------------------------------------------------------
 
 /**
+ * The execution-log events that carry rex token spend. One set for the package
+ * rollup and the per-command event stream both: when the rollup read only
+ * `analyze_token_usage`, every smart-add call was in the By-command breakdown
+ * (and the dashboard's totals) but missing from the headline `ndx usage`
+ * figure, so the two surfaces could never agree to the cent.
+ */
+const REX_TOKEN_EVENTS: Record<string, string> = {
+  analyze_token_usage: "analyze",
+  smart_add_token_usage: "smart-add",
+};
+
+/**
  * Extract rex token usage from execution log entries.
  *
- * Looks for `analyze_token_usage` events whose `detail` field
- * contains JSON-serialized AnalyzeTokenUsage data.
+ * Reads every event kind in {@link REX_TOKEN_EVENTS} whose `detail` field
+ * contains JSON-serialized token usage data.
  */
 export function extractRexTokenUsage(
   logEntries: TokenUsageLogEntry[],
@@ -252,7 +264,7 @@ export function extractRexTokenUsage(
   const usage = emptyPackageUsage();
 
   for (const entry of logEntries) {
-    if (entry.event !== "analyze_token_usage") continue;
+    if (!REX_TOKEN_EVENTS[entry.event]) continue;
     if (!entry.detail) continue;
     if (!isInRange(entry.timestamp, filter)) continue;
 
@@ -467,14 +479,8 @@ export function extractRexTokenEvents(
 ): TokenEvent[] {
   const events: TokenEvent[] = [];
 
-  /** Map log event types to human-readable command names. */
-  const EVENT_COMMAND_MAP: Record<string, string> = {
-    analyze_token_usage: "analyze",
-    smart_add_token_usage: "smart-add",
-  };
-
   for (const entry of logEntries) {
-    const command = EVENT_COMMAND_MAP[entry.event];
+    const command = REX_TOKEN_EVENTS[entry.event];
     if (!command) continue;
     if (!entry.detail) continue;
     if (!isInRange(entry.timestamp, filter)) continue;
@@ -912,19 +918,40 @@ export function estimateCost(
   usage: AggregateTokenUsage,
   pricing?: ModelPricing,
 ): CostEstimate {
-  const totals: BillableTokens = {
-    inputTokens: usage.totalInputTokens,
-    outputTokens: usage.totalOutputTokens,
-    cacheCreationTokens: usage.totalCacheCreationTokens,
-    cacheReadTokens: usage.totalCacheReadTokens,
-  };
+  return estimateCostFromTotals(
+    {
+      inputTokens: usage.totalInputTokens,
+      outputTokens: usage.totalOutputTokens,
+      cacheCreationTokens: usage.totalCacheCreationTokens,
+      cacheReadTokens: usage.totalCacheReadTokens,
+    },
+    usage.byModel,
+    pricing,
+  );
+}
 
+/**
+ * The per-model pricing arithmetic behind {@link estimateCost}, over bare
+ * totals and buckets rather than rex's aggregate shape.
+ *
+ * Exported (and re-exported through the web package's rex gateway) because the
+ * dashboard aggregates its own four-package shape — it has a `web` bucket rex's
+ * aggregate does not model — but must quote the same dollar figure as
+ * `ndx usage` for the same tokens. One arithmetic, two aggregations;
+ * `tests/unit/token-pricing-parity.test.js` pins that the dashboard has no
+ * local copy of this loop.
+ */
+export function estimateCostFromTotals(
+  totals: BillableTokens,
+  byModel?: Record<string, BillableTokens>,
+  pricing?: ModelPricing,
+): CostEstimate {
   if (pricing) {
     const flat = priceTokens(totals, pricing);
     return { ...flat, total: fmtUsd(flat.totalRaw), byModel: [], fullyAttributed: false };
   }
 
-  const buckets = Object.entries(usage.byModel ?? {});
+  const buckets = Object.entries(byModel ?? {});
   const lines: ModelCostLine[] = [];
   let inputCost = 0;
   let outputCost = 0;
