@@ -137,24 +137,34 @@ ndx config rex.model gpt-5.6-terra .
 
 ## TypeSafe Jev for Judgment Calls
 
-Some sourcevision calls are judgments, not text generation, and those can go to [TypeSafe's Jev](https://docs.typesafe.ai), which answers typed questions with a probability per option instead of free-text JSON:
+Some sourcevision calls are judgments, not text generation, and those go to [TypeSafe's Jev](https://docs.typesafe.ai), which answers typed questions with a probability per option instead of free-text JSON. Setting `TYPESAFE_API_KEY` opts in; without it every prompt and output is exactly as before.
 
 | Task class | Judgment | What changes |
 |---|---|---|
-| `code.classify` | Choice over the archetype catalog | A file's classification confidence is Jev's probability for that archetype, not a fixed 0.7; a `none` or sub-threshold answer leaves it unclassified |
-| `finding.judge` | Score for severity, Choice for category | Enrichment prompts stop asking the text model for `severity`/`category`; Jev grades each pass ≥ 1 finding and its confidence lands in `Finding.confidence`. The meta pass re-rates existing findings the same way instead of returning `severityUpdates` |
-| `zone.judge` | Two Nouls per enriched zone | Zones whose files serve unrelated purposes, or that depend on more of the codebase than their size warrants, get a structural observation carrying the probability |
+| `code.classify` | Choice over the archetype catalog | A file's classification confidence is Jev's probability for that archetype, not a fixed 0.7. A confident `none` leaves the file unclassified; an unsure answer is **escalated** to the text classifier with the file's leading doc comment as extra evidence |
+| `finding.judge` | Score for severity, Choice for category, Nouls for support and metric-paraphrase, Choices for anchor file, type and scope | Enrichment prompts stop asking the text model for `severity`, `category`, `type` and `scope`. Findings the evidence contradicts are dropped (support below 0.3 — this replaces the hedge-phrase regex), undecided ones (0.3–0.7) are kept with the support probability recorded as their confidence, paraphrases of pass 0 metrics are dropped, `Finding.anchors` and `Finding.confidence` are filled. The meta pass re-rates existing findings the same way instead of returning `severityUpdates` |
+| `zone.judge` | Choice over deterministic name candidates, Nouls over merge-candidate pairs, two fragility Nouls per zone | Zone names are **selected** from the package name, dominant directories and dominant archetype (a `none` or spread Choice escalates to three generated names, verified by a Noul); zones the graph links are merged at ≥ 0.8 and reported as an observation between 0.4–0.6; fragility above 0.7 is a structural finding |
+
+### The cascade
+
+With the key present, `ndx analyze` runs the **cascade** by default: facts are computed, Jev judges them, and the text model is asked only about what a judgment left uncertain. Fragility probabilities at or above 0.7 become templated findings, at or below 0.3 nothing, and a zone in between is **escalated** — the per-zone generative prompt runs for that zone alone, and its findings are then judged like any other. Zone descriptions are templated from facts. `PRIMER.md` is not regenerated in this mode (a cached one is still served).
 
 ```sh
-# Opt in: the key's presence is the switch
 export TYPESAFE_API_KEY=...
+ndx analyze .              # cascade: judgments first, generation only on escalation
+ndx analyze --narrate .    # the full generative pass over every zone, as before the key
+ndx analyze --fast .       # no LLM at all
 
 # Send a class back to the vendor tier, or name the route explicitly
 ndx config llm.routes.code.classify light .
 ndx config llm.routes.finding.judge typesafe .
 ```
 
-Zone names, descriptions, insights and `CONTEXT.md` stay on `llm.vendor` — Jev does not generate text. Without the key every class uses the vendor tier from `llm.routes`/the built-in registry, prompts are unchanged, and a class explicitly routed to `typesafe` prints one notice naming the fallback. Thresholds (0.4 classification probability, 0.5 finding confidence, 0.7 fragility probability) live in code, not config. `enforceSeverityRules` still runs last and pass 0 heuristic findings are never re-graded.
+Thresholds — 0.4 classification probability, 0.5 finding confidence, the 0.3/0.7 support bands, 0.7 paraphrase, 0.8 rescope, 0.8 merge, 0.6 generated-name fit, and the 0.3–0.7 escalation band — live in code, not config. `enforceSeverityRules` still runs last and pass 0 heuristic findings are never re-graded. A class explicitly routed to `typesafe` without the key prints one notice naming the fallback.
+
+### What a run records
+
+Every `ndx analyze` writes `manifest.lastAnalysis` — mode (`fast` · `generative` · `narrate` · `cascade`), wall-clock per phase, and calls, tokens and time per LLM task class, so you can see which model answered what and how long it took (a class served by two vendors in one run, such as `code.classify` with its escalations, appears once per vendor). The same record is appended to `.sourcevision/.cache/analyses.jsonl` (last 200 runs). Jev answers are cached in `.sourcevision/.cache/judgments.json`, keyed by the question and only the slice of state it references, so a re-run re-asks only what changed; the CLI's token report shows hits and misses. Both cache files are machine-local and safe to delete.
 
 ## Hench Configuration
 

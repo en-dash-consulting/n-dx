@@ -21,6 +21,8 @@
 
 import { ClaudeClientError, TYPESAFE_API_KEY_ENV } from "@n-dx/llm-client";
 import type { TokenUsage } from "../schema/index.js";
+import { recordLLMCall, recordJudgmentCache } from "./run-ledger.js";
+import { isJudgmentCacheConfigured, lookupJudgments, storeJudgments } from "./judgment-cache.js";
 
 export const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 export const JEV_MODEL = "jev-latest";
@@ -145,6 +147,8 @@ export interface JevResponse {
 }
 
 export interface AskJevOptions {
+  /** Task class for the run ledger; `unclassed` when omitted. */
+  taskClass?: string;
   /** Injection seams for tests. */
   fetchImpl?: typeof fetch;
   env?: NodeJS.ProcessEnv;
@@ -180,12 +184,22 @@ export async function askJev(
   const fetchImpl = opts.fetchImpl ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
+  // Answers already on disk are not asked again; only the misses are sent.
+  const lookup = lookupJudgments(request.state, request.questions, JEV_MODEL);
+  const hitCount = Object.keys(lookup.hits).length;
+  const missCount = Object.keys(lookup.misses).length;
+  if (isJudgmentCacheConfigured()) recordJudgmentCache(hitCount, missCount);
+  if (missCount === 0) {
+    return { model: lookup.model ?? JEV_MODEL, answers: lookup.hits };
+  }
+
   const body = JSON.stringify({
     state: request.state,
     model: JEV_MODEL,
-    questions: request.questions,
+    questions: lookup.misses,
   });
 
+  const startedAt = Date.now();
   let lastTransient: ClaudeClientError | undefined;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let res: Response;
@@ -213,7 +227,16 @@ export async function askJev(
     }
 
     if (res.ok) {
-      return parseResponse(await res.json(), request.questions);
+      const parsed = parseResponse(await res.json(), lookup.misses);
+      recordLLMCall({
+        taskClass: opts.taskClass ?? "unclassed",
+        vendor: "typesafe",
+        model: parsed.model,
+        tokenUsage: parsed.tokenUsage,
+        durationMs: Date.now() - startedAt,
+      });
+      storeJudgments(lookup.keys, parsed.answers, parsed.model);
+      return { ...parsed, answers: { ...lookup.hits, ...parsed.answers } };
     }
 
     const detail = await safeText(res);

@@ -58,6 +58,9 @@ import {
 import type { MergeLogEntry } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
 import { judgeFindings, judgeZoneFragility } from "./enrich-judge.js";
+import { cascadeEnrichment } from "./enrich-cascade.js";
+import { getJudgmentRoute } from "./claude-client.js";
+import { setRunMode } from "./run-ledger.js";
 import { emptyAnalyzeTokenUsage } from "./token-usage.js";
 import { deduplicateFindings, enforceSeverityRules } from "./enrich-parsing.js";
 import { detectPinDivergence, detectImportNeighborMoves } from "./move-recommendations.js";
@@ -311,6 +314,23 @@ export function preservePreviousZoneIdentity(
   }
 
   return result;
+}
+
+/**
+ * After identity preservation restores a previous zone's name and
+ * description, put the cascade's labels back where they should win: the
+ * description is templated from current facts, so it is always the cascade's;
+ * the name is the cascade's only when the preserved one is the algorithmic
+ * default (a chosen name from an earlier run stays, for stability).
+ */
+export function reapplyCascadeLabels(preserved: Zone[], cascade: Zone[]): Zone[] {
+  const byFiles = new Map(cascade.map((z) => [[...z.files].sort().join("\u0000"), z]));
+  return preserved.map((zone) => {
+    const source = byFiles.get([...zone.files].sort().join("\u0000"));
+    if (!source) return zone;
+    const keepName = zone.name !== deriveZoneName(zone.id);
+    return { ...zone, description: source.description, name: keepName ? zone.name : source.name };
+  });
 }
 
 // ── Zone ID / name derivation ───────────────────────────────────────────────
@@ -1892,6 +1912,14 @@ interface EnrichmentResult {
   enrichmentPass: number;
   metaUpdatedFindings: Finding[] | null;
   enrichTokenUsage?: AnalyzeTokenUsage;
+  /** Files of the zones the LLM actually enriched this pass — the ones worth a fragility judgment. */
+  enrichedFiles?: Set<string>;
+  /** The cascade already judged fragility; the assemble-time hook must not ask again. */
+  fragilityJudged?: boolean;
+  /** The cascade ran: descriptions are templated from facts and must survive identity preservation. */
+  cascade?: boolean;
+  /** Judgment-made findings that bypass the support/paraphrase judgment. */
+  prejudgedFindings?: Finding[];
 }
 
 /**
@@ -1909,6 +1937,7 @@ async function applyEnrichment(
   currentContentHashes?: Record<string, string>,
   hints?: string,
   projectProfile?: ProjectProfile,
+  narrate = false,
 ): Promise<EnrichmentResult> {
   let finalZones = expandedZones;
   let aiZoneInsights = new Map<string, string[]>();
@@ -1918,6 +1947,10 @@ async function applyEnrichment(
   let metaUpdatedFindings: Finding[] | null = null;
   let enrichTokenUsage: AnalyzeTokenUsage | undefined;
   let enrichedZoneIds: Set<string> | undefined;
+  let enrichedFiles: Set<string> | undefined;
+  let fragilityJudged = false;
+  let cascadeRan = false;
+  let prejudgedFindings: Finding[] | undefined;
 
   if (enrich) {
     // Build pre-enrichment crossings for prompt context
@@ -1939,7 +1972,27 @@ async function applyEnrichment(
       }
     }
 
-    if (perZone) {
+    // The cascade (enrich-cascade.ts) is the default whenever a judgment
+    // route resolves; --narrate forces the generative prompts over every
+    // zone. Without a route this branch is never taken, so the no-key path
+    // is exactly the one below.
+    const cascade = !narrate && getJudgmentRoute("zone.judge") === "typesafe";
+    if (cascade) {
+      setRunMode("cascade");
+      const result = await cascadeEnrichment(
+        expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes, hints, projectProfile,
+      );
+      finalZones = result.zones;
+      aiZoneInsights = result.newZoneInsights;
+      aiGlobalInsights = result.newGlobalInsights;
+      aiFindings = result.newFindings;
+      enrichmentPass = result.pass;
+      enrichTokenUsage = result.tokenUsage;
+      enrichedZoneIds = result.enrichedZoneIds;
+      fragilityJudged = result.fragilityJudged;
+      cascadeRan = true;
+      prejudgedFindings = result.prejudgedFindings;
+    } else if (perZone) {
       const result = await enrichZonesPerZone(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes, hints,
       );
@@ -1967,27 +2020,12 @@ async function applyEnrichment(
       }
     }
 
-    // Judgment step (enrich-judge.ts). Runs after extraction and before
-    // assembleFindings' enforceSeverityRules, for every enrichment mode at
-    // once. Inert without a judgment route: both calls return their input.
-    // Fragility is asked only of zones the LLM saw this pass, over crossings
-    // rebuilt against the post-rename zone ids.
-    const judged = await judgeFindings(aiFindings);
-    const fragilityZones = enrichedZoneIds
-      ? finalZones.filter((z) => enrichedZoneIds!.has(z.id))
-      : [];
-    const fragility = await judgeZoneFragility(
-      fragilityZones,
-      fragilityZones.length > 0 ? buildCrossings(finalZones, imports, []) : [],
-      enrichmentPass,
-    );
-    aiFindings = [...judged.findings, ...fragility.findings];
-    for (const r of [judged, fragility]) {
-      if (r.calls === 0) continue;
-      enrichTokenUsage ??= emptyAnalyzeTokenUsage();
-      enrichTokenUsage.calls += r.calls;
-      enrichTokenUsage.inputTokens += r.tokenUsage?.input ?? 0;
-      enrichTokenUsage.outputTokens += r.tokenUsage?.output ?? 0;
+    // Zone ids can still change after this point (identity preservation,
+    // pins), so remember the enriched zones by file rather than by id.
+    if (enrichedZoneIds) {
+      enrichedFiles = new Set(
+        finalZones.filter((z) => enrichedZoneIds!.has(z.id)).flatMap((z) => z.files),
+      );
     }
   } else if (validPrevious) {
     // --fast with unchanged structure: apply previous AI names, preserve insights
@@ -2025,6 +2063,10 @@ async function applyEnrichment(
     enrichmentPass,
     metaUpdatedFindings,
     enrichTokenUsage,
+    enrichedFiles,
+    fragilityJudged,
+    cascade: cascadeRan,
+    prejudgedFindings,
   };
 }
 
@@ -2837,6 +2879,11 @@ export async function analyzeZones(
      */
     reuseStructure?: boolean;
     /**
+     * Force the generative enrichment prompts over every zone even when a
+     * judgment route would otherwise select the cascade (`--narrate`).
+     */
+    narrate?: boolean;
+    /**
      * Detected project profile (frameworks, release infra, import-graph quality).
      * Forwarded to the AI enrichment prompt so the LLM can suppress
      * recommendations that contradict the project's actual shape.
@@ -2940,15 +2987,19 @@ export async function analyzeZones(
   // ── AI enrichment or preserve previous ──
   const enrichResult = await applyEnrichment(
     expandedZones, imports, inventory, validPrevious, enrich, perZone, options?.fileArchetypes,
-    zoneContentHashes, options?.hints, options?.projectProfile,
+    zoneContentHashes, options?.hints, options?.projectProfile, options?.narrate === true,
   );
-  const { finalZones: enrichedZones, aiZoneInsights, aiGlobalInsights, aiFindings,
-    enrichmentPass, metaUpdatedFindings, enrichTokenUsage } = enrichResult;
+  const { finalZones: enrichedZones, aiZoneInsights, aiGlobalInsights,
+    enrichmentPass, metaUpdatedFindings, enrichedFiles, fragilityJudged } = enrichResult;
+  let { aiFindings, enrichTokenUsage } = enrichResult;
 
   // ── Preserve previous zone identity for high-overlap zones ──
-  const finalZones = previousZones
+  let finalZones = previousZones
     ? preservePreviousZoneIdentity(enrichedZones, previousZones.zones)
     : enrichedZones;
+  if (enrichResult.cascade && previousZones) {
+    finalZones = reapplyCascadeLabels(finalZones, enrichedZones);
+  }
 
   // ── Remap content hashes to post-enrichment zone IDs ──
   const remappedContentHashes = remapContentHashKeys(
@@ -2989,6 +3040,30 @@ export async function analyzeZones(
     ...computeSkippedPinFindings(skippedPins),
     ...computeEmptyAnchorFindings(emptyAnchors),
   );
+
+  // ── Judgment step (enrich-judge.ts) ──
+  // After extraction, before assembleFindings' enforceSeverityRules, for every
+  // enrichment mode at once. Inert without a judgment route. Here — not inside
+  // applyEnrichment — because the evidence a finding is judged against
+  // (post-rename crossings, heuristic findings) only exists at this point.
+  const judged = await judgeFindings(aiFindings, {
+    zones: pinnedFinalZones,
+    crossings,
+    heuristics: structural.findings,
+    projectDir: options?.projectProfile?.projectDir,
+  });
+  const fragilityZones = enrichedFiles && !fragilityJudged
+    ? pinnedFinalZones.filter((z) => z.files.some((f) => enrichedFiles.has(f)))
+    : [];
+  const fragility = await judgeZoneFragility(fragilityZones, crossings, enrichmentPass);
+  aiFindings = [...judged.findings, ...fragility.findings, ...(enrichResult.prejudgedFindings ?? [])];
+  for (const r of [judged, fragility]) {
+    if (r.calls === 0) continue;
+    enrichTokenUsage ??= emptyAnalyzeTokenUsage();
+    enrichTokenUsage.calls += r.calls;
+    enrichTokenUsage.inputTokens += r.tokenUsage?.input ?? 0;
+    enrichTokenUsage.outputTokens += r.tokenUsage?.output ?? 0;
+  }
 
   // ── Merge insights ──
   mergeZoneInsights(pinnedFinalZones, structural, aiZoneInsights, validPrevious);

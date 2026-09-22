@@ -32,6 +32,7 @@ import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
 import { section, svPromptEnvelope, svPrompt } from "./prompt-envelope.js";
+import { collectFileHeaders } from "./file-headers.js";
 
 /** Minimum accumulated score for a primary classification. */
 const PRIMARY_THRESHOLD = 0.4;
@@ -333,6 +334,10 @@ export async function enrichClassificationsWithLLM(
   classifications: Classifications,
   inventory: Inventory,
   imports: Imports,
+  opts?: {
+    /** Enables file headers in the text prompt for files Jev could not place confidently. */
+    projectDir?: string;
+  },
 ): Promise<LLMClassifyResult> {
   const tokenUsage = emptyAnalyzeTokenUsage();
   const updatedFiles: FileClassification[] = [];
@@ -373,17 +378,27 @@ export async function enrichClassificationsWithLLM(
     const batch = batches[batchIdx];
     const batchLabel = batches.length > 1 ? ` batch ${batchIdx + 1}/${batches.length}` : "";
 
-    const result = judgmentRoute === "typesafe"
-      ? await classifyBatchWithJev(batch, archetypeCatalog, batchLabel, tokenUsage, projectLanguages)
-      : await classifyBatchWithLLM(batch, archetypeCatalog, validIds, batchLabel, tokenUsage);
-
-    if (result === "auth-error") {
-      // Stop all batches on auth/not-found error
-      break;
+    if (judgmentRoute !== "typesafe") {
+      const result = await classifyBatchWithLLM(batch, archetypeCatalog, validIds, batchLabel, tokenUsage);
+      if (result === "auth-error") break;
+      if (result) updatedFiles.push(...result);
+      continue;
     }
 
-    if (result) {
-      updatedFiles.push(...result);
+    const judged = await classifyBatchWithJev(batch, archetypeCatalog, batchLabel, tokenUsage, projectLanguages);
+    if (judged === "auth-error") break;
+    if (!judged) continue;
+    updatedFiles.push(...judged.results);
+
+    // Escalation: a file Jev leaned on but not confidently goes to the text
+    // model with more evidence than Jev was given — its leading doc comment.
+    // A confident `none` is a real answer and stays unclassified.
+    if (judged.escalate.length > 0) {
+      console.log(`  [classify]${batchLabel} ${judged.escalate.length} ambiguous file(s) escalated to the text model with headers`);
+      const headers = collectFileHeaders(judged.escalate.map((f) => f.path), opts?.projectDir);
+      const result = await classifyBatchWithLLM(judged.escalate, archetypeCatalog, validIds, batchLabel, tokenUsage, headers);
+      if (result === "auth-error") break;
+      if (result) updatedFiles.push(...result);
     }
   }
 
@@ -414,6 +429,7 @@ async function classifyBatchWithLLM(
   validIds: Set<string>,
   batchLabel: string,
   tokenUsage: AnalyzeTokenUsage,
+  headers?: Record<string, string>,
 ): Promise<FileClassification[] | null | "auth-error"> {
   const attempts = computeLLMClassifyAttempts(batch.length);
 
@@ -421,7 +437,7 @@ async function classifyBatchWithLLM(
     const config = attempts[attempt];
     const filesToClassify = batch.slice(0, config.maxFiles);
 
-    const prompt = buildLLMClassifyPrompt(filesToClassify, archetypeCatalog, config.includeDescriptions);
+    const prompt = buildLLMClassifyPrompt(filesToClassify, archetypeCatalog, config.includeDescriptions, headers);
     const promptLevel = config.includeDescriptions ? "full" : "compact";
     const spinner = startSpinner(
       `  [classify]${batchLabel} Calling LLM (attempt ${attempt + 1}/${attempts.length}, ${promptLevel} prompt, ${filesToClassify.length} files)...`,
@@ -508,6 +524,20 @@ const JEV_MIN_PROBABILITY = PRIMARY_THRESHOLD;
 /** The no-match option; every Choice needs one because the catalog is not exhaustive. */
 const JEV_NONE = "none";
 
+/**
+ * Probability on `none` at which "no archetype fits" is taken as the answer
+ * rather than as uncertainty. Below it, and below {@link JEV_MIN_PROBABILITY}
+ * for any other option, the file is escalated to the text model.
+ */
+const JEV_CONFIDENT_NONE = 0.6;
+
+/** Outcome of one Jev classification batch. */
+export interface JevClassifyBatch {
+  results: FileClassification[];
+  /** Files Jev leaned on but not confidently — worth a second look with more evidence. */
+  escalate: FileClassification[];
+}
+
 export interface JevClassifyRequest {
   state: JsonValue;
   questions: Record<string, ChoiceQuestion>;
@@ -559,9 +589,10 @@ export function buildJevClassifyRequest(
 
 /**
  * Classify a batch by asking Jev. No attempt ladder: the answer is an option
- * id with a probability, so there is no free text to fail to parse. A file
- * whose answer is `none`, names an id outside the catalog, or falls under
- * {@link JEV_MIN_PROBABILITY} simply stays unclassified.
+ * id with a probability, so there is no free text to fail to parse. Three
+ * outcomes per file: a probability at or above {@link JEV_MIN_PROBABILITY}
+ * classifies it; a confident `none` leaves it unclassified; anything else is
+ * returned for escalation.
  */
 async function classifyBatchWithJev(
   batch: FileClassification[],
@@ -569,13 +600,13 @@ async function classifyBatchWithJev(
   batchLabel: string,
   tokenUsage: AnalyzeTokenUsage,
   projectLanguages: string[],
-): Promise<FileClassification[] | null | "auth-error"> {
+): Promise<JevClassifyBatch | null | "auth-error"> {
   const { state, questions, ids } = buildJevClassifyRequest(batch, archetypes, projectLanguages);
   const spinner = startSpinner(`  [classify]${batchLabel} Asking Jev (${batch.length} files)...`);
 
   let response;
   try {
-    response = await askJev({ state, questions });
+    response = await askJev({ state, questions }, { taskClass: "code.classify" });
   } catch (err) {
     spinner.stop();
     if (err instanceof ClaudeClientError) {
@@ -596,11 +627,20 @@ async function classifyBatchWithJev(
 
   const validIds = new Set(archetypes.map((a) => a.id));
   const results: FileClassification[] = [];
+  const escalate: FileClassification[] = [];
   for (const [id, file] of ids) {
     const answer = response.answers[id];
     if (answer.type !== "choice") continue;
     const p = answer.probabilities[answer.choice] ?? 0;
-    if (answer.choice === JEV_NONE || !validIds.has(answer.choice) || p < JEV_MIN_PROBABILITY) continue;
+    if (answer.choice === JEV_NONE) {
+      if (p < JEV_CONFIDENT_NONE) escalate.push(file);
+      continue;
+    }
+    if (!validIds.has(answer.choice)) continue;
+    if (p < JEV_MIN_PROBABILITY) {
+      escalate.push(file);
+      continue;
+    }
     const confidence = Math.round(p * 100) / 100;
     results.push({
       path: file.path,
@@ -615,7 +655,7 @@ async function classifyBatchWithJev(
       }],
     });
   }
-  return results;
+  return { results, escalate };
 }
 
 /**
@@ -625,6 +665,8 @@ export function buildLLMClassifyEnvelope(
   files: FileClassification[],
   archetypes: { id: string; name: string; description: string }[],
   includeDescriptions: boolean,
+  /** Leading doc comments by path — present only for files escalated from a Jev judgment. */
+  headers?: Record<string, string>,
 ): PromptEnvelope {
   const archetypeLines = archetypes.map((a) =>
     includeDescriptions
@@ -656,6 +698,14 @@ export function buildLLMClassifyEnvelope(
     section("catalog", `Archetypes:\n${archetypeLines}`),
     section("input", `Files:\n${fileLines}`),
     section(
+      "file-headers",
+      headers && Object.keys(headers).length > 0
+        ? `File headers (leading doc comments — authoritative about each file's purpose):\n${Object.entries(headers)
+            .map(([path, h]) => `  - ${path}:\n${h.split("\n").map((l) => `      ${l}`).join("\n")}`)
+            .join("\n")}`
+        : "",
+    ),
+    section(
       "output",
       [
         "Respond with ONLY a JSON array (no markdown, no explanation):",
@@ -670,8 +720,9 @@ export function buildLLMClassifyPrompt(
   files: FileClassification[],
   archetypes: { id: string; name: string; description: string }[],
   includeDescriptions: boolean,
+  headers?: Record<string, string>,
 ): string {
-  return svPrompt(buildLLMClassifyEnvelope(files, archetypes, includeDescriptions));
+  return svPrompt(buildLLMClassifyEnvelope(files, archetypes, includeDescriptions, headers));
 }
 
 /**

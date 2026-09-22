@@ -44,6 +44,7 @@ import {
   getPassConfig,
 } from "./enrich-config.js";
 import { computeGlobalContentHash } from "./zone-hash.js";
+import { getJudgmentRoute } from "./claude-client.js";
 import { extractFindings, mergeZonesByName, deduplicateZoneIds, findPrevZone, extractZoneInsights } from "./enrich-parsing.js";
 import type { EnrichResult } from "./enrich-parsing.js";
 import {
@@ -276,7 +277,7 @@ export async function enrichZonesWithAI(
  * list paraphrased and the name comes from the directory shape. Templating
  * these saves a meaningful chunk of LLM cost.
  */
-function isStructuralZone(
+export function isStructuralZone(
   zone: Zone,
   inventoryByPath: Map<string, { role: string }>,
 ): boolean {
@@ -287,7 +288,7 @@ function isStructuralZone(
   return zone.files.length > 0;
 }
 
-function applyStructuralTemplate(
+export function applyStructuralTemplate(
   zone: Zone,
   inventoryByPath: Map<string, { role: string }>,
 ): Zone {
@@ -411,7 +412,9 @@ function applyEnrichResults(
   }
 
   const combinedParsed = { zones: allParsedZones, insights: dedupedInsights, findings: allParsedFindings };
-  const newFindings = extractFindings(combinedParsed, passNumber, passConfig.expectedTypes);
+  const newFindings = extractFindings(combinedParsed, passNumber, passConfig.expectedTypes, {
+    skipSpeculativeFilter: getJudgmentRoute("finding.judge") === "typesafe",
+  });
 
   return {
     zones: enriched,

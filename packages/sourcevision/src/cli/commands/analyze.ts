@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from "node:fs";
 import {resolve, join} from "node:path";import {
   SV_DIR,
   DATA_FILES,
@@ -41,6 +41,8 @@ import { generatePrMarkdownFile } from "./pr-markdown.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
+import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger } from "../../analyzers/run-ledger.js";
+import { configureJudgmentCache } from "../../analyzers/judgment-cache.js";
 import type { Manifest } from "../sourcevision-core.js";
 
 type PhaseFilter =
@@ -131,6 +133,7 @@ async function initAndLoadLLMConfig(absDir: string): Promise<{
   const llmConfig = await loadLLMConfig(absDir);
   setLLMConfig(llmConfig);
   setProjectDir(absDir);
+  configureJudgmentCache({ svDir: join(absDir, SV_DIR) });
   const vendor = getLLMVendor();
   if (vendor) {
     printVendorModelHeader(vendor, llmConfig);
@@ -176,6 +179,7 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
   for (const { phase, module, run, critical } of phases) {
     if (!shouldRunPhase(filter, phase, module)) continue;
 
+    const phaseStartedAt = Date.now();
     try {
       await run();
     } catch (err) {
@@ -212,12 +216,19 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
           throw err;
         }
       }
+    } finally {
+      recordPhaseDuration(module, Date.now() - phaseStartedAt);
     }
   }
 }
 
+/** Runs kept in `.sourcevision/.cache/analyses.jsonl`; older lines are dropped. */
+const ANALYSIS_HISTORY_MAX = 200;
+
 /**
- * Report and persist token usage to manifest for cross-package aggregation.
+ * Report and persist token usage to manifest for cross-package aggregation,
+ * and record the run — per phase and per task class — on the manifest and
+ * in the machine-local history.
  */
 function finalizeTokenUsage(
   ctx: AnalyzeContext,
@@ -227,16 +238,36 @@ function finalizeTokenUsage(
   if (usageLine) {
     info(`${dim("Token usage:")} ${usageLine}`);
   }
+  const run = snapshotRunLedger();
+  for (const line of formatRunLedger(run)) info(dim(line));
 
+  const manifest = readManifest(ctx.absDir);
   if (ctx.tokenUsage.calls > 0) {
     const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
-    const manifest = readManifest(ctx.absDir);
     manifest.tokenUsage = {
       ...ctx.tokenUsage,
       vendor: metadata.vendor,
       model: metadata.model,
     };
-    writeManifest(ctx.absDir, manifest);
+  }
+  manifest.lastAnalysis = run;
+  writeManifest(ctx.absDir, manifest);
+  appendAnalysisHistory(ctx.svDir, JSON.stringify(run));
+}
+
+/** Append one run to the history file, trimming it to {@link ANALYSIS_HISTORY_MAX} lines. */
+function appendAnalysisHistory(svDir: string, line: string): void {
+  try {
+    const dir = join(svDir, ".cache");
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, "analyses.jsonl");
+    appendFileSync(path, line + "\n");
+    const lines = readFileSync(path, "utf-8").split("\n").filter(Boolean);
+    if (lines.length > ANALYSIS_HISTORY_MAX) {
+      writeFileSync(path, lines.slice(-ANALYSIS_HISTORY_MAX).join("\n") + "\n");
+    }
+  } catch {
+    // History is a convenience; never fail an analysis for it.
   }
 }
 
@@ -252,11 +283,15 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   const { svDir, llmConfig } = await initAndLoadLLMConfig(absDir);
   const filter = parsePhaseFilter(extraArgs);
 
+  startRunLedger(
+    extraArgs.includes("--fast") ? "fast" : extraArgs.includes("--narrate") ? "narrate" : "generative",
+  );
   const ctx: AnalyzeContext = {
     absDir,
     svDir,
     fullMode: extraArgs.includes("--full"),
     fastMode: extraArgs.includes("--fast"),
+    narrate: extraArgs.includes("--narrate"),
     targetPass: parseTargetPass(extraArgs),
     tokenUsage: emptyAnalyzeTokenUsage(),
     inventoryResult: null,
@@ -373,6 +408,16 @@ async function writePrimerIfPossible(
     if (ctx.tokenUsage.calls === 0) {
       if (!cachedPrimer) {
         info(`${dim("[primer]")} skipped — no LLM calls in this analysis`);
+      }
+      return;
+    }
+    // The cascade's calls are judgments, not generation: they prove a Jev
+    // key works, not that a text model is reachable. The primer is prose,
+    // so it is generated only by a generative run (`--narrate`, or the
+    // default without a judgment route); a cached primer is still served.
+    if (snapshotRunLedger().mode === "cascade") {
+      if (!cachedPrimer) {
+        info(`${dim("[primer]")} skipped — cascade mode; run with --narrate to generate it`);
       }
       return;
     }

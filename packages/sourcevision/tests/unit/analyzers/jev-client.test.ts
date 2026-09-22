@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { askJev, choice, noul, score, JEV_ENDPOINT, JEV_MODEL } from "../../../src/analyzers/jev-client.js";
 import { ClaudeClientError } from "@n-dx/llm-client";
+import { startRunLedger, snapshotRunLedger } from "../../../src/analyzers/run-ledger.js";
 
 const env = { TYPESAFE_API_KEY: "tsk_test" } as NodeJS.ProcessEnv;
 const noSleep = vi.fn(async () => {});
@@ -153,5 +154,74 @@ describe("askJev — noul and score answers", () => {
       reason: "unknown",
       message: expect.stringContaining('score answer for question "sev"'),
     });
+  });
+});
+
+describe("askJev — run ledger", () => {
+  it("records a successful call under its task class with the answering model and usage", async () => {
+    startRunLedger("cascade");
+    const fetchImpl = vi.fn(async () => jsonResponse(200, okBody));
+    await askJev(request, { fetchImpl, env, sleep: noSleep, taskClass: "code.classify" });
+    const { byTaskClass } = snapshotRunLedger().llm;
+    expect(byTaskClass["code.classify"]).toMatchObject({ calls: 1, inputTokens: 120, outputTokens: 6, vendor: "typesafe", model: "jev-1.13.0" });
+  });
+
+  it("records nothing for a failed call", async () => {
+    startRunLedger("cascade");
+    const fetchImpl = vi.fn(async () => new Response("no", { status: 401 }));
+    await askJev(request, { fetchImpl, env, sleep: noSleep, taskClass: "code.classify" }).catch(() => {});
+    expect(snapshotRunLedger().llm.byTaskClass).toEqual({});
+  });
+});
+
+describe("askJev — judgment cache", () => {
+  it("serves repeated questions from the cache and fetches only the misses", async () => {
+    const { mkdtempSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { configureJudgmentCache } = await import("../../../src/analyzers/judgment-cache.js");
+    const dir = mkdtempSync(join(tmpdir(), "sv-jev-cache-"));
+    configureJudgmentCache({ svDir: dir });
+    try {
+      startRunLedger("cascade");
+      const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
+        const sent = JSON.parse(init.body as string);
+        const answers: Record<string, unknown> = {};
+        for (const id of Object.keys(sent.questions)) {
+          answers[id] = { type: "choice", choice: "service", probabilities: { service: 0.9, utility: 0.05, none: 0.05 }, confidence: 0.8 };
+        }
+        return jsonResponse(200, { model: "jev-1.13.0", answers, usage: { input_tokens: 10, output_tokens: 1 } });
+      });
+
+      const two = {
+        state: { files: { f0: { path: "a.ts" }, f1: { path: "b.ts" } } },
+        questions: {
+          f0: choice("Which archetype fits `files.f0`?", { service: "s", utility: "u", none: "n" }),
+          f1: choice("Which archetype fits `files.f1`?", { service: "s", utility: "u", none: "n" }),
+        },
+      };
+      const first = await askJev(two, { fetchImpl, env, sleep: noSleep });
+      expect(Object.keys(first.answers).sort()).toEqual(["f0", "f1"]);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+      // Same questions again: no request at all, answers and model from the cache.
+      const second = await askJev(two, { fetchImpl, env, sleep: noSleep });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(second.answers.f1).toEqual(first.answers.f1);
+      expect(second.model).toBe("jev-1.13.0");
+      expect(second.tokenUsage).toBeUndefined();
+
+      // One file changes: only its question is sent.
+      const changed = { ...two, state: { files: { f0: { path: "a.ts" }, f1: { path: "b2.ts" } } } };
+      await askJev(changed, { fetchImpl, env, sleep: noSleep });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      const sent = JSON.parse((fetchImpl.mock.calls[1] as unknown as [string, RequestInit])[1].body as string);
+      expect(Object.keys(sent.questions)).toEqual(["f1"]);
+
+      expect(snapshotRunLedger().llm.judgmentCache).toEqual({ hits: 3, misses: 3 });
+    } finally {
+      configureJudgmentCache(undefined);
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

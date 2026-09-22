@@ -127,7 +127,15 @@ function isSpeculativeFinding(text: string): boolean {
 export function extractFindings(
   parsed: any,
   passNumber: number,
-  expectedTypes: FindingType[]
+  expectedTypes: FindingType[],
+  opts?: {
+    /**
+     * Skip the hedge-phrase backstop. Set when Jev judges each finding's
+     * support against the evidence (enrich-judge.ts) — a probability over
+     * the actual files beats a regex over the first 120 characters.
+     */
+    skipSpeculativeFilter?: boolean;
+  },
 ): Finding[] {
   const findings: Finding[] = [];
   const defaultType = expectedTypes[0] ?? "observation";
@@ -138,7 +146,7 @@ export function extractFindings(
 
   const parseFinding = (f: any, fallbackScope: string) => {
     if (f && typeof f === "object" && typeof f.text === "string") {
-      if (isSpeculativeFinding(f.text)) {
+      if (!opts?.skipSpeculativeFilter && isSpeculativeFinding(f.text)) {
         speculativeDropped++;
         return;
       }

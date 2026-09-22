@@ -23,6 +23,7 @@ import {
   TYPESAFE_API_KEY_ENV,
 } from "@n-dx/llm-client";
 import type { TokenUsage } from "../schema/index.js";
+import { recordLLMCall } from "./run-ledger.js";
 
 export { ClaudeClientError } from "@n-dx/llm-client";
 
@@ -212,9 +213,17 @@ export async function callClaude(
         vendor: resolveVendor(),
       }).model
     : resolveModel(model);
+  const startedAt = Date.now();
   const result: CompletionResult = await client.complete({
     prompt,
     model: resolved,
+  });
+  recordLLMCall({
+    taskClass: opts?.taskClass ?? "unclassed",
+    vendor: resolveVendor(),
+    model: resolved,
+    tokenUsage: result.tokenUsage,
+    durationMs: Date.now() - startedAt,
   });
   return {
     text: result.text,

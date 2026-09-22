@@ -22,8 +22,13 @@ import {
   buildFindingJudgeRequest,
   buildZoneFragilityRequest,
   FINDING_JUDGE_MIN_CONFIDENCE,
+  FINDING_SUPPORT_DROP_BELOW,
+  FINDING_SUPPORT_UNCERTAIN_BELOW,
+  FINDING_RESTATES_MAX_PROBABILITY,
+  FINDING_RESCOPE_MIN_CONFIDENCE,
   ZONE_FRAGILITY_MIN_PROBABILITY,
 } from "../../../src/analyzers/enrich-judge.js";
+import type { FindingEvidence } from "../../../src/analyzers/enrich-judge.js";
 import { enforceSeverityRules } from "../../../src/analyzers/enrich-parsing.js";
 
 const mockedRoute = vi.mocked(getJudgmentRoute);
@@ -133,12 +138,26 @@ describe("judgeFindings", () => {
     expect(res.tokenUsage).toBeUndefined();
   });
 
-  it("stops on a client error and keeps the remaining findings as stated", async () => {
+  it("splits a failing batch in half and keeps only the finding that still fails as stated", async () => {
     const input = [finding("a", { severity: "info" }), finding("b", { severity: "critical" })];
-    mockedAskJev.mockRejectedValueOnce(new ClaudeClientError("rate limited", "rate-limit", true));
+    mockedAskJev
+      .mockRejectedValueOnce(new ClaudeClientError("bad batch", "unknown", false))   // both
+      .mockResolvedValueOnce({ model: "jev", answers: { s0: scoreAnswer(2, 0.9), c0: choiceAnswer("code", 0.9) } })  // a
+      .mockRejectedValueOnce(new ClaudeClientError("still bad", "unknown", false));  // b alone
 
     const res = await judgeFindings(input);
 
+    expect(mockedAskJev).toHaveBeenCalledTimes(3);
+    expect(res.calls).toBe(1);
+    expect(res.findings[0]).toMatchObject({ severity: "critical", category: "code", confidence: 0.9 });
+    expect(res.findings[1]).toBe(input[1]);
+  });
+
+  it("stops on an auth error and keeps every finding as stated", async () => {
+    const input = [finding("a", { severity: "info" }), finding("b", { severity: "critical" })];
+    mockedAskJev.mockRejectedValueOnce(new ClaudeClientError("bad key", "auth", false));
+    const res = await judgeFindings(input);
+    expect(mockedAskJev).toHaveBeenCalledTimes(1);
     expect(res.calls).toBe(0);
     expect(res.findings).toEqual(input);
   });
@@ -270,5 +289,126 @@ describe("buildZoneFragilityRequest", () => {
       cohesion: 0.3, coupling: 0.8, importsTo: { rex: 2 }, importedFrom: {},
     });
     expect((req.state as { zones: Record<string, { importedFrom: object }> }).zones.z1.importedFrom).toEqual({ "web-viewer": 2 });
+  });
+});
+
+// ── Evidence mode: support, restates, anchor, type, scope ────────────────────
+
+const evidence: FindingEvidence = {
+  zones: [
+    { id: "web-viewer", name: "Web Viewer", description: "UI", files: ["ui/app.ts", "ui/hub.ts", "ui/store.ts"], entryPoints: [], cohesion: 0.3, coupling: 0.8 },
+    { id: "rex", name: "Rex", description: "PRD", files: ["rex/store.ts"], entryPoints: [], cohesion: 0.9, coupling: 0.1 },
+  ],
+  crossings: [{ from: "ui/app.ts", to: "rex/store.ts", fromZone: "web-viewer", toZone: "rex" }],
+  heuristics: [finding("Cohesion 0.30 and coupling 0.80 place web-viewer in dual-fragility territory", { pass: 0, scope: "web-viewer", severity: "warning" })],
+};
+
+function noulAnswer(p: number) {
+  return { type: "noul" as const, noul: p };
+}
+
+describe("buildFindingJudgeRequest — with evidence", () => {
+  it("adds support, restates, anchor, type and scope questions over shared zone and heuristic state", () => {
+    const req = buildFindingJudgeRequest(
+      [finding("ui/hub.ts re-implements the store", { scope: "web-viewer", related: ["ui/store.ts"] }), finding("Everything is fine", { scope: "global" })],
+      evidence,
+    );
+    expect(Object.keys(req.questions).sort()).toEqual(["a0", "c0", "c1", "r0", "s0", "s1", "t0", "t1", "v0", "v1", "z0", "z1"]);
+    const state = req.state as { zones: Record<string, unknown>; heuristics: Record<string, string[]> };
+    expect(state.zones["web-viewer"]).toMatchObject({ name: "Web Viewer", fileCount: 3, files: ["ui/app.ts", "ui/hub.ts", "ui/store.ts"], importsTo: { rex: 1 } });
+    // No projectDir → no headers, but the field is present so instructions can reference it.
+    expect((state.zones["web-viewer"] as { headers: object }).headers).toEqual({});
+    expect(state.zones.rex).toBeUndefined(); // only scopes the batch references
+    expect(state.heuristics["web-viewer"]).toHaveLength(1);
+    // Files the finding names come first among the anchor candidates.
+    expect(req.anchorFiles.get("a0")).toEqual(["ui/hub.ts", "ui/store.ts", "ui/app.ts"]);
+    expect(Object.keys((req.questions.a0 as { criteria: object }).criteria)).toEqual(["a0", "a1", "a2", "none"]);
+    expect(Object.keys((req.questions.z0 as { criteria: object }).criteria)).toEqual(["web-viewer", "rex", "global"]);
+    // A global finding has no restates question (no heuristics for global) and no anchor question.
+    expect(req.questions.r1).toBeUndefined();
+    expect(req.questions.a1).toBeUndefined();
+  });
+});
+
+describe("judgeFindings — support band", () => {
+  it("keeps an undecided finding and records the support probability as its confidence", async () => {
+    const mid = (FINDING_SUPPORT_DROP_BELOW + FINDING_SUPPORT_UNCERTAIN_BELOW) / 2;
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: { s0: scoreAnswer(1, 0.95), c0: choiceAnswer("code", 0.9), v0: noulAnswer(mid) },
+    });
+    const res = await judgeFindings([finding("Maybe true", { scope: "web-viewer", severity: "warning" })], evidence);
+    expect(res.dropped).toBeUndefined();
+    expect(res.findings[0]).toMatchObject({ severity: "warning", confidence: Math.round(mid * 100) / 100 });
+  });
+
+  it("leaves the grade's confidence alone when support is clear", async () => {
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: { s0: scoreAnswer(1, 0.8), c0: choiceAnswer("code", 0.9), v0: noulAnswer(FINDING_SUPPORT_UNCERTAIN_BELOW) },
+    });
+    const res = await judgeFindings([finding("Clearly true", { scope: "web-viewer", severity: "warning" })], evidence);
+    expect(res.findings[0].confidence).toBe(0.8);
+  });
+});
+
+describe("judgeFindings — with evidence", () => {
+  const base = () => [
+    finding("Unsupported claim", { scope: "web-viewer", severity: "info" }),
+    finding("Cohesion 0.30 and coupling 0.80 mean fragility", { scope: "web-viewer", severity: "warning" }),
+    finding("ui/hub.ts re-implements the store", { scope: "web-viewer", severity: "info" }),
+  ];
+  const grades = (i: number) => ({ [`s${i}`]: scoreAnswer(1, 0.9), [`c${i}`]: choiceAnswer("code", 0.9) });
+
+  it("drops unsupported findings and metric paraphrases, keeps the rest", async () => {
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: {
+        ...grades(0), v0: noulAnswer(FINDING_SUPPORT_DROP_BELOW - 0.01), r0: noulAnswer(0.1),
+        ...grades(1), v1: noulAnswer(0.9), r1: noulAnswer(FINDING_RESTATES_MAX_PROBABILITY),
+        ...grades(2), v2: noulAnswer(0.95), r2: noulAnswer(0.05), a2: choiceAnswer("a0", 0.8), t2: choiceAnswer("anti-pattern", 0.7), z2: choiceAnswer("web-viewer", 0.9),
+      },
+    });
+
+    const res = await judgeFindings(base(), evidence);
+
+    expect(res.dropped).toBe(2);
+    expect(res.findings).toHaveLength(1);
+    expect(res.findings[0]).toMatchObject({
+      text: "ui/hub.ts re-implements the store",
+      severity: "warning", category: "code", type: "anti-pattern", scope: "web-viewer",
+      anchors: [{ file: "ui/hub.ts" }],
+    });
+  });
+
+  it("leaves anchors empty on none, keeps type below threshold, and rescopes only at high confidence", async () => {
+    const input = [finding("x", { scope: "web-viewer" }), finding("y", { scope: "web-viewer" })];
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: {
+        ...grades(0), v0: noulAnswer(0.9), a0: choiceAnswer("none", 0.9), t0: choiceAnswer("suggestion", FINDING_JUDGE_MIN_CONFIDENCE - 0.01), z0: choiceAnswer("rex", FINDING_RESCOPE_MIN_CONFIDENCE - 0.01),
+        ...grades(1), v1: noulAnswer(0.9), a1: choiceAnswer("a9", 0.9), t1: choiceAnswer("suggestion", 0.9), z1: choiceAnswer("rex", FINDING_RESCOPE_MIN_CONFIDENCE),
+      },
+    });
+
+    const res = await judgeFindings(input, evidence);
+
+    expect(res.findings[0].anchors).toBeUndefined();
+    expect(res.findings[0].type).toBe("observation");
+    expect(res.findings[0].scope).toBe("web-viewer");
+    // An anchor option outside the candidate list is ignored; a valid rescope applies.
+    expect(res.findings[1].anchors).toBeUndefined();
+    expect(res.findings[1].type).toBe("suggestion");
+    expect(res.findings[1].scope).toBe("rex");
+    expect(res.dropped).toBeUndefined();
+  });
+
+  it("never rescopes to a zone that is not in the evidence", async () => {
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev",
+      answers: { ...grades(0), v0: noulAnswer(0.9), z0: choiceAnswer("made-up", 0.99) },
+    });
+    const res = await judgeFindings([finding("x", { scope: "web-viewer" })], evidence);
+    expect(res.findings[0].scope).toBe("web-viewer");
   });
 });

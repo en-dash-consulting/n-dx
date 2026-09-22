@@ -66,6 +66,8 @@ export interface AnalyzeContext {
   svDir: string;
   fullMode: boolean;
   fastMode: boolean;
+  /** `--narrate`: generative prompts over every zone even when the cascade would apply. */
+  narrate: boolean;
   /** Run enrichment passes up to this pass (2–4). `--full` implies 4. */
   targetPass?: number;
   tokenUsage: AnalyzeTokenUsage;
@@ -223,7 +225,7 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
     // LLM enrichment (skip in --fast mode)
     if (!ctx.fastMode && classifications.summary.totalUnclassified > 0) {
       info(`  ${bold(String(classifications.summary.totalClassified))} classified, ${bold(String(classifications.summary.totalUnclassified))} unclassified — ${cyan("enriching with LLM...")}`)
-      const llmResult = await enrichClassificationsWithLLM(classifications, inventory, importsData);
+      const llmResult = await enrichClassificationsWithLLM(classifications, inventory, importsData, { projectDir: ctx.absDir });
       if (llmResult.updatedFiles.length > 0) {
         classifications = mergeClassificationResults(classifications, llmResult.updatedFiles);
         info(`  ${cyan("LLM classified")} ${bold(String(llmResult.updatedFiles.length))} additional files`);
@@ -350,6 +352,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
 
     let zonesResult = await analyzeZones(inventory, importsData, {
       enrich, previousZones, perZone, subAnalyses, fileArchetypes, onReset, hints,
+      narrate: ctx.narrate,
       zonePins: pinCount > 0 ? zonePins : undefined,
       zoneAnchors: zoneAnchors.length > 0 ? zoneAnchors : undefined,
       smallZoneMergeThreshold,
@@ -385,6 +388,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
         info(`\n${bold(cyan("[phase 4]"))} Enrichment pass ${currentPass + p + 2}...`);
         zonesResult = await analyzeZones(inventory, importsData, {
           enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset, hints,
+          narrate: ctx.narrate,
           zonePins: Object.keys(zonePins).length > 0 ? zonePins : undefined,
           zoneAnchors: zoneAnchors.length > 0 ? zoneAnchors : undefined,
           smallZoneMergeThreshold,

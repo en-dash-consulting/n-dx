@@ -40,6 +40,7 @@ import {
   findingsContract,
   stripJudgedFields,
   outputLines,
+  findingTypesHint,
 } from "./prompt-envelope.js";
 
 // ── Per-zone structure hash ──────────────────────────────────────────────────
@@ -125,7 +126,7 @@ export function buildSingleZoneFirstPassEnvelope(
         JSON_OBJECT_ONLY,
         stripJudgedFields(`{"id":"kebab-case-id","name":"Title Case Name","description":"One sentence describing the zone's purpose.","insights":["actionable insight about this zone"],"findings":[{"type":"observation","scope":"${zone.id}","text":"finding text","severity":"info"}]}`, ctx.judged === true),
         "",
-        `Use finding types: ${passConfig.expectedTypes.join(", ")}.`,
+        findingTypesHint(passConfig.expectedTypes, ctx.judged === true),
       ]),
     ),
   ]);
@@ -171,7 +172,9 @@ export function buildSingleZoneLaterPassEnvelope(
         JSON_OBJECT_ONLY,
         stripJudgedFields(`{"id":"${zone.id}","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"${zone.id}","text":"finding text","severity":"info"}]}`, ctx.judged === true),
         "",
-        `Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine if nothing new to add.`,
+        ctx.judged
+          ? "Empty arrays are fine if nothing new to add."
+          : `Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine if nothing new to add.`,
       ]),
     ),
   ]);
@@ -261,7 +264,11 @@ async function enrichSingleZone(
 
     let callText: string;
     try {
-      const callResult = await callClaude(prompt);
+      // Pass 1 names and describes (scan tier); later passes analyse (deep
+      // tier). Spelled literally so the task-class registry test can see them.
+      const callResult = isFirstPass
+        ? await callClaude(prompt, undefined, { taskClass: "zone.enrich-scan" })
+        : await callClaude(prompt, undefined, { taskClass: "zone.enrich-deep" });
       zoneTokenUsage.calls++;
       if (callResult.tokenUsage) {
         zoneTokenUsage.input += callResult.tokenUsage.input;
@@ -303,13 +310,13 @@ async function enrichSingleZone(
         description: candidate.description,
       };
       const newInsights = extractZoneInsights(candidate, "insights");
-      const newFindings = extractFindings({ zones: [candidate], findings: candidate.findings ?? [] }, passNumber, passConfig.expectedTypes);
+      const newFindings = extractFindings({ zones: [candidate], findings: candidate.findings ?? [] }, passNumber, passConfig.expectedTypes, { skipSpeculativeFilter: judged });
       return { zone: enrichedZone, newInsights, newFindings, tokenUsage: zoneTokenUsage, success: true };
     }
 
     // Pass 2+: preserve zone identity, extract new insights
     const newInsights = extractZoneInsights(candidate, "newInsights");
-    const newFindings = extractFindings({ zones: [candidate], findings: candidate.findings ?? [] }, passNumber, passConfig.expectedTypes);
+    const newFindings = extractFindings({ zones: [candidate], findings: candidate.findings ?? [] }, passNumber, passConfig.expectedTypes, { skipSpeculativeFilter: judged });
     return { zone, newInsights, newFindings, tokenUsage: zoneTokenUsage, success: true };
   }
 

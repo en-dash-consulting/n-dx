@@ -916,3 +916,17 @@ describe("enforceSeverityRules", () => {
     expect(result[0].severity).toBe("info");
   });
 });
+
+describe("extractFindings — skipSpeculativeFilter", () => {
+  const hedged = { findings: [{ type: "observation", scope: "global", text: "If this grows, it might become a problem", severity: "info" }] };
+
+  it("drops hedged findings by default", () => {
+    expect(extractFindings(hedged, 2, ["observation"])).toHaveLength(0);
+  });
+
+  it("keeps them when the support judgment will decide instead", () => {
+    const out = extractFindings(hedged, 2, ["observation"], { skipSpeculativeFilter: true });
+    expect(out).toHaveLength(1);
+    expect(out[0].text).toContain("If this grows");
+  });
+});

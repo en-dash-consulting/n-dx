@@ -1,0 +1,21 @@
+---
+id: "7576c53c-afd2-4407-8200-6b67fe513f80"
+level: "task"
+title: "Cascade follow-ups: heuristic real-problem Noul, move-file Choice, escalation band tuning, --per-zone passthrough"
+status: "pending"
+priority: "low"
+tags:
+  - "sourcevision"
+  - "llm"
+  - "typesafe"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "Unit tests for the heuristic Noul bands and the move Choice with stay"
+  - "Fragility probability distribution recorded for the two gauntlet fixtures and this repository, with the chosen band and its escalation rate"
+  - "--per-zone reaches cmdAnalyze (probe: manifest.lastAnalysis or a log line shows per-zone mode)"
+  - "A finding emitted under a zone and global is persisted once"
+  - "pnpm --filter @n-dx/sourcevision test passes"
+description: "Pieces the cascade task (f378e4b4) named but did not ship, plus what its live runs surfaced. Each is independent.\n\n1. **Heuristic real-problem Noul.** In `assembleFindings` (made async), ask Jev per pass 0 heuristic finding *\"given these files, is this a real problem or a detection artifact?\"*; ≤ 0.3 → demote to `info`, 0.3–0.7 → record confidence, ≥ 0.7 → keep. Heuristics are computed after enrichment, which is why the cascade could not use them for escalation.\n2. **Move-file Choice.** Per crossing-heavy file a Choice *\"which zone should this live in?\"* over the zone list plus `stay`, feeding `move-recommendations.ts` with a probability per move.\n3. **Escalation band.** On this repository 13 of 26 zones fell in 0.3–0.7 and were narrated (232 s of the cascade's wall-clock). Measure the fragility probability distribution across the gauntlet fixtures and this repo and pick a narrower band or a per-zone cap.\n4. **`--per-zone` passthrough.** `packages/sourcevision/src/cli/index.ts` allow-lists analyze flags; `--per-zone` is documented in help but not on the list, so it never reaches `cmdAnalyze` (found while adding `--narrate`).\n5. **Duplicate finding text across scopes.** The per-zone prompt emits the same finding under the zone and `global`; `deduplicateFindings` keys on scope so both survive, and the type Choice can grade the two copies differently. Dedupe by text across scopes, keeping the zone-scoped copy.\n6. **Narrate-path cleanup.** `PASS_CONFIGS`, attempt ladders, meta pass and the per-zone content-hash skip remain only for `--narrate`; decide whether to keep them or reduce narrate to the per-zone prompt the cascade already uses."
+lastModified: "2026-09-22T04:42:26.998Z"
+lastModifiedBy: "Nick Daniel <nick@endash.us>"
+---

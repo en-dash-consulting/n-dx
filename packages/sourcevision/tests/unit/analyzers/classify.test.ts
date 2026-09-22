@@ -689,17 +689,52 @@ describe("enrichClassificationsWithLLM — Jev route", () => {
     expect(result.tokenUsage).toMatchObject({ calls: 1, inputTokens: 300, outputTokens: 12, model: "jev-1.13.0" });
   });
 
-  it("leaves a file unclassified on a none answer or a sub-threshold probability", async () => {
-    const base = makeBase(["src/a.ts", "src/b.ts", "src/c.ts"]);
+  it("keeps a confident none unclassified and escalates an unsure answer to the text model", async () => {
+    const base = makeBase(["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts"]);
     mockedAskJev.mockResolvedValueOnce(jevResponse({
       f0: { choice: "none", probabilities: { none: 0.9, service: 0.1 } },
       f1: { choice: "service", probabilities: { service: 0.39, utility: 0.31, none: 0.3 } },
       f2: { choice: "service", probabilities: { service: 0.4, utility: 0.3, none: 0.3 } },
+      f3: { choice: "none", probabilities: { none: 0.4, service: 0.35, utility: 0.25 } },
     }));
+    // The text model, given headers, places the two escalated files.
+    mockedCallClaude.mockResolvedValueOnce({
+      text: JSON.stringify([{ path: "src/b.ts", archetype: "utility", reason: "helper" }]),
+    });
 
-    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/a.ts", "src/b.ts", "src/c.ts", "src/index.ts"]), emptyImports);
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts", "src/index.ts"]), emptyImports);
 
-    expect(result.updatedFiles.map((f) => f.path)).toEqual(["src/c.ts"]);
+    expect(mockedCallClaude).toHaveBeenCalledTimes(1);
+    const prompt = mockedCallClaude.mock.calls[0][0] as string;
+    expect(prompt).toContain("src/b.ts");
+    expect(prompt).toContain("src/d.ts");
+    expect(prompt).not.toContain("src/a.ts");
+    expect(prompt).not.toContain("src/c.ts");
+    expect(result.updatedFiles.map((f) => [f.path, f.archetype, f.confidence])).toEqual([
+      ["src/c.ts", "service", 0.4],
+      ["src/b.ts", "utility", 0.7],
+    ]);
+    expect(result.tokenUsage.calls).toBe(2);
+  });
+
+  it("includes file headers in the escalation prompt when a project dir is given", async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "sv-classify-esc-"));
+    mkdirSync(join(dir, "src"));
+    writeFileSync(join(dir, "src/b.ts"), "/**\n * Formats durations for the CLI.\n * Pure helpers.\n */\nexport const f = 1;\n");
+    try {
+      const base = makeBase(["src/b.ts"]);
+      mockedAskJev.mockResolvedValueOnce(jevResponse({ f0: { choice: "service", probabilities: { service: 0.3, utility: 0.3, none: 0.4 } } }));
+      mockedCallClaude.mockResolvedValue({ text: '[{"path":"src/b.ts","archetype":"utility","reason":"helper"}]' });
+      await enrichClassificationsWithLLM(base, makeInventory(["src/b.ts", "src/index.ts"]), emptyImports, { projectDir: dir });
+      const prompt = mockedCallClaude.mock.calls[0][0] as string;
+      expect(prompt).toContain("File headers");
+      expect(prompt).toContain("Formats durations for the CLI.");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("drops an archetype id outside the catalog for that file only", async () => {

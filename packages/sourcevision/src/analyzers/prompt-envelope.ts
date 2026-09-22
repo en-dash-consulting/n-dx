@@ -114,7 +114,21 @@ export function stripJudgedFields(example: string, judged: boolean): string {
   if (!judged) return example;
   return example
     .replace(/,"severity":"[a-z]+"/g, "")
-    .replace(/,"category":"[a-z]+"/g, "");
+    .replace(/,"category":"[a-z]+"/g, "")
+    // type and scope are selected by Jev from the finding text and the zone
+    // list (enrich-judge.ts), so the model is asked for text only.
+    .replace(/"type":"[^"]*",/g, "")
+    .replace(/"scope":"[^"]*",/g, "");
+}
+
+/** The finding-type instruction, or nothing when Jev selects the type. */
+export function findingTypesHint(types: readonly string[], judged: boolean): string {
+  return judged ? "" : `Use finding types: ${types.join(", ")}.`;
+}
+
+/** Join a sentence and an optional hint with one space, byte-identical when the hint is present. */
+export function withHint(base: string, hint: string): string {
+  return hint ? `${base} ${hint}` : base;
 }
 
 /**

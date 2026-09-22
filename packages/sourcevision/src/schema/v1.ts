@@ -15,6 +15,39 @@ export interface ModuleInfo {
   chunks?: number;
 }
 
+/** Calls, tokens and wall-clock for one LLM task class in one analyze run. */
+export interface LLMClassUsage {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  durationMs: number;
+  vendor: string;
+  model: string;
+}
+
+/**
+ * What one `sv analyze` run cost, per phase and per LLM task class. The
+ * aggregate `tokenUsage` bucket cannot say which model answered or how long
+ * anything took; this can, which is what a decision to route a class
+ * elsewhere has to be made on.
+ */
+export interface AnalysisRun {
+  at: string;
+  /**
+   * `fast`: no LLM. `generative`: the enrichment prompts. `narrate`: the same,
+   * forced by `--narrate`. `cascade`: deterministic facts plus Jev judgments,
+   * generation only where a judgment was uncertain.
+   */
+  mode: "fast" | "generative" | "narrate" | "cascade";
+  durationMs: number;
+  /** Phase name → wall-clock ms. */
+  phases: Record<string, number>;
+  llm: {
+    byTaskClass: Record<string, LLMClassUsage>;
+    judgmentCache?: { hits: number; misses: number };
+  };
+}
+
 export interface Manifest {
   schemaVersion: string;
   toolVersion: string;
@@ -25,6 +58,8 @@ export interface Manifest {
   modules: Record<string, ModuleInfo>;
   /** Aggregate token usage from the most recent analyze run. */
   tokenUsage?: AnalyzeTokenUsage;
+  /** Per-phase and per-task-class cost of the most recent analyze run. */
+  lastAnalysis?: AnalysisRun;
   /** Whether per-zone output files were emitted to zones/ directory. */
   zoneOutputs?: boolean;
   /** Incorporated sub-analyses (nested .sourcevision/ directories). */

@@ -13,6 +13,26 @@ const ModuleInfoSchema = z.object({
   chunks: z.number().int().positive().optional(),
 });
 
+const LLMClassUsageSchema = z.object({
+  calls: z.number().int().nonnegative(),
+  inputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  durationMs: z.number().nonnegative(),
+  vendor: z.string(),
+  model: z.string(),
+});
+
+const AnalysisRunSchema = z.object({
+  at: z.string(),
+  mode: z.enum(["fast", "generative", "narrate", "cascade"]),
+  durationMs: z.number().nonnegative(),
+  phases: z.record(z.string(), z.number().nonnegative()),
+  llm: z.object({
+    byTaskClass: z.record(z.string(), LLMClassUsageSchema),
+    judgmentCache: z.object({ hits: z.number().int().nonnegative(), misses: z.number().int().nonnegative() }).optional(),
+  }),
+});
+
 export const ManifestSchema = z.object({
   schemaVersion: z.string(),
   toolVersion: z.string(),
@@ -21,6 +41,7 @@ export const ManifestSchema = z.object({
   gitBranch: z.string().optional(),
   targetPath: z.string(),
   modules: z.record(z.string(), ModuleInfoSchema),
+  lastAnalysis: AnalysisRunSchema.optional(),
 });
 
 // ── Inventory ───────────────────────────────────────────────────────────────

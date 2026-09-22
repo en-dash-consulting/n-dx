@@ -179,14 +179,19 @@ describe("the judged form of every enrichment prompt", () => {
     ...perZoneOutputs(true),
   ];
 
-  it("omits the severity/category contract and the example keys", () => {
+  it("omits the severity/category contract, the type/scope keys, and the types hint", () => {
     for (const text of judgedSections()) {
       expect(text).not.toContain("Findings: severity");
       expect(text).not.toContain('"severity":');
       expect(text).not.toContain('"category":');
+      expect(text).not.toContain('"type":');
+      expect(text).not.toContain('"scope":');
+      expect(text).not.toContain("Use finding types");
+      expect(text).toContain('"text":"finding text"');
       expect(text).toContain(JSON_OBJECT_ONLY);
       expect(text).not.toMatch(/\n\n\n/);
       expect(text.startsWith("\n")).toBe(false);
+      expect(text.endsWith(" ")).toBe(false);
     }
   });
 
@@ -194,6 +199,8 @@ describe("the judged form of every enrichment prompt", () => {
     for (const text of [...batchOutputs(false), ...perZoneOutputs(false)]) {
       expect(text).toContain("Findings: severity");
       expect(text).toContain('"severity":"info"');
+      expect(text).toContain('"type":"');
+      expect(text).toContain("Use finding types");
     }
   });
 

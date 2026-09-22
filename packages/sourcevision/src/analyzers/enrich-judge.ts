@@ -21,13 +21,15 @@
 import type {
   Finding,
   FindingCategory,
+  FindingType,
   TokenUsage,
   Zone,
   ZoneCrossing,
 } from "../schema/index.js";
 import { ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { askJev, choice, noul, score } from "./jev-client.js";
-import type { JevQuestion, JsonValue } from "./jev-client.js";
+import type { JevQuestion, JevResponse, JsonValue } from "./jev-client.js";
+import { collectFileHeaders } from "./file-headers.js";
 
 // ── Thresholds ───────────────────────────────────────────────────────────────
 
@@ -46,8 +48,42 @@ export const FINDING_JUDGE_MIN_CONFIDENCE = 0.5;
  */
 export const ZONE_FRAGILITY_MIN_PROBABILITY = 0.7;
 
-/** Findings per request: two questions each, well inside the request budget. */
+/**
+ * Support Noul bands. Below the first the finding is dropped: the text model
+ * asserted something the evidence (files, headers, crossings) contradicts or
+ * cannot show at all — what the old hedge-phrase regex tried to catch from
+ * wording alone. Between the two the finding is kept, with the support
+ * probability recorded as its confidence when that is lower than the grade's:
+ * the text model saw more of the zone than the evidence sample carries, so an
+ * undecided Noul is a reason to flag, not to delete. At or above the second
+ * the evidence backs it.
+ */
+export const FINDING_SUPPORT_DROP_BELOW = 0.3;
+export const FINDING_SUPPORT_UNCERTAIN_BELOW = 0.7;
+
+/**
+ * Probability above which a finding is judged to merely restate a heuristic
+ * metric already reported for the same scope, and is dropped as a paraphrase.
+ */
+export const FINDING_RESTATES_MAX_PROBABILITY = 0.7;
+
+/**
+ * Confidence a scope Choice needs before a finding is moved to another zone.
+ * Higher than the grade threshold because rescoping changes what the finding
+ * is deduplicated and preserved against.
+ */
+export const FINDING_RESCOPE_MIN_CONFIDENCE = 0.8;
+
+/** Findings per request without evidence: two questions each. */
 const FINDINGS_PER_REQUEST = 40;
+/** Findings per request with evidence: up to seven questions each plus the zone state. */
+const FINDINGS_PER_REQUEST_WITH_EVIDENCE = 20;
+/** Candidate anchor files offered per finding; files the text names come first. */
+const ANCHOR_CANDIDATE_LIMIT = 100;
+/** No-anchor option id. */
+const NO_ANCHOR = "none";
+/** Scope option for findings about the codebase as a whole. */
+const GLOBAL_SCOPE = "global";
 /** Zones per request: two Nouls each. */
 const ZONES_PER_REQUEST = 25;
 /** File paths included per zone; enough to see the shape without the whole list. */
@@ -91,6 +127,16 @@ const CATEGORY_CRITERIA: Record<FindingCategory, JsonValue> = {
 
 const CATEGORY_IDS = Object.keys(CATEGORY_CRITERIA) as FindingCategory[];
 
+/** Selectable finding types; `move-file` is emitted by code, never by a judgment. */
+const TYPE_CRITERIA: Record<Exclude<FindingType, "move-file">, string> = {
+  observation: "A neutral statement of what the code does or how it is arranged.",
+  pattern: "A recurring structure or convention seen across several files or zones.",
+  relationship: "How two or more zones or files depend on or interact with each other.",
+  "anti-pattern": "A structure that works against maintainability, correctness, or the project's own conventions.",
+  suggestion: "A concrete change the author of the finding recommends making.",
+};
+const TYPE_IDS = Object.keys(TYPE_CRITERIA) as FindingType[];
+
 // ── Shared result shape ──────────────────────────────────────────────────────
 
 export interface JudgeResult {
@@ -99,6 +145,22 @@ export interface JudgeResult {
   tokenUsage?: TokenUsage;
   /** Requests made. */
   calls: number;
+  /** Findings removed as unsupported or as metric paraphrases. */
+  dropped?: number;
+}
+
+/**
+ * What a finding is judged against. Supplying it adds the support, restates,
+ * anchor, type and scope questions; without it only severity and category are
+ * asked (the shape the meta pass re-rating uses).
+ */
+export interface FindingEvidence {
+  zones: Zone[];
+  crossings?: ZoneCrossing[];
+  /** Pass 0 heuristic findings; a finding that only restates one is dropped. */
+  heuristics?: Finding[];
+  /** Enables file headers in the evidence; without it only paths are shown. */
+  projectDir?: string;
 }
 
 // ── Findings: severity + category ────────────────────────────────────────────
@@ -106,16 +168,63 @@ export interface JudgeResult {
 export interface FindingJudgeRequest {
   state: JsonValue;
   questions: Record<string, JevQuestion>;
+  /** question id → anchor option id → file path (anchor questions only). */
+  anchorFiles: Map<string, string[]>;
 }
 
 /**
  * One Score (severity) and one Choice (category) per finding, over one state
  * object. The model is not shown the severity or category the generative pass
  * stated — the judgment is meant to be independent of it.
+ *
+ * With {@link FindingEvidence}, the state also carries each zone's file sample,
+ * leading comments, and crossing counts, plus the heuristic findings per
+ * scope, and every finding gains: a support Noul, a restates-metric Noul
+ * (only when the scope has heuristics), an anchor Choice over the scope's
+ * files, a type Choice and a scope Choice. All are independent, so one request.
  */
-export function buildFindingJudgeRequest(findings: Finding[]): FindingJudgeRequest {
+export function buildFindingJudgeRequest(
+  findings: Finding[],
+  evidence?: FindingEvidence,
+): FindingJudgeRequest {
   const fState: Record<string, JsonValue> = {};
   const questions: Record<string, JevQuestion> = {};
+  const anchorFiles = new Map<string, string[]>();
+
+  // Evidence state, shared by every finding in the batch.
+  const zonesById = new Map((evidence?.zones ?? []).map((z) => [z.id, z]));
+  const heuristicsByScope = new Map<string, string[]>();
+  for (const h of evidence?.heuristics ?? []) {
+    const list = heuristicsByScope.get(h.scope) ?? [];
+    list.push(h.text);
+    heuristicsByScope.set(h.scope, list);
+  }
+  const zoneState: Record<string, JsonValue> = {};
+  if (evidence) {
+    const crossingCounts = new Map<string, Record<string, number>>();
+    for (const c of evidence.crossings ?? []) {
+      const out = crossingCounts.get(c.fromZone) ?? {};
+      out[c.toZone] = (out[c.toZone] ?? 0) + 1;
+      crossingCounts.set(c.fromZone, out);
+    }
+    const scopesNeeded = new Set(findings.map((f) => f.scope).filter((s) => zonesById.has(s)));
+    for (const id of scopesNeeded) {
+      const zone = zonesById.get(id)!;
+      zoneState[id] = {
+        name: zone.name,
+        fileCount: zone.files.length,
+        files: zone.files.slice(0, ZONE_FILE_SAMPLE),
+        headers: collectFileHeaders(zone.files.slice(0, ZONE_FILE_SAMPLE), evidence.projectDir),
+        importsTo: crossingCounts.get(id) ?? {},
+      };
+    }
+  }
+  const scopeCriteria: Record<string, JsonValue> = {};
+  if (evidence) {
+    for (const z of evidence.zones) scopeCriteria[z.id] = `${z.name}: ${z.files.length} files`;
+    scopeCriteria[GLOBAL_SCOPE] = "About the codebase as a whole, not one zone.";
+  }
+
   findings.forEach((f, i) => {
     const id = `f${i}`;
     fState[id] = {
@@ -132,8 +241,42 @@ export function buildFindingJudgeRequest(findings: Finding[]): FindingJudgeReque
       `Which kind of finding is \`findings.${id}\`?`,
       CATEGORY_CRITERIA as Record<string, JsonValue>,
     );
+    if (!evidence) return;
+
+    const zone = zonesById.get(f.scope);
+    const evidenceRef = zone ? `\`zones.${f.scope}\` (its files, their leading comments, and its imports)` : "the zone list";
+    questions[`v${i}`] = noul(
+      `Is finding \`findings.${id}\` supported by the evidence in ${evidenceRef}? Answer no if it asserts something the evidence does not show, or hedges with "if" or "might" instead of observing.`,
+    );
+    const heuristics = heuristicsByScope.get(f.scope);
+    if (heuristics && heuristics.length > 0) {
+      questions[`r${i}`] = noul(
+        `Does \`findings.${id}\` merely restate a fact or metric already listed in \`heuristics.${f.scope}\`, adding no new observation?`,
+      );
+    }
+    if (zone) {
+      const named = zone.files.filter((p) => f.text.includes(p) || (f.related ?? []).includes(p));
+      const rest = zone.files.filter((p) => !named.includes(p));
+      const candidates = [...named, ...rest].slice(0, ANCHOR_CANDIDATE_LIMIT);
+      const anchorCriteria: Record<string, JsonValue> = {};
+      candidates.forEach((p, k) => { anchorCriteria[`a${k}`] = p; });
+      anchorCriteria[NO_ANCHOR] = "No single file in this zone is what the finding is about.";
+      anchorFiles.set(`a${i}`, candidates);
+      questions[`a${i}`] = choice(
+        `Which file in \`zones.${f.scope}\` is finding \`findings.${id}\` primarily about?`,
+        anchorCriteria,
+      );
+    }
+    questions[`t${i}`] = choice(`What kind of statement is \`findings.${id}\`?`, TYPE_CRITERIA as Record<string, JsonValue>);
+    questions[`z${i}`] = choice(`Which zone is \`findings.${id}\` about?`, scopeCriteria);
   });
-  return { state: { findings: fState }, questions };
+
+  const state: Record<string, JsonValue> = { findings: fState };
+  if (evidence) {
+    state.zones = zoneState;
+    state.heuristics = Object.fromEntries(heuristicsByScope);
+  }
+  return { state, questions, anchorFiles };
 }
 
 /**
@@ -147,7 +290,10 @@ export function buildFindingJudgeRequest(findings: Finding[]): FindingJudgeReque
  *
  * Runs before `enforceSeverityRules`, which still has the last word.
  */
-export async function judgeFindings(findings: Finding[]): Promise<JudgeResult> {
+export async function judgeFindings(
+  findings: Finding[],
+  evidence?: FindingEvidence,
+): Promise<JudgeResult> {
   if (findings.length === 0 || getJudgmentRoute("finding.judge") !== "typesafe") {
     return { findings, calls: 0 };
   }
@@ -166,29 +312,18 @@ export async function judgeFindings(findings: Finding[]): Promise<JudgeResult> {
   let judged = 0;
   let filled = 0;
   let changed = 0;
+  let unsupported = 0;
+  let uncertain = 0;
+  let paraphrased = 0;
+  let anchored = 0;
+  let skipped = 0;
+  const dropIndexes = new Set<number>();
 
-  for (let start = 0; start < candidates.length; start += FINDINGS_PER_REQUEST) {
-    const slice = candidates.slice(start, start + FINDINGS_PER_REQUEST);
-    const batch = slice.map(({ f }) => f);
-    let response;
-    try {
-      response = await askJev(buildFindingJudgeRequest(batch));
-    } catch (err) {
-      if (err instanceof ClaudeClientError) {
-        console.warn(`  [judge] finding.judge failed (${err.reason}) — keeping model-stated severities for ${candidates.length - start} finding(s)`);
-        break;
-      }
-      throw err;
-    }
-    calls++;
-    if (response.tokenUsage) {
-      usage.input += response.tokenUsage.input;
-      usage.output += response.tokenUsage.output;
-    }
-
-    batch.forEach((f, i) => {
-      const sev = response.answers[`s${i}`];
-      const cat = response.answers[`c${i}`];
+  /** Apply one batch's answers to `out`. */
+  const apply = (slice: Array<{ f: Finding; index: number }>, request: FindingJudgeRequest, answers: JevResponse["answers"]): void => {
+    slice.forEach(({ f, index }, i) => {
+      const sev = answers[`s${i}`];
+      const cat = answers[`c${i}`];
       let next: Finding = f;
       if (sev?.type === "score") {
         next = { ...next, confidence: round2(sev.confidence) };
@@ -212,18 +347,109 @@ export async function judgeFindings(findings: Finding[]): Promise<JudgeResult> {
           changed++;
         }
       }
-      out[slice[i].index] = next;
+
+      // Evidence questions. A drop wins over every other answer.
+      const support = answers[`v${i}`];
+      if (support?.type === "noul") {
+        if (support.noul < FINDING_SUPPORT_DROP_BELOW) {
+          dropIndexes.add(index);
+          unsupported++;
+          return;
+        }
+        if (support.noul < FINDING_SUPPORT_UNCERTAIN_BELOW) {
+          next = { ...next, confidence: Math.min(next.confidence ?? 1, round2(support.noul)) };
+          uncertain++;
+        }
+      }
+      const restates = answers[`r${i}`];
+      if (restates?.type === "noul" && restates.noul >= FINDING_RESTATES_MAX_PROBABILITY) {
+        dropIndexes.add(index);
+        paraphrased++;
+        return;
+      }
+      const anchor = answers[`a${i}`];
+      const anchorCandidates = request.anchorFiles.get(`a${i}`);
+      if (anchor?.type === "choice" && anchorCandidates && anchor.choice !== NO_ANCHOR) {
+        const k = Number(anchor.choice.slice(1));
+        const file = anchorCandidates[k];
+        if (file) {
+          next = { ...next, anchors: [{ file }] };
+          anchored++;
+        }
+      }
+      const type = answers[`t${i}`];
+      if (type?.type === "choice" && (TYPE_IDS as string[]).includes(type.choice) && type.confidence >= FINDING_JUDGE_MIN_CONFIDENCE) {
+        next = { ...next, type: type.choice as FindingType };
+      }
+      const scope = answers[`z${i}`];
+      if (scope?.type === "choice" && scope.confidence >= FINDING_RESCOPE_MIN_CONFIDENCE && scope.choice !== f.scope) {
+        const valid = scope.choice === GLOBAL_SCOPE || (evidence?.zones ?? []).some((z) => z.id === scope.choice);
+        if (valid) next = { ...next, scope: scope.choice };
+      }
+
+      out[index] = next;
       judged++;
     });
+  };
+
+  /**
+   * Judge one batch; on a non-auth failure split it and try each half, so a
+   * transient error or one bad question costs at most one finding its
+   * judgment rather than every finding after it. Returns false on auth.
+   */
+  const judgeBatch = async (slice: Array<{ f: Finding; index: number }>): Promise<boolean> => {
+    const request = buildFindingJudgeRequest(slice.map(({ f }) => f), evidence);
+    try {
+      const response = await askJev(request, { taskClass: "finding.judge" });
+      calls++;
+      if (response.tokenUsage) {
+        usage.input += response.tokenUsage.input;
+        usage.output += response.tokenUsage.output;
+      }
+      apply(slice, request, response.answers);
+      return true;
+    } catch (err) {
+      if (!(err instanceof ClaudeClientError)) throw err;
+      if (err.reason === "auth") {
+        console.warn(`  [judge] finding.judge failed (auth) — keeping model-stated severities: ${err.message.slice(0, 200)}`);
+        return false;
+      }
+      if (slice.length > 1) {
+        const mid = Math.ceil(slice.length / 2);
+        console.warn(`  [judge] finding.judge batch of ${slice.length} failed (${err.reason}) — retrying as two halves: ${err.message.slice(0, 160)}`);
+        const first = await judgeBatch(slice.slice(0, mid));
+        if (!first) return false;
+        return judgeBatch(slice.slice(mid));
+      }
+      skipped++;
+      console.warn(`  [judge] finding.judge could not judge one finding (${err.reason}) — kept as stated: ${err.message.slice(0, 160)}`);
+      return true;
+    }
+  };
+
+  const perRequest = evidence ? FINDINGS_PER_REQUEST_WITH_EVIDENCE : FINDINGS_PER_REQUEST;
+  for (let start = 0; start < candidates.length; start += perRequest) {
+    const ok = await judgeBatch(candidates.slice(start, start + perRequest));
+    if (!ok) break;
   }
 
   if (calls > 0) {
+    const evidenceNote = evidence
+      ? `, ${unsupported} unsupported + ${paraphrased} paraphrase dropped, ${uncertain} kept with low support, ${anchored} anchored`
+      : "";
+    const skippedNote = skipped > 0 ? `, ${skipped} skipped` : "";
     console.log(
-      `  [judge] finding.judge: ${judged} finding(s) in ${calls} request(s) — ` +
-        `${filled} field(s) filled, ${changed} changed (${usage.input} in / ${usage.output} out)`,
+      `  [judge] finding.judge: ${judged + unsupported + paraphrased} finding(s) in ${calls} request(s) — ` +
+        `${filled} field(s) filled, ${changed} changed${evidenceNote}${skippedNote} (${usage.input} in / ${usage.output} out)`,
     );
   }
-  return { findings: out, tokenUsage: calls > 0 ? usage : undefined, calls };
+  const kept = dropIndexes.size > 0 ? out.filter((_, i) => !dropIndexes.has(i)) : out;
+  return {
+    findings: kept,
+    tokenUsage: calls > 0 ? usage : undefined,
+    calls,
+    ...(dropIndexes.size > 0 ? { dropped: dropIndexes.size } : {}),
+  };
 }
 
 // ── Zones: fragility ─────────────────────────────────────────────────────────
@@ -246,7 +472,7 @@ const FRAGILITY = {
   },
 } as const;
 
-type FragilityKind = keyof typeof FRAGILITY;
+export type FragilityKind = keyof typeof FRAGILITY;
 
 export interface ZoneFragilityRequest {
   state: JsonValue;
@@ -300,22 +526,26 @@ export function buildZoneFragilityRequest(
   return { state: { zones: zState }, questions, ids };
 }
 
+/** Raw fragility probabilities per zone, for callers that band them. */
+export interface ZoneFragilityAssessment {
+  /** zone id → probability per condition; zones with no answer are absent. */
+  probabilities: Map<string, Partial<Record<FragilityKind, number>>>;
+  tokenUsage?: TokenUsage;
+  calls: number;
+}
+
 /**
- * Ask Jev whether each zone is fragile. Every Noul at or above
- * {@link ZONE_FRAGILITY_MIN_PROBABILITY} becomes a pass-scoped structural
- * observation carrying the probability as its confidence. Text is fixed per
- * zone and condition so `deduplicateFindings` merges repeats across passes.
+ * Ask Jev the two fragility Nouls for each zone and return the raw
+ * probabilities. Inert without a `zone.judge` route.
  */
-export async function judgeZoneFragility(
+export async function assessZoneFragility(
   zones: Zone[],
   crossings: ZoneCrossing[],
-  passNumber: number,
-): Promise<JudgeResult> {
+): Promise<ZoneFragilityAssessment> {
+  const probabilities = new Map<string, Partial<Record<FragilityKind, number>>>();
   if (zones.length === 0 || getJudgmentRoute("zone.judge") !== "typesafe") {
-    return { findings: [], calls: 0 };
+    return { probabilities, calls: 0 };
   }
-
-  const findings: Finding[] = [];
   const usage: TokenUsage = { input: 0, output: 0 };
   let calls = 0;
 
@@ -324,10 +554,10 @@ export async function judgeZoneFragility(
     const { state, questions, ids } = buildZoneFragilityRequest(batch, crossings);
     let response;
     try {
-      response = await askJev({ state, questions });
+      response = await askJev({ state, questions }, { taskClass: "zone.judge" });
     } catch (err) {
       if (err instanceof ClaudeClientError) {
-        console.warn(`  [judge] zone.judge failed (${err.reason}) — no fragility findings for ${zones.length - start} zone(s)`);
+        console.warn(`  [judge] zone.judge failed (${err.reason}) — no fragility judgment for ${zones.length - start} zone(s)`);
         break;
       }
       throw err;
@@ -339,7 +569,28 @@ export async function judgeZoneFragility(
     }
     for (const [qid, { zone, kind }] of ids) {
       const answer = response.answers[qid];
-      if (answer?.type !== "noul" || answer.noul < ZONE_FRAGILITY_MIN_PROBABILITY) continue;
+      if (answer?.type !== "noul") continue;
+      const entry = probabilities.get(zone.id) ?? {};
+      entry[kind] = round2(answer.noul);
+      probabilities.set(zone.id, entry);
+    }
+  }
+  return { probabilities, tokenUsage: calls > 0 ? usage : undefined, calls };
+}
+
+/** Findings for every fragility probability at or above the threshold. */
+export function fragilityFindings(
+  zones: Zone[],
+  assessment: ZoneFragilityAssessment,
+  passNumber: number,
+): Finding[] {
+  const findings: Finding[] = [];
+  for (const zone of zones) {
+    const probs = assessment.probabilities.get(zone.id);
+    if (!probs) continue;
+    for (const kind of Object.keys(FRAGILITY) as FragilityKind[]) {
+      const p = probs[kind];
+      if (p === undefined || p < ZONE_FRAGILITY_MIN_PROBABILITY) continue;
       findings.push({
         type: "observation",
         pass: passNumber,
@@ -347,18 +598,34 @@ export async function judgeZoneFragility(
         text: FRAGILITY[kind].text(zone),
         severity: "info",
         category: "structural",
-        confidence: round2(answer.noul),
+        confidence: p,
       });
     }
   }
+  return findings;
+}
 
-  if (calls > 0) {
+/**
+ * Ask Jev whether each zone is fragile. Every Noul at or above
+ * {@link ZONE_FRAGILITY_MIN_PROBABILITY} becomes a pass-scoped structural
+ * observation carrying the probability as its confidence. Text is fixed per
+ * zone and condition so `deduplicateFindings` merges repeats across passes.
+ */
+export async function judgeZoneFragility(
+  zones: Zone[],
+  crossings: ZoneCrossing[],
+  passNumber: number,
+): Promise<JudgeResult> {
+  const assessment = await assessZoneFragility(zones, crossings);
+  const findings = fragilityFindings(zones, assessment, passNumber);
+  if (assessment.calls > 0) {
+    const u = assessment.tokenUsage ?? { input: 0, output: 0 };
     console.log(
-      `  [judge] zone.judge: ${zones.length} zone(s) in ${calls} request(s) — ` +
-        `${findings.length} fragility finding(s) (${usage.input} in / ${usage.output} out)`,
+      `  [judge] zone.judge: ${zones.length} zone(s) in ${assessment.calls} request(s) — ` +
+        `${findings.length} fragility finding(s) (${u.input} in / ${u.output} out)`,
     );
   }
-  return { findings, tokenUsage: calls > 0 ? usage : undefined, calls };
+  return { findings, tokenUsage: assessment.tokenUsage, calls: assessment.calls };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
