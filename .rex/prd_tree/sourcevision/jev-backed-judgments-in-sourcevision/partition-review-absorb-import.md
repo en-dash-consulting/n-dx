@@ -1,0 +1,27 @@
+---
+id: "07e84b24-f429-4fc3-940c-a748db0f7878"
+level: "task"
+title: "Partition review: absorb import-isolated singletons by directory, Jev judges whether a cached partition is sensible, upgrades re-partition without sv reset"
+status: "pending"
+priority: "high"
+tags:
+  - "sourcevision"
+  - "llm"
+  - "typesafe"
+  - "zones"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "Unit test: mergeSmallCommunities absorbs a one-file community with no edges into the community sharing its longest directory prefix; a community in a different package/sub-analysis or across the test quarantine is never chosen"
+  - "Unit test: a fixture shaped like React Router flat routes (20 route files, no inter-route imports, shared layout) yields no more than 3 zones under app/routes"
+  - "ZONE_ALGORITHM_VERSION is bumped and a test asserts a zones.json from the previous version is not reused"
+  - "Unit test: partitionHealth is computed on both the reuse and the fresh path, and healthy signals make no Jev request"
+  - "Unit test with mocked Jev: accepted merge choices above threshold merge the zones before naming; below threshold nothing changes"
+  - "Unit test with mocked Jev: map Noul <= 0.3 on a reused partition forces one fresh partition; the same inputFingerprint does not force again on the next run"
+  - "Unit test: with TYPESAFE_API_KEY unset, step 1 and step 2 still run and step 3 makes no request"
+  - "manifest.lastAnalysis.partition is populated and the CLI prints a [partition] line"
+  - "Live on n-site2 after upgrade with no sv reset: zones with <= 2 files drop from 18 to at most 4 and no routes-<n> ids remain; before/after recorded in this item's log"
+  - "pnpm --filter @n-dx/sourcevision test passes"
+description: "On n-site2 (React Router, flat `app/routes/`) the partition is 30 zones of which 18 hold one or two files: `routes-2` … `routes-14`, `routes-18`, \"Search Crawler Policy\" (`app/routes/robots[.]txt.ts`), \"Toolkit Layout\", and so on. Naming makes these look better but cannot fix them — the partition is the defect. `sv reset` + re-run would not help either: same inputs + same algorithm = same partition. And a cached partition is reused whenever `inputFingerprint` matches (`analyzeZones` reuse path, `zones.ts`), which is never checked for quality — so the only way an existing repo sees a better partition today is a `ZONE_ALGORITHM_VERSION` bump or deleting `.sourcevision/`.\n\n**1. Deterministic: import-isolated small communities.** `mergeSmallCommunities` (`louvain.ts`) `continue`s when a small community has no neighbor edges (\"isolated small cluster\"). Route-convention frameworks (React Router / Remix `app/routes`, Next `app/` / `pages/`, SvelteKit `src/routes`) produce exactly these: files the framework wires by path, which never import one another. For a small community with no edges, absorb it into the community that shares the longest common directory prefix with it (tie-break: largest shared-file count in that directory, then lexicographic), stopping at the project root and never crossing a sub-analysis/package boundary or a test/production quarantine. Bump `ZONE_ALGORITHM_VERSION` so every existing repo re-partitions on upgrade with no reset.\n\n**2. Deterministic health signals, every run (reused or not).** Compute: share of zones with ≤ 2 files, count of numeric-suffix ids, share of zones whose files have zero internal edges, largest-zone share. Store as `zones.partitionHealth`. Below all thresholds → no question asked.\n\n**3. Jev map review when signals trip.** One Jev request, cached by `structureHash` in `judgment-cache.ts`: state = zones (id, name, file count, top directories, cohesion, coupling, crossing summary, sample paths). Questions: a Noul *is this a sensible architecture map a maintainer would recognise?*, and per flagged small zone a Choice over `keep | merge-into:<candidate ids by directory and crossings> | none`. Accepted merges (probability over a code-set threshold) are applied as zone merges before naming; a low map Noul (≤ 0.3) on a *reused* partition forces a fresh Louvain run this analyze instead of reuse (at most once per `inputFingerprint`, recorded so it does not loop). The existing naming-time merge pairs (`nameZonesBySelection`, 61 pairs, 0 merged on n-site2) stay; this is the map-level question those pairwise ones cannot answer.\n\n**4. Run record.** `manifest.lastAnalysis.partition = { reused, healthBefore, healthAfter, merged, forcedRepartition, jevMapProbability }` and one `[partition]` CLI line.\n\nRelationship to `Re-run judgments` (56e9d8d4): that task decides whether a zone's *narrative* needs refreshing for an unchanged partition; this decides whether the *partition* itself should stand. Partition decisions run first, so re-run judgments see the final zones."
+lastModified: "2026-09-22T18:27:41.306Z"
+lastModifiedBy: "Nick Daniel <nick@endash.us>"
+---

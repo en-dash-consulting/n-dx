@@ -26,12 +26,15 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Background narration lifecycle: re-queue superseded work, visible in ndx status and the dashboard, ndx plan waits](./background-narration-lifecycle-re.md) | pending |
 | [Cascade follow-ups: heuristic real-problem Noul, move-file Choice, escalation band tuning, --per-zone passthrough](./cascade-follow-ups-heuristic-real.md) | completed |
 | [Cascade re-run idempotence: no repeated name fallbacks, unchanged escalated zones carried forward, stable judgment keys, naming progress](./cascade-re-run-idempotence-no-repeated.md) | completed |
 | [Cascade robustness: model-alias expansion and config warning, visible CLI errors, ladder stops on non-retryable failures, --full skipped after the cascade, naming progress and concurrency](./cascade-robustness-model-alias.md) | deferred |
 | [Finding cascade: Jev gates, verifies and anchors enrichment; free-text generation becomes --narrate](./finding-cascade-jev-gates-verifies-and.md) | completed |
 | [Finding severity, finding category and zone fragility as Jev judgments](./finding-severity-finding-category-and.md) | completed |
 | [Jev client and code.classify as a Choice over the archetype catalog](./jev-client-and-code-classify-as-a.md) | completed |
+| [Partition review: absorb import-isolated singletons by directory, Jev judges whether a cached partition is sensible, upgrades re-partition without sv reset](./partition-review-absorb-import.md) | pending |
 | [Re-run judgments: Jev decides what needs re-enrichment and which findings still hold](./re-run-judgments-jev-decides-what.md) | pending |
 | [Scan quality: symbol evidence, symbol/README name candidates, typed anchored findings, declared-rule checks](./scan-quality-symbol-evidence-symbol.md) | pending |
 | [Scan speed: one generation call per kind, narration off the critical path](./scan-speed-one-generation-call-per.md) | completed |
+| [Zone identity: stale fallback names are not treated as chosen, numeric-suffix ids follow their verified names](./zone-identity-stale-fallback-names-are.md) | pending |

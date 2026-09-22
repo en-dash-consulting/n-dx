@@ -1,0 +1,26 @@
+---
+id: "a6dd190a-9452-42b0-8931-490108d568ce"
+level: "task"
+title: "Background narration lifecycle: re-queue superseded work, visible in ndx status and the dashboard, ndx plan waits"
+status: "pending"
+priority: "high"
+tags:
+  - "sourcevision"
+  - "core"
+  - "web"
+  - "llm"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "Unit test: analyze with manifest.narration {status: failed, reason: superseded, zones:[a,b]} and zones a,b still present spawns a narrator whose pending set includes a and b"
+  - "Unit test: pending zones from the previous narration that no longer exist by id but match a new zone by file-set overlap are re-queued under the new id; ones with no match are dropped and counted"
+  - "Unit test: spawning while a previous narrator pid is alive sends it SIGTERM and records the new pid; ESRCH is ignored"
+  - "Unit test: a pending narration whose pid is not alive and has no finishedAt is reported failed with reason 'narrator exited without finishing' and re-queued"
+  - "Unit test: ndx status output includes a narration line for pending and failed states and none when done or absent"
+  - "ndx plan either waits for narration or prints the still-running notice; covered by a core test and documented in `ndx plan --help`"
+  - "Dashboard sourcevision overview shows narration state from the manifest (web test)"
+  - "Live: on n-site2, two back-to-back `sv analyze` runs end with narration done and the four previously dropped zones narrated"
+  - "pnpm test passes for @n-dx/sourcevision, @n-dx/core and @n-dx/web"
+description: "Cascade `sv analyze` spawns a detached `sv narrate` (`spawnNarrator` in `cli/commands/analyze.ts`) and records it in `manifest.narration`. Nothing outside sourcevision reads that field, and a superseded narration is simply lost.\n\nObserved on n-site2 (2026-09-22): analyze at 18:07:32 spawned narrate at 18:07:48; its naming phase wrote 18 renames; a second analyze finished at 18:08:28 (2.5 s, cache hits); at 18:08:58 narrate dropped the descriptions/findings for `automation-run-artifacts`, `footer-randomblob`, `layout-prompts` and `routes-11` with `reason: \"superseded by a newer analysis\"`. The second analyze did not queue a narrator (its naming step found the fallback already tried), so those four zones stay un-narrated until someone runs `sv narrate .` by hand. `ndx status`, the dashboard and `ndx plan` (which runs `sv analyze` then immediately `rex analyze`) have no idea any of this happened.\n\n1. **Re-queue instead of drop.** When `analyze` starts and `manifest.narration` is `pending` with a live `pid`, or `failed` with reason `superseded`, carry its `zones`/`names` that still exist in the new zones.json (matched by id, then by file-set overlap) into this run's pending set before deciding whether to spawn. A superseded narrator's work therefore always lands on the next narrator. A still-running older narrator is signalled to stop (SIGTERM on its pid, ignore ESRCH) rather than left to race and self-discard.\n2. **One narrator at a time.** Spawning records the pid; a second spawn while the first is alive replaces it as above, never runs alongside it.\n3. **Visible.** `ndx status` prints one line when narration is pending (zone count, age, log path) or failed (reason, and `sv narrate .` as the remedy). The dashboard's sourcevision overview shows the same state from the manifest. `sv analyze` itself prints the log path when it spawns.\n4. **Consumers wait or say so.** `ndx plan` (and `ndx refresh`) pass `--wait` to `sv analyze` when a narrator would be spawned, or — if kept asynchronous — print that narration is still running and that rex proposals were built from judged names only. Pick one and document it in the command help.\n5. **Stale pid.** A `pending` narration whose pid is gone and has no `finishedAt` is reported as `failed: narrator exited without finishing` and re-queued by rule 1."
+lastModified: "2026-09-22T18:27:20.313Z"
+lastModifiedBy: "Nick Daniel <nick@endash.us>"
+---
