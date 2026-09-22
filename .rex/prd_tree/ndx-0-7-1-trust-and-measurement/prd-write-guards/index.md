@@ -25,7 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Adopt a conformant unmarked tree with a notice instead of refusing it](./adopt-a-conformant-unmarked-tree-with.md) | pending |
-| [Check the slug-rule marker direction inside the PRD lock in adoptSlugRule](./check-the-slug-rule-marker-direction.md) | completed |
+| [Check the slug-rule marker direction inside the PRD lock in adoptSlugRule (both stores)](./check-the-slug-rule-marker-direction.md) | completed |
 | [Fail rex validate and CI when the PRD tree does not match the slug rule](./fail-rex-validate-and-ci-when-the-prd.md) | completed |
 | [Fix the slug-rule guard's false refusal on an unmarked tree and bound migrate-slugs to upgrades](./fix-the-slug-rule-guard-s-false.md) | completed |
 | [Make the repo slug invariant test import source and check the marker](./make-the-repo-slug-invariant-test.md) | pending |

@@ -280,6 +280,53 @@ describe("slug-rule write guard", () => {
       await expect(make(rexDir).saveDocument(doc())).resolves.toBeUndefined();
     });
 
+    // `adoptSlugRule` used to read the marker and decide direction *before*
+    // acquiring the PRD lock, then skip the guard entirely on the locked
+    // write. A concurrent writer that recorded a newer marker in that window
+    // had it silently overwritten. The check has to happen after the lock is
+    // held, which no single-writer test can distinguish from before it — so
+    // this one pins the ordering by holding the real lock.
+    it("re-reads the marker after acquiring the lock, so a newer marker recorded while it waited survives", async () => {
+      const store = make(rexDir);
+      await store.saveDocument(doc());
+
+      // Stand in for a concurrent writer that is mid-write, holding the PRD
+      // lock, when this build calls adoptSlugRule.
+      let releaseHolder!: () => void;
+      const releaseSignal = new Promise<void>((resolve) => {
+        releaseHolder = resolve;
+      });
+      let holderHasLock!: () => void;
+      const holderAcquired = new Promise<void>((resolve) => {
+        holderHasLock = resolve;
+      });
+      const holderDone = withLock(prdLockPath(rexDir), async () => {
+        holderHasLock();
+        await releaseSignal;
+        // The concurrent writer finishes its own write — under its own
+        // rule, a newer one — before giving up the lock.
+        const meta = JSON.parse(await readFile(join(rexDir, TREE_META), "utf-8"));
+        await writeFile(
+          join(rexDir, TREE_META),
+          JSON.stringify({ ...meta, slugRule: SLUG_RULE_VERSION + 1 }),
+          "utf-8",
+        );
+      });
+      await holderAcquired;
+
+      // adoptSlugRule is entered while the lock is still held by the writer
+      // above. If it read the marker now, it would see the old, adoptable
+      // value.
+      const adopt = store.adoptSlugRule!();
+      releaseHolder();
+      await holderDone;
+
+      await expect(adopt).rejects.toThrow(SlugRuleMismatchError);
+      // The newer marker the concurrent writer recorded must survive —
+      // adoptSlugRule must not have overwritten it on the way to refusing.
+      expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION + 1);
+    });
+
     // A migration can only move a tree onto the rule this build implements,
     // so adopt-newer is a downgrade wearing a migration's name. Left
     // unbounded it made the guard's own advice into a loop: the newer build
@@ -321,55 +368,6 @@ describe("slug-rule write guard", () => {
         expect(err!.message).toContain("Upgrade rex");
         expect(err!.message).not.toMatch(/Run 'rex migrate-slugs'/);
       });
-    });
-  });
-
-  // `adoptSlugRule` used to read the marker and decide direction *before*
-  // acquiring the PRD lock, then skip the guard entirely on the locked write.
-  // A concurrent writer that recorded a newer marker in that window had it
-  // silently overwritten. FolderTreeStore-only: the fix landed there; this
-  // pins the lock ordering directly rather than through the shared
-  // `describe.each(STORES)` harness above, which FileStore still fails.
-  describe("adoptSlugRule direction check runs under the lock", () => {
-    it("re-reads the marker after acquiring the lock, so a newer marker recorded while it waited survives", async () => {
-      const store = new FolderTreeStore(rexDir);
-      await store.saveDocument(doc());
-
-      // Stand in for a concurrent writer that is mid-write, holding the PRD
-      // lock, when this build calls adoptSlugRule.
-      let releaseHolder!: () => void;
-      const releaseSignal = new Promise<void>((resolve) => {
-        releaseHolder = resolve;
-      });
-      let holderHasLock!: () => void;
-      const holderAcquired = new Promise<void>((resolve) => {
-        holderHasLock = resolve;
-      });
-      const holderDone = withLock(prdLockPath(rexDir), async () => {
-        holderHasLock();
-        await releaseSignal;
-        // The concurrent writer finishes its own write — under its own
-        // rule, a newer one — before giving up the lock.
-        const meta = JSON.parse(await readFile(join(rexDir, TREE_META), "utf-8"));
-        await writeFile(
-          join(rexDir, TREE_META),
-          JSON.stringify({ ...meta, slugRule: SLUG_RULE_VERSION + 1 }),
-          "utf-8",
-        );
-      });
-      await holderAcquired;
-
-      // adoptSlugRule is entered while the lock is still held by the writer
-      // above. If it read the marker now, it would see the old, adoptable
-      // value.
-      const adopt = store.adoptSlugRule!();
-      releaseHolder();
-      await holderDone;
-
-      await expect(adopt).rejects.toThrow(SlugRuleMismatchError);
-      // The newer marker the concurrent writer recorded must survive —
-      // adoptSlugRule must not have overwritten it on the way to refusing.
-      expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION + 1);
     });
   });
 
