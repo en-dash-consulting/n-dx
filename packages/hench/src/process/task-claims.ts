@@ -61,6 +61,22 @@ export class TaskClaimedElsewhereError extends CLIError {
 }
 
 /**
+ * A claim this run held that another worktree has taken over.
+ *
+ * Emitted by the renewal timer, not by anything the run does, so it can
+ * arrive at any point during a run. The run deliberately keeps going — see
+ * {@link TaskClaims.renewNow} — which is exactly why it has to be said out
+ * loud somewhere the operator is looking.
+ */
+export interface ClaimLostEvent {
+  /** When the refusal was observed. */
+  at: string;
+  taskId: string;
+  /** Worktree root that now holds the task. */
+  holderWorktree: string;
+}
+
+/**
  * Never wake more often than this to refresh, however short a claim's life.
  * Guards against a tiny TTL (tests, a future per-call override) turning
  * renewal into a busy loop on the claims lock.
@@ -83,6 +99,17 @@ export class TaskClaims {
 
   private renewalTimer: ReturnType<typeof setTimeout> | null = null;
   private renewalActive = false;
+
+  /** The most recent claim this run lost to another worktree, if any. */
+  claimLost: ClaimLostEvent | null = null;
+
+  /**
+   * Notified when a renewal is refused because another worktree took the
+   * task. The run loop uses this to stamp the run record and save it, so the
+   * dashboard's Sessions tray learns about it while the run is still going
+   * rather than at the end. Set by `recordClaimLoss` in agent/lifecycle.
+   */
+  onClaimLost: ((event: ClaimLostEvent) => void) | null = null;
 
   constructor(
     readonly store: ClaimsStore,
@@ -187,6 +214,18 @@ export class TaskClaims {
         } else {
           this.held.delete(taskId);
           this.expiries.delete(taskId);
+          const event: ClaimLostEvent = {
+            at: new Date().toISOString(),
+            taskId,
+            holderWorktree: result.heldBy.worktreeRoot,
+          };
+          this.claimLost = event;
+          try {
+            this.onClaimLost?.(event);
+          } catch {
+            // A listener that throws must not stop the remaining claims being
+            // refreshed, nor fail a run that is otherwise fine.
+          }
         }
       } catch {
         // Transient: a locked or unwritable store must not fail the run. The

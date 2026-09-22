@@ -154,6 +154,8 @@ describe("GET /api/worktrees", () => {
         taskTitle: "title for run-b",
         startedAt: "2026-09-16T10:00:00.000Z",
         finishedAt: "2026-09-16T11:00:00.000Z",
+        // No worktree took this run's task over.
+        claimLostTo: null,
       },
     });
     expect(list.find((w) => w.path === linked)!.runs).toEqual({
@@ -166,7 +168,64 @@ describe("GET /api/worktrees", () => {
         taskTitle: "title for run-c",
         startedAt: "2026-09-16T10:00:00.000Z",
         finishedAt: null,
+        claimLostTo: null,
       },
+    });
+    await server.close();
+  });
+
+  it("reports the worktree that took a run's task over, and null when none did", async () => {
+    // Written the way hench writes it: the run is still `running`, because a
+    // run whose claim is taken over deliberately carries on.
+    const runsDir = join(linked, ".hench", "runs");
+    mkdirSync(runsDir, { recursive: true });
+    writeFileSync(
+      join(runsDir, "run-taken.json"),
+      JSON.stringify({
+        id: "run-taken",
+        taskId: "task-1",
+        taskTitle: "taken over",
+        startedAt: "2026-09-16T12:00:00.000Z",
+        status: "running",
+        claimLost: { at: "2026-09-16T12:30:00.000Z", taskId: "task-1", holderWorktree: repo },
+      }),
+    );
+    clearWorktreesCache();
+
+    server = await startRouteTestServer((req, res) => handleWorktreesRoute(req, res, ctxFor(repo)));
+    const list = await fetchWorktrees(server);
+    expect(list.find((w) => w.path === linked)!.runs.latest).toMatchObject({
+      id: "run-taken",
+      status: "running",
+      claimLostTo: repo,
+    });
+    // The anchor's own runs are untouched by another worktree's record.
+    expect(list.find((w) => w.path === repo)!.runs.latest!.claimLostTo).toBeNull();
+    await server.close();
+  });
+
+  it("treats a malformed claimLost as no takeover rather than losing the run", async () => {
+    // Run files are read across worktrees, so one may come from a different
+    // hench version. A bad entry must not cost the whole digest.
+    const runsDir = join(linked, ".hench", "runs");
+    mkdirSync(runsDir, { recursive: true });
+    writeFileSync(
+      join(runsDir, "run-odd.json"),
+      JSON.stringify({
+        id: "run-odd",
+        taskTitle: "odd",
+        startedAt: "2026-09-16T13:00:00.000Z",
+        status: "running",
+        claimLost: { at: "2026-09-16T13:30:00.000Z", holderWorktree: 42 },
+      }),
+    );
+    clearWorktreesCache();
+
+    server = await startRouteTestServer((req, res) => handleWorktreesRoute(req, res, ctxFor(repo)));
+    const list = await fetchWorktrees(server);
+    expect(list.find((w) => w.path === linked)!.runs.latest).toMatchObject({
+      id: "run-odd",
+      claimLostTo: null,
     });
     await server.close();
   });

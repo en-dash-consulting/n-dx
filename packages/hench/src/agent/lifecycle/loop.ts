@@ -39,6 +39,7 @@ import {
   captureBaselineUntracked,
   runReviewGate,
   finalizeRun,
+  recordClaimLoss,
   handleRunFailure,
   handleBudgetExceeded,
   formatModelLabel,
@@ -681,6 +682,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   // one sees tool results, so identical results are part of "the same call".
   const livelock = createLivelockDetector({ threshold: config.livelockThreshold });
 
+  recordClaimLoss(opts.claims, run, henchDir);
   const heartbeat = startHeartbeat(henchDir, run);
 
   // Register SIGINT handler for graceful cancellation (mirrors Claude loop).
@@ -1221,6 +1223,7 @@ async function runLocalToolLoop(params: {
   // one sees tool results, so identical results are part of "the same call".
   const livelock = createLivelockDetector({ threshold: config.livelockThreshold });
 
+  recordClaimLoss(opts.claims, run, henchDir);
   const heartbeat = startHeartbeat(henchDir, run);
 
   let cancelled = false;
@@ -1712,6 +1715,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Start heartbeat — writes lastActivityAt to disk periodically so long-running
   // tool calls don't make the run appear stale to the web dashboard. The API
   // loop already sets run.turns per turn, so it needs no counter hook.
+  recordClaimLoss(opts.claims, run, henchDir);
   const heartbeat = startHeartbeat(henchDir, run);
 
   // API-specific: turn-based execution loop

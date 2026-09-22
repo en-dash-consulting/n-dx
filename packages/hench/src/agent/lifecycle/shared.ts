@@ -2496,6 +2496,34 @@ async function collectRunCommits(projectDir: string, startHead: string | undefin
  * run post-task tests, retrieve Codex tokens if applicable, set timestamps,
  * and persist. Called at the end of both loops.
  */
+/**
+ * Record on the run, and persist immediately, when another worktree takes
+ * this run's task over mid-flight.
+ *
+ * The renewal timer notices the takeover, not the run, so without this the
+ * task simply leaves the held set and nothing anywhere says so. The run keeps
+ * going on purpose — see `TaskClaims.renewNow` — which is precisely why the
+ * operator needs to be told: the work continuing is not the same as the work
+ * still being this run's to finish.
+ *
+ * Saving here rather than waiting for the next heartbeat is what makes the
+ * dashboard's Sessions tray show it promptly: the run file changing is what
+ * the server's watcher turns into a `hench:run-changed` broadcast.
+ */
+export function recordClaimLoss(
+  claims: TaskClaims | undefined,
+  run: RunRecord,
+  henchDir: string,
+): void {
+  if (!claims) return;
+  claims.onClaimLost = (event) => {
+    run.claimLost = event;
+    // Best-effort: losing the claim is already the bad news, and failing to
+    // write it down must not also fail the run.
+    void saveRun(henchDir, run).catch(() => {});
+  };
+}
+
 export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   const { run, henchDir, projectDir, config, testCommand, heartbeat, memoryCtx, selfHeal, yes, autonomous, skipFullTestGate } = opts;
 

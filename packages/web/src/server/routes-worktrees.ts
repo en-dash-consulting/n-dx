@@ -53,6 +53,11 @@ export interface WorktreeLatestRun {
   taskTitle: string | null;
   startedAt: string | null;
   finishedAt: string | null;
+  /**
+   * Worktree root that took this run's task over while it was still running,
+   * or null. Present only on records written by a hench that records it.
+   */
+  claimLostTo: string | null;
 }
 
 /** Hench run history recorded under one worktree's `.hench/runs/`. */
@@ -136,6 +141,7 @@ interface RunFileDigest {
   taskTitle: string | null;
   startedAt: string | null;
   finishedAt: string | null;
+  claimLostTo: string | null;
 }
 
 const runDigestCache = new Map<string, RunFileDigest>();
@@ -165,6 +171,19 @@ async function countDirtyFiles(worktree: GitWorktree): Promise<number | null> {
 }
 
 /** Read just the two fields this route needs from one run file, via the digest cache. */
+/**
+ * The worktree named by a run record's `claimLost`, or null.
+ *
+ * Tolerant by design: this reads run files written by other worktrees, which
+ * may be on a different hench version, so a missing or malformed entry is
+ * simply no takeover rather than a parse failure that costs the whole digest.
+ */
+function claimLostHolder(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const holder = (value as Record<string, unknown>).holderWorktree;
+  return typeof holder === "string" && holder.length > 0 ? holder : null;
+}
+
 function digestRunFile(path: string): RunFileDigest | null {
   let mtimeMs: number;
   let size: number;
@@ -192,11 +211,12 @@ function digestRunFile(path: string): RunFileDigest | null {
       taskTitle: str(run.taskTitle),
       startedAt: str(run.startedAt),
       finishedAt: str(run.finishedAt),
+      claimLostTo: claimLostHolder(run.claimLost),
     };
   } catch {
     // Unparseable (mid-write, corrupt): remember that so it is not re-read on
     // every poll, but count it as no run.
-    digest = { mtimeMs, size, id: null, status: null, taskTitle: null, startedAt: null, finishedAt: null };
+    digest = { mtimeMs, size, id: null, status: null, taskTitle: null, startedAt: null, finishedAt: null, claimLostTo: null };
   }
   runDigestCache.set(path, digest);
   return digest;
@@ -253,6 +273,7 @@ function summariseRuns(worktreePath: string): WorktreeRunsSummary {
         taskTitle: best.taskTitle,
         startedAt: best.startedAt,
         finishedAt: best.finishedAt,
+        claimLostTo: best.claimLostTo,
       };
   return { total, running, lastFinishedAt, latest };
 }

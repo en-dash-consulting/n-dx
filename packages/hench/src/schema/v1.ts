@@ -1180,6 +1180,24 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   uncommittedPaths?: string[];
+  /**
+   * Set when another worktree took this run's task over while it was still
+   * running — the renewal timer's refresh was refused. The run continues by
+   * design (abandoning work in progress would be worse than the overlap), so
+   * this is the only trace that the task is no longer this run's to finish.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  claimLost?: RunClaimLost;
+}
+
+/** See {@link RunRecord.claimLost}. Mirrors ClaimLostEvent in process/task-claims.ts. */
+export interface RunClaimLost {
+  /** When the refusal was observed. */
+  at: string;
+  taskId: string;
+  /** Worktree root that now holds the task. */
+  holderWorktree: string;
 }
 
 /** A single commit a run produced. See {@link RunRecord.commits}. */
