@@ -33,5 +33,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Re-run the slug-rule gate on every loop iteration](./re-run-the-slug-rule-gate-on-every.md) | pending |
 | [Record the slug rule version in tree-meta.json and refuse writes from a build with a different rule](./record-the-slug-rule-version-in-tree.md) | completed |
 | [Refuse to start ndx work or a dashboard Execute on a non-conformant PRD tree](./refuse-to-start-ndx-work-or-a.md) | completed |
-| [Remove the dead omitSlugRuleMarker option or reach it from a CLI fixture](./remove-the-dead-omitslugrulemarker.md) | pending |
+| [Remove the dead omitSlugRuleMarker option or reach it from a CLI fixture](./remove-the-dead-omitslugrulemarker.md) | completed |
 | [Report slugRuleRecorded in rex migrate-slugs JSON output](./report-slugrulerecorded-in-rex-migrate.md) | completed |
