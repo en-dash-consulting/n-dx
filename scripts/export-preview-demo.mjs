@@ -10,13 +10,14 @@
  * that blocks or stops scripts — a mail or Slack preview, Drive, reader mode,
  * a browser restoring a sleeping tab — shows the frame with nothing in it.
  *
- * So this runs the page once in headless Chromium, walks every page in the
- * rail, and writes what the renderer PRODUCED into the markup: all pages
- * present as static HTML, the inactive ones hidden, both zone-graph
- * projections present with one hidden. The exported file's own script is a
- * few lines of show/hide — navigation, section collapse, the 2D/3D toggle,
- * theme — and the numbers no longer depend on it. With scripts disabled the
- * Analysis page still reads in full.
+ * So this runs the page once in headless Chromium, walks every destination
+ * in the shell (the three stage tabs, the Commands sheet, the settings
+ * pages), and writes what the renderer PRODUCED into the markup: all pages
+ * present as static HTML in their own hosts, the inactive ones hidden, both
+ * zone-graph projections present with one hidden. The exported file's own
+ * script is a few lines of show/hide — navigation, the sheet and overlay,
+ * section collapse, the 2D/3D toggle, theme — and the numbers no longer
+ * depend on it. With scripts disabled the Analysis page still reads in full.
  *
  * Needs the web package's Playwright Chromium (`npx playwright install chromium`
  * in packages/web if it is missing).
@@ -42,13 +43,29 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
 await page.goto(pathToFileURL(SOURCE).href + "#analysis", { waitUntil: "load" });
 
-// Every destination in the rail, in rail order.
-const pageIds = await page.$$eval("[data-page]", (els) => els.map((el) => el.dataset.page));
+// Every destination in the shell, in document order: the three stage tabs,
+// the Commands button, then the settings pages. The stage links repeat the
+// stage ids, hence the Set.
+const pageIds = [...new Set(await page.$$eval("[data-page]", (els) => els.map((el) => el.dataset.page)))];
+
+// Stage pages render into #content; settings and commands into their own
+// hosts (an overlay and a sheet over the stage). Same split as the page's go().
+const kindOf = (id) => (id.startsWith("s-") ? "settings" : id === "commands" ? "commands" : "main");
+const HOSTS = {
+  main: '<div class="content" id="content"></div>',
+  settings: '<div class="overlay-content" id="settings-body"></div>',
+  commands: '<div class="sheet-body" id="commands-body"></div>',
+};
+const hostSelector = { main: "#content", settings: "#settings-body", commands: "#commands-body" };
 
 const rendered = [];
 for (const id of pageIds) {
+  const host = hostSelector[kindOf(id)];
   await page.evaluate((next) => { location.hash = next; }, id);
-  await page.waitForFunction((next) => location.hash.slice(1) === next && document.querySelector("#content .page-head"), id);
+  await page.waitForFunction(
+    ([next, sel]) => document.body.dataset.page === next && document.querySelector(sel + " .page-head"),
+    [id, host],
+  );
 
   if (id === "analysis") {
     // Capture both projections of the zone graph, 3D hidden, so the toggle in
@@ -71,8 +88,9 @@ for (const id of pageIds) {
 
   rendered.push({
     id,
+    kind: kindOf(id),
     crumbs: await page.$eval("#crumbs", (el) => el.innerHTML),
-    html: await page.$eval("#content", (el) => el.innerHTML),
+    html: await page.$eval(host, (el) => el.innerHTML),
   });
 }
 await browser.close();
@@ -82,32 +100,59 @@ if (errors.length) {
 }
 
 // ── Assemble the static document from the source shell ────────────────────
-const contentTag = '<div class="content" id="content"></div>';
-if (!source.includes(contentTag)) throw new Error("content host not found in source");
+for (const tag of Object.values(HOSTS)) {
+  if (!source.includes(tag)) throw new Error("host not found in source: " + tag);
+}
 
-const pagesHtml = rendered.map((r) =>
-  `<div class="page" data-page-id="${r.id}" data-crumbs="${escapeAttr(r.crumbs)}"${r.id === "analysis" ? "" : " hidden"}>\n${r.html}\n</div>`,
-).join("\n");
+const pageDiv = (r) =>
+  `<div class="page" data-page-id="${r.id}" data-crumbs="${escapeAttr(r.crumbs)}"${r.id === "analysis" ? "" : " hidden"}>\n${r.html}\n</div>`;
+const bakedInto = (kind) =>
+  HOSTS[kind].replace("></div>", ">\n" + rendered.filter((r) => r.kind === kind).map(pageDiv).join("\n") + "\n</div>");
 
 const staticScript = `<script>
-// Static export: the content above is baked in. This only shows and hides.
+// Static export: the content above is baked in. This only shows and hides —
+// the same routing as the live page: stage pages in #content, settings as an
+// overlay, commands as a sheet lifted over the current stage.
 (function () {
   var pages = document.querySelectorAll(".page");
   var crumbs = document.getElementById("crumbs");
+  var main = document.getElementById("main"), overlay = document.getElementById("settings-overlay");
+  var sheet = document.getElementById("commands-sheet"), scrim = document.getElementById("scrim");
+  var cmdToggle = document.getElementById("commands-toggle");
+  var stage = "analysis", lastSettings = "s-general";
+  function kindOf(id) { return id.slice(0, 2) === "s-" ? "settings" : id === "commands" ? "commands" : "main"; }
   function show(id) {
-    var found = false;
-    pages.forEach(function (p) { var on = p.dataset.pageId === id; p.hidden = !on; if (on) { found = true; crumbs.innerHTML = p.dataset.crumbs; } });
-    if (!found) return show("analysis");
-    document.querySelectorAll("[data-page]").forEach(function (el) { el.classList.toggle("active", el.dataset.page === id); });
-    if (id.slice(0, 2) === "s-") { document.getElementById("settings-items").hidden = false; document.querySelector("#settings-label .caret").textContent = "▾"; }
-    document.getElementById("content").scrollTop = 0;
+    var target = null;
+    pages.forEach(function (p) { if (p.dataset.pageId === id) target = p; });
+    if (!target) return show("analysis");
+    var kind = kindOf(id);
+    if (kind === "main") stage = id; else if (kind === "settings") lastSettings = id;
+    // An overlay or sheet sits over the stage, so the stage page stays shown beneath it.
+    pages.forEach(function (p) { p.hidden = !(p === target || (kind !== "main" && p.dataset.pageId === stage)); });
+    crumbs.innerHTML = target.dataset.crumbs;
+    overlay.hidden = kind !== "settings";
+    sheet.classList.toggle("open", kind === "commands");
+    scrim.hidden = kind !== "commands";
+    cmdToggle.setAttribute("aria-expanded", String(kind === "commands"));
+    main.dataset.stage = stage;
+    document.querySelectorAll("[data-page]").forEach(function (el) {
+      el.classList.toggle("active", el.dataset.page === id || (el.classList.contains("nav-section") && el.dataset.page === stage));
+    });
+    target.parentElement.scrollTop = 0;
+    document.body.dataset.page = id;
     if (location.hash.slice(1) !== id) history.replaceState(null, "", "#" + id);
   }
-  document.querySelectorAll("[data-page]").forEach(function (el) { el.addEventListener("click", function () { show(el.dataset.page); }); });
+  document.querySelectorAll("[data-page]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      var id = el.dataset.page;
+      show(el.hasAttribute("data-toggle") && document.body.dataset.page === id ? stage : id);
+    });
+  });
   window.addEventListener("hashchange", function () { show(location.hash.slice(1)); });
-  document.getElementById("settings-label").addEventListener("click", function () {
-    var items = document.getElementById("settings-items"); items.hidden = !items.hidden;
-    document.querySelector("#settings-label .caret").textContent = items.hidden ? "▸" : "▾";
+  document.getElementById("settings-toggle").addEventListener("click", function () { show(lastSettings); });
+  document.querySelectorAll("[data-close], #scrim").forEach(function (el) { el.addEventListener("click", function () { show(stage); }); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && kindOf(document.body.dataset.page || "analysis") !== "main") show(stage);
   });
   document.querySelectorAll(".sec-head").forEach(function (head) {
     head.addEventListener("click", function () { head.parentElement.classList.toggle("collapsed"); });
@@ -132,7 +177,8 @@ const staticScript = `<script>
 </script>`;
 
 let doc = source;
-doc = doc.replace(contentTag, `<div class="content" id="content">\n${pagesHtml}\n</div>`);
+// Function form: a string replacement would expand "$&"-style sequences in the baked markup.
+for (const kind of Object.keys(HOSTS)) doc = doc.replace(HOSTS[kind], () => bakedInto(kind));
 doc = doc.replace(/<script>[\s\S]*<\/script>/, staticScript);          // the renderer is no longer needed
 doc = doc.replace('  <a href="./">← back to the editor</a>\n', "");   // only means something beside the editor
 doc = doc.replace(

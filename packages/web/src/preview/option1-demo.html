@@ -22,6 +22,14 @@
   same measured crossings, drawn as a node-link map or as an isometric block
   map. Static, not a build artefact — edit and save, the page reloads.
 
+  Shell:  the three stages are tabs in a top bar beside the logo and project
+  info. The bottom bar holds the server status, a settings cog and a Commands
+  button: Commands lifts a sheet over the page with the runner and the full
+  reference; the cog opens the settings pages as a full overlay with an ✕ to
+  close. Each stage page carries two small vertical buttons on its edges that
+  step around the loop — Analysis → Plan → Work → Analysis — so the next move
+  is always one click away.
+
   Served next to the editor:  ndx start --preview .  →  /option1-demo.html
 -->
 <html lang="en" data-theme="dark">
@@ -67,35 +75,21 @@ a { color: var(--accent); }
 .demo-bar a { color: #fff; margin-left: auto; }
 .demo-bar button { font: inherit; background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer; }
 
-/* ── shell ──────────────────────────────────────────────────────────────── */
-.shell { display: flex; flex: 1; min-height: 0; }
-.sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--bg-surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
-.sidebar-header { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-4); border-bottom: 1px solid var(--border); }
+/* ── shell: top nav · main (with stage links) · bottom bar ─────────────── */
+.shell { display: flex; flex-direction: column; flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.topnav { display: flex; align-items: center; gap: var(--space-3); height: 48px; padding: 0 var(--space-4); background: var(--bg-surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.brand { display: flex; align-items: center; gap: var(--space-2); padding-right: var(--space-4); border-right: 1px solid var(--border); }
 .logo-dot { width: 26px; height: 26px; border-radius: var(--radius-md); background: var(--purple); color: #fff; display: grid; place-items: center; font: 700 12px/1 var(--font-mono); }
-.project-name { font-weight: 600; }
-.project-path { color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
-.nav { padding: var(--space-2) 0; flex: 1; }
-.nav-section { display: flex; align-items: center; gap: 8px; padding: 9px var(--space-4); color: var(--text-dim); cursor: pointer; border-left: 2px solid transparent; }
+.project-name { font-weight: 600; line-height: 1.2; }
+.project-path { color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); line-height: 1.2; }
+.tabs { display: flex; align-self: stretch; }
+.nav-section { display: flex; align-items: center; gap: 8px; padding: 0 var(--space-4); color: var(--text-dim); cursor: pointer; font: inherit; background: none; border: none; border-top: 2px solid transparent; border-bottom: 2px solid transparent; }
 .nav-section:hover { background: var(--bg-hover); color: var(--text); }
-.nav-section.active { background: var(--bg-active); color: var(--text); border-left-color: var(--accent); }
+.nav-section.active { color: var(--text); border-bottom-color: var(--accent); }
 .nav-section .glyph { width: 18px; text-align: center; color: var(--text-muted); }
 .nav-section.active .glyph { color: var(--accent); }
 .nav-section .name { font-weight: 600; letter-spacing: .02em; }
-.nav-section .hint { margin-left: auto; font: 10px/1 var(--font-mono); color: var(--text-muted); }
-.nav-group { border-top: 1px solid var(--border); margin-top: var(--space-2); padding-top: var(--space-2); }
-.nav-group-label { display: flex; align-items: center; gap: 6px; padding: 6px var(--space-4); font: 600 10px/1.6 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); cursor: pointer; }
-.nav-group-label .caret { width: 12px; font-size: 10px; }
-.nav-item { display: flex; align-items: center; gap: 8px; padding: 5px var(--space-4) 5px 28px; color: var(--text-dim); cursor: pointer; }
-.nav-item:hover { background: var(--bg-hover); color: var(--text); }
-.nav-item.active { background: var(--bg-active); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
-.nav-item .glyph { width: 16px; text-align: center; color: var(--text-muted); }
-.sidebar-footer { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); color: var(--text-muted); font-size: 11px; display: flex; gap: 10px; align-items: center; }
-.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; }
-
-.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.topbar { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--border); background: var(--bg-surface); }
-.crumbs { color: var(--text-muted); font-size: 12px; }
-.crumbs b { color: var(--text); font-weight: 600; }
+.nav-section .hint { font: 10px/1 var(--font-mono); color: var(--text-muted); }
 .search { margin-left: auto; min-width: 220px; padding: 5px var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text-muted); display: flex; justify-content: space-between; }
 kbd { font: 10px/1 var(--font-mono); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 2px 5px; color: var(--text-dim); }
 .btn { font: inherit; font-size: 12px; padding: 5px var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: var(--bg-active); color: var(--text); cursor: pointer; }
@@ -103,10 +97,60 @@ kbd { font: 10px/1 var(--font-mono); border: 1px solid var(--border-strong); bor
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #04121a; font-weight: 600; }
 [data-theme="light"] .btn-primary { color: #fff; }
 .btn-sm { padding: 3px 9px; font-size: 11px; }
-.content { flex: 1; overflow-y: auto; padding: var(--space-5) var(--space-5) 60px; }
+
+.main { flex: 1; display: flex; min-height: 0; position: relative; }
+.content { flex: 1; overflow-y: auto; padding: var(--space-5) 48px 60px; }
 .page-head { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-4); }
 .page-head h1 { margin: 0; font-size: 20px; font-weight: 600; }
 .page-head .sub { color: var(--text-muted); font-size: 12px; }
+
+/* stage links: one pair per stage, the pair for the current stage is shown.
+   Analysis → Plan → Work → Analysis, so every page has a previous and a next. */
+.stage-link { position: absolute; top: 50%; transform: translateY(-50%); z-index: 5; display: none; flex-direction: column; align-items: center; gap: 8px; width: 30px; padding: 12px 0; font: inherit; color: var(--text-dim); background: var(--bg-surface); border: 1px solid var(--border-strong); cursor: pointer; }
+.stage-link.prev { left: 0; border-left: none; border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }
+.stage-link.next { right: 0; border-right: none; border-radius: var(--radius-lg) 0 0 var(--radius-lg); }
+.stage-link:hover, .stage-link:focus-visible { color: var(--text); background: var(--bg-hover); border-color: var(--accent); outline: none; }
+.stage-link .k { writing-mode: vertical-rl; font: 600 9px/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
+.stage-link .n { writing-mode: vertical-rl; font-weight: 600; font-size: 12px; letter-spacing: .04em; }
+.stage-link .arrow { color: var(--accent); font-size: 13px; line-height: 1; }
+.main[data-stage="analysis"] .stage-link[data-for="analysis"],
+.main[data-stage="plan"] .stage-link[data-for="plan"],
+.main[data-stage="work"] .stage-link[data-for="work"] { display: flex; }
+
+.bottombar { display: flex; align-items: center; gap: var(--space-3); height: 38px; padding: 0 var(--space-4); background: var(--bg-surface); border-top: 1px solid var(--border); color: var(--text-muted); font-size: 11px; flex-shrink: 0; position: relative; z-index: 31; }
+.status { display: flex; align-items: center; gap: 8px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; }
+.icon-btn { font: inherit; font-size: 15px; line-height: 1; width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--radius-md); border: 1px solid transparent; background: transparent; color: var(--text-dim); cursor: pointer; }
+.icon-btn:hover, .icon-btn:focus-visible, .icon-btn.active { background: var(--bg-hover); color: var(--text); border-color: var(--border-strong); outline: none; }
+.cmd { margin-left: auto; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 12px; padding: 4px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: var(--bg-active); color: var(--text); cursor: pointer; }
+.cmd:hover, .cmd[aria-expanded="true"] { background: var(--bg-hover); border-color: var(--accent); }
+.cmd .glyph { color: var(--text-muted); }
+.cmd .caret { font-size: 10px; color: var(--text-muted); transition: transform .2s; }
+.cmd[aria-expanded="true"] .caret { transform: rotate(180deg); }
+
+/* commands sheet: lifts from the bottom bar over the page */
+.scrim { position: absolute; inset: 0 0 38px 0; z-index: 29; background: rgba(0, 0, 0, .35); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 38px; max-height: 72%; z-index: 30; display: flex; flex-direction: column; background: var(--bg-surface); border-top: 1px solid var(--border-strong); box-shadow: 0 -12px 32px rgba(0, 0, 0, .35); transform: translateY(100%); visibility: hidden; transition: transform .22s ease; }
+.sheet.open { transform: none; visibility: visible; }
+.sheet-head { display: flex; align-items: center; gap: var(--space-3); padding: 6px var(--space-5); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sheet-head .close { margin-left: auto; }
+.sheet-body { overflow-y: auto; padding: var(--space-4) var(--space-5) var(--space-5); }
+.sheet-body .page-head { margin-bottom: var(--space-3); }
+
+/* settings overlay: a full page over the shell, ✕ in the top right */
+.overlay { position: absolute; inset: 0; z-index: 40; display: flex; flex-direction: column; background: var(--bg); }
+.overlay-head { display: flex; align-items: center; gap: var(--space-3); height: 48px; padding: 0 var(--space-5); background: var(--bg-surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.overlay-head .glyph { color: var(--text-muted); font-size: 15px; }
+.overlay-head .close { margin-left: auto; width: 30px; height: 30px; }
+.crumbs { color: var(--text-muted); font-size: 12px; }
+.crumbs b { color: var(--text); font-weight: 600; }
+.overlay-body { flex: 1; display: flex; min-height: 0; }
+.settings-nav { width: var(--sidebar-w); flex-shrink: 0; padding: var(--space-2) 0; background: var(--bg-surface); border-right: 1px solid var(--border); overflow-y: auto; }
+.nav-item { display: flex; align-items: center; gap: 8px; padding: 7px var(--space-4); color: var(--text-dim); cursor: pointer; }
+.nav-item:hover { background: var(--bg-hover); color: var(--text); }
+.nav-item.active { background: var(--bg-active); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+.nav-item .glyph { width: 16px; text-align: center; color: var(--text-muted); }
+.overlay-content { flex: 1; overflow-y: auto; padding: var(--space-5); }
 
 /* ── sections ("dropdowns") ─────────────────────────────────────────────── */
 .sec { margin-bottom: var(--space-5); }
@@ -180,57 +224,80 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11
 .graph line, .graph path.edge { stroke: var(--text-muted); stroke-opacity: .35; fill: none; }
 .hotkeys li { justify-content: space-between; }
 .log time { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; }
-@media (max-width: 960px) { .panel { grid-column: span 12 !important; } .sidebar { display: none; } }
+.w3 { grid-column: span 3; }
+@media (max-width: 960px) { .panel { grid-column: span 12 !important; } .project-path, .topnav .search, .stage-link .k { display: none; } .settings-nav { width: 170px; } }
 </style>
 </head>
 <body>
 
 <div class="demo-bar">
   <b>demo</b>
-  <span>Option 1 layout, filled with this repo's real analysis, PRD and run history (as of 2026-09-17). Nothing here is new — only moved.</span>
+  <span>Option 1 layout — stages across the top, commands and settings on the bottom bar — filled with this repo's real analysis, PRD and run history (as of 2026-09-17). Nothing here is new — only moved.</span>
   <button id="theme">◐ theme</button>
   <a href="./">← back to the editor</a>
 </div>
 
 <div class="shell">
-  <aside class="sidebar">
-    <div class="sidebar-header">
+  <header class="topnav">
+    <div class="brand">
       <span class="logo-dot">n</span>
       <div><div class="project-name">n-dx</div><div class="project-path">~/VSCodeProjects/n-dx</div></div>
     </div>
-    <nav class="nav">
-      <div class="nav-section" data-page="analysis"><span class="glyph">▣</span><span class="name">Analysis</span><span class="hint">sv</span></div>
-      <div class="nav-section" data-page="plan"><span class="glyph">☑</span><span class="name">Plan</span><span class="hint">rex</span></div>
-      <div class="nav-section" data-page="work"><span class="glyph">▶</span><span class="name">Work</span><span class="hint">hench</span></div>
-      <div class="nav-group">
-        <div class="nav-group-label"><span class="caret">▾</span> Commands</div>
-        <div class="nav-item" data-page="commands"><span class="glyph">⌘</span> All Commands</div>
-      </div>
-      <div class="nav-group">
-        <div class="nav-group-label" id="settings-label"><span class="caret">▸</span> Settings</div>
-        <div id="settings-items" hidden>
-          <div class="nav-item" data-page="s-general"><span class="glyph">🧠</span> General</div>
-          <div class="nav-item" data-page="s-plan"><span class="glyph">▣</span> ndx analyze / plan</div>
-          <div class="nav-item" data-page="s-work"><span class="glyph">▶</span> ndx work</div>
-          <div class="nav-item" data-page="s-sync"><span class="glyph">🔌</span> ndx sync</div>
-          <div class="nav-item" data-page="s-export"><span class="glyph">📤</span> ndx export / refresh</div>
-          <div class="nav-item" data-page="s-flags"><span class="glyph">📌</span> Feature Flags</div>
-          <div class="nav-item" data-page="s-timeouts"><span class="glyph">⏱</span> CLI Timeouts</div>
-        </div>
-      </div>
+    <nav class="tabs" aria-label="Stages">
+      <button class="nav-section" data-page="analysis"><span class="glyph">▣</span><span class="name">Analysis</span><span class="hint">sv</span></button>
+      <button class="nav-section" data-page="plan"><span class="glyph">☑</span><span class="name">Plan</span><span class="hint">rex</span></button>
+      <button class="nav-section" data-page="work"><span class="glyph">▶</span><span class="name">Work</span><span class="hint">hench</span></button>
     </nav>
-    <div class="sidebar-footer"><span class="dot"></span> server :3117 · analysis fresh · 1 run live</div>
-  </aside>
+    <div class="search"><span>Search files, zones, tasks…</span><kbd>⌘K</kbd></div>
+    <button class="btn">Refresh</button>
+    <button class="btn btn-primary">Analyze</button>
+  </header>
 
-  <div class="main">
-    <div class="topbar">
-      <div class="crumbs" id="crumbs"></div>
-      <div class="search"><span>Search files, zones, tasks…</span><kbd>⌘K</kbd></div>
-      <button class="btn">Refresh</button>
-      <button class="btn btn-primary">Analyze</button>
-    </div>
+  <div class="main" id="main" data-stage="analysis">
+    <!-- Analysis → Plan → Work → Analysis. One pair per stage; CSS shows the current pair. -->
+    <button class="stage-link prev" data-page="work" data-for="analysis" title="Previous stage: Work"><span class="arrow">←</span><span class="k">prev</span><span class="n">Work</span></button>
+    <button class="stage-link next" data-page="plan" data-for="analysis" title="Next stage: Plan"><span class="k">next</span><span class="n">Plan</span><span class="arrow">→</span></button>
+    <button class="stage-link prev" data-page="analysis" data-for="plan" title="Previous stage: Analysis"><span class="arrow">←</span><span class="k">prev</span><span class="n">Analysis</span></button>
+    <button class="stage-link next" data-page="work" data-for="plan" title="Next stage: Work"><span class="k">next</span><span class="n">Work</span><span class="arrow">→</span></button>
+    <button class="stage-link prev" data-page="plan" data-for="work" title="Previous stage: Plan"><span class="arrow">←</span><span class="k">prev</span><span class="n">Plan</span></button>
+    <button class="stage-link next" data-page="analysis" data-for="work" title="Next stage: Analysis"><span class="k">next</span><span class="n">Analysis</span><span class="arrow">→</span></button>
     <div class="content" id="content"></div>
   </div>
+
+  <footer class="bottombar">
+    <span class="status"><span class="dot"></span> server :3117 · analysis fresh · 1 run live</span>
+    <button class="icon-btn" id="settings-toggle" title="Settings" aria-label="Settings" aria-haspopup="dialog" aria-controls="settings-overlay">⚙</button>
+    <button class="cmd" id="commands-toggle" data-page="commands" data-toggle aria-expanded="false" aria-controls="commands-sheet"><span class="glyph">⌘</span> Commands <span class="caret">▲</span></button>
+  </footer>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <section class="sheet" id="commands-sheet" role="dialog" aria-label="Commands">
+    <div class="sheet-head">
+      <span class="muted mono">ndx · run a command or look one up</span>
+      <button class="icon-btn close" data-close aria-label="Close commands">✕</button>
+    </div>
+    <div class="sheet-body" id="commands-body"></div>
+  </section>
+
+  <section class="overlay" id="settings-overlay" role="dialog" aria-modal="true" aria-label="Settings" hidden>
+    <div class="overlay-head">
+      <span class="glyph">⚙</span>
+      <div class="crumbs" id="crumbs"></div>
+      <button class="icon-btn close" data-close aria-label="Close settings">✕</button>
+    </div>
+    <div class="overlay-body">
+      <nav class="settings-nav" aria-label="Settings pages">
+        <div class="nav-item" data-page="s-general"><span class="glyph">🧠</span> General</div>
+        <div class="nav-item" data-page="s-plan"><span class="glyph">▣</span> ndx analyze / plan</div>
+        <div class="nav-item" data-page="s-work"><span class="glyph">▶</span> ndx work</div>
+        <div class="nav-item" data-page="s-sync"><span class="glyph">🔌</span> ndx sync</div>
+        <div class="nav-item" data-page="s-export"><span class="glyph">📤</span> ndx export / refresh</div>
+        <div class="nav-item" data-page="s-flags"><span class="glyph">📌</span> Feature Flags</div>
+        <div class="nav-item" data-page="s-timeouts"><span class="glyph">⏱</span> CLI Timeouts</div>
+      </nav>
+      <div class="overlay-content" id="settings-body"></div>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -815,62 +882,103 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11
   }
 
   function commandsPage() {
-    return [section("", null, [panel(12, "All Commands", COMMANDS.length + " orchestrator commands", commandReference(null))], { plain: true })];
+    var order = ["setup", "analysis", "plan", "work"];
+    var colour = { setup: "b-muted", analysis: "b-green", plan: "b-blue", work: "b-orange" };
+    var sorted = COMMANDS.slice().sort(function (a, b) { return order.indexOf(a[2]) - order.indexOf(b[2]); });
+    return [section("", null, [
+      panel(4, "Run a command", "any ndx command · output streams below", commandRunner(COMMANDS.map(function (c) { return c[0]; }))),
+      panel(8, "All Commands", COMMANDS.length + " orchestrator commands · by stage", [
+        h("ul", { class: "list" }, sorted.map(function (c) {
+          return h("li", null, [badge(c[2], colour[c[2]]), h("code", { class: "mono", style: "min-width:130px" }, "ndx " + c[0]), h("span", { class: "grow dim" }, c[1])]);
+        })),
+      ]),
+    ], { plain: true })];
   }
 
+  var SETTINGS_FORMS = {
+    "s-general": ["General", [["LLM vendor", "claude"], ["Model", "claude-opus-5"], ["Codex model", "—"], ["Web port", "3117"]]],
+    "s-plan": ["ndx analyze / plan", [["Zone merge threshold", "5"], ["Pinned zones", "4"], ["Analysis depth", "--deep"], ["SourceVision", "auto"]]],
+    "s-work": ["ndx work", [["Provider", HENCH.provider], ["Model", HENCH.model], ["Permission mode", HENCH.permissionMode], ["Max turns", String(HENCH.maxTurns)], ["Max tokens", String(HENCH.maxTokens)], ["Auto-commit", String(HENCH.autoCommit)], ["Livelock threshold", String(HENCH.livelockThreshold)], ["Allowed commands", HENCH.allowed.join(", ")], ["Blocked paths", HENCH.blocked.join(", ")]]],
+    "s-sync": ["ndx sync", [["Adapter", "file"], ["Notion", "disabled (rex.notionSync flag off)"]]],
+    "s-export": ["ndx export / refresh", [["Export out-dir", "—"], ["Deploy target", "github"], ["Refresh", "--ui-only · --data-only · --no-build"]]],
+    "s-flags": ["Feature Flags", [["rex.notionSync", "off"], ["rex.integrations", "off"], ["sourcevision.prMarkdown", "off"], ["sourcevision.ask", "off"]]],
+    "s-timeouts": ["CLI Timeouts", [["Command timeout", HENCH.commandTimeout + " ms"], ["Stop grace", "2000 ms"], ["Shutdown", "30000 ms"]]],
+  };
   function settingsPage(id) {
-    var forms = {
-      "s-general": ["General", [["LLM vendor", "claude"], ["Model", "claude-opus-5"], ["Codex model", "—"], ["Web port", "3117"]]],
-      "s-plan": ["ndx analyze / plan", [["Zone merge threshold", "5"], ["Pinned zones", "4"], ["Analysis depth", "--deep"], ["SourceVision", "auto"]]],
-      "s-work": ["ndx work", [["Provider", HENCH.provider], ["Model", HENCH.model], ["Permission mode", HENCH.permissionMode], ["Max turns", String(HENCH.maxTurns)], ["Max tokens", String(HENCH.maxTokens)], ["Auto-commit", String(HENCH.autoCommit)], ["Livelock threshold", String(HENCH.livelockThreshold)], ["Allowed commands", HENCH.allowed.join(", ")], ["Blocked paths", HENCH.blocked.join(", ")]]],
-      "s-sync": ["ndx sync", [["Adapter", "file"], ["Notion", "disabled (rex.notionSync flag off)"]]],
-      "s-export": ["ndx export / refresh", [["Export out-dir", "—"], ["Deploy target", "github"], ["Refresh", "--ui-only · --data-only · --no-build"]]],
-      "s-flags": ["Feature Flags", [["rex.notionSync", "off"], ["rex.integrations", "off"], ["sourcevision.prMarkdown", "off"], ["sourcevision.ask", "off"]]],
-      "s-timeouts": ["CLI Timeouts", [["Command timeout", HENCH.commandTimeout + " ms"], ["Stop grace", "2000 ms"], ["Shutdown", "30000 ms"]]],
-    };
-    var f = forms[id];
+    var f = SETTINGS_FORMS[id];
     return [section("", null, [panel(8, f[0], "settings", f[1].map(function (kv) {
       return h("div", { class: "field" }, [h("label", null, kv[0]), h("input", { value: kv[1] })]);
     }).concat([h("div", { class: "row" }, [h("button", { class: "btn btn-primary btn-sm" }, "Save"), h("button", { class: "btn btn-sm" }, "Reset")])]))], { plain: true })];
   }
 
   var PAGES = {
-    analysis: { title: "Analysis", sub: "SourceVision · zones, imports, PRD state and spend on one page", crumbs: ["Analysis"], render: analysisPage },
-    plan: { title: "Plan", sub: "Rex · add work, run planning commands, see what happened", crumbs: ["Plan"], render: planPage },
-    work: { title: "Work", sub: "Hench · run the next task, pick a template, watch spend", crumbs: ["Work"], render: workPage },
-    commands: { title: "All Commands", sub: "every ndx orchestrator command", crumbs: ["Commands", "All Commands"], render: commandsPage },
+    analysis: { title: "Analysis", sub: "SourceVision · zones, imports, PRD state and spend on one page", crumbs: [], render: analysisPage },
+    plan: { title: "Plan", sub: "Rex · add work, run planning commands, see what happened", crumbs: [], render: planPage },
+    work: { title: "Work", sub: "Hench · run the next task, pick a template, watch spend", crumbs: [], render: workPage },
+    commands: { title: "All Commands", sub: "every ndx orchestrator command", crumbs: ["Commands"], render: commandsPage },
   };
-  ["s-general", "s-plan", "s-work", "s-sync", "s-export", "s-flags", "s-timeouts"].forEach(function (id) {
-    PAGES[id] = { title: null, sub: null, crumbs: ["Settings"], render: function () { return settingsPage(id); } };
+  Object.keys(SETTINGS_FORMS).forEach(function (id) {
+    PAGES[id] = { title: SETTINGS_FORMS[id][0], sub: null, crumbs: ["Settings"], render: function () { return settingsPage(id); } };
   });
+
+  /* ═══ Routing: three stage pages in #content; settings and commands render
+     into their own hosts and open as an overlay / a sheet over the stage. ═══ */
+  var mainEl = document.getElementById("main");
+  var overlay = document.getElementById("settings-overlay");
+  var sheet = document.getElementById("commands-sheet");
+  var scrim = document.getElementById("scrim");
+  var cmdToggle = document.getElementById("commands-toggle");
+  var HOSTS = { main: document.getElementById("content"), settings: document.getElementById("settings-body"), commands: document.getElementById("commands-body") };
+  var stage = "analysis";          // the stage page currently in #content
+  var lastSettings = "s-general";  // where the cog reopens
+
+  function kindOf(id) { return id.slice(0, 2) === "s-" ? "settings" : id === "commands" ? "commands" : "main"; }
+
+  function render(host, id) {
+    var page = PAGES[id];
+    host.textContent = "";
+    host.appendChild(h("div", { class: "page-head" }, [h("h1", null, page.title), page.sub ? h("span", { class: "sub" }, page.sub) : null]));
+    page.render().forEach(function (b) { host.appendChild(b); });
+    host.scrollTop = 0;
+    return page.title;
+  }
 
   function go(id) {
     if (!PAGES[id]) id = "analysis";
     location.hash = id;
-    var page = PAGES[id];
-    document.querySelectorAll("[data-page]").forEach(function (el) { el.classList.toggle("active", el.dataset.page === id); });
-    if (id.slice(0, 2) === "s-") { document.getElementById("settings-items").hidden = false; document.querySelector("#settings-label .caret").textContent = "▾"; }
-    var content = document.getElementById("content");
-    content.textContent = "";
-    var body = page.render();
-    var title = page.title || document.querySelector('[data-page="' + id + '"] ').textContent.trim();
-    document.getElementById("crumbs").textContent = "";
-    page.crumbs.forEach(function (c, i) {
-      var last = i === page.crumbs.length - 1;
-      document.getElementById("crumbs").appendChild(last ? h("b", null, page.title || title) : document.createTextNode(c + " / "));
+    var kind = kindOf(id);
+    if (kind === "main") stage = id;
+    else if (!HOSTS.main.firstChild) render(HOSTS.main, stage);   // opened by URL: the stage still needs to be beneath
+    if (kind === "settings") lastSettings = id;
+    var title = render(HOSTS[kind], id);
+
+    var crumbs = document.getElementById("crumbs");
+    crumbs.textContent = "";
+    PAGES[id].crumbs.forEach(function (c) { crumbs.appendChild(document.createTextNode(c + " / ")); });
+    crumbs.appendChild(h("b", null, title));
+
+    overlay.hidden = kind !== "settings";
+    sheet.classList.toggle("open", kind === "commands");
+    scrim.hidden = kind !== "commands";
+    cmdToggle.setAttribute("aria-expanded", String(kind === "commands"));
+    mainEl.dataset.stage = stage;
+    document.querySelectorAll("[data-page]").forEach(function (el) {
+      el.classList.toggle("active", el.dataset.page === id || (el.classList.contains("nav-section") && el.dataset.page === stage));
     });
-    content.appendChild(h("div", { class: "page-head" }, [h("h1", null, page.title || title), page.sub ? h("span", { class: "sub" }, page.sub) : null]));
-    body.forEach(function (b) { content.appendChild(b); });
-    content.scrollTop = 0;
+    document.body.dataset.page = id;
   }
 
   document.querySelectorAll("[data-page]").forEach(function (el) {
-    el.addEventListener("click", function () { go(el.dataset.page); });
+    el.addEventListener("click", function () {
+      var id = el.dataset.page;
+      // data-toggle: a second click on the thing that opened a sheet closes it
+      go(el.hasAttribute("data-toggle") && document.body.dataset.page === id ? stage : id);
+    });
   });
-  document.getElementById("settings-label").addEventListener("click", function () {
-    var items = document.getElementById("settings-items");
-    items.hidden = !items.hidden;
-    document.querySelector("#settings-label .caret").textContent = items.hidden ? "▸" : "▾";
+  document.getElementById("settings-toggle").addEventListener("click", function () { go(lastSettings); });
+  document.querySelectorAll("[data-close], #scrim").forEach(function (el) { el.addEventListener("click", function () { go(stage); }); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && kindOf(document.body.dataset.page || "analysis") !== "main") go(stage);
   });
   document.getElementById("theme").addEventListener("click", function () {
     var root = document.documentElement;
@@ -880,7 +988,10 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11
   });
   try { var t = localStorage.getItem("ndx-preview-theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
 
-  window.addEventListener("hashchange", function () { go(location.hash.slice(1)); });
+  window.addEventListener("hashchange", function () {
+    var id = location.hash.slice(1);
+    if (id !== document.body.dataset.page) go(id);
+  });
   go(location.hash.slice(1) || "analysis");
 })();
 </script>
