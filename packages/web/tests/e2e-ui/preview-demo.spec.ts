@@ -100,14 +100,67 @@ test("every page renders its headline sections without throwing", async ({ page 
   }
   await expect(page.getByRole("button", { name: /Run this task with the agent/ })).toBeVisible();
 
-  await page.locator('.nav-item[data-page="commands"]').click();
-  await expect(page.locator(".panel h3", { hasText: "All Commands" })).toBeVisible();
+  await page.locator("#commands-toggle").click();
+  await expect(page.locator("#commands-sheet .panel h3", { hasText: "All Commands" })).toBeVisible();
 
-  await page.locator("#settings-label").click();
+  await page.locator("#settings-toggle").click();
   await page.locator('.nav-item[data-page="s-work"]').click();
-  await expect(page.locator(".panel h3", { hasText: "ndx work" })).toBeVisible();
+  await expect(page.locator("#settings-overlay .panel h3", { hasText: "ndx work" })).toBeVisible();
 
   expect(errors).toEqual([]);
+});
+
+test("the stage links step around the Analysis → Plan → Work loop", async ({ page }) => {
+  await page.goto(baseUrl + "/option1-demo.html#analysis", { waitUntil: "networkidle" });
+  const shown = page.locator(".stage-link:visible");
+
+  // Two links per page: the previous stage on the left, the next on the right.
+  await expect(shown).toHaveCount(2);
+  await expect(shown.filter({ hasText: "prev" })).toContainText("Work");
+  await expect(shown.filter({ hasText: "next" })).toContainText("Plan");
+
+  await shown.filter({ hasText: "next" }).click();
+  await expect(page.locator("#content h1")).toHaveText("Plan");
+  await expect(page.locator('.nav-section[data-page="plan"]')).toHaveClass(/active/);
+  await shown.filter({ hasText: "next" }).click();
+  await expect(page.locator("#content h1")).toHaveText("Work");
+  await shown.filter({ hasText: "next" }).click();         // wraps around
+  await expect(page.locator("#content h1")).toHaveText("Analysis");
+  await shown.filter({ hasText: "prev" }).click();         // and back the other way
+  await expect(page.locator("#content h1")).toHaveText("Work");
+});
+
+test("commands lift from the bottom bar; settings open from the cog and close with ✕", async ({ page }) => {
+  await page.goto(baseUrl + "/option1-demo.html#plan", { waitUntil: "networkidle" });
+  const sheet = page.locator("#commands-sheet");
+  const overlay = page.locator("#settings-overlay");
+  const toggle = page.locator("#commands-toggle");
+
+  await expect(sheet).toBeHidden();
+  await toggle.click();
+  await expect(sheet).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(sheet.locator(".panel h3", { hasText: "Run a command" })).toBeVisible();
+  await expect(sheet.locator(".panel h3", { hasText: "All Commands" })).toBeVisible();
+  // The Plan page is still there beneath the sheet.
+  await expect(page.locator("#content h1")).toHaveText("Plan");
+  await toggle.click();                                    // same button closes it
+  await expect(sheet).toBeHidden();
+  await expect(page).toHaveURL(/#plan$/);
+
+  await page.locator("#settings-toggle").click();
+  await expect(overlay).toBeVisible();
+  await expect(overlay.locator("#crumbs")).toHaveText("Settings / General");
+  await page.locator('.nav-item[data-page="s-timeouts"]').click();
+  await expect(overlay.locator("#crumbs")).toHaveText("Settings / CLI Timeouts");
+  await expect(overlay.locator(".panel h3", { hasText: "CLI Timeouts" })).toBeVisible();
+  await overlay.getByRole("button", { name: "Close settings" }).click();
+  await expect(overlay).toBeHidden();
+  await expect(page.locator("#content h1")).toHaveText("Plan");
+  await expect(page).toHaveURL(/#plan$/);
+  // The cog reopens on the page last visited.
+  await page.locator("#settings-toggle").click();
+  await expect(overlay.locator("#crumbs")).toHaveText("Settings / CLI Timeouts");
 });
 
 test("the zone graph is one panel that flips between 2D and 3D", async ({ page }) => {

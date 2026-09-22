@@ -61,7 +61,23 @@ test("with scripts on, navigation, collapse and the 2D/3D toggle still work", as
 
   await page.locator('.nav-section[data-page="work"]').click();
   await expect(page.locator('.page:not([hidden]) h1')).toHaveText("Work");
-  await expect(page.locator("#crumbs")).toHaveText("Work");
+  await expect(page.locator('.nav-section[data-page="work"]')).toHaveClass(/active/);
+
+  // The stage links wrap: Work → Analysis.
+  await page.locator(".stage-link:visible", { hasText: "next" }).click();
+  await expect(page.locator('.page:not([hidden]) h1')).toHaveText("Analysis");
+
+  // Commands lift over the stage; settings open as an overlay and close again.
+  await page.locator("#commands-toggle").click();
+  await expect(page.locator("#commands-sheet .panel h3", { hasText: "All Commands" })).toBeVisible();
+  await expect(page.locator(".page:not([hidden])")).toHaveCount(2);   // the stage stays beneath the sheet
+  await page.locator("#settings-toggle").click();
+  await expect(page.locator("#settings-overlay")).toBeVisible();
+  await expect(page.locator("#crumbs")).toHaveText("Settings / General");
+  await expect(page.locator("#commands-sheet")).toBeHidden();
+  await page.getByRole("button", { name: "Close settings" }).click();
+  await expect(page.locator("#settings-overlay")).toBeHidden();
+  await expect(page.locator(".page:not([hidden])")).toHaveCount(1);
 
   await page.locator('.nav-section[data-page="analysis"]').click();
   const panel = page.locator(".panel", { has: page.locator("h3", { hasText: "Zone graph" }) });
