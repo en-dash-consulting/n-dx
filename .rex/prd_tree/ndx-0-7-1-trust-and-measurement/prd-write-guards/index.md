@@ -25,7 +25,13 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Check the slug-rule marker direction inside the PRD lock in adoptSlugRule](./check-the-slug-rule-marker-direction.md) | pending |
 | [Fail rex validate and CI when the PRD tree does not match the slug rule](./fail-rex-validate-and-ci-when-the-prd.md) | completed |
 | [Fix the slug-rule guard's false refusal on an unmarked tree and bound migrate-slugs to upgrades](./fix-the-slug-rule-guard-s-false.md) | completed |
+| [Make the repo slug invariant test import source and check the marker](./make-the-repo-slug-invariant-test.md) | pending |
+| [Preserve unknown tree-meta keys and treat a missing marker as a failure once one has been adopted](./preserve-unknown-tree-meta-keys-and.md) | pending |
+| [Re-run the slug-rule gate on every loop iteration](./re-run-the-slug-rule-gate-on-every.md) | pending |
 | [Record the slug rule version in tree-meta.json and refuse writes from a build with a different rule](./record-the-slug-rule-version-in-tree.md) | completed |
 | [Refuse to start ndx work or a dashboard Execute on a non-conformant PRD tree](./refuse-to-start-ndx-work-or-a.md) | completed |
+| [Remove the dead omitSlugRuleMarker option or reach it from a CLI fixture](./remove-the-dead-omitslugrulemarker.md) | pending |
+| [Report slugRuleRecorded in rex migrate-slugs JSON output](./report-slugrulerecorded-in-rex-migrate.md) | pending |
