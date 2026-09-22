@@ -33,3 +33,5 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Finding severity, finding category and zone fragility as Jev judgments](./finding-severity-finding-category-and.md) | completed |
 | [Jev client and code.classify as a Choice over the archetype catalog](./jev-client-and-code-classify-as-a.md) | completed |
 | [Re-run judgments: Jev decides what needs re-enrichment and which findings still hold](./re-run-judgments-jev-decides-what.md) | pending |
+| [Scan quality: symbol evidence, symbol/README name candidates, typed anchored findings, declared-rule checks](./scan-quality-symbol-evidence-symbol.md) | pending |
+| [Scan speed: one generation call per kind, narration off the critical path](./scan-speed-one-generation-call-per.md) | in_progress |
