@@ -100,15 +100,22 @@ export class FolderTreeStore implements PRDStore {
   /**
    * Serialize the document to disk. Callers must hold the PRD lock.
    *
-   * @param adoptSlugRule Skip the slug-rule guard and take ownership of the
-   *   tree under this build's rule. Only `rex migrate-slugs` may pass this —
-   *   see {@link adoptSlugRule}.
+   * @param adoptSlugRule Skip the ordinary slug-rule guard and take ownership
+   *   of the tree under this build's rule instead. Only `rex migrate-slugs`
+   *   may pass this — see {@link adoptSlugRule}. The direction check still
+   *   runs; only the *comparison* changes, from "matches exactly" to "is not
+   *   newer".
    */
   private async writeTree(doc: PRDDocument, adoptSlugRule = false): Promise<void> {
     // Before mkdir, before the sidecar, before the serializer: a refusal has
     // to leave the tree byte-identical, which it only does if nothing has been
-    // written yet.
-    if (!adoptSlugRule) {
+    // written yet. Both branches read the marker fresh, here, under the lock
+    // `writeTree` is always called while holding — reading it any earlier
+    // leaves a window where a concurrent writer's newer marker is read, then
+    // silently overwritten by this write once it takes the lock.
+    if (adoptSlugRule) {
+      await assertSlugRuleAdoptable(this.rexDir);
+    } else {
       await assertSlugRuleWritable(this.rexDir, this.treeRoot);
     }
     await mkdir(this.treeRoot, { recursive: true });
@@ -293,10 +300,12 @@ export class FolderTreeStore implements PRDStore {
    * between the two would disarm the guard on a tree it was meant to protect.
    *
    * Bounded to the adopt-older direction by {@link assertSlugRuleAdoptable},
-   * checked before the transaction opens so a refusal writes nothing at all.
+   * checked by {@link writeTree} under the lock, ahead of `mkdir` — not here.
+   * A pre-lock check here would read the marker, then race a concurrent
+   * writer that records a newer one before this call takes the lock; the
+   * stale "adoptable" verdict would let the migration overwrite it anyway.
    */
   async adoptSlugRule(): Promise<void> {
-    await assertSlugRuleAdoptable(this.rexDir);
     await this.runTransaction(async () => {}, undefined, true);
   }
 
