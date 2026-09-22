@@ -1,4 +1,5 @@
 import { z, ZodError } from "zod";
+import { DEFAULT_RETRY_CONFIG } from "./v1.js";
 
 export type ValidationResult<T> =
   | { ok: true; data: T }
@@ -41,10 +42,14 @@ const GuardConfigSchema = z.object({
   memoryMonitor: MemoryMonitorConfigSchema,
 });
 
+// Per-field defaults so a partial retry group loads: the dashboard's config
+// editor writes one dotted key at a time (`retry.maxRetries`), which can put
+// a `retry` object with a single member on disk. Requiring the other members
+// bricked the next `ndx work` over a file every present value of which was valid.
 const RetryConfigSchema = z.object({
-  maxRetries: z.number().int().nonnegative(),
-  baseDelayMs: z.number().positive(),
-  maxDelayMs: z.number().positive(),
+  maxRetries: z.number().int().nonnegative().default(DEFAULT_RETRY_CONFIG.maxRetries),
+  baseDelayMs: z.number().positive().default(DEFAULT_RETRY_CONFIG.baseDelayMs),
+  maxDelayMs: z.number().positive().default(DEFAULT_RETRY_CONFIG.maxDelayMs),
 });
 
 const ProjectLanguageSchema = z.enum(["typescript", "javascript", "go"]).optional();
@@ -59,11 +64,7 @@ export const HenchConfigSchema = z.object({
   rexDir: z.string(),
   apiKeyEnv: z.string(),
   guard: GuardConfigSchema,
-  retry: RetryConfigSchema.optional().default({
-    maxRetries: 3,
-    baseDelayMs: 2000,
-    maxDelayMs: 30000,
-  }),
+  retry: RetryConfigSchema.optional().default(() => ({ ...DEFAULT_RETRY_CONFIG })),
   loopPauseMs: z.number().int().nonnegative().optional().default(2000),
   maxFailedAttempts: z.number().int().positive().optional().default(3),
   language: ProjectLanguageSchema,

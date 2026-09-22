@@ -24,6 +24,7 @@ import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { safeDecodeSegment } from "../shared/index.js";
 import {
   validateConfigKeyValue,
+  completeConfigGroups,
   getConfigValue as getNestedValue,
   setConfigValue as setNestedValue,
 } from "./hench-config-fields.js";
@@ -724,6 +725,8 @@ async function handleApplyAdjustment(
 
   const previousValue = getNestedValue(config, configKey);
   setNestedValue(config, configKey, newValue);
+  // Never leave a partial nested group (e.g. retry with one member) on disk.
+  completeConfigGroups(config);
 
   try {
     writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
@@ -844,6 +847,8 @@ async function handleSetOverride(
     const config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
     const previousValue = getNestedValue(config, key);
     setNestedValue(config, key, value);
+    // Never leave a partial nested group (e.g. retry with one member) on disk.
+    completeConfigGroups(config);
     writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
 
     state.history.push({
