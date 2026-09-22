@@ -115,8 +115,8 @@ const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
   [
     /Invalid hench config|Invalid config\.json/,
     CLI_ERROR_CODES.INVALID_CONFIGURATION,
-    "Configuration file is corrupted or has an invalid format.",
-    "Check .hench/config.json for syntax errors, or re-initialize with 'n-dx init'.",
+    "",  // Use original message — loadConfig names the offending fields
+    "Fix the listed fields in .hench/config.json, or re-initialize with 'n-dx init'.",
   ],
   [
     /Invalid run record/,

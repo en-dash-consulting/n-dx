@@ -51,6 +51,7 @@ import {
   CONFIG_FIELD_META,
   validateFieldValue,
   validateConfigKeyValue,
+  completeConfigGroups,
   getConfigValue as getNestedValue,
   setConfigValue as setNestedValue,
 } from "./hench-config-fields.js";
@@ -844,6 +845,11 @@ async function handleConfigUpdate(
     return true;
   }
 
+  // A single-member write into a group hench reads whole (e.g. the first
+  // retry.* edit on a config with no retry block) must not leave a partial
+  // group on disk — complete it from the defaults before serializing.
+  completeConfigGroups(current);
+
   // Write back
   try {
     writeFileSync(configPath, JSON.stringify(current, null, 2) + "\n", "utf-8");
@@ -1134,6 +1140,9 @@ function handleTemplateApply(
   }
 
   const updated = mergeTemplateConfig(config, template.config);
+  // A template overlay carrying part of a nested group (or merging into a
+  // config that never had it) must not leave a partial group on disk.
+  completeConfigGroups(updated);
   const configPath = join(ctx.projectDir, ".hench", "config.json");
 
   try {

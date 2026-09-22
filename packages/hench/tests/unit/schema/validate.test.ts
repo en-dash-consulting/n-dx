@@ -6,7 +6,7 @@ import {
   HenchConfigSchema,
   RunRecordSchema,
 } from "../../../src/schema/validate.js";
-import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
+import { DEFAULT_HENCH_CONFIG, DEFAULT_RETRY_CONFIG } from "../../../src/schema/v1.js";
 import { DEFAULT_TEST_GATE_TIMEOUT_MS } from "../../../src/tools/test-runner.js";
 
 describe("validateConfig", () => {
@@ -63,6 +63,21 @@ describe("validateConfig", () => {
         maxRetries: 3,
         baseDelayMs: 2000,
         maxDelayMs: 30000,
+      });
+    }
+  });
+
+  it("fills a partial retry section with defaults (dashboard writes one key at a time)", () => {
+    // The config editor's first retry.* edit can leave a one-member group on
+    // disk; requiring the other members bricked the next `ndx work`.
+    const config = { ...DEFAULT_HENCH_CONFIG(), retry: { maxRetries: 5 } };
+    const result = validateConfig(config);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.retry).toEqual({
+        maxRetries: 5,
+        baseDelayMs: DEFAULT_RETRY_CONFIG.baseDelayMs,
+        maxDelayMs: DEFAULT_RETRY_CONFIG.maxDelayMs,
       });
     }
   });
