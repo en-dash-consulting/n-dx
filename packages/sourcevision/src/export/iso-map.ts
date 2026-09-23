@@ -452,6 +452,27 @@ function compose(){
     return c;
   });
 
+  // Imports between an expanded area and anything else: replace the
+  // area-level connector with one per visible zone pair, aggregated where the
+  // other side is still a collapsed area.
+  var shown = {};
+  children.forEach(function(c){ shown[c.id] = true; });
+  var expandedPair = function(e){
+    var fa = placed[e.from] && placed[e.from].old.areaId, ta = placed[e.to] && placed[e.to].old.areaId;
+    return !e.seam && !e.infra && fa && ta && (EXPANDED[fa] || EXPANDED[ta]);
+  };
+  edges = edges.filter(function(e){ return !expandedPair(e); });
+  var arcs = {};
+  (ROOT.crossAreaEdges || []).forEach(function(x){
+    if (!EXPANDED[x.fromArea] && !EXPANDED[x.toArea]) return;
+    var from = EXPANDED[x.fromArea] && shown[x.from] ? x.from : "area:" + x.fromArea;
+    var to = EXPANDED[x.toArea] && shown[x.to] ? x.to : "area:" + x.toArea;
+    var k = from + "\u0001" + to;
+    var a = arcs[k] || (arcs[k] = { from: from, to: to, weight: 0, calls: 0, back: false, arc: true, points: [] });
+    a.weight += x.weight; a.calls += x.calls;
+  });
+  for (var ak in arcs) if (Object.prototype.hasOwnProperty.call(arcs, ak)) edges.push(arcs[ak]);
+
   nodes = nodes.concat(children);
   edges = edges.concat(innerEdges);
   var uM = 1, vM = 1;
@@ -469,9 +490,9 @@ function toggleExpand(areaId){
 
 var camera = el("g", { id: "camera" });
 svg.appendChild(camera);
-var gGround = el("g"), gEdge = el("g"), gBlock = el("g"), gTag = el("g");
+var gGround = el("g"), gEdge = el("g"), gBlock = el("g"), gArc = el("g"), gTag = el("g");
 camera.appendChild(gGround); camera.appendChild(gEdge);
-camera.appendChild(gBlock); camera.appendChild(gTag);
+camera.appendChild(gBlock); camera.appendChild(gArc); camera.appendChild(gTag);
 
 var uMin, uMax, vMin, vMax, minX, maxX, minY, maxY;
 var edgeEls = [], blockEls = {};
@@ -479,7 +500,7 @@ function clearGroup(g){ while (g.firstChild) g.removeChild(g.firstChild); }
 
 /** Draw the composed scene: ground, connectors, blocks, and the viewBox. */
 function build(){
-[gGround, gEdge, gBlock, gTag].forEach(clearGroup);
+[gGround, gEdge, gBlock, gArc, gTag].forEach(clearGroup);
 var S = compose();
 NODES = S.nodes; EDGES = S.edges; B = S.bounds;
 BY = {}; NODES.forEach(function(n){ BY[n.id] = n; });
@@ -529,11 +550,23 @@ EDGES.forEach(function(e, index){
         ? (unver ? ", declared but no supporting calls in the call graph" : "")
         : (e.infra ? "" : ", " + e.weight + " references"))
   });
-  var hit = el("polyline", {
-    points: pts(projected), fill: "none", stroke: "transparent",
-    "stroke-width": "14", "stroke-linejoin": "round", "stroke-linecap": "round"
-  });
-  var line = el("polyline", { points: pts(projected), "marker-end": "url(#wire)" });
+  var hit, line;
+  if (e.arc && from && to) {
+    // Lifted arc between block tops, drawn above the blocks: these zone-level
+    // connectors have no ground route, and would hide behind blocks otherwise.
+    var a = P(from.u + from.w / 2, from.v + from.d / 2, from.h), b = P(to.u + to.w / 2, to.v + to.d / 2, to.h);
+    var dist = Math.sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]));
+    var d = "M" + a[0].toFixed(1) + "," + a[1].toFixed(1) + " Q" + ((a[0] + b[0]) / 2).toFixed(1) + "," +
+      (Math.min(a[1], b[1]) - 30 - dist * 0.25).toFixed(1) + " " + b[0].toFixed(1) + "," + b[1].toFixed(1);
+    hit = el("path", { d: d, fill: "none", stroke: "transparent", "stroke-width": "14", "stroke-linecap": "round" });
+    line = el("path", { d: d, fill: "none", "marker-end": "url(#wire)" });
+  } else {
+    hit = el("polyline", {
+      points: pts(projected), fill: "none", stroke: "transparent",
+      "stroke-width": "14", "stroke-linejoin": "round", "stroke-linecap": "round"
+    });
+    line = el("polyline", { points: pts(projected), "marker-end": "url(#wire)" });
+  }
   line.setAttribute("class", "wire" + (e.seam ? " seam" : "") + (unver ? " unver" : "") +
     (e.infra ? " infra" : ""));
   // Dash pattern, not just hue: an unsupported claim has to read as different
@@ -542,7 +575,7 @@ EDGES.forEach(function(e, index){
   else if (e.infra) line.setAttribute("stroke-dasharray", "10 4");
   else if (e.back) line.setAttribute("stroke-dasharray", "7 6");
   g.appendChild(hit); g.appendChild(line);
-  gEdge.appendChild(g);
+  (e.arc ? gArc : gEdge).appendChild(g);
   edgeEls.push({ e: e, g: g, node: line });
 
   g.addEventListener("click", function(ev){
@@ -795,6 +828,15 @@ function renderNode(n){
   }
   h += '<h4>Imported by</h4>' + linkList(n.inbound, n.id, true);
   h += '<h4>Imports</h4>' + linkList(n.outbound, n.id, false);
+  // Expanded areas: the zone-level connectors to and from other areas.
+  var arcOut = [], arcIn = [];
+  EDGES.forEach(function(e){
+    if (!e.arc) return;
+    if (e.from === n.id && BY[e.to]) arcOut.push({ id: e.to, name: BY[e.to].name, weight: e.weight });
+    if (e.to === n.id && BY[e.from]) arcIn.push({ id: e.from, name: BY[e.from].name, weight: e.weight });
+  });
+  if (arcIn.length) h += '<h4>Imported from other areas</h4>' + linkList(arcIn, n.id, true);
+  if (arcOut.length) h += '<h4>Imports in other areas</h4>' + linkList(arcOut, n.id, false);
   return h;
 }
 
@@ -922,9 +964,16 @@ function highlighted(){
       if (e.from === curNode) set[e.to] = true;
       if (e.to === curNode) set[e.from] = true;
     });
-    // A selected expanded area keeps its own zones lit.
+    // A selected expanded area keeps its own zones lit, and whatever they
+    // connect to.
     var sel = BY[curNode];
-    if (sel && sel.frame) NODES.forEach(function(n){ if (n.inArea === sel.areaId) set[n.id] = true; });
+    if (sel && sel.frame) {
+      NODES.forEach(function(n){ if (n.inArea === sel.areaId) set[n.id] = true; });
+      EDGES.forEach(function(e){
+        if (BY[e.from] && BY[e.from].inArea === sel.areaId) set[e.to] = true;
+        if (BY[e.to] && BY[e.to].inArea === sel.areaId) set[e.from] = true;
+      });
+    }
   } else if (curEdge !== null) {
     var e = EDGES[curEdge];
     set[e.from] = true; set[e.to] = true;
@@ -954,7 +1003,9 @@ function refresh(scrollPanel){
   });
 
   edgeEls.forEach(function(x, i){
-    var hot = (i === curEdge) || (curNode !== null && (x.e.from === curNode || x.e.to === curNode));
+    var selArea = curNode !== null && BY[curNode] && BY[curNode].frame ? BY[curNode].areaId : null;
+    var hot = (i === curEdge) || (curNode !== null && (x.e.from === curNode || x.e.to === curNode)) ||
+      (selArea !== null && ((BY[x.e.from] || {}).inArea === selArea || (BY[x.e.to] || {}).inArea === selArea));
     var ends = kindVisible((BY[x.e.from] || {}).kind) && kindVisible((BY[x.e.to] || {}).kind);
     var weight = edgeWeight(x.e);
     var declared = (x.e.seam ? " seam" : "") + (unverifiedSeam(x.e) ? " unver" : "") +

@@ -32,6 +32,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Cascade robustness: model-alias expansion and config warning, visible CLI errors, ladder stops on non-retryable failures, --full skipped after the cascade, naming progress and concurrency](./cascade-robustness-model-alias.md) | deferred |
 | [Finding cascade: Jev gates, verifies and anchors enrichment; free-text generation becomes --narrate](./finding-cascade-jev-gates-verifies-and.md) | completed |
 | [Finding severity, finding category and zone fragility as Jev judgments](./finding-severity-finding-category-and.md) | completed |
+| [Iso map: an expanded area's connectors leave from the zones that import, not the area's edge](./iso-map-an-expanded-area-s-connectors.md) | completed |
 | [Iso map: expand areas in place, several at once, instead of only opening one area on its own](./iso-map-expand-areas-in-place-several.md) | completed |
 | [Jev client and code.classify as a Choice over the archetype catalog](./jev-client-and-code-classify-as-a.md) | completed |
 | [Partition balance and nesting: lopsided subdivisions count as failures, oversized zones flagged, tests grouped with their code, iso map draws sub-zones](./partition-balance-and-nesting-lopsided.md) | completed |

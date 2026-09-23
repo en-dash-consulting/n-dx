@@ -64,11 +64,23 @@ describe("in-place expansion", () => {
     expect(labels(dom)).toEqual(expect.arrayContaining(["A1", "A2", "B2"]));
   });
 
-  it("keeps inter-area connectors attached after expansion", () => {
+  it("replaces an expanded area's connector with one from the zone that imports", () => {
     const dom = mount();
-    const before = dom.window.document.querySelectorAll("#iso .edge").length;
     dbl(dom, block(dom, "Alpha"));
-    // Alpha→Beta stays; Alpha's internal a1→a2 is added.
-    expect(dom.window.document.querySelectorAll("#iso .edge").length).toBe(before + 1);
+    const edges = [...dom.window.document.querySelectorAll("#iso .edge")].map((g) => g.getAttribute("aria-label"));
+    // a1 → (collapsed) Beta as an arc, plus Alpha's internal a1 → a2.
+    expect(edges).toEqual(expect.arrayContaining(["Dependency: A1 imports Beta, 1 references", "Dependency: A1 imports A2, 1 references"]));
+    expect(edges.some((l) => l?.startsWith("Dependency: Alpha imports"))).toBe(false);
+  });
+
+  it("connects zone to zone when both areas are expanded, and lists it in the zone's panel", () => {
+    const dom = mount();
+    dbl(dom, block(dom, "Alpha"));
+    dbl(dom, block(dom, "Beta"));
+    const labels = [...dom.window.document.querySelectorAll("#iso .edge")].map((g) => g.getAttribute("aria-label"));
+    expect(labels).toContain("Dependency: A1 imports ALPHA, 1 references");
+    expect(dom.window.document.querySelectorAll("#iso path.wire").length).toBeGreaterThan(0);
+    block(dom, "A1").dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+    expect(dom.window.document.getElementById("dossier")!.textContent).toContain("Imports in other areas");
   });
 });

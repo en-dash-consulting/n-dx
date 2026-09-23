@@ -189,6 +189,22 @@ export interface IsoEdge {
   infra?: boolean;
   /** Orthogonal route in grid units, precomputed so the renderer stays dumb. */
   points: Array<[number, number]>;
+  /**
+   * Drawn as a lifted arc between block tops instead of a ground route: the
+   * zone-level cross-area connectors composed in the browser when an area is
+   * expanded, which have no precomputed route.
+   */
+  arc?: boolean;
+}
+
+/** A zone-to-zone import that crosses areas, for connecting expanded areas. */
+export interface IsoCrossAreaEdge {
+  from: string;
+  to: string;
+  fromArea: string;
+  toArea: string;
+  weight: number;
+  calls: number;
 }
 
 export interface IsoModelMeta {
@@ -225,6 +241,8 @@ export interface IsoModel {
   scenes?: Record<string, IsoModel>;
   /** On a scene: the area it shows. */
   scene?: { id: string; name: string };
+  /** On an areas-level model: zone-to-zone imports between areas. */
+  crossAreaEdges?: IsoCrossAreaEdge[];
 }
 
 // ── Normalized input ────────────────────────────────────────────────────────
@@ -478,6 +496,23 @@ export function buildIsoModel(input: IsoModelInput, options: IsoModelOptions = {
     scenes[a.id] = scene;
   }
   root.scenes = scenes;
+
+  // Zone-level imports across areas, restricted to zones their scene draws,
+  // so an expanded area can show which of its zones each connector leaves.
+  const drawn = new Set(Object.values(scenes).flatMap((sc) => sc.nodes.map((n) => n.id)));
+  const cross = new Map<string, IsoCrossAreaEdge>();
+  const bump = (from: string, to: string, weight: number, calls: number) => {
+    const fa = areaOf.get(from), ta = areaOf.get(to);
+    if (!fa || !ta || fa === ta || !drawn.has(from) || !drawn.has(to)) return;
+    const k = `${from}\u0001${to}`;
+    const e = cross.get(k) ?? { from, to, fromArea: fa, toArea: ta, weight: 0, calls: 0 };
+    e.weight += weight;
+    e.calls += calls;
+    cross.set(k, e);
+  };
+  for (const c of input.crossings) bump(c.fromZone, c.toZone, 1, 0);
+  for (const c of input.callEdges ?? []) bump(c.fromZone, c.toZone, 0, c.weight);
+  root.crossAreaEdges = [...cross.values()].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
   return root;
 }
 
