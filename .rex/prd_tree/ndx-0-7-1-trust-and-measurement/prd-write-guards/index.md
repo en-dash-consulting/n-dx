@@ -29,6 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Detect an index.md whose Children table omits a child directory, after confirming whether it hides items](./detect-an-index-md-whose-children.md) | pending |
 | [Fail rex validate and CI when the PRD tree does not match the slug rule](./fail-rex-validate-and-ci-when-the-prd.md) | completed |
 | [Fix the slug-rule guard's false refusal on an unmarked tree and bound migrate-slugs to upgrades](./fix-the-slug-rule-guard-s-false.md) | completed |
+| [Keep worktree agents' MCP PRD writes in their own worktree when a local-scope registration pins another path](./keep-worktree-agents-mcp-prd-writes-in.md) | pending |
 | [Make the repo slug invariant test import source and check the marker](./make-the-repo-slug-invariant-test.md) | completed |
 | [Offer to migrate a non-conformant tree at the gate, and stop rather than continue](./offer-to-migrate-a-non-conformant-tree.md) | pending |
 | [Preserve unknown tree-meta keys and treat a missing marker as a failure once one has been adopted](./preserve-unknown-tree-meta-keys-and.md) | completed |
