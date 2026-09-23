@@ -364,12 +364,12 @@ describe("cmdValidate", () => {
       expect(output).toContain("rex migrate-slugs");
     });
 
-    // Absence used to be tolerated as "a tree older than the marker". It is
-    // reported as an error now because a build older than the field rewrites
-    // the sidecar without it — erasing the record while moving no path — so a
-    // missing marker is as likely to be a disarmed guard as an old tree, and
-    // CI is where that has to be caught rather than mid-run.
-    it("exits 1 when the tree carries no slug-rule marker at all", async () => {
+    // The marker is unreleased, so every repository in the wild is unmarked
+    // while its paths already follow rule 2. Failing validate on that would
+    // break CI in every upgraded checkout for a state the next save repairs by
+    // itself — so it is a notice, and the checkout passes without operator
+    // action.
+    it("exits 0 with a notice when an unmarked tree's paths all conform", async () => {
       writeConfig(tmpDir, VALID_CONFIG);
       const rexDir = join(tmpDir, ".rex");
       await new FileStore(rexDir).saveDocument(SLUG_DOC);
@@ -378,6 +378,31 @@ describe("cmdValidate", () => {
       const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
       delete meta.slugRule;
       writeFileSync(metaPath, JSON.stringify(meta));
+
+      await cmdValidate(tmpDir, {});
+
+      expect(exitSpy).not.toHaveBeenCalled();
+      const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(output).toContain("⚠ tree slug rule marker");
+      expect(output).toContain("rex migrate-slugs");
+    });
+
+    // No marker *and* paths this build did not write: nothing is left to
+    // identify the writer, and the next save is refused rather than adopting.
+    // CI is where that has to be caught rather than mid-run.
+    it("exits 1 when an unmarked tree's paths follow a foreign rule", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      const rexDir = join(tmpDir, ".rex");
+      await new FileStore(rexDir).saveDocument(SLUG_DOC);
+
+      const metaPath = join(rexDir, TREE_META_FILENAME);
+      const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+      delete meta.slugRule;
+      writeFileSync(metaPath, JSON.stringify(meta));
+
+      const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
+      const current = readdirSync(treeRoot).filter((e) => e !== "tree-meta.json")[0];
+      renameSync(join(treeRoot, current), join(treeRoot, "child-process-cleanup-and-exit-epicab"));
 
       await expect(cmdValidate(tmpDir, {})).rejects.toThrow("process.exit");
       expect(exitSpy).toHaveBeenCalledWith(1);
@@ -423,7 +448,7 @@ describe("cmdValidate", () => {
       expect(output).not.toContain("tree slug rule marker");
     });
 
-    it("reports the missing-marker check as severity=error in JSON output", async () => {
+    it("reports the conformant missing-marker check as severity=warn in JSON output", async () => {
       writeConfig(tmpDir, VALID_CONFIG);
       const rexDir = join(tmpDir, ".rex");
       await new FileStore(rexDir).saveDocument(SLUG_DOC);
@@ -433,7 +458,7 @@ describe("cmdValidate", () => {
       delete meta.slugRule;
       writeFileSync(metaPath, JSON.stringify(meta));
 
-      await expect(cmdValidate(tmpDir, { format: "json" })).rejects.toThrow("process.exit");
+      await cmdValidate(tmpDir, { format: "json" });
 
       const jsonCall = stdoutSpy.mock.calls.find((c) => {
         try {
@@ -447,8 +472,9 @@ describe("cmdValidate", () => {
       const check = report.checks.find((c: { name: string }) => c.name === "tree slug rule marker");
       expect(check).toBeDefined();
       expect(check.pass).toBe(false);
-      expect(check.severity).toBe("error");
-      expect(report.ok).toBe(false);
+      expect(check.severity).toBe("warn");
+      // The whole point of the severity: an upgraded checkout still passes.
+      expect(report.ok).toBe(true);
     });
 
     it("reports the marker check as severity=error in JSON output", async () => {
@@ -882,9 +908,9 @@ describe("cmdValidate — folder tree read path", () => {
 
   /**
    * `serializeFolderTree` writes the tree but not the sidecar, and a tree with
-   * no slug-rule marker is now a validate error in its own right. Without
-   * this, every test below would fail on the marker rather than on whatever it
-   * set out to check.
+   * no slug-rule marker reports a marker notice of its own. Without this, every
+   * test below carries that extra line into its output assertions rather than
+   * showing only what it set out to check — and a real tree always has one.
    */
   function seedTreeMeta(title: string): void {
     writeFileSync(
