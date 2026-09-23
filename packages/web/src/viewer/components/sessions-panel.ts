@@ -71,6 +71,20 @@ export function claimLabel(claim: ClaimEntry): string {
   return claim.taskTitle ?? claim.taskId;
 }
 
+/**
+ * The takeover line, or null when nothing took this run's task over.
+ *
+ * A run whose claim was taken by another worktree keeps going — hench decides
+ * that abandoning work in progress is worse than the overlap — so the row
+ * still shows a live run. Without this line the tray would say "running" about
+ * a task that is now someone else's to finish.
+ */
+export function claimLostLabel(latest: WorktreeLatestRun | null): string | null {
+  const holder = latest?.claimLostTo;
+  if (!holder) return null;
+  return `claim taken over by ${worktreeName(holder)}`;
+}
+
 /** The branch cell. Detached and bare checkouts have no branch to name. */
 export function branchLabel(entry: WorktreeEntry): string {
   if (entry.branch) return entry.branch;
@@ -122,6 +136,7 @@ function WorktreeRow({ entry, claims, navigateTo }: { entry: WorktreeEntry; clai
   const dirty = dirtyLabel(entry);
   const run = runLine(entry.runs.latest);
   const runId = entry.runs.latest?.id ?? null;
+  const takenOver = claimLostLabel(entry.runs.latest);
 
   return h("li", { class: `sessions-row${entry.isServed ? " sessions-row-served" : ""}` },
     h("div", { class: "sessions-row-head" },
@@ -141,6 +156,14 @@ function WorktreeRow({ entry, claims, navigateTo }: { entry: WorktreeEntry; clai
           )
         : null,
     ),
+    // Said next to the run it belongs to, not in the claims list below:
+    // the claim is gone, so it is no longer in that list at all.
+    takenOver
+      ? h("div", { class: "sessions-claim-lost", title: entry.runs.latest?.claimLostTo ?? undefined },
+          h("span", { class: "sessions-claim-lost-icon", "aria-hidden": "true" }, "⚠"),
+          takenOver,
+        )
+      : null,
     // Tasks this worktree has claimed — what it is working on, from the
     // shared claims store rather than from a run record it may not have
     // written yet.

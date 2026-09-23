@@ -16,6 +16,7 @@ import {
   branchLabel,
   claimLabel,
   dirtyLabel,
+  claimLostLabel,
   runLine,
   sessionsPillLabel,
   shouldShowSessions,
@@ -74,6 +75,7 @@ const LINKED = makeWorktree({
       taskTitle: "Sessions panel",
       startedAt: new Date(Date.now() - 62_000).toISOString(),
       finishedAt: null,
+      claimLostTo: null,
     },
   },
 });
@@ -116,7 +118,7 @@ describe("sessions-panel helpers", () => {
   describe("runLine", () => {
     it("defers the elapsed time to the caller for a running run", () => {
       const startedAt = "2026-09-16T10:00:00.000Z";
-      expect(runLine({ id: "r", status: "running", taskTitle: "Do a thing", startedAt, finishedAt: null }))
+      expect(runLine({ id: "r", status: "running", taskTitle: "Do a thing", startedAt, finishedAt: null, claimLostTo: null }))
         .toEqual({ title: "Do a thing", detail: "running", elapsedFrom: startedAt, tone: "running" });
     });
 
@@ -127,18 +129,19 @@ describe("sessions-panel helpers", () => {
         taskTitle: "Do a thing",
         startedAt: "2026-09-16T10:00:00.000Z",
         finishedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+        claimLostTo: null,
       });
       expect(line).toMatchObject({ title: "Do a thing", detail: "completed · 5m ago", tone: "ok" });
       expect(line.elapsedFrom).toBeNull();
     });
 
     it("tones a failed run apart from a completed one", () => {
-      expect(runLine({ id: "r", status: "failed", taskTitle: "t", startedAt: null, finishedAt: null }).tone)
+      expect(runLine({ id: "r", status: "failed", taskTitle: "t", startedAt: null, finishedAt: null, claimLostTo: null }).tone)
         .toBe("bad");
     });
 
     it("falls back to the run id when the record has no task title", () => {
-      expect(runLine({ id: "run-42", status: "completed", taskTitle: null, startedAt: null, finishedAt: null }).title)
+      expect(runLine({ id: "run-42", status: "completed", taskTitle: null, startedAt: null, finishedAt: null, claimLostTo: null }).title)
         .toBe("run-42");
     });
 
@@ -269,5 +272,84 @@ describe("SessionsPanel", () => {
     render(h(SessionsPanel, { worktrees: [makeWorktree(), LINKED] }), root);
     act(() => { (root.querySelector(".sessions-toggle") as HTMLButtonElement).click(); });
     expect(root.querySelectorAll(".sessions-run-link").length).toBe(0);
+  });
+});
+
+// ── Claim taken over mid-run (0.7.1 PR F) ──────────────────────────────────
+//
+// A run whose claim another worktree takes over keeps going by design, so the
+// row still shows a live run. Without a line saying otherwise the tray would
+// report "running" about a task that is no longer this run's to finish.
+
+describe("claimLostLabel", () => {
+  const base = { id: "r", status: "running", taskTitle: "t", startedAt: null, finishedAt: null };
+
+  it("names the worktree that took the task, by its last path segment", () => {
+    expect(claimLostLabel({ ...base, claimLostTo: "/repo/.claude/worktrees/feature" }))
+      .toBe("claim taken over by feature");
+  });
+
+  it("is null for an ordinary run, and for no run at all", () => {
+    expect(claimLostLabel({ ...base, claimLostTo: null })).toBeNull();
+    expect(claimLostLabel(null)).toBeNull();
+  });
+
+  it("is null for a record written before the field existed", () => {
+    // Older hench versions write no claimLost at all; the digest reports null,
+    // but an undefined must not render "claim taken over by undefined".
+    expect(claimLostLabel({ ...base, claimLostTo: undefined as unknown as null })).toBeNull();
+  });
+});
+
+describe("SessionsPanel takeover line", () => {
+  let root: HTMLDivElement;
+
+  beforeEach(() => {
+    root = document.createElement("div");
+    document.body.appendChild(root);
+  });
+
+  afterEach(() => {
+    render(null, root);
+    root.remove();
+  });
+
+  function expand(worktrees: ReturnType<typeof makeWorktree>[]) {
+    render(h(SessionsPanel, { worktrees }), root);
+    act(() => {
+      root.querySelector<HTMLButtonElement>(".sessions-toggle")!.click();
+    });
+  }
+
+  it("shows the takeover beside the run that lost its claim", () => {
+    const taken = makeWorktree({
+      path: "/repo/.claude/worktrees/feature",
+      isAnchor: false,
+      runs: {
+        total: 1,
+        running: 1,
+        lastFinishedAt: null,
+        latest: {
+          id: "run-live",
+          status: "running",
+          taskTitle: "Sessions panel",
+          startedAt: new Date(Date.now() - 1000).toISOString(),
+          finishedAt: null,
+          claimLostTo: "/repo/.claude/worktrees/other",
+        },
+      },
+    });
+    expand([makeWorktree(), taken]);
+
+    const line = root.querySelector(".sessions-claim-lost");
+    expect(line).toBeTruthy();
+    expect(line!.textContent).toContain("claim taken over by other");
+    // The run itself is still shown as running — it did not stop.
+    expect(root.querySelector(".sessions-run-running")).toBeTruthy();
+  });
+
+  it("renders no takeover line for ordinary runs", () => {
+    expand([makeWorktree(), LINKED]);
+    expect(root.querySelector(".sessions-claim-lost")).toBeNull();
   });
 });
