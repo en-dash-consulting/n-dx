@@ -59,6 +59,7 @@ import { validateTaskCompletion } from "./task-completion-gate.js";
 import {
   PRD_COMMIT_PATHS,
   findUncommittedWork,
+  formatRecordCommitPending,
   formatUncommittedWorkRefusal,
   listDirtyPaths,
   partitionDirtyPaths,
@@ -1691,6 +1692,12 @@ async function scopePrdPathsToReport(
 export interface PrdTreeCommitResult {
   staged: number;
   error?: Error;
+  /**
+   * The project-relative paths this commit staged (or tried to). Always set
+   * once staging began — on `error` it is what a caller needs to report the
+   * exact scope of the record still pending, rather than "the tree".
+   */
+  paths?: string[];
 }
 
 async function commitPrdTreeIfStaged(
@@ -1720,12 +1727,12 @@ async function commitPrdTreeIfStaged(
       await execGitMutation(projectDir, ["add", prdPath], 10_000);
     }
   } catch (err) {
-    return { staged: 0, error: err as Error };
+    return { staged: 0, error: err as Error, paths: prdPaths };
   }
 
   const staged = await countStagedFiles(projectDir, [".rex/"]);
   if (staged === 0) {
-    return { staged: 0 };
+    return { staged: 0, paths: prdPaths };
   }
 
   try {
@@ -1745,9 +1752,9 @@ async function commitPrdTreeIfStaged(
       ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine(), "--", ...prdPaths],
       30_000,
     );
-    return { staged };
+    return { staged, paths: prdPaths };
   } catch (err) {
-    return { staged, error: err as Error };
+    return { staged, error: err as Error, paths: prdPaths };
   }
 }
 
@@ -3052,18 +3059,27 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         opts.store ? takeSaveFileReport(opts.store) : null,
       );
       if (completionMetadata.error) {
-        // The task's own work already succeeded (checked above) — only the
-        // follow-up PRD record commit failed to land. `status` still flips to
-        // "failed" (the two outcomes share one field today), but this flag is
-        // set at the exact point of the failure so the run summary can tell
-        // the difference instead of reporting an indistinguishable failure.
-        run.status = "failed";
-        run.recordCommitPending = true;
-        run.error = `Could not commit completion metadata: ${completionMetadata.error.message}`;
-        info(`\n${run.error}`);
-        if (opts.store) {
-          await withdrawCompletionClaim(opts.store, run, run.error);
-        }
+        // The task's own work already succeeded and validated — only the
+        // follow-up PRD record commit failed to land. That is a pending
+        // record, not a failed run: the run stays completed and nothing is
+        // withdrawn. Withdrawing here responded to "I cannot commit PRD
+        // state" by writing MORE PRD state through the path that just
+        // failed, which left the tree dirtier than the failure did — and
+        // reset a genuinely finished task for another run to redo. The
+        // cross-worktree claim is deliberately not held either: the work is
+        // committed, so there is nothing another worktree could destroy by
+        // picking the next task; the claim lapses through the run's normal
+        // release. The pending record travels on the run record with the
+        // exact paths, and the operator gets commands scoped to them.
+        run.recordCommitPending = {
+          paths: completionMetadata.paths ?? [],
+          error: completionMetadata.error.message,
+        };
+        info(`\n${formatRecordCommitPending(
+          completionMetadata.paths ?? [],
+          run.taskId,
+          completionMetadata.error.message,
+        )}`);
       }
     }
   }

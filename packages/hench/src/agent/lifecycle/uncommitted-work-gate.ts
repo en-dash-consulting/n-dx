@@ -265,6 +265,29 @@ export function renderPaths(paths: string[]): string {
 }
 
 /**
+ * Printed when a completed task's follow-up PRD "record" commit could not be
+ * committed. The work itself is committed and the task stays completed — a
+ * failed bookkeeping commit is a pending record, not a failed run — so the
+ * message says exactly that, and the recovery commands are scoped to the
+ * paths the record commit tried to stage, nothing wider: an unscoped
+ * `git add`/`git commit` here would sweep whatever else the operator has in
+ * flight, which is the same hazard the scoped completion commit exists to
+ * avoid.
+ */
+export function formatRecordCommitPending(paths: string[], taskId: string, error: string): string {
+  const pathspec = paths.join(" ");
+  return (
+    `⚠ Work committed; record not committed: the PRD record commit for task ${taskId} failed.\n` +
+    `  ${error}\n` +
+    `The task stays completed and its code commits are intact. Still uncommitted:\n` +
+    `${renderPaths(paths)}\n` +
+    `Land the record once the cause is fixed:\n` +
+    `  git add -- ${pathspec}\n` +
+    `  git commit -m "chore(prd): commit PRD tree changes (task ${taskId} completed)" -- ${pathspec}`
+  );
+}
+
+/**
  * The message recorded on `run.error` and printed when a completion is
  * refused. Names every path, because the whole failure mode was work
  * disappearing without anyone being told which work.

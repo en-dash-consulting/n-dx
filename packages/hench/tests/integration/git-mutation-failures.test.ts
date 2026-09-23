@@ -186,7 +186,12 @@ describe("Git mutation failures in the Hench lifecycle", () => {
     }
   });
 
-  it("fails the auto-commit lifecycle when its completion metadata commit is rejected", async () => {
+  // WM2085: a record-commit failure is a pending record, not a failed run.
+  // Before, this path set status "failed" and withdrew the completion —
+  // responding to "I cannot commit PRD state" by writing more PRD state
+  // through the path that just failed, and resetting a finished task for
+  // another run to redo.
+  it("keeps the task completed when only the completion metadata commit is rejected", async () => {
     const projectDir = await mkdtemp(join(tmpdir(), "hench-metadata-commit-failure-"));
     try {
       const henchDir = join(projectDir, ".hench");
@@ -197,6 +202,9 @@ describe("Git mutation failures in the Hench lifecycle", () => {
       await mkdir(join(henchDir, "runs"), { recursive: true });
       await mkdir(join(projectDir, ".rex", "prd_tree", "task"), { recursive: true });
       await writeFile(taskPath, "status: in_progress\n", "utf-8");
+      // Every real save rewrites the sidecar; its presence is what puts it in
+      // the staging roots and therefore in the reported pathspec.
+      await writeFile(join(projectDir, ".rex", "tree-meta.json"), "{}", "utf-8");
       await execAsync("git add . && git commit -m initial", { cwd: projectDir });
 
       let taskStatus = "in_progress";
@@ -212,10 +220,13 @@ describe("Git mutation failures in the Hench lifecycle", () => {
         }),
         appendLog: vi.fn(async () => {}),
         loadDocument: vi.fn(async () => ({ items: [] })),
+        takeSaveFileReport: vi.fn(() => ({ written: [".rex/prd_tree/task/index.md"], deleted: [] })),
       };
+      const claims = { hold: vi.fn(async () => {}) };
 
       await failGitMutation("commit", "pre-commit hook rejected completion metadata");
       const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+      const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
       const run = completedRun();
       await finalizeRun({
         run,
@@ -225,11 +236,31 @@ describe("Git mutation failures in the Hench lifecycle", () => {
         rollbackOnFailure: false,
         skipFullTestGate: true,
         store: store as never,
+        claims: claims as never,
       });
 
-      expect(run.status).toBe("failed");
-      expect(run.error).toContain("pre-commit hook rejected completion metadata");
-      expect(taskStatus).toBe("pending");
+      // The run and the PRD both stay completed — the work landed; only the
+      // bookkeeping commit is pending.
+      expect(run.status).toBe("completed");
+      expect(run.error).toBeUndefined();
+      expect(taskStatus).toBe("completed");
+      expect(run.recordCommitPending).toEqual({
+        paths: [".rex/prd_tree/task/index.md", ".rex/tree-meta.json"],
+        error: expect.stringContaining("pre-commit hook rejected completion metadata"),
+      });
+
+      // No withdrawal, and the claim is not held — it lapses through the
+      // run's normal release.
+      expect(taskStatus).not.toBe("pending");
+      expect(claims.hold).not.toHaveBeenCalled();
+
+      // The operator gets the exact scope, not "the tree".
+      const logged = consoleLog.mock.calls.flat().join("\n");
+      expect(logged).toContain("Work committed; record not committed");
+      expect(logged).toContain("git add -- .rex/prd_tree/task/index.md .rex/tree-meta.json");
+      expect(logged).toMatch(/git commit -m "[^"]+" -- \.rex\/prd_tree\/task\/index\.md \.rex\/tree-meta\.json/);
+
+      // The record commit really did not land, and its write is still in the tree.
       const { stdout: log } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
       expect(log.trim()).toBe("initial");
       const { stdout: status } = await execAsync("git status --porcelain", { cwd: projectDir });
