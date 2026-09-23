@@ -29,6 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Fail rex validate and CI when the PRD tree does not match the slug rule](./fail-rex-validate-and-ci-when-the-prd.md) | completed |
 | [Fix the slug-rule guard's false refusal on an unmarked tree and bound migrate-slugs to upgrades](./fix-the-slug-rule-guard-s-false.md) | completed |
 | [Make the repo slug invariant test import source and check the marker](./make-the-repo-slug-invariant-test.md) | completed |
+| [Offer to migrate a non-conformant tree at the gate, and stop rather than continue](./offer-to-migrate-a-non-conformant-tree.md) | pending |
 | [Preserve unknown tree-meta keys and treat a missing marker as a failure once one has been adopted](./preserve-unknown-tree-meta-keys-and.md) | completed |
 | [Re-run the slug-rule gate on every loop iteration](./re-run-the-slug-rule-gate-on-every.md) | completed |
 | [Record the slug rule version in tree-meta.json and refuse writes from a build with a different rule](./record-the-slug-rule-version-in-tree.md) | completed |
