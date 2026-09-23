@@ -1,0 +1,28 @@
+---
+id: "5d5aaed5-5b3b-4947-9320-3444ac727e1b"
+level: "task"
+title: "Zone identity: ids from the deepest distinguishing directory, clean filename ids, sub-zone ids follow their parent, stale fallback names not treated as chosen, numeric-suffix ids follow verified names"
+status: "pending"
+priority: "medium"
+tags:
+  - "sourcevision"
+  - "zones"
+blockedBy:
+  - "84a91da2-f8b2-4970-8e4e-2d5826a75533"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "Unit test: reapplyCascadeLabels replaces a preserved name 'Routes 8' on zone routes-6 with the cascade's name"
+  - "Unit test: deriveZoneName never emits consecutive spaces"
+  - "Unit test: a zone with id routes-11 and an accepted name 'Scrapbook Application' gets id scrapbook-application and previousIds ['routes-11']"
+  - "Unit test: a zone whose id has no numeric suffix keeps its id regardless of name"
+  - "Unit test: a zone pin using a previous id resolves to the renamed zone"
+  - "Unit test: a second run on unchanged input keeps the renamed id (no oscillation)"
+  - "Unit test: disambiguateZoneId for app/routes/apps/learn-agentcore/lib/* colliding on routes and apps returns learn-agentcore"
+  - "Unit test: filename-derived ids split camelCase and strip route syntax: CosmicCallout.tsx + DashboardGrid.tsx -> cosmic-callout-dashboard-grid (<= 3 words); sandbox._index.tsx + what.case-studies.$slug.tsx contains no '.', '$' or '_'"
+  - "Unit test: a parent renamed by identity preservation re-prefixes every sub-zone id recursively"
+  - "Live on a copy of n-site2: no zone id matches /-\\d+$/ where the zone has an accepted name, and no sub-zone id carries a prefix different from its parent's id; recorded in this item's log"
+  - "pnpm --filter @n-dx/sourcevision test passes"
+description: "Identity defects seen on n-site2 (2026-09-22).\n\n**1. Stale fallback names survive as if chosen.** `routes-6` is named \"Routes 8\" and `routes-7` \"Routes 7\". `reapplyCascadeLabels` (`zones.ts`) keeps a preserved name when `zone.name !== deriveZoneName(zone.id)`. After `preservePreviousZoneIdentity` or renumbering, though, a name that was the algorithmic default for a *different* id (\"Routes 8\" from a former `routes-8`) fails that check and is kept as a deliberate choice. `isGenericZoneName` and the naming step's \"already tried\" skip then leave it alone forever. Treat a name as algorithmic when it equals `deriveZoneName` of the id's base with any numeric suffix (`^<Base>( \\d+)?$`), or of any id the zone has held, so it goes back through naming. Also fix `deriveZoneName` producing a double space (\"Routes  Marketing\") from ids with empty segments.\n\n**2. Numeric-suffix ids never improve.** Zone ids come from `deriveZoneId` and fall back to `<base>-<n>`. A verified name (\"Scrapbook Application\") never flows back into the id, so `routes-11` is what every finding, CONTEXT.md heading, `ndx zone` argument and iso-map label shows. When a zone's id has a numeric suffix and its name was accepted by the naming judgment, derive a new id by kebab-casing the name, disambiguated against used ids, and record `previousIds` on the zone. Everything that resolves zone ids accepts a previous id as an alias: `zonePins`, `ndx zone <id>`, sourcevision MCP `get_zone`, and `preservePreviousZoneIdentity`. Ids without numeric suffixes are never renamed.\n\n**3. Disambiguation looks one segment deep.** `disambiguateZoneId` tries only the first segment below the colliding base. Under `app/routes/apps/learn-agentcore/lib/` that is `apps`, which is already taken, so the id falls to a numeric suffix even though `learn-agentcore` distinguishes it. Walk deeper: use the deepest directory shared by a majority of the zone's files, skipping `lib`, `components`, `utils`, `hooks` and other role segments. Fall back to a numeric suffix only when no segment distinguishes.\n\n**4. Filename-derived ids are unreadable.** `deriveZoneIdFromFilenames` / `deriveZoneIdFromFileStems` lowercase PascalCase stems without splitting them (`cosmiccallout-dashboardgrid`) and pass route syntax through (`sandbox.-index-what.case-studies.$slug`). Split camelCase and PascalCase into words, strip route syntax (`$param`, leading `_`, `_index`, `[.]`, `.` separators, `+`), and cap the id at three words.\n\n**5. Sub-zone ids go stale when the parent is renamed.** `preservePreviousZoneIdentity` (and the cascade rename) changes a parent's id (`routes-apps` → `core-application-monolith`), but `subZones` keep the old prefix (`routes-apps/routes/components`). Re-prefix sub-zone ids, recursively, whenever a parent's id changes."
+lastModified: "2026-09-23T02:33:31.026Z"
+lastModifiedBy: "Nick Daniel <nick@endash.us>"
+---
