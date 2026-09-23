@@ -7,7 +7,7 @@
  * only a real layout exercises that join end to end.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -16,8 +16,10 @@ import type { ServerContext } from "../../src/server/types.js";
 import {
   handleWorktreesRoute,
   clearWorktreesCache,
+  invalidateWorktreesAnswer,
   type WorktreeEntry,
 } from "../../src/server/routes-worktrees.js";
+import { closeWorktreeRunWatchers } from "../../src/server/routes-hench.js";
 import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 
 function git(cwd: string, ...args: string[]): string {
@@ -104,6 +106,9 @@ afterAll(() => {
 
 beforeEach(() => {
   clearWorktreesCache();
+  // Watchers are module-level, one per runs directory: a test must not
+  // inherit one registered (with another test's broadcaster) earlier.
+  closeWorktreeRunWatchers();
 });
 
 describe("GET /api/worktrees", () => {
@@ -292,6 +297,59 @@ describe("GET /api/worktrees", () => {
     server = await startRouteTestServer((req, res) => handleWorktreesRoute(req, res, ctxFor(repo)));
     expect((await fetch(`${server.baseUrl}/api/worktrees/x`)).status).toBe(404);
     expect((await fetch(`${server.baseUrl}/api/worktrees`, { method: "POST" })).status).toBe(404);
+    await server.close();
+  });
+
+  it("a run file saved in another worktree pushes hench:run-changed without the Runs view", async () => {
+    // The Sessions tray is open but the Runs view (the only other caller that
+    // watches linked worktrees) was never visited: GET /api/worktrees alone
+    // must register the watcher, or a mid-run claim takeover waits for a poll.
+    const broadcast = vi.fn();
+    const onStatusInvalidate = vi.fn(invalidateWorktreesAnswer);
+    server = await startRouteTestServer((req, res) =>
+      handleWorktreesRoute(req, res, ctxFor(repo), { broadcast, onStatusInvalidate }),
+    );
+    try {
+      await fetchWorktrees(server);
+
+      writeRun(linked, "run-c", "running");
+
+      await vi.waitFor(() => {
+        expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: "hench:run-changed" }));
+      }, { timeout: 4_000, interval: 50 });
+      expect(onStatusInvalidate).toHaveBeenCalled();
+    } finally {
+      closeWorktreeRunWatchers();
+      await server.close();
+    }
+  });
+
+  it("does not watch the served worktree's runs — start.ts already does", async () => {
+    const broadcast = vi.fn();
+    server = await startRouteTestServer((req, res) =>
+      handleWorktreesRoute(req, res, ctxFor(linked), { broadcast }),
+    );
+    try {
+      await fetchWorktrees(server);
+      writeRun(linked, "run-c", "running");
+      await new Promise((r) => setTimeout(r, 1_000));
+      expect(broadcast).not.toHaveBeenCalled();
+    } finally {
+      closeWorktreeRunWatchers();
+      await server.close();
+    }
+  });
+
+  it("a runs-dir change drops the cached answer so the refetch sees it", async () => {
+    server = await startRouteTestServer((req, res) => handleWorktreesRoute(req, res, ctxFor(repo)));
+    const before = (await fetchWorktrees(server)).find((w) => w.path === repo)!.runs.total;
+
+    writeRun(repo, "run-d", "completed", "2026-09-16T12:00:00.000Z");
+    expect((await fetchWorktrees(server)).find((w) => w.path === repo)!.runs.total).toBe(before);
+
+    invalidateWorktreesAnswer();
+    expect((await fetchWorktrees(server)).find((w) => w.path === repo)!.runs.total).toBe(before + 1);
+    rmSync(join(repo, ".hench", "runs", "run-d.json"));
     await server.close();
   });
 });

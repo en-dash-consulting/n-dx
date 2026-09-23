@@ -325,15 +325,18 @@ async function resolveRunSources(ctx: ServerContext): Promise<WorktreeRunsSource
  * run written in another worktree fires `hench:run-changed` exactly as one in
  * the served directory does (start.ts's registerHenchWatcher covers that one).
  *
- * Lazy — registered on the first `?scope=repo` request that sees the
- * directory — rather than at startup, because worktrees and their
- * `.hench/runs/` come and go while the server is up. Each poll re-checks, so
- * a worktree added later is picked up without a restart.
+ * Lazy — registered on the first request that sees the directory, from
+ * either `?scope=repo` here or `GET /api/worktrees` (the Sessions tray) —
+ * rather than at startup, because worktrees and their `.hench/runs/` come
+ * and go while the server is up. Each poll re-checks, so a worktree added
+ * later is picked up without a restart. Idempotent per directory: whichever
+ * route registers first owns the watcher, so both must pass the same
+ * `onStatusInvalidate`.
  */
 const worktreeRunWatchers = new Map<string, FSWatcher>();
 const WORKTREE_WATCH_DEBOUNCE_MS = 500;
 
-function ensureWorktreeRunWatcher(
+export function ensureWorktreeRunWatcher(
   runsDir: string,
   broadcast: WebSocketBroadcaster | undefined,
   onStatusInvalidate: (() => void) | undefined,

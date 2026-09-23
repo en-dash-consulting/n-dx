@@ -32,6 +32,8 @@ import { exec, getWorktreeRoot, listWorktrees } from "@n-dx/llm-client";
 import type { GitWorktree } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
+import { ensureWorktreeRunWatcher } from "./routes-hench.js";
+import type { WebSocketBroadcaster } from "./websocket.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -150,6 +152,19 @@ const runDigestCache = new Map<string, RunFileDigest>();
 export function clearWorktreesCache(): void {
   worktreesCache = null;
   runDigestCache.clear();
+}
+
+/**
+ * Drop the whole-answer cache so the next request re-reads every worktree.
+ *
+ * Called when a runs directory changes: the `hench:run-changed` broadcast
+ * makes the Sessions tray refetch at once, and without this it would be
+ * served an answer up to {@link WORKTREES_CACHE_TTL_MS} old — the change it
+ * was told about not yet in it. The per-file digest cache stays: it is keyed
+ * on mtime and size, so a changed run file is re-read regardless.
+ */
+export function invalidateWorktreesAnswer(): void {
+  worktreesCache = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -334,11 +349,36 @@ export async function collectWorktrees(projectDir: string): Promise<WorktreeEntr
 
 const WORKTREES_PATH = "/api/worktrees";
 
+export interface WorktreesRouteOptions {
+  /** Where a change to another worktree's runs is announced as `hench:run-changed`. */
+  broadcast?: WebSocketBroadcaster;
+  /** Caches to drop when any runs directory changes — see `ensureWorktreeRunWatcher`. */
+  onStatusInvalidate?: () => void;
+}
+
+/**
+ * Watch every non-served worktree's `.hench/runs/`, so a run file saved there
+ * — a claim takeover stamped mid-run, a run starting or finishing — reaches
+ * the Sessions tray as a push rather than on its next poll. The served
+ * worktree is already watched by start.ts. Re-checked on every request, cached
+ * answer or not, so a worktree whose runs directory appears later is picked up.
+ */
+function watchOtherWorktreeRuns(entries: WorktreeEntry[], options: WorktreesRouteOptions): void {
+  // Nothing to announce to — and registering anyway would claim the
+  // directory's one watcher slot with a silent watcher.
+  if (!options.broadcast) return;
+  for (const entry of entries) {
+    if (entry.isServed || entry.bare) continue;
+    ensureWorktreeRunWatcher(join(entry.path, ".hench", "runs"), options.broadcast, options.onStatusInvalidate);
+  }
+}
+
 /** Handle GET /api/worktrees. Returns true if the request was handled. */
 export async function handleWorktreesRoute(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
+  options: WorktreesRouteOptions = {},
 ): Promise<boolean> {
   const url = (req.url || "/").split("?")[0];
   if (url !== WORKTREES_PATH || (req.method || "GET") !== "GET") return false;
@@ -349,12 +389,14 @@ export async function handleWorktreesRoute(
     worktreesCache.projectDir === ctx.projectDir &&
     now - worktreesCache.timestamp < WORKTREES_CACHE_TTL_MS
   ) {
+    watchOtherWorktreeRuns(worktreesCache.entries, options);
     jsonResponse(res, 200, worktreesCache.entries);
     return true;
   }
 
   const entries = await collectWorktrees(ctx.projectDir);
   worktreesCache = { projectDir: ctx.projectDir, timestamp: now, entries };
+  watchOtherWorktreeRuns(entries, options);
   jsonResponse(res, 200, entries);
   return true;
 }
