@@ -1083,6 +1083,8 @@ describe("writtenPaths and deletedPaths", () => {
     const relWritten = result.writtenPaths.map((p) => relative(testDir, p).split(sep).join("/"));
     expect(relWritten.sort()).toEqual(["epic/index.md", "epic/task-a.md"]);
     expect(result.deletedPaths).toEqual([]);
+    // The written files' own clock, for the store's post-save loadedAt.
+    expect(result.maxWrittenMtimeMs).toBeGreaterThan(0);
   });
 
   it("reports nothing written when content is unchanged (writeIfChanged skip)", async () => {
@@ -1097,6 +1099,7 @@ describe("writtenPaths and deletedPaths", () => {
     expect(second.filesSkipped).toBeGreaterThan(0);
     expect(second.writtenPaths).toEqual([]);
     expect(second.deletedPaths).toEqual([]);
+    expect(second.maxWrittenMtimeMs).toBe(0);
   });
 
   it("reports a removed leaf file as deleted", async () => {

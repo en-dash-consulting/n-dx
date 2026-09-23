@@ -87,6 +87,16 @@ export interface SerializeResult {
    * addresses files).
    */
   deletedPaths: string[];
+  /**
+   * The largest on-disk mtime among the files this call wrote (epoch ms),
+   * `0` when nothing was written. Stores fold this into the `loadedAt` they
+   * adopt after a save — on Windows the filesystem clock can run ahead of
+   * `Date.now()` by more than the stale-save guard's tolerance, so a
+   * `Date.now()` taken after the write can be *earlier* than the write's own
+   * mtime, and the next save would then refuse to clean up this writer's own
+   * work as "another writer's newer file".
+   */
+  maxWrittenMtimeMs: number;
 }
 
 /**
@@ -156,6 +166,7 @@ export async function serializeFolderTree(
     fileDigests: new Map(),
     writtenPaths: [],
     deletedPaths: [],
+    maxWrittenMtimeMs: 0,
   };
 
   await ensureDir(treeRoot, result);
@@ -979,4 +990,14 @@ async function writeIfChanged(
   await rename(tmpPath, filePath);
   result.filesWritten++;
   result.writtenPaths.push(resolve(filePath));
+  try {
+    // The write's own mtime, for SerializeResult.maxWrittenMtimeMs — the file
+    // clock may run ahead of Date.now(), and the store's post-save loadedAt
+    // must not read this writer's own files as someone else's newer work.
+    const written = await stat(filePath);
+    if (written.mtimeMs > result.maxWrittenMtimeMs) result.maxWrittenMtimeMs = written.mtimeMs;
+  } catch {
+    // Vanished between rename and stat — a concurrent deletion the guard on
+    // the next save will judge; nothing to record for this write.
+  }
 }

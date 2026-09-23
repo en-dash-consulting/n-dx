@@ -130,7 +130,11 @@ export class FolderTreeStore implements PRDStore {
     });
     // A completed save makes this instance's view of the tree current again:
     // its own writes must not read as "another writer's work" on the next save.
-    this.loadedAt = Date.now();
+    // Folding in the written files' own mtimes matters on Windows, where the
+    // file clock can run ahead of Date.now() by more than the guard's
+    // tolerance — a bare Date.now() intermittently read this save's own files
+    // as newer than the save.
+    this.loadedAt = Math.max(Date.now(), written.maxWrittenMtimeMs);
     this.loadedFiles = written.fileDigests;
     // Accumulated rather than replaced: a caller may save several times
     // between commit points and needs the union at take time.

@@ -21,7 +21,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Correct the 0.5.1 slug-rule claim and the cost-rise wording in the 0.7.1 changesets](./correct-the-0-5-1-slug-rule-claim-and.md) | pending |
+| [Correct the 0.5.1 slug-rule claim and the cost-rise wording in the 0.7.1 changesets](./correct-the-0-5-1-slug-rule-claim-and.md) | completed |
 | [Expose the PRD serializer's written and deleted file list through the rex gateway](./expose-the-prd-serializer-s-written.md) | completed |
 | [Filter gitignored paths out of the hench PRD staging list](./filter-gitignored-paths-out-of-the.md) | completed |
 | [Keep a completed task completed when only the record commit fails](./keep-a-completed-task-completed-when.md) | pending |
