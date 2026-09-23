@@ -219,13 +219,23 @@ describe("rex claim release", () => {
     expect(await mine.readClaims()).toEqual([]);
   });
 
-  it("frees another worktree's held claim only with --force", async () => {
+  it("frees another worktree's held claim without --force", async () => {
     const theirs = openClaimsStore(linked);
     await theirs.claim("T1", { worktreeRoot: linked });
     await theirs.hold("T1", { worktreeRoot: linked }, "uncommitted-work");
 
-    // Held, so the liveness gate passes — but it is not this worktree's to free.
-    await expect(run(["release", "T1"])).rejects.toThrow(/another worktree/);
+    // This is the exact command a refused completion's hint gives the *other*
+    // worktree — it must work from where that reader is standing, without a
+    // --force the hint never mentioned.
+    expect(await run(["release", "T1"])).toContain("Released the claim on T1");
+    expect(await theirs.readClaims()).toEqual([]);
+  });
+
+  it("still refuses another worktree's live claim without --force", async () => {
+    const theirs = openClaimsStore(linked);
+    await theirs.claim("T1", { worktreeRoot: linked });
+
+    await expect(run(["release", "T1"])).rejects.toThrow(/still working it/);
     expect(await theirs.readClaims()).toHaveLength(1);
 
     expect(await run(["release", "T1"], { force: "true" })).toContain("Released");

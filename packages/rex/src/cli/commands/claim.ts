@@ -143,6 +143,10 @@ export function formatClaims(reports: ClaimReport[]): string[] {
  *
  * A live pid with no held reason is a run in progress. Freeing that invites
  * exactly the duplicate work claims exist to prevent, so it takes `--force`.
+ *
+ * The same judgement decides whether the release may cross the worktree
+ * boundary: a claim that is safe to free at all is safe to free from
+ * whichever worktree the operator happens to be standing in.
  */
 export function releasableWithoutForce(claim: Pick<TaskClaim, "reason" | "pid">): boolean {
   return Boolean(claim.reason) || !defaultIsPidAlive(claim.pid);
@@ -177,11 +181,16 @@ async function releaseOne(
         `Re-run with --force if that process is not really working this task.`,
     };
   }
-  // `force` also crosses the worktree boundary: the store's own release is
-  // scoped to the caller's worktree, which is right for a run cleaning up
-  // after itself and wrong for an operator clearing a stuck claim from
-  // wherever they happen to be standing.
-  const released = await store.release(taskId, holder, { force });
+  // The store's own release is scoped to the caller's worktree — right for a
+  // run cleaning up after itself, wrong for an operator clearing a stuck
+  // claim from wherever they happen to be standing. A claim that is
+  // releasable without --force is safe to free whoever asks, so cross the
+  // boundary for it too: the completion-refusal hint tells the *refused*
+  // worktree to run `ndx claim release <taskId>`, and that command must work
+  // from there without a --force the hint never mentioned.
+  const released = await store.release(taskId, holder, {
+    force: force || releasableWithoutForce(claim),
+  });
   return released
     ? { taskId, released: true }
     : { taskId, released: false, detail: `held by another worktree (${claim.worktreeRoot}) — use --force` };
@@ -205,8 +214,7 @@ Usage:
   rex claim release --all [dir]         Free every claim this worktree holds
 
 Options:
-  --force            Release even while the holding process is alive, or when
-                     the claim belongs to another worktree
+  --force            Release even while the holding process is alive
   --format=json      Machine-readable output
 
 A claim is held deliberately when a run refused to complete its task because
