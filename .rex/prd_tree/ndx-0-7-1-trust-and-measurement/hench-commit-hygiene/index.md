@@ -21,9 +21,12 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Correct the 0.5.1 slug-rule claim and the cost-rise wording in the 0.7.1 changesets](./correct-the-0-5-1-slug-rule-claim-and.md) | pending |
 | [Expose the PRD serializer's written and deleted file list through the rex gateway](./expose-the-prd-serializer-s-written.md) | pending |
 | [Filter gitignored paths out of the hench PRD staging list](./filter-gitignored-paths-out-of-the.md) | completed |
 | [Keep a completed task completed when only the record commit fails](./keep-a-completed-task-completed-when.md) | pending |
 | [Make the rollback prompt say what it reverts and default to restoring](./make-the-rollback-prompt-say-what-it.md) | completed |
 | [Make the run summary distinguish work failure from record failure and name the commits](./make-the-run-summary-distinguish-work.md) | completed |
+| [Resolve hench review pending from the project's review directory rather than the stored absolute report path](./resolve-hench-review-pending-from-the.md) | pending |
+| [Stage and discount the same PRD paths so a tracked execution log does not dirty the tree after every completion](./stage-and-discount-the-same-prd-paths.md) | pending |
 | [Stage only the files the serializer wrote in hench completion and reset-deferred commits](./stage-only-the-files-the-serializer.md) | pending |

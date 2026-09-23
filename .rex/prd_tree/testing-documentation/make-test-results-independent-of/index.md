@@ -32,6 +32,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [exec-interrupt-forwarding.test.js justifies its location with a false claim about where CI runs tests](./exec-interrupt-forwarding-test-js.md) | completed |
 | [Fake-CLI fixtures write .args into the repo root instead of a temp dir](./fake-cli-fixtures-write-args-into-the.md) | completed |
 | [Give add-auto-reshape's scaling gate a min-of-N, and fix its shared-tree confound](./give-add-auto-reshape-s-scaling-gate-a.md) | completed |
+| [Give each cli-hints spawn the load-scaled budget, not a fixed 10 seconds](./give-each-cli-hints-spawn-the-load.md) | pending |
 | [Make the tests' sh-on-PATH dependency explicit instead of failing opaquely](./make-the-tests-sh-on-path-dependency.md) | completed |
 | [Neutralize ambient color env so FORCE_COLOR does not fail 24 tests](./neutralize-ambient-color-env-so-force.md) | completed |
 | [packages/hench/tests/unit/tools/git.test.ts spawns `sh` unguarded, so 7 cases fail from PowerShell](./packages-hench-tests-unit-tools-git.md) | completed |

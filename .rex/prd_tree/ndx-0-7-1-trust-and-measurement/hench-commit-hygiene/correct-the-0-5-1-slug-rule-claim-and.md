@@ -1,0 +1,23 @@
+---
+id: "e7939c6f-2b6a-440b-a34d-295e89281590"
+level: "task"
+title: "Correct the 0.5.1 slug-rule claim and the cost-rise wording in the 0.7.1 changesets"
+status: "pending"
+priority: "high"
+tags:
+  - "0.7.1"
+  - "hench-commit-hygiene"
+  - "pr-c"
+  - "audit-2026-09-23"
+  - "changesets"
+source: "0.7.1 release audit 2026-09-23 (main @ ee165780); carried by PR C at the owner's request"
+acceptanceCriteria:
+  - "preserve-tree-meta-keys-and-refuse-missing-marker.md says trees written by 0.5.2 and later are adopted, and that trees from 0.5.1 and earlier are refused until rex migrate-slugs runs."
+  - "slug-rule-guard.ts:42-44 and folder-tree-serializer.ts:584 name 0.5.2 as the first release with the current rule, and a grep finds no other source comment claiming 0.5.1."
+  - "per-model-cost-pricing.md gives the rise as about half (+54% on the baseline batch, up to about two thirds for Opus-heavy projects) and no longer says 'about a third'."
+  - "per-model-cost-pricing.md lists @n-dx/core as a patch, so the note appears in core's 0.7.1 changelog; pnpm changeset status still shows six patch bumps."
+  - "No other existing changeset is edited."
+description: "Two release-note errors found by the 0.7.1 release audit, plus two source comments that repeat one of them. Filed under Hench commit hygiene because PR C carries it; it changes no hench code.\n\n1. `.changeset/preserve-tree-meta-keys-and-refuse-missing-marker.md` line 43 says trees \"written by 0.5.1 and later already follow the current rule and are adopted\". That is false for 0.5.1: cf13a6b3 (shipped in 0.5.1) appended an `-{id6}` suffix to every slug, and the `@n-dx/core@0.5.1` tag's tree shows it (`cli-developer-tools-021e30/`). The current rule (4e0ca1c4) first shipped in 0.5.2, whose tree has no suffixes. The code is right — 0.5.1 trees are refused and `rex migrate-slugs` really renames them — but the note, and the comments at `packages/rex/src/store/slug-rule-guard.ts:42-44` and `packages/rex/src/store/folder-tree-serializer.ts:584`, name the wrong release.\n\n2. `.changeset/per-model-cost-pricing.md` line 9 says reported costs rise \"typically by about a third\". Its own example goes from $161.08 (flat Sonnet) to $247.53 (per model), which is +54%; its second example, $124 to $186, is +50%. About 35% is how much the old figure under-reported, not how much the new one rises. The changeset lists only `@n-dx/llm-client`, `@n-dx/rex` and `@n-dx/web`, so the headline `@n-dx/core@0.7.1` GitHub release (built from core's changelog) will not carry the note.\n\nThis is the one PR C task allowed to edit existing changesets. The docs PR's final changeset pass reviews everything else."
+lastModified: "2026-09-23T18:39:22.514Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

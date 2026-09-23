@@ -22,8 +22,13 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add ndx claim to list and release cross-worktree task claims](./add-ndx-claim-to-list-and-release.md) | in_progress |
-| [Hold the task claim when the uncommitted-work gate refuses completion](./hold-the-task-claim-when-the.md) | in_progress |
+| [Add ndx claim to list and release cross-worktree task claims](./add-ndx-claim-to-list-and-release.md) | completed |
+| [Carry the hold reason into the dashboard claims payload and the Execute 409](./carry-the-hold-reason-into-the.md) | pending |
+| [Dispose the dashboard's per-worktree run watchers when a worktree is removed](./dispose-the-dashboard-s-per-worktree.md) | pending |
+| [Hold the task claim when the uncommitted-work gate refuses completion](./hold-the-task-claim-when-the.md) | completed |
+| [Keep a held claim until it is released, or say in the refusal when the hold lapses](./keep-a-held-claim-until-it-is-released.md) | pending |
+| [Make ndx claim resolve .rex in the directory it is given](./make-ndx-claim-resolve-rex-in-the.md) | pending |
 | [Make the dashboard next-task read skip live claims so it matches Execute](./make-the-dashboard-next-task-read-skip.md) | pending |
 | [Offer only validated, path-scoped recovery commands after an uncommitted-work refusal](./offer-only-validated-path-scoped.md) | pending |
-| [Surface a claim lost mid-run in the Sessions tray](./surface-a-claim-lost-mid-run-in-the.md) | in_progress |
+| [Prove the uncommitted-work refusal in finalizeRun holds the claim](./prove-the-uncommitted-work-refusal-in.md) | pending |
+| [Surface a claim lost mid-run in the Sessions tray](./surface-a-claim-lost-mid-run-in-the.md) | completed |
