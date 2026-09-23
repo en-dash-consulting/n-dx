@@ -29,6 +29,7 @@ Which rules are enforced, where, and how. Prevents duplicate or conflicting enfo
 | Assistant instruction drift | `tests/e2e/assistant-body-drift.test.js` | `CLAUDE.md` / `AGENTS.md` must equal the generator output from `packages/core/assistant-assets/` | Test failure |
 | Catalog ↔ runtime model defaults | `tests/e2e/catalog-runtime-contract.test.js` | `llm-model-catalog.js` recommended model equals `DEFAULT_CLAUDE_MODEL` / `DEFAULT_CODEX_MODEL` | Test failure |
 | Primer fingerprint across tiers | `tests/integration/primer-fingerprint-contract.test.js` | sourcevision `primerFingerprint`, core `sourcevisionAnalysisFingerprint`, and hench `sourcevisionFingerprint` produce identical values | Test failure |
+| Hook budget ≥ test budget | `tests/unit/vitest-timeout-policy.test.js` | Every vitest config that raises `testTimeout` raises `hookTimeout` to at least the same value | Test failure |
 
 ## Configuration
 

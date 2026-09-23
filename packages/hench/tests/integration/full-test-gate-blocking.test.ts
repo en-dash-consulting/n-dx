@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { initGitFixtureRepoSync } from "../helpers/index.js";
+import { initGitFixtureRepoSync, RM_RETRY } from "../helpers/index.js";
 
 describe("Full Test Suite Gate Blocking Integration", () => {
   let projectDir: string;
@@ -52,7 +52,7 @@ describe("Full Test Suite Gate Blocking Integration", () => {
   });
 
   afterEach(async () => {
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("test gate result structure is present", async () => {

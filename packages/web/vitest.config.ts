@@ -38,5 +38,15 @@ export default defineConfig({
           "tests/integration/ws-health-integration.test.ts",
         ]
       : [],
+    // Matches hench, rex and sourcevision, which raised these for the same
+    // reason: server and worktree fixtures bind ports and spawn git, and on the
+    // Windows CI runner process creation plus on-access AV scanning multiplies
+    // their cost by roughly an order of magnitude. This suite was still on
+    // Vitest's 5s/10s defaults and has failed that job (run 35761150216), so it
+    // gets the same budget rather than the tightest one in the monorepo.
+    // hookTimeout is never below testTimeout: a setup hook always gets at least
+    // as long as the test it prepares.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
 });

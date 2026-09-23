@@ -16,7 +16,7 @@ import type { PRDItem } from "@n-dx/rex";
 import { openClaimsStore, resolveClaimHolder } from "@n-dx/rex";
 import { assembleTaskBrief, getActionableTasks } from "../../src/agent/planning/brief.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../src/process/task-claims.js";
-import { mockStoreWithDefaults } from "../helpers/index.js";
+import { mockStoreWithDefaults, RM_RETRY } from "../helpers/index.js";
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync(
@@ -64,7 +64,7 @@ beforeAll(() => {
 
 afterAll(() => {
   for (const c of children) c.kill();
-  rmSync(root, { recursive: true, force: true });
+  rmSync(root, { recursive: true, force: true, ...RM_RETRY });
 });
 
 afterEach(() => {

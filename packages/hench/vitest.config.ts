@@ -30,5 +30,11 @@ export default defineConfig({
     // on their own. Under full-monorepo parallel load (pnpm -r test) the first
     // module-load per worker can push past 5 s, causing spurious timeouts.
     testTimeout: 30_000,
+    // Never below testTimeout. Vitest defaults hookTimeout to 10s, which gave a
+    // beforeEach a third of the budget of the test it prepares. These hooks run
+    // mkdtemp plus initGitFixtureRepo's git init/add/commit as subprocesses; on
+    // a loaded Windows CI runner that exceeds 10s, which is what produced
+    // "Hook timed out in 10000ms" in the integration suites.
+    hookTimeout: 30_000,
   },
 });

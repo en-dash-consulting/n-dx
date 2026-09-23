@@ -10,7 +10,7 @@ import { initConfig } from "../../src/store/config.js";
 import { finalizeRun, quarantinePendingCommitMessage } from "../../src/agent/lifecycle/shared.js";
 import { startCommitMsgWatcher } from "../../src/agent/lifecycle/commit-msg-watcher.js";
 import type { RunRecord } from "../../src/schema/index.js";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 const SENTINEL = ".hench-commit-msg.txt";
@@ -46,7 +46,7 @@ describe("stale .hench-commit-msg.txt quarantine", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   function makeRun(overrides: Partial<RunRecord> = {}): RunRecord {

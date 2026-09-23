@@ -20,7 +20,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
-import { initGitFixtureRepo } from "../../../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../../../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -61,7 +61,7 @@ describe("startCommitMsgWatcher — timeout handler branches", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("empty file: deletes the file and skips the commit", async () => {

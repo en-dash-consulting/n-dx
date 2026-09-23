@@ -21,5 +21,8 @@ export default defineConfig({
     setupFiles: ["../../tests/setup-color-env.js", "../../tests/setup-session-env.js"],
     include: ["tests/**/*.test.ts"],
     testTimeout: 30000,
+    // Never below testTimeout — Vitest's 10s default would give a setup hook
+    // less time than the test it prepares. See the root vitest.config.js.
+    hookTimeout: 30000,
   },
 });

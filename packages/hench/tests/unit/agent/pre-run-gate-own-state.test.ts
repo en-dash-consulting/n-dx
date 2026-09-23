@@ -34,6 +34,7 @@ import {
   excludeHenchRuntimeArtifacts,
   HENCH_RUNTIME_GITIGNORE_ENTRIES,
 } from "../../../src/store/artifacts.js";
+import { RM_RETRY } from "../../helpers/index.js";
 
 /** Porcelain lines as `git status --porcelain` would emit them. */
 const OWN_STATE = [
@@ -118,7 +119,7 @@ describe("the gate against a real git repository", () => {
   const dirs: string[] = [];
 
   afterEach(() => {
-    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true, ...RM_RETRY });
   });
 
   /** A committed repo with hench's startup lock present and NOT gitignored. */
@@ -187,7 +188,7 @@ describe("the gate when hench lives below the repository root", () => {
   const dirs: string[] = [];
 
   afterEach(() => {
-    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true, ...RM_RETRY });
   });
 
   /**

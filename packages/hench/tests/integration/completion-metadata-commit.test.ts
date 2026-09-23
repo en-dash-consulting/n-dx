@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
 import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -71,7 +71,7 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("commits .rex/prd_tree metadata on autoCommit path, leaving working tree clean", async () => {
@@ -311,7 +311,7 @@ describe("commitCompletionMetadata — execution log gitignored per rex init (Bu
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("lands the completion commit instead of aborting on the ignored log", async () => {
