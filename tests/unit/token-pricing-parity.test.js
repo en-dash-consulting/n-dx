@@ -4,20 +4,23 @@
  * Token aggregation exists twice: `packages/rex/src/core/token-usage.ts` backs
  * both CLI surfaces (they share `formatAggregateTokenUsage`, so they agree by
  * construction), and `packages/web/src/server/routes-token-usage.ts` is a
- * standalone copy for the dashboard.
+ * standalone aggregation for the dashboard — it carries a `web` bucket for Ask
+ * spend that rex's shape does not model.
  *
- * This used to compare two hand-written `DEFAULT_PRICING` literals against each
- * other. That guarded drift but institutionalised the duplication, and it could
- * only ever pin a single Sonnet-shaped rate — the moment pricing became
- * per-model there was no single literal left to compare. Both surfaces now
- * resolve rates from one foundation-tier table
- * (`packages/llm-client/src/config.ts` → `MODEL_COSTS`, exposed through
- * `model-pricing.ts`), so what needs guarding is that neither reintroduces a
- * local copy.
+ * The pricing, however, exists once. This file used to pin only that both
+ * surfaces resolved rates from the shared table
+ * (`packages/llm-client/src/config.ts` → `MODEL_COSTS`); when pricing became
+ * per-model that stopped being enough — two copies of the *arithmetic* (bucket
+ * loop, labelled fallback for unknown ids, clamped unattributed residual) can
+ * drift just as silently as two copies of a rate table did. So the arithmetic
+ * lives in rex (`estimateCostFromTotals`) and the dashboard imports it through
+ * its rex gateway rather than keeping a loop of its own.
  *
- * It reads source rather than importing, because the web copy is
- * module-private and rex's is not on the package's public API — neither is
- * reachable from a test without widening a surface for the test's benefit.
+ * This reads source rather than importing because what it guards is the
+ * *absence* of a local copy — a property of the text, not of any value the
+ * modules export. The value-level parity (same fixture, same dollar figure to
+ * the cent) is pinned by
+ * `packages/web/tests/unit/server/token-usage-per-model-parity.test.ts`.
  */
 
 import { describe, it, expect } from "vitest";
@@ -27,6 +30,7 @@ import { join } from "node:path";
 const ROOT = join(import.meta.dirname, "../..");
 const REX_SRC = join(ROOT, "packages/rex/src/core/token-usage.ts");
 const WEB_SRC = join(ROOT, "packages/web/src/server/routes-token-usage.ts");
+const WEB_GATEWAY = join(ROOT, "packages/web/src/server/rex-gateway.ts");
 const SHARED_TABLE = join(ROOT, "packages/llm-client/src/config.ts");
 const SHARED_PRICING = join(ROOT, "packages/llm-client/src/model-pricing.ts");
 
@@ -49,28 +53,42 @@ describe("token pricing parity between the CLI and the dashboard", () => {
     }
   });
 
-  it("both surfaces take their fallback rates from the shared table", () => {
-    for (const [name, file] of COST_SURFACES) {
-      const src = readFileSync(file, "utf-8");
-      expect(src, `${name} does not import the shared fallback`).toContain(
-        "FALLBACK_MODEL_PRICING",
-      );
-      expect(src, `${name} does not import from @n-dx/llm-client`).toContain(
-        "@n-dx/llm-client",
-      );
-    }
+  it("rex holds the one copy of the per-model arithmetic", () => {
+    const src = readFileSync(REX_SRC, "utf-8");
+    expect(src).toContain("export function estimateCostFromTotals");
+    // The arithmetic prices every bucket at its resolved rates, all four kinds.
+    expect(src).toContain("resolveModelPricing");
+    expect(src).toContain("priceTokens");
+    expect(src).toContain("cacheWriteCost");
+    expect(src).toContain("cacheReadCost");
+    // Rates come from the shared table, not a local literal.
+    expect(src).toContain("FALLBACK_MODEL_PRICING");
+    expect(src).toContain("@n-dx/llm-client");
   });
 
-  it("both surfaces price all four token kinds through the shared helper", () => {
-    // Guards the arithmetic, not just the constants: a correct table is no use
-    // if a surface still adds only two of the four terms.
+  it("the dashboard imports the arithmetic instead of keeping a copy", () => {
+    const src = readFileSync(WEB_SRC, "utf-8");
+    // It delegates…
+    expect(src).toContain("estimateCostFromTotals");
+    // …through the gateway, not by importing rex directly…
+    expect(src).toContain('from "./rex-gateway.js"');
+    expect(readFileSync(WEB_GATEWAY, "utf-8")).toContain("estimateCostFromTotals");
+    // …and holds no pricing of its own: no rate lookups, no multiplication.
+    expect(src, "web re-grew a local pricing loop").not.toContain("resolveModelPricing");
+    expect(src, "web re-grew a local pricing call").not.toContain("priceTokens");
+    expect(src, "web re-grew a local fallback rate").not.toContain("FALLBACK_MODEL_PRICING");
+  });
+
+  it("both aggregations attribute models under the same rule", () => {
+    // The arithmetic being shared is not enough if the two aggregations
+    // disagree about which tokens are attributed: a surface that buckets
+    // blank/"unknown" ids would price them at the fallback *silently* instead
+    // of on the labelled unattributed line.
     for (const [name, file] of COST_SURFACES) {
       const src = readFileSync(file, "utf-8");
-      expect(src, `${name} does not use the shared priceTokens`).toContain("priceTokens");
-      const fn = /function estimateCost[\s\S]*?\n\}/.exec(src);
-      expect(fn, `${name}: estimateCost not found`).not.toBeNull();
-      expect(fn[0], `${name}: estimateCost ignores cache writes`).toContain("cacheWriteCost");
-      expect(fn[0], `${name}: estimateCost ignores cache reads`).toContain("cacheReadCost");
+      expect(src, `${name} lost the placeholder-model guard`).toMatch(
+        /if \(!key \|\| key === "unknown"\) return;/,
+      );
     }
   });
 

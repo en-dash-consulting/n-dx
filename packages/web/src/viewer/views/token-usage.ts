@@ -66,6 +66,26 @@ interface AggregateTokenUsage {
   totalCacheCreationTokens?: number;
   totalCacheReadTokens?: number;
   totalCalls: number;
+  /** Tokens split by the model that spent them. Absent from older servers. */
+  byModel?: Record<string, {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationTokens?: number;
+    cacheReadTokens?: number;
+  }>;
+}
+
+/** One model's contribution to the bill, as rex's `ModelCostLine` sends it. */
+interface ModelCostLine {
+  model: string;
+  /** The catalog model whose rates were applied ("priced as X" when guessed). */
+  pricedAs: string;
+  /** False when the id had no price-table entry and fallback rates were used. */
+  known: boolean;
+  /** True for the synthetic line covering tokens with no model attribution. */
+  unattributed: boolean;
+  tokens: number;
+  totalRaw: number;
 }
 
 interface CostEstimate {
@@ -75,6 +95,9 @@ interface CostEstimate {
   outputCost: number;
   cacheWriteCost?: number;
   cacheReadCost?: number;
+  /** Per-model contribution, most expensive first. Absent from older servers. */
+  byModel?: ModelCostLine[];
+  fullyAttributed?: boolean;
 }
 
 interface CommandTokenUsage extends PackageTokenUsage {
@@ -152,6 +175,36 @@ interface ItemUsageRow extends ItemUsageRollupWire {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Token counts behind the cost estimate's "unattributed" line: the totals
+ * minus every per-model bucket, clamped at zero the way the server clamps its
+ * residual. The server sends only the line's cost, not its per-kind split, so
+ * the table derives it from the same numbers the server used.
+ */
+function unattributedResidual(usage: AggregateTokenUsage): {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+} {
+  let input = 0;
+  let output = 0;
+  let cacheWrite = 0;
+  let cacheRead = 0;
+  for (const bucket of Object.values(usage.byModel ?? {})) {
+    input += bucket.inputTokens;
+    output += bucket.outputTokens;
+    cacheWrite += bucket.cacheCreationTokens ?? 0;
+    cacheRead += bucket.cacheReadTokens ?? 0;
+  }
+  return {
+    inputTokens: Math.max(0, usage.totalInputTokens - input),
+    outputTokens: Math.max(0, usage.totalOutputTokens - output),
+    cacheCreationTokens: Math.max(0, (usage.totalCacheCreationTokens ?? 0) - cacheWrite),
+    cacheReadTokens: Math.max(0, (usage.totalCacheReadTokens ?? 0) - cacheRead),
+  };
+}
 
 function fmtTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -900,7 +953,58 @@ export function TokenUsageView() {
         )
       : null,
 
-    // Cost breakdown
+    // Cost by model — each model priced at its own rates, matching `ndx usage`.
+    cost && usage && (cost.byModel?.length ?? 0) > 0
+      ? h("div", { class: "token-section" },
+          h("h3", null, "Cost by Model"),
+          h("div", { class: "token-table-wrapper" },
+            h("table", { class: "token-table" },
+              h("thead", null,
+                h("tr", null,
+                  h("th", null, "Model"),
+                  h("th", { class: "num" }, "Input"),
+                  h("th", { class: "num" }, "Output"),
+                  h("th", { class: "num" }, "Cache write"),
+                  h("th", { class: "num" }, "Cache read"),
+                  h("th", { class: "num" }, "Cost"),
+                ),
+              ),
+              h("tbody", null,
+                (cost.byModel ?? []).map((line) => {
+                  const bucket = line.unattributed
+                    ? unattributedResidual(usage)
+                    : usage.byModel?.[line.model];
+                  // A guessed rate must never read as a measured one.
+                  const label = line.known
+                    ? line.model
+                    : `${line.unattributed ? "unattributed" : line.model} · priced as ${line.pricedAs}`;
+                  return h("tr", { key: line.model },
+                    h("td", null, label),
+                    h("td", { class: "num" }, fmtTokens(bucket?.inputTokens ?? 0)),
+                    h("td", { class: "num" }, fmtTokens(bucket?.outputTokens ?? 0)),
+                    h("td", { class: "num" }, fmtTokens(bucket?.cacheCreationTokens ?? 0)),
+                    h("td", { class: "num" }, fmtTokens(bucket?.cacheReadTokens ?? 0)),
+                    h("td", { class: "num" }, `$${line.totalRaw.toFixed(2)}`),
+                  );
+                }),
+              ),
+              h("tfoot", null,
+                h("tr", { class: "cost-total" },
+                  h("td", null, "Total estimated"),
+                  h("td", { class: "num" }, fmtTokens(usage.totalInputTokens)),
+                  h("td", { class: "num" }, fmtTokens(usage.totalOutputTokens)),
+                  h("td", { class: "num" }, fmtTokens(usage.totalCacheCreationTokens ?? 0)),
+                  h("td", { class: "num" }, fmtTokens(usage.totalCacheReadTokens ?? 0)),
+                  h("td", { class: "num" }, cost.total),
+                ),
+              ),
+            ),
+          ),
+        )
+      : null,
+
+    // Cost breakdown by token kind. No per-million rates are named here: with
+    // per-model pricing there is no single rate behind any of these lines.
     cost && usage
       ? h("div", { class: "token-section" },
           h("h3", null, "Cost Breakdown"),
@@ -908,24 +1012,22 @@ export function TokenUsageView() {
             h("div", { class: "cost-item" },
               h("span", { class: "cost-label" }, "Input tokens"),
               h("span", { class: "cost-value" }, `$${cost.inputCost.toFixed(4)}`),
-              h("span", { class: "cost-detail" }, `${fmtNumber(usage.totalInputTokens)} tokens @ $3/M`),
+              h("span", { class: "cost-detail" }, `${fmtNumber(usage.totalInputTokens)} tokens`),
             ),
             h("div", { class: "cost-item" },
               h("span", { class: "cost-label" }, "Output tokens"),
               h("span", { class: "cost-value" }, `$${cost.outputCost.toFixed(4)}`),
-              h("span", { class: "cost-detail" }, `${fmtNumber(usage.totalOutputTokens)} tokens @ $15/M`),
+              h("span", { class: "cost-detail" }, `${fmtNumber(usage.totalOutputTokens)} tokens`),
             ),
-            // Priced by the server all along; the breakdown simply never named
-            // them, so the line items did not add up to the total beneath them.
             h("div", { class: "cost-item" },
               h("span", { class: "cost-label" }, "Cache writes"),
               h("span", { class: "cost-value" }, `$${(cost.cacheWriteCost ?? 0).toFixed(4)}`),
-              h("span", { class: "cost-detail" }, `${fmtNumber(usage.totalCacheCreationTokens ?? 0)} tokens @ $3.75/M`),
+              h("span", { class: "cost-detail" }, `${fmtNumber(usage.totalCacheCreationTokens ?? 0)} tokens`),
             ),
             h("div", { class: "cost-item" },
               h("span", { class: "cost-label" }, "Cache reads"),
               h("span", { class: "cost-value" }, `$${(cost.cacheReadCost ?? 0).toFixed(4)}`),
-              h("span", { class: "cost-detail" }, `${fmtNumber(usage.totalCacheReadTokens ?? 0)} tokens @ $0.30/M`),
+              h("span", { class: "cost-detail" }, `${fmtNumber(usage.totalCacheReadTokens ?? 0)} tokens`),
             ),
             h("div", { class: "cost-item cost-total" },
               h("span", { class: "cost-label" }, "Total estimated"),

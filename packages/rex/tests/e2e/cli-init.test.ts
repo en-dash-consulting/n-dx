@@ -6,7 +6,11 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { RexConfigSchema } from "../../src/schema/validate.js";
 import { SCHEMA_VERSION, DEFAULT_CONFIG } from "../../src/schema/v1.js";
-import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
+import {
+  PRD_TREE_DIRNAME,
+  TREE_META_FILENAME,
+  SLUG_RULE_VERSION,
+} from "../../src/store/index.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -18,11 +22,17 @@ const cliPath = join(
   "index.js",
 );
 
-function run(args: string[]): string {
-  return execFileSync("node", [cliPath, ...args], {
-    encoding: "utf-8",
-    timeout: 10000,
-  });
+function run(args: string[], expectFail = false): string {
+  try {
+    return execFileSync("node", [cliPath, ...args], {
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+  } catch (err: unknown) {
+    if (!expectFail) throw err;
+    const e = err as { stderr?: string; stdout?: string };
+    return (e.stderr ?? "") + (e.stdout ?? "");
+  }
 }
 
 describe("rex init", () => {
@@ -124,6 +134,40 @@ describe("rex init", () => {
     );
     expect(treeIndex).toContain(`# ${config.project}`);
     expect(treeIndex).toContain("rex add epic");
+  });
+
+  // A tree with no slug-rule marker is refused by every writer, so a new
+  // project has to reach its first save without one. It does, because an empty
+  // tree has nothing a marker could be wrong about — and that first save is
+  // what records it. Init itself writes no sidecar: its presence is what tells
+  // the store the tree is canonical, and asserting that over an empty tree
+  // would orphan a legacy PRD arriving behind it.
+  it("leaves a new project able to write, and the first write records the marker", async () => {
+    run(["init", tmpDir]);
+
+    const metaPath = join(tmpDir, ".rex", TREE_META_FILENAME);
+    await expect(access(metaPath)).rejects.toThrow();
+
+    // The first real write goes through rather than being refused …
+    expect(() => run(["add", "epic", tmpDir, "--title=First Epic"])).not.toThrow();
+
+    // … and arms the guard for every writer after it.
+    const meta = JSON.parse(await readFile(metaPath, "utf-8"));
+    expect(meta.slugRule).toBe(SLUG_RULE_VERSION);
+  });
+
+  // The other half: once the tree has items, a missing marker is a refusal
+  // rather than something the next writer quietly adopts.
+  it("refuses a write once the marker is gone from a tree that has items", async () => {
+    run(["init", tmpDir]);
+    run(["add", "epic", tmpDir, "--title=First Epic"]);
+
+    // Exactly what a build older than the marker left behind: the record gone,
+    // the tree untouched and still full of items.
+    await rm(join(tmpDir, ".rex", TREE_META_FILENAME));
+
+    const output = run(["add", "epic", tmpDir, "--title=Second Epic"], true);
+    expect(output).toContain("slug rule marker missing; run rex migrate-slugs");
   });
 
   it("creates empty execution-log.jsonl", async () => {

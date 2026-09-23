@@ -14,8 +14,10 @@ import {
   findNonConformingSlugs,
   findTreeIdentityFaults,
   readSlugRuleMarker,
+  parseFolderTree,
   PRD_TREE_DIRNAME,
   SLUG_RULE_VERSION,
+  SLUG_RULE_MARKER_MISSING,
 } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { REX_DIR } from "./constants.js";
@@ -299,6 +301,42 @@ export async function cmdValidate(
           `Tree was written under slug rule ${slugRuleMarker}, but this build implements slug rule ${SLUG_RULE_VERSION}.`,
           `Every write from this build would rewrite every path. Run rex migrate-slugs on the default branch, ` +
             `or use a rex build that implements rule ${slugRuleMarker}.`,
+        ],
+      });
+    }
+
+    // Absent marker. Reported as an error rather than adopted, for the reason
+    // spelled out in `slug-rule-guard.ts`: a build older than the field erases
+    // the marker without moving a path, so absence is as likely to be a
+    // disarmed guard as an old tree. This check is what makes the store's
+    // refusal reviewable — a tree that no longer says who wrote it fails CI
+    // here rather than surfacing as a refused save mid-run.
+    //
+    // Guarded on the items **the folder tree itself holds**, not on
+    // `doc.items`, and the difference is the whole correctness of this check.
+    // `doc` may have been loaded from a legacy `prd.md` or a branch-scoped
+    // file, which `ensureLegacyPrdMigrated` above only converts when the
+    // source is `prd.json` — so a project still on `prd.md` reaches here with
+    // items and no tree at all. Judged by `doc.items` it failed validation and
+    // was told to run `rex migrate-slugs`, which refuses a project with no
+    // tree: an error with no way out of it, on a checkout that had nothing
+    // wrong with it.
+    //
+    // Reading the tree makes the predicate identical to the store guard's, so
+    // validate is a faithful preview of what the next write will do rather
+    // than a second opinion that can disagree with it.
+    const { items: treeItems } = await parseFolderTree(join(dir, REX_DIR, PRD_TREE_DIRNAME));
+    if (slugRuleMarker === undefined && treeItems.length > 0) {
+      checks.push({
+        name: "tree slug rule marker",
+        pass: false,
+        severity: "error",
+        errors: [
+          `The PRD tree carries no slug-rule marker — ${SLUG_RULE_MARKER_MISSING}.`,
+          `An absent marker no longer adopts silently: a rex build older than the marker ` +
+            `rewrites tree-meta.json without it, erasing the record while moving no path, ` +
+            `so this tree may be one whose guard was disarmed rather than one that predates it. ` +
+            `rex migrate-slugs re-records the marker after bringing every path onto rule ${SLUG_RULE_VERSION}.`,
         ],
       });
     }
