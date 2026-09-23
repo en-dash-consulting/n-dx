@@ -431,3 +431,68 @@ describe("TaskClaims.hold", () => {
     await second.releaseAll();
   });
 });
+
+// ── Claim lost mid-run (0.7.1 PR F) ─────────────────────────────────────────
+//
+// Renewal noticing a takeover is the only moment anything learns about it, and
+// the run deliberately carries on. So the event has to be emitted there, or it
+// is not recorded anywhere at all.
+
+describe("TaskClaims claim-lost events", () => {
+  function clocked(worktree: string, now: () => number): TaskClaims {
+    const base = TaskClaims.forProject(worktree);
+    return new TaskClaims(openClaimsStore(worktree, { now }), base.holder);
+  }
+
+  it("emits the takeover, naming the task and the worktree that now holds it", async () => {
+    let nowMs = Date.parse("2026-01-01T00:00:00.000Z");
+    const mine = clocked(wtA, () => nowMs);
+    await mine.claim("t-high");
+
+    const seen: Array<{ taskId: string; holderWorktree: string; at: string }> = [];
+    mine.onClaimLost = (e) => seen.push(e);
+
+    nowMs += 5 * 60 * 60 * 1000;
+    const b = holderIn(wtB);
+    expect(await b.claim("t-high")).toBeNull();
+
+    await mine.renewNow();
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ taskId: "t-high", holderWorktree: b.holder.worktreeRoot });
+    expect(Number.isFinite(Date.parse(seen[0]!.at))).toBe(true);
+    // Also kept on the instance, so a caller that attached no listener can
+    // still find out afterwards.
+    expect(mine.claimLost).toMatchObject({ taskId: "t-high" });
+  });
+
+  it("says nothing when renewal succeeds", async () => {
+    const mine = TaskClaims.forProject(wtA);
+    await mine.claim("t-high");
+    const seen: unknown[] = [];
+    mine.onClaimLost = (e) => seen.push(e);
+
+    await mine.renewNow();
+
+    expect(seen).toEqual([]);
+    expect(mine.claimLost).toBeNull();
+    await mine.releaseAll();
+  });
+
+  it("keeps refreshing the rest when a listener throws", async () => {
+    let nowMs = Date.parse("2026-01-01T00:00:00.000Z");
+    const mine = clocked(wtA, () => nowMs);
+    await mine.claim("t-high");
+    await mine.claim("t-low");
+    mine.onClaimLost = () => { throw new Error("listener blew up"); };
+
+    nowMs += 5 * 60 * 60 * 1000;
+    const b = holderIn(wtB);
+    await b.claim("t-high");
+
+    // Must not reject, and t-low must survive the pass.
+    await expect(mine.renewNow()).resolves.toBeUndefined();
+    expect(mine.held.has("t-high")).toBe(false);
+    expect(mine.held.has("t-low")).toBe(true);
+  });
+});

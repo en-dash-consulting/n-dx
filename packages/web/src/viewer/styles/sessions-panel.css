@@ -232,3 +232,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* A run whose task another worktree took over mid-run. The run is still
+   going, so this sits beside its line rather than replacing it. */
+.sessions-claim-lost {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--font-sm);
+  color: var(--orange);
+  margin-top: var(--space-1);
+}
+
+.sessions-claim-lost-icon {
+  flex: none;
+}

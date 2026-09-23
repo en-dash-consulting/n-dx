@@ -97,6 +97,7 @@ import {
   captureBaselineUntracked,
   runReviewGate,
   finalizeRun,
+  recordClaimLoss,
   handleRunFailure,
   formatModelLabel,
 } from "./shared.js";
@@ -1881,6 +1882,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // subprocess doesn't appear stale to the web dashboard during long tool calls,
   // and carries the in-flight spawn's turns and tokens so the dashboard does not
   // read a busy run as an idle one (GH #362).
+  recordClaimLoss(opts.claims, run, henchDir);
   const heartbeat = startHeartbeat(henchDir, run, undefined, () => {
     run.turns = accumulated.turns + liveProgress.turns;
     run.tokenUsage = addTokenUsage(accumulated.tokenUsage, liveProgress.tokenUsage);
