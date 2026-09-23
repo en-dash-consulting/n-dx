@@ -1083,8 +1083,13 @@ describe("writtenPaths and deletedPaths", () => {
     const relWritten = result.writtenPaths.map((p) => relative(testDir, p).split(sep).join("/"));
     expect(relWritten.sort()).toEqual(["epic/index.md", "epic/task-a.md"]);
     expect(result.deletedPaths).toEqual([]);
-    // The written files' own clock, for the store's post-save loadedAt.
-    expect(result.maxWrittenMtimeMs).toBeGreaterThan(0);
+    // The written files' own clock, for the store's post-save loadedAt —
+    // exactly the largest mtime among the files this call wrote, not a
+    // wall-clock reading.
+    const writtenMtimes = await Promise.all(
+      result.writtenPaths.map(async (p) => (await stat(p)).mtimeMs),
+    );
+    expect(result.maxWrittenMtimeMs).toBe(Math.max(...writtenMtimes));
   });
 
   it("reports nothing written when content is unchanged (writeIfChanged skip)", async () => {
