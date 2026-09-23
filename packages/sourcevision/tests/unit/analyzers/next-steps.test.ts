@@ -132,6 +132,22 @@ describe("deriveNextSteps", () => {
     expect(result[0].relatedFindings.length).toBeGreaterThan(result[1].relatedFindings.length);
   });
 
+  it("drops the metric detail after an em-dash from the title but keeps it in the description", () => {
+    const findings = [
+      makeFinding({
+        severity: "warning",
+        type: "suggestion",
+        scope: "fragile-zone",
+        text: "Zone \"Fragile\" is fragile and needs refactoring — cohesion: 0.20, coupling: 0.80 (risk score: 0.65)",
+      }),
+    ];
+    const result = deriveNextSteps(makeZones(findings));
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("Zone \"Fragile\" is fragile and needs refactoring");
+    expect(result[0].title).not.toContain("cohesion");
+    expect(result[0].description).toContain("cohesion: 0.20, coupling: 0.80");
+  });
+
   it("truncates long text in titles", () => {
     const longText = "A".repeat(100);
     const findings = [

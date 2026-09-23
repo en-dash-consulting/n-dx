@@ -443,8 +443,8 @@ async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
         const existingFindings = (zonesData.findings ?? []).filter(
           (f: { pass: number; text: string }) =>
             !(f.pass === 0 && (
-              f.text.includes("risk (score:") ||
-              f.text.includes("exceed architectural risk thresholds")
+              f.text.includes("(risk score:") ||
+              f.text.includes("zones are fragile")
             )),
         );
         zonesData.findings = enforceSeverityRules(

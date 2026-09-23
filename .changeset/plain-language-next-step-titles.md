@@ -2,23 +2,29 @@
 "@n-dx/sourcevision": patch
 ---
 
-fix(sourcevision): lead Next Steps and Problems titles with plain language, not the metric
+Lead Next Steps and Problems titles with plain language, not the metric.
 
-Generated Next Step titles read metric-first ("Low cohesion (0.2) — files are
-loosely related, consider splitting this zone") because the same
-`Finding.text` also backs CONTEXT.md and llms.txt, where a number up front is
-the point. Read standalone in the dashboard, that reads as jargon before
-context — an outside first-use review couldn't tell what the finding meant
-without opening a detail panel.
+Findings and their Next Step titles read metric-first — "Zone X has critical
+risk (score: 0.65, cohesion: 0.30, coupling: 0.70) — requires refactoring…",
+"N zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6):
+…", "Low cohesion (0.2) — files are loosely related…" — and the 80-character
+title truncation could cut a title off mid-metric, hiding the explanation. An
+outside first-use review could not tell what a finding meant without opening
+its detail.
 
-`next-steps.ts`'s title templates now strip a recognized "<Metric label>
-(<value>) —" or "<Metric label>:" lead via `plainLanguageLead()` and title on
-the plain-language remainder instead; a grouped Next Step states the group's
-count before that lead ("2 related findings: ...") rather than appending
-"(+N related)" after the raw text. `Finding.text` itself is untouched — it
-still becomes `NextStep.description`, unabridged — so CONTEXT.md and
-llms.txt keep exactly the same structure and the same underlying text; only
-the Next Step / Problems title wording changes. Free-form (AI-authored)
-finding text without a recognized metric prefix passes through unchanged.
+- Architectural-risk findings (`risk-scoring.ts`) now lead with the problem
+  ("Zone X is fragile and needs refactoring before new feature development",
+  "N zones are fragile: they hold loosely related files and depend heavily on
+  other zones") and put the cohesion, coupling and score numbers after an
+  em-dash. The Problems view, CONTEXT.md and llms.txt show this new wording.
+- Next Step titles drop any trailing metric clause after an em-dash, and
+  strip a leading "<Metric label> (<value>) —" or "<Metric label>:" prefix
+  from findings that still start with one, so a title is plain language even
+  when truncated. The full finding text, metric included, is still the Next
+  Step's description.
+- A grouped Next Step states its count first ("2 related findings: …")
+  instead of appending "(+N related)".
 
-No change to the findings or next-steps JSON shape.
+The findings and next-steps JSON shapes, and the CONTEXT.md and llms.txt
+section structure, are unchanged; only wording changed. Anything that matched
+on the old risk-finding wording should match on the new text.

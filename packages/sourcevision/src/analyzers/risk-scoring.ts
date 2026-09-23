@@ -350,10 +350,10 @@ export function assessAllZoneRisks(
       pass: 0,
       scope: "global",
       text:
-        `${failingZones.length} zones exceed architectural risk thresholds ` +
-        `(cohesion < ${RISK_THRESHOLDS.cohesionFloor}, coupling > ${RISK_THRESHOLDS.couplingCeiling}): ` +
-        `${failingZones.map(({ zone }) => zone.id).join(", ")} — ` +
-        `mandatory refactoring recommended before further development`,
+        `${failingZones.length} zones are fragile: they hold loosely related files and depend heavily on other zones ` +
+        `— mandatory refactoring recommended before further development ` +
+        `(${failingZones.map(({ zone }) => zone.id).join(", ")}; ` +
+        `cohesion < ${RISK_THRESHOLDS.cohesionFloor}, coupling > ${RISK_THRESHOLDS.couplingCeiling})`,
       severity: "warning",
       related: failingZones.map(({ zone }) => zone.id),
     });
@@ -364,36 +364,38 @@ export function assessAllZoneRisks(
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatZoneFinding(zone: Zone, risk: ZoneRiskMetrics): string {
-  const level = risk.riskLevel;
-  const action =
-    level === "catastrophic"
-      ? "requires immediate architectural intervention"
-      : level === "critical"
-        ? "requires refactoring before new feature development"
-        : "approaching architectural risk thresholds";
+/** Plain-language statement of what is wrong with a zone, before any metric. */
+function riskStatement(zoneName: string, level: ZoneRiskMetrics["riskLevel"]): string {
+  switch (level) {
+    case "catastrophic":
+      return `Zone "${zoneName}" is severely fragile and needs immediate architectural intervention`;
+    case "critical":
+      return `Zone "${zoneName}" is fragile and needs refactoring before new feature development`;
+    default:
+      return `Zone "${zoneName}" is showing early signs of fragility, approaching architectural risk thresholds`;
+  }
+}
 
-  return (
-    `Zone "${zone.name}" (${zone.id}) has ${level} risk ` +
-    `(score: ${risk.riskScore.toFixed(2)}, cohesion: ${risk.cohesion.toFixed(2)}, ` +
-    `coupling: ${risk.coupling.toFixed(2)}) — ${action}`
-  );
+/** Numeric detail for a zone's risk assessment — kept out of the plain-language lead. */
+function metricDetail(risk: ZoneRiskMetrics): string {
+  return `cohesion: ${risk.cohesion.toFixed(2)}, coupling: ${risk.coupling.toFixed(2)} (risk score: ${risk.riskScore.toFixed(2)})`;
+}
+
+function formatZoneFinding(zone: Zone, risk: ZoneRiskMetrics): string {
+  return `${riskStatement(zone.name, risk.riskLevel)} — ${metricDetail(risk)}`;
 }
 
 function formatSmallZoneFinding(zone: Zone, risk: ZoneRiskMetrics): string {
+  const n = zone.files.length;
   return (
-    `Zone "${zone.name}" (${zone.id}) has ${risk.riskLevel} risk ` +
-    `(score: ${risk.riskScore.toFixed(2)}, cohesion: ${risk.cohesion.toFixed(2)}, ` +
-    `coupling: ${risk.coupling.toFixed(2)}) — unreliable: zone has only ` +
-    `${zone.files.length} file${zone.files.length === 1 ? "" : "s"} (minimum ${RISK_THRESHOLDS.minZoneSize} for reliable metrics)`
+    `Zone "${zone.name}" has an unreliable risk reading: only ${n} file${n === 1 ? "" : "s"} tracked ` +
+    `(minimum ${RISK_THRESHOLDS.minZoneSize} needed for reliable metrics) — ${metricDetail(risk)}`
   );
 }
 
 function formatJustifiedFinding(zone: Zone, risk: ZoneRiskMetrics): string {
   return (
-    `Zone "${zone.name}" (${zone.id}) has ${risk.riskLevel} risk ` +
-    `(score: ${risk.riskScore.toFixed(2)}, cohesion: ${risk.cohesion.toFixed(2)}, ` +
-    `coupling: ${risk.coupling.toFixed(2)}) — justified: ${risk.riskJustification}`
+    `Zone "${zone.name}" is fragile but justified: ${risk.riskJustification} — ${metricDetail(risk)}`
   );
 }
 
