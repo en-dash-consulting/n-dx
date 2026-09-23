@@ -57,7 +57,7 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = [
   {
     term: "epic / feature / task",
     definition:
-      "The three levels of the PRD hierarchy: an epic groups features, a feature groups tasks, and a task is the unit of work an agent picks up and completes.",
+      "The levels of the PRD hierarchy: an epic groups features, a feature groups tasks, and a task is the unit of work an agent picks up — a task can be broken down further into subtasks.",
   },
   {
     term: "worktree anchor",

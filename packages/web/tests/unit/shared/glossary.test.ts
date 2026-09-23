@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { GLOSSARY_TERMS, getGlossaryDefinition } from "../../../src/shared/glossary.js";
+import { getChildLevel } from "../../../src/viewer/components/prd-tree/levels.js";
 
 const REQUIRED_TERMS = [
   "zone",
@@ -22,6 +23,42 @@ describe("GLOSSARY_TERMS", () => {
     expect(terms.length).toBe(new Set(terms).size);
     for (const t of GLOSSARY_TERMS) {
       expect(t.definition.trim().length).toBeGreaterThan(0);
+    }
+  });
+});
+
+/**
+ * The PRD-hierarchy definition has to describe the hierarchy the tree can
+ * actually render. It first shipped saying "The three levels of the PRD
+ * hierarchy" while `prd-tree` renders four level badges — Epic, Feature,
+ * Task and Subtask — so a reader looking at a subtask was told it did not
+ * exist. The level chain is read from `getChildLevel`, the module the tree
+ * itself uses, rather than restated here: add a level there and this fails
+ * until the definition accounts for it.
+ */
+describe("epic / feature / task definition matches the rendered hierarchy", () => {
+  function levelChain(): string[] {
+    const chain: string[] = ["epic"];
+    for (let next = getChildLevel("epic"); next; next = getChildLevel(next)) {
+      chain.push(next);
+    }
+    return chain;
+  }
+
+  it("names every level the PRD tree can render", () => {
+    const definition = getGlossaryDefinition("epic / feature / task")!;
+    const unmentioned = levelChain().filter(
+      (level) => !definition.toLowerCase().includes(level),
+    );
+    expect(unmentioned).toEqual([]);
+  });
+
+  it("does not claim a level count that contradicts the hierarchy", () => {
+    const definition = getGlossaryDefinition("epic / feature / task")!;
+    const claimed = definition.match(/\b(two|three|four|five)\s+levels\b/i)?.[1];
+    if (claimed) {
+      const asNumber = { two: 2, three: 3, four: 4, five: 5 }[claimed.toLowerCase()];
+      expect(asNumber).toBe(levelChain().length);
     }
   });
 });
