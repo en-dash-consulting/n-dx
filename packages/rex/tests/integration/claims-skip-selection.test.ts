@@ -9,13 +9,19 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { cmdNext } from "../../src/cli/commands/next.js";
 import { handleClaimTask, handleGetNextTask, handleReleaseTask, handleUpdateTaskStatus } from "../../src/cli/mcp-tools.js";
 import { openClaimsStore, resolveClaimHolder } from "../../src/store/claims.js";
-import { resolveStore, serializeFolderTree, PRD_TREE_DIRNAME } from "../../src/store/index.js";
+import {
+  resolveStore,
+  serializeFolderTree,
+  PRD_TREE_DIRNAME,
+  TREE_META_FILENAME,
+  SLUG_RULE_VERSION,
+} from "../../src/store/index.js";
 import { findNextTask, collectCompletedIds } from "../../src/core/next-task.js";
 import type { PRDDocument } from "../../src/schema/index.js";
 
@@ -52,6 +58,14 @@ beforeAll(async () => {
   mkdirSync(wtA);
   git(wtA, "init", "--quiet", "--initial-branch=main");
   await serializeFolderTree(PRD.items, join(wtA, ".rex", PRD_TREE_DIRNAME));
+  // `serializeFolderTree` writes the tree but not the sidecar, and a tree with
+  // no slug-rule marker is refused by every writer — including the MCP
+  // handlers under test here.
+  writeFileSync(
+    join(wtA, ".rex", TREE_META_FILENAME),
+    JSON.stringify({ title: PRD.title, schema: PRD.schema, slugRule: SLUG_RULE_VERSION }),
+    "utf-8",
+  );
   git(wtA, "add", "-A");
   git(wtA, "commit", "--quiet", "-m", "prd");
   wtB = join(root, "b");
