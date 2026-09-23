@@ -27,7 +27,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initConfig } from "../../src/store/config.js";
 import { SELF_HEAL_TAG } from "@n-dx/rex/dist/store/index.js";
-import { cliSpawnsOnly } from "../helpers/index.js";
+import { cliSpawnsOnly, RM_RETRY } from "../helpers/index.js";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -167,7 +167,7 @@ describe("self-heal tag scoping — integration", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   // ── SC-1: Untagged task status is unchanged after a self-heal iteration ────

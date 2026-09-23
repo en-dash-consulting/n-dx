@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initConfig } from "../../../src/store/config.js";
+import { RM_RETRY } from "../../helpers/index.js";
 
 const { mockResolveActor, mockResolveHost } = vi.hoisted(() => ({
   mockResolveActor: vi.fn(async () => "Test Actor <test@example.com>"),
@@ -77,7 +78,7 @@ describe("shared lifecycle", () => {
   });
 
   afterEach(async () => {
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   describe("prepareBrief", () => {

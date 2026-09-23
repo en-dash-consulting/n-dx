@@ -39,6 +39,7 @@ import type {
   ReviewFinding,
   ReviewPromptContext,
 } from "../../../src/agent/analysis/adversarial-review.js";
+import { RM_RETRY } from "../../helpers/index.js";
 
 const BASE_CTX: ReviewPromptContext = {
   taskId: "task-abc",
@@ -331,7 +332,7 @@ describe("readReviewReport", () => {
   });
 
   afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("distinguishes a missing report from a malformed one", async () => {

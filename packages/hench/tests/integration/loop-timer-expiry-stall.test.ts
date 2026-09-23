@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -44,7 +44,7 @@ describe("Timer-expiry auto-commit in --yes mode", () => {
   });
 
   afterEach(async () => {
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("recognizes timer-expiry auto-commit when performCommitPromptIfNeeded is called", async () => {

@@ -29,3 +29,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Fix rex fix timestamp backfill inverting startedAt/completedAt (#375)](./fix-rex-fix-timestamp-backfill.md) | completed |
 | [Reproduce Windows near-port relocation never engaging (#367)](./reproduce-windows-near-port-relocation.md) | pending |
 | [Stop the sourcevision cli-hints e2e test timing out under preflight load](./stop-the-sourcevision-cli-hints-e2e.md) | completed |
+| [Stop the Windows CI flakes: unset hookTimeout and bypassed rm retries](./stop-the-windows-ci-flakes-unset.md) | completed |

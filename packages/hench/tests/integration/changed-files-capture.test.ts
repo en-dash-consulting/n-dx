@@ -14,7 +14,7 @@ import { mkdtemp, rm, writeFile, mkdir, readFile, unlink } from "node:fs/promise
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
-import { initGitFixtureRepoSync } from "../helpers/index.js";
+import { initGitFixtureRepoSync, RM_RETRY } from "../helpers/index.js";
 import {
   captureCommitChanges,
   captureMultiCommitChanges,
@@ -32,7 +32,7 @@ describe("Changed files capture integration", () => {
 
   afterEach(async () => {
     try {
-      await rm(projectDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
     } catch {
       // Ignore cleanup errors
     }

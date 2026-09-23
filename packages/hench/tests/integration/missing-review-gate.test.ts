@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
 import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -143,7 +143,7 @@ describe("finalizeRun — missing-review gate", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("refuses the completion when the reviewer never spawned, and names the missing review", async () => {

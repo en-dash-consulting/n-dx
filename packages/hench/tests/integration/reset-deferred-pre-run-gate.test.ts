@@ -40,7 +40,7 @@ import {
 } from "../../src/agent/lifecycle/shared.js";
 import { listUncommittedPrdPaths } from "../../src/agent/lifecycle/uncommitted-work-gate.js";
 import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execFile = promisify(execFileCb);
 
@@ -81,7 +81,7 @@ describe("--reset-deferred vs the pre-run commit gate", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   /** Mock PRDStore: updateItem writes the same index.md a real store would. */

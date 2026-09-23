@@ -6,7 +6,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { toolGit, tokenizeArgs } from "../../../src/tools/git.js";
 import type { ToolGuard } from "../../../src/tools/contracts.js";
-import { initGitFixtureRepoSync } from "../../helpers/index.js";
+import { initGitFixtureRepoSync, RM_RETRY } from "../../helpers/index.js";
 // toolGit now spawns `git` with an explicit argv and NO shell. The
 // `itNeedsPosixShell` guard is kept on cases that assert on git's real output
 // only so this suite still skips cleanly on a machine without git-friendly
@@ -52,7 +52,7 @@ describe("toolGit", () => {
   });
 
   afterEach(async () => {
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   describe("allowed subcommands", () => {

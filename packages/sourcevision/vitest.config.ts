@@ -34,5 +34,9 @@ export default defineConfig({
     // worktree multiply that by roughly an order of magnitude, which pushed
     // the heaviest three past 5 s while the rest of the suite stayed green.
     testTimeout: 30_000,
+    // Never below testTimeout — Vitest's 10s default would give a setup hook
+    // less time than the test it prepares, and these hooks build the same real
+    // git repos the tests measure. See the root vitest.config.js.
+    hookTimeout: 30_000,
   },
 });

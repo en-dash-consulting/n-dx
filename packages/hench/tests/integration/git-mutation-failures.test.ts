@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { RunRecord } from "../../src/schema/index.js";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 import { initConfig } from "../../src/store/config.js";
 
 const execAsync = promisify(execCb);
@@ -119,7 +119,7 @@ describe("Git mutation failures in the Hench lifecycle", () => {
       const { stdout: status } = await execAsync("git status --porcelain", { cwd: projectDir });
       expect(status).toContain("lib.ts");
     } finally {
-      await rm(projectDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
     }
   });
 
@@ -155,7 +155,7 @@ describe("Git mutation failures in the Hench lifecycle", () => {
       });
       expect(gate).toBe("stop");
     } finally {
-      await rm(projectDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
     }
   });
 
@@ -182,7 +182,7 @@ describe("Git mutation failures in the Hench lifecycle", () => {
       const { stdout: head } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
       expect(head.trim()).toBe("initial");
     } finally {
-      await rm(projectDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
     }
   });
 
@@ -235,7 +235,7 @@ describe("Git mutation failures in the Hench lifecycle", () => {
       const { stdout: status } = await execAsync("git status --porcelain", { cwd: projectDir });
       expect(status).toContain(".rex/prd_tree/task/index.md");
     } finally {
-      await rm(projectDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
     }
   });
 
@@ -306,7 +306,7 @@ describe("Git mutation failures in the Hench lifecycle", () => {
       expect(status).toContain("src.ts");
       expect(status).toContain(".rex/prd_tree/task/index.md");
     } finally {
-      await rm(projectDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
     }
   });
 
@@ -360,7 +360,7 @@ describe("Git mutation failures in the Hench lifecycle", () => {
       const { stdout: status } = await execAsync("git status --porcelain", { cwd: projectDir });
       expect(status).not.toContain("src.ts");
     } finally {
-      await rm(projectDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
     }
   });
 
@@ -428,7 +428,7 @@ describe("Git mutation failures in the Hench lifecycle", () => {
       expect(status).toContain("src.ts");
       expect(status).toContain(".rex/prd_tree/task/index.md");
     } finally {
-      await rm(projectDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
     }
   });
 });

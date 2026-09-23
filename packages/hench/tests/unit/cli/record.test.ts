@@ -22,6 +22,7 @@ vi.mock("../../../src/process/actor-identity.js", async (importOriginal) => {
 import { cmdRecord } from "../../../src/cli/commands/record.js";
 import { listRuns } from "../../../src/store/runs.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/index.js";
+import { RM_RETRY } from "../../helpers/index.js";
 
 /**
  * `hench record` writes an assisted run record so /ndx-work task execution is
@@ -50,7 +51,7 @@ describe("hench record", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("writes an assisted run record, with zero usage when there is no session", async () => {

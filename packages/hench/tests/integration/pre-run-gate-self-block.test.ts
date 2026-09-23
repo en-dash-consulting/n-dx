@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { execFile as execFileCb } from "node:child_process";
 import { performPreRunCommitGateIfNeeded } from "../../src/agent/lifecycle/shared.js";
 import { measureChangeMagnitude } from "../../src/agent/analysis/change-magnitude.js";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execFile = promisify(execFileCb);
 
@@ -51,7 +51,7 @@ describe("pre-run commit gate vs hench's own runtime artifacts", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   /** Create the lock directory exactly as ProcessLimiter does at startup. */

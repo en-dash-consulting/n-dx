@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { proposePreRunCommitMessage } from "../../../../src/agent/lifecycle/shared.js";
 import { defaultRegistry, TIER_MODELS, NEWEST_MODELS } from "../../../../src/prd/llm-gateway.js";
 import type { ReviewDiff } from "../../../../src/agent/analysis/review.js";
+import { RM_RETRY } from "../../../helpers/index.js";
 
 const diff: ReviewDiff = {
   stat: " 1 file changed, 2 insertions(+)",
@@ -41,7 +42,7 @@ describe("proposePreRunCommitMessage light-tier routing", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(tmpDir, { recursive: true, force: true });
+    await rm(tmpDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("uses the light-tier model when the passed model is the standard resolution", async () => {
