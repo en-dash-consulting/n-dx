@@ -225,6 +225,7 @@ describe("extractHenchTokenUsage", () => {
     const usage = await extractHenchTokenUsage(tmp);
 
     expect(usage.calls).toBe(1);
+    expect(usage.runs).toBe(1);
     expect(usage.inputTokens).toBe(5000);
     expect(usage.outputTokens).toBe(1500);
   });
@@ -244,6 +245,7 @@ describe("extractHenchTokenUsage", () => {
     const usage = await extractHenchTokenUsage(tmp);
 
     expect(usage.calls).toBe(2);
+    expect(usage.runs).toBe(2);
     expect(usage.inputTokens).toBe(7000);
     expect(usage.outputTokens).toBe(2200);
   });
@@ -361,7 +363,9 @@ describe("extractHenchTokenUsage", () => {
       });
       // Flat totals keep coming from the run-level record.
       expect(usage.inputTokens).toBe(300);
-      expect(usage.calls).toBe(1);
+      // One run, two LLM calls — `calls` counts turns, `runs` counts runs.
+      expect(usage.calls).toBe(2);
+      expect(usage.runs).toBe(1);
     });
 
     it("falls back to the run-level model when turns carry none", async () => {
@@ -1442,6 +1446,101 @@ describe("groupByCommand", () => {
     expect(commands[0].package).toBe("hench");
     expect(commands[1].package).toBe("rex");
     expect(commands[2].package).toBe("sv");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hench run counting across surfaces (WM2052)
+// ---------------------------------------------------------------------------
+
+describe("hench run counting stays consistent across surfaces", () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "rex-run-count-"));
+    mkdirSync(join(tmp, ".hench", "runs"), { recursive: true });
+    // 10 runs of 20 turns each — the shape that used to print "200 runs" in
+    // the By-command breakdown against "10 runs" on the By-package line.
+    for (let i = 0; i < 10; i++) {
+      const turns = Array.from({ length: 20 }, (_, t) => ({
+        turn: t + 1,
+        input: 100,
+        output: 10,
+        model: "claude-sonnet-5",
+      }));
+      const id = `run-${String(i).padStart(3, "0")}`;
+      writeFileSync(
+        join(tmp, ".hench", "runs", `${id}.json`),
+        JSON.stringify({
+          id,
+          startedAt: `2026-01-${String(10 + i).padStart(2, "0")}T10:00:00.000Z`,
+          tokenUsage: { input: 2000, output: 200 },
+          turnTokenUsage: turns,
+        }),
+      );
+    }
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true });
+  });
+
+  it("reports 10 runs and 200 calls on the package rollup", async () => {
+    const usage = await extractHenchTokenUsage(tmp);
+
+    expect(usage.runs).toBe(10);
+    expect(usage.calls).toBe(200);
+  });
+
+  it("reports the same 10 runs per hench command", async () => {
+    const events = await extractHenchTokenEvents(tmp);
+    const commands = groupByCommand(events);
+    const henchRun = commands.find((c) => c.package === "hench" && c.command === "run");
+
+    expect(henchRun?.runs).toBe(10);
+    expect(henchRun?.calls).toBe(200);
+  });
+
+  it("period buckets agree with the package rollup on both counts", async () => {
+    const events = await extractHenchTokenEvents(tmp);
+    // All ten runs fall in January, so one month bucket must hold them all.
+    const buckets = groupByTimePeriod(events, "month");
+
+    expect(buckets).toHaveLength(1);
+    const hench = buckets[0].usage.packages.hench;
+    expect(hench.runs).toBe(10);
+    expect(hench.calls).toBe(200);
+  });
+
+  it("counts a run once even when its turns split across groupers", async () => {
+    const events = await extractHenchTokenEvents(tmp);
+
+    // Every event from the same file carries the same runId.
+    const ids = new Set(events.map((e) => e.runId));
+    expect(events).toHaveLength(200);
+    expect(ids.size).toBe(10);
+  });
+
+  it("rex and sv usage carries no run count", async () => {
+    const logEntries: TokenUsageLogEntry[] = [
+      {
+        timestamp: "2026-01-15T10:00:00.000Z",
+        event: "analyze_token_usage",
+        detail: JSON.stringify({ calls: 2, inputTokens: 100, outputTokens: 10 }),
+      },
+    ];
+
+    expect(extractRexTokenUsage(logEntries).runs).toBeUndefined();
+    const commands = groupByCommand(extractRexTokenEvents(logEntries));
+    expect(commands[0].runs).toBeUndefined();
+  });
+
+  it("formats the hench package line with the run count, not the turn count", async () => {
+    const usage = await aggregateTokenUsage([], tmp);
+    const lines = formatAggregateTokenUsage(usage);
+
+    expect(lines[1]).toContain("10 runs");
+    expect(lines[1]).not.toContain("200 runs");
   });
 });
 

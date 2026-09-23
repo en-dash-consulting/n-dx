@@ -40,6 +40,7 @@ unusable for the before/after comparisons the cost work depends on.
   prints the per-model split in place of the blanket Sonnet caveat, and emits
   it in `--format=json`.
 - `@n-dx/web` — the dashboard's duplicate pricing literal is gone; it resolves
-  the same fallback rates from the shared table. Its own aggregation does not
-  yet carry a per-model split, so dashboard figures still price everything at
-  the fallback — tracked separately.
+  the same fallback rates from the shared table. Its aggregation now carries
+  its own per-model split and prices it through rex's arithmetic, so dashboard
+  and CLI figures agree for the same runs (see the dashboard-per-model-pricing
+  changeset in this release).

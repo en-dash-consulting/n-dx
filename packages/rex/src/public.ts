@@ -417,6 +417,14 @@ export type {
   ItemTokenAggregation,
 } from "./core/item-token-rollup.js";
 
+// ---- Core: per-model cost estimation ------------------------------------------
+// The dashboard aggregates its own token shape (it has a `web` bucket) but must
+// quote the same dollar figure as `ndx usage`. It imports the arithmetic — not
+// a copy of it — through its rex gateway.
+
+export { estimateCostFromTotals, estimateCost, aggregateTokenUsage } from "./core/token-usage.js";
+export type { CostEstimate, ModelCostLine, AggregateTokenUsage } from "./core/token-usage.js";
+
 // ---- Core: per-item duration rollup -----------------------------------------
 
 export { aggregateItemDurations } from "./core/item-duration-rollup.js";
