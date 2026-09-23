@@ -73,6 +73,20 @@ export interface SerializeResult {
    * about to relocate without reloading the tree.
    */
   fileDigests: Map<string, string>;
+  /**
+   * Resolved absolute paths of the files this call actually wrote — new
+   * files and content changes only; files skipped by `writeIfChanged` are
+   * not listed. The counterpart of `filesWritten`, path by path, so a caller
+   * that commits the save can stage exactly these instead of the whole tree.
+   */
+  writtenPaths: string[];
+  /**
+   * Resolved absolute paths of the files this call removed, including every
+   * file inside a removed stale directory (the directory itself is not
+   * listed — git tracks files, and the staging use these lists exist for
+   * addresses files).
+   */
+  deletedPaths: string[];
 }
 
 /**
@@ -140,6 +154,8 @@ export async function serializeFolderTree(
     directoriesCreated: 0,
     directoriesRemoved: 0,
     fileDigests: new Map(),
+    writtenPaths: [],
+    deletedPaths: [],
   };
 
   await ensureDir(treeRoot, result);
@@ -152,11 +168,41 @@ export async function serializeFolderTree(
   await guardStaleEntries(staleEntries, options, collectItemIds(items));
 
   for (const entry of staleEntries) {
+    // Enumerated before the rm so a removed directory's contents can still be
+    // named — deletedPaths lists files, which is what a git stage addresses.
+    if (entry.isDir) {
+      result.deletedPaths.push(...(await collectFilesUnder(entry.path)));
+    } else {
+      result.deletedPaths.push(resolve(entry.path));
+    }
     await rm(entry.path, { recursive: entry.isDir, force: true });
     if (entry.isDir) result.directoriesRemoved++;
   }
 
   return result;
+}
+
+/**
+ * Every file under `path` (recursively), as resolved absolute paths.
+ * A subtree that vanishes mid-scan contributes nothing — there is nothing
+ * left to report deleted.
+ */
+async function collectFilesUnder(path: string): Promise<string[]> {
+  const files: string[] = [];
+  try {
+    for (const child of await readdir(path)) {
+      const childPath = join(path, child);
+      const info = await stat(childPath);
+      if (info.isDirectory()) {
+        files.push(...(await collectFilesUnder(childPath)));
+      } else {
+        files.push(resolve(childPath));
+      }
+    }
+  } catch {
+    // Vanished mid-scan.
+  }
+  return files;
 }
 
 /** Every item id in the tree being saved, at any depth. */
@@ -932,4 +978,5 @@ async function writeIfChanged(
   await writeFile(tmpPath, content, "utf8");
   await rename(tmpPath, filePath);
   result.filesWritten++;
+  result.writtenPaths.push(resolve(filePath));
 }

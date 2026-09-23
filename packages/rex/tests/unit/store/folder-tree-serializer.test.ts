@@ -1063,3 +1063,77 @@ describe("serializeFolderTree: strict round-trip deep equality", () => {
     expect(parsedItems).toEqual(originalItems);
   });
 });
+
+// ── Written / deleted path reporting ─────────────────────────────────────────
+//
+// SerializeResult.writtenPaths and .deletedPaths name the exact files a save
+// touched, so a caller that commits the save (hench's completion and
+// --reset-deferred commits) can stage those paths instead of the whole tree.
+
+describe("writtenPaths and deletedPaths", () => {
+  it("lists every file a fresh serialize writes, path by path", async () => {
+    const task = makeTask("aaaa1111-0000-0000-0000-000000000000", "Task A");
+    const epic = makeEpic("eeee1111-0000-0000-0000-000000000000", "Epic", {
+      children: [task],
+    });
+
+    const result = await serializeFolderTree([epic], testDir);
+
+    expect(result.writtenPaths).toHaveLength(result.filesWritten);
+    const relWritten = result.writtenPaths.map((p) => relative(testDir, p).split(sep).join("/"));
+    expect(relWritten.sort()).toEqual(["epic/index.md", "epic/task-a.md"]);
+    expect(result.deletedPaths).toEqual([]);
+  });
+
+  it("reports nothing written when content is unchanged (writeIfChanged skip)", async () => {
+    const task = makeTask("aaaa1111-0000-0000-0000-000000000000", "Task A");
+    const epic = makeEpic("eeee1111-0000-0000-0000-000000000000", "Epic", {
+      children: [task],
+    });
+
+    await serializeFolderTree([epic], testDir);
+    const second = await serializeFolderTree([epic], testDir);
+
+    expect(second.filesSkipped).toBeGreaterThan(0);
+    expect(second.writtenPaths).toEqual([]);
+    expect(second.deletedPaths).toEqual([]);
+  });
+
+  it("reports a removed leaf file as deleted", async () => {
+    const taskA = makeTask("aaaa1111-0000-0000-0000-000000000000", "Task A");
+    const taskB = makeTask("bbbb1111-0000-0000-0000-000000000000", "Task B");
+    const epic = makeEpic("eeee1111-0000-0000-0000-000000000000", "Epic", {
+      children: [taskA, taskB],
+    });
+
+    await serializeFolderTree([epic], testDir);
+    const withoutB = makeEpic("eeee1111-0000-0000-0000-000000000000", "Epic", {
+      children: [taskA],
+    });
+    const result = await serializeFolderTree([withoutB], testDir);
+
+    const relDeleted = result.deletedPaths.map((p) => relative(testDir, p).split(sep).join("/"));
+    expect(relDeleted).toEqual(["epic/task-b.md"]);
+  });
+
+  it("reports every file inside a removed directory, not the directory itself", async () => {
+    const subtask = makeSubtask("cccc1111-0000-0000-0000-000000000000", "Sub");
+    const doomed = makeTask("bbbb1111-0000-0000-0000-000000000000", "Doomed Task", {
+      children: [subtask],
+    });
+    const survivor = makeTask("aaaa1111-0000-0000-0000-000000000000", "Survivor");
+    const epic = makeEpic("eeee1111-0000-0000-0000-000000000000", "Epic", {
+      children: [doomed, survivor],
+    });
+
+    await serializeFolderTree([epic], testDir);
+    const withoutDoomed = makeEpic("eeee1111-0000-0000-0000-000000000000", "Epic", {
+      children: [survivor],
+    });
+    const result = await serializeFolderTree([withoutDoomed], testDir);
+
+    const relDeleted = result.deletedPaths.map((p) => relative(testDir, p).split(sep).join("/")).sort();
+    expect(relDeleted).toEqual(["epic/doomed-task/index.md", "epic/doomed-task/sub.md"]);
+    expect(result.directoriesRemoved).toBe(1);
+  });
+});

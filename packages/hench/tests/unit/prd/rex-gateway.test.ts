@@ -29,6 +29,8 @@ const EXPECTED_EXPORTS = [
   // Folder-tree storage path
   "PRD_TREE_DIRNAME",
   "TREE_META_FILENAME",
+  // Save file report — the paths the last PRD save(s) wrote and deleted
+  "takeSaveFileReport",
   // PRD tree slug conformance — the pre-run gate
   "checkTreeConformance",
   // Self-heal tag scoping

@@ -17,8 +17,8 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
-import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
+import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
+import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunCommitRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -1594,6 +1594,77 @@ async function prdPathsToStage(
   return staged;
 }
 
+/** Whether git already tracks `relativePath` — a deleted tracked file can still be staged. */
+async function isGitTracked(projectDir: string, relativePath: string): Promise<boolean> {
+  const result = await exec("git", ["ls-files", "--error-unmatch", "--", relativePath], {
+    cwd: projectDir,
+    timeout: 10_000,
+  });
+  return result.exitCode === 0;
+}
+
+/**
+ * Narrow the wholesale staging roots to the exact files the PRD save(s)
+ * reported written and deleted, plus the `tree-meta.json` sidecar (rewritten
+ * by every save, deliberately not part of the report).
+ *
+ * `rootPaths` is {@link prdPathsToStage}'s output and carries its existence
+ * and gitignore filtering: a report path is only eligible when its root
+ * survived (an ignored `.rex/prd_tree/` drops every file under it). Report
+ * paths outside `.rex/prd_tree/` are dropped too — the report is trusted
+ * about *which tree files* changed, not as a licence to stage anywhere.
+ *
+ * Per-path checks keep `git add` from erroring:
+ * - a written file must still exist (a path that vanished since the save and
+ *   was never tracked has nothing to stage);
+ * - a deleted file is staged only when git tracks it — `git add` on a
+ *   missing untracked path is an error, and an untracked file that is gone
+ *   left nothing to record.
+ */
+async function scopePrdPathsToReport(
+  projectDir: string,
+  rootPaths: string[],
+  report: SaveFileReport,
+): Promise<string[]> {
+  const { join, sep } = await import("node:path");
+  const { existsSync } = await import("node:fs");
+
+  // rootPaths carry OS separators (join(".rex", name)); the report uses
+  // forward slashes on every platform. Compare on the forward-slash form —
+  // git accepts it on Windows too.
+  const allowedRoots = new Set(rootPaths.map((p) => p.split(sep).join("/")));
+  const treePrefix = `.rex/${PRD_TREE_DIRNAME}/`;
+  const treeAllowed = allowedRoots.has(`.rex/${PRD_TREE_DIRNAME}`);
+
+  const scoped: string[] = [];
+  const seen = new Set<string>();
+  const push = (p: string) => {
+    if (!seen.has(p)) {
+      seen.add(p);
+      scoped.push(p);
+    }
+  };
+
+  if (treeAllowed) {
+    for (const path of report.written) {
+      if (!path.startsWith(treePrefix)) continue;
+      if (!existsSync(join(projectDir, path))) continue;
+      push(path);
+    }
+    for (const path of report.deleted) {
+      if (!path.startsWith(treePrefix)) continue;
+      if (existsSync(join(projectDir, path)) || (await isGitTracked(projectDir, path))) {
+        push(path);
+      }
+    }
+  }
+
+  const metaPath = `.rex/${TREE_META_FILENAME}`;
+  if (allowedRoots.has(metaPath)) push(metaPath);
+
+  return scoped;
+}
+
 /**
  * Stage the PRD folder tree and its sidecar, and commit them if anything ends
  * up staged.
@@ -1622,8 +1693,23 @@ export interface PrdTreeCommitResult {
   error?: Error;
 }
 
-async function commitPrdTreeIfStaged(projectDir: string, message: string): Promise<PrdTreeCommitResult> {
-  const prdPaths = await prdPathsToStage(projectDir);
+async function commitPrdTreeIfStaged(
+  projectDir: string,
+  message: string,
+  report?: SaveFileReport | null,
+): Promise<PrdTreeCommitResult> {
+  const rootPaths = await prdPathsToStage(projectDir);
+
+  if (rootPaths.length === 0) {
+    return { staged: 0 };
+  }
+
+  // With a save report, stage exactly the files the store's save(s) wrote and
+  // deleted rather than the whole tree — staging `.rex/prd_tree/` wholesale
+  // once swept a 1,378-file in-flight rename into a "task completed" commit.
+  // Without one (a store that does not track saves, or nothing saved), fall
+  // back to the wholesale roots, which is the pre-report behaviour.
+  const prdPaths = report ? await scopePrdPathsToReport(projectDir, rootPaths, report) : rootPaths;
 
   if (prdPaths.length === 0) {
     return { staged: 0 };
@@ -1677,6 +1763,7 @@ async function commitCompletionMetadata(
   projectDir: string,
   taskId: string,
   origin?: RunGitOrigin,
+  report?: SaveFileReport | null,
 ): Promise<PrdTreeCommitResult> {
   // #360's guard, kept ahead of the staging helper so a moved checkout leaves
   // the tree exactly as it was. Reported, never thrown — the metadata staying
@@ -1693,11 +1780,12 @@ async function commitCompletionMetadata(
     return { staged: 0 };
   }
 
-  // Stages the whole `.rex/prd_tree/` (the completion write may touch the task
-  // plus cascaded ancestors). Under the no-concurrent-PRD-writers contract this
-  // is just this run's metadata; the message reflects it may span the tree.
+  // With a save report, stages exactly the files the completion write touched
+  // (the task plus cascaded ancestors); without one, falls back to staging the
+  // whole `.rex/prd_tree/`, which under the no-concurrent-PRD-writers contract
+  // is just this run's metadata. The message reflects it may span the tree.
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
-  const result = await commitPrdTreeIfStaged(projectDir, message);
+  const result = await commitPrdTreeIfStaged(projectDir, message, report);
   if (result.error) {
     detail(`Warning: could not commit PRD tree changes: ${result.error.message}`);
   } else if (result.staged > 0) {
@@ -1729,10 +1817,12 @@ async function commitCompletionMetadata(
  * against this task's uncommitted PRD write.
  *
  * **PRECONDITION: the PRD tree must have been clean before the reset ran.**
- * This stages `.rex/prd_tree/` and the sidecar wholesale and cannot tell the
- * reset's write from an operator edit that was already sitting there, so
- * calling it on an already-dirty tree commits that edit too, under a message
- * that describes something else entirely. Checking the precondition is the
+ * With a save `report` the staging is scoped to the files the reset actually
+ * wrote, but without one (a store that does not track saves) this stages
+ * `.rex/prd_tree/` and the sidecar wholesale and cannot tell the reset's
+ * write from an operator edit that was already sitting there — on an
+ * already-dirty tree the fallback commits that edit too, under a message that
+ * describes something else entirely. Checking the precondition is the
  * caller's job, because only the caller can look *before* the reset writes:
  * see `resetDeferredAndCommit` in `cli/commands/run.ts`, which snapshots
  * `listUncommittedPrdPaths` (uncommitted-work-gate.ts) first and skips this
@@ -1741,10 +1831,11 @@ async function commitCompletionMetadata(
 export async function commitResetDeferredChanges(
   projectDir: string,
   resetCount: number,
+  report?: SaveFileReport | null,
 ): Promise<PrdTreeCommitResult> {
   if (resetCount <= 0) return { staged: 0 };
   const message = `chore(prd): reset ${resetCount} deferred/failing task(s) to pending (--reset-deferred)`;
-  const result = await commitPrdTreeIfStaged(projectDir, message);
+  const result = await commitPrdTreeIfStaged(projectDir, message, report);
   if (result.error) {
     detail(`Warning: could not commit --reset-deferred changes: ${result.error.message}`);
   } else if (result.staged > 0) {
@@ -2952,7 +3043,14 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     }
 
     if (run.status === "completed") {
-      const completionMetadata = await commitCompletionMetadata(projectDir, run.taskId, run);
+      // Drained here, at the commit point, so the pathspec covers every PRD
+      // save this run made since the last commit — not just the last one.
+      const completionMetadata = await commitCompletionMetadata(
+        projectDir,
+        run.taskId,
+        run,
+        opts.store ? takeSaveFileReport(opts.store) : null,
+      );
       if (completionMetadata.error) {
         // The task's own work already succeeded (checked above) — only the
         // follow-up PRD record commit failed to land. `status` still flips to
