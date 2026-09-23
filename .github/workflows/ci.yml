@@ -1,7 +1,10 @@
 # GitHub Actions — PR validation and main branch CI for n-dx
 #
 # Replicates the pipeline previously defined in bitbucket-pipelines.yml.
-# Steps: install → build → typecheck → PR check (build + rex validate) → PRD structure
+# One `build` matrix job runs ubuntu, macOS and Windows in parallel:
+#   install → build → (Linux: policy, typecheck, docs, PR check, PRD structure)
+#   → (macOS/Windows: smoke collect) → root e2e/integration → per-package tests
+# then smoke-parity compares the macOS and Windows smoke artifacts.
 #
 # Node 22 LTS. Exact pnpm version managed by corepack via packageManager
 # field in package.json.
@@ -22,17 +25,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Build & Validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+  # ONE MATRIX JOB, THREE OSes, ALL IN PARALLEL. ubuntu, macOS and Windows run
+  # the same install -> build -> test sequence; the legs start together rather
+  # than the smoke legs waiting on ubuntu. Steps that only need to run once
+  # (policy checks, typecheck, docs, PRD structure, changesets) are gated to
+  # the Linux leg; the cross-OS smoke collector runs on the macOS and Windows
+  # legs, whose artifacts smoke-parity compares.
+  #
+  # `name:` comes from the matrix so the three check names — "Build &
+  # Validate", "CLI Smoke (macOS)", "CLI Smoke (Windows)" — stay exactly what
+  # they were. They are load-bearing for branch protection; keep them stable.
+  #
+  # `fail-fast: false`: the default would cancel the other OS legs the moment
+  # one fails, hiding whether a defect is platform-specific.
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Build & Validate
+            # changeset status compares against main to compute the release plan
+            fetch-depth: 0
+            timeout: 20
+          # macOS and Windows get 30 rather than 20: the per-package suites
+          # were measured locally at ~1.7x the root suite's wall time, and these
+          # runners are slower than Linux. A timeout kill presents as a red job,
+          # so the headroom is deliberate. Lower it again if real runs land
+          # comfortably under 20.
+          - os: macos-latest
+            name: CLI Smoke (macOS)
+            smoke: macos
+            fetch-depth: 1
+            timeout: 30
+          - os: windows-latest
+            name: CLI Smoke (Windows)
+            smoke: windows
+            fetch-depth: 1
+            timeout: 30
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          # changeset status compares against main to compute the release plan
-          fetch-depth: 0
+          fetch-depth: ${{ matrix.fetch-depth }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v5
@@ -47,12 +86,14 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check obfuscated code policy
+        if: runner.os == 'Linux'
         run: pnpm security:obfuscation
 
       - name: Build
         run: pnpm build
 
       - name: Check no source maps in publish
+        if: runner.os == 'Linux'
         run: |
           MAPS=""
           for pkg in packages/*/; do
@@ -68,12 +109,15 @@ jobs:
           fi
 
       - name: Typecheck
+        if: runner.os == 'Linux'
         run: pnpm typecheck
 
       - name: Docs build
+        if: runner.os == 'Linux'
         run: pnpm docs:build
 
       - name: PR check
+        if: runner.os == 'Linux'
         run: pnpm pr-check
 
       # `rex validate --post-merge` reports two classes of finding. Repairable
@@ -88,6 +132,7 @@ jobs:
       # them. Two such directories reached main during 0.7.1 — the detector
       # existed the whole time and nothing ran it.
       - name: PRD tree structure
+        if: runner.os == 'Linux'
         run: |
           node packages/rex/dist/cli/index.js validate --post-merge --format=json . \
             | node -e '
@@ -109,27 +154,62 @@ jobs:
               });
             '
 
+      # This step ASSERTS the per-OS baseline (expected exit code, stdout/stderr
+      # contract, JSON shape) as well as collecting, so a platform-only CLI
+      # regression fails the leg that broke it rather than smoke-parity. See
+      # validateBaseline in scripts/cli-smoke-parity.mjs.
+      - name: Collect normalized smoke artifact
+        if: matrix.smoke
+        run: node scripts/cli-smoke-parity.mjs collect --output ndx-cli-smoke-${{ matrix.smoke }}.json
+
+      # `always()`: on a baseline failure the collector writes the artifact and
+      # then exits non-zero, so the artifact holds the exact output that broke the
+      # contract. Uploading it anyway is the difference between a diagnosable
+      # failure and a red job with nothing to inspect. Missing-file is a warning,
+      # not an error, so a collector that died before the write is still fine here.
+      - name: Upload smoke artifact
+        if: always() && matrix.smoke
+        uses: actions/upload-artifact@v4
+        with:
+          name: ndx-cli-smoke-${{ matrix.smoke }}
+          path: ndx-cli-smoke-${{ matrix.smoke }}.json
+
+      # Root-level e2e / integration / gauntlet suites live in tests/** and are
+      # NOT covered by the per-package runner. The bind-aware runner excludes the
+      # LLM-spend sourcevision eval gate (run separately via `pnpm gauntlet:evals`)
+      # and any loopback-bind suites when the runner can't bind a local socket.
+      #
+      # Runs on EVERY leg and EVERY event, macOS included. It was once gated to
+      # main-branch pushes on macOS to save billed minutes, which meant PRs got
+      # no macOS test coverage at all — and its one historical catch (run
+      # 32283838405: a test assuming synchronous reaping, true for
+      # `taskkill /T /F` but not POSIX `SIGKILL`) was exactly the kind of defect
+      # that should be caught before merge. tests/** is where every cross-OS
+      # behaviour lives: spawn/quoting, child-process lifecycle, config file
+      # permissions, init, and the CLI e2e flows.
+      #
+      # Runs after the smoke upload so a test failure still leaves the artifact
+      # published for smoke-parity's comparison on the next green run.
+      - name: Run root e2e / integration tests
+        run: node scripts/run-vitest-bind-aware.mjs root
+
       # NOT `pnpm -r run test`: that bails on the first failing package, and
       # because hench and web depend on rex they are ordered after it — so a red
       # rex meant they never executed and their absence from the log read as
       # "nothing to report". This runner executes every package regardless and
       # still exits non-zero if any failed. (`pnpm -r --no-bail` is not an
       # option: pnpm documents it as exiting 0 even when a script fails.)
-      - name: Run unit tests
+      #
+      # Runs on EVERY leg, macOS included, and is deliberately unconditional:
+      # macOS bills at 10x Linux minutes, but coverage is not traded for speed
+      # here. Reduce cost by making the suites faster, not by skipping an OS.
+      - name: Run per-package tests
         run: node scripts/run-all-tests.mjs packages
-
-      # Root-level e2e / integration / gauntlet suites live in tests/** and are
-      # NOT covered by `pnpm -r run test` (which only runs per-package tests).
-      # The bind-aware runner excludes the LLM-spend sourcevision eval gate
-      # (run separately via `pnpm gauntlet:evals`) and any loopback-bind suites
-      # when the runner can't bind a local socket.
-      - name: Run root e2e / integration tests
-        run: node scripts/run-vitest-bind-aware.mjs root
 
       - name: Require changeset
         # Skip on the Changesets release PR: that PR's whole purpose is
         # to consume the changesets, so the directory is empty by design.
-        if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
+        if: runner.os == 'Linux' && github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
         run: |
           # Skip if the PR touches no publishable package code. This avoids
           # the empty-changeset trap (a marker changeset added solely to
@@ -153,196 +233,14 @@ jobs:
         # otherwise only fail in the Release workflow after merge to main).
         # --since=origin/main is required because PR checkouts are detached
         # HEAD with no local "main" branch for changeset to diff against.
+        if: runner.os == 'Linux'
         run: pnpm exec changeset status --since=origin/main
-
-  smoke-macos:
-    name: CLI Smoke (macOS)
-    runs-on: macos-latest
-    needs:
-      - validate
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v5
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm build
-
-      # This step ASSERTS the per-OS baseline (expected exit code, stdout/stderr
-      # contract, JSON shape) as well as collecting. It used to be assertion-free,
-      # with the baseline checked in smoke-parity — which meant a macOS-only CLI
-      # regression left this job green and reddened an ubuntu job two steps
-      # downstream, and went unchecked entirely whenever either smoke job failed
-      # (smoke-parity `needs` both). The contract now fails the platform that
-      # broke it. See validateBaseline in scripts/cli-smoke-parity.mjs.
-      - name: Collect normalized smoke artifact
-        run: node scripts/cli-smoke-parity.mjs collect --output ndx-cli-smoke-macos.json
-
-      # `always()`: on a baseline failure the collector writes the artifact and
-      # then exits non-zero, so the artifact holds the exact output that broke the
-      # contract. Uploading it anyway is the difference between a diagnosable
-      # failure and a red job with nothing to inspect. Missing-file is a warning,
-      # not an error, so a collector that died before the write is still fine here.
-      - name: Upload smoke artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ndx-cli-smoke-macos
-          path: ndx-cli-smoke-macos.json
-
-      # Runs AFTER the upload deliberately: a test failure then still leaves the
-      # smoke artifact published, so this job's collection contract with
-      # smoke-parity is unaffected by suite results. (smoke-parity is skipped
-      # when this job fails, because it `needs` it — the artifact itself is
-      # intact and the next green run compares normally.)
-      #
-      # SCOPE — root suite only, and deliberately narrower than smoke-windows.
-      # tests/** is where every cross-OS behaviour lives: spawn/quoting,
-      # child-process lifecycle, config file permissions, init, and the CLI e2e
-      # flows.
-      #
-      # The per-package suites run on Windows (smoke-windows) but NOT here.
-      # macOS bills at 10x Linux minutes — five times the Windows rate — and the
-      # failures this whole effort found were Windows-specific by nature (path
-      # separators, file locking, CRLF, timestamp granularity, process trees).
-      # Paying the highest rate for the smallest increment is the wrong trade. If
-      # a macOS-only defect ever does surface, revisit this — but add the suites
-      # with evidence, not on principle.
-      #
-      # CONSEQUENCE, worth knowing before choosing where to put a test: the
-      # ubuntu `validate` job already runs BOTH suites — per-package unit tests
-      # and the root e2e / integration suite — so POSIX coverage does not depend
-      # on this job. What this job uniquely provides is macOS specifically, and
-      # only for the root suite: a macOS-only behavior exercised solely by a
-      # per-package test never runs on macOS in CI.
-      #
-      # GATED TO main-BRANCH PUSHES. Measured on run 32286589689, this step is
-      # 2.53 of the job's 3.52 wall minutes — ~30 of its 40 billed, and macOS
-      # bills at 10x Linux. It ran green in 14 of 15 runs on the branch that
-      # added it. Its single catch (run 32283838405: a test assuming synchronous
-      # reaping, true for `taskkill /T /F` but not POSIX `SIGKILL`) was real, so
-      # the step stays — but PRs get macOS collection only, and the suite runs on
-      # every merge to main, which is upstream of every release since release.yml
-      # runs from main. Net effect ~71 -> ~41 billed minutes per PR.
-      #
-      # A POSIX-semantics defect can now merge before this step sees it. If that
-      # actually happens, the next escalation is a path filter on the spawn and
-      # lifecycle areas (packages/core, llm-client exec, hench process, tests/e2e)
-      # rather than reverting to unconditional — better coverage per minute, at
-      # the cost of `fetch-depth: 0` and a diff step to maintain.
-      #
-      # DELIBERATELY A STEP CONDITION, NOT A JOB CONDITION: smoke-parity `needs`
-      # this job and `needs` propagates skips, so gating the job would silently
-      # disable the parity comparison. Do not reach for workflow-level
-      # `paths-ignore` either — a required status check that never starts stays
-      # pending forever and blocks the PR, whereas a job skipped by a job-level
-      # `if:` is treated as successful. Job names are load-bearing for branch
-      # protection; keep them stable.
-      - name: Run root e2e / integration tests
-        if: github.event_name == 'push'
-        run: node scripts/run-vitest-bind-aware.mjs root
-
-  smoke-windows:
-    name: CLI Smoke (Windows)
-    runs-on: windows-latest
-    needs:
-      - validate
-    # 30 rather than the 20 the other jobs use: this job now runs the per-package
-    # suites on top of the root suite, measured locally at ~1.7x the root suite's
-    # wall time. A timeout kill presents as a red job, which is the failure mode
-    # this whole effort exists to avoid, so the headroom is deliberate. Lower it
-    # again if real runs land comfortably under 20.
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v5
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm build
-
-      # Asserts the per-OS baseline as well as collecting — see the equivalent
-      # step in smoke-macos for why the contract lives here rather than in
-      # smoke-parity.
-      - name: Collect normalized smoke artifact
-        run: node scripts/cli-smoke-parity.mjs collect --output ndx-cli-smoke-windows.json
-
-      # `always()` for the same reason as smoke-macos: keep the artifact that
-      # records a baseline failure.
-      - name: Upload smoke artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ndx-cli-smoke-windows
-          path: ndx-cli-smoke-windows.json
-
-      # See the equivalent step in smoke-macos for why this runs after the upload.
-      #
-      # Measured locally on Windows 11 (2026-08-18): 92 files, 2074 passed,
-      # 1 skipped, 0 failed, 69s wall. Same timed run as the cost figures below.
-      - name: Run root e2e / integration tests
-        run: node scripts/run-vitest-bind-aware.mjs root
-
-      # The per-package suites now run here too, not just on ubuntu.
-      #
-      # They were ubuntu-only because they were red on Windows and a permanently
-      # red job gets disabled, which would have cost all cross-OS coverage. That
-      # is fixed: every package passes on Windows (llm-client 1232, rex 4406,
-      # sourcevision 1691, hench 2901, web 2872 — 0 failures). The earlier note
-      # here claimed only two rex wall-clock budgets were failing; that was wrong,
-      # hench and web were red as well, and the runner below is what made their
-      # failures visible instead of silently skipped.
-      #
-      # NOT `pnpm -r run test`: it bails on the first failing package, and because
-      # hench and web depend on rex they are ordered after it — so a red rex meant
-      # they never executed and their absence read as "nothing to report". NOT
-      # `pnpm -r --no-bail run test` either: pnpm documents it as exiting 0 even
-      # when a script fails, which would report a red suite as green. Keep this in
-      # step with the equivalent comment in the validate job.
-      #
-      # COST, measured locally rather than assumed — both steps timed back to back
-      # in this job's order (2026-08-18, Windows 11):
-      #   root suite   69s  (92 files, 2074 passed, 1 skipped)
-      #   per-package  119s (5 packages, ~13,000 tests, 5/5 suites)
-      #   total       188s  vs 69s before, so the job's test time is ~2.7x
-      # This step is ~1.7x the root suite on its own. Windows bills at 2x Linux
-      # minutes, so the added spend is roughly 2 x (per-package runner minutes).
-      # A hosted runner is slower than this machine, so treat the RATIO as the
-      # transferable figure and the seconds as a floor.
-      - name: Run per-package tests
-        run: node scripts/run-all-tests.mjs packages
 
   smoke-parity:
     name: CLI Smoke Parity
     runs-on: ubuntu-latest
     needs:
-      - smoke-macos
-      - smoke-windows
+      - build
     timeout-minutes: 10
 
     steps:
