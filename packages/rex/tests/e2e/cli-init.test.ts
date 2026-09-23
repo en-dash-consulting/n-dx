@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, access } from "node:fs/promises";
+import { mkdtemp, rm, readFile, access, rename } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { RexConfigSchema } from "../../src/schema/validate.js";
 import { SCHEMA_VERSION, DEFAULT_CONFIG } from "../../src/schema/v1.js";
@@ -156,15 +156,38 @@ describe("rex init", () => {
     expect(meta.slugRule).toBe(SLUG_RULE_VERSION);
   });
 
-  // The other half: once the tree has items, a missing marker is a refusal
-  // rather than something the next writer quietly adopts.
-  it("refuses a write once the marker is gone from a tree that has items", async () => {
+  // The other half: once the tree has items, a missing marker is judged by the
+  // paths. A build older than the marker leaves the record gone and every path
+  // untouched, which is the state every existing repository upgrades in — so
+  // it is adopted, with a notice, rather than stopping the next write.
+  it("adopts a conformant tree once the marker is gone, and says so on stderr", async () => {
     run(["init", tmpDir]);
     run(["add", "epic", tmpDir, "--title=First Epic"]);
-
-    // Exactly what a build older than the marker left behind: the record gone,
-    // the tree untouched and still full of items.
     await rm(join(tmpDir, ".rex", TREE_META_FILENAME));
+
+    const { status, stderr } = spawnSync(
+      "node",
+      [cliPath, "add", "epic", tmpDir, "--title=Second Epic"],
+      { encoding: "utf-8", timeout: 10000 },
+    );
+
+    expect(status).toBe(0);
+    expect(stderr).toContain("rex migrate-slugs");
+    // The notice is only worth printing because the save re-arms the guard.
+    const meta = JSON.parse(await readFile(join(tmpDir, ".rex", TREE_META_FILENAME), "utf-8"));
+    expect(meta.slugRule).toBe(SLUG_RULE_VERSION);
+  });
+
+  // And the refusal survives where it still belongs: no marker *and* a path
+  // this build did not write leaves nothing to identify the writer.
+  it("refuses a write when the marker is gone and a path follows a foreign rule", async () => {
+    run(["init", tmpDir]);
+    run(["add", "epic", tmpDir, "--title=First Epic"]);
+    await rm(join(tmpDir, ".rex", TREE_META_FILENAME));
+
+    // The superseded rule's shape: an unconditional `-{id6}` suffix.
+    const treeRoot = join(tmpDir, ".rex", PRD_TREE_DIRNAME);
+    await rename(join(treeRoot, "first-epic.md"), join(treeRoot, "first-epic-aaaaaa.md"));
 
     const output = run(["add", "epic", tmpDir, "--title=Second Epic"], true);
     expect(output).toContain("slug rule marker missing; run rex migrate-slugs");

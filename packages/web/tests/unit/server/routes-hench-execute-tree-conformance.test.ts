@@ -175,10 +175,12 @@ describe("POST /api/hench/execute — PRD tree conformance gate", () => {
   // unmarked with paths that already conform. Refusing would make Execute
   // unusable on every upgraded checkout; the write that the run ends with
   // adopts the tree and says so instead.
-  it("starts on a missing slug-rule marker when every path conforms", async () => {
+  it("reaches the per-task checks on a missing marker when every path conforms", async () => {
     await stripMarker();
 
-    expect((await execute("task-def456")).status).not.toBe(412);
+    // The unknown task again: a 404 is only reachable past the gate, and
+    // unlike a real task id it proves the gate opened without spawning a run.
+    expect(await execute("task-nope")).toMatchObject({ status: 404 });
   });
 
   it("refuses a missing marker when a path follows a foreign rule", async () => {
