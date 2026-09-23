@@ -4,6 +4,7 @@ import type { LoadedData, NavigateTo } from "../types.js";
 import type { Finding } from "../external.js";
 import { FindingsList } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
+import { effectiveEnrichmentPass } from "../enrichment-pass.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
 import { findingAskSeed } from "./finding-seed.js";
 
@@ -83,8 +84,8 @@ function RefreshRecommendationsButton() {
 }
 
 export function SuggestionsView({ data, navigateTo, askEnabled = false }: SuggestionsProps) {
-  const { zones } = data;
-  const enrichmentPass = zones?.enrichmentPass ?? 0;
+  const { zones, manifest } = data;
+  const enrichmentPass = effectiveEnrichmentPass(zones, manifest);
 
   // ── Every hook, before the enrichment gate ────────────────────────────────
   // The gate below returns early, and `enrichmentPass` comes from analysis data

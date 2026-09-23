@@ -31,6 +31,8 @@ export interface Manifest {
   children?: SubAnalysisRef[];
   /** Background `sv narrate` state — zone names and insights still landing while `pending`. */
   narration?: NarrationState;
+  /** The most recent analyze run; `mode` says how zones were enriched. */
+  lastAnalysis?: { mode?: string };
 }
 
 /** Mirrors sourcevision's `NarrationState`. */
@@ -227,6 +229,8 @@ export interface Zones {
   findings?: Finding[];
   /** Number of AI enrichment passes completed */
   enrichmentPass?: number;
+  /** `cascade`: one judged pass that yields every finding kind passes 2–4 add. */
+  enrichmentMode?: "cascade" | "generative";
   /** Number of meta-evaluation passes completed (pass 5+) */
   metaEvaluationCount?: number;
   /** Hash of structural zone groupings for change detection */

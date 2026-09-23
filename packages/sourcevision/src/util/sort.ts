@@ -123,6 +123,7 @@ export function sortZonesData(zones: Zones): Zones {
     ...(zones.insights ? { insights: zones.insights } : {}),
     ...(zones.findings?.length ? { findings: sortFindings(zones.findings) } : {}),
     ...(zones.enrichmentPass != null ? { enrichmentPass: zones.enrichmentPass } : {}),
+    ...(zones.enrichmentMode ? { enrichmentMode: zones.enrichmentMode } : {}),
     ...(zones.metaEvaluationCount != null ? { metaEvaluationCount: zones.metaEvaluationCount } : {}),
     ...(zones.structureHash ? { structureHash: zones.structureHash } : {}),
     ...(zones.inputFingerprint ? { inputFingerprint: zones.inputFingerprint } : {}),

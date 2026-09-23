@@ -18,6 +18,7 @@ import { useProjectMetadata, useFeatureToggle, useCliName } from "../api.js";
 import { resolveCliLabel } from "../hooks/index.js";
 import { SOURCEVISION_TABS } from "../api.js";
 import { isDeployedMode } from "../deployed-mode.js";
+import { effectiveEnrichmentPass } from "../enrichment-pass.js";
 
 const STORAGE_KEY = "sidebar-expanded-section";
 
@@ -188,7 +189,7 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
     scope ? (visibleSections[0]?.label ?? getInitialExpanded(view)) : getInitialExpanded(view)
   );
 
-  const enrichmentPass = zones?.enrichmentPass ?? 0;
+  const enrichmentPass = effectiveEnrichmentPass(zones, manifest);
 
   const modules = manifest?.modules ?? {};
   const moduleNames = ["inventory", "imports", "classifications", "zones", "components", "callgraph"];

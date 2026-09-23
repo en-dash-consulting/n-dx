@@ -425,6 +425,12 @@ export interface Zones {
   findings?: Finding[];
   /** Number of AI enrichment passes completed */
   enrichmentPass?: number;
+  /**
+   * How the enrichment was produced. `cascade` is one judged pass that yields
+   * every finding kind the generative passes 2–4 add one at a time, so
+   * consumers gating on the pass number treat a cascade pass as complete.
+   */
+  enrichmentMode?: "cascade" | "generative";
   /** Number of meta-evaluation passes completed (pass 5+) */
   metaEvaluationCount?: number;
   /** Hash of structural zone groupings for change detection */

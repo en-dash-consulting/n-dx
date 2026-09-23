@@ -3066,12 +3066,13 @@ function buildAnalyzeZonesResult(opts: {
   pendingNames?: string[];
   partitionReview?: PartitionReview;
   areas?: ZoneArea[];
+  enrichmentMode?: Zones["enrichmentMode"];
 }): AnalyzeZonesResult {
   const {
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
     previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration, pendingNames,
-    partitionReview, areas,
+    partitionReview, areas, enrichmentMode,
   } = opts;
 
   const prevMetaCount = previousZones?.metaEvaluationCount ?? 0;
@@ -3091,6 +3092,7 @@ function buildAnalyzeZonesResult(opts: {
       insights: allGlobalInsights.length > 0 ? allGlobalInsights : undefined,
       findings: allFindings.length > 0 ? allFindings : undefined,
       enrichmentPass: enrichmentPass > 0 ? displayPass : undefined,
+      ...(enrichmentPass > 0 && enrichmentMode ? { enrichmentMode } : {}),
       ...(metaEvaluationCount ? { metaEvaluationCount } : {}),
       structureHash,
       inputFingerprint,
@@ -3503,5 +3505,8 @@ export async function analyzeZones(
     previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration,
     partitionReview, areas,
     pendingNames: [...(pendingNames ?? []), ...pendingAreaNames, ...pendingSubZoneNames],
+    // A run that enriched says how; one that reused the previous enrichment
+    // (--fast on an unchanged structure) keeps the previous mode.
+    enrichmentMode: enrichResult.cascade ? "cascade" : enrich && enrichTokenUsage ? "generative" : validPrevious?.enrichmentMode,
   });
 }

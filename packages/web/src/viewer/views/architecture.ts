@@ -4,6 +4,7 @@ import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { Finding } from "../external.js";
 import { FindingsList, BarChart } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
+import { effectiveEnrichmentPass } from "../enrichment-pass.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 
@@ -14,8 +15,8 @@ interface ArchitectureProps {
 }
 
 export function ArchitectureView({ data, onSelect, navigateTo }: ArchitectureProps) {
-  const { zones } = data;
-  const enrichmentPass = zones?.enrichmentPass ?? 0;
+  const { zones, manifest } = data;
+  const enrichmentPass = effectiveEnrichmentPass(zones, manifest);
 
   // ── Every hook, before the enrichment gate ────────────────────────────────
   // The gate below returns early, and `enrichmentPass` comes from analysis data
