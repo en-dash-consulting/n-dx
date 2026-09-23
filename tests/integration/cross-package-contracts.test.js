@@ -701,7 +701,7 @@ describe("gateway export auto-detection", () => {
         "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "cascadeParentReset",
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId",
         "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
-        "VALID_VALIDATION_TYPES", "CHILD_LEVEL"],
+        "VALID_VALIDATION_TYPES", "CHILD_LEVEL", "estimateCostFromTotals"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance"],
     ]);
 
