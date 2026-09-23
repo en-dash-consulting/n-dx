@@ -95,6 +95,9 @@ export class TaskClaims {
   private renewalTimer: ReturnType<typeof setTimeout> | null = null;
   private renewalActive = false;
 
+  /** The renewal pass currently in flight, if any. {@link hold} waits it out. */
+  private renewalTick: Promise<void> | null = null;
+
   constructor(
     readonly store: ClaimsStore,
     readonly holder: ClaimHolder,
@@ -161,12 +164,24 @@ export class TaskClaims {
    */
   async hold(taskId: string, reason: ClaimHoldReason): Promise<TaskClaim | null> {
     if (this.readOnly || !this.held.has(taskId)) return null;
-    const claim = await this.store.hold(taskId, this.holder, reason);
-    this.held.delete(taskId);
-    this.expiries.delete(taskId);
-    // Re-aim the timer at whatever is left, or stand it down when nothing is.
-    if (this.renewalActive) this.scheduleRenewal();
-    return claim;
+    // A renewal tick may already be in flight with this task in its snapshot,
+    // waiting on the claims lock. Landing after the hold, its `store.claim`
+    // would rewrite the claim without the reason — and a reasonless claim
+    // dies with this pid, which is exactly what holding exists to prevent.
+    // Stand renewal down and wait the tick out, so the hold is the last
+    // write this process makes to the claim.
+    const wasRenewing = this.renewalActive;
+    this.stopRenewal();
+    try {
+      await this.renewalTick;
+      const claim = await this.store.hold(taskId, this.holder, reason);
+      this.held.delete(taskId);
+      this.expiries.delete(taskId);
+      return claim;
+    } finally {
+      // Resume for whatever is left; scheduling stands down when nothing is.
+      if (wasRenewing) this.startRenewal();
+    }
   }
 
   /** Release one claim this run holds. */
@@ -210,6 +225,19 @@ export class TaskClaims {
    * Exposed for tests; the timer is the only production caller.
    */
   async renewNow(): Promise<void> {
+    // Recorded so {@link hold} can wait a tick out instead of racing it: a
+    // refresh queued behind the claims lock when the hold is written would
+    // land after it and erase the reason.
+    const tick = this.renewalPass();
+    this.renewalTick = tick;
+    try {
+      await tick;
+    } finally {
+      if (this.renewalTick === tick) this.renewalTick = null;
+    }
+  }
+
+  private async renewalPass(): Promise<void> {
     for (const taskId of [...this.held]) {
       try {
         const result = await this.store.claim(taskId, {

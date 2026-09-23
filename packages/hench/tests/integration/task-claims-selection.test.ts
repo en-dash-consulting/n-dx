@@ -12,7 +12,7 @@ import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { PRDItem } from "@n-dx/rex";
+import type { ClaimsStore, PRDItem } from "@n-dx/rex";
 import { openClaimsStore, resolveClaimHolder } from "@n-dx/rex";
 import { assembleTaskBrief, getActionableTasks } from "../../src/agent/planning/brief.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../src/process/task-claims.js";
@@ -375,6 +375,46 @@ describe("TaskClaims.hold", () => {
     await preview.claim("t-high");
     expect(await preview.hold("t-high", "uncommitted-work")).toBeNull();
     expect(await TaskClaims.forProject(wtB).foreignClaims()).toEqual(new Map());
+  });
+
+  it("is not erased by a renewal tick that was already in flight", async () => {
+    // The losing interleaving: renewNow snapshots its held tasks and its
+    // `store.claim` is parked (here: on a gate; in production: on the claims
+    // lock) when the completion gate holds the task. Landing after the hold,
+    // that claim would rewrite the record without the reason — and a
+    // reasonless claim dies with this pid. hold() must wait the tick out.
+    const real = openClaimsStore(wtA);
+    let unblock!: () => void;
+    const gate = new Promise<void>((resolve) => { unblock = resolve; });
+    let parkNextClaim = false;
+    const store: ClaimsStore = {
+      path: real.path,
+      readClaims: () => real.readClaims(),
+      claim: async (taskId, options) => {
+        if (parkNextClaim) {
+          parkNextClaim = false;
+          await gate;
+        }
+        return real.claim(taskId, options);
+      },
+      release: (taskId, holder, options) => real.release(taskId, holder, options),
+      hold: (taskId, holder, reason) => real.hold(taskId, holder, reason),
+      isClaimedByOther: (taskId, holder) => real.isClaimedByOther(taskId, holder),
+      claimedElsewhere: (root) => real.claimedElsewhere(root),
+    };
+
+    const run = new TaskClaims(store, resolveClaimHolder(wtA));
+    await run.claim("t-high");
+
+    parkNextClaim = true;
+    const tick = run.renewNow();
+    const held = run.hold("t-high", "uncommitted-work");
+    unblock();
+    await Promise.all([tick, held]);
+
+    const claims = await real.readClaims();
+    expect(claims).toHaveLength(1);
+    expect(claims[0]).toMatchObject({ taskId: "t-high", reason: "uncommitted-work" });
   });
 
   it("is cleared by re-running the task in the worktree that left the work", async () => {
