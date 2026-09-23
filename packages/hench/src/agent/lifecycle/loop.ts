@@ -907,6 +907,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   }
 
   await finalizeRun({
+    claims: opts.claims,
     run,
     henchDir,
     projectDir,
@@ -1672,6 +1673,7 @@ async function runLocalToolLoop(params: {
   }
 
   await finalizeRun({
+    claims: opts.claims,
     run,
     henchDir,
     projectDir,
@@ -2063,6 +2065,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   // Shared: finalize run (build summary, memory stats, post-task tests, save)
   await finalizeRun({
+    claims: opts.claims,
     run,
     henchDir,
     projectDir,
