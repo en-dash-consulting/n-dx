@@ -245,7 +245,8 @@ export async function ensureLegacyPrdMigrated(dir: string): Promise<LegacyPrdMig
     // Persist the document title alongside the tree. Without this,
     // `FileStore.loadDocument()` defaults the title to "PRD" after migration.
     try {
-      await atomicWriteJSON(join(rexDir, TREE_META_FILENAME), treeMetaContents(doc));
+      const metaPath = join(rexDir, TREE_META_FILENAME);
+      await atomicWriteJSON(metaPath, await treeMetaContents(metaPath, doc));
     } catch (err) {
       throw new LegacyPrdMigrationError(
         `Failed to write tree-meta.json: ${String(err)}`,

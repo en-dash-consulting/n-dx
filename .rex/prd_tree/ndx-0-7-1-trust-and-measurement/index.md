@@ -27,6 +27,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Claims hardening](./claims-hardening/index.md) | pending |
 | [Cost measurement lands](./cost-measurement-lands/index.md) | pending |
 | [Hench commit hygiene](./hench-commit-hygiene/index.md) | pending |
-| [PRD write guards](./prd-write-guards/index.md) | completed |
+| [PRD write guards](./prd-write-guards/index.md) | pending |
 | [Release plumbing](./release-plumbing/index.md) | pending |
 | [Trust copy](./trust-copy/index.md) | pending |

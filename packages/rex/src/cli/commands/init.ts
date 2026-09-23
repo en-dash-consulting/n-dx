@@ -70,6 +70,24 @@ export async function cmdInit(
     info("Created tree/index.md");
   }
 
+  // NOTE: init deliberately does *not* write `tree-meta.json`, even though
+  // that is where the slug-rule marker lives and a marker recorded here would
+  // make it an invariant from the moment the project exists.
+  //
+  // The file cannot be written this early because its *presence* is the signal
+  // `FileStore.loadDocument` uses to decide the folder tree is canonical. A
+  // sidecar beside an empty tree makes that empty tree authoritative, so
+  // writing one here silently orphans any `prd.md`/`prd.json` that arrives
+  // before the first real save — the legacy PRD stops being read at all, with
+  // no error and no warning.
+  //
+  // A new project is covered without it: the write guard and `rex validate`
+  // both treat a tree with no items as having nothing a marker could be wrong
+  // about, so a fresh project writes, validates and records the marker on its
+  // first save. Untangling the two jobs this file does — carrying document
+  // facts, and signalling tree ownership — is what would let init record it,
+  // and that is a change to the migration path rather than to the guard.
+
   // Ensure .gitignore covers generated rex files
   await ensureGitignoreEntries(dir, [
     ".rex/n-dx_workflow.md",

@@ -163,6 +163,22 @@ describe("POST /api/hench/execute — PRD tree conformance gate", () => {
     expect(error).toMatch(/rex migrate-slugs/);
   });
 
+  // A rex build older than the marker rewrites the sidecar without it, erasing
+  // the record while moving no path. The paths scan clean, so the absence
+  // itself has to refuse — otherwise Execute starts an agent against a tree
+  // whose guard someone has already taken off.
+  it("refuses a missing slug-rule marker even when every path conforms", async () => {
+    const metaPath = join(rexDir, TREE_META);
+    const meta = JSON.parse(await readFile(metaPath, "utf-8"));
+    delete meta.slugRule;
+    await writeFile(metaPath, JSON.stringify(meta), "utf-8");
+
+    const { status, error } = await execute("task-def456");
+
+    expect(status).toBe(412);
+    expect(error).toMatch(/slug rule marker missing; run rex migrate-slugs/);
+  });
+
   // `migrate-slugs` rewrites the tree under *this* build's rule, so advising
   // it for a newer tree walks the operator into a downgrade — and the newer
   // build, refused in turn, is advised to migrate it back.

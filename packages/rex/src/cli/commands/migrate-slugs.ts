@@ -146,6 +146,11 @@ export async function cmdMigrateSlugs(
           // A non-lossless rename throws above, so reaching here proves it.
           itemsVerified: beforePrints.size,
           lossless: true,
+          // The other half of this command's job, and invisible in the counts:
+          // a tree with no marker is refused by every writer, so a run that
+          // renamed nothing may still be the run that unblocked the repository.
+          // `entriesRenamed: 0` alone reads as "nothing happened".
+          slugRuleRecorded: markerBefore !== SLUG_RULE_VERSION,
         },
         null,
         2,
