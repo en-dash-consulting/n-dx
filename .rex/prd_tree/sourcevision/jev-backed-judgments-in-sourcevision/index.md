@@ -36,7 +36,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Partition balance and nesting: lopsided subdivisions count as failures, oversized zones flagged, tests grouped with their code, iso map draws sub-zones](./partition-balance-and-nesting-lopsided.md) | pending |
 | [Partition review: Jev and health signals decide whether a previous partition may be reused or seed Louvain; upgrades re-partition without sv reset](./partition-review-jev-and-health.md) | completed |
 | [Re-run judgments: Jev decides what needs re-enrichment and which findings still hold](./re-run-judgments-jev-decides-what.md) | pending |
-| [Route-aware partitioning: detect file-based routing, treat route directories as generic, group route modules by route subtree](./route-aware-partitioning-detect-file.md) | pending |
+| [Route-aware partitioning: detect file-based routing, treat route directories as generic, group route modules by route subtree](./route-aware-partitioning-detect-file.md) | completed |
 | [Scan quality: symbol evidence, symbol/README name candidates, typed anchored findings, declared-rule checks](./scan-quality-symbol-evidence-symbol.md) | pending |
 | [Scan speed: one generation call per kind, narration off the critical path](./scan-speed-one-generation-call-per.md) | completed |
 | [Zone identity: ids from the deepest distinguishing directory, clean filename ids, sub-zone ids follow their parent, stale fallback names not treated as chosen, numeric-suffix ids follow verified names](./zone-identity-ids-from-the-deepest.md) | pending |

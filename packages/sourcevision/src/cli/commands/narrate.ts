@@ -19,6 +19,7 @@ import { DATA_FILES, readManifest, writeManifest, toCanonicalJSON, deduplicateFi
 import { SV_DIR } from "./constants.js";
 import { narrateZones } from "../../analyzers/enrich-multiplex.js";
 import { nameZonesBySelection } from "../../analyzers/zone-naming.js";
+import { routeLayoutFor } from "../../analyzers/route-convention.js";
 import { dedupeZoneNames } from "../../analyzers/enrich-cascade.js";
 import { judgeFindings } from "../../analyzers/enrich-judge.js";
 import { buildProjectProfile } from "../../analyzers/project-profile.js";
@@ -235,6 +236,7 @@ export async function cmdNarrate(targetDir: string, opts: NarrateOptions): Promi
       projectDir: absDir,
       fileArchetypes,
       crossings: stored.crossings,
+      routeLayout: routeLayoutFor(inventory.files.map((f: { path: string }) => f.path)),
     });
     const applied = applyGeneratedNames(stored, naming.zones);
     if (applied.renamed.length > 0) {

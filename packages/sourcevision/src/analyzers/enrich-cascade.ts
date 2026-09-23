@@ -40,6 +40,7 @@ import { assessZoneFragility, fragilityFindings } from "./enrich-judge.js";
 import { nameZonesBySelection, describeZoneFromFacts, algorithmicZoneName } from "./zone-naming.js";
 import { emptyAnalyzeTokenUsage } from "./token-usage.js";
 import type { AnalyzeTokenUsage } from "../schema/index.js";
+import { routeLayoutFor } from "./route-convention.js";
 
 /**
  * Fragility probabilities inside this band are neither a finding nor a
@@ -211,6 +212,7 @@ export async function cascadeEnrichment(
     crossings,
     skipGeneratedNames,
     deferGeneratedNames: options.deferNarration === true,
+    routeLayout: routeLayoutFor(inventory.files.map((f) => f.path)),
   });
   const deferredNameZoneIds = new Set(options.deferNarration ? naming.fallbackZoneIds : []);
   addUsage(tokenUsage, naming.calls, naming.tokenUsage);

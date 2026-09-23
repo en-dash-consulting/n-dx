@@ -175,6 +175,30 @@ describe("analyzeZones partition review", () => {
     expect(second.zones.partitionReview).toEqual(first.zones.partitionReview);
   });
 
+  it("neither reuses nor seeds from a partition made by another algorithm version", async () => {
+    const { zones: fresh } = await analyzeZones(inventory, imports, { enrich: false });
+    // A healthy-looking older partition that glued alpha+beta together.
+    const glued = [
+      makeZone("alpha", files.filter((p) => /alpha|beta/.test(p))),
+      makeZone("gamma", files.filter((p) => p.includes("gamma"))),
+      makeZone("delta", files.filter((p) => p.includes("delta"))),
+    ];
+    const previousZones: Zones = { ...fresh, zones: glued, structureHash: computeStructureHash(glued), algorithmVersion: 2 };
+    const result = await analyzeZones(inventory, imports, { enrich: false, previousZones });
+    expect(result.zones.zones.find((z) => z.files.includes("src/alpha/m0.ts"))?.files).not.toContain("src/beta/m0.ts");
+    expect(result.zones.algorithmVersion).toBe(fresh.algorithmVersion);
+  });
+
+  it("keeps new ids but carries chosen names across an algorithm change", async () => {
+    const { zones: fresh } = await analyzeZones(inventory, imports, { enrich: false });
+    const old = fresh.zones.map((z, i) => ({ ...z, id: `legacy-${i + 2}`, name: i === 0 ? "Chosen Name" : `Legacy ${i + 2}` }));
+    const previousZones: Zones = { ...fresh, zones: old, structureHash: computeStructureHash(old), algorithmVersion: 2 };
+    const result = await analyzeZones(inventory, imports, { enrich: false, previousZones });
+    expect(result.zones.zones.some((z) => z.id.startsWith("legacy-"))).toBe(false);
+    expect(result.zones.zones.map((z) => z.name)).toContain("Chosen Name");
+    expect(result.zones.zones.map((z) => z.name)).not.toContain("Legacy 3");
+  });
+
   it("keeps an explicit reuseStructure request", async () => {
     const previousZones = await fragmentedPrevious();
     const result = await analyzeZones(inventory, imports, { enrich: false, previousZones, reuseStructure: true });

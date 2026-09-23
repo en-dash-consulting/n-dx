@@ -130,6 +130,7 @@ export function sortZonesData(zones: Zones): Zones {
     ...(zones.lastReset ? { lastReset: zones.lastReset } : {}),
     ...(zones.stability ? { stability: zones.stability } : {}),
     ...(zones.partitionReview ? { partitionReview: zones.partitionReview } : {}),
+    ...(zones.algorithmVersion != null ? { algorithmVersion: zones.algorithmVersion } : {}),
   };
 }
 

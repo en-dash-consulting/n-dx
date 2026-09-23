@@ -26,6 +26,8 @@ import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client
 import { askJev, choice, noul } from "./jev-client.js";
 import type { JevQuestion, JsonValue } from "./jev-client.js";
 import { tryParseJSON, mergeZonesByName } from "./enrich-parsing.js";
+import { dominantRouteFeature, routePathOf } from "./route-convention.js";
+import type { RouteLayout } from "./route-convention.js";
 
 /**
  * kebab-or-snake segment → Title Case. Mirrors zones.ts `deriveZoneName`
@@ -58,7 +60,7 @@ const NONE = "none";
 
 // ── Candidates ───────────────────────────────────────────────────────────────
 
-export type CandidateSource = "package" | "directory" | "directories" | "archetype";
+export type CandidateSource = "route" | "package" | "directory" | "directories" | "archetype";
 
 export interface NameCandidate {
   name: string;
@@ -98,11 +100,11 @@ function titleCase(segment: string): string {
 }
 
 /** Directory counts at a given depth, generic prefixes skipped. */
-function directoryCounts(files: string[], depth: number): Map<string, number> {
+function directoryCounts(files: string[], depth: number, extraSkip?: ReadonlySet<string>): Map<string, number> {
   const counts = new Map<string, number>();
   for (const f of files) {
     const parts = dirname(f).split("/").filter((p) => p !== "." && p !== "");
-    const meaningful = parts.filter((p) => !GENERIC_SEGMENTS.has(p.toLowerCase()));
+    const meaningful = parts.filter((p) => !GENERIC_SEGMENTS.has(p.toLowerCase()) && !extraSkip?.has(p.toLowerCase()));
     if (meaningful.length < depth) continue;
     const key = meaningful.slice(0, depth).join("/");
     counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -159,6 +161,8 @@ export interface NamingContext {
    * are reported in `fallbackZoneIds` for a later `sv narrate` to name.
    */
   deferGeneratedNames?: boolean;
+  /** File-based routing layout; adds the route a zone serves as a name candidate. */
+  routeLayout?: RouteLayout;
 }
 
 /** Zones per name-proposal prompt; the answer is a map keyed by zone id. */
@@ -178,11 +182,21 @@ export function buildNameCandidates(zone: Zone, ctx: NamingContext): NameCandida
   const pkg = packageName(zone, ctx.projectDir);
   if (pkg) add({ name: titleCase(pkg), source: "package", why: `The files belong to the "${pkg}" package.` });
 
-  const dir1 = top(directoryCounts(zone.files, 1));
+  // A route feature is the most specific identity a zone can have: the URL
+  // it serves. Its name comes from the feature directory, not the route root.
+  const route = ctx.routeLayout ? dominantRouteFeature(zone.files, ctx.routeLayout) : undefined;
+  if (route && ctx.routeLayout) {
+    const path = routePathOf(route.feature, ctx.routeLayout);
+    const leaf = path.split("/").pop() || "home";
+    add({ name: titleCase(leaf), source: "route", why: `${route.count} of ${zone.files.length} files make up the ${path} route.` });
+  }
+
+  const skip = ctx.routeLayout?.genericSegments;
+  const dir1 = top(directoryCounts(zone.files, 1, skip));
   if (dir1) {
     add({ name: titleCase(dir1[0]), source: "directory", why: `${dir1[1]} of ${zone.files.length} files sit under ${dir1[0]}/.` });
   }
-  const dir2 = top(directoryCounts(zone.files, 2));
+  const dir2 = top(directoryCounts(zone.files, 2, skip));
   if (dir2 && dir2[1] >= Math.max(2, zone.files.length * 0.5)) {
     const [a, b] = dir2[0].split("/");
     add({ name: `${titleCase(a)} ${titleCase(b)}`, source: "directories", why: `${dir2[1]} files sit under ${dir2[0]}/.` });

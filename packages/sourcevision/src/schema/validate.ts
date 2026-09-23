@@ -269,6 +269,7 @@ export const ZonesSchema = z.object({
   zoneContentHashes: z.record(z.string()).optional(),
   lastReset: z.object({ from: z.number().int().positive(), to: z.number().int().positive() }).optional(),
   partitionReview: PartitionReviewSchema.optional(),
+  algorithmVersion: z.number().int().positive().optional(),
 });
 
 // ── Components ──────────────────────────────────────────────────────────────

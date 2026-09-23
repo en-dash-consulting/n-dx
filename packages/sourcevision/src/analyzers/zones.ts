@@ -36,6 +36,8 @@ import type {
 } from "../schema/index.js";
 import type { SubAnalysis } from "./workspace.js";
 import { assessPartitionHealth, formatPartitionLine, reviewPreviousPartition } from "./partition-review.js";
+import { addRouteFeatureEdges, buildRouteLayout, detectRouteConventions, routeFeatureZoneId } from "./route-convention.js";
+import type { RouteLayout } from "./route-convention.js";
 import {
   buildPackageMap,
   computeCrossRepoCrossings,
@@ -129,6 +131,12 @@ export interface ZonePipelineOptions {
    * import edge weight. Default: 0.5. Set to 0 to disable stability bias.
    */
   stabilityWeight?: number;
+  /**
+   * File-based routing layout (see `route-convention.ts`). Its generic
+   * segments are skipped in id derivation and its route features are tied
+   * together with proximity edges.
+   */
+  routeLayout?: RouteLayout;
 }
 
 /** Result of running the zone detection pipeline. */
@@ -278,6 +286,7 @@ export function preservePreviousZoneIdentity(
   newZones: Zone[],
   previousZones: Zone[],
   threshold: number = ZONE_OVERLAP_THRESHOLD,
+  opts: { keepIds?: boolean } = {},
 ): Zone[] {
   if (previousZones.length === 0) return newZones;
 
@@ -315,6 +324,15 @@ export function preservePreviousZoneIdentity(
 
     if (bestMatch) {
       usedPrevIds.add(bestMatch.zone.id);
+      if (opts.keepIds) {
+        // The id derivation changed on purpose; only a chosen name carries over.
+        const chosen = bestMatch.zone.name !== deriveZoneName(bestMatch.zone.id);
+        if (chosen) console.log(`  [zones] keeping name "${bestMatch.zone.name}" for "${zone.id}" (was "${bestMatch.zone.id}", ${(bestMatch.overlap * 100).toFixed(0)}% file overlap)`);
+        result.push(chosen
+          ? { ...zone, name: bestMatch.zone.name, description: bestMatch.zone.description || zone.description }
+          : zone);
+        continue;
+      }
       console.log(`  [zones] preserving identity: "${zone.id}" → "${bestMatch.zone.id}" (${(bestMatch.overlap * 100).toFixed(0)}% file overlap)`);
       result.push({
         ...zone,
@@ -372,10 +390,10 @@ const SKIPPABLE_SEGMENTS = new Set([
  * segments are treated as generic and skipped, producing deeper, more
  * specific names (e.g., "agent" instead of "hench").
  */
-export function deriveZoneId(files: string[], parentId?: string): string {
+export function deriveZoneId(files: string[], parentId?: string, extraSkip?: ReadonlySet<string>): string {
   // When deriving sub-zone IDs, treat parent's ID segments as generic
-  const skip = parentId
-    ? new Set([...SKIPPABLE_SEGMENTS, ...parentId.split("/").map(s => s.toLowerCase())])
+  const skip = parentId || extraSkip?.size
+    ? new Set([...SKIPPABLE_SEGMENTS, ...(extraSkip ?? []), ...(parentId ? parentId.split("/").map(s => s.toLowerCase()) : [])])
     : SKIPPABLE_SEGMENTS;
 
   const segmentCounts = new Map<string, number>();
@@ -433,11 +451,13 @@ export function deriveZoneId(files: string[], parentId?: string): string {
 export function disambiguateZoneId(
   baseId: string,
   files: string[],
-  parentId?: string
+  parentId?: string,
+  extraSkip?: ReadonlySet<string>,
 ): string {
-  const parentSegments = parentId
-    ? new Set(parentId.split("/").map(s => s.toLowerCase()))
-    : new Set<string>();
+  const parentSegments = new Set([
+    ...(parentId ? parentId.split("/").map(s => s.toLowerCase()) : []),
+    ...(extraSkip ?? []),
+  ]);
 
   const nextCounts = new Map<string, number>();
 
@@ -1030,7 +1050,8 @@ export function subdivideZone(
   imports: Imports,
   inventory: Inventory,
   testFiles: Set<string> = new Set(),
-  depth: number = 0
+  depth: number = 0,
+  routeLayout?: RouteLayout,
 ): Zone[] {
   // Don't subdivide small zones or if we've hit max depth. The threshold is
   // project-size-relative — a 29-file zone in a 111-file project is 26 % of
@@ -1064,6 +1085,7 @@ export function subdivideZone(
     parentId: zone.id,
     depth: depth + 1,
     testFiles,
+    routeLayout,
   });
 
   // If pipeline found only 1 or 0 zones, no meaningful subdivision
@@ -1106,7 +1128,7 @@ export function computeStructureHash(zones: Zone[]): string {
  * silently keep stale zones — and, e.g., an empty codebase map — until they
  * delete `.sourcevision`. Monotonic integer; history is intentionally terse.
  */
-export const ZONE_ALGORITHM_VERSION = 2;
+export const ZONE_ALGORITHM_VERSION = 3;
 
 /**
  * Hash the analysis inputs that determine the Louvain partition, independent
@@ -1546,7 +1568,8 @@ function collectFileStructureFindings(
  */
 function mergeSameIdCommunities(
   community: Map<string, string>,
-  maxSize?: number
+  maxSize?: number,
+  extraSkip?: ReadonlySet<string>,
 ): void {
   const tempMembers = new Map<string, string[]>();
   for (const [node, comm] of community) {
@@ -1556,7 +1579,7 @@ function mergeSameIdCommunities(
   }
 
   // Pass 1: merge communities with the same derived zone ID
-  mergeByKey(community, tempMembers, (members) => deriveZoneId(members), maxSize);
+  mergeByKey(community, tempMembers, (members) => deriveZoneId(members, undefined, extraSkip), maxSize);
 
   // Rebuild member map after pass 1 (community assignments may have changed)
   tempMembers.clear();
@@ -1742,7 +1765,9 @@ function buildZonesFromCommunities(
   parentId?: string,
   depth: number = 0,
   maxMergeSize?: number,
+  routeLayout?: RouteLayout,
 ): { zones: Zone[]; filenameBasedZoneIds: Set<string> } {
+  const extraSkip = routeLayout?.genericSegments;
   const communityMembers = new Map<string, string[]>();
   for (const [node, comm] of community) {
     let list = communityMembers.get(comm);
@@ -1776,10 +1801,15 @@ function buildZonesFromCommunities(
       const normalized = suite.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "");
       id = normalized ? `tests-${normalized}` : "tests";
     } else {
-      id = deriveZoneId(members, parentId);
+      id = deriveZoneId(members, parentId, extraSkip);
+      // Directory derivation fell through to a route-generic segment: flat
+      // route files directly under the root. Name the zone after the route.
+      if (routeLayout && extraSkip?.has(id)) {
+        id = routeFeatureZoneId(members, routeLayout) ?? id;
+      }
     }
     if (usedIds.has(id)) {
-      const disambiguated = disambiguateZoneId(id, members, parentId);
+      const disambiguated = disambiguateZoneId(id, members, parentId, extraSkip);
       if (disambiguated !== id && !usedIds.has(disambiguated)) {
         id = disambiguated;
       } else {
@@ -1811,7 +1841,7 @@ function buildZonesFromCommunities(
             existing.coupling = metrics.coupling;
             // Re-subdivide with merged files
             existing.subZones = undefined;
-            const subZones = subdivideZone(existing, imports, inventory, testFiles, depth);
+            const subZones = subdivideZone(existing, imports, inventory, testFiles, depth, routeLayout);
             if (subZones.length > 0) {
               existing.subZones = subZones;
             }
@@ -1847,7 +1877,7 @@ function buildZonesFromCommunities(
       ...(depth > 0 ? { depth } : {}),
     };
 
-    const subZones = subdivideZone(zone, imports, inventory, testFiles, depth);
+    const subZones = subdivideZone(zone, imports, inventory, testFiles, depth, routeLayout);
     if (subZones.length > 0) {
       zone.subZones = subZones;
     }
@@ -2389,6 +2419,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     smallZoneMergeThreshold = 3,
     previousZoneAssignment,
     stabilityWeight = 0.5,
+    routeLayout,
   } = options;
 
   // ── Resolve directory-targeted edges ──
@@ -2440,6 +2471,12 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     return (nonImportDirCounts.get(dir) ?? 0) >= 2;
   });
   addDirectoryProximityEdges(graph, clusterableNonImportFiles);
+
+  // ── Route features ──
+  // Route modules are wired by path, not by importing each other; tie each
+  // route feature's files together so shared-component imports do not decide
+  // the grouping. Added after the import-only snapshot, like proximity edges.
+  if (routeLayout) addRouteFeatureEdges(graph, scopeFiles, routeLayout);
 
   // ── Add co-zone stability bias from previous run ──
   // When previous zones exist, add synthetic edges between files that shared
@@ -2518,7 +2555,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   // ── Split oversized communities (production only) ──
   community = splitLargeCommunities(community, productionGraph, maxZoneSize);
 
-  mergeSameIdCommunities(community, maxPct < 100 ? maxZoneSize : undefined);
+  mergeSameIdCommunities(community, maxPct < 100 ? maxZoneSize : undefined, routeLayout?.genericSegments);
   community = capZoneCount(community, productionGraph, scaledMaxZones);  // re-cap after split
 
   // ── Drop quarantined tests into their own per-suite zones ──
@@ -2534,7 +2571,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   // ── Build zones from communities ──
   const { zones, filenameBasedZoneIds } = buildZonesFromCommunities(
     community, graph, importOnlyGraph, imports, inventory, testFiles, parentId, depth,
-    maxPct < 100 ? maxZoneSize : undefined,
+    maxPct < 100 ? maxZoneSize : undefined, routeLayout,
   );
 
   // ── Assign unzoned files by directory proximity ──
@@ -2863,6 +2900,7 @@ function buildAnalyzeZonesResult(opts: {
       ...(lastReset ? { lastReset } : {}),
       ...(stability ? { stability } : {}),
       ...(partitionReview ? { partitionReview } : {}),
+      algorithmVersion: ZONE_ALGORITHM_VERSION,
     }),
     tokenUsage: enrichTokenUsage,
     structureChanged,
@@ -2945,6 +2983,9 @@ export async function analyzeZones(
   let structureHash: string;
   let structureChanged: boolean;
 
+  const inventoryPaths = inventory.files.map((f) => f.path);
+  const routeLayout = buildRouteLayout(inventoryPaths, detectRouteConventions(inventoryPaths));
+
   const inputFingerprint = computeInputFingerprint(
     inventory,
     options?.zonePins,
@@ -2970,7 +3011,16 @@ export async function analyzeZones(
   let partitionReview: PartitionReview | undefined = previousZones?.partitionReview;
   let trustPrevious = true;
   let freshReview = false;
-  if (previousZones?.zones?.length && !options?.reuseStructure) {
+  // A partition from another algorithm version is neither reused nor used as
+  // the stability seed: seeding would pull the new algorithm back toward the
+  // old grouping, which is exactly what the version bump is meant to escape.
+  const algorithmChanged =
+    !!previousZones?.zones?.length && previousZones.algorithmVersion !== ZONE_ALGORITHM_VERSION;
+  if (algorithmChanged && !options?.reuseStructure) {
+    trustPrevious = false;
+    partitionReview = undefined;
+    console.log(`  [partition] zone algorithm changed (v${previousZones?.algorithmVersion ?? "?"} → v${ZONE_ALGORITHM_VERSION}) — re-partitioned without stability bias`);
+  } else if (previousZones?.zones?.length && !options?.reuseStructure) {
     const decision = await reviewPreviousPartition(previousZones, inputFingerprint);
     partitionReview = decision.review;
     trustPrevious = decision.trustPrevious;
@@ -3000,6 +3050,7 @@ export async function analyzeZones(
 
     // ── Run zone detection pipeline ──
     const pipeline = runZonePipeline({
+      routeLayout,
       edges: filteredEdges,
       inventory,
       imports,
@@ -3035,7 +3086,10 @@ export async function analyzeZones(
     recordPartitionReview({ ...partitionReview, reused: reuseStructure });
   }
 
-  const validPrevious = structureChanged ? undefined : previousZones;
+  // After an algorithm change the previous zones' ids are the old derivation's;
+  // their enrichment is not valid for the new ids even when file sets match.
+  // Chosen names still carry over through identity preservation below.
+  const validPrevious = structureChanged || algorithmChanged ? undefined : previousZones;
 
   if (structureChanged && previousZones?.enrichmentPass && options?.onReset) {
     options.onReset(previousZones.enrichmentPass, 1);
@@ -3061,6 +3115,7 @@ export async function analyzeZones(
         enrichedZones,
         previousZones.zones,
         trustPrevious ? ZONE_OVERLAP_THRESHOLD : REJECTED_PARTITION_OVERLAP_THRESHOLD,
+        { keepIds: algorithmChanged },
       )
     : enrichedZones;
   if (enrichResult.cascade && previousZones) {

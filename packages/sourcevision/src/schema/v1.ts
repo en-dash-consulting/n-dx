@@ -442,6 +442,8 @@ export interface Zones {
   stability?: ZoneStability;
   /** Whether the previous partition was judged fit to reuse (see `analyzers/partition-review.ts`). */
   partitionReview?: PartitionReview;
+  /** `ZONE_ALGORITHM_VERSION` that produced this partition; a different version is not reused or used as a seed. */
+  algorithmVersion?: number;
 }
 
 /** Deterministic signals of how fragmented a zone partition is. */
@@ -876,6 +878,8 @@ export interface ProjectProfile {
   ciSurfaces: ProjectSurface[];
   /** Quality of the import graph that backed zone detection. */
   importGraphQuality: "rich" | "sparse" | "absent";
+  /** File-based routing roots (see `analyzers/route-convention.ts`); absent when none. */
+  routeConventions?: Array<{ framework: "react-router" | "nextjs" | "sveltekit"; root: string }>;
 }
 
 /** A release-versioning system detected in the repo. */
