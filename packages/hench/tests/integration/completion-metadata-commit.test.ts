@@ -194,6 +194,59 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
     expect(changed).not.toContain("execution-log");
   });
 
+  it("reports a tracked execution log as the operator's instead of leaving it silently dirty", async () => {
+    // This fixture's execution log was committed at baseline, i.e. the project
+    // tracks it (created before rex init gitignored the pattern). Hench never
+    // stages it and the completion gate discounts it, so without the report it
+    // stayed dirty after every completion and the next autonomous run's
+    // pre-run gate refused to start.
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const logPath = join(projectDir, ".rex", "execution-log.jsonl");
+
+    const mockStore = {
+      getItem: vi.fn(async (id: string) =>
+        id === taskId ? { id: taskId, status: "in_progress", title: "Test task", level: "task" } : null,
+      ),
+      updateItem: vi.fn(async (id: string, updates: Record<string, unknown>) => {
+        if (id === taskId && updates.status === "completed") {
+          const current = readFileSync(taskIndexPath, "utf-8").replace(/\r\n/g, "\n");
+          await writeFile(taskIndexPath, current.replace("status: in_progress", "status: completed"), "utf-8");
+        }
+      }),
+      // A real store appends every status transition to the log.
+      appendLog: vi.fn(async () => {
+        await appendFile(logPath, "completion log\n", "utf-8");
+      }),
+      loadDocument: vi.fn(async () => ({ items: [] })),
+    };
+
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(taskId),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store: mockStore,
+    });
+
+    // The completion commit lands, without the log…
+    const { stdout: logMsg } = await execAsync("git log -1 --format='%s'", { cwd: projectDir });
+    expect(logMsg.trim()).toContain(taskId);
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    expect(changed).not.toContain("execution-log");
+
+    // …the log stays the operator's, dirty in the tree…
+    const dirty = await getRexDirtyLines(projectDir);
+    expect(dirty.some((line) => line.includes("execution-log.jsonl"))).toBe(true);
+
+    // …and hench says so instead of leaving it silently.
+    const logged = (console.log as unknown as { mock: { calls: unknown[][] } }).mock.calls
+      .flat()
+      .join("\n");
+    expect(logged).toContain("hench never commits");
+    expect(logged).toContain(".rex/execution-log.jsonl");
+  });
+
   it("no-ops cleanly when task is already completed (nothing to stage)", async () => {
     const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
 
@@ -361,6 +414,12 @@ describe("commitCompletionMetadata — execution log gitignored per rex init (Bu
     expect(changed).toContain(`.rex/${PRD_TREE_DIRNAME}/${"task-slug-gitignored"}/index.md`);
     // …the gitignored log was not.
     expect(changed).not.toContain("execution-log");
+
+    // A gitignored log is nobody's problem: neither staged nor reported.
+    const logged = (console.log as unknown as { mock: { calls: unknown[][] } }).mock.calls
+      .flat()
+      .join("\n");
+    expect(logged).not.toContain("hench never commits");
   });
 });
 

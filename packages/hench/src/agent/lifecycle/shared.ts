@@ -58,10 +58,13 @@ import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
 import {
   PRD_COMMIT_PATHS,
+  PRD_STAGE_PATHS,
   findUncommittedWork,
+  formatOperatorPrdLeftovers,
   formatRecordCommitPending,
   formatUncommittedWorkRefusal,
   listDirtyPaths,
+  listOperatorOwnedPrdDirt,
   partitionDirtyPaths,
   renderPaths,
 } from "./uncommitted-work-gate.js";
@@ -1559,33 +1562,41 @@ async function isGitIgnored(projectDir: string, relativePath: string): Promise<b
  * gitignored, and should be staged by a commit that lands a PRD write.
  *
  * One helper for both staging sites — {@link commitPrdTreeIfStaged} and the
- * commit prompt — because the set they stage has to stay equal to what the
- * uncommitted-work gate discounts ({@link PRD_COMMIT_PATHS}). When they
- * disagreed, the sidecar `tree-meta.json` was discounted by nobody and staged
- * by nobody, and every completion was refused.
+ * commit prompt — and its candidates come from {@link PRD_STAGE_PATHS}, the
+ * same definition the uncommitted-work gate's discount derives from. The two
+ * sets drifted twice when they were maintained by hand: `tree-meta.json` was
+ * discounted by nobody and staged by nobody, so every completion was refused;
+ * then the execution log was staged by nobody but still discounted, so a
+ * tracked log stayed silently dirty after every completion. The definition's
+ * operator-owned entries are deliberately NOT staged here — they are reported
+ * instead, by {@link listOperatorOwnedPrdDirt}'s caller.
  *
  * Each path is existence-checked: `git add` errors on a missing path, and in a
  * fresh project the legacy markdown (and, before the first PRD write, the tree
  * itself) is absent. Each surviving path is then checked with
  * {@link isGitIgnored}; an ignored path is dropped with a debug line rather
  * than passed to `git add`.
+ *
+ * Exported for the divergence test in uncommitted-work-gate.test.ts, which
+ * pins that this stages exactly the definition's hench-staged entries.
  */
-async function prdPathsToStage(
+export async function prdPathsToStage(
   projectDir: string,
   opts: { includeLegacyMarkdown?: boolean } = {},
 ): Promise<string[]> {
   const { join } = await import("node:path");
   const { existsSync } = await import("node:fs");
   const candidates = [
-    PRD_TREE_DIRNAME,
-    TREE_META_FILENAME,
-    ...(opts.includeLegacyMarkdown ? [PRD_MARKDOWN_FILENAME] : []),
+    ...PRD_STAGE_PATHS,
+    // Prompt-only legacy extra: read-only for years, never written by a PRD
+    // mutation, so it is neither staged by the completion commit nor
+    // discounted by the gate — a dirty prd.md is operator work.
+    ...(opts.includeLegacyMarkdown ? [`.rex/${PRD_MARKDOWN_FILENAME}`] : []),
   ];
-  const existing = candidates.filter((name) => existsSync(join(projectDir, ".rex", name)));
+  const existing = candidates.filter((relativePath) => existsSync(join(projectDir, relativePath)));
 
   const staged: string[] = [];
-  for (const name of existing) {
-    const relativePath = join(".rex", name);
+  for (const relativePath of existing) {
     if (await isGitIgnored(projectDir, relativePath)) {
       detail(`Skipping gitignored PRD path: ${relativePath}`);
       continue;
@@ -1797,6 +1808,16 @@ async function commitCompletionMetadata(
     detail(`Warning: could not commit PRD tree changes: ${result.error.message}`);
   } else if (result.staged > 0) {
     detail(`Committed completion metadata (${result.staged} PRD file(s))`);
+  }
+
+  // The completion's PRD write also appended the execution log, which hench
+  // never stages. In the common case the log is gitignored and this finds
+  // nothing; in a project that tracks it, say whose file it is — the gate
+  // discounts it, this commit skipped it, and silence here is what left it
+  // permanently dirty and the next autonomous run refused at the pre-run gate.
+  const operatorDirt = await listOperatorOwnedPrdDirt(projectDir);
+  if (operatorDirt.length > 0) {
+    info(`\n${formatOperatorPrdLeftovers(operatorDirt)}`);
   }
   return result;
 }
