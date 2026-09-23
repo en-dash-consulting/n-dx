@@ -175,6 +175,13 @@ describe("rex cli/commands import surface", () => {
     "../../schema/validate.js",
     "../../store/adapter-registry.js",
     "../../store/atomic-write.js",
+    // `rex claim` is a CLI over the claims store and nothing else: it lists
+    // what the store holds and releases entries from it. Routing it through
+    // public.ts would widen the package's external API — openClaimsStore and
+    // friends are already there for hench and web, but defaultIsPidAlive and
+    // the store's release options are internal detail this command needs and
+    // no external consumer should depend on.
+    "../../store/claims.js",
     "../../store/index.js",
     "../../store/markdown-parser.js",
     "../../store/project-config.js",

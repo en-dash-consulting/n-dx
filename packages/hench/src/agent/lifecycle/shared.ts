@@ -855,6 +855,15 @@ export interface FinalizeRunOptions {
    */
   autonomous?: boolean;
   /**
+   * Cross-worktree claims for this run, when it has any.
+   *
+   * Finalization is where the uncommitted-work gate refuses a completion, and
+   * that refusal is the one outcome that must *hold* the task's claim rather
+   * than let the run's `finally` release it. Without this the refusal path
+   * could not reach the claims it needed to hold. See `process/task-claims.ts`.
+   */
+  claims?: TaskClaims;
+  /**
    * PRD store used to reset task status to pending on failure.
    * When provided, if the run fails and the task is still in_progress,
    * it is reset to pending so it reappears as actionable. This occurs
@@ -2864,6 +2873,19 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       info(`\n${run.error}`);
       if (opts.store) {
         await withdrawCompletionClaim(opts.store, run, run.error);
+      }
+      // Hold the cross-worktree claim rather than letting the run's `finally`
+      // release it. The refusal means finished work is sitting uncommitted in
+      // *this* worktree; a free task is an invitation for another worktree to
+      // claim it and do the same work again. The hold outlives this process
+      // and lapses at the claim's existing TTL. See process/task-claims.ts.
+      if (opts.claims && run.taskId) {
+        try {
+          await opts.claims.hold(run.taskId, "uncommitted-work");
+        } catch {
+          // A claims-store failure must not change the run's outcome. The
+          // claim then dies with this pid, as it did before holds existed.
+        }
       }
     }
   }

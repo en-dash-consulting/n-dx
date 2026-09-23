@@ -147,6 +147,13 @@ const COMMAND_REGISTRY = [
     related: ["status"],
   },
   {
+    name: "claim",
+    category: "Orchestration",
+    summary: "Inspect and free cross-worktree task claims (list|release)",
+    keywords: ["claim", "worktree", "lock", "held", "release", "stuck", "concurrent"],
+    related: ["work", "status"],
+  },
+  {
     name: "sync",
     category: "Orchestration",
     summary: "Sync local PRD with remote adapter (e.g. Notion)",

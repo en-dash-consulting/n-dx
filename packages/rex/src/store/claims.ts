@@ -46,6 +46,16 @@ export const CLAIMS_FILENAME = "claims.json";
 const CLAIMS_LOCK_FILENAME = "claims.lock";
 const CLAIMS_FILE_VERSION = 1;
 
+/**
+ * Why a claim is being kept after the run that took it has ended.
+ *
+ * `uncommitted-work`: the completion gate refused to mark the task done
+ * because the run's work is still uncommitted in that worktree. Releasing
+ * then would let a second worktree claim the task and redo work that already
+ * exists on disk, so the claim is held instead — see {@link ClaimsStore.hold}.
+ */
+export type ClaimHoldReason = "uncommitted-work";
+
 export interface TaskClaim {
   taskId: string;
   /** Realpath of the worktree root working the task. */
@@ -56,6 +66,12 @@ export interface TaskClaim {
   host: string;
   claimedAt: string;
   expiresAt: string;
+  /**
+   * Set when the claim is deliberately held past its holder's exit. A held
+   * claim's {@link pid} is expected to be dead, so liveness falls back to the
+   * expiry alone. Absent on an ordinary claim held by a running process.
+   */
+  reason?: ClaimHoldReason;
 }
 
 interface ClaimsFile {
@@ -74,6 +90,19 @@ export interface ClaimOptions {
 export type ClaimResult =
   | { ok: true; claim: TaskClaim }
   | { ok: false; heldBy: TaskClaim };
+
+export interface ReleaseOptions {
+  /**
+   * Release the claim whoever holds it.
+   *
+   * Ownership is otherwise absolute: a run may only free what its own
+   * worktree took, which is what stops one checkout clearing another's claim
+   * by accident. `rex claim release --force` is the deliberate exception —
+   * an operator clearing a claim whose holder is gone, or whose hold they
+   * have dealt with, standing in whichever worktree they happen to be in.
+   */
+  force?: boolean;
+}
 
 /**
  * Who is asking, for the operations that only need identity.
@@ -115,9 +144,25 @@ export interface ClaimsStore {
   claim(taskId: string, options: ClaimOptions): Promise<ClaimResult>;
   /**
    * Release a claim this worktree holds. False when no such claim exists, or
-   * when it belongs to another worktree.
+   * when it belongs to another worktree. Held claims release like any other —
+   * that is what frees a task after the work is dealt with.
    */
-  release(taskId: string, holder: ClaimOwner): Promise<boolean>;
+  release(taskId: string, holder: ClaimOwner, options?: ReleaseOptions): Promise<boolean>;
+  /**
+   * Keep a claim this worktree holds after its process exits, recording why.
+   *
+   * An ordinary claim dies with its pid, which is what stops a crashed run
+   * wedging a task. That is exactly wrong when the run ended by *refusing* to
+   * complete the task because its work is still uncommitted: the work exists,
+   * in this worktree, and a second worktree picking the task up would redo it.
+   * A held claim therefore survives a dead pid and lapses only at its expiry,
+   * which is not extended here — an abandoned hold still clears itself at the
+   * original TTL.
+   *
+   * Returns the held claim, or null when this worktree holds no live claim on
+   * the task.
+   */
+  hold(taskId: string, holder: ClaimOwner, reason: ClaimHoldReason): Promise<TaskClaim | null>;
   /**
    * The live claim held by another worktree, or null when the task is free or
    * held by this one.
@@ -176,6 +221,10 @@ export const NOOP_CLAIMS_STORE: ClaimsStore = {
   async release() {
     return true;
   },
+  async hold() {
+    // Nothing was recorded, so there is nothing to hold.
+    return null;
+  },
   async isClaimedByOther() {
     return null;
   },
@@ -211,6 +260,10 @@ class FileClaimsStore implements ClaimsStore {
   private isLive(claim: TaskClaim): boolean {
     const expires = Date.parse(claim.expiresAt);
     if (!Number.isFinite(expires) || expires <= this.now()) return false;
+    // A held claim outlives the process that took it — that is the whole
+    // point of holding one, so the pid says nothing here and only the expiry
+    // can retire it. See {@link ClaimsStore.hold}.
+    if (claim.reason) return true;
     return this.isPidAlive(claim.pid);
   }
 
@@ -273,17 +326,38 @@ class FileClaimsStore implements ClaimsStore {
         claimedAt: existing?.claimedAt ?? new Date(nowMs).toISOString(),
         expiresAt: new Date(nowMs + ttlMs).toISOString(),
       };
+      // Deliberately no `reason`: a live process has taken the task, so
+      // whatever hold was recorded is over. Re-running in the worktree that
+      // left uncommitted work is one of the ways to resolve a hold.
       claims[taskId] = claim;
       return { ok: true, claim };
     });
   }
 
-  async release(taskId: string, holder: ClaimOwner): Promise<boolean> {
+  async release(taskId: string, holder: ClaimOwner, options: ReleaseOptions = {}): Promise<boolean> {
     return this.update((claims) => {
       const existing = claims[taskId];
-      if (!existing || !sameHolder(existing, holder.worktreeRoot)) return false;
+      if (!existing) return false;
+      if (!options.force && !sameHolder(existing, holder.worktreeRoot)) return false;
       delete claims[taskId];
       return true;
+    });
+  }
+
+  async hold(taskId: string, holder: ClaimOwner, reason: ClaimHoldReason): Promise<TaskClaim | null> {
+    return this.update((claims) => {
+      const existing = claims[taskId];
+      if (!existing || !sameHolder(existing, holder.worktreeRoot)) return null;
+      // The expiry is carried over untouched: holding a claim states why it
+      // is still here, it does not buy it more time.
+      // TODO: that means a held claim still lapses at the original 4h TTL,
+      // while hench's refusal message says it is "held until someone deals
+      // with that work" — overnight, the hold quietly evaporates and another
+      // worktree can redo the uncommitted work. Either extend the expiry
+      // here (a longer held-claim TTL) or soften that wording.
+      const held: TaskClaim = { ...existing, reason };
+      claims[taskId] = held;
+      return held;
     });
   }
 
@@ -342,6 +416,7 @@ function isClaim(value: unknown): value is TaskClaim {
     typeof c.worktreeRoot === "string" &&
     typeof c.pid === "number" &&
     typeof c.expiresAt === "string" &&
-    typeof c.claimedAt === "string"
+    typeof c.claimedAt === "string" &&
+    (c.reason === undefined || typeof c.reason === "string")
   );
 }

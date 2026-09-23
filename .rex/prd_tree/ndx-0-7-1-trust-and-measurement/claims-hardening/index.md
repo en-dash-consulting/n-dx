@@ -22,8 +22,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add ndx claim to list and release cross-worktree task claims](./add-ndx-claim-to-list-and-release.md) | pending |
-| [Hold the task claim when the uncommitted-work gate refuses completion](./hold-the-task-claim-when-the.md) | pending |
+| [Add ndx claim to list and release cross-worktree task claims](./add-ndx-claim-to-list-and-release.md) | in_progress |
+| [Hold the task claim when the uncommitted-work gate refuses completion](./hold-the-task-claim-when-the.md) | in_progress |
 | [Make the dashboard next-task read skip live claims so it matches Execute](./make-the-dashboard-next-task-read-skip.md) | pending |
 | [Offer only validated, path-scoped recovery commands after an uncommitted-work refusal](./offer-only-validated-path-scoped.md) | pending |
 | [Surface a claim lost mid-run in the Sessions tray](./surface-a-claim-lost-mid-run-in-the.md) | in_progress |

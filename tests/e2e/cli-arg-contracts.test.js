@@ -106,6 +106,7 @@ const REX_COMMANDS = [
   "reorganize",
   "health",
   "sync",
+  "claim",
   "adapter",
   "migrate-to-md",
   "migrate-folder-tree-filenames",
