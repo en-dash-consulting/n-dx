@@ -10,12 +10,10 @@
  * ## Why this lives in the ROOT suite
  *
  * This is real-process, platform-divergent behaviour, and the root suite is
- * the only suite every CI job runs: the ubuntu `validate` job runs BOTH the
- * per-package suites (`run-all-tests.mjs packages`) and the root suite, while
- * `smoke-macos` deliberately runs the root suite only and `smoke-windows`
- * runs both (see the SCOPE comments in .github/workflows/ci.yml). Under
- * `packages/llm-client/tests/` this file would run on ubuntu and Windows but
- * never on macOS; here it runs on all three families. The injected-seam unit
+ * where the cross-OS CLI and process-lifecycle suites live. The `build`
+ * matrix in .github/workflows/ci.yml runs both the root suite and the
+ * per-package suites (`run-all-tests.mjs packages`) on ubuntu, macOS and
+ * Windows. The injected-seam unit
  * coverage lives next to the module, in
  * packages/llm-client/tests/unit/interrupt-forwarding.test.ts.
  *
