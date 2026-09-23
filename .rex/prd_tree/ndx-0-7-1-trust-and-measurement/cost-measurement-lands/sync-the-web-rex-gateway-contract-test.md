@@ -1,0 +1,20 @@
+---
+id: "a0d16397-5bbb-48b8-858b-f574b754861c"
+level: "task"
+title: "Sync the web rex-gateway contract test list with estimateCostFromTotals"
+status: "pending"
+priority: "high"
+tags:
+  - "0.7.1"
+  - "cost-measurement"
+  - "ci-fix"
+source: "CI failure on PR #394 (run 35787612862); follow-up to WM2051"
+acceptanceCriteria:
+  - "tests/integration/cross-package-contracts.test.js passes, including the \"web rex-gateway source exports match contract test list\" case."
+  - "Only \"estimateCostFromTotals\" is added to testedSymbols; the type-only CostEstimate and ModelCostLine are not."
+  - "No file outside tests/integration/cross-package-contracts.test.js is modified."
+  - "The root suite is green (pnpm test or pnpm preflight)."
+description: "CI on PR #394 fails one test: tests/integration/cross-package-contracts.test.js > \"gateway export auto-detection\" > \"web rex-gateway source exports match contract test list\", with \"New exports not in contract test: + estimateCostFromTotals\". Everything else is green (1 failed, 2690 passed, 12 skipped); the three CLI Smoke jobs are SKIPPED only because they gate on Build & Validate.\n\nCause: WM2051 added a runtime re-export to packages/web/src/server/rex-gateway.ts (line 95, `export { estimateCostFromTotals } from \"@n-dx/rex\";`). That gateway is covered by TWO independent guards and only one was updated. tests/e2e/architecture-policy.test.js had its maxExports ceiling raised 69 -> 72 with rationale prose, but the explicit symbol allow-list in tests/integration/cross-package-contracts.test.js (the `testedSymbols` set in the \"web rex-gateway source exports match contract test list\" block, around line 707) never gained the symbol.\n\nWork: add \"estimateCostFromTotals\" to that `testedSymbols` set. Only that one symbol is needed - the companion `CostEstimate` and `ModelCostLine` are `export type` declarations and parseRuntimeExports (same file, ~line 532) deliberately skips type-only export blocks, so they must NOT be added or the test fails the other way with a stale entry. Note the asymmetry between the two guards: the architecture-policy ceiling counts all three exports, the contract list counts only the runtime one.\n\nScope limit - this is a test-list sync, nothing else. Do NOT change pricing behaviour, routes-token-usage.ts, the gateway, or the Token Usage view. In particular, WM2051's original acceptance criterion 3 (\"Runs whose model has no pricing entry are labelled 'unpriced' and excluded from the cost total\") was DELIBERATELY deviated from and that deviation is documented in WM2051's resolutionDetail: unknown models are priced at the labelled fallback so the to-the-cent parity with `ndx usage` holds. Do not \"fix\" that.\n\nNo changeset: this is a test-only change with no user-facing behaviour.\n\nValidation: run `npx vitest run tests/integration/cross-package-contracts.test.js` and confirm the \"web rex-gateway\" case passes, then run the root suite (`pnpm test`) or `pnpm preflight` to confirm nothing else regressed. The failure is deterministic and reproduces locally - it is not a flake."
+lastModified: "2026-09-23T01:21:31.324Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

@@ -28,4 +28,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Price dashboard token usage per model and show the split](./price-dashboard-token-usage-per-model.md) | completed |
 | [Rebase PR #353 onto main and merge it](./rebase-pr-353-onto-main-and-merge-it.md) | completed |
 | [Run the post-merge measurement batch and record the comparison with the baseline](./run-the-post-merge-measurement-batch.md) | pending |
+| [Sync the web rex-gateway contract test list with estimateCostFromTotals](./sync-the-web-rex-gateway-contract-test.md) | pending |
 | [Write the 0.7.1 release note explaining the reported-cost change](./write-the-0-7-1-release-note.md) | in_progress |
