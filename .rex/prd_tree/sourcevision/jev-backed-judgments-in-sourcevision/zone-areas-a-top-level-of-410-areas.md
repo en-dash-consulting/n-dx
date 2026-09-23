@@ -1,0 +1,25 @@
+---
+id: "7cd180ef-93e2-48e7-affa-9f19dcfe4755"
+level: "task"
+title: "Zone areas: a top level of 4–10 areas over the fine zones, tests join the area they test, iso map shows areas with drill-in"
+status: "pending"
+priority: "high"
+tags:
+  - "sourcevision"
+  - "zones"
+  - "iso-map"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "Unit test: route container children and package roots seed areas; agglomeration stops at clamp(round(1.3*sqrt(n)),4,10) areas"
+  - "Unit test: a test zone whose outgoing crossings mostly target one area joins it; one spread across areas goes to a tests area"
+  - "Unit test: every top-level zone belongs to exactly one area; areas validate in zones.json and survive sortZonesData"
+  - "Unit test: iso model built from areas has one node per area with member zones as tiles and edges aggregated between areas"
+  - "Unit test: the rendered map switches to an area's zone scene on area click and back via the breadcrumb (jsdom)"
+  - "Unit test: layout fallback triggers for one fat layer or a long single-node chain and places nodes in a grid"
+  - "iso-skill drift test passes"
+  - "Live on a copy of n-site2: area count and membership recorded in this item's log; the top-level map shows <= 10 blocks"
+  - "pnpm --filter @n-dx/sourcevision test passes"
+description: "After the balance work, n-site2 is 52 flat zones (23 of them test zones) and the iso map is unusable. It shows 40 of the 52 (12 are silently dropped), 25 zones fall into a single dependency layer (one long diagonal), and the big zones form a one-per-layer chain (a second diagonal), with 217 edges crossing an empty middle. The fine zones are a good leaf level; what is missing is the level above them.\n\n1. **Areas.** `zones.json` gains `areas: [{ id, name, zones: string[], files }]`, computed at the end of `analyzeZones` from the final top-level zones and crossings:\n   - Structural seeds: zones under one route container child (`app/routes/apps/*`) start in one area; in a monorepo, zones under one package root start together.\n   - Agglomerative merge on the zone graph: repeatedly merge the pair of groups with the highest crossing weight relative to the smaller group's file count, until at most `clamp(round(1.3 × √n), 4, 10)` groups remain.\n   - Test zones are placed after, not clustered: each joins the area its files import most, when that area gets at least half of its outgoing crossing weight; otherwise it goes into a `tests` area.\n   - Naming: one Jev naming Choice over directory/route candidates when a route is active; otherwise, and on no answer, the largest member zone's name when it holds ≥ 50% of the files, else the dominant directory.\n2. **Iso map.** When areas exist, the top-level scene draws one block per area, with member zones as tiles and edges aggregated between areas. Clicking an area block opens its zones as their own scene: the same renderer, zones as blocks, edges between them, plus a greyed block per other area that has crossings. A breadcrumb returns to the top. The legend and dossier work at both levels.\n3. **Layout fallback.** When dependency layering puts more than half the nodes in one layer, or produces a chain of single-node layers longer than half the nodes, lay out nodes in a grid ordered by layer, then size.\n4. The iso-map skill script is regenerated."
+lastModified: "2026-09-23T03:55:47.919Z"
+lastModifiedBy: "Nick Daniel <nick@endash.us>"
+---
