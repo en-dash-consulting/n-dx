@@ -236,15 +236,38 @@ describe("the PRD tree gate between tasks", () => {
     expect(await snapshotTree(treeRoot)).toEqual(afterTamper);
   });
 
-  // WM2092: an absent marker on a non-empty tree is itself a refusal, so drift
-  // need not move a path to be caught.
-  it("refuses when the marker disappears between tasks, with every path conformant", async () => {
+  // A marker that vanishes with every path still conformant is what a 0.7.0
+  // MCP server leaves behind, and those run alongside this build for the whole
+  // release window. It is not drift — no path moved — so the gate carries on
+  // and the next write re-records the marker.
+  it("carries on when the marker disappears between tasks and every path conforms", async () => {
     mockedAgentLoop.mockImplementation(async () => {
       if (mockedAgentLoop.mock.calls.length === 1) {
         const metaPath = join(rexDir, TREE_META_FILENAME);
         const meta = JSON.parse(await readFile(metaPath, "utf-8"));
         delete meta.slugRule;
         await writeFile(metaPath, JSON.stringify(meta), "utf-8");
+      }
+      return completedRun("run-1", "task-def456");
+    });
+
+    await expect(
+      cmdRun(projectDir, { auto: "true", iterations: "2" }),
+    ).resolves.not.toThrow();
+
+    expect(mockedAgentLoop).toHaveBeenCalledTimes(2);
+  });
+
+  // But an absent marker is no longer a free pass either: once a path moves as
+  // well, nothing identifies the writer and the iteration gate stops.
+  it("refuses when the marker disappears and a path moves with it", async () => {
+    mockedAgentLoop.mockImplementation(async () => {
+      if (mockedAgentLoop.mock.calls.length === 1) {
+        const metaPath = join(rexDir, TREE_META_FILENAME);
+        const meta = JSON.parse(await readFile(metaPath, "utf-8"));
+        delete meta.slugRule;
+        await writeFile(metaPath, JSON.stringify(meta), "utf-8");
+        await reSuffixEpicDir();
       }
       return completedRun("run-1", "task-def456");
     });

@@ -16,6 +16,8 @@
  *  - a conformant tree passes, so the gate is not simply always-on
  *  - one re-suffixed path stops the run, naming the count and `rex migrate-slugs`
  *  - a foreign slug-rule marker stops it too, even with conformant paths
+ *  - an absent marker over conformant paths does *not* stop it: the write that
+ *    follows adopts the tree rather than refusing it
  *  - the refusal takes no claim and writes nothing — the tree is byte-identical
  *  - `--dry-run` refuses as well; a preview that hid this would report that the
  *    real run was going to be fine
@@ -134,15 +136,27 @@ describe("the pre-run PRD tree conformance gate", () => {
     await expect(assertPrdTreeConformant(rexDir)).rejects.toThrow(/rex migrate-slugs/);
   });
 
-  // An absent marker is what a rex build older than the field leaves behind:
-  // it rewrites the sidecar without `slugRule`, erasing the record while moving
-  // no path. The paths therefore scan clean, and the gate has to refuse on the
-  // absence itself or a run starts against a tree with no guard on it.
-  it("refuses a missing slug-rule marker even when every path conforms", async () => {
+  /** Strip the marker, leaving whatever paths are on disk untouched. */
+  async function stripMarker(): Promise<void> {
     const metaPath = join(rexDir, TREE_META_FILENAME);
     const meta = JSON.parse(await readFile(metaPath, "utf-8"));
     delete meta.slugRule;
     await writeFile(metaPath, JSON.stringify(meta), "utf-8");
+  }
+
+  // Every repository in the wild is unmarked — the marker is unreleased — and
+  // its paths already follow this rule. Refusing here would stop the first run
+  // after every upgrade, so the gate agrees with the write guard: conformant
+  // paths are adopted, and the adopting write announces itself.
+  it("passes a missing slug-rule marker when every path conforms", async () => {
+    await stripMarker();
+
+    await expect(assertPrdTreeConformant(rexDir)).resolves.toBeUndefined();
+  });
+
+  it("refuses a missing marker when a path follows a foreign rule", async () => {
+    await stripMarker();
+    await reSuffixEpicDir();
     const before = await snapshotTree(treeRoot);
 
     await expect(assertPrdTreeConformant(rexDir)).rejects.toThrow(
