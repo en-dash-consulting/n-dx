@@ -13,17 +13,23 @@
  * here therefore runs against both.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, readFile, readdir, mkdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { FolderTreeStore, ensureFolderTreeRexDir } from "../../../src/store/folder-tree-store.js";
 import { FileStore } from "../../../src/store/file-adapter.js";
-import { SlugRuleMismatchError, readSlugRuleMarker } from "../../../src/store/slug-rule-guard.js";
+import {
+  SlugRuleMismatchError,
+  readSlugRuleMarker,
+  checkTreeConformance,
+} from "../../../src/store/slug-rule-guard.js";
 import { SLUG_RULE_VERSION } from "../../../src/store/folder-tree-serializer.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
 import { syncFolderTree } from "../../../src/cli/commands/folder-tree-sync.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
+import { withLock } from "../../../src/store/file-lock.js";
+import { prdLockPath } from "../../../src/store/paths.js";
 import type { PRDDocument, PRDItem, PRDStore } from "../../../src/store/index.js";
 
 const TREE_META = "tree-meta.json";
@@ -146,28 +152,13 @@ describe("slug-rule write guard", () => {
       expect(err!.message).toContain("rex migrate-slugs");
     });
 
-    it("adopts an unmarked tree whose paths already conform", async () => {
-      await make(rexDir).saveDocument(doc());
-      // Strip the marker, leaving a tree as any pre-guard build wrote it.
-      await writeFile(
-        join(rexDir, TREE_META),
-        JSON.stringify({ title: "Guarded PRD", schema: SCHEMA_VERSION }),
-        "utf-8",
-      );
-      expect(await readSlugRuleMarker(rexDir)).toBeUndefined();
-
-      await make(rexDir).saveDocument(doc());
-
-      expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
-    });
-
-    // Every tree written before this guard shipped is unmarked, so the
-    // path-scan branch is the one a real upgrade takes — and it used to judge
-    // the tree by the document *about to be written*, which already carries
-    // the mutation. Any slug-changing write therefore looked exactly like a
-    // foreign build's re-slug, and was refused with that accusation. It bit
-    // once per repository: the first such write after upgrading.
-    describe("a slug-changing write on an unmarked tree", () => {
+    // An absent marker is two states at once — a tree older than the guard,
+    // and one whose sidecar a build older than the `slugRule` field rewrote
+    // without it — and nothing on disk separates them. The tree is judged by
+    // its paths instead: clean adopts with a notice, dirty refuses. Refusing
+    // both would stop every repository in existence, since the marker is
+    // unreleased and rule 2 predates the oldest build in the wild.
+    describe("a tree whose marker has gone missing", () => {
       /** Save through the store, then strip the marker the save recorded. */
       async function unmarkedTree(items: PRDItem[] = ITEMS): Promise<void> {
         await make(rexDir).saveDocument(doc(items));
@@ -179,106 +170,92 @@ describe("slug-rule write guard", () => {
         expect(await readSlugRuleMarker(rexDir)).toBeUndefined();
       }
 
-      it("renames rather than refusing, and stamps the marker", async () => {
+      it("is adopted when every path already conforms, and records the marker", async () => {
         await unmarkedTree();
 
-        await make(rexDir).withTransaction(async (d) => {
-          d.items[0]!.title = "Renamed Support";
-        });
+        await expect(make(rexDir).saveDocument(doc())).resolves.toBeUndefined();
 
-        expect(await readdir(treeRoot)).toEqual(["renamed-support.md"]);
         expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
       });
 
-      // The nastiest shape of the same bug: nobody edited a title, but adding
-      // a same-titled sibling moves *both* siblings onto `-{id6}` paths, so
-      // the pending document disagreed with the tree about an item the caller
-      // never touched.
-      it("allows an add that forces a colliding sibling onto an id suffix", async () => {
+      // Adoption is a build claiming a tree it cannot prove it wrote. It is
+      // the right call — see the module header — but it must not be a silent
+      // one, or the only record of the claim is the marker it just wrote.
+      it("says so on stderr, naming rex migrate-slugs as the way to verify", async () => {
         await unmarkedTree();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-        await make(rexDir).withTransaction(async (d) => {
-          d.items.push(task("bbbbbbbb-2222-4222-8222-222222222222", "Add SSO Support"));
-        });
+        await make(rexDir).saveDocument(doc());
 
-        expect((await readdir(treeRoot)).sort()).toEqual([
-          "add-sso-support-aaaaaa.md",
-          "add-sso-support-bbbbbb.md",
-        ]);
-        expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
+        const notices = warn.mock.calls.map((c) => String(c[0]));
+        const notice = notices.find((m) => m.includes("slug-rule marker"));
+        expect(notice).toBeDefined();
+        expect(notice).toContain("rex migrate-slugs");
+        // One line, so it cannot be mistaken for the multi-line refusal.
+        expect(notice).not.toContain("\n");
+        warn.mockRestore();
       });
 
-      // A move or a merge only trips the guard when it changes the slug of an
-      // item it did not touch: taking one of two same-titled siblings away
-      // leaves the other unique, so the survivor drops its `-{id6}` suffix.
-      // Moving a *uniquely* titled item proves nothing here — the mismatch
-      // scan only reports a rival entry found in the same directory, and a
-      // moved item simply leaves its old directory, so that version of this
-      // test passed against the unfixed guard.
-      it("allows a move that re-slugs the twin left behind", async () => {
-        const epic: PRDItem = {
-          id: "dddddddd-4444-4444-8444-444444444444",
-          title: "Alpha Epic",
-          status: "pending",
-          level: "epic",
-          description: "",
-          priority: "medium",
-          children: [
-            task("eeeeeeee-5555-4555-8555-555555555555", "Shared Title"),
-            task("ffffffff-6666-4666-8666-666666666666", "Shared Title"),
-          ],
-        } as PRDItem;
-        await unmarkedTree([epic]);
-        // Both twins carry the suffix while they are siblings.
-        expect((await readdir(join(treeRoot, "alpha-epic"))).sort()).toEqual([
-          "index.md",
-          "shared-title-eeeeee.md",
-          "shared-title-ffffff.md",
-        ]);
+      // The marker the adopting save records is what makes the notice fire
+      // once rather than on every write for the rest of the repository's life.
+      it("does not repeat the notice on the next save", async () => {
+        await unmarkedTree();
+        await make(rexDir).saveDocument(doc());
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-        await make(rexDir).withTransaction(async (d) => {
-          const moved = d.items[0]!.children!.pop()!;
-          (moved as PRDItem).level = "epic";
-          d.items.push(moved);
-        });
+        await make(rexDir).saveDocument(doc());
 
-        // The survivor is unique now, so it sheds the suffix — the rename the
-        // guard used to read as a foreign build's work.
-        expect((await readdir(join(treeRoot, "alpha-epic"))).sort()).toEqual([
-          "index.md",
-          "shared-title.md",
-        ]);
-        expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
-      });
-    });
-
-    it("refuses an unmarked tree whose paths follow a foreign rule", async () => {
-      await make(rexDir).saveDocument(doc());
-      await writeFile(
-        join(rexDir, TREE_META),
-        JSON.stringify({ title: "Guarded PRD", schema: SCHEMA_VERSION }),
-        "utf-8",
-      );
-
-      // Re-slug the single item the way the superseded rule did: an
-      // unconditional `-{id6}` suffix, even without a sibling collision.
-      const body = await readFile(join(treeRoot, "add-sso-support.md"), "utf-8");
-      await rm(join(treeRoot, "add-sso-support.md"));
-      await writeFile(join(treeRoot, "add-sso-support-aaaaaa.md"), body, "utf-8");
-      const before = await snapshotTree(rexDir);
-
-      const err = await make(rexDir)
-        .saveDocument(doc())
-        .then(
-          () => undefined,
-          (e: unknown) => e as SlugRuleMismatchError,
+        expect(warn.mock.calls.map((c) => String(c[0]))).not.toContainEqual(
+          expect.stringContaining("slug-rule marker"),
         );
+        warn.mockRestore();
+      });
 
-      expect(err).toBeInstanceOf(SlugRuleMismatchError);
-      expect(err!.found).toBeUndefined();
-      expect(err!.message).toContain("no slug-rule marker");
-      expect(err!.message).toContain("rex migrate-slugs");
-      expect(await snapshotTree(rexDir)).toEqual(before);
+      it("is adopted on the transaction path too", async () => {
+        await unmarkedTree();
+
+        await expect(
+          make(rexDir).withTransaction(async (d) => {
+            d.items[0]!.title = "Renamed Support";
+          }),
+        ).resolves.toBeUndefined();
+
+        expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
+      });
+
+      it("is refused when the paths follow a foreign rule", async () => {
+        await unmarkedTree();
+
+        // Re-slug the single item the way the superseded rule did: an
+        // unconditional `-{id6}` suffix, even without a sibling collision.
+        const body = await readFile(join(treeRoot, "add-sso-support.md"), "utf-8");
+        await rm(join(treeRoot, "add-sso-support.md"));
+        await writeFile(join(treeRoot, "add-sso-support-aaaaaa.md"), body, "utf-8");
+        const before = await snapshotTree(rexDir);
+
+        const err = await make(rexDir)
+          .saveDocument(doc())
+          .then(
+            () => undefined,
+            (e: unknown) => e as SlugRuleMismatchError,
+          );
+
+        expect(err).toBeInstanceOf(SlugRuleMismatchError);
+        expect(err!.found).toBeUndefined();
+        expect(err!.message).toContain("slug rule marker missing; run rex migrate-slugs");
+        expect(await snapshotTree(rexDir)).toEqual(before);
+      });
+
+      // The escape hatch has to work from exactly this state, or the refusal
+      // above is a wall rather than a detour.
+      it("is cleared by adoptSlugRule, which re-records the marker", async () => {
+        await unmarkedTree();
+
+        await make(rexDir).adoptSlugRule!();
+
+        expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
+        await expect(make(rexDir).saveDocument(doc())).resolves.toBeUndefined();
+      });
     });
 
     it("guards the transaction path, not only saveDocument", async () => {
@@ -321,6 +298,53 @@ describe("slug-rule write guard", () => {
 
       // And the guard is armed again for ordinary writers.
       await expect(make(rexDir).saveDocument(doc())).resolves.toBeUndefined();
+    });
+
+    // `adoptSlugRule` used to read the marker and decide direction *before*
+    // acquiring the PRD lock, then skip the guard entirely on the locked
+    // write. A concurrent writer that recorded a newer marker in that window
+    // had it silently overwritten. The check has to happen after the lock is
+    // held, which no single-writer test can distinguish from before it — so
+    // this one pins the ordering by holding the real lock.
+    it("re-reads the marker after acquiring the lock, so a newer marker recorded while it waited survives", async () => {
+      const store = make(rexDir);
+      await store.saveDocument(doc());
+
+      // Stand in for a concurrent writer that is mid-write, holding the PRD
+      // lock, when this build calls adoptSlugRule.
+      let releaseHolder!: () => void;
+      const releaseSignal = new Promise<void>((resolve) => {
+        releaseHolder = resolve;
+      });
+      let holderHasLock!: () => void;
+      const holderAcquired = new Promise<void>((resolve) => {
+        holderHasLock = resolve;
+      });
+      const holderDone = withLock(prdLockPath(rexDir), async () => {
+        holderHasLock();
+        await releaseSignal;
+        // The concurrent writer finishes its own write — under its own
+        // rule, a newer one — before giving up the lock.
+        const meta = JSON.parse(await readFile(join(rexDir, TREE_META), "utf-8"));
+        await writeFile(
+          join(rexDir, TREE_META),
+          JSON.stringify({ ...meta, slugRule: SLUG_RULE_VERSION + 1 }),
+          "utf-8",
+        );
+      });
+      await holderAcquired;
+
+      // adoptSlugRule is entered while the lock is still held by the writer
+      // above. If it read the marker now, it would see the old, adoptable
+      // value.
+      const adopt = store.adoptSlugRule!();
+      releaseHolder();
+      await holderDone;
+
+      await expect(adopt).rejects.toThrow(SlugRuleMismatchError);
+      // The newer marker the concurrent writer recorded must survive —
+      // adoptSlugRule must not have overwritten it on the way to refusing.
+      expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION + 1);
     });
 
     // A migration can only move a tree onto the rule this build implements,
@@ -421,6 +445,75 @@ describe("slug-rule write guard", () => {
     });
   });
 
+  // The gate half. `ndx work` and the dashboard's Execute both call this
+  // before starting an agent, so what it refuses decides whether a run begins
+  // at all — and a run that begins writes the PRD when it finishes.
+  describe("checkTreeConformance", () => {
+    // The gate must agree with the write guard, or a run it permits is refused
+    // at the finish line — after it has spent its tokens and made its changes.
+    it("passes a tree whose marker has gone missing but whose paths conform", async () => {
+      const store = new FolderTreeStore(rexDir);
+      await store.saveDocument(doc());
+      await writeFile(
+        join(rexDir, TREE_META),
+        JSON.stringify({ title: "Guarded PRD", schema: SCHEMA_VERSION }),
+        "utf-8",
+      );
+
+      const refusal = await checkTreeConformance(
+        rexDir,
+        treeRoot,
+        (await new FolderTreeStore(rexDir).loadDocument()).items,
+      );
+
+      expect(refusal).toBeNull();
+    });
+
+    it("refuses a tree with no marker whose paths follow a foreign rule", async () => {
+      const store = new FolderTreeStore(rexDir);
+      await store.saveDocument(doc());
+      await writeFile(
+        join(rexDir, TREE_META),
+        JSON.stringify({ title: "Guarded PRD", schema: SCHEMA_VERSION }),
+        "utf-8",
+      );
+      const items = (await new FolderTreeStore(rexDir).loadDocument()).items;
+      // The superseded rule's shape: an unconditional `-{id6}` suffix.
+      const body = await readFile(join(treeRoot, "add-sso-support.md"), "utf-8");
+      await rm(join(treeRoot, "add-sso-support.md"));
+      await writeFile(join(treeRoot, "add-sso-support-aaaaaa.md"), body, "utf-8");
+
+      const refusal = await checkTreeConformance(rexDir, treeRoot, items);
+
+      expect(refusal).not.toBeNull();
+      expect(refusal!.markerFound).toBeUndefined();
+      // The same sentence the store and `rex validate` use, so an operator who
+      // meets the refusal in one surface recognises it in the others.
+      expect(refusal!.message).toContain("slug rule marker missing; run rex migrate-slugs");
+    });
+
+    // A project that has been initialised but never written to has a `.rex/`
+    // and no items. Refusing it would block the first run in every new
+    // repository on a migration with nothing to migrate.
+    it("passes an empty tree with no marker", async () => {
+      await mkdir(treeRoot, { recursive: true });
+
+      expect(await checkTreeConformance(rexDir, treeRoot, [])).toBeNull();
+    });
+
+    it("passes a tree this build owns", async () => {
+      await new FolderTreeStore(rexDir).saveDocument(doc());
+
+      const refusal = await checkTreeConformance(
+        rexDir,
+        treeRoot,
+        (await new FolderTreeStore(rexDir).loadDocument()).items,
+      );
+
+      expect(refusal).toBeNull();
+    });
+  });
+
   // The refusal exists to be read. `parentDir` is built with `path.join`, so
   // concatenating a hardcoded "/" onto it rendered a nested offender as the
   // mixed `epic-x\feature-y/task.md` on Windows — a path the operator cannot
@@ -436,28 +529,29 @@ describe("slug-rule write guard", () => {
       children: [task("eeeeeeee-5555-4555-8555-555555555555", "Nested Task")],
     } as PRDItem;
     await new FolderTreeStore(rexDir).saveDocument(doc([epic]));
-    await writeFile(
-      join(rexDir, TREE_META),
-      JSON.stringify({ title: "Guarded PRD", schema: SCHEMA_VERSION }),
-      "utf-8",
-    );
 
     // Re-slug the *nested* entry the superseded rule's way, so the offender
-    // has a parent directory in its rendered path.
+    // has a parent directory in its rendered path. The marker is left intact:
+    // a tree this build owns whose paths were disturbed under it is exactly
+    // the case the gate reports and the write guard's marker check misses.
     const epicDir = join(treeRoot, "alpha-epic");
     const body = await readFile(join(epicDir, "nested-task.md"), "utf-8");
     await rm(join(epicDir, "nested-task.md"));
     await writeFile(join(epicDir, "nested-task-eeeeee.md"), body, "utf-8");
 
-    const err = await new FolderTreeStore(rexDir)
-      .saveDocument(doc([epic]))
-      .then(
-        () => undefined,
-        (e: unknown) => e as SlugRuleMismatchError,
-      );
+    // Through the gate rather than the write guard because the marker is
+    // intact here, which the write guard's marker check accepts without
+    // scanning. It is also the output an operator actually reads — `ndx work`
+    // and the dashboard print it verbatim.
+    const store = new FolderTreeStore(rexDir);
+    const refusal = await checkTreeConformance(
+      rexDir,
+      treeRoot,
+      (await store.loadDocument()).items,
+    );
 
-    expect(err).toBeInstanceOf(SlugRuleMismatchError);
-    expect(err!.message).toContain(join("alpha-epic", "nested-task-eeeeee.md"));
+    expect(refusal).not.toBeNull();
+    expect(refusal!.message).toContain(join("alpha-epic", "nested-task-eeeeee.md"));
   });
 
   it("treats a damaged sidecar as unmarked rather than as permission to write", async () => {

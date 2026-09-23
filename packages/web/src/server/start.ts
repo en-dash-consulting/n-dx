@@ -28,7 +28,7 @@ import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
-import { handleWorktreesRoute } from "./routes-worktrees.js";
+import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
 import { handleWorkspacesRoute } from "./routes-workspaces.js";
 import { invalidatePrdDelta } from "./prd-delta.js";
 import { WorkspaceRegistry } from "./workspaces.js";
@@ -425,6 +425,18 @@ function registerRexWatcher(
   return watchers;
 }
 
+/**
+ * Drop every cache derived from run files: the status summary and the
+ * Sessions tray's worktree answer. Shared by all three runs watchers — the
+ * served directory's here, and the lazily registered per-worktree ones in
+ * routes-hench.ts — so a `hench:run-changed` push is never answered from a
+ * cache that predates it.
+ */
+function invalidateRunCaches(): void {
+  clearStatusCache();
+  invalidateWorktreesAnswer();
+}
+
 function registerHenchWatcher(
   scope: ViewerScope | undefined,
   henchRunsDir: string,
@@ -432,7 +444,7 @@ function registerHenchWatcher(
 ): FSWatcher | null {
   if (!isInScope(scope, "hench") || !existsSync(henchRunsDir)) return null;
   const debouncedBroadcast = debounce(() => {
-    clearStatusCache();
+    invalidateRunCaches();
     ws.broadcast({
       type: "hench:run-changed",
       timestamp: new Date().toISOString(),
@@ -709,7 +721,7 @@ async function handleApiRoutes(
   if (await handleMcpRoute(req, res, ctx)) return true;
   if (await handleProjectRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
-  if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx, { broadcast, onStatusInvalidate: invalidateRunCaches }))) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
@@ -731,7 +743,7 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, broadcast))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, broadcast, { onStatusInvalidate: clearStatusCache }))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, broadcast, { onStatusInvalidate: invalidateRunCaches }))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleWorkflowRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleAdaptiveRoute(req, res, ctx))) return true;
   if (isInScope(ctx.scope, "rex") && handleValidationRoute(req, res, ctx)) return true;

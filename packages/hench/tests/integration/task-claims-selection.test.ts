@@ -12,7 +12,7 @@ import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { PRDItem } from "@n-dx/rex";
+import type { ClaimsStore, PRDItem } from "@n-dx/rex";
 import { openClaimsStore, resolveClaimHolder } from "@n-dx/rex";
 import { assembleTaskBrief, getActionableTasks } from "../../src/agent/planning/brief.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../src/process/task-claims.js";
@@ -294,5 +294,205 @@ describe("TaskClaims in read-only mode", () => {
     const real = TaskClaims.forProject(wtB);
     expect(await real.claim("t-high")).toBeNull();
     await real.releaseAll();
+  });
+});
+
+// ── Held claims (0.7.1 PR D) ────────────────────────────────────────────────
+//
+// A run that ends by refusing to complete its task — because the work it did
+// is still uncommitted in this worktree — must not hand the task back. The
+// work exists; a second worktree claiming it would redo it. So the claim is
+// held instead of released, and unlike an ordinary claim it outlives the
+// process that took it.
+
+describe("TaskClaims.hold", () => {
+  /** Reads the shared claims file as a later process would: every holder dead. */
+  function afterTheRunExits(worktree: string): TaskClaims {
+    const base = TaskClaims.forProject(worktree);
+    return new TaskClaims(
+      openClaimsStore(worktree, { isPidAlive: () => false }),
+      base.holder,
+    );
+  }
+
+  it("survives releaseAll, where an ordinary claim does not", async () => {
+    const run = TaskClaims.forProject(wtA);
+    await run.claim("t-high");
+    await run.claim("t-low");
+
+    const held = await run.hold("t-high", "uncommitted-work");
+    expect(held).toMatchObject({ taskId: "t-high", reason: "uncommitted-work" });
+    // Dropped from `held`, which is what stops the run's own `finally`
+    // releasing it on the way out.
+    expect([...run.held]).toEqual(["t-low"]);
+
+    await run.releaseAll();
+
+    const later = afterTheRunExits(wtA);
+    expect((await later.store.readClaims()).map((c) => c.taskId)).toEqual(["t-high"]);
+  });
+
+  it("keeps the other worktree off the task after the holding run is gone", async () => {
+    const run = TaskClaims.forProject(wtA);
+    await run.claim("t-high");
+    await run.hold("t-high", "uncommitted-work");
+    await run.releaseAll();
+
+    const other = afterTheRunExits(wtB);
+    expect([...(await other.foreignClaims()).keys()]).toEqual(["t-high"]);
+
+    const brief = await assembleTaskBrief(mockStoreWithDefaults(ITEMS), undefined, { claims: other });
+    expect(brief.taskId).not.toBe("t-high");
+  });
+
+  it("refuses an explicit request naming the reason, the worktree and how to clear it", async () => {
+    const run = TaskClaims.forProject(wtA);
+    await run.claim("t-high");
+    await run.hold("t-high", "uncommitted-work");
+    await run.releaseAll();
+
+    const other = afterTheRunExits(wtB);
+    await expect(
+      assembleTaskBrief(mockStoreWithDefaults(ITEMS), "t-high", { claims: other }),
+    ).rejects.toThrow(TaskClaimedElsewhereError);
+
+    const claim = await other.heldElsewhere("t-high");
+    expect(claim).not.toBeNull();
+    const err = new TaskClaimedElsewhereError("t-high", claim!, "High priority");
+    // Not "is being worked on": that run ended, and sending the reader to look
+    // for a live process is the confusion this wording exists to avoid.
+    expect(err.message).not.toContain("is being worked on");
+    expect(err.message).toContain("still uncommitted");
+    expect(err.message).toContain(run.holder.worktreeRoot);
+    expect(String(err.suggestion ?? "")).toContain("ndx claim release t-high");
+  });
+
+  it("does nothing for a task this run does not hold, or in read-only mode", async () => {
+    const run = TaskClaims.forProject(wtA);
+    expect(await run.hold("t-high", "uncommitted-work")).toBeNull();
+
+    const preview = TaskClaims.forProject(wtA, { readOnly: true });
+    await preview.claim("t-high");
+    expect(await preview.hold("t-high", "uncommitted-work")).toBeNull();
+    expect(await TaskClaims.forProject(wtB).foreignClaims()).toEqual(new Map());
+  });
+
+  it("is not erased by a renewal tick that was already in flight", async () => {
+    // The losing interleaving: renewNow snapshots its held tasks and its
+    // `store.claim` is parked (here: on a gate; in production: on the claims
+    // lock) when the completion gate holds the task. Landing after the hold,
+    // that claim would rewrite the record without the reason — and a
+    // reasonless claim dies with this pid. hold() must wait the tick out.
+    const real = openClaimsStore(wtA);
+    let unblock!: () => void;
+    const gate = new Promise<void>((resolve) => { unblock = resolve; });
+    let parkNextClaim = false;
+    const store: ClaimsStore = {
+      path: real.path,
+      readClaims: () => real.readClaims(),
+      claim: async (taskId, options) => {
+        if (parkNextClaim) {
+          parkNextClaim = false;
+          await gate;
+        }
+        return real.claim(taskId, options);
+      },
+      release: (taskId, holder, options) => real.release(taskId, holder, options),
+      hold: (taskId, holder, reason) => real.hold(taskId, holder, reason),
+      isClaimedByOther: (taskId, holder) => real.isClaimedByOther(taskId, holder),
+      claimedElsewhere: (root) => real.claimedElsewhere(root),
+    };
+
+    const run = new TaskClaims(store, resolveClaimHolder(wtA));
+    await run.claim("t-high");
+
+    parkNextClaim = true;
+    const tick = run.renewNow();
+    const held = run.hold("t-high", "uncommitted-work");
+    unblock();
+    await Promise.all([tick, held]);
+
+    const claims = await real.readClaims();
+    expect(claims).toHaveLength(1);
+    expect(claims[0]).toMatchObject({ taskId: "t-high", reason: "uncommitted-work" });
+  });
+
+  it("is cleared by re-running the task in the worktree that left the work", async () => {
+    const first = TaskClaims.forProject(wtA);
+    await first.claim("t-high");
+    await first.hold("t-high", "uncommitted-work");
+    await first.releaseAll();
+
+    // The operator commits the work and runs the task again, here.
+    const second = TaskClaims.forProject(wtA);
+    expect(await second.claim("t-high")).toBeNull();
+    const claims = await second.store.readClaims();
+    expect(claims[0]!.reason).toBeUndefined();
+    await second.releaseAll();
+  });
+});
+
+// ── Claim lost mid-run (0.7.1 PR F) ─────────────────────────────────────────
+//
+// Renewal noticing a takeover is the only moment anything learns about it, and
+// the run deliberately carries on. So the event has to be emitted there, or it
+// is not recorded anywhere at all.
+
+describe("TaskClaims claim-lost events", () => {
+  function clocked(worktree: string, now: () => number): TaskClaims {
+    const base = TaskClaims.forProject(worktree);
+    return new TaskClaims(openClaimsStore(worktree, { now }), base.holder);
+  }
+
+  it("emits the takeover, naming the task and the worktree that now holds it", async () => {
+    let nowMs = Date.parse("2026-01-01T00:00:00.000Z");
+    const mine = clocked(wtA, () => nowMs);
+    await mine.claim("t-high");
+
+    const seen: Array<{ taskId: string; holderWorktree: string; at: string }> = [];
+    mine.onClaimLost = (e) => seen.push(e);
+
+    nowMs += 5 * 60 * 60 * 1000;
+    const b = holderIn(wtB);
+    expect(await b.claim("t-high")).toBeNull();
+
+    await mine.renewNow();
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ taskId: "t-high", holderWorktree: b.holder.worktreeRoot });
+    expect(Number.isFinite(Date.parse(seen[0]!.at))).toBe(true);
+    // Also kept on the instance, so a caller that attached no listener can
+    // still find out afterwards.
+    expect(mine.claimLost).toMatchObject({ taskId: "t-high" });
+  });
+
+  it("says nothing when renewal succeeds", async () => {
+    const mine = TaskClaims.forProject(wtA);
+    await mine.claim("t-high");
+    const seen: unknown[] = [];
+    mine.onClaimLost = (e) => seen.push(e);
+
+    await mine.renewNow();
+
+    expect(seen).toEqual([]);
+    expect(mine.claimLost).toBeNull();
+    await mine.releaseAll();
+  });
+
+  it("keeps refreshing the rest when a listener throws", async () => {
+    let nowMs = Date.parse("2026-01-01T00:00:00.000Z");
+    const mine = clocked(wtA, () => nowMs);
+    await mine.claim("t-high");
+    await mine.claim("t-low");
+    mine.onClaimLost = () => { throw new Error("listener blew up"); };
+
+    nowMs += 5 * 60 * 60 * 1000;
+    const b = holderIn(wtB);
+    await b.claim("t-high");
+
+    // Must not reject, and t-low must survive the pass.
+    await expect(mine.renewNow()).resolves.toBeUndefined();
+    expect(mine.held.has("t-high")).toBe(false);
+    expect(mine.held.has("t-low")).toBe(true);
   });
 });

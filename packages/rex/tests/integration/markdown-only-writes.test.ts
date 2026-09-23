@@ -21,7 +21,7 @@ import { tmpdir } from "node:os";
 import { FileStore } from "../../src/store/file-adapter.js";
 import { SCHEMA_VERSION } from "../../src/schema/index.js";
 import { toCanonicalJSON } from "../../src/core/canonical.js";
-import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
+import { PRD_TREE_DIRNAME, SLUG_RULE_VERSION } from "../../src/store/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,11 +35,13 @@ async function seedRexDir(rexDir: string): Promise<void> {
       const treeDir = join(rexDir, PRD_TREE_DIRNAME);
       await mkdir(treeDir, { recursive: true });
 
-      // Write tree-meta.json
+      // Write tree-meta.json, including the slug-rule marker every real tree
+      // carries: a tree without one is refused by the write guard, so a
+      // fixture that omits it tests the guard rather than what it means to.
       const fs = await import("node:fs/promises");
       await fs.writeFile(
         join(rexDir, "tree-meta.json"),
-        JSON.stringify({ title: "Test" }),
+        JSON.stringify({ title: "Test", slugRule: SLUG_RULE_VERSION }),
       );
 
       // Create epic-1 directory

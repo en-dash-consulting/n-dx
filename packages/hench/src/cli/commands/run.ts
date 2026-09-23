@@ -406,6 +406,49 @@ export async function assertPrdTreeConformant(rexDir: string): Promise<void> {
   );
 }
 
+/** Re-checks the PRD tree before a task starts. @see createPerTaskTreeGate */
+export type PerTaskTreeGate = () => Promise<void>;
+
+/**
+ * The per-task form of {@link assertPrdTreeConformant}, run at the top of
+ * `runOne` so every task in an invocation is gated, not only the first.
+ *
+ * The pre-flight check answers the question once, before the run begins. A
+ * `--loop` or `--epic-by-epic` invocation outlives that answer: another
+ * worktree writes the tree, an operator pulls, a migration lands, and from the
+ * second task onward the run is working against a tree nobody asked about
+ * again. Its own completion write then re-slugs whatever drifted — the run
+ * becomes the sweeper, which is the thing the gate exists to prevent.
+ *
+ * Placed inside `runOne` rather than in the three loop bodies deliberately.
+ * `runOne` is the single funnel — `runIterations`, `runLoop` and
+ * `runEpicByEpic` each call it, and a fix applied at the loops would cover
+ * some call sites and leave others unguarded while still passing a test
+ * written against the covered one.
+ *
+ * `alreadyChecked` is consumed once: `cmdRun` runs the pre-flight check before
+ * the commit gate and before `--reset-deferred` (both of which must not happen
+ * ahead of a refusal), so the first task is already covered and re-parsing the
+ * tree for it would double a single-task run's cost for nothing. Every task
+ * after the first re-checks.
+ *
+ * @param rexDir The `.rex` directory to re-check.
+ * @param alreadyChecked True when the caller already ran the pre-flight check.
+ */
+export function createPerTaskTreeGate(
+  rexDir: string,
+  alreadyChecked = false,
+): PerTaskTreeGate {
+  let satisfiedByPreflight = alreadyChecked;
+  return async () => {
+    if (satisfiedByPreflight) {
+      satisfiedByPreflight = false;
+      return;
+    }
+    await assertPrdTreeConformant(rexDir);
+  };
+}
+
 export interface ResetDeferredOptions {
   /**
    * List what would be reset and write nothing.
@@ -968,6 +1011,7 @@ async function runOne(
   dir: string,
   henchDir: string,
   rexDir: string,
+  gateTree: PerTaskTreeGate,
   provider: "cli" | "api",
   taskId: string | undefined,
   dryRun: boolean,
@@ -988,6 +1032,11 @@ async function runOne(
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
 ): Promise<{ status: string; taskTitle: string; selectedTaskId?: string }> {
+  // First statement in the task: a tree this build would re-slug stops the task
+  // before the claim below is taken and before any token is spent. The tree can
+  // have changed since the previous task finished.
+  await gateTree();
+
   // Lenient without a warning: cmdRun already loaded the same file leniently
   // and warned once — repeating it per task would spam loop mode.
   const config = await loadConfig(henchDir, { onInvalid: "use-defaults" });
@@ -1433,10 +1482,22 @@ export async function cmdRun(
   }
 
   // Refuse a tree this build would re-slug, before anything is claimed, reset
-  // or written — `--reset-deferred` below is the run's first PRD write, and the
-  // claims store is opened later still. Unconditional: a dry run that hid the
-  // refusal would report that the real run was going to be fine.
+  // or written — `--reset-deferred` below is the run's first PRD write, the
+  // commit gate further down can commit the working tree, and the claims store
+  // is opened later still. Unconditional: a dry run that hid the refusal would
+  // report that the real run was going to be fine.
+  //
+  // This check cannot be the one the first task relies on, so `gateTree` is
+  // built without consuming it: every task re-asks inside runOne, the first
+  // included. Between here and that first task sit `--reset-deferred` below
+  // and the commit gate further down, and the commit gate blocks on an
+  // operator prompt — unbounded wall-clock time. An operator who starts a run,
+  // is asked about uncommitted changes, and answers an hour later would
+  // otherwise execute task one against a tree last verified an hour ago, and
+  // task one's completion write would be the sweeper. The cost of re-asking is
+  // one extra loadDocument, ~0.33s on a 405-item tree, once per run.
   await assertPrdTreeConformant(rexDir);
+  const gateTree = createPerTaskTreeGate(rexDir);
 
   // --reset-deferred: reset all deferred/failing tasks to pending before running.
   // This lets the user retry tasks that were deferred by infrastructure failures
@@ -1747,7 +1808,7 @@ export async function cmdRun(
     }
 
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
+      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
       return;
     }
 
@@ -1761,9 +1822,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
+      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
     } else {
-      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
+      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
     }
   } finally {
     await limiter.release();
@@ -1825,6 +1886,7 @@ async function runIterations(
   dir: string,
   henchDir: string,
   rexDir: string,
+  gateTree: PerTaskTreeGate,
   provider: "cli" | "api",
   taskId: string | undefined,
   dryRun: boolean,
@@ -1870,7 +1932,7 @@ async function runIterations(
       : forcedExclusionIds;
 
     const { status, selectedTaskId } = await runOne(
-      dir, henchDir, rexDir, provider,
+      dir, henchDir, rexDir, gateTree, provider,
       // Only use the explicit taskId for the first iteration;
       // subsequent iterations autoselect the next task
       i === 0 ? taskId : undefined,
@@ -1932,6 +1994,7 @@ async function runLoop(
   dir: string,
   henchDir: string,
   rexDir: string,
+  gateTree: PerTaskTreeGate,
   provider: "cli" | "api",
   taskId: string | undefined,
   dryRun: boolean,
@@ -2034,7 +2097,7 @@ async function runLoop(
 
         try {
           const result = await runOne(
-            dir, henchDir, rexDir, provider,
+            dir, henchDir, rexDir, gateTree, provider,
             // Only use explicit taskId on the very first iteration
             effectiveTaskId,
             dryRun, model, spawnModel, maxTurns, tokenBudget,
@@ -2197,6 +2260,7 @@ async function runEpicByEpic(
   dir: string,
   henchDir: string,
   rexDir: string,
+  gateTree: PerTaskTreeGate,
   provider: "cli" | "api",
   dryRun: boolean,
   model: string | undefined,
@@ -2356,7 +2420,7 @@ async function runEpicByEpic(
 
           try {
             const result = await runOne(
-              dir, henchDir, rexDir, provider,
+              dir, henchDir, rexDir, gateTree, provider,
               undefined, // autoselect within epic
               dryRun, model, spawnModel, maxTurns, tokenBudget,
               reviewOpts,

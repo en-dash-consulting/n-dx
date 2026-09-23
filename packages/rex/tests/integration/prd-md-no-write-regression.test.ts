@@ -42,7 +42,7 @@ vi.mock("../../src/analyze/llm-bridge.js", async (importOriginal) => {
 // ---------------------------------------------------------------------------
 
 import { reasonFromDescription } from "../../src/analyze/reason.js";
-import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
+import { PRD_TREE_DIRNAME, SLUG_RULE_VERSION } from "../../src/store/index.js";
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -106,10 +106,12 @@ async function seedFolderTree(rexDir: string): Promise<void> {
   const treeDir = join(rexDir, PRD_TREE_DIRNAME);
   await mkdir(treeDir, { recursive: true });
 
-  // Create tree-meta.json
+  // Create tree-meta.json, including the slug-rule marker every real tree
+  // carries: a tree without one is refused by the write guard, so a fixture
+  // that omits it tests the guard rather than what it means to.
   await writeFile(
     join(rexDir, "tree-meta.json"),
-    JSON.stringify({ title: "Test PRD" }),
+    JSON.stringify({ title: "Test PRD", slugRule: SLUG_RULE_VERSION }),
     "utf-8",
   );
 

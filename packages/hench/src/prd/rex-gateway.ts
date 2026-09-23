@@ -146,4 +146,4 @@ export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "@n-dx/re
 // All type imports from rex must flow through this gateway to prevent
 // type-import promotion erosion (a type import can be promoted to a
 // runtime import during refactoring, silently bypassing the gateway).
-export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim } from "@n-dx/rex";
+export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason } from "@n-dx/rex";

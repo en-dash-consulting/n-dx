@@ -1982,6 +1982,18 @@ async function handleUsage(rest) {
   exitWithCleanup(0);
 }
 
+/**
+ * `ndx claim` — see and free cross-worktree task claims.
+ *
+ * Forwarded verbatim: the subcommand decides where the optional directory
+ * sits, so rex resolves it rather than this layer guessing.
+ */
+async function handleClaim(rest) {
+  requireInit(process.cwd(), [".rex"]);
+  await runOrDie(tools.rex, ["claim", ...rest]);
+  exitWithCleanup(0);
+}
+
 async function handleSync(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, [".rex"]);
@@ -2888,6 +2900,7 @@ const COMMAND_DISPATCH = new Map([
   ["status",            handleStatus],
   ["usage",             handleUsage],
   ["sync",              handleSync],
+  ["claim",             handleClaim],
   ["ci",                handleCI],
   ["dev",               handleDev],
   ["start",             (rest) => handleStart(rest, "start")],

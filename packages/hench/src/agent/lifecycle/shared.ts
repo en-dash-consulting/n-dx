@@ -29,7 +29,7 @@ import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../..
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 import { resolveCliPath, resolveNdxVersion } from "../../process/toolchain-identity.js";
-import type { TaskClaims } from "../../process/task-claims.js";
+import type { ClaimLostEvent, TaskClaims } from "../../process/task-claims.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
@@ -854,6 +854,15 @@ export interface FinalizeRunOptions {
    * non-interactive, so they never revert on failure.
    */
   autonomous?: boolean;
+  /**
+   * Cross-worktree claims for this run, when it has any.
+   *
+   * Finalization is where the uncommitted-work gate refuses a completion, and
+   * that refusal is the one outcome that must *hold* the task's claim rather
+   * than let the run's `finally` release it. Without this the refusal path
+   * could not reach the claims it needed to hold. See `process/task-claims.ts`.
+   */
+  claims?: TaskClaims;
   /**
    * PRD store used to reset task status to pending on failure.
    * When provided, if the run fails and the task is still in_progress,
@@ -2499,6 +2508,40 @@ async function collectRunCommits(projectDir: string, startHead: string | undefin
 }
 
 /**
+ * Record on the run, and persist immediately, when another worktree takes
+ * this run's task over mid-flight.
+ *
+ * The renewal timer notices the takeover, not the run, so without this the
+ * task simply leaves the held set and nothing anywhere says so. The run keeps
+ * going on purpose — see `TaskClaims.renewNow` — which is precisely why the
+ * operator needs to be told: the work continuing is not the same as the work
+ * still being this run's to finish.
+ *
+ * Saving here rather than waiting for the next heartbeat is what makes the
+ * dashboard's Sessions tray show it promptly: the run file changing is what
+ * the server's watcher turns into a `hench:run-changed` broadcast.
+ */
+export function recordClaimLoss(
+  claims: TaskClaims | undefined,
+  run: RunRecord,
+  henchDir: string,
+): void {
+  if (!claims) return;
+  const stamp = (event: ClaimLostEvent): void => {
+    run.claimLost = event;
+    // Best-effort: losing the claim is already the bad news, and failing to
+    // write it down must not also fail the run.
+    void saveRun(henchDir, run).catch(() => {});
+  };
+  // A refusal observed before this listener was attached — between the claim
+  // in prepareBrief and the loop starting its heartbeat — fired into a null
+  // listener; `claims.claimLost` is kept for exactly this late caller. Only
+  // this run's task: the instance field is not reset between tasks.
+  if (claims.claimLost && claims.claimLost.taskId === run.taskId) stamp(claims.claimLost);
+  claims.onClaimLost = stamp;
+}
+
+/**
  * Finalize a run: build structured summary, capture memory stats,
  * run post-task tests, retrieve Codex tokens if applicable, set timestamps,
  * and persist. Called at the end of both loops.
@@ -2830,6 +2873,19 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       info(`\n${run.error}`);
       if (opts.store) {
         await withdrawCompletionClaim(opts.store, run, run.error);
+      }
+      // Hold the cross-worktree claim rather than letting the run's `finally`
+      // release it. The refusal means finished work is sitting uncommitted in
+      // *this* worktree; a free task is an invitation for another worktree to
+      // claim it and do the same work again. The hold outlives this process
+      // and lapses at the claim's existing TTL. See process/task-claims.ts.
+      if (opts.claims && run.taskId) {
+        try {
+          await opts.claims.hold(run.taskId, "uncommitted-work");
+        } catch {
+          // A claims-store failure must not change the run's outcome. The
+          // claim then dies with this pid, as it did before holds existed.
+        }
       }
     }
   }

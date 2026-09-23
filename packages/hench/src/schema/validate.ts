@@ -309,6 +309,9 @@ export const RunRecordSchema = z.object({
   commits: z.array(RunCommitRecordSchema).optional(),
   recordCommitPending: z.boolean().optional(),
   uncommittedPaths: z.array(z.string()).optional(),
+  claimLost: z
+    .object({ at: z.string(), taskId: z.string(), holderWorktree: z.string() })
+    .optional(),
   // Fields the record has gained over time that this schema had not been
   // told about. Zod strips what it does not declare, so each was written to
   // disk by `saveRun` and then dropped by every `loadRun` that read it back

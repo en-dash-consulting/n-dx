@@ -242,6 +242,28 @@ describe("rex migrate-slugs", () => {
     expect(payload.entriesRenamed).toBe(0);
   });
 
+  // The counts cannot express this. A tree with no marker is refused by every
+  // writer, so the run that records one is the run that unblocks the
+  // repository — and on an already-conformant tree it renames nothing, which
+  // reads as "nothing happened" to anything parsing the JSON.
+  it("reports slugRuleRecorded when it recorded a marker the tree lacked", async () => {
+    const lines: string[] = [];
+    (console.log as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (...args: unknown[]) => void lines.push(args.join(" ")),
+    );
+    expect(await readSlugRuleMarker(rexDir)).toBeUndefined();
+
+    await cmdMigrateSlugs(projectDir, { format: "json" });
+
+    expect(JSON.parse(lines.join("\n")).slugRuleRecorded).toBe(true);
+    expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
+
+    // A second run has a matching marker already, so it recorded nothing.
+    lines.length = 0;
+    await cmdMigrateSlugs(projectDir, { format: "json" });
+    expect(JSON.parse(lines.join("\n")).slugRuleRecorded).toBe(false);
+  });
+
   it("refuses, naming the offenders, when siblings share a title and an id", async () => {
     // The suffix cannot separate these: same normalised title, same id, so the
     // same `-{id6}`. The serializer would fall back to position suffixes and
