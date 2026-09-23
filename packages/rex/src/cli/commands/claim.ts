@@ -147,6 +147,11 @@ export function formatClaims(reports: ClaimReport[]): string[] {
  * The same judgement decides whether the release may cross the worktree
  * boundary: a claim that is safe to free at all is safe to free from
  * whichever worktree the operator happens to be standing in.
+ *
+ * TODO: `defaultIsPidAlive` is a local `kill(pid, 0)`, which means nothing
+ * for a claim recorded on another host — a live remote run reads as "not
+ * running" here and frees without --force. Compare `claim.host` against this
+ * machine's hostname and treat a foreign host's unexpired claim as live.
  */
 export function releasableWithoutForce(claim: Pick<TaskClaim, "reason" | "pid">): boolean {
   return Boolean(claim.reason) || !defaultIsPidAlive(claim.pid);

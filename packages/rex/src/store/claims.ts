@@ -350,6 +350,11 @@ class FileClaimsStore implements ClaimsStore {
       if (!existing || !sameHolder(existing, holder.worktreeRoot)) return null;
       // The expiry is carried over untouched: holding a claim states why it
       // is still here, it does not buy it more time.
+      // TODO: that means a held claim still lapses at the original 4h TTL,
+      // while hench's refusal message says it is "held until someone deals
+      // with that work" — overnight, the hold quietly evaporates and another
+      // worktree can redo the uncommitted work. Either extend the expiry
+      // here (a longer held-claim TTL) or soften that wording.
       const held: TaskClaim = { ...existing, reason };
       claims[taskId] = held;
       return held;
