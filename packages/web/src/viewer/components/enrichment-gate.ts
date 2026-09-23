@@ -15,6 +15,7 @@
 
 import { h } from "preact";
 import { useSvAnalyze } from "../hooks/index.js";
+import { GlossaryLine } from "./glossary-line.js";
 
 export interface EnrichmentGateProps {
   /** View name shown as the heading, e.g. "Architecture". */
@@ -36,6 +37,7 @@ export function EnrichmentGate({ title, requiredPass, currentPass, pollIntervalM
     h("div", { class: "locked-icon", "aria-hidden": "true" }, "\u{1F512}"),
     h("h2", null, title),
     h("p", null, "Requires enrichment pass ", requiredPass, " (current: ", currentPass, ")"),
+    h(GlossaryLine, { term: "enrichment pass" }),
     h("p", { class: "locked-hint" },
       "Each analysis run adds one enrichment pass. Unlock just this view, or run the full analysis to unlock every tab.",
     ),

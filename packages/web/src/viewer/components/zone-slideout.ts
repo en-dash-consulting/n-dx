@@ -6,6 +6,7 @@ import { getZoneColorByIndex } from "../visualization/colors.js";
 import { meterClass } from "../visualization/metrics.js";
 import { basename } from "../utils.js";
 import type { NavigateTo } from "../types.js";
+import { GlossaryLine } from "./glossary-line.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -300,6 +301,7 @@ export function ZoneSlideout({
         },
           showFiles ? "Hide files" : `Show ${zone.files.length} files`,
         ),
+        h(GlossaryLine, { term: "zone pin" }),
         showFiles
           ? h("ul", { class: "zone-slideout-file-list" },
               zone.files.map((f) =>

@@ -137,3 +137,5 @@ export type {
   LanguageStripEntry,
   LanguageStripGroup,
 } from "./language-analysis-strip.js";
+export { GlossaryLine } from "./glossary-line.js";
+export type { GlossaryLineProps } from "./glossary-line.js";

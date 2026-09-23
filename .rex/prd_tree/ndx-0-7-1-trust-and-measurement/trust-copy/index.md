@@ -22,7 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add a glossary source and render definition lines under the dashboard fields that use its terms](./add-a-glossary-source-and-render.md) | pending |
+| [Add a glossary source and render definition lines under the dashboard fields that use its terms](./add-a-glossary-source-and-render.md) | completed |
 | [Lead Next Steps and Problems titles with plain language before the metric](./lead-next-steps-and-problems-titles.md) | completed |
 | [Make CLI progress monotonic and print retries on their own line](./make-cli-progress-monotonic-and-print.md) | pending |
 | [Print how to stop the server on the ndx start success block](./print-how-to-stop-the-server-on-the.md) | pending |

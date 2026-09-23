@@ -4,7 +4,7 @@ import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { FileEntry } from "../external.js";
 import { buildFileToZoneMap, getZoneColorByIndex } from "../visualization/index.js";
 import { basename } from "../utils.js";
-import { BrandedHeader, LanguageAnalysisStrip } from "../components/index.js";
+import { BrandedHeader, LanguageAnalysisStrip, GlossaryLine } from "../components/index.js";
 
 const FILE_SEARCH_LISTBOX_ID = "file-search-listbox";
 const FILE_SEARCH_MAX_OPTIONS = 10;
@@ -452,7 +452,9 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
           h("th", { onClick: () => toggleSort("size") }, `Size${sortIndicator("size")}`),
           h("th", { onClick: () => toggleSort("role") }, `Role${sortIndicator("role")}`),
           h("th", { onClick: () => toggleSort("category") }, `Category${sortIndicator("category")}`),
-          classifications ? h("th", null, "Archetype") : null
+          classifications
+            ? h("th", null, "Archetype", h(GlossaryLine, { term: "archetype" }))
+            : null
         )
       ),
       h("tbody", null,
