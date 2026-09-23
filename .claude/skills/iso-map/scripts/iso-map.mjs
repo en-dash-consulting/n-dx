@@ -836,15 +836,17 @@ ${STYLES}
 "use strict";
 var MODEL = ${embedJSON(model)};
 var ROOT = MODEL;
-// An areas-level map carries one zone scene per area; the URL hash picks it,
-// so Back, bookmarks and reloads all land on the same scene.
-var SCENE = (function(){
+// An areas-level map carries one zone scene per area. The URL hash picks the
+// scene at load, and scenes switch in the page — never by navigating, which a
+// sandboxed srcdoc frame (the dashboard's) cannot do.
+function sceneFromHash(){
   var id = "";
   try { id = decodeURIComponent((location.hash || "").slice(1)); } catch (e) { id = ""; }
   return id && ROOT.scenes && ROOT.scenes[id] ? id : "";
-})();
-MODEL = SCENE ? ROOT.scenes[SCENE] : ROOT;
-window.addEventListener("hashchange", function(){ location.reload(); });
+}
+MODEL = sceneFromHash() ? ROOT.scenes[sceneFromHash()] : ROOT;
+window.addEventListener("hashchange", function(){ switchScene(sceneFromHash()); });
+window.addEventListener("popstate", function(){ switchScene(sceneFromHash()); });
 ${RUNTIME}
 })();
 </script>
@@ -996,12 +998,16 @@ var NODES = MODEL.nodes, EDGES = MODEL.edges, B = MODEL.bounds;
 var COLOR = {}, LABEL = {}, GLYPH = {};
 MODEL.kinds.forEach(function(k){ COLOR[k.id] = k.color; LABEL[k.id] = k.label; GLYPH[k.id] = k.glyph; });
 var BY = {}; NODES.forEach(function(n){ BY[n.id] = n; });
-(function(){
+function renderCrumbs(){
   var crumbs = document.getElementById("crumbs");
-  if (!crumbs || !MODEL.scene) return;
+  if (!crumbs) return;
+  if (!MODEL.scene) { crumbs.hidden = true; crumbs.innerHTML = ""; return; }
   crumbs.hidden = false;
-  crumbs.innerHTML = '<a href="#">All areas</a> <span>&rsaquo;</span> <b>' + esc(MODEL.scene.name) + '</b>';
-})();
+  crumbs.innerHTML = '<a href="#" data-scene="">All areas</a> <span>&rsaquo;</span> <b>' + esc(MODEL.scene.name) + '</b>';
+  var back = crumbs.querySelector("[data-scene]");
+  if (back) back.addEventListener("click", function(ev){ ev.preventDefault(); openScene(""); });
+}
+renderCrumbs();
 
 /**
  * A declared seam the call graph was checked against and did not support.
@@ -1431,7 +1437,7 @@ build();
 
 /* ---------- detail panel ---------- */
 var dossier = document.getElementById("dossier");
-var INTRO =
+function introHtml(){ return (
   '<h3>' + esc(MODEL.meta.project) + '</h3>' +
   '<div class="sub">' + (MODEL.level === "areas"
     ? num(NODES.filter(function(n){ return n.tiles; }).length) + ' areas &middot; ' + num(MODEL.meta.totalZones) + ' zones &middot; '
@@ -1444,7 +1450,7 @@ var INTRO =
     : '') +
   (MODEL.scene
     ? '<div class="body">The zones of <b>' + esc(MODEL.scene.name) + '</b>. Imports to other areas are not drawn here; ' +
-      '<a href="#">all areas</a> shows them.</div>'
+      '<a href="#" data-scene="">all areas</a> shows them.</div>'
     : '') +
   (MODEL.level === "areas" ? '' :
   '<div class="body">Each block is a zone of the codebase. Footprint scales with file count and ' +
@@ -1469,7 +1475,7 @@ var INTRO =
     : '') +
   '<li>Use the legend to isolate one kind of zone.</li>' +
   '<li>Drag to pan, scroll to zoom, <b>Reset view</b> to recentre. <b>Esc</b> clears.</li>' +
-  '</ul>';
+  '</ul>'); }
 
 /** Index of the edge joining two zones, or -1. */
 function edgeIndex(fromId, toId){
@@ -1643,10 +1649,27 @@ function renderEdge(e){
   return h;
 }
 
+/** Show one area's scene ("" for the areas map) in place, recording it in history when allowed. */
 function openScene(id){
-  location.hash = encodeURIComponent(id);
+  switchScene(id);
+  try { history.pushState(null, "", id ? "#" + encodeURIComponent(id) : location.pathname + location.search); } catch (e) { /* sandboxed frame */ }
+}
+function switchScene(id){
+  var next = id && ROOT.scenes && ROOT.scenes[id] ? ROOT.scenes[id] : ROOT;
+  if (next === MODEL) return;
+  MODEL = next;
+  EXPANDED = {};
+  curNode = null; curEdge = null;
+  renderCrumbs();
+  build();
+  k = 1; tx = 0; ty = 0; apply();
+  refresh(false);
 }
 function bindPanel(){
+  var scenes = dossier.querySelectorAll("[data-scene]");
+  for (var sc = 0; sc < scenes.length; sc++) {
+    scenes[sc].addEventListener("click", function(ev){ ev.preventDefault(); openScene(ev.currentTarget.getAttribute("data-scene") || ""); });
+  }
   var expands = dossier.querySelectorAll("[data-expand]");
   for (var x = 0; x < expands.length; x++) {
     expands[x].addEventListener("click", function(ev){ toggleExpand(ev.currentTarget.getAttribute("data-expand")); });
@@ -1741,7 +1764,7 @@ function refresh(scrollPanel){
 
   if (curNode !== null && BY[curNode]) dossier.innerHTML = renderNode(BY[curNode]);
   else if (curEdge !== null) dossier.innerHTML = renderEdge(EDGES[curEdge]);
-  else dossier.innerHTML = INTRO;
+  else dossier.innerHTML = introHtml();
   bindPanel();
   dossier.scrollTop = 0;
 

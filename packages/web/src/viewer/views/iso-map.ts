@@ -70,7 +70,7 @@ async function readRouteError(res: Response): Promise<IsoMapError> {
   return { status: res.status, message, suggestScan: res.status === 404 };
 }
 
-export function IsoMapView() {
+export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = {}) {
   const deployed = isDeployedMode();
   const cliName = useCliName();
 
@@ -140,6 +140,17 @@ export function IsoMapView() {
     if (deployed) return;
     void generate(ISO_MAP_DEFAULTS);
   }, [deployed, generate]);
+
+  // Regenerate with the applied controls when the analysis changes (a new
+  // run, or narration landing names), so the map never shows stale zones.
+  const appliedRef = useRef(applied);
+  appliedRef.current = applied;
+  const lastStampRef = useRef(analysisStamp);
+  useEffect(() => {
+    if (deployed || analysisStamp === lastStampRef.current) return;
+    lastStampRef.current = analysisStamp;
+    void generate(appliedRef.current);
+  }, [analysisStamp, deployed, generate]);
 
   const appliedUrl = buildIsoMapUrl(applied);
 

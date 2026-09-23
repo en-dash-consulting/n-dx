@@ -91,3 +91,14 @@ describe("isoMapDownloadName", () => {
       .toBe(`iso-map-auto-${ISO_MAP_MAX_NODES}.html`);
   });
 });
+
+describe("isoMapAnalysisStamp", () => {
+  it("changes with a new analysis or finished narration, and is stable otherwise", async () => {
+    const { isoMapAnalysisStamp } = await import("../../../src/viewer/views/iso-map-url.js");
+    const base = { manifest: { analyzedAt: "a", narration: { status: "pending" } }, zones: { structureHash: "h" } };
+    expect(isoMapAnalysisStamp(base)).toBe(isoMapAnalysisStamp({ ...base }));
+    expect(isoMapAnalysisStamp({ ...base, manifest: { analyzedAt: "b", narration: { status: "pending" } } })).not.toBe(isoMapAnalysisStamp(base));
+    expect(isoMapAnalysisStamp({ ...base, manifest: { analyzedAt: "a", narration: { status: "done", finishedAt: "t" } } })).not.toBe(isoMapAnalysisStamp(base));
+    expect(isoMapAnalysisStamp(null)).toBe("");
+  });
+});

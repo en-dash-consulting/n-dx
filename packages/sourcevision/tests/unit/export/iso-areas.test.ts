@@ -84,6 +84,25 @@ describe("rendered map with areas", () => {
   });
 });
 
+describe("scene switching without navigation", () => {
+  it("opens an area on its own and returns via the breadcrumb, in place", () => {
+    // about:srcdoc, as in the dashboard's sandboxed frame: navigation is not an option.
+    const dom = new JSDOM(renderIsoMap(buildIsoModel(input())), { runScripts: "dangerously" });
+    const doc = dom.window.document;
+    const tags = () => [...doc.querySelectorAll("#iso .tagtext")].map((t) => t.textContent).filter((t) => t && t.length > 1);
+    const alpha = [...doc.querySelectorAll('#iso g.node[role="button"]')].find((g) => (g.getAttribute("aria-label") ?? "").startsWith("Alpha,"))!;
+    alpha.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+    (doc.querySelector("[data-open]") as HTMLElement).click();
+    expect(tags()).toEqual(expect.arrayContaining(["A1", "A2"]));
+    expect(tags()).not.toContain("BETA");
+    const crumbs = doc.getElementById("crumbs")!;
+    expect(crumbs.hidden).toBe(false);
+    (crumbs.querySelector("[data-scene]") as HTMLElement).click();
+    expect(crumbs.hidden).toBe(true);
+    expect(tags().sort()).toEqual(["ALPHA", "BETA"]);
+  });
+});
+
 describe("wrapTallColumns", () => {
   it("splits a column taller than max(3, ceil(sqrt(n))) and shifts later columns", () => {
     const node = (id: string, col: number, row: number) => ({ id, col, row } as unknown as IsoNode);

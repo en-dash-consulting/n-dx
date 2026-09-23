@@ -100,6 +100,20 @@ describe("IsoMapView", () => {
       .filter((u) => u.startsWith("/api/iso-map"));
   }
 
+  describe("analysis changes", () => {
+    it("regenerates the map when the analysis stamp changes, and not otherwise", async () => {
+      act(() => { render(h(IsoMapView, { analysisStamp: "t1" }), root); });
+      await settle();
+      expect(urls()).toHaveLength(1);
+      act(() => { render(h(IsoMapView, { analysisStamp: "t1" }), root); });
+      await settle();
+      expect(urls()).toHaveLength(1);
+      act(() => { render(h(IsoMapView, { analysisStamp: "t2" }), root); });
+      await settle();
+      expect(urls()).toHaveLength(2);
+    });
+  });
+
   // ── Deployed-mode gate ─────────────────────────────────────────────
 
   describe("deployed (static export) mode", () => {
@@ -358,4 +372,5 @@ describe("iso-map view registration", () => {
     expect(tab.minPass).toBe(0);
     expect(tab.requiresServer).toBe(true);
   });
+
 });

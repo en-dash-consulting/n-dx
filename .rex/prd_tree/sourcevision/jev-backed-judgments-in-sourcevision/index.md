@@ -31,6 +31,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Cascade re-run idempotence: no repeated name fallbacks, unchanged escalated zones carried forward, stable judgment keys, naming progress](./cascade-re-run-idempotence-no-repeated.md) | completed |
 | [Cascade robustness: model-alias expansion and config warning, visible CLI errors, ladder stops on non-retryable failures, --full skipped after the cascade, naming progress and concurrency](./cascade-robustness-model-alias.md) | deferred |
 | [Dashboard: Architecture, Problems and Suggestions unlock after a cascade analysis](./dashboard-architecture-problems-and.md) | completed |
+| [Dashboard behind the hub: product logos, favicon and notification icon carry the /p/<id> prefix; Isometric Map matches `sv iso` and stays current](./dashboard-behind-the-hub-product-logos.md) | completed |
 | [Finding cascade: Jev gates, verifies and anchors enrichment; free-text generation becomes --narrate](./finding-cascade-jev-gates-verifies-and.md) | completed |
 | [Finding severity, finding category and zone fragility as Jev judgments](./finding-severity-finding-category-and.md) | completed |
 | [Iso map: an expanded area's connectors leave from the zones that import, not the area's edge](./iso-map-an-expanded-area-s-connectors.md) | completed |
