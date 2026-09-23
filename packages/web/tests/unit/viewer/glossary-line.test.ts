@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { GlossaryLine } from "../../../src/viewer/components/glossary-line.js";
-import { getGlossaryDefinition } from "../../../src/shared/glossary.js";
+import { getGlossaryDefinition } from "../../../src/viewer/components/glossary-terms.js";
 
 describe("GlossaryLine", () => {
   let root: HTMLDivElement;

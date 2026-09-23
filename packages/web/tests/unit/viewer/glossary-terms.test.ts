@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { GLOSSARY_TERMS, getGlossaryDefinition } from "../../../src/shared/glossary.js";
+import { GLOSSARY_TERMS, getGlossaryDefinition } from "../../../src/viewer/components/glossary-terms.js";
 import { getChildLevel } from "../../../src/viewer/components/prd-tree/levels.js";
 
 const REQUIRED_TERMS = [
@@ -9,7 +9,6 @@ const REQUIRED_TERMS = [
   "zone pin",
   "enrichment pass",
   "archetype",
-  "weight",
   "guard rail",
   "epic / feature / task",
   "worktree anchor",

@@ -301,7 +301,12 @@ export function ZoneSlideout({
         },
           showFiles ? "Hide files" : `Show ${zone.files.length} files`,
         ),
-        h(GlossaryLine, { term: "zone pin" }),
+        // Explain the "pinned" badge only where one can appear: most projects
+        // set no zone pins, and a permanent definition for a badge that never
+        // shows is noise (the WorkspaceWriteStrip precedent in CLAUDE.md).
+        zone.files.some((f) => pinnedFiles?.has(f))
+          ? h(GlossaryLine, { term: "zone pin" })
+          : null,
         showFiles
           ? h("ul", { class: "zone-slideout-file-list" },
               zone.files.map((f) =>

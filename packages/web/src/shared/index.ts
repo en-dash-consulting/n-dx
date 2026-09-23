@@ -33,5 +33,3 @@ export {
   buildValidViews,
   isKnownViewPath,
 } from "./view-routing.js";
-export { GLOSSARY_TERMS, getGlossaryDefinition } from "./glossary.js";
-export type { GlossaryTerm } from "./glossary.js";

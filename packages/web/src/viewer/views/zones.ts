@@ -2472,7 +2472,6 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
         : `${visibleZones.length} sub-zones in ${drillPath[drillPath.length - 1].label}`,
     ),
     h(GlossaryLine, { term: "zone" }),
-    h(GlossaryLine, { term: "weight" }),
 
     // Search
     h(SearchFilter, {

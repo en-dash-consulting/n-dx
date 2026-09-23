@@ -3,17 +3,23 @@
  * definitions rendered under dashboard fields and column headers.
  *
  * An outside first-use review of the dashboard could not tell what "zone",
- * "zone pin", "enrichment pass", "archetype", "weight", "guard rail",
+ * "zone pin", "enrichment pass", "archetype", "guard rail",
  * "epic / feature / task" or "worktree anchor" meant, because those words
  * appear on screen with no explanation. This module holds one definition per
- * term; `GlossaryLine` (`viewer/components/glossary-line.ts`) renders it
+ * term; `GlossaryLine` (`glossary-line.ts`, beside this file) renders it
  * where each term first appears on a page. Adding a term here and wiring one
  * `GlossaryLine` call is the whole change — there is no second place that
  * writes definition text.
  *
- * Framework-agnostic (no Preact, no `node:*` imports) so it can be imported
- * by both the server and the viewer, per the `src/shared/` addition policy
- * in `packages/web/CLAUDE.md`.
+ * Every term must be a word the dashboard actually shows: a definition for a
+ * word the reader cannot find on screen explains nothing. "weight" was
+ * dropped for that reason — the Zones view shows call counts, never the word,
+ * and the one place a user meets it (CONTEXT.md's "weighted avg cohesion")
+ * means weighted by file count, not connection traffic.
+ *
+ * Lives in the viewer rather than `src/shared/`: the viewer is its only
+ * consumer, and `src/shared/` requires two consumer zones
+ * (`tests/integration/boundary-check.test.ts`).
  */
 
 export interface GlossaryTerm {
@@ -37,17 +43,12 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = [
   {
     term: "enrichment pass",
     definition:
-      "One round of SourceVision's deeper analysis. Some views need a minimum pass count before they unlock; running analysis again advances the pass.",
+      "One round of LLM analysis layered on SourceVision's automated scan: pass 1 names the zones, pass 2 maps how they depend on each other, pass 3 looks for anti-patterns, and pass 4 writes suggestions.",
   },
   {
     term: "archetype",
     definition:
       "The role SourceVision assigns a file — for example component, route, or utility — which can be overridden per file.",
-  },
-  {
-    term: "weight",
-    definition:
-      "How much traffic — import or call count — flows along a connection between two zones or files. Heavier connections are drawn thicker and count for more in cross-zone totals.",
   },
   {
     term: "guard rail",

@@ -415,53 +415,77 @@ describe("server/client boundary", () => {
    * > A new module must have at least two distinct consumer zones before
    * > being added. Single-consumer utilities belong closer to their
    * > dominant use site.
+   *
+   * A zone consumes a module when it imports one of that module's own
+   * symbols — directly (`shared/<mod>`) or through the barrel
+   * (`shared/index`), resolved by the names the barrel re-exports from each
+   * module. Counting any barrel import as consuming every module made the
+   * rule unfalsifiable: server/ and viewer/ both import the barrel for
+   * unrelated symbols, so every module inherited two consumer zones.
    */
   it("shared/ modules have at least two consumer zones", () => {
     const sharedDir = join(WEB_SRC, "shared");
 
-    // Collect leaf module names exported from shared/
     let sharedModules: string[];
+    let barrel: string;
     try {
       sharedModules = readdirSync(sharedDir)
         .filter((f) => /\.ts$/.test(f) && f !== "index.ts")
         .map((f) => f.replace(/\.ts$/, ""));
+      barrel = readFileSync(join(sharedDir, "index.ts"), "utf-8");
     } catch {
       // shared/ doesn't exist in test environment — pass
       return;
     }
 
-    // For each shared module, count distinct top-level zone directories that import it
-    const violations: string[] = [];
+    /** "type Foo", "Foo as Bar" -> "Foo" (the name as the barrel exports it). */
+    const bindingNames = (list: string): string[] =>
+      list.split(",")
+        .map((s) => s.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0]!.trim())
+        .filter(Boolean);
 
-    for (const mod of sharedModules) {
-      const consumerZones = new Set<string>();
+    // symbol exported by the barrel -> the shared module it comes from
+    const moduleOfSymbol = new Map<string, string>();
+    for (const m of barrel.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["']\.\/([\w-]+)(?:\.js)?["']/g)) {
+      for (const name of bindingNames(m[1]!)) moduleOfSymbol.set(name, m[2]!);
+    }
 
-      // Scan all TS files under src/
-      for (const dir of ["server", "viewer"]) {
-        const base = join(WEB_SRC, dir);
-        try {
-          for (const file of collectTsFiles(base)) {
-            for (const imp of extractImportPaths(file)) {
-              // Match both barrel imports (shared/index) and direct imports (shared/<mod>)
-              if (imp.includes(`shared/${mod}`) || imp.includes("shared/index")) {
-                const rel = relPosix(file);
-                // Extract the top-level zone: "server", "viewer", or "viewer/<subzone>"
-                const parts = rel.split("/");
-                const zone = parts[0] === "viewer" && parts.length > 2
-                  ? `${parts[0]}/${parts[1]}`
-                  : parts[0]!;
-                consumerZones.add(zone);
-              }
-            }
+    // Every zone under src/ except shared/ itself.
+    const zoneDirs = readdirSync(WEB_SRC, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && e.name !== "shared")
+      .map((e) => e.name);
+
+    const consumers = new Map<string, Set<string>>(sharedModules.map((m) => [m, new Set<string>()]));
+    const importRe = /(?:import|export)\s+(?:type\s+)?(?:\{([^}]*)\}|\*(?:\s+as\s+\w+)?)\s*from\s*["']([^"']*\/shared\/([\w-]+)(?:\.js)?)["']/g;
+
+    for (const dir of zoneDirs) {
+      for (const file of collectTsFiles(join(WEB_SRC, dir))) {
+        const rel = relPosix(file);
+        const parts = rel.split("/");
+        // Top-level zone: "server", "hub", "viewer", or "viewer/<subzone>"
+        const zone = parts[0] === "viewer" && parts.length > 2 ? `${parts[0]}/${parts[1]}` : parts[0]!;
+        const content = readFileSync(file, "utf-8");
+        for (const m of content.matchAll(importRe)) {
+          const target = m[3]!;
+          if (target !== "index") {
+            consumers.get(target)?.add(zone);
+            continue;
           }
-        } catch {
-          // Directory doesn't exist — skip
+          // Barrel import: attribute each named binding to its module. A
+          // namespace import (`* as x`) could use anything, so it counts for all.
+          const mods = m[1] === undefined
+            ? sharedModules
+            : bindingNames(m[1]).map((n) => moduleOfSymbol.get(n)).filter((x): x is string => !!x);
+          for (const mod of mods) consumers.get(mod)?.add(zone);
         }
       }
+    }
 
-      if (consumerZones.size < 2) {
+    const violations: string[] = [];
+    for (const [mod, zones] of consumers) {
+      if (zones.size < 2) {
         violations.push(
-          `shared/${mod}.ts has ${consumerZones.size} consumer zone(s) [${[...consumerZones].join(", ")}] — requires at least 2`
+          `shared/${mod}.ts has ${zones.size} consumer zone(s) [${[...zones].join(", ")}] — requires at least 2`
         );
       }
     }
