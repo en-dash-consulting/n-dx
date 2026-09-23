@@ -248,6 +248,7 @@ const ZoneSchema = z.object({
   cohesion: z.number().min(0).max(1),
   coupling: z.number().min(0).max(1),
   insights: z.array(z.string()).optional(),
+  previousIds: z.array(z.string()).optional(),
 });
 
 const ZoneCrossingSchema = z.object({

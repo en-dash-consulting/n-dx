@@ -39,4 +39,4 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Route-aware partitioning: detect file-based routing, treat route directories as generic, group route modules by route subtree](./route-aware-partitioning-detect-file.md) | completed |
 | [Scan quality: symbol evidence, symbol/README name candidates, typed anchored findings, declared-rule checks](./scan-quality-symbol-evidence-symbol.md) | pending |
 | [Scan speed: one generation call per kind, narration off the critical path](./scan-speed-one-generation-call-per.md) | completed |
-| [Zone identity: ids from the deepest distinguishing directory, clean filename ids, sub-zone ids follow their parent, stale fallback names not treated as chosen, numeric-suffix ids follow verified names](./zone-identity-ids-from-the-deepest.md) | pending |
+| [Zone identity: ids from the deepest distinguishing directory, clean filename ids, sub-zone ids follow their parent, stale fallback names not treated as chosen, numeric-suffix ids follow verified names](./zone-identity-ids-from-the-deepest.md) | completed |

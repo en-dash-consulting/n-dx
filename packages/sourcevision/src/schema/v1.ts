@@ -325,6 +325,8 @@ export interface Zone {
   depth?: number;
   /** Sub-zones from recursive subdivision of large zones. */
   subZones?: Zone[];
+  /** Ids this zone was known by in earlier runs; resolved as aliases (pins, `get_zone`). */
+  previousIds?: string[];
   /** Cross-zone import edges within this zone's sub-zones. */
   subCrossings?: ZoneCrossing[];
   /** Computed architectural risk metrics (deterministic, from cohesion/coupling). */

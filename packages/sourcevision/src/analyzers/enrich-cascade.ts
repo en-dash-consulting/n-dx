@@ -41,6 +41,7 @@ import { nameZonesBySelection, describeZoneFromFacts, algorithmicZoneName } from
 import { emptyAnalyzeTokenUsage } from "./token-usage.js";
 import type { AnalyzeTokenUsage } from "../schema/index.js";
 import { routeLayoutFor } from "./route-convention.js";
+import { dedupeZoneNames, isAlgorithmicName, zoneIdsOf } from "./zone-identity.js";
 
 /**
  * Fragility probabilities inside this band are neither a finding nor a
@@ -125,27 +126,8 @@ function previousMatch(zone: Zone, previous: Zone[] | undefined): { zone: Zone; 
   return best;
 }
 
-/**
- * A selected or templated name can coincide across zones ("Tests" for three
- * test directories, the package name for a two-file remainder of a package).
- * The largest zone keeps the name; the others fall back to the algorithmic
- * name, which is unique by construction.
- */
-export function dedupeZoneNames(zones: Zone[]): Zone[] {
-  const byName = new Map<string, Zone[]>();
-  for (const z of zones) {
-    const key = z.name.trim().toLowerCase();
-    byName.set(key, [...(byName.get(key) ?? []), z]);
-  }
-  const fallback = new Set<string>();
-  for (const group of byName.values()) {
-    if (group.length < 2) continue;
-    const [, ...rest] = [...group].sort((a, b) => b.files.length - a.files.length);
-    for (const z of rest) fallback.add(z.id);
-  }
-  if (fallback.size === 0) return zones;
-  return zones.map((z) => (fallback.has(z.id) ? { ...z, name: algorithmicZoneName(z.id) } : z));
-}
+// Name dedupe lives with the other identity rules; re-exported for callers.
+export { dedupeZoneNames } from "./zone-identity.js";
 
 function addUsage(total: AnalyzeTokenUsage, calls: number, usage?: { input: number; output: number }): void {
   total.calls += calls;
@@ -199,7 +181,7 @@ export async function cascadeEnrichment(
   const skipGeneratedNames = new Set<string>();
   for (const zone of candidates) {
     const prev = previousMatch(zone, previousZones?.zones);
-    if (prev && prev.zone.name && prev.zone.name !== algorithmicZoneName(prev.zone.id)) {
+    if (prev && prev.zone.name && !isAlgorithmicName(prev.zone.name, zoneIdsOf(prev.zone))) {
       inherited.set(zone.id, prev.zone.name);
     } else {
       toName.push(zone);

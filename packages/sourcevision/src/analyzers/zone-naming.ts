@@ -37,6 +37,7 @@ import type { RouteLayout } from "./route-convention.js";
 export function algorithmicZoneName(id: string): string {
   return id
     .split("-")
+    .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }

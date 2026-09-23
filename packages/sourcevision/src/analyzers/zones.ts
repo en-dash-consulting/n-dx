@@ -63,6 +63,7 @@ import type { MergeLogEntry } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
 import { judgeFindings, judgeZoneFragility, judgeHeuristicFindings, judgeMoves } from "./enrich-judge.js";
 import { cascadeEnrichment } from "./enrich-cascade.js";
+import { dedupeZoneNames, deepestDistinguishingSegment, idFromStems, idsFollowNames, isAlgorithmicName, renameZoneRefs, reprefixSubZones, zoneIdsOf } from "./zone-identity.js";
 import { getJudgmentRoute } from "./claude-client.js";
 import { recordPartitionReview, setRunMode } from "./run-ledger.js";
 import { emptyAnalyzeTokenUsage } from "./token-usage.js";
@@ -326,7 +327,7 @@ export function preservePreviousZoneIdentity(
       usedPrevIds.add(bestMatch.zone.id);
       if (opts.keepIds) {
         // The id derivation changed on purpose; only a chosen name carries over.
-        const chosen = bestMatch.zone.name !== deriveZoneName(bestMatch.zone.id);
+        const chosen = !isAlgorithmicName(bestMatch.zone.name, zoneIdsOf(bestMatch.zone));
         if (chosen) console.log(`  [zones] keeping name "${bestMatch.zone.name}" for "${zone.id}" (was "${bestMatch.zone.id}", ${(bestMatch.overlap * 100).toFixed(0)}% file overlap)`);
         result.push(chosen
           ? { ...zone, name: bestMatch.zone.name, description: bestMatch.zone.description || zone.description }
@@ -334,12 +335,13 @@ export function preservePreviousZoneIdentity(
         continue;
       }
       console.log(`  [zones] preserving identity: "${zone.id}" → "${bestMatch.zone.id}" (${(bestMatch.overlap * 100).toFixed(0)}% file overlap)`);
-      result.push({
+      result.push(reprefixSubZones({
         ...zone,
         id: bestMatch.zone.id,
         name: bestMatch.zone.name,
         description: bestMatch.zone.description || zone.description,
-      });
+        ...(bestMatch.zone.previousIds?.length ? { previousIds: bestMatch.zone.previousIds } : {}),
+      }, zone.id));
     } else {
       result.push(zone);
     }
@@ -360,7 +362,7 @@ export function reapplyCascadeLabels(preserved: Zone[], cascade: Zone[]): Zone[]
   return preserved.map((zone) => {
     const source = byFiles.get([...zone.files].sort().join("\u0000"));
     if (!source) return zone;
-    const keepName = zone.name !== deriveZoneName(zone.id);
+    const keepName = !isAlgorithmicName(zone.name, zoneIdsOf(zone));
     return { ...zone, description: source.description, name: keepName ? zone.name : source.name };
   });
 }
@@ -590,13 +592,18 @@ function deriveZoneIdFromFileStems(
   const stems = [...new Set(
     sourceFiles
       .map((file) => basename(file).replace(/\.[^.]+$/, ""))
-      .map((stem) => stem.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, ""))
-      .filter((stem) => stem && !SMALL_COMMUNITY_STEM_SKIP_WORDS.has(stem) && !skipWords.has(stem))
+      .filter((stem) => {
+        const norm = stem.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "");
+        return norm && !SMALL_COMMUNITY_STEM_SKIP_WORDS.has(norm) && !skipWords.has(norm);
+      })
       .sort()
   )];
 
   if (stems.length < 2) return null;
-  return stems.slice(0, 2).join("-");
+  // Words, not raw stems: camelCase split and route syntax stripped, so
+  // CosmicCallout + DashboardGrid → cosmic-callout-dashboard-grid rather
+  // than cosmiccallout-dashboardgrid.
+  return idFromStems(stems.slice(0, 2));
 }
 
 /**
@@ -605,6 +612,7 @@ function deriveZoneIdFromFileStems(
 export function deriveZoneName(id: string): string {
   return id
     .split("-")
+    .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
@@ -621,8 +629,8 @@ function isGenericZoneName(name: string, id: string): boolean {
   // "Src 2", "Lib 3" etc — generic base + numeric suffix
   const match = name.match(/^(\w+)\s+(\d+)$/);
   if (match && GENERIC_BASES.has(match[1].toLowerCase())) return true;
-  // Name unchanged from algorithmic default when ID has numeric suffix
-  if (/-\d+$/.test(id) && name === deriveZoneName(id)) return true;
+  // A placeholder from this or an earlier numbered id ("Routes 8" on routes-6)
+  if (/-\d+$/.test(id) && isAlgorithmicName(name, [id])) return true;
   return false;
 }
 
@@ -786,6 +794,10 @@ export function applyZonePins(
 
   // Build zone ID → index
   const zoneIdToIdx = new Map<string, number>();
+  for (let i = 0; i < zones.length; i++) {
+    // Earlier ids first, so a current id always wins over someone's alias.
+    for (const prev of zones[i].previousIds ?? []) if (!zoneIdToIdx.has(prev)) zoneIdToIdx.set(prev, i);
+  }
   for (let i = 0; i < zones.length; i++) {
     zoneIdToIdx.set(zones[i].id, i);
   }
@@ -1810,8 +1822,15 @@ function buildZonesFromCommunities(
     }
     if (usedIds.has(id)) {
       const disambiguated = disambiguateZoneId(id, members, parentId, extraSkip);
+      // One segment below the base was not enough (or was taken): walk the
+      // shared directory prefix from its deepest segment up.
+      const deeper = disambiguated !== id && !usedIds.has(disambiguated)
+        ? undefined
+        : deepestDistinguishingSegment(members, new Set([...SKIPPABLE_SEGMENTS, ...(extraSkip ?? []), id]), usedIds);
       if (disambiguated !== id && !usedIds.has(disambiguated)) {
         id = disambiguated;
+      } else if (deeper) {
+        id = deeper;
       } else {
         // Try filename-based derivation before merging or adding numeric suffix
         const filenameId = deriveZoneIdFromFilenames(members);
@@ -2798,7 +2817,7 @@ function computeMoveFindings(
 /**
  * Compute zone stability metrics by comparing new zones against previous zones.
  */
-function computeZoneStability(
+export function computeZoneStability(
   newZones: Zone[],
   previousZones: Zone[],
 ): ZoneStability {
@@ -2808,6 +2827,15 @@ function computeZoneStability(
   for (const z of previousZones) {
     prevZoneIds.add(z.id);
     for (const f of z.files) prevFileZone.set(f, z.id);
+  }
+
+  // A zone renamed from a numbered id is the same zone: map its old id to
+  // the new one so the rename is not counted as a removal plus an addition.
+  const canonical = new Map<string, string>();
+  for (const z of newZones) for (const prev of z.previousIds ?? []) canonical.set(prev, z.id);
+  for (const [f, id] of prevFileZone) prevFileZone.set(f, canonical.get(id) ?? id);
+  for (const [prev, now] of canonical) {
+    if (prevZoneIds.delete(prev)) prevZoneIds.add(now);
   }
 
   const newZoneIds = new Set(newZones.map(z => z.id));
@@ -3120,6 +3148,20 @@ export async function analyzeZones(
     : enrichedZones;
   if (enrichResult.cascade && previousZones) {
     finalZones = reapplyCascadeLabels(finalZones, enrichedZones);
+  }
+  // Preservation can hand two zones the same name; the smaller falls back.
+  finalZones = dedupeZoneNames(finalZones);
+
+  // ── Numbered ids follow chosen names ──
+  const idRename = idsFollowNames(finalZones);
+  if (idRename.renamed.size > 0) {
+    finalZones = idRename.zones;
+    aiFindings = renameZoneRefs(aiFindings, idRename.renamed);
+    for (const [from, to] of idRename.renamed) {
+      const ins = aiZoneInsights.get(from);
+      if (ins) { aiZoneInsights.delete(from); aiZoneInsights.set(to, ins); }
+      console.log(`  [zones] id follows name: "${from}" → "${to}"`);
+    }
   }
 
   // ── Remap content hashes to post-enrichment zone IDs ──
