@@ -33,7 +33,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Finding cascade: Jev gates, verifies and anchors enrichment; free-text generation becomes --narrate](./finding-cascade-jev-gates-verifies-and.md) | completed |
 | [Finding severity, finding category and zone fragility as Jev judgments](./finding-severity-finding-category-and.md) | completed |
 | [Jev client and code.classify as a Choice over the archetype catalog](./jev-client-and-code-classify-as-a.md) | completed |
-| [Partition balance and nesting: lopsided subdivisions count as failures, oversized zones flagged, tests grouped with their code, iso map draws sub-zones](./partition-balance-and-nesting-lopsided.md) | pending |
+| [Partition balance and nesting: lopsided subdivisions count as failures, oversized zones flagged, tests grouped with their code, iso map draws sub-zones](./partition-balance-and-nesting-lopsided.md) | completed |
 | [Partition review: Jev and health signals decide whether a previous partition may be reused or seed Louvain; upgrades re-partition without sv reset](./partition-review-jev-and-health.md) | completed |
 | [Re-run judgments: Jev decides what needs re-enrichment and which findings still hold](./re-run-judgments-jev-decides-what.md) | pending |
 | [Route-aware partitioning: detect file-based routing, treat route directories as generic, group route modules by route subtree](./route-aware-partitioning-detect-file.md) | completed |

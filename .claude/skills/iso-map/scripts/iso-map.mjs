@@ -14,6 +14,34 @@ import { writeFileSync, existsSync as existsSync4 } from "node:fs";
 import { resolve as resolve3, join as join4, dirname as dirname2 } from "node:path";
 
 // packages/sourcevision/src/export/iso-model.ts
+function layoutTiles(children, w, d) {
+  const kids = children.filter((c) => c.files > 0).sort((a, b) => b.files - a.files || a.id.localeCompare(b.id));
+  if (kids.length < 2) return [];
+  const rowCount = Math.max(1, Math.round(Math.sqrt(kids.length)));
+  const rows = Array.from({ length: rowCount }, () => ({ total: 0, items: [] }));
+  for (const k of kids) {
+    const row = rows.reduce((best, r) => r.total < best.total ? r : best, rows[0]);
+    row.items.push(k);
+    row.total += k.files;
+  }
+  const grand = rows.reduce((n, r) => n + r.total, 0);
+  const tiles = [];
+  let v = 0;
+  for (const row of rows.filter((r) => r.items.length > 0)) {
+    const rd = d * row.total / grand;
+    let u = 0;
+    for (const k of row.items) {
+      const tw = w * k.files / row.total;
+      tiles.push({ id: k.id, name: k.name, files: k.files, u: round3(u), v: round3(v), w: round3(tw), d: round3(rd) });
+      u += tw;
+    }
+    v += rd;
+  }
+  return tiles;
+}
+function round3(n) {
+  return Math.round(n * 1e3) / 1e3;
+}
 var ISO_KINDS = [
   { id: "entry", label: "Entry points", color: "#4F9BE8", glyph: "▶" },
   { id: "logic", label: "Business logic", color: "#7FAE33", glyph: "◆" },
@@ -187,6 +215,9 @@ function buildIsoModel(input, options = {}) {
       inbound: (inboundById.get(zone.id) ?? []).slice(0, 8),
       outbound: (outboundById.get(zone.id) ?? []).slice(0, 8)
     });
+    const node = nodes[nodes.length - 1];
+    const tiles = zone.children?.length ? layoutTiles(zone.children, node.w, node.d) : [];
+    if (tiles.length > 0) node.tiles = tiles;
   }
   for (const ext of externalPicks) {
     const consumerNames = ext.consumers.map((id) => zoneById.get(id)?.name).filter((n) => Boolean(n));
@@ -939,6 +970,20 @@ order.forEach(function(n){
     fill: base, stroke: shade(base, 0.28), "stroke-width": "1"
   });
   g.appendChild(faceL); g.appendChild(faceR); g.appendChild(top);
+  // Sub-zones: tiles on the top face, alternating tints so neighbours read
+  // apart, each with a title for hover. Not focusable — the dossier lists them.
+  (n.tiles || []).forEach(function(t, i){
+    var tu = u + t.u, tv = v + t.v;
+    var tile = el("polygon", {
+      points: pts([P(tu, tv, h), P(tu + t.w, tv, h), P(tu + t.w, tv + t.d, h), P(tu, tv + t.d, h)]),
+      fill: shade(base, i % 2 ? 0.14 : 0.04), stroke: shade(base, -0.3), "stroke-width": "0.8"
+    });
+    tile.setAttribute("class", "tile");
+    var tt = el("title");
+    tt.textContent = t.name + " · " + num(t.files) + " files";
+    tile.appendChild(tt);
+    g.appendChild(tile);
+  });
   gBlock.appendChild(g);
 
   var cTop = P(u + w / 2, v + d / 2, h);
@@ -1075,6 +1120,11 @@ function renderNode(n){
   if (n.mix.length) {
     h += '<h4>Contents</h4><div class="mx">' + n.mix.map(function(a){
       return '<span>' + esc(LABEL[a[0]] || a[0]) + ' <b>' + num(a[1]) + '</b></span>';
+    }).join("") + '</div>';
+  }
+  if (n.tiles && n.tiles.length) {
+    h += '<h4>Sub-zones</h4><div class="mx">' + n.tiles.map(function(t){
+      return '<span>' + esc(t.name) + ' <b>' + num(t.files) + '</b></span>';
     }).join("") + '</div>';
   }
   if (n.insights.length) {
@@ -2449,6 +2499,14 @@ function resolveInfrastructure(infrastructure, zoneIds, zoneOfFile) {
   });
 }
 var REQUIRED_FILES = ["zones.json", "inventory.json", "imports.json"];
+var LOPSIDED_CHILD_SHARE = 0.7;
+function balancedChildren(zone) {
+  const kids = (zone.subZones ?? []).filter((k) => (k.files?.length ?? 0) > 0);
+  const total = zone.files?.length ?? 0;
+  if (kids.length < 2 || total === 0) return void 0;
+  if (kids.reduce((n, k) => Math.max(n, k.files.length), 0) / total >= LOPSIDED_CHILD_SHARE) return void 0;
+  return kids.map((k) => ({ id: k.id, name: k.name, files: k.files.length }));
+}
 function hasSourcevision(root) {
   const svDir = join3(root, ".sourcevision");
   return existsSync3(svDir) && REQUIRED_FILES.every((f) => existsSync3(join3(svDir, f)));
@@ -2502,7 +2560,8 @@ function loadFromSourcevision(root, options = {}) {
     cohesion: z.cohesion ?? 0,
     coupling: z.coupling ?? 0,
     riskLevel: z.riskMetrics?.riskLevel,
-    insights: z.insights ?? []
+    insights: z.insights ?? [],
+    ...balancedChildren(z) ? { children: balancedChildren(z) } : {}
   }));
   const zoneOfFile = /* @__PURE__ */ new Map();
   for (const zone of zones) for (const f of zone.files) zoneOfFile.set(f, zone.id);

@@ -38,6 +38,16 @@ describe("assessPartitionHealth", () => {
     expect(assessPartitionHealth(zonesOf(10, 1)).verdict).toBe("healthy");
   });
 
+  it("is borderline when a zone is oversized without a balanced subdivision, at any zone count", () => {
+    const big = makeZone("core", Array.from({ length: 60 }, (_, i) => `src/core/f${i}.ts`));
+    const zones = [big, ...zonesOf(3, 0)];
+    const h = assessPartitionHealth(zones);
+    expect(h.verdict).toBe("borderline");
+    expect(h.reasons?.join(" ")).toContain("over 30%");
+    const split = { ...big, subZones: [makeZone("core/a", big.files.slice(0, 30)), makeZone("core/b", big.files.slice(30))] };
+    expect(assessPartitionHealth([split, ...zonesOf(3, 0)]).verdict).toBe("healthy");
+  });
+
   it("is borderline when a quarter of ids carry a numeric suffix", () => {
     const h = assessPartitionHealth(zonesOf(8, 0, (i) => (i < 2 ? `routes-${i + 2}` : `zone-${String.fromCharCode(97 + i)}`)));
     expect(h.verdict).toBe("borderline");

@@ -430,6 +430,20 @@ order.forEach(function(n){
     fill: base, stroke: shade(base, 0.28), "stroke-width": "1"
   });
   g.appendChild(faceL); g.appendChild(faceR); g.appendChild(top);
+  // Sub-zones: tiles on the top face, alternating tints so neighbours read
+  // apart, each with a title for hover. Not focusable — the dossier lists them.
+  (n.tiles || []).forEach(function(t, i){
+    var tu = u + t.u, tv = v + t.v;
+    var tile = el("polygon", {
+      points: pts([P(tu, tv, h), P(tu + t.w, tv, h), P(tu + t.w, tv + t.d, h), P(tu, tv + t.d, h)]),
+      fill: shade(base, i % 2 ? 0.14 : 0.04), stroke: shade(base, -0.3), "stroke-width": "0.8"
+    });
+    tile.setAttribute("class", "tile");
+    var tt = el("title");
+    tt.textContent = t.name + " \u00b7 " + num(t.files) + " files";
+    tile.appendChild(tt);
+    g.appendChild(tile);
+  });
   gBlock.appendChild(g);
 
   var cTop = P(u + w / 2, v + d / 2, h);
@@ -566,6 +580,11 @@ function renderNode(n){
   if (n.mix.length) {
     h += '<h4>Contents</h4><div class="mx">' + n.mix.map(function(a){
       return '<span>' + esc(LABEL[a[0]] || a[0]) + ' <b>' + num(a[1]) + '</b></span>';
+    }).join("") + '</div>';
+  }
+  if (n.tiles && n.tiles.length) {
+    h += '<h4>Sub-zones</h4><div class="mx">' + n.tiles.map(function(t){
+      return '<span>' + esc(t.name) + ' <b>' + num(t.files) + '</b></span>';
     }).join("") + '</div>';
   }
   if (n.insights.length) {

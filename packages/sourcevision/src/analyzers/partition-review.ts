@@ -47,6 +47,14 @@ export const FRAGMENTED_SMALL_SHARE = 0.4;
 export const BORDERLINE_SMALL_SHARE = 0.2;
 export const BORDERLINE_NUMERIC_SHARE = 0.25;
 
+/**
+ * A top-level zone above this share of all zoned files, with no balanced
+ * sub-zones, is oversized: `max(2 × maxZonePercent, 30%)`.
+ */
+export function oversizedShare(maxZonePercent = 15): number {
+  return Math.max((2 * maxZonePercent) / 100, 0.3);
+}
+
 /** Map Noul at or below which the partition is rejected. */
 export const MAP_REJECT_MAX_PROBABILITY = 0.3;
 
@@ -57,7 +65,7 @@ const MAP_FILE_SAMPLE = 6;
 // ── Health ───────────────────────────────────────────────────────────────────
 
 /** Deterministic partition-health signals. */
-export function assessPartitionHealth(zones: Zone[]): PartitionHealth {
+export function assessPartitionHealth(zones: Zone[], maxZonePercent?: number): PartitionHealth {
   const total = zones.length;
   const smallZones = zones.filter((z) => z.files.length <= SMALL_ZONE_MAX_FILES).length;
   const numericIds = zones.filter((z) => /-\d+$/.test(z.id)).length;
@@ -65,6 +73,8 @@ export function assessPartitionHealth(zones: Zone[]): PartitionHealth {
   const largest = zones.reduce((n, z) => Math.max(n, z.files.length), 0);
   const smallShare = total > 0 ? round2(smallZones / total) : 0;
   const numericShare = total > 0 ? round2(numericIds / total) : 0;
+  const limit = oversizedShare(maxZonePercent);
+  const oversized = zones.filter((z) => fileCount > 0 && z.files.length / fileCount > limit && !hasBalancedSubZones(z)).length;
 
   let verdict: PartitionHealth["verdict"] = "healthy";
   const reasons: string[] = [];
@@ -79,9 +89,14 @@ export function assessPartitionHealth(zones: Zone[]): PartitionHealth {
       if (numericShare >= BORDERLINE_NUMERIC_SHARE) {
         reasons.push(`${numericIds}/${total} zone ids carry a numeric suffix`);
       }
-      if (reasons.length > 0) verdict = "borderline";
     }
   }
+  // Oversized zones matter at any zone count: one zone holding most of a
+  // project is the opposite failure from fragmentation.
+  if (verdict !== "fragmented" && oversized > 0) {
+    reasons.push(`${oversized} zone${oversized === 1 ? "" : "s"} over ${Math.round(limit * 100)}% of files without a balanced subdivision`);
+  }
+  if (verdict === "healthy" && reasons.length > 0) verdict = "borderline";
 
   return {
     zones: total,
@@ -92,6 +107,12 @@ export function assessPartitionHealth(zones: Zone[]): PartitionHealth {
     verdict,
     ...(reasons.length > 0 ? { reasons } : {}),
   };
+}
+
+function hasBalancedSubZones(zone: Zone): boolean {
+  const kids = zone.subZones ?? [];
+  if (kids.length < 2 || zone.files.length === 0) return false;
+  return kids.reduce((n, k) => Math.max(n, k.files.length), 0) / zone.files.length < 0.7;
 }
 
 // ── Jev map judgment ─────────────────────────────────────────────────────────
@@ -176,13 +197,13 @@ export interface PartitionDecision {
 export async function reviewPreviousPartition(
   previous: { zones: Zone[]; crossings?: ZoneCrossing[]; partitionReview?: PartitionReview },
   inputFingerprint: string,
-  opts: { judge?: typeof judgePartitionMap } = {},
+  opts: { judge?: typeof judgePartitionMap; maxZonePercent?: number } = {},
 ): Promise<PartitionDecision> {
   const prior = previous.partitionReview;
   if (prior?.rejected && prior.fingerprint === inputFingerprint) {
     return { trustPrevious: true, review: prior, fresh: false };
   }
-  const health = assessPartitionHealth(previous.zones);
+  const health = assessPartitionHealth(previous.zones, opts.maxZonePercent);
 
   let mapProbability: number | undefined;
   let rejected = health.verdict === "fragmented";

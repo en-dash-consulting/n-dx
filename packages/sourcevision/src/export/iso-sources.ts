@@ -34,6 +34,7 @@ import type {
   Imports,
   Inventory,
   Manifest,
+  Zone,
   Zones,
 } from "../schema/v1.js";
 
@@ -404,6 +405,22 @@ function resolveInfrastructure(
 
 const REQUIRED_FILES = ["zones.json", "inventory.json", "imports.json"];
 
+/** Children share of the parent at or above which a subdivision is not drawn. */
+const LOPSIDED_CHILD_SHARE = 0.7;
+
+/**
+ * A zone's sub-zones for the map, or undefined when there are fewer than two
+ * or one of them holds most of the parent (the sliver-chain shape older
+ * analyses produced; drawn, it is a single tile plus specks).
+ */
+export function balancedChildren(zone: Zone): Array<{ id: string; name: string; files: number }> | undefined {
+  const kids = (zone.subZones ?? []).filter((k) => (k.files?.length ?? 0) > 0);
+  const total = zone.files?.length ?? 0;
+  if (kids.length < 2 || total === 0) return undefined;
+  if (kids.reduce((n, k) => Math.max(n, k.files.length), 0) / total >= LOPSIDED_CHILD_SHARE) return undefined;
+  return kids.map((k) => ({ id: k.id, name: k.name, files: k.files.length }));
+}
+
 /** Whether a directory holds a usable analysis. */
 export function hasSourcevision(root: string): boolean {
   const svDir = join(root, ".sourcevision");
@@ -471,6 +488,7 @@ export function loadFromSourcevision(root: string, options: LoadOptions = {}): I
       coupling: z.coupling ?? 0,
       riskLevel: z.riskMetrics?.riskLevel,
       insights: z.insights ?? [],
+      ...(balancedChildren(z) ? { children: balancedChildren(z) } : {}),
     }));
 
   const zoneOfFile = new Map<string, string>();

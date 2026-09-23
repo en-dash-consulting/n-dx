@@ -58,6 +58,7 @@ import {
   mergeSatelliteCommunities,
   capZoneCount,
   splitLargeCommunities,
+  splitByFirstDifferingDirectory,
 } from "./louvain.js";
 import type { MergeLogEntry } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
@@ -138,6 +139,13 @@ export interface ZonePipelineOptions {
    * together with proximity edges.
    */
   routeLayout?: RouteLayout;
+  /** Louvain resolution; above 1.0 favours smaller communities. Default 1.0. */
+  resolution?: number;
+  /**
+   * Use this file → community assignment for production files instead of
+   * Louvain (subdivision's directory fallback). Tests are still quarantined.
+   */
+  presetCommunity?: Map<string, string>;
 }
 
 /** Result of running the zone detection pipeline. */
@@ -1021,32 +1029,115 @@ export function subdivisionThreshold(totalFiles: number): number {
 /** @deprecated use {@link subdivisionThreshold}(totalFiles) — kept for back-compat */
 export const SUBDIVISION_THRESHOLD = SUBDIVISION_THRESHOLD_MIN;
 
+/** A subdivision whose largest child holds this share of the parent or more is rejected. */
+export const LOPSIDED_CHILD_SHARE = 0.7;
+/** Louvain resolution for the second subdivision attempt. */
+const SUBDIVISION_RETRY_RESOLUTION = 2.0;
+/** Smallest directory group kept on its own by the directory fallback. */
+const SUBDIVISION_MIN_CHILD = 3;
+
+/** At least two children and none holding {@link LOPSIDED_CHILD_SHARE} of the parent. */
+export function isBalancedSubdivision(children: Zone[], parentSize: number): boolean {
+  if (children.length < 2 || parentSize === 0) return false;
+  const largest = children.reduce((n, z) => Math.max(n, z.files.length), 0);
+  return largest / parentSize < LOPSIDED_CHILD_SHARE;
+}
+
 /** Maximum recursion depth for subdivision to prevent infinite loops. */
 export const MAX_SUBDIVISION_DEPTH = 3;
 
 /**
- * Map a test file path to its community ID. Groups test files by their
- * top-level Tests/<suite>/ prefix so projects with multiple test targets
- * (e.g. `Tests/GoToBedCoreTests`, `Tests/GoToBedTests`) get one zone per
- * suite. Files not under a Tests/<suite>/ path fall back to a single
- * "tests" community.
+ * Map a test file path to its community ID.
+ *
+ * - A top-level test root groups by suite: `Tests/<suite>/…` → one community
+ *   per suite (multi-target Swift projects), `tests/x.test.ts` → the root.
+ * - A test directory nested in a production tree (`app/utils/__tests__/`,
+ *   `src/core/tests/`) groups with its parent directory: `tests:app/utils`.
+ *   Lumping every nested `__tests__` directory together produced one
+ *   250-file zone named after whichever parent was most common.
+ * - Anything else falls back to a single "tests" community.
  */
 export function deriveTestSuiteCommunity(filePath: string): string {
   const segments = filePath.split("/");
-  // Look for a "Tests" or "tests" or "test" segment near the top of the path.
   for (let i = 0; i < segments.length - 1; i++) {
     const lc = segments[i].toLowerCase();
-    if (lc === "tests" || lc === "test") {
-      const suite = segments[i + 1];
-      // Only use the suite if it's itself a directory (not the test file
-      // sitting directly in Tests/) — otherwise lump under generic tests.
-      if (i + 2 < segments.length) {
-        return `tests:${segments[i]}/${suite}`;
-      }
-      return `tests:${segments[i]}`;
+    if (!TEST_DIR_SEGMENTS.has(lc)) continue;
+    if (i > 0) {
+      // A test root inside a package (`packages/web/tests/unit/…`) keeps its
+      // suite; a `__tests__` directory is itself the suite.
+      const parent = segments.slice(0, i).join("/");
+      const suite = lc !== "__tests__" && i + 2 < segments.length ? segments[i + 1] : undefined;
+      return suite ? `tests:${parent}#${suite}` : `tests:${parent}`;
     }
+    // Top-level test root: per suite when the file sits in a subdirectory.
+    if (i + 2 < segments.length) return `tests:${segments[i]}#${segments[i + 1]}`;
+    return `tests:${segments[i]}`;
   }
   return "tests";
+}
+
+const TEST_DIR_SEGMENTS = new Set(["tests", "test", "__tests__", "spec", "specs", "e2e"]);
+
+/**
+ * Zone id for a test community keyed by its parent path: `tests-<leaf>`,
+ * walking up the path (`tests-digest-utils`) until the id is unused, so two
+ * `utils/__tests__` directories in different features stay two zones.
+ */
+function testCommunityZoneId(key: string, used: ReadonlySet<string>, extraSkip?: ReadonlySet<string>): string {
+  const [parentPath, suiteRaw] = key.split("#");
+  const suite = suiteRaw ? suiteRaw.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "") : "";
+  const withSuite = (id: string) => (suite ? `${id}-${suite}` : id);
+  const all = parentPath
+    .split("/")
+    .map((p) => p.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, ""))
+    .filter((p) => p && !TEST_DIR_SEGMENTS.has(p));
+  const meaningful = all.filter((p) => !GENERIC_SEGMENTS.has(p) && !extraSkip?.has(p));
+  if (all.length === 0) {
+    const id = withSuite("tests");
+    return used.has(id) ? uniqueSuffix(id, used) : id;
+  }
+  // Shortest meaningful suffix first; then the full path, generic segments
+  // included, so `app/utils` becomes `tests-app-utils` when `tests-utils` is taken.
+  for (const segs of [meaningful, all]) {
+    for (let k = 1; k <= segs.length; k++) {
+      const id = withSuite(`tests-${segs.slice(-k).join("-")}`);
+      if (!used.has(id)) return id;
+    }
+  }
+  return uniqueSuffix(withSuite(`tests-${all.join("-")}`), used);
+}
+
+function uniqueSuffix(base: string, used: ReadonlySet<string>): string {
+  let n = 2;
+  while (used.has(`${base}-${n}`)) n++;
+  return `${base}-${n}`;
+}
+
+/**
+ * Test communities below `minSize` files are folded into their nearest
+ * ancestor test community (`tests:app/utils/format` → `tests:app/utils` →
+ * `tests:app`), so nested test directories of one or two files do not each
+ * become a zone.
+ */
+export function foldSmallTestCommunities(assignments: Map<string, string>, minSize: number): void {
+  for (let pass = 0; pass < 8; pass++) {
+    const sizes = new Map<string, number>();
+    for (const c of assignments.values()) sizes.set(c, (sizes.get(c) ?? 0) + 1);
+    let moved = false;
+    for (const [file, c] of assignments) {
+      if ((sizes.get(c) ?? 0) >= minSize || !c.startsWith("tests:")) continue;
+      const path = c.slice("tests:".length);
+      const hash = path.indexOf("#");
+      const slash = path.lastIndexOf("/");
+      const parent = hash !== -1
+        ? `tests:${path.slice(0, hash)}`
+        : slash === -1 ? "tests" : `tests:${path.slice(0, slash)}`;
+      if (parent === c) continue;
+      assignments.set(file, parent);
+      moved = true;
+    }
+    if (!moved) break;
+  }
 }
 
 /**
@@ -1087,8 +1178,11 @@ export function subdivideZone(
     return [];
   }
 
-  // Run full pipeline on the zone's internal graph
-  const result = runZonePipeline({
+  // Run full pipeline on the zone's internal graph. A split whose largest
+  // child keeps most of the parent is not a subdivision — it is the parent
+  // again plus slivers, and recursing on it built three-deep chains of one
+  // dominant child. Retry finer, then by directory, then give up.
+  const base = {
     edges: internalEdges,
     inventory,
     imports,
@@ -1098,12 +1192,24 @@ export function subdivideZone(
     depth: depth + 1,
     testFiles,
     routeLayout,
-  });
-
-  // If pipeline found only 1 or 0 zones, no meaningful subdivision
-  if (result.zones.length <= 1) {
-    return [];
+  };
+  const attempts: Array<() => ZonePipelineResult | null> = [
+    () => runZonePipeline(base),
+    () => runZonePipeline({ ...base, resolution: SUBDIVISION_RETRY_RESOLUTION }),
+    () => {
+      const preset = splitByFirstDifferingDirectory(zone.files, SUBDIVISION_MIN_CHILD);
+      return preset ? runZonePipeline({ ...base, presetCommunity: preset }) : null;
+    },
+  ];
+  let result: ZonePipelineResult | undefined;
+  for (const attempt of attempts) {
+    const r = attempt();
+    if (r && isBalancedSubdivision(r.zones, zone.files.length)) {
+      result = r;
+      break;
+    }
   }
+  if (!result) return [];
 
   // Store sub-crossings on parent zone
   if (result.crossings.length > 0) {
@@ -1140,7 +1246,7 @@ export function computeStructureHash(zones: Zone[]): string {
  * silently keep stale zones — and, e.g., an empty codebase map — until they
  * delete `.sourcevision`. Monotonic integer; history is intentionally terse.
  */
-export const ZONE_ALGORITHM_VERSION = 3;
+export const ZONE_ALGORITHM_VERSION = 4;
 
 /**
  * Hash the analysis inputs that determine the Louvain partition, independent
@@ -1807,11 +1913,8 @@ function buildZonesFromCommunities(
     // collides with `src/core/`). Honor the community ID directly so test
     // zones get a stable test-flavored id (`tests-<suite>`).
     let id: string;
-    if (communityId.startsWith("tests:")) {
-      const suiteRaw = communityId.slice("tests:".length);
-      const suite = suiteRaw.split("/").pop() ?? suiteRaw;
-      const normalized = suite.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "");
-      id = normalized ? `tests-${normalized}` : "tests";
+    if (communityId === "tests" || communityId.startsWith("tests:")) {
+      id = testCommunityZoneId(communityId.slice("tests:".length), usedIds, extraSkip);
     } else {
       id = deriveZoneId(members, parentId, extraSkip);
       // Directory derivation fell through to a route-generic segment: flat
@@ -2439,6 +2542,8 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     previousZoneAssignment,
     stabilityWeight = 0.5,
     routeLayout,
+    resolution = 1.0,
+    presetCommunity,
   } = options;
 
   // ── Resolve directory-targeted edges ──
@@ -2565,17 +2670,26 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
 
   // ── Louvain community detection (production only) ──
   const smallZoneMergeLog: MergeLogEntry[] = [];
-  let community = louvainPhase1(productionGraph, 100, 1.0, previousZoneAssignment);
-  community = mergeBidirectionalCoupling(community, productionGraph);
-  community = mergeSmallCommunities(community, productionGraph, smallZoneMergeThreshold, smallZoneMergeLog);
-  community = mergeSatelliteCommunities(community, productionGraph);
-  community = capZoneCount(community, productionGraph, scaledMaxZones);
+  let community: Map<string, string>;
+  if (presetCommunity) {
+    community = new Map();
+    for (const node of productionGraph.keys()) {
+      const c = presetCommunity.get(node);
+      if (c !== undefined) community.set(node, c);
+    }
+  } else {
+    community = louvainPhase1(productionGraph, 100, resolution, previousZoneAssignment);
+    community = mergeBidirectionalCoupling(community, productionGraph);
+    community = mergeSmallCommunities(community, productionGraph, smallZoneMergeThreshold, smallZoneMergeLog);
+    community = mergeSatelliteCommunities(community, productionGraph);
+    community = capZoneCount(community, productionGraph, scaledMaxZones, maxPct < 100 ? maxZoneSize : undefined);
 
-  // ── Split oversized communities (production only) ──
-  community = splitLargeCommunities(community, productionGraph, maxZoneSize);
+    // ── Split oversized communities (production only) ──
+    community = splitLargeCommunities(community, productionGraph, maxZoneSize);
 
-  mergeSameIdCommunities(community, maxPct < 100 ? maxZoneSize : undefined, routeLayout?.genericSegments);
-  community = capZoneCount(community, productionGraph, scaledMaxZones);  // re-cap after split
+    mergeSameIdCommunities(community, maxPct < 100 ? maxZoneSize : undefined, routeLayout?.genericSegments);
+    community = capZoneCount(community, productionGraph, scaledMaxZones, maxPct < 100 ? maxZoneSize : undefined);  // re-cap after split
+  }
 
   // ── Drop quarantined tests into their own per-suite zones ──
   // Group quarantined test files by their top-level Tests/<suite>/ prefix
@@ -2583,9 +2697,12 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   // zone per suite rather than one mega-tests zone. Colocated tests
   // (`internal/foo/*_test.go`) stayed in productionGraph and are already
   // partitioned alongside their package.
+  const testAssignments = new Map<string, string>();
   for (const testFile of quarantineTests) {
-    community.set(testFile, deriveTestSuiteCommunity(testFile));
+    testAssignments.set(testFile, deriveTestSuiteCommunity(testFile));
   }
+  foldSmallTestCommunities(testAssignments, smallZoneMergeThreshold);
+  for (const [testFile, c] of testAssignments) community.set(testFile, c);
 
   // ── Build zones from communities ──
   const { zones, filenameBasedZoneIds } = buildZonesFromCommunities(
@@ -3049,7 +3166,7 @@ export async function analyzeZones(
     partitionReview = undefined;
     console.log(`  [partition] zone algorithm changed (v${previousZones?.algorithmVersion ?? "?"} → v${ZONE_ALGORITHM_VERSION}) — re-partitioned without stability bias`);
   } else if (previousZones?.zones?.length && !options?.reuseStructure) {
-    const decision = await reviewPreviousPartition(previousZones, inputFingerprint);
+    const decision = await reviewPreviousPartition(previousZones, inputFingerprint, { maxZonePercent: options?.maxZonePercent });
     partitionReview = decision.review;
     trustPrevious = decision.trustPrevious;
     freshReview = decision.fresh;
@@ -3105,7 +3222,7 @@ export async function analyzeZones(
     structureHash = computeStructureHash(expandedZones);
     structureChanged = previousZones?.structureHash !== structureHash;
     if (partitionReview?.rejected && !trustPrevious) {
-      partitionReview = { ...partitionReview, after: assessPartitionHealth(expandedZones) };
+      partitionReview = { ...partitionReview, after: assessPartitionHealth(expandedZones, options?.maxZonePercent) };
     }
   }
   if (partitionReview && freshReview) {

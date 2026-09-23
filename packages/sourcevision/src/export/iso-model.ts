@@ -91,6 +91,56 @@ export interface IsoNode {
   findings: Array<{ text: string; severity: string }>;
   inbound: IsoNodeLink[];
   outbound: IsoNodeLink[];
+  /** Sub-zone tiles on the top face, offsets relative to the node's (u, v). */
+  tiles?: IsoTile[];
+}
+
+/** A sub-zone drawn as a rectangle on its parent's top face. */
+export interface IsoTile {
+  id: string;
+  name: string;
+  files: number;
+  u: number;
+  v: number;
+  w: number;
+  d: number;
+}
+
+/**
+ * Lay children out as rows of tiles filling a `w × d` face, areas
+ * proportional to file count: about √n rows, children assigned largest-first
+ * to the lightest row, each row's depth proportional to its total and each
+ * tile's width to its share of the row. Deterministic for a given input.
+ */
+export function layoutTiles(children: Array<{ id: string; name: string; files: number }>, w: number, d: number): IsoTile[] {
+  const kids = children.filter((c) => c.files > 0)
+    .sort((a, b) => b.files - a.files || a.id.localeCompare(b.id));
+  if (kids.length < 2) return [];
+  const rowCount = Math.max(1, Math.round(Math.sqrt(kids.length)));
+  const rows: Array<{ total: number; items: typeof kids }> = Array.from({ length: rowCount }, () => ({ total: 0, items: [] }));
+  for (const k of kids) {
+    const row = rows.reduce((best, r) => (r.total < best.total ? r : best), rows[0]);
+    row.items.push(k);
+    row.total += k.files;
+  }
+  const grand = rows.reduce((n, r) => n + r.total, 0);
+  const tiles: IsoTile[] = [];
+  let v = 0;
+  for (const row of rows.filter((r) => r.items.length > 0)) {
+    const rd = (d * row.total) / grand;
+    let u = 0;
+    for (const k of row.items) {
+      const tw = (w * k.files) / row.total;
+      tiles.push({ id: k.id, name: k.name, files: k.files, u: round3(u), v: round3(v), w: round3(tw), d: round3(rd) });
+      u += tw;
+    }
+    v += rd;
+  }
+  return tiles;
+}
+
+function round3(n: number): number {
+  return Math.round(n * 1000) / 1000;
 }
 
 /**
@@ -183,6 +233,12 @@ export interface IsoZoneInput {
   coupling: number;
   riskLevel?: string;
   insights?: string[];
+  /**
+   * Balanced sub-zones, drawn as tiles on the zone's top face. Only a
+   * subdivision where no child dominates is passed; a lopsided one would
+   * draw as one giant tile plus slivers.
+   */
+  children?: Array<{ id: string; name: string; files: number }>;
 }
 
 export interface IsoFileInput {
@@ -507,6 +563,9 @@ export function buildIsoModel(input: IsoModelInput, options: IsoModelOptions = {
       inbound: (inboundById.get(zone.id) ?? []).slice(0, 8),
       outbound: (outboundById.get(zone.id) ?? []).slice(0, 8),
     });
+    const node = nodes[nodes.length - 1];
+    const tiles = zone.children?.length ? layoutTiles(zone.children, node.w, node.d) : [];
+    if (tiles.length > 0) node.tiles = tiles;
   }
 
   for (const ext of externalPicks) {
