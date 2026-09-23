@@ -29,7 +29,7 @@ import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../..
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 import { resolveCliPath, resolveNdxVersion } from "../../process/toolchain-identity.js";
-import type { TaskClaims } from "../../process/task-claims.js";
+import type { ClaimLostEvent, TaskClaims } from "../../process/task-claims.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
@@ -2496,6 +2496,40 @@ async function collectRunCommits(projectDir: string, startHead: string | undefin
     // status/summary normally, just without a Commits: line.
     return [];
   }
+}
+
+/**
+ * Record on the run, and persist immediately, when another worktree takes
+ * this run's task over mid-flight.
+ *
+ * The renewal timer notices the takeover, not the run, so without this the
+ * task simply leaves the held set and nothing anywhere says so. The run keeps
+ * going on purpose — see `TaskClaims.renewNow` — which is precisely why the
+ * operator needs to be told: the work continuing is not the same as the work
+ * still being this run's to finish.
+ *
+ * Saving here rather than waiting for the next heartbeat is what makes the
+ * dashboard's Sessions tray show it promptly: the run file changing is what
+ * the server's watcher turns into a `hench:run-changed` broadcast.
+ */
+export function recordClaimLoss(
+  claims: TaskClaims | undefined,
+  run: RunRecord,
+  henchDir: string,
+): void {
+  if (!claims) return;
+  const stamp = (event: ClaimLostEvent): void => {
+    run.claimLost = event;
+    // Best-effort: losing the claim is already the bad news, and failing to
+    // write it down must not also fail the run.
+    void saveRun(henchDir, run).catch(() => {});
+  };
+  // A refusal observed before this listener was attached — between the claim
+  // in prepareBrief and the loop starting its heartbeat — fired into a null
+  // listener; `claims.claimLost` is kept for exactly this late caller. Only
+  // this run's task: the instance field is not reset between tasks.
+  if (claims.claimLost && claims.claimLost.taskId === run.taskId) stamp(claims.claimLost);
+  claims.onClaimLost = stamp;
 }
 
 /**
