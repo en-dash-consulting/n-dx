@@ -1,7 +1,7 @@
 # GitHub Actions — PR validation and main branch CI for n-dx
 #
 # Replicates the pipeline previously defined in bitbucket-pipelines.yml.
-# Steps: install → build → typecheck → PR check (build + rex validate)
+# Steps: install → build → typecheck → PR check (build + rex validate) → PRD structure
 #
 # Node 22 LTS. Exact pnpm version managed by corepack via packageManager
 # field in package.json.
@@ -75,6 +75,39 @@ jobs:
 
       - name: PR check
         run: pnpm pr-check
+
+      # `rex validate --post-merge` reports two classes of finding. Repairable
+      # ones (level mismatches and similar) `--repair` fixes mechanically and
+      # are advisory here — there are ~142 on the tree today and gating on them
+      # would mean a sweeping PRD rewrite, the exact change this check exists to
+      # make safe. Manual ones need a human decision and do gate.
+      #
+      # The one that matters is `orphaned-directory`: a folder holding item
+      # files but no `index.md`. The rex loader cannot see those items, so the
+      # next full-tree save writes out only what it loaded and silently deletes
+      # them. Two such directories reached main during 0.7.1 — the detector
+      # existed the whole time and nothing ran it.
+      - name: PRD tree structure
+        run: |
+          node packages/rex/dist/cli/index.js validate --post-merge --format=json . \
+            | node -e '
+              let s = "";
+              process.stdin.on("data", (d) => (s += d)).on("end", () => {
+                const issues = JSON.parse(s).issues || [];
+                const blocking = issues.filter((i) => i.repairable !== true);
+                const repairable = issues.length - blocking.length;
+                if (repairable) {
+                  console.log(`note: ${repairable} repairable issue(s) — advisory; run \x60rex validate --post-merge --repair\x60`);
+                }
+                if (!blocking.length) {
+                  console.log("PRD tree structurally sound: no issues needing manual intervention.");
+                  process.exit(0);
+                }
+                console.error(`PRD tree has ${blocking.length} issue(s) needing manual intervention:`);
+                for (const i of blocking) console.error(`  [${i.class}] ${i.path}: ${i.message}`);
+                process.exit(1);
+              });
+            '
 
       # NOT `pnpm -r run test`: that bails on the first failing package, and
       # because hench and web depend on rex they are ordered after it — so a red
