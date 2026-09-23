@@ -47,6 +47,14 @@ export interface TokenCounts {
 
 export interface PackageTokenUsage extends TokenCounts {
   /**
+   * Distinct agent runs behind these counts. Only hench sets it — a hench run
+   * spans many LLM calls (turns), so `calls` alone reads ~200x too large when
+   * labelled "runs", which is exactly what `ndx usage` used to do. rex and
+   * sourcevision have no run concept and leave it undefined rather than
+   * reporting a meaningless zero.
+   */
+  runs?: number;
+  /**
    * The same tokens split by the model that spent them.
    *
    * Optional, and frequently a partial view: sourcevision's manifest records
@@ -232,10 +240,22 @@ function normalizeEventMetadata(value: unknown): string | undefined {
 // ---------------------------------------------------------------------------
 
 /**
+ * The execution-log events that carry rex token spend. One set for the package
+ * rollup and the per-command event stream both: when the rollup read only
+ * `analyze_token_usage`, every smart-add call was in the By-command breakdown
+ * (and the dashboard's totals) but missing from the headline `ndx usage`
+ * figure, so the two surfaces could never agree to the cent.
+ */
+const REX_TOKEN_EVENTS: Record<string, string> = {
+  analyze_token_usage: "analyze",
+  smart_add_token_usage: "smart-add",
+};
+
+/**
  * Extract rex token usage from execution log entries.
  *
- * Looks for `analyze_token_usage` events whose `detail` field
- * contains JSON-serialized AnalyzeTokenUsage data.
+ * Reads every event kind in {@link REX_TOKEN_EVENTS} whose `detail` field
+ * contains JSON-serialized token usage data.
  */
 export function extractRexTokenUsage(
   logEntries: TokenUsageLogEntry[],
@@ -244,7 +264,7 @@ export function extractRexTokenUsage(
   const usage = emptyPackageUsage();
 
   for (const entry of logEntries) {
-    if (entry.event !== "analyze_token_usage") continue;
+    if (!REX_TOKEN_EVENTS[entry.event]) continue;
     if (!entry.detail) continue;
     if (!isInRange(entry.timestamp, filter)) continue;
 
@@ -296,10 +316,18 @@ export interface TokenEvent {
   calls: number;
   vendor?: string;
   model?: string;
+  /**
+   * The run this event came from, for counting distinct runs downstream.
+   * Hench fans one run out into one event per turn; without this id the
+   * per-command and per-period groupers can only count events, which is the
+   * turn count. Only hench events carry it.
+   */
+  runId?: string;
 }
 
 /** Minimal shape of a hench RunRecord for token extraction. */
 interface HenchRunSummary {
+  id?: string;
   startedAt: string;
   model?: string;
   tokenUsage: {
@@ -329,6 +357,7 @@ export async function extractHenchTokenUsage(
   filter: TokenUsageFilter = {},
 ): Promise<PackageTokenUsage> {
   const usage = emptyPackageUsage();
+  usage.runs = 0;
   const runsDir = join(projectDir, PROJECT_DIRS.HENCH, "runs");
 
   let files: string[];
@@ -348,7 +377,13 @@ export async function extractHenchTokenUsage(
       if (!run.startedAt || !run.tokenUsage) continue;
       if (!isInRange(run.startedAt, filter)) continue;
 
-      usage.calls += 1; // Each run counts as one aggregate call
+      usage.runs = (usage.runs ?? 0) + 1;
+      // `calls` counts LLM calls (turns), matching what the per-turn event
+      // stream sums to. A run without turn records is at least one call — the
+      // real number is unrecoverable, so the floor is the honest choice.
+      usage.calls += Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0
+        ? run.turnTokenUsage.length
+        : 1;
       usage.inputTokens += run.tokenUsage.input ?? 0;
       usage.outputTokens += run.tokenUsage.output ?? 0;
       usage.cacheCreationTokens += run.tokenUsage.cacheCreationInput ?? 0;
@@ -444,14 +479,8 @@ export function extractRexTokenEvents(
 ): TokenEvent[] {
   const events: TokenEvent[] = [];
 
-  /** Map log event types to human-readable command names. */
-  const EVENT_COMMAND_MAP: Record<string, string> = {
-    analyze_token_usage: "analyze",
-    smart_add_token_usage: "smart-add",
-  };
-
   for (const entry of logEntries) {
-    const command = EVENT_COMMAND_MAP[entry.event];
+    const command = REX_TOKEN_EVENTS[entry.event];
     if (!command) continue;
     if (!entry.detail) continue;
     if (!isInRange(entry.timestamp, filter)) continue;
@@ -514,6 +543,10 @@ export async function extractHenchTokenEvents(
       if (!run.startedAt || !run.tokenUsage) continue;
       if (!isInRange(run.startedAt, filter)) continue;
 
+      // One file is one run; the id lets groupers count runs while the events
+      // themselves stay one-per-turn for model attribution.
+      const runId = run.id?.trim() || file.replace(/\.json$/, "");
+
       if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
         for (const turn of run.turnTokenUsage) {
           events.push({
@@ -527,6 +560,7 @@ export async function extractHenchTokenEvents(
             calls: 1,
             vendor: turn.vendor,
             model: turn.model ?? run.model,
+            runId,
           });
         }
         continue;
@@ -542,6 +576,7 @@ export async function extractHenchTokenEvents(
         cacheReadTokens: run.tokenUsage.cacheReadInput ?? 0,
         calls: 1,
         model: run.model,
+        runId,
       });
     } catch {
       // Invalid run file — skip
@@ -615,6 +650,10 @@ export async function collectTokenEvents(
  */
 export function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
   const map = new Map<string, CommandTokenUsage>();
+  // Distinct runs per command entry. Summing event calls counts turns for
+  // hench, and turns must never be printed as "runs" — that was the 1,459-vs-8
+  // disagreement between the By-command and By-package lines.
+  const runIds = new Map<string, Set<string>>();
 
   for (const ev of events) {
     const key = `${ev.package}:${ev.command}`;
@@ -636,6 +675,15 @@ export function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
     entry.cacheCreationTokens += ev.cacheCreationTokens;
     entry.cacheReadTokens += ev.cacheReadTokens;
     entry.calls += ev.calls;
+    if (ev.runId) {
+      let ids = runIds.get(key);
+      if (!ids) {
+        ids = new Set();
+        runIds.set(key, ids);
+      }
+      ids.add(ev.runId);
+      entry.runs = ids.size;
+    }
   }
 
   // Sort by total tokens descending — cache included, since a command whose
@@ -719,6 +767,9 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
   const rex = emptyPackageUsage();
   const hench = emptyPackageUsage();
   const sv = emptyPackageUsage();
+  // Distinct runs per package, so period buckets report the same run counts
+  // as the all-time package rollup does. Only hench events carry a runId.
+  const runIds = { rex: new Set<string>(), hench: new Set<string>(), sv: new Set<string>() };
 
   for (const ev of events) {
     const pkg = ev.package === "rex" ? rex : ev.package === "hench" ? hench : sv;
@@ -727,6 +778,11 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
     pkg.cacheCreationTokens += ev.cacheCreationTokens;
     pkg.cacheReadTokens += ev.cacheReadTokens;
     pkg.calls += ev.calls;
+    if (ev.runId) {
+      const ids = runIds[ev.package];
+      ids.add(ev.runId);
+      pkg.runs = ids.size;
+    }
     attributeToModel(modelBuckets(pkg), ev.model, {
       inputTokens: ev.inputTokens,
       outputTokens: ev.outputTokens,
@@ -862,19 +918,40 @@ export function estimateCost(
   usage: AggregateTokenUsage,
   pricing?: ModelPricing,
 ): CostEstimate {
-  const totals: BillableTokens = {
-    inputTokens: usage.totalInputTokens,
-    outputTokens: usage.totalOutputTokens,
-    cacheCreationTokens: usage.totalCacheCreationTokens,
-    cacheReadTokens: usage.totalCacheReadTokens,
-  };
+  return estimateCostFromTotals(
+    {
+      inputTokens: usage.totalInputTokens,
+      outputTokens: usage.totalOutputTokens,
+      cacheCreationTokens: usage.totalCacheCreationTokens,
+      cacheReadTokens: usage.totalCacheReadTokens,
+    },
+    usage.byModel,
+    pricing,
+  );
+}
 
+/**
+ * The per-model pricing arithmetic behind {@link estimateCost}, over bare
+ * totals and buckets rather than rex's aggregate shape.
+ *
+ * Exported (and re-exported through the web package's rex gateway) because the
+ * dashboard aggregates its own four-package shape — it has a `web` bucket rex's
+ * aggregate does not model — but must quote the same dollar figure as
+ * `ndx usage` for the same tokens. One arithmetic, two aggregations;
+ * `tests/unit/token-pricing-parity.test.js` pins that the dashboard has no
+ * local copy of this loop.
+ */
+export function estimateCostFromTotals(
+  totals: BillableTokens,
+  byModel?: Record<string, BillableTokens>,
+  pricing?: ModelPricing,
+): CostEstimate {
   if (pricing) {
     const flat = priceTokens(totals, pricing);
     return { ...flat, total: fmtUsd(flat.totalRaw), byModel: [], fullyAttributed: false };
   }
 
-  const buckets = Object.entries(usage.byModel ?? {});
+  const buckets = Object.entries(byModel ?? {});
   const lines: ModelCostLine[] = [];
   let inputCost = 0;
   let outputCost = 0;

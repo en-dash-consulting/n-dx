@@ -50,9 +50,9 @@
     "allTime": {
       "packages": {
         "rex": {
-          "inputTokens": 3000,
-          "outputTokens": 700,
-          "calls": 5,
+          "inputTokens": 3500,
+          "outputTokens": 800,
+          "calls": 6,
           "cacheCreationTokens": 0,
           "cacheReadTokens": 0,
           "byModel": {}
@@ -61,6 +61,7 @@
           "inputTokens": 2100,
           "outputTokens": 700,
           "calls": 2,
+          "runs": 2,
           "cacheCreationTokens": 0,
           "cacheReadTokens": 0,
           "byModel": {
@@ -88,9 +89,9 @@
         }
       },
       "totals": {
-        "inputTokens": 5700,
-        "outputTokens": 1550,
-        "calls": 9
+        "inputTokens": 6200,
+        "outputTokens": 1650,
+        "calls": 10
       },
       "commands": {
         "rex:analyze": {
@@ -120,9 +121,9 @@
       "until": "2026-02-04T23:59:59.000Z",
       "packages": {
         "rex": {
-          "inputTokens": 2000,
-          "outputTokens": 500,
-          "calls": 3,
+          "inputTokens": 2500,
+          "outputTokens": 600,
+          "calls": 4,
           "cacheCreationTokens": 0,
           "cacheReadTokens": 0,
           "byModel": {}
@@ -131,6 +132,7 @@
           "inputTokens": 900,
           "outputTokens": 300,
           "calls": 1,
+          "runs": 1,
           "cacheCreationTokens": 0,
           "cacheReadTokens": 0,
           "byModel": {
@@ -152,9 +154,9 @@
         }
       },
       "totals": {
-        "inputTokens": 3500,
-        "outputTokens": 950,
-        "calls": 6
+        "inputTokens": 4000,
+        "outputTokens": 1050,
+        "calls": 7
       }
     }
   },
