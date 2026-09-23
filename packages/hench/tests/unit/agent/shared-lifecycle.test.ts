@@ -835,4 +835,93 @@ describe("shared lifecycle", () => {
       expect(result.run.invocationContext).toBe("api");
     });
   });
+
+  describe("recordClaimLoss", () => {
+    const OTHER = "/repo/other-worktree";
+
+    /**
+     * A real TaskClaims over a scripted store: the first claim succeeds, every
+     * later one (the renewals) is refused by another worktree. Real rather
+     * than a bare `{ onClaimLost }` object, so the test pins the wiring the
+     * loops depend on — renewal refusing → listener → run file on disk.
+     */
+    async function claimsThatLoseTask(taskId: string) {
+      const { TaskClaims } = await import("../../../src/process/task-claims.js");
+      const claimFor = (worktreeRoot: string) => ({
+        taskId,
+        worktreeRoot,
+        pid: 1,
+        host: "h",
+        claimedAt: "2026-09-23T00:00:00.000Z",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      });
+      let calls = 0;
+      const store = {
+        path: "/fake/claims.json",
+        claim: vi.fn(async () =>
+          calls++ === 0
+            ? { ok: true as const, claim: claimFor("/repo/this") }
+            : { ok: false as const, heldBy: claimFor(OTHER) },
+        ),
+      };
+      const claims = new TaskClaims(store as never, { worktreeRoot: "/repo/this", pid: process.pid });
+      expect(await claims.claim(taskId)).toBeNull();
+      return claims;
+    }
+
+    async function readSavedRun(id: string): Promise<Record<string, unknown>> {
+      const { readFile } = await import("node:fs/promises");
+      return JSON.parse(await readFile(join(henchDir, "runs", `${id}.json`), "utf-8"));
+    }
+
+    it("stamps claimLost on the run and saves it when renewal is refused", async () => {
+      const { initRunRecord, recordClaimLoss } = await import("../../../src/agent/lifecycle/shared.js");
+      const { run } = await initRunRecord({ taskId: "task-1", taskTitle: "Test task", model: "sonnet", henchDir, vendor: "claude" });
+      const claims = await claimsThatLoseTask("task-1");
+
+      recordClaimLoss(claims, run, henchDir);
+      await claims.renewNow();
+
+      expect(run.claimLost).toMatchObject({ taskId: "task-1", holderWorktree: OTHER });
+      await vi.waitFor(async () => {
+        const saved = await readSavedRun(run.id);
+        expect(saved.claimLost).toEqual({ at: expect.any(String), taskId: "task-1", holderWorktree: OTHER });
+      });
+    });
+
+    it("stamps a loss observed before the listener was attached", async () => {
+      const { initRunRecord, recordClaimLoss } = await import("../../../src/agent/lifecycle/shared.js");
+      const { run } = await initRunRecord({ taskId: "task-1", taskTitle: "Test task", model: "sonnet", henchDir, vendor: "claude" });
+      const claims = await claimsThatLoseTask("task-1");
+
+      // Refused between the claim and the loop attaching — no listener yet.
+      await claims.renewNow();
+      expect(run.claimLost).toBeUndefined();
+
+      recordClaimLoss(claims, run, henchDir);
+
+      expect(run.claimLost).toMatchObject({ taskId: "task-1", holderWorktree: OTHER });
+      await vi.waitFor(async () => {
+        expect((await readSavedRun(run.id)).claimLost).toMatchObject({ taskId: "task-1", holderWorktree: OTHER });
+      });
+    });
+
+    it("does not stamp an earlier loss of a different task", async () => {
+      const { initRunRecord, recordClaimLoss } = await import("../../../src/agent/lifecycle/shared.js");
+      const { run } = await initRunRecord({ taskId: "task-1", taskTitle: "Test task", model: "sonnet", henchDir, vendor: "claude" });
+      const claims = await claimsThatLoseTask("task-other");
+      await claims.renewNow();
+
+      recordClaimLoss(claims, run, henchDir);
+
+      expect(run.claimLost).toBeUndefined();
+    });
+
+    it("is a no-op without claims", async () => {
+      const { initRunRecord, recordClaimLoss } = await import("../../../src/agent/lifecycle/shared.js");
+      const { run } = await initRunRecord({ taskId: "task-1", taskTitle: "Test task", model: "sonnet", henchDir, vendor: "claude" });
+      expect(() => recordClaimLoss(undefined, run, henchDir)).not.toThrow();
+      expect(run.claimLost).toBeUndefined();
+    });
+  });
 });

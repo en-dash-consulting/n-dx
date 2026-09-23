@@ -26,4 +26,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Hold the task claim when the uncommitted-work gate refuses completion](./hold-the-task-claim-when-the.md) | pending |
 | [Make the dashboard next-task read skip live claims so it matches Execute](./make-the-dashboard-next-task-read-skip.md) | pending |
 | [Offer only validated, path-scoped recovery commands after an uncommitted-work refusal](./offer-only-validated-path-scoped.md) | pending |
-| [Surface a claim lost mid-run in the Sessions tray](./surface-a-claim-lost-mid-run-in-the.md) | pending |
+| [Surface a claim lost mid-run in the Sessions tray](./surface-a-claim-lost-mid-run-in-the.md) | in_progress |
