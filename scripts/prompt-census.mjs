@@ -56,8 +56,8 @@
  * @see tests/e2e/prompt-census.test.js — registry staleness enforcement
  */
 
-import { readFileSync, writeFileSync, existsSync, realpathSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { readFileSync, writeFileSync, existsSync, realpathSync, statSync } from "node:fs";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
@@ -1688,34 +1688,89 @@ function contentHash(report) {
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 /**
- * Read the current commit from `.git` directly.
+ * Locate a checkout's git directory and its common directory.
  *
- * Still not `git rev-parse` — reading the ref is exact and needs no subprocess.
- * What a `.git/` read cannot tell you is whether the *working tree* matches
- * that commit, which is the question {@link treeState} exists to answer.
+ * In the main checkout `.git` is a directory and the two are the same. In a
+ * linked worktree (`git worktree add`) `.git` is a one-line file,
+ * `gitdir: <main>/.git/worktrees/<name>`: that directory holds the worktree's
+ * own HEAD and index, while branch refs and packed-refs live in the common
+ * directory that its `commondir` file names (relative to the gitdir).
+ *
+ * The previous reader treated `.git/HEAD` as a path under the checkout, found
+ * nothing in a worktree, and stamped the baseline "unknown" — a recording its
+ * own gate then rejected, so nobody could regenerate it from a worktree.
+ *
+ * @returns `{ gitDir, commonDir }` as absolute paths, or null outside a repo.
  */
-function currentCommit() {
-  const head = readGitFile(".git/HEAD");
-  if (!head) return "unknown";
+function gitDirs(root) {
+  const dotGit = join(root, ".git");
+  if (!existsSync(dotGit)) return null;
+  let gitDir = dotGit;
+  if (statSync(dotGit).isFile()) {
+    const m = /^gitdir:\s*(.+)$/m.exec(readFileSync(dotGit, "utf8"));
+    if (!m) return null;
+    gitDir = resolve(root, m[1].trim());
+  }
+  const commonFile = join(gitDir, "commondir");
+  const commonDir = existsSync(commonFile)
+    ? resolve(gitDir, readFileSync(commonFile, "utf8").trim())
+    : gitDir;
+  return { gitDir, commonDir };
+}
+
+/**
+ * Read the current commit of `root` (the checkout being measured) from its
+ * git metadata directly.
+ *
+ * Reading the ref is exact and needs no subprocess, and it works the same in
+ * the main checkout and in a linked worktree once {@link gitDirs} has said
+ * where HEAD and the refs actually are. `git rev-parse HEAD` is the fallback
+ * for layouts this reader does not model (a `GIT_DIR` override, say) — only
+ * when that fails too is the answer "unknown". What none of this can tell you
+ * is whether the *working tree* matches the commit, which is the question
+ * {@link treeState} exists to answer.
+ */
+export function currentCommit(root = ROOT) {
+  const dirs = gitDirs(root);
+  const direct = dirs ? readCommitFrom(dirs) : null;
+  if (direct) return direct;
+
+  try {
+    const out = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return out.trim().slice(0, 12) || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/** Resolve HEAD through loose and packed refs; null when the ref cannot be found. */
+function readCommitFrom({ gitDir, commonDir }) {
+  const head = readGitFile(join(gitDir, "HEAD"));
+  if (!head) return null;
 
   const ref = /^ref:\s*(.+)$/.exec(head);
   if (!ref) return head.slice(0, 12); // detached HEAD holds the sha directly
 
-  const loose = readGitFile(join(".git", ref[1]));
+  // Branch refs live in the common dir; a worktree-private ref (bisect,
+  // rewritten) lives in its own gitdir. Try the common one first.
+  const loose = readGitFile(join(commonDir, ref[1])) ?? readGitFile(join(gitDir, ref[1]));
   if (loose) return loose.slice(0, 12);
 
   // Ref has been packed — scan packed-refs for it.
-  const packed = readGitFile(".git/packed-refs") ?? "";
+  const packed = readGitFile(join(commonDir, "packed-refs")) ?? "";
   for (const line of packed.split("\n")) {
     const [sha, name] = line.trim().split(/\s+/);
     if (name === ref[1]) return sha.slice(0, 12);
   }
-  return "unknown";
+  return null;
 }
 
-/** Read a file under .git, or null when it is absent (e.g. a tarball checkout). */
-function readGitFile(relative) {
-  const abs = join(ROOT, relative);
+/** Read a git metadata file by absolute path, or null when it is absent (e.g. a tarball checkout). */
+function readGitFile(abs) {
   return existsSync(abs) ? readFileSync(abs, "utf8").trim() : null;
 }
 
