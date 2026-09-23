@@ -163,15 +163,29 @@ describe("POST /api/hench/execute — PRD tree conformance gate", () => {
     expect(error).toMatch(/rex migrate-slugs/);
   });
 
-  // A rex build older than the marker rewrites the sidecar without it, erasing
-  // the record while moving no path. The paths scan clean, so the absence
-  // itself has to refuse — otherwise Execute starts an agent against a tree
-  // whose guard someone has already taken off.
-  it("refuses a missing slug-rule marker even when every path conforms", async () => {
+  /** Strip the marker, leaving whatever paths are on disk untouched. */
+  async function stripMarker(): Promise<void> {
     const metaPath = join(rexDir, TREE_META);
     const meta = JSON.parse(await readFile(metaPath, "utf-8"));
     delete meta.slugRule;
     await writeFile(metaPath, JSON.stringify(meta), "utf-8");
+  }
+
+  // The marker is unreleased, so every repository reaching this build is
+  // unmarked with paths that already conform. Refusing would make Execute
+  // unusable on every upgraded checkout; the write that the run ends with
+  // adopts the tree and says so instead.
+  it("reaches the per-task checks on a missing marker when every path conforms", async () => {
+    await stripMarker();
+
+    // The unknown task again: a 404 is only reachable past the gate, and
+    // unlike a real task id it proves the gate opened without spawning a run.
+    expect(await execute("task-nope")).toMatchObject({ status: 404 });
+  });
+
+  it("refuses a missing marker when a path follows a foreign rule", async () => {
+    await stripMarker();
+    await reSuffixEpicDir();
 
     const { status, error } = await execute("task-def456");
 

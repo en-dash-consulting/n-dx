@@ -13,7 +13,7 @@
  * here therefore runs against both.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, readFile, readdir, mkdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
@@ -152,13 +152,12 @@ describe("slug-rule write guard", () => {
       expect(err!.message).toContain("rex migrate-slugs");
     });
 
-    // Absence used to be adopted when the paths scanned clean, on the reading
-    // that no marker meant a tree older than the guard. A rex MCP server
-    // running an older build disproved it: rewriting `tree-meta.json` from a
-    // type with no `slugRule` field erased the marker while moving no path at
-    // all, so a disarmed guard and a pre-guard tree became indistinguishable.
-    // Adoption now refuses, and `rex migrate-slugs` — which verifies the paths
-    // before recording anything — is the only way to re-arm it.
+    // An absent marker is two states at once — a tree older than the guard,
+    // and one whose sidecar a build older than the `slugRule` field rewrote
+    // without it — and nothing on disk separates them. The tree is judged by
+    // its paths instead: clean adopts with a notice, dirty refuses. Refusing
+    // both would stop every repository in existence, since the marker is
+    // unreleased and rule 2 predates the oldest build in the wild.
     describe("a tree whose marker has gone missing", () => {
       /** Save through the store, then strip the marker the save recorded. */
       async function unmarkedTree(items: PRDItem[] = ITEMS): Promise<void> {
@@ -171,36 +170,57 @@ describe("slug-rule write guard", () => {
         expect(await readSlugRuleMarker(rexDir)).toBeUndefined();
       }
 
-      it("is refused even when every path already conforms", async () => {
+      it("is adopted when every path already conforms, and records the marker", async () => {
         await unmarkedTree();
-        const before = await snapshotTree(rexDir);
 
-        const err = await make(rexDir)
-          .saveDocument(doc())
-          .then(
-            () => undefined,
-            (e: unknown) => e as SlugRuleMismatchError,
-          );
+        await expect(make(rexDir).saveDocument(doc())).resolves.toBeUndefined();
 
-        expect(err).toBeInstanceOf(SlugRuleMismatchError);
-        expect(err!.found).toBeUndefined();
-        expect(err!.message).toContain("slug rule marker missing; run rex migrate-slugs");
-        // The refusal's whole promise: nothing was written on the way out.
-        expect(await snapshotTree(rexDir)).toEqual(before);
-        expect(await readSlugRuleMarker(rexDir)).toBeUndefined();
+        expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
       });
 
-      it("is refused on the transaction path too", async () => {
+      // Adoption is a build claiming a tree it cannot prove it wrote. It is
+      // the right call — see the module header — but it must not be a silent
+      // one, or the only record of the claim is the marker it just wrote.
+      it("says so on stderr, naming rex migrate-slugs as the way to verify", async () => {
         await unmarkedTree();
-        const before = await snapshotTree(rexDir);
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        await make(rexDir).saveDocument(doc());
+
+        const notices = warn.mock.calls.map((c) => String(c[0]));
+        const notice = notices.find((m) => m.includes("slug-rule marker"));
+        expect(notice).toBeDefined();
+        expect(notice).toContain("rex migrate-slugs");
+        // One line, so it cannot be mistaken for the multi-line refusal.
+        expect(notice).not.toContain("\n");
+        warn.mockRestore();
+      });
+
+      // The marker the adopting save records is what makes the notice fire
+      // once rather than on every write for the rest of the repository's life.
+      it("does not repeat the notice on the next save", async () => {
+        await unmarkedTree();
+        await make(rexDir).saveDocument(doc());
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        await make(rexDir).saveDocument(doc());
+
+        expect(warn.mock.calls.map((c) => String(c[0]))).not.toContainEqual(
+          expect.stringContaining("slug-rule marker"),
+        );
+        warn.mockRestore();
+      });
+
+      it("is adopted on the transaction path too", async () => {
+        await unmarkedTree();
 
         await expect(
           make(rexDir).withTransaction(async (d) => {
             d.items[0]!.title = "Renamed Support";
           }),
-        ).rejects.toThrow(SlugRuleMismatchError);
+        ).resolves.toBeUndefined();
 
-        expect(await snapshotTree(rexDir)).toEqual(before);
+        expect(await readSlugRuleMarker(rexDir)).toBe(SLUG_RULE_VERSION);
       });
 
       it("is refused when the paths follow a foreign rule", async () => {
@@ -429,7 +449,9 @@ describe("slug-rule write guard", () => {
   // before starting an agent, so what it refuses decides whether a run begins
   // at all — and a run that begins writes the PRD when it finishes.
   describe("checkTreeConformance", () => {
-    it("refuses a tree whose marker has gone missing", async () => {
+    // The gate must agree with the write guard, or a run it permits is refused
+    // at the finish line — after it has spent its tokens and made its changes.
+    it("passes a tree whose marker has gone missing but whose paths conform", async () => {
       const store = new FolderTreeStore(rexDir);
       await store.saveDocument(doc());
       await writeFile(
@@ -443,6 +465,25 @@ describe("slug-rule write guard", () => {
         treeRoot,
         (await new FolderTreeStore(rexDir).loadDocument()).items,
       );
+
+      expect(refusal).toBeNull();
+    });
+
+    it("refuses a tree with no marker whose paths follow a foreign rule", async () => {
+      const store = new FolderTreeStore(rexDir);
+      await store.saveDocument(doc());
+      await writeFile(
+        join(rexDir, TREE_META),
+        JSON.stringify({ title: "Guarded PRD", schema: SCHEMA_VERSION }),
+        "utf-8",
+      );
+      const items = (await new FolderTreeStore(rexDir).loadDocument()).items;
+      // The superseded rule's shape: an unconditional `-{id6}` suffix.
+      const body = await readFile(join(treeRoot, "add-sso-support.md"), "utf-8");
+      await rm(join(treeRoot, "add-sso-support.md"));
+      await writeFile(join(treeRoot, "add-sso-support-aaaaaa.md"), body, "utf-8");
+
+      const refusal = await checkTreeConformance(rexDir, treeRoot, items);
 
       expect(refusal).not.toBeNull();
       expect(refusal!.markerFound).toBeUndefined();
@@ -498,10 +539,10 @@ describe("slug-rule write guard", () => {
     await rm(join(epicDir, "nested-task.md"));
     await writeFile(join(epicDir, "nested-task-eeeeee.md"), body, "utf-8");
 
-    // Through the gate rather than the write guard: since an absent marker is
-    // refused outright, `checkTreeConformance` is the only caller left that
-    // scans paths and renders offenders. It is also the one whose output an
-    // operator actually reads — `ndx work` and the dashboard print it verbatim.
+    // Through the gate rather than the write guard because the marker is
+    // intact here, which the write guard's marker check accepts without
+    // scanning. It is also the output an operator actually reads — `ndx work`
+    // and the dashboard print it verbatim.
     const store = new FolderTreeStore(rexDir);
     const refusal = await checkTreeConformance(
       rexDir,
