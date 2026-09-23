@@ -578,10 +578,11 @@ function escapeForRegExp(value: string): string {
  *
  * - `1` — implicit; every tree written before the marker existed. Covers both
  *   the original title-only rule and the unconditional `-{id6}` rule that
- *   briefly replaced it, because neither recorded itself and the two cannot be
- *   told apart from a tree alone.
+ *   briefly replaced it (shipped in 0.5.1), because neither recorded itself
+ *   and the two cannot be told apart from a tree alone.
  * - `2` — title-only, with `-{id6}` added only where siblings collide on a
- *   normalised title. Landed 2026-08-26; the first version to be recorded.
+ *   normalised title. Landed 2026-08-26 and first shipped in 0.5.2; the first
+ *   version to be recorded.
  *
  * @see {@link file://./slug-rule-guard.ts} for the write-time enforcement.
  */
