@@ -87,6 +87,14 @@ export { computeTimestampUpdates } from "@n-dx/rex";
 export { aggregateItemTokenUsage } from "@n-dx/rex";
 export type { ItemTokenTotals } from "@n-dx/rex";
 
+// ---- Rex per-model cost estimation -------------------------------------------
+// The dashboard keeps its own event aggregation (it has a `web` bucket rex's
+// shape does not model) but prices it through rex's arithmetic so both
+// surfaces quote the same figure. tests/unit/token-pricing-parity.test.js
+// pins that routes-token-usage.ts holds no local copy of the pricing loop.
+export { estimateCostFromTotals } from "@n-dx/rex";
+export type { CostEstimate, ModelCostLine } from "@n-dx/rex";
+
 // ---- Rex per-item duration rollup -------------------------------------------
 export { aggregateItemDurations } from "@n-dx/rex";
 export type { ItemDurationTotals } from "@n-dx/rex";

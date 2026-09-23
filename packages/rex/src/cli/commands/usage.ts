@@ -61,8 +61,11 @@ function formatPackageDetail(usage: AggregateTokenUsage): string[] {
   for (const { name, pkg, unit } of entries) {
     const total = totalTokens(pkg);
     if (total === 0) continue;
+    // Hench's headline unit is runs; its calls count turns and stays available
+    // in the JSON output rather than being printed under the wrong label.
+    const count = unit === "runs" ? pkg.runs ?? pkg.calls : pkg.calls;
     lines.push(
-      `  ${name}: ${fmt(total)} tokens (${splitTokens(pkg)}) — ${pkg.calls} ${unit}`,
+      `  ${name}: ${fmt(total)} tokens (${splitTokens(pkg)}) — ${count} ${unit}`,
     );
   }
 
@@ -78,8 +81,9 @@ function formatCommandDetail(commands: CommandTokenUsage[]): string[] {
   for (const cmd of commands) {
     const total = totalTokens(cmd);
     const unit = cmd.package === "hench" ? "runs" : "calls";
+    const count = cmd.package === "hench" ? cmd.runs ?? cmd.calls : cmd.calls;
     lines.push(
-      `  ${cmd.package} ${cmd.command}: ${fmt(total)} tokens (${splitTokens(cmd)}) — ${cmd.calls} ${unit}`,
+      `  ${cmd.package} ${cmd.command}: ${fmt(total)} tokens (${splitTokens(cmd)}) — ${count} ${unit}`,
     );
   }
 
@@ -196,12 +200,15 @@ export async function cmdUsage(
     };
 
     // Per-command breakdown
+    // Both counts survive into JSON: `runs` (hench only) for the human unit,
+    // `calls` for the turn count downstream consumers still need.
     output.commands = commands.map((cmd) => ({
       package: cmd.package,
       command: cmd.command,
       inputTokens: cmd.inputTokens,
       outputTokens: cmd.outputTokens,
       calls: cmd.calls,
+      ...(cmd.runs !== undefined ? { runs: cmd.runs } : {}),
     }));
 
     // Period breakdown (if --group specified)

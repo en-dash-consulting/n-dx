@@ -70,7 +70,9 @@ export function formatAggregateTokenUsage(usage: AggregateTokenUsage): string[] 
   }
 
   if (totalTokens(hench) > 0) {
-    parts.push(`hench: ${fmt(totalTokens(hench))} (${hench.calls} runs)`);
+    // `runs` is the run count; `calls` counts turns and must not wear the
+    // "runs" label. Old aggregates built before `runs` existed fall back.
+    parts.push(`hench: ${fmt(totalTokens(hench))} (${hench.runs ?? hench.calls} runs)`);
   }
 
   if (parts.length > 0) {

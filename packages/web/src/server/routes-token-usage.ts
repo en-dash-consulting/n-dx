@@ -35,9 +35,9 @@ import {
   DEFAULT_LLM_VENDOR,
   LLM_VENDOR,
   isLLMVendor,
-  FALLBACK_MODEL_PRICING,
-  priceTokens,
+  type BillableTokens,
 } from "@n-dx/llm-client";
+import { estimateCostFromTotals, type CostEstimate } from "./rex-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors rex/core/token-usage but kept local to avoid cross-package import)
@@ -69,6 +69,13 @@ interface AggregateTokenUsage {
   totalCacheCreationTokens: number;
   totalCacheReadTokens: number;
   totalCalls: number;
+  /**
+   * The same tokens split by the model that spent them, mirroring rex's
+   * aggregate. Tokens with no usable model id are left out and reach cost
+   * estimation as the unattributed residual, priced at the labelled fallback —
+   * never bucketed under a made-up key that would read as a real model.
+   */
+  byModel?: Record<string, BillableTokens>;
 }
 
 interface TokenEvent {
@@ -146,15 +153,6 @@ interface WeeklyBudgetConfig {
   vendors?: Record<string, VendorWeeklyBudgetScope>;
 }
 
-interface CostEstimate {
-  total: string;
-  totalRaw: number;
-  inputCost: number;
-  outputCost: number;
-  cacheWriteCost: number;
-  cacheReadCost: number;
-}
-
 type TimePeriod = "day" | "week" | "month";
 type BudgetSeverity = "ok" | "warning" | "exceeded";
 
@@ -191,6 +189,34 @@ function addEvent(target: PackageTokenUsage, ev: TokenEvent): void {
   target.cacheCreationTokens += ev.cacheCreationTokens;
   target.cacheReadTokens += ev.cacheReadTokens;
   target.calls += ev.calls;
+}
+
+/**
+ * Add one event's tokens to the per-model split under its model.
+ *
+ * Mirrors rex's attribution rule exactly: a missing, blank, or placeholder
+ * model id is dropped rather than bucketed under a made-up key, so those
+ * tokens fall through to the unattributed residual that cost estimation
+ * prices at the labelled fallback. The two surfaces must agree on which
+ * tokens count as attributed or their totals diverge.
+ */
+function attributeToModel(
+  target: Record<string, BillableTokens>,
+  ev: TokenEvent,
+): void {
+  const key = ev.model?.trim();
+  if (!key || key === "unknown") return;
+
+  const bucket = (target[key] ??= {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+  });
+  bucket.inputTokens += ev.inputTokens;
+  bucket.outputTokens += ev.outputTokens;
+  bucket.cacheCreationTokens += ev.cacheCreationTokens;
+  bucket.cacheReadTokens += ev.cacheReadTokens;
 }
 
 /** Sum one field across every package bucket. */
@@ -313,42 +339,27 @@ function normalizeWeeklyBudgetConfig(
 }
 
 /**
- * Rates applied when the tokens carry no model attribution.
+ * Price an aggregate through rex's per-model arithmetic.
  *
- * Sourced from the shared foundation-tier table rather than a local literal.
- * The dashboard and `ndx usage` are expected to quote the same figure for the
- * same runs, and two hand-maintained copies of a price table drift silently —
- * the same run set ends up quoted at two different dollar figures with nothing
- * failing. `tests/unit/token-pricing-parity.test.js` pins both surfaces here.
- *
- * The dashboard's aggregation does not yet carry a per-model split the way
- * rex's does, so every token still lands on this fallback. That is a known
- * gap, not the intended end state: see the PRD item for wiring `byModel`
- * through the dashboard's own aggregation.
+ * The dashboard and `ndx usage` must quote the same figure for the same runs,
+ * so the pricing loop is imported through the rex gateway rather than copied —
+ * two hand-maintained copies of the arithmetic drift as silently as two copies
+ * of a rate table did. Only the aggregation differs between the surfaces (this
+ * one carries a `web` bucket); everything from the byModel split onward —
+ * per-model rates, the labelled fallback for unknown ids, the clamped
+ * unattributed residual — is the same code. Pinned by
+ * `tests/unit/token-pricing-parity.test.js`.
  */
-const DEFAULT_PRICING = FALLBACK_MODEL_PRICING;
-
 function estimateCost(usage: AggregateTokenUsage): CostEstimate {
-  // All four kinds are billed. Cache tokens were counted in the totals long
-  // before they were priced, so the dashboard quoted a figure that ignored
-  // most of the bill on any cache-heavy workload.
-  const { inputCost, outputCost, cacheWriteCost, cacheReadCost, totalRaw } = priceTokens(
+  return estimateCostFromTotals(
     {
       inputTokens: usage.totalInputTokens,
       outputTokens: usage.totalOutputTokens,
       cacheCreationTokens: usage.totalCacheCreationTokens,
       cacheReadTokens: usage.totalCacheReadTokens,
     },
-    DEFAULT_PRICING,
+    usage.byModel,
   );
-  return {
-    total: `$${totalRaw.toFixed(2)}`,
-    totalRaw,
-    inputCost,
-    outputCost,
-    cacheWriteCost,
-    cacheReadCost,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -606,9 +617,11 @@ function resolveSourceMeta(ctx: ServerContext): UtilizationSourceMeta {
 
 function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
   const packages = emptyToolBreakdown();
+  const byModel: Record<string, BillableTokens> = {};
 
   for (const ev of events) {
     addEvent(packages[ev.package], ev);
+    attributeToModel(byModel, ev);
   }
 
   return {
@@ -618,6 +631,7 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
     totalCacheCreationTokens: sumPackages(packages, "cacheCreationTokens"),
     totalCacheReadTokens: sumPackages(packages, "cacheReadTokens"),
     totalCalls: sumPackages(packages, "calls"),
+    byModel,
   };
 }
 
