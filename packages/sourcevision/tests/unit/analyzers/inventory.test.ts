@@ -323,6 +323,68 @@ describe("analyzeInventory", () => {
     expect(paths).toEqual(["lib.py", "src/app.ts"]);
   });
 
+  it("records skipped extensions with counts under the default code-only walk", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-skipped-"));
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+
+    await writeFile(join(tmpDir, "package.json"), '{ "name": "test" }\n');
+    await writeFile(join(tmpDir, "src", "app.ts"), 'console.log("hi");\n');
+    await writeFile(join(tmpDir, "README.md"), "# Hello\n");
+    await writeFile(join(tmpDir, "NOTES.md"), "# Notes\n");
+    await writeFile(join(tmpDir, "logo.png"), "\x89PNG\r\n");
+
+    const inv = await analyzeInventory(tmpDir);
+
+    expect(inv.summary.skippedExtensions).toEqual({
+      ".json": 1,
+      ".md": 2,
+      ".png": 1,
+    });
+  });
+
+  it("omits skippedExtensions when nothing was skipped", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-noskip-"));
+    await writeFile(join(tmpDir, "app.ts"), "code\n");
+
+    const inv = await analyzeInventory(tmpDir);
+
+    expect(inv.summary.skippedExtensions).toBeUndefined();
+  });
+
+  it("omits skippedExtensions when codeOnly is disabled (nothing is filtered out)", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-noskip-all-"));
+    await writeFile(join(tmpDir, "app.ts"), "code\n");
+    await writeFile(join(tmpDir, "README.md"), "# Hello\n");
+
+    const inv = await analyzeInventory(tmpDir, { codeOnly: false });
+
+    expect(inv.summary.skippedExtensions).toBeUndefined();
+  });
+
+  it("does not count extraExtensions matches as skipped", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-extraext-noskip-"));
+    await writeFile(join(tmpDir, "app.ts"), "code\n");
+    await writeFile(join(tmpDir, "schema.proto"), "message M {}\n");
+    await writeFile(join(tmpDir, "data.json"), "{}\n"); // still unsupported → skipped
+
+    const inv = await analyzeInventory(tmpDir, { extraExtensions: [".proto"] });
+
+    expect(inv.summary.skippedExtensions).toEqual({ ".json": 1 });
+  });
+
+  it("marks JS/TS as analysed and a language with no import parser as inventoried-only", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-analysed-"));
+    await writeFile(join(tmpDir, "package.json"), '{ "name": "test" }\n');
+    await writeFile(join(tmpDir, "app.ts"), "export const x = 1;\n");
+    await writeFile(join(tmpDir, "lib.zig"), "pub fn add() void {}\n");
+
+    const inv = await analyzeInventory(tmpDir);
+
+    expect(inv.summary.byLanguage["TypeScript"]).toBe(1);
+    expect(inv.summary.byLanguage["Zig"]).toBe(1);
+    expect(inv.summary.analysedLanguages).toEqual(["TypeScript"]);
+  });
+
   it("includes extra extensions when configured (extraExtensions)", async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-extraext-"));
     await writeFile(join(tmpDir, "app.ts"), "code\n");

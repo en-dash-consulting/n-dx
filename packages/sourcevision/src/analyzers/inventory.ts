@@ -572,13 +572,22 @@ export async function analyzeInventory(
   // Build skip set: always-skipped dirs + vendored deps + language-specific dirs + user extras
   const skipDirs = new Set([...BASE_SKIP_DIRS, ...VENDOR_SKIP_DIRS, ...langConfig.skipDirectories, ...extraSkipDirs]);
 
+  // Extensions rejected by the code-only filter below, tallied by extension —
+  // surfaced on the summary as `skippedExtensions` so a project whose files
+  // are silently dropped (e.g. a language with no support at all) shows up
+  // as "skipped" instead of just vanishing from the inventory.
+  const skippedExtensions = new Map<string, number>();
+
   // Code-only walk filter: keep files whose detected language is a programming
   // language, plus any user-supplied extra extensions. Disabled when codeOnly
   // is false (legacy: inventory every file).
   const acceptFile = (relPath: string): boolean => {
     if (!codeOnly) return true;
     if (PROGRAMMING_LANGUAGES.has(detectLanguage(relPath))) return true;
-    return extraExtensions.has(extname(relPath).toLowerCase());
+    const ext = extname(relPath).toLowerCase();
+    if (extraExtensions.has(ext)) return true;
+    if (ext) skippedExtensions.set(ext, (skippedExtensions.get(ext) ?? 0) + 1);
+    return false;
   };
 
   const ig = await loadIgnoreFilter(absDir);
@@ -675,6 +684,31 @@ export async function analyzeInventory(
   }
 
   const summary = computeInventorySummary(files);
+
+  if (skippedExtensions.size > 0) {
+    summary.skippedExtensions = Object.fromEntries(
+      [...skippedExtensions.entries()].sort(([a], [b]) => a.localeCompare(b)),
+    );
+  }
+
+  // Languages whose files take part in import-graph and zone analysis: JS/TS
+  // is always parseable (backward-compatible default), plus whatever the
+  // detected primary language's own parser handles. Mirrors the extension set
+  // analyzeImports() builds in imports.ts. Intersected with byLanguage so the
+  // list only names languages actually present in this inventory.
+  const analysedExtensions = new Set<string>([
+    ...typescriptConfig.parseableExtensions,
+    ...langConfig.parseableExtensions,
+  ]);
+  const analysedLanguageNames = new Set<string>();
+  for (const ext of analysedExtensions) {
+    const lang = EXT_TO_LANGUAGE[ext];
+    if (lang) analysedLanguageNames.add(lang);
+  }
+  summary.analysedLanguages = Object.keys(summary.byLanguage)
+    .filter((lang) => analysedLanguageNames.has(lang))
+    .sort();
+
   const result: InventoryResult = sortInventory({ files, summary }) as InventoryResult;
 
   if (prev) {

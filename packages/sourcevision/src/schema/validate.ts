@@ -53,6 +53,8 @@ const InventorySummarySchema = z.object({
   byLanguage: z.record(z.string(), z.number().int().nonnegative()),
   byRole: z.record(z.string(), z.number().int().nonnegative()),
   byCategory: z.record(z.string(), z.number().int().nonnegative()),
+  skippedExtensions: z.record(z.string(), z.number().int().nonnegative()).optional(),
+  analysedLanguages: z.array(z.string()).optional(),
 });
 
 export const InventorySchema = z.object({

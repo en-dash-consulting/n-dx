@@ -4,7 +4,7 @@ import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { FileEntry } from "../external.js";
 import { buildFileToZoneMap, getZoneColorByIndex } from "../visualization/index.js";
 import { basename } from "../utils.js";
-import { BrandedHeader } from "../components/index.js";
+import { BrandedHeader, LanguageAnalysisStrip } from "../components/index.js";
 
 const FILE_SEARCH_LISTBOX_ID = "file-search-listbox";
 const FILE_SEARCH_MAX_OPTIONS = 10;
@@ -437,6 +437,8 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
         `Showing ${Math.min(showCount, filtered.length)} of ${filtered.length} files`
       ),
     ),
+
+    h(LanguageAnalysisStrip, { summary: inventory.summary }),
 
     // Table
     h("div", { class: "data-table-wrapper" },
