@@ -271,6 +271,13 @@ export const ZonesSchema = z.object({
   lastReset: z.object({ from: z.number().int().positive(), to: z.number().int().positive() }).optional(),
   partitionReview: PartitionReviewSchema.optional(),
   algorithmVersion: z.number().int().positive().optional(),
+  areas: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    zones: z.array(z.string()),
+    files: z.number().int().nonnegative(),
+    nameSource: z.enum(["package", "route", "member", "template", "judged", "generated", "support", "tests"]).optional(),
+  })).optional(),
 });
 
 // ── Components ──────────────────────────────────────────────────────────────

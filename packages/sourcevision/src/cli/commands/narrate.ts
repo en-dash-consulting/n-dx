@@ -20,6 +20,8 @@ import { SV_DIR } from "./constants.js";
 import { narrateZones } from "../../analyzers/enrich-multiplex.js";
 import { nameZonesBySelection } from "../../analyzers/zone-naming.js";
 import { routeLayoutFor } from "../../analyzers/route-convention.js";
+import { areaAsZone } from "../../analyzers/zone-areas.js";
+import { applyGeneratedAreaNames } from "../../analyzers/area-naming.js";
 import { dedupeZoneNames } from "../../analyzers/enrich-cascade.js";
 import { judgeFindings } from "../../analyzers/enrich-judge.js";
 import { buildProjectProfile } from "../../analyzers/project-profile.js";
@@ -228,6 +230,31 @@ export async function cmdNarrate(targetDir: string, opts: NarrateOptions): Promi
   const fileArchetypes = loadFileArchetypes(svDir);
   const hints = loadHints(svDir);
 
+  // Area names deferred by analyze: generated on area-shaped zones, applied
+  // to zones.json `areas`. Separate from zone naming — areas are never merged.
+  const areaTargets = (stored.areas ?? []).filter((a) => nameZoneIds.includes(`area:${a.id}`));
+  if (areaTargets.length > 0) {
+    info(`${bold("[narrate]")} generating names for ${areaTargets.length} area(s): ${areaTargets.map((a) => a.id).join(", ")}`);
+    const naming = await nameZonesBySelection(areaTargets.map((a) => areaAsZone(a, stored.zones)), {
+      projectDir: absDir,
+      fileArchetypes,
+      crossings: [],
+      noMerges: true,
+      routeLayout: routeLayoutFor(inventory.files.map((f: { path: string }) => f.path)),
+    });
+    const applied = applyGeneratedAreaNames(stored.areas ?? [], naming.zones);
+    if (applied.renamed.length > 0) {
+      if (isSuperseded(startedAnalyzedAt, readManifest(absDir))) {
+        setNarration(absDir, { status: "failed", finishedAt: new Date().toISOString(), reason: "superseded by a newer analysis" });
+        warn("  [narrate] a newer analysis finished meanwhile — result dropped");
+        return;
+      }
+      stored = { ...stored, areas: applied.areas };
+      writeFileSync(join(svDir, DATA_FILES.zones), toCanonicalJSON(stored));
+      info(`  ${applied.renamed.length} area(s) renamed → ${dim(join(svDir, DATA_FILES.zones))}`);
+    }
+  }
+
   // Names first: one proposal call for every deferred zone, verified by Jev.
   const nameTargets = stored.zones.filter((z) => nameZoneIds.includes(z.id));
   if (nameTargets.length > 0) {
@@ -249,9 +276,9 @@ export async function cmdNarrate(targetDir: string, opts: NarrateOptions): Promi
       writeFileSync(join(svDir, DATA_FILES.zones), toCanonicalJSON(stored));
       info(`  ${applied.renamed.length} zone(s) renamed → ${dim(join(svDir, DATA_FILES.zones))}`);
     }
-    // Names are done: a later takeover must not queue them again.
-    if (!opts.inline) setNarration(absDir, { names: [] });
   }
+  // Names (zones and areas) are done: a later takeover must not queue them again.
+  if (!opts.inline && (nameTargets.length > 0 || areaTargets.length > 0)) setNarration(absDir, { names: [] });
 
   const targets = stored.zones.filter((z) => zoneIds.includes(z.id));
   if (targets.length === 0) {

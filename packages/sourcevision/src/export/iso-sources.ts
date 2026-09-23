@@ -514,6 +514,7 @@ export function loadFromSourcevision(root: string, options: LoadOptions = {}): I
 
   return {
     zones,
+    ...(zonesData.areas?.length ? { areas: zonesData.areas.map((a) => ({ id: a.id, name: a.name, zones: a.zones })) } : {}),
     crossings: (zonesData.crossings ?? []).map((c) => ({ fromZone: c.fromZone, toZone: c.toZone })),
     seams: seamResolution.seams,
     infrastructure: resolveInfrastructure(declared.infrastructure, zoneIds, zoneOfFile),

@@ -49,8 +49,9 @@ export function renderIsoMap(model: IsoModel, options: RenderIsoMapOptions = {})
   const title = options.title ?? `${model.meta.project} — architecture map`;
   const meta = model.meta;
 
+  const areaCount = model.level === "areas" ? model.nodes.filter((n) => n.kind !== "external" && n.kind !== "infra").length : 0;
   const stats = [
-    `${meta.shownZones} of ${meta.totalZones} zones`,
+    areaCount > 0 ? `${areaCount} areas · ${meta.totalZones} zones` : `${meta.shownZones} of ${meta.totalZones} zones`,
     `${meta.totalFiles.toLocaleString("en-US")} files`,
     `${meta.totalLines.toLocaleString("en-US")} lines`,
     meta.origin === "sourcevision" ? "sourcevision analysis" : "direct scan",
@@ -94,6 +95,7 @@ ${STYLES}
 <header class="top">
   <div class="ttl">
     <h1>${esc(meta.project)}</h1>
+    <nav class="crumbs" id="crumbs" aria-label="Map level" hidden></nav>
     <p>${stats.map((s) => `<span>${s}</span>`).join("")}</p>
   </div>
   <div class="tools">
@@ -124,6 +126,16 @@ ${STYLES}
 (function(){
 "use strict";
 var MODEL = ${embedJSON(model)};
+var ROOT = MODEL;
+// An areas-level map carries one zone scene per area; the URL hash picks it,
+// so Back, bookmarks and reloads all land on the same scene.
+var SCENE = (function(){
+  var id = "";
+  try { id = decodeURIComponent((location.hash || "").slice(1)); } catch (e) { id = ""; }
+  return id && ROOT.scenes && ROOT.scenes[id] ? id : "";
+})();
+MODEL = SCENE ? ROOT.scenes[SCENE] : ROOT;
+window.addEventListener("hashchange", function(){ location.reload(); });
 ${RUNTIME}
 })();
 </script>
@@ -174,6 +186,11 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
   padding:.85rem 1.15rem;border-bottom:1px solid var(--line);background:var(--panel);
 }
 .ttl h1{font-size:1.12rem}
+.crumbs{font-size:.86rem;margin-top:.15rem}
+.crumbs a,.dossier .body a{color:var(--ink);text-decoration:underline}
+.crumbs span{color:var(--muted)}
+.dossier .open{margin:.7rem 0 .2rem;background:var(--chip);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:.45rem .8rem;font:inherit;font-size:.84rem;cursor:pointer}
+.dossier .open:hover{background:var(--chip-hover)}
 .ttl p{margin:.2rem 0 0;color:var(--muted);font-size:.82rem;display:flex;gap:.5rem;flex-wrap:wrap}
 .ttl p span:not(:last-child)::after{content:" ·";color:var(--line)}
 .tools{display:flex;gap:.4rem}
@@ -280,6 +297,12 @@ var NODES = MODEL.nodes, EDGES = MODEL.edges, B = MODEL.bounds;
 var COLOR = {}, LABEL = {}, GLYPH = {};
 MODEL.kinds.forEach(function(k){ COLOR[k.id] = k.color; LABEL[k.id] = k.label; GLYPH[k.id] = k.glyph; });
 var BY = {}; NODES.forEach(function(n){ BY[n.id] = n; });
+(function(){
+  var crumbs = document.getElementById("crumbs");
+  if (!crumbs || !MODEL.scene) return;
+  crumbs.hidden = false;
+  crumbs.innerHTML = '<a href="#">All areas</a> <span>&rsaquo;</span> <b>' + esc(MODEL.scene.name) + '</b>';
+})();
 
 /**
  * A declared seam the call graph was checked against and did not support.
@@ -493,6 +516,10 @@ order.forEach(function(n){
   }
   g.addEventListener("click", pick);
   tg.addEventListener("click", pick);
+  if (MODEL.level === "areas" && ROOT.scenes && ROOT.scenes[n.id]) {
+    g.addEventListener("dblclick", function(){ openScene(n.id); });
+    tg.addEventListener("dblclick", function(){ openScene(n.id); });
+  }
   g.addEventListener("keydown", function(ev){
     if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectNode(n.id); }
   });
@@ -515,14 +542,28 @@ svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 var dossier = document.getElementById("dossier");
 var INTRO =
   '<h3>' + esc(MODEL.meta.project) + '</h3>' +
-  '<div class="sub">' + num(MODEL.meta.shownZones) + ' zones &middot; ' +
+  '<div class="sub">' + (MODEL.level === "areas"
+    ? num(NODES.filter(function(n){ return n.tiles; }).length) + ' areas &middot; ' + num(MODEL.meta.totalZones) + ' zones &middot; '
+    : num(MODEL.meta.shownZones) + ' zones &middot; ') +
   (MODEL.meta.origin === "sourcevision" ? 'from sourcevision analysis' : 'from a direct scan') + '</div>' +
+  (MODEL.level === "areas"
+    ? '<div class="body">Each block is an <b>area</b>: a group of zones that belong together. The tiles on ' +
+      'top are its zones, sized by file count. Lines are imports between areas. Open an area to see its ' +
+      'zones and the imports between them.</div>'
+    : '') +
+  (MODEL.scene
+    ? '<div class="body">The zones of <b>' + esc(MODEL.scene.name) + '</b>. Imports to other areas are not drawn here; ' +
+      '<a href="#">all areas</a> shows them.</div>'
+    : '') +
+  (MODEL.level === "areas" ? '' :
   '<div class="body">Each block is a zone of the codebase. Footprint scales with file count and ' +
   'height with line count, so the tall wide blocks are where the code actually is. Colour and glyph ' +
   'show what the zone mostly does. Solid lines are import dependencies pointing from the importer ' +
-  'to what it imports; dashed lines run backwards through the layering and mark a dependency cycle.</div>' +
+  'to what it imports; dashed lines run backwards through the layering and mark a dependency cycle.</div>') +
   '<h4>Try this</h4><ul>' +
-  '<li>Click a block to see its files and cross-zone edges.</li>' +
+  (MODEL.level === "areas"
+    ? '<li>Click an area, then <b>Open</b> (or double-click it) to see its zones.</li>'
+    : '<li>Click a block to see its files and cross-zone edges.</li>') +
   '<li>Click a connector, or a reference count in a panel, to inspect one dependency.</li>' +
   (MODEL.meta.seamCount || MODEL.meta.infraCount
     ? '<li>Pink connectors are <b>declared</b>, not inferred: runtime seams and infrastructure ' +
@@ -565,6 +606,9 @@ function renderNode(n){
     esc(GLYPH[n.kind] || "") + ' ' + esc(n.stage) + ' &middot; ' + esc(LABEL[n.kind] || n.kind) + '</div>';
   h += '<h3>' + esc(n.name) + '</h3>';
   h += '<div class="sub">' + esc(n.sub) + '</div>';
+  if (MODEL.level === "areas" && ROOT.scenes && ROOT.scenes[n.id]) {
+    h += '<button type="button" class="open" data-open="' + esc(n.id) + '">Open ' + esc(n.name) + ' &rarr;</button>';
+  }
 
   if (n.kind !== "external") {
     h += '<div class="mx">' +
@@ -689,7 +733,14 @@ function renderEdge(e){
   return h;
 }
 
+function openScene(id){
+  location.hash = encodeURIComponent(id);
+}
 function bindPanel(){
+  var opens = dossier.querySelectorAll("[data-open]");
+  for (var o = 0; o < opens.length; o++) {
+    opens[o].addEventListener("click", function(ev){ openScene(ev.currentTarget.getAttribute("data-open")); });
+  }
   var gotos = dossier.querySelectorAll("[data-goto]");
   for (var i = 0; i < gotos.length; i++) {
     gotos[i].addEventListener("click", function(ev){

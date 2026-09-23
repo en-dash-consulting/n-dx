@@ -89,6 +89,78 @@ function resolveZoneKind(kindCounts, totalFiles) {
   return bestCount <= 0 ? "support" : best;
 }
 function buildIsoModel(input, options = {}) {
+  const areas = (input.areas ?? []).filter((a) => a.zones.length > 0);
+  if (areas.length < 2) return buildZoneIsoModel(input, options);
+  const zoneById = new Map(input.zones.map((z) => [z.id, z]));
+  const areaOf = /* @__PURE__ */ new Map();
+  for (const a of areas) for (const id of a.zones) areaOf.set(id, a.id);
+  const mapId = (id) => areaOf.get(id);
+  const areaZones = areas.map((a) => {
+    const members = a.zones.map((id) => zoneById.get(id)).filter((z) => Boolean(z));
+    const files = members.flatMap((z) => z.files);
+    const weigh = (pick) => files.length > 0 ? members.reduce((n, z) => n + pick(z) * z.files.length, 0) / files.length : 0;
+    return {
+      id: a.id,
+      name: a.name,
+      description: `${members.length} zone${members.length === 1 ? "" : "s"}: ${members.slice().sort((x, y) => y.files.length - x.files.length).slice(0, 6).map((z) => z.name).join(", ")}${members.length > 6 ? ", …" : ""}.`,
+      files,
+      entryPoints: members.flatMap((z) => z.entryPoints).slice(0, 12),
+      cohesion: Math.round(weigh((z) => z.cohesion) * 100) / 100,
+      coupling: Math.round(weigh((z) => z.coupling) * 100) / 100,
+      insights: [],
+      children: members.map((z) => ({ id: z.id, name: z.name, files: z.files.length }))
+    };
+  });
+  const liftPairs = (items) => items.flatMap((c) => {
+    const from = mapId(c.fromZone), to = mapId(c.toZone);
+    return from && to && from !== to ? [{ ...c, fromZone: from, toZone: to }] : [];
+  });
+  const callTotals = /* @__PURE__ */ new Map();
+  for (const c of liftPairs(input.callEdges ?? [])) {
+    const k = `${c.fromZone}${c.toZone}`;
+    const t = callTotals.get(k);
+    if (t) t.weight += c.weight;
+    else callTotals.set(k, { ...c });
+  }
+  const areaInput = {
+    ...input,
+    zones: areaZones,
+    crossings: liftPairs(input.crossings),
+    callEdges: [...callTotals.values()],
+    external: input.external.map((e) => ({ ...e, importedBy: [...new Set(e.importedBy.map((id) => mapId(id) ?? id))] })),
+    findings: input.findings.flatMap((f) => mapId(f.scope) ? [{ ...f, scope: mapId(f.scope) }] : []),
+    seams: liftPairs(input.seams ?? []),
+    infrastructure: (input.infrastructure ?? []).map((i) => ({ ...i, consumers: [...new Set(i.consumers.map((id) => mapId(id) ?? id))] })),
+    areas: void 0
+  };
+  const root = buildZoneIsoModel(areaInput, { ...options, maxNodes: Math.max(areas.length, options.maxNodes ?? 40) });
+  root.level = "areas";
+  root.meta.totalZones = input.zones.filter((z) => z.files.length > 0).length;
+  const scenes = {};
+  for (const a of areas) {
+    const ids = new Set(a.zones);
+    const scene = buildZoneIsoModel(
+      {
+        ...input,
+        zones: input.zones.filter((z) => ids.has(z.id)),
+        crossings: input.crossings.filter((c) => ids.has(c.fromZone) && ids.has(c.toZone)),
+        callEdges: (input.callEdges ?? []).filter((c) => ids.has(c.fromZone) && ids.has(c.toZone)),
+        external: input.external.map((e) => ({ ...e, importedBy: e.importedBy.filter((id) => ids.has(id)) })),
+        findings: input.findings.filter((f) => ids.has(f.scope)),
+        seams: (input.seams ?? []).filter((c) => ids.has(c.fromZone) && ids.has(c.toZone)),
+        infrastructure: (input.infrastructure ?? []).map((i) => ({ ...i, consumers: i.consumers.filter((id) => ids.has(id)) })),
+        areas: void 0
+      },
+      options
+    );
+    scene.level = "zones";
+    scene.scene = { id: a.id, name: a.name };
+    scenes[a.id] = scene;
+  }
+  root.scenes = scenes;
+  return root;
+}
+function buildZoneIsoModel(input, options = {}) {
   const maxNodes = options.maxNodes ?? 40;
   const includeExternals = options.includeExternals ?? true;
   const maxExternals = options.maxExternals ?? 5;
@@ -276,6 +348,7 @@ function buildIsoModel(input, options = {}) {
   }
   nodes.push(...infraNodes);
   orderRows(nodes, [...rawEdges, ...infraEdges]);
+  wrapTallColumns(nodes);
   const lanes = placeOnGrid(nodes);
   const layerCount = nodes.reduce((max, n) => Math.max(max, n.col), 0) + 1;
   const layers = [];
@@ -467,6 +540,25 @@ function barycenter(node, predecessors, rowOf) {
   if (rows.length === 0) return Number.MAX_SAFE_INTEGER;
   return rows.reduce((sum, r) => sum + r, 0) / rows.length;
 }
+function wrapTallColumns(nodes) {
+  const maxRows = Math.max(3, Math.ceil(Math.sqrt(nodes.length)));
+  const byCol = /* @__PURE__ */ new Map();
+  for (const n of nodes) {
+    let list = byCol.get(n.col);
+    if (!list) byCol.set(n.col, list = []);
+    list.push(n);
+  }
+  let shift = 0;
+  for (const col of [...byCol.keys()].sort((a, b) => a - b)) {
+    const inCol = byCol.get(col).sort((a, b) => a.row - b.row);
+    const parts = Math.ceil(inCol.length / maxRows);
+    inCol.forEach((n, i) => {
+      n.col = col + shift + Math.floor(i / maxRows);
+      n.row = i % maxRows;
+    });
+    shift += parts - 1;
+  }
+}
 function placeOnGrid(nodes) {
   const colWidth = /* @__PURE__ */ new Map();
   const rowDepth = /* @__PURE__ */ new Map();
@@ -617,8 +709,9 @@ function embedJSON(value) {
 function renderIsoMap(model, options = {}) {
   const title = options.title ?? `${model.meta.project} — architecture map`;
   const meta = model.meta;
+  const areaCount = model.level === "areas" ? model.nodes.filter((n) => n.kind !== "external" && n.kind !== "infra").length : 0;
   const stats = [
-    `${meta.shownZones} of ${meta.totalZones} zones`,
+    areaCount > 0 ? `${areaCount} areas · ${meta.totalZones} zones` : `${meta.shownZones} of ${meta.totalZones} zones`,
     `${meta.totalFiles.toLocaleString("en-US")} files`,
     `${meta.totalLines.toLocaleString("en-US")} lines`,
     meta.origin === "sourcevision" ? "sourcevision analysis" : "direct scan"
@@ -645,6 +738,7 @@ ${STYLES}
 <header class="top">
   <div class="ttl">
     <h1>${esc(meta.project)}</h1>
+    <nav class="crumbs" id="crumbs" aria-label="Map level" hidden></nav>
     <p>${stats.map((s) => `<span>${s}</span>`).join("")}</p>
   </div>
   <div class="tools">
@@ -675,6 +769,16 @@ ${STYLES}
 (function(){
 "use strict";
 var MODEL = ${embedJSON(model)};
+var ROOT = MODEL;
+// An areas-level map carries one zone scene per area; the URL hash picks it,
+// so Back, bookmarks and reloads all land on the same scene.
+var SCENE = (function(){
+  var id = "";
+  try { id = decodeURIComponent((location.hash || "").slice(1)); } catch (e) { id = ""; }
+  return id && ROOT.scenes && ROOT.scenes[id] ? id : "";
+})();
+MODEL = SCENE ? ROOT.scenes[SCENE] : ROOT;
+window.addEventListener("hashchange", function(){ location.reload(); });
 ${RUNTIME}
 })();
 </script>
@@ -722,6 +826,11 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
   padding:.85rem 1.15rem;border-bottom:1px solid var(--line);background:var(--panel);
 }
 .ttl h1{font-size:1.12rem}
+.crumbs{font-size:.86rem;margin-top:.15rem}
+.crumbs a,.dossier .body a{color:var(--ink);text-decoration:underline}
+.crumbs span{color:var(--muted)}
+.dossier .open{margin:.7rem 0 .2rem;background:var(--chip);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:.45rem .8rem;font:inherit;font-size:.84rem;cursor:pointer}
+.dossier .open:hover{background:var(--chip-hover)}
 .ttl p{margin:.2rem 0 0;color:var(--muted);font-size:.82rem;display:flex;gap:.5rem;flex-wrap:wrap}
 .ttl p span:not(:last-child)::after{content:" ·";color:var(--line)}
 .tools{display:flex;gap:.4rem}
@@ -820,6 +929,12 @@ var NODES = MODEL.nodes, EDGES = MODEL.edges, B = MODEL.bounds;
 var COLOR = {}, LABEL = {}, GLYPH = {};
 MODEL.kinds.forEach(function(k){ COLOR[k.id] = k.color; LABEL[k.id] = k.label; GLYPH[k.id] = k.glyph; });
 var BY = {}; NODES.forEach(function(n){ BY[n.id] = n; });
+(function(){
+  var crumbs = document.getElementById("crumbs");
+  if (!crumbs || !MODEL.scene) return;
+  crumbs.hidden = false;
+  crumbs.innerHTML = '<a href="#">All areas</a> <span>&rsaquo;</span> <b>' + esc(MODEL.scene.name) + '</b>';
+})();
 
 /**
  * A declared seam the call graph was checked against and did not support.
@@ -1033,6 +1148,10 @@ order.forEach(function(n){
   }
   g.addEventListener("click", pick);
   tg.addEventListener("click", pick);
+  if (MODEL.level === "areas" && ROOT.scenes && ROOT.scenes[n.id]) {
+    g.addEventListener("dblclick", function(){ openScene(n.id); });
+    tg.addEventListener("dblclick", function(){ openScene(n.id); });
+  }
   g.addEventListener("keydown", function(ev){
     if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectNode(n.id); }
   });
@@ -1055,14 +1174,28 @@ svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 var dossier = document.getElementById("dossier");
 var INTRO =
   '<h3>' + esc(MODEL.meta.project) + '</h3>' +
-  '<div class="sub">' + num(MODEL.meta.shownZones) + ' zones &middot; ' +
+  '<div class="sub">' + (MODEL.level === "areas"
+    ? num(NODES.filter(function(n){ return n.tiles; }).length) + ' areas &middot; ' + num(MODEL.meta.totalZones) + ' zones &middot; '
+    : num(MODEL.meta.shownZones) + ' zones &middot; ') +
   (MODEL.meta.origin === "sourcevision" ? 'from sourcevision analysis' : 'from a direct scan') + '</div>' +
+  (MODEL.level === "areas"
+    ? '<div class="body">Each block is an <b>area</b>: a group of zones that belong together. The tiles on ' +
+      'top are its zones, sized by file count. Lines are imports between areas. Open an area to see its ' +
+      'zones and the imports between them.</div>'
+    : '') +
+  (MODEL.scene
+    ? '<div class="body">The zones of <b>' + esc(MODEL.scene.name) + '</b>. Imports to other areas are not drawn here; ' +
+      '<a href="#">all areas</a> shows them.</div>'
+    : '') +
+  (MODEL.level === "areas" ? '' :
   '<div class="body">Each block is a zone of the codebase. Footprint scales with file count and ' +
   'height with line count, so the tall wide blocks are where the code actually is. Colour and glyph ' +
   'show what the zone mostly does. Solid lines are import dependencies pointing from the importer ' +
-  'to what it imports; dashed lines run backwards through the layering and mark a dependency cycle.</div>' +
+  'to what it imports; dashed lines run backwards through the layering and mark a dependency cycle.</div>') +
   '<h4>Try this</h4><ul>' +
-  '<li>Click a block to see its files and cross-zone edges.</li>' +
+  (MODEL.level === "areas"
+    ? '<li>Click an area, then <b>Open</b> (or double-click it) to see its zones.</li>'
+    : '<li>Click a block to see its files and cross-zone edges.</li>') +
   '<li>Click a connector, or a reference count in a panel, to inspect one dependency.</li>' +
   (MODEL.meta.seamCount || MODEL.meta.infraCount
     ? '<li>Pink connectors are <b>declared</b>, not inferred: runtime seams and infrastructure ' +
@@ -1105,6 +1238,9 @@ function renderNode(n){
     esc(GLYPH[n.kind] || "") + ' ' + esc(n.stage) + ' &middot; ' + esc(LABEL[n.kind] || n.kind) + '</div>';
   h += '<h3>' + esc(n.name) + '</h3>';
   h += '<div class="sub">' + esc(n.sub) + '</div>';
+  if (MODEL.level === "areas" && ROOT.scenes && ROOT.scenes[n.id]) {
+    h += '<button type="button" class="open" data-open="' + esc(n.id) + '">Open ' + esc(n.name) + ' &rarr;</button>';
+  }
 
   if (n.kind !== "external") {
     h += '<div class="mx">' +
@@ -1229,7 +1365,14 @@ function renderEdge(e){
   return h;
 }
 
+function openScene(id){
+  location.hash = encodeURIComponent(id);
+}
 function bindPanel(){
+  var opens = dossier.querySelectorAll("[data-open]");
+  for (var o = 0; o < opens.length; o++) {
+    opens[o].addEventListener("click", function(ev){ openScene(ev.currentTarget.getAttribute("data-open")); });
+  }
   var gotos = dossier.querySelectorAll("[data-goto]");
   for (var i = 0; i < gotos.length; i++) {
     gotos[i].addEventListener("click", function(ev){
@@ -2583,6 +2726,7 @@ function loadFromSourcevision(root, options = {}) {
   extraGaps.push(...seamGaps(seamResolution));
   return {
     zones,
+    ...zonesData.areas?.length ? { areas: zonesData.areas.map((a) => ({ id: a.id, name: a.name, zones: a.zones })) } : {},
     crossings: (zonesData.crossings ?? []).map((c) => ({ fromZone: c.fromZone, toZone: c.toZone })),
     seams: seamResolution.seams,
     infrastructure: resolveInfrastructure(declared.infrastructure, zoneIds, zoneOfFile),

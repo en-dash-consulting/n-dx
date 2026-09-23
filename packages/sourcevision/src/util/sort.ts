@@ -131,6 +131,7 @@ export function sortZonesData(zones: Zones): Zones {
     ...(zones.stability ? { stability: zones.stability } : {}),
     ...(zones.partitionReview ? { partitionReview: zones.partitionReview } : {}),
     ...(zones.algorithmVersion != null ? { algorithmVersion: zones.algorithmVersion } : {}),
+    ...(zones.areas?.length ? { areas: zones.areas } : {}),
   };
 }
 

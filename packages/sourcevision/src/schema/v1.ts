@@ -446,6 +446,24 @@ export interface Zones {
   partitionReview?: PartitionReview;
   /** `ZONE_ALGORITHM_VERSION` that produced this partition; a different version is not reused or used as a seed. */
   algorithmVersion?: number;
+  /** The level above zones: 4–10 groups of top-level zones (see `analyzers/zone-areas.ts`). */
+  areas?: ZoneArea[];
+}
+
+/** A group of top-level zones: the first level of the project map. */
+export interface ZoneArea {
+  id: string;
+  name: string;
+  /** Top-level zone ids in this area. */
+  zones: string[];
+  /** Total files across the area's zones. */
+  files: number;
+  /**
+   * Where the name came from. `template` names (joined member names, a
+   * directory) are candidates for a judged or generated name; the others are
+   * already specific.
+   */
+  nameSource?: "package" | "route" | "member" | "template" | "judged" | "generated" | "support" | "tests";
 }
 
 /** Deterministic signals of how fragmented a zone partition is. */

@@ -33,6 +33,7 @@ import type {
   SubAnalysisRef,
   ProjectProfile,
   PartitionReview,
+  ZoneArea,
 } from "../schema/index.js";
 import type { SubAnalysis } from "./workspace.js";
 import { assessPartitionHealth, formatPartitionLine, reviewPreviousPartition } from "./partition-review.js";
@@ -67,6 +68,8 @@ import { cascadeEnrichment } from "./enrich-cascade.js";
 import { dedupeZoneNames, deepestDistinguishingSegment, idFromStems, idsFollowNames, isAlgorithmicName, renameZoneRefs, reprefixSubZones, zoneIdsOf } from "./zone-identity.js";
 import { getJudgmentRoute } from "./claude-client.js";
 import { recordPartitionReview, setRunMode } from "./run-ledger.js";
+import { computeAreas } from "./zone-areas.js";
+import { nameAreas } from "./area-naming.js";
 import { emptyAnalyzeTokenUsage } from "./token-usage.js";
 import { deduplicateFindings, enforceSeverityRules } from "./enrich-parsing.js";
 import { detectPinDivergence, detectImportNeighborMoves } from "./move-recommendations.js";
@@ -3013,12 +3016,13 @@ function buildAnalyzeZonesResult(opts: {
   pendingNarration?: string[];
   pendingNames?: string[];
   partitionReview?: PartitionReview;
+  areas?: ZoneArea[];
 }): AnalyzeZonesResult {
   const {
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
     previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration, pendingNames,
-    partitionReview,
+    partitionReview, areas,
   } = opts;
 
   const prevMetaCount = previousZones?.metaEvaluationCount ?? 0;
@@ -3046,6 +3050,7 @@ function buildAnalyzeZonesResult(opts: {
       ...(stability ? { stability } : {}),
       ...(partitionReview ? { partitionReview } : {}),
       algorithmVersion: ZONE_ALGORITHM_VERSION,
+      ...(areas && areas.length > 0 ? { areas } : {}),
     }),
     tokenUsage: enrichTokenUsage,
     structureChanged,
@@ -3411,10 +3416,29 @@ export async function analyzeZones(
   const pendingNarration = byFiles(enrichResult.deferredFiles);
   const pendingNames = byFiles(enrichResult.deferredNameFiles);
 
+  // ── Areas: the level above zones ──
+  let areas = computeAreas({ zones: allZones, crossings, testFiles, routeLayout });
+  const pendingAreaNames: string[] = [];
+  if (areas.length > 0 && enrich) {
+    const named = await nameAreas(areas, allZones, {
+      projectDir: options?.projectProfile?.projectDir,
+      fileArchetypes: options?.fileArchetypes,
+      routeLayout,
+      previous: previousZones?.areas,
+      defer: options?.deferNarration === true,
+    });
+    areas = named.areas;
+    pendingAreaNames.push(...named.pending);
+  }
+  if (areas.length > 0) {
+    console.log(`  [areas] ${allZones.length} zones in ${areas.length} areas: ${areas.map((a) => `${a.name} (${a.zones.length})`).join(", ")}`);
+  }
+
   return buildAnalyzeZonesResult({
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
-    previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration, pendingNames,
-    partitionReview,
+    previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration,
+    partitionReview, areas,
+    pendingNames: [...(pendingNames ?? []), ...pendingAreaNames],
   });
 }

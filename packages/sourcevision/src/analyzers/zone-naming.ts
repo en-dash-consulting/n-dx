@@ -164,6 +164,8 @@ export interface NamingContext {
   deferGeneratedNames?: boolean;
   /** File-based routing layout; adds the route a zone serves as a name candidate. */
   routeLayout?: RouteLayout;
+  /** Name only: ask no merge questions (areas are named, never merged). */
+  noMerges?: boolean;
 }
 
 /** Zones per name-proposal prompt; the answer is a map keyed by zone id. */
@@ -419,7 +421,7 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
   const named = new Map<string, string>(); // zone.id → chosen name
   const escalate: Zone[] = [];
   const mergeNames = new Map<string, string>(); // zone.id → shared name for mergeZonesByName
-  const pairs = candidatePairs(zones, ctx.crossings);
+  const pairs = ctx.noMerges ? [] : candidatePairs(zones, ctx.crossings);
 
   for (let start = 0; start < zones.length; start += ZONES_PER_REQUEST) {
     const batch = zones.slice(start, start + ZONES_PER_REQUEST);
