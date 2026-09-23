@@ -395,6 +395,7 @@ describe("web → rex gateway contract", () => {
     "handleEditItem",
     "aggregateItemTokenUsage",
     "aggregateItemDurations",
+    "estimateCostFromTotals",
     "parseFolderTree",
     "resolveSiblingSlugs",
     "resolveStore",
