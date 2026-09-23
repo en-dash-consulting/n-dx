@@ -126,3 +126,17 @@ describe("test grouping", () => {
     expect(b.files.every((f) => f.startsWith("app/routes/apps/digest/utils/__tests__/"))).toBe(true);
   });
 });
+
+describe("parent-relative subdivision", () => {
+  it("splits a 40-file zone with structure even when it is under 15% of the project", () => {
+    const dirs = ["a", "b", "c"];
+    const zoneFiles = dirs.flatMap((d) => Array.from({ length: 13 }, (_, i) => `src/core/${d}/m${i}.ts`)).concat("src/core/index.ts");
+    const other = Array.from({ length: 360 }, (_, i) => `src/other/o${i}.ts`);
+    const inventory = makeInventory([...zoneFiles, ...other].map((p) => makeFileEntry(p)));
+    const edges = dirs.flatMap((d) => Array.from({ length: 12 }, (_, i) => makeEdge(`src/core/${d}/m${i}.ts`, `src/core/${d}/m${i + 1}.ts`)));
+    edges.push(makeEdge("src/core/index.ts", "src/core/a/m0.ts"));
+    const children = subdivideZone(makeZone("core", zoneFiles), makeImports(edges), inventory);
+    expect(children.length).toBeGreaterThanOrEqual(3);
+    expect(children.every((c) => c.files.length > 2)).toBe(true);
+  });
+});

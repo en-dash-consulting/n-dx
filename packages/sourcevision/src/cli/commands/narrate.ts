@@ -22,6 +22,7 @@ import { nameZonesBySelection } from "../../analyzers/zone-naming.js";
 import { routeLayoutFor } from "../../analyzers/route-convention.js";
 import { areaAsZone } from "../../analyzers/zone-areas.js";
 import { applyGeneratedAreaNames } from "../../analyzers/area-naming.js";
+import { applySubZoneNames, flattenSubZones, revertEchoedNames, subZoneIdsFollowNames, subZoneNamingContext } from "../../analyzers/subzone-naming.js";
 import { dedupeZoneNames } from "../../analyzers/enrich-cascade.js";
 import { judgeFindings } from "../../analyzers/enrich-judge.js";
 import { buildProjectProfile } from "../../analyzers/project-profile.js";
@@ -255,6 +256,29 @@ export async function cmdNarrate(targetDir: string, opts: NarrateOptions): Promi
     }
   }
 
+  // Sub-zone names deferred by analyze: generated without merge questions and
+  // applied anywhere in the tree; numbered sub-zone ids then follow them.
+  const subTargets = flattenSubZones(stored.zones).filter((z) => nameZoneIds.includes(z.id));
+  if (subTargets.length > 0) {
+    info(`${bold("[narrate]")} generating names for ${subTargets.length} sub-zone(s)`);
+    const naming = await nameZonesBySelection(subTargets, subZoneNamingContext(stored.zones, {
+      projectDir: absDir,
+      fileArchetypes,
+      routeLayout: routeLayoutFor(inventory.files.map((f: { path: string }) => f.path)),
+    }));
+    const applied = applySubZoneNames(stored.zones, new Map(naming.zones.map((z) => [z.id, z.name])));
+    if (applied.renamed.length > 0) {
+      if (isSuperseded(startedAnalyzedAt, readManifest(absDir))) {
+        setNarration(absDir, { status: "failed", finishedAt: new Date().toISOString(), reason: "superseded by a newer analysis" });
+        warn("  [narrate] a newer analysis finished meanwhile — result dropped");
+        return;
+      }
+      stored = { ...stored, zones: subZoneIdsFollowNames(revertEchoedNames(applied.zones, new Set(applied.renamed))) };
+      writeFileSync(join(svDir, DATA_FILES.zones), toCanonicalJSON(stored));
+      info(`  ${applied.renamed.length} sub-zone(s) renamed → ${dim(join(svDir, DATA_FILES.zones))}`);
+    }
+  }
+
   // Names first: one proposal call for every deferred zone, verified by Jev.
   const nameTargets = stored.zones.filter((z) => nameZoneIds.includes(z.id));
   if (nameTargets.length > 0) {
@@ -278,7 +302,7 @@ export async function cmdNarrate(targetDir: string, opts: NarrateOptions): Promi
     }
   }
   // Names (zones and areas) are done: a later takeover must not queue them again.
-  if (!opts.inline && (nameTargets.length > 0 || areaTargets.length > 0)) setNarration(absDir, { names: [] });
+  if (!opts.inline && (nameTargets.length > 0 || areaTargets.length > 0 || subTargets.length > 0)) setNarration(absDir, { names: [] });
 
   const targets = stored.zones.filter((z) => zoneIds.includes(z.id));
   if (targets.length === 0) {

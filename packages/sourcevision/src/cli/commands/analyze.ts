@@ -270,9 +270,13 @@ async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds:
 
 function currentZoneIds(svDir: string): Set<string> {
   try {
-    const zones = JSON.parse(readFileSync(join(svDir, DATA_FILES.zones), "utf-8")) as { zones?: { id: string }[]; areas?: { id: string }[] };
-    // Area names are queued as `area:<id>` alongside zone ids.
-    return new Set([...(zones.zones ?? []).map((z) => z.id), ...(zones.areas ?? []).map((a) => `area:${a.id}`)]);
+    type Z = { id: string; subZones?: Z[] };
+    const zones = JSON.parse(readFileSync(join(svDir, DATA_FILES.zones), "utf-8")) as { zones?: Z[]; areas?: { id: string }[] };
+    const ids: string[] = [];
+    const walk = (z: Z) => { ids.push(z.id); (z.subZones ?? []).forEach(walk); };
+    (zones.zones ?? []).forEach(walk);
+    // Sub-zone ids and `area:<id>` names are queued alongside zone ids.
+    return new Set([...ids, ...(zones.areas ?? []).map((a) => `area:${a.id}`)]);
   } catch {
     return new Set();
   }

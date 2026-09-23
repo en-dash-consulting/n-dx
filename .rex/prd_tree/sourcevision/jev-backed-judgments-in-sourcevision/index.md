@@ -38,7 +38,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Partition balance and nesting: lopsided subdivisions count as failures, oversized zones flagged, tests grouped with their code, iso map draws sub-zones](./partition-balance-and-nesting-lopsided.md) | completed |
 | [Partition review: Jev and health signals decide whether a previous partition may be reused or seed Louvain; upgrades re-partition without sv reset](./partition-review-jev-and-health.md) | completed |
 | [Re-run judgments: Jev decides what needs re-enrichment and which findings still hold](./re-run-judgments-jev-decides-what.md) | pending |
-| [Recursive levels: sub-zones split relative to their parent, clean and named at every depth, iso map expands any level in place](./recursive-levels-sub-zones-split.md) | pending |
+| [Recursive levels: sub-zones split relative to their parent, clean and named at every depth, iso map expands any level in place](./recursive-levels-sub-zones-split.md) | completed |
 | [Route-aware partitioning: detect file-based routing, treat route directories as generic, group route modules by route subtree](./route-aware-partitioning-detect-file.md) | completed |
 | [Scan quality: symbol evidence, symbol/README name candidates, typed anchored findings, declared-rule checks](./scan-quality-symbol-evidence-symbol.md) | pending |
 | [Scan speed: one generation call per kind, narration off the critical path](./scan-speed-one-generation-call-per.md) | completed |

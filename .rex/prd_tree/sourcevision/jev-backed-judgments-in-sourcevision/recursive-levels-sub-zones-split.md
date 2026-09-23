@@ -2,13 +2,18 @@
 id: "aca995cd-18c8-465b-a120-f5eb942e208a"
 level: "task"
 title: "Recursive levels: sub-zones split relative to their parent, clean and named at every depth, iso map expands any level in place"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "sourcevision"
   - "zones"
   - "iso-map"
 source: "ndx-capture"
+startedAt: "2026-09-23T14:22:31.843Z"
+completedAt: "2026-09-23T14:22:31.843Z"
+endedAt: "2026-09-23T14:22:31.843Z"
+resolutionType: "code-change"
+resolutionDetail: "Subdivision threshold capped at 30 files; no test quarantine or test-zone splitting inside subdivisions; sliver fold with rebuilt split (or no split when only slivers balanced it); ZONE_ALGORITHM_VERSION 5; subzone-naming.ts (carry, Jev with parent-relative candidates, echo revert, deferred generation via narrate, ids follow names); iso model zoneScenes/leafEdges/parents; recursive in-place expansion with deepest-visible arcs. 2195 sv tests, evals 4/4, live n-site2 3-level expansion screenshot."
 acceptanceCriteria:
   - "Unit test: a 40-file zone with a balanced internal structure gets sub-zones in a project where it is under 15% of files"
   - "Unit test: sub-zones below the small-zone threshold are folded into the sibling they share the most edges with; no sub-zone of <= 2 files remains when a sibling exists"
@@ -19,6 +24,6 @@ acceptanceCriteria:
   - "Live on a copy of n-site2: sub-zone tree recorded in this item's log; screenshot of Components expanded with Park expanded inside it"
   - "pnpm --filter @n-dx/sourcevision test passes; sourcevision eval gate passes"
 description: "The map now goes areas → zones, and stops there. Real structure continues below that: probing with a parent-relative threshold gives n-site2 Components (129) → Icons / Global Nav / Forms / Modals / Park (49) → Engine / Worldgen, and n-dx Hench (82) → Agent / Lifecycle / Queue / CLI / Quota. Three things prevent it from showing:\n\n1. **Threshold.** `subdivideZone` splits only zones at or above `max(12, 15% of project files)` (167 on n-site2), so after the balance work nothing splits. Split any zone of ≥ 30 files, at any depth up to `MAX_SUBDIVISION_DEPTH`, when the split is balanced.\n2. **Clean children.** Subdivision leaves 1–2-file slivers and numbered siblings (`worldgen-2`, `llm-client-3`). After a split, fold children below the small-zone threshold into the sibling they share the most import edges with (else the largest), then re-check balance. Sub-zones go through the naming pass (Jev Choice, deferred generation via `sv narrate`, ids following chosen names) like top-level zones.\n3. **Map.** Generalise expand-in-place from areas → zones to any node with balanced children. Every expandable node gets a precomputed scene; the browser composes expanded nodes recursively (a frame's size is its composed scene's bounds). Cross-node connectors come from leaf-level edges: each file-level crossing maps to its deepest drawn node, the browser lifts each end to the deepest visible node, and pairs that no routed edge already shows are drawn as arcs.\n\nBump `ZONE_ALGORITHM_VERSION`; re-record eval goldens if the top-level partition changes."
-lastModified: "2026-09-23T14:02:51.770Z"
+lastModified: "2026-09-23T14:22:32.200Z"
 lastModifiedBy: "Nick Daniel <nick@endash.us>"
 ---

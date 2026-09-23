@@ -70,6 +70,7 @@ import { getJudgmentRoute } from "./claude-client.js";
 import { recordPartitionReview, setRunMode } from "./run-ledger.js";
 import { computeAreas } from "./zone-areas.js";
 import { nameAreas } from "./area-naming.js";
+import { nameSubZones } from "./subzone-naming.js";
 import { emptyAnalyzeTokenUsage } from "./token-usage.js";
 import { deduplicateFindings, enforceSeverityRules } from "./enrich-parsing.js";
 import { detectPinDivergence, detectImportNeighborMoves } from "./move-recommendations.js";
@@ -149,6 +150,12 @@ export interface ZonePipelineOptions {
    * Louvain (subdivision's directory fallback). Tests are still quarantined.
    */
   presetCommunity?: Map<string, string>;
+  /**
+   * Put tests in test-only directories into their own communities. Default
+   * true; subdivision turns it off — inside a zone, a test belongs with the
+   * code it tests, not in a one-file sliver of its own.
+   */
+  quarantineTests?: boolean;
 }
 
 /** Result of running the zone detection pipeline. */
@@ -1026,8 +1033,16 @@ export const SUBDIVISION_THRESHOLD_PCT = 0.15;
  * external consumer pinning to the constant still gets reasonable behavior.
  */
 export function subdivisionThreshold(totalFiles: number): number {
-  return Math.max(SUBDIVISION_THRESHOLD_MIN, Math.floor(totalFiles * SUBDIVISION_THRESHOLD_PCT));
+  return Math.max(SUBDIVISION_THRESHOLD_MIN, Math.min(SUBDIVISION_THRESHOLD_CAP, Math.floor(totalFiles * SUBDIVISION_THRESHOLD_PCT)));
 }
+
+/**
+ * Upper bound on the subdivision trigger. With areas as the top level, a zone
+ * is a leaf of a hierarchy rather than the whole map, and a 100-file zone
+ * inside a 1,000-file project still has structure worth drawing: 15% of the
+ * project (150 files) meant nothing below the zones ever split.
+ */
+export const SUBDIVISION_THRESHOLD_CAP = 30;
 
 /** @deprecated use {@link subdivisionThreshold}(totalFiles) — kept for back-compat */
 export const SUBDIVISION_THRESHOLD = SUBDIVISION_THRESHOLD_MIN;
@@ -1195,6 +1210,7 @@ export function subdivideZone(
     depth: depth + 1,
     testFiles,
     routeLayout,
+    quarantineTests: false,
   };
   const attempts: Array<() => ZonePipelineResult | null> = [
     () => runZonePipeline(base),
@@ -1213,6 +1229,34 @@ export function subdivideZone(
     }
   }
   if (!result) return [];
+
+  // Slivers: children below the minimum join the sibling they share the most
+  // import edges with (else the largest), and the split is rebuilt from that
+  // assignment so ids, metrics and crossings are computed as usual.
+  const small = result.zones.filter((z) => z.files.length < SUBDIVISION_MIN_CHILD);
+  if (small.length > 0 && result.zones.length - small.length >= 2) {
+    const childOf = new Map<string, string>();
+    for (const z of result.zones) for (const f of z.files) childOf.set(f, z.id);
+    const big = result.zones.filter((z) => z.files.length >= SUBDIVISION_MIN_CHILD);
+    const largest = [...big].sort((a, b) => b.files.length - a.files.length)[0];
+    const preset = new Map<string, string>();
+    for (const z of big) for (const f of z.files) preset.set(f, z.id);
+    for (const z of small) {
+      const members = new Set(z.files);
+      const links = new Map<string, number>();
+      for (const e of internalEdges) {
+        const other = members.has(e.from) ? e.to : members.has(e.to) ? e.from : undefined;
+        const target = other && !members.has(other) ? childOf.get(other) : undefined;
+        if (target && big.some((b) => b.id === target)) links.set(target, (links.get(target) ?? 0) + 1);
+      }
+      const best = [...links.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? largest.id;
+      for (const f of z.files) preset.set(f, best);
+    }
+    const folded = runZonePipeline({ ...base, presetCommunity: preset });
+    // Balanced only thanks to slivers is not balanced: no sub-zones then.
+    if (!isBalancedSubdivision(folded.zones, zone.files.length)) return [];
+    result = folded;
+  }
 
   // Store sub-crossings on parent zone
   if (result.crossings.length > 0) {
@@ -1249,7 +1293,7 @@ export function computeStructureHash(zones: Zone[]): string {
  * silently keep stale zones — and, e.g., an empty codebase map — until they
  * delete `.sourcevision`. Monotonic integer; history is intentionally terse.
  */
-export const ZONE_ALGORITHM_VERSION = 4;
+export const ZONE_ALGORITHM_VERSION = 5;
 
 /**
  * Hash the analysis inputs that determine the Louvain partition, independent
@@ -1993,7 +2037,9 @@ function buildZonesFromCommunities(
 
     const zone: Zone = {
       id,
-      name: deriveZoneName(id),
+      // A sub-zone is named for itself, not its path ("Global Nav", not
+      // "Components/global Nav"); the parent is already on screen around it.
+      name: deriveZoneName(id.slice(id.lastIndexOf("/") + 1)),
       description: describeZone(members, inventory),
       files: members,
       entryPoints,
@@ -2002,7 +2048,9 @@ function buildZonesFromCommunities(
       ...(depth > 0 ? { depth } : {}),
     };
 
-    const subZones = subdivideZone(zone, imports, inventory, testFiles, depth, routeLayout);
+    // Test zones are not subdivided: their structure mirrors the code's.
+    const isTestCommunity = communityId === "tests" || communityId.startsWith("tests:");
+    const subZones = isTestCommunity ? [] : subdivideZone(zone, imports, inventory, testFiles, depth, routeLayout);
     if (subZones.length > 0) {
       zone.subZones = subZones;
     }
@@ -2547,6 +2595,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     routeLayout,
     resolution = 1.0,
     presetCommunity,
+    quarantineTests: quarantine = true,
   } = options;
 
   // ── Resolve directory-targeted edges ──
@@ -2631,7 +2680,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     productionDirs.add(slash === -1 ? "" : f.slice(0, slash));
   }
   const quarantineTests = new Set<string>();
-  for (const t of testFiles) {
+  for (const t of quarantine ? testFiles : []) {
     if (!scopeFileSet.has(t)) continue;
     const slash = t.lastIndexOf("/");
     const dir = slash === -1 ? "" : t.slice(0, slash);
@@ -3274,6 +3323,20 @@ export async function analyzeZones(
   // Preservation can hand two zones the same name; the smaller falls back.
   finalZones = dedupeZoneNames(finalZones);
 
+  // ── Sub-zone names, at every depth ──
+  let pendingSubZoneNames: string[] = [];
+  if (enrich) {
+    const sub = await nameSubZones(finalZones, {
+      projectDir: options?.projectProfile?.projectDir,
+      fileArchetypes: options?.fileArchetypes,
+      routeLayout,
+      previous: previousZones?.zones,
+      defer: options?.deferNarration === true,
+    });
+    finalZones = sub.zones;
+    pendingSubZoneNames = sub.pending;
+  }
+
   // ── Numbered ids follow chosen names ──
   const idRename = idsFollowNames(finalZones);
   if (idRename.renamed.size > 0) {
@@ -3439,6 +3502,6 @@ export async function analyzeZones(
     enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
     previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration,
     partitionReview, areas,
-    pendingNames: [...(pendingNames ?? []), ...pendingAreaNames],
+    pendingNames: [...(pendingNames ?? []), ...pendingAreaNames, ...pendingSubZoneNames],
   });
 }

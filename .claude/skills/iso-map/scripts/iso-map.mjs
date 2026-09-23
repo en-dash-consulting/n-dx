@@ -89,6 +89,72 @@ function resolveZoneKind(kindCounts, totalFiles) {
   return bestCount <= 0 ? "support" : best;
 }
 function buildIsoModel(input, options = {}) {
+  const root = buildLevels(input, options);
+  attachHierarchy(root, input, options);
+  return root;
+}
+function attachHierarchy(root, input, options) {
+  const areaOf = /* @__PURE__ */ new Map();
+  for (const a of input.areas ?? []) for (const id of a.zones) areaOf.set(id, a.id);
+  const useAreas = root.level === "areas";
+  const parents = {};
+  const deepest = /* @__PURE__ */ new Map();
+  const zoneScenes = {};
+  const visit = (z, parent) => {
+    if (parent) parents[z.id] = parent;
+    for (const f of z.files) deepest.set(f, z.id);
+    const kids = (z.subZones ?? []).filter((k) => k.files.length > 0);
+    if (kids.length < 2) return;
+    const kidIds = new Set(kids.map((k) => k.id));
+    zoneScenes[z.id] = buildZoneIsoModel(
+      {
+        ...input,
+        zones: kids,
+        crossings: (z.subCrossings ?? []).filter((c) => kidIds.has(c.fromZone) && kidIds.has(c.toZone)),
+        callEdges: [],
+        external: [],
+        findings: input.findings.filter((f) => kidIds.has(f.scope)),
+        seams: [],
+        infrastructure: [],
+        areas: void 0
+      },
+      options
+    );
+    zoneScenes[z.id].level = "zones";
+    zoneScenes[z.id].scene = { id: z.id, name: z.name };
+    for (const k of kids) visit(k, z.id);
+  };
+  for (const z of input.zones) visit(z, useAreas && areaOf.has(z.id) ? `area:${areaOf.get(z.id)}` : void 0);
+  const leaf = /* @__PURE__ */ new Map();
+  const add = (fromFile, toFile) => {
+    const from = deepest.get(fromFile), to = deepest.get(toFile);
+    if (!from || !to || from === to) return;
+    const k = `${from}${to}`;
+    const e = leaf.get(k) ?? { from, to, weight: 0 };
+    e.weight++;
+    leaf.set(k, e);
+  };
+  if (input.fileCrossings) {
+    for (const c of input.fileCrossings) add(c.from, c.to);
+  } else {
+    for (const c of input.crossings) {
+      if (c.fromZone === c.toZone) continue;
+      const k = `${c.fromZone}${c.toZone}`;
+      const e = leaf.get(k) ?? { from: c.fromZone, to: c.toZone, weight: 0 };
+      e.weight++;
+      leaf.set(k, e);
+    }
+  }
+  const walkSub = (z) => {
+    for (const c of z.subCrossings ?? []) add(c.from, c.to);
+    for (const k of z.subZones ?? []) walkSub(k);
+  };
+  input.zones.forEach(walkSub);
+  if (Object.keys(zoneScenes).length > 0) root.zoneScenes = zoneScenes;
+  root.parents = parents;
+  root.leafEdges = [...leaf.values()].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
+}
+function buildLevels(input, options) {
   const areas = (input.areas ?? []).filter((a) => a.zones.length > 0);
   if (areas.length < 2) return buildZoneIsoModel(input, options);
   const zoneById = new Map(input.zones.map((z) => [z.id, z]));
@@ -158,20 +224,6 @@ function buildIsoModel(input, options = {}) {
     scenes[a.id] = scene;
   }
   root.scenes = scenes;
-  const drawn = new Set(Object.values(scenes).flatMap((sc) => sc.nodes.map((n) => n.id)));
-  const cross = /* @__PURE__ */ new Map();
-  const bump = (from, to, weight, calls) => {
-    const fa = areaOf.get(from), ta = areaOf.get(to);
-    if (!fa || !ta || fa === ta || !drawn.has(from) || !drawn.has(to)) return;
-    const k = `${from}${to}`;
-    const e = cross.get(k) ?? { from, to, fromArea: fa, toArea: ta, weight: 0, calls: 0 };
-    e.weight += weight;
-    e.calls += calls;
-    cross.set(k, e);
-  };
-  for (const c of input.crossings) bump(c.fromZone, c.toZone, 1, 0);
-  for (const c of input.callEdges ?? []) bump(c.fromZone, c.toZone, 0, c.weight);
-  root.crossAreaEdges = [...cross.values()].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
   return root;
 }
 function buildZoneIsoModel(input, options = {}) {
@@ -1002,28 +1054,40 @@ svg.appendChild(defs);
 
 
 /* ---------- in-place expansion ---------- */
-// On an areas-level map any area can be expanded where it stands: its block
-// becomes a flat frame carrying that area's own zone layout (precomputed as
-// its scene), its column and row grow to fit, and everything else keeps its
-// place relative to the grid. Area nodes are renamed "area:<id>" in the
-// composed scene so they cannot collide with a zone of the same id.
+// Any block with drawn children can be expanded where it stands: areas (their
+// zones), zones (their sub-zones), and so on down. The block becomes a flat
+// frame carrying its own precomputed scene, composed recursively so a frame is
+// as big as everything expanded inside it; its column and row grow to fit and
+// the rest of the grid keeps its place. Area nodes are renamed "area:<id>" so
+// they cannot collide with a zone of the same id. Connectors between nodes at
+// different depths come from leaf-level edges lifted to the deepest visible
+// node at each end, drawn as arcs where no ground route already shows them.
 var EXPANDED = {};
 var FRAME_PAD = 1.5, FRAME_H = 0.3;
 function isAreaMap(){ return MODEL.level === "areas" && !!ROOT.scenes; }
-function sceneOf(areaNode){ return areaNode.areaId && ROOT.scenes ? ROOT.scenes[areaNode.areaId] : null; }
 function copy(o){ var r = {}; for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) r[k] = o[k]; return r; }
+function sceneFor(n){
+  if (n.kind === "external" || n.kind === "infra") return null;
+  if (n.areaId) return ROOT.scenes ? ROOT.scenes[n.areaId] : null;
+  return ROOT.zoneScenes ? ROOT.zoneScenes[n.id] || null : null;
+}
+function expandable(n){ return !!sceneFor(n); }
 
-function compose(){
-  if (!isAreaMap()) return { nodes: MODEL.nodes, edges: MODEL.edges, bounds: MODEL.bounds };
+function composeLevel(model, isRoot){
   var rename = {};
-  var base = MODEL.nodes.map(function(n){
+  var base = model.nodes.map(function(n){
     var c = copy(n);
-    if (ROOT.scenes[n.id]) { c.areaId = n.id; c.id = "area:" + n.id; rename[n.id] = c.id; }
+    if (isRoot && isAreaMap() && ROOT.scenes[n.id]) { c.areaId = n.id; c.id = "area:" + n.id; rename[n.id] = c.id; }
     return c;
   });
+  var subs = {};
+  base.forEach(function(n){
+    var sc = EXPANDED[n.id] ? sceneFor(n) : null;
+    if (sc) subs[n.id] = composeLevel(sc, false);
+  });
   function footprint(n){
-    var sc = n.areaId && EXPANDED[n.areaId] ? sceneOf(n) : null;
-    return sc ? { w: sc.bounds.uMax + 2 * FRAME_PAD, d: sc.bounds.vMax + 2 * FRAME_PAD } : { w: n.w, d: n.d };
+    var sub = subs[n.id];
+    return sub ? { w: sub.bounds.uMax + 2 * FRAME_PAD, d: sub.bounds.vMax + 2 * FRAME_PAD } : { w: n.w, d: n.d };
   }
   function axis(key, startKey, lenKey){
     var m = {};
@@ -1050,25 +1114,23 @@ function compose(){
     return prev ? prev.newStart + prev.newLen + (x - (prev.start + prev.oldLen)) : x;
   }
 
-  var nodes = [], placed = {}, children = [], innerEdges = [];
+  var nodes = [], placed = {}, inner = [], innerEdges = [];
   base.forEach(function(n){
-    var f = footprint(n);
-    var p = copy(n);
+    var f = footprint(n), p = copy(n);
     p.u = mapAxis(n.u, cols); p.v = mapAxis(n.v, rows); p.w = f.w; p.d = f.d;
     placed[n.id] = { old: n, now: p };
-    var sc = n.areaId && EXPANDED[n.areaId] ? sceneOf(n) : null;
-    if (sc) {
+    var sub = subs[n.id];
+    if (sub) {
       p.frame = true; p.h = FRAME_H; p.tiles = null;
-      var ou = p.u + FRAME_PAD, ov = p.v + FRAME_PAD, keep = {};
-      sc.nodes.forEach(function(z){
-        if (z.kind === "external" || z.kind === "infra") return;
-        var c = copy(z); c.u = z.u + ou; c.v = z.v + ov; c.inArea = n.areaId;
-        keep[z.id] = true; children.push(c);
+      var ou = p.u + FRAME_PAD, ov = p.v + FRAME_PAD;
+      sub.nodes.forEach(function(z){
+        var c = copy(z); c.u = z.u + ou; c.v = z.v + ov;
+        c.ancestors = [n.id].concat(z.ancestors || []);
+        inner.push(c);
       });
-      sc.edges.forEach(function(e){
-        if (!keep[e.from] || !keep[e.to]) return;
+      sub.edges.forEach(function(e){
         var c = copy(e);
-        c.points = e.points.map(function(q){ return [q[0] + ou, q[1] + ov]; });
+        c.points = (e.points || []).map(function(q){ return [q[0] + ou, q[1] + ov]; });
         innerEdges.push(c);
       });
     }
@@ -1079,9 +1141,12 @@ function compose(){
     var o = geo.old, n = geo.now;
     return [n.u + (q[0] - o.u) * (o.w ? n.w / o.w : 1), n.v + (q[1] - o.v) * (o.d ? n.d / o.d : 1)];
   }
-  var edges = MODEL.edges.map(function(e){
+  var edges = [];
+  model.edges.forEach(function(e){
     var c = copy(e);
     c.from = rename[e.from] || e.from; c.to = rename[e.to] || e.to;
+    // A connector touching an expanded node is replaced by leaf-level arcs.
+    if (!e.seam && !e.infra && (subs[c.from] || subs[c.to])) return;
     var src = e.points, out = src.map(function(q){ return [mapAxis(q[0], cols), mapAxis(q[1], rows)]; });
     var last = src.length - 1, gf = placed[c.from], gt = placed[c.to];
     // Endpoints follow their block's face; the adjacent segment stays orthogonal.
@@ -1095,42 +1160,51 @@ function compose(){
       else if (src[last][0] === src[last - 1][0]) out[last - 1][0] = out[last][0];
     }
     c.points = out;
-    return c;
+    edges.push(c);
   });
 
-  // Imports between an expanded area and anything else: replace the
-  // area-level connector with one per visible zone pair, aggregated where the
-  // other side is still a collapsed area.
-  var shown = {};
-  children.forEach(function(c){ shown[c.id] = true; });
-  var expandedPair = function(e){
-    var fa = placed[e.from] && placed[e.from].old.areaId, ta = placed[e.to] && placed[e.to].old.areaId;
-    return !e.seam && !e.infra && fa && ta && (EXPANDED[fa] || EXPANDED[ta]);
-  };
-  edges = edges.filter(function(e){ return !expandedPair(e); });
-  var arcs = {};
-  (ROOT.crossAreaEdges || []).forEach(function(x){
-    if (!EXPANDED[x.fromArea] && !EXPANDED[x.toArea]) return;
-    var from = EXPANDED[x.fromArea] && shown[x.from] ? x.from : "area:" + x.fromArea;
-    var to = EXPANDED[x.toArea] && shown[x.to] ? x.to : "area:" + x.toArea;
-    var k = from + "" + to;
-    var a = arcs[k] || (arcs[k] = { from: from, to: to, weight: 0, calls: 0, back: false, arc: true, points: [] });
-    a.weight += x.weight; a.calls += x.calls;
-  });
-  for (var ak in arcs) if (Object.prototype.hasOwnProperty.call(arcs, ak)) edges.push(arcs[ak]);
-
-  nodes = nodes.concat(children);
+  nodes = nodes.concat(inner);
   edges = edges.concat(innerEdges);
   var uM = 1, vM = 1;
   nodes.forEach(function(n){ uM = Math.max(uM, n.u + n.w); vM = Math.max(vM, n.v + n.d); });
   return { nodes: nodes, edges: edges, bounds: { uMin: 0, uMax: uM, vMin: 0, vMax: vM } };
 }
 
-function toggleExpand(areaId){
-  EXPANDED[areaId] = !EXPANDED[areaId];
+function compose(){
+  var S = composeLevel(MODEL, true);
+  var shown = {}, routed = {};
+  S.nodes.forEach(function(n){ if (!n.frame) shown[n.id] = true; });
+  S.edges.forEach(function(e){ routed[e.from + "" + e.to] = true; });
+  var parents = ROOT.parents || {};
+  function lift(id){
+    var cur = id, guard = 0;
+    while (cur && !shown[cur] && guard++ < 24) cur = parents[cur];
+    return cur && shown[cur] ? cur : null;
+  }
+  var arcs = {};
+  (ROOT.leafEdges || []).forEach(function(x){
+    var from = lift(x.from), to = lift(x.to);
+    if (!from || !to || from === to || routed[from + "" + to]) return;
+    var k = from + "" + to;
+    var a = arcs[k] || (arcs[k] = { from: from, to: to, weight: 0, calls: 0, back: false, arc: true, points: [] });
+    a.weight += x.weight;
+  });
+  for (var ak in arcs) if (Object.prototype.hasOwnProperty.call(arcs, ak)) S.edges.push(arcs[ak]);
+  return S;
+}
+
+/** True when node n sits (at any depth) on the frame with id frameId. */
+function within(n, frameId){ return !!(n && n.ancestors && n.ancestors.indexOf(frameId) !== -1); }
+
+function toggleExpand(id){
+  EXPANDED[id] = !EXPANDED[id];
+  if (!EXPANDED[id]) {
+    // Collapsing a node forgets what was expanded inside it.
+    for (var k in EXPANDED) if (EXPANDED[k] && BY[k] && within(BY[k], id)) EXPANDED[k] = false;
+  }
   build();
   curEdge = null;
-  curNode = BY["area:" + areaId] ? "area:" + areaId : null;
+  curNode = BY[id] ? id : null;
   refresh(false);
 }
 
@@ -1331,9 +1405,9 @@ order.forEach(function(n){
   }
   g.addEventListener("click", pick);
   tg.addEventListener("click", pick);
-  if (n.areaId) {
-    g.addEventListener("dblclick", function(){ toggleExpand(n.areaId); });
-    tg.addEventListener("dblclick", function(){ toggleExpand(n.areaId); });
+  if (expandable(n)) {
+    g.addEventListener("dblclick", function(ev){ ev.stopPropagation(); toggleExpand(n.id); });
+    tg.addEventListener("dblclick", function(ev){ ev.stopPropagation(); toggleExpand(n.id); });
   }
   g.addEventListener("keydown", function(ev){
     if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectNode(n.id); }
@@ -1380,7 +1454,8 @@ var INTRO =
   '<h4>Try this</h4><ul>' +
   (MODEL.level === "areas"
     ? '<li>Double-click an area (or click it, then <b>Expand here</b>) to open its zones in place; ' +
-      'expand as many as you like. <b>Open on its own</b> shows one area by itself.</li>'
+      'zones with tiles on top open the same way, as deep as the analysis goes. ' +
+      '<b>Open on its own</b> shows one area by itself.</li>'
     : '<li>Click a block to see its files and cross-zone edges.</li>') +
   '<li>Click a connector, or a reference count in a panel, to inspect one dependency.</li>' +
   (MODEL.meta.seamCount || MODEL.meta.infraCount
@@ -1424,14 +1499,16 @@ function renderNode(n){
     esc(GLYPH[n.kind] || "") + ' ' + esc(n.stage) + ' &middot; ' + esc(LABEL[n.kind] || n.kind) + '</div>';
   h += '<h3>' + esc(n.name) + '</h3>';
   h += '<div class="sub">' + esc(n.sub) + '</div>';
-  if (n.areaId) {
-    h += '<div class="acts"><button type="button" class="open" data-expand="' + esc(n.areaId) + '">' +
-      (EXPANDED[n.areaId] ? 'Collapse' : 'Expand here') + '</button> ' +
-      '<button type="button" class="open" data-open="' + esc(n.areaId) + '">Open on its own &rarr;</button></div>';
+  if (expandable(n)) {
+    h += '<div class="acts"><button type="button" class="open" data-expand="' + esc(n.id) + '">' +
+      (EXPANDED[n.id] ? 'Collapse' : 'Expand here') + '</button>' +
+      (n.areaId ? ' <button type="button" class="open" data-open="' + esc(n.areaId) + '">Open on its own &rarr;</button>' : '') +
+      '</div>';
   }
-  if (n.inArea && BY["area:" + n.inArea]) {
-    h += '<div class="sub">In area <button type="button" class="link" data-goto="area:' + esc(n.inArea) + '">' +
-      esc(BY["area:" + n.inArea].name) + '</button></div>';
+  var parentId = n.ancestors && n.ancestors[0];
+  if (parentId && BY[parentId]) {
+    h += '<div class="sub">Inside <button type="button" class="link" data-goto="' + esc(parentId) + '">' +
+      esc(BY[parentId].name) + '</button></div>';
   }
 
   if (n.kind !== "external") {
@@ -1610,14 +1687,14 @@ function highlighted(){
       if (e.from === curNode) set[e.to] = true;
       if (e.to === curNode) set[e.from] = true;
     });
-    // A selected expanded area keeps its own zones lit, and whatever they
-    // connect to.
+    // A selected expanded node keeps everything on it lit, and whatever that
+    // connects to.
     var sel = BY[curNode];
     if (sel && sel.frame) {
-      NODES.forEach(function(n){ if (n.inArea === sel.areaId) set[n.id] = true; });
+      NODES.forEach(function(n){ if (within(n, sel.id)) set[n.id] = true; });
       EDGES.forEach(function(e){
-        if (BY[e.from] && BY[e.from].inArea === sel.areaId) set[e.to] = true;
-        if (BY[e.to] && BY[e.to].inArea === sel.areaId) set[e.from] = true;
+        if (within(BY[e.from], sel.id)) set[e.to] = true;
+        if (within(BY[e.to], sel.id)) set[e.from] = true;
       });
     }
   } else if (curEdge !== null) {
@@ -1649,9 +1726,9 @@ function refresh(scrollPanel){
   });
 
   edgeEls.forEach(function(x, i){
-    var selArea = curNode !== null && BY[curNode] && BY[curNode].frame ? BY[curNode].areaId : null;
+    var selFrame = curNode !== null && BY[curNode] && BY[curNode].frame ? curNode : null;
     var hot = (i === curEdge) || (curNode !== null && (x.e.from === curNode || x.e.to === curNode)) ||
-      (selArea !== null && ((BY[x.e.from] || {}).inArea === selArea || (BY[x.e.to] || {}).inArea === selArea));
+      (selFrame !== null && (within(BY[x.e.from], selFrame) || within(BY[x.e.to], selFrame)));
     var ends = kindVisible((BY[x.e.from] || {}).kind) && kindVisible((BY[x.e.to] || {}).kind);
     var weight = edgeWeight(x.e);
     var declared = (x.e.seam ? " seam" : "") + (unverifiedSeam(x.e) ? " unver" : "") +
@@ -2911,18 +2988,26 @@ function loadFromSourcevision(root, options = {}) {
       routes: routesOf.get(file.path)
     });
   }
-  const zones = (zonesData.zones ?? []).filter((z) => (z.files?.length ?? 0) > 0 && z.detectionQuality !== "artifact").map((z) => ({
-    id: z.id,
-    name: z.name,
-    description: z.description ?? "",
-    files: z.files,
-    entryPoints: z.entryPoints ?? [],
-    cohesion: z.cohesion ?? 0,
-    coupling: z.coupling ?? 0,
-    riskLevel: z.riskMetrics?.riskLevel,
-    insights: z.insights ?? [],
-    ...balancedChildren(z) ? { children: balancedChildren(z) } : {}
-  }));
+  const toInput = (z) => {
+    const kids = balancedChildren(z);
+    return {
+      id: z.id,
+      name: z.name,
+      description: z.description ?? "",
+      files: z.files,
+      entryPoints: z.entryPoints ?? [],
+      cohesion: z.cohesion ?? 0,
+      coupling: z.coupling ?? 0,
+      riskLevel: z.riskMetrics?.riskLevel,
+      insights: z.insights ?? [],
+      ...kids ? {
+        children: kids,
+        subZones: (z.subZones ?? []).filter((k) => (k.files?.length ?? 0) > 0).map(toInput),
+        subCrossings: (z.subCrossings ?? []).map((c) => ({ from: c.from, to: c.to, fromZone: c.fromZone, toZone: c.toZone }))
+      } : {}
+    };
+  };
+  const zones = (zonesData.zones ?? []).filter((z) => (z.files?.length ?? 0) > 0 && z.detectionQuality !== "artifact").map(toInput);
   const zoneOfFile = /* @__PURE__ */ new Map();
   for (const zone of zones) for (const f of zone.files) zoneOfFile.set(f, zone.id);
   const info = options.useGit === false ? {} : readGitInfo(root);
@@ -2944,6 +3029,7 @@ function loadFromSourcevision(root, options = {}) {
   return {
     zones,
     ...zonesData.areas?.length ? { areas: zonesData.areas.map((a) => ({ id: a.id, name: a.name, zones: a.zones })) } : {},
+    fileCrossings: (zonesData.crossings ?? []).map((c) => ({ from: c.from, to: c.to })),
     crossings: (zonesData.crossings ?? []).map((c) => ({ fromZone: c.fromZone, toZone: c.toZone })),
     seams: seamResolution.seams,
     infrastructure: resolveInfrastructure(declared.infrastructure, zoneIds, zoneOfFile),

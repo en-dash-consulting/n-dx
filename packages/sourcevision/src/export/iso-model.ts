@@ -197,15 +197,6 @@ export interface IsoEdge {
   arc?: boolean;
 }
 
-/** A zone-to-zone import that crosses areas, for connecting expanded areas. */
-export interface IsoCrossAreaEdge {
-  from: string;
-  to: string;
-  fromArea: string;
-  toArea: string;
-  weight: number;
-  calls: number;
-}
 
 export interface IsoModelMeta {
   project: string;
@@ -241,8 +232,16 @@ export interface IsoModel {
   scenes?: Record<string, IsoModel>;
   /** On a scene: the area it shows. */
   scene?: { id: string; name: string };
-  /** On an areas-level model: zone-to-zone imports between areas. */
-  crossAreaEdges?: IsoCrossAreaEdge[];
+  /** Zone or sub-zone id → the map of its sub-zones. Present on the top-level model. */
+  zoneScenes?: Record<string, IsoModel>;
+  /**
+   * Imports between the deepest drawn nodes (zones without drawn sub-zones,
+   * or sub-zones), aggregated. The browser lifts each end to the deepest node
+   * currently visible to draw connectors for expanded nodes.
+   */
+  leafEdges?: Array<{ from: string; to: string; weight: number }>;
+  /** Drawn node id → parent id ("area:<id>" for top-level zones under areas). */
+  parents?: Record<string, string>;
 }
 
 // ── Normalized input ────────────────────────────────────────────────────────
@@ -263,6 +262,10 @@ export interface IsoZoneInput {
    * draw as one giant tile plus slivers.
    */
   children?: Array<{ id: string; name: string; files: number }>;
+  /** The balanced sub-zones themselves, recursively, for expandable scenes. */
+  subZones?: IsoZoneInput[];
+  /** File-level imports between this zone's sub-zones. */
+  subCrossings?: Array<{ from: string; to: string; fromZone: string; toZone: string }>;
 }
 
 export interface IsoFileInput {
@@ -323,6 +326,8 @@ export interface IsoModelInput {
    * top level draws areas and each area gets its own zone scene.
    */
   areas?: Array<{ id: string; name: string; zones: string[] }>;
+  /** File-level imports between top-level zones, for leaf-level connectors. */
+  fileCrossings?: Array<{ from: string; to: string }>;
 }
 
 export interface IsoModelOptions {
@@ -419,6 +424,83 @@ export function resolveZoneKind(kindCounts: Map<IsoKind, number>, totalFiles: nu
  * zone-level model per area; otherwise zones are drawn directly.
  */
 export function buildIsoModel(input: IsoModelInput, options: IsoModelOptions = {}): IsoModel {
+  const root = buildLevels(input, options);
+  attachHierarchy(root, input, options);
+  return root;
+}
+
+/**
+ * Scenes for every zone and sub-zone with drawn sub-zones, plus the leaf-level
+ * edges and parent links the browser needs to expand any node in place.
+ */
+function attachHierarchy(root: IsoModel, input: IsoModelInput, options: IsoModelOptions): void {
+  const areaOf = new Map<string, string>();
+  for (const a of input.areas ?? []) for (const id of a.zones) areaOf.set(id, a.id);
+  const useAreas = root.level === "areas";
+  const parents: Record<string, string> = {};
+  const deepest = new Map<string, string>(); // file → deepest drawn node id
+  const zoneScenes: Record<string, IsoModel> = {};
+
+  const visit = (z: IsoZoneInput, parent: string | undefined) => {
+    if (parent) parents[z.id] = parent;
+    for (const f of z.files) deepest.set(f, z.id);
+    const kids = (z.subZones ?? []).filter((k) => k.files.length > 0);
+    if (kids.length < 2) return;
+    const kidIds = new Set(kids.map((k) => k.id));
+    zoneScenes[z.id] = buildZoneIsoModel(
+      {
+        ...input,
+        zones: kids,
+        crossings: (z.subCrossings ?? []).filter((c) => kidIds.has(c.fromZone) && kidIds.has(c.toZone)),
+        callEdges: [],
+        external: [],
+        findings: input.findings.filter((f) => kidIds.has(f.scope)),
+        seams: [],
+        infrastructure: [],
+        areas: undefined,
+      },
+      options,
+    );
+    zoneScenes[z.id].level = "zones";
+    zoneScenes[z.id].scene = { id: z.id, name: z.name };
+    for (const k of kids) visit(k, z.id);
+  };
+  for (const z of input.zones) visit(z, useAreas && areaOf.has(z.id) ? `area:${areaOf.get(z.id)}` : undefined);
+
+  const leaf = new Map<string, { from: string; to: string; weight: number }>();
+  const add = (fromFile: string, toFile: string) => {
+    const from = deepest.get(fromFile), to = deepest.get(toFile);
+    if (!from || !to || from === to) return;
+    const k = `${from}\u0001${to}`;
+    const e = leaf.get(k) ?? { from, to, weight: 0 };
+    e.weight++;
+    leaf.set(k, e);
+  };
+  if (input.fileCrossings) {
+    for (const c of input.fileCrossings) add(c.from, c.to);
+  } else {
+    // No file-level crossings (a direct scan, or a hand-built input): zones
+    // are the leaves, so zone-level crossings are the leaf edges.
+    for (const c of input.crossings) {
+      if (c.fromZone === c.toZone) continue;
+      const k = `${c.fromZone}\u0001${c.toZone}`;
+      const e = leaf.get(k) ?? { from: c.fromZone, to: c.toZone, weight: 0 };
+      e.weight++;
+      leaf.set(k, e);
+    }
+  }
+  const walkSub = (z: IsoZoneInput) => {
+    for (const c of z.subCrossings ?? []) add(c.from, c.to);
+    for (const k of z.subZones ?? []) walkSub(k);
+  };
+  input.zones.forEach(walkSub);
+
+  if (Object.keys(zoneScenes).length > 0) root.zoneScenes = zoneScenes;
+  root.parents = parents;
+  root.leafEdges = [...leaf.values()].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
+}
+
+function buildLevels(input: IsoModelInput, options: IsoModelOptions): IsoModel {
   const areas = (input.areas ?? []).filter((a) => a.zones.length > 0);
   if (areas.length < 2) return buildZoneIsoModel(input, options);
 
@@ -497,22 +579,6 @@ export function buildIsoModel(input: IsoModelInput, options: IsoModelOptions = {
   }
   root.scenes = scenes;
 
-  // Zone-level imports across areas, restricted to zones their scene draws,
-  // so an expanded area can show which of its zones each connector leaves.
-  const drawn = new Set(Object.values(scenes).flatMap((sc) => sc.nodes.map((n) => n.id)));
-  const cross = new Map<string, IsoCrossAreaEdge>();
-  const bump = (from: string, to: string, weight: number, calls: number) => {
-    const fa = areaOf.get(from), ta = areaOf.get(to);
-    if (!fa || !ta || fa === ta || !drawn.has(from) || !drawn.has(to)) return;
-    const k = `${from}\u0001${to}`;
-    const e = cross.get(k) ?? { from, to, fromArea: fa, toArea: ta, weight: 0, calls: 0 };
-    e.weight += weight;
-    e.calls += calls;
-    cross.set(k, e);
-  };
-  for (const c of input.crossings) bump(c.fromZone, c.toZone, 1, 0);
-  for (const c of input.callEdges ?? []) bump(c.fromZone, c.toZone, 0, c.weight);
-  root.crossAreaEdges = [...cross.values()].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
   return root;
 }
 

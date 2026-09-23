@@ -166,6 +166,12 @@ export interface NamingContext {
   routeLayout?: RouteLayout;
   /** Name only: ask no merge questions (areas are named, never merged). */
   noMerges?: boolean;
+  /**
+   * Extra directory segments to skip for one zone's candidates — for a
+   * sub-zone, its parent's shared directories, so siblings are not all offered
+   * the parent's own name.
+   */
+  skipSegmentsFor?: (zone: Zone) => ReadonlySet<string>;
 }
 
 /** Zones per name-proposal prompt; the answer is a map keyed by zone id. */
@@ -187,14 +193,20 @@ export function buildNameCandidates(zone: Zone, ctx: NamingContext): NameCandida
 
   // A route feature is the most specific identity a zone can have: the URL
   // it serves. Its name comes from the feature directory, not the route root.
+  const extra = ctx.skipSegmentsFor?.(zone);
   const route = ctx.routeLayout ? dominantRouteFeature(zone.files, ctx.routeLayout) : undefined;
   if (route && ctx.routeLayout) {
     const path = routePathOf(route.feature, ctx.routeLayout);
     const leaf = path.split("/").pop() || "home";
-    add({ name: titleCase(leaf), source: "route", why: `${route.count} of ${zone.files.length} files make up the ${path} route.` });
+    // A sub-zone inside one route shares its parent's route: not a name for it.
+    if (!extra?.has(leaf.toLowerCase())) {
+      add({ name: titleCase(leaf), source: "route", why: `${route.count} of ${zone.files.length} files make up the ${path} route.` });
+    }
   }
 
-  const skip = ctx.routeLayout?.genericSegments;
+  const skip = extra && extra.size > 0
+    ? new Set([...(ctx.routeLayout?.genericSegments ?? []), ...extra])
+    : ctx.routeLayout?.genericSegments;
   const dir1 = top(directoryCounts(zone.files, 1, skip));
   if (dir1) {
     add({ name: titleCase(dir1[0]), source: "directory", why: `${dir1[1]} of ${zone.files.length} files sit under ${dir1[0]}/.` });

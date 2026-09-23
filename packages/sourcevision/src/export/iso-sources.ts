@@ -476,9 +476,9 @@ export function loadFromSourcevision(root: string, options: LoadOptions = {}): I
 
   // Detection artifacts carry meaningless cohesion/coupling — drawing one as
   // architecture would be a lie, so they are excluded from the scene entirely.
-  const zones: IsoZoneInput[] = (zonesData.zones ?? [])
-    .filter((z) => (z.files?.length ?? 0) > 0 && z.detectionQuality !== "artifact")
-    .map((z) => ({
+  const toInput = (z: Zone): IsoZoneInput => {
+    const kids = balancedChildren(z);
+    return {
       id: z.id,
       name: z.name,
       description: z.description ?? "",
@@ -488,8 +488,18 @@ export function loadFromSourcevision(root: string, options: LoadOptions = {}): I
       coupling: z.coupling ?? 0,
       riskLevel: z.riskMetrics?.riskLevel,
       insights: z.insights ?? [],
-      ...(balancedChildren(z) ? { children: balancedChildren(z) } : {}),
-    }));
+      ...(kids
+        ? {
+            children: kids,
+            subZones: (z.subZones ?? []).filter((k) => (k.files?.length ?? 0) > 0).map(toInput),
+            subCrossings: (z.subCrossings ?? []).map((c) => ({ from: c.from, to: c.to, fromZone: c.fromZone, toZone: c.toZone })),
+          }
+        : {}),
+    };
+  };
+  const zones: IsoZoneInput[] = (zonesData.zones ?? [])
+    .filter((z) => (z.files?.length ?? 0) > 0 && z.detectionQuality !== "artifact")
+    .map(toInput);
 
   const zoneOfFile = new Map<string, string>();
   for (const zone of zones) for (const f of zone.files) zoneOfFile.set(f, zone.id);
@@ -515,6 +525,7 @@ export function loadFromSourcevision(root: string, options: LoadOptions = {}): I
   return {
     zones,
     ...(zonesData.areas?.length ? { areas: zonesData.areas.map((a) => ({ id: a.id, name: a.name, zones: a.zones })) } : {}),
+    fileCrossings: (zonesData.crossings ?? []).map((c) => ({ from: c.from, to: c.to })),
     crossings: (zonesData.crossings ?? []).map((c) => ({ fromZone: c.fromZone, toZone: c.toZone })),
     seams: seamResolution.seams,
     infrastructure: resolveInfrastructure(declared.infrastructure, zoneIds, zoneOfFile),

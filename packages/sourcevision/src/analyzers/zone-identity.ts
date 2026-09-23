@@ -46,6 +46,9 @@ export function isAlgorithmicName(name: string, ids: Iterable<string>): boolean 
   for (const id of ids) {
     if (!id) continue;
     if (n === normalizeName(titleFromId(id))) return true;
+    // Older sub-zone placeholders were title-cased from the whole path.
+    const fullTitle = id.split("-").filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    if (n === normalizeName(fullTitle)) return true;
     const base = (id.split("/").pop() ?? id).replace(/-\d+$/, "");
     const baseTitle = normalizeName(titleFromId(base));
     if (baseTitle && (n === baseTitle || new RegExp(`^${escapeRegExp(baseTitle)} \\d+$`).test(n))) return true;
@@ -242,4 +245,25 @@ export function dedupeZoneNames(zones: Zone[]): Zone[] {
   }
   if (fallback.size === 0) return zones;
   return zones.map((z) => (fallback.has(z.id) ? { ...z, name: z.id.split("-").filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") } : z));
+}
+
+/**
+ * Lower-cased directory segments shared by at least half of `files`, from the
+ * root down — the part of the path a zone's children all have in common.
+ */
+export function sharedPrefixSegments(files: string[]): Set<string> {
+  const dirs = files.map((f) => f.split("/").slice(0, -1));
+  const half = Math.ceil(dirs.length / 2);
+  const prefix: string[] = [];
+  for (let depth = 0; dirs.length > 0; depth++) {
+    const counts = new Map<string, number>();
+    for (const d of dirs) {
+      if (d.length <= depth || !prefix.every((p, i) => d[i] === p)) continue;
+      counts.set(d[depth], (counts.get(d[depth]) ?? 0) + 1);
+    }
+    const best = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+    if (!best || best[1] < half) break;
+    prefix.push(best[0]);
+  }
+  return new Set(prefix.map((p) => p.toLowerCase()));
 }
