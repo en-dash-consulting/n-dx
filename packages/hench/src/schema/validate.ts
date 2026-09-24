@@ -1,5 +1,5 @@
 import { z, ZodError } from "zod";
-import { DEFAULT_RETRY_CONFIG } from "./v1.js";
+import { DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MIN_PRUNE_PAIRS } from "./v1.js";
 
 export type ValidationResult<T> =
   | { ok: true; data: T }
@@ -52,6 +52,45 @@ const RetryConfigSchema = z.object({
   maxDelayMs: z.number().positive().default(DEFAULT_RETRY_CONFIG.maxDelayMs),
 });
 
+/**
+ * Per-field defaults for the same reason RetryConfigSchema has them: the
+ * dashboard's config editor writes one dotted key at a time (`prune.retainPairs`),
+ * so a single-member group reaches disk and must still load.
+ *
+ * {@link MIN_PRUNE_PAIRS} is the floor, shared with the pruner rather than
+ * restated: this schema refuses a bad value in `.hench/config.json`, but
+ * `loadConfig` merges `.n-dx.json` overrides after validation, so the pruner
+ * has to clamp to the same floor for values that never reach here.
+ */
+const PruneConfigSchema = z
+  .object({
+    triggerPairs: z
+      .number()
+      .int("prune.triggerPairs must be a whole number of turn-pairs")
+      .min(MIN_PRUNE_PAIRS, `prune.triggerPairs must be at least ${MIN_PRUNE_PAIRS}`)
+      .default(DEFAULT_PRUNE_CONFIG.triggerPairs),
+    retainPairs: z
+      .number()
+      .int("prune.retainPairs must be a whole number of turn-pairs")
+      .min(MIN_PRUNE_PAIRS, `prune.retainPairs must be at least ${MIN_PRUNE_PAIRS}`)
+      .default(DEFAULT_PRUNE_CONFIG.retainPairs),
+    transcriptMessageChars: z
+      .number()
+      .int("prune.transcriptMessageChars must be a whole number of characters")
+      .positive("prune.transcriptMessageChars must be greater than zero")
+      .default(DEFAULT_PRUNE_CONFIG.transcriptMessageChars),
+  })
+  // Equal values would prune every turn and drop nothing; a retention above the
+  // trigger would never let a prune reach a droppable span at all. Both are
+  // configuration mistakes with no useful reading, so they fail the load rather
+  // than being silently clamped.
+  .refine((prune) => prune.retainPairs < prune.triggerPairs, {
+    path: ["retainPairs"],
+    message:
+      "prune.retainPairs must be below prune.triggerPairs — the gap between them is " +
+      "how many turns of cache-friendly growth follow each prune",
+  });
+
 const ProjectLanguageSchema = z.enum(["typescript", "javascript", "go"]).optional();
 
 export const HenchConfigSchema = z.object({
@@ -65,6 +104,10 @@ export const HenchConfigSchema = z.object({
   apiKeyEnv: z.string(),
   guard: GuardConfigSchema,
   retry: RetryConfigSchema.optional().default(() => ({ ...DEFAULT_RETRY_CONFIG })),
+  // Left optional rather than defaulted: an absent group means "the pruner's own
+  // defaults", which are the same numbers, and defaulting here would write them
+  // into every config that round-trips through validation.
+  prune: PruneConfigSchema.optional(),
   loopPauseMs: z.number().int().nonnegative().optional().default(2000),
   maxFailedAttempts: z.number().int().positive().optional().default(3),
   language: ProjectLanguageSchema,
@@ -96,6 +139,8 @@ export const HenchConfigSchema = z.object({
       requireCleanTree: z.boolean().optional(),
     })
     .optional(),
+  promptCache: z.boolean().optional(),
+  promptCacheTtl: z.enum(["5m", "1h"]).optional(),
 });
 
 const RunStatusSchema = z.enum([

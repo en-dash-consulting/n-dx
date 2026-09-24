@@ -156,7 +156,31 @@ describe("dashboard hench-config gate agrees with hench's schema", () => {
     // hench changes a default, the dashboard would silently write stale values
     // into completed groups.
     it("web's group defaults equal hench's config defaults", () => {
-      expect(CONFIG_GROUP_DEFAULTS.retry).toEqual(DEFAULT_HENCH_CONFIG().retry);
+      const henchDefaults = DEFAULT_HENCH_CONFIG();
+      for (const group of Object.keys(CONFIG_GROUP_DEFAULTS)) {
+        expect(CONFIG_GROUP_DEFAULTS[group], `group "${group}"`).toEqual(henchDefaults[group]);
+      }
+      // Iterating web's keys alone would pass vacuously if the mirror lost a
+      // group, so name the one that must be there. `prune` is deliberately not
+      // mirrored — see the note under CONFIG_GROUP_DEFAULTS.
+      expect(Object.keys(CONFIG_GROUP_DEFAULTS)).toEqual(["retry"]);
+    });
+
+    // A group completed from web's mirror must satisfy hench's cross-field
+    // refinements, not just its per-field types.
+    it("a config completed from web's mirror alone still loads", () => {
+      for (const group of Object.keys(CONFIG_GROUP_DEFAULTS)) {
+        const config = baseConfig();
+        config[group] = {};
+        completeConfigGroups(config);
+
+        const parsed = HenchConfigSchema.safeParse(JSON.parse(JSON.stringify(config)));
+        expect(
+          parsed.success,
+          `an empty "${group}" completed from web's defaults leaves a config hench rejects: ` +
+          (parsed.success ? "" : JSON.stringify(parsed.error.issues)),
+        ).toBe(true);
+      }
     });
 
     // The regression this pins: writing one retry.* key into a config with no

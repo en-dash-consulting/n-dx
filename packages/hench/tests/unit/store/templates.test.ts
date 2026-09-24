@@ -330,9 +330,75 @@ describe("applyTemplate", () => {
     const result = applyTemplate(config, quickIter.config);
 
     expect(result.maxTurns).toBe(15);
-    expect(result.tokenBudget).toBe(50000);
+    // fit(15) = 271K x 2 headroom — see the basis comment in templates.ts.
+    expect(result.tokenBudget).toBe(600000);
     expect(result.loopPauseMs).toBe(500);
     expect(result.retry.maxRetries).toBe(2);
+  });
+});
+
+// Regression guard for the defect this suite previously could not see: the
+// template budgets were re-derived by multiplying a per-turn average by
+// maxTurns, which drops the ~190K fixed cost of the initial context write and
+// so set short-run templates below what a short run actually costs. Asserting
+// each budget against itself cannot catch that — these cases assert them
+// against *measured* run profiles taken from .hench/runs/ (2026-09).
+//
+// A completed run of a template's turn class must never reach that template's
+// budget; if it does, the run is marked budget_exceeded after finishing its
+// work and its task is reset to pending, which is the bug the rule exists to
+// prevent. Update these fixtures only from new measurements, never to make a
+// failing budget pass.
+describe("built-in token budgets vs measured runs", () => {
+  const countedTokens = (u: {
+    input: number;
+    output: number;
+    cacheCreationInput?: number;
+  }) => u.input + (u.cacheCreationInput ?? 0) + u.output;
+
+  // Real completed runs: [turns, uncached input, output, cache writes].
+  const MEASURED_COMPLETED: Array<[number, number, number, number]> = [
+    [11, 318, 24_551, 459_573],   // 484,442 counted
+    [20, 256, 26_234, 462_390],   // 488,880 counted
+    [42, 218, 10_620, 174_092],   // 184,930 counted
+    [72, 400, 39_105, 285_605],   // 325,110 counted
+    [77, 154, 60_241, 115_909],   // 176,304 counted
+  ];
+
+  for (const templateId of [
+    "quick-iteration",
+    "budget-conscious",
+    "api-direct",
+    "thorough-execution",
+  ]) {
+    it(`${templateId} does not trip on any measured completed run of its turn class`, () => {
+      const template = BUILT_IN_TEMPLATES.find((t) => t.id === templateId)!;
+      const maxTurns = template.config.maxTurns as number;
+      const budget = template.config.tokenBudget as number;
+
+      const inClass = MEASURED_COMPLETED.filter(([turns]) => turns <= maxTurns);
+      expect(inClass.length).toBeGreaterThan(0);
+
+      for (const [turns, input, output, cacheCreationInput] of inClass) {
+        const counted = countedTokens({ input, output, cacheCreationInput });
+        expect(
+          counted,
+          `${templateId} budget ${budget} would fail a completed ${turns}-turn run costing ${counted}`,
+        ).toBeLessThan(budget);
+      }
+    });
+  }
+
+  it("every built-in budget clears the fixed context-write floor", () => {
+    // ~190K is paid before a run does any work, so a budget near it fails
+    // runs on arrival regardless of turn count.
+    const FIXED_CONTEXT_WRITE_FLOOR = 190_000;
+    for (const template of BUILT_IN_TEMPLATES) {
+      const budget = template.config.tokenBudget as number | undefined;
+      if (budget == null) continue;
+      expect(budget, `${template.id} budget sits at or below the context-write floor`)
+        .toBeGreaterThan(FIXED_CONTEXT_WRITE_FLOOR * 2);
+    }
   });
 });
 

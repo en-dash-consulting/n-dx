@@ -25,7 +25,7 @@
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type {PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage} from "../../schema/index.js";import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { toolRexAppendLog } from "../../tools/rex.js";
-import {checkTokenBudget} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
+import {checkTokenBudget, formatBudgetExceeded} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
@@ -1600,16 +1600,11 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
   const budgetUsage = ctx.runAccumulator
     ? ctx.runAccumulator.tokenUsage.total
     : run.tokenUsage;
-  // Cache reads are excluded here and only here: this check runs after the
-  // run already finished, so it cannot bound anything — its only power is to
-  // mark a successful run budget_exceeded and reset the task. A Claude Code
-  // session reads millions of cached tokens as a matter of course, so at face
-  // value any configured budget would trip on every run.
-  const budgetCheck = checkTokenBudget(budgetUsage, ctx.tokenBudget, { excludeCacheReads: true });
+  const budgetCheck = checkTokenBudget(budgetUsage, ctx.tokenBudget);
   if (budgetCheck.exceeded) {
     run.status = "budget_exceeded";
     run.summary = result.summary;
-    run.error = `Token budget exceeded: ${budgetCheck.totalUsed} used of ${budgetCheck.budget} budget`;
+    run.error = formatBudgetExceeded(budgetCheck);
     info(`\n${run.error}`);
     await handleRunFailure(store, taskId, "pending", "budget_exceeded", run.error);
     return "break";

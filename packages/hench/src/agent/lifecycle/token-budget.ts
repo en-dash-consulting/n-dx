@@ -1,32 +1,19 @@
-import { normalizeRunTokens } from "../../schema/index.js";
 import type { TokenUsage } from "../../schema/index.js";
+
+/** The token classes that count against `hench.tokenBudget`. */
+export const BUDGET_TOKEN_CLASSES = "uncached input + cache writes + output";
 
 export interface TokenBudgetResult {
   /** Whether the token budget has been met or exceeded. */
   exceeded: boolean;
-  /** Total tokens consumed (uncached input + cache writes + cache reads + output). */
+  /** Counted tokens: uncached input + cache writes + output. */
   totalUsed: number;
+  /** Cache-read tokens seen but deliberately excluded from `totalUsed`. */
+  cacheReadNotCounted: number;
   /** The configured budget (undefined if unlimited). */
   budget: number | undefined;
   /** Tokens remaining before budget is hit (0 if exceeded or unlimited). */
   remaining: number;
-}
-
-export interface TokenBudgetOptions {
-  /**
-   * Leave cache reads out of the total.
-   *
-   * For the CLI provider's post-run check only. That check cannot stop a run
-   * — it fires after the run finished, and its only effect is to mark a
-   * *successful* run `budget_exceeded` and reset the task before review and
-   * commit. A Claude Code session re-reads its cached prefix every turn, so
-   * cache reads grow with turns × context into the millions regardless of how
-   * much new work the run did; counted at face value they make every
-   * configured budget read as "always exceeded". Uncached input, cache writes
-   * and output — the tokens that would have been `input + output` before
-   * caching existed — still count.
-   */
-  excludeCacheReads?: boolean;
 }
 
 /**
@@ -34,35 +21,60 @@ export interface TokenBudgetOptions {
  *
  * A budget of 0 or undefined means unlimited — the check always passes.
  *
- * The budget is measured against every token the run processed: uncached
- * input, cache writes, cache reads, and output, all at face value. Cached
- * input MUST be counted. On a prompt-cached loop `usage.input` holds only the
- * uncached slice — one 83-turn run recorded 534 uncached input tokens against
- * 876K cache writes and 34.1M cache reads — so an `input + output` total
- * bounds output plus a rounding error and the budget stops applying.
+ * The budget counts the tokens a run caused to be *newly* processed: uncached
+ * input, cache writes, and output. Cache reads are excluded.
  *
- * Face value rather than cost weighting keeps the number vendor-neutral and
- * free of any price table, and preserves the meaning it had before prompt
- * caching existed: tokens processed per run.
+ * Both halves of that rule are load-bearing:
  *
- * The one exception is {@link TokenBudgetOptions.excludeCacheReads}, for the
- * post-run check where the budget cannot bound anything and would only punish
- * a finished run for its cache traffic.
+ * - Cached input MUST be counted, or the budget stops applying. On a
+ *   prompt-cached loop `usage.input` holds only the uncached slice — one
+ *   83-turn run recorded 534 uncached input tokens against 876K cache writes,
+ *   so an `input + output` total bounds output plus a rounding error.
+ *
+ * - Cache reads MUST NOT be counted, or the budget fires on healthy runs. A
+ *   cache read is by construction a re-read of tokens already counted when
+ *   they were written, so counting reads charges the same tokens once per
+ *   turn. Across the 27 recorded runs in this repository (`.hench/runs/`,
+ *   2026-09) face value ran a median of 70x the counted total — a Claude Code
+ *   session reading millions of cached tokens tripped every built-in template
+ *   budget after finishing its work, and the task was reset to pending before
+ *   the review and commit steps.
+ *
+ * This is a double-counting argument, not a pricing one: the rule needs no
+ * price table and stays vendor-neutral. Runaway loops are still bounded,
+ * because cache writes and output both grow with turn count.
  */
 export function checkTokenBudget(
   usage: TokenUsage,
   budget: number | undefined,
-  options: TokenBudgetOptions = {},
 ): TokenBudgetResult {
-  const { total } = normalizeRunTokens(usage);
-  const totalUsed = options.excludeCacheReads ? total - (usage?.cacheReadInput ?? 0) : total;
+  const totalUsed =
+    (usage?.input ?? 0) + (usage?.cacheCreationInput ?? 0) + (usage?.output ?? 0);
+  const cacheReadNotCounted = usage?.cacheReadInput ?? 0;
 
   if (!budget) {
-    return { exceeded: false, totalUsed, budget: undefined, remaining: 0 };
+    return { exceeded: false, totalUsed, cacheReadNotCounted, budget: undefined, remaining: 0 };
   }
 
   const exceeded = totalUsed >= budget;
   const remaining = Math.max(0, budget - totalUsed);
 
-  return { exceeded, totalUsed, budget, remaining };
+  return { exceeded, totalUsed, cacheReadNotCounted, budget, remaining };
+}
+
+/**
+ * Render the operator-facing budget-exceeded message.
+ *
+ * Names the token classes that counted, and how many cache-read tokens were
+ * seen but excluded, so an operator can tell a genuine overrun from the
+ * cache-read inflation this check used to mistake for one.
+ */
+export function formatBudgetExceeded(result: TokenBudgetResult): string {
+  const note = result.cacheReadNotCounted > 0
+    ? `; ${result.cacheReadNotCounted.toLocaleString("en-US")} cache-read tokens not counted`
+    : "";
+  return (
+    `Token budget exceeded: ${result.totalUsed.toLocaleString("en-US")} of ` +
+    `${(result.budget ?? 0).toLocaleString("en-US")} (${BUDGET_TOKEN_CLASSES}${note})`
+  );
 }

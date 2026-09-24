@@ -855,7 +855,8 @@ describe("n-dx config", () => {
     it("states that api keys are stored in .n-dx.local.json", () => {
       const output = run(["--help"]);
       expect(output).not.toContain("stored in .n-dx.json");
-      const apiKeyBlock = output.slice(output.indexOf("claude.api_key"), output.indexOf("claude.api_endpoint"));
+      const start = output.indexOf("claude.api_key");
+      const apiKeyBlock = output.slice(start, output.indexOf("claude.api_endpoint", start));
       expect(apiKeyBlock).toContain(".n-dx.local.json");
     });
 

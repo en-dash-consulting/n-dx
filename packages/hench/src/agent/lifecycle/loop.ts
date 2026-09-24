@@ -788,6 +788,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
           vendor: LLM_VENDOR.GOOGLE,
           taskTitle,
         }),
+        config.prune,
       );
 
       for (let turn = 0; turn < maxTurns; turn++) {
@@ -817,7 +818,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
 
         const budgetCheck = checkTokenBudget(run.tokenUsage, tokenBudget);
         if (budgetCheck.exceeded) {
-          await handleBudgetExceeded(store, taskId, run, budgetCheck.totalUsed, budgetCheck.budget);
+          await handleBudgetExceeded(store, taskId, run, budgetCheck);
           break;
         }
 
@@ -1379,6 +1380,7 @@ async function runLocalToolLoop(params: {
       vendor: LLM_VENDOR.LOCAL,
       taskTitle,
     }),
+    config.prune,
   );
 
   // Pre-send token check: if maxContextTokens is configured, estimate whether the initial
@@ -1495,7 +1497,7 @@ async function runLocalToolLoop(params: {
 
       const budgetCheck = checkTokenBudget(run.tokenUsage, tokenBudget);
       if (budgetCheck.exceeded) {
-        await handleBudgetExceeded(store, taskId, run, budgetCheck.totalUsed, budgetCheck.budget);
+        await handleBudgetExceeded(store, taskId, run, budgetCheck);
         break;
       }
 
@@ -1837,6 +1839,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       vendor,
       taskTitle: brief.task.title,
     }),
+    config.prune,
   );
 
   section(
@@ -1898,6 +1901,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
             systemPrompt,
             tools: TOOL_DEFINITIONS,
             messages,
+            promptCache: config.promptCache,
+            promptCacheTtl: config.promptCacheTtl,
           }),
           config,
           vendor,
@@ -1929,7 +1934,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       // Shared: check token budget
       const budgetCheck = checkTokenBudget(run.tokenUsage, tokenBudget);
       if (budgetCheck.exceeded) {
-        await handleBudgetExceeded(store, taskId, run, budgetCheck.totalUsed, budgetCheck.budget);
+        await handleBudgetExceeded(store, taskId, run, budgetCheck);
         break;
       }
 
