@@ -2,7 +2,7 @@
 id: "cf5af1ce-6ce6-4715-adfe-d3abc8011872"
 level: "task"
 title: "Stop Claude CLI cache reads from tripping hench.tokenBudget"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "0.7.1"
@@ -12,6 +12,11 @@ tags:
   - "hench"
   - "token-budget"
 source: "0.7.1 release audit 2026-09-23 (main @ ee165780)"
+startedAt: "2026-09-24T15:18:47.967Z"
+completedAt: "2026-09-24T15:31:30.622Z"
+endedAt: "2026-09-24T15:31:30.622Z"
+resolutionType: "code-change"
+resolutionDetail: "checkTokenBudget now counts uncached input + cache writes + output and excludes cache reads, applied identically by the CLI and API loops. Template budgets re-derived from the 27 runs in .hench/runs/ with their basis in comments; budget-exceeded message names the counted classes and the excluded cache-read count. New changeset added. Preflight green (6/6 suites)."
 acceptanceCriteria:
   - "A Claude CLI run fixture with 2M cache-read tokens and 40K uncached input plus output does not exceed a 200K budget, and the API loop judges the same usage by the same rule."
   - "The API-loop case that motivated #390's change (534 uncached input, 876K cache writes, 34.1M cache reads) still stops at a configured budget."
@@ -19,6 +24,6 @@ acceptanceCriteria:
   - "The budget-exceeded message names which token classes counted."
   - "This task adds its own new changeset; the existing token-budget changeset text is corrected by the docs PR's final changeset pass."
 description: "#390's changeset `token-budget-counts-cached-input` made `checkTokenBudget` count cache reads at face value (`packages/hench/src/agent/lifecycle/token-budget.ts:34`). That fixes the API loop, where `usage.input` holds only the uncached slice. The same check runs after the run on the Claude CLI path (`cli-loop.ts`, near 1600), where a Claude Code session reads millions of cached tokens.\n\nThe default `tokenBudget` is 0 (unlimited), so most projects are unaffected. The built-in templates set 50K, 200K, 30K and 150K (`schema/templates.ts:54, 77, 100, 165`), though. A run under a template, or any set budget, finishes its work, is marked `budget_exceeded`, and has its task reset to pending before the review and commit steps. The changeset says \"Runs with no cache activity are unaffected\" and does not mention the CLI path.\n\nOptions:\n1. (Recommended) Weight cache reads in the budget (for example at 0.1, their price ratio to input), or exclude them on the CLI post-run check, and re-derive the template budgets.\n2. Keep face value and rescale the templates from measured runs.\n\nConstraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (hench: src/prd/rex-gateway.ts and src/prd/llm-gateway.ts; web: src/server/rex-gateway.ts and src/server/domain-gateway.ts) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name (@n-dx/hench, @n-dx/rex, @n-dx/web, @n-dx/core, @n-dx/sourcevision, @n-dx/llm-client) with a patch bump; run pnpm preflight before opening the PR."
-lastModified: "2026-09-23T18:40:47.807Z"
+lastModified: "2026-09-24T15:31:31.030Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

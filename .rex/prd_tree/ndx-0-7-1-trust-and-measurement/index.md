@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Cost measurement lands](./cost-measurement-lands/index.md) | pending |
 | [Hench commit hygiene](./hench-commit-hygiene/index.md) | pending |
 | [PRD write guards](./prd-write-guards/index.md) | pending |
-| [Prompt cache, prune and budget configuration](./prompt-cache-prune-and-budget/index.md) | pending |
+| [Prompt cache, prune and budget configuration](./prompt-cache-prune-and-budget/index.md) | completed |
 | [Release plumbing](./release-plumbing/index.md) | pending |
 | [Trust copy](./trust-copy/index.md) | pending |
 | [Vendor-aware hench model and provider settings](./vendor-aware-hench-model-and-provider/index.md) | pending |

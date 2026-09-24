@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   checkTokenBudget,
+  formatBudgetExceeded,
   type TokenBudgetResult,
 } from "../../../src/agent/lifecycle/token-budget.js";
 import type { TokenUsage } from "../../../src/schema/v1.js";
@@ -56,7 +57,7 @@ describe("checkTokenBudget", () => {
   // a rounding error, and a configured budget silently stopped applying on the
   // Anthropic loop — the PR that introduced cache_control recorded 534 uncached
   // input tokens against 876K cache writes and 34.1M cache reads.
-  it("counts cache-write and cache-read input toward the budget", () => {
+  it("counts cache-write input toward the budget", () => {
     const usage: TokenUsage = {
       input: 534,
       output: 40,
@@ -64,12 +65,46 @@ describe("checkTokenBudget", () => {
       cacheReadInput: 34_100_000,
     };
     const result = checkTokenBudget(usage, 1_000_000);
-    expect(result.exceeded).toBe(true);
-    expect(result.totalUsed).toBe(534 + 40 + 876_000 + 34_100_000);
-    expect(result.remaining).toBe(0);
+    // Cache writes alone clear a 1M budget; the 34.1M reads are not counted.
+    expect(result.exceeded).toBe(false);
+    expect(result.totalUsed).toBe(534 + 40 + 876_000);
+    expect(result.cacheReadNotCounted).toBe(34_100_000);
   });
 
-  it("reports the cache-inclusive total when no budget is set", () => {
+  // Acceptance criterion: the API-loop case that motivated #390 must still stop
+  // at a configured budget. Every built-in template budget is below its counted
+  // total, so the run is caught by cache writes alone.
+  it("still stops the #390 API-loop run at a configured budget", () => {
+    const usage: TokenUsage = {
+      input: 534,
+      output: 40,
+      cacheCreationInput: 876_000,
+      cacheReadInput: 34_100_000,
+    };
+    for (const budget of [30_000, 150_000, 200_000, 500_000, 876_000]) {
+      const result = checkTokenBudget(usage, budget);
+      expect(result.exceeded).toBe(true);
+      expect(result.remaining).toBe(0);
+    }
+  });
+
+  // Acceptance criterion: a Claude CLI run that reads millions of cached tokens
+  // must not trip a 200K budget on 40K of actual new work. Before this rule the
+  // same fixture totalled 2.04M and was marked budget_exceeded after finishing.
+  it("does not let CLI cache reads trip the budget", () => {
+    const usage: TokenUsage = {
+      input: 10_000,
+      output: 30_000,
+      cacheReadInput: 2_000_000,
+    };
+    const result = checkTokenBudget(usage, 200_000);
+    expect(result.exceeded).toBe(false);
+    expect(result.totalUsed).toBe(40_000);
+    expect(result.remaining).toBe(160_000);
+    expect(result.cacheReadNotCounted).toBe(2_000_000);
+  });
+
+  it("excludes cache reads from the reported total when no budget is set", () => {
     const usage: TokenUsage = {
       input: 100,
       output: 50,
@@ -78,60 +113,44 @@ describe("checkTokenBudget", () => {
     };
     const result = checkTokenBudget(usage, 0);
     expect(result.exceeded).toBe(false);
-    expect(result.totalUsed).toBe(10_150);
+    expect(result.totalUsed).toBe(1_150);
+    expect(result.cacheReadNotCounted).toBe(9_000);
   });
 
-  it("subtracts cached input from the remaining budget", () => {
+  it("subtracts cache writes, not cache reads, from the remaining budget", () => {
     const usage: TokenUsage = {
       input: 1_000,
       output: 1_000,
+      cacheCreationInput: 6_000,
       cacheReadInput: 8_000,
     };
     const result = checkTokenBudget(usage, 50_000);
     expect(result.exceeded).toBe(false);
-    expect(result.totalUsed).toBe(10_000);
-    expect(result.remaining).toBe(40_000);
+    expect(result.totalUsed).toBe(8_000);
+    expect(result.remaining).toBe(42_000);
   });
 
-  // The CLI provider's post-run check passes excludeCacheReads: it fires after
-  // the run finished, so its only power is to mark a successful run
-  // budget_exceeded and reset the task — and a Claude Code session reads
-  // millions of cached tokens on any non-trivial run, which at face value
-  // would trip every configured budget.
-  describe("excludeCacheReads", () => {
-    it("leaves cache reads out of the total while still counting cache writes", () => {
-      const usage: TokenUsage = {
-        input: 5_000,
-        output: 8_000,
-        cacheCreationInput: 20_000,
-        cacheReadInput: 12_000_000,
-      };
-      const result = checkTokenBudget(usage, 50_000, { excludeCacheReads: true });
-      expect(result.exceeded).toBe(false);
-      expect(result.totalUsed).toBe(33_000);
-      expect(result.remaining).toBe(17_000);
-    });
+  it("names the counted token classes for the budget-exceeded message", () => {
+    const usage: TokenUsage = {
+      input: 1_000,
+      output: 2_000,
+      cacheCreationInput: 300_000,
+      cacheReadInput: 5_000_000,
+    };
+    const result = checkTokenBudget(usage, 200_000);
+    expect(result.exceeded).toBe(true);
+    expect(formatBudgetExceeded(result)).toBe(
+      "Token budget exceeded: 303,000 of 200,000 " +
+        "(uncached input + cache writes + output; 5,000,000 cache-read tokens not counted)",
+    );
+  });
 
-    it("still exceeds when uncached input + cache writes + output pass the budget", () => {
-      const usage: TokenUsage = {
-        input: 10_000,
-        output: 15_000,
-        cacheCreationInput: 30_000,
-        cacheReadInput: 4_000_000,
-      };
-      const result = checkTokenBudget(usage, 50_000, { excludeCacheReads: true });
-      expect(result.exceeded).toBe(true);
-      expect(result.totalUsed).toBe(55_000);
-      expect(result.remaining).toBe(0);
-    });
-
-    it("matches the inclusive total when there are no cache reads", () => {
-      const usage: TokenUsage = { input: 1_000, output: 2_000, cacheCreationInput: 3_000 };
-      const inclusive = checkTokenBudget(usage, 10_000);
-      const exclusive = checkTokenBudget(usage, 10_000, { excludeCacheReads: true });
-      expect(exclusive.totalUsed).toBe(inclusive.totalUsed);
-      expect(exclusive.exceeded).toBe(inclusive.exceeded);
-    });
+  it("omits the cache-read note when the run read no cache", () => {
+    const usage: TokenUsage = { input: 150_000, output: 60_000 };
+    const result = checkTokenBudget(usage, 200_000);
+    expect(formatBudgetExceeded(result)).toBe(
+      "Token budget exceeded: 210,000 of 200,000 (uncached input + cache writes + output)",
+    );
   });
 
   it("handles zero usage correctly", () => {

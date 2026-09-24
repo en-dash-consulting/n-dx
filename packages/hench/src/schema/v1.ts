@@ -82,6 +82,78 @@ export const DEFAULT_RETRY_CONFIG: Readonly<RetryConfig> = {
 };
 
 /**
+ * Tuning for the summarizing context prune in `agent/lifecycle/context-prune.ts`.
+ *
+ * Every member trades the same two things against each other: how much of the
+ * run the agent can still read verbatim, and how often the prompt prefix the
+ * provider cached is invalidated. See {@link DEFAULT_PRUNE_CONFIG} for what the
+ * defaults are and why.
+ *
+ * Only the API loops prune — the CLI loops hand the conversation to the vendor
+ * binary, which manages its own window.
+ */
+export interface PruneConfig {
+  /**
+   * Turn-pairs tolerated before a prune fires. Sets peak context: the prompt
+   * grows by pure append until it crosses this, so raising it raises the
+   * largest request the run will send.
+   */
+  triggerPairs?: number;
+  /**
+   * Turn-pairs kept verbatim after a prune. Everything older is replaced by a
+   * summary, so this is how much of the recent run the agent can still read
+   * word-for-word.
+   *
+   * The gap between this and {@link triggerPairs} is how many turns of
+   * append-only, cache-friendly growth follow each prune — raising retention
+   * toward the trigger narrows that gap and invalidates the cached prefix more
+   * often. Must stay below the trigger.
+   */
+  retainPairs?: number;
+  /**
+   * Characters of each dropped message the summarizer is shown. A message
+   * longer than this is truncated with a visible marker before the light model
+   * ever sees it, so anything past the cap cannot reach the summary.
+   */
+  transcriptMessageChars?: number;
+}
+
+/**
+ * Canonical prune defaults — the single source for {@link DEFAULT_HENCH_CONFIG},
+ * the per-field defaults in `validate.ts`'s PruneConfigSchema, and the exported
+ * constants in `agent/lifecycle/context-prune.ts`.
+ *
+ * `20`/`10`: unchanged from the pre-configuration behavior, so peak context and
+ * the cache cadence (one prune per ten turns) stay where they were measured.
+ *
+ * `2000`: matches `MAX_TOOL_OUTPUT_STORED` in `agent/lifecycle/loop.ts`, the
+ * size at which hench truncates a tool result for the run record. Below that the
+ * summarizer sees less of a tool result than the run itself keeps — at the
+ * original 800 a 2,000-character result lost 60% of its characters before
+ * summarization, which is the finding this config surface came from.
+ */
+export const DEFAULT_PRUNE_CONFIG: Readonly<Required<PruneConfig>> = {
+  triggerPairs: 20,
+  retainPairs: 10,
+  transcriptMessageChars: 2000,
+};
+
+/**
+ * Floor on {@link PruneConfig.triggerPairs} and {@link PruneConfig.retainPairs}.
+ *
+ * A floor on usefulness rather than on arithmetic: one retained pair leaves the
+ * agent a single turn of verbatim history, and a trigger of 1 prunes on every
+ * turn — the front-splice behavior the summarizing prune exists to replace.
+ *
+ * Lives here, with the defaults, because both places that enforce it are
+ * downstream of this module: `validate.ts` refuses a smaller value in
+ * `.hench/config.json`, and `agent/lifecycle/context-prune.ts` clamps to it at
+ * runtime for the `.n-dx.json` overrides that `loadConfig` merges *after*
+ * validation. One constant, so the refusal and the clamp cannot disagree.
+ */
+export const MIN_PRUNE_PAIRS = 2;
+
+/**
  * Git-safety configuration embedded in {@link HenchConfig}.
  *
  * Governs how checkpoint decisions (currently the pre-run commit gate) react
@@ -328,7 +400,58 @@ export interface HenchConfig {
    * See {@link GitSafetyConfig} for field semantics and defaults.
    */
   git?: GitSafetyConfig;
+  /**
+   * Whether the Anthropic API loop marks `cache_control` breakpoints on the
+   * request (see `agent/lifecycle/prompt-cache.ts`). Default: true.
+   *
+   * Set to false when `claude.api_endpoint` points at a gateway or proxy that
+   * rejects the `cache_control` field (some OpenAI-to-Anthropic shims, some
+   * enterprise gateways, Bedrock's legacy InvokeModel path for models without
+   * caching) — those return a 400 on turn 1 with no other way to disable the
+   * markers. When false, the request is sent as it was before prompt caching
+   * was added: `system` as a plain string, tools and messages untouched.
+   * Only meaningful when `provider === "api"` with the Claude vendor; the CLI
+   * loop never calls into `prompt-cache.ts`.
+   */
+  promptCache?: boolean;
+  /**
+   * TTL for the Anthropic API loop's `cache_control` breakpoints (see
+   * `agent/lifecycle/prompt-cache.ts`). Default: `"5m"`.
+   *
+   * Anthropic measures a cache entry's TTL from the start of the request
+   * that wrote or read it, so time spent on generation and tool calls
+   * counts against the window. A turn whose tool call runs long (the test
+   * gate alone allows up to `fullTestTimeoutMs`) commonly exceeds the
+   * 5-minute default before the next request, so the cached prefix is
+   * re-written at the 1.25x-input rate instead of read at 0.1x.
+   *
+   * `"1h"` extends both breakpoints (there are always exactly two — see the
+   * module header on `prompt-cache.ts`) to Anthropic's one-hour TTL. It only
+   * pays off when the start-to-start gap between turns regularly falls
+   * between 5 and 60 minutes: below 5 minutes the default window already
+   * covers it, and above 60 minutes neither TTL helps. A 1-hour write costs
+   * 2x input rather than 1.25x — cost estimates do not price that
+   * difference; see the caveat above `MODEL_COSTS` in llm-client's
+   * `config.ts`, which documents that every write is priced at the
+   * 1.25x rate regardless of TTL, so enabling `"1h"` makes estimated spend
+   * under-report the real bill by the gap between 1.25x and 2x on writes.
+   * Enable it only when turns are consistently slow enough to miss the
+   * default window.
+   *
+   * Only meaningful when `provider === "api"` with the Claude vendor and
+   * `promptCache !== false`.
+   */
+  promptCacheTtl?: PromptCacheTtl;
+  /**
+   * Tuning for the summarizing context prune the API loops run once a
+   * conversation outgrows the trigger. See {@link PruneConfig} for field
+   * semantics and {@link DEFAULT_PRUNE_CONFIG} for the defaults.
+   */
+  prune?: PruneConfig;
 }
+
+/** The two prompt-cache TTLs Anthropic's `cache_control` breakpoints support. */
+export type PromptCacheTtl = "5m" | "1h";
 
 // ── Language-specific guard defaults ──────────────────────────────────
 
@@ -418,6 +541,7 @@ export function DEFAULT_HENCH_CONFIG(language?: ProjectLanguage): HenchConfig {
     apiKeyEnv: "ANTHROPIC_API_KEY",
     guard: guardDefaultsForLanguage(language),
     retry: { ...DEFAULT_RETRY_CONFIG },
+    prune: { ...DEFAULT_PRUNE_CONFIG },
     loopPauseMs: 2000,
     maxFailedAttempts: 3,
     autoCommit: false,
