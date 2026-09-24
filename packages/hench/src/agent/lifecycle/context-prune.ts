@@ -73,7 +73,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { isLLMVendor, resolveTaskModel } from "../../prd/llm-gateway.js";
 import type { LLMConfig, LLMProvider } from "../../prd/llm-gateway.js";
-import { DEFAULT_PRUNE_CONFIG } from "../../schema/index.js";
+import { DEFAULT_PRUNE_CONFIG, MIN_PRUNE_PAIRS } from "../../schema/index.js";
 import type { PruneConfig, TokenUsage } from "../../schema/index.js";
 import { detail } from "../../types/output.js";
 
@@ -250,6 +250,20 @@ export interface PruneLimits extends PruneConfig {
   transcriptChars?: number;
 }
 
+/**
+ * Resolve one numeric limit, ignoring anything that is not a usable number.
+ *
+ * `hench.prune.*` normally arrives already checked by `HenchConfigSchema` — but
+ * `loadConfig` merges `.n-dx.json`'s `hench` section *after* validation, so an
+ * override reaches this class unvalidated. See {@link ConversationPruner}'s
+ * constructor for what that used to do.
+ */
+function resolveLimit(value: unknown, fallback: number, min: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  const whole = Math.floor(value);
+  return whole < min ? fallback : whole;
+}
+
 const NO_PRUNE: PruneOutcome = { dropped: 0, summarized: false };
 
 /** Truncate with a visible marker so the model knows text is missing. */
@@ -352,20 +366,53 @@ export class ConversationPruner<M> {
   private readonly transcriptChars: number;
 
   /**
-   * `limits` is normally the run's `hench.prune` config group, already
-   * validated by `HenchConfigSchema`. It is resolved once here rather than read
-   * per prune so a run's window cannot change under it mid-conversation.
+   * `limits` is normally the run's `hench.prune` config group. Resolved once
+   * here rather than read per prune, so a run's window cannot change under it
+   * mid-conversation.
+   *
+   * **Every limit is re-checked here, and the class does not assume the caller
+   * validated them.** `HenchConfigSchema` does check the group — but
+   * `loadConfig` merges `.n-dx.json`'s `hench` section *after* validation
+   * (`store/config.ts`), so a `hench.prune` override in that file reaches this
+   * constructor having passed through no schema at all. Three of those
+   * overrides used to be fatal or silent:
+   *
+   * - `"prune": null` threw here, before the run's first turn.
+   * - `retainPairs` at or above `triggerPairs` made `prune` index the message
+   *   array below zero and throw on turn 21, mid-run.
+   * - `retainPairs: 0` disabled pruning outright, and the conversation grew
+   *   until the provider rejected it — no error, just a run that got expensive
+   *   and then failed far from the cause.
+   *
+   * A bad tuning value must not do any of that: before this group existed the
+   * numbers were constants and every run pruned correctly, so the floor here is
+   * "fall back to the default and say so", never "take the run down".
    */
   constructor(
     private readonly shape: PruneShape<M>,
     private readonly summarize: PruneSummarizer,
-    limits: PruneLimits = {},
+    limits: PruneLimits | null | undefined = {},
   ) {
-    this.triggerPairs = limits.triggerPairs ?? PRUNE_TRIGGER_PAIRS;
-    this.retainPairs = limits.retainPairs ?? PRUNE_RETAIN_PAIRS;
-    this.transcriptMessageChars =
-      limits.transcriptMessageChars ?? TRANSCRIPT_MESSAGE_CHAR_LIMIT;
-    this.transcriptChars = limits.transcriptChars ?? TRANSCRIPT_CHAR_LIMIT;
+    const given: PruneLimits = limits && typeof limits === "object" ? limits : {};
+
+    this.triggerPairs = resolveLimit(given.triggerPairs, PRUNE_TRIGGER_PAIRS, MIN_PRUNE_PAIRS);
+    this.transcriptMessageChars = resolveLimit(
+      given.transcriptMessageChars, TRANSCRIPT_MESSAGE_CHAR_LIMIT, 1,
+    );
+    this.transcriptChars = resolveLimit(given.transcriptChars, TRANSCRIPT_CHAR_LIMIT, 1);
+
+    // Retention is resolved against the trigger, not independently: the gap
+    // between them is the whole point of batching, and a retention that meets
+    // or passes the trigger leaves no droppable span. Clamped rather than
+    // refused so the run continues on the nearest legal value.
+    const retainPairs = resolveLimit(given.retainPairs, PRUNE_RETAIN_PAIRS, MIN_PRUNE_PAIRS);
+    this.retainPairs = Math.min(retainPairs, this.triggerPairs - 1);
+    if (this.retainPairs !== retainPairs) {
+      detail(
+        `prune.retainPairs ${retainPairs} is not below prune.triggerPairs ` +
+        `${this.triggerPairs} — using ${this.retainPairs}`,
+      );
+    }
   }
 
   /**
@@ -397,7 +444,15 @@ export class ConversationPruner<M> {
 
     // Walk the cut forward to a message that may legally begin the tail, so a
     // tool result is never separated from the request it answers.
-    let cut = messages.length - this.retainPairs * 2;
+    //
+    // Floored at `dropStart` because the walk below indexes `messages` before
+    // the bounds check after it: a cut past the start of the droppable span
+    // reads `undefined` and `isTailStart` throws on it. The constructor's
+    // clamp already makes that unreachable from a config value, and this keeps
+    // it unreachable from the next caller that passes limits some other way.
+    // Flooring degrades to "prune little or nothing", which the guard below
+    // then turns into NO_PRUNE.
+    let cut = Math.max(messages.length - this.retainPairs * 2, dropStart);
     while (cut < messages.length && !this.shape.isTailStart(messages[cut])) cut++;
     if (cut >= messages.length || cut <= dropStart) return NO_PRUNE;
 

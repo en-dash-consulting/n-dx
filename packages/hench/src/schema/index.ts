@@ -7,6 +7,7 @@ export {
   isPermissionMode,
   DEFAULT_CHECKPOINT_THRESHOLD,
   DEFAULT_PRUNE_CONFIG,
+  MIN_PRUNE_PAIRS,
 } from "./v1.js";
 
 export type {

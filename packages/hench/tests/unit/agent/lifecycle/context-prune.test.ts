@@ -36,7 +36,11 @@ import {
   renderPruneTranscript,
   stripAnthropicThinking,
 } from "../../../../src/agent/lifecycle/context-prune.js";
-import type { PruneShape, PruneSummary } from "../../../../src/agent/lifecycle/context-prune.js";
+import type {
+  PruneLimits,
+  PruneShape,
+  PruneSummary,
+} from "../../../../src/agent/lifecycle/context-prune.js";
 import {
   geminiPruneShape,
   openAiPruneShape,
@@ -400,6 +404,83 @@ describe("ConversationPruner limit overrides", () => {
     expect(seen[0]).toContain("[truncated]");
     // 22 dropped messages, each clamped to 40 characters plus the marker.
     expect(seen[0].length).toBeLessThan(22 * (40 + 16));
+  });
+
+  /**
+   * `HenchConfigSchema` checks `hench.prune`, but `loadConfig` merges
+   * `.n-dx.json`'s `hench` section *after* validation (`store/config.ts`), so a
+   * `hench.prune` override in that file reaches the pruner unchecked. Each case
+   * below is a value a user can put in `.n-dx.json` today; each one used to end
+   * the run.
+   */
+  describe("limits arriving unvalidated from a .n-dx.json override", () => {
+    /** What `mergeWithOverrides` leaves on the config for the given override. */
+    const merged = (override: unknown) => override as PruneLimits;
+
+    it("survives a null group instead of throwing before the first turn", async () => {
+      const pruner = new ConversationPruner(
+        anthropicPruneShape(), stubSummarizer, merged(null),
+      );
+      const messages = conversation(PRUNE_TRIGGER_PAIRS + 1);
+
+      expect((await pruner.prune(messages)).summarized).toBe(true);
+      expect(messages).toHaveLength(2 + PRUNE_RETAIN_PAIRS * 2);
+    });
+
+    it("clamps a retention at or above the trigger instead of indexing below zero", async () => {
+      for (const retainPairs of [PRUNE_TRIGGER_PAIRS, PRUNE_TRIGGER_PAIRS + 5]) {
+        const pruner = new ConversationPruner(
+          anthropicPruneShape(), stubSummarizer, { retainPairs },
+        );
+        const messages = conversation(PRUNE_TRIGGER_PAIRS + 1);
+
+        // Used to throw "Cannot read properties of undefined (reading 'role')"
+        // on turn 21, from the tail walk in prune().
+        const outcome = await pruner.prune(messages);
+
+        expect(outcome.summarized).toBe(true);
+        // Clamped to the nearest legal value: one pair below the trigger.
+        expect(messages).toHaveLength(2 + (PRUNE_TRIGGER_PAIRS - 1) * 2);
+      }
+    });
+
+    it("keeps pruning when a pair count is zero, negative or fractional", async () => {
+      for (const limits of [
+        { retainPairs: 0 },
+        { retainPairs: -5 },
+        { triggerPairs: 0 },
+        { triggerPairs: 1 },
+        { retainPairs: 2.7 },
+        { retainPairs: Number.NaN },
+        { triggerPairs: Number.POSITIVE_INFINITY },
+      ] as PruneLimits[]) {
+        const pruner = new ConversationPruner(anthropicPruneShape(), stubSummarizer, limits);
+        const messages = conversation(PRUNE_TRIGGER_PAIRS + 1);
+
+        // `retainPairs: 0` used to leave cut === messages.length, so the prune
+        // was a no-op on every turn and the conversation grew without bound
+        // until the provider refused it — silently, unlike the throw above.
+        const outcome = await pruner.prune(messages);
+
+        expect(outcome.dropped, `${JSON.stringify(limits)} pruned nothing`).toBeGreaterThan(0);
+        expect(messages.length).toBeLessThan(1 + (PRUNE_TRIGGER_PAIRS + 1) * 2);
+      }
+    });
+
+    it("ignores a non-numeric transcript limit rather than emptying the transcript", async () => {
+      const { seen, summarize } = extractingSummarizer("never matches");
+      const pruner = new ConversationPruner(anthropicPruneShape(), summarize, {
+        transcriptMessageChars: 0,
+        transcriptChars: -1,
+      } as PruneLimits);
+
+      await pruner.prune(conversation(PRUNE_TRIGGER_PAIRS + 1));
+
+      // A zero cap would have clamped every message to "…[truncated]", handing
+      // the summarizer a transcript with no facts in it at all.
+      expect(seen[0]).toContain("src/step-1.ts");
+      expect(seen[0]).not.toContain("[truncated]");
+    });
   });
 
   it("falls back to the module defaults for every limit left out", async () => {

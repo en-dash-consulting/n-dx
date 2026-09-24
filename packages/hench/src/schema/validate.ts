@@ -1,5 +1,5 @@
 import { z, ZodError } from "zod";
-import { DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG } from "./v1.js";
+import { DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MIN_PRUNE_PAIRS } from "./v1.js";
 
 export type ValidationResult<T> =
   | { ok: true; data: T }
@@ -57,22 +57,22 @@ const RetryConfigSchema = z.object({
  * dashboard's config editor writes one dotted key at a time (`prune.retainPairs`),
  * so a single-member group reaches disk and must still load.
  *
- * The floor of 2 is a floor on usefulness, not on arithmetic. One retained pair
- * leaves the agent a single turn of verbatim history, and a trigger of 1 prunes
- * on every turn — which is the front-splice behavior this module was written to
- * replace, invalidating the cached prefix on every request.
+ * {@link MIN_PRUNE_PAIRS} is the floor, shared with the pruner rather than
+ * restated: this schema refuses a bad value in `.hench/config.json`, but
+ * `loadConfig` merges `.n-dx.json` overrides after validation, so the pruner
+ * has to clamp to the same floor for values that never reach here.
  */
 const PruneConfigSchema = z
   .object({
     triggerPairs: z
       .number()
       .int("prune.triggerPairs must be a whole number of turn-pairs")
-      .min(2, "prune.triggerPairs must be at least 2")
+      .min(MIN_PRUNE_PAIRS, `prune.triggerPairs must be at least ${MIN_PRUNE_PAIRS}`)
       .default(DEFAULT_PRUNE_CONFIG.triggerPairs),
     retainPairs: z
       .number()
       .int("prune.retainPairs must be a whole number of turn-pairs")
-      .min(2, "prune.retainPairs must be at least 2")
+      .min(MIN_PRUNE_PAIRS, `prune.retainPairs must be at least ${MIN_PRUNE_PAIRS}`)
       .default(DEFAULT_PRUNE_CONFIG.retainPairs),
     transcriptMessageChars: z
       .number()

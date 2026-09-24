@@ -139,6 +139,21 @@ export const DEFAULT_PRUNE_CONFIG: Readonly<Required<PruneConfig>> = {
 };
 
 /**
+ * Floor on {@link PruneConfig.triggerPairs} and {@link PruneConfig.retainPairs}.
+ *
+ * A floor on usefulness rather than on arithmetic: one retained pair leaves the
+ * agent a single turn of verbatim history, and a trigger of 1 prunes on every
+ * turn — the front-splice behavior the summarizing prune exists to replace.
+ *
+ * Lives here, with the defaults, because both places that enforce it are
+ * downstream of this module: `validate.ts` refuses a smaller value in
+ * `.hench/config.json`, and `agent/lifecycle/context-prune.ts` clamps to it at
+ * runtime for the `.n-dx.json` overrides that `loadConfig` merges *after*
+ * validation. One constant, so the refusal and the clamp cannot disagree.
+ */
+export const MIN_PRUNE_PAIRS = 2;
+
+/**
  * Git-safety configuration embedded in {@link HenchConfig}.
  *
  * Governs how checkpoint decisions (currently the pre-run commit gate) react
