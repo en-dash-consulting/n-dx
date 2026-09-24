@@ -290,6 +290,24 @@
   margin-top: var(--space-2);
 }
 
+/* The top of the queue is claimed in another worktree — a one-line note above
+   the suggestion, so the 409 the operator would otherwise hit is said here. */
+.rex-dash-next-skipped {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+  background: var(--bg);
+  border-radius: var(--radius-lg);
+}
+
+.rex-dash-next-skipped-icon {
+  flex-shrink: 0;
+}
+
 .rex-dash-next-empty {
   display: flex;
   align-items: center;

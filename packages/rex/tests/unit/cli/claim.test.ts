@@ -99,7 +99,7 @@ describe("formatClaims", () => {
     expect(formatClaims([]).join("\n")).toContain("No task claims");
   });
 
-  it("names the title, worktree, holder liveness, state and expiry", () => {
+  it("names the title, worktree, holder liveness, state — and that a hold never expires", () => {
     const report: ClaimReport = {
       taskId: "abc123",
       title: "Hold the task claim",
@@ -118,8 +118,30 @@ describe("formatClaims", () => {
     expect(out).toContain("/repo/wt");
     expect(out).toContain("pid 4242 on box — not running");
     expect(out).toContain("uncommitted-work");
-    expect(out).toContain("2026-09-22 14:00");
+    // A held claim does not expire, and the listing must not print the
+    // carried-over lease time as if it did.
+    expect(out).toContain("never — held until released");
+    expect(out).not.toContain("2026-09-22 14:00");
+    expect(out).toContain("claimed 2026-09-22 10:00");
     expect(out).not.toContain("(this worktree)");
+  });
+
+  it("shows the lease expiry for an ordinary running claim", () => {
+    const report: ClaimReport = {
+      taskId: "def456",
+      title: "A live run",
+      worktreeRoot: "/repo/wt",
+      pid: 4242,
+      host: "box",
+      pidAlive: true,
+      claimedAt: "2026-09-22T10:00:00.000Z",
+      expiresAt: "2026-09-22T14:00:00.000Z",
+      reason: null,
+      mine: false,
+    };
+    const out = formatClaims([report]).join("\n");
+    expect(out).toContain("2026-09-22 14:00");
+    expect(out).not.toContain("never — held until released");
   });
 
   it("marks the caller's own claims", () => {

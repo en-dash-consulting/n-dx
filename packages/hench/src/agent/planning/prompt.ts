@@ -104,7 +104,7 @@ export function buildSystemPrompt(
   // here, including why not to commit, rather than half here and half there.
   const commitStep = autoCommit
     ? "Commit your work with git, using a clear commit message"
-    : `Stage changes with \`git add -A\`, then write your proposed commit message to \`.hench-commit-msg.txt\` at the project root. Do NOT run \`git commit\` — ${cliName} will confirm the commit with the user.`;
+    : `Stage exactly the files you changed with \`git add -- <path...>\`, naming each path — never stage the whole tree, which may hold changes that are not yours to commit. Then write your proposed commit message to \`.hench-commit-msg.txt\` at the project root. Do NOT run \`git commit\` — ${cliName} will confirm the commit with the user.`;
 
   const exploreStep = "Explore the codebase to understand context — read the code you are about to change before changing it";
   const testStep = "Run validation/tests if configured";

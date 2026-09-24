@@ -65,11 +65,18 @@ export interface TaskClaim {
   /** Informational — claims are only meaningful on one machine. */
   host: string;
   claimedAt: string;
+  /**
+   * When the lease lapses for an ordinary claim. On a held claim (see
+   * {@link reason}) this is informational only — the moment the ordinary
+   * lease would have lapsed — and does not retire the claim.
+   */
   expiresAt: string;
   /**
    * Set when the claim is deliberately held past its holder's exit. A held
-   * claim's {@link pid} is expected to be dead, so liveness falls back to the
-   * expiry alone. Absent on an ordinary claim held by a running process.
+   * claim's {@link pid} is expected to be dead and its {@link expiresAt} does
+   * not apply: the claim lives until released, force-released, or re-claimed
+   * by its own worktree. Absent on an ordinary claim held by a running
+   * process.
    */
   reason?: ClaimHoldReason;
 }
@@ -134,7 +141,10 @@ export function resolveClaimHolder(projectDir: string): ClaimHolder {
 export interface ClaimsStore {
   /** Where claims are kept, or null for the no-op store outside a repository. */
   readonly path: string | null;
-  /** Every live claim — dead pids and expired entries are filtered out. */
+  /**
+   * Every live claim — dead pids and expired entries are filtered out, except
+   * held claims, which neither the pid nor the clock retires.
+   */
   readClaims(): Promise<TaskClaim[]>;
   /**
    * Claim a task. Succeeds when no live claim exists, or when the live claim
@@ -155,9 +165,12 @@ export interface ClaimsStore {
    * wedging a task. That is exactly wrong when the run ended by *refusing* to
    * complete the task because its work is still uncommitted: the work exists,
    * in this worktree, and a second worktree picking the task up would redo it.
-   * A held claim therefore survives a dead pid and lapses only at its expiry,
-   * which is not extended here — an abandoned hold still clears itself at the
-   * original TTL.
+   * A held claim therefore survives a dead pid and does not expire — the
+   * uncommitted work it guards does not clean itself up overnight, so neither
+   * does the hold. It ends only on {@link release} (the work was dealt with),
+   * `release --force`, or a fresh {@link claim} from the holding worktree
+   * (a re-run there clears the reason). `expiresAt` is carried over as an
+   * informational value: when the ordinary lease would have lapsed.
    *
    * Returns the held claim, or null when this worktree holds no live claim on
    * the task.
@@ -258,12 +271,15 @@ class FileClaimsStore implements ClaimsStore {
   }
 
   private isLive(claim: TaskClaim): boolean {
+    // A held claim outlives its process AND its lease: neither the pid nor
+    // the clock retires it, because the uncommitted work it guards does not
+    // clean itself up overnight. It ends only by an explicit release (the
+    // operator dealt with the work), release --force, or a fresh claim from
+    // the holding worktree (a re-run there clears the reason). See
+    // {@link ClaimsStore.hold}.
+    if (claim.reason) return true;
     const expires = Date.parse(claim.expiresAt);
     if (!Number.isFinite(expires) || expires <= this.now()) return false;
-    // A held claim outlives the process that took it — that is the whole
-    // point of holding one, so the pid says nothing here and only the expiry
-    // can retire it. See {@link ClaimsStore.hold}.
-    if (claim.reason) return true;
     return this.isPidAlive(claim.pid);
   }
 
@@ -348,13 +364,11 @@ class FileClaimsStore implements ClaimsStore {
     return this.update((claims) => {
       const existing = claims[taskId];
       if (!existing || !sameHolder(existing, holder.worktreeRoot)) return null;
-      // The expiry is carried over untouched: holding a claim states why it
-      // is still here, it does not buy it more time.
-      // TODO: that means a held claim still lapses at the original 4h TTL,
-      // while hench's refusal message says it is "held until someone deals
-      // with that work" — overnight, the hold quietly evaporates and another
-      // worktree can redo the uncommitted work. Either extend the expiry
-      // here (a longer held-claim TTL) or soften that wording.
+      // The expiry is carried over untouched, and for a held claim it is
+      // informational only — the moment the ordinary lease would have lapsed.
+      // `isLive` never retires a claim that carries a reason, so the hold
+      // ends by release, release --force, or a fresh claim from this
+      // worktree, never by the clock.
       const held: TaskClaim = { ...existing, reason };
       claims[taskId] = held;
       return held;

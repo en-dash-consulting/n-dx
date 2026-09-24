@@ -308,8 +308,10 @@ setTimeout(() => {}, 20000);
 // wedging a task. That is exactly wrong when the run ended by *refusing* to
 // complete the task because its work is still uncommitted: the work is real
 // and it is in that worktree, so a second worktree picking the task up would
-// redo it. A held claim therefore survives a dead holder and lapses only at
-// its expiry.
+// redo it. A held claim therefore survives a dead holder and does not expire:
+// it ends only on release, release --force, or a fresh claim from the
+// worktree that left the work. The uncommitted work does not clean itself up
+// overnight, so neither does the hold that guards it.
 
 describe("held claims", () => {
   /** A store that reads the same file but declares every holder dead. */
@@ -337,29 +339,36 @@ describe("held claims", () => {
     expect(await theirs.isClaimedByOther("T-plain", { worktreeRoot: linked })).toBeNull();
   });
 
-  it("does not buy the claim more time, and still lapses at the original expiry", async () => {
+  it("survives past its lease expiry — a hold ends only by release, re-claim, or force", async () => {
     const mine = openClaimsStore(repo);
     const claimed = await mine.claim("T1", { worktreeRoot: repo, ttlMs: 60_000 });
     expect(claimed.ok).toBe(true);
     if (!claimed.ok) return;
 
     const held = await mine.hold("T1", { worktreeRoot: repo }, "uncommitted-work");
+    // The expiry is carried over unchanged, but for a held claim it is
+    // informational — when the ordinary lease would have lapsed — and no
+    // longer retires the claim.
     expect(held?.expiresAt).toBe(claimed.claim.expiresAt);
     expect(held?.claimedAt).toBe(claimed.claim.claimedAt);
 
-    // Dead holder, but still inside the TTL: live.
-    const during = openClaimsStore(repo, {
-      isPidAlive: () => false,
-      now: () => Date.parse(claimed.claim.expiresAt) - 1,
-    });
-    expect(await during.readClaims()).toHaveLength(1);
+    // Dead holder, clock past the carried-over expiry AND past the 4h default
+    // lease — the overnight case the old behaviour silently lost.
+    const overnight = Date.parse(claimed.claim.expiresAt) + DEFAULT_CLAIM_TTL_MS + 60_000;
+    const later = openClaimsStore(repo, { isPidAlive: () => false, now: () => overnight });
+    expect(await later.readClaims()).toMatchObject([{ taskId: "T1", reason: "uncommitted-work" }]);
 
-    // Past it: gone, with nothing needed to clean it up.
-    const after = openClaimsStore(repo, {
-      isPidAlive: () => false,
-      now: () => Date.parse(claimed.claim.expiresAt) + 1,
-    });
-    expect(await after.readClaims()).toEqual([]);
+    // Another worktree still cannot take the task — and its attempt runs the
+    // store's prune pass, which must not drop the hold either.
+    const theirs = openClaimsStore(linked, { isPidAlive: () => false, now: () => overnight });
+    const attempt = await theirs.claim("T1", { worktreeRoot: linked });
+    expect(attempt.ok).toBe(false);
+    if (attempt.ok) return;
+    expect(attempt.heldBy).toMatchObject({ worktreeRoot: repo, reason: "uncommitted-work" });
+
+    // An operator's forced release is one of the three ways it ends.
+    expect(await theirs.release("T1", { worktreeRoot: linked }, { force: true })).toBe(true);
+    expect(await later.readClaims()).toEqual([]);
   });
 
   it("releases like any other claim — that is how the work is declared dealt with", async () => {

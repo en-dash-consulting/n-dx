@@ -171,12 +171,16 @@ describe("refusal messages", () => {
     expect(message).toContain("Nothing was discarded");
   });
 
-  it("truncates a very long path list rather than flooding the log", () => {
+  it("truncates a very long displayed list, while the commands still carry every path", () => {
     const paths = Array.from({ length: 25 }, (_, i) => `src/file-${i}.ts`);
     const message = formatUncommittedWorkRefusal(paths);
     expect(message).toContain("src/file-19.ts");
-    expect(message).not.toContain("src/file-20.ts");
     expect(message).toContain("…and 5 more");
+    // The listing stops at 20 paths — but a truncated *pathspec* would land
+    // only part of the refused work (WM2048), so the command lines carry all.
+    const listedLines = message.split("\n").filter((l) => l.startsWith("  ") && !l.trimStart().startsWith("git "));
+    expect(listedLines.some((l) => l.includes("src/file-20.ts"))).toBe(false);
+    expect(message).toMatch(/git commit -- .*src\/file-20\.ts/);
   });
 
   it("explains why the loop stopped", () => {
@@ -243,6 +247,291 @@ describe("PRD staged and discounted sets derive from one definition", () => {
       }
     } finally {
       await rm(projectDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  });
+});
+
+// ── Recovery commands: validated and path-scoped (WM2048) ────────────────────
+//
+// A refusal that suggests `git add -A` or an unscoped commit/stash is how an
+// unrelated in-flight change gets swept into a hench commit — the exact
+// hazard the gate exists to prevent. Every suggested command must carry an
+// explicit pathspec limited to the listed paths, and a path that no longer
+// exists on disk gets `git rm --cached` rather than an add that would error.
+
+describe("recovery commands", () => {
+  const UNSCOPED = [/git add -A\b/, /git add \.(?![\w/])/, /git commit(?! --)/m, /git stash push(?! --)/];
+
+  function expectScoped(output: string, paths: string[], deleted: string[] = []): void {
+    for (const pattern of UNSCOPED) {
+      expect(output, `unscoped command matched ${pattern}`).not.toMatch(pattern);
+    }
+    // Every listed path appears in a pathspec (after a `--`).
+    const pathspecLines = output.split("\n").filter((l) => l.includes(" -- "));
+    for (const p of paths) {
+      expect(
+        pathspecLines.some((l) => l.includes(p)),
+        `path ${p} missing from every pathspec`,
+      ).toBe(true);
+    }
+    for (const p of deleted) {
+      expect(output).toContain(`git rm --cached -- ${p}`);
+    }
+  }
+
+  it("uncommitted-work refusal suggests only scoped commands", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const paths = ["src/new-module.ts", "tests/new-module.test.ts"];
+    const out = formatUncommittedWorkRefusal(paths, new Set());
+    expect(out).toContain("git add -- src/new-module.ts tests/new-module.test.ts");
+    expect(out).toContain("git commit -- src/new-module.ts tests/new-module.test.ts");
+    expect(out).toContain("git stash push -- src/new-module.ts tests/new-module.test.ts");
+    expectScoped(out, paths);
+  });
+
+  it("a deleted path is offered git rm --cached, and is not in the add", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const paths = ["src/kept.ts", "src/gone.ts"];
+    const out = formatUncommittedWorkRefusal(paths, new Set(["src/gone.ts"]));
+    expect(out).toContain("git add -- src/kept.ts");
+    expect(out).not.toMatch(/git add -- .*src\/gone\.ts/);
+    expectScoped(out, paths, ["src/gone.ts"]);
+  });
+
+  // A path outside the shell-inert charset must never ride inline on a
+  // command line: there is no quoting that is safe in POSIX shells,
+  // PowerShell, AND cmd.exe at once (cmd treats single quotes as literal
+  // characters, so `&` still splits; `%VAR%` cannot be escaped interactively).
+  // With pathspec files available the commands reference the file and carry no
+  // arbitrary text at all; without them the fallback is POSIX-quoted with an
+  // explicit caveat naming the shells it is for.
+
+  it("routes a path containing a space through the pathspec file", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const files = { all: ".hench/recovery/pathspec.txt" };
+    const out = formatUncommittedWorkRefusal(["docs/release notes.md"], new Set(), files);
+    expect(out).toContain("git add --pathspec-from-file=.hench/recovery/pathspec.txt");
+    expect(out).toContain("git commit --pathspec-from-file=.hench/recovery/pathspec.txt");
+    expect(out).toContain("git stash push --pathspec-from-file=.hench/recovery/pathspec.txt");
+    // The name still appears in the listing above, but on no command line.
+    const commandLines = out.split("\n").filter((l) => l.trimStart().startsWith("git "));
+    for (const line of commandLines) {
+      expect(line).not.toContain("release notes");
+    }
+  });
+
+  it("keeps hostile filenames off every command line when pathspec files exist", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    // Copy/paste recovery commands: a filename an agent (or a compromised
+    // repo) created must never execute — or split the command — when the
+    // operator pastes into sh, PowerShell, or cmd.exe.
+    const hostile = [
+      "src/$(touch pwned).ts",
+      "src/`touch pwned`.ts",
+      "src/a;rm -rf x.ts",
+      'src/a"b.ts',
+      "src/$HOME.ts",
+      "src/a&b.ts",
+      "src/%TEMP%.ts",
+      "src/it's a file.ts",
+    ];
+    const files = { all: ".hench/recovery/pathspec.txt" };
+    const out = formatUncommittedWorkRefusal(hostile, new Set(), files);
+    const commandLines = out.split("\n").filter((l) => l.trimStart().startsWith("git "));
+    expect(commandLines.length).toBeGreaterThan(0);
+    for (const line of commandLines) {
+      // Nothing but shell-inert characters on the whole command line — no
+      // quoting needed in any shell, nothing to expand or split.
+      expect(line.trim(), `non-inert command line: ${line}`).toMatch(
+        /^[A-Za-z0-9._/= -]+$/,
+      );
+    }
+  });
+
+  it("falls back to POSIX quoting with a shell caveat when no pathspec file exists", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const out = formatUncommittedWorkRefusal(["src/it's a file.ts", "src/a&b.ts"], new Set());
+    // Single quotes, not double: double quotes still expand $(…) in POSIX
+    // shells, and the embedded quote uses the close-escape-reopen idiom.
+    expect(out).toContain(String.raw`git add -- 'src/it'\''s a file.ts' 'src/a&b.ts'`);
+    // The quoting is only correct for POSIX shells, and the message says so.
+    expect(out).toContain("POSIX shells");
+    expect(out).toContain("cmd.exe");
+  });
+
+  it("does not print the caveat when every path is inert", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const out = formatUncommittedWorkRefusal(["src/a.ts"], new Set());
+    expect(out).not.toContain("POSIX shells");
+  });
+
+  it("splits add and rm across the dedicated pathspec files", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const files = {
+      all: ".hench/recovery/pathspec.txt",
+      add: ".hench/recovery/pathspec-add.txt",
+      rm: ".hench/recovery/pathspec-rm.txt",
+    };
+    const out = formatUncommittedWorkRefusal(
+      ["src/kept file.ts", "src/gone file.ts"],
+      new Set(["src/gone file.ts"]),
+      files,
+    );
+    expect(out).toContain("git add --pathspec-from-file=.hench/recovery/pathspec-add.txt");
+    expect(out).toContain("git rm --cached --pathspec-from-file=.hench/recovery/pathspec-rm.txt");
+    expect(out).toContain("git commit --pathspec-from-file=.hench/recovery/pathspec.txt");
+  });
+
+  it("the record-commit-pending message uses the pathspec file the same way", async () => {
+    const { formatRecordCommitPending } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const paths = [".rex/prd_tree/some task/index.md", ".rex/$(evil).json"];
+    const files = { all: ".hench/recovery/pathspec.txt" };
+    const out = formatRecordCommitPending(paths, "task-1", "boom", files);
+    expect(out).toContain("git add --pathspec-from-file=.hench/recovery/pathspec.txt");
+    expect(out).toContain(
+      'git commit -m "chore(prd): commit PRD tree changes (task task-1 completed)" ' +
+        "--pathspec-from-file=.hench/recovery/pathspec.txt",
+    );
+    expect(out).not.toMatch(/git add -- /);
+    // And without the file it degrades to the same POSIX-quoted fallback.
+    const fallback = formatRecordCommitPending(paths, "task-1", "boom");
+    expect(fallback).toContain("git add -- '.rex/prd_tree/some task/index.md' '.rex/$(evil).json'");
+    expect(fallback).toContain("POSIX shells");
+  });
+
+  it("the commands carry every path even when the displayed list truncates", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const paths = Array.from({ length: 25 }, (_, i) => `src/f${i}.ts`);
+    const out = formatUncommittedWorkRefusal(paths, new Set());
+    expect(out).toContain("…and 5 more");
+    expectScoped(out, paths);
+  });
+
+  it("the loop refusal and the reset-deferred skip suggest the same scoped commands", async () => {
+    const { formatLoopRefusal, formatResetDeferredCommitSkipped } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const paths = [".rex/prd_tree/task/index.md"];
+    for (const out of [
+      formatLoopRefusal(paths, new Set()),
+      formatResetDeferredCommitSkipped(paths, new Set()),
+    ]) {
+      expect(out).toContain("git add -- .rex/prd_tree/task/index.md");
+      expectScoped(out, paths);
+    }
+  });
+
+  it("prepareRecoveryPathspecs is not needed for inert paths", async () => {
+    const { prepareRecoveryPathspecs } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    // Bare inline pathspecs are safe in every shell, so no file is written.
+    await expect(
+      prepareRecoveryPathspecs(OUTSIDE_ANY_REPO, ["src/a.ts", ".rex/prd_tree/x/index.md"]),
+    ).resolves.toBeUndefined();
+  });
+
+  it("prepareRecoveryPathspecs writes the hostile names verbatim to the pathspec file", async () => {
+    const { prepareRecoveryPathspecs } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "recovery-pathspec-"));
+    try {
+      const hostile = ["src/a&b.ts", "src/$(touch pwned).ts", "src/it's a file.ts"];
+      const files = await prepareRecoveryPathspecs(dir, hostile);
+      expect(files).toBeDefined();
+      expect(files!.all).toBe(".hench/recovery/pathspec.txt");
+      expect(files!.add).toBeUndefined();
+      expect(files!.rm).toBeUndefined();
+      const content = readFileSync(join(dir, ".hench/recovery/pathspec.txt"), "utf-8");
+      // Verbatim, one per line: git reads these directly, no shell involved.
+      expect(content).toBe("src/a&b.ts\nsrc/$(touch pwned).ts\nsrc/it's a file.ts\n");
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  });
+
+  it("prepareRecoveryPathspecs splits deleted paths into their own file", async () => {
+    const { prepareRecoveryPathspecs } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "recovery-pathspec-rm-"));
+    try {
+      const files = await prepareRecoveryPathspecs(
+        dir,
+        ["src/kept file.ts", "src/gone file.ts"],
+        new Set(["src/gone file.ts"]),
+      );
+      expect(files).toEqual({
+        all: ".hench/recovery/pathspec.txt",
+        add: ".hench/recovery/pathspec-add.txt",
+        rm: ".hench/recovery/pathspec-rm.txt",
+      });
+      expect(readFileSync(join(dir, ".hench/recovery/pathspec-add.txt"), "utf-8")).toBe(
+        "src/kept file.ts\n",
+      );
+      expect(readFileSync(join(dir, ".hench/recovery/pathspec-rm.txt"), "utf-8")).toBe(
+        "src/gone file.ts\n",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  });
+
+  it("prepareRecoveryPathspecs C-quotes a name a plain line would misparse", async () => {
+    const { prepareRecoveryPathspecs } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "recovery-pathspec-quote-"));
+    try {
+      // --pathspec-from-file C-unquotes an element wrapped in double quotes
+      // (core.quotePath), and a raw newline would split into two entries.
+      const files = await prepareRecoveryPathspecs(dir, ['"quoted".ts', "line\nbreak.ts"]);
+      const content = readFileSync(join(dir, ".hench/recovery/pathspec.txt"), "utf-8");
+      expect(content).toBe('"\\"quoted\\".ts"\n"line\\nbreak.ts"\n');
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  });
+
+  it("deletedAmong reports exactly the listed paths that are gone from disk", async () => {
+    const { deletedAmong } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "deleted-among-"));
+    try {
+      mkdirSync(join(dir, "src"), { recursive: true });
+      writeFileSync(join(dir, "src", "kept.ts"), "x");
+      const deleted = deletedAmong(dir, ["src/kept.ts", "src/gone.ts"]);
+      expect([...deleted]).toEqual(["src/gone.ts"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   });
 });

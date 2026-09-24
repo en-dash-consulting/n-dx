@@ -59,7 +59,7 @@ export class TaskClaimedElsewhereError extends CLIError {
     const message = claim.reason === "uncommitted-work"
       ? `Task ${label} is claimed by another worktree: ${claim.worktreeRoot}. ` +
         `A run there refused to complete it because its work is still uncommitted, ` +
-        `so the claim is held until someone deals with that work (expires ${claim.expiresAt}).`
+        `so the claim is held until someone deals with that work — it does not expire.`
       : `Task ${label} is being worked on in another worktree: ${claim.worktreeRoot} (pid ${claim.pid}, claim expires ${claim.expiresAt}).`;
     const hint = claim.reason === "uncommitted-work"
       ? `Commit or discard the work in ${claim.worktreeRoot} and re-run the task there, or free the task with 'ndx claim release ${taskId}'.`
@@ -187,7 +187,19 @@ export class TaskClaims {
    * hold stick: {@link releaseAll} in the run's `finally` only releases what is
    * still held, and renewal stops caring about a claim it no longer tracks.
    *
+   * The claim is re-asserted when the store no longer carries it. That is the
+   * ordinary shape of this path, not an edge case: the spawned agent calls
+   * `rex_update_status(completed)` itself through the rex MCP server, whose
+   * handler releases the claim for every completing status — and it is
+   * exactly that completion this gate then refuses. Observed live on
+   * 2026-09-23 (run 01c990df): the claims file was empty at refusal time, so
+   * `store.hold` had nothing to hold and the task went straight back on the
+   * market with its work uncommitted. Re-claiming is safe because the work is
+   * in this worktree; a claim another worktree took meanwhile refuses the
+   * re-claim, and theirs is not ours to overwrite.
+   *
    * A no-op in read-only mode, and when this run does not hold the task.
+   * Returns the held claim, or null when the hold could not stick.
    */
   async hold(taskId: string, reason: ClaimHoldReason): Promise<TaskClaim | null> {
     if (this.readOnly || !this.held.has(taskId)) return null;
@@ -201,7 +213,16 @@ export class TaskClaims {
     this.stopRenewal();
     try {
       await this.renewalTick;
-      const claim = await this.store.hold(taskId, this.holder, reason);
+      let claim = await this.store.hold(taskId, this.holder, reason);
+      if (claim === null) {
+        const attempt = await this.store.claim(taskId, {
+          worktreeRoot: this.holder.worktreeRoot,
+          pid: this.holder.pid,
+        });
+        if (attempt.ok) {
+          claim = await this.store.hold(taskId, this.holder, reason);
+        }
+      }
       this.held.delete(taskId);
       this.expiries.delete(taskId);
       return claim;

@@ -24,7 +24,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Autonomous review capture](./autonomous-review-capture/index.md) | completed |
-| [Claims hardening](./claims-hardening/index.md) | pending |
+| [Claims hardening](./claims-hardening/index.md) | completed |
 | [Cost measurement lands](./cost-measurement-lands/index.md) | pending |
 | [Hench commit hygiene](./hench-commit-hygiene/index.md) | pending |
 | [PRD write guards](./prd-write-guards/index.md) | pending |

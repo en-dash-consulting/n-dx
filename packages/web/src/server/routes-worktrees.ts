@@ -32,7 +32,7 @@ import { exec, getWorktreeRoot, listWorktrees } from "@n-dx/llm-client";
 import type { GitWorktree } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
-import { ensureWorktreeRunWatcher } from "./routes-hench.js";
+import { ensureWorktreeRunWatcher, pruneWorktreeRunWatchers } from "./routes-hench.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 
 // ---------------------------------------------------------------------------
@@ -396,6 +396,19 @@ export async function handleWorktreesRoute(
 
   const entries = await collectWorktrees(ctx.projectDir);
   worktreesCache = { projectDir: ctx.projectDir, timestamp: now, entries };
+  // A fresh `git worktree list` is the moment a removed worktree is known to
+  // be gone: close its watcher now rather than accumulating dead handles for
+  // the life of the server. Only on the fresh path — the cached answer may
+  // trail a worktree another route just registered. The keep-set retains
+  // every non-bare worktree, *including* the served one: `isServed` is
+  // per-request (ctx is workspace-scoped), so excluding it here let a request
+  // scoped to worktree B close the watcher an anchor-scoped request had
+  // registered for B, and pushes to the anchor's Sessions view went dark.
+  // Nothing registers a watcher for the request's own root, so keeping it in
+  // the set closes nothing it shouldn't.
+  pruneWorktreeRunWatchers(
+    new Set(entries.filter((e) => !e.bare).map((e) => join(e.path, ".hench", "runs"))),
+  );
   watchOtherWorktreeRuns(entries, options);
   jsonResponse(res, 200, entries);
   return true;

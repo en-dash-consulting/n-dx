@@ -758,6 +758,15 @@
   color: var(--text-dim);
 }
 
+/* A hold left by a finished run — not a live one. The warn hue plus a dashed
+   outline reads as "needs an operator", where a plain claim reads as
+   "in motion". */
+.prd-claim-chip-held {
+  color: var(--warn, var(--accent));
+  outline: 1px dashed currentColor;
+  outline-offset: -1px;
+}
+
 /* Tags — visual properties come from .tag-chip / .tag-chip-list in badges.css.
    These selectors extend the base to keep existing markup working. */
 .prd-tag-list {
