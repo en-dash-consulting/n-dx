@@ -30,5 +30,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Make ndx claim resolve .rex in the directory it is given](./make-ndx-claim-resolve-rex-in-the.md) | pending |
 | [Make the dashboard next-task read skip live claims so it matches Execute](./make-the-dashboard-next-task-read-skip.md) | pending |
 | [Offer only validated, path-scoped recovery commands after an uncommitted-work refusal](./offer-only-validated-path-scoped.md) | pending |
-| [Prove the uncommitted-work refusal in finalizeRun holds the claim](./prove-the-uncommitted-work-refusal-in.md) | pending |
+| [Prove the uncommitted-work refusal in finalizeRun holds the claim](./prove-the-uncommitted-work-refusal-in.md) | completed |
 | [Surface a claim lost mid-run in the Sessions tray](./surface-a-claim-lost-mid-run-in-the.md) | completed |
