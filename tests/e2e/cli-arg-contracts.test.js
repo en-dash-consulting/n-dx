@@ -9,8 +9,11 @@
  * The contracts live alongside the tests (not in a separate schema file)
  * so they're easy to review in diffs.
  */
-import { describe, it, expect } from "vitest";
-import { run } from "./e2e-helpers.js";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { run, runFail } from "./e2e-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -322,6 +325,56 @@ describe("CLI argument contracts", () => {
           `missing tool name in footer: ${tool}`,
         ).toContain(tool);
       }
+    });
+  });
+
+  /**
+   * `ndx claim` takes an optional trailing [dir], and the init check must
+   * look at that directory — not process.cwd() — because rex resolves the
+   * same argument itself (PR E, audit item ddfd38ea). Where the [dir] sits
+   * depends on the subcommand, so each shape is exercised from a cwd that is
+   * NOT an initialized project.
+   */
+  describe("ndx claim directory argument", () => {
+    let projectDir;
+    let outsideDir;
+
+    beforeAll(() => {
+      projectDir = mkdtempSync(join(tmpdir(), "ndx-claim-dir-project-"));
+      mkdirSync(join(projectDir, ".rex"), { recursive: true });
+      outsideDir = mkdtempSync(join(tmpdir(), "ndx-claim-dir-outside-"));
+    });
+
+    afterAll(() => {
+      for (const dir of [projectDir, outsideDir]) {
+        if (dir) rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+      }
+    });
+
+    it("claim list <dir> works from outside the project", () => {
+      const out = run(["claim", "list", projectDir], { cwd: outsideDir });
+      expect(out).toContain("No task claims");
+    });
+
+    it("claim release <taskId> <dir> reaches rex from outside the project", () => {
+      // The release itself fails — there is no such claim — but with rex's
+      // own message, not the orchestrator's init refusal: the dir landed in
+      // the right positional slot.
+      const { stdout, stderr } = runFail(["claim", "release", "no-such-task", projectDir], {
+        cwd: outsideDir,
+      });
+      expect(`${stdout}\n${stderr}`).toContain("no live claim");
+      expect(`${stdout}\n${stderr}`).not.toContain("NOT_INITIALIZED");
+    });
+
+    it("claim release --all <dir> works from outside the project", () => {
+      const out = run(["claim", "release", "--all", projectDir], { cwd: outsideDir });
+      expect(out).toContain("No claims are held");
+    });
+
+    it("claim list without a dir still refuses an uninitialized cwd", () => {
+      const { stderr } = runFail(["claim", "list"], { cwd: outsideDir });
+      expect(stderr).toContain("NOT_INITIALIZED");
     });
   });
 
