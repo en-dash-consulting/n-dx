@@ -39,6 +39,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [prd-tree-atomic-writes asserts raw 500ms latency budgets and compares two adjacent micro-spans](./prd-tree-atomic-writes-asserts-raw.md) | pending |
 | [Real-timer ordering assertions are load-sensitive and invisible to the wall-clock inventory scanner](./real-timer-ordering-assertions-are.md) | pending |
 | [run-loop puts a lower bound on a real timer and dom-performance-monitor keeps an absolute count budget](./run-loop-puts-a-lower-bound-on-a-real.md) | pending |
+| [Scale the web watcher-based integration waits with BUDGET_MULTIPLIER](./scale-the-web-watcher-based.md) | pending |
 | [Search index rebuild and search route elapsed budgets bypass the documented BUDGET_MULTIPLIER policy](./search-index-rebuild-and-search-route.md) | pending |
 | [Stabilize rex's load-sensitive performance assertions](./stabilize-rex-s-load-sensitive.md) | completed |
 | [Triage the 39 hench/web failures now that the run no longer hides them](./triage-the-39-hench-web-failures-now.md) | completed |
