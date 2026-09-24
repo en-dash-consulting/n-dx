@@ -37,6 +37,25 @@ export interface WorkflowTemplate {
 }
 
 // ── Built-in templates ────────────────────────────────────────────────
+//
+// Token budget basis
+// ------------------
+// `tokenBudget` is measured by `checkTokenBudget`, which counts uncached
+// input + cache writes + output and excludes cache reads (a cache read
+// re-reads tokens already counted when they were written).
+//
+// The budgets below are derived from the 27 recorded runs in this
+// repository's `.hench/runs/` as of 2026-09. Under this rule those runs
+// consumed a median of ~6,000 counted tokens per turn (p75 ~10,300), for
+// run totals of 176K–2.5M. Each budget is therefore
+//
+//     maxTurns x 6,000 counted tokens/turn x 2 headroom
+//
+// rounded to a round number — high enough that a healthy run at the
+// template's turn ceiling does not trip it, low enough to stop a runaway.
+// The pre-2026-09 values (50K/200K/30K/150K) predate prompt caching and sat
+// below a single median run, so any run under a template was marked
+// `budget_exceeded` after finishing its work.
 
 export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
   {
@@ -51,7 +70,7 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
     tags: ["fast", "lightweight", "prototyping"],
     config: {
       maxTurns: 15,
-      tokenBudget: 50000,
+      tokenBudget: 200000,        // 15 turns x 6K x 2 headroom = 180K, rounded up
       loopPauseMs: 500,
       retry: {
         maxRetries: 2,
@@ -74,7 +93,7 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
     config: {
       maxTurns: 80,
       maxTokens: 16384,
-      tokenBudget: 200000,
+      tokenBudget: 1000000,       // 80 turns x 6K x 2 headroom = 960K, rounded up
       loopPauseMs: 2000,
       retry: {
         maxRetries: 5,
@@ -97,7 +116,9 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
     config: {
       maxTurns: 20,
       maxTokens: 4096,
-      tokenBudget: 30000,
+      // 20 turns x 6K x 2 headroom = 240K; held at 150K, a deliberate 1.25x
+      // rather than 2x, because this template's purpose is to stop early.
+      tokenBudget: 150000,
       loopPauseMs: 3000,
       retry: {
         maxRetries: 2,
@@ -162,7 +183,7 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
     config: {
       provider: "api",
       maxTurns: 40,
-      tokenBudget: 150000,
+      tokenBudget: 500000,        // 40 turns x 6K x 2 headroom = 480K, rounded up
       retry: {
         maxRetries: 4,
         baseDelayMs: 3000,

@@ -401,20 +401,22 @@ describe("shared lifecycle", () => {
         model: "claude-sonnet-4-6",
       };
 
-      await handleBudgetExceeded(store, "task-1", run, 100000, 50000);
+      const { checkTokenBudget } = await import("../../../src/agent/lifecycle/token-budget.js");
+      await handleBudgetExceeded(store, "task-1", run, checkTokenBudget(run.tokenUsage, 50000));
 
       expect(run.status).toBe("budget_exceeded");
       expect(run.error).toContain("Token budget exceeded");
-      expect(run.error).toContain("100000");
-      expect(run.error).toContain("50000");
+      expect(run.error).toContain("100,000");
+      expect(run.error).toContain("50,000");
 
       vi.restoreAllMocks();
     });
 
     // Pins the caller contract both loops rely on: the figure in the error
-    // message is whatever checkTokenBudget totalled, so a prompt-cached run
-    // must report its cache tokens rather than the bare uncached input.
-    it("reports the cache-inclusive total when fed a checkTokenBudget result", async () => {
+    // message is whatever checkTokenBudget counted, so a prompt-cached run
+    // must report its cache writes rather than the bare uncached input, and
+    // must name the classes so the number can be read without guessing.
+    it("reports the counted total and names the token classes", async () => {
       const { handleBudgetExceeded } = await import("../../../src/agent/lifecycle/shared.js");
       const { checkTokenBudget } = await import("../../../src/agent/lifecycle/token-budget.js");
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
@@ -442,13 +444,17 @@ describe("shared lifecycle", () => {
         model: "claude-sonnet-4-6",
       };
 
-      const check = checkTokenBudget(tokenUsage, 1_000_000);
+      const check = checkTokenBudget(tokenUsage, 200_000);
       expect(check.exceeded).toBe(true);
 
-      await handleBudgetExceeded(store, "task-1", run, check.totalUsed, check.budget);
+      await handleBudgetExceeded(store, "task-1", run, check);
 
-      // 534 + 40 + 876_000 + 34_100_000 — not the 574 an uncached sum reports.
-      expect(run.error).toBe("Token budget exceeded: 34976574 used of 1000000 budget");
+      // 534 + 876_000 + 40 — not the 574 an uncached sum reports, and not the
+      // 34,976,574 that counting cache reads at face value produced.
+      expect(run.error).toBe(
+        "Token budget exceeded: 876,574 of 200,000 " +
+          "(uncached input + cache writes + output; 34,100,000 cache-read tokens not counted)",
+      );
 
       vi.restoreAllMocks();
     });

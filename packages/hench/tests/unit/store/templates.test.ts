@@ -330,7 +330,8 @@ describe("applyTemplate", () => {
     const result = applyTemplate(config, quickIter.config);
 
     expect(result.maxTurns).toBe(15);
-    expect(result.tokenBudget).toBe(50000);
+    // 15 turns x ~6K counted tokens/turn x 2 headroom — see templates.ts.
+    expect(result.tokenBudget).toBe(200000);
     expect(result.loopPauseMs).toBe(500);
     expect(result.retry.maxRetries).toBe(2);
   });

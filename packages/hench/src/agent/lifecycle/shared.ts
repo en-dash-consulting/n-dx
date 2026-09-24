@@ -38,6 +38,7 @@ import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { saveRun } from "../../store/runs.js";
 import { persistRunLog } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
+import { formatBudgetExceeded, type TokenBudgetResult } from "./token-budget.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
@@ -3229,11 +3230,10 @@ export async function handleBudgetExceeded(
   store: PRDStore,
   taskId: string,
   run: RunRecord,
-  totalUsed: number,
-  budget: number | undefined,
+  result: TokenBudgetResult,
 ): Promise<void> {
   run.status = "budget_exceeded";
-  run.error = `Token budget exceeded: ${totalUsed} used of ${budget ?? 0} budget`;
+  run.error = formatBudgetExceeded(result);
   stream("Budget", run.error);
 
   await handleRunFailure(store, taskId, "pending", "budget_exceeded", run.error);
