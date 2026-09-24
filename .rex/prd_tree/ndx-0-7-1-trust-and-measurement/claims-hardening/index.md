@@ -23,7 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add ndx claim to list and release cross-worktree task claims](./add-ndx-claim-to-list-and-release.md) | completed |
-| [Carry the hold reason into the dashboard claims payload and the Execute 409](./carry-the-hold-reason-into-the.md) | pending |
+| [Carry the hold reason into the dashboard claims payload and the Execute 409](./carry-the-hold-reason-into-the.md) | completed |
 | [Dispose the dashboard's per-worktree run watchers when a worktree is removed](./dispose-the-dashboard-s-per-worktree.md) | pending |
 | [Hold the task claim when the uncommitted-work gate refuses completion](./hold-the-task-claim-when-the.md) | completed |
 | [Keep a held claim until it is released, or say in the refusal when the hold lapses](./keep-a-held-claim-until-it-is-released.md) | completed |
