@@ -6,12 +6,14 @@ export {
   PERMISSION_MODES,
   isPermissionMode,
   DEFAULT_CHECKPOINT_THRESHOLD,
+  DEFAULT_PRUNE_CONFIG,
 } from "./v1.js";
 
 export type {
   GuardConfig,
   PolicyLimitsConfig,
   RetryConfig,
+  PruneConfig,
   GitSafetyConfig,
   HenchConfig,
   Provider,

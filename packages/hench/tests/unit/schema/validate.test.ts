@@ -6,7 +6,11 @@ import {
   HenchConfigSchema,
   RunRecordSchema,
 } from "../../../src/schema/validate.js";
-import { DEFAULT_HENCH_CONFIG, DEFAULT_RETRY_CONFIG } from "../../../src/schema/v1.js";
+import {
+  DEFAULT_HENCH_CONFIG,
+  DEFAULT_PRUNE_CONFIG,
+  DEFAULT_RETRY_CONFIG,
+} from "../../../src/schema/v1.js";
 import { DEFAULT_TEST_GATE_TIMEOUT_MS } from "../../../src/tools/test-runner.js";
 
 describe("validateConfig", () => {
@@ -64,6 +68,57 @@ describe("validateConfig", () => {
         baseDelayMs: 2000,
         maxDelayMs: 30000,
       });
+    }
+  });
+
+  it("accepts the prune group and fills a partial one from the defaults", () => {
+    const config = { ...DEFAULT_HENCH_CONFIG(), prune: { retainPairs: 15 } };
+    const result = validateConfig(config);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.prune).toEqual({
+        triggerPairs: DEFAULT_PRUNE_CONFIG.triggerPairs,
+        retainPairs: 15,
+        transcriptMessageChars: DEFAULT_PRUNE_CONFIG.transcriptMessageChars,
+      });
+    }
+  });
+
+  it("leaves prune absent rather than materializing defaults onto every config", () => {
+    const { prune, ...configWithoutPrune } = DEFAULT_HENCH_CONFIG();
+    const result = validateConfig(configWithoutPrune);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.prune).toBeUndefined();
+  });
+
+  it("rejects a prune retention at or above the trigger, naming both keys", () => {
+    for (const retainPairs of [DEFAULT_PRUNE_CONFIG.triggerPairs, DEFAULT_PRUNE_CONFIG.triggerPairs + 1]) {
+      const result = validateConfig({ ...DEFAULT_HENCH_CONFIG(), prune: { retainPairs } });
+      expect(result.ok, `retainPairs=${retainPairs} should be refused`).toBe(false);
+      if (!result.ok) {
+        const messages = formatValidationErrors(result.errors);
+        expect(messages.join("\n")).toContain("prune.retainPairs must be below prune.triggerPairs");
+      }
+    }
+  });
+
+  it("rejects prune pair counts below 2", () => {
+    for (const prune of [{ retainPairs: 1 }, { triggerPairs: 1, retainPairs: 0 }, { triggerPairs: 0 }]) {
+      const result = validateConfig({ ...DEFAULT_HENCH_CONFIG(), prune });
+      expect(result.ok, `${JSON.stringify(prune)} should be refused`).toBe(false);
+      if (!result.ok) {
+        expect(formatValidationErrors(result.errors).join("\n")).toContain("must be at least 2");
+      }
+    }
+  });
+
+  it("rejects a non-integer or non-positive transcriptMessageChars", () => {
+    for (const transcriptMessageChars of [0, -1, 1.5]) {
+      const result = validateConfig({
+        ...DEFAULT_HENCH_CONFIG(),
+        prune: { transcriptMessageChars },
+      });
+      expect(result.ok, `transcriptMessageChars=${transcriptMessageChars} should be refused`).toBe(false);
     }
   });
 

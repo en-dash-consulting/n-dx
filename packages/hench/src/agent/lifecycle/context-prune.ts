@@ -46,6 +46,11 @@
  * is unchanged; between prunes the prompt grows by pure append, which is
  * exactly the shape the cache rewards.
  *
+ * Those two numbers and the per-message transcript cap are defaults, not
+ * constants: a project overrides them through the `hench.prune` config group
+ * ({@link PruneLimits}), because how much verbatim history a run needs against
+ * how often it is willing to reset the cache is a per-repository judgement.
+ *
  * The retained tail is the one region a prune may rewrite, and it does: editing
  * the middle of the history invalidates any signature in the tail that was
  * bound to the old prefix, so a shape may supply
@@ -68,30 +73,51 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { isLLMVendor, resolveTaskModel } from "../../prd/llm-gateway.js";
 import type { LLMConfig, LLMProvider } from "../../prd/llm-gateway.js";
-import type { TokenUsage } from "../../schema/index.js";
+import { DEFAULT_PRUNE_CONFIG } from "../../schema/index.js";
+import type { PruneConfig, TokenUsage } from "../../schema/index.js";
 import { detail } from "../../types/output.js";
 
 /**
  * Turn-pairs tolerated before a prune fires. Unchanged from the pre-summary
- * prune so peak context does not grow.
+ * prune so peak context does not grow. Overridable per project with
+ * `hench.prune.triggerPairs`.
  */
-export const PRUNE_TRIGGER_PAIRS = 20;
+export const PRUNE_TRIGGER_PAIRS = DEFAULT_PRUNE_CONFIG.triggerPairs;
 
 /**
  * Turn-pairs retained verbatim after a prune. Lower than the trigger on
  * purpose: the gap between the two is how many turns of append-only,
- * cache-friendly growth follow each prune.
+ * cache-friendly growth follow each prune. Overridable per project with
+ * `hench.prune.retainPairs`.
  */
-export const PRUNE_RETAIN_PAIRS = 10;
+export const PRUNE_RETAIN_PAIRS = DEFAULT_PRUNE_CONFIG.retainPairs;
 
 /** Hard cap on a single summary. Roughly 400 tokens. */
 export const SUMMARY_CHAR_LIMIT = 1600;
 
-/** Per-message cap when rendering the dropped span for the summarizer. */
-export const TRANSCRIPT_MESSAGE_CHAR_LIMIT = 800;
+/**
+ * Per-message cap when rendering the dropped span for the summarizer.
+ * Overridable per project with `hench.prune.transcriptMessageChars`; see
+ * {@link DEFAULT_PRUNE_CONFIG} for why it matches `MAX_TOOL_OUTPUT_STORED`.
+ */
+export const TRANSCRIPT_MESSAGE_CHAR_LIMIT = DEFAULT_PRUNE_CONFIG.transcriptMessageChars;
 
-/** Overall cap on the rendered span. */
-export const TRANSCRIPT_CHAR_LIMIT = 20_000;
+/**
+ * Overall cap on the rendered span.
+ *
+ * Sized so the per-message cap is the only one that normally fires: a span at
+ * the default trigger is about 22 messages, of which half are tool results
+ * capped at {@link TRANSCRIPT_MESSAGE_CHAR_LIMIT}, so a worst-case realistic
+ * span lands near 23K characters. The remaining headroom is what keeps a
+ * raised `prune.transcriptMessageChars` from silently hitting this ceiling
+ * instead.
+ *
+ * Not a config key: it is a backstop on the summarizer prompt's size rather
+ * than a tuning dial, and the knob an operator actually wants — how much of
+ * each message survives — is the per-message cap. Constructor-overridable for
+ * tests and callers that need a different backstop.
+ */
+export const TRANSCRIPT_CHAR_LIMIT = 40_000;
 
 /**
  * Assistant turn that bridges the brief and the summary on formats that
@@ -210,6 +236,20 @@ interface SummarizeAttempt {
   model?: string;
 }
 
+/**
+ * Per-run overrides for the prune's four size limits.
+ *
+ * Three of them are the `hench.prune.*` config group ({@link PruneConfig}),
+ * which is why this extends it rather than restating the fields; the fourth,
+ * {@link TRANSCRIPT_CHAR_LIMIT}, is a backstop rather than a dial and has no
+ * config key. Every member is optional and falls back to the module constant,
+ * so a caller that passes nothing gets exactly the pre-configuration behavior.
+ */
+export interface PruneLimits extends PruneConfig {
+  /** Overall cap on the rendered span. Defaults to {@link TRANSCRIPT_CHAR_LIMIT}. */
+  transcriptChars?: number;
+}
+
 const NO_PRUNE: PruneOutcome = { dropped: 0, summarized: false };
 
 /** Truncate with a visible marker so the model knows text is missing. */
@@ -227,14 +267,17 @@ function clamp(text: string, limit: number): string {
 export function renderPruneTranscript<M>(
   messages: readonly M[],
   render: (message: M) => string,
+  limits: Pick<PruneLimits, "transcriptMessageChars" | "transcriptChars"> = {},
 ): string {
+  const perMessage = limits.transcriptMessageChars ?? TRANSCRIPT_MESSAGE_CHAR_LIMIT;
+  const overall = limits.transcriptChars ?? TRANSCRIPT_CHAR_LIMIT;
   const lines: string[] = [];
   for (const message of messages) {
     const text = render(message).trim();
     if (text.length === 0) continue;
-    lines.push(clamp(text, TRANSCRIPT_MESSAGE_CHAR_LIMIT));
+    lines.push(clamp(text, perMessage));
   }
-  return clamp(lines.join("\n\n"), TRANSCRIPT_CHAR_LIMIT);
+  return clamp(lines.join("\n\n"), overall);
 }
 
 /**
@@ -303,10 +346,27 @@ export function buildPruneSummaryPrompt(transcript: string, taskTitle: string): 
 export class ConversationPruner<M> {
   private summaryCount = 0;
 
+  private readonly triggerPairs: number;
+  private readonly retainPairs: number;
+  private readonly transcriptMessageChars: number;
+  private readonly transcriptChars: number;
+
+  /**
+   * `limits` is normally the run's `hench.prune` config group, already
+   * validated by `HenchConfigSchema`. It is resolved once here rather than read
+   * per prune so a run's window cannot change under it mid-conversation.
+   */
   constructor(
     private readonly shape: PruneShape<M>,
     private readonly summarize: PruneSummarizer,
-  ) {}
+    limits: PruneLimits = {},
+  ) {
+    this.triggerPairs = limits.triggerPairs ?? PRUNE_TRIGGER_PAIRS;
+    this.retainPairs = limits.retainPairs ?? PRUNE_RETAIN_PAIRS;
+    this.transcriptMessageChars =
+      limits.transcriptMessageChars ?? TRANSCRIPT_MESSAGE_CHAR_LIMIT;
+    this.transcriptChars = limits.transcriptChars ?? TRANSCRIPT_CHAR_LIMIT;
+  }
 
   /**
    * Messages held in the append-only summary region. Counted in messages, not
@@ -320,7 +380,7 @@ export class ConversationPruner<M> {
 
   /** Length at which the next prune fires. */
   get triggerLength(): number {
-    return this.shape.headCount + this.summaryCount + PRUNE_TRIGGER_PAIRS * 2;
+    return this.shape.headCount + this.summaryCount + this.triggerPairs * 2;
   }
 
   /**
@@ -337,7 +397,7 @@ export class ConversationPruner<M> {
 
     // Walk the cut forward to a message that may legally begin the tail, so a
     // tool result is never separated from the request it answers.
-    let cut = messages.length - PRUNE_RETAIN_PAIRS * 2;
+    let cut = messages.length - this.retainPairs * 2;
     while (cut < messages.length && !this.shape.isTailStart(messages[cut])) cut++;
     if (cut >= messages.length || cut <= dropStart) return NO_PRUNE;
 
@@ -391,7 +451,10 @@ export class ConversationPruner<M> {
    */
   private async trySummarize(dropped: readonly M[]): Promise<SummarizeAttempt> {
     try {
-      const transcript = renderPruneTranscript(dropped, this.shape.render);
+      const transcript = renderPruneTranscript(dropped, this.shape.render, {
+        transcriptMessageChars: this.transcriptMessageChars,
+        transcriptChars: this.transcriptChars,
+      });
       if (transcript.length === 0) return {};
 
       const result = await this.summarize(transcript);

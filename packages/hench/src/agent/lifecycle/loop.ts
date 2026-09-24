@@ -788,6 +788,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
           vendor: LLM_VENDOR.GOOGLE,
           taskTitle,
         }),
+        config.prune,
       );
 
       for (let turn = 0; turn < maxTurns; turn++) {
@@ -1379,6 +1380,7 @@ async function runLocalToolLoop(params: {
       vendor: LLM_VENDOR.LOCAL,
       taskTitle,
     }),
+    config.prune,
   );
 
   // Pre-send token check: if maxContextTokens is configured, estimate whether the initial
@@ -1837,6 +1839,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       vendor,
       taskTitle: brief.task.title,
     }),
+    config.prune,
   );
 
   section(

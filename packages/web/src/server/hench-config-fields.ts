@@ -76,6 +76,30 @@ export const CONFIG_GROUP_DEFAULTS: Record<string, Record<string, unknown>> = {
 };
 
 /**
+ * Why hench's `prune` group is deliberately NOT in the table above.
+ *
+ * A group belongs here when the dashboard can leave a partial one on disk, and
+ * that only happens for members it can write. `prune.*` is absent from
+ * {@link CONFIG_FIELD_META}, so no route can produce a partial `prune` group
+ * and completing one would mean the dashboard rewriting config a human hand-
+ * edited, in keys it cannot show. That is what the "every group member is a
+ * writable field" assertion in `tests/unit/server/hench-config-fields.test.ts`
+ * exists to stop.
+ *
+ * Nothing is at risk from the omission: every member of hench's
+ * `PruneConfigSchema` carries its own default, so a partial group already
+ * loads.
+ *
+ * Making `prune` editable here needs more than three `CONFIG_FIELD_META` rows.
+ * hench refuses a config whose `prune.retainPairs` is at or above its
+ * `prune.triggerPairs`, and {@link validateFieldValue} sees one field at a time
+ * — it cannot check a sibling. Adding the rows without a config-aware gate
+ * would let a 200 response write a file the next `ndx work` refuses, which is
+ * exactly the drift `tests/e2e/hench-config-gate-contract.test.js` catches. Do
+ * that work first, or leave the group to the CLI (`ndx config hench.prune.*`).
+ */
+
+/**
  * Fill in missing members of any partially-present group in-place. A group
  * that is absent entirely stays absent (hench applies its own defaults);
  * a group that is present but not a plain object is left for the schema to
