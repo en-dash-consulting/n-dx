@@ -40,6 +40,12 @@ export interface ClaimWire {
   host: string;
   claimedAt: string;
   expiresAt: string;
+  /**
+   * Why the claim is being kept past its run's exit (`"uncommitted-work"`).
+   * Present only on a held claim — a live run's entry omits it, which is how
+   * the dashboard tells a hold from work in progress.
+   */
+  reason?: string;
 }
 
 /**
@@ -120,6 +126,7 @@ async function handleClaims(res: ServerResponse, ctx: ServerContext): Promise<bo
       host: c.host,
       claimedAt: c.claimedAt,
       expiresAt: c.expiresAt,
+      ...(c.reason ? { reason: c.reason } : {}),
     }))
     .sort((a, b) => a.claimedAt.localeCompare(b.claimedAt) || a.taskId.localeCompare(b.taskId));
   jsonResponse(res, 200, { servedWorktree: holder.worktreeRoot, claims: wire });

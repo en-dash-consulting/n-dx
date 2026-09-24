@@ -1449,8 +1449,17 @@ async function handleExecute(
   const claimedBy = await openClaimsStore(ctx.projectDir)
     .isClaimedByOther(taskId, resolveClaimHolder(ctx.projectDir));
   if (claimedBy) {
+    // A held claim is not a running one: its run ended by refusing to
+    // complete the task because work was left uncommitted, and "is being
+    // worked on" would send the operator looking for a process that is not
+    // there. Name the hold and the way to free it instead.
+    const error = claimedBy.reason === "uncommitted-work"
+      ? `Task is held by another worktree: a run in ${claimedBy.worktreeRoot} refused to complete it ` +
+        `because its work is still uncommitted. Deal with that work there, or free the task with ` +
+        `'ndx claim release ${taskId}'.`
+      : `Task is being worked on in another worktree: ${claimedBy.worktreeRoot}`;
     jsonResponse(res, 409, {
-      error: `Task is being worked on in another worktree: ${claimedBy.worktreeRoot}`,
+      error,
       taskId,
       claimedBy: {
         worktreeRoot: claimedBy.worktreeRoot,
@@ -1458,6 +1467,7 @@ async function handleExecute(
         host: claimedBy.host,
         claimedAt: claimedBy.claimedAt,
         expiresAt: claimedBy.expiresAt,
+        ...(claimedBy.reason ? { reason: claimedBy.reason } : {}),
       },
     });
     return true;

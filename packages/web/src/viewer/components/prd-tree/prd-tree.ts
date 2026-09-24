@@ -23,6 +23,7 @@ import type { ComponentType } from "preact";
 import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, PRDDocumentData, ItemStatus, ItemLevel, Priority, TaskUsageSummary, WeeklyBudgetResolution, ItemUsageRollup } from "./types.js";
 import type { ClaimEntry } from "../../hooks/index.js";
+import { useCliName } from "../../hooks/index.js";
 import { computeBranchStats, completionRatio, formatTimestamp } from "./compute.js";
 import { isWorkItem } from "./levels.js";
 import { defaultStatusFilter } from "../../views/status-filter.js";
@@ -349,22 +350,34 @@ function renderDurationCell(args: DurationCellArgs) {
 // capabilities from the bubbled event.
 
 /**
- * "claimed · <worktree>" on a row another checkout is working. Reuses the
- * tag chip's visual so it reads as metadata, not as a status; the tooltip
- * carries the rest of the claim.
+ * "claimed · <worktree>" on a row another checkout is working, or
+ * "held · <worktree>" for a claim a finished run kept because its work is
+ * still uncommitted — "claimed" would read as a live run that is not there.
+ * Reuses the tag chip's visual so it reads as metadata, not as a status; the
+ * tooltip carries the rest of the claim.
  */
 export function claimChipLabel(claim: ClaimEntry): string {
-  return `claimed · ${claim.isServedHere ? "here" : claim.worktree}`;
+  const where = claim.isServedHere ? "here" : claim.worktree;
+  return `${claim.reason ? "held" : "claimed"} · ${where}`;
 }
 
-export function claimChipTitle(claim: ClaimEntry): string {
+export function claimChipTitle(claim: ClaimEntry, cliName: string): string {
+  if (claim.reason) {
+    // A held claim does not expire, so no lease time here — naming one would
+    // promise a self-cleanup that no longer happens.
+    return (
+      `Held: a run in ${claim.worktreeRoot} refused to complete this task because its work is ` +
+      `still uncommitted. Deal with that work there, or free it with '${cliName} claim release ${claim.taskId}'.`
+    );
+  }
   return `Being worked on in ${claim.worktreeRoot} (pid ${claim.pid}${claim.host ? ` on ${claim.host}` : ""}) — claim expires ${claim.expiresAt}`;
 }
 
 function ClaimChip({ claim }: { claim: ClaimEntry }) {
+  const cliName = useCliName();
   return h("span", {
-    class: `tag-chip prd-claim-chip${claim.isServedHere ? " prd-claim-chip-here" : ""}`,
-    title: claimChipTitle(claim),
+    class: `tag-chip prd-claim-chip${claim.isServedHere ? " prd-claim-chip-here" : ""}${claim.reason ? " prd-claim-chip-held" : ""}`,
+    title: claimChipTitle(claim, cliName),
     "data-claimed-by": claim.worktreeRoot,
   }, claimChipLabel(claim));
 }

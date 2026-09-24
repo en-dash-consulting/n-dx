@@ -29,6 +29,11 @@ export interface ClaimEntry {
   host: string;
   claimedAt: string;
   expiresAt: string;
+  /**
+   * Why the claim outlives its run (`"uncommitted-work"`). Present only on a
+   * held claim; a live run's entry omits it.
+   */
+  reason?: string;
 }
 
 /** The acceptance bar is "within one poll interval"; claims change at run cadence, not per second. */
