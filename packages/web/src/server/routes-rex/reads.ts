@@ -43,6 +43,61 @@ export interface ClaimWire {
 }
 
 /**
+ * A higher-priority task the next-task read passed over because another
+ * worktree holds it. Included so the card can say why the suggestion is not
+ * the top of the queue, instead of the operator discovering it as Execute's
+ * 409 a click later.
+ */
+export interface SkippedForClaimWire {
+  taskId: string;
+  title: string;
+  /** Realpath of the claiming worktree root. */
+  worktreeRoot: string;
+  /** Its basename — the label the card shows. */
+  worktree: string;
+}
+
+/**
+ * The next actionable task with foreign live claims excluded — the same set
+ * the Execute route's 409 check consults, so the suggestion is always a task
+ * Execute will accept. Claims are read for the request's workspace
+ * (`ctx.projectDir`), matching how Execute resolves its holder.
+ *
+ * Also reports the highest-priority task that was passed over because of a
+ * claim, when there is one: the unexcluded pick, if it differs and is
+ * claimed, is exactly that task.
+ */
+async function findNextUnclaimedTask(
+  ctx: ServerContext,
+  items: Parameters<typeof findNextTask>[0],
+  completedIds: Set<string>,
+): Promise<{ task: ReturnType<typeof findNextTask>; skipped?: SkippedForClaimWire }> {
+  const holder = resolveClaimHolder(ctx.projectDir);
+  const foreign = await openClaimsStore(ctx.projectDir).claimedElsewhere(holder.worktreeRoot);
+  if (foreign.size === 0) {
+    return { task: findNextTask(items, completedIds) };
+  }
+
+  const task = findNextTask(items, completedIds, { excludeIds: new Set(foreign.keys()) });
+  const top = findNextTask(items, completedIds);
+  if (top && top.id !== (task?.id ?? null)) {
+    const claim = foreign.get(top.id);
+    if (claim) {
+      return {
+        task,
+        skipped: {
+          taskId: top.id,
+          title: top.title,
+          worktreeRoot: claim.worktreeRoot,
+          worktree: basename(claim.worktreeRoot) || claim.worktreeRoot,
+        },
+      };
+    }
+  }
+  return { task };
+}
+
+/**
  * GET /api/rex/claims — every live claim in the repository's claims store.
  *
  * Read-only. The store lives in the git common dir, so this is the same
@@ -117,41 +172,50 @@ export function routePrdReads(
       errorResponse(res, 404, "No PRD data found");
       return true;
     }
-    const stats = computeStats(doc.items);
-    const completedIds = collectCompletedIds(doc.items);
-    const next = findNextTask(doc.items, completedIds);
-    const epics = computeEpicStats(doc.items);
-    const priorities = computePriorityDistribution(doc.items);
-    const reqSummary = computeRequirementsSummary(doc.items);
-    jsonResponse(res, 200, {
-      title: doc.title,
-      stats,
-      percentComplete: stats.total > 0
-        ? Math.round((stats.completed / stats.total) * 100)
-        : 0,
-      epics,
-      nextTask: next,
-      priorities,
-      requirements: reqSummary,
-    });
-    return true;
+    return (async () => {
+      const stats = computeStats(doc.items);
+      const completedIds = collectCompletedIds(doc.items);
+      const { task: next, skipped } = await findNextUnclaimedTask(ctx, doc.items, completedIds);
+      const epics = computeEpicStats(doc.items);
+      const priorities = computePriorityDistribution(doc.items);
+      const reqSummary = computeRequirementsSummary(doc.items);
+      jsonResponse(res, 200, {
+        title: doc.title,
+        stats,
+        percentComplete: stats.total > 0
+          ? Math.round((stats.completed / stats.total) * 100)
+          : 0,
+        epics,
+        nextTask: next,
+        ...(skipped ? { nextTaskSkipped: skipped } : {}),
+        priorities,
+        requirements: reqSummary,
+      });
+      return true;
+    })();
   }
 
-  // GET /api/rex/next — next actionable task
+  // GET /api/rex/next — next actionable task, skipping tasks other worktrees hold
   if (path === "next" && method === "GET") {
     const doc = loadPRDSync(ctx.rexDir);
     if (!doc) {
       errorResponse(res, 404, "No PRD data found");
       return true;
     }
-    const completedIds = collectCompletedIds(doc.items);
-    const next = findNextTask(doc.items, completedIds);
-    if (!next) {
-      jsonResponse(res, 200, { task: null, message: "All tasks completed or blocked" });
+    return (async () => {
+      const completedIds = collectCompletedIds(doc.items);
+      const { task: next, skipped } = await findNextUnclaimedTask(ctx, doc.items, completedIds);
+      if (!next) {
+        jsonResponse(res, 200, {
+          task: null,
+          message: "All tasks completed or blocked",
+          ...(skipped ? { skipped } : {}),
+        });
+        return true;
+      }
+      jsonResponse(res, 200, { task: next, ...(skipped ? { skipped } : {}) });
       return true;
-    }
-    jsonResponse(res, 200, { task: next });
-    return true;
+    })();
   }
 
   // GET /api/rex/log — execution log
