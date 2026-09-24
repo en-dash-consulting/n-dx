@@ -96,6 +96,7 @@ export const HenchConfigSchema = z.object({
       requireCleanTree: z.boolean().optional(),
     })
     .optional(),
+  promptCache: z.boolean().optional(),
 });
 
 const RunStatusSchema = z.enum([

@@ -210,4 +210,71 @@ describe("buildCachedMessageRequest", () => {
     expect(params.tools?.[1]).toHaveProperty("cache_control", { type: "ephemeral" });
     expect(countBreakpoints(params)).toBe(2);
   });
+
+  describe("promptCache: false", () => {
+    it("emits zero cache_control markers and a plain-string system field", () => {
+      const params = buildCachedMessageRequest({
+        model: "claude-sonnet-4-6",
+        maxTokens: 4096,
+        systemPrompt: SYSTEM,
+        tools: TOOLS,
+        messages: [{ role: "user", content: BRIEF }],
+        promptCache: false,
+      });
+
+      expect(countBreakpoints(params)).toBe(0);
+      expect(params.system).toBe(SYSTEM);
+      expect(typeof params.system).toBe("string");
+    });
+
+    it("leaves tools and messages byte-identical to the inputs", () => {
+      const messages: Anthropic.MessageParam[] = [
+        { role: "user", content: BRIEF },
+        { role: "assistant", content: [{ type: "text", text: "working" }] },
+      ];
+      const params = buildCachedMessageRequest({
+        model: "claude-sonnet-4-6",
+        maxTokens: 4096,
+        systemPrompt: SYSTEM,
+        tools: TOOLS,
+        messages,
+        promptCache: false,
+      });
+
+      expect(JSON.stringify(params.tools)).toBe(JSON.stringify(TOOLS));
+      expect(JSON.stringify(params.messages)).toBe(JSON.stringify(messages));
+    });
+
+    it("omits the system field when there is no prompt, same as the enabled path", () => {
+      const params = buildCachedMessageRequest({
+        model: "claude-sonnet-4-6",
+        maxTokens: 4096,
+        systemPrompt: undefined,
+        tools: TOOLS,
+        messages: [{ role: "user", content: BRIEF }],
+        promptCache: false,
+      });
+
+      expect(params.system).toBeUndefined();
+      expect(countBreakpoints(params)).toBe(0);
+    });
+
+    it("does not mutate the caller's tools or messages", () => {
+      const toolsSnapshot = JSON.stringify(TOOLS);
+      const messages: Anthropic.MessageParam[] = [{ role: "user", content: BRIEF }];
+      const messagesSnapshot = JSON.stringify(messages);
+
+      buildCachedMessageRequest({
+        model: "claude-sonnet-4-6",
+        maxTokens: 4096,
+        systemPrompt: SYSTEM,
+        tools: TOOLS,
+        messages,
+        promptCache: false,
+      });
+
+      expect(JSON.stringify(TOOLS)).toBe(toolsSnapshot);
+      expect(JSON.stringify(messages)).toBe(messagesSnapshot);
+    });
+  });
 });

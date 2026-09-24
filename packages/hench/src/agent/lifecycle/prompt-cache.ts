@@ -28,6 +28,15 @@
  *
  * This module is Anthropic-only. The Gemini, OpenAI-compatible and CLI paths in
  * `loop.ts` / `cli-loop.ts` do not call into it.
+ *
+ * Some gateways and proxies placed in front of the Claude API via
+ * `claude.api_endpoint` reject the `cache_control` field outright (some
+ * OpenAI-to-Anthropic shims, some enterprise gateways, Bedrock's legacy
+ * InvokeModel path for models without caching), returning a 400 on turn 1.
+ * `CachedRequestInput.promptCache: false` (surfaced as the `hench.promptCache`
+ * config key) is the escape hatch: `buildCachedMessageRequest` then emits the
+ * request as it looked before caching was added — no breakpoints, `system` as
+ * a plain string, tools and messages passed through untouched.
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
@@ -52,6 +61,13 @@ export interface CachedRequestInput {
   tools: readonly AnthropicToolDef[];
   /** Conversation so far. Never mutated. */
   messages: readonly Anthropic.MessageParam[];
+  /**
+   * When false, skip cache breakpoints entirely: `system` is sent as a plain
+   * string and `tools`/`messages` pass through untouched — no copy-on-write
+   * normalization, no `cache_control` anywhere in the request. Default: true.
+   * See the module header for why this exists.
+   */
+  promptCache?: boolean;
 }
 
 /**
@@ -154,10 +170,26 @@ export function withTrailingCacheBreakpoint(
  *
  * The returned object is what `client.messages.create` is called with; the
  * caller's `tools` and `messages` inputs are left untouched.
+ *
+ * `input.promptCache === false` takes the escape hatch: no `cache_control`
+ * anywhere, `system` as a plain string, `tools`/`messages` passed through as
+ * given (still copied, never the caller's own arrays, but otherwise
+ * byte-identical to the pre-caching request).
  */
 export function buildCachedMessageRequest(
   input: CachedRequestInput,
 ): Anthropic.MessageCreateParamsNonStreaming {
+  if (input.promptCache === false) {
+    const params: Anthropic.MessageCreateParamsNonStreaming = {
+      model: input.model,
+      max_tokens: input.maxTokens,
+      tools: [...input.tools],
+      messages: [...input.messages],
+    };
+    if (input.systemPrompt) params.system = input.systemPrompt;
+    return params;
+  }
+
   const system = buildCachedSystem(input.systemPrompt);
 
   const params: Anthropic.MessageCreateParamsNonStreaming = {

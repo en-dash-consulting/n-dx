@@ -1898,6 +1898,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
             systemPrompt,
             tools: TOOL_DEFINITIONS,
             messages,
+            promptCache: config.promptCache,
           }),
           config,
           vendor,

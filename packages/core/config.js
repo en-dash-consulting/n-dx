@@ -1701,6 +1701,14 @@ Hench settings (.hench/config.json):
                                      livelocked (default: 6). 0 disables the check. Raise it if a
                                      legitimate workload repeats one read-only call many times
                                      without editing anything.
+  hench.promptCache        boolean   Mark cache_control breakpoints on hench.provider=api Claude
+                                     requests (default: true). Set to false when
+                                     claude.api_endpoint points at a gateway or proxy that rejects
+                                     the cache_control field (some OpenAI-to-Anthropic shims, some
+                                     enterprise gateways, Bedrock's legacy InvokeModel path for
+                                     models without caching) and turn 1 fails with a 400. With
+                                     false, requests are sent exactly as before prompt caching was
+                                     added: plain-string system prompt, untouched tools/messages.
 
 Hench test-gate settings (mandatory full-suite gate before commit):
   hench.fullTestCommand    string    Command that runs the whole suite. Resolved from this key,

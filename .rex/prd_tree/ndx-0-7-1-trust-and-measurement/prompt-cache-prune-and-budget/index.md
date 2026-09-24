@@ -21,7 +21,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [No way to disable cache_control breakpoints for a Claude api_endpoint that rejects them](./no-way-to-disable-cache-control.md) | pending |
+| [No way to disable cache_control breakpoints for a Claude api_endpoint that rejects them](./no-way-to-disable-cache-control.md) | completed |
 | [Prompt cache TTL is fixed at 5 minutes, so tool calls longer than about 4 minutes rewrite the whole conversation at the cache-write price](./prompt-cache-ttl-is-fixed-at-5-minutes.md) | pending |
 | [Prune retention and transcript truncation are hard-coded, halving the verbatim window and summarizing from 800-char excerpts](./prune-retention-and-transcript.md) | pending |
 | [Stop Claude CLI cache reads from tripping hench.tokenBudget](./stop-claude-cli-cache-reads-from.md) | completed |

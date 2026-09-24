@@ -328,6 +328,20 @@ export interface HenchConfig {
    * See {@link GitSafetyConfig} for field semantics and defaults.
    */
   git?: GitSafetyConfig;
+  /**
+   * Whether the Anthropic API loop marks `cache_control` breakpoints on the
+   * request (see `agent/lifecycle/prompt-cache.ts`). Default: true.
+   *
+   * Set to false when `claude.api_endpoint` points at a gateway or proxy that
+   * rejects the `cache_control` field (some OpenAI-to-Anthropic shims, some
+   * enterprise gateways, Bedrock's legacy InvokeModel path for models without
+   * caching) — those return a 400 on turn 1 with no other way to disable the
+   * markers. When false, the request is sent as it was before prompt caching
+   * was added: `system` as a plain string, tools and messages untouched.
+   * Only meaningful when `provider === "api"` with the Claude vendor; the CLI
+   * loop never calls into `prompt-cache.ts`.
+   */
+  promptCache?: boolean;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────
