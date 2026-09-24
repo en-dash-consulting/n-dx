@@ -74,6 +74,7 @@ import type {
 } from "./rex-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
 import { resolveNdxBin } from "./routes-commands.js";
+import { readCliName } from "./cli-name.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { ProcessMemoryTracker } from "./process-memory-tracker.js";
 import { ConcurrentExecutionMetrics } from "./concurrent-execution-metrics.js";
@@ -1486,7 +1487,7 @@ async function handleExecute(
     const error = claimedBy.reason === "uncommitted-work"
       ? `Task is held by another worktree: a run in ${claimedBy.worktreeRoot} refused to complete it ` +
         `because its work is still uncommitted. Deal with that work there, or free the task with ` +
-        `'ndx claim release ${taskId}'.`
+        `'${readCliName(ctx.projectDir)} claim release ${taskId}'.`
       : `Task is being worked on in another worktree: ${claimedBy.worktreeRoot}`;
     jsonResponse(res, 409, {
       error,

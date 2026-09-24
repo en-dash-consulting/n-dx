@@ -307,7 +307,59 @@ describe("recovery commands", () => {
       "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
     );
     const out = formatUncommittedWorkRefusal(["docs/release notes.md"], new Set());
-    expect(out).toContain('git add -- "docs/release notes.md"');
+    // Single quotes, not double: double quotes still expand $(…) in POSIX
+    // shells and PowerShell, so they are never emitted around a path.
+    expect(out).toContain("git add -- 'docs/release notes.md'");
+  });
+
+  it("neutralizes shell metacharacters in a hostile filename", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    // Copy/paste recovery commands: a filename an agent (or a compromised
+    // repo) created must never execute when the operator pastes the command.
+    const hostile = [
+      "src/$(touch pwned).ts",
+      "src/`touch pwned`.ts",
+      "src/a;rm -rf x.ts",
+      'src/a"b.ts',
+      "src/$HOME.ts",
+      "src/a&b.ts",
+    ];
+    const out = formatUncommittedWorkRefusal(hostile, new Set());
+    for (const p of hostile) {
+      expect(out, `${p} must be single-quoted wherever it appears in a command`)
+        .toContain(`'${p}'`);
+    }
+    // Outside the single-quoted segments, no command line carries a
+    // metacharacter at all.
+    const commandLines = out.split("\n").filter((l) => l.trimStart().startsWith("git "));
+    expect(commandLines.length).toBeGreaterThan(0);
+    for (const line of commandLines) {
+      const outsideQuotes = line.replace(/'[^']*'/g, "");
+      expect(outsideQuotes, `unquoted metacharacter in: ${line}`).not.toMatch(/[$`;&"()]/);
+    }
+  });
+
+  it("escapes an embedded single quote with the POSIX close-escape-reopen idiom", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const out = formatUncommittedWorkRefusal(["src/it's a file.ts"], new Set());
+    expect(out).toContain(String.raw`git add -- 'src/it'\''s a file.ts'`);
+  });
+
+  it("the record-commit-pending message quotes its pathspec the same way", async () => {
+    const { formatRecordCommitPending } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const out = formatRecordCommitPending(
+      [".rex/prd_tree/some task/index.md", ".rex/$(evil).json"],
+      "task-1",
+      "boom",
+    );
+    expect(out).toContain("git add -- '.rex/prd_tree/some task/index.md' '.rex/$(evil).json'");
+    expect(out).not.toMatch(/git add -- \.rex/);
   });
 
   it("the commands carry every path even when the displayed list truncates", async () => {

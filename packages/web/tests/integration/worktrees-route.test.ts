@@ -19,7 +19,8 @@ import {
   invalidateWorktreesAnswer,
   type WorktreeEntry,
 } from "../../src/server/routes-worktrees.js";
-import { closeWorktreeRunWatchers } from "../../src/server/routes-hench.js";
+import { closeWorktreeRunWatchers, setWorktreeRunWatchFactory } from "../../src/server/routes-hench.js";
+import type { FSWatcher } from "node:fs";
 import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 
 function git(cwd: string, ...args: string[]): string {
@@ -321,6 +322,42 @@ describe("GET /api/worktrees", () => {
     } finally {
       closeWorktreeRunWatchers();
       await server.close();
+    }
+  });
+
+  it("a request scoped to another workspace does not prune that worktree's live watcher", async () => {
+    // Regression: the prune keep-set excluded the request's served worktree,
+    // and `isServed` is per-request (ctx is workspace-scoped) — so a viewer
+    // mounted on the linked worktree, whose /api/worktrees arrives with ctx
+    // scoped to `linked`, closed the watcher the anchor's dashboard had
+    // registered for `linked`. Pushes to the anchor's Sessions view went dark
+    // until something re-registered it.
+    const opened: string[] = [];
+    const closed: string[] = [];
+    setWorktreeRunWatchFactory((dir) => {
+      opened.push(dir);
+      return { close: () => { closed.push(dir); }, on: () => {} } as unknown as FSWatcher;
+    });
+    const linkedRuns = join(linked, ".hench", "runs");
+    const anchorServer = await startRouteTestServer((req, res) =>
+      handleWorktreesRoute(req, res, ctxFor(repo), { broadcast: vi.fn() }),
+    );
+    const linkedServer = await startRouteTestServer((req, res) =>
+      handleWorktreesRoute(req, res, ctxFor(linked), { broadcast: vi.fn() }),
+    );
+    try {
+      await fetchWorktrees(anchorServer);
+      expect(opened).toContain(linkedRuns);
+
+      // A different projectDir misses the answer cache, so this request
+      // recomputes the worktree list and runs the prune.
+      await fetchWorktrees(linkedServer);
+      expect(closed).not.toContain(linkedRuns);
+    } finally {
+      setWorktreeRunWatchFactory(null);
+      closeWorktreeRunWatchers();
+      await anchorServer.close();
+      await linkedServer.close();
     }
   });
 

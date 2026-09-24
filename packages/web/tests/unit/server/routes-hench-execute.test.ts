@@ -196,6 +196,9 @@ describe("POST /api/hench/execute", () => {
         },
       },
     }));
+    // The release guidance must carry the project's configured CLI name, not
+    // a hard-coded `ndx` — configured projects install under cli.name.
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ cli: { name: "myapp" } }));
 
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
@@ -206,7 +209,7 @@ describe("POST /api/hench/execute", () => {
     const body = await res.json();
     expect(body.error).toContain("held");
     expect(body.error).toContain("uncommitted");
-    expect(body.error).toContain("ndx claim release task-1");
+    expect(body.error).toContain("myapp claim release task-1");
     expect(body.error).not.toContain("is being worked on");
     expect(body.claimedBy).toMatchObject({
       worktreeRoot: "/somewhere/else/feature-x",

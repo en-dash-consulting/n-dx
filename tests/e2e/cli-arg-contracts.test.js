@@ -372,6 +372,14 @@ describe("CLI argument contracts", () => {
       expect(out).toContain("No claims are held");
     });
 
+    it("claim release --all=true <dir> works from outside the project", () => {
+      // Rex's flag parser reads `--all=true` as `--all`; the orchestrator's
+      // [dir] slicing must agree, or the init check validates the cwd and
+      // fails with NDX_CLI_NOT_INITIALIZED despite a valid <dir> argument.
+      const out = run(["claim", "release", "--all=true", projectDir], { cwd: outsideDir });
+      expect(out).toContain("No claims are held");
+    });
+
     it("claim list without a dir still refuses an uninitialized cwd", () => {
       const { stderr } = runFail(["claim", "list"], { cwd: outsideDir });
       expect(stderr).toContain("NOT_INITIALIZED");

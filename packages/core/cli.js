@@ -1995,8 +1995,13 @@ async function handleUsage(rest) {
  */
 async function handleClaim(rest) {
   const positionals = rest.filter((a) => !a.startsWith("-"));
+  // Rex's flag parser reads bare `--all` and `--all=true` as the same flag —
+  // recognize both spellings here, or the [dir] slicing disagrees with the
+  // slicing rex itself will do and the init check validates the wrong
+  // directory.
+  const releaseAll = rest.some((a) => a === "--all" || a === "--all=true");
   const dirArgs =
-    positionals[0] === "release" && !rest.includes("--all")
+    positionals[0] === "release" && !releaseAll
       ? positionals.slice(2)
       : positionals.slice(1);
   requireInit(resolveDir(dirArgs), [".rex"]);

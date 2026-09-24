@@ -353,7 +353,7 @@ export function formatOperatorPrdLeftovers(paths: string[]): string {
  * avoid.
  */
 export function formatRecordCommitPending(paths: string[], taskId: string, error: string): string {
-  const pathspec = paths.join(" ");
+  const pathspec = paths.map(shellPath).join(" ");
   return (
     `⚠ Work committed; record not committed: the PRD record commit for task ${taskId} failed.\n` +
     `  ${error}\n` +
@@ -375,9 +375,17 @@ export function deletedAmong(projectDir: string, paths: string[]): Set<string> {
   return new Set(paths.filter((p) => !existsSync(join(projectDir, p))));
 }
 
-/** Quote a pathspec entry the shell would otherwise split. */
+/**
+ * Quote a pathspec entry for copy/paste into a shell. Bare only when every
+ * character is inert; otherwise single-quoted, because single quotes are the
+ * one form that suppresses expansion in POSIX shells and PowerShell alike —
+ * inside double quotes `$(…)` still executes in both, which turns a hostile
+ * filename into a command the moment the operator pastes. An embedded single
+ * quote is closed, escaped, and reopened (the POSIX `'\''` idiom).
+ */
 function shellPath(path: string): string {
-  return /\s/.test(path) ? `"${path}"` : path;
+  if (/^[A-Za-z0-9._/-]+$/.test(path)) return path;
+  return `'${path.replace(/'/g, "'\\''")}'`;
 }
 
 /**
