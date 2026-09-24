@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 22194,
-    "uniqueTokens": 13707,
+    "perCallTokens": 22227,
+    "uniqueTokens": 13740,
     "skills": 13,
     "skillTokens": 17483
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4037,
-      "uniqueTokens": 4037
+      "perCallTokens": 4070,
+      "uniqueTokens": 4070
     },
     "core": {
       "surfaces": 1,
@@ -727,9 +727,9 @@
       "inline": false,
       "literals": 66,
       "constants": {},
-      "ownTokens": 890,
-      "fixedChars": 3557,
-      "fixedTokens": 890
+      "ownTokens": 923,
+      "fixedChars": 3689,
+      "fixedTokens": 923
     },
     {
       "pkg": "hench",
@@ -928,9 +928,9 @@
           "tokens": 167
         }
       ],
-      "fixedTokens": 1104,
+      "fixedTokens": 1137,
       "branchConditional": true,
-      "unreachedTokens": 398
+      "unreachedTokens": 431
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -985,8 +985,8 @@
       }
     ]
   },
-  "contentHash": "d989f195ee4062d0",
-  "recordedAt": "2026-09-22T20:09:18.021Z",
-  "commit": "55f2d5b4b584",
+  "contentHash": "49b2a205b4b8b2d0",
+  "recordedAt": "2026-09-24T16:18:52.203Z",
+  "commit": "61c655cb869a",
   "dirty": false
 }
