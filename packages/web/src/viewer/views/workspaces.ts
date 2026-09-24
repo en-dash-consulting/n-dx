@@ -39,7 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks"
 import type { ViewId } from "../types.js";
 import { detectBasePath } from "../external.js";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
-import { ElapsedTime, StartTaskButton } from "../components/index.js";
+import { ElapsedTime, StartTaskButton, GlossaryLine } from "../components/index.js";
 import { formatSince } from "../utils/format.js";
 
 // ---------------------------------------------------------------------------
@@ -672,6 +672,7 @@ export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) 
       h("p", { class: "workspaces-subtitle" },
         "Every git worktree of this repository, with what each one is running and how its PRD differs from the anchor's.",
       ),
+      h(GlossaryLine, { term: "worktree anchor" }),
     ),
     h(MachineStrip, { stats }),
     body,

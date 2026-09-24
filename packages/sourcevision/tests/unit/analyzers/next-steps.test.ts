@@ -132,6 +132,22 @@ describe("deriveNextSteps", () => {
     expect(result[0].relatedFindings.length).toBeGreaterThan(result[1].relatedFindings.length);
   });
 
+  it("drops the metric detail after an em-dash from the title but keeps it in the description", () => {
+    const findings = [
+      makeFinding({
+        severity: "warning",
+        type: "suggestion",
+        scope: "fragile-zone",
+        text: "Zone \"Fragile\" is fragile and needs refactoring — cohesion: 0.20, coupling: 0.80 (risk score: 0.65)",
+      }),
+    ];
+    const result = deriveNextSteps(makeZones(findings));
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("Zone \"Fragile\" is fragile and needs refactoring");
+    expect(result[0].title).not.toContain("cohesion");
+    expect(result[0].description).toContain("cohesion: 0.20, coupling: 0.80");
+  });
+
   it("truncates long text in titles", () => {
     const longText = "A".repeat(100);
     const findings = [
@@ -645,6 +661,77 @@ describe("deriveNextSteps", () => {
       const result = deriveNextSteps(makeZones(findings, zones));
       expect(result).toHaveLength(1);
       expect(result[0].priority).toBe("high");
+    });
+  });
+
+  // ── Plain-language titles ───────────────────────────────────────────────
+
+  describe("plain-language titles", () => {
+    it("leads the title with plain language and keeps the metric in the description", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "observation",
+          scope: "test-zone",
+          text: "Low cohesion (0.24) — files are loosely related, consider splitting this zone",
+        }),
+      ];
+      const result = deriveNextSteps(makeZones(findings));
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe("Files are loosely related, consider splitting this zone");
+      expect(result[0].title).not.toContain("0.24");
+      expect(result[0].description).toContain("Low cohesion (0.24)");
+    });
+
+    it("states the group's count before the plain-language lead, not the metric", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "anti-pattern",
+          scope: "hench-zone",
+          text: 'High coupling (0.82) — 3 imports target "hench"',
+        }),
+        makeFinding({
+          severity: "warning",
+          type: "anti-pattern",
+          scope: "hench-zone",
+          text: 'High coupling (0.9) — 2 imports target "rex"',
+        }),
+      ];
+      const result = deriveNextSteps(makeZones(findings));
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('2 related findings: 3 imports target "hench"');
+      expect(result[0].title.startsWith("High coupling")).toBe(false);
+    });
+
+    it("passes free-form finding text through unchanged when it has no metric prefix", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "suggestion",
+          text: "Consider extracting the shared validation logic into its own module",
+        }),
+      ];
+      const result = deriveNextSteps(makeZones(findings));
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe(
+        "Consider extracting the shared validation logic into its own module"
+      );
+    });
+
+    it("moves a colon-style metric label out of the title lead", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "observation",
+          scope: "global",
+          text: 'Bidirectional coupling: "a" ↔ "b" (4+2 crossings) — consider extracting shared interface',
+        }),
+      ];
+      const result = deriveNextSteps(makeZones(findings));
+      expect(result).toHaveLength(1);
+      expect(result[0].title.startsWith("Bidirectional coupling:")).toBe(false);
+      expect(result[0].description).toContain("Bidirectional coupling:");
     });
   });
 });

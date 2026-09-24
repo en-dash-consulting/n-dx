@@ -1,3 +1,10 @@
+/* Files page language analysis strip — analysed / inventoried-only / skipped */
+.language-analysis-strip {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  margin: 0 0 var(--space-3);
+}
+
 /* Search/filter bar */
 .filter-bar {
   display: flex;

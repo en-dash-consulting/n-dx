@@ -24,6 +24,7 @@ import { basename } from "../utils.js";
 import { SearchFilter } from "../components/index.js";
 import { BrandedHeader } from "../components/index.js";
 import { ZoneSlideout } from "../components/index.js";
+import { GlossaryLine } from "../components/index.js";
 import type {
   ZoneData,
   BoxRect,
@@ -2470,6 +2471,7 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
         ? `${zones.zones.length} zones, ${zones.crossings.length} cross-zone dependencies, ${zones.unzoned.length} unzoned files`
         : `${visibleZones.length} sub-zones in ${drillPath[drillPath.length - 1].label}`,
     ),
+    h(GlossaryLine, { term: "zone" }),
 
     // Search
     h(SearchFilter, {

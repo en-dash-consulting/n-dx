@@ -134,7 +134,7 @@ export function deriveNextSteps(zones: Zones): NextStep[] {
 
     steps.push({
       priority: sugPriority,
-      title: truncateText(f.text, 80),
+      title: titleText(f.text),
       description: f.text,
       category: "refactor",
       relatedFindings: related,
@@ -156,7 +156,7 @@ export function deriveNextSteps(zones: Zones): NextStep[] {
 
     steps.push({
       priority: isHighImpact(f, zoneList) ? "high" : "medium",
-      title: truncateText(f.text, 80),
+      title: titleText(f.text),
       description: `${f.text}${filesStr}`,
       category: categorizeFromType(f.type),
       relatedFindings: [i],
@@ -179,16 +179,65 @@ export function deriveNextSteps(zones: Zones): NextStep[] {
 }
 
 function summarizeFindings(findings: Finding[], indices: number[]): string {
+  const lead = titleLead(findings[indices[0]].text);
   if (indices.length === 1) {
-    return truncateText(findings[indices[0]].text, 80);
+    return truncateText(lead, 80);
   }
-  const f = findings[indices[0]];
-  return truncateText(f.text, 60) + ` (+${indices.length - 1} related)`;
+  return truncateText(`${indices.length} related findings: ${lead}`, 80);
 }
 
 function truncateText(text: string, max: number): string {
   if (text.length <= max) return text;
   return text.slice(0, max - 1) + "\u2026";
+}
+
+/**
+ * Metric-prefixed finding text, read standalone. Matches a leading
+ * "<Label> (<value>) <dash>" or "<Label>:" prefix and returns the
+ * plain-language remainder, capitalized. Text without a recognized prefix
+ * (e.g. AI-authored findings, which are already free-form prose) passes
+ * through unchanged.
+ */
+const METRIC_PAREN_PREFIX = /^[A-Z][\w %]*\s*\([^)]*\)\s*[\u2014-]\s*(.+)$/;
+const METRIC_COLON_PREFIX = /^[A-Z][\w ]*:\s*(.+)$/;
+
+/**
+ * Move a finding's leading metric expression out of the way so a Next Step
+ * title reads as plain language first.
+ *
+ * Finding.text is written metric-first, e.g. "Low cohesion (0.2), files are
+ * loosely related, consider splitting this zone", because the same text also
+ * backs CONTEXT.md and llms.txt, where a number up front is the point. A
+ * Next Step title is read standalone in the dashboard, so it should lead
+ * with the plain-language complaint instead; the original text (metric
+ * included) still becomes NextStep.description via the caller. Generators
+ * that already lead with plain language (risk-scoring.ts) pass through
+ * unchanged, and titleLead() then drops their trailing metric clause.
+ */
+function plainLanguageLead(text: string): string {
+  const match = text.match(METRIC_PAREN_PREFIX) ?? text.match(METRIC_COLON_PREFIX);
+  if (!match) return text;
+  const rest = match[1];
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
+/**
+ * The plain-language lead of a finding's text: any leading metric prefix
+ * removed (plainLanguageLead), then any metric/threshold detail clause after
+ * a " \u2014 " separator dropped (e.g. "Zone X is fragile \u2014 cohesion: 0.20,
+ * coupling: 0.80"). Titles must lead with what is wrong, not the metric that
+ * proves it; the detail still reaches the reader through
+ * `NextStep.description`, which carries the finding's full text.
+ */
+function titleLead(text: string): string {
+  const lead = plainLanguageLead(text);
+  const sepIndex = lead.indexOf(" \u2014 ");
+  return sepIndex === -1 ? lead : lead.slice(0, sepIndex);
+}
+
+/** A Next Step title: the finding's plain-language lead, truncated. */
+function titleText(text: string, max = 80): string {
+  return truncateText(titleLead(text), max);
 }
 
 /** Threshold of related items at which a warning finding is considered high-impact. */

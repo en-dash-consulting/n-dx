@@ -12,7 +12,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
-import { BrandedHeader } from "../components/index.js";
+import { BrandedHeader, GlossaryLine } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -385,6 +385,7 @@ function CategorySection({ category, fields, editValues, errors, onFieldChange }
       h("div", null,
         h("h3", { class: "hench-config-category-title" }, meta.label),
         h("p", { class: "hench-config-category-desc" }, meta.description),
+        category === "guard" ? h(GlossaryLine, { term: "guard rail" }) : null,
       ),
     ),
     h("div", { class: "hench-config-fields" },

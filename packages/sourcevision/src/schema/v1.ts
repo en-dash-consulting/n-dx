@@ -105,6 +105,22 @@ export interface InventorySummary {
   byLanguage: Record<string, number>;
   byRole: Partial<Record<FileRole, number>>;
   byCategory: Record<string, number>;
+  /**
+   * File extensions the walker saw but did not inventory because the
+   * extension isn't recognized as program code (the `codeOnly` filter
+   * rejected them), extension -> file count. Optional: absent when
+   * `codeOnly` is disabled, when nothing was skipped, and in inventories
+   * written before this field existed.
+   */
+  skippedExtensions?: Record<string, number>;
+  /**
+   * Subset of `byLanguage` keys whose files take part in import-graph and
+   * zone analysis (JS/TS always, plus the project's detected primary
+   * language's parseable extensions). Languages in `byLanguage` but absent
+   * here were inventoried but not analysed. Optional: absent in
+   * inventories written before this field existed.
+   */
+  analysedLanguages?: string[];
 }
 
 export interface Inventory {
