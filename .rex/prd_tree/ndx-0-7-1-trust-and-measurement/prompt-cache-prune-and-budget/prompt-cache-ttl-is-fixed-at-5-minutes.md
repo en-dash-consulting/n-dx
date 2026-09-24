@@ -2,7 +2,7 @@
 id: "a0eaf286-9157-400b-931e-bcdf78b6fbd6"
 level: "task"
 title: "Prompt cache TTL is fixed at 5 minutes, so tool calls longer than about 4 minutes rewrite the whole conversation at the cache-write price"
-status: "pending"
+status: "completed"
 priority: "low"
 tags:
   - "0.7.1"
@@ -16,6 +16,10 @@ tags:
   - "recovered-from-08a93b7f"
 source: "ndx-adversarial-review of PR #353 (original rex id dbc469d2-88fd-4221-825a-65ae3c3b19ce, recovered from 08a93b7f on 2026-09-23)"
 startedAt: "2026-09-24T17:21:13.026Z"
+completedAt: "2026-09-24T17:54:44.467Z"
+endedAt: "2026-09-24T17:54:44.467Z"
+resolutionType: "code-change"
+resolutionDetail: "Added hench.promptCacheTtl (\"5m\" | \"1h\", default 5m). With \"1h\" both cache_control breakpoints carry ttl \"1h\"; the default request is byte-identical to before. Schema validation rejects other values; config docs state the 2x write cost and the 5-60 minute window, and reference the under-reporting caveat on MODEL_COSTS in llm-client config.ts. Work commit de7fa74b (committed by hand after run 01d15d75 ended with its work uncommitted; hench's test gate had passed and the adversarial review ran, with F1 fixed)."
 acceptanceCriteria:
   - "hench config schema accepts `promptCacheTtl` with values `5m` and `1h` (default `5m`) and rejects other values with an actionable error"
   - "With `promptCacheTtl: \"1h\"`, both cache_control markers in the built request carry `ttl: \"1h\"`"
@@ -24,6 +28,6 @@ acceptanceCriteria:
   - "Config documentation states the 2x write cost and the 5 to 60 minute gap where 1h pays off"
   - "Cost estimates either price 1h cache writes at 2x input, or keep the documented under-reporting caveat in llm-client's model-pricing table and reference it from the config documentation"
 description: "Recovered 2026-09-23 from 08a93b7f (original id dbc469d2). It was left behind when #353 was rebased into #390. Re-verified on main: `ephemeral()` at `prompt-cache.ts:41` returns `{ type: \"ephemeral\" }`, with no `ttl` field and no `promptCacheTtl` config. Cost note: llm-client's `model-pricing` table documents that a 1-hour cache write bills at 2x input rather than 1.25x. If this key ships, price 1h writes correctly or keep that caveat and reference it.\n\nSeverity: low. Verdict: should-fix (user elected to address). Found by the adversarial review of PR #353.\n\n## Observation\nBoth breakpoints in packages/hench/src/agent/lifecycle/prompt-cache.ts:41 use `{ type: \"ephemeral\" }`, the 5-minute TTL. Anthropic measures the TTL from the start of the request that wrote or read the entry, so generation time counts against it. A turn whose tool call runs a long test suite (the test-runner and local loop allow 5 minutes) leaves the next request outside the window: the conversation prefix is re-written at 1.25x input price instead of read at 0.1x, for up to 20 pairs plus system and tools. The 1-hour TTL costs 2x on writes and only pays off when start-to-start gaps between turns regularly fall in the 5 to 60 minute range, so it should be opt-in per project. Entries with the longer TTL must appear before shorter ones, so both breakpoints must share one TTL.\n\n## Reachability\nAny API-mode run whose tool calls exceed roughly 4 minutes; common for projects with slow test suites.\n\n## Solution options\n1. (Recommended) Add `hench.promptCacheTtl: \"5m\" | \"1h\"` (default `\"5m\"`). When `\"1h\"`, both markers carry `ttl: \"1h\"`. Document the break-even so users only enable it when their turns are slow. Cost: trivial. Risk: none at the default.\n2. Choose the TTL adaptively from measured tool latency. Over-engineered for the size of the effect.\n\nOption 1 mirrors the SDK's own knob.\n\nConstraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (hench: src/prd/rex-gateway.ts and src/prd/llm-gateway.ts; web: src/server/rex-gateway.ts and src/server/domain-gateway.ts) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name (@n-dx/hench, @n-dx/rex, @n-dx/web, @n-dx/core, @n-dx/sourcevision, @n-dx/llm-client) with a patch bump; run pnpm preflight before opening the PR."
-lastModified: "2026-09-24T17:38:15.276Z"
+lastModified: "2026-09-24T17:54:44.829Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
