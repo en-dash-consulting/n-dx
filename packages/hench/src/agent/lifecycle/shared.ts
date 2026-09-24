@@ -2997,10 +2997,20 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       // release it. The refusal means finished work is sitting uncommitted in
       // *this* worktree; a free task is an invitation for another worktree to
       // claim it and do the same work again. The hold outlives this process
-      // and lapses at the claim's existing TTL. See process/task-claims.ts.
+      // and lapses at the claim's existing TTL, and it re-asserts the claim
+      // when the agent's own status write already released it through the MCP
+      // server — see TaskClaims.hold in process/task-claims.ts.
       if (opts.claims && run.taskId) {
         try {
-          await opts.claims.hold(run.taskId, "uncommitted-work");
+          const held = await opts.claims.hold(run.taskId, "uncommitted-work");
+          if (held === null) {
+            // Never silent again (run 01c990df): a hold that did not stick
+            // means the task is back on the market with its work uncommitted.
+            detail(
+              `Warning: could not hold the claim on ${run.taskId} — ` +
+                `another worktree may have taken the task, or this run never claimed it.`,
+            );
+          }
         } catch {
           // A claims-store failure must not change the run's outcome. The
           // claim then dies with this pid, as it did before holds existed.
