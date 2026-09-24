@@ -40,14 +40,15 @@
  * {@link SLUG_RULE_VERSION} in the same commit and can turn adoption back into
  * a refusal there. Refusing today buys protection against a future that does
  * not exist, and charges for it now: the marker is unreleased, so *every*
- * repository is unmarked, and rule {@link SLUG_RULE_VERSION} predates the
- * oldest release in the wild — `rex migrate-slugs` on those trees renames
- * nothing and records the marker, which is precisely what adoption does. The
- * refusal would fall entirely on the population for whom the command is
- * ceremony. A notice buys the visibility without the stop.
+ * repository is unmarked, and every tree written by 0.5.2 or later already
+ * follows rule {@link SLUG_RULE_VERSION} — `rex migrate-slugs` on those trees
+ * renames nothing and records the marker, which is precisely what adoption
+ * does. The refusal would fall entirely on the population for whom the command
+ * is ceremony. A notice buys the visibility without the stop.
  *
- * Trees older than that carry rule-1 paths, fail the scan, and are refused —
- * as they were before the marker existed.
+ * Trees older than that carry rule-1 paths (0.5.1 suffixed every slug with
+ * `-{id6}`; the title-only rule before it is rule 1 too), fail the scan, and
+ * are refused — as they were before the marker existed.
  *
  * `rex migrate-slugs` is the sole sanctioned way past a refusal: it rewrites
  * the tree under this build's rule and adopts the marker in the same locked

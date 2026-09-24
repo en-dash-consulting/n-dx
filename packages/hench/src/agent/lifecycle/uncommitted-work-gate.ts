@@ -33,31 +33,72 @@ import {
 } from "../../store/artifacts.js";
 
 /**
- * PRD paths that a completing run commits *after* this gate runs — either via
- * the commit prompt (which stages `.rex/` alongside the agent's work) or via
- * `commitCompletionMetadata` on the autoCommit path.
- *
- * They are dirty at gate time by design: the agent's own `rex_update_status`
- * call, and hench's completion write, both land here. Counting them as leaked
- * work would refuse every completion.
- *
- * Two entries, not one. `tree-meta.json` is a tracked sidecar that *every*
- * store save rewrites, and in a project whose committed copy predates the
- * schema marker the rewrite changes its bytes — so the first PRD write of any
- * run produced ` M .rex/tree-meta.json`, which is neither a hench runtime
- * artifact nor under the tree, and the completion gate refused every task
- * forever. The same dirt defeated `--reset-deferred` (#365) one gate earlier.
- *
- * The append-only execution log is also part of the PRD write: each status
- * transition records its audit entry there. The legacy `.rex/prd.md` remains
- * absent because no PRD mutation writes it any more.
+ * One entry in the single definition of the PRD paths hench's own writes
+ * touch. `PRD_STAGE_PATHS` and `PRD_COMMIT_PATHS` both derive from the list
+ * below — the staged set and the discounted set have drifted twice, in both
+ * directions, and each drift was invisible until a project hit it:
+ * `tree-meta.json` was once discounted by nobody and staged by nobody, so
+ * every completion was refused; then the execution log was staged by nobody
+ * but still discounted, so in a project that tracks it every completion left
+ * it silently dirty and the next autonomous run's pre-run gate refused to
+ * start.
  */
-export const PRD_COMMIT_PATHS: readonly string[] = [
-  `.rex/${PRD_TREE_DIRNAME}/`,
-  `.rex/${TREE_META_FILENAME}`,
-  ".rex/execution-log.jsonl",
-  ".rex/execution-log.1.jsonl",
+interface PrdWritePath {
+  /** Project-relative path, forward slashes, no trailing slash. */
+  path: string;
+  /** A directory: the gate's discount covers everything beneath it. */
+  isDirectory: boolean;
+  /**
+   * Who lands the write. `"hench"`: the completion/reset commits stage it.
+   * `"operator"`: hench never stages it — the append-only execution log is
+   * gitignored by `rex init`, and in a repository that tracks it anyway the
+   * operator owns committing it; the completion path *reports* it
+   * ({@link listOperatorOwnedPrdDirt}) rather than leaving it silently dirty.
+   */
+  stagedBy: "hench" | "operator";
+}
+
+/**
+ * The single definition. These paths are dirty at gate time by design: the
+ * agent's own `rex_update_status` call, and hench's completion write, land
+ * here — counting them as leaked work would refuse every completion.
+ *
+ * `tree-meta.json` is its own entry because it is a tracked sidecar *every*
+ * store save rewrites; in a project whose committed copy predated the schema
+ * marker the rewrite changed its bytes, and as neither a runtime artifact nor
+ * a tree path it once refused every task forever. The execution-log entries
+ * carry each status transition's audit line. The legacy `.rex/prd.md` is
+ * absent because no PRD mutation writes it any more (the commit prompt still
+ * stages it when present, as a prompt-only legacy extra).
+ */
+const PRD_WRITE_PATHS: readonly PrdWritePath[] = [
+  { path: `.rex/${PRD_TREE_DIRNAME}`, isDirectory: true, stagedBy: "hench" },
+  { path: `.rex/${TREE_META_FILENAME}`, isDirectory: false, stagedBy: "hench" },
+  { path: ".rex/execution-log.jsonl", isDirectory: false, stagedBy: "operator" },
+  { path: ".rex/execution-log.1.jsonl", isDirectory: false, stagedBy: "operator" },
 ];
+
+/**
+ * What the completion and reset-deferred commits stage (after per-path
+ * existence and gitignore filtering — see `prdPathsToStage` in shared.ts).
+ */
+export const PRD_STAGE_PATHS: readonly string[] = PRD_WRITE_PATHS
+  .filter((entry) => entry.stagedBy === "hench")
+  .map((entry) => entry.path);
+
+/** PRD writes hench never stages; dirty ones are the operator's, and are said so. */
+export const OPERATOR_PRD_PATHS: readonly string[] = PRD_WRITE_PATHS
+  .filter((entry) => entry.stagedBy === "operator")
+  .map((entry) => entry.path);
+
+/**
+ * What the completion gate discounts: every PRD write path, staged-by-hench
+ * or not. A trailing slash marks a directory prefix for
+ * {@link findUncommittedWork}'s matcher.
+ */
+export const PRD_COMMIT_PATHS: readonly string[] = PRD_WRITE_PATHS.map((entry) =>
+  entry.isDirectory ? `${entry.path}/` : entry.path,
+);
 
 /** How many paths the refusal message lists before it truncates. */
 const MAX_REPORTED_PATHS = 20;
@@ -262,6 +303,64 @@ export function renderPaths(paths: string[]): string {
     shown.push(`  …and ${paths.length - MAX_REPORTED_PATHS} more`);
   }
   return shown.join("\n");
+}
+
+/**
+ * The operator-owned PRD writes ({@link OPERATOR_PRD_PATHS}) still dirty in
+ * `projectDir`'s working tree.
+ *
+ * In the common case — `rex init` gitignored the execution log — this is
+ * empty: `git status --porcelain` never lists an ignored file, and a tracked
+ * file cannot be ignored. It is non-empty exactly in the project this exists
+ * for: one whose log predates the gitignore entry and is tracked, where every
+ * completion modifies it, hench never stages it, and the gate discounts it —
+ * so without a report it stayed silently dirty and the next autonomous run's
+ * pre-run gate refused to start.
+ */
+export async function listOperatorOwnedPrdDirt(projectDir: string): Promise<string[]> {
+  const lines = await listDirtyPaths(projectDir);
+  if (lines.length === 0) return [];
+  const repoPrefix = await repoRelativePrefix(projectDir);
+  return lines
+    .map(parsePorcelainPath)
+    .filter((path) => matchesProjectPath(path, OPERATOR_PRD_PATHS, repoPrefix));
+}
+
+/**
+ * Printed after a completion commit when {@link listOperatorOwnedPrdDirt}
+ * found something — the log is never staged by hench, so silence here is what
+ * turned a tracked log into a permanent pre-run-gate refusal.
+ */
+export function formatOperatorPrdLeftovers(paths: string[]): string {
+  return (
+    `note: ${paths.length} PRD bookkeeping file(s) hench never commits are uncommitted:\n` +
+    `${renderPaths(paths)}\n` +
+    `The execution log is yours to commit — or add .rex/execution-log*.jsonl to ` +
+    `.gitignore (rex init does), so PRD writes stop dirtying the tree.`
+  );
+}
+
+/**
+ * Printed when a completed task's follow-up PRD "record" commit could not be
+ * committed. The work itself is committed and the task stays completed — a
+ * failed bookkeeping commit is a pending record, not a failed run — so the
+ * message says exactly that, and the recovery commands are scoped to the
+ * paths the record commit tried to stage, nothing wider: an unscoped
+ * `git add`/`git commit` here would sweep whatever else the operator has in
+ * flight, which is the same hazard the scoped completion commit exists to
+ * avoid.
+ */
+export function formatRecordCommitPending(paths: string[], taskId: string, error: string): string {
+  const pathspec = paths.join(" ");
+  return (
+    `⚠ Work committed; record not committed: the PRD record commit for task ${taskId} failed.\n` +
+    `  ${error}\n` +
+    `The task stays completed and its code commits are intact. Still uncommitted:\n` +
+    `${renderPaths(paths)}\n` +
+    `Land the record once the cause is fixed:\n` +
+    `  git add -- ${pathspec}\n` +
+    `  git commit -m "chore(prd): commit PRD tree changes (task ${taskId} completed)" -- ${pathspec}`
+  );
 }
 
 /**

@@ -39,7 +39,18 @@ describe("toolRunCommand", () => {
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-test-shell-"));
-    guard = new GuardRails(projectDir, DEFAULT_HENCH_CONFIG().guard);
+    // Pinned to POSIX semantics rather than the machine's resolved shell. The
+    // guard is deliberately shell-aware: on a host with no `sh` it resolves
+    // "cmd" and lets `;`, backticks and `$` through (inert text to cmd.exe),
+    // so the rejection cases below would reach a real spawn and fail — while
+    // `'print(1)'` would be refused for its parens (single quotes protect
+    // nothing under cmd) instead of for the allowlist. Every case that
+    // expects a rejection is then deterministic on every machine, and never
+    // spawns; every case that actually runs a command sits inside
+    // describeNeedsPosixShell/itNeedsPosixShell, which only run where the
+    // resolved kind is "posix" anyway. The cmd.exe branch is covered with an
+    // injected shellKind in tests/unit/guard/{commands,guard-integration}.test.ts.
+    guard = new GuardRails(projectDir, DEFAULT_HENCH_CONFIG().guard, { shellKind: "posix" });
   });
 
   afterEach(async () => {

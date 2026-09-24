@@ -1,5 +1,5 @@
 import { readFile, writeFile, appendFile, mkdir, rename, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { SCHEMA_VERSION } from "../schema/index.js";
@@ -30,7 +30,8 @@ import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
-import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
+import type { PRDStore, StoreCapabilities, WriteOptions, SaveFileReport } from "./contracts.js";
+import { buildSaveFileReport, mergeSaveFileReports } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
 export const PRD_FILENAME = "prd.json";
@@ -48,6 +49,8 @@ export class FileStore implements PRDStore {
    * last load or save left on disk — see FolderTreeStore.loadedFiles.
    */
   private loadedFiles: ReadonlyMap<string, string> = new Map();
+  /** Files written/deleted by saves since the last {@link takeSaveFileReport}. */
+  private pendingSaveReport: SaveFileReport | null = null;
   private itemToFile: Map<string, string> = new Map();
   private fileMetadata: Map<string, { schema: string; title: string }> = new Map();
   private ownershipLoaded = false;
@@ -515,9 +518,25 @@ export class FileStore implements PRDStore {
     // A completed save makes this instance's view of the tree current again:
     // its own writes must not read as "another writer's work" on the next save,
     // and the files it just wrote are the ones it can vouch for relocating.
-    this.loadedAt = Date.now();
+    // Folding in the written files' own mtimes matters on Windows, where the
+    // file clock can run ahead of Date.now() by more than the guard's
+    // tolerance — a bare Date.now() intermittently read this save's own files
+    // as newer than the save.
+    this.loadedAt = Math.max(Date.now(), written.maxWrittenMtimeMs);
     this.loadedFiles = written.fileDigests;
+    // Accumulated rather than replaced: a caller may save several times
+    // between commit points and needs the union at take time.
+    this.pendingSaveReport = mergeSaveFileReports(
+      this.pendingSaveReport,
+      buildSaveFileReport(written, dirname(this.rexDir)),
+    );
     this.rebuildOwnershipFromItems(doc);
+  }
+
+  takeSaveFileReport(): SaveFileReport | null {
+    const report = this.pendingSaveReport;
+    this.pendingSaveReport = null;
+    return report;
   }
 
   /**

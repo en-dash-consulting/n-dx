@@ -307,7 +307,11 @@ export const RunRecordSchema = z.object({
   actor: z.string().optional(),
   host: z.string().optional(),
   commits: z.array(RunCommitRecordSchema).optional(),
-  recordCommitPending: z.boolean().optional(),
+  // Boolean is the legacy shape (records written before the paths existed);
+  // new records carry the paths the record commit tried to stage.
+  recordCommitPending: z
+    .union([z.boolean(), z.object({ paths: z.array(z.string()), error: z.string() })])
+    .optional(),
   uncommittedPaths: z.array(z.string()).optional(),
   claimLost: z
     .object({ at: z.string(), taskId: z.string(), holderWorktree: z.string() })

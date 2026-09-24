@@ -88,6 +88,14 @@ async function cmdReviewPending(
     );
   }
 
+  // TODO(prd 77a603ad-sibling c7585f76, PR C follow-up): this preference is
+  // backwards. The stored reportPath is absolute, so after a project moves on
+  // disk it is exactly the stale path — the comment below claims the opposite
+  // of what the code does. Resolve from the current project's
+  // .hench/reviews/ (reviewReportPath) first and fall back to the stored
+  // reportPath only when that file is absent; fix this comment and add a
+  // moved-project unit test when picking it up.
+  //
   // Prefer the path the run recorded: a project moved on disk since the run
   // would otherwise be told its findings are gone when they are merely
   // somewhere else. Fall back to the canonical location for a record written

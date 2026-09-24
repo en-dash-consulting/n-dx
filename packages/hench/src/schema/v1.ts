@@ -993,6 +993,18 @@ export type RunReviewRecord =
       gated?: boolean;
     };
 
+/**
+ * A completion whose PRD "record" commit did not land — the work itself is
+ * committed and the task stays completed; only the bookkeeping is pending.
+ * See {@link RunRecord.recordCommitPending}.
+ */
+export interface RecordCommitPending {
+  /** Project-relative paths the record commit tried to stage. */
+  paths: string[];
+  /** Why the commit failed, verbatim from git. */
+  error: string;
+}
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -1173,28 +1185,32 @@ export interface RunRecord {
    * whichever landed — in the order git created them.
    *
    * Read by the run summary printer to name what actually happened instead of
-   * inferring it from `status` alone: a run can land two commits and still
-   * report `status: "failed"` when only the follow-up record commit failed
-   * (see {@link recordCommitPending}), and without this list the summary had
+   * inferring it from `status` alone: a run can land its work commits and
+   * still have the follow-up record commit pending (see
+   * {@link recordCommitPending}), and without this list the summary had
    * nothing to point at.
    *
    * v1 additive field — old records without this field load normally.
    */
   commits?: RunCommitRecord[];
   /**
-   * True when the task's own work already succeeded but the follow-up PRD
+   * Set when the task's own work already succeeded but the follow-up PRD
    * "record" commit (completion metadata) could not be committed.
    *
-   * `status` still becomes `"failed"` when this happens — the record commit
-   * and the task's own outcome share one status field today — but this flag
-   * is set at the exact point that failure happens, so a reader (or the run
-   * summary printer) can tell "the work failed" apart from "the work
-   * succeeded and only the bookkeeping commit is pending" without guessing
-   * from the error text.
+   * The run stays `"completed"` — the work landed and validated; a failed
+   * bookkeeping commit is a pending record, not a failed task. The object
+   * form carries the project-relative paths the record commit tried to
+   * stage and why it failed, so the operator (or a later resume) can land
+   * the record with commands scoped to exactly those paths.
+   *
+   * The bare `true` form is the legacy shape: records written before the
+   * paths existed set a boolean, and on that era's runs `status` also read
+   * `"failed"`. Readers should treat any truthy value as "work completed,
+   * record pending" (see `classifyRunOutcome` in cli/commands/run.ts).
    *
    * v1 additive field — old records without this field load normally.
    */
-  recordCommitPending?: boolean;
+  recordCommitPending?: boolean | RecordCommitPending;
   /**
    * Operator-visible paths still dirty in the working tree when the run
    * finished, after any rollback — what the run actually left behind rather

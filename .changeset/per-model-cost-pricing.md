@@ -1,4 +1,5 @@
 ---
+"@n-dx/core": patch
 "@n-dx/llm-client": patch
 "@n-dx/rex": patch
 "@n-dx/web": patch
@@ -6,12 +7,14 @@
 
 Price token usage at each model's own rates instead of Claude Sonnet's.
 
-**Reported costs rise on upgrade — typically by about a third.** Dashboard
-and CLI cost figures go up because runs are now priced at each model's own
-rates instead of a flat Sonnet rate; no tokens were added and nothing runs
-more expensively. On this repo's baseline batch the same runs moved from
-$161.08 (flat Sonnet) to $247.53 (per model). Budget alerts or dashboards
-keyed to the old under-reported figures will see a one-time jump.
+**Reported costs rise on upgrade — typically by about half, and Opus-heavy
+projects by up to about two-thirds.** Dashboard and CLI cost figures go up
+because runs are now priced at each model's own rates instead of a flat
+Sonnet rate; no tokens were added and nothing runs more expensively. On this
+repo's baseline batch the same runs moved from $161.08 (flat Sonnet) to
+$247.53 (per model), a 54% rise — the old figure under-reported by about 35%.
+Budget alerts or dashboards keyed to the old under-reported figures will see
+a one-time jump.
 
 `estimateCost` took a `ModelPricing` parameter that every caller left at a
 single hardcoded Sonnet default (3/15 per MTok, cache write 3.75, cache read

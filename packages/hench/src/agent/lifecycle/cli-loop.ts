@@ -1600,7 +1600,12 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
   const budgetUsage = ctx.runAccumulator
     ? ctx.runAccumulator.tokenUsage.total
     : run.tokenUsage;
-  const budgetCheck = checkTokenBudget(budgetUsage, ctx.tokenBudget);
+  // Cache reads are excluded here and only here: this check runs after the
+  // run already finished, so it cannot bound anything — its only power is to
+  // mark a successful run budget_exceeded and reset the task. A Claude Code
+  // session reads millions of cached tokens as a matter of course, so at face
+  // value any configured budget would trip on every run.
+  const budgetCheck = checkTokenBudget(budgetUsage, ctx.tokenBudget, { excludeCacheReads: true });
   if (budgetCheck.exceeded) {
     run.status = "budget_exceeded";
     run.summary = result.summary;
