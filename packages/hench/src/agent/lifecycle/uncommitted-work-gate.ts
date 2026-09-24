@@ -22,6 +22,8 @@
  * @module hench/agent/lifecycle/uncommitted-work-gate
  */
 
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { execStdout } from "../../process/exec.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import {
@@ -364,15 +366,55 @@ export function formatRecordCommitPending(paths: string[], taskId: string, error
 }
 
 /**
+ * The subset of `paths` no longer on disk, checked at print time so the
+ * suggested commands match what git will accept: `git add` on a missing
+ * untracked path is an error, and a deleted tracked one is recovered with
+ * `git rm --cached` instead.
+ */
+export function deletedAmong(projectDir: string, paths: string[]): Set<string> {
+  return new Set(paths.filter((p) => !existsSync(join(projectDir, p))));
+}
+
+/** Quote a pathspec entry the shell would otherwise split. */
+function shellPath(path: string): string {
+  return /\s/.test(path) ? `"${path}"` : path;
+}
+
+/**
+ * Path-scoped recovery commands for a set of dirty paths.
+ *
+ * Every command carries `--` and the exact listed paths — all of them, even
+ * when the displayed list above truncates — because an unscoped
+ * `git add`/`git commit`/`git stash` is how an unrelated in-flight change
+ * gets swept into a hench commit (WM2048), and a partial pathspec would land
+ * only part of the refused work. Deleted paths get `git rm --cached`.
+ */
+function renderRecoveryCommands(paths: string[], deleted: ReadonlySet<string>): string {
+  const spec = (list: string[]): string => list.map(shellPath).join(" ");
+  const existing = paths.filter((p) => !deleted.has(p));
+  const gone = paths.filter((p) => deleted.has(p));
+
+  const lines: string[] = ["To keep the work, commit exactly these paths:"];
+  if (existing.length > 0) lines.push(`  git add -- ${spec(existing)}`);
+  if (gone.length > 0) lines.push(`  git rm --cached -- ${spec(gone)}`);
+  lines.push(`  git commit -- ${spec(paths)}`);
+  lines.push("Or set them aside:");
+  lines.push(`  git stash push -- ${spec(paths)}`);
+  return lines.join("\n");
+}
+
+/**
  * The message recorded on `run.error` and printed when a completion is
  * refused. Names every path, because the whole failure mode was work
- * disappearing without anyone being told which work.
+ * disappearing without anyone being told which work — and suggests only
+ * commands scoped to those paths ({@link renderRecoveryCommands}).
  */
-export function formatUncommittedWorkRefusal(paths: string[]): string {
+export function formatUncommittedWorkRefusal(paths: string[], deleted: ReadonlySet<string> = new Set()): string {
   return (
     `⚠ Refusing to mark this task completed: ${paths.length} path(s) of its work are still uncommitted.\n` +
     `${renderPaths(paths)}\n` +
-    `Nothing was discarded. Commit these paths (or delete them if they are scratch output), then re-run the task.`
+    `Nothing was discarded. Land the work, then re-run the task.\n` +
+    renderRecoveryCommands(paths, deleted)
   );
 }
 
@@ -383,11 +425,13 @@ export function formatUncommittedWorkRefusal(paths: string[]): string {
  * Starting anyway is what turned one leaked task into a tangle of three: the
  * next task's diff, review and commit all include files it never wrote.
  */
-export function formatLoopRefusal(paths: string[]): string {
+export function formatLoopRefusal(paths: string[], deleted: ReadonlySet<string> = new Set()): string {
   return (
     `⚠ Stopping the loop: ${paths.length} path(s) from the previous task are still uncommitted.\n` +
     `${renderPaths(paths)}\n` +
-    `Starting another task would fold them into its commit. Commit or remove them, then re-run.`
+    `Starting another task would fold them into its commit.\n` +
+    `${renderRecoveryCommands(paths, deleted)}\n` +
+    `Then re-run.`
   );
 }
 
@@ -399,11 +443,12 @@ export function formatLoopRefusal(paths: string[]): string {
  * It names them because the consequence — the pre-run gate refusing the run a
  * moment later — otherwise looks like `--reset-deferred` not working.
  */
-export function formatResetDeferredCommitSkipped(paths: string[]): string {
+export function formatResetDeferredCommitSkipped(paths: string[], deleted: ReadonlySet<string> = new Set()): string {
   return (
     `⚠ Reset applied but not committed: ${paths.length} PRD path(s) were already uncommitted before it.\n` +
     `${renderPaths(paths)}\n` +
     `Committing would fold that work into hench's own "reset deferred/failing task(s)" commit. ` +
-    `Commit or stash these first; the pre-run gate will refuse the run until you do.`
+    `The pre-run gate will refuse the run until it is dealt with.\n` +
+    renderRecoveryCommands(paths, deleted)
   );
 }

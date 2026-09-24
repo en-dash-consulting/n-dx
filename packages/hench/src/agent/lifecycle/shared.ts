@@ -59,6 +59,7 @@ import { validateTaskCompletion } from "./task-completion-gate.js";
 import {
   PRD_COMMIT_PATHS,
   PRD_STAGE_PATHS,
+  deletedAmong,
   findUncommittedWork,
   formatOperatorPrdLeftovers,
   formatRecordCommitPending,
@@ -2988,7 +2989,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     if (!leaked.clean) {
       uncommittedWorkRefused = true;
       run.status = "failed";
-      run.error = formatUncommittedWorkRefusal(leaked.paths);
+      run.error = formatUncommittedWorkRefusal(leaked.paths, deletedAmong(projectDir, leaked.paths));
       info(`\n${run.error}`);
       if (opts.store) {
         await withdrawCompletionClaim(opts.store, run, run.error);

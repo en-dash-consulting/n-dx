@@ -171,12 +171,16 @@ describe("refusal messages", () => {
     expect(message).toContain("Nothing was discarded");
   });
 
-  it("truncates a very long path list rather than flooding the log", () => {
+  it("truncates a very long displayed list, while the commands still carry every path", () => {
     const paths = Array.from({ length: 25 }, (_, i) => `src/file-${i}.ts`);
     const message = formatUncommittedWorkRefusal(paths);
     expect(message).toContain("src/file-19.ts");
-    expect(message).not.toContain("src/file-20.ts");
     expect(message).toContain("…and 5 more");
+    // The listing stops at 20 paths — but a truncated *pathspec* would land
+    // only part of the refused work (WM2048), so the command lines carry all.
+    const listedLines = message.split("\n").filter((l) => l.startsWith("  ") && !l.trimStart().startsWith("git "));
+    expect(listedLines.some((l) => l.includes("src/file-20.ts"))).toBe(false);
+    expect(message).toMatch(/git commit -- .*src\/file-20\.ts/);
   });
 
   it("explains why the loop stopped", () => {
@@ -243,6 +247,107 @@ describe("PRD staged and discounted sets derive from one definition", () => {
       }
     } finally {
       await rm(projectDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  });
+});
+
+// ── Recovery commands: validated and path-scoped (WM2048) ────────────────────
+//
+// A refusal that suggests `git add -A` or an unscoped commit/stash is how an
+// unrelated in-flight change gets swept into a hench commit — the exact
+// hazard the gate exists to prevent. Every suggested command must carry an
+// explicit pathspec limited to the listed paths, and a path that no longer
+// exists on disk gets `git rm --cached` rather than an add that would error.
+
+describe("recovery commands", () => {
+  const UNSCOPED = [/git add -A\b/, /git add \.(?![\w/])/, /git commit(?! --)/m, /git stash push(?! --)/];
+
+  function expectScoped(output: string, paths: string[], deleted: string[] = []): void {
+    for (const pattern of UNSCOPED) {
+      expect(output, `unscoped command matched ${pattern}`).not.toMatch(pattern);
+    }
+    // Every listed path appears in a pathspec (after a `--`).
+    const pathspecLines = output.split("\n").filter((l) => l.includes(" -- "));
+    for (const p of paths) {
+      expect(
+        pathspecLines.some((l) => l.includes(p)),
+        `path ${p} missing from every pathspec`,
+      ).toBe(true);
+    }
+    for (const p of deleted) {
+      expect(output).toContain(`git rm --cached -- ${p}`);
+    }
+  }
+
+  it("uncommitted-work refusal suggests only scoped commands", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const paths = ["src/new-module.ts", "tests/new-module.test.ts"];
+    const out = formatUncommittedWorkRefusal(paths, new Set());
+    expect(out).toContain("git add -- src/new-module.ts tests/new-module.test.ts");
+    expect(out).toContain("git commit -- src/new-module.ts tests/new-module.test.ts");
+    expect(out).toContain("git stash push -- src/new-module.ts tests/new-module.test.ts");
+    expectScoped(out, paths);
+  });
+
+  it("a deleted path is offered git rm --cached, and is not in the add", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const paths = ["src/kept.ts", "src/gone.ts"];
+    const out = formatUncommittedWorkRefusal(paths, new Set(["src/gone.ts"]));
+    expect(out).toContain("git add -- src/kept.ts");
+    expect(out).not.toMatch(/git add -- .*src\/gone\.ts/);
+    expectScoped(out, paths, ["src/gone.ts"]);
+  });
+
+  it("quotes a path containing a space", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const out = formatUncommittedWorkRefusal(["docs/release notes.md"], new Set());
+    expect(out).toContain('git add -- "docs/release notes.md"');
+  });
+
+  it("the commands carry every path even when the displayed list truncates", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const paths = Array.from({ length: 25 }, (_, i) => `src/f${i}.ts`);
+    const out = formatUncommittedWorkRefusal(paths, new Set());
+    expect(out).toContain("…and 5 more");
+    expectScoped(out, paths);
+  });
+
+  it("the loop refusal and the reset-deferred skip suggest the same scoped commands", async () => {
+    const { formatLoopRefusal, formatResetDeferredCommitSkipped } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const paths = [".rex/prd_tree/task/index.md"];
+    for (const out of [
+      formatLoopRefusal(paths, new Set()),
+      formatResetDeferredCommitSkipped(paths, new Set()),
+    ]) {
+      expect(out).toContain("git add -- .rex/prd_tree/task/index.md");
+      expectScoped(out, paths);
+    }
+  });
+
+  it("deletedAmong reports exactly the listed paths that are gone from disk", async () => {
+    const { deletedAmong } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "deleted-among-"));
+    try {
+      mkdirSync(join(dir, "src"), { recursive: true });
+      writeFileSync(join(dir, "src", "kept.ts"), "x");
+      const deleted = deletedAmong(dir, ["src/kept.ts", "src/gone.ts"]);
+      expect([...deleted]).toEqual(["src/gone.ts"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   });
 });

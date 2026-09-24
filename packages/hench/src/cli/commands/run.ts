@@ -14,6 +14,7 @@ import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
 import {
   PRD_COMMIT_PATHS,
+  deletedAmong,
   findUncommittedWork,
   formatLoopRefusal,
   formatResetDeferredCommitSkipped,
@@ -539,7 +540,7 @@ export async function resetDeferredAndCommit(
   if (dryRun) return resetCount;
 
   if (prdDirtyBeforeReset.length > 0) {
-    info(formatResetDeferredCommitSkipped(prdDirtyBeforeReset));
+    info(formatResetDeferredCommitSkipped(prdDirtyBeforeReset, deletedAmong(projectDir, prdDirtyBeforeReset)));
     return resetCount;
   }
 
@@ -1880,7 +1881,7 @@ export async function shouldStopForUncommittedWork(
     discountPaths: PRD_COMMIT_PATHS,
   });
   if (leftover.clean) return false;
-  info(`\n${colorWarn(formatLoopRefusal(leftover.paths))}`);
+  info(`\n${colorWarn(formatLoopRefusal(leftover.paths, deletedAmong(projectDir, leftover.paths)))}`);
   process.exitCode = 1;
   return true;
 }
