@@ -211,6 +211,61 @@ describe("buildCachedMessageRequest", () => {
     expect(countBreakpoints(params)).toBe(2);
   });
 
+  describe("promptCacheTtl", () => {
+    it("omits ttl from both markers by default", () => {
+      const params = build([{ role: "user", content: BRIEF }]);
+
+      const systemBlock = (params.system as Anthropic.TextBlockParam[])[0];
+      expect(systemBlock.cache_control).toEqual({ type: "ephemeral" });
+      const trailing = params.messages[0].content as Anthropic.ContentBlockParam[];
+      expect(trailing[0].cache_control).toEqual({ type: "ephemeral" });
+    });
+
+    it("carries ttl: \"1h\" on both breakpoints when set to \"1h\"", () => {
+      const params = buildCachedMessageRequest({
+        model: "claude-sonnet-4-6",
+        maxTokens: 4096,
+        systemPrompt: SYSTEM,
+        tools: TOOLS,
+        messages: [{ role: "user", content: BRIEF }],
+        promptCacheTtl: "1h",
+      });
+
+      const systemBlock = (params.system as Anthropic.TextBlockParam[])[0];
+      expect(systemBlock.cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
+      const trailing = params.messages[0].content as Anthropic.ContentBlockParam[];
+      expect(trailing[0].cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
+      expect(countBreakpoints(params)).toBe(2);
+    });
+
+    it("carries ttl: \"1h\" on the tools fallback breakpoint when there is no system prompt", () => {
+      const params = buildCachedMessageRequest({
+        model: "claude-sonnet-4-6",
+        maxTokens: 4096,
+        systemPrompt: undefined,
+        tools: TOOLS,
+        messages: [{ role: "user", content: BRIEF }],
+        promptCacheTtl: "1h",
+      });
+
+      expect(params.tools?.[1]).toHaveProperty("cache_control", { type: "ephemeral", ttl: "1h" });
+    });
+
+    it("leaves the default (\"5m\") request byte-identical to an unset promptCacheTtl", () => {
+      const withDefault = build([{ role: "user", content: BRIEF }]);
+      const withExplicit5m = buildCachedMessageRequest({
+        model: "claude-sonnet-4-6",
+        maxTokens: 4096,
+        systemPrompt: SYSTEM,
+        tools: TOOLS,
+        messages: [{ role: "user", content: BRIEF }],
+        promptCacheTtl: "5m",
+      });
+
+      expect(JSON.stringify(withExplicit5m)).toBe(JSON.stringify(withDefault));
+    });
+  });
+
   describe("promptCache: false", () => {
     it("emits zero cache_control markers and a plain-string system field", () => {
       const params = buildCachedMessageRequest({

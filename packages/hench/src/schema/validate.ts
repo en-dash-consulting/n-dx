@@ -97,6 +97,7 @@ export const HenchConfigSchema = z.object({
     })
     .optional(),
   promptCache: z.boolean().optional(),
+  promptCacheTtl: z.enum(["5m", "1h"]).optional(),
 });
 
 const RunStatusSchema = z.enum([

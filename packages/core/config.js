@@ -1709,6 +1709,16 @@ Hench settings (.hench/config.json):
                                      models without caching) and turn 1 fails with a 400. With
                                      false, requests are sent exactly as before prompt caching was
                                      added: plain-string system prompt, untouched tools/messages.
+  hench.promptCacheTtl     string    TTL for both cache_control breakpoints: "5m" or "1h"
+                                     (default: "5m"). Raise to "1h" only when tool calls
+                                     (e.g. a slow test gate) regularly push the gap between
+                                     turns past 5 minutes, so the prefix would otherwise be
+                                     re-written at the 1.25x-input rate instead of read at
+                                     0.1x. "1h" writes cost 2x input, not 1.25x — pays off
+                                     only when that turn gap regularly falls between 5 and
+                                     60 minutes. Cost estimates price every write at 1.25x
+                                     regardless of TTL (see llm-client's config.ts), so enabling
+                                     "1h" under-reports estimated spend by that difference.
 
 Hench test-gate settings (mandatory full-suite gate before commit):
   hench.fullTestCommand    string    Command that runs the whole suite. Resolved from this key,

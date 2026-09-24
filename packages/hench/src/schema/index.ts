@@ -16,6 +16,7 @@ export type {
   HenchConfig,
   Provider,
   PermissionMode,
+  PromptCacheTtl,
   ProjectLanguage,
   RunStatus,
   ToolCallRecord,

@@ -37,18 +37,29 @@
  * config key) is the escape hatch: `buildCachedMessageRequest` then emits the
  * request as it looked before caching was added — no breakpoints, `system` as
  * a plain string, tools and messages passed through untouched.
+ *
+ * Both breakpoints default to Anthropic's 5-minute TTL. `CachedRequestInput.
+ * promptCacheTtl: "1h"` (surfaced as `hench.promptCacheTtl`) extends both to
+ * the 1-hour TTL — see the field doc on `HenchConfig.promptCacheTtl` for when
+ * that pays off. The default omits `ttl` from the wire request entirely
+ * rather than sending `"5m"` explicitly, so a default-config request stays
+ * byte-identical to the pre-TTL-support build.
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { AnthropicToolDef } from "../../prd/llm-gateway.js";
+import type { PromptCacheTtl } from "../../schema/index.js";
 
 /**
  * A fresh ephemeral `cache_control` marker.
  *
  * Returned per call rather than shared so no two blocks alias one object.
+ * Omits `ttl` unless it is `"1h"` — Anthropic's default 5-minute TTL applies
+ * whenever the field is absent, and omitting it keeps the default request
+ * byte-identical to before TTL support existed.
  */
-function ephemeral(): Anthropic.CacheControlEphemeral {
-  return { type: "ephemeral" };
+function ephemeral(ttl?: PromptCacheTtl): Anthropic.CacheControlEphemeral {
+  return ttl === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
 }
 
 /** Inputs needed to build one cached Anthropic request. */
@@ -68,6 +79,12 @@ export interface CachedRequestInput {
    * See the module header for why this exists.
    */
   promptCache?: boolean;
+  /**
+   * TTL for both cache breakpoints. Default: `"5m"` (Anthropic's default —
+   * see `ephemeral`). `"1h"` extends both. See the module header and
+   * `HenchConfig.promptCacheTtl` for the cost tradeoff.
+   */
+  promptCacheTtl?: PromptCacheTtl;
 }
 
 /**
@@ -78,9 +95,10 @@ export interface CachedRequestInput {
  */
 export function buildCachedSystem(
   systemPrompt: string | undefined,
+  ttl?: PromptCacheTtl,
 ): Anthropic.TextBlockParam[] | undefined {
   if (!systemPrompt) return undefined;
-  return [{ type: "text", text: systemPrompt, cache_control: ephemeral() }];
+  return [{ type: "text", text: systemPrompt, cache_control: ephemeral(ttl) }];
 }
 
 /**
@@ -92,12 +110,13 @@ export function buildCachedSystem(
 export function buildCachedTools(
   tools: readonly AnthropicToolDef[],
   markLast: boolean,
+  ttl?: PromptCacheTtl,
 ): Anthropic.ToolUnion[] {
   const copied: Anthropic.ToolUnion[] = [...tools];
   if (!markLast || copied.length === 0) return copied;
 
   const lastIndex = copied.length - 1;
-  copied[lastIndex] = { ...tools[lastIndex], cache_control: ephemeral() };
+  copied[lastIndex] = { ...tools[lastIndex], cache_control: ephemeral(ttl) };
   return copied;
 }
 
@@ -140,6 +159,7 @@ function normalizeContent(
  */
 export function withTrailingCacheBreakpoint(
   messages: readonly Anthropic.MessageParam[],
+  ttl?: PromptCacheTtl,
 ): Anthropic.MessageParam[] {
   const copied = messages.map(normalizeContent);
   if (copied.length === 0) return copied;
@@ -152,9 +172,9 @@ export function withTrailingCacheBreakpoint(
   for (let i = blocks.length - 1; i >= 0; i--) {
     const block = blocks[i];
     if (block.type === "text") {
-      blocks[i] = { ...block, cache_control: ephemeral() };
+      blocks[i] = { ...block, cache_control: ephemeral(ttl) };
     } else if (block.type === "tool_result") {
-      blocks[i] = { ...block, cache_control: ephemeral() };
+      blocks[i] = { ...block, cache_control: ephemeral(ttl) };
     } else {
       continue;
     }
@@ -190,13 +210,13 @@ export function buildCachedMessageRequest(
     return params;
   }
 
-  const system = buildCachedSystem(input.systemPrompt);
+  const system = buildCachedSystem(input.systemPrompt, input.promptCacheTtl);
 
   const params: Anthropic.MessageCreateParamsNonStreaming = {
     model: input.model,
     max_tokens: input.maxTokens,
-    tools: buildCachedTools(input.tools, system === undefined),
-    messages: withTrailingCacheBreakpoint(input.messages),
+    tools: buildCachedTools(input.tools, system === undefined, input.promptCacheTtl),
+    messages: withTrailingCacheBreakpoint(input.messages, input.promptCacheTtl),
   };
   if (system !== undefined) params.system = system;
 

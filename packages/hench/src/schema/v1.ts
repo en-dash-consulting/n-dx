@@ -342,7 +342,38 @@ export interface HenchConfig {
    * loop never calls into `prompt-cache.ts`.
    */
   promptCache?: boolean;
+  /**
+   * TTL for the Anthropic API loop's `cache_control` breakpoints (see
+   * `agent/lifecycle/prompt-cache.ts`). Default: `"5m"`.
+   *
+   * Anthropic measures a cache entry's TTL from the start of the request
+   * that wrote or read it, so time spent on generation and tool calls
+   * counts against the window. A turn whose tool call runs long (the test
+   * gate alone allows up to `fullTestTimeoutMs`) commonly exceeds the
+   * 5-minute default before the next request, so the cached prefix is
+   * re-written at the 1.25x-input rate instead of read at 0.1x.
+   *
+   * `"1h"` extends both breakpoints (there are always exactly two — see the
+   * module header on `prompt-cache.ts`) to Anthropic's one-hour TTL. It only
+   * pays off when the start-to-start gap between turns regularly falls
+   * between 5 and 60 minutes: below 5 minutes the default window already
+   * covers it, and above 60 minutes neither TTL helps. A 1-hour write costs
+   * 2x input rather than 1.25x — cost estimates do not price that
+   * difference; see the caveat above `MODEL_COSTS` in llm-client's
+   * `config.ts`, which documents that every write is priced at the
+   * 1.25x rate regardless of TTL, so enabling `"1h"` makes estimated spend
+   * under-report the real bill by the gap between 1.25x and 2x on writes.
+   * Enable it only when turns are consistently slow enough to miss the
+   * default window.
+   *
+   * Only meaningful when `provider === "api"` with the Claude vendor and
+   * `promptCache !== false`.
+   */
+  promptCacheTtl?: PromptCacheTtl;
 }
+
+/** The two prompt-cache TTLs Anthropic's `cache_control` breakpoints support. */
+export type PromptCacheTtl = "5m" | "1h";
 
 // ── Language-specific guard defaults ──────────────────────────────────
 

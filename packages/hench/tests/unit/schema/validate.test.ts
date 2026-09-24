@@ -91,6 +91,34 @@ describe("validateConfig", () => {
     expect(result.ok).toBe(false);
   });
 
+  describe("promptCacheTtl", () => {
+    it("is optional and defaults to unset (5m)", () => {
+      const { promptCacheTtl, ...configWithout } = { ...DEFAULT_HENCH_CONFIG(), promptCacheTtl: undefined };
+      const result = validateConfig(configWithout);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.promptCacheTtl).toBeUndefined();
+      }
+    });
+
+    it("accepts '5m' and '1h'", () => {
+      for (const value of ["5m", "1h"] as const) {
+        const result = validateConfig({ ...DEFAULT_HENCH_CONFIG(), promptCacheTtl: value });
+        expect(result.ok).toBe(true);
+        if (result.ok) expect(result.data.promptCacheTtl).toBe(value);
+      }
+    });
+
+    it("rejects other values with an actionable error", () => {
+      const result = validateConfig({ ...DEFAULT_HENCH_CONFIG(), promptCacheTtl: "30m" });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        const messages = formatValidationErrors(result.errors);
+        expect(messages.some((m) => m.startsWith("promptCacheTtl:"))).toBe(true);
+      }
+    });
+  });
+
   describe("tokenBudget defaults and validation", () => {
     it("is optional in schema and defaults to 0 (unlimited)", () => {
       const { tokenBudget, ...configWithout } = DEFAULT_HENCH_CONFIG();
