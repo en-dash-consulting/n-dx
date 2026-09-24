@@ -12,6 +12,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { FolderTreeStore, ensureFolderTreeRexDir } from "../../../src/store/folder-tree-store.js";
+import { takeSaveFileReport } from "../../../src/store/contracts.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
 import type { PRDItem } from "../../../src/schema/index.js";
@@ -140,5 +141,69 @@ describe("FolderTreeStore lastModified stamping", () => {
 
   it("removeItem still throws when the item does not exist", async () => {
     await expect(store.removeItem("does-not-exist")).rejects.toThrow();
+  });
+});
+
+// ── Save file report ──────────────────────────────────────────────────────────
+//
+// takeSaveFileReport drains the project-relative paths the store's saves wrote
+// and deleted since the last take. Hench stages exactly these paths (plus the
+// tree-meta sidecar) in its completion and --reset-deferred commits, instead of
+// sweeping the whole `.rex/prd_tree/`.
+
+describe("FolderTreeStore takeSaveFileReport", () => {
+  let tmpDir: string;
+  let rexDir: string;
+  let store: FolderTreeStore;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-ft-savereport-"));
+    rexDir = join(tmpDir, ".rex");
+    await ensureFolderTreeRexDir(rexDir);
+    store = new FolderTreeStore(rexDir);
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("reports the written file of a save, project-relative with forward slashes", async () => {
+    await store.addItem({ id: "e1", title: "Epic One", status: "pending", level: "epic" });
+
+    const report = takeSaveFileReport(store);
+    expect(report).not.toBeNull();
+    expect(report!.written).toEqual([".rex/prd_tree/epic-one.md"]);
+    expect(report!.deleted).toEqual([]);
+  });
+
+  it("drains on take: a second take with no intervening save returns null", async () => {
+    await store.addItem({ id: "e1", title: "Epic One", status: "pending", level: "epic" });
+
+    expect(takeSaveFileReport(store)).not.toBeNull();
+    expect(takeSaveFileReport(store)).toBeNull();
+  });
+
+  it("accumulates across several saves between takes", async () => {
+    await store.addItem({ id: "e1", title: "Epic One", status: "pending", level: "epic" });
+    await store.addItem({ id: "e2", title: "Epic Two", status: "pending", level: "epic" });
+
+    const report = takeSaveFileReport(store);
+    expect(report!.written.sort()).toEqual([
+      ".rex/prd_tree/epic-one.md",
+      ".rex/prd_tree/epic-two.md",
+    ]);
+  });
+
+  it("reports deletions, and unchanged files appear in neither list", async () => {
+    await store.addItem({ id: "e1", title: "Epic One", status: "pending", level: "epic" });
+    await store.addItem({ id: "e2", title: "Epic Two", status: "pending", level: "epic" });
+    takeSaveFileReport(store);
+
+    await store.removeItem("e2");
+
+    const report = takeSaveFileReport(store);
+    expect(report!.deleted).toEqual([".rex/prd_tree/epic-two.md"]);
+    // Epic One's file content did not change, so writeIfChanged skipped it.
+    expect(report!.written).not.toContain(".rex/prd_tree/epic-one.md");
   });
 });

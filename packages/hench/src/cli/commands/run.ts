@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
-import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG } from "../../prd/rex-gateway.js";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
@@ -545,8 +545,14 @@ export async function resetDeferredAndCommit(
 
   // Commit the reset's own PRD-tree write immediately so the pre-run commit
   // gate sees a clean tree instead of refusing the very run --reset-deferred
-  // exists to resume (GitHub #365).
-  const commitResult = await commitResetDeferredChanges(projectDir, resetCount);
+  // exists to resume (GitHub #365). The save report is drained here so the
+  // commit stages exactly the files the per-task resets wrote — the store
+  // saves once per reset task, and the report accumulates across them.
+  const commitResult = await commitResetDeferredChanges(
+    projectDir,
+    resetCount,
+    takeSaveFileReport(store),
+  );
   if (commitResult.error) {
     throw commitResult.error;
   }
@@ -925,20 +931,21 @@ export function formatChangeClassification(
 // ---------------------------------------------------------------------------
 
 /**
- * The three outcomes a finished run can report. `run.status` alone conflates
- * the last two: `commitCompletionMetadata` (in the lifecycle) sets
- * `status: "failed"` when the task's own work already succeeded and only the
- * follow-up PRD record commit failed to land, which used to print
- * "Status: failed" beside "Summary: Task complete" — a bookkeeping failure
- * reading as a failed task.
+ * The three outcomes a finished run can report. `run.status` alone cannot
+ * carry the third: a run whose work landed but whose follow-up PRD record
+ * commit failed stays `"completed"` with `recordCommitPending` set (records
+ * from before WM2085 read `"failed"` with a boolean flag instead, which
+ * printed "Status: failed" beside "Summary: Task complete" — a bookkeeping
+ * failure reading as a failed task).
  */
 export type RunOutcome = "work_failed" | "work_completed" | "work_completed_record_pending";
 
 /**
  * Classify a finished run into one of the three outcomes. Reads
- * `run.recordCommitPending` rather than `run.status` alone so a record-commit
- * failure — which still flips `status` to `"failed"` — is told apart from a
- * genuine task failure. Exported for testing.
+ * `run.recordCommitPending` before `run.status` so the pending-record case is
+ * told apart from a genuine task failure — necessary for legacy records,
+ * where a record-commit failure also flipped `status` to `"failed"`.
+ * Exported for testing.
  */
 export function classifyRunOutcome(run: RunRecord): RunOutcome {
   if (run.recordCommitPending) return "work_completed_record_pending";

@@ -65,11 +65,27 @@ describe("classifyRunOutcome", () => {
   });
 
   it("is work_completed_record_pending when recordCommitPending is set, even though status reads failed", async () => {
+    // Legacy record shape: before WM2085 a record-commit failure also flipped
+    // status to "failed" and set a bare boolean.
     const { classifyRunOutcome } = await import("../../../../src/cli/commands/run.js");
     const run = baseRun({
       status: "failed",
       recordCommitPending: true,
       error: "Could not commit completion metadata: EACCES",
+    });
+    expect(classifyRunOutcome(run)).toBe("work_completed_record_pending");
+  });
+
+  it("is work_completed_record_pending for a completed run carrying the pending record's paths", async () => {
+    // Current shape (WM2085): the run stays completed and the field carries
+    // the paths the record commit tried to stage.
+    const { classifyRunOutcome } = await import("../../../../src/cli/commands/run.js");
+    const run = baseRun({
+      status: "completed",
+      recordCommitPending: {
+        paths: [".rex/prd_tree/task/index.md", ".rex/tree-meta.json"],
+        error: "pre-commit hook rejected completion metadata",
+      },
     });
     expect(classifyRunOutcome(run)).toBe("work_completed_record_pending");
   });

@@ -185,3 +185,64 @@ describe("refusal messages", () => {
     expect(message).toContain("src/a.ts");
   });
 });
+
+// ── Staged set vs discounted set: one definition ─────────────────────────────
+//
+// The completion commit's staging list and this gate's discount list both
+// derive from PRD_WRITE_PATHS in the gate module. They drifted twice while
+// maintained by hand — tree-meta.json staged by nobody and discounted by
+// nobody (every completion refused), then the execution log staged by nobody
+// but still discounted (a tracked log left silently dirty after every
+// completion until the pre-run gate refused). These tests fail on the next
+// drift in either direction.
+
+describe("PRD staged and discounted sets derive from one definition", () => {
+  it("the discount covers exactly the staged paths plus the operator-owned writes", async () => {
+    const { PRD_STAGE_PATHS, OPERATOR_PRD_PATHS } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+
+    // Every staged path is discounted (a directory as its slash-suffixed
+    // prefix), every operator-owned write is discounted, and nothing else is.
+    const derived = [
+      ...PRD_STAGE_PATHS.map((p) => (PRD_COMMIT_PATHS.includes(`${p}/`) ? `${p}/` : p)),
+      ...OPERATOR_PRD_PATHS,
+    ];
+    expect([...PRD_COMMIT_PATHS].sort()).toEqual([...derived].sort());
+  });
+
+  it("prdPathsToStage stages exactly the definition's hench-staged entries", async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { prdPathsToStage } = await import("../../../../src/agent/lifecycle/shared.js");
+    const { PRD_STAGE_PATHS, OPERATOR_PRD_PATHS } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+
+    // A fixture where every path in the definition exists and none is
+    // gitignored, so nothing is filtered and the staged output IS the
+    // hench-staged half of the definition. A hardcoded candidate added to
+    // prdPathsToStage outside the definition would surface here as an extra;
+    // an entry reclassified to hench-staged would appear automatically.
+    const projectDir = await mkdtemp(join(tmpdir(), "hench-stage-discount-parity-"));
+    try {
+      for (const p of [...PRD_STAGE_PATHS, ...OPERATOR_PRD_PATHS]) {
+        const abs = join(projectDir, p);
+        if (p.includes("prd_tree")) {
+          await mkdir(abs, { recursive: true });
+        } else {
+          await mkdir(join(projectDir, ".rex"), { recursive: true });
+          await writeFile(abs, "x", "utf-8");
+        }
+      }
+
+      const staged = await prdPathsToStage(projectDir);
+      expect([...staged].sort()).toEqual([...PRD_STAGE_PATHS].sort());
+      for (const operatorPath of OPERATOR_PRD_PATHS) {
+        expect(staged).not.toContain(operatorPath);
+      }
+    } finally {
+      await rm(projectDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  });
+});

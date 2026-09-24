@@ -62,7 +62,8 @@ export {
   CLAIMS_FILENAME,
 } from "./store/claims.js";
 export type { ClaimsStore, ClaimsStoreOptions, ClaimOptions, ClaimResult, ClaimHolder, ClaimOwner, TaskClaim, ClaimHoldReason, ReleaseOptions } from "./store/claims.js";
-export type { PRDStore } from "./store/contracts.js";
+export type { PRDStore, SaveFileReport } from "./store/contracts.js";
+export { takeSaveFileReport } from "./store/contracts.js";
 
 // ---- Markdown serializer / parser ------------------------------------------
 

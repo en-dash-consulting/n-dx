@@ -18,7 +18,7 @@
  */
 
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { SCHEMA_VERSION } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
@@ -29,7 +29,8 @@ import { withLock } from "./file-lock.js";
 import { parseTreeMeta, treeMetaContents } from "./tree-meta.js";
 import { assertSlugRuleWritable, assertSlugRuleAdoptable } from "./slug-rule-guard.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
-import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
+import type { PRDStore, StoreCapabilities, WriteOptions, SaveFileReport } from "./contracts.js";
+import { buildSaveFileReport, mergeSaveFileReports } from "./contracts.js";
 import {
   stampModified,
   stampUpdatedItem,
@@ -61,6 +62,8 @@ export class FolderTreeStore implements PRDStore {
   private loadedAt = 0;
   /** Identity of item files at load/save time, used by relocation-safe deletes. */
   private loadedFiles: ReadonlyMap<string, string> = new Map();
+  /** Files written/deleted by saves since the last {@link takeSaveFileReport}. */
+  private pendingSaveReport: SaveFileReport | null = null;
 
   constructor(rexDir: string) {
     this.rexDir = rexDir;
@@ -127,8 +130,24 @@ export class FolderTreeStore implements PRDStore {
     });
     // A completed save makes this instance's view of the tree current again:
     // its own writes must not read as "another writer's work" on the next save.
-    this.loadedAt = Date.now();
+    // Folding in the written files' own mtimes matters on Windows, where the
+    // file clock can run ahead of Date.now() by more than the guard's
+    // tolerance — a bare Date.now() intermittently read this save's own files
+    // as newer than the save.
+    this.loadedAt = Math.max(Date.now(), written.maxWrittenMtimeMs);
     this.loadedFiles = written.fileDigests;
+    // Accumulated rather than replaced: a caller may save several times
+    // between commit points and needs the union at take time.
+    this.pendingSaveReport = mergeSaveFileReports(
+      this.pendingSaveReport,
+      buildSaveFileReport(written, dirname(this.rexDir)),
+    );
+  }
+
+  takeSaveFileReport(): SaveFileReport | null {
+    const report = this.pendingSaveReport;
+    this.pendingSaveReport = null;
+    return report;
   }
 
   /**

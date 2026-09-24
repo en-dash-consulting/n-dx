@@ -93,6 +93,47 @@ describe("checkTokenBudget", () => {
     expect(result.remaining).toBe(40_000);
   });
 
+  // The CLI provider's post-run check passes excludeCacheReads: it fires after
+  // the run finished, so its only power is to mark a successful run
+  // budget_exceeded and reset the task — and a Claude Code session reads
+  // millions of cached tokens on any non-trivial run, which at face value
+  // would trip every configured budget.
+  describe("excludeCacheReads", () => {
+    it("leaves cache reads out of the total while still counting cache writes", () => {
+      const usage: TokenUsage = {
+        input: 5_000,
+        output: 8_000,
+        cacheCreationInput: 20_000,
+        cacheReadInput: 12_000_000,
+      };
+      const result = checkTokenBudget(usage, 50_000, { excludeCacheReads: true });
+      expect(result.exceeded).toBe(false);
+      expect(result.totalUsed).toBe(33_000);
+      expect(result.remaining).toBe(17_000);
+    });
+
+    it("still exceeds when uncached input + cache writes + output pass the budget", () => {
+      const usage: TokenUsage = {
+        input: 10_000,
+        output: 15_000,
+        cacheCreationInput: 30_000,
+        cacheReadInput: 4_000_000,
+      };
+      const result = checkTokenBudget(usage, 50_000, { excludeCacheReads: true });
+      expect(result.exceeded).toBe(true);
+      expect(result.totalUsed).toBe(55_000);
+      expect(result.remaining).toBe(0);
+    });
+
+    it("matches the inclusive total when there are no cache reads", () => {
+      const usage: TokenUsage = { input: 1_000, output: 2_000, cacheCreationInput: 3_000 };
+      const inclusive = checkTokenBudget(usage, 10_000);
+      const exclusive = checkTokenBudget(usage, 10_000, { excludeCacheReads: true });
+      expect(exclusive.totalUsed).toBe(inclusive.totalUsed);
+      expect(exclusive.exceeded).toBe(inclusive.exceeded);
+    });
+  });
+
   it("handles zero usage correctly", () => {
     const usage: TokenUsage = { input: 0, output: 0 };
     const result = checkTokenBudget(usage, 100_000);

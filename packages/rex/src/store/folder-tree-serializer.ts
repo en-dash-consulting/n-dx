@@ -73,6 +73,30 @@ export interface SerializeResult {
    * about to relocate without reloading the tree.
    */
   fileDigests: Map<string, string>;
+  /**
+   * Resolved absolute paths of the files this call actually wrote — new
+   * files and content changes only; files skipped by `writeIfChanged` are
+   * not listed. The counterpart of `filesWritten`, path by path, so a caller
+   * that commits the save can stage exactly these instead of the whole tree.
+   */
+  writtenPaths: string[];
+  /**
+   * Resolved absolute paths of the files this call removed, including every
+   * file inside a removed stale directory (the directory itself is not
+   * listed — git tracks files, and the staging use these lists exist for
+   * addresses files).
+   */
+  deletedPaths: string[];
+  /**
+   * The largest on-disk mtime among the files this call wrote (epoch ms),
+   * `0` when nothing was written. Stores fold this into the `loadedAt` they
+   * adopt after a save — on Windows the filesystem clock can run ahead of
+   * `Date.now()` by more than the stale-save guard's tolerance, so a
+   * `Date.now()` taken after the write can be *earlier* than the write's own
+   * mtime, and the next save would then refuse to clean up this writer's own
+   * work as "another writer's newer file".
+   */
+  maxWrittenMtimeMs: number;
 }
 
 /**
@@ -140,6 +164,9 @@ export async function serializeFolderTree(
     directoriesCreated: 0,
     directoriesRemoved: 0,
     fileDigests: new Map(),
+    writtenPaths: [],
+    deletedPaths: [],
+    maxWrittenMtimeMs: 0,
   };
 
   await ensureDir(treeRoot, result);
@@ -152,11 +179,41 @@ export async function serializeFolderTree(
   await guardStaleEntries(staleEntries, options, collectItemIds(items));
 
   for (const entry of staleEntries) {
+    // Enumerated before the rm so a removed directory's contents can still be
+    // named — deletedPaths lists files, which is what a git stage addresses.
+    if (entry.isDir) {
+      result.deletedPaths.push(...(await collectFilesUnder(entry.path)));
+    } else {
+      result.deletedPaths.push(resolve(entry.path));
+    }
     await rm(entry.path, { recursive: entry.isDir, force: true });
     if (entry.isDir) result.directoriesRemoved++;
   }
 
   return result;
+}
+
+/**
+ * Every file under `path` (recursively), as resolved absolute paths.
+ * A subtree that vanishes mid-scan contributes nothing — there is nothing
+ * left to report deleted.
+ */
+async function collectFilesUnder(path: string): Promise<string[]> {
+  const files: string[] = [];
+  try {
+    for (const child of await readdir(path)) {
+      const childPath = join(path, child);
+      const info = await stat(childPath);
+      if (info.isDirectory()) {
+        files.push(...(await collectFilesUnder(childPath)));
+      } else {
+        files.push(resolve(childPath));
+      }
+    }
+  } catch {
+    // Vanished mid-scan.
+  }
+  return files;
 }
 
 /** Every item id in the tree being saved, at any depth. */
@@ -578,10 +635,11 @@ function escapeForRegExp(value: string): string {
  *
  * - `1` — implicit; every tree written before the marker existed. Covers both
  *   the original title-only rule and the unconditional `-{id6}` rule that
- *   briefly replaced it, because neither recorded itself and the two cannot be
- *   told apart from a tree alone.
+ *   briefly replaced it (shipped in 0.5.1), because neither recorded itself
+ *   and the two cannot be told apart from a tree alone.
  * - `2` — title-only, with `-{id6}` added only where siblings collide on a
- *   normalised title. Landed 2026-08-26; the first version to be recorded.
+ *   normalised title. Landed 2026-08-26 and first shipped in 0.5.2; the first
+ *   version to be recorded.
  *
  * @see {@link file://./slug-rule-guard.ts} for the write-time enforcement.
  */
@@ -931,4 +989,15 @@ async function writeIfChanged(
   await writeFile(tmpPath, content, "utf8");
   await rename(tmpPath, filePath);
   result.filesWritten++;
+  result.writtenPaths.push(resolve(filePath));
+  try {
+    // The write's own mtime, for SerializeResult.maxWrittenMtimeMs — the file
+    // clock may run ahead of Date.now(), and the store's post-save loadedAt
+    // must not read this writer's own files as someone else's newer work.
+    const written = await stat(filePath);
+    if (written.mtimeMs > result.maxWrittenMtimeMs) result.maxWrittenMtimeMs = written.mtimeMs;
+  } catch {
+    // Vanished between rename and stat — a concurrent deletion the guard on
+    // the next save will judge; nothing to record for this write.
+  }
 }
