@@ -336,6 +336,18 @@ async function resolveRunSources(ctx: ServerContext): Promise<WorktreeRunsSource
 const worktreeRunWatchers = new Map<string, FSWatcher>();
 const WORKTREE_WATCH_DEBOUNCE_MS = 500;
 
+/**
+ * How a watcher is made. Injectable so the lifecycle tests can count opens
+ * and closes without racing real fs.watch handles; production never sets it.
+ */
+type WorktreeWatchFactory = (dir: string, listener: (eventType: string, filename: string | Buffer | null) => void) => FSWatcher;
+let worktreeWatchFactory: WorktreeWatchFactory = watch as WorktreeWatchFactory;
+
+/** Test seam — pass null to restore the real fs.watch. */
+export function setWorktreeRunWatchFactory(factory: WorktreeWatchFactory | null): void {
+  worktreeWatchFactory = factory ?? (watch as WorktreeWatchFactory);
+}
+
 export function ensureWorktreeRunWatcher(
   runsDir: string,
   broadcast: WebSocketBroadcaster | undefined,
@@ -351,7 +363,7 @@ export function ensureWorktreeRunWatcher(
   };
 
   try {
-    const watcher = watch(runsDir, (_eventType, filename) => {
+    const watcher = worktreeWatchFactory(runsDir, (_eventType, filename) => {
       if (!filename || !String(filename).endsWith(".json")) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(fire, WORKTREE_WATCH_DEBOUNCE_MS);
@@ -365,6 +377,24 @@ export function ensureWorktreeRunWatcher(
     worktreeRunWatchers.set(runsDir, watcher);
   } catch {
     // fs.watch unavailable here — polling still works, just without the push.
+  }
+}
+
+/**
+ * Close every watcher whose runs directory is not in `liveRunsDirs`.
+ *
+ * Called by the /api/worktrees refresh with the runs dirs of the worktrees
+ * `git worktree list` currently reports: a removed worktree's watcher is
+ * closed on the next refresh instead of accumulating for the life of the
+ * server (the error-event cleanup above only fires if the OS reports the
+ * vanished directory, which not every platform does). A worktree that comes
+ * back re-registers through the same lazy {@link ensureWorktreeRunWatcher}.
+ */
+export function pruneWorktreeRunWatchers(liveRunsDirs: ReadonlySet<string>): void {
+  for (const [runsDir, watcher] of worktreeRunWatchers) {
+    if (liveRunsDirs.has(runsDir)) continue;
+    watcher.close();
+    worktreeRunWatchers.delete(runsDir);
   }
 }
 
