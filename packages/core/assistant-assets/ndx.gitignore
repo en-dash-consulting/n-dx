@@ -21,6 +21,8 @@
 .hench/locks/
 # Adversarial-review reports, one JSON per run (`ndx work --review`)
 .hench/reviews/
+# Pathspec files referenced by refusal recovery commands (--pathspec-from-file)
+.hench/recovery/
 # Per-session token-usage watermarks written by `hench record`
 .hench/usage-cursors/
 # Warm-parent session cache, rewritten on every orientation. Machine-local.

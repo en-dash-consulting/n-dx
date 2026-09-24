@@ -48,6 +48,7 @@ export const HENCH_RUNTIME_GITIGNORE_ENTRIES: readonly string[] = [
   ".hench/locks/",
   ".hench/usage-cursors/",
   ".hench/reviews/",
+  ".hench/recovery/",
   ".hench/session-cache.json",
   ".hench-commit-msg.txt",
 ];

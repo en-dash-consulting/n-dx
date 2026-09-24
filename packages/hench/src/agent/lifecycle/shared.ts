@@ -67,6 +67,7 @@ import {
   listDirtyPaths,
   listOperatorOwnedPrdDirt,
   partitionDirtyPaths,
+  prepareRecoveryPathspecs,
   renderPaths,
 } from "./uncommitted-work-gate.js";
 import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
@@ -2989,7 +2990,12 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     if (!leaked.clean) {
       uncommittedWorkRefused = true;
       run.status = "failed";
-      run.error = formatUncommittedWorkRefusal(leaked.paths, deletedAmong(projectDir, leaked.paths));
+      const leakedDeleted = deletedAmong(projectDir, leaked.paths);
+      run.error = formatUncommittedWorkRefusal(
+        leaked.paths,
+        leakedDeleted,
+        await prepareRecoveryPathspecs(projectDir, leaked.paths, leakedDeleted),
+      );
       info(`\n${run.error}`);
       if (opts.store) {
         await withdrawCompletionClaim(opts.store, run, run.error);
@@ -3111,6 +3117,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
           completionMetadata.paths ?? [],
           run.taskId,
           completionMetadata.error.message,
+          await prepareRecoveryPathspecs(projectDir, completionMetadata.paths ?? []),
         )}`);
       }
     }

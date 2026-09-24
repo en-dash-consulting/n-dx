@@ -19,6 +19,7 @@ import {
   formatLoopRefusal,
   formatResetDeferredCommitSkipped,
   listUncommittedPrdPaths,
+  prepareRecoveryPathspecs,
 } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims } from "../../process/task-claims.js";
@@ -540,7 +541,12 @@ export async function resetDeferredAndCommit(
   if (dryRun) return resetCount;
 
   if (prdDirtyBeforeReset.length > 0) {
-    info(formatResetDeferredCommitSkipped(prdDirtyBeforeReset, deletedAmong(projectDir, prdDirtyBeforeReset)));
+    const deleted = deletedAmong(projectDir, prdDirtyBeforeReset);
+    info(formatResetDeferredCommitSkipped(
+      prdDirtyBeforeReset,
+      deleted,
+      await prepareRecoveryPathspecs(projectDir, prdDirtyBeforeReset, deleted),
+    ));
     return resetCount;
   }
 
@@ -1881,7 +1887,12 @@ export async function shouldStopForUncommittedWork(
     discountPaths: PRD_COMMIT_PATHS,
   });
   if (leftover.clean) return false;
-  info(`\n${colorWarn(formatLoopRefusal(leftover.paths, deletedAmong(projectDir, leftover.paths)))}`);
+  const deleted = deletedAmong(projectDir, leftover.paths);
+  info(`\n${colorWarn(formatLoopRefusal(
+    leftover.paths,
+    deleted,
+    await prepareRecoveryPathspecs(projectDir, leftover.paths, deleted),
+  ))}`);
   process.exitCode = 1;
   return true;
 }

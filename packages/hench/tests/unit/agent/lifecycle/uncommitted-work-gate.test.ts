@@ -302,22 +302,37 @@ describe("recovery commands", () => {
     expectScoped(out, paths, ["src/gone.ts"]);
   });
 
-  it("quotes a path containing a space", async () => {
+  // A path outside the shell-inert charset must never ride inline on a
+  // command line: there is no quoting that is safe in POSIX shells,
+  // PowerShell, AND cmd.exe at once (cmd treats single quotes as literal
+  // characters, so `&` still splits; `%VAR%` cannot be escaped interactively).
+  // With pathspec files available the commands reference the file and carry no
+  // arbitrary text at all; without them the fallback is POSIX-quoted with an
+  // explicit caveat naming the shells it is for.
+
+  it("routes a path containing a space through the pathspec file", async () => {
     const { formatUncommittedWorkRefusal } = await import(
       "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
     );
-    const out = formatUncommittedWorkRefusal(["docs/release notes.md"], new Set());
-    // Single quotes, not double: double quotes still expand $(…) in POSIX
-    // shells and PowerShell, so they are never emitted around a path.
-    expect(out).toContain("git add -- 'docs/release notes.md'");
+    const files = { all: ".hench/recovery/pathspec.txt" };
+    const out = formatUncommittedWorkRefusal(["docs/release notes.md"], new Set(), files);
+    expect(out).toContain("git add --pathspec-from-file=.hench/recovery/pathspec.txt");
+    expect(out).toContain("git commit --pathspec-from-file=.hench/recovery/pathspec.txt");
+    expect(out).toContain("git stash push --pathspec-from-file=.hench/recovery/pathspec.txt");
+    // The name still appears in the listing above, but on no command line.
+    const commandLines = out.split("\n").filter((l) => l.trimStart().startsWith("git "));
+    for (const line of commandLines) {
+      expect(line).not.toContain("release notes");
+    }
   });
 
-  it("neutralizes shell metacharacters in a hostile filename", async () => {
+  it("keeps hostile filenames off every command line when pathspec files exist", async () => {
     const { formatUncommittedWorkRefusal } = await import(
       "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
     );
     // Copy/paste recovery commands: a filename an agent (or a compromised
-    // repo) created must never execute when the operator pastes the command.
+    // repo) created must never execute — or split the command — when the
+    // operator pastes into sh, PowerShell, or cmd.exe.
     const hostile = [
       "src/$(touch pwned).ts",
       "src/`touch pwned`.ts",
@@ -325,41 +340,79 @@ describe("recovery commands", () => {
       'src/a"b.ts',
       "src/$HOME.ts",
       "src/a&b.ts",
+      "src/%TEMP%.ts",
+      "src/it's a file.ts",
     ];
-    const out = formatUncommittedWorkRefusal(hostile, new Set());
-    for (const p of hostile) {
-      expect(out, `${p} must be single-quoted wherever it appears in a command`)
-        .toContain(`'${p}'`);
-    }
-    // Outside the single-quoted segments, no command line carries a
-    // metacharacter at all.
+    const files = { all: ".hench/recovery/pathspec.txt" };
+    const out = formatUncommittedWorkRefusal(hostile, new Set(), files);
     const commandLines = out.split("\n").filter((l) => l.trimStart().startsWith("git "));
     expect(commandLines.length).toBeGreaterThan(0);
     for (const line of commandLines) {
-      const outsideQuotes = line.replace(/'[^']*'/g, "");
-      expect(outsideQuotes, `unquoted metacharacter in: ${line}`).not.toMatch(/[$`;&"()]/);
+      // Nothing but shell-inert characters on the whole command line — no
+      // quoting needed in any shell, nothing to expand or split.
+      expect(line.trim(), `non-inert command line: ${line}`).toMatch(
+        /^[A-Za-z0-9._/= -]+$/,
+      );
     }
   });
 
-  it("escapes an embedded single quote with the POSIX close-escape-reopen idiom", async () => {
+  it("falls back to POSIX quoting with a shell caveat when no pathspec file exists", async () => {
     const { formatUncommittedWorkRefusal } = await import(
       "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
     );
-    const out = formatUncommittedWorkRefusal(["src/it's a file.ts"], new Set());
-    expect(out).toContain(String.raw`git add -- 'src/it'\''s a file.ts'`);
+    const out = formatUncommittedWorkRefusal(["src/it's a file.ts", "src/a&b.ts"], new Set());
+    // Single quotes, not double: double quotes still expand $(…) in POSIX
+    // shells, and the embedded quote uses the close-escape-reopen idiom.
+    expect(out).toContain(String.raw`git add -- 'src/it'\''s a file.ts' 'src/a&b.ts'`);
+    // The quoting is only correct for POSIX shells, and the message says so.
+    expect(out).toContain("POSIX shells");
+    expect(out).toContain("cmd.exe");
   });
 
-  it("the record-commit-pending message quotes its pathspec the same way", async () => {
+  it("does not print the caveat when every path is inert", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const out = formatUncommittedWorkRefusal(["src/a.ts"], new Set());
+    expect(out).not.toContain("POSIX shells");
+  });
+
+  it("splits add and rm across the dedicated pathspec files", async () => {
+    const { formatUncommittedWorkRefusal } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const files = {
+      all: ".hench/recovery/pathspec.txt",
+      add: ".hench/recovery/pathspec-add.txt",
+      rm: ".hench/recovery/pathspec-rm.txt",
+    };
+    const out = formatUncommittedWorkRefusal(
+      ["src/kept file.ts", "src/gone file.ts"],
+      new Set(["src/gone file.ts"]),
+      files,
+    );
+    expect(out).toContain("git add --pathspec-from-file=.hench/recovery/pathspec-add.txt");
+    expect(out).toContain("git rm --cached --pathspec-from-file=.hench/recovery/pathspec-rm.txt");
+    expect(out).toContain("git commit --pathspec-from-file=.hench/recovery/pathspec.txt");
+  });
+
+  it("the record-commit-pending message uses the pathspec file the same way", async () => {
     const { formatRecordCommitPending } = await import(
       "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
     );
-    const out = formatRecordCommitPending(
-      [".rex/prd_tree/some task/index.md", ".rex/$(evil).json"],
-      "task-1",
-      "boom",
+    const paths = [".rex/prd_tree/some task/index.md", ".rex/$(evil).json"];
+    const files = { all: ".hench/recovery/pathspec.txt" };
+    const out = formatRecordCommitPending(paths, "task-1", "boom", files);
+    expect(out).toContain("git add --pathspec-from-file=.hench/recovery/pathspec.txt");
+    expect(out).toContain(
+      'git commit -m "chore(prd): commit PRD tree changes (task task-1 completed)" ' +
+        "--pathspec-from-file=.hench/recovery/pathspec.txt",
     );
-    expect(out).toContain("git add -- '.rex/prd_tree/some task/index.md' '.rex/$(evil).json'");
-    expect(out).not.toMatch(/git add -- \.rex/);
+    expect(out).not.toMatch(/git add -- /);
+    // And without the file it degrades to the same POSIX-quoted fallback.
+    const fallback = formatRecordCommitPending(paths, "task-1", "boom");
+    expect(fallback).toContain("git add -- '.rex/prd_tree/some task/index.md' '.rex/$(evil).json'");
+    expect(fallback).toContain("POSIX shells");
   });
 
   it("the commands carry every path even when the displayed list truncates", async () => {
@@ -383,6 +436,85 @@ describe("recovery commands", () => {
     ]) {
       expect(out).toContain("git add -- .rex/prd_tree/task/index.md");
       expectScoped(out, paths);
+    }
+  });
+
+  it("prepareRecoveryPathspecs is not needed for inert paths", async () => {
+    const { prepareRecoveryPathspecs } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    // Bare inline pathspecs are safe in every shell, so no file is written.
+    await expect(
+      prepareRecoveryPathspecs(OUTSIDE_ANY_REPO, ["src/a.ts", ".rex/prd_tree/x/index.md"]),
+    ).resolves.toBeUndefined();
+  });
+
+  it("prepareRecoveryPathspecs writes the hostile names verbatim to the pathspec file", async () => {
+    const { prepareRecoveryPathspecs } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "recovery-pathspec-"));
+    try {
+      const hostile = ["src/a&b.ts", "src/$(touch pwned).ts", "src/it's a file.ts"];
+      const files = await prepareRecoveryPathspecs(dir, hostile);
+      expect(files).toBeDefined();
+      expect(files!.all).toBe(".hench/recovery/pathspec.txt");
+      expect(files!.add).toBeUndefined();
+      expect(files!.rm).toBeUndefined();
+      const content = readFileSync(join(dir, ".hench/recovery/pathspec.txt"), "utf-8");
+      // Verbatim, one per line: git reads these directly, no shell involved.
+      expect(content).toBe("src/a&b.ts\nsrc/$(touch pwned).ts\nsrc/it's a file.ts\n");
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  });
+
+  it("prepareRecoveryPathspecs splits deleted paths into their own file", async () => {
+    const { prepareRecoveryPathspecs } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "recovery-pathspec-rm-"));
+    try {
+      const files = await prepareRecoveryPathspecs(
+        dir,
+        ["src/kept file.ts", "src/gone file.ts"],
+        new Set(["src/gone file.ts"]),
+      );
+      expect(files).toEqual({
+        all: ".hench/recovery/pathspec.txt",
+        add: ".hench/recovery/pathspec-add.txt",
+        rm: ".hench/recovery/pathspec-rm.txt",
+      });
+      expect(readFileSync(join(dir, ".hench/recovery/pathspec-add.txt"), "utf-8")).toBe(
+        "src/kept file.ts\n",
+      );
+      expect(readFileSync(join(dir, ".hench/recovery/pathspec-rm.txt"), "utf-8")).toBe(
+        "src/gone file.ts\n",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  });
+
+  it("prepareRecoveryPathspecs C-quotes a name a plain line would misparse", async () => {
+    const { prepareRecoveryPathspecs } = await import(
+      "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
+    );
+    const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "recovery-pathspec-quote-"));
+    try {
+      // --pathspec-from-file C-unquotes an element wrapped in double quotes
+      // (core.quotePath), and a raw newline would split into two entries.
+      const files = await prepareRecoveryPathspecs(dir, ['"quoted".ts', "line\nbreak.ts"]);
+      const content = readFileSync(join(dir, ".hench/recovery/pathspec.txt"), "utf-8");
+      expect(content).toBe('"\\"quoted\\".ts"\n"line\\nbreak.ts"\n');
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   });
 

@@ -22,7 +22,7 @@
  * @module hench/agent/lifecycle/uncommitted-work-gate
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { execStdout } from "../../process/exec.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
@@ -350,18 +350,37 @@ export function formatOperatorPrdLeftovers(paths: string[]): string {
  * paths the record commit tried to stage, nothing wider: an unscoped
  * `git add`/`git commit` here would sweep whatever else the operator has in
  * flight, which is the same hazard the scoped completion commit exists to
- * avoid.
+ * avoid. The pathspec rides inline only when shell-inert; otherwise the
+ * commands read the pathspec file (see {@link prepareRecoveryPathspecs}).
  */
-export function formatRecordCommitPending(paths: string[], taskId: string, error: string): string {
-  const pathspec = paths.map(shellPath).join(" ");
+export function formatRecordCommitPending(
+  paths: string[],
+  taskId: string,
+  error: string,
+  files?: RecoveryPathspecs,
+): string {
+  const mode = specMode(paths, files);
+  const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
+  let commands: string;
+  if (mode.kind === "file") {
+    commands =
+      `Land the record once the cause is fixed (paths listed in ${mode.files.all}):\n` +
+      `  git add --pathspec-from-file=${mode.files.all}\n` +
+      `  git commit -m "${message}" --pathspec-from-file=${mode.files.all}`;
+  } else {
+    const pathspec = paths.map(posixQuote).join(" ");
+    const caveat = mode.kind === "posix" ? ` ${POSIX_ONLY_CAVEAT}` : "";
+    commands =
+      `Land the record once the cause is fixed${caveat}:\n` +
+      `  git add -- ${pathspec}\n` +
+      `  git commit -m "${message}" -- ${pathspec}`;
+  }
   return (
     `⚠ Work committed; record not committed: the PRD record commit for task ${taskId} failed.\n` +
     `  ${error}\n` +
     `The task stays completed and its code commits are intact. Still uncommitted:\n` +
     `${renderPaths(paths)}\n` +
-    `Land the record once the cause is fixed:\n` +
-    `  git add -- ${pathspec}\n` +
-    `  git commit -m "chore(prd): commit PRD tree changes (task ${taskId} completed)" -- ${pathspec}`
+    commands
   );
 }
 
@@ -376,33 +395,181 @@ export function deletedAmong(projectDir: string, paths: string[]): Set<string> {
 }
 
 /**
- * Quote a pathspec entry for copy/paste into a shell. Bare only when every
- * character is inert; otherwise single-quoted, because single quotes are the
- * one form that suppresses expansion in POSIX shells and PowerShell alike —
- * inside double quotes `$(…)` still executes in both, which turns a hostile
- * filename into a command the moment the operator pastes. An embedded single
- * quote is closed, escaped, and reopened (the POSIX `'\''` idiom).
+ * Characters that mean nothing to POSIX shells, PowerShell, *and* cmd.exe. A
+ * command line made only of these needs no quoting anywhere, so it is the one
+ * form of inline pathspec that survives every shell an operator might paste
+ * into. Everything else goes through a pathspec file instead of quoting: no
+ * single scheme covers all three shells — single quotes are literal characters
+ * to cmd.exe (`&` still splits, spaces still separate), the POSIX `'\''`
+ * embedded-quote idiom is not PowerShell escaping (PowerShell doubles the
+ * quote), and cmd.exe's `%VAR%` expansion cannot be escaped at all on an
+ * interactive prompt.
  */
-function shellPath(path: string): string {
-  if (/^[A-Za-z0-9._/-]+$/.test(path)) return path;
+const SHELL_INERT = /^[A-Za-z0-9._/-]+$/;
+
+/** Where the recovery pathspec files live, relative to the project directory. */
+const RECOVERY_DIR = ".hench/recovery";
+
+/**
+ * The pathspec files a refusal's recovery commands read, written by
+ * {@link prepareRecoveryPathspecs}. Paths are repo-root-relative and
+ * shell-inert, so they can appear on a command line unquoted.
+ */
+export interface RecoveryPathspecs {
+  /** Every listed path — read by `git commit` and `git stash push`. */
+  all: string;
+  /** Only the still-existing paths — read by `git add`. Absent when it would equal `all`. */
+  add?: string;
+  /** Only the deleted paths — read by `git rm --cached`. Absent when nothing is deleted. */
+  rm?: string;
+}
+
+/**
+ * One pathspec-file entry per line. `--pathspec-from-file` C-unquotes an
+ * element wrapped in double quotes (the `core.quotePath` convention), so a
+ * name that begins with `"` — or contains a line break, which would otherwise
+ * split into two bogus entries — is C-quoted here to round-trip verbatim.
+ */
+function pathspecFileEntry(path: string): string {
+  if (!path.startsWith('"') && !/[\r\n]/.test(path)) return path;
+  const escaped = path
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r");
+  return `"${escaped}"`;
+}
+
+/**
+ * Write the pathspec files the recovery commands will reference, when they are
+ * needed at all.
+ *
+ * Returns `undefined` when every path is {@link SHELL_INERT} (the commands can
+ * carry the paths inline, unquoted, safely in every shell), when the file
+ * references themselves would not be shell-inert (a hostile directory name
+ * above the project), or when the write fails — the renderer then falls back
+ * to POSIX-quoted inline paths with an explicit shell caveat.
+ *
+ * The files live under `.hench/recovery/`, which is a declared hench runtime
+ * artifact (gitignored by `hench init`, discounted by both gates), so writing
+ * them cannot itself dirty the tree the refusal is complaining about. A single
+ * well-known set of names is overwritten each time rather than accumulating.
+ */
+export async function prepareRecoveryPathspecs(
+  projectDir: string,
+  paths: string[],
+  deleted: ReadonlySet<string> = new Set(),
+): Promise<RecoveryPathspecs | undefined> {
+  if (paths.length === 0 || paths.every((p) => SHELL_INERT.test(p))) return undefined;
+
+  // The commands are run from the repo root (the listed paths are
+  // repo-root-relative), so the file references must be too.
+  const repoPrefix = await repoRelativePrefix(projectDir);
+  const ref = (name: string): string => `${repoPrefix}${RECOVERY_DIR}/${name}`;
+  if (!SHELL_INERT.test(ref("pathspec.txt"))) return undefined;
+
+  const existing = paths.filter((p) => !deleted.has(p));
+  const gone = paths.filter((p) => deleted.has(p));
+  const content = (list: string[]): string =>
+    list.map(pathspecFileEntry).join("\n") + "\n";
+
+  try {
+    mkdirSync(join(projectDir, RECOVERY_DIR), { recursive: true });
+    const files: RecoveryPathspecs = { all: ref("pathspec.txt") };
+    writeFileSync(join(projectDir, RECOVERY_DIR, "pathspec.txt"), content(paths), "utf-8");
+    if (gone.length > 0) {
+      files.rm = ref("pathspec-rm.txt");
+      writeFileSync(join(projectDir, RECOVERY_DIR, "pathspec-rm.txt"), content(gone), "utf-8");
+      if (existing.length > 0) {
+        files.add = ref("pathspec-add.txt");
+        writeFileSync(join(projectDir, RECOVERY_DIR, "pathspec-add.txt"), content(existing), "utf-8");
+      }
+    }
+    return files;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Quote a pathspec entry for the POSIX-only fallback ({@link SpecMode}
+ * `"posix"`). Single quotes because inside double quotes `$(…)` still
+ * executes; the embedded quote uses the `'\''` close-escape-reopen idiom.
+ * Never emitted without the caveat line naming the shells it is for.
+ */
+function posixQuote(path: string): string {
+  if (SHELL_INERT.test(path)) return path;
   return `'${path.replace(/'/g, "'\\''")}'`;
 }
+
+type SpecMode =
+  | { kind: "bare" }
+  | { kind: "file"; files: RecoveryPathspecs }
+  | { kind: "posix" };
+
+/** How this message's commands carry their pathspecs. */
+function specMode(paths: string[], files: RecoveryPathspecs | undefined): SpecMode {
+  if (paths.every((p) => SHELL_INERT.test(p))) return { kind: "bare" };
+  if (files) return { kind: "file", files };
+  return { kind: "posix" };
+}
+
+/**
+ * The caveat printed with POSIX-quoted inline paths — the fallback when a
+ * pathspec file could not be written. Without it, pasting into cmd.exe treats
+ * the quotes as literal characters and `&`/spaces split the command.
+ */
+const POSIX_ONLY_CAVEAT =
+  "(quoted for POSIX shells such as bash — requote before pasting into PowerShell or cmd.exe)";
 
 /**
  * Path-scoped recovery commands for a set of dirty paths.
  *
- * Every command carries `--` and the exact listed paths — all of them, even
- * when the displayed list above truncates — because an unscoped
+ * Every command is scoped to the exact listed paths — all of them, even when
+ * the displayed list above truncates — because an unscoped
  * `git add`/`git commit`/`git stash` is how an unrelated in-flight change
  * gets swept into a hench commit (WM2048), and a partial pathspec would land
  * only part of the refused work. Deleted paths get `git rm --cached`.
+ *
+ * When every path is shell-inert the pathspec rides inline, unquoted — safe
+ * verbatim in POSIX shells, PowerShell, and cmd.exe alike. Otherwise the
+ * commands read a pathspec file (`--pathspec-from-file`, git ≥ 2.26): the
+ * hostile names never touch a command line, so there is nothing for any shell
+ * to expand or split.
  */
-function renderRecoveryCommands(paths: string[], deleted: ReadonlySet<string>): string {
-  const spec = (list: string[]): string => list.map(shellPath).join(" ");
+function renderRecoveryCommands(
+  paths: string[],
+  deleted: ReadonlySet<string>,
+  files?: RecoveryPathspecs,
+): string {
   const existing = paths.filter((p) => !deleted.has(p));
   const gone = paths.filter((p) => deleted.has(p));
+  const mode = specMode(paths, files);
 
-  const lines: string[] = ["To keep the work, commit exactly these paths:"];
+  const lines: string[] = [];
+  if (mode.kind === "file") {
+    lines.push(
+      `To keep the work, commit exactly these paths (listed in ${mode.files.all} — ` +
+        `their names contain shell metacharacters, so git reads them from the file):`,
+    );
+    if (existing.length > 0) {
+      lines.push(`  git add --pathspec-from-file=${mode.files.add ?? mode.files.all}`);
+    }
+    if (gone.length > 0) {
+      lines.push(`  git rm --cached --pathspec-from-file=${mode.files.rm ?? mode.files.all}`);
+    }
+    lines.push(`  git commit --pathspec-from-file=${mode.files.all}`);
+    lines.push("Or set them aside:");
+    lines.push(`  git stash push --pathspec-from-file=${mode.files.all}`);
+    return lines.join("\n");
+  }
+
+  const spec = (list: string[]): string => list.map(posixQuote).join(" ");
+  lines.push(
+    mode.kind === "posix"
+      ? `To keep the work, commit exactly these paths ${POSIX_ONLY_CAVEAT}:`
+      : "To keep the work, commit exactly these paths:",
+  );
   if (existing.length > 0) lines.push(`  git add -- ${spec(existing)}`);
   if (gone.length > 0) lines.push(`  git rm --cached -- ${spec(gone)}`);
   lines.push(`  git commit -- ${spec(paths)}`);
@@ -417,12 +584,16 @@ function renderRecoveryCommands(paths: string[], deleted: ReadonlySet<string>): 
  * disappearing without anyone being told which work — and suggests only
  * commands scoped to those paths ({@link renderRecoveryCommands}).
  */
-export function formatUncommittedWorkRefusal(paths: string[], deleted: ReadonlySet<string> = new Set()): string {
+export function formatUncommittedWorkRefusal(
+  paths: string[],
+  deleted: ReadonlySet<string> = new Set(),
+  files?: RecoveryPathspecs,
+): string {
   return (
     `⚠ Refusing to mark this task completed: ${paths.length} path(s) of its work are still uncommitted.\n` +
     `${renderPaths(paths)}\n` +
     `Nothing was discarded. Land the work, then re-run the task.\n` +
-    renderRecoveryCommands(paths, deleted)
+    renderRecoveryCommands(paths, deleted, files)
   );
 }
 
@@ -433,12 +604,16 @@ export function formatUncommittedWorkRefusal(paths: string[], deleted: ReadonlyS
  * Starting anyway is what turned one leaked task into a tangle of three: the
  * next task's diff, review and commit all include files it never wrote.
  */
-export function formatLoopRefusal(paths: string[], deleted: ReadonlySet<string> = new Set()): string {
+export function formatLoopRefusal(
+  paths: string[],
+  deleted: ReadonlySet<string> = new Set(),
+  files?: RecoveryPathspecs,
+): string {
   return (
     `⚠ Stopping the loop: ${paths.length} path(s) from the previous task are still uncommitted.\n` +
     `${renderPaths(paths)}\n` +
     `Starting another task would fold them into its commit.\n` +
-    `${renderRecoveryCommands(paths, deleted)}\n` +
+    `${renderRecoveryCommands(paths, deleted, files)}\n` +
     `Then re-run.`
   );
 }
@@ -451,12 +626,16 @@ export function formatLoopRefusal(paths: string[], deleted: ReadonlySet<string> 
  * It names them because the consequence — the pre-run gate refusing the run a
  * moment later — otherwise looks like `--reset-deferred` not working.
  */
-export function formatResetDeferredCommitSkipped(paths: string[], deleted: ReadonlySet<string> = new Set()): string {
+export function formatResetDeferredCommitSkipped(
+  paths: string[],
+  deleted: ReadonlySet<string> = new Set(),
+  files?: RecoveryPathspecs,
+): string {
   return (
     `⚠ Reset applied but not committed: ${paths.length} PRD path(s) were already uncommitted before it.\n` +
     `${renderPaths(paths)}\n` +
     `Committing would fold that work into hench's own "reset deferred/failing task(s)" commit. ` +
     `The pre-run gate will refuse the run until it is dealt with.\n` +
-    renderRecoveryCommands(paths, deleted)
+    renderRecoveryCommands(paths, deleted, files)
   );
 }
