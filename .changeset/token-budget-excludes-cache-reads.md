@@ -24,11 +24,16 @@ Runaway loops remain bounded: cache writes and output both grow with turn count.
 
 Also:
 
-- Built-in template budgets re-derived from measured runs (`maxTurns` x ~6K
-  counted tokens/turn x 2 headroom), each with its basis in a comment:
-  quick-iteration 50K -> 200K, thorough-execution 200K -> 1M,
-  budget-conscious 30K -> 150K, api-direct 150K -> 500K. The old values
-  predated prompt caching and sat below a single median run.
+- Built-in template budgets re-derived from measured runs. Counted cost is
+  affine in turn count — roughly `190,000 + 5,400 x turns`, where the constant
+  is the initial context write — so each budget is that fit at the template's
+  `maxTurns`, doubled for headroom: quick-iteration 50K -> 600K,
+  thorough-execution 200K -> 1.5M, budget-conscious 30K -> 600K,
+  api-direct 150K -> 850K. The old values predated prompt caching and sat
+  below a single median run. `budget-conscious` is not tightened below
+  `quick-iteration` despite its name: measured runs in its turn class
+  *completed* at 484K and 489K, so a lower budget would fail finished work —
+  it economises through `maxTurns` and its 4096 `maxTokens` cap instead.
 - The budget-exceeded message now names the token classes that counted and how
   many cache-read tokens were excluded, so a genuine overrun can be told apart
   from cache-read inflation.

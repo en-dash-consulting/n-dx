@@ -925,7 +925,7 @@ const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
     description: "Short, fast runs for rapid prototyping and small fixes",
     useCases: ["Bug fixes and small patches", "Quick refactors with clear scope", "Exploratory changes with fast feedback"],
     tags: ["fast", "lightweight", "prototyping"],
-    config: { maxTurns: 15, tokenBudget: 200000, loopPauseMs: 500, retry: { maxRetries: 2, baseDelayMs: 1000, maxDelayMs: 10000 } },
+    config: { maxTurns: 15, tokenBudget: 600000, loopPauseMs: 500, retry: { maxRetries: 2, baseDelayMs: 1000, maxDelayMs: 10000 } },
     builtIn: true,
   },
   {
@@ -934,7 +934,7 @@ const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
     description: "Extended runs with generous limits for complex multi-file tasks",
     useCases: ["New feature implementation across multiple files", "Large refactoring efforts", "Tasks requiring extensive test writing"],
     tags: ["thorough", "complex", "multi-file"],
-    config: { maxTurns: 80, maxTokens: 16384, tokenBudget: 1000000, loopPauseMs: 2000, retry: { maxRetries: 5, baseDelayMs: 2000, maxDelayMs: 60000 } },
+    config: { maxTurns: 80, maxTokens: 16384, tokenBudget: 1500000, loopPauseMs: 2000, retry: { maxRetries: 5, baseDelayMs: 2000, maxDelayMs: 60000 } },
     builtIn: true,
   },
   {
@@ -943,7 +943,7 @@ const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
     description: "Optimized for minimal token usage while maintaining quality",
     useCases: ["Cost-sensitive environments", "High-volume task processing", "Routine maintenance tasks"],
     tags: ["budget", "cost-effective", "efficient"],
-    config: { maxTurns: 20, maxTokens: 4096, tokenBudget: 150000, loopPauseMs: 3000, retry: { maxRetries: 2, baseDelayMs: 3000, maxDelayMs: 15000 } },
+    config: { maxTurns: 20, maxTokens: 4096, tokenBudget: 600000, loopPauseMs: 3000, retry: { maxRetries: 2, baseDelayMs: 3000, maxDelayMs: 15000 } },
     builtIn: true,
   },
   {
@@ -961,7 +961,7 @@ const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
     description: "Use Anthropic API directly instead of Claude Code CLI for headless environments",
     useCases: ["CI/CD pipeline integration", "Headless server environments", "Custom API key management"],
     tags: ["api", "headless", "ci-cd"],
-    config: { provider: "api", maxTurns: 40, tokenBudget: 500000, retry: { maxRetries: 4, baseDelayMs: 3000, maxDelayMs: 30000 } },
+    config: { provider: "api", maxTurns: 40, tokenBudget: 850000, retry: { maxRetries: 4, baseDelayMs: 3000, maxDelayMs: 30000 } },
     builtIn: true,
   },
 ];

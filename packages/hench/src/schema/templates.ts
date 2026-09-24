@@ -44,18 +44,33 @@ export interface WorkflowTemplate {
 // input + cache writes + output and excludes cache reads (a cache read
 // re-reads tokens already counted when they were written).
 //
-// The budgets below are derived from the 27 recorded runs in this
-// repository's `.hench/runs/` as of 2026-09. Under this rule those runs
-// consumed a median of ~6,000 counted tokens per turn (p75 ~10,300), for
-// run totals of 176K–2.5M. Each budget is therefore
+// The budgets below are derived from the 26 recorded runs in this
+// repository's `.hench/runs/` as of 2026-09, whose counted totals ran
+// 176K–2.5M.
 //
-//     maxTurns x 6,000 counted tokens/turn x 2 headroom
+// Counted cost is affine in turn count, not proportional:
 //
-// rounded to a round number — high enough that a healthy run at the
-// template's turn ceiling does not trip it, low enough to stop a runaway.
+//     counted ~= 190,000 + 5,400 x turns        (least-squares fit)
+//
+// The ~190K constant is the initial context write, which a run pays before
+// it does any work. Multiplying a per-turn average by `maxTurns` drops that
+// constant and so under-budgets short-run templates badly — a measured
+// 11-turn run cost 484K, far above what any per-turn model predicts for 11
+// turns. Each budget below is therefore the fit evaluated at the template's
+// `maxTurns`, doubled for headroom and rounded up.
+//
+// Checked against the recorded runs: no *completed* run of a given
+// template's turn class reaches that template's budget. The one run that
+// does trip (3 turns, 1.13M counted) had already failed, and 1.13M in 3
+// turns is the runaway these budgets exist to stop.
+//
 // The pre-2026-09 values (50K/200K/30K/150K) predate prompt caching and sat
 // below a single median run, so any run under a template was marked
 // `budget_exceeded` after finishing its work.
+//
+// A genuinely cheaper template is built with `maxTurns` and `maxTokens`,
+// which bound the work. A `tokenBudget` below the ~190K floor plus real
+// work does not save money; it just fails runs after they have spent it.
 
 export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
   {
@@ -70,7 +85,7 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
     tags: ["fast", "lightweight", "prototyping"],
     config: {
       maxTurns: 15,
-      tokenBudget: 200000,        // 15 turns x 6K x 2 headroom = 180K, rounded up
+      tokenBudget: 600000,        // fit(15) = 271K x 2 headroom = 542K, rounded up
       loopPauseMs: 500,
       retry: {
         maxRetries: 2,
@@ -93,7 +108,7 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
     config: {
       maxTurns: 80,
       maxTokens: 16384,
-      tokenBudget: 1000000,       // 80 turns x 6K x 2 headroom = 960K, rounded up
+      tokenBudget: 1500000,       // fit(80) = 619K x 2 headroom = 1.24M, rounded up
       loopPauseMs: 2000,
       retry: {
         maxRetries: 5,
@@ -116,9 +131,12 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
     config: {
       maxTurns: 20,
       maxTokens: 4096,
-      // 20 turns x 6K x 2 headroom = 240K; held at 150K, a deliberate 1.25x
-      // rather than 2x, because this template's purpose is to stop early.
-      tokenBudget: 150000,
+      // fit(20) = 297K x 2 headroom = 595K, rounded up. Not tightened below
+      // quick-iteration despite the name: two measured runs in this turn
+      // class *completed* at 484K and 489K, so a lower budget would fail
+      // finished work. This template economises through maxTurns and the
+      // 4096 maxTokens cap instead.
+      tokenBudget: 600000,
       loopPauseMs: 3000,
       retry: {
         maxRetries: 2,
@@ -183,7 +201,7 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
     config: {
       provider: "api",
       maxTurns: 40,
-      tokenBudget: 500000,        // 40 turns x 6K x 2 headroom = 480K, rounded up
+      tokenBudget: 850000,        // fit(40) = 405K x 2 headroom = 809K, rounded up
       retry: {
         maxRetries: 4,
         baseDelayMs: 3000,
