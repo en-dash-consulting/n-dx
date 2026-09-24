@@ -126,7 +126,13 @@ export function formatClaims(reports: ClaimReport[]): string[] {
     lines.push(`    worktree: ${r.worktreeRoot}`);
     lines.push(`    holder:   pid ${r.pid} on ${r.host} — ${r.pidAlive ? "alive" : "not running"}`);
     lines.push(`    state:    ${claimState({ reason: r.reason ?? undefined })}`);
-    lines.push(`    expires:  ${shortTime(r.expiresAt)} (claimed ${shortTime(r.claimedAt)})`);
+    // A held claim does not expire — printing the carried-over lease time
+    // would promise a self-cleanup that no longer happens.
+    lines.push(
+      r.reason
+        ? `    expires:  never — held until released (claimed ${shortTime(r.claimedAt)})`
+        : `    expires:  ${shortTime(r.expiresAt)} (claimed ${shortTime(r.claimedAt)})`,
+    );
     lines.push("");
   }
   return lines;

@@ -59,7 +59,7 @@ export class TaskClaimedElsewhereError extends CLIError {
     const message = claim.reason === "uncommitted-work"
       ? `Task ${label} is claimed by another worktree: ${claim.worktreeRoot}. ` +
         `A run there refused to complete it because its work is still uncommitted, ` +
-        `so the claim is held until someone deals with that work (expires ${claim.expiresAt}).`
+        `so the claim is held until someone deals with that work — it does not expire.`
       : `Task ${label} is being worked on in another worktree: ${claim.worktreeRoot} (pid ${claim.pid}, claim expires ${claim.expiresAt}).`;
     const hint = claim.reason === "uncommitted-work"
       ? `Commit or discard the work in ${claim.worktreeRoot} and re-run the task there, or free the task with 'ndx claim release ${taskId}'.`
