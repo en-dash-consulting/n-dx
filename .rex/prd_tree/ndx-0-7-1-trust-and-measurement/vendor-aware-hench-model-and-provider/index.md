@@ -25,3 +25,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Honour a per-vendor agent model override in ndx work](./honour-a-per-vendor-agent-model.md) | pending |
 | [Make the hench Config view vendor-aware: provider choices and an agent-model picker for the active vendor](./make-the-hench-config-view-vendor.md) | pending |
 | [Serve one per-vendor model catalog and use it in the LLM Provider view](./serve-one-per-vendor-model-catalog-and.md) | pending |
+| [Validate .n-dx.json hench overrides after the merge, falling back per field with a warning](./validate-n-dx-json-hench-overrides.md) | pending |
