@@ -26,7 +26,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Carry the hold reason into the dashboard claims payload and the Execute 409](./carry-the-hold-reason-into-the.md) | pending |
 | [Dispose the dashboard's per-worktree run watchers when a worktree is removed](./dispose-the-dashboard-s-per-worktree.md) | pending |
 | [Hold the task claim when the uncommitted-work gate refuses completion](./hold-the-task-claim-when-the.md) | completed |
-| [Keep a held claim until it is released, or say in the refusal when the hold lapses](./keep-a-held-claim-until-it-is-released.md) | pending |
+| [Keep a held claim until it is released, or say in the refusal when the hold lapses](./keep-a-held-claim-until-it-is-released.md) | completed |
 | [Make ndx claim resolve .rex in the directory it is given](./make-ndx-claim-resolve-rex-in-the.md) | pending |
 | [Make the dashboard next-task read skip live claims so it matches Execute](./make-the-dashboard-next-task-read-skip.md) | pending |
 | [Offer only validated, path-scoped recovery commands after an uncommitted-work refusal](./offer-only-validated-path-scoped.md) | pending |
