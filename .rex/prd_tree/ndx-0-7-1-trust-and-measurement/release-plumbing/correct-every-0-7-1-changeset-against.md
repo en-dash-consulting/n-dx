@@ -19,7 +19,10 @@ acceptanceCriteria:
   - "PR C's corrections are present: the 0.5.2 boundary, the cost rise stated as about half, and @n-dx/core listed on the cost note."
   - "pnpm changeset status shows exactly six patch bumps, and the regenerated #380 CHANGELOG diff has been read for each package, including a sourcevision entry that says what changed in it."
   - "#397's content, credited to #395 because it amended that changeset, is either left as is or split out deliberately."
+  - "token-budget-counts-cached-input.md no longer says the API loop counts cache reads at face value: PR C (#404) rewrote it to describe C's CLI-only exclusion, which PR M then replaced with one rule on both loops (token-budget-excludes-cache-reads.md). The two changesets must not contradict each other."
+  - "foreground-invariant-autonomous-runs.md does not claim the backgrounding problem is solved by the prompt alone; it either points to the detect-and-resume fix (PR BG) or is merged with its changeset."
+  - "Every existing changeset edited by a code PR rather than by this pass (PR C edited token-budget-counts-cached-input.md) is checked against what merged."
 description: "This is the final changeset pass. It runs after the last code PR merges and lands directly before #380 (Version Packages), which regenerates from whatever changesets are on main. It checks every changeset against the code that merged, not against the PR that wrote it. PR C corrects the two errors already known (the 0.5.1 slug-rule boundary and the cost-rise wording); this pass verifies those and covers everything else."
-lastModified: "2026-09-23T18:40:53.591Z"
+lastModified: "2026-09-24T20:31:09.000Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

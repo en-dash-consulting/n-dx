@@ -27,6 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Close out the 0.7.1 PRD bookkeeping before the cut](./close-out-the-0-7-1-prd-bookkeeping.md) | pending |
 | [Close the issues fixed by #370 and triage #375 and #367](./close-the-issues-fixed-by-370-and.md) | completed |
 | [Commit the PRD storage migration design document](./commit-the-prd-storage-migration.md) | pending |
+| [Confirm hench.promptCacheTtl 1h is accepted by the live Anthropic API before the cut](./confirm-hench-promptcachettl-1h-is.md) | pending |
 | [Correct every 0.7.1 changeset against the merged behaviour before the cut](./correct-every-0-7-1-changeset-against.md) | pending |
 | [Diagnose and fix the release workflow so publishes create git tags and GitHub releases](./diagnose-and-fix-the-release-workflow.md) | in_progress |
 | [Fix rex fix timestamp backfill inverting startedAt/completedAt (#375)](./fix-rex-fix-timestamp-backfill.md) | completed |
