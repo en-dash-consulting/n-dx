@@ -133,12 +133,17 @@ describe("buildReviewBrief", () => {
     expect(brief).toMatch(/Capture as a PRD task with `add_item`/);
   });
 
-  it("defers to the human when the run is interactive", () => {
+  it("leaves the capture choice to the operator when the run is attended, without waiting for it", () => {
+    // The reviewer is headless even on an attended run, so it can never hear
+    // a selection (95b81c0a). It reports; the run queues; the operator picks.
     const brief = buildReviewBrief({ ...BASE_CTX, autonomous: false });
 
-    expect(brief).toMatch(/Ask before capturing/);
-    expect(brief).toMatch(/capture only what the user selects/);
-    expect(brief).not.toMatch(/Do not stop to ask/);
+    expect(brief).toMatch(/Do not stop to ask, and do not capture/);
+    expect(brief).toMatch(/cannot receive a\s+reply/);
+    expect(brief).toMatch(/the run queues it for the operator/);
+    expect(brief).not.toMatch(/wait for an explicit selection/);
+    expect(brief).not.toMatch(/capture only what the user selects/);
+    expect(brief).not.toMatch(/Capture as a PRD task with `add_item`/);
   });
 
   it("names the exact report path and the schema fields the parser reads", () => {

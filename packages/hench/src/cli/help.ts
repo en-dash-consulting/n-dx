@@ -243,10 +243,11 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "inspect what an adversarial review pass left behind",
     usage: "hench review pending <run-id> [options] [dir]",
     description:
-      "Lists the findings an autonomous `--review` run deferred instead of\n" +
-      "capturing. Autonomous runs have nobody at the capture prompt, so a\n" +
-      "finding the reviewer would have offered is parked with a `deferred`\n" +
-      "disposition and an id rather than being dropped into scrollback.\n" +
+      "Lists the findings a `--review` run deferred instead of capturing.\n" +
+      "The reviewer runs headless, so nobody is at its capture prompt even\n" +
+      "on an attended run: a finding it would have offered is parked with a\n" +
+      "`deferred` disposition and an id rather than being dropped into\n" +
+      "scrollback.\n" +
       "\n" +
       "Each finding is listed with its id, severity, verdict and failure\n" +
       "scenario. To capture one, run the /ndx-adversarial-review skill and\n" +
