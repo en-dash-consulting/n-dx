@@ -26,7 +26,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Adopt a conformant unmarked tree with a notice instead of refusing it](./adopt-a-conformant-unmarked-tree-with.md) | completed |
 | [Check the slug-rule marker direction inside the PRD lock in adoptSlugRule (both stores)](./check-the-slug-rule-marker-direction.md) | completed |
-| [Detect an index.md whose Children table omits a child directory, after confirming whether it hides items](./detect-an-index-md-whose-children.md) | pending |
+| [Detect an index.md whose Children table omits a child directory, after confirming whether it hides items](./detect-an-index-md-whose-children.md) | completed |
 | [Fail rex validate and CI when the PRD tree does not match the slug rule](./fail-rex-validate-and-ci-when-the-prd.md) | completed |
 | [Fix the slug-rule guard's false refusal on an unmarked tree and bound migrate-slugs to upgrades](./fix-the-slug-rule-guard-s-false.md) | completed |
 | [Keep worktree agents' MCP PRD writes in their own worktree when a local-scope registration pins another path](./keep-worktree-agents-mcp-prd-writes-in.md) | completed |
