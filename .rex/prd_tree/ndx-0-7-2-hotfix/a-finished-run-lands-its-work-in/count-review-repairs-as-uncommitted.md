@@ -1,0 +1,23 @@
+---
+id: "0c9623b6-57a4-47f9-a371-3865149cf866"
+level: "task"
+title: "Count review repairs as uncommitted work unless a commit will really follow"
+status: "pending"
+priority: "high"
+tags:
+  - "0.7.2"
+  - "hench"
+  - "hotfix"
+  - "completion-gate"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "Review repairs are excluded from the completion gate only when a commit will really follow: autoCommit is on, or a non-empty commit message file exists — the same condition as the staged-index exclusion"
+  - "When the gate refuses a completion, the paths it names and the recovery commands it prints include every leftover path, review repairs included"
+  - "A regression test reproduces run 2fb96507: autoCommit off, no commit message file, and review repairs covering untracked files the agent created; the refusal lists those files"
+  - "With autoCommit on, or with a commit message file present, repairs are still excluded and committed as before (existing tests keep passing)"
+  - "A patch changeset for @n-dx/hench describes the fix"
+  - "hench unit tests pass"
+description: "The completion gate in packages/hench/src/agent/lifecycle/shared.ts (the `findUncommittedWork` call with `discountPaths: [...PRD_COMMIT_PATHS, ...pendingRepairs]`) excludes `review.repairedFiles` on the promise that a later step of the run commits them: `commitReviewRepairsIfNeeded` on autoCommit, or the commit prompt's `stageReviewRepairs` otherwise. But the commit prompt returns early when `.hench-commit-msg.txt` is missing or empty, so on `autoCommit: false` with no message file nothing commits the repairs. The staged-index exclusion next to it is already conditioned on `pendingCommitMessageExists`; the repairs exclusion is not.\n\nRepairs are computed as every path the review pass changed (packages/hench/src/agent/lifecycle/cli-loop.ts, `diffDirtyState` over the pre/post-review snapshots), which includes files the agent created and the reviewer then edited. In caos run 2fb96507 that was the whole feature: `app/utils/mcp-auth.server.ts` and its test. The refusal named only `package.json` and `package-lock.json`, and its \"commit exactly these paths\" commands would have left both new files uncommitted. The run record's `uncommittedPaths` had all five paths.\n\nWorking notes for this run: do not edit anything under .rex/ by hand — hench records the task's completion after the gate. `pnpm` is not an allowed command in this project; run tests with `npx vitest run --root packages/hench <path>` from the repo root."
+lastModified: "2026-09-25T19:14:44.700Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
