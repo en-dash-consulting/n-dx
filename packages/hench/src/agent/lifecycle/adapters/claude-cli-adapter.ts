@@ -24,7 +24,12 @@
  * @see docs/architecture/phase2-vendor-normalization.md — design rationale
  */
 
-import type { VendorAdapter, SpawnConfig, VendorSpawnOptions } from "../vendor-adapter.js";
+import type {
+  VendorAdapter,
+  SpawnConfig,
+  VendorSpawnOptions,
+  BackgroundWaitSignal,
+} from "../vendor-adapter.js";
 import type {
   PromptEnvelope,
   ExecutionPolicy,
@@ -372,6 +377,38 @@ function extractToolUseBlocks(
 
 // ── ClaudeCliAdapter ─────────────────────────────────────────────────────
 
+/** Claude CLI tools whose only purpose is to wait for a later notification. */
+const CLAUDE_WAIT_TOOLS = new Set(["ScheduleWakeup", "Monitor"]);
+
+const BACKGROUND_DETAIL_LENGTH = 120;
+
+/**
+ * The background signal a Claude CLI `tool_use` carries, if any.
+ *
+ * Two shapes count: a `Bash` call with `run_in_background: true` (strictly
+ * `true`: a stringly `"true"` is not what the CLI honours), and any
+ * `ScheduleWakeup` or `Monitor` call, which exist only to wait for something
+ * that never arrives in a `claude -p` session. Polling a job's output
+ * (`BashOutput`) is the agent still working, and does not count.
+ *
+ * @internal Exported for testing.
+ */
+export function detectClaudeBackgroundWait(toolCall: {
+  tool: string;
+  input: Readonly<Record<string, unknown>> | undefined;
+}): BackgroundWaitSignal | undefined {
+  const { tool, input } = toolCall;
+  if (tool === "Bash" && input?.run_in_background === true) {
+    const command = typeof input.command === "string" ? input.command : "";
+    return { tool, detail: command.slice(0, BACKGROUND_DETAIL_LENGTH) };
+  }
+  if (CLAUDE_WAIT_TOOLS.has(tool)) {
+    const reason = typeof input?.reason === "string" ? input.reason : "";
+    return { tool, detail: reason.slice(0, BACKGROUND_DETAIL_LENGTH) };
+  }
+  return undefined;
+}
+
 /**
  * VendorAdapter implementation for the Claude CLI.
  *
@@ -381,6 +418,7 @@ function extractToolUseBlocks(
 export const claudeCliAdapter: VendorAdapter = {
   vendor: LLM_VENDOR.CLAUDE,
   parseMode: "stream-json",
+  resumesUnfinishedSessions: true,
 
   buildSpawnConfig(
     envelope: PromptEnvelope,
@@ -426,6 +464,8 @@ export const claudeCliAdapter: VendorAdapter = {
     const id = (rawJson as Record<string, unknown>).session_id;
     return typeof id === "string" && id ? id : undefined;
   },
+
+  detectBackgroundWait: detectClaudeBackgroundWait,
 
   classifyError(err: unknown): FailureCategory {
     return classifyVendorError(err);

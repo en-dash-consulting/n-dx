@@ -1071,16 +1071,18 @@ export type RunReviewRecord =
        */
       failedActionCount: number;
       /**
-       * Findings an autonomous run parked for the operator instead of
-       * dropping, because no human was at the capture prompt to rule on them.
+       * Findings the run parked for the operator instead of dropping, because
+       * no human was at the reviewer's capture prompt to rule on them — on an
+       * attended run as much as an autonomous one, since the reviewer is
+       * always headless.
        * See `deriveDisposition` in `agent/analysis/adversarial-review.ts` for
        * what earns a deferral; `hench review pending <run-id>` lists them.
        *
        * v1 additive field, and orthogonal to `unresolvedCount` rather than a
        * slice of it: an unrepaired must-fix is counted by both, while a
        * should-fix nobody answered for is deferred but not unresolved. Absent
-       * on records written before the field existed and on interactive runs,
-       * which have a human to decide and so park nothing.
+       * on records written before the field existed, and when nothing was
+       * parked. Attended runs written before PR BG park nothing either.
        */
       deferredCount?: number;
       /** True when the reviewer edited a file. */
@@ -1096,6 +1098,11 @@ export type RunReviewRecord =
       repairedFiles?: string[];
       /** Commit that captured the repairs on the autoCommit path. */
       repairCommit?: string;
+      /**
+       * True when the reviewer ended waiting on a background command without
+       * writing its report and was resumed once to write it.
+       */
+      backgroundResumed?: boolean;
       failed?: undefined;
     }
   | {
@@ -1115,6 +1122,8 @@ export type RunReviewRecord =
        * (`--review-optional`) failure, which does not block anything.
        */
       gated?: boolean;
+      /** As on the success shape: the reviewer was resumed once, and still wrote nothing usable. */
+      backgroundResumed?: boolean;
     };
 
 /**
@@ -1223,6 +1232,15 @@ export interface RunRecord {
    * v1 additive field.
    */
   spawnBreakdown?: Record<string, number>;
+  /**
+   * Set when the work session ended waiting on a background command (a
+   * backgrounded Bash call, `ScheduleWakeup`, or `Monitor`) with its work
+   * uncommitted, and the run resumed it once to finish in the foreground.
+   * Names the call that triggered the resume, so a run that needed one is
+   * distinguishable from one that did not. See
+   * `agent/lifecycle/background-wait.ts`. v1 additive field.
+   */
+  backgroundResume?: { tool: string; detail: string };
   /**
    * How many times the in-memory conversation window was condensed during
    * the run (tool-output digests and LLM summarization passes both count).

@@ -40,7 +40,8 @@ export type SpawnReason =
   | "initial"
   | "retry"
   | "plan-respawn"
-  | "fork-fallback";
+  | "fork-fallback"
+  | "background-resume";
 
 export interface SpawnLedger {
   /** Total spawns made for this task. */
@@ -54,7 +55,13 @@ export interface SpawnLedger {
 export function createSpawnLedger(limit = DEFAULT_MAX_SPAWNS_PER_TASK): SpawnLedger {
   return {
     total: 0,
-    byReason: { initial: 0, retry: 0, "plan-respawn": 0, "fork-fallback": 0 },
+    byReason: {
+      initial: 0,
+      retry: 0,
+      "plan-respawn": 0,
+      "fork-fallback": 0,
+      "background-resume": 0,
+    },
     limit: limit > 0 ? limit : DEFAULT_MAX_SPAWNS_PER_TASK,
   };
 }
