@@ -170,10 +170,21 @@ const staticScript = `<script>
       panel.querySelectorAll(".toggle button").forEach(function (b) { b.setAttribute("aria-pressed", String(b === btn)); });
     });
   });
-  document.getElementById("theme").addEventListener("click", function () {
+  // Theme: same three-way control as the live page. No attribute = system
+  // (the CSS media query decides); light / dark pin it; the choice is kept.
+  function applyTheme(pref) {
+    if (["system", "light", "dark"].indexOf(pref) < 0) pref = "system";
     var root = document.documentElement;
-    root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+    if (pref === "system") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", pref);
+    document.querySelectorAll("#theme-toggle button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.themePref === pref)); });
+    try { if (pref === "system") localStorage.removeItem("ndx-preview-theme"); else localStorage.setItem("ndx-preview-theme", pref); } catch (e) {}
+  }
+  document.querySelectorAll("#theme-toggle button").forEach(function (b) {
+    b.addEventListener("click", function () { applyTheme(b.dataset.themePref); });
   });
+  var storedTheme = null;
+  try { storedTheme = localStorage.getItem("ndx-preview-theme"); } catch (e) {}
+  applyTheme(storedTheme || "system");
   show(location.hash.slice(1) || "home");
 })();
 </script>`;
