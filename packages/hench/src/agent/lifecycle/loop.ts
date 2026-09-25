@@ -73,12 +73,17 @@ const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
 /**
  * Displayed turn number for the "Turn N/maxTurns" banner.
  *
- * Routed through the active progress reporter (if one is registered for
- * this task's attempt sequence) so a fresh spawn — a retry or plan-mode
- * respawn always restarts this loop's local `turn` at 0 — never prints a
- * turn number lower than one already shown for this task. `run.turns`,
- * the persisted count used for budgeting and the run summary, is
- * unaffected: this only changes what gets printed.
+ * A guard, not a fix for a live defect: today `agentLoop` is entered once
+ * per task (run.ts calls it in the `provider === "api"` branch only) and
+ * its turn loop runs once, so this returns `turnNumber` unchanged in every
+ * reachable case. Plan-mode respawn — the case that *would* restart a
+ * turn counter — lives in cli-loop.ts, which prints no turn banner and
+ * never reaches this function. The routing exists so that if a future
+ * change re-enters a turn loop within one task, the banner cannot print a
+ * number lower than one already shown.
+ *
+ * `run.turns`, the persisted count used for budgeting and the run summary,
+ * is unaffected either way: this only changes what gets printed.
  */
 function displayTurn(turnNumber: number, maxTurns: number): number {
   return getActiveProgressReporter()?.advance("turn", turnNumber, maxTurns) ?? turnNumber;

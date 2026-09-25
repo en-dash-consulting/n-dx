@@ -18,10 +18,16 @@ line afterward. `api-provider.ts`, `cli-provider.ts` and
 it, replacing the old `Rate limited — retry in Ns… (attempt n of m)` text.
 
 `sourcevision analyze` registers a reporter for the life of the command
-(including recursive `--deep` sub-analyses) and uses it for the zone
-enrichment pass counter, which previously restarted at pass 2 for every
-`--deep` sub-package even after a parent analysis had already shown a later
-pass number. `hench run` registers a reporter for a task's whole attempt
-sequence so the `Turn N/maxTurns` banner never prints a lower turn number
-after a plan-mode respawn restarts the spawn from turn 0 — the persisted
-`run.turns` accounting is unaffected, only what gets printed.
+(including recursive `--deep` sub-analyses), and its spinners register
+themselves as the active reporter while they own the terminal line, so a
+rate-limit retry raised inside an enrichment or classification batch pauses
+the spinner, prints its line, and resumes it instead of interleaving with
+the spinner's redraw. The zone enrichment pass number is deliberately left
+unclamped: it is an absolute identifier (`--target-pass=N` names it) rather
+than a progress tick, so forcing it upward would report the wrong pass.
+
+`hench run` registers a reporter for a task's whole attempt sequence and
+routes the `Turn N/maxTurns` banner through it. This is a guard, not a
+behavior change: `agentLoop` is entered once per task and its turn loop
+runs once, so the printed number is unchanged today. The persisted
+`run.turns` accounting is not affected either way.

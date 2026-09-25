@@ -53,7 +53,7 @@ import type {
   InventoryResult,
 } from "../sourcevision-core.js";
 import { info } from "../output.js";
-import { bold, cyan, dim, yellow, green, red, loadProjectOverrides, getActiveProgressReporter } from "@n-dx/llm-client";
+import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx/llm-client";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 
 // ── Shared context passed between phases ─────────────────────────────
@@ -398,15 +398,18 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
 
       let prevFingerprint = fingerprint(zones);
       for (let p = 0; p < passesNeeded; p++) {
-        // Route through the active progress reporter (if any) so a `--deep`
-        // sub-analysis — which re-enters this phase from scratch for each
-        // sub-package and would otherwise restart the pass number at 2 —
-        // never prints a lower pass number than the parent analysis already
-        // showed. Falls back to the raw computed number when this phase
-        // runs without a reporter registered (e.g. direct unit tests).
+        // The enrichment pass number is an absolute identifier, not a
+        // progress tick: `--target-pass=N` names it, the convergence message
+        // below counts remaining passes from it, and it is persisted as
+        // `zones.enrichmentPass`. It must NOT be routed through a monotonic
+        // progress reporter — clamping it to a running maximum would freeze
+        // the label at a stale higher value and report the wrong pass under
+        // `--deep` (every sub-analysis restarts at pass 2, so scope two
+        // onward would print the first scope's final pass number). The
+        // restart across sub-analyses is already disambiguated by the
+        // `[deep] Analyzing <prefix>...` header that precedes each scope.
         const passNumber = currentPass + p + 2;
-        const displayPass = getActiveProgressReporter()?.advance("zones:enrichment-pass", passNumber, targetPass) ?? passNumber;
-        info(`\n${bold(cyan("[phase 4]"))} Enrichment pass ${displayPass}...`);
+        info(`\n${bold(cyan("[phase 4]"))} Enrichment pass ${passNumber}...`);
         zonesResult = await analyzeZones(inventory, importsData, {
           enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset, hints,
           narrate: ctx.narrate,

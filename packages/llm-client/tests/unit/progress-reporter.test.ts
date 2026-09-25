@@ -77,6 +77,29 @@ describe("ProgressReporter monotonicity", () => {
     const second = reporter.advance("retry-loop", 1, 5); // e.g. an attempt counter reset
     expect(second).toBeGreaterThanOrEqual(first);
   });
+
+  it("discards the true input when it is lower than the running max — so absolute identifiers must not be routed through it", () => {
+    // The clamp buys monotonicity by throwing the real value away. That is
+    // correct for a progress tick ("step 7 of many") and WRONG for an
+    // absolute identifier that means something on its own — a sourcevision
+    // enrichment pass number, a schema version, a page number. Routing one
+    // of those through advance() silently reports a stale higher value
+    // instead of the real one, which reads as a confident wrong answer
+    // rather than as a restarting counter.
+    const reporter = createProgressReporter(fakeNonTTYStream());
+
+    // Scope one reports passes 2..4 honestly.
+    expect(reporter.advance("enrichment-pass", 2, 4)).toBe(2);
+    expect(reporter.advance("enrichment-pass", 3, 4)).toBe(3);
+    expect(reporter.advance("enrichment-pass", 4, 4)).toBe(4);
+
+    // Scope two genuinely restarts at pass 2 — and the clamp hides that,
+    // reporting pass 4 three times over. Pinned here so the next caller
+    // tempted to clamp a meaningful number sees what it costs.
+    expect(reporter.advance("enrichment-pass", 2, 4)).toBe(4);
+    expect(reporter.advance("enrichment-pass", 3, 4)).toBe(4);
+    expect(reporter.advance("enrichment-pass", 4, 4)).toBe(4);
+  });
 });
 
 // ── retry line format ───────────────────────────────────────────────────
