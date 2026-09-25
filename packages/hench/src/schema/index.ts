@@ -38,6 +38,7 @@ export type {
   RunReviewRecord,
   RunRecord,
   RunCommitRecord,
+  RunCompletionHold,
   TaskBrief,
   TaskBriefTask,
   TaskBriefParent,

@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "nod
 import { join } from "node:path";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunCommitRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -2056,6 +2056,7 @@ export async function updateCompletedTaskStatus(
   store: PRDStore,
   taskId: string,
   run: RunRecord,
+  resolution?: { resolutionType?: string; resolutionDetail?: string },
 ): Promise<boolean> {
   if (!taskId) return false;
   if (run.status !== "completed") return false;
@@ -2068,8 +2069,13 @@ export async function updateCompletedTaskStatus(
       return false;
     }
 
-    // Update PRD status to "completed"
-    await toolRexUpdateStatus(store, taskId, { status: "completed" });
+    // Update PRD status to "completed" — with the resolution the agent gave
+    // when it asked for the completion, which rex held for this moment.
+    await toolRexUpdateStatus(store, taskId, {
+      status: "completed",
+      ...(resolution?.resolutionType ? { resolutionType: resolution.resolutionType } : {}),
+      ...(resolution?.resolutionDetail ? { resolutionDetail: resolution.resolutionDetail } : {}),
+    });
 
     // Log the completion event
     await toolRexAppendLog(store, taskId, {
@@ -2568,6 +2574,163 @@ async function withdrawCompletionClaim(
 }
 
 // ---------------------------------------------------------------------------
+// Completion hold
+// ---------------------------------------------------------------------------
+
+/**
+ * What became of the completion the agent asked for during the run.
+ *
+ * The agent marks its own task completed — through rex MCP (Claude CLI, Codex
+ * CLI), `rex update` from its shell, or the API loop's `rex_update_status` —
+ * and then commits with `git add -A`. Written straight to the PRD, that
+ * completion rode the work commit, and when the full test gate failed a moment
+ * later nothing withdrew it: runs 6eacca42, 8dc53406 and a6e7efa6 all ended
+ * `failed` with their task `completed` on disk and in git.
+ *
+ * So no completion lands before the gate passes. Every claim a run takes
+ * holds the task's completion (`TaskClaims.pendingCompletion`), and rex
+ * records the agent's request on the claim — in the git common dir, where no
+ * commit can reach it — instead of writing it. This reads it back once the
+ * agent is done, including a session resumed after a background wait: the
+ * claim is this process's for the whole run, so every session's request lands
+ * in the same place and the latest one wins.
+ *
+ * `bypassed` is the one case the hold cannot see coming: the task is already
+ * `completed` on disk with nothing held — a rex server built before the hold
+ * existed, a run outside a git repository (no claims), or a direct edit. The
+ * caller withdraws that completion if the gate then fails.
+ *
+ * The first cause is the likely one for some time. The agent's rex MCP server
+ * (launched from `.mcp.json` as `ndx rex mcp .`, or the Codex equivalent) and
+ * any `rex` it runs from its shell come from the `n-dx` on PATH, not from the
+ * install running this hench. So the hold engages only once *that* build
+ * includes it; until then a new hench sees every agent completion here as
+ * `bypassed`, possibly already inside the agent's work commit. Pinning the
+ * agent's tools to hench's own install is tracked separately (0.7.1 J4).
+ *
+ * Best-effort: an unreadable claims store or PRD reports nothing held.
+ */
+async function readCompletionHold(
+  claims: TaskClaims | undefined,
+  store: PRDStore | undefined,
+  run: RunRecord,
+): Promise<RunCompletionHold | undefined> {
+  if (!run.taskId) return undefined;
+  try {
+    const pending = claims ? await claims.pendingCompletion(run.taskId) : null;
+    if (pending) {
+      return {
+        outcome: "not-applied",
+        ...(pending.resolutionType ? { resolutionType: pending.resolutionType } : {}),
+        ...(pending.resolutionDetail ? { resolutionDetail: pending.resolutionDetail } : {}),
+        requestedAt: pending.requestedAt,
+      };
+    }
+  } catch {
+    // Fall through to the PRD: an unreadable store holds nothing we can apply.
+  }
+  if (!store) return undefined;
+  try {
+    const item = await store.getItem(run.taskId);
+    if (item?.status === "completed") {
+      return {
+        outcome: "bypassed",
+        ...(item.resolutionType ? { resolutionType: item.resolutionType } : {}),
+        ...(item.resolutionDetail ? { resolutionDetail: item.resolutionDetail } : {}),
+      };
+    }
+  } catch {
+    // Nothing to report.
+  }
+  return undefined;
+}
+
+/**
+ * Record a held completion the run did not apply, so the retry can see what
+ * the agent believed it had finished and why it did not land.
+ *
+ * The run record carries it (`completionHold`); the execution log gets it too,
+ * because that is what `rex` and the dashboard read for an item's history.
+ * Best-effort, like every other log write on a failure path.
+ */
+async function reportCompletionNotApplied(
+  store: PRDStore | undefined,
+  run: RunRecord,
+  hold: RunCompletionHold,
+): Promise<void> {
+  const reason = run.error ?? `run ended ${run.status}`;
+  const resolution = [hold.resolutionType, hold.resolutionDetail].filter(Boolean).join(": ");
+  info(
+    `\nThe agent marked the task completed, but the run ended ${run.status}, so hench did not apply that ` +
+      `completion — the task is not completed. Its resolution is kept on the run record for the retry.`,
+  );
+  if (!store || !run.taskId) return;
+  try {
+    await toolRexAppendLog(store, run.taskId, {
+      event: "completion_not_applied",
+      detail: `${resolution ? `Held resolution (${resolution}) not applied` : "Held completion not applied"}: ${reason}`,
+    });
+  } catch (err) {
+    detail(`Warning: could not log the unapplied completion: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Tidy up after the test gate fails, before anything else looks at the tree.
+ *
+ * - A completion that bypassed the hold (see {@link readCompletionHold}) is
+ *   withdrawn from disk. If the agent already committed it, that commit keeps
+ *   saying so — hench does not write a record commit to reverse it — and the
+ *   operator is told.
+ * - Review repairs get an owner. They are otherwise committed only after the
+ *   gate passes, so a failed gate left them in the tree (run 8dc53406), where
+ *   the next run's pre-run gate refuses them or folds them into a
+ *   "commit local changes" commit. On autoCommit the executor's own work is
+ *   already committed, so the repairs follow it in their own commit; without
+ *   autoCommit the executor's work is itself uncommitted, and the repairs are
+ *   named as left beside it.
+ */
+async function settleAfterTestGateFailure(
+  opts: FinalizeRunOptions,
+  run: RunRecord,
+  hold: RunCompletionHold | undefined,
+): Promise<void> {
+  if (hold?.outcome === "bypassed" && opts.store) {
+    info(
+      "\n⚠ The task was already marked completed when the test gate ran: the agent's completion did not go " +
+        "through the hold (a rex MCP server built before it, or a direct write). Withdrawing it. " +
+        "If the agent committed it, that commit still records the task as completed.",
+    );
+    await withdrawCompletionClaim(opts.store, run, run.error ?? "Test gate failed");
+  }
+
+  const review = run.review;
+  const repairs = review && review.failed === undefined ? review.repairedFiles ?? [] : [];
+  if (repairs.length === 0) return;
+  if (opts.autoCommit === true) {
+    try {
+      await commitReviewRepairsIfNeeded(opts.projectDir, run);
+    } catch {
+      // commitReviewRepairsIfNeeded has already said the repairs remain in
+      // the working tree; the run has already failed.
+      noteUncommittedRepairs(run, repairs);
+    }
+    return;
+  }
+  info(
+    `\nReview repairs left uncommitted beside the task's own uncommitted work (the test gate failed before ` +
+      `hench's commit): ${repairs.join(", ")}`,
+  );
+  noteUncommittedRepairs(run, repairs);
+}
+
+/** Record on the run which review repairs no commit owns, for the retry and the dashboard. */
+function noteUncommittedRepairs(run: RunRecord, repairs: string[]): void {
+  run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: "unknown", notes: [] };
+  run.diagnostics.notes.push(`review_repairs_uncommitted: ${repairs.join(", ")}`);
+}
+
+// ---------------------------------------------------------------------------
 // Token diagnostic helpers
 // ---------------------------------------------------------------------------
 
@@ -2673,6 +2836,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
 
+  // Every agent session is over by now, so whatever completion it asked for
+  // is on the claim. Nothing is applied until the gates below have passed.
+  const completionHold = await readCompletionHold(opts.claims, opts.store, run);
+  if (completionHold?.outcome === "not-applied") {
+    detail("The agent marked the task completed; hench applies that only after the test gate passes.");
+  }
+
   // Update token diagnostic status from per-turn data
   if (run.diagnostics && run.turnTokenUsage) {
     run.diagnostics.tokenDiagnosticStatus =
@@ -2759,6 +2929,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // Runs whenever the run completed successfully and gate is not explicitly skipped.
   // On failure, prompts for rerun/abort/skip actions with interactive feedback.
   let testGateSkipped = false;
+  let testGateFailed = false;
   let resolvedTestCommand: string | undefined;
 
   if (run.status === "completed" && !skipFullTestGate && run.structuredSummary) {
@@ -2833,6 +3004,15 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         run.diagnostics.testGateOutputTail = testGate.outputTail;
       }
 
+      // What failed, printed last so it is the first thing above the verdict
+      // and not buried in the tail — and kept whole on the run record.
+      if (testGate.failureDigest) {
+        detail("Test gate failures (extracted from the whole output):");
+        detail(testGate.failureDigest);
+        run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: "unknown", notes: [] };
+        run.diagnostics.testGateFailureDigest = testGate.failureDigest;
+      }
+
       if (testGate.ran) {
         const packageCount = testGate.packages.length;
         const passCount = testGate.packages.filter((p) => p.passed).length;
@@ -2894,6 +3074,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             // is meaningless without knowing which command hung.
             const commandNote = testGate.command ? ` [command: ${testGate.command}]` : "";
             run.error = `Test gate failed${commandNote}: ${reason}`;
+            testGateFailed = true;
             gateComplete = true;
           }
         }
@@ -2928,7 +3109,12 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       info("\nTest gate max attempts reached");
       run.status = "failed";
       run.error = "Test gate max retry attempts exceeded";
+      testGateFailed = true;
     }
+  }
+
+  if (testGateFailed) {
+    await settleAfterTestGateFailure(opts, run, completionHold);
   }
 
   // Missing-review gate. `--review` is sold as a gate, and an opt-in gate that
@@ -3031,9 +3217,15 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // This ensures status is persisted to disk before the next iteration's
   // task selection, preventing re-selection of just-completed tasks.
   if (opts.store && run.taskId && run.status === "completed") {
-    const updated = await updateCompletedTaskStatus(opts.store, run.taskId, run);
+    const held = completionHold?.outcome === "not-applied" ? completionHold : undefined;
+    const updated = await updateCompletedTaskStatus(opts.store, run.taskId, run, held);
     if (updated) {
-      detail("Marked task as completed in PRD (before commit)");
+      if (held) held.outcome = "applied";
+      detail(
+        held
+          ? "Marked task as completed in PRD with the agent's held resolution (before commit)"
+          : "Marked task as completed in PRD (before commit)",
+      );
     }
   }
 
@@ -3187,6 +3379,16 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // `findUncommittedWork` (no discounts) is the same view the completion gate
   // takes, minus hench's own runtime artifacts.
   run.uncommittedPaths = (await findUncommittedWork({ projectDir })).paths;
+
+  // A held completion is applied only by a run that ends completed. Applied
+  // and then withdrawn (a later commit step failed) counts as not applied.
+  if (completionHold) {
+    if (completionHold.requestedAt && (completionHold.outcome !== "applied" || run.status !== "completed")) {
+      completionHold.outcome = "not-applied";
+      await reportCompletionNotApplied(opts.store, run, completionHold);
+    }
+    run.completionHold = completionHold;
+  }
 
   run.finishedAt = new Date().toISOString();
   run.lastActivityAt = run.finishedAt;

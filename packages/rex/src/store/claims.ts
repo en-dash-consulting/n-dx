@@ -56,6 +56,17 @@ const CLAIMS_FILE_VERSION = 1;
  */
 export type ClaimHoldReason = "uncommitted-work";
 
+/**
+ * A completion the agent asked for while a hench run held the task, recorded
+ * instead of applied. See {@link ClaimsStore.recordPendingCompletion}.
+ */
+export interface PendingCompletion {
+  resolutionType?: string;
+  resolutionDetail?: string;
+  /** When the completion was asked for. */
+  requestedAt: string;
+}
+
 export interface TaskClaim {
   taskId: string;
   /** Realpath of the worktree root working the task. */
@@ -79,6 +90,17 @@ export interface TaskClaim {
    * process.
    */
   reason?: ClaimHoldReason;
+  /**
+   * Set when the holder is a `hench run` that applies the task's completion
+   * itself, after its full test gate passes. While the claim is live, a
+   * completion asked for from this worktree (the agent's own rex MCP call, or
+   * `rex update` from its shell) is recorded in {@link pendingCompletion}
+   * rather than written to the PRD. Absent on every other claim, so
+   * interactive MCP use and the rex CLI outside a run are unaffected.
+   */
+  holdsCompletion?: true;
+  /** The completion recorded while {@link holdsCompletion} was in force. */
+  pendingCompletion?: PendingCompletion;
 }
 
 interface ClaimsFile {
@@ -92,6 +114,11 @@ export interface ClaimOptions {
   pid?: number;
   /** Defaults to {@link DEFAULT_CLAIM_TTL_MS}. */
   ttlMs?: number;
+  /**
+   * Hold the task's completion for the claimant to apply — set by a `hench
+   * run`, never by MCP or the CLI. See {@link TaskClaim.holdsCompletion}.
+   */
+  holdsCompletion?: boolean;
 }
 
 export type ClaimResult =
@@ -109,6 +136,12 @@ export interface ReleaseOptions {
    * have dealt with, standing in whichever worktree they happen to be in.
    */
   force?: boolean;
+  /**
+   * The process asking. Defaults to this one. Consulted only for a live claim
+   * that holds completion (see {@link TaskClaim.holdsCompletion}): only the
+   * hench run that holds it may release it without `force`.
+   */
+  pid?: number;
 }
 
 /**
@@ -153,9 +186,11 @@ export interface ClaimsStore {
    */
   claim(taskId: string, options: ClaimOptions): Promise<ClaimResult>;
   /**
-   * Release a claim this worktree holds. False when no such claim exists, or
-   * when it belongs to another worktree. Held claims release like any other —
-   * that is what frees a task after the work is dealt with.
+   * Release a claim this worktree holds. False when no such claim exists, when
+   * it belongs to another worktree, or when it is a live hench run's
+   * completion-holding claim and the caller is not that run (unless `force`).
+   * Held claims release like any other — that is what frees a task after the
+   * work is dealt with.
    */
   release(taskId: string, holder: ClaimOwner, options?: ReleaseOptions): Promise<boolean>;
   /**
@@ -176,6 +211,29 @@ export interface ClaimsStore {
    * the task.
    */
   hold(taskId: string, holder: ClaimOwner, reason: ClaimHoldReason): Promise<TaskClaim | null>;
+  /**
+   * Record a completion instead of applying it, when a live `hench run` in
+   * this worktree holds the task's completion.
+   *
+   * The agent a run drives marks its own task completed — through rex MCP, or
+   * `rex update` from its shell — and then commits with `git add -A`. Written
+   * straight to the PRD, that completion rode the work commit and stayed there
+   * when hench's full test gate failed a moment later: nothing withdrew it
+   * (runs 6eacca42, 8dc53406). Recorded here instead, it lives in the git
+   * common dir, which no commit can pick up, and the run applies it in its
+   * own record commit once the gate passes. A later call replaces an earlier
+   * one — the latest completion the agent asked for is the one applied.
+   *
+   * Returns the updated claim when the completion was held, or null when it
+   * was not — no live claim, another worktree's claim, or a claim that does
+   * not hold completion — in which case the caller writes the status as it
+   * always has.
+   */
+  recordPendingCompletion(
+    taskId: string,
+    holder: ClaimOwner,
+    completion: PendingCompletion,
+  ): Promise<TaskClaim | null>;
   /**
    * The live claim held by another worktree, or null when the task is free or
    * held by this one.
@@ -238,6 +296,10 @@ export const NOOP_CLAIMS_STORE: ClaimsStore = {
     // Nothing was recorded, so there is nothing to hold.
     return null;
   },
+  async recordPendingCompletion() {
+    // No claim was recorded, so no run holds the completion: write it.
+    return null;
+  },
   async isClaimedByOther() {
     return null;
   },
@@ -281,6 +343,15 @@ class FileClaimsStore implements ClaimsStore {
     const expires = Date.parse(claim.expiresAt);
     if (!Number.isFinite(expires) || expires <= this.now()) return false;
     return this.isPidAlive(claim.pid);
+  }
+
+  /**
+   * Whether a completion asked for now would be held: the claim holds
+   * completion, is an ordinary live claim (not one kept past its holder's exit
+   * by {@link hold}), and its process is alive to apply what is recorded.
+   */
+  private holdsCompletionNow(claim: TaskClaim): boolean {
+    return claim.holdsCompletion === true && !claim.reason && this.isLive(claim);
   }
 
   /** Parse the file, tolerating absence and corruption (a corrupt file is an empty one). */
@@ -331,6 +402,14 @@ class FileClaimsStore implements ClaimsStore {
       if (existing && !sameHolder(existing, options.worktreeRoot)) {
         return { ok: false, heldBy: existing };
       }
+      // A live hench run in this worktree holds the task's completion. Its
+      // agent claiming the task too (`claim_task`, or `update_task_status
+      // in_progress`, from an MCP server with its own pid) is the same holder
+      // asking again, but taking the claim over would drop the hold and hand
+      // the claim to a process that is not applying anything. Leave it.
+      if (existing && this.holdsCompletionNow(existing) && !options.holdsCompletion && existing.pid !== pid) {
+        return { ok: true, claim: existing };
+      }
       const nowMs = this.now();
       const claim: TaskClaim = {
         taskId,
@@ -345,6 +424,15 @@ class FileClaimsStore implements ClaimsStore {
       // Deliberately no `reason`: a live process has taken the task, so
       // whatever hold was recorded is over. Re-running in the worktree that
       // left uncommitted work is one of the ways to resolve a hold.
+      if (options.holdsCompletion) {
+        claim.holdsCompletion = true;
+        // A refresh by the same process keeps what its agent asked for; a
+        // new run starts with nothing held — the previous run's completion
+        // was never earned by this one.
+        if (existing?.pendingCompletion && existing.pid === pid) {
+          claim.pendingCompletion = existing.pendingCompletion;
+        }
+      }
       claims[taskId] = claim;
       return { ok: true, claim };
     });
@@ -355,6 +443,14 @@ class FileClaimsStore implements ClaimsStore {
       const existing = claims[taskId];
       if (!existing) return false;
       if (!options.force && !sameHolder(existing, holder.worktreeRoot)) return false;
+      // The same guard as claim(): inside a live hench run, the agent's own
+      // MCP server shares the run's worktree, so worktree identity alone would
+      // let its `release_task` (or a terminal status write) drop the run's
+      // claim — and with it the completion hold. Only the run releases it;
+      // an operator's `rex claim release --force` still can.
+      if (!options.force && this.holdsCompletionNow(existing) && existing.pid !== (options.pid ?? process.pid)) {
+        return false;
+      }
       delete claims[taskId];
       return true;
     });
@@ -370,8 +466,32 @@ class FileClaimsStore implements ClaimsStore {
       // ends by release, release --force, or a fresh claim from this
       // worktree, never by the clock.
       const held: TaskClaim = { ...existing, reason };
+      // The process that would have applied a held completion is ending, so
+      // nothing would ever apply one recorded from here on.
+      delete held.holdsCompletion;
+      delete held.pendingCompletion;
       claims[taskId] = held;
       return held;
+    });
+  }
+
+  async recordPendingCompletion(
+    taskId: string,
+    holder: ClaimOwner,
+    completion: PendingCompletion,
+  ): Promise<TaskClaim | null> {
+    // Read first, so the common case — no run holds this task — takes no lock
+    // and writes nothing. `update` re-checks under the lock.
+    const current = (await this.load()).claims[taskId];
+    if (!current || !this.holdsCompletionNow(current)) return null;
+    return this.update((claims) => {
+      const existing = claims[taskId];
+      if (!existing || !this.holdsCompletionNow(existing) || !sameHolder(existing, holder.worktreeRoot)) {
+        return null;
+      }
+      const updated: TaskClaim = { ...existing, pendingCompletion: { ...completion } };
+      claims[taskId] = updated;
+      return updated;
     });
   }
 

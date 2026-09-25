@@ -2,7 +2,7 @@
 id: "4b45c028-0bb4-47e8-a4b0-f795e524221b"
 level: "task"
 title: "Make the test-gate timeout kill the whole test process tree"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "0.7.1"
@@ -11,11 +11,16 @@ tags:
   - "test-gate"
   - "process-lifecycle"
 source: "PR M execution, 2026-09-24 (run 8dc53406)"
+startedAt: "2026-09-25T05:10:54.459Z"
+completedAt: "2026-09-25T05:10:54.459Z"
+endedAt: "2026-09-25T05:10:54.459Z"
+resolutionType: "code-change"
+resolutionDetail: "The tree kill already worked on main. llm-client exec.ts (treeKill, on by default) spawns the gate shell as a process-group leader and, on timeout, signals the group and sweeps descendants snapshotted before signalling. A rebuilt npm run → node → workers chain died about 60ms after the deadline, and a SIGTERM-ignoring worker died within the 5s grace. 8dc53406's overrun is attributed to a stalled hench process by inference, not by evidence from that run: no system sleep was logged and the host was heavily loaded, but the run recorded nothing that separates a stall from a slow kill. What changed: runTestGate arms its own deadline watchdog and reports when the kill took effect (\"process tree was gone Xs after the kill began\"), and a late deadline is reported as a stall of this process. An outside signal and a maxBuffer overflow are no longer reported as timeouts. The buffer ceiling goes from 5MB to 32MB. Windows is documented as best-effort (taskkill /T /F tree walk). \"Reported duration ≤ timeout + grace\" holds only when the host is not stalled; a stalled hench cannot act on its deadline, and that case is reported, not bounded. Tests: packages/hench/tests/integration/test-gate-kill-tree.test.ts, POSIX real-process trees with a SIGTERM-ignoring worker and a detached grandchild; the discriminating bounds were measured clean and against an injected second grace, and recorded in the wall-clock inventory. Commit 8a1810ce."
 acceptanceCriteria:
   - "A gate test command that spawns long-running grandchildren is fully terminated within a few seconds of the timeout, on macOS and Linux."
   - "The reported duration of a timed-out gate is at most the timeout plus a small grace period."
   - "Windows behaviour is covered or explicitly documented as best-effort."
 description: "Run 8dc53406's gate reported \"`npm run test` did not finish within 15m 0s and was killed (ran for 21m 45s)\". Killing at 15 minutes did not end the suite for almost seven more minutes, which suggests the kill reaches `npm` but not its `node scripts/run-all-tests.mjs` and vitest children. The machine was also heavily loaded (load averages about 10.9 and 9.6), which is what took a roughly 6-minute suite past 15 minutes. The load-induced `cli-hints` failure in that run is tracked separately (dc6224ba). Kill the process group, or tree, on timeout, as other hench spawns do (see `hidden-detached-spawns.md`), and make the timeout message report when the kill took effect."
-lastModified: "2026-09-24T20:30:32.834Z"
+lastModified: "2026-09-25T05:17:17.872Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

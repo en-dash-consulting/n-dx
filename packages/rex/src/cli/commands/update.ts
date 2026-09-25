@@ -12,6 +12,8 @@ import { findAutoCompletions } from "../../core/parent-completion.js";
 import { validateDAG } from "../../core/dag.js";
 import { findItem, resolveItem } from "../../core/tree.js";
 import { deleteItem, cleanBlockedByRefs } from "../../core/delete.js";
+import { openClaimsStore, resolveClaimHolder } from "../../store/index.js";
+import { holdCompletionForRun, describeHeldCompletion } from "../completion-hold.js";
 import { VALID_STATUSES, VALID_PRIORITIES, isItemStatus, isPriority } from "../../schema/index.js";
 import type {PRDItem, ItemStatus} from "../../schema/index.js";
 export async function cmdUpdate(
@@ -48,6 +50,8 @@ export async function cmdUpdate(
   const resolvedId = resolvedEntry.item.id;
 
   const updates: Partial<PRDItem> = {};
+  /** Set when a hench run holds the completion; the status is then not written. */
+  let heldCompletion: string | undefined;
 
   if (flags.status) {
     if (!isItemStatus(flags.status)) {
@@ -68,6 +72,23 @@ export async function cmdUpdate(
           transition.message!,
           "Use --force to override this check.",
         );
+      }
+    }
+
+    // Run from a hench run's agent shell, a completion is recorded for the
+    // run to apply after its test gate, not written — see
+    // cli/completion-hold.ts. Other fields in the same call still apply.
+    if (flags.status === "completed") {
+      const claims = { store: openClaimsStore(dir), worktreeRoot: resolveClaimHolder(dir).worktreeRoot };
+      const held = await holdCompletionForRun(claims, resolvedId, {});
+      if (held) {
+        await store.appendLog({
+          timestamp: new Date().toISOString(),
+          event: "completion_held",
+          itemId: resolvedId,
+          detail: `Completion held for hench run (pid ${held.pid}) until its test gate passes`,
+        });
+        heldCompletion = describeHeldCompletion(resolvedId, held);
       }
     }
 
@@ -95,16 +116,18 @@ export async function cmdUpdate(
       return;
     }
 
-    updates.status = flags.status as ItemStatus;
+    if (!heldCompletion) {
+      updates.status = flags.status as ItemStatus;
 
-    // Set failureReason when transitioning to failing
-    if (flags.status === "failing" && flags.reason) {
-      updates.failureReason = flags.reason;
+      // Set failureReason when transitioning to failing
+      if (flags.status === "failing" && flags.reason) {
+        updates.failureReason = flags.reason;
+      }
+
+      // Compute automatic timestamp updates for the status change
+      const tsUpdates = computeTimestampUpdates(existing.status, updates.status, existing);
+      Object.assign(updates, tsUpdates);
     }
-
-    // Compute automatic timestamp updates for the status change
-    const tsUpdates = computeTimestampUpdates(existing.status, updates.status, existing);
-    Object.assign(updates, tsUpdates);
   }
 
   if (flags.priority) {
@@ -128,6 +151,15 @@ export async function cmdUpdate(
     } else {
       updates.blockedBy = parseCsvList(raw);
     }
+  }
+
+  if (heldCompletion && Object.keys(updates).length === 0) {
+    if (flags.format === "json") {
+      result(JSON.stringify({ id: resolvedId, status: existing.status, completionHeld: true, message: heldCompletion }, null, 2));
+    } else {
+      result(heldCompletion);
+    }
+    return;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -208,6 +240,7 @@ export async function cmdUpdate(
     const updated = await store.getItem(resolvedId);
     result(JSON.stringify({ ...updated, autoCompleted }, null, 2));
   } else {
+    if (heldCompletion) info(heldCompletion);
     result(`Updated ${existing.level}: ${existing.title}`);
     info(`  ${Object.entries(updates).map(([k, v]) => `${k}: ${v}`).join(", ")}`);
     for (const item of autoCompleted) {

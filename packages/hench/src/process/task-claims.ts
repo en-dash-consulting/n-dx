@@ -166,7 +166,7 @@ export class TaskClaims {
     // real run be refused?" — and record nothing.
     if (this.readOnly) return this.heldElsewhere(taskId);
 
-    const result = await this.store.claim(taskId, { worktreeRoot: this.holder.worktreeRoot, pid: this.holder.pid });
+    const result = await this.store.claim(taskId, this.claimOptions());
     if (!result.ok) return result.heldBy;
     this.held.add(taskId);
     this.noteExpiry(taskId, result.claim);
@@ -215,10 +215,7 @@ export class TaskClaims {
       await this.renewalTick;
       let claim = await this.store.hold(taskId, this.holder, reason);
       if (claim === null) {
-        const attempt = await this.store.claim(taskId, {
-          worktreeRoot: this.holder.worktreeRoot,
-          pid: this.holder.pid,
-        });
+        const attempt = await this.store.claim(taskId, this.claimOptions());
         if (attempt.ok) {
           claim = await this.store.hold(taskId, this.holder, reason);
         }
@@ -232,11 +229,44 @@ export class TaskClaims {
     }
   }
 
+  /**
+   * The completion this run's agent asked for, held on the claim rather than
+   * written to the PRD, or null when it asked for none (or the claim is gone).
+   *
+   * Every claim a run takes holds the task's completion (see
+   * {@link claimOptions}): the agent marks its own task completed through rex
+   * MCP or `rex update`, and rex records that here instead of writing it,
+   * because the agent's `git add -A && git commit` would otherwise carry the
+   * completion into the work commit ahead of the test gate. The lifecycle
+   * reads it back after the gate and applies it — or, when the gate fails,
+   * keeps it on the run record for the retry. See `finalizeRun`.
+   */
+  async pendingCompletion(taskId: string): Promise<NonNullable<TaskClaim["pendingCompletion"]> | null> {
+    if (this.readOnly) return null;
+    const claim = (await this.store.readClaims()).find(
+      (c) => c.taskId === taskId && c.worktreeRoot === this.holder.worktreeRoot && c.pid === this.holder.pid,
+    );
+    return claim?.pendingCompletion ?? null;
+  }
+
+  /**
+   * What every claim, refresh and re-claim of this run writes. `holdsCompletion`
+   * is what makes rex hold the agent's completion for this run to apply after
+   * its test gate — the same for Claude CLI, Codex CLI and API-loop runs,
+   * because it is carried by the claim rather than by anything the vendor
+   * passes to its MCP servers.
+   */
+  private claimOptions(): { worktreeRoot: string; pid: number; holdsCompletion: true } {
+    return { worktreeRoot: this.holder.worktreeRoot, pid: this.holder.pid, holdsCompletion: true };
+  }
+
   /** Release one claim this run holds. */
   async release(taskId: string): Promise<void> {
     if (!this.held.delete(taskId)) return;
     this.expiries.delete(taskId);
-    await this.store.release(taskId, this.holder);
+    // The pid is passed, not defaulted: a completion-holding claim releases
+    // only for the process that holds it (see rex ClaimsStore.release).
+    await this.store.release(taskId, this.holder, { pid: this.holder.pid });
   }
 
   /**
@@ -288,10 +318,7 @@ export class TaskClaims {
   private async renewalPass(): Promise<void> {
     for (const taskId of [...this.held]) {
       try {
-        const result = await this.store.claim(taskId, {
-          worktreeRoot: this.holder.worktreeRoot,
-          pid: this.holder.pid,
-        });
+        const result = await this.store.claim(taskId, this.claimOptions());
         if (result.ok) {
           this.noteExpiry(taskId, result.claim);
         } else {
