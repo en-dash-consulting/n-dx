@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add stale-dist build guards to web integration tests that assert on built server output](./add-stale-dist-build-guards-to-web.md) | completed |
 | [Commit every preact render inside act() in the web viewer tests that still leak a frame-fallback timer](./commit-every-preact-render-inside-act.md) | completed |
-| [Commit the Guide modal clicks and Escape dispatch in accessibility.test.ts inside act()](./commit-the-guide-modal-clicks-and.md) | pending |
+| [Commit the Guide modal clicks and Escape dispatch in accessibility.test.ts inside act()](./commit-the-guide-modal-clicks-and.md) | completed |
 | [Convert write-path-profile's absolute budgets to scaling assertions](./convert-write-path-profile-s-absolute.md) | completed |
 | [exec-interrupt-forwarding.test.js justifies its location with a false claim about where CI runs tests](./exec-interrupt-forwarding-test-js.md) | completed |
 | [Fail a web test file that leaves a preact frame-fallback timer pending at teardown](./fail-a-web-test-file-that-leaves-a.md) | completed |

@@ -21,19 +21,6 @@ function flush(): Promise<void> {
   );
 }
 
-/** Wait for a condition to become true, polling up to maxMs. */
-async function waitFor(
-  condition: () => boolean,
-  maxMs = 500,
-  interval = 10,
-): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < maxMs) {
-    if (condition()) return;
-    await new Promise((r) => setTimeout(r, interval));
-  }
-}
-
 function renderToDiv(vnode: ReturnType<typeof h>) {
   const root = document.createElement("div");
   document.body.appendChild(root);
@@ -67,61 +54,53 @@ describe("Guide modal accessibility", () => {
     expect(btn?.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("guide button has aria-expanded=true when open", async () => {
+  it("guide button has aria-expanded=true when open", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
-    btn?.click();
-    await flush();
+    act(() => { btn?.click(); });
     expect(btn?.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("open guide modal has role=dialog and aria-modal", async () => {
+  it("open guide modal has role=dialog and aria-modal", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
-    btn?.click();
-    await flush();
+    act(() => { btn?.click(); });
     const overlay = root.querySelector(".guide-overlay");
     expect(overlay?.getAttribute("role")).toBe("dialog");
     expect(overlay?.getAttribute("aria-modal")).toBe("true");
   });
 
-  it("guide modal has descriptive aria-label", async () => {
+  it("guide modal has descriptive aria-label", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
-    btn?.click();
-    await flush();
+    act(() => { btn?.click(); });
     const overlay = root.querySelector(".guide-overlay");
     expect(overlay?.getAttribute("aria-label")).toContain("Guide:");
   });
 
-  it("close button has aria-label", async () => {
+  it("close button has aria-label", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
-    btn?.click();
-    await flush();
+    act(() => { btn?.click(); });
     const closeBtn = root.querySelector(".guide-close");
     expect(closeBtn?.getAttribute("aria-label")).toBe("Close guide");
   });
 
-  it("Escape key closes the guide modal", async () => {
+  it("Escape key closes the guide modal", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
-    btn?.click();
-    // Wait for the modal to open
-    await waitFor(() => root.querySelector(".guide-overlay") !== null);
+    act(() => { btn?.click(); });
     expect(root.querySelector(".guide-overlay")).not.toBeNull();
 
-    // Give the useEffect time to register the Escape handler
-    // Preact schedules effects via rAF -> needs multiple event loop ticks
-    await new Promise((r) => setTimeout(r, 50));
+    // Commit inside act() so the Escape handler's setOpen(false) flushes
+    // synchronously; no need to wait for preact's rAF/setTimeout(35)
+    // effect-scheduling fallback.
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+      );
+    });
 
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
-    );
-
-    // Wait for the modal to close
-    await new Promise((r) => setTimeout(r, 50));
-    await flush();
     expect(root.querySelector(".guide-overlay")).toBeNull();
   });
 });
