@@ -248,6 +248,7 @@ const RunDiagnosticsSchema = z.object({
   sandbox: z.string().optional(),
   approvals: z.string().optional(),
   testGateOutputTail: z.string().optional(),
+  testGateFailureDigest: z.string().optional(),
 });
 
 const PersistedRuntimeEventSchema = z.object({
@@ -361,6 +362,16 @@ export const RunRecordSchema = z.object({
   uncommittedPaths: z.array(z.string()).optional(),
   claimLost: z
     .object({ at: z.string(), taskId: z.string(), holderWorktree: z.string() })
+    .optional(),
+  // `outcome` a bare string for the same reason as invocationContext below: a
+  // value this build does not know must not cost the whole run.
+  completionHold: z
+    .object({
+      outcome: z.string(),
+      resolutionType: z.string().optional(),
+      resolutionDetail: z.string().optional(),
+      requestedAt: z.string().optional(),
+    })
     .optional(),
   // Fields the record has gained over time that this schema had not been
   // told about. Zod strips what it does not declare, so each was written to

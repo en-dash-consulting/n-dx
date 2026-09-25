@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor } from "../prd/rex-gateway.js";
 import { PROJECT_DIRS } from "../prd/llm-gateway.js";
 import { execShellCmd } from "../process/exec.js";
-import { computeTimestampUpdates, reconcileAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "../prd/rex-gateway.js";
+import { computeTimestampUpdates, reconcileAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding, openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 import type {
   RexToolHandlers,
@@ -22,12 +22,20 @@ export interface UpdateStatusOptions {
   startingHead?: string;
   /** When true, reject doc-only completions. */
   selfHeal?: boolean;
+  /**
+   * Set on the agent's own tool call, never on hench's internal writes: a
+   * completion that passes validation is recorded on the run's claim for the
+   * lifecycle to apply after the test gate, instead of being written. The same
+   * hold rex applies to the agent's MCP and CLI calls — see
+   * `TaskClaims.pendingCompletion`.
+   */
+  holdCompletionForRun?: boolean;
 }
 
 export async function toolRexUpdateStatus(
   store: PRDStore,
   taskId: string,
-  params: { status: string; reason?: string; resolutionType?: string },
+  params: { status: string; reason?: string; resolutionType?: string; resolutionDetail?: string },
   options?: UpdateStatusOptions,
 ): Promise<string> {
   const validStatuses = ["pending", "in_progress", "completed", "failing", "deferred", "blocked"];
@@ -95,6 +103,28 @@ export async function toolRexUpdateStatus(
     }
   }
 
+  if (params.status === "completed" && options?.holdCompletionForRun && options.projectDir) {
+    const held = await openClaimsStore(options.projectDir).recordPendingCompletion(
+      taskId,
+      { worktreeRoot: resolveClaimHolder(options.projectDir).worktreeRoot },
+      {
+        ...(params.resolutionType ? { resolutionType: params.resolutionType } : {}),
+        ...(params.resolutionDetail ? { resolutionDetail: params.resolutionDetail } : {}),
+        requestedAt: new Date().toISOString(),
+      },
+    );
+    if (held) {
+      await store.appendLog({
+        timestamp: new Date().toISOString(),
+        event: "completion_held",
+        itemId: taskId,
+        detail: "Completion held until the test gate passes",
+      });
+      return `[COMPLETION_HELD] Completion of ${taskId} recorded, not yet applied: hench marks the task ` +
+        `completed itself once its full test gate passes. Nothing more to do.`;
+    }
+  }
+
   const existing = await store.getItem(taskId);
   const tsUpdates = computeTimestampUpdates(
     existing?.status ?? "pending",
@@ -107,6 +137,9 @@ export async function toolRexUpdateStatus(
   }
   if (params.status === "completed" && params.resolutionType) {
     statusUpdates.resolutionType = params.resolutionType as ResolutionType;
+  }
+  if (params.status === "completed" && params.resolutionDetail) {
+    statusUpdates.resolutionDetail = params.resolutionDetail;
   }
   await store.updateItem(taskId, statusUpdates, {
     applyAttribution: true,
@@ -260,6 +293,7 @@ export const rexToolHandlers: RexToolHandlers = {
         testCommand: ctx.testCommand,
         startingHead: ctx.startingHead,
         selfHeal: ctx.selfHeal,
+        holdCompletionForRun: true,
       },
     ),
   appendLog: (ctx: ToolContext, params: RexAppendLogParams) =>

@@ -50,7 +50,7 @@ export {
 } from "./self-heal-tag.js";
 export { withLock, acquireLock } from "./file-lock.js";
 export { openClaimsStore, claimsStorePath, resolveClaimHolder } from "./claims.js";
-export type { ClaimsStore, ClaimHolder, TaskClaim } from "./claims.js";
+export type { ClaimsStore, ClaimHolder, TaskClaim, PendingCompletion } from "./claims.js";
 export {
   ensureLegacyPrdMigrated,
   LegacyPrdMigrationError,
