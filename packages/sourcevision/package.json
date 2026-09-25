@@ -48,6 +48,6 @@
     "@types/node": "^26.2.0",
     "@types/pdfkit": "^0.17.6",
     "jsdom": "^30.0.1",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }
