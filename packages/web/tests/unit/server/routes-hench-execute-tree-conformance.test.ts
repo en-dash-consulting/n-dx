@@ -70,14 +70,22 @@ describe("POST /api/hench/execute — PRD tree conformance gate", () => {
   let server: Server;
   let port: number;
 
-  async function execute(taskId: string): Promise<{ status: number; error?: string }> {
+  async function execute(
+    taskId: string,
+    extra: Record<string, unknown> = {},
+  ): Promise<{ status: number; error?: string; migratable?: boolean; body: Record<string, unknown> }> {
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({ taskId, ...extra }),
     });
-    const body = await res.json().catch(() => ({}));
-    return { status: res.status, error: body.error };
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    return {
+      status: res.status,
+      error: body.error as string | undefined,
+      migratable: body.migratable as boolean | undefined,
+      body,
+    };
   }
 
   /** Rename the epic directory into the superseded id-qualified form. */
@@ -204,5 +212,109 @@ describe("POST /api/hench/execute — PRD tree conformance gate", () => {
     expect(status).toBe(412);
     expect(error).toMatch(/Upgrade rex/);
     expect(error).not.toMatch(/Run 'rex migrate-slugs'/);
+  });
+
+  // ---------------------------------------------------------------------
+  // The migration offer
+  // ---------------------------------------------------------------------
+
+  /**
+   * `migratable` is what lets the viewer offer the fix instead of only quoting
+   * the problem. It is bounded by rex's own adoption rule, so the dashboard
+   * cannot offer a migration the command would refuse.
+   */
+  describe("the migratable flag on the refusal", () => {
+    it("is true for a re-slugged tree", async () => {
+      await reSuffixEpicDir();
+
+      expect(await execute("task-def456")).toMatchObject({ status: 412, migratable: true });
+    });
+
+    it("is true for a superseded marker", async () => {
+      await markRule(-1);
+
+      expect(await execute("task-def456")).toMatchObject({ status: 412, migratable: true });
+    });
+
+    // Migrating here is a downgrade wearing a migration's name, so no offer
+    // may reach the operator however the client asks.
+    it("is false for a newer marker", async () => {
+      await markRule(1);
+
+      expect(await execute("task-def456")).toMatchObject({ status: 412, migratable: false });
+    });
+  });
+
+  describe("POST with migrateSlugs", () => {
+    let savedCliPath: string | undefined;
+
+    beforeEach(() => {
+      // resolveNdxBin's first rung. Without it the ladder ends at
+      // `<projectDir>/packages/core/cli.js`, which a temp dir does not have —
+      // so the route would report a spawn failure rather than run anything.
+      savedCliPath = process.env["NDX_CLI_PATH"];
+      process.env["NDX_CLI_PATH"] = join(
+        import.meta.dirname,
+        "../../../../..",
+        "packages",
+        "core",
+        "cli.js",
+      );
+    });
+
+    afterEach(() => {
+      if (savedCliPath === undefined) delete process.env["NDX_CLI_PATH"];
+      else process.env["NDX_CLI_PATH"] = savedCliPath;
+    });
+
+    // The whole point of the offer: the tree is fixed, and the task is *not*
+    // started — so the rename lands in a commit of its own rather than being
+    // swept into a "task completed" one.
+    it("migrates the tree and does not start the task", async () => {
+      const foreign = await reSuffixEpicDir();
+
+      const { status, body } = await execute("task-def456", { migrateSlugs: true });
+
+      expect(status).toBe(200);
+      expect(body.migrated).toBe(true);
+      expect(body.message).toMatch(/review/i);
+      expect(body.message).toMatch(/commit/i);
+      // No run was started — the response carries no execution state at all.
+      expect(body.runId).toBeUndefined();
+      expect(body.status).toBeUndefined();
+
+      // The tree really was migrated: the gate that refused it now opens, which
+      // an unknown task id proves without spawning anything.
+      expect((await readdir(treeRoot)).includes(foreign)).toBe(false);
+      expect(await execute("task-nope")).toMatchObject({ status: 404 });
+    }, 60_000);
+
+    // Bounded by `migratable`, not by politeness: a client that asks anyway
+    // still gets the refusal, because the command would refuse it too.
+    it("refuses to migrate a tree on a newer rule however explicitly it is asked", async () => {
+      await markRule(1);
+      const metaBefore = await readFile(join(rexDir, TREE_META), "utf-8");
+
+      const { status, error, migratable } = await execute("task-def456", { migrateSlugs: true });
+
+      expect(status).toBe(412);
+      expect(migratable).toBe(false);
+      expect(error).toMatch(/Upgrade rex/);
+      // Nothing ran, so the newer marker is still there to protect the tree.
+      expect(await readFile(join(rexDir, TREE_META), "utf-8")).toBe(metaBefore);
+    });
+
+    // A conformant tree has nothing to migrate, and the flag must become neither
+    // a way to trigger a whole-tree rewrite nor a way to start the task: the
+    // button that sends it promised not to run anything. A runnable task id is
+    // used so that falling through to the executor would be visible.
+    it("answers 409 on a conformant tree and starts nothing", async () => {
+      const { status, error, body } = await execute("task-def456", { migrateSlugs: true });
+
+      expect(status).toBe(409);
+      expect(error).toMatch(/nothing to migrate/);
+      expect(error).toMatch(/not started/);
+      expect(body.runId).toBeUndefined();
+    });
   });
 });

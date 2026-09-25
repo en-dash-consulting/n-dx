@@ -126,7 +126,13 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope (--mcp-scope=local
     expect(projects.map(base)).toContain(base(projectDir));
   });
 
-  it("points every server at the initialised project", async () => {
+  it("points every server at a cwd-relative project, never an absolute one", async () => {
+    // The entry is keyed under the initialised project (asserted above), but
+    // its recorded argv must stay cwd-relative. Claude Code applies a
+    // repository's local-scope entry to sessions started in that repository's
+    // other linked worktrees, so an absolute directory here pins all of them
+    // to one checkout — the defect that sent a worktree run's
+    // `update_task_status` into the main checkout.
     execFileSync("node", [CLI_PATH, "init", "--provider=claude", "--mcp-scope=local", projectDir], {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
@@ -141,7 +147,7 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope (--mcp-scope=local
     for (const [project, servers] of Object.entries(byProject)) {
       for (const [name, cfg] of Object.entries(servers)) {
         const target = Array.isArray(cfg?.args) ? cfg.args[cfg.args.length - 1] : undefined;
-        if (!target || base(target) !== base(projectDir)) {
+        if (target !== ".") {
           offenders.push(`${project} → ${name} targets ${target ?? "(none)"}`);
         }
       }
@@ -149,8 +155,8 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope (--mcp-scope=local
 
     expect(
       offenders,
-      `Every registered server must target the project being initialised ` +
-        `(${projectDir}). Offenders:\n  ${offenders.join("\n  ")}`,
+      `Every registered server must record "." as its project directory, so each ` +
+        `worktree's session resolves its own. Offenders:\n  ${offenders.join("\n  ")}`,
     ).toEqual([]);
   });
 

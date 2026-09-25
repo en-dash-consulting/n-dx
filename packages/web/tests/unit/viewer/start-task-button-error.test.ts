@@ -87,3 +87,121 @@ describe("StartTaskButton refusal display", () => {
     expect(onStarted).toHaveBeenCalledOnce();
   });
 });
+
+/**
+ * The dashboard half of the migration offer.
+ *
+ * The server has no session and no auth, so consent to a whole-tree rename is
+ * not inferred from the request — it is carried by a second, explicit one. This
+ * button is where that second request comes from, which makes two of its
+ * properties load-bearing: the offer appears only when the server says a
+ * migration would fix the refusal, and accepting it does *not* count as
+ * starting the task.
+ */
+describe("StartTaskButton migration offer", () => {
+  const REFUSAL =
+    "1 path in the PRD tree does not match slug rule 2, which this build implements.\n" +
+    "Run 'rex migrate-slugs' on the default branch to bring the tree onto rule 2.";
+
+  /** Answer the first POST with the refusal and the second with a result. */
+  function stubRefusalThen(second: { status: number; body: unknown }): ReturnType<typeof vi.fn> {
+    const calls: unknown[] = [];
+    const fetchMock = vi.fn(async (_url: string, init: { body: string }) => {
+      calls.push(JSON.parse(init.body));
+      const first = calls.length === 1;
+      const status = first ? 412 : second.status;
+      return {
+        ok: status >= 200 && status < 300,
+        status,
+        json: async () => (first ? { error: REFUSAL, migratable: true } : second.body),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock as unknown as ReturnType<typeof vi.fn>;
+  }
+
+  async function clickMigrate(): Promise<void> {
+    await act(async () => {
+      root!.querySelector<HTMLButtonElement>(".start-task-migrate-btn")!.click();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+
+  it("offers the migration when the server says one would fix it", async () => {
+    stubFetch(412, { error: REFUSAL, migratable: true });
+
+    await clickStart();
+
+    expect(root!.querySelector(".start-task-migrate-btn")).not.toBeNull();
+    expect(root!.querySelector(".start-task-error")!.textContent).toContain("rex migrate-slugs");
+  });
+
+  // The refusal must not auto-clear the way a transient failure does: wiping a
+  // multi-line explanation and the button that fixes it after four seconds is
+  // how the offer would go unnoticed.
+  it("keeps a migratable refusal on screen past the transient-error timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      stubFetch(412, { error: REFUSAL, migratable: true });
+      root = renderToDiv(h(StartTaskButton, { taskId: "t-1", onStarted: () => {} }));
+      await act(async () => {
+        root!.querySelector<HTMLButtonElement>(".start-task-btn")!.click();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      expect(root!.querySelector(".start-task-error")).not.toBeNull();
+      expect(root!.querySelector(".start-task-migrate-btn")).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // A refusal the operator cannot fix from here gets no button — the advice in
+  // the message is to upgrade rex, and a migrate button beside it would
+  // contradict what they are reading.
+  it("offers nothing when the refusal is not migratable", async () => {
+    stubFetch(412, { error: "Upgrade rex to a build that implements slug rule 3.", migratable: false });
+
+    await clickStart();
+
+    expect(root!.querySelector(".start-task-migrate-btn")).toBeNull();
+  });
+
+  it("sends migrateSlugs on the second request and reports the result", async () => {
+    const fetchMock = stubRefusalThen({
+      status: 200,
+      body: { migrated: true, message: "The PRD tree was migrated. Review it and commit it." },
+    });
+
+    const onStarted = vi.fn();
+    await clickStart(onStarted);
+    await clickMigrate();
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ taskId: "t-1" });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      taskId: "t-1",
+      migrateSlugs: true,
+    });
+
+    // Migrating is not starting: the run did not begin, so nothing may refresh
+    // as though it had.
+    expect(onStarted).not.toHaveBeenCalled();
+    expect(root!.querySelector(".start-task-notice")!.textContent).toContain("Review it");
+    // The offer is spent, and the refusal it hung under is gone.
+    expect(root!.querySelector(".start-task-migrate-btn")).toBeNull();
+    expect(root!.querySelector(".start-task-error")).toBeNull();
+  });
+
+  it("shows the reason when the migration itself fails", async () => {
+    stubRefusalThen({ status: 500, body: { error: "'rex migrate-slugs' did not complete: exit 1." } });
+
+    await clickStart();
+    await clickMigrate();
+
+    expect(root!.querySelector(".start-task-error")!.textContent).toContain("did not complete");
+  });
+});

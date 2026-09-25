@@ -15,13 +15,31 @@
  *
  * Corruption classes and their repair policy:
  *
- * | class               | meaning                                        | repair |
- * |---------------------|------------------------------------------------|--------|
- * | conflict-markers    | unresolved `<<<<<<<` blocks in a file          | refused — a human owns conflict resolution |
- * | duplicate-id        | one item id at two or more paths               | refused — which copy wins is ambiguous |
- * | orphaned-directory  | a directory with no `index.md`                 | removed when empty of items; refused when items remain inside |
- * | level-mismatch      | frontmatter `level` disagrees with nesting     | rewritten to the depth-implied level |
- * | dangling-blocked-by | `blockedBy` id that exists nowhere in the tree | dangling ids dropped, valid ones kept |
+ * | class                      | meaning                                        | repair |
+ * |----------------------------|------------------------------------------------|--------|
+ * | conflict-markers           | unresolved `<<<<<<<` blocks in a file          | refused — a human owns conflict resolution |
+ * | duplicate-id               | one item id at two or more paths               | refused — which copy wins is ambiguous |
+ * | orphaned-directory         | a directory with no `index.md`                 | removed when empty of items; refused when items remain inside |
+ * | level-mismatch             | frontmatter `level` disagrees with nesting     | rewritten to the depth-implied level |
+ * | dangling-blocked-by        | `blockedBy` id that exists nowhere in the tree | dangling ids dropped, valid ones kept |
+ * | children-table-out-of-sync | `## Children` disagrees with the directory     | table rewritten from the directory |
+ *
+ * `children-table-out-of-sync` is the one class here that is not corruption.
+ * The table is informational — the parser walks the filesystem and never reads
+ * it — so an item missing from the table is still loaded, still saved, and the
+ * next full-tree save rewrites the table complete. It is reported because it
+ * reached `main` unnoticed and was repaired by hand twice (#394, #395), and
+ * because a stale table misleads every human and agent reading the tree as
+ * documentation. It is deliberately repairable, so the CI gate added in #396
+ * reports it as advisory rather than blocking the merge.
+ *
+ * Do not confuse it with the shape that does destroy items: a directory whose
+ * `index.md` is missing cannot be parsed as an item at all, so a full save
+ * collects everything inside it as unreachable. That is `orphaned-directory`,
+ * and it is what 47062ab3 restored five files from.
+ *
+ * @see packages/rex/tests/integration/children-table-omission.test.ts — the
+ *      fixture that settled cosmetic-vs-destructive against the real store.
  *
  * @module rex/core/post-merge-validate
  */
@@ -36,7 +54,8 @@ export type PostMergeIssueClass =
   | "duplicate-id"
   | "orphaned-directory"
   | "level-mismatch"
-  | "dangling-blocked-by";
+  | "dangling-blocked-by"
+  | "children-table-out-of-sync";
 
 export interface PostMergeIssue {
   class: PostMergeIssueClass;
@@ -69,6 +88,20 @@ interface ScannedEntry {
   level?: string;
   blockedBy: string[];
   hasConflictMarkers: boolean;
+  /**
+   * A legacy single-child compaction shim. The parser handles these on a
+   * separate path and never lists them as leaf children, so neither does the
+   * Children-table census.
+   */
+  isParentShim: boolean;
+  /**
+   * Link targets read out of this file's `## Children` table, in table order,
+   * normalised to the directory-relative form the serializer writes
+   * (`child.md` or `child/index.md`). `undefined` when the file has no
+   * Children section at all — which is the correct state for a leaf, and drift
+   * only for an item that has children on disk.
+   */
+  childLinks?: string[];
 }
 
 const CONFLICT_MARKERS = /^(<{7} |={7}$|>{7} )/m;
@@ -125,6 +158,8 @@ export async function detectPostMergeIssues(treeRoot: string): Promise<PostMerge
       detail: dangling,
     });
   }
+
+  issues.push(...detectChildrenTableDrift(entries));
 
   issues.sort((a, b) => a.path.localeCompare(b.path) || a.class.localeCompare(b.class));
   return { issues, scannedFiles: entries.length };
@@ -227,7 +262,198 @@ async function scanFile(fullPath: string, treeRoot: string): Promise<ScannedEntr
     level: matchScalar(text, "level"),
     blockedBy: matchList(text, "blockedBy"),
     hasConflictMarkers: CONFLICT_MARKERS.test(text),
+    isParentShim: matchScalar(text, "__parentId") !== undefined,
+    childLinks: parseChildrenTable(text),
   };
+}
+
+// ── Children table ────────────────────────────────────────────────────────────
+
+/** The `## Children` heading line. */
+const CHILDREN_HEADING = /^##[^\S\n]+Children[^\S\n]*$/m;
+/**
+ * A markdown link target: the `](…)` half only, deliberately not the `[label]`
+ * half. Titles routinely contain square brackets — "Color-code [Tool], [Agent]
+ * … labels" is a real item in this repo's own tree — and the serializer writes
+ * `[${title}](${link})` without escaping them, so a label-anchored pattern
+ * fails to match exactly those rows and reports the child as unlisted.
+ */
+const CHILD_LINK = /\]\(([^)\s]+)\)/g;
+
+/** The span a `## Children` block occupies, and the table rows inside it. */
+interface ChildrenSection {
+  /** Offset of the `#` that starts the heading. */
+  start: number;
+  /** Offset just past the last table row — never past anything else. */
+  end: number;
+  /** The `|`-prefixed lines, header and separator included. */
+  rows: string[];
+}
+
+/**
+ * Locate the `## Children` block: its heading, the blank lines under it, and
+ * the run of table rows that follows. Nothing more.
+ *
+ * The boundary is the table itself and deliberately not "up to the next `##`
+ * heading". A block bounded that way swallows everything a `##` does not
+ * introduce — an `h1`, an `h3`, trailing prose — and {@link replaceChildrenTable}
+ * would then delete it. `rex validate --post-merge --repair` is advertised in
+ * the CI gate's own advisory line, so that silently destroyed hand-written
+ * body content on a command operators are told to run.
+ */
+function findChildrenSection(text: string): ChildrenSection | null {
+  const heading = CHILDREN_HEADING.exec(text);
+  if (heading === null) return null;
+
+  const start = heading.index;
+  let cursor = start + heading[0].length;
+  // Rows end the block; blank lines between them do not, but trailing blanks
+  // after the last row belong to whatever follows and are left alone.
+  let end = cursor;
+  const rows: string[] = [];
+
+  while (text[cursor] === "\n" || text[cursor] === "\r") {
+    const lineStart = cursor + (text.startsWith("\r\n", cursor) ? 2 : 1);
+    const newline = text.indexOf("\n", lineStart);
+    const lineEnd = newline === -1 ? text.length : newline;
+    const line = text.slice(lineStart, lineEnd).replace(/\r$/, "");
+
+    if (line.startsWith("|")) {
+      rows.push(line);
+      end = lineEnd;
+    } else if (line.trim() !== "") {
+      break; // prose, or a heading of any level — not ours to touch
+    }
+    cursor = lineEnd;
+  }
+
+  return { start, end, rows };
+}
+
+/**
+ * Link targets from a file's `## Children` table, in table order, normalised
+ * to the directory-relative form the serializer writes. `undefined` when there
+ * is no Children section — distinct from `[]`, which means an empty table.
+ *
+ * One link per row, taken as the row's *last* `](…)`: the serializer puts the
+ * child link at the end of the row, so a bracketed or link-bearing title
+ * cannot displace it.
+ */
+function parseChildrenTable(text: string): string[] | undefined {
+  const section = findChildrenSection(text);
+  if (section === null) return undefined;
+
+  const links: string[] = [];
+  for (const line of section.rows) {
+    const matches = [...line.matchAll(CHILD_LINK)];
+    const last = matches[matches.length - 1];
+    if (last) links.push(last[1].replace(/^\.\//, ""));
+  }
+  return links;
+}
+
+/**
+ * Compare each folder item's Children table against the directory it sits in.
+ *
+ * Both directions are reported under one class: a child on disk but absent
+ * from the table (the shape #391 produced) and a row pointing at a file that
+ * is no longer there. Neither loses data — the parser reads the directory, not
+ * the table — but both make the tree lie to anyone reading it.
+ */
+function detectChildrenTableDrift(entries: ScannedEntry[]): PostMergeIssue[] {
+  // Directory of each folder item, keyed by the directory's path relative to
+  // the tree root. Only an `index.md` owns a Children table; a leaf `<slug>.md`
+  // has no directory of its own and so has no children to list. An `index.md`
+  // with no `id` is not an item — `rex init` writes exactly one, the banner at
+  // the tree root, whose "children" are every epic in the PRD.
+  const folderItems = new Map<string, ScannedEntry>();
+  for (const entry of entries) {
+    const dir = owningDirOfIndex(entry.relPath);
+    if (dir === null || entry.id === undefined) continue;
+    folderItems.set(dir, entry);
+  }
+
+  const issues: PostMergeIssue[] = [];
+  for (const [dir, owner] of folderItems) {
+    // A file mid-conflict has two of everything; its table is not meaningful.
+    if (owner.hasConflictMarkers) continue;
+
+    const onDisk = childLinksOnDisk(dir, entries);
+    const listed = owner.childLinks ?? [];
+    const missing = onDisk.filter((link) => !listed.includes(link));
+    const stale = listed.filter((link) => !onDisk.includes(link));
+    if (missing.length === 0 && stale.length === 0) continue;
+
+    const parts: string[] = [];
+    if (missing.length > 0) {
+      parts.push(
+        `omits ${missing.length} of ${onDisk.length} child${onDisk.length === 1 ? "" : "ren"} ` +
+          `present in the directory (${missing.join(", ")})`,
+      );
+    }
+    if (stale.length > 0) {
+      parts.push(`lists ${stale.length} entr${stale.length === 1 ? "y" : "ies"} that is not on disk (${stale.join(", ")})`);
+    }
+
+    issues.push({
+      class: "children-table-out-of-sync",
+      path: owner.relPath,
+      itemId: owner.id,
+      message:
+        `## Children ${parts.join(" and ")} — cosmetic: the loader walks the directory and never ` +
+        `reads this table, so the items are intact and the next full-tree save rewrites it. ` +
+        `Repair rewrites it now so the tree stops misreporting itself.`,
+      repairable: true,
+      detail: missing,
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * The child links the serializer would write for the item owning `dir`:
+ * `<name>/index.md` for each subdirectory that is itself an item, and
+ * `<name>.md` for each sibling leaf file. Ordered the way the parser builds
+ * `children` — subdirectories alphabetically, then leaf files alphabetically —
+ * so a repaired table matches what the next save produces.
+ */
+/**
+ * The directory a file owns as its item's folder, or `null` when the file is
+ * not an `index.md`. Matches the basename exactly — `my-index.md` is a leaf
+ * child, not a folder item's own file.
+ */
+function owningDirOfIndex(relPath: string): string | null {
+  if (relPath === "index.md") return "";
+  if (!relPath.endsWith("/index.md")) return null;
+  return relPath.slice(0, -"/index.md".length);
+}
+
+function childLinksOnDisk(dir: string, entries: ScannedEntry[]): string[] {
+  const prefix = dir === "" ? "" : `${dir}/`;
+  const branches: string[] = [];
+  const leaves: string[] = [];
+
+  for (const entry of entries) {
+    if (!entry.relPath.startsWith(prefix)) continue;
+    const rest = entry.relPath.slice(prefix.length);
+    if (rest === "index.md") continue; // the owner itself
+    // A file with no id is not an item the parser would load (a README, say),
+    // and a shim is handled on the parser's separate orphaned-child path.
+    if (entry.id === undefined || entry.isParentShim) continue;
+
+    const slash = rest.indexOf("/");
+    if (slash === -1) {
+      leaves.push(rest);
+    } else if (rest.slice(slash) === "/index.md") {
+      // An immediate subdirectory's own index.md. Anything deeper belongs to
+      // that child, and a subdirectory with no index.md is not an item at all
+      // — that is `orphaned-directory`, reported as its own class.
+      branches.push(rest);
+    }
+  }
+
+  return [...branches.sort(), ...leaves.sort()];
 }
 
 async function countMarkdownInside(dir: string): Promise<number> {
@@ -267,6 +493,18 @@ export async function repairPostMergeIssues(
   const repaired: PostMergeIssue[] = [];
   const refused: PostMergeIssue[] = [];
 
+  // Rebuilding a Children table needs the directory census the detector used.
+  // Scanned lazily and once: most repair runs never touch this class, and the
+  // ones that do must all see the same tree.
+  let census: ScannedEntry[] | null = null;
+  const scanned = async (): Promise<ScannedEntry[]> => {
+    if (census === null) {
+      census = [];
+      await walk(treeRoot, treeRoot, census, []);
+    }
+    return census;
+  };
+
   for (const issue of issues) {
     if (!issue.repairable) {
       refused.push(issue);
@@ -286,6 +524,11 @@ export async function repairPostMergeIssues(
         case "dangling-blocked-by":
           await rewriteFile(fullPath, (text) => dropBlockedByRefs(text, new Set(issue.detail ?? [])));
           break;
+        case "children-table-out-of-sync": {
+          const rows = await renderChildRows(treeRoot, issue.path, await scanned());
+          await rewriteFile(fullPath, (text) => replaceChildrenTable(text, rows));
+          break;
+        }
         default:
           refused.push(issue);
           continue;
@@ -320,6 +563,60 @@ function dropBlockedByRefs(text: string, dangling: Set<string>): string {
 
   const replacement = kept.length > 0 ? `blockedBy:\n${kept.join("\n")}\n` : "";
   return text.replace(chunk[0], replacement);
+}
+
+/**
+ * Table rows for every child of the item at `indexRelPath`, in the order the
+ * parser builds `children` and rendered the way the serializer renders them,
+ * so a repaired table is the table the next full-tree save would write.
+ */
+async function renderChildRows(
+  treeRoot: string,
+  indexRelPath: string,
+  entries: ScannedEntry[],
+): Promise<string[]> {
+  const dir = owningDirOfIndex(indexRelPath);
+  if (dir === null) return [];
+  const rows: string[] = [];
+
+  for (const link of childLinksOnDisk(dir, entries)) {
+    const childRel = dir === "" ? link : `${dir}/${link}`;
+    let text = "";
+    try {
+      text = await readFile(join(treeRoot, ...childRel.split("/")), "utf-8");
+    } catch {
+      continue; // vanished between scan and repair — the next run re-reports it
+    }
+    // A child with no readable title would render a blank link. Falling back to
+    // its path keeps the row navigable and makes the gap visible.
+    const title = matchScalar(text, "title") || link;
+    const status = matchScalar(text, "status") || "pending";
+    rows.push(`| [${title}](./${link}) | ${status} |`);
+  }
+
+  return rows;
+}
+
+/**
+ * Replace the file's `## Children` section with `rows`, or append one when the
+ * file has none. An item whose children have all gone loses the section
+ * entirely, matching the serializer, which omits it for a childless item.
+ *
+ * Only the heading and the table are rewritten — see {@link findChildrenSection}
+ * for why the block is bounded by the table and not by the next heading.
+ */
+function replaceChildrenTable(text: string, rows: string[]): string {
+  const section =
+    rows.length === 0
+      ? ""
+      : ["## Children", "", "| Title | Status |", "|-------|--------|", ...rows].join("\n");
+
+  const existing = findChildrenSection(text);
+  if (existing !== null) {
+    return `${text.slice(0, existing.start)}${section}${text.slice(existing.end)}`;
+  }
+  if (section === "") return text;
+  return `${text.endsWith("\n") ? text : `${text}\n`}\n${section}\n`;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

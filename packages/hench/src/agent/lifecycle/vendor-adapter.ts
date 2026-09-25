@@ -120,6 +120,22 @@ export interface VendorSpawnOptions {
    * strategy falls back to cold spawns for them.
    */
   readonly forkSession?: boolean;
+  /**
+   * Path to a file that becomes the spawned session's only source of MCP
+   * servers, naming this run's project directory absolutely.
+   *
+   * Set by the run so the agent's rex writes PRD changes to the worktree the
+   * run is executing in, rather than to whichever checkout an inherited
+   * local-scope registration happens to pin.
+   *
+   * Only honored by the Claude CLI adapter (`--mcp-config <file>
+   * --strict-mcp-config`). Other adapters ignore it and keep inheriting the
+   * session's ambient registrations, so the run pre-flight still warns for
+   * them.
+   *
+   * @see packages/hench/src/process/agent-mcp-config.ts — builds the file
+   */
+  readonly mcpConfigPath?: string;
 }
 
 // ── VendorAdapter ────────────────────────────────────────────────────────

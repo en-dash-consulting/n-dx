@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { cleanupProjectDir } from "../helpers/index.js";
 import {
   createScriptedClaudeCli,
@@ -226,6 +227,39 @@ describe("cliLoop — review background-wait resume", () => {
     expect(cli.invocations).toHaveLength(4);
     expect(resumes(cli.invocations[3]!, REVIEW_SESSION)).toBe(true);
     expect(run.review).toMatchObject({ findingCount: 1, backgroundResumed: true });
+  });
+
+  // A resumed session does not keep its MCP config, and the reviewer can write
+  // review captures to the PRD. Without the pin, the resume falls back to
+  // Claude's own MCP discovery — where a local-scope registration pinning
+  // another checkout sends those writes to the wrong worktree (task 859a814b).
+  it("pins the resumed reviewer to this run's MCP config, like every other spawn", async () => {
+    const saved = process.env["NDX_CLI_PATH"];
+    // A usable launcher is what makes the run prepare an MCP config at all.
+    process.env["NDX_CLI_PATH"] = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../..",
+      "packages/core/cli.js",
+    );
+    try {
+      cli.script(workCommits, reviewerEndsWaiting, reviewerWritesReport);
+
+      await runLoop();
+
+      expect(cli.invocations).toHaveLength(3);
+      const configOf = (call: CliInvocation): string | undefined => {
+        const i = call.args.indexOf("--mcp-config");
+        return i === -1 ? undefined : call.args[i + 1];
+      };
+      const [work, review, resume] = cli.invocations;
+      expect(configOf(work!)).toBeDefined();
+      expect(configOf(review!)).toBe(configOf(work!));
+      expect(configOf(resume!)).toBe(configOf(work!));
+      expect(resume!.args).toContain("--strict-mcp-config");
+    } finally {
+      if (saved === undefined) delete process.env["NDX_CLI_PATH"];
+      else process.env["NDX_CLI_PATH"] = saved;
+    }
   });
 
   it("leaves a reviewer that wrote nothing without any background wait to the existing no-report path", async () => {

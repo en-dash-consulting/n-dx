@@ -242,6 +242,38 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Offered under a refusal the server says `rex migrate-slugs` would fix.
+   Deliberately not styled like the primary Start button: it runs a whole-tree
+   rename and then stops, so it must not read as the obvious next click. */
+.start-task-migrate-btn {
+  font-size: var(--font-xs);
+  color: var(--text-secondary, #9ca3af);
+  background: transparent;
+  border: 1px solid var(--border, #374151);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.start-task-migrate-btn:hover {
+  color: var(--text-primary, #e5e7eb);
+  border-color: var(--text-secondary, #9ca3af);
+}
+
+.start-task-migrate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.start-task-notice {
+  font-size: var(--font-xs);
+  color: var(--text-secondary, #9ca3af);
+  max-width: 220px;
+  text-align: center;
+}
+
 /* Glossary definition line — the one-sentence plain-language definition
    rendered under the field or column header that uses a term (see
    src/shared/glossary.ts). Sized and dimmed like the other explanatory

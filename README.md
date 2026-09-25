@@ -308,7 +308,7 @@ Rex and SourceVision expose MCP servers for any MCP-compatible assistant (Claude
 
 `.mcp.json` is committed to the repo, not gitignored: every worktree and teammate clone runs the same servers, resolved against whatever directory Claude Code launches them from. Claude Code shows a one-time approval prompt for a project's servers the first time it opens the checkout — approve once and it's remembered for that project.
 
-If `ndx` isn't on `PATH`, run the CLI through npx instead: `npx -y @n-dx/core rex mcp .` / `npx -y @n-dx/core sv mcp .`. Alternatively, `ndx init --mcp-scope=local` registers via the older `claude mcp add --scope local` path (per-machine, absolute paths) instead of writing `.mcp.json`.
+If `ndx` isn't on `PATH`, run the CLI through npx instead: `npx -y @n-dx/core rex mcp .` / `npx -y @n-dx/core sv mcp .`. Alternatively, `ndx init --mcp-scope=local` registers via the older `claude mcp add --scope local` path (per-machine, absolute server path) instead of writing `.mcp.json`. The project directory it records is cwd-relative, like `.mcp.json`'s — an absolute one would pin every worktree of the repository to a single checkout, because Claude Code applies a repository's local-scope entry to sessions started in its linked worktrees.
 
 Codex reads `.codex/config.toml` automatically — no manual registration required.
 
