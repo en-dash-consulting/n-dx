@@ -264,6 +264,49 @@ describe("post-merge corruption detection and repair", () => {
       expect(rewritten).toContain('title: "Epic"');
     });
 
+    it("repairs the table without touching body content that follows it", async () => {
+      // The block is bounded by the table, not by the next `##` heading. An
+      // `h3` or trailing prose is introduced by neither, so a heading-bounded
+      // block swallowed it and --repair deleted it — silently, on the very
+      // command the CI gate's advisory line tells operators to run.
+      await mkdir(join(treeRoot, "epic-aaaaaa"));
+      await writeFile(
+        join(treeRoot, "epic-aaaaaa", "index.md"),
+        md({ id: "a", level: "epic", title: "Epic", status: "pending" }, childrenTable([["Listed", "./listed-bbbbbb.md", "pending"]])) +
+          "\n### Operator notes\n\nDo not delete this.\n\n## Later section\n\nnor this\n",
+      );
+      await writeFile(join(treeRoot, "epic-aaaaaa", "listed-bbbbbb.md"), md({ id: "b", level: "feature", title: "Listed", status: "pending" }));
+      await writeFile(join(treeRoot, "epic-aaaaaa", "omitted-cccccc.md"), md({ id: "c", level: "feature", title: "Omitted", status: "pending" }));
+
+      await repairPostMergeIssues(treeRoot, (await detectPostMergeIssues(treeRoot)).issues);
+
+      const rewritten = await readFile(join(treeRoot, "epic-aaaaaa", "index.md"), "utf-8");
+      expect(rewritten).toContain("| [Omitted](./omitted-cccccc.md) | pending |");
+      expect(rewritten).toContain("### Operator notes");
+      expect(rewritten).toContain("Do not delete this.");
+      expect(rewritten).toContain("## Later section");
+      expect(rewritten).toContain("nor this");
+      // The heading survives exactly once — the block was replaced, not appended to.
+      expect(rewritten.match(/^## Children$/gm)).toHaveLength(1);
+      expect((await detectPostMergeIssues(treeRoot)).issues).toEqual([]);
+    });
+
+    it("appends a table to an item that has none, keeping its body", async () => {
+      await mkdir(join(treeRoot, "epic-aaaaaa"));
+      await writeFile(
+        join(treeRoot, "epic-aaaaaa", "index.md"),
+        md({ id: "a", level: "epic", title: "Epic", status: "pending" }, "Some requirements prose.\n"),
+      );
+      await writeFile(join(treeRoot, "epic-aaaaaa", "kid-bbbbbb.md"), md({ id: "b", level: "feature", title: "Kid", status: "pending" }));
+
+      await repairPostMergeIssues(treeRoot, (await detectPostMergeIssues(treeRoot)).issues);
+
+      const rewritten = await readFile(join(treeRoot, "epic-aaaaaa", "index.md"), "utf-8");
+      expect(rewritten).toContain("Some requirements prose.");
+      expect(rewritten).toContain("| [Kid](./kid-bbbbbb.md) | pending |");
+      expect((await detectPostMergeIssues(treeRoot)).issues).toEqual([]);
+    });
+
     it("reads a row whose title contains square brackets", async () => {
       // The serializer writes `[${title}](${link})` unescaped, so a title like
       // this one — taken from this repo's own tree — puts `[Tool]` and

@@ -269,12 +269,8 @@ async function scanFile(fullPath: string, treeRoot: string): Promise<ScannedEntr
 
 // ── Children table ────────────────────────────────────────────────────────────
 
-/**
- * The `## Children` block, heading included, up to the next `##` heading or the
- * end of the file. `(?![\s\S])` is the end-of-input assertion — `$` cannot be
- * used for it here, because `m` makes `$` match at every line end.
- */
-const CHILDREN_SECTION = /^##[^\S\n]+Children[^\S\n]*$([\s\S]*?)(?=^##[^\S\n]|(?![\s\S]))/m;
+/** The `## Children` heading line. */
+const CHILDREN_HEADING = /^##[^\S\n]+Children[^\S\n]*$/m;
 /**
  * A markdown link target: the `](…)` half only, deliberately not the `[label]`
  * half. Titles routinely contain square brackets — "Color-code [Tool], [Agent]
@@ -283,6 +279,56 @@ const CHILDREN_SECTION = /^##[^\S\n]+Children[^\S\n]*$([\s\S]*?)(?=^##[^\S\n]|(?
  * fails to match exactly those rows and reports the child as unlisted.
  */
 const CHILD_LINK = /\]\(([^)\s]+)\)/g;
+
+/** The span a `## Children` block occupies, and the table rows inside it. */
+interface ChildrenSection {
+  /** Offset of the `#` that starts the heading. */
+  start: number;
+  /** Offset just past the last table row — never past anything else. */
+  end: number;
+  /** The `|`-prefixed lines, header and separator included. */
+  rows: string[];
+}
+
+/**
+ * Locate the `## Children` block: its heading, the blank lines under it, and
+ * the run of table rows that follows. Nothing more.
+ *
+ * The boundary is the table itself and deliberately not "up to the next `##`
+ * heading". A block bounded that way swallows everything a `##` does not
+ * introduce — an `h1`, an `h3`, trailing prose — and {@link replaceChildrenTable}
+ * would then delete it. `rex validate --post-merge --repair` is advertised in
+ * the CI gate's own advisory line, so that silently destroyed hand-written
+ * body content on a command operators are told to run.
+ */
+function findChildrenSection(text: string): ChildrenSection | null {
+  const heading = CHILDREN_HEADING.exec(text);
+  if (heading === null) return null;
+
+  const start = heading.index;
+  let cursor = start + heading[0].length;
+  // Rows end the block; blank lines between them do not, but trailing blanks
+  // after the last row belong to whatever follows and are left alone.
+  let end = cursor;
+  const rows: string[] = [];
+
+  while (text[cursor] === "\n" || text[cursor] === "\r") {
+    const lineStart = cursor + (text.startsWith("\r\n", cursor) ? 2 : 1);
+    const newline = text.indexOf("\n", lineStart);
+    const lineEnd = newline === -1 ? text.length : newline;
+    const line = text.slice(lineStart, lineEnd).replace(/\r$/, "");
+
+    if (line.startsWith("|")) {
+      rows.push(line);
+      end = lineEnd;
+    } else if (line.trim() !== "") {
+      break; // prose, or a heading of any level — not ours to touch
+    }
+    cursor = lineEnd;
+  }
+
+  return { start, end, rows };
+}
 
 /**
  * Link targets from a file's `## Children` table, in table order, normalised
@@ -294,12 +340,11 @@ const CHILD_LINK = /\]\(([^)\s]+)\)/g;
  * cannot displace it.
  */
 function parseChildrenTable(text: string): string[] | undefined {
-  const section = CHILDREN_SECTION.exec(text);
-  if (!section) return undefined;
+  const section = findChildrenSection(text);
+  if (section === null) return undefined;
 
   const links: string[] = [];
-  for (const line of section[1].split("\n")) {
-    if (!line.startsWith("|")) continue;
+  for (const line of section.rows) {
     const matches = [...line.matchAll(CHILD_LINK)];
     const last = matches[matches.length - 1];
     if (last) links.push(last[1].replace(/^\.\//, ""));
@@ -556,21 +601,22 @@ async function renderChildRows(
  * Replace the file's `## Children` section with `rows`, or append one when the
  * file has none. An item whose children have all gone loses the section
  * entirely, matching the serializer, which omits it for a childless item.
+ *
+ * Only the heading and the table are rewritten — see {@link findChildrenSection}
+ * for why the block is bounded by the table and not by the next heading.
  */
 function replaceChildrenTable(text: string, rows: string[]): string {
   const section =
     rows.length === 0
       ? ""
-      : ["## Children", "", "| Title | Status |", "|-------|--------|", ...rows, ""].join("\n");
+      : ["## Children", "", "| Title | Status |", "|-------|--------|", ...rows].join("\n");
 
-  const existing = CHILDREN_SECTION.exec(text);
-  if (existing) {
-    const before = text.slice(0, existing.index);
-    const after = text.slice(existing.index + existing[0].length);
-    return `${before}${section}${after}`;
+  const existing = findChildrenSection(text);
+  if (existing !== null) {
+    return `${text.slice(0, existing.start)}${section}${text.slice(existing.end)}`;
   }
   if (section === "") return text;
-  return `${text.endsWith("\n") ? text : `${text}\n`}\n${section}`;
+  return `${text.endsWith("\n") ? text : `${text}\n`}\n${section}\n`;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
