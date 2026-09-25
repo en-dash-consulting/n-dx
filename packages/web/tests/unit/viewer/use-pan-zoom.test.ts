@@ -69,7 +69,12 @@ function mount(rect: { width: number; height: number; left?: number; top?: numbe
 }
 
 afterEach(() => {
-  for (const root of roots) render(null, root);
+  // Unmount inside act() to flush Preact's after-paint effect queue
+  // synchronously, rather than leaving a real rAF/setTimeout fallback
+  // pending past teardown.
+  act(() => {
+    for (const root of roots) render(null, root);
+  });
   roots.length = 0;
   vi.restoreAllMocks();
 });

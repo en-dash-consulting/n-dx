@@ -9,6 +9,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -65,23 +66,26 @@ describe("useActiveOperations", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    // Unmount inside act() to flush Preact's after-paint effect queue
+    // synchronously — an unflushed mount effect otherwise leaves a real
+    // requestAnimationFrame/setTimeout fallback pending past teardown.
+    act(() => { render(null, root); });
     if (root.parentNode) root.parentNode.removeChild(root);
     globalThis.fetch = originalFetch;
   });
 
   it("returns no operations when everything is idle", async () => {
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     await vi.waitFor(() => expect(capturedPoll).toBeInstanceOf(Function));
 
     await capturedPoll!();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(hookResult).toEqual([]);
   });
 
   it("registers polling with the correct source name and interval", () => {
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     expect(usePolling).toHaveBeenCalledWith("active-operations", expect.any(Function), 3_000);
   });
 
@@ -99,11 +103,11 @@ describe("useActiveOperations", () => {
       return { ok: true, json: async () => idleWire() } as Response;
     }) as typeof fetch;
 
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     await vi.waitFor(() => expect(capturedPoll).toBeInstanceOf(Function));
 
     await capturedPoll!();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(hookResult).toHaveLength(1);
     expect(hookResult[0]).toMatchObject({
@@ -128,11 +132,11 @@ describe("useActiveOperations", () => {
       return { ok: true, json: async () => idleWire() } as Response;
     }) as typeof fetch;
 
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     await vi.waitFor(() => expect(capturedPoll).toBeInstanceOf(Function));
 
     await capturedPoll!();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(hookResult).toHaveLength(1);
     expect(hookResult[0]).toMatchObject({ kind: "self-heal", status: "failed", error: "build failed" });
@@ -153,7 +157,7 @@ describe("useActiveOperations", () => {
       return { ok: true, json: async () => idleWire() } as Response;
     }) as typeof fetch;
 
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     await vi.waitFor(() => {
       expect(hookResult.some((op) => op.kind === "hench")).toBe(true);
@@ -164,14 +168,14 @@ describe("useActiveOperations", () => {
   });
 
   it("updates hench state live from the WebSocket broadcast", async () => {
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     await vi.waitFor(() => expect(capturedOnMessage).toBeInstanceOf(Function));
 
     capturedOnMessage!({
       type: "hench:task-execution-progress",
       state: { taskId: "t2", taskTitle: "Fix flaky test", status: "completed", startedAt: "2026-08-26T09:00:00.000Z", finishedAt: "2026-08-26T09:10:00.000Z" },
     });
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     await vi.waitFor(() => {
       expect(hookResult.some((op) => op.id === "hench:t2")).toBe(true);
@@ -181,18 +185,18 @@ describe("useActiveOperations", () => {
   });
 
   it("ignores WebSocket messages of other types", async () => {
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     await vi.waitFor(() => expect(capturedOnMessage).toBeInstanceOf(Function));
 
     capturedOnMessage!({ type: "some:other-message" });
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(hookResult).toEqual([]);
   });
 
   it("drops a finished entry once past the retention window", async () => {
     capturedOnMessage = null;
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     await vi.waitFor(() => expect(capturedOnMessage).toBeInstanceOf(Function));
 
     // finishedAt is already older than FINISHED_RETENTION_MS (10s), so the
@@ -203,7 +207,7 @@ describe("useActiveOperations", () => {
       type: "hench:task-execution-progress",
       state: { taskId: "t3", taskTitle: "Done task", status: "completed", startedAt: "2026-08-26T09:00:00.000Z", finishedAt },
     });
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     await vi.waitFor(() => {
       expect(hookResult.some((op) => op.id === "hench:t3")).toBe(false);
@@ -221,11 +225,11 @@ describe("useActiveOperations", () => {
       return { ok: true, json: async () => idleWire() } as Response;
     }) as typeof fetch;
 
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     await vi.waitFor(() => expect(capturedPoll).toBeInstanceOf(Function));
 
     await expect(capturedPoll!()).resolves.not.toThrow();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     expect(hookResult).toEqual([]);
   });
 });

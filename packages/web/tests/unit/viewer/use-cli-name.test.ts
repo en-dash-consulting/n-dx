@@ -19,7 +19,10 @@ describe("useCliName (shared-state CLI name accessor)", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    // Unmount inside act() to flush Preact's after-paint effect queue
+    // synchronously, rather than leaving a real rAF/setTimeout fallback
+    // pending past teardown.
+    act(() => { render(null, root); });
     root.remove();
     vi.unstubAllGlobals();
   });

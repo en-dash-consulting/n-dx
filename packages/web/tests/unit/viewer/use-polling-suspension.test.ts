@@ -8,6 +8,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { useState } from "preact/hooks";
 import {
   registerPollingSource,
@@ -54,40 +55,43 @@ describe("usePollingSuspension", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    // Unmount inside act() so Preact's after-paint effect queue is flushed
+    // synchronously here, rather than leaking a real requestAnimationFrame +
+    // setTimeout fallback pair that can fire after jsdom is torn down.
+    act(() => { render(null, root); });
     if (root.parentNode) root.parentNode.removeChild(root);
     resetPollingState();
   });
 
   it("returns isSuspended=false when polling is running", () => {
     registerPollingSource("test-a", makeDummySource());
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     expect(hookResult!.isSuspended).toBe(false);
     expect(hookResult!.suspendedCount).toBe(0);
   });
 
   it("returns isSuspended=true after suspendAllSources", () => {
     registerPollingSource("test-a", makeDummySource());
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     suspendAllSources();
 
     // Re-render to pick up state change
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     expect(hookResult!.isSuspended).toBe(true);
     expect(hookResult!.suspendedCount).toBe(1);
   });
 
   it("returns isSuspended=false after resumeAllSources", () => {
     registerPollingSource("test-a", makeDummySource());
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     suspendAllSources();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     expect(hookResult!.isSuspended).toBe(true);
 
     resumeAllSources();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     expect(hookResult!.isSuspended).toBe(false);
     expect(hookResult!.suspendedCount).toBe(0);
   });
@@ -95,31 +99,31 @@ describe("usePollingSuspension", () => {
   it("tracks sourceCount correctly", () => {
     registerPollingSource("test-a", makeDummySource());
     registerPollingSource("test-b", makeDummySource());
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     expect(hookResult!.sourceCount).toBe(2);
   });
 
   it("increments generation on suspend/resume", () => {
     registerPollingSource("test-a", makeDummySource());
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     const gen0 = hookResult!.generation;
 
     suspendAllSources();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     expect(hookResult!.generation).toBe(gen0 + 1);
 
     resumeAllSources();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     expect(hookResult!.generation).toBe(gen0 + 2);
   });
 
   it("does not count essential sources as suspended", () => {
     registerPollingSource("essential-src", makeDummySource(), { essential: true });
     registerPollingSource("non-essential-src", makeDummySource());
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     suspendAllSources();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(hookResult!.isSuspended).toBe(true);
     // Only the non-essential source should be suspended

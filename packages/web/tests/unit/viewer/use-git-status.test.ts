@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 
 let capturedPoll: (() => Promise<void>) | null = null;
 
@@ -48,52 +49,59 @@ describe("useGitStatus", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    // Unmount inside act() to flush Preact's after-paint effect queue
+    // synchronously — an unflushed mount effect otherwise leaves a real
+    // requestAnimationFrame/setTimeout fallback pending past teardown.
+    act(() => { render(null, root); });
     root.remove();
     vi.unstubAllGlobals();
   });
 
   it("fetches status once on mount", async () => {
-    render(h(TestHarness, null), root);
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
+    // Wait for the actual state, not just the fetch call: the mount effect
+    // now runs synchronously inside act(), but the fetch it kicks off still
+    // resolves on a later microtask, so asserting on "fetch was called"
+    // alone would race the state update.
+    await vi.waitFor(() => expect(hookResult!.status).toEqual(CLEAN));
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/git/status");
     expect(hookResult!.status).toEqual(CLEAN);
   });
 
   it("refetches on each poll tick", async () => {
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     await vi.waitFor(() => expect(capturedPoll).toBeInstanceOf(Function));
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
     fetchMock.mockResolvedValue(jsonResponse(200, DIRTY));
     await capturedPoll!();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(hookResult!.status).toEqual(DIRTY);
   });
 
   it("exposes a manual refetch that updates status", async () => {
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
     fetchMock.mockResolvedValue(jsonResponse(200, DIRTY));
     await hookResult!.refetch();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(hookResult!.status).toEqual(DIRTY);
   });
 
   it("keeps the last known status when a fetch fails", async () => {
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
     await vi.waitFor(() => expect(capturedPoll).toBeInstanceOf(Function));
     await vi.waitFor(() => expect(hookResult!.status).toEqual(CLEAN));
 
     fetchMock.mockRejectedValue(new Error("network down"));
     await capturedPoll!();
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(hookResult!.status).toEqual(CLEAN);
   });

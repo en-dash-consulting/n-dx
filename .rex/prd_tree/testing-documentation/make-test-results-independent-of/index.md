@@ -43,5 +43,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Search index rebuild and search route elapsed budgets bypass the documented BUDGET_MULTIPLIER policy](./search-index-rebuild-and-search-route.md) | pending |
 | [Stabilize rex's load-sensitive performance assertions](./stabilize-rex-s-load-sensitive.md) | completed |
 | [Triage the 39 hench/web failures now that the run no longer hides them](./triage-the-39-hench-web-failures-now.md) | completed |
-| [Unmount preact harnesses so the frame-fallback timer cannot outlive jsdom](./unmount-preact-harnesses-so-the-frame.md) | pending |
+| [Unmount preact harnesses so the frame-fallback timer cannot outlive jsdom](./unmount-preact-harnesses-so-the-frame.md) | completed |
 | [vi.stubEnv in child-lifecycle.test.js leaks NDX_DEBUG_LIFECYCLE into sibling e2e children](./vi-stubenv-in-child-lifecycle-test-js.md) | completed |
