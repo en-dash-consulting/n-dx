@@ -358,11 +358,12 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     inventoryResult: null,
   };
 
-  // Register a monotonic progress reporter for the life of this command so
-  // phase-qualified counters (e.g. the zone enrichment pass number) never
-  // print a lower value than one already shown — including across the
-  // recursive `--deep` sub-analysis calls below, each of which would
-  // otherwise restart its own counters from scratch. Guarded so a nested
+  // Register a monotonic progress reporter for the life of this command.
+  // Spinners started under it delegate `advance()` here, so a progress tick
+  // routed through the reporter keeps one running maximum across spinners
+  // and across the recursive `--deep` sub-analysis calls below. Identifiers
+  // such as the zone enrichment pass number are not progress ticks and are
+  // never routed through it (see runZonesPhase). Guarded so a nested
   // `cmdAnalyze` call (sub-analysis) reuses the outermost call's reporter
   // instead of replacing it.
   const ownsProgressReporter = getActiveProgressReporter() === null;

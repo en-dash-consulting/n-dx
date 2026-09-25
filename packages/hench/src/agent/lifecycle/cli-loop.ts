@@ -1725,7 +1725,7 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
 
   if (attempt < retryConfig.maxRetries) {
     const delay = computeDelay(attempt, retryConfig.baseDelayMs, retryConfig.maxDelayMs);
-    info(`Transient error on attempt ${attempt + 1}, retrying in ${delay}ms...`);
+    info(`retry ${attempt + 1}/${retryConfig.maxRetries}: transient error, waiting ${delay}ms`);
     await sleep(delay);
     return "retry";
   }

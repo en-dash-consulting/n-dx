@@ -4,9 +4,9 @@
 "@n-dx/hench": patch
 ---
 
-CLI progress counters no longer appear to move backwards, and LLM rate-limit
-retries print as their own line instead of overwriting whatever progress line
-was on screen.
+Retries now print as their own `retry n/m: <reason>` line across the LLM
+providers and hench, and `@n-dx/llm-client` gains a monotonic progress
+reporter for counters that span phases or batches.
 
 `@n-dx/llm-client` adds a `ProgressReporter` (`createProgressReporter`) that
 turns phase-qualified counters into a running total — switching phases or
@@ -21,13 +21,13 @@ it, replacing the old `Rate limited — retry in Ns… (attempt n of m)` text.
 (including recursive `--deep` sub-analyses), and its spinners register
 themselves as the active reporter while they own the terminal line, so a
 rate-limit retry raised inside an enrichment or classification batch pauses
-the spinner, prints its line, and resumes it instead of interleaving with
-the spinner's redraw. The zone enrichment pass number is deliberately left
-unclamped: it is an absolute identifier (`--target-pass=N` names it) rather
-than a progress tick, so forcing it upward would report the wrong pass.
+the spinner, prints its line, and redraws the spinner after it. The zone
+enrichment pass number is deliberately left unclamped: it is an absolute
+identifier (`--target-pass=N` names it) rather than a progress tick, so
+forcing it upward would report the wrong pass.
 
-`hench run` registers a reporter for a task's whole attempt sequence and
-routes the `Turn N/maxTurns` banner through it. This is a guard, not a
-behavior change: `agentLoop` is entered once per task and its turn loop
-runs once, so the printed number is unchanged today. The persisted
-`run.turns` accounting is not affected either way.
+`hench run` prints its own retries in the same form: the API loop's
+`API returned 429, retrying in 1000ms...` becomes `retry 1/3: API returned
+429, waiting 1000ms`, and the CLI loop's `Transient error on attempt n,
+retrying in Xms...` becomes `retry n/m: transient error, waiting Xms`, where
+`m` is the configured `retry.maxRetries`.

@@ -104,11 +104,18 @@ describe("CLI output", () => {
 
     it("pauses and resumes the spinner around a retry line instead of corrupting the redraw", () => {
       const spinner = startSpinner("Calling LLM (attempt 1/3)...");
+      stderrWriteSpy.mockClear();
 
       printRetryLine(2, 4, "rate limited, waiting 5s");
 
+      // Presence alone would pass even if the spinner were never redrawn. The
+      // spinner text must be written again after the retry line: that write
+      // is the redraw. ora also re-renders around foreign writes to its own
+      // stream, so this pins the behaviour, not the pause/resume mechanism.
       const written = stderrWriteSpy.mock.calls.map((c) => String(c[0])).join("");
-      expect(written).toContain("retry 2/4: rate limited, waiting 5s\n");
+      const retryAt = written.indexOf("retry 2/4: rate limited, waiting 5s\n");
+      expect(retryAt).toBeGreaterThanOrEqual(0);
+      expect(written.lastIndexOf("Calling LLM (attempt 1/3)...")).toBeGreaterThan(retryAt);
 
       spinner.stop();
     });

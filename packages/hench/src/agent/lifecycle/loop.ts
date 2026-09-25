@@ -16,7 +16,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, getActiveProgressReporter } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -69,26 +69,6 @@ export interface AgentLoopResult {
 }
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
-
-/**
- * Displayed turn number for the "Turn N/maxTurns" banner.
- *
- * A guard, not a fix for a live defect: today `agentLoop` is entered once
- * per task (run.ts calls it in the `provider === "api"` branch only) and
- * its turn loop runs once, so this returns `turnNumber` unchanged in every
- * reachable case. Plan-mode respawn — the case that *would* restart a
- * turn counter — lives in cli-loop.ts, which prints no turn banner and
- * never reaches this function. The routing exists so that if a future
- * change re-enters a turn loop within one task, the banner cannot print a
- * number lower than one already shown.
- *
- * `run.turns`, the persisted count used for budgeting and the run summary,
- * is unaffected either way: this only changes what gets printed.
- */
-function displayTurn(turnNumber: number, maxTurns: number): number {
-  return getActiveProgressReporter()?.advance("turn", turnNumber, maxTurns) ?? turnNumber;
-}
-
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 const MAX_SUMMARY_LENGTH = 500;
@@ -165,7 +145,7 @@ async function callWithRetry(
 
       if (status && RETRY_STATUS_CODES.has(status) && attempt < MAX_RETRIES) {
         const delay = BASE_DELAY_MS * Math.pow(2, attempt);
-        stream("Retry", `API returned ${status}, retrying in ${delay}ms...`);
+        stream("Retry", `retry ${attempt + 1}/${MAX_RETRIES}: API returned ${status}, waiting ${delay}ms`);
         await new Promise((r) => setTimeout(r, delay));
         continue;
       }
@@ -819,7 +799,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
         }
 
         run.turns = turn + 1;
-        subsection(`Turn ${displayTurn(turn + 1, maxTurns)}/${maxTurns}`);
+        subsection(`Turn ${turn + 1}/${maxTurns}`);
 
         recordPruneUsage(run, await pruner.prune(contents), turn + 1, "google", model);
 
@@ -1431,7 +1411,7 @@ async function runLocalToolLoop(params: {
       }
 
       run.turns = turn + 1;
-      subsection(`Turn ${displayTurn(turn + 1, maxTurns)}/${maxTurns}`);
+      subsection(`Turn ${turn + 1}/${maxTurns}`);
 
       // Fallback prune — only when no context window is configured. With
       // llm.local.maxContextTokens set, the token-triggered condensation at
@@ -1906,7 +1886,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       run.turns = turn + 1;
 
-      subsection(`Turn ${displayTurn(turn + 1, maxTurns)}/${maxTurns}`);
+      subsection(`Turn ${turn + 1}/${maxTurns}`);
 
       recordPruneUsage(run, await pruner.prune(messages), turn + 1, vendor, model);
 
