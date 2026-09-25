@@ -31,5 +31,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [PRD write guards](./prd-write-guards/index.md) | completed |
 | [Prompt cache, prune and budget configuration](./prompt-cache-prune-and-budget/index.md) | completed |
 | [Release plumbing](./release-plumbing/index.md) | pending |
-| [Trust copy](./trust-copy/index.md) | pending |
+| [Trust copy](./trust-copy/index.md) | completed |
 | [Vendor-aware hench model and provider settings](./vendor-aware-hench-model-and-provider/index.md) | pending |

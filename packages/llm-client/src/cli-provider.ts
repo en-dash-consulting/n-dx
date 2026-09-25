@@ -38,6 +38,8 @@ import { parseCliTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo } from "./provider-interface.js";
 import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
 import { classifyAuthError } from "./llm-error-classifier.js";
+import { printRetryLine } from "./progress-reporter.js";
+import { formatRetryCountdown } from "./rate-limit.js";
 
 /** Regex patterns for stderr content indicating an auth error. */
 const AUTH_PATTERNS = /auth|unauthorized|api.key|credential|login|not logged in/i;
@@ -399,8 +401,8 @@ function parseStreamOutput(stdout: string): CompletionResult {
  * programmatically without making a real completion request.
  */
 function defaultRateLimitOnRetry(attempt: number, maxAttempts: number, delayMs: number): void {
-  const delaySec = Math.round(delayMs / 1000);
-  process.stderr.write(`Rate limited — retrying in ${delaySec}s… (attempt ${attempt} of ${maxAttempts})\n`);
+  const countdown = formatRetryCountdown(Math.round(delayMs / 1000));
+  printRetryLine(attempt, maxAttempts, `rate limited, waiting ${countdown}`);
 }
 
 export function createCliClient(options: CliProviderOptions): ClaudeClient & LLMProvider {

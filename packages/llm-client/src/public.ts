@@ -363,6 +363,16 @@ export {
 // Brand and animation
 export { createSpinner } from "./cli-brand.js";
 
+// Monotonic progress reporting (phase-qualified counters, retry lines)
+export {
+  createProgressReporter,
+  formatRetryLine,
+  printRetryLine,
+  setActiveProgressReporter,
+  getActiveProgressReporter,
+} from "./progress-reporter.js";
+export type { ProgressReporter } from "./progress-reporter.js";
+
 
 // Vendor/model header (surfaces active vendor+model at command start)
 export {
