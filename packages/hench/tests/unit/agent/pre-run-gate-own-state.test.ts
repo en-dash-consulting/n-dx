@@ -41,6 +41,7 @@ const OWN_STATE = [
   "?? .hench/locks/",
   "?? .hench/runs/",
   "?? .hench/usage-cursors/",
+  "?? .hench/mcp/",
   "?? .hench-commit-msg.txt",
 ];
 
@@ -79,6 +80,10 @@ describe("the pre-run gate ignores hench's own runtime state", () => {
         ".hench/locks/",
         ".hench/runs/",
         ".hench/usage-cursors/",
+        // The per-run MCP config directory, written for every Claude-vendor
+        // run. Absent from this list in 0.7.1, which refused the completion of
+        // the run that wrote it in any project whose .gitignore lacked it.
+        ".hench/mcp/",
         ".hench-commit-msg.txt",
       ]),
     );

@@ -251,10 +251,17 @@ async function pruneStaleConfigs(dir: string, now: number): Promise<void> {
 /**
  * Write the run's MCP config and return the path to pass as `--mcp-config`.
  *
- * Written as a file under `.hench/` — which is gitignored, so it is never
- * committed — rather than passed as inline JSON. Inline JSON would have to
- * survive cmd.exe quoting on Windows, which is the hazard the Windows branch of
- * `buildClaudeCliArgs` already exists to work around.
+ * Written as a file rather than passed as inline JSON: inline JSON would have
+ * to survive cmd.exe quoting on Windows, which is the hazard the Windows branch
+ * of `buildClaudeCliArgs` already exists to work around.
+ *
+ * `.hench/` as a whole is *not* gitignored — `.hench/config.json` is meant to be
+ * committed — so the directory this writes into earns its exemption by being
+ * declared in `HENCH_RUNTIME_GITIGNORE_ENTRIES` (`../store/artifacts.ts`), which
+ * is both what `hench init` writes to `.gitignore` and what the pre-run, loop
+ * and completion gates discount. Leaving it out of that list is what made a
+ * successful run refuse its own completion in projects whose `.gitignore`
+ * predated this file.
  */
 export async function writeAgentMcpConfig(opts: {
   readonly henchDir: string;

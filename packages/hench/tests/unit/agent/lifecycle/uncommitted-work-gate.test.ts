@@ -1,11 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   PRD_COMMIT_PATHS,
   findUncommittedWork,
   formatLoopRefusal,
   formatUncommittedWorkRefusal,
 } from "../../../../src/agent/lifecycle/uncommitted-work-gate.js";
+import { RM_RETRY } from "../../../helpers/index.js";
 
 /**
  * A directory that is not inside any git repository, so the repo-relative
@@ -533,5 +537,77 @@ describe("recovery commands", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
+  });
+});
+
+// ── Against a real repository that does not gitignore .hench/mcp/ ────────────
+//
+// The stubbed tests above cannot catch this class of bug, and neither could
+// dogfooding: this repo's own `.gitignore` lists every `.hench/` runtime path,
+// so a path missing from HENCH_RUNTIME_GITIGNORE_ENTRIES is still invisible to
+// `git status` here. The gate must not depend on the project having the ignore
+// line — that is the whole reason the discount list exists alongside it.
+
+describe("findUncommittedWork against a repository without the ignore lines", () => {
+  const dirs: string[] = [];
+
+  afterEach(() => {
+    for (const d of dirs.splice(0)) {
+      rmSync(d, { recursive: true, force: true, ...RM_RETRY });
+    }
+  });
+
+  /**
+   * A committed repo whose `.gitignore` covers nothing under `.hench/` — the
+   * state of every project initialised before the artifact in question existed.
+   */
+  function repoWithoutHenchIgnores(): string {
+    const dir = mkdtempSync(join(tmpdir(), "hench-mcp-gate-"));
+    dirs.push(dir);
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, stdio: "pipe" });
+    git("init", "-q");
+    git("config", "user.email", "test@example.com");
+    git("config", "user.name", "test");
+    writeFileSync(join(dir, "README.md"), "# t\n");
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\n");
+    git("add", "-A");
+    git("commit", "-qm", "init");
+    return dir;
+  }
+
+  /** What `writeAgentMcpConfig` leaves behind for a Claude-vendor run. */
+  function writeRunMcpConfig(dir: string, runId: string): void {
+    mkdirSync(join(dir, ".hench", "mcp"), { recursive: true });
+    writeFileSync(join(dir, ".hench", "mcp", `${runId}.json`), '{"mcpServers":{}}\n');
+  }
+
+  it("does not report the run's own MCP config as uncommitted work", async () => {
+    // The observed failure (consumer project caos, run e3fe956f): the run
+    // succeeded, this file was the only thing dirty, the completion was refused
+    // and the task reset to pending.
+    const dir = repoWithoutHenchIgnores();
+    writeRunMcpConfig(dir, "e3fe956f");
+
+    expect(
+      execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
+        cwd: dir,
+        encoding: "utf-8",
+      }).trim(),
+    ).toBe("?? .hench/mcp/e3fe956f.json");
+
+    await expect(findUncommittedWork({ projectDir: dir })).resolves.toEqual({
+      clean: true,
+      paths: [],
+    });
+  });
+
+  it("still reports the agent's real work alongside it", async () => {
+    const dir = repoWithoutHenchIgnores();
+    writeRunMcpConfig(dir, "e3fe956f");
+    writeFileSync(join(dir, "src.ts"), "export const x = 1;\n");
+
+    const result = await findUncommittedWork({ projectDir: dir });
+    expect(result.clean).toBe(false);
+    expect(result.paths).toEqual(["src.ts"]);
   });
 });
