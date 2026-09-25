@@ -29,6 +29,14 @@
  * a file it had just written itself. An ignore line alone does not fix that
  * once the file is tracked — the untrack and the discount are both required.
  *
+ * `.hench/mcp/` arrived the same way. 0.7.1 began writing a per-run MCP config
+ * there for every Claude-vendor run but never added it here, and this repo's
+ * own `.gitignore` already listed it — so dogfooding never tripped it while
+ * every consumer project refused the completion of the run that wrote the
+ * file, reset the task to pending, and could refuse the next run too (the
+ * config is swept by age, not at run end). A gitignore entry the project has
+ * not got is exactly what this list exists to stop mattering.
+ *
  * @module hench/store/artifacts
  */
 
@@ -49,6 +57,7 @@ export const HENCH_RUNTIME_GITIGNORE_ENTRIES: readonly string[] = [
   ".hench/usage-cursors/",
   ".hench/reviews/",
   ".hench/recovery/",
+  ".hench/mcp/",
   ".hench/session-cache.json",
   ".hench-commit-msg.txt",
 ];
