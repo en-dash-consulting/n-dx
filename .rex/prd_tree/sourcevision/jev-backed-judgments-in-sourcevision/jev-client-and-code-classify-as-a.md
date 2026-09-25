@@ -1,0 +1,24 @@
+---
+id: "6c302b20-92d4-43ff-833d-74a62b9fc72b"
+level: "task"
+title: "Jev client and code.classify as a Choice over the archetype catalog"
+status: "pending"
+priority: "medium"
+tags:
+  - "sourcevision"
+  - "llm"
+  - "typesafe"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "Unit test with mocked fetch: a batch of files yields FileClassification entries whose confidence equals Jev's probability for the chosen archetype, not 0.7"
+  - "Unit test: a `none` answer or a top probability below the code-set threshold yields archetype null"
+  - "Unit test: an archetype id in the answer that is not in the catalog is dropped for that file only"
+  - "Unit test: 401 from the API surfaces as ClaudeClientError with reason \"auth\" and the pass stops, matching current CLI behaviour"
+  - "Unit test: with TYPESAFE_API_KEY unset, classifyBatchWithLLM calls callClaude exactly as on main"
+  - "Unit test for resolveJudgmentRoute: default route for code.classify, llm.routes override to a tier, explicit \"typesafe\" route, and key-absent → undefined"
+  - "Jev usage.input_tokens/output_tokens accumulate into the classify pass token usage"
+  - "`pnpm --filter @n-dx/sourcevision test` and `pnpm --filter @n-dx/llm-client test` pass; tests/e2e/domain-isolation.test.js still passes (no new cross-package import outside the gateway)"
+description: "Add `packages/sourcevision/src/analyzers/jev-client.ts`: a thin fetch wrapper over `POST https://api.typesafe.ai/v1/systemone` (bearer `TYPESAFE_API_KEY`, model `jev-latest`, body `{ state, model, questions }`, response `{ model, answers, usage: { input_tokens, output_tokens } }`). Map 401 → the existing `ClaudeClientError` `auth` reason, 429/529 → retry with backoff then the existing retry reason, 422 → a thrown error naming the malformed question. Record `usage` into `AnalyzeTokenUsage` so the classify pass keeps appearing in token reports.\n\nIn `analyzers/classify.ts`, `classifyBatchWithLLM` branches to Jev before `callClaude` when `resolveJudgmentRoute(\"code.classify\", config)` returns `\"typesafe\"`. One request per file batch; `state` is the batch as a JSON object keyed by file path carrying the path, the top-three partial signals from the heuristic pass, and the project languages; one `choice` question per file with `criteria` = archetype id → `{ what: description, examples: representative path patterns }` from the catalog plus a `none` option meaning no archetype fits. The answer's `probabilities[chosen]` becomes `FileClassification.confidence` (replacing the hardcoded `0.7`); `none` or a top probability below a threshold set in code maps to `archetype: null`; `source: \"llm\"` is kept so `mergeClassificationResults` and the dashboard are unchanged. The three-attempt prompt-degradation ladder is bypassed on the Jev path — there is no free text to fail to parse.\n\nIn `@n-dx/llm-client`, add `resolveJudgmentRoute(taskClass, config): \"typesafe\" | undefined`, exported through `public.ts`: returns `\"typesafe\"` when `llm.routes[<class>]` (exact, then longest glob) is `\"typesafe\"`, or when the class is in a built-in `DEFAULT_JUDGMENT_ROUTES` set and `llm.routes` does not redirect it to a tier — and only if `TYPESAFE_API_KEY` is non-empty. `resolveTaskModel` is unchanged (an unrecognised route value already degrades to `standard`). `DEFAULT_JUDGMENT_ROUTES` initially contains `code.classify`. Sourcevision imports the helper through `analyzers/claude-client.ts`, which is already its @n-dx/llm-client boundary.\n\nDo not add `typesafe` to `LLM_VENDOR`, `TIER_MODELS`, or `NEWEST_MODELS`; do not implement `ClaudeClient.complete` for it."
+lastModified: "2026-09-22T02:08:32.704Z"
+lastModifiedBy: "Nick Daniel <nick@endash.us>"
+---
