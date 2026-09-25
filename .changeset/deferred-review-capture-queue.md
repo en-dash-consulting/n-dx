@@ -2,7 +2,7 @@
 "@n-dx/hench": patch
 ---
 
-Autonomous `--review` runs park their unanswered findings instead of dropping them
+`--review` runs park their unanswered findings instead of dropping them
 
 An adversarial review inside `ndx work --auto`/`--loop` offered its should-fix
 findings to a capture prompt with nobody at it, then recorded them as `dropped`
@@ -18,5 +18,7 @@ summary names the deferred count and the record path, and `hench review pending
 <run-id>` lists each parked finding with an id, its severity, verdict and
 failure scenario — ready to hand to `/ndx-adversarial-review` for capture.
 
-Interactive runs are untouched: a human was at the prompt, so a declined finding
-really was declined.
+Attended runs park them the same way. The reviewer is a headless session that
+cannot receive the operator's selection, so it reports `should-fix` and
+`out-of-scope` findings without capturing them, and the run queues them for
+`hench review pending`.

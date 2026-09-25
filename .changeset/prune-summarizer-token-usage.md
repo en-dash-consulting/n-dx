@@ -5,7 +5,7 @@
 Count what context compaction costs, instead of discarding it.
 
 `createContextSummarizer` destructured only `text` from the completion and threw
-`tokenUsage` away. Every prune ships up to 20,000 characters of transcript to the
+`tokenUsage` away. Every prune ships up to 40,000 characters of transcript to the
 light-tier model and gets a summary back, so on a long run that spend was real
 and entirely unrecorded: `hench show`, the run summary, `rex usage`, the
 dashboard and `get_token_usage` all under-reported any run that pruned, and with

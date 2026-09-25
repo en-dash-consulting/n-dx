@@ -28,12 +28,14 @@ Three changes close it:
   It removes the pinned entries it can reach and reports the ones it cannot,
   with the `claude mcp remove --scope local` command.
 - The `ndx work` pre-flight warns when a local-scope registration pins another
-  checkout of this repository. It is silent for Claude runs, which already
-  override it, and applies to Codex runs and interactive sessions.
+  checkout of this repository. It is silent for Claude runs that pinned their
+  own servers, and applies to Codex runs, to Claude runs that fell back (a
+  standalone `hench run`, or an `NDX_CLI_PATH` that does not lead back to this
+  hench), and to interactive sessions.
 
 Note that `--strict-mcp-config` drops the operator's user-scope and other MCP
-servers from autonomous Claude runs — the spawned session sees only rex and
-sourcevision.
+servers from every Claude run that pins its servers, attended or not — the
+spawned session sees only rex and sourcevision.
 
 Known gap: the agent's shell `rex` / `ndx` / `n-dx` commands still resolve from
 `PATH`, which can reach a different install than the one running hench. Pinning

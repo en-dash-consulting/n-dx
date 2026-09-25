@@ -3,24 +3,29 @@
 "@n-dx/web": patch
 ---
 
-Stop prompt-cache reads from tripping `hench.tokenBudget`
+`hench.tokenBudget` counts cache writes and excludes cache reads
 
-`checkTokenBudget` now counts **uncached input + cache writes + output** and
-excludes cache reads. A cache read is by construction a re-read of tokens
-already counted when they were written, so counting reads charged the same
-tokens once per turn: across the 27 recorded runs in this repository face
-value ran a median of **70x** the counted total.
+`checkTokenBudget` summed `input + output`. With prompt caching, `input` holds
+only the uncached slice — an 83-turn API-loop run recorded 534 uncached input
+tokens against 876K cache writes and 34.1M cache reads — so a configured budget
+bounded output plus a rounding error, and the run continued to `maxTurns`
+instead of stopping.
 
-The practical failure was on the Claude CLI path, where the check runs after
-the run. A Claude Code session reading millions of cached tokens exceeded every
-built-in template budget, so a run that had finished its work was marked
-`budget_exceeded` and its task reset to `pending` before the review and commit
-steps. The previous change to this check fixed the API loop — where
-`usage.input` holds only the uncached slice — but counted cache reads at face
-value, which broke the CLI path. Both loops now apply the same rule, and the
-API-loop run that motivated that change is still stopped, by its cache writes.
+The budget now counts **uncached input + cache writes + output**, on the API
+loops and the Claude and Codex CLI paths alike, and excludes cache reads. A
+cache read is by construction a re-read of tokens already counted when they
+were written, so counting reads would charge the same tokens once per turn:
+across the 27 recorded runs in this repository, face value ran a median of
+**70x** the counted total. On the Claude CLI path, where the check runs after
+the session has finished, that would have marked every non-trivial run
+`budget_exceeded` and reset its task before the review and commit steps. The
+rule needs no price table and stays vendor-neutral, and runaway loops remain
+bounded because cache writes and output both grow with turn count.
 
-Runaway loops remain bounded: cache writes and output both grow with turn count.
+A run that writes no cache counts exactly what it did before. A Claude Code
+session always writes one, so on the CLI path every run now also counts its
+cache writes, and a budget tuned to the old accounting may need raising on
+either path.
 
 Also:
 
@@ -33,7 +38,8 @@ Also:
   below a single median run. `budget-conscious` is not tightened below
   `quick-iteration` despite its name: measured runs in its turn class
   *completed* at 484K and 489K, so a lower budget would fail finished work —
-  it economises through `maxTurns` and its 4096 `maxTokens` cap instead.
+  it economises through `maxTurns` and its 4096 `maxTokens` cap instead. The
+  dashboard's template list carries the same values.
 - The budget-exceeded message now names the token classes that counted and how
   many cache-read tokens were excluded, so a genuine overrun can be told apart
   from cache-read inflation.

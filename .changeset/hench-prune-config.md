@@ -5,32 +5,30 @@
 
 Make the context prune's retention and transcript limits configurable
 
-The summarizing prune in the API loops kept the most recent 10 turn-pairs
-verbatim and showed its summarizer only the first 800 characters of each
-dropped message — both hard-coded. Neither was a defect, but together they
-bounded how much of a run the agent could still read and how much of it
-could reach the summary, with no way to tune either and no visibility into
-the trade.
+The summarizing prune in the API loops keeps the most recent turn-pairs
+verbatim and shows its summarizer a capped excerpt of each dropped message.
+Together those bound how much of a run the agent can still read and how much of
+it can reach the summary, so both are tunable rather than hard-coded.
 
-`ConversationPruner` now takes the limits as constructor options, and all
-three API loops resolve them from the new `hench.prune` config group:
+`ConversationPruner` takes the limits as constructor options, and all three API
+loops resolve them from the new `hench.prune` config group:
 `prune.triggerPairs` (default 20), `prune.retainPairs` (default 10) and
-`prune.transcriptMessageChars`. The pair defaults are unchanged, so peak
-context and the one-prune-per-ten-turns cache cadence stay where they were.
-Validation refuses a retention at or above the trigger, and either below 2,
-naming both keys.
+`prune.transcriptMessageChars` (default 2,000). At the pair defaults a prune
+fires roughly once every ten turns, which keeps the cached prefix stable between
+prunes. Validation refuses a retention at or above the trigger, and either below
+2, naming both keys.
 
-The per-message transcript cap moves from 800 to 2,000 characters, matching
-the size at which hench truncates a tool result for the run record — a
-2,000-character result previously lost 60% of itself before the summarizer
-saw it. The overall cap moves from 20,000 to 40,000 so a full 22-message
-span at the new per-message cap is not then cut from the end.
+The 2,000-character per-message excerpt matches the size at which hench
+truncates a tool result for the run record, so a result the run recorded in
+full reaches the summarizer in full. The overall transcript is capped at 40,000
+characters; since roughly half of a dropped span's messages are tool results at
+the cap, a typical span lands well under it and is not cut from the end.
 
 The pruner also clamps its own limits rather than trusting the schema, because
 `loadConfig` merges `.n-dx.json`'s `hench` section after validation — so a
 `hench.prune` override in that file reaches the agent loop unchecked. An
-out-of-range value falls back to the default (or, for a retention at or above
-the trigger, to one pair below it) and says so in the prune log, instead of
+out-of-range value falls back to the default, and a retention at or above the
+trigger falls back to one pair below it and says so in the run log, instead of
 ending the run.
 
 The group is CLI- and file-only for now (`ndx config hench.prune.retainPairs

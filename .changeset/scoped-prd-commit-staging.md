@@ -3,17 +3,18 @@
 "@n-dx/hench": patch
 ---
 
-Hench's PRD commits stage the files the save actually touched, not the whole tree
+Hench's completion and `--reset-deferred` commits stage the PRD files the save actually touched, not the whole tree
 
 Staging `.rex/prd_tree/` wholesale once swept a 1,378-file in-flight rename
 into a "task completed" commit. The serializer always knew exactly which files
 each save wrote and deleted; that list now crosses the package boundary.
 
-- `@n-dx/rex` — every folder-tree save records the repository-relative paths
-  it wrote and deleted (`SerializeResult.writtenPaths`/`deletedPaths`; files
+- `@n-dx/rex` — every folder-tree save records the paths it wrote and
+  deleted (`SerializeResult.writtenPaths`/`deletedPaths`; files
   skipped as unchanged are not listed, and a removed directory is reported as
   the files inside it). Both local stores accumulate the lists across saves
-  and expose them through the new `takeSaveFileReport(store)`, which drains
+  and expose them, relative to the project directory, through the new
+  `takeSaveFileReport(store)`, which drains
   the accumulator — a caller that saves several times between commit points
   (`--reset-deferred` saves once per task) gets the union, not the last save.
 - `@n-dx/hench` — the completion-metadata commit and the `--reset-deferred`
