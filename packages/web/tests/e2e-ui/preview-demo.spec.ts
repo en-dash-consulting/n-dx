@@ -91,9 +91,8 @@ test("every page renders its headline sections without throwing", async ({ page 
   await expect(page.locator(".stat", { hasText: "Zones" }).first().locator(".info")).toHaveAttribute("data-info", /Louvain/);
 
   await page.locator('.nav-section[data-page="plan"]').click();
-  for (const name of ["History", "CLI help", "Basic Planning Settings"]) {
-    await expect(page.locator(".sec-head h2", { hasText: name })).toBeVisible();
-  }
+  // Order matters: the command runner and reference sit above the run history.
+  await expect(page.locator("#content .sec:not(.plain) .sec-head h2")).toHaveText(["CLI help", "History", "Basic Planning Settings"]);
   await expect(page.locator(".panel h3", { hasText: "Add Items" })).toBeVisible();
 
   await page.locator('.nav-section[data-page="work"]').click();
@@ -175,6 +174,45 @@ test("the landing page is three stage cards that go where they say, highlighted 
   await page.locator(".brand").click();
   await expect(page.locator("#content h1")).toHaveText("n-dx");
   await expect(page).toHaveURL(/#home$/);
+});
+
+test("theme follows the system by default and can be pinned to light or dark", async ({ page }) => {
+  const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const root = page.locator("html");
+  const pressed = (pref: string) => page.locator(`#theme-toggle button[data-theme-pref="${pref}"]`);
+
+  // System: nothing pinned on <html>, and the palette tracks prefers-color-scheme live.
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto(baseUrl + "/option1-demo.html", { waitUntil: "networkidle" });
+  await expect(root).not.toHaveAttribute("data-theme", /./);
+  await expect(pressed("system")).toHaveAttribute("aria-pressed", "true");
+  const dark = await bg();
+  await page.emulateMedia({ colorScheme: "light" });
+  const light = await bg();
+  expect(light).not.toBe(dark);
+
+  // Pinning dark wins over a light system, and survives a reload.
+  await pressed("dark").click();
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await expect(pressed("dark")).toHaveAttribute("aria-pressed", "true");
+  expect(await bg()).toBe(dark);
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  expect(await bg()).toBe(dark);
+
+  // Pinning light on a dark system is the mirror image.
+  await page.emulateMedia({ colorScheme: "dark" });
+  await pressed("light").click();
+  await expect(root).toHaveAttribute("data-theme", "light");
+  expect(await bg()).toBe(light);
+
+  // Back to system: the attribute goes, and the system (dark) shows through.
+  await pressed("system").click();
+  await expect(root).not.toHaveAttribute("data-theme", /./);
+  expect(await bg()).toBe(dark);
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(pressed("system")).toHaveAttribute("aria-pressed", "true");
+  await expect(root).not.toHaveAttribute("data-theme", /./);
 });
 
 test("the stage links step around the Analysis → Plan → Work loop", async ({ page }) => {

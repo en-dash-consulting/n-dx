@@ -44,7 +44,7 @@
 
   Served next to the editor:  ndx start --preview .  →  /option1-demo.html
 -->
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -58,12 +58,17 @@
   --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px;
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px;
 }
-[data-theme="dark"] {
+/* Theme. No data-theme attribute means "system": the palette follows
+   prefers-color-scheme, in CSS, so it holds even with scripts off. The toggle
+   pins data-theme="light" or "dark" on <html>, which overrides the query.
+   Dark is the base; the light block is repeated once for the system case. */
+:root, [data-theme="dark"] {
   color-scheme: dark;
   --bg: #0c0e1a; --bg-surface: #151829; --bg-hover: #1e2240; --bg-active: #262b4a;
   --border: #2a2f4a; --border-strong: #3d4470;
   --text: #e8eaf0; --text-dim: #9ea3bc; --text-muted: #868aaa;
   --accent: var(--brand-teal); --green: #00bd81; --orange: #ff8060; --red: #ff7f9c; --purple: var(--brand-purple); --blue: #6ea8ff;
+  --on-accent: #04121a;
 }
 [data-theme="light"] {
   color-scheme: light;
@@ -71,6 +76,17 @@
   --border: #d8dce6; --border-strong: #bcc2d4;
   --text: #1a1d2e; --text-dim: #5c6078; --text-muted: #6b6e88;
   --accent: #006E4E; --green: #006E4A; --orange: #B03800; --red: #B01A54; --purple: var(--brand-purple); --blue: #2f66d0;
+  --on-accent: #fff;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f5f6fa; --bg-surface: #ffffff; --bg-hover: #eef0f6; --bg-active: #e4e7f0;
+    --border: #d8dce6; --border-strong: #bcc2d4;
+    --text: #1a1d2e; --text-dim: #5c6078; --text-muted: #6b6e88;
+    --accent: #006E4E; --green: #006E4A; --orange: #B03800; --red: #B01A54; --purple: var(--brand-purple); --blue: #2f66d0;
+    --on-accent: #fff;
+  }
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -108,8 +124,7 @@ a { color: var(--accent); }
 kbd { font: 10px/1 var(--font-mono); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 2px 5px; color: var(--text-dim); }
 .btn { font: inherit; font-size: 12px; padding: 5px var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: var(--bg-active); color: var(--text); cursor: pointer; }
 .btn:hover { background: var(--bg-hover); }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: #04121a; font-weight: 600; }
-[data-theme="light"] .btn-primary { color: #fff; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 .btn-sm { padding: 3px 9px; font-size: 11px; }
 
 .main { flex: 1; display: flex; min-height: 0; position: relative; }
@@ -258,8 +273,11 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11
 .kv dt { color: var(--text-muted); } .kv dd { margin: 0; font-family: var(--font-mono); font-size: 11px; }
 .toggle { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 999px; overflow: hidden; margin-left: auto; }
 .toggle button { font: 600 11px/1 var(--font-mono); letter-spacing: .06em; padding: 5px 12px; border: none; background: transparent; color: var(--text-dim); cursor: pointer; }
-.toggle button[aria-pressed="true"] { background: var(--accent); color: #04121a; }
-[data-theme="light"] .toggle button[aria-pressed="true"] { color: #fff; }
+.toggle button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+/* theme control in the bottom bar: System · Light · Dark */
+.theme-toggle { margin-left: 0; }
+.theme-toggle button { padding: 4px 9px; font-size: 10px; }
+.theme-toggle button .g { margin-right: 4px; }
 .graph { width: 100%; height: 340px; display: block; }
 .graph text { font: 10px var(--font-mono); fill: var(--text-dim); }
 .graph .lbl { font: 11px var(--font-sans); fill: var(--text); }
@@ -275,7 +293,6 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11
 <div class="demo-bar">
   <b>demo</b>
   <span>Option 1 layout — stages across the top, commands and settings on the bottom bar — filled with this repo's real analysis, PRD and run history (as of 2026-09-17). Nothing here is new — only moved.</span>
-  <button id="theme">◐ theme</button>
   <a href="./">← back to the editor</a>
 </div>
 
@@ -309,6 +326,11 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11
   <footer class="bottombar">
     <span class="status"><span class="dot"></span> server :3117 · analysis fresh · 1 run live</span>
     <button class="icon-btn" id="settings-toggle" title="Settings" aria-label="Settings" aria-haspopup="dialog" aria-controls="settings-overlay">⚙</button>
+    <div class="toggle theme-toggle" id="theme-toggle" role="group" aria-label="Theme">
+      <button data-theme-pref="system" aria-pressed="true" title="Follow the system setting"><span class="g">◐</span>System</button>
+      <button data-theme-pref="light" aria-pressed="false" title="Always light"><span class="g">☼</span>Light</button>
+      <button data-theme-pref="dark" aria-pressed="false" title="Always dark"><span class="g">☾</span>Dark</button>
+    </div>
     <button class="cmd" id="commands-toggle" data-page="commands" data-toggle aria-expanded="false" aria-controls="commands-sheet"><span class="glyph">⌘</span> Commands <span class="caret">▲</span></button>
   </footer>
 
@@ -824,12 +846,12 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11
           ]),
         ]),
       ], { plain: true }),
-      section("History", "5 most recent of " + fmt(USAGE.runs) + " runs", [
-        panel(12, "Runs", ".hench/runs", [runsTable()]),
-      ]),
       section("CLI help", null, [
         panel(6, "CLI buttons to run commands", "with options and text fields", commandRunner(["plan", "plan --accept", "recommend", "add", "analyze --deep", "status", "validate", "fix"])),
         panel(6, "CLI reference", "planning commands", commandReference(["plan", "analysis"])),
+      ]),
+      section("History", "5 most recent of " + fmt(USAGE.runs) + " runs", [
+        panel(12, "Runs", ".hench/runs", [runsTable()]),
       ]),
       section("Basic Planning Settings", null, [
         panel(12, "Planning specific Settings shortcut", ".n-dx.json · .rex/config.json", [
@@ -1057,13 +1079,23 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && kindOf(document.body.dataset.page || "home") !== "main") go(stage);
   });
-  document.getElementById("theme").addEventListener("click", function () {
+  /* Theme: "system" (default) leaves <html> without data-theme so the CSS
+     media query decides; "light" / "dark" pin the attribute. The choice is
+     remembered; system means nothing stored. */
+  var THEMES = ["system", "light", "dark"];
+  function applyTheme(pref) {
+    if (THEMES.indexOf(pref) < 0) pref = "system";
     var root = document.documentElement;
-    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    root.setAttribute("data-theme", next);
-    try { localStorage.setItem("ndx-preview-theme", next); } catch (e) {}
+    if (pref === "system") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", pref);
+    document.querySelectorAll("#theme-toggle button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.themePref === pref)); });
+    try { if (pref === "system") localStorage.removeItem("ndx-preview-theme"); else localStorage.setItem("ndx-preview-theme", pref); } catch (e) {}
+  }
+  document.querySelectorAll("#theme-toggle button").forEach(function (b) {
+    b.addEventListener("click", function () { applyTheme(b.dataset.themePref); });
   });
-  try { var t = localStorage.getItem("ndx-preview-theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+  var storedTheme = null;
+  try { storedTheme = localStorage.getItem("ndx-preview-theme"); } catch (e) {}
+  applyTheme(storedTheme || "system");
 
   window.addEventListener("hashchange", function () {
     var id = location.hash.slice(1);
