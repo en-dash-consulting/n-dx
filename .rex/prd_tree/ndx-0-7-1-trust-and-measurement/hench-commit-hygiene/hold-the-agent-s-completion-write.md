@@ -2,7 +2,7 @@
 id: "b4413a5d-5b91-44ab-8044-131520f4887e"
 level: "task"
 title: "Hold the agent's completion write until hench's test gate passes"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "0.7.1"
@@ -11,6 +11,11 @@ tags:
   - "test-gate"
   - "commit-hygiene"
 source: "PR M execution, 2026-09-24 (runs 6eacca42, 8dc53406); deferred C follow-up (run a6e7efa6)"
+startedAt: "2026-09-25T05:10:46.067Z"
+completedAt: "2026-09-25T05:10:46.067Z"
+endedAt: "2026-09-25T05:10:46.067Z"
+resolutionType: "code-change"
+resolutionDetail: "Every hench-run claim carries holdsCompletion. rex ClaimsStore.recordPendingCompletion records the agent's completion on the claim, in the git common dir, instead of writing it. This applies to rex MCP update_task_status (stdio and the dashboard's HTTP MCP, scoped to the request's workspace), rex update, and the hench API-loop rex_update_status alike, so the behaviour is vendor-agnostic. Inside a live run, the agent's MCP server can neither take over (claim) nor release the run's claim; only the run's pid or force releases it. finalizeRun reads the held completion back and applies it with the agent's resolutionType/detail once the gate passes, and hench's record commit lands it. On gate failure the task stays not completed, and the resolution is kept on run.completionHold and logged as completion_not_applied. Review repairs from a failed gate are committed as fix(review) on autoCommit, and reported and noted otherwise. A completion that bypassed the hold is withdrawn on gate failure; bypass policy is unchanged, pending the operator's decision. A claim, not an env var, carries the hold because it reaches HTTP MCP and Codex's restricted MCP environment, and it dies with the run's pid. git add -A is not narrowed: with the hold, the agent's completion never touches the tree. Caveat: the agent's rex MCP server and rex CLI come from the n-dx on PATH, so the hold engages only once that build has this change (J4). Tests: packages/rex/tests/integration/completion-hold.test.ts (incl. release guard), packages/web/tests/integration/mcp-completion-hold-workspace.test.ts, packages/hench/tests/integration/gate-holds-completion.test.ts (6eacca42 replay, gate pass, resumed session, API loop, review repairs, bypass). Commit 8a1810ce."
 acceptanceCriteria:
   - "In a hench run where the agent marks its task completed and the test gate then fails, the task is not completed on disk or in any commit, and its resolution detail is preserved for the retry."
   - "When the gate passes, the task becomes completed in hench's record commit, with the agent's resolution type and detail."
@@ -18,6 +23,6 @@ acceptanceCriteria:
   - "Marking a task completed outside a hench run (interactive MCP use, rex CLI) behaves as today."
   - "An integration test reproduces the 6eacca42 sequence (agent completes and commits, gate fails) and asserts the task is not completed."
 description: "A failed test gate leaves a task committed as completed. The agent marks its own task completed through rex MCP, then runs `git add -A && git commit`, which folds the PRD status flip into the work commit. hench's mandatory full-suite gate runs only after that, and when it fails, nothing withdraws the completion. Runs 6eacca42 (b75b2958), 8dc53406 (c4166591) and a6e7efa6 all ended `failed` with the task `completed` on disk and in git. In 8dc53406 the review repairs were also left uncommitted, because hench commits those only after the gate passes.\n\nDecision 2026-09-24, option (c): no completion lands before the gate passes. Rejected: (a) resetting the task and committing that as a record, and (b) leaving it completed and flagging it failing. Both let the PRD state `completed` for a while for work that has not passed.\n\nA likely mechanism: during a hench run the task is claimed by that run (rex `store/claims.ts`), so rex MCP `update_task_status completed` on a task held by a live hench run can record the resolution as pending, not apply it. hench then applies it after the gate passes, in its own record commit. Also check whether the agent's `git add -A` should exclude `.rex/prd_tree/` during a hench run. This includes the C follow-up deferred from #402 (\"a failed test gate that left a task committed as completed\")."
-lastModified: "2026-09-24T20:30:23.756Z"
+lastModified: "2026-09-25T05:17:23.548Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
