@@ -2,7 +2,7 @@
 id: "b13e95dd-f99e-4f95-97e6-be560a699fd7"
 level: "task"
 title: "Confirm hench.promptCacheTtl 1h is accepted by the live Anthropic API before the cut"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "0.7.1"
@@ -10,11 +10,16 @@ tags:
   - "hench"
   - "prompt-cache-config"
 source: "ndx-adversarial-review of PR M task a0eaf286 (run 01d15d75, F3)"
+startedAt: "2026-09-25T16:45:33.104Z"
+completedAt: "2026-09-25T16:45:33.104Z"
+endedAt: "2026-09-25T16:45:33.104Z"
+resolutionType: "acknowledgment"
+resolutionDetail: "Closed by operator decision before the 0.7.1 cut (2026-09-25). The live request with promptCacheTtl \"1h\" has NOT been run yet: the operator will run it after the docs PR and record the model, date and result. Risk is limited because hench.promptCacheTtl is opt-in and defaults to \"5m\"; if a beta header turns out to be required, it ships as its own patch."
 acceptanceCriteria:
   - "One hench.provider=api run, or a direct request built by buildCachedMessageRequest with promptCacheTtl \"1h\", against the Anthropic API returns 200, and its usage shows the cache write."
   - "If a beta header or other change is needed, it lands before #380 merges, as a patch with its own changeset."
   - "The result is noted on this task, with the model and date."
 description: "PR M's `hench.promptCacheTtl: \"1h\"` sends `cache_control: {type: \"ephemeral\", ttl: \"1h\"}` on both breakpoints, but it has never been sent to a live endpoint. Nothing in hench or llm-client sends an `anthropic-beta` header. The reviewer found the field typed on the non-beta `Anthropic.CacheControlEphemeral`, which suggests it is generally available, but could not read the SDK or the network to confirm. If a beta header is required, every turn-1 request 400s while the key is on. The setting is opt-in and off by default, so the risk is limited to operators who turn it on."
-lastModified: "2026-09-24T20:30:51.162Z"
+lastModified: "2026-09-25T16:45:33.475Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
