@@ -4,9 +4,9 @@ level: "epic"
 title: "SourceVision"
 status: "pending"
 startedAt: "2026-04-13T18:35:49.604Z"
-endedAt: "2026-09-10T17:30:22.562Z"
+endedAt: "2026-09-22T04:42:26.099Z"
 description: "Static analysis engine: file inventory, import graph, zone detection (Louvain community detection), React component catalog, PR markdown generation. Produces .sourcevision/CONTEXT.md and llms.txt for AI consumption.\n\n---\n\nBuild an evaluation harness in tests/gauntlet/ that captures sourcevision's current LLM-driven analysis output (zone enrichment, file classification) as golden fixtures and scores future runs against them. Once the harness exists, optimization PRs (Haiku swap, heuristic-first classifier, payload reduction, raised concurrency, skip-trivial-zones short-circuit, --full pass signature dedup, cached LLM replay, semantic zone-name scoring) become measured changes with eval-score deltas rather than vibes-based judgment. Motivation: sourcevision analyze burns substantial tokens and wall-clock time; multiple optimization paths exist but each carries silent quality regression risk."
-lastModified: "2026-09-22T02:08:10.281Z"
+lastModified: "2026-09-22T04:42:28.823Z"
 lastModifiedBy: "Nick Daniel <nick@endash.us>"
 ---
 

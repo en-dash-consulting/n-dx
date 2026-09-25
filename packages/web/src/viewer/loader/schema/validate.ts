@@ -158,6 +158,7 @@ export const ZonesSchema = z.object({
   insights: z.array(z.string()).optional(),
   findings: z.array(FindingSchema).optional(),
   enrichmentPass: z.number().int().nonnegative().optional(),
+  enrichmentMode: z.enum(["cascade", "generative"]).optional(),
   metaEvaluationCount: z.number().int().nonnegative().optional(),
   structureHash: z.string().optional(),
   zoneContentHashes: z.record(z.string()).optional(),

@@ -1630,3 +1630,44 @@ describe("diagnoseCliNotFound", () => {
     expect(msg).toBeNull();
   });
 });
+
+describe("spawnTool — detached with a log file", () => {
+  it("wires the child's stdout and stderr to the file, detaches, unrefs, and returns the pid", async () => {
+    const { mkdtempSync, rmSync, existsSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "spawn-log-"));
+    const logFile = join(dir, "child.log");
+    const unref = vi.fn();
+    let captured: Record<string, unknown> | undefined;
+    vi.mocked(spawn).mockImplementation(((_cmd: string, _args: string[], opts: Record<string, unknown>) => {
+      captured = opts;
+      return { pid: 4242, unref } as never;
+    }) as never);
+    try {
+      const result = await spawnTool("node", ["-e", "1"], { detached: true, detachedLogFile: logFile });
+      expect(result).toEqual({ exitCode: 0, pid: 4242, stdout: "", stderr: "" });
+      expect(unref).toHaveBeenCalledTimes(1);
+      expect(captured?.detached).toBe(true);
+      const stdio = captured?.stdio as unknown[];
+      expect(stdio[0]).toBe("ignore");
+      expect(typeof stdio[1]).toBe("number");
+      expect(stdio[2]).toBe(stdio[1]);
+      expect(existsSync(logFile)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("discards output when no log file is given", async () => {
+    const unref = vi.fn();
+    let captured: Record<string, unknown> | undefined;
+    vi.mocked(spawn).mockImplementation(((_cmd: string, _args: string[], opts: Record<string, unknown>) => {
+      captured = opts;
+      return { pid: 7, unref } as never;
+    }) as never);
+    const result = await spawnTool("node", ["-e", "1"], { detached: true });
+    expect(result.pid).toBe(7);
+    expect(captured?.stdio).toBe("ignore");
+  });
+});

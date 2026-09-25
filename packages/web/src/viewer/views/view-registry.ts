@@ -54,6 +54,7 @@ import {
 } from "./domain-hench.js";
 
 import { WorkspacesView } from "./domain-workspaces.js";
+import { isoMapAnalysisStamp } from "./iso-map-url.js";
 
 import {
   NotionConfigView,
@@ -107,8 +108,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "graph": ({ data, setDetail, selectedFile, selectedZone, navigateTo }) =>
     h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo }),
 
-  "iso-map": () =>
-    h(IsoMapView, null),
+  "iso-map": ({ data }) =>
+    h(IsoMapView, { analysisStamp: isoMapAnalysisStamp(data) }),
 
   "zones": ({ data, setDetail, navigateTo }) =>
     h(ZonesView, { data, onSelect: setDetail, navigateTo }),

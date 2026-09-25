@@ -24,6 +24,7 @@ import {
   SV_DIR,
   TOOL_VERSION,
 } from "./sourcevision-core.js";
+import { findZoneById } from "../analyzers/zone-identity.js";
 
 interface SourcevisionData {
   manifest: Manifest | null;
@@ -256,15 +257,16 @@ function registerZoneTools(server: McpServer, context: McpContext): void {
         return { content: [{ type: "text", text: "No zones data available." }] };
       }
 
-      const zone = data.zones.zones.find((z) => z.id === id);
+      // A zone renamed from a numbered id still answers to the old one.
+      const zone = findZoneById(data.zones.zones, id);
       if (!zone) {
         const available = data.zones.zones.map((z) => z.id).join(", ");
         return { content: [{ type: "text", text: `Zone "${id}" not found. Available: ${available}` }] };
       }
 
-      const findings = (data.zones.findings ?? []).filter((f) => f.scope === id);
+      const findings = (data.zones.findings ?? []).filter((f) => f.scope === zone.id);
       const crossings = data.zones.crossings.filter(
-        (c) => c.fromZone === id || c.toZone === id
+        (c) => c.fromZone === zone.id || c.toZone === zone.id
       );
 
       return {

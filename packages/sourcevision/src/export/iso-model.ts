@@ -91,6 +91,56 @@ export interface IsoNode {
   findings: Array<{ text: string; severity: string }>;
   inbound: IsoNodeLink[];
   outbound: IsoNodeLink[];
+  /** Sub-zone tiles on the top face, offsets relative to the node's (u, v). */
+  tiles?: IsoTile[];
+}
+
+/** A sub-zone drawn as a rectangle on its parent's top face. */
+export interface IsoTile {
+  id: string;
+  name: string;
+  files: number;
+  u: number;
+  v: number;
+  w: number;
+  d: number;
+}
+
+/**
+ * Lay children out as rows of tiles filling a `w × d` face, areas
+ * proportional to file count: about √n rows, children assigned largest-first
+ * to the lightest row, each row's depth proportional to its total and each
+ * tile's width to its share of the row. Deterministic for a given input.
+ */
+export function layoutTiles(children: Array<{ id: string; name: string; files: number }>, w: number, d: number): IsoTile[] {
+  const kids = children.filter((c) => c.files > 0)
+    .sort((a, b) => b.files - a.files || a.id.localeCompare(b.id));
+  if (kids.length < 2) return [];
+  const rowCount = Math.max(1, Math.round(Math.sqrt(kids.length)));
+  const rows: Array<{ total: number; items: typeof kids }> = Array.from({ length: rowCount }, () => ({ total: 0, items: [] }));
+  for (const k of kids) {
+    const row = rows.reduce((best, r) => (r.total < best.total ? r : best), rows[0]);
+    row.items.push(k);
+    row.total += k.files;
+  }
+  const grand = rows.reduce((n, r) => n + r.total, 0);
+  const tiles: IsoTile[] = [];
+  let v = 0;
+  for (const row of rows.filter((r) => r.items.length > 0)) {
+    const rd = (d * row.total) / grand;
+    let u = 0;
+    for (const k of row.items) {
+      const tw = (w * k.files) / row.total;
+      tiles.push({ id: k.id, name: k.name, files: k.files, u: round3(u), v: round3(v), w: round3(tw), d: round3(rd) });
+      u += tw;
+    }
+    v += rd;
+  }
+  return tiles;
+}
+
+function round3(n: number): number {
+  return Math.round(n * 1000) / 1000;
 }
 
 /**
@@ -139,7 +189,14 @@ export interface IsoEdge {
   infra?: boolean;
   /** Orthogonal route in grid units, precomputed so the renderer stays dumb. */
   points: Array<[number, number]>;
+  /**
+   * Drawn as a lifted arc between block tops instead of a ground route: the
+   * zone-level cross-area connectors composed in the browser when an area is
+   * expanded, which have no precomputed route.
+   */
+  arc?: boolean;
 }
+
 
 export interface IsoModelMeta {
   project: string;
@@ -169,6 +226,22 @@ export interface IsoModel {
   layers: string[];
   meta: IsoModelMeta;
   bounds: { uMin: number; uMax: number; vMin: number; vMax: number };
+  /** `areas` when nodes are areas of zones; absent (zones) otherwise. */
+  level?: "areas" | "zones";
+  /** Area id → the map of that area's zones. Present on an areas-level model. */
+  scenes?: Record<string, IsoModel>;
+  /** On a scene: the area it shows. */
+  scene?: { id: string; name: string };
+  /** Zone or sub-zone id → the map of its sub-zones. Present on the top-level model. */
+  zoneScenes?: Record<string, IsoModel>;
+  /**
+   * Imports between the deepest drawn nodes (zones without drawn sub-zones,
+   * or sub-zones), aggregated. The browser lifts each end to the deepest node
+   * currently visible to draw connectors for expanded nodes.
+   */
+  leafEdges?: Array<{ from: string; to: string; weight: number }>;
+  /** Drawn node id → parent id ("area:<id>" for top-level zones under areas). */
+  parents?: Record<string, string>;
 }
 
 // ── Normalized input ────────────────────────────────────────────────────────
@@ -183,6 +256,16 @@ export interface IsoZoneInput {
   coupling: number;
   riskLevel?: string;
   insights?: string[];
+  /**
+   * Balanced sub-zones, drawn as tiles on the zone's top face. Only a
+   * subdivision where no child dominates is passed; a lopsided one would
+   * draw as one giant tile plus slivers.
+   */
+  children?: Array<{ id: string; name: string; files: number }>;
+  /** The balanced sub-zones themselves, recursively, for expandable scenes. */
+  subZones?: IsoZoneInput[];
+  /** File-level imports between this zone's sub-zones. */
+  subCrossings?: Array<{ from: string; to: string; fromZone: string; toZone: string }>;
 }
 
 export interface IsoFileInput {
@@ -238,6 +321,13 @@ export interface IsoModelInput {
   };
   /** Base URL for source links, e.g. https://github.com/o/r/blob/main. */
   linkBase?: string;
+  /**
+   * Areas over the zones (`zones.json` `areas`). With two or more, the model's
+   * top level draws areas and each area gets its own zone scene.
+   */
+  areas?: Array<{ id: string; name: string; zones: string[] }>;
+  /** File-level imports between top-level zones, for leaf-level connectors. */
+  fileCrossings?: Array<{ from: string; to: string }>;
 }
 
 export interface IsoModelOptions {
@@ -328,7 +418,171 @@ export function resolveZoneKind(kindCounts: Map<IsoKind, number>, totalFiles: nu
 
 // ── Model construction ──────────────────────────────────────────────────────
 
+/**
+ * Build the map model. With areas, the top level draws one block per area
+ * (its zones as tiles, edges aggregated between areas) and `scenes` holds one
+ * zone-level model per area; otherwise zones are drawn directly.
+ */
 export function buildIsoModel(input: IsoModelInput, options: IsoModelOptions = {}): IsoModel {
+  const root = buildLevels(input, options);
+  attachHierarchy(root, input, options);
+  return root;
+}
+
+/**
+ * Scenes for every zone and sub-zone with drawn sub-zones, plus the leaf-level
+ * edges and parent links the browser needs to expand any node in place.
+ */
+function attachHierarchy(root: IsoModel, input: IsoModelInput, options: IsoModelOptions): void {
+  const areaOf = new Map<string, string>();
+  for (const a of input.areas ?? []) for (const id of a.zones) areaOf.set(id, a.id);
+  const useAreas = root.level === "areas";
+  const parents: Record<string, string> = {};
+  const deepest = new Map<string, string>(); // file → deepest drawn node id
+  const zoneScenes: Record<string, IsoModel> = {};
+
+  const visit = (z: IsoZoneInput, parent: string | undefined) => {
+    if (parent) parents[z.id] = parent;
+    for (const f of z.files) deepest.set(f, z.id);
+    const kids = (z.subZones ?? []).filter((k) => k.files.length > 0);
+    if (kids.length < 2) return;
+    const kidIds = new Set(kids.map((k) => k.id));
+    zoneScenes[z.id] = buildZoneIsoModel(
+      {
+        ...input,
+        zones: kids,
+        crossings: (z.subCrossings ?? []).filter((c) => kidIds.has(c.fromZone) && kidIds.has(c.toZone)),
+        callEdges: [],
+        external: [],
+        findings: input.findings.filter((f) => kidIds.has(f.scope)),
+        seams: [],
+        infrastructure: [],
+        areas: undefined,
+      },
+      options,
+    );
+    zoneScenes[z.id].level = "zones";
+    zoneScenes[z.id].scene = { id: z.id, name: z.name };
+    for (const k of kids) visit(k, z.id);
+  };
+  for (const z of input.zones) visit(z, useAreas && areaOf.has(z.id) ? `area:${areaOf.get(z.id)}` : undefined);
+
+  const leaf = new Map<string, { from: string; to: string; weight: number }>();
+  const add = (fromFile: string, toFile: string) => {
+    const from = deepest.get(fromFile), to = deepest.get(toFile);
+    if (!from || !to || from === to) return;
+    const k = `${from}\u0001${to}`;
+    const e = leaf.get(k) ?? { from, to, weight: 0 };
+    e.weight++;
+    leaf.set(k, e);
+  };
+  if (input.fileCrossings) {
+    for (const c of input.fileCrossings) add(c.from, c.to);
+  } else {
+    // No file-level crossings (a direct scan, or a hand-built input): zones
+    // are the leaves, so zone-level crossings are the leaf edges.
+    for (const c of input.crossings) {
+      if (c.fromZone === c.toZone) continue;
+      const k = `${c.fromZone}\u0001${c.toZone}`;
+      const e = leaf.get(k) ?? { from: c.fromZone, to: c.toZone, weight: 0 };
+      e.weight++;
+      leaf.set(k, e);
+    }
+  }
+  const walkSub = (z: IsoZoneInput) => {
+    for (const c of z.subCrossings ?? []) add(c.from, c.to);
+    for (const k of z.subZones ?? []) walkSub(k);
+  };
+  input.zones.forEach(walkSub);
+
+  if (Object.keys(zoneScenes).length > 0) root.zoneScenes = zoneScenes;
+  root.parents = parents;
+  root.leafEdges = [...leaf.values()].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
+}
+
+function buildLevels(input: IsoModelInput, options: IsoModelOptions): IsoModel {
+  const areas = (input.areas ?? []).filter((a) => a.zones.length > 0);
+  if (areas.length < 2) return buildZoneIsoModel(input, options);
+
+  const zoneById = new Map(input.zones.map((z) => [z.id, z]));
+  const areaOf = new Map<string, string>();
+  for (const a of areas) for (const id of a.zones) areaOf.set(id, a.id);
+  const mapId = (id: string) => areaOf.get(id);
+
+  const areaZones: IsoZoneInput[] = areas.map((a) => {
+    const members = a.zones.map((id) => zoneById.get(id)).filter((z): z is IsoZoneInput => Boolean(z));
+    const files = members.flatMap((z) => z.files);
+    const weigh = (pick: (z: IsoZoneInput) => number) =>
+      files.length > 0 ? members.reduce((n, z) => n + pick(z) * z.files.length, 0) / files.length : 0;
+    return {
+      id: a.id,
+      name: a.name,
+      description: `${members.length} zone${members.length === 1 ? "" : "s"}: ${members
+        .slice().sort((x, y) => y.files.length - x.files.length).slice(0, 6).map((z) => z.name).join(", ")}${members.length > 6 ? ", …" : ""}.`,
+      files,
+      entryPoints: members.flatMap((z) => z.entryPoints).slice(0, 12),
+      cohesion: Math.round(weigh((z) => z.cohesion) * 100) / 100,
+      coupling: Math.round(weigh((z) => z.coupling) * 100) / 100,
+      insights: [],
+      children: members.map((z) => ({ id: z.id, name: z.name, files: z.files.length })),
+    };
+  });
+
+  const liftPairs = <T extends { fromZone: string; toZone: string }>(items: T[]): T[] =>
+    items.flatMap((c) => {
+      const from = mapId(c.fromZone), to = mapId(c.toZone);
+      return from && to && from !== to ? [{ ...c, fromZone: from, toZone: to }] : [];
+    });
+  const callTotals = new Map<string, { fromZone: string; toZone: string; weight: number }>();
+  for (const c of liftPairs(input.callEdges ?? [])) {
+    const k = `${c.fromZone}\u0001${c.toZone}`;
+    const t = callTotals.get(k);
+    if (t) t.weight += c.weight;
+    else callTotals.set(k, { ...c });
+  }
+
+  const areaInput: IsoModelInput = {
+    ...input,
+    zones: areaZones,
+    crossings: liftPairs(input.crossings),
+    callEdges: [...callTotals.values()],
+    external: input.external.map((e) => ({ ...e, importedBy: [...new Set(e.importedBy.map((id) => mapId(id) ?? id))] })),
+    findings: input.findings.flatMap((f) => (mapId(f.scope) ? [{ ...f, scope: mapId(f.scope)! }] : [])),
+    seams: liftPairs(input.seams ?? []),
+    infrastructure: (input.infrastructure ?? []).map((i) => ({ ...i, consumers: [...new Set(i.consumers.map((id) => mapId(id) ?? id))] })),
+    areas: undefined,
+  };
+  const root = buildZoneIsoModel(areaInput, { ...options, maxNodes: Math.max(areas.length, options.maxNodes ?? 40) });
+  root.level = "areas";
+  root.meta.totalZones = input.zones.filter((z) => z.files.length > 0).length;
+
+  const scenes: Record<string, IsoModel> = {};
+  for (const a of areas) {
+    const ids = new Set(a.zones);
+    const scene = buildZoneIsoModel(
+      {
+        ...input,
+        zones: input.zones.filter((z) => ids.has(z.id)),
+        crossings: input.crossings.filter((c) => ids.has(c.fromZone) && ids.has(c.toZone)),
+        callEdges: (input.callEdges ?? []).filter((c) => ids.has(c.fromZone) && ids.has(c.toZone)),
+        external: input.external.map((e) => ({ ...e, importedBy: e.importedBy.filter((id) => ids.has(id)) })),
+        findings: input.findings.filter((f) => ids.has(f.scope)),
+        seams: (input.seams ?? []).filter((c) => ids.has(c.fromZone) && ids.has(c.toZone)),
+        infrastructure: (input.infrastructure ?? []).map((i) => ({ ...i, consumers: i.consumers.filter((id) => ids.has(id)) })),
+        areas: undefined,
+      },
+      options,
+    );
+    scene.level = "zones";
+    scene.scene = { id: a.id, name: a.name };
+    scenes[a.id] = scene;
+  }
+  root.scenes = scenes;
+
+  return root;
+}
+
+function buildZoneIsoModel(input: IsoModelInput, options: IsoModelOptions = {}): IsoModel {
   const maxNodes = options.maxNodes ?? 40;
   const includeExternals = options.includeExternals ?? true;
   const maxExternals = options.maxExternals ?? 5;
@@ -507,6 +761,9 @@ export function buildIsoModel(input: IsoModelInput, options: IsoModelOptions = {
       inbound: (inboundById.get(zone.id) ?? []).slice(0, 8),
       outbound: (outboundById.get(zone.id) ?? []).slice(0, 8),
     });
+    const node = nodes[nodes.length - 1];
+    const tiles = zone.children?.length ? layoutTiles(zone.children, node.w, node.d) : [];
+    if (tiles.length > 0) node.tiles = tiles;
   }
 
   for (const ext of externalPicks) {
@@ -582,6 +839,7 @@ export function buildIsoModel(input: IsoModelInput, options: IsoModelOptions = {
   // ── Placement ─────────────────────────────────────────────────────────────
 
   orderRows(nodes, [...rawEdges, ...infraEdges]);
+  wrapTallColumns(nodes);
   const lanes = placeOnGrid(nodes);
 
   const layerCount = nodes.reduce((max, n) => Math.max(max, n.col), 0) + 1;
@@ -827,6 +1085,33 @@ function barycenter(
 }
 
 // ── Grid placement ──────────────────────────────────────────────────────────
+
+/**
+ * Split any column holding more rows than `max(3, ⌈√n⌉)` into several
+ * adjacent columns, shifting the columns after it. A flat dependency graph
+ * puts most zones in one layer, which drew as a single long diagonal of
+ * specks; wrapping keeps the left-to-right layer order and makes it a block.
+ */
+export function wrapTallColumns(nodes: IsoNode[]): void {
+  const maxRows = Math.max(3, Math.ceil(Math.sqrt(nodes.length)));
+  // Group by the original column before renumbering anything.
+  const byCol = new Map<number, IsoNode[]>();
+  for (const n of nodes) {
+    let list = byCol.get(n.col);
+    if (!list) byCol.set(n.col, (list = []));
+    list.push(n);
+  }
+  let shift = 0;
+  for (const col of [...byCol.keys()].sort((a, b) => a - b)) {
+    const inCol = byCol.get(col)!.sort((a, b) => a.row - b.row);
+    const parts = Math.ceil(inCol.length / maxRows);
+    inCol.forEach((n, i) => {
+      n.col = col + shift + Math.floor(i / maxRows);
+      n.row = i % maxRows;
+    });
+    shift += parts - 1;
+  }
+}
 
 /**
  * Converts (col, row) slots into grid coordinates and returns the free

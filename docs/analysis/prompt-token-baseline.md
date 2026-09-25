@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-09-24T16:18:52.203Z
-- **Commit** — `61c655cb869a`
-- **Content hash** — `49b2a205b4b8b2d0` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-09-25T04:42:28.012Z
+- **Commit** — `7ab535bfce97`
+- **Content hash** — `295e060ead0c29dc` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 36
-- **Per-call total** — 22,227 tokens (what every surface costs, summed)
-- **Unique fixed text** — 13,740 tokens (distinct text a rewrite has to edit)
+- **Per-call total** — 22,290 tokens (what every surface costs, summed)
+- **Unique fixed text** — 13,787 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -101,16 +101,16 @@ so a jump is never mistaken for a regression or a win.
 | `buildBodyMergeEnvelope` | `packages/rex/src/analyze/reshape-reason.ts` | Merge two item descriptions into one during a reshape. | 12 | 106 | — | 106 |
 | `buildValidationFeedbackEnvelope` | `packages/rex/src/analyze/escalate.ts` | Retry feedback appended to a prompt whose response failed validation. | 12 | 62 | — | 62 |
 
-## sourcevision — 2,659 per-call / 2,194 unique, 7 surfaces
+## sourcevision — 2,722 per-call / 2,241 unique, 7 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
-| `buildFirstPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | First-pass zone enrichment for a batch of zones. | 57 | 317 | 463 | 780 |
-| `buildLaterPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | Later-pass zone enrichment, given the previous pass's output. | 50 | 265 | 434 | 699 |
-| `buildMetaEnvelope` | `packages/sourcevision/src/analyzers/enrich-config.ts` | Meta-evaluation choosing the enrichment strategy for a repo. | 23 | 531 | 14 | 545 |
-| `buildSingleZoneFirstPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | Per-zone enrichment, first pass — names and describes one zone. | 25 | 138 | 16 | 154 |
-| `buildSingleZoneLaterPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | Per-zone enrichment, later pass — adds only what pass 1 missed. | 27 | 120 | 41 | 161 |
-| `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 19 | 91 | — | 91 |
+| `buildFirstPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | First-pass zone enrichment for a batch of zones. | 55 | 310 | 463 | 773 |
+| `buildLaterPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | Later-pass zone enrichment, given the previous pass's output. | 49 | 259 | 434 | 693 |
+| `buildMetaEnvelope` | `packages/sourcevision/src/analyzers/enrich-config.ts` | Meta-evaluation choosing the enrichment strategy for a repo. | 45 | 559 | 30 | 589 |
+| `buildSingleZoneFirstPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | Per-zone enrichment, first pass — names and describes one zone. | 22 | 131 | 16 | 147 |
+| `buildSingleZoneLaterPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | Per-zone enrichment, later pass — adds only what pass 1 missed. | 27 | 131 | 41 | 172 |
+| `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 27 | 119 | — | 119 |
 | `buildPrimerEnvelope` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 21 | 229 | — | 229 |
 
 ## hench — 4,070 per-call / 4,070 unique, 9 surfaces
@@ -150,7 +150,7 @@ it. This is the leverage ordering for a rewrite.
 | `OUTPUT_INSTRUCTION` | rex | 52 | 8 | 416 |
 | `ANTI_PATTERNS` | rex | 61 | 6 | 366 |
 | `RESHAPE_FEW_SHOT` | rex | 326 | 1 | 326 |
-| `JSON_OBJECT_ONLY` | sourcevision | 16 | 4 | 64 |
+| `JSON_OBJECT_ONLY` | sourcevision | 16 | 5 | 80 |
 | `formatFileHeaders` | sourcevision | 54 | 1 | 54 |
 | `ONLY_NEW_INSIGHTS` | sourcevision | 25 | 2 | 50 |
 | `summarizeExisting` | rex | 9 | 4 | 36 |
@@ -169,7 +169,7 @@ reproducible without a model call. Dump any of them with `--dump <package>`.
 |---|---|---|---:|---:|---:|
 | rex | `buildAssessmentEnvelope` | Granularity assessment over one two-task proposal. | 497 | 245 | 742 |
 | sourcevision | `buildPrimerEnvelope` | Primer distillation over a fixed 3-zone CONTEXT.md excerpt. | 229 | 137 | 366 |
-| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,137 | n/a — 431 of the fixed text is on another branch | 706 |
+| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,137 | n/a — 398 of the fixed text is on another branch | 739 |
 | core | `buildReviewerPrompt` | Pair-programming reviewer prompt over three changed files. | 281 | 16 | 297 |
 
 A `fixed` figure above the assembled length is not an error: the fixed column counts
@@ -216,8 +216,8 @@ per section rather than as one literal. These are the same sections
 
 | Section | Chars | Tokens | Share |
 |---|---:|---:|---:|
-| `system` | 2,152 | 538 | 76.3% |
-| `brief` | 668 | 167 | 23.7% |
+| `system` | 2,284 | 571 | 77.4% |
+| `brief` | 668 | 167 | 22.6% |
 
 ## Workflow skills — 17,483 tokens, 13 skills
 

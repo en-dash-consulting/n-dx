@@ -1129,6 +1129,11 @@ export const TASK_CLASSES = {
   "zone.enrich-scan": "light",
   "zone.enrich-deep": "standard",
   "zone.meta-eval": "standard",
+  // Judgment classes: answered by TypeSafe Jev when TYPESAFE_API_KEY is set
+  // (llm.routes.<class> = "typesafe" names it explicitly); the tier is the
+  // text-model fallback resolveTaskModel reports for them.
+  "finding.judge": "light",
+  "zone.judge": "light",
   // web
   "sourcevision.ask": "standard",
 };
@@ -1905,7 +1910,10 @@ Task routing (which model serves which kind of call):
                  prd.restructure (standard)
     sourcevision code.classify (light)         zone.enrich-scan (light)
                  zone.enrich-deep (standard)   zone.meta-eval (standard)
+                 finding.judge (light)         zone.judge (light)
     web          sourcevision.ask (standard)
+  code.classify, finding.judge and zone.judge are judgments: with TYPESAFE_API_KEY set
+  they go to TypeSafe Jev, and a route of "typesafe" names that explicitly.
   Setting a route for a class not listed here still works — it may be a glob, or a
   class a newer n-dx defines — but ndx says so, and suggests the closest match.
 

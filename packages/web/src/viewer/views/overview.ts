@@ -9,6 +9,7 @@ import {
   getZoneColorByIndex,
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
+import { narrationNotice } from "./narration-notice.js";
 import { AnalyzeControls, BrandedHeader } from "../components/index.js";
 
 interface NextStep {
@@ -308,7 +309,10 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
             manifest.gitBranch ? `${manifest.gitBranch} ` : "",
             manifest.gitSha ? `(${manifest.gitSha.slice(0, 7)}) \u2022 ` : "",
             new Date(manifest.analyzedAt).toLocaleString()
-          )
+          ),
+          narrationNotice(manifest.narration)
+            ? h("p", { class: "overview-meta overview-narration", role: "status" }, narrationNotice(manifest.narration))
+            : null,
         )
       : h("div", { class: "view-header" },
           h(BrandedHeader, { product: "sourcevision", title: "SourceVision", class: "branded-header-sv" }),

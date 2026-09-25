@@ -150,6 +150,8 @@ export async function cmdIso(dir: string, options: IsoOptions = {}): Promise<voi
 
   result(
     `Isometric map written to ${outputPath} ` +
-      `(${model.meta.shownZones} zones, ${model.edges.length} edges, ${model.meta.origin})`,
+      (model.level === "areas"
+        ? `(${Object.keys(model.scenes ?? {}).length} areas over ${model.meta.totalZones} zones, ${model.meta.origin})`
+        : `(${model.meta.shownZones} zones, ${model.edges.length} edges, ${model.meta.origin})`),
   );
 }

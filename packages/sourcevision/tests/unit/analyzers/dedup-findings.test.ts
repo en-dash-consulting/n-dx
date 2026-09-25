@@ -203,3 +203,23 @@ describe("deduplicateFindings", () => {
     expect(result[0].severity).toBe("warning");
   });
 });
+
+describe("deduplicateFindings — across scopes", () => {
+  it("drops the global copy of a finding that also exists under a zone, even with a different type", () => {
+    const out = deduplicateFindings([
+      makeFinding({ scope: "web-viewer", type: "pattern", text: "Core exposes no public surface." }),
+      makeFinding({ scope: "global", type: "anti-pattern", text: "Core exposes no public surface." }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].scope).toBe("web-viewer");
+  });
+
+  it("keeps a global-only finding and keeps the same text under two different zones", () => {
+    const out = deduplicateFindings([
+      makeFinding({ scope: "global", text: "Only global." }),
+      makeFinding({ scope: "a", text: "Mixed tooling." }),
+      makeFinding({ scope: "b", text: "Mixed tooling." }),
+    ]);
+    expect(out.map((f) => f.scope).sort()).toEqual(["a", "b", "global"]);
+  });
+});
