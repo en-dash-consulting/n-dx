@@ -1,6 +1,6 @@
 ---
 id: "8d80f006-9ca7-4d9e-89a7-1b3f16bf1f6c"
-level: "task"
+level: "feature"
 title: "Zone cohesion gate silently passes in CI instead of reporting it did not run"
 status: "completed"
 priority: "medium"

@@ -1,6 +1,6 @@
 ---
 id: "8ba9c8fa-3cd8-40a2-bb30-f5684f1c9ad2"
-level: "task"
+level: "feature"
 title: "Retry lock acquisition when a contending lock vanishes during inspection"
 status: "completed"
 priority: "high"

@@ -1,6 +1,6 @@
 ---
 id: "fe7084dc-1b20-4d0d-8fe1-31481255aa80"
-level: "task"
+level: "feature"
 title: "resolveDir treats a tool subcommand as the project directory, so `ndx hench record` checks the wrong path"
 status: "completed"
 priority: "medium"

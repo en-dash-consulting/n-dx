@@ -1,6 +1,6 @@
 ---
 id: "bdd329b5-f9b4-4987-85d5-dca2d785ec63"
-level: "task"
+level: "feature"
 title: "Skill commit steps prescribe a POSIX-only heredoc, which fails in PowerShell and can drop the attribution trailer"
 status: "completed"
 priority: "medium"

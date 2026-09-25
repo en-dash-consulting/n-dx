@@ -1,6 +1,6 @@
 ---
 id: "0d5a1ff3-bcb9-42b9-8640-11d4ab3abb39"
-level: "task"
+level: "feature"
 title: "Jira Work Tracking Integration"
 status: "completed"
 priority: "medium"

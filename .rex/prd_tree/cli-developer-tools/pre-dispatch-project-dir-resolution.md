@@ -1,6 +1,6 @@
 ---
 id: "729edd1a-7dfc-42c1-b731-0b120bbf185c"
-level: "task"
+level: "feature"
 title: "Pre-dispatch project-dir resolution still lets a directory shadow a config key"
 status: "completed"
 priority: "medium"

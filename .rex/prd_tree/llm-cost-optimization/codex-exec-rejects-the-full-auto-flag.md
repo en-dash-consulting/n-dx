@@ -1,6 +1,6 @@
 ---
 id: "c86273ce-88fd-465c-8a90-7de4fde389ad"
-level: "task"
+level: "feature"
 title: "codex exec rejects the --full-auto flag, breaking autonomous codex spawns"
 status: "completed"
 priority: "high"

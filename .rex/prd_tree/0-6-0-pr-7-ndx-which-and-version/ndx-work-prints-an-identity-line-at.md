@@ -1,6 +1,6 @@
 ---
 id: "c1b8bb00-116c-4451-9eab-5a646c489378"
-level: "task"
+level: "feature"
 title: "ndx work prints an identity line at start: version, cli path, project dir, branch"
 status: "completed"
 priority: "medium"

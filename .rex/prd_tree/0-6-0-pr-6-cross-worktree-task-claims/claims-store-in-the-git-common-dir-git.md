@@ -1,6 +1,6 @@
 ---
 id: "67115804-a580-4b38-af7b-5b3629f20a06"
-level: "task"
+level: "feature"
 title: "Claims store in the git common dir: .git/ndx/claims.json with pid, worktree, task id and expiry"
 status: "completed"
 priority: "high"

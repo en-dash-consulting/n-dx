@@ -13,7 +13,7 @@ autonomous run's pre-run gate refused to start.
 
 Both sets now derive from a single `PRD_WRITE_PATHS` definition that also
 records who commits each path, with a test that fails on the next drift in
-either direction. Hench still never stages the execution log; after a
+either direction. Hench no longer stages the execution log at all (0.7.0 did); after a
 completion commit it now checks for dirty operator-owned PRD writes and
 prints whose they are — commit the log yourself, or gitignore it as `rex
 init` does. A gitignored log is, as before, neither staged nor reported.

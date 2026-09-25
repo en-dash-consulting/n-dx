@@ -39,11 +39,12 @@ the scan, and it now reports `slugRuleRecorded` in its JSON output — on an
 already-conformant tree it renames nothing, so the counts alone read as
 "nothing happened" when it was the run that recorded the marker.
 
-**Upgrading costs nothing on a conformant repository.** The marker is
-unreleased, so every existing tree arrives without one; those written by 0.5.2
+**Upgrading costs nothing on a conformant repository.** The marker is new in
+this release, so every existing tree arrives without one; those written by 0.5.2
 and later already follow the current rule and are adopted on their next save. A
 tree predating that carries paths from a superseded rule (0.5.1 suffixed every
-slug with `-{id6}`; the current rule first shipped in 0.5.2), and is refused until
-`rex migrate-slugs` is run — as it was before this marker existed. A new project
+slug with `-{id6}`; the current rule first shipped in 0.5.2), and its writes are
+refused until `rex migrate-slugs` is run — `rex validate` already reported those
+paths before this release, but nothing stopped a write from re-slugging them. A new project
 is unaffected: an empty tree has nothing a marker could be wrong about, so a
 first save proceeds and records one.

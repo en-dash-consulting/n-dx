@@ -1,6 +1,6 @@
 ---
 id: "90e6afb9-a3ab-49e4-bea5-bcca4c5b28e4"
-level: "task"
+level: "feature"
 title: "`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record"
 status: "completed"
 priority: "medium"

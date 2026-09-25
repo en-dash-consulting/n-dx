@@ -1,6 +1,6 @@
 ---
 id: "989494aa-521e-42dc-89a4-5927f6b74c79"
-level: "task"
+level: "feature"
 title: "Livelock intercept does not kill its child on Windows, failing CLI Smoke (Windows)"
 status: "completed"
 priority: "high"

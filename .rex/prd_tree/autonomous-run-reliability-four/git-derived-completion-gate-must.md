@@ -1,6 +1,6 @@
 ---
 id: "4ceadf67-034a-4052-8e0f-af2d9ff097f4"
-level: "task"
+level: "feature"
 title: "Git-derived completion gate must recognize API-loop writes"
 status: "completed"
 priority: "high"

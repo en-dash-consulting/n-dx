@@ -1,6 +1,6 @@
 ---
 id: "eb4ec55f-22c8-4488-92d1-5154156897a2"
-level: "task"
+level: "feature"
 title: "--reset-deferred must commit only its own writes and must not write on --dry-run"
 status: "completed"
 priority: "high"

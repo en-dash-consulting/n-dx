@@ -1,6 +1,6 @@
 ---
 id: "3bc1cab2-ebb4-4f6a-8d4f-a19e3fb22a09"
-level: "task"
+level: "feature"
 title: "Windows CLI Spawn and Execution Fixes"
 status: "completed"
 priority: "critical"

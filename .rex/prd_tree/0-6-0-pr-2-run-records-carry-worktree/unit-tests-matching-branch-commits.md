@@ -1,6 +1,6 @@
 ---
 id: "6879f7b0-ff96-4a8b-a9c0-48cee03a7f30"
-level: "task"
+level: "feature"
 title: "Unit tests: matching branch commits; mismatched branch, detached HEAD and worktree-root mismatch are refused"
 status: "completed"
 priority: "high"

@@ -1,6 +1,6 @@
 ---
 id: "2800b15d-7a3f-42cb-ae77-b32e23eb3758"
-level: "task"
+level: "feature"
 title: "Asana Work Tracking Integration"
 status: "completed"
 priority: "medium"

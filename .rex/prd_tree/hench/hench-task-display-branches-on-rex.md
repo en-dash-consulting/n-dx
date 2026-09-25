@@ -1,6 +1,6 @@
 ---
 id: "1d05adea-488f-4120-8dc3-0138ac5f8240"
-level: "task"
+level: "feature"
 title: "Hench task display branches on rex prose, so a reworded selection summary silently blanks the finalize label"
 status: "completed"
 priority: "low"

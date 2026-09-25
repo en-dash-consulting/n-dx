@@ -1,6 +1,6 @@
 ---
 id: "9cea889f-17de-4b92-a97e-b7279e158578"
-level: "task"
+level: "feature"
 title: "Calibrate the uncommitted-work guards: discount hench's own PRD writes and the tree-meta sidecar, and cover --epic-by-epic"
 status: "completed"
 priority: "critical"

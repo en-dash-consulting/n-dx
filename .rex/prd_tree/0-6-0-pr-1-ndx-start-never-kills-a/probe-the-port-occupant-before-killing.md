@@ -1,6 +1,6 @@
 ---
 id: "a9a2090c-a298-4188-a9e6-5c910ce09a28"
-level: "task"
+level: "feature"
 title: "Probe the port occupant before killing it and fall back to a free port when it is another n-dx server"
 status: "completed"
 priority: "critical"

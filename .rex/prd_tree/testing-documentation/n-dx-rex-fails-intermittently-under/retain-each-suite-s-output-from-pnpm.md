@@ -1,6 +1,6 @@
 ---
 id: "56651b0f-9a11-4a77-9d8c-78ffb772729d"
-level: "subtask"
+level: "task"
 title: "Retain each suite's output from `pnpm test` so an intermittent failure is diagnosable"
 status: "completed"
 priority: "medium"

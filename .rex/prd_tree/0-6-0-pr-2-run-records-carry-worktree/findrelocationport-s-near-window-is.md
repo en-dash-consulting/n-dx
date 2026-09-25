@@ -1,6 +1,6 @@
 ---
 id: "1bf34524-5f93-4824-bf30-a2f5512fbfc5"
-level: "task"
+level: "feature"
 title: "findRelocationPort's near window is unclamped, so a peer on port 65535 crashes ndx start"
 status: "completed"
 priority: "medium"

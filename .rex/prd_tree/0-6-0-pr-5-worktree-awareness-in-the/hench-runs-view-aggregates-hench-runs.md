@@ -1,6 +1,6 @@
 ---
 id: "eb095228-c50c-40a9-ae12-ad62da7b2a32"
-level: "task"
+level: "feature"
 title: "Hench Runs view aggregates .hench/runs across worktrees with a worktree badge"
 status: "completed"
 priority: "high"

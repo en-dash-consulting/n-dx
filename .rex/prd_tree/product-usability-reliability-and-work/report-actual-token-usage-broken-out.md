@@ -1,6 +1,6 @@
 ---
 id: "a9fe2cc4-325d-4178-b853-4c9281a7478b"
-level: "task"
+level: "feature"
 title: "Report actual token usage broken out by type (input/output/cache-write/cache-read), consistently in rollup + dashboard (#294)"
 status: "completed"
 priority: "high"

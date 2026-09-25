@@ -16,8 +16,7 @@ Now the run and the task both stay completed. Nothing is withdrawn, the
 cross-worktree claim lapses through the run's normal release, and the run
 record carries `recordCommitPending: { paths, error }` — the exact
 project-relative paths the record commit tried to stage. The CLI prints
-"work committed; record not committed" with `git add`/`git commit` commands
+"Work committed; record not committed" with `git add`/`git commit` commands
 scoped to those paths, so landing the record by hand cannot sweep anything
-else. Old run records with the boolean form of `recordCommitPending` still
-validate and still classify as record-pending in the run summary. A genuine
+else. A genuine
 task failure fails the run exactly as before.

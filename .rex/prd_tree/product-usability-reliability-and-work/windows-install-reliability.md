@@ -1,6 +1,6 @@
 ---
 id: "70bba667-18d0-4d01-878e-c4b79515df6a"
-level: "task"
+level: "feature"
 title: "Windows Install Reliability"
 status: "completed"
 priority: "critical"

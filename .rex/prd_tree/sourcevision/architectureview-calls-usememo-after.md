@@ -1,6 +1,6 @@
 ---
 id: "cbb8a5de-d037-4353-acd9-a0f4b4d41168"
-level: "task"
+level: "feature"
 title: "ArchitectureView calls useMemo after its enrichment-gate early return"
 status: "completed"
 priority: "medium"

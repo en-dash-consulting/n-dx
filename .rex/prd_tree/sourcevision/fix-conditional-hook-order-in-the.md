@@ -1,6 +1,6 @@
 ---
 id: "cbcc2814-37b6-4bbb-8b32-b45c752f33b0"
-level: "task"
+level: "feature"
 title: "Fix conditional hook order in the Problems and Suggestions views"
 status: "completed"
 priority: "medium"

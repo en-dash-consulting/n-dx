@@ -1,6 +1,6 @@
 ---
 id: "1620e4cd-78b8-4835-82b4-14fd54cc3a45"
-level: "task"
+level: "feature"
 title: "Tree-kill late Windows children and their descendants"
 status: "completed"
 priority: "high"

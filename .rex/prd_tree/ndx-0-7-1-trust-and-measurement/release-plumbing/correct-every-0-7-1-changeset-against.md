@@ -2,7 +2,7 @@
 id: "fb8c753f-c4b3-42c4-80af-5760286e8abc"
 level: "task"
 title: "Correct every 0.7.1 changeset against the merged behaviour before the cut"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "0.7.1"
@@ -12,6 +12,11 @@ tags:
   - "changesets"
   - "non-code"
 source: "0.7.1 re-plan 2026-09-23: changeset accuracy is a task in the docs PR"
+startedAt: "2026-09-25T16:45:37.826Z"
+completedAt: "2026-09-25T16:45:37.826Z"
+endedAt: "2026-09-25T16:45:37.826Z"
+resolutionType: "code-change"
+resolutionDetail: "Every changeset in .changeset/ checked against the merged code on main (the 76 listed plus #417's). Removed 2: #400 (test and CI config only) and #415's audit changeset (root overrides and devDependencies only; nothing a consumer receives). The test-only changesets for #417, viewer-perf and remove-dead-omit-slug-rule-marker-option are kept by operator decision. Merged 4 contradicting pairs (token-budget, held claims, rollback prompt, prune summary shape). Corrected stale claims in about 30 more, including gate-holds-completion per #416's MCP pinning. pnpm changeset status: six packages, all patch. Simulated changeset version and read each package's CHANGELOG."
 acceptanceCriteria:
   - "token-budget-counts-cached-input.md agrees with what PR M shipped; 'Runs with no cache activity are unaffected' is removed or qualified for the Claude CLI path."
   - "windows-ci-hook-budgets-and-rm-retries.md (#400, test and CI changes only) is removed, or its presence is justified in the PR."
@@ -23,6 +28,6 @@ acceptanceCriteria:
   - "foreground-invariant-autonomous-runs.md does not claim the backgrounding problem is solved by the prompt alone; it either points to the detect-and-resume fix (PR BG) or is merged with its changeset."
   - "Every existing changeset edited by a code PR rather than by this pass (PR C edited token-budget-counts-cached-input.md) is checked against what merged."
 description: "This is the final changeset pass. It runs after the last code PR merges and lands directly before #380 (Version Packages), which regenerates from whatever changesets are on main. It checks every changeset against the code that merged, not against the PR that wrote it. PR C corrects the two errors already known (the 0.5.1 slug-rule boundary and the cost-rise wording); this pass verifies those and covers everything else."
-lastModified: "2026-09-24T20:31:09.000Z"
+lastModified: "2026-09-25T16:51:16.355Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

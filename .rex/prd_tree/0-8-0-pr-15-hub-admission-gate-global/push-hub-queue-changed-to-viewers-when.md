@@ -1,6 +1,6 @@
 ---
 id: "ca54925b-bf8a-4507-af06-67a04ba96ad6"
-level: "task"
+level: "feature"
 title: "Push hub:queue-changed to viewers when the admission queue moves"
 status: "completed"
 priority: "medium"

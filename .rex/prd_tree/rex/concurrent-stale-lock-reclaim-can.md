@@ -1,6 +1,6 @@
 ---
 id: "063f2600-ce36-40d6-b278-7a4e4a580137"
-level: "task"
+level: "feature"
 title: "Concurrent stale-lock reclaim can unlink a replacement live lock"
 status: "completed"
 priority: "high"

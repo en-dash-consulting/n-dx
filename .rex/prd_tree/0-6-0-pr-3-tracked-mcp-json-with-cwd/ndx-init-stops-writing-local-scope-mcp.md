@@ -1,6 +1,6 @@
 ---
 id: "e4df3296-b5d3-4e5e-b9d5-564524aa8a53"
-level: "task"
+level: "feature"
 title: "ndx init stops writing local-scope MCP registrations by default and never removes user-scope entries"
 status: "completed"
 priority: "high"

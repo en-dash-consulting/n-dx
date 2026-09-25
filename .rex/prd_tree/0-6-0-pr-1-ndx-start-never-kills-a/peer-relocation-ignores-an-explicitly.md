@@ -1,6 +1,6 @@
 ---
 id: "38a30719-5244-452b-9931-916a04834398"
-level: "task"
+level: "feature"
 title: "Peer relocation ignores an explicitly requested port outside 3117–3200"
 status: "completed"
 priority: "medium"

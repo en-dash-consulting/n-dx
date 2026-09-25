@@ -1,6 +1,6 @@
 ---
 id: "271a28ee-10dc-41d3-9e35-5f10571cbcfe"
-level: "task"
+level: "feature"
 title: "GET /api/worktrees: the served repo's worktrees with branch, head, dirty, run counts and server presence"
 status: "completed"
 priority: "high"

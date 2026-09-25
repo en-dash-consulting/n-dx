@@ -1,6 +1,6 @@
 ---
 id: "89579226-600d-4657-976a-e3377e3cce7a"
-level: "task"
+level: "feature"
 title: "Stamp lastModified on tree mutations made inside store.withTransaction"
 status: "completed"
 priority: "medium"

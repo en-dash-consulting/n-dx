@@ -1,6 +1,6 @@
 ---
 id: "b41d7f6b-5e05-4f53-a4c6-594dc39f5303"
-level: "task"
+level: "feature"
 title: "Status route reports served projectDir, server version, CLI path, pid and port"
 status: "completed"
 priority: "high"

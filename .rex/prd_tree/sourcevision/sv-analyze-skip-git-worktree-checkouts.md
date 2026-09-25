@@ -1,6 +1,6 @@
 ---
 id: "36cd4378-93d4-4cf7-8381-7029a98ef2f2"
-level: "task"
+level: "feature"
 title: "sv analyze: skip git worktree checkouts in sub-analysis discovery"
 status: "completed"
 priority: "critical"

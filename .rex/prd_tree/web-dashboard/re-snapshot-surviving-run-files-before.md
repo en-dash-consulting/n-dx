@@ -1,6 +1,6 @@
 ---
 id: "377aa1d0-06cb-4fa1-82e9-86dccfeca2a4"
-level: "task"
+level: "feature"
 title: "Re-snapshot surviving run files before the no-change short-circuit"
 status: "completed"
 priority: "medium"

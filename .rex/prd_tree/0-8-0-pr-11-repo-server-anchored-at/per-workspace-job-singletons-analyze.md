@@ -1,6 +1,6 @@
 ---
 id: "a5be7ddb-5459-407b-a6bd-655a6bc141fb"
-level: "task"
+level: "feature"
 title: "Per-workspace job singletons: analyze, refresh, self-heal, ci, reshape, execution state and active executions keyed by workspace"
 status: "completed"
 priority: "high"

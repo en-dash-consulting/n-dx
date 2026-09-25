@@ -22,15 +22,15 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add ndx claim to the README and refresh the CLAUDE.md hench gateway row](./add-ndx-claim-to-the-readme-and.md) | pending |
+| [Add ndx claim to the README and refresh the CLAUDE.md hench gateway row](./add-ndx-claim-to-the-readme-and.md) | completed |
 | [Backfill git tags and GitHub releases for 0.5.x and 0.6.0](./backfill-git-tags-and-github-releases.md) | completed |
-| [Close out the 0.7.1 PRD bookkeeping before the cut](./close-out-the-0-7-1-prd-bookkeeping.md) | pending |
+| [Close out the 0.7.1 PRD bookkeeping before the cut](./close-out-the-0-7-1-prd-bookkeeping.md) | completed |
 | [Close the issues fixed by #370 and triage #375 and #367](./close-the-issues-fixed-by-370-and.md) | completed |
-| [Commit the PRD storage migration design document](./commit-the-prd-storage-migration.md) | pending |
-| [Confirm hench.promptCacheTtl 1h is accepted by the live Anthropic API before the cut](./confirm-hench-promptcachettl-1h-is.md) | pending |
-| [Correct every 0.7.1 changeset against the merged behaviour before the cut](./correct-every-0-7-1-changeset-against.md) | pending |
+| [Commit the PRD storage migration design document](./commit-the-prd-storage-migration.md) | completed |
+| [Confirm hench.promptCacheTtl 1h is accepted by the live Anthropic API before the cut](./confirm-hench-promptcachettl-1h-is.md) | completed |
+| [Correct every 0.7.1 changeset against the merged behaviour before the cut](./correct-every-0-7-1-changeset-against.md) | completed |
 | [Diagnose and fix the release workflow so publishes create git tags and GitHub releases](./diagnose-and-fix-the-release-workflow.md) | in_progress |
 | [Fix rex fix timestamp backfill inverting startedAt/completedAt (#375)](./fix-rex-fix-timestamp-backfill.md) | completed |
-| [Reproduce Windows near-port relocation never engaging (#367)](./reproduce-windows-near-port-relocation.md) | pending |
+| [Reproduce Windows near-port relocation never engaging (#367)](./reproduce-windows-near-port-relocation.md) | deferred |
 | [Stop the sourcevision cli-hints e2e test timing out under preflight load](./stop-the-sourcevision-cli-hints-e2e.md) | completed |
 | [Stop the Windows CI flakes: unset hookTimeout and bypassed rm retries](./stop-the-windows-ci-flakes-unset.md) | completed |

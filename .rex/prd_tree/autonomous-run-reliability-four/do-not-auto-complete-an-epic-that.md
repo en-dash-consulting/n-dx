@@ -1,6 +1,6 @@
 ---
 id: "8cb6899d-7edb-45d1-a938-5f554ff12c72"
-level: "task"
+level: "feature"
 title: "Do not auto-complete an epic that still has deferred, blocked or failing children"
 status: "completed"
 priority: "high"

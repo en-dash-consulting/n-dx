@@ -1,6 +1,6 @@
 ---
 id: "08d050ce-f4ca-451e-9bb5-fd423f17c994"
-level: "task"
+level: "feature"
 title: "Git helper failures must not be reported as successful staging or commits"
 status: "completed"
 priority: "medium"

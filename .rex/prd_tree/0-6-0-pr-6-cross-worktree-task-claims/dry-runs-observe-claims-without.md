@@ -1,6 +1,6 @@
 ---
 id: "e02571f1-877e-40d5-8ad7-60d68dff71bd"
-level: "task"
+level: "feature"
 title: "Dry runs observe claims without writing one"
 status: "completed"
 priority: "medium"

@@ -1,6 +1,6 @@
 ---
 id: "db911d92-d716-4fa1-b2b8-8823daa82095"
-level: "task"
+level: "feature"
 title: "hench init must gitignore .hench/locks/ or the first autonomous run self-blocks"
 status: "completed"
 priority: "high"

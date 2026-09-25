@@ -1,6 +1,6 @@
 ---
 id: "f7a6d344-fe86-4cff-b003-e1d2e1057330"
-level: "task"
+level: "feature"
 title: "Reverse proxy HTTP and WebSocket under /p/:id/ with viewer base-path support; root routes alias the sole registered project"
 status: "completed"
 priority: "high"

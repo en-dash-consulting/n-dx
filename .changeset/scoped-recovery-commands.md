@@ -13,6 +13,6 @@ gets swept into a hench commit. Each message now prints commands scoped with
 `git rm --cached` for ones that were deleted (checked at print time), a
 scoped `git commit`, and a scoped `git stash push` as the set-aside
 alternative. The commands carry every path even where the displayed list
-truncates. The agent prompt's staging instruction is scoped the same way —
+truncates. When `autoCommit` is off, the agent prompt's staging instruction is scoped the same way —
 name each changed path, never stage the whole tree — and a policy test keeps
-`git add -A` / `git add .` out of hench source for good.
+`git add -A` / `git add .` out of hench's code for good.

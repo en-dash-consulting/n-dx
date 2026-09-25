@@ -1,6 +1,6 @@
 ---
 id: "84ccf6bc-ea8c-441a-ab97-692826bab26a"
-level: "task"
+level: "feature"
 title: "Codex .codex/config.toml uses the same cwd-relative MCP commands"
 status: "completed"
 priority: "high"

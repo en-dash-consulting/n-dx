@@ -1,6 +1,6 @@
 ---
 id: "a6970e26-d9db-4629-a1ef-7baba0f493f6"
-level: "task"
+level: "feature"
 title: "rex fix must reopen parents to pending (not in_progress) and run the whole-tree stuck-parent sweep"
 status: "completed"
 priority: "high"

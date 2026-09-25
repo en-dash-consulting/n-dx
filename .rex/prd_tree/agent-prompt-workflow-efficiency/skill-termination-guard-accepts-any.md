@@ -1,6 +1,6 @@
 ---
 id: "faaf7ebe-75bf-4e5a-a944-9d4aad46ac48"
-level: "task"
+level: "feature"
 title: "Skill termination guard accepts any bare \"not\" as an out-of-scope statement"
 status: "completed"
 priority: "medium"

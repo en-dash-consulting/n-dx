@@ -1,6 +1,6 @@
 ---
 id: "f30e0ef3-a0f2-45cb-80d6-3bceec23003c"
-level: "task"
+level: "feature"
 title: "Publish only a complete PRD snapshot after a retry"
 status: "completed"
 priority: "high"

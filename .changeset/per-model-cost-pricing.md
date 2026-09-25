@@ -18,9 +18,9 @@ a one-time jump.
 
 `estimateCost` took a `ModelPricing` parameter that every caller left at a
 single hardcoded Sonnet default (3/15 per MTok, cache write 3.75, cache read
-0.30). A project configured for Opus (5/25) therefore had its spend
-under-reported by exactly the Sonnet-to-Opus ratio — on this repo's own run
-history, $124 quoted against a real $186. The `(based on Sonnet pricing)`
+0.30). Opus (5/25) usage was therefore quoted at three-fifths of its real cost —
+on this repo's own run history, which is not all Opus, $124 quoted against a
+real $186. The `(based on Sonnet pricing)`
 label made that honest rather than silently wrong, but it left the figures
 unusable for the before/after comparisons the cost work depends on.
 
@@ -28,7 +28,7 @@ unusable for the before/after comparisons the cost work depends on.
   so the existing catalog now covers all four billed token kinds for every
   model in `TIER_MODELS` across claude, codex and google. New `model-pricing`
   module exports `resolveModelPricing` (exact id → Claude alias → Codex legacy
-  remap → labelled fallback) and `priceTokens`. Two known under-reporting
+  remap → lower-case retry → labelled fallback) and `priceTokens`. Two known under-reporting
   caveats are documented on the table: a 1-hour cache write bills at 2x input
   rather than 1.25x, and long-context surcharges apply above 200K input on
   some models. Neither is recoverable from aggregate token counts.

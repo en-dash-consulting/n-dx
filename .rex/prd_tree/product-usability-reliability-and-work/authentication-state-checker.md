@@ -1,6 +1,6 @@
 ---
 id: "4e17b4f7-e45e-4d54-a720-db4591816850"
-level: "task"
+level: "feature"
 title: "Authentication State Checker"
 status: "completed"
 priority: "critical"

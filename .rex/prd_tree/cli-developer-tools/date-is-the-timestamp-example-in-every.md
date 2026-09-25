@@ -1,6 +1,6 @@
 ---
 id: "66866236-900b-4dc2-8059-9745891d9ea1"
-level: "task"
+level: "feature"
 title: "`date -Is`, the timestamp example in every recording skill, fails on macOS (BSD date)"
 status: "completed"
 priority: "low"

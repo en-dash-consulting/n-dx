@@ -1,6 +1,6 @@
 ---
 id: "8e7eef7b-0acd-4fc3-97c5-ad73bb3322b6"
-level: "task"
+level: "feature"
 title: "No changeset bumps @n-dx/llm-client, though this branch adds public API that rex, sourcevision and hench import"
 status: "completed"
 priority: "high"

@@ -1,6 +1,6 @@
 ---
 id: "e40e04aa-30e7-48c3-8d65-37e0ba3bb89e"
-level: "task"
+level: "feature"
 title: "Bind-unavailable runs report four passing no-op tests in cli-start-two-projects"
 status: "completed"
 priority: "low"

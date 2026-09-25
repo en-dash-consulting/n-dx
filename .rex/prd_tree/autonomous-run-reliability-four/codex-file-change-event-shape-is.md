@@ -1,6 +1,6 @@
 ---
 id: "cf511d6d-4ea7-4a5d-8dc8-79da893a68ef"
-level: "task"
+level: "feature"
 title: "Codex file_change event shape is unverified, so the livelock progress fix can silently not work"
 status: "completed"
 priority: "medium"

@@ -1,6 +1,6 @@
 ---
 id: "97fbaef0-3691-42b7-9149-70a0bc9aa5b2"
-level: "task"
+level: "feature"
 title: "ndx init writes a tracked .mcp.json with cwd-relative stdio commands for rex and sourcevision"
 status: "completed"
 priority: "critical"

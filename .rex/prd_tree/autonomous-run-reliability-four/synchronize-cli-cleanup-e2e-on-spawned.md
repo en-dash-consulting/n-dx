@@ -1,6 +1,6 @@
 ---
 id: "a38db1f7-aae6-45d3-9753-2aa34bc8642d"
-level: "task"
+level: "feature"
 title: "Synchronize CLI cleanup E2E on spawned-child readiness"
 status: "completed"
 priority: "medium"

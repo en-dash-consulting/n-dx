@@ -1,6 +1,6 @@
 ---
 id: "7bc1bb3d-e981-4384-a103-d75c974f190a"
-level: "task"
+level: "feature"
 title: "E2E test: two project directories start dashboards concurrently without killing each other"
 status: "completed"
 priority: "high"

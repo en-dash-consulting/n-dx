@@ -1,6 +1,6 @@
 ---
 id: "63592288-b8af-4c43-94a9-79d1e5708866"
-level: "task"
+level: "feature"
 title: "Tests: init writes .mcp.json; generated MCP configs contain no absolute paths"
 status: "completed"
 priority: "high"

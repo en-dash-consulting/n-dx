@@ -1,6 +1,6 @@
 ---
 id: "9fe4e4e6-eb03-476f-9955-d0013a0c6c81"
-level: "task"
+level: "feature"
 title: "Finalize gate must discount only what the commit prompt will actually commit: staged work only with a pending message, reviewer repairs on both paths"
 status: "completed"
 priority: "critical"

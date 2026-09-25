@@ -1,6 +1,6 @@
 ---
 id: "b278c791-6f55-4dea-a8ff-87eda5818473"
-level: "task"
+level: "feature"
 title: "Keep writing .n-dx-web.port in the project directory pointing at the hub so refresh --live-server and the reload signal work unchanged"
 status: "completed"
 priority: "high"

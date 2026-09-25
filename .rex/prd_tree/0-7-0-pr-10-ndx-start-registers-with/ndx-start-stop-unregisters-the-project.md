@@ -1,6 +1,6 @@
 ---
 id: "9bc85bfd-8071-4ff7-abe9-7ede8d4833b4"
-level: "task"
+level: "feature"
 title: "ndx start stop unregisters the project; hub exits with its last project unless hub.keepAlive; status reports hub and project state"
 status: "completed"
 priority: "medium"

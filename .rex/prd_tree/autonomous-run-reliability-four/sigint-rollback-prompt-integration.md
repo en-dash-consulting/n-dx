@@ -1,6 +1,6 @@
 ---
 id: "75fa50be-c4f3-47aa-a1af-3a4af939f891"
-level: "task"
+level: "feature"
 title: "SIGINT rollback-prompt integration tests are flaky and leak Windows handles"
 status: "completed"
 priority: "high"

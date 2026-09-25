@@ -1,6 +1,6 @@
 ---
 id: "811cf124-3b65-4623-b72f-bfc000229d6a"
-level: "task"
+level: "feature"
 title: "Add getWorktreeRoot(cwd) to llm-client exec helpers and re-export it through the hench gateway"
 status: "completed"
 priority: "critical"

@@ -1,6 +1,6 @@
 ---
 id: "08c19879-81a5-4257-b5f6-1cbcaba29f05"
-level: "task"
+level: "feature"
 title: "Skills that call add_item describe item content in prose instead of naming its parameters"
 status: "completed"
 priority: "medium"

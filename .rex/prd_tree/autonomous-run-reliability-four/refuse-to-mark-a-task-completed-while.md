@@ -1,6 +1,6 @@
 ---
 id: "5fe55ced-a1dd-4c54-b471-647ede89caf4"
-level: "task"
+level: "feature"
 title: "Refuse to mark a task completed while its work is uncommitted"
 status: "completed"
 priority: "critical"

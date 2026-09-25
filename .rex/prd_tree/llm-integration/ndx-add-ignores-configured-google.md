@@ -1,6 +1,6 @@
 ---
 id: "46d8b92f-cc15-438a-84e0-9bac61a9adc7"
-level: "task"
+level: "feature"
 title: "`ndx add` ignores configured Google/Gemini vendor and falls back to Claude"
 status: "completed"
 priority: "high"

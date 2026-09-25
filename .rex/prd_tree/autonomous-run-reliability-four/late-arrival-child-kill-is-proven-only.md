@@ -1,6 +1,6 @@
 ---
 id: "518bc0ab-50f1-4cff-a171-3d99932c66e1"
-level: "task"
+level: "feature"
 title: "Late-arrival child kill is proven only against a fake, and the e2e guard that would catch it only trips under load"
 status: "completed"
 priority: "medium"

@@ -1,6 +1,6 @@
 ---
 id: "2e921485-212e-49b8-a00a-f6666144dee4"
-level: "task"
+level: "feature"
 title: "Token rollups and cost estimate exclude cache tokens, undercounting spend ~50x"
 status: "completed"
 priority: "high"
