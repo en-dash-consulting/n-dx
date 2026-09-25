@@ -1,6 +1,6 @@
 ---
 id: "5323b1af-0806-4852-92a8-d856def55b28"
-level: "task"
+level: "feature"
 title: "rex and sourcevision still spawn the vendor CLI without a cwd"
 status: "completed"
 priority: "medium"

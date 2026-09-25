@@ -1,6 +1,6 @@
 ---
 id: "38db1905-bcc0-463e-a576-057b7ef0914a"
-level: "task"
+level: "feature"
 title: "Notion Work Tracking Integration MVP"
 status: "completed"
 priority: "high"

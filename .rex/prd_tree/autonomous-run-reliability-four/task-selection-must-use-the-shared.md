@@ -1,6 +1,6 @@
 ---
 id: "602a4abc-b997-4f9b-ab61-4bc092b40518"
-level: "task"
+level: "feature"
 title: "Task selection must use the shared completed-child predicate"
 status: "completed"
 priority: "medium"

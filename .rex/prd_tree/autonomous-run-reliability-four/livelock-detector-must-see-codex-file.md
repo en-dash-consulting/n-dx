@@ -1,6 +1,6 @@
 ---
 id: "dee1d86c-6d72-4b4a-8b3c-1405acd01ae9"
-level: "task"
+level: "feature"
 title: "Livelock detector must see Codex file edits as progress"
 status: "completed"
 priority: "high"

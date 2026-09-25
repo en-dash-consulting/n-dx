@@ -1,6 +1,6 @@
 ---
 id: "7bf0be34-f352-41bc-addc-dac9392f80b2"
-level: "task"
+level: "feature"
 title: "Completion must not cascade over an explicit in_progress parent, or outside the run's subtree"
 status: "completed"
 priority: "critical"

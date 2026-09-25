@@ -1,6 +1,6 @@
 ---
 id: "949f600b-219c-4bba-8a88-1517df83f00b"
-level: "task"
+level: "feature"
 title: "List the known task classes in ndx config and flag an unrecognized route as probably-new, with the closest match"
 status: "completed"
 priority: "medium"

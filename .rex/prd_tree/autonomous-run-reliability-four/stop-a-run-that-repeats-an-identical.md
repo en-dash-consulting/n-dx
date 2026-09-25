@@ -1,6 +1,6 @@
 ---
 id: "cbab7b85-7c00-4880-abbb-479bb112ac40"
-level: "task"
+level: "feature"
 title: "Stop a run that repeats an identical tool call instead of letting it loop forever"
 status: "completed"
 priority: "high"

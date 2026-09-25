@@ -1,6 +1,6 @@
 ---
 id: "3d40e0c3-c900-4975-b150-59f80469e01e"
-level: "task"
+level: "feature"
 title: "Relocation-port unit test races with real CI port allocation"
 status: "completed"
 priority: "high"

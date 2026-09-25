@@ -1,6 +1,6 @@
 ---
 id: "271d2e3b-0407-42d9-a9ae-71cd498fbe9c"
-level: "task"
+level: "feature"
 title: "Recommended Install Path Validation"
 status: "completed"
 priority: "critical"

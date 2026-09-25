@@ -1,6 +1,6 @@
 ---
 id: "1030134e-3060-4536-a1de-16f096164b1e"
-level: "task"
+level: "feature"
 title: "createLLMClient and cli-provider accept a cwd and the Ask route passes ctx.projectDir"
 status: "completed"
 priority: "high"

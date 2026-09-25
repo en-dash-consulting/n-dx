@@ -1,6 +1,6 @@
 ---
 id: "856e89fb-302f-4079-941f-a623bf591a31"
-level: "task"
+level: "feature"
 title: "Stale node_modules makes `pnpm typecheck` report type errors that CI does not have"
 status: "completed"
 priority: "medium"

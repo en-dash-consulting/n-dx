@@ -1,6 +1,6 @@
 ---
 id: "d3a995ca-7ea2-400a-b9a3-37f07acaa77f"
-level: "task"
+level: "feature"
 title: "`@n-dx/rex` fails intermittently under `pnpm test` but passes standalone"
 status: "completed"
 priority: "medium"

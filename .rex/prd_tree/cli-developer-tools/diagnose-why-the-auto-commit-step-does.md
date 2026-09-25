@@ -1,6 +1,6 @@
 ---
 id: "66437fad-2881-47b9-9e37-8c9c34bbd600"
-level: "task"
+level: "feature"
 title: "Diagnose why the auto-commit step does not fire after MCP-driven PRD mutations in Claude Code skills"
 status: "completed"
 priority: "high"

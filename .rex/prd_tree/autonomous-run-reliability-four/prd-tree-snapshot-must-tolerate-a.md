@@ -1,6 +1,6 @@
 ---
 id: "607c72c9-5edf-4091-b0a8-77eea1484a40"
-level: "task"
+level: "feature"
 title: "PRD tree snapshot must tolerate a concurrent writer's temp files"
 status: "completed"
 priority: "high"

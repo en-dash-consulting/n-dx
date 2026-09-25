@@ -1,6 +1,6 @@
 ---
 id: "79132a2f-96d9-41f0-8eb9-28d4edf9de59"
-level: "task"
+level: "feature"
 title: "Cleanup from the #370 review: dedupe the adapter stamping block, share the porcelain path matcher, align next-task wording"
 status: "completed"
 priority: "low"

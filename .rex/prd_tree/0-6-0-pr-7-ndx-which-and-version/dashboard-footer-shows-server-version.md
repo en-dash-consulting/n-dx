@@ -1,6 +1,6 @@
 ---
 id: "9cb2fa5b-a788-4193-b6e7-e08e53221124"
-level: "task"
+level: "feature"
 title: "Dashboard footer shows server version, install path and served project directory"
 status: "completed"
 priority: "medium"

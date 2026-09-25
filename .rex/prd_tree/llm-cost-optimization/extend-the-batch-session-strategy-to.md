@@ -1,6 +1,6 @@
 ---
 id: "662bb418-12f3-41ee-85bc-cd653aa05482"
-level: "task"
+level: "feature"
 title: "Extend the batch session strategy to the codex CLI"
 status: "completed"
 priority: "low"

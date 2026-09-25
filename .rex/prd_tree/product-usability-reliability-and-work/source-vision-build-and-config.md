@@ -1,6 +1,6 @@
 ---
 id: "f771e5ca-0ad1-451f-9032-e2baba69e61d"
-level: "task"
+level: "feature"
 title: "Source Vision Build and Config Artifact Classification"
 status: "completed"
 priority: "high"

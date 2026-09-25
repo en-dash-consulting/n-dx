@@ -1,6 +1,6 @@
 ---
 id: "baf53d27-a211-4930-a692-51f2fd60f11e"
-level: "task"
+level: "feature"
 title: "Windows stale-lock contention regression test can deadlock"
 status: "completed"
 priority: "high"

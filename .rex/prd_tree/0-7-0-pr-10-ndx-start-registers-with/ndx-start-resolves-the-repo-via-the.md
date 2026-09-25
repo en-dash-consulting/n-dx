@@ -1,6 +1,6 @@
 ---
 id: "3ef3366c-7d84-4f33-a0e0-3f9c3f368e61"
-level: "task"
+level: "feature"
 title: "ndx start resolves the repo via the git common dir, derives the project id, starts the hub if absent, registers and opens /p/:id/"
 status: "completed"
 priority: "high"

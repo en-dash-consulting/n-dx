@@ -1,6 +1,6 @@
 ---
 id: "e879c6ba-bcfe-4c76-821c-5972112bc49d"
-level: "task"
+level: "feature"
 title: "Hub daemon skeleton: `web hub` command, ~/.n-dx registry and pid file, /api/hub/* routes, spawn/attach per-repo servers with health checks"
 status: "completed"
 priority: "high"

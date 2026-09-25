@@ -1,6 +1,6 @@
 ---
 id: "0e20da64-ab1c-49ac-991e-bbd79a79c2b3"
-level: "task"
+level: "feature"
 title: "readWebVersion memoizes its own failure, pinning the reported version to \"unknown\""
 status: "completed"
 priority: "low"

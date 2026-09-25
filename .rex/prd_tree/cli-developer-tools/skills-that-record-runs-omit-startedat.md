@@ -1,6 +1,6 @@
 ---
 id: "f050baf6-8be1-4db5-b65e-fe9a903fbb4c"
-level: "task"
+level: "feature"
 title: "Skills that record runs omit --startedAt, so each one's first record claims the whole session"
 status: "completed"
 priority: "high"

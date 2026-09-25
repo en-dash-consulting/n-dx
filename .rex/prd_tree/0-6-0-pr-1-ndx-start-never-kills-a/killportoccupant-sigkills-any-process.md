@@ -1,6 +1,6 @@
 ---
 id: "eee179a1-ef0c-4bca-b741-5187f553e14b"
-level: "task"
+level: "feature"
 title: "killPortOccupant SIGKILLs any process holding a socket on the port, not just the listener"
 status: "completed"
 priority: "high"

@@ -1,6 +1,6 @@
 ---
 id: "9c9ae59f-4cf3-4e05-80c9-761c6ec80fdf"
-level: "task"
+level: "feature"
 title: "Reconcile the null-hash contract in both run-file change detectors"
 status: "completed"
 priority: "low"

@@ -1,6 +1,6 @@
 ---
 id: "daf5646c-0deb-43dc-9297-41c7ad894ada"
-level: "task"
+level: "feature"
 title: "ndx init e2e test overwrites the developer's real MCP registration"
 status: "completed"
 priority: "high"

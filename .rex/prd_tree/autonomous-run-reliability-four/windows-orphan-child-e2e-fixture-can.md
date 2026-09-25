@@ -1,6 +1,6 @@
 ---
 id: "8174c84e-2076-489b-8b2e-fadb75c0b386"
-level: "task"
+level: "feature"
 title: "Windows orphan-child E2E fixture can start without its grandchild"
 status: "completed"
 priority: "high"

@@ -1,6 +1,6 @@
 ---
 id: "651e7993-8e8f-44fe-9fd6-9653a8baf359"
-level: "task"
+level: "feature"
 title: "classifyPortOccupant compares paths lexically, so a symlinked project path starts a second dashboard on the same PRD tree"
 status: "completed"
 priority: "medium"

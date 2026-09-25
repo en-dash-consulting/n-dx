@@ -1,6 +1,6 @@
 ---
 id: "305318f8-eaa9-44bb-938b-4b05a86126eb"
-level: "task"
+level: "feature"
 title: "PRD-to-Work-Item Linkage Model"
 status: "completed"
 priority: "high"

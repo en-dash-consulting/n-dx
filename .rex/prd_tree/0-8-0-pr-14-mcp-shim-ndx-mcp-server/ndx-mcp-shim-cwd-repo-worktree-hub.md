@@ -1,6 +1,6 @@
 ---
 id: "99f752e7-487c-4447-b0e7-0636224705b2"
-level: "task"
+level: "feature"
 title: "ndx mcp shim: cwd → repo + worktree → hub bridge when alive, in-process stdio otherwise"
 status: "completed"
 priority: "medium"

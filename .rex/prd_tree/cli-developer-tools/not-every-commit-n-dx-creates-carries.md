@@ -1,6 +1,6 @@
 ---
 id: "f93230bc-2cf5-4b56-90f1-6ded82314f20"
-level: "task"
+level: "feature"
 title: "Not every commit n-dx creates carries the Co-Authored-By trailer"
 status: "completed"
 priority: "medium"

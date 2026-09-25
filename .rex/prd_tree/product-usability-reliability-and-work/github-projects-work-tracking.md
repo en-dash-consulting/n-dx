@@ -1,6 +1,6 @@
 ---
 id: "84aa58d1-f940-48a9-b2bc-11976dd28f48"
-level: "task"
+level: "feature"
 title: "GitHub Projects Work Tracking Integration"
 status: "completed"
 priority: "medium"

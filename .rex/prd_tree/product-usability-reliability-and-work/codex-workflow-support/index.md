@@ -1,6 +1,6 @@
 ---
 id: "7e14ce05-95ad-4fa4-adc9-73d0c6742566"
-level: "task"
+level: "feature"
 title: "Codex Workflow Support"
 status: "completed"
 priority: "critical"

@@ -1,6 +1,6 @@
 ---
 id: "6d2c0c1c-9ac7-4aef-932f-c0b76f1407ff"
-level: "task"
+level: "feature"
 title: "Front-End Action Fixes"
 status: "completed"
 priority: "high"

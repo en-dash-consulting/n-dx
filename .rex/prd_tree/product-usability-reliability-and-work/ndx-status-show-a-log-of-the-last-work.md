@@ -1,6 +1,6 @@
 ---
 id: "7d634075-c0a6-4a7b-ba38-c37f2b9e1b4d"
-level: "task"
+level: "feature"
 title: "ndx status: show a log of the last work cycle (completed / failed / skipped)"
 status: "completed"
 priority: "medium"

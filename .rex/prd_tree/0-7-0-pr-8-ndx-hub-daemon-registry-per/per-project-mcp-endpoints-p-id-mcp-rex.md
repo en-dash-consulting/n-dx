@@ -1,6 +1,6 @@
 ---
 id: "1519783b-dcd6-43d2-b166-e410aef4c3ce"
-level: "task"
+level: "feature"
 title: "Per-project MCP endpoints /p/:id/mcp/rex and /p/:id/mcp/sourcevision proxied to the project server"
 status: "completed"
 priority: "high"

@@ -1,6 +1,6 @@
 ---
 id: "c7d5bc62-c804-4be5-bdf9-b366da18c576"
-level: "task"
+level: "feature"
 title: "Allowlist workspace.ts in the child_process architecture policy (PR #354 CI fix)"
 status: "completed"
 priority: "critical"

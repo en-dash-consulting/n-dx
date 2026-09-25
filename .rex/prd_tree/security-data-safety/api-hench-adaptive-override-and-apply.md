@@ -1,6 +1,6 @@
 ---
 id: "0a778581-d674-429c-827a-6b0e1ef22e0f"
-level: "task"
+level: "feature"
 title: "`/api/hench/adaptive/override` and `/apply` write arbitrary keys into `.hench/config.json`"
 status: "completed"
 priority: "medium"

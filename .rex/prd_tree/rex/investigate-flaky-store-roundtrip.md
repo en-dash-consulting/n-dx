@@ -1,6 +1,6 @@
 ---
 id: "5d0a6670-7a22-47b5-ac9c-7309ca2032e2"
-level: "task"
+level: "feature"
 title: "Investigate flaky store-roundtrip concurrency test (0 items after serialized mutations)"
 status: "completed"
 priority: "medium"

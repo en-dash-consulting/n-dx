@@ -1,6 +1,6 @@
 ---
 id: "1073b478-bdc0-4f23-9a1c-8aa6eec44bae"
-level: "task"
+level: "feature"
 title: "Hub home page: project cards fed from each child's status route, chooser at / when several projects are registered"
 status: "completed"
 priority: "medium"

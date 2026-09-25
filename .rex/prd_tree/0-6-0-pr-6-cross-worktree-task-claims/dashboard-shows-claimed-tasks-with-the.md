@@ -1,6 +1,6 @@
 ---
 id: "f9e70688-972f-41b8-bd84-54ab99420c0d"
-level: "task"
+level: "feature"
 title: "Dashboard shows claimed tasks with the claiming worktree in the PRD tree and the Sessions panel"
 status: "completed"
 priority: "medium"

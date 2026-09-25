@@ -1,6 +1,6 @@
 ---
 id: "69ee731c-5062-4257-8828-7d94f89da8d2"
-level: "task"
+level: "feature"
 title: "Sessions panel: each worktree with branch, dirty state, and running or last run"
 status: "completed"
 priority: "medium"

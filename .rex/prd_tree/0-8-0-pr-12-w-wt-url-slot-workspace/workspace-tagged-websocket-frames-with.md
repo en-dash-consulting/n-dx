@@ -1,6 +1,6 @@
 ---
 id: "592e5c5f-8007-4fb3-860e-9eb4ee37e760"
-level: "task"
+level: "feature"
 title: "Workspace-tagged WebSocket frames with client-side filtering, and the breadcrumb workspace switcher"
 status: "completed"
 priority: "high"

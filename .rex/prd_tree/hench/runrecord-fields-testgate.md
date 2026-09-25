@@ -1,6 +1,6 @@
 ---
 id: "69a97bf3-f84a-475b-9852-350b98470a21"
-level: "task"
+level: "feature"
 title: "RunRecord fields testGate, dependencyAudit and cleanupTransformations are stripped by the run-record schema on load"
 status: "completed"
 priority: "medium"

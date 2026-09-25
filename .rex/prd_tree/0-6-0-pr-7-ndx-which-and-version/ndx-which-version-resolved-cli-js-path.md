@@ -1,6 +1,6 @@
 ---
 id: "076208cd-50c8-4e8d-937c-67d40e9a77e2"
-level: "task"
+level: "feature"
 title: "ndx which: version, resolved cli.js path, install kind, install checkout branch and SHA, project dir; --json; --version --verbose alias"
 status: "completed"
 priority: "high"

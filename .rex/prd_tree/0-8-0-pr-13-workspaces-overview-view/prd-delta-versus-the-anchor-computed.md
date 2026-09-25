@@ -1,6 +1,6 @@
 ---
 id: "8d5f3393-57cf-4d83-8324-108cc4388d24"
-level: "task"
+level: "feature"
 title: "PRD delta versus the anchor computed server-side and exposed at /api/workspaces/:wt/prd-delta"
 status: "completed"
 priority: "high"

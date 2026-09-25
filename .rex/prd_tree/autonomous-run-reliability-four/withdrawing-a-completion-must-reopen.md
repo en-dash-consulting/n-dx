@@ -1,6 +1,6 @@
 ---
 id: "ecb154ec-3916-4cd6-afd3-1cb15200ac3a"
-level: "task"
+level: "feature"
 title: "Withdrawing a completion must reopen the ancestors the agent's own cascade already closed"
 status: "completed"
 priority: "high"

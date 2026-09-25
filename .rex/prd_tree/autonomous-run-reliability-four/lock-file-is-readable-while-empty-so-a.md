@@ -1,6 +1,6 @@
 ---
 id: "a63d1345-5167-4332-844a-0398aea517b1"
-level: "task"
+level: "feature"
 title: "Lock file is readable while empty, so a second writer can reclaim a live lock"
 status: "completed"
 priority: "high"

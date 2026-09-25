@@ -1,6 +1,6 @@
 ---
 id: "a63f9e13-2c9c-4ee4-9bb8-dba5bf671cb2"
-level: "task"
+level: "feature"
 title: "prompt-census --write stamps a commit that does not match the measured tree"
 status: "completed"
 priority: "medium"

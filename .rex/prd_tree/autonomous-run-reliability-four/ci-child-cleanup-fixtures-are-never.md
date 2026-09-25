@@ -1,6 +1,6 @@
 ---
 id: "099a0f2d-065b-4ae3-8bff-c76990289c0e"
-level: "task"
+level: "feature"
 title: "CI child-cleanup fixtures are never reaped and accumulate across suite runs"
 status: "completed"
 priority: "medium"

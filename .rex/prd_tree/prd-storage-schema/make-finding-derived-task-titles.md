@@ -1,6 +1,6 @@
 ---
 id: "36121811-32bb-4800-b0d8-bd73cfbc4cf7"
-level: "task"
+level: "feature"
 title: "Make finding-derived task titles distinctive at generation time"
 status: "completed"
 priority: "low"

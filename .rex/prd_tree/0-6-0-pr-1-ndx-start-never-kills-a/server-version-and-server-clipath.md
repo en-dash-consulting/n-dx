@@ -1,6 +1,6 @@
 ---
 id: "a1c9febd-2f08-4d83-bdf8-670b57b05bd3"
-level: "task"
+level: "feature"
 title: "server.version and server.cliPath assertions are tautological, so a silent \"unknown\" version ships green"
 status: "completed"
 priority: "medium"

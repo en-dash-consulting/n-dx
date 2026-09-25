@@ -1,6 +1,6 @@
 ---
 id: "769fe73d-705f-431d-a342-a745425f06eb"
-level: "task"
+level: "feature"
 title: "rex add hangs indefinitely when stdin is an open pipe"
 status: "completed"
 priority: "medium"

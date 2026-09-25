@@ -1,6 +1,6 @@
 ---
 id: "459aabf9-e7b8-49f4-b013-3c6c34aa77c0"
-level: "task"
+level: "feature"
 title: "Capture worktreeRoot and branch at run start and refuse automatic commits when they no longer match"
 status: "completed"
 priority: "critical"

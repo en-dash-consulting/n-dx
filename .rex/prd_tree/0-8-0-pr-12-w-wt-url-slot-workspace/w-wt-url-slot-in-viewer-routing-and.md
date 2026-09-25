@@ -1,6 +1,6 @@
 ---
 id: "fe40eba6-bc8e-4d12-9b5f-f91389f3a0ca"
-level: "task"
+level: "feature"
 title: "/w/:wt/ URL slot in viewer routing and server dispatch; default workspace is the anchor; slot-less deep links still resolve"
 status: "completed"
 priority: "high"

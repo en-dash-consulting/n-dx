@@ -1,6 +1,6 @@
 ---
 id: "bcc8d2de-752a-4f01-ad59-18b4be58a61f"
-level: "task"
+level: "feature"
 title: "Source Vision Vendor Artifact Exclusion"
 status: "completed"
 priority: "high"

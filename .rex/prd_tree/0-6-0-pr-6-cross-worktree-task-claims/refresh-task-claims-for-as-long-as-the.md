@@ -1,6 +1,6 @@
 ---
 id: "c3ab0b13-7ac7-4760-a594-cc143b595f93"
-level: "task"
+level: "feature"
 title: "Refresh task claims for as long as the run lasts"
 status: "completed"
 priority: "high"

@@ -1,6 +1,6 @@
 ---
 id: "351f574c-ae9f-4412-a7a9-899eec518607"
-level: "task"
+level: "feature"
 title: "Add listWorktrees(cwd) to llm-client and re-export it through the web and hench gateways"
 status: "completed"
 priority: "high"

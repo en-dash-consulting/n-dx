@@ -1,6 +1,6 @@
 ---
 id: "80ef4daf-9b80-4119-bb5b-6729b50fbdfd"
-level: "task"
+level: "feature"
 title: "findAvailablePort reports a requested port of 0 as \"in use\""
 status: "completed"
 priority: "low"

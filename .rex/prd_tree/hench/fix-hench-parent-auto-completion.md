@@ -1,6 +1,6 @@
 ---
 id: "e8f4411d-c876-4f40-8817-3598472d04fd"
-level: "task"
+level: "feature"
 title: "Fix hench parent auto-completion cascade silently skipped + add reconciliation sweep (#293)"
 status: "completed"
 priority: "high"

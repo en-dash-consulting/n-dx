@@ -1,6 +1,6 @@
 ---
 id: "9f0a2b51-beab-4984-b68d-96e3c33ca93a"
-level: "task"
+level: "feature"
 title: "Docs: rewrite the MCP registration section; mark HTTP registration as single-project"
 status: "completed"
 priority: "medium"

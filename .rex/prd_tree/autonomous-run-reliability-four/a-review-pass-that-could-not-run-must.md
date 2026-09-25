@@ -1,6 +1,6 @@
 ---
 id: "3b3e6b76-14ae-4978-a320-5993b7b276b0"
-level: "task"
+level: "feature"
 title: "A review pass that could not run must not report a completed, reviewed task"
 status: "completed"
 priority: "high"

@@ -1,6 +1,6 @@
 ---
 id: "1fd545b9-b9d2-47a3-abc4-b492773aeed9"
-level: "task"
+level: "feature"
 title: "Workspace registry: one ServerContext, watcher set and PRD cache per worktree, lazily created, refreshed from git worktree list"
 status: "completed"
 priority: "high"

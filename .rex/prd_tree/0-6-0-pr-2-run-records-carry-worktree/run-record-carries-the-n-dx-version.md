@@ -1,6 +1,6 @@
 ---
 id: "b623224f-02ef-455a-99ca-6cc886cdb580"
-level: "task"
+level: "feature"
 title: "Run record carries the n-dx version and CLI path that produced it"
 status: "completed"
 priority: "high"

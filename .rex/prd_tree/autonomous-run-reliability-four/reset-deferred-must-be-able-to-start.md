@@ -1,6 +1,6 @@
 ---
 id: "1752251a-3d51-4542-904e-4768d10932f6"
-level: "task"
+level: "feature"
 title: "--reset-deferred must be able to start the run it enables, and a refusal must exit non-zero"
 status: "completed"
 priority: "high"

@@ -1,6 +1,6 @@
 ---
 id: "5c8cb33a-e446-42ac-bfde-07bd91f4b081"
-level: "task"
+level: "feature"
 title: "Fix hench task-completion commit gap + fullTestCommand schema drop (#302)"
 status: "completed"
 priority: "high"

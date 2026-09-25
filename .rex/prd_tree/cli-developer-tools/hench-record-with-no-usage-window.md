@@ -1,6 +1,6 @@
 ---
 id: "f1ada08d-b9e6-4f4e-b71f-407cf344cbfe"
-level: "task"
+level: "feature"
 title: "`hench record` with no usage window silently claims the entire session transcript"
 status: "completed"
 priority: "high"

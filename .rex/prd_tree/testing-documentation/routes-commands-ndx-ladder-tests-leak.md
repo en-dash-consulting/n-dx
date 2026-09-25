@@ -1,6 +1,6 @@
 ---
 id: "5b154933-05e7-4696-bb8a-20726cf1a068"
-level: "task"
+level: "feature"
 title: "routes-commands ndx-ladder tests leak the ambient NDX_CLI_PATH env var"
 status: "completed"
 priority: "medium"

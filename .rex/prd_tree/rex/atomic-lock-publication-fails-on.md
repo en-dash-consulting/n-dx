@@ -1,6 +1,6 @@
 ---
 id: "3290ab84-1bc6-423f-940a-f11eb553728f"
-level: "task"
+level: "feature"
 title: "Atomic lock publication fails on filesystems without hard-link support"
 status: "completed"
 priority: "medium"

@@ -1,6 +1,6 @@
 ---
 id: "a3e03e31-4abe-4039-a5e8-00cd94c183fd"
-level: "task"
+level: "feature"
 title: "ndx work claims the task before starting and releases on finish; get_next_task and hench selection skip live claims"
 status: "completed"
 priority: "high"

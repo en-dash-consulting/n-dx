@@ -1,6 +1,6 @@
 ---
 id: "d95cab0e-ab9e-4d61-a1c5-f76b0efbfe2e"
-level: "task"
+level: "feature"
 title: "Dashboard writes go to the selected workspace's tree; editing the anchor while viewing a branch requires an explicit switch"
 status: "completed"
 priority: "high"

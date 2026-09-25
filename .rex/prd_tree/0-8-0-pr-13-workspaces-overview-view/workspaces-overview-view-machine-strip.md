@@ -1,6 +1,6 @@
 ---
 id: "00669fc3-3e39-446c-826a-ae3c964e83f9"
-level: "task"
+level: "feature"
 title: "Workspaces Overview view: machine strip, one card per worktree with live run, PRD delta count and Open / Start working / Stop; new WORKSPACES sidebar section"
 status: "completed"
 priority: "high"

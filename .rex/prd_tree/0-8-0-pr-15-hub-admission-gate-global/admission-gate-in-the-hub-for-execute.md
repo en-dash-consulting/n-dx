@@ -1,6 +1,6 @@
 ---
 id: "37458c57-6f30-4802-b5fd-8a41e35bfd0a"
-level: "task"
+level: "feature"
 title: "Admission gate in the hub for execute requests: global cap, memory floor, FIFO queue with position broadcasts, ~/.n-dx/config.json"
 status: "completed"
 priority: "medium"
