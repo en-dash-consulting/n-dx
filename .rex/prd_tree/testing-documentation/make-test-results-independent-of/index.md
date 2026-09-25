@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Commit every preact render inside act() in the web viewer tests that still leak a frame-fallback timer](./commit-every-preact-render-inside-act.md) | completed |
 | [Convert write-path-profile's absolute budgets to scaling assertions](./convert-write-path-profile-s-absolute.md) | completed |
 | [exec-interrupt-forwarding.test.js justifies its location with a false claim about where CI runs tests](./exec-interrupt-forwarding-test-js.md) | completed |
-| [Fail a web test file that leaves a preact frame-fallback timer pending at teardown](./fail-a-web-test-file-that-leaves-a.md) | pending |
+| [Fail a web test file that leaves a preact frame-fallback timer pending at teardown](./fail-a-web-test-file-that-leaves-a.md) | completed |
 | [Fake-CLI fixtures write .args into the repo root instead of a temp dir](./fake-cli-fixtures-write-args-into-the.md) | completed |
 | [Give add-auto-reshape's scaling gate a min-of-N, and fix its shared-tree confound](./give-add-auto-reshape-s-scaling-gate-a.md) | completed |
 | [Give each cli-hints spawn the load-scaled budget, not a fixed 10 seconds](./give-each-cli-hints-spawn-the-load.md) | completed |

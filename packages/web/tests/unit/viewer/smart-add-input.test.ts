@@ -511,11 +511,21 @@ describe("SmartAddInput", () => {
       render(h(SmartAddInput, { onPrdChanged: vi.fn() }), root);
     });
 
-    // Let the fetch promise chain fully resolve
-    await new Promise<void>((r) => setTimeout(r, 0));
-    await new Promise<void>((r) => queueMicrotask(r));
-
-    // Flush the re-render triggered by setState
+    // Let the fetch promise chain fully resolve. Each wait gets its own
+    // act() call (not a bare await between two act() calls, and not one
+    // shared with the render above — that render's effect body isn't even
+    // invoked until this act() drains at the *end* of its span, so a wait
+    // added there would elapse before the effect could use it): act()'s
+    // options.requestAnimationFrame/debounceRendering override only covers
+    // commits that land while its own callback's promise is still pending.
+    // A commit in the gap between two act() calls falls through to
+    // preact's real requestAnimationFrame/setTimeout(35) after-paint
+    // fallback instead — usually harmless (the real timer fires and
+    // self-clears well before this file's afterAll), but under load it can
+    // still be pending when this file tears down, non-deterministically
+    // failing a *later* file.
+    await act(async () => { await new Promise<void>((r) => setTimeout(r, 0)); });
+    await act(async () => { await new Promise<void>((r) => queueMicrotask(r)); });
     await act(async () => {});
 
     expect(root.querySelector(".smart-add-scope-select")).toBeTruthy();

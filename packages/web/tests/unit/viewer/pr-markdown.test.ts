@@ -17,22 +17,33 @@ interface StatePayload {
   staleAfterMs?: number;
 }
 
+// Every settle step gets its *own* act() call, rather than a bare await
+// between two act() calls (or a single act() the mount's effect body isn't
+// even invoked until draining at the *end* of, so waiting inside it just
+// delays the wait past the point it could help). act()'s
+// options.requestAnimationFrame/debounceRendering override is active for
+// the whole span from invocation to the callback's promise settling, so a
+// commit landing during one of these real waits — e.g. the mount effect's
+// fetch chain resolving — is captured and flushed synchronously here
+// instead of falling through to preact's real requestAnimationFrame/
+// setTimeout(35) after-paint fallback. A bare `await` between two act()
+// calls has no such coverage: a commit landing there is usually harmless
+// (the real timer fires and self-clears well before this file's afterAll),
+// but under load (many files competing for the event loop) it can still be
+// pending when this file tears down, non-deterministically failing a
+// *later* file.
 async function renderAndWait(root: HTMLDivElement) {
   await act(async () => {
     render(h(PRMarkdownView, null), root);
   });
-  await new Promise<void>((r) => setTimeout(r, 0));
-  await new Promise<void>((r) => queueMicrotask(r));
+  await act(async () => { await new Promise<void>((r) => setTimeout(r, 0)); });
+  await act(async () => { await new Promise<void>((r) => queueMicrotask(r)); });
   await act(async () => {});
 }
 
 async function flushUi() {
-  await act(async () => {
-    await Promise.resolve();
-  });
-  await act(async () => {
-    await Promise.resolve();
-  });
+  await act(async () => { await Promise.resolve(); });
+  await act(async () => { await Promise.resolve(); });
 }
 
 function createFetchMock(state: StatePayload, markdown: string | null = null) {
@@ -73,7 +84,11 @@ describe("PRMarkdownView", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    // Unmount inside act() to match every act()-wrapped render/update above —
+    // an unwrapped unmount still commits, which can re-arm preact's real
+    // requestAnimationFrame/setTimeout(35) after-paint fallback instead of
+    // flushing synchronously.
+    act(() => { render(null, root); });
     root.remove();
     vi.useRealTimers();
     vi.restoreAllMocks();
