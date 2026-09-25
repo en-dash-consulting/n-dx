@@ -16,6 +16,7 @@ export {
   getCurrentHead,
   getCurrentBranch,
   getWorktreeRoot,
+  listWorktrees,
   isExecutableOnPath,
   spawnTool,
   spawnManaged,
@@ -24,6 +25,7 @@ export {
 } from "../prd/llm-gateway.js";
 
 export type {
+  GitWorktree,
   ExecResult,
   ExecOptions,
   SpawnToolOptions,

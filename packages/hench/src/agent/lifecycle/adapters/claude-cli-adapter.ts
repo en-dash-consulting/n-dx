@@ -127,6 +127,27 @@ export interface ClaudeCliInput {
    * resume, and emitting it alone would claim a fork that never happened.
    */
   forkSession?: boolean;
+  /**
+   * Path to an MCP config file that becomes the session's *only* source of MCP
+   * servers (`--mcp-config <file> --strict-mcp-config`).
+   *
+   * Set for every Claude spawn in a run that could resolve the CLI which
+   * launched it, so the agent's rex and sourcevision servers name this run's
+   * project directory absolutely. Without it the session inherits whatever
+   * Claude Code has registered for the repository, and a local-scope
+   * registration pinning another worktree silently redirects the agent's PRD
+   * writes there.
+   *
+   * `--strict-mcp-config` is what makes the file authoritative rather than
+   * additive; it also drops the operator's user-scope MCP servers from the
+   * spawned session.
+   *
+   * Omitted when no usable launcher CLI could be identified — the session then
+   * inherits, which is the behaviour that predates this flag.
+   *
+   * @see packages/hench/src/process/agent-mcp-config.ts — builds the file
+   */
+  mcpConfigPath?: string;
 }
 
 /** Separates the system prompt from the task prompt when both travel via stdin. */
@@ -162,6 +183,12 @@ export function buildClaudeCliArgs(
     ...(isWindows ? [input.allowedTools.join(",")] : input.allowedTools),
     ...(input.modelOverride ? ["--model", input.modelOverride] : []),
     ...(input.permissionMode ? ["--permission-mode", input.permissionMode] : []),
+    // A file path, never inline JSON: an inline document would have to survive
+    // cmd.exe quoting on Windows, the hazard the isWindows branches above work
+    // around. --strict-mcp-config makes the file the session's only source of
+    // MCP servers, so an absolute-path local-scope registration pinning another
+    // worktree cannot shadow it.
+    ...(input.mcpConfigPath ? ["--mcp-config", input.mcpConfigPath, "--strict-mcp-config"] : []),
     ...(input.resumeSessionId ? ["--resume", input.resumeSessionId] : []),
     ...(input.resumeSessionId && input.forkSession ? ["--fork-session"] : []),
   ];
@@ -436,6 +463,7 @@ export const claudeCliAdapter: VendorAdapter = {
       permissionMode: opts.permissionMode,
       resumeSessionId: opts.resumeSessionId,
       forkSession: opts.forkSession,
+      mcpConfigPath: opts.mcpConfigPath,
     });
 
     return {

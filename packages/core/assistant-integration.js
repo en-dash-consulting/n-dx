@@ -151,6 +151,12 @@ export function formatInitReport(results, opts = {}) {
       if (result.error) {
         lines.push(`      reason: ${result.error}`);
       }
+      // Shown even here: a compact or de-emphasized surface is still the
+      // surface whose registrations are misdirecting MCP writes, and this is
+      // the one line the operator has to act on.
+      for (const line of formatPinnedMcpWarning(result.detail?.mcp?.pinned)) {
+        lines.push(`      ${line}`);
+      }
       continue;
     }
 
@@ -163,6 +169,34 @@ export function formatInitReport(results, opts = {}) {
   }
 
   return lines;
+}
+
+/**
+ * Warn about local-scope MCP registrations that record an absolute project
+ * directory, and give the command that removes them.
+ *
+ * Claude Code applies a repository's local-scope entry to sessions started in
+ * that repository's other linked worktrees. An absolute directory in the
+ * entry's argv therefore points every one of them at a single checkout — the
+ * shape that sent an autonomous run's PRD writes into the main checkout while
+ * the run itself executed in a worktree. `ndx init` no longer writes one and
+ * removes the ones it can reach; this reports whatever it could not.
+ *
+ * @param {{ name: string, pinnedDir: string }[] | undefined} pinned
+ * @returns {string[]}
+ */
+export function formatPinnedMcpWarning(pinned) {
+  if (!Array.isArray(pinned) || pinned.length === 0) return [];
+
+  const names = [...new Set(pinned.map((p) => p.name))];
+  const dirs = [...new Set(pinned.map((p) => p.pinnedDir))];
+
+  return [
+    `⚠ local-scope MCP registration pins ${names.join(", ")} to ${dirs.join(", ")}`,
+    `  It shadows .mcp.json in this repository's other worktrees, so MCP writes`,
+    `  made there can land in that checkout instead. Remove it with:`,
+    ...names.map((n) => `    claude mcp remove --scope local ${n}`),
+  ];
 }
 
 /**
@@ -209,6 +243,12 @@ function formatVendorArtifacts(vendor, detail) {
     }
     if (detail.mcpJson?.written) {
       lines.push(`.mcp.json — ${detail.mcpJson.servers.join(", ")} (tracked, cwd-relative)`);
+    }
+    // Surfaced regardless of mode and regardless of verbosity elsewhere: an
+    // entry pinning an absolute checkout silently redirects MCP calls made
+    // from this repository's other worktrees, and init could not remove it.
+    for (const line of formatPinnedMcpWarning(detail.mcp?.pinned)) {
+      lines.push(line);
     }
   }
 

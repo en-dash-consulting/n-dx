@@ -2,7 +2,7 @@
 id: "563aace2-25a9-4f53-b754-560c2da6bb06"
 level: "task"
 title: "Detect an index.md whose Children table omits a child directory, after confirming whether it hides items"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "0.7.1"
@@ -10,11 +10,16 @@ tags:
   - "pr-j4"
   - "audit-2026-09-23"
 source: "0.7.1 execution plan status 2026-09-23 (uncaptured follow-up) and the 0.7.1 release audit"
+startedAt: "2026-09-25T06:48:50.543Z"
+completedAt: "2026-09-25T07:07:10.470Z"
+endedAt: "2026-09-25T07:07:10.470Z"
+resolutionType: "code-change"
+resolutionDetail: "The shape is COSMETIC. A fixture test (packages/rex/tests/integration/children-table-omission.test.ts) builds a conformant tree, strikes one leaf .md child and one child directory from a feature's Children table, then loads and saves through the real FolderTreeStore: both children load, both survive the full-tree save, and the save regenerates the table complete. The parser walks the filesystem and never reads the table (folder-tree-parser.ts:13), so nothing is hidden from the loader. The execution plan's claim that such items are \"deleted by the next full-tree save\" conflated this with orphaned-directory — a directory that has lost its index.md, which cannot be parsed as an item at all and whose contents a full save does collect as unreachable. That is the shape commit 47062ab3 restored five files from, and it already has an issue class. Per the third acceptance criterion's survives-branch, rex validate --post-merge now reports children-table-out-of-sync as repairable (advisory to the #396 CI gate, not blocking), in both directions — a child on disk that no row lists, and a row pointing at a file that is gone. --repair rewrites the table from the directory."
 acceptanceCriteria:
   - "A fixture test records whether a child directory missing from its parent's Children table survives a load followed by a full-tree save."
   - "If the child does not survive, rex validate --post-merge reports the shape as needing manual intervention, so the #396 CI gate fails on it."
   - "If the child survives, rex validate --post-merge reports the table as repairable (out of sync), and the task's resolution records that the shape is cosmetic."
 description: "`testing-documentation/make-test-results-independent-of` reached `main` with its `index.md` present but four children missing from its Children table. PRs #394 and #395 each repaired it by hand. The execution plan says items hidden this way are invisible to the loader and deleted by the next full-tree save. `rex validate --post-merge` reports nothing for this shape: `post-merge-validate.ts` has no issue class for it, so the #396 CI gate cannot catch it.\n\nThe audit found that `folder-tree-parser.ts:13` treats the Children table as informational and directory nesting as authoritative, which would make the shape cosmetic. Settle that first: build a fixture whose feature `index.md` omits one child from its table, load it, save the full tree, and check whether the child survives.\n\nConstraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (hench: src/prd/rex-gateway.ts and src/prd/llm-gateway.ts; web: src/server/rex-gateway.ts and src/server/domain-gateway.ts) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name (@n-dx/hench, @n-dx/rex, @n-dx/web, @n-dx/core, @n-dx/sourcevision, @n-dx/llm-client) with a patch bump; run pnpm preflight before opening the PR."
-lastModified: "2026-09-23T18:40:21.653Z"
+lastModified: "2026-09-25T07:07:11.051Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

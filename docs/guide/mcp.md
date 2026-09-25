@@ -8,7 +8,7 @@ Rex and SourceVision expose [Model Context Protocol](https://modelcontextprotoco
 
 `ndx init` writes a tracked `.mcp.json` at the project root (cwd-relative commands, e.g. `{"command":"ndx","args":["rex","mcp","."]}`) and read-only tool permissions to `.claude/settings.local.json`. `.mcp.json` is committed to the repo, so every worktree and teammate clone gets a working registration without any `claude mcp add` call — **MCP works out of the box** after init. Claude Code shows a one-time approval prompt for a project's servers the first time it opens the checkout.
 
-If `ndx` isn't on `PATH`, run the CLI through npx instead: `npx -y @n-dx/core rex mcp .` / `npx -y @n-dx/core sv mcp .`. Pass `--mcp-scope=local` to `ndx init` to fall back to the older `claude mcp add --scope local` registration (per-machine, absolute paths) instead of `.mcp.json`.
+If `ndx` isn't on `PATH`, run the CLI through npx instead: `npx -y @n-dx/core rex mcp .` / `npx -y @n-dx/core sv mcp .`. Pass `--mcp-scope=local` to `ndx init` to fall back to the older `claude mcp add --scope local` registration (per-machine, absolute server path) instead of `.mcp.json`. The project directory it records is cwd-relative, like `.mcp.json`'s — an absolute one would pin every worktree of the repository to a single checkout, because Claude Code applies a repository's local-scope entry to sessions started in its linked worktrees. `ndx init` reports any absolute-path entry it finds along with the `claude mcp remove --scope local` command that retires it.
 
 For multi-project setups, HTTP transport is available but is only safe with **one n-dx project running at a time** until the multi-project hub (0.7.0) lands — see [Transport Options](#transport-options) below.
 

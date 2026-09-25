@@ -66,6 +66,12 @@ export interface EnsureWarmParentOptions {
   fresh?: boolean;
   /** TTL override (`hench.parentMaxAgeHours`). */
   maxAgeHours?: number;
+  /**
+   * Run-scoped MCP config the orientation spawn must use, so the parent every
+   * task forks from was oriented against this worktree's servers rather than
+   * an inherited registration's.
+   */
+  mcpConfigPath?: string;
   /** Spawn executor, injected so this module stays process-free and testable. */
   spawn: (config: SpawnConfig) => Promise<OrientationSpawnResult>;
 }
@@ -213,6 +219,7 @@ export async function ensureWarmParent(
     // Plan mode cannot edit. Orientation is the one spawn where that is
     // exactly right — and it is a third guard behind the two prompts.
     permissionMode: "plan",
+    mcpConfigPath: opts.mcpConfigPath,
   });
 
   let result: OrientationSpawnResult;

@@ -512,6 +512,59 @@ describe("slug-rule write guard", () => {
 
       expect(refusal).toBeNull();
     });
+
+    // `migratable` is what a gate consults before offering to run
+    // `rex migrate-slugs`. It has to agree with `assertSlugRuleAdoptable`,
+    // which is the command's own refusal: an offer for a tree the migration
+    // would refuse sends the operator into a dead end, and — worse — an offer
+    // withheld from a tree it would have fixed leaves the manual step in place
+    // for the one case this is all meant to close.
+    async function refusalFor(slugRule: number): Promise<{ markerFound: number | undefined; migratable: boolean }> {
+      await new FolderTreeStore(rexDir).saveDocument(doc());
+      const items = (await new FolderTreeStore(rexDir).loadDocument()).items;
+      const meta = JSON.parse(await readFile(join(rexDir, TREE_META), "utf-8"));
+      await writeFile(join(rexDir, TREE_META), JSON.stringify({ ...meta, slugRule }), "utf-8");
+
+      const refusal = await checkTreeConformance(rexDir, treeRoot, items);
+      expect(refusal).not.toBeNull();
+      return refusal!;
+    }
+
+    it("marks an older marker migratable, matching the advice it gives", async () => {
+      const refusal = await refusalFor(SLUG_RULE_VERSION - 1);
+
+      expect(refusal.migratable).toBe(true);
+      expect(refusal.markerFound).toBe(SLUG_RULE_VERSION - 1);
+    });
+
+    // The direction `assertSlugRuleAdoptable` refuses. Offering a migration
+    // here would be a downgrade wearing a migration's name, and the two builds
+    // would ping-pong whole-tree renames between them.
+    it("marks a newer marker not migratable", async () => {
+      const refusal = await refusalFor(SLUG_RULE_VERSION + 1);
+
+      expect(refusal.migratable).toBe(false);
+      expect(refusal.markerFound).toBe(SLUG_RULE_VERSION + 1);
+    });
+
+    it("marks an unmarked non-conforming tree migratable", async () => {
+      const store = new FolderTreeStore(rexDir);
+      await store.saveDocument(doc());
+      await writeFile(
+        join(rexDir, TREE_META),
+        JSON.stringify({ title: "Guarded PRD", schema: SCHEMA_VERSION }),
+        "utf-8",
+      );
+      const items = (await new FolderTreeStore(rexDir).loadDocument()).items;
+      const body = await readFile(join(treeRoot, "add-sso-support.md"), "utf-8");
+      await rm(join(treeRoot, "add-sso-support.md"));
+      await writeFile(join(treeRoot, "add-sso-support-aaaaaa.md"), body, "utf-8");
+
+      const refusal = await checkTreeConformance(rexDir, treeRoot, items);
+
+      expect(refusal!.migratable).toBe(true);
+      expect(refusal!.markerFound).toBeUndefined();
+    });
   });
 
   // The refusal exists to be read. `parentDir` is built with `path.join`, so

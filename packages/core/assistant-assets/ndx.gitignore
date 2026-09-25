@@ -25,6 +25,9 @@
 .hench/recovery/
 # Per-session token-usage watermarks written by `hench record`
 .hench/usage-cursors/
+# Per-run MCP server configs handed to the spawned agent session. Machine-local
+# (they hold absolute paths for this checkout and install); safe to delete.
+.hench/mcp/
 # Warm-parent session cache, rewritten on every orientation. Machine-local.
 .hench/session-cache.json
 .hench-commit-msg.txt

@@ -18,7 +18,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmdirSync, unlinkSync, readdirSync, realpathSync } from "fs";
 import { createRequire } from "module";
-import { join, resolve } from "path";
+import { isAbsolute, join, resolve } from "path";
 // execFileSyncCli, not execSync: every argument here is a filesystem path
 // (the claude binary, the resolved MCP entrypoint, the project dir). Building a
 // cmd.exe command line by hand around those broke on `&`, `^`, `(`, `)`, `!` and
@@ -41,6 +41,19 @@ import { homedir } from "os";
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
 const _require = createRequire(import.meta.url);
+
+/**
+ * The project-directory positional every MCP server registration records.
+ *
+ * Deliberately cwd-relative. A registration is re-run by every session Claude
+ * Code applies it to, and it applies a repository's local-scope entry to
+ * sessions started in that repository's other linked worktrees. An absolute
+ * directory therefore pins all of them to one checkout: a run in a worktree
+ * got a rex server writing to the main checkout, and its `update_task_status`
+ * landed there, on whatever branch that checkout had out. `.` resolves against
+ * the session's own cwd, so each worktree reaches its own `.rex/`.
+ */
+const MCP_PROJECT_ARG = ".";
 
 /**
  * Resolve a sub-package CLI path — monorepo first, then node_modules.
@@ -237,11 +250,16 @@ function readLocalMcpServers(absDir) {
 
 /**
  * True only when Claude Code has a local-scope entry named `name` under this
- * project AND that entry's own recorded args target this directory (its last
- * arg — the project dir positional in the `mcp add` command below — equals
- * `absDir`). Local scope is already keyed per-directory, but this extra
- * check guards against removing an entry that merely happens to share a
- * project key without actually pointing here.
+ * project AND that entry's own recorded args target this directory. Local
+ * scope is already keyed per-directory, but this extra check guards against
+ * removing an entry that merely happens to share a project key without
+ * actually pointing here.
+ *
+ * Two shapes count as targeting this project: the cwd-relative `.` this
+ * function's caller writes today, and the absolute `absDir` it used to write.
+ * Recognising the legacy shape is what makes re-running `ndx init` repair a
+ * pinned registration rather than leave it in place.
+ *
  * @param {string} absDir
  * @param {string} name
  * @returns {boolean}
@@ -249,7 +267,36 @@ function readLocalMcpServers(absDir) {
 function localEntryTargetsProject(absDir, name) {
   const servers = readLocalMcpServers(absDir);
   const args = servers?.[name]?.args;
-  return Array.isArray(args) && args.length > 0 && args[args.length - 1] === absDir;
+  if (!Array.isArray(args) || args.length === 0) return false;
+  const target = args[args.length - 1];
+  return target === MCP_PROJECT_ARG || projectConfigKeyCandidates(absDir).includes(target);
+}
+
+/**
+ * Local-scope entries that record an **absolute** project directory.
+ *
+ * An absolute directory is the defect: Claude Code applies a repository's
+ * local-scope entry to sessions started in that repository's other linked
+ * worktrees, so an entry naming one checkout redirects every MCP call made
+ * from any of them — including an autonomous run's PRD writes, which then land
+ * in the wrong checkout on whatever branch it has out.
+ *
+ * @param {string} absDir
+ * @returns {{ name: string, pinnedDir: string }[]}
+ */
+function findPinnedLocalEntries(absDir) {
+  const servers = readLocalMcpServers(absDir);
+  if (!servers) return [];
+
+  const pinned = [];
+  for (const name of Object.keys(getMcpServers())) {
+    const args = servers[name]?.args;
+    if (!Array.isArray(args) || args.length === 0) continue;
+    const target = args[args.length - 1];
+    if (typeof target !== "string" || !isAbsolute(target)) continue;
+    pinned.push({ name, pinnedDir: target });
+  }
+  return pinned;
 }
 
 /**
@@ -269,18 +316,35 @@ function localEntryTargetsProject(absDir, name) {
  * scope is global — removing it would strip a registration that has nothing
  * to do with this project.
  *
+ * Neither mode writes an absolute project directory any more — see
+ * {@link MCP_PROJECT_ARG}. Entries left behind by a build that did are
+ * reported in `pinned` so the caller can surface them even when they could not
+ * be removed (no `claude` on PATH, or a removal that failed).
+ *
  * @param {string} dir
  * @param {{ mcpScope?: "local" }} [opts]
  */
 function registerMcpServers(dir, opts = {}) {
   const useLocalScope = opts.mcpScope === "local";
+  const absDir = resolve(dir);
+
+  // Read before anything is removed, and before the `claude` lookup can bail:
+  // a missing CLI is precisely the case where init cannot clean up and the
+  // operator has to be told the command.
+  const pinned = findPinnedLocalEntries(absDir);
+
   const discovery = discoverClaudeCli(dir);
   if (!discovery.found) {
-    return { registered: false, reason: "claude CLI not found", searched: discovery.searched, mode: useLocalScope ? "local" : "tracked" };
+    return {
+      registered: false,
+      reason: "claude CLI not found",
+      searched: discovery.searched,
+      mode: useLocalScope ? "local" : "tracked",
+      pinned,
+    };
   }
 
   const claudeCmd = discovery.path;
-  const absDir = resolve(dir);
   const servers = getMcpServers();
 
   // Clean up any stale local-scope entry left by a prior run — but only one
@@ -298,11 +362,18 @@ function registerMcpServers(dir, opts = {}) {
     }
   }
 
+  // What the sweep above could not reach: an entry pinning some *other*
+  // directory. `claude mcp remove --scope local` is cwd-scoped, so it only
+  // retires entries that name this project — which the loop just did.
+  const keys = projectConfigKeyCandidates(absDir);
+  const unresolved = pinned.filter((p) => !keys.includes(p.pinnedDir));
+
   if (!useLocalScope) {
     return {
       registered: false,
       reason: "using tracked .mcp.json (pass --mcp-scope=local to register local scope instead)",
       mode: "tracked",
+      pinned: unresolved,
     };
   }
 
@@ -311,9 +382,12 @@ function registerMcpServers(dir, opts = {}) {
     const bin = resolveSubPackageCli(descriptor.package, descriptor.npmName);
     try {
       // `claude mcp add --scope local` — the flag-gated legacy path.
+      // MCP_PROJECT_ARG, never absDir: the recorded argv is re-run by every
+      // session Claude Code applies this entry to, including sessions in the
+      // repository's other worktrees.
       execFileSyncCli(
         claudeCmd,
-        ["mcp", "add", "--scope", "local", name, "--", "node", bin, descriptor.mcpCommand, absDir],
+        ["mcp", "add", "--scope", "local", name, "--", "node", bin, descriptor.mcpCommand, MCP_PROJECT_ARG],
         { stdio: "pipe", timeout: 10_000, cwd: absDir },
       );
       results.push({ name, transport: "stdio", ok: true });
@@ -322,7 +396,7 @@ function registerMcpServers(dir, opts = {}) {
     }
   }
 
-  return { registered: true, servers: results, mode: "local" };
+  return { registered: true, servers: results, mode: "local", pinned: unresolved };
 }
 
 // ── Tracked .mcp.json ─────────────────────────────────────────────────────────
@@ -343,7 +417,7 @@ function buildTrackedMcpServers(cliName) {
   const entries = {};
   for (const [name, descriptor] of Object.entries(servers)) {
     const subcommand = descriptor.cliCommand ?? name;
-    entries[name] = { command: cliName, args: [subcommand, descriptor.mcpCommand, "."] };
+    entries[name] = { command: cliName, args: [subcommand, descriptor.mcpCommand, MCP_PROJECT_ARG] };
   }
   return entries;
 }

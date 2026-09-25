@@ -117,6 +117,10 @@ import {
 } from "./background-wait.js";
 import type { BackgroundWaitSignal } from "./vendor-adapter.js";
 import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
+import {
+  prepareAgentMcpConfig,
+  LAUNCHER_REJECTION_DETAIL,
+} from "../../process/agent-mcp-config.js";
 
 // ── normalizeCodexResponse ────────────────────────────────────────────────
 
@@ -1250,6 +1254,12 @@ export interface ReviewPassContext {
   /** True when no human is attached — the reviewer applies the verdict policy itself. */
   autonomous: boolean;
   taskTitle: string;
+  /**
+   * Run-scoped MCP config the reviewer must use. The reviewer resumes the work
+   * session and can apply must-fixes, so it reaches the PRD through the same
+   * servers and must be pinned to the same worktree.
+   */
+  mcpConfigPath?: string;
 }
 
 /**
@@ -1364,6 +1374,7 @@ async function runAdversarialReviewPass(
     model: ctx.reviewModel || undefined,
     permissionMode: ctx.permissionMode,
     resumeSessionId,
+    mcpConfigPath: ctx.mcpConfigPath,
   });
 
   stream(
@@ -1447,6 +1458,9 @@ async function runAdversarialReviewPass(
         model: ctx.reviewModel || undefined,
         permissionMode: ctx.permissionMode,
         resumeSessionId: reviewerSession,
+        // Same pin as the first review spawn: a resumed session does not keep
+        // its MCP config, and this one can write review captures to the PRD.
+        mcpConfigPath: ctx.mcpConfigPath,
       }),
     );
     if (!resumed.ok) return failReview(resumed);
@@ -1886,6 +1900,29 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const cliBinary = resolveVendorCliPath(llmConfig, config);
   const cliEnv = resolveVendorCliEnv(llmConfig);
 
+  // Pin the spawned session's MCP servers to *this* project directory, so the
+  // agent's PRD writes land in the worktree the run is executing in. Without
+  // this the session inherits Claude Code's registrations for the repository,
+  // and a local-scope entry pinning another checkout silently redirects every
+  // `update_task_status` there — the per-workspace PRD lock cannot help,
+  // because the write never reaches this workspace at all.
+  //
+  // Claude only: no other adapter honours `--mcp-config`, and the pre-flight
+  // warns for those instead.
+  let mcpConfigPath: string | undefined;
+  if (vendor === LLM_VENDOR.CLAUDE) {
+    const prepared = await prepareAgentMcpConfig({ henchDir, runId: run.id, projectDir });
+    if (prepared.ok) {
+      mcpConfigPath = prepared.path;
+    } else {
+      detail(
+        `MCP servers: inheriting the session's registrations ` +
+          `(${LAUNCHER_REJECTION_DETAIL[prepared.reason]}). ` +
+          `PRD writes are not pinned to ${projectDir}.`,
+      );
+    }
+  }
+
   // Assemble the review-pass context once, if `--review` is on. Building it
   // here rather than at the call site keeps the per-attempt success path free
   // of config resolution, and makes "review is off" a single undefined value.
@@ -1906,6 +1943,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         permissionMode: "acceptEdits",
         autonomous: autonomous || opts.yes === true || process.stdin.isTTY !== true,
         taskTitle: brief.task.title,
+        mcpConfigPath,
       }
     : undefined;
 
@@ -2027,6 +2065,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       projectDir,
       model: opts.spawnModel ?? "",
       maxAgeHours: config.parentMaxAgeHours,
+      mcpConfigPath,
       spawn: (spawnConfig) =>
         spawnWithAdapter({
           adapter,
@@ -2179,6 +2218,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             backgroundResumeSessionId ?? retryResumeSessionId ?? warmParentId ?? batchResumeId,
           forkSession:
             !backgroundResumeSessionId && !retryResumeSessionId && warmParentId ? true : undefined,
+          mcpConfigPath,
         });
 
         // Capture prompt section diagnostics on the first attempt for run-level storage.

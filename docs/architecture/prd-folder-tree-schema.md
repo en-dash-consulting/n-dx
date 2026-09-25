@@ -626,7 +626,7 @@ The Web Dashboard is the central hub for PRD management, analysis, and autonomou
 
 ## Recursive Children Summary Block
 
-Every per-item markdown file whose item has direct children **must** include a `## Children` section at the end of the Markdown body. Tasks **never** include this section — their children are subtasks encoded as sections.
+Every per-item markdown file whose item has direct children **must** include a `## Children` section at the end of the Markdown body. This holds at every level, tasks included — the compatibility matrix above says the same. (An earlier revision claimed tasks never carry the section, on the reasoning that their children are subtasks encoded as sections. Subtask *sections* are indeed not listed, but a task whose subtasks are stored as files or folders lists them like any other parent, and the serializer has always written the section for it.)
 
 ### Format
 
@@ -635,14 +635,16 @@ Every per-item markdown file whose item has direct children **must** include a `
 
 | Title | Status |
 |-------|--------|
-| [{child title}](./{child-slug}/{child_title}.md) | {status} |
+| [{child title}](./{child-slug}.md) | {status} |
+| [{child title}](./{child-slug}/index.md) | {status} |
 ```
 
 **Rules:**
 - Children listed in PRD insertion order.
-- Relative link: `./` + child directory name + `/` + `<titleToFilename(child.title)>.md`. Legacy fixtures whose links still point at `/index.md` are accepted by the parser, but the serializer always emits the title-named form.
+- Relative link: `./` + the child's slug, then `.md` for a leaf child (no children of its own) or `/index.md` for a child that owns a directory. The two forms track the storage format, so a child gaining its first child changes its link along with its file.
 - If a non-leaf item has no children (empty container), omit the `## Children` section entirely.
-- The parser **ignores** this section for tree reconstruction — it uses directory nesting as ground truth. The section is informational only.
+- Titles are **not** escaped into the link label, so a title containing `[` or `]` produces a row whose label has unbalanced brackets. Read the link target as the row's last `](…)` rather than by matching a `[label](target)` pair — see `parseChildrenTable` in `packages/rex/src/core/post-merge-validate.ts`.
+- The parser **ignores** this section for tree reconstruction — it uses directory nesting as ground truth. The section is informational only, and a child absent from it is still loaded and still saved.
 
 ---
 
@@ -877,6 +879,10 @@ The parser (folder tree → PRD) must:
 ## Post-Merge Validation
 
 A git merge of the tree can leave corruption no rex code path produces: duplicate IDs (both branches created or moved the same item at different paths), directories whose `index.md` was lost in conflict resolution, files at the wrong nesting depth, `blockedBy` references to items the other branch deleted, and unresolved conflict markers. `rex validate --post-merge` scans the raw tree for all five classes; `--repair` fixes the deterministic ones (empty orphaned directories are removed, `level` is rewritten to the depth-implied value, dangling `blockedBy` ids are dropped) and refuses the ambiguous ones (duplicate IDs, conflict markers, orphaned directories that still contain items) with instructions.
+
+A sixth class, `children-table-out-of-sync`, is reported alongside them but is **not** corruption: a `## Children` table that disagrees with its own directory, in either direction. Because the parser reads the directory and never the table, nothing is lost — the omitted items load normally and the next full-tree save rewrites the table complete. It is reported because the state reached `main` unnoticed and was repaired by hand twice, and because a stale table misleads every human and agent reading the tree as documentation. It is repairable (the table is rewritten from the directory), so the CI gate treats it as advisory.
+
+The class that *does* destroy items is `orphaned-directory`: an item file whose directory has lost its `index.md` cannot be parsed as an item at all, so a full-tree save collects everything inside it as unreachable. Do not conflate the two.
 
 Exit codes are hook-friendly — 0 means clean (including a repo with no PRD tree at all), 1 means issues remain — so it wires directly into an optional git post-merge hook:
 
