@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { cleanupProjectDir } from "../helpers/index.js";
+import { cleanupProjectDir, decodeClaudeDelivery } from "../helpers/index.js";
 import {
   createScriptedClaudeCli,
   setupScriptedProject,
@@ -127,9 +127,12 @@ describe("cliLoop — background-wait resume", () => {
     expect(resumes(resume!, WORK_SESSION)).toBe(true);
     // Continues the session that stopped — a fork would leave its transcript behind.
     expect(forks(resume!)).toBe(false);
-    expect(resume!.stdin).toContain(WORK_SESSION_RESUME_MESSAGE);
+    // The task prompt, not raw stdin: on Windows stdin carries the system
+    // prompt as well.
+    const { taskPrompt } = decodeClaudeDelivery(resume!.args, resume!.stdin);
+    expect(taskPrompt).toContain(WORK_SESSION_RESUME_MESSAGE);
     // The whole turn is the message: the resumed session already holds the task.
-    expect(resume!.stdin).not.toContain("Scripted task");
+    expect(taskPrompt).not.toContain("Scripted task");
 
     expect(run.status).toBe("completed");
     expect(run.error).toBeUndefined();

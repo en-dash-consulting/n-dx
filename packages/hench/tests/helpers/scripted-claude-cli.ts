@@ -23,6 +23,13 @@ import { setupProjectDir, disableMemoryGuard, commitGitFixtureBaseline } from ".
 
 /** What one vendor-CLI spawn received. */
 export interface CliInvocation {
+  /**
+   * The vendor CLI's own argv, without the binary — the same shape on every
+   * platform. On Windows `spawnCli` launches the CLI as
+   * `cmd.exe /d /s /c "<quoted command line>"`; that line is decoded back
+   * here, so tests assert the argv the CLI actually parses rather than one
+   * platform's wrapper.
+   */
   args: string[];
   stdin: string;
 }
@@ -37,14 +44,68 @@ function commandBase(command: string): string {
 const VENDOR_CLIS = ["claude", "codex"];
 
 /**
- * True for a vendor CLI: `claude` or `codex` on POSIX, and the `cmd.exe`
- * wrapper `spawnCli` launches them through on Windows. A `--version` probe is
- * not a session and is answered with an empty child.
+ * Split a command line built by `buildWindowsCliCommandLine` back into its
+ * tokens — the binary first, then the argv.
+ *
+ * The inverse of `quoteWindowsToken`: every argument is wrapped in `"…"`, an
+ * embedded quote is written `""`, and backslashes are doubled only where they
+ * precede a quote (or the closing quote). The binary may be bare.
+ *
+ * @internal Exported for testing.
  */
-function isVendorCli(command: string, args: string[]): boolean {
+export function decodeWindowsCommandLine(line: string): string[] {
+  const tokens: string[] = [];
+  let i = 0;
+  const n = line.length;
+  while (i < n) {
+    while (i < n && line[i] === " ") i++;
+    if (i >= n) break;
+    if (line[i] !== '"') {
+      const start = i;
+      while (i < n && line[i] !== " ") i++;
+      tokens.push(line.slice(start, i));
+      continue;
+    }
+    i++; // opening quote
+    let token = "";
+    while (i < n) {
+      let slashes = 0;
+      while (i < n && line[i] === "\\") {
+        slashes++;
+        i++;
+      }
+      if (i < n && line[i] === '"') {
+        token += "\\".repeat(slashes / 2);
+        if (line[i + 1] === '"') {
+          token += '"'; // `""` is an embedded quote
+          i += 2;
+          continue;
+        }
+        i++; // closing quote
+        break;
+      }
+      token += "\\".repeat(slashes);
+      if (i < n) token += line[i++];
+    }
+    tokens.push(token);
+  }
+  return tokens;
+}
+
+/**
+ * The vendor binary and argv behind one spawn, or undefined when the spawn is
+ * not a vendor CLI. On Windows `spawnCli` runs `cmd.exe /d /s /c "<line>"`,
+ * where `<line>` is the quoted command line; it is decoded back to argv.
+ */
+function vendorInvocation(command: string, args: string[]): { args: string[] } | undefined {
   const base = commandBase(command).toLowerCase();
-  if (base === "cmd") return VENDOR_CLIS.some((cli) => args.join(" ").includes(cli));
-  return VENDOR_CLIS.includes(base);
+  if (base === "cmd") {
+    const wrapped = args[args.length - 1] ?? "";
+    const line = wrapped.startsWith('"') && wrapped.endsWith('"') ? wrapped.slice(1, -1) : wrapped;
+    const [binary = "", ...argv] = decodeWindowsCommandLine(line);
+    return VENDOR_CLIS.includes(commandBase(binary).toLowerCase()) ? { args: argv } : undefined;
+  }
+  return VENDOR_CLIS.includes(base) ? { args } : undefined;
 }
 
 function emptyChild(): EventEmitter {
@@ -124,11 +185,12 @@ export function createScriptedClaudeCli(actualSpawn: typeof nodeSpawn): Scripted
     invocations,
     script: (...turns) => queue.push(...turns),
     spawn: (command, args = [], opts) => {
-      if (!isVendorCli(command, args)) {
+      const vendor = vendorInvocation(command, args);
+      if (!vendor) {
         return (actualSpawn as (c: string, a: string[], o: unknown) => unknown)(command, args, opts);
       }
-      if (args.length === 1 && args[0] === "--version") return emptyChild();
-      return cliChild(args);
+      if (vendor.args.length === 1 && vendor.args[0] === "--version") return emptyChild();
+      return cliChild(vendor.args);
     },
   };
 }
@@ -166,14 +228,15 @@ export function resultLine(sessionId: string, text: string, numTurns = 2): objec
   return { type: "result", subtype: "success", session_id: sessionId, result: text, num_turns: numTurns };
 }
 
-/** True when this invocation resumes `sessionId`, on either platform's argv shape. */
+/** True when this invocation resumes `sessionId`. */
 export function resumes(call: CliInvocation, sessionId: string): boolean {
-  return call.args.join(" ").includes(`--resume ${sessionId}`);
+  const at = call.args.indexOf("--resume");
+  return at !== -1 && call.args[at + 1] === sessionId;
 }
 
 /** True when this invocation forks the session it resumes. */
 export function forks(call: CliInvocation): boolean {
-  return call.args.join(" ").includes("--fork-session");
+  return call.args.includes("--fork-session");
 }
 
 // ── Project fixture ─────────────────────────────────────────────────────────
