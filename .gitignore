@@ -7,6 +7,9 @@ package-lock.json
 .hench/usage-cursors/
 .hench/reviews/
 .hench/recovery/
+# Per-run MCP server configs handed to the spawned agent session. Machine-local
+# (they hold absolute paths for this checkout and install); safe to delete.
+.hench/mcp/
 .hench/session-cache.json
 .hench-commit-msg.txt
 .run-logs/

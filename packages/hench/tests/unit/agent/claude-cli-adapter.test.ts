@@ -374,6 +374,67 @@ describe("ClaudeCliAdapter: --permission-mode", () => {
   });
 });
 
+// ── 3b. --mcp-config / --strict-mcp-config ───────────────────────────────
+
+describe("ClaudeCliAdapter: --mcp-config", () => {
+  const base = { systemPrompt: "SP", promptText: "TP", allowedTools: ["Read"] };
+
+  it("pairs --mcp-config with --strict-mcp-config", () => {
+    // Without --strict-mcp-config the file is additive, so an inherited
+    // local-scope registration pinning another worktree would still be in
+    // play and could still answer the agent's PRD writes.
+    const { args } = buildClaudeCliArgs({ ...base, mcpConfigPath: "/run/.hench/runs/r1.mcp.json" });
+
+    const idx = args.indexOf("--mcp-config");
+    expect(idx).toBeGreaterThan(-1);
+    expect(args[idx + 1]).toBe("/run/.hench/runs/r1.mcp.json");
+    expect(args).toContain("--strict-mcp-config");
+  });
+
+  it("passes a path, never an inline document", () => {
+    // Inline JSON would have to survive cmd.exe quoting on Windows — the
+    // hazard the Windows branch of this builder already works around.
+    const { args } = buildClaudeCliArgs({ ...base, mcpConfigPath: "/tmp/r.mcp.json" });
+    const value = args[args.indexOf("--mcp-config") + 1]!;
+    expect(value).not.toContain("{");
+  });
+
+  it("omits both flags when no config path is supplied", () => {
+    const { args } = buildClaudeCliArgs(base);
+    expect(args).not.toContain("--mcp-config");
+    expect(args).not.toContain("--strict-mcp-config");
+  });
+
+  it("emits the flags on Windows too, where the shadowing registration also applies", () => {
+    const { args } = buildClaudeCliArgs({ ...base, mcpConfigPath: "C:\\r.mcp.json" }, "win32");
+    expect(args[args.indexOf("--mcp-config") + 1]).toBe("C:\\r.mcp.json");
+    expect(args).toContain("--strict-mcp-config");
+  });
+
+  it("still applies when the spawn resumes or forks a session", () => {
+    // The review pass resumes, and the warm-parent strategy forks. Both reach
+    // the PRD, so neither may fall back to the inherited registrations.
+    const { args } = buildClaudeCliArgs({
+      ...base,
+      mcpConfigPath: "/tmp/r.mcp.json",
+      resumeSessionId: "s-1",
+      forkSession: true,
+    });
+    expect(args).toContain("--strict-mcp-config");
+    expect(args).toContain("--fork-session");
+  });
+
+  it("adapter forwards opts.mcpConfigPath through buildSpawnConfig", () => {
+    const config = claudeCliAdapter.buildSpawnConfig(
+      createMinimalEnvelope(),
+      DEFAULT_EXECUTION_POLICY,
+      { mcpConfigPath: "/tmp/r.mcp.json" },
+    );
+    expect(config.args[config.args.indexOf("--mcp-config") + 1]).toBe("/tmp/r.mcp.json");
+    expect(config.args).toContain("--strict-mcp-config");
+  });
+});
+
 // ── 4. parseEvent ────────────────────────────────────────────────────────
 
 describe("ClaudeCliAdapter: parseEvent", () => {

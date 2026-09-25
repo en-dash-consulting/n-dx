@@ -23,6 +23,11 @@ import {
 } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims } from "../../process/task-claims.js";
+import {
+  findShadowingRegistrations,
+  formatShadowingWarning,
+} from "../../process/claude-mcp-registration.js";
+import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
@@ -37,6 +42,7 @@ import {
   MAX_CONTEXT_FILE_CHARS,
 } from "../../agent/planning/context-caps.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
+import type { LLMVendor } from "../../prd/llm-gateway.js";
 import { LLM_VENDOR, printVendorModelHeader, resolveModel, resolveTaskModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
 import { formatQueueStatus } from "../../queue/format.js";
@@ -449,6 +455,45 @@ export function createPerTaskTreeGate(
     }
     await assertPrdTreeConformant(rexDir);
   };
+}
+
+/**
+ * Warn when a local-scope Claude MCP registration pins this repository's rex or
+ * sourcevision server to a different checkout than the run will execute in.
+ *
+ * A warning, not a refusal: the registration is the operator's machine-local
+ * configuration, it may be deliberate, and a run that cannot start because of a
+ * file outside the repository would be worse than one that says what it found.
+ *
+ * Silent only when the run will actually override the entry: a Claude run that
+ * could resolve the CLI which launched it passes its own `--mcp-config` with
+ * `--strict-mcp-config` and does not inherit the registration at all. Warning
+ * there would describe a hazard the run has already closed.
+ *
+ * Everything else still inherits and still has to be told — Codex, whose
+ * adapter has no equivalent flag; a standalone `hench run`, which has no
+ * launcher CLI to build the config from; and the operator's own interactive
+ * sessions, which no run controls.
+ *
+ * Never throws: a detector that failed a run would be a worse defect than the
+ * one it reports.
+ *
+ * @param projectDir The directory the run will execute in.
+ * @param vendor The resolved LLM vendor for this run.
+ */
+export async function warnOnShadowingMcpRegistration(
+  projectDir: string,
+  vendor: LLMVendor,
+): Promise<void> {
+  if (vendor === LLM_VENDOR.CLAUDE && resolveLauncherCli().usable) return;
+
+  let lines: string[];
+  try {
+    lines = formatShadowingWarning(projectDir, await findShadowingRegistrations(projectDir));
+  } catch {
+    return;
+  }
+  for (const line of lines) info(colorWarn(line));
 }
 
 export interface ResetDeferredOptions {
@@ -1512,6 +1557,15 @@ export async function cmdRun(
   // one extra loadDocument, ~0.33s on a 405-item tree, once per run.
   await assertPrdTreeConformant(rexDir);
   const gateTree = createPerTaskTreeGate(rexDir);
+
+  // Warn when a local-scope Claude MCP registration pins this repository's
+  // servers to a different checkout — the shape that sent run 0b919f4f's
+  // `update_task_status` into the main checkout instead of the worktree it was
+  // executing in.
+  //
+  // Only for the spawns that cannot override it — see the function's own note
+  // on which those are.
+  await warnOnShadowingMcpRegistration(dir, llmVendor);
 
   // --reset-deferred: reset all deferred/failing tasks to pending before running.
   // This lets the user retry tasks that were deferred by infrastructure failures
