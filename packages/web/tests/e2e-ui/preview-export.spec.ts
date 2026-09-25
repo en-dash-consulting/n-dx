@@ -41,15 +41,30 @@ test("reads in full with scripts disabled", async ({ browser }) => {
   const page = await context.newPage();
   await page.goto(fileUrl, { waitUntil: "load" });
 
+  // The landing page is what a reader without scripts sees: three stage cards
+  // with the headline numbers baked in.
   const visible = page.locator(".page:not([hidden])");
   await expect(visible).toHaveCount(1);
-  for (const name of ["General Repository Information", "Repository Map", "PRD Items", "Token Usage"]) {
-    await expect(visible.locator(".sec-head h2", { hasText: name })).toBeVisible();
+  await expect(visible).toHaveAttribute("data-page-id", "home");
+  const cards = visible.locator(".stage-card");
+  await expect(cards).toHaveCount(3);
+  await expect(cards.nth(0)).toContainText("1,933");
+  await expect(cards.nth(1)).toContainText("1,548");
+  await expect(cards.nth(2)).toContainText("1,146");
+
+  // Every other page is in the markup too, hidden, with its data — the Analysis
+  // page's sections, its real numbers and the 2D graph, none drawn on load.
+  const analysis = page.locator('.page[data-page-id="analysis"]');
+  await expect(analysis).toHaveCount(1);
+  for (const name of ["General Repository Information", "Repository Map", "Token Usage"]) {
+    await expect(analysis.locator(".sec-head h2", { hasText: name })).toHaveCount(1);
   }
-  await expect(visible.locator(".stat", { hasText: "Files" }).first()).toContainText("1,933");
-  await expect(visible.locator(".stat", { hasText: "Zones" }).first().locator(".info")).toHaveAttribute("data-info", /Louvain/);
-  // The 2D graph is in the markup, not drawn on load.
-  await expect(visible.locator("svg:not([hidden]) circle")).not.toHaveCount(0);
+  await expect(page.locator('.page[data-page-id="work"] .sec-head h2', { hasText: "PRD Items" })).toHaveCount(1);
+  // The package marks are inlined, so the export still carries no external references.
+  await expect(cards.locator(".mark img")).toHaveCount(3);
+  await expect(analysis.locator(".stat", { hasText: "Files" }).first()).toContainText("1,933");
+  await expect(analysis.locator(".stat", { hasText: "Zones" }).first().locator(".info")).toHaveAttribute("data-info", /Louvain/);
+  await expect(analysis.locator("svg:not([hidden]) circle")).not.toHaveCount(0);
 
   await context.close();
 });

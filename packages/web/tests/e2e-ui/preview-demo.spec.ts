@@ -81,9 +81,11 @@ test("every page renders its headline sections without throwing", async ({ page 
   const errors = watchErrors(page);
   await page.goto(baseUrl + "/option1-demo.html#analysis", { waitUntil: "networkidle" });
 
-  for (const name of ["General Repository Information", "Repository Map", "PRD Items", "Token Usage"]) {
+  for (const name of ["General Repository Information", "Repository Map", "Token Usage"]) {
     await expect(page.locator(".sec-head h2", { hasText: name })).toBeVisible();
   }
+  // PRD state moved to Work; nothing of it should remain here.
+  await expect(page.locator(".sec-head h2", { hasText: "PRD Items" })).toHaveCount(0);
   // Real numbers from this repo's analysis, not placeholders.
   await expect(page.locator(".stat", { hasText: "Files" }).first()).toContainText("1,933");
   await expect(page.locator(".stat", { hasText: "Zones" }).first().locator(".info")).toHaveAttribute("data-info", /Louvain/);
@@ -95,10 +97,13 @@ test("every page renders its headline sections without throwing", async ({ page 
   await expect(page.locator(".panel h3", { hasText: "Add Items" })).toBeVisible();
 
   await page.locator('.nav-section[data-page="work"]').click();
-  for (const name of ["Templates", "Commands", "Usage"]) {
-    await expect(page.locator(".sec-head h2", { hasText: name })).toBeVisible();
-  }
+  // Order matters: PRD Items directly above History, both above Templates.
+  // (.plain excludes the headerless top section, whose h2 is empty.)
+  const workSections = page.locator("#content .sec:not(.plain) .sec-head h2");
+  await expect(workSections).toHaveText(["PRD Items", "History", "Templates", "Commands", "Usage"]);
+  await expect(page.locator(".stat", { hasText: "Complete" }).first()).toContainText("96.4%");
   await expect(page.getByRole("button", { name: /Run this task with the agent/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Verify criteria" })).toBeVisible();
 
   await page.locator("#commands-toggle").click();
   await expect(page.locator("#commands-sheet .panel h3", { hasText: "All Commands" })).toBeVisible();
@@ -108,6 +113,68 @@ test("every page renders its headline sections without throwing", async ({ page 
   await expect(page.locator("#settings-overlay .panel h3", { hasText: "ndx work" })).toBeVisible();
 
   expect(errors).toEqual([]);
+});
+
+test("the landing page is three stage cards that go where they say, highlighted like the stage links", async ({ page }) => {
+  await page.goto(baseUrl + "/option1-demo.html", { waitUntil: "networkidle" });
+  await expect(page).toHaveURL(/#home$/);
+  await expect(page.locator("#content h1")).toHaveText("n-dx");
+
+  // Three columns side by side, in loop order, each headed by its package mark
+  // and carrying real headline numbers.
+  const cards = page.locator(".landing .stage-card");
+  await expect(cards).toHaveCount(3);
+  await expect(cards.locator(".name")).toHaveText(["Analysis", "Plan", "Work"]);
+  const boxes = await cards.evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, w: r.width, h: r.height }; }));
+  expect(boxes[0].left).toBeLessThan(boxes[1].left);
+  expect(boxes[1].left).toBeLessThan(boxes[2].left);
+  expect(boxes[0].top).toBe(boxes[1].top);
+  expect(boxes[1].top).toBe(boxes[2].top);
+  for (const b of boxes) expect(b.h).toBeGreaterThan(b.w);            // tall bars, not wide rows
+  for (let i = 0; i < 3; i++) {
+    const img = cards.nth(i).locator(".mark img");
+    await expect(img).toHaveAttribute("src", /^data:image\/png;base64,/); // inlined, never fetched
+    expect(await img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+  }
+  await expect(cards.nth(0).locator(".facts")).toContainText("1,933");
+  await expect(cards.nth(1).locator(".facts")).toContainText("1,548");
+  await expect(cards.nth(2).locator(".facts")).toContainText("1,146");
+  // No stage links on the landing page — there is no previous or next stage yet.
+  await expect(page.locator(".stage-link:visible")).toHaveCount(0);
+
+  // Hover highlights the card with the accent border and accent name; the side
+  // stage links get the identical treatment. Both are asserted against the
+  // theme's --accent token, resolved to rgb the way the browser reports it.
+  // The highlight is transitioned (150ms), so every colour check below is a
+  // retrying toHaveCSS rather than a one-shot sample — a sample taken the
+  // instant after hover() reads a mid-transition colour.
+  const accent = await page.evaluate(() => {
+    const s = document.createElement("span");
+    s.style.color = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+    document.body.appendChild(s);
+    const v = getComputedStyle(s).color;
+    s.remove();
+    return v;
+  });
+  await expect(cards.nth(1)).not.toHaveCSS("border-top-color", accent);   // resting
+  await cards.nth(1).hover();
+  await expect(cards.nth(1)).toHaveCSS("border-top-color", accent);
+  await expect(cards.nth(1).locator(".name")).toHaveCSS("color", accent);
+
+  await cards.nth(1).click();
+  await expect(page.locator("#content h1")).toHaveText("Plan");
+  await expect(page.locator('.nav-section[data-page="plan"]')).toHaveClass(/active/);
+
+  const link = page.locator(".stage-link:visible", { hasText: "next" });
+  await expect(link).not.toHaveCSS("border-top-color", accent);           // resting
+  await link.hover();
+  await expect(link).toHaveCSS("border-top-color", accent);
+  await expect(link.locator(".n")).toHaveCSS("color", accent);
+
+  // The logo is the way back.
+  await page.locator(".brand").click();
+  await expect(page.locator("#content h1")).toHaveText("n-dx");
+  await expect(page).toHaveURL(/#home$/);
 });
 
 test("the stage links step around the Analysis → Plan → Work loop", async ({ page }) => {

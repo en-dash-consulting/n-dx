@@ -17,7 +17,9 @@
  * zone-graph projections present with one hidden. The exported file's own
  * script is a few lines of show/hide — navigation, the sheet and overlay,
  * section collapse, the 2D/3D toggle, theme — and the numbers no longer
- * depend on it. With scripts disabled the Analysis page still reads in full.
+ * depend on it. With scripts disabled the landing page reads in full — the
+ * three stage cards with their headline numbers — and every other page is
+ * present in the markup, hidden, for a reader who can flip them on.
  *
  * Needs the web package's Playwright Chromium (`npx playwright install chromium`
  * in packages/web if it is missing).
@@ -105,7 +107,7 @@ for (const tag of Object.values(HOSTS)) {
 }
 
 const pageDiv = (r) =>
-  `<div class="page" data-page-id="${r.id}" data-crumbs="${escapeAttr(r.crumbs)}"${r.id === "analysis" ? "" : " hidden"}>\n${r.html}\n</div>`;
+  `<div class="page" data-page-id="${r.id}" data-crumbs="${escapeAttr(r.crumbs)}"${r.id === "home" ? "" : " hidden"}>\n${r.html}\n</div>`;
 const bakedInto = (kind) =>
   HOSTS[kind].replace("></div>", ">\n" + rendered.filter((r) => r.kind === kind).map(pageDiv).join("\n") + "\n</div>");
 
@@ -119,12 +121,12 @@ const staticScript = `<script>
   var main = document.getElementById("main"), overlay = document.getElementById("settings-overlay");
   var sheet = document.getElementById("commands-sheet"), scrim = document.getElementById("scrim");
   var cmdToggle = document.getElementById("commands-toggle");
-  var stage = "analysis", lastSettings = "s-general";
+  var stage = "home", lastSettings = "s-general";
   function kindOf(id) { return id.slice(0, 2) === "s-" ? "settings" : id === "commands" ? "commands" : "main"; }
   function show(id) {
     var target = null;
     pages.forEach(function (p) { if (p.dataset.pageId === id) target = p; });
-    if (!target) return show("analysis");
+    if (!target) return show("home");
     var kind = kindOf(id);
     if (kind === "main") stage = id; else if (kind === "settings") lastSettings = id;
     // An overlay or sheet sits over the stage, so the stage page stays shown beneath it.
@@ -152,7 +154,7 @@ const staticScript = `<script>
   document.getElementById("settings-toggle").addEventListener("click", function () { show(lastSettings); });
   document.querySelectorAll("[data-close], #scrim").forEach(function (el) { el.addEventListener("click", function () { show(stage); }); });
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && kindOf(document.body.dataset.page || "analysis") !== "main") show(stage);
+    if (e.key === "Escape" && kindOf(document.body.dataset.page || "home") !== "main") show(stage);
   });
   document.querySelectorAll(".sec-head").forEach(function (head) {
     head.addEventListener("click", function () { head.parentElement.classList.toggle("collapsed"); });
@@ -172,7 +174,7 @@ const staticScript = `<script>
     var root = document.documentElement;
     root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark");
   });
-  show(location.hash.slice(1) || "analysis");
+  show(location.hash.slice(1) || "home");
 })();
 </script>`;
 
