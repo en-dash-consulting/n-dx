@@ -19,5 +19,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Allow hench's own rex MCP write tools in the spawned Claude session](./allow-hench-s-own-rex-mcp-write-tools.md) | in_progress |
+| [Allow hench's own rex MCP write tools in the spawned Claude session](./allow-hench-s-own-rex-mcp-write-tools.md) | completed |
 | [Count review repairs as uncommitted work unless a commit will really follow](./count-review-repairs-as-uncommitted.md) | pending |
