@@ -677,6 +677,10 @@ function parseHeuristicFallback(
 export const codexCliAdapter: VendorAdapter = {
   vendor: LLM_VENDOR.CODEX,
   parseMode: "json",
+  // `codex exec resume` exists (the batch chain and transient retries use it
+  // through their own paths), but resuming a session that ended unfinished is
+  // not enabled for Codex yet: nothing here detects that it ended waiting.
+  resumesUnfinishedSessions: false,
 
   buildSpawnConfig(
     envelope: PromptEnvelope,
@@ -799,6 +803,17 @@ export const codexCliAdapter: VendorAdapter = {
     if (event.type !== "thread.started") return undefined;
     const id = event.thread_id;
     return typeof id === "string" && id ? id : undefined;
+  },
+
+  /**
+   * Never reports a background wait. `codex exec` has no known tool that
+   * hands work to the background and notifies later, and a shell command
+   * backgrounded with `&` inside a `command_execution` item is not detected —
+   * telling that apart from a legitimately detached process would mean
+   * parsing shell.
+   */
+  detectBackgroundWait(): undefined {
+    return undefined;
   },
 
   classifyError(err: unknown): FailureCategory {

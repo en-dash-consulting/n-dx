@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 22290,
-    "uniqueTokens": 13787,
+    "perCallTokens": 22345,
+    "uniqueTokens": 13842,
     "skills": 13,
     "skillTokens": 17483
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4070,
-      "uniqueTokens": 4070
+      "perCallTokens": 4125,
+      "uniqueTokens": 4125
     },
     "core": {
       "surfaces": 1,
@@ -775,11 +775,11 @@
       "builder": "buildReviewBrief",
       "purpose": "Brief handed to the reviewer — what to attack and where to report.",
       "inline": false,
-      "literals": 140,
+      "literals": 142,
       "constants": {},
-      "ownTokens": 1660,
-      "fixedChars": 6639,
-      "fixedTokens": 1660
+      "ownTokens": 1715,
+      "fixedChars": 6858,
+      "fixedTokens": 1715
     },
     {
       "pkg": "hench",
@@ -987,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "295e060ead0c29dc",
-  "recordedAt": "2026-09-25T04:42:28.012Z",
-  "commit": "7ab535bfce97",
+  "contentHash": "7ef26d414db5dc63",
+  "recordedAt": "2026-09-25T06:08:44.745Z",
+  "commit": "ffc467d3c36e",
   "dirty": false
 }
