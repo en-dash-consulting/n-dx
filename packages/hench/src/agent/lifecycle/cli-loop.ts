@@ -1458,6 +1458,9 @@ async function runAdversarialReviewPass(
         model: ctx.reviewModel || undefined,
         permissionMode: ctx.permissionMode,
         resumeSessionId: reviewerSession,
+        // Same pin as the first review spawn: a resumed session does not keep
+        // its MCP config, and this one can write review captures to the PRD.
+        mcpConfigPath: ctx.mcpConfigPath,
       }),
     );
     if (!resumed.ok) return failReview(resumed);
