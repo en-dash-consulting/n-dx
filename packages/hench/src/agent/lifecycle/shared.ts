@@ -3155,9 +3155,17 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   //
   // - The PRD paths, on both paths: the commit prompt stages them, and
   //   commitCompletionMetadata commits them on autoCommit.
-  // - The review repairs, on both paths, when the review produced a usable
-  //   report: commitReviewRepairsIfNeeded commits them on autoCommit, and the
-  //   commit prompt stages them (stageReviewRepairs) before `git commit -F`.
+  // - The review repairs, when the review produced a usable report *and* a
+  //   commit really follows: commitReviewRepairsIfNeeded commits them on
+  //   autoCommit, and otherwise the commit prompt stages them
+  //   (stageReviewRepairs) before `git commit -F`. That prompt returns early
+  //   on a missing or empty .hench-commit-msg.txt, so without a message file
+  //   nothing commits them — the same condition the staged index is discounted
+  //   under, which this exclusion was missing (caos run 2fb96507). It matters
+  //   more here than for the index: a repair is every path the review pass
+  //   changed (diffDirtyState in cli-loop.ts), so it covers files the agent
+  //   created and the reviewer then edited. In that run the repairs were the
+  //   whole feature, and the refusal named only the manifests.
   // - The staged index, only when the commit prompt will really run — which
   //   takes a non-empty .hench-commit-msg.txt, not just `!autoCommit`. Staged
   //   work with no message file is the #363 leak wearing an `A ` prefix.
@@ -3166,12 +3174,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   let uncommittedWorkRefused = false;
   if (run.status === "completed") {
     const autoCommit = opts.autoCommit === true;
+    const commitPromptFollows = !autoCommit && pendingCommitMessageExists(projectDir);
     const review = run.review;
-    const pendingRepairs =
-      review && review.failed === undefined ? review.repairedFiles ?? [] : [];
+    const repairs = review && review.failed === undefined ? review.repairedFiles ?? [] : [];
+    const pendingRepairs = autoCommit || commitPromptFollows ? repairs : [];
     const leaked = await findUncommittedWork({
       projectDir,
-      stagedCommitFollows: !autoCommit && pendingCommitMessageExists(projectDir),
+      stagedCommitFollows: commitPromptFollows,
       discountPaths: [...PRD_COMMIT_PATHS, ...pendingRepairs],
     });
     if (!leaked.clean) {

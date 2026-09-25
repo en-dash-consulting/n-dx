@@ -26,6 +26,7 @@ import {
   buildAllowedTools,
 } from "../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
 import type { ClaudeCliInput } from "../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
+import { AGENT_REX_MCP_TOOLS } from "../../src/process/agent-mcp-config.js";
 import {
   classifyVendorError,
   failureCategoryLabel,
@@ -823,8 +824,11 @@ describe("vendor adapter contract: Claude CLI arg snapshots", () => {
   });
 
   it("buildAllowedTools with empty commands still includes file tools", () => {
+    // The rex MCP entries are unconditional: hench attaches that server and its
+    // prompts direct the agent at those tools, so an empty command policy must
+    // not strip the grant. Derived, not restated — see AGENT_REX_MCP_TOOLS.
     const tools = buildAllowedTools([]);
-    expect(tools).toEqual(["Read", "Edit", "Write", "Glob", "Grep"]);
+    expect(tools).toEqual(["Read", "Edit", "Write", "Glob", "Grep", ...AGENT_REX_MCP_TOOLS]);
   });
 });
 

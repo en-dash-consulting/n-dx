@@ -166,16 +166,72 @@ export function resolveLauncherCli(env: NodeJS.ProcessEnv = process.env): Launch
 }
 
 /**
+ * Name the run's rex server is registered under, and therefore the middle
+ * segment of every `mcp__<server>__<tool>` permission written against it.
+ *
+ * Exported so {@link AGENT_REX_MCP_TOOLS} can be derived from it rather than
+ * restating the spelling: a rename that left the grants behind would deny every
+ * PRD write again, silently, and only in a headless spawn.
+ */
+export const REX_MCP_SERVER_NAME = "rex";
+
+/** Name the run's sourcevision server is registered under. */
+export const SOURCEVISION_MCP_SERVER_NAME = "sourcevision";
+
+/**
+ * Rex tools the spawned agent session is allowed to call.
+ *
+ * ## Why the grant is needed at all
+ *
+ * Attaching the server is not permission to use it. `ndx init` auto-approves
+ * only rex's *read* tools (`AUTO_APPROVED_TOOLS` in
+ * `packages/core/claude-integration.js`) — deliberately, because those settings
+ * also govern the operator's interactive sessions — and a `claude -p` spawn has
+ * nobody to answer the prompt for the rest. So the run's own prompts directed
+ * the agent at tools the run had not allowed. Two consumer-project runs show
+ * both ways that ends: one agent hand-edited the task's `index.md` and committed
+ * it, bypassing the completion hold; the other ended its turn asking for
+ * permission, with all of its work uncommitted.
+ *
+ * ## Why this exact set
+ *
+ * Every entry has a hench prompt behind it, and nothing else is granted — the
+ * session reaches the whole rex server through the config this module writes,
+ * so this list is the only thing deciding what it may call:
+ *
+ * - `update_task_status` — base workflow step 6 (`rex/src/workflow/default.ts`).
+ * - `append_log` — base workflow step 7.
+ * - `add_item` — base workflow steps 3 and 9, and the `should-fix` action of the
+ *   autonomous adversarial-review pass (`../agent/analysis/adversarial-review.ts`).
+ *
+ * A tool no prompt asks for does not belong here. Adding one is a deliberate
+ * edit with a test to match, not a convenience.
+ *
+ * ## Why granting the write tools is safe
+ *
+ * The completion hold, not the allowlist, is what protects the PRD. While a run
+ * holds the task's claim, rex records the agent's status request on the claim
+ * (`TaskClaims.pendingCompletion`) rather than writing it, and hench applies it
+ * only once the test gate has passed. Denying the tool did not add a safeguard —
+ * it pushed the agent into hand-editing the task file, which has none.
+ */
+export const AGENT_REX_MCP_TOOLS: readonly string[] = [
+  "update_task_status",
+  "append_log",
+  "add_item",
+].map((tool) => `mcp__${REX_MCP_SERVER_NAME}__${tool}`);
+
+/**
  * Build the MCP server document for one run.
  *
  * Both entries name `projectDir` as an absolute path, which is the whole point:
  * an absolute directory cannot be re-resolved against another worktree's cwd,
  * and it cannot be shadowed by a registration that pins one.
  *
- * The server names stay exactly `rex` and `sourcevision`. The agent's MCP tools
- * are permitted by `.claude/settings.json` entries such as
- * `mcp__rex__update_task_status`, not by `--allowed-tools`, so a renamed server
- * would hit permission denials in a `-p` run.
+ * The server names come from {@link REX_MCP_SERVER_NAME} and
+ * {@link SOURCEVISION_MCP_SERVER_NAME}, which are also what the agent's
+ * `--allowed-tools` grants are spelled from — see {@link AGENT_REX_MCP_TOOLS}.
+ * Renaming a server therefore renames its grants, instead of orphaning them.
  */
 export function buildAgentMcpServers(opts: {
   readonly cliPath: string;
@@ -191,8 +247,8 @@ export function buildAgentMcpServers(opts: {
   });
   return {
     mcpServers: {
-      rex: server("rex"),
-      sourcevision: server("sv"),
+      [REX_MCP_SERVER_NAME]: server("rex"),
+      [SOURCEVISION_MCP_SERVER_NAME]: server("sv"),
     },
   };
 }

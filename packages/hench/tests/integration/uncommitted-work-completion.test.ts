@@ -385,6 +385,74 @@ describe("finalizeRun — uncommitted-work gate", () => {
       expect(await porcelain()).not.toContain("lib.ts");
     });
 
+    /**
+     * The repairs discount rests on a commit that never happens (caos run
+     * 2fb96507). `commitReviewRepairsIfNeeded` runs only on autoCommit, and
+     * the commit prompt returns early when `.hench-commit-msg.txt` is missing
+     * or empty — so with autoCommit off and no message file, nothing commits
+     * the repairs, exactly as nothing commits the staged index. The staged
+     * exclusion beside it already asked `pendingCommitMessageExists`; this one
+     * did not.
+     *
+     * It matters because a "repair" is every path the review pass changed
+     * (`diffDirtyState` in cli-loop.ts), which includes files the agent created
+     * and the reviewer then edited. In 2fb96507 that was the entire feature.
+     */
+    it("names review repairs when no commit will follow (run 2fb96507)", async () => {
+      // What the run left behind: a dependency bump to the manifests, and a new
+      // module plus its test, both of which the reviewer went on to edit.
+      await writeFile(join(projectDir, "package.json"), '{"name":"app"}\n', "utf-8");
+      await writeFile(join(projectDir, "package-lock.json"), "{}\n", "utf-8");
+      await execAsync("git add package.json package-lock.json", { cwd: projectDir });
+      await execAsync('git commit -m "chore: manifests"', { cwd: projectDir });
+      await writeFile(join(projectDir, "package.json"), '{"name":"app","dependencies":{}}\n', "utf-8");
+      await writeFile(join(projectDir, "package-lock.json"), '{"lockfileVersion":3}\n', "utf-8");
+
+      await mkdir(join(projectDir, "app", "utils"), { recursive: true });
+      await writeFile(join(projectDir, "app/utils/mcp-auth.server.ts"), "export const auth = 1;\n", "utf-8");
+      await writeFile(join(projectDir, "app/utils/mcp-auth.server.test.ts"), "// covers auth\n", "utf-8");
+
+      const run = buildCompletedRun();
+      run.review = buildUsableReview([
+        "app/utils/mcp-auth.server.ts",
+        "app/utils/mcp-auth.server.test.ts",
+      ]);
+      await runFinalize(run, buildStore(), false);
+
+      expect(run.status).toBe("failed");
+      expect(statuses).not.toContain("completed");
+      // The refusal named only the manifests; its "commit exactly these paths"
+      // commands would have left the feature itself behind.
+      expect(run.error).toContain("package.json");
+      expect(run.error).toContain("app/utils/mcp-auth.server.ts");
+      expect(run.error).toContain("app/utils/mcp-auth.server.test.ts");
+      const addCommand = (run.error ?? "").split("\n").find((l) => l.includes("git add --")) ?? "";
+      expect(addCommand).toContain("app/utils/mcp-auth.server.ts");
+      expect(addCommand).toContain("app/utils/mcp-auth.server.test.ts");
+    });
+
+    it("refuses when the repairs are the only work left, instead of completing silently", async () => {
+      // The sharper form of the same defect: with nothing else dirty the
+      // discount made the tree look clean, so the task reached `completed`
+      // with its whole diff still untracked and no refusal printed at all.
+      await mkdir(join(projectDir, "app", "utils"), { recursive: true });
+      await writeFile(join(projectDir, "app/utils/mcp-auth.server.ts"), "export const auth = 1;\n", "utf-8");
+
+      const run = buildCompletedRun();
+      run.review = buildUsableReview(["app/utils/mcp-auth.server.ts"]);
+      await runFinalize(run, buildStore(), false);
+
+      expect(run.status).toBe("failed");
+      expect(run.error).toContain("app/utils/mcp-auth.server.ts");
+      expect(statuses).not.toContain("completed");
+      // Nothing is discarded — `-uall` because the gate's own listing uses it,
+      // and the default collapses a wholly-untracked directory to `app/`.
+      const { stdout } = await execAsync("git status --porcelain --untracked-files=all", {
+        cwd: projectDir,
+      });
+      expect(stdout).toContain("app/utils/mcp-auth.server.ts");
+    });
+
     it("does not discount repairs when the review produced no usable report", async () => {
       await writeFile(join(projectDir, "lib.ts"), "export const lib = 1;\n", "utf-8");
       await execAsync("git add lib.ts", { cwd: projectDir });
