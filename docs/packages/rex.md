@@ -102,7 +102,7 @@ Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes 
 | `get_next_task` | Next actionable task based on priority and dependencies (skips tasks claimed by another worktree) |
 | `claim_task` | Hold a task for this worktree so other worktrees skip it |
 | `release_task` | Give back a claim without changing the task's status |
-| `update_task_status` | Update item status |
+| `update_task_status` | Update item status. While a `hench run` in this worktree holds the task, `completed` is recorded for the run to apply after its test gate rather than written |
 | `add_item` | Add epic/feature/task/subtask |
 | `edit_item` | Edit item content (title, description, priority, tags) |
 | `get_item` | Full item details with parent chain |
