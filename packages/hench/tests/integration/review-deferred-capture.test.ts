@@ -104,7 +104,7 @@ describe("autonomous review deferral", () => {
   it("parks the unanswered finding on disk, where the CLI can find it", async () => {
     await writeReport(reviewerReport());
 
-    const { deferred } = await resolveReviewDispositions(reportPath, reviewerReport(), true);
+    const { deferred } = await resolveReviewDispositions(reportPath, reviewerReport());
 
     expect(deferred.map((d) => d.id)).toEqual(["f2"]);
 
@@ -115,7 +115,7 @@ describe("autonomous review deferral", () => {
   it("keeps the deferred finding's severity and evidence intact through the write", async () => {
     await writeReport(reviewerReport());
 
-    await resolveReviewDispositions(reportPath, reviewerReport(), true);
+    await resolveReviewDispositions(reportPath, reviewerReport());
 
     const parked = (await readBack()).findings[1];
     expect(parked).toMatchObject({
@@ -133,7 +133,7 @@ describe("autonomous review deferral", () => {
     // Trusting it is exactly how the finding went missing.
     await writeReport(reviewerReport());
 
-    await resolveReviewDispositions(reportPath, reviewerReport(), true);
+    await resolveReviewDispositions(reportPath, reviewerReport());
 
     expect((await readBack()).findings[1].disposition).toBe("deferred");
   });
@@ -179,7 +179,7 @@ describe("autonomous review deferral", () => {
       await writeFile(reportPath, JSON.stringify(richReport(), null, 2), "utf-8");
       const parsed = parseReviewReport(await readFile(reportPath, "utf-8"));
       if (!parsed) throw new Error("fixture is not parseable");
-      return resolveReviewDispositions(reportPath, parsed, true);
+      return resolveReviewDispositions(reportPath, parsed);
     };
 
     it("keeps a finding the parser skipped as malformed", async () => {
@@ -221,7 +221,7 @@ describe("autonomous review deferral", () => {
 
       const spy = vi.spyOn(console, "log").mockImplementation(() => {});
       try {
-        await resolveReviewDispositions(reportPath, parkedReportInput(), true);
+        await resolveReviewDispositions(reportPath, parkedReportInput());
       } finally {
         spy.mockRestore();
       }
@@ -230,17 +230,6 @@ describe("autonomous review deferral", () => {
     });
   });
 
-  it("leaves an interactive run's report exactly as the reviewer wrote it", async () => {
-    const original = reviewerReport();
-    await writeReport(original);
-    const before = await readFile(reportPath, "utf-8");
-
-    const { report, deferred } = await resolveReviewDispositions(reportPath, original, false);
-
-    expect(deferred).toEqual([]);
-    expect(report).toBe(original);
-    expect(await readFile(reportPath, "utf-8")).toBe(before);
-  });
 
   it("says the findings are the only copy when the record cannot be written", async () => {
     // The parked report cannot land, so `hench review pending` will come back
@@ -259,7 +248,7 @@ describe("autonomous review deferral", () => {
     });
 
     try {
-      const { deferred } = await resolveReviewDispositions(unwritable, reviewerReport(), true);
+      const { deferred } = await resolveReviewDispositions(unwritable, reviewerReport());
 
       // The conclusion still stands in memory, so the run record and the
       // end-of-run summary stay honest about what the pass decided.

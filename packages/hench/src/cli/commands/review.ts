@@ -1,8 +1,9 @@
 /**
  * `hench review` — inspect what an adversarial review pass left behind.
  *
- * Today it has one subcommand, `pending`, which lists the findings an
- * autonomous run parked instead of dropping. The command exists because the
+ * Today it has one subcommand, `pending`, which lists the findings a
+ * reviewed run parked instead of dropping — autonomous or attended, since the
+ * reviewer is headless either way. The command exists because the
  * review pass's own output is mid-run: by the time a `--loop` batch finishes,
  * the findings from run three are several test gates and two commit prompts up
  * the scrollback, and before the deferral mechanism they existed nowhere else

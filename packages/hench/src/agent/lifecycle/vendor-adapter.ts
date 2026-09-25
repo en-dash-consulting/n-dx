@@ -137,9 +137,34 @@ export interface VendorSpawnOptions {
  * `cli-loop.ts`'s `dispatchVendorSpawn` function, making the vendor
  * surface pluggable and independently testable.
  */
+/**
+ * A tool call that handed work to the background — something whose result
+ * arrives as a later notification, which a non-interactive session never
+ * receives. See `agent/lifecycle/background-wait.ts`.
+ */
+export interface BackgroundWaitSignal {
+  /** Tool name as the vendor reported it. */
+  tool: string;
+  /** What the call was waiting on, for the operator, in one line. */
+  detail: string;
+}
+
 export interface VendorAdapter {
   /** Which LLM vendor this adapter handles. */
   readonly vendor: LLMVendor;
+
+  /**
+   * Whether the run loop may resume a session it saw end unfinished — a work
+   * session that ended waiting on a background command with its work
+   * uncommitted, or a reviewer that ended waiting without writing its report.
+   * Each is resumed once with {@link VendorSpawnOptions.resumeSessionId}.
+   *
+   * A capability of the adapter, not a check on the vendor's name, so
+   * enabling it for another vendor is a change here rather than in the loop.
+   * Deliberately separate from the transient-retry resume, which has its own
+   * rule. Absent means false.
+   */
+  readonly resumesUnfinishedSessions?: boolean;
 
   /**
    * Output parse mode identifier.
@@ -208,6 +233,23 @@ export interface VendorAdapter {
    * @returns The session id, or `undefined` if this line has none
    */
   extractSessionId?(rawJson: unknown): string | undefined;
+
+  /**
+   * Recognise a tool call that hands work to the background, or return
+   * `undefined` for one that does not.
+   *
+   * Which tools do that is vendor knowledge — the Claude CLI has Bash's
+   * `run_in_background` plus `ScheduleWakeup` and `Monitor` — so it lives
+   * here, and the run loop only records what the adapter reports.
+   *
+   * Optional: an adapter that omits it never reports a background wait.
+   *
+   * @param toolCall - The tool name and input from one `tool_use` event
+   */
+  detectBackgroundWait?(toolCall: {
+    tool: string;
+    input: Readonly<Record<string, unknown>> | undefined;
+  }): BackgroundWaitSignal | undefined;
 
   /**
    * Classify an error into the shared failure taxonomy.

@@ -200,8 +200,10 @@ export interface ReviewPromptContext {
   resumed: boolean;
   /**
    * True when the run cannot ask the user anything — `--auto`, `--loop`,
-   * `--yes`, or no TTY. Autonomous runs use the verdict-driven policy below;
-   * interactive runs still stop and ask before capturing to the PRD.
+   * `--yes`, or no TTY. Autonomous runs capture `should-fix` and
+   * `out-of-scope` findings themselves. Attended runs leave them uncaptured
+   * for the run to queue: the operator is attached to the run, but the
+   * reviewer is a headless session that could never receive their selection.
    */
   autonomous: boolean;
 }
@@ -325,10 +327,15 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
       "  policy below instead.",
     );
   } else {
+    // The skill's Step 5 asks and waits. This session cannot hear an answer:
+    // it is `claude -p`, so a question ends the turn and the findings were
+    // left `offered` with nothing queuing them (runs a32aeeb0, 8dc53406).
     lines.push(
-      "- **Ask before capturing, as the skill says.** A human is attached to this",
-      "  run. Present findings and wait for an explicit selection before writing",
-      "  any PRD item.",
+      "- **Do not stop to ask, and do not capture.** A human is attached to this",
+      "  run, but not to this session: it runs headless and cannot receive a",
+      "  reply, so a question asked here is never answered. Report `should-fix`",
+      "  and `out-of-scope` findings without capturing them. The run queues them,",
+      "  and the operator chooses what to capture after it ends.",
     );
   }
   lines.push(
@@ -345,10 +352,10 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "| `must-fix` | Fix it now, in this session. Add or update the test that would have caught it. Re-run the project's checks after the fix. | `fixed` | `fixed` |",
     ctx.autonomous
       ? "| `should-fix` | Capture as a PRD task with `add_item` (rex MCP). Do not fix it here. | `captured` | `offered` |"
-      : "| `should-fix` | Offer to capture; capture only what the user selects. | `captured`, else `dropped` | `offered` |",
+      : "| `should-fix` | Report it. Do not capture it and do not fix it here — the run queues it for the operator. | `dropped` | `offered` |",
     ctx.autonomous
       ? "| `out-of-scope` | Capture under the area it actually belongs to, never under this change. | `captured` | `offered` |"
-      : "| `out-of-scope` | Offer to capture under its own area; capture only what the user selects. | `captured`, else `dropped` | `offered` |",
+      : "| `out-of-scope` | Report it under the area it actually belongs to. Do not capture it — the run queues it for the operator. | `dropped` | `offered` |",
     "| `not-worth-fixing` | Nothing. Report it with the reason — unreachable, already covered, or fix costs more than the defect. | `dropped` | `dropped` |",
     "",
     "`disposition` records a finding's fate on its own closed scale of",
@@ -720,9 +727,10 @@ export function deriveDisposition(f: ReviewFinding): ReviewDisposition {
  * Returns a new report; the input is left alone so a caller can still show
  * what the reviewer claimed alongside what the run concluded.
  *
- * Applied only on the autonomous path. An interactive run has a human at the
- * capture prompt, so its `dropped` findings really were declined and
- * rewriting them to `deferred` would invent a queue nobody needs.
+ * Applied to every reviewed run. The reviewer is always a headless session,
+ * so no human is ever at its capture prompt: on an autonomous run it captures
+ * by policy, and on an attended run it is told to leave the choice to the
+ * operator, who reads the queue after the run.
  */
 export function parkDeferredFindings(report: ReviewReport): ReviewReport {
   return {
