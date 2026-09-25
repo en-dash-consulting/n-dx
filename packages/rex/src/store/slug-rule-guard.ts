@@ -196,6 +196,19 @@ export async function readSlugRuleMarker(rexDir: string): Promise<number | undef
 }
 
 /**
+ * Whether `rex migrate-slugs` is the command that fixes a marker reading `found`.
+ *
+ * The same direction rule {@link assertSlugRuleAdoptable} enforces and
+ * {@link markerAdvice} words, stated once so a gate offering to run the
+ * migration cannot disagree with the command that would refuse it. Older or
+ * absent is the only direction a migration can fix; newer means this build is
+ * the stale one, and migrating there is a downgrade wearing a migration's name.
+ */
+function slugMigrationFixes(found: number | undefined): boolean {
+  return found === undefined || found <= SLUG_RULE_VERSION;
+}
+
+/**
  * What to tell the operator about a marker that disagrees with this build.
  *
  * The advice has to branch on direction, and getting it wrong is not a wording
@@ -348,6 +361,16 @@ export interface TreeConformanceRefusal {
   mismatches: readonly SlugMismatch[];
   /** `slugRule` found in `tree-meta.json`, or `undefined` when absent. */
   markerFound: number | undefined;
+  /**
+   * Whether `rex migrate-slugs` would resolve this refusal.
+   *
+   * False for exactly the case {@link assertSlugRuleAdoptable} refuses: a
+   * marker naming a *newer* rule, where the fix is to upgrade rex rather than
+   * to migrate the tree. A gate that offers to run the migration must consult
+   * this rather than re-deriving the direction from `markerFound`, so that the
+   * offer and the command it would run cannot come to different conclusions.
+   */
+  migratable: boolean;
 }
 
 /**
@@ -389,6 +412,7 @@ export async function checkTreeConformance(
     return {
       markerFound,
       mismatches: [],
+      migratable: slugMigrationFixes(markerFound),
       message:
         `The PRD tree was written under slug rule ${markerFound}, but this build ` +
         `implements slug rule ${SLUG_RULE_VERSION}. Every path in the tree would be ` +
@@ -410,6 +434,7 @@ export async function checkTreeConformance(
   return {
     markerFound,
     mismatches,
+    migratable: slugMigrationFixes(markerFound),
     message:
       (markerFound === undefined
         ? `The PRD tree carries no slug-rule marker — ${SLUG_RULE_MARKER_MISSING}. `

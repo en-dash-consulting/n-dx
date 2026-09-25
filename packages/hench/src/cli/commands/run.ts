@@ -34,6 +34,7 @@ import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.j
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
+import { offerSlugMigration } from "../slug-migration-offer.js";
 import { info, result as output, setQuiet, warn } from "../output.js";
 import { section, detail } from "../../types/output.js";
 import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
@@ -395,22 +396,64 @@ function countTasksByStatus(items: PRDItem[], statuses: string[]): number {
  * @throws {CLIError} When the tree does not match this build's slug rule.
  */
 export async function assertPrdTreeConformant(rexDir: string): Promise<void> {
+  const refusal = await readTreeConformanceRefusal(rexDir);
+  if (refusal) throw treeConformanceError(refusal);
+}
+
+/**
+ * The gate's refusal, named structurally from the gateway function that
+ * produces it.
+ *
+ * Derived rather than re-exported as a nominal type through
+ * `prd/rex-gateway.ts`, which keeps the gateway's surface — and its export cap
+ * — for symbols that are actually called. It cannot drift from rex's
+ * definition, because it *is* rex's definition.
+ */
+type TreeRefusal = NonNullable<Awaited<ReturnType<typeof checkTreeConformance>>>;
+
+/**
+ * The read half of {@link assertPrdTreeConformant}: why this build must not
+ * write the tree, or `null` when it may.
+ *
+ * Split out because the refusal object carries more than its message — the
+ * offending paths a migration would rename, and whether a migration is the
+ * command that fixes it at all. The interactive gate in `cmdRun` offers to run
+ * that migration and needs both; `assertPrdTreeConformant` still exists for the
+ * callers that only need the throw.
+ */
+export async function readTreeConformanceRefusal(
+  rexDir: string,
+): Promise<TreeRefusal | null> {
   const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   // No folder tree, nothing to be non-conformant. Checked before the load
   // because loading a project that has no PRD at all throws, and reporting
   // that is the job of the task selection this gate runs ahead of.
-  if (!existsSync(treeRoot)) return;
+  if (!existsSync(treeRoot)) return null;
 
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
-  const refusal = await checkTreeConformance(rexDir, treeRoot, doc.items);
-  if (!refusal) return;
+  return await checkTreeConformance(rexDir, treeRoot, doc.items);
+}
 
-  throw new CLIError(
+/**
+ * The refusal the gate throws, optionally saying why a migration offer was
+ * withheld.
+ *
+ * `withheldNote` is appended rather than replacing the standing advice: the
+ * operator still has to be told what the tree's problem is and that nothing was
+ * claimed, and "you were not offered the fix" is an extra fact about *this*
+ * run, not a different diagnosis of the repository.
+ */
+export function treeConformanceError(
+  refusal: TreeRefusal,
+  withheldNote?: string,
+): CLIError {
+  return new CLIError(
     refusal.message,
     "This run would write the PRD when it completed the task, carrying the rewrite " +
       "into your branch under a 'task completed' commit. Nothing has been claimed or " +
-      "written. Migrate the tree on the default branch, then start the run again.",
+      "written. Migrate the tree on the default branch, then start the run again." +
+      (withheldNote ? `\n\n${withheldNote}` : ""),
   );
 }
 
@@ -1555,7 +1598,31 @@ export async function cmdRun(
   // otherwise execute task one against a tree last verified an hour ago, and
   // task one's completion write would be the sweeper. The cost of re-asking is
   // one extra loadDocument, ~0.33s on a 405-item tree, once per run.
-  await assertPrdTreeConformant(rexDir);
+  //
+  // This is also the only gate an interactive run can reach before anything
+  // happens, so it is where the migration is offered — see
+  // `offerSlugMigration`. The per-task gate inside `runOne` deliberately does
+  // not offer: by the time it fires for task two, the run has already committed
+  // task one, and a rename dropped in there is the surprise diff the offer
+  // exists to prevent. A loop is autonomous anyway, and autonomous never asks.
+  const treeRefusal = await readTreeConformanceRefusal(rexDir);
+  if (treeRefusal) {
+    const offer = await offerSlugMigration(
+      dir,
+      treeRefusal,
+      { autonomous: auto || loop || flags["epic-by-epic"] === "true", assumeYes: yes },
+    );
+    if (offer.outcome === "migrated") {
+      output(offer.report);
+      // Stop. Not an error — the migration succeeded and the operator has been
+      // told what to do next — so `cmdRun` returns rather than throwing.
+      return;
+    }
+    throw treeConformanceError(
+      treeRefusal,
+      offer.outcome === "withheld" ? offer.note : undefined,
+    );
+  }
   const gateTree = createPerTaskTreeGate(rexDir);
 
   // Warn when a local-scope Claude MCP registration pins this repository's

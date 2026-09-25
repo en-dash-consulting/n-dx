@@ -44,7 +44,7 @@ import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
 import { totalmem, freemem, loadavg, cpus } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, type ManagedChild } from "@n-dx/llm-client";
+import { exec, spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import {
@@ -72,7 +72,7 @@ import type {
   ItemTokenTotals,
   ItemDurationTotals,
 } from "./rex-gateway.js";
-import { loadPRDSync } from "./prd-io.js";
+import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
 import { resolveNdxBin } from "./routes-commands.js";
 import { readCliName } from "./cli-name.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
@@ -1285,30 +1285,108 @@ function loadPRDForExecute(ctx: ServerContext): Record<string, unknown> | null {
  * the tree on disk, so the tree is what has to be read: a cache hit would let
  * the gate pass on a repository whose `.rex/prd_tree/` it never looked at.
  *
- * @returns `true` when a refusal was written to `res` and the caller must stop.
+ * @returns The refusal, or `null` when this build may write the tree.
  */
-async function refuseNonConformantTree(
-  res: ServerResponse,
+async function readTreeConformanceRefusal(
   ctx: ServerContext,
-): Promise<boolean> {
+): Promise<Awaited<ReturnType<typeof checkTreeConformance>>> {
   // No folder tree, nothing to be non-conformant. Checked before the load
   // because loading a project that has no PRD at all throws, and "there is no
   // PRD" is the caller's 404 to report, not this gate's failure.
-  if (!existsSync(join(ctx.rexDir, PRD_TREE_DIRNAME))) return false;
+  if (!existsSync(join(ctx.rexDir, PRD_TREE_DIRNAME))) return null;
 
   const store = await resolveStore(ctx.rexDir);
   const doc = await store.loadDocument();
 
-  const refusal = await checkTreeConformance(
+  return await checkTreeConformance(
     ctx.rexDir,
     join(ctx.rexDir, PRD_TREE_DIRNAME),
     doc.items,
   );
-  if (!refusal) return false;
+}
 
-  // 412 Precondition Failed: the request is well-formed and the task is fine;
-  // the repository is in a state that forbids acting on it.
-  errorResponse(res, 412, refusal.message);
+/**
+ * How long the dashboard gives `rex migrate-slugs` before treating it as hung.
+ *
+ * Matches hench's gate. The request is held open for the duration because the
+ * operator is watching a button; a job queue for a command that takes seconds
+ * would be more machinery than the thing it manages.
+ */
+const MIGRATION_TIMEOUT_MS = 10 * 60_000;
+
+/**
+ * Run `rex migrate-slugs` on behalf of an operator who asked for it, then stop.
+ *
+ * The dashboard mirror of hench's gate offer, and it stops for the same reason:
+ * the migration rewrites every path that does not match the running rule, which
+ * can be the whole tree, and that rename has to land in a commit of its own
+ * where somebody can look at it. Starting the run afterwards would carry it
+ * into a "task completed" commit instead — the 2026-09-17 incident with the
+ * review step deleted rather than automated. So this answers 200 and starts
+ * nothing; the operator reviews, commits, and presses the button again.
+ *
+ * **What counts as an operator here.** The server has no session, no auth and
+ * no notion of who is calling — it is loopback-only by design. So consent is
+ * not inferred from the request; it is *carried* by it. The first Execute gets
+ * a 412 naming what is wrong and whether a migration would fix it, and only a
+ * second, explicit `{ migrateSlugs: true }` runs anything. A scripted client
+ * has to opt in as deliberately as a human clicking the button, which is the
+ * same bar `--yes` fails to clear on the CLI side.
+ *
+ * @returns `true` — the caller always stops, whether this succeeded or not.
+ */
+async function runTreeMigration(
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  const result = await exec(
+    bin,
+    [...prefixArgs, "rex", "migrate-slugs", "--format=json", ctx.projectDir],
+    { cwd: ctx.projectDir, timeout: MIGRATION_TIMEOUT_MS },
+  );
+
+  if (!result.launched || result.exitCode !== 0) {
+    const detail = (result.stderr.trim() || result.stdout.trim() || "no output").slice(0, 2000);
+    errorResponse(
+      res,
+      500,
+      `'rex migrate-slugs' did not complete: ${
+        result.launched ? `exit ${result.exitCode ?? "killed"}` : "the command never ran"
+      }.\n${detail}`,
+    );
+    return true;
+  }
+
+  let summary: Record<string, unknown> = {};
+  try {
+    const start = result.stdout.indexOf("{");
+    if (start !== -1) summary = JSON.parse(result.stdout.slice(start)) as Record<string, unknown>;
+  } catch {
+    // Left empty: the command exited 0, so the migration happened. Reporting
+    // "failed" over an unreadable summary would send the operator looking for
+    // damage that is not there.
+  }
+
+  // The tree's paths have all changed, so the derived cache is now describing
+  // files that no longer exist.
+  try {
+    refreshPRDCache(ctx.rexDir, (await (await resolveStore(ctx.rexDir)).loadDocument()) as never);
+  } catch {
+    // A stale cache is a display problem the watcher corrects; it must not turn
+    // a successful migration into a reported failure.
+  }
+
+  jsonResponse(res, 200, {
+    migrated: true,
+    entriesRenamed: summary.entriesRenamed ?? null,
+    entriesUnchanged: summary.entriesUnchanged ?? null,
+    slugRuleRecorded: summary.slugRuleRecorded ?? null,
+    message:
+      "The PRD tree was migrated. The task was not started, so the rename gets a commit of " +
+      "its own — review it and commit it, then start the task again. 'rex restore' undoes " +
+      "the migration if the diff is not what you expected.",
+  });
   return true;
 }
 
@@ -1437,7 +1515,41 @@ async function handleExecute(
   // Tree-level fault first: on a tree this build would re-slug, no task is
   // runnable, so reporting it before the per-task checks keeps the operator
   // from reading a repository fault as a problem with the task they picked.
-  if (await refuseNonConformantTree(res, ctx)) return true;
+  const treeRefusal = await readTreeConformanceRefusal(ctx);
+  if (treeRefusal) {
+    // The second request, carrying the operator's explicit yes to the rename
+    // the 412 below described. Bounded by `migratable`: a tree on a *newer*
+    // rule is refused however loudly the client asks, because migrating there
+    // is a downgrade wearing a migration's name and `rex migrate-slugs` would
+    // refuse it too.
+    if (body.migrateSlugs === true && treeRefusal.migratable) {
+      return await runTreeMigration(res, ctx);
+    }
+
+    // 412 Precondition Failed: the request is well-formed and the task is fine;
+    // the repository is in a state that forbids acting on it. `migratable` is
+    // what lets the viewer offer the fix rather than only quote the problem —
+    // and, just as importantly, withhold the offer when the fix is elsewhere.
+    jsonResponse(res, 412, {
+      error: treeRefusal.message,
+      migratable: treeRefusal.migratable,
+    });
+    return true;
+  }
+
+  // A migrate request is consent to the rename, never to a run. Reaching here
+  // with it means the tree needs no migration — typically it was migrated
+  // between the 412 and the click — so falling through would start the task
+  // from the button that promised not to.
+  if (body.migrateSlugs === true) {
+    errorResponse(
+      res,
+      409,
+      "The PRD tree already matches this build's slug rule, so there is nothing to migrate. " +
+        "The task was not started — press Start to run it.",
+    );
+    return true;
+  }
 
   // Validate task exists in PRD
   const doc = loadPRDForExecute(ctx);
