@@ -28,8 +28,8 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 
 | Package | Gateway file | Imports from | Re-exports |
 |---------|-------------|--------------|------------|
-| hench | `src/prd/rex-gateway.ts` | rex | 21 functions + 4 constants + 8 types (schema, store, tree, task selection, timestamps, auto-completion, parent reset, requirements, level helpers, finding acknowledgment) |
-| hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | 30 functions + 10 types (config, constants, JSON, output, help, errors, process execution, token parsing, model resolution) |
+| hench | `src/prd/rex-gateway.ts` | rex | 25 functions + 4 constants + 13 types (schema, store, tree, save-file report, tree conformance, task selection, claims, timestamps, auto-completion, parent reset, requirements, level helpers, finding acknowledgment) |
+| hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | 99 functions + 5 classes + 15 constants + 49 types (config, vendor constants, JSON, output and colour, help, errors, process execution and git worktrees, token parsing, model resolution, usage formatting, prompt envelope and failure categories, prompt-section costs, Codex policy flags, tool-definition converters, LM Studio, provider registry) |
 | web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants, tree utilities |
 | web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory, next-step derivation, archetype override, iso-map builder, analysis artifact schema types |
 | web | `src/viewer/external.ts` | `src/viewer/messaging/`, `src/shared/`, `src/schema/` | Schema types (V1), data-file constants, RequestDedup — viewer↔server boundary gateway |
