@@ -73,6 +73,14 @@ export {
   createSpinner,
 } from "@n-dx/llm-client";
 
+// ---- Monotonic progress reporting -------------------------------------------
+export {
+  createProgressReporter,
+  setActiveProgressReporter,
+  getActiveProgressReporter,
+} from "@n-dx/llm-client";
+export type { ProgressReporter } from "@n-dx/llm-client";
+
 // ---- Deprecation filter (CLI entry points) ----------------------------------
 export { suppressKnownDeprecations } from "@n-dx/llm-client";
 

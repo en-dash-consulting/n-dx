@@ -16,7 +16,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, getActiveProgressReporter } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -69,6 +69,21 @@ export interface AgentLoopResult {
 }
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
+
+/**
+ * Displayed turn number for the "Turn N/maxTurns" banner.
+ *
+ * Routed through the active progress reporter (if one is registered for
+ * this task's attempt sequence) so a fresh spawn — a retry or plan-mode
+ * respawn always restarts this loop's local `turn` at 0 — never prints a
+ * turn number lower than one already shown for this task. `run.turns`,
+ * the persisted count used for budgeting and the run summary, is
+ * unaffected: this only changes what gets printed.
+ */
+function displayTurn(turnNumber: number, maxTurns: number): number {
+  return getActiveProgressReporter()?.advance("turn", turnNumber, maxTurns) ?? turnNumber;
+}
+
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 const MAX_SUMMARY_LENGTH = 500;
@@ -799,7 +814,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
         }
 
         run.turns = turn + 1;
-        subsection(`Turn ${turn + 1}/${maxTurns}`);
+        subsection(`Turn ${displayTurn(turn + 1, maxTurns)}/${maxTurns}`);
 
         recordPruneUsage(run, await pruner.prune(contents), turn + 1, "google", model);
 
@@ -1411,7 +1426,7 @@ async function runLocalToolLoop(params: {
       }
 
       run.turns = turn + 1;
-      subsection(`Turn ${turn + 1}/${maxTurns}`);
+      subsection(`Turn ${displayTurn(turn + 1, maxTurns)}/${maxTurns}`);
 
       // Fallback prune — only when no context window is configured. With
       // llm.local.maxContextTokens set, the token-triggered condensation at
@@ -1886,7 +1901,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       run.turns = turn + 1;
 
-      subsection(`Turn ${turn + 1}/${maxTurns}`);
+      subsection(`Turn ${displayTurn(turn + 1, maxTurns)}/${maxTurns}`);
 
       recordPruneUsage(run, await pruner.prune(messages), turn + 1, vendor, model);
 

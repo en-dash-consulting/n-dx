@@ -37,7 +37,7 @@ import {
   MAX_CONTEXT_FILE_CHARS,
 } from "../../agent/planning/context-caps.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { LLM_VENDOR, printVendorModelHeader, resolveModel, resolveTaskModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, printVendorModelHeader, resolveModel, resolveTaskModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter } from "../../prd/llm-gateway.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
 import { formatQueueStatus } from "../../queue/format.js";
 import { resolveSchedulingPriority } from "../../queue/priority-scheduler.js";
@@ -1079,6 +1079,17 @@ async function runOne(
   // starting in another worktree.
   const claims = TaskClaims.forProject(dir, { readOnly: dryRun });
   claims.startRenewal();
+
+  // Register a monotonic progress reporter for this task's whole attempt
+  // sequence (spawn + any retries/plan-mode respawns) so the turn counter
+  // printed by the loop never appears to move backwards after a respawn
+  // restarts the spawn from turn 0, and so an LLM provider's rate-limit
+  // retry line (printed deep inside the loop) can redraw whatever progress
+  // line was showing. Guarded against re-registration in case this task is
+  // itself invoked from within an already-active reporter's scope.
+  const ownsProgressReporter = getActiveProgressReporter() === null;
+  if (ownsProgressReporter) setActiveProgressReporter(createProgressReporter());
+
   let result: Awaited<ReturnType<typeof cliLoop>> | Awaited<ReturnType<typeof agentLoop>>;
   try {
   result = provider === "cli"
@@ -1133,6 +1144,7 @@ async function runOne(
       });
   } finally {
     await claims.releaseAll();
+    if (ownsProgressReporter) setActiveProgressReporter(null);
   }
 
   const { run } = result;

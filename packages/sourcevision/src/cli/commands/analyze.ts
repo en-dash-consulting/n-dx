@@ -24,7 +24,7 @@ import {resolve, join} from "node:path";import {
 import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
-import { DEFAULT_LLM_VENDOR, loadLLMConfig, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, loadLLMConfig, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter } from "@n-dx/llm-client";
 import type { RiskJustificationEntry, ZoneType } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
@@ -358,76 +358,90 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     inventoryResult: null,
   };
 
-  // Stop a narrator still working on the previous analysis before this one
-  // rewrites zones.json; whatever it had not finished is queued again below.
-  const takenOver = takeOverNarration(absDir);
-  if (takenOver.stopped !== undefined) {
-    info(dim(`  [narrate] stopped the previous background narrator (pid ${takenOver.stopped}); its unfinished work is carried into this run`));
-  }
+  // Register a monotonic progress reporter for the life of this command so
+  // phase-qualified counters (e.g. the zone enrichment pass number) never
+  // print a lower value than one already shown — including across the
+  // recursive `--deep` sub-analysis calls below, each of which would
+  // otherwise restart its own counters from scratch. Guarded so a nested
+  // `cmdAnalyze` call (sub-analysis) reuses the outermost call's reporter
+  // instead of replacing it.
+  const ownsProgressReporter = getActiveProgressReporter() === null;
+  if (ownsProgressReporter) setActiveProgressReporter(createProgressReporter());
 
-  await runDeepSubAnalyses(absDir, extraArgs);
-
-  info(`${bold("Analyzing:")} ${dim(absDir)}`);
-  info("");
-
-  await executePhases(ctx, filter, extraArgs);
-
-  // A --fast run makes no LLM calls, so it leaves the carried work recorded
-  // (as a retryable failure) for the next full run instead of spawning for it.
-  if (!ctx.fastMode && takenOver.zones.length + takenOver.names.length > 0) {
-    const merged = carryNarration(
-      takenOver,
-      { zones: ctx.pendingNarration, names: ctx.pendingNames },
-      currentZoneIds(svDir),
-    );
-    ctx.pendingNarration = merged.zones;
-    ctx.pendingNames = merged.names;
-    if (merged.carried + merged.dropped > 0) {
-      info(dim(`  [narrate] ${merged.carried} unfinished item(s) from the previous narration carried forward${merged.dropped > 0 ? `, ${merged.dropped} dropped (zone no longer exists)` : ""}`));
-    }
-  }
-
-  // --wait: narrate the escalated zones (and generate pending names) now,
-  // before the outputs are written.
-  const anythingPending = (ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0;
-  if (anythingPending && ctx.wait) {
-    await cmdNarrate(absDir, { inline: true, zoneIds: ctx.pendingNarration ?? [], nameZoneIds: ctx.pendingNames ?? [], deps: narrateDeps() });
-    ctx.pendingNarration = undefined;
-    ctx.pendingNames = undefined;
-  }
-
-  if (filter.type === "all") {
-    await generateOutputFiles(ctx);
-    await generatePrMarkdownStep(ctx);
-  }
-
-  finalizeTokenUsage(ctx, llmConfig);
-
-  // Otherwise the results are on disk already; narration continues in a
-  // detached child so this command can return.
-  if ((ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0) {
-    await scheduleDetachedNarration(ctx.absDir, ctx.svDir, ctx.pendingNarration ?? [], ctx.pendingNames ?? []);
-  }
-
-  // Hint about zone pins when move-file or structural findings exist
   try {
-    const zonesPath = join(ctx.svDir, "zones.json");
-    const zonesRaw = readFileSync(zonesPath, "utf-8");
-    const zonesData = JSON.parse(zonesRaw);
-    const findings = zonesData.findings ?? [];
-    const moveCount = findings.filter((f: { type: string }) => f.type === "move-file").length;
-    const structuralCount = findings.filter((f: { category?: string }) => f.category === "structural").length;
-    if (moveCount > 0 || structuralCount > 0) {
-      info("");
-      info(`${cyan("Tip:")} ${moveCount > 0 ? `${bold(String(moveCount))} file-move suggestion${moveCount === 1 ? "" : "s"} detected. ` : ""}If zone assignments look wrong, you can override them with zone pins:`);
-      info(`  ${dim("ndx config sourcevision.zones.pins '{\"path/to/file.ts\": \"target-zone-id\"}'")}`);
+    // Stop a narrator still working on the previous analysis before this one
+    // rewrites zones.json; whatever it had not finished is queued again below.
+    const takenOver = takeOverNarration(absDir);
+    if (takenOver.stopped !== undefined) {
+      info(dim(`  [narrate] stopped the previous background narrator (pid ${takenOver.stopped}); its unfinished work is carried into this run`));
     }
-  } catch {
-    // Non-critical — don't fail the analysis
-  }
 
-  info("");
-  info(green("Done."));
+    await runDeepSubAnalyses(absDir, extraArgs);
+
+    info(`${bold("Analyzing:")} ${dim(absDir)}`);
+    info("");
+
+    await executePhases(ctx, filter, extraArgs);
+
+    // A --fast run makes no LLM calls, so it leaves the carried work recorded
+    // (as a retryable failure) for the next full run instead of spawning for it.
+    if (!ctx.fastMode && takenOver.zones.length + takenOver.names.length > 0) {
+      const merged = carryNarration(
+        takenOver,
+        { zones: ctx.pendingNarration, names: ctx.pendingNames },
+        currentZoneIds(svDir),
+      );
+      ctx.pendingNarration = merged.zones;
+      ctx.pendingNames = merged.names;
+      if (merged.carried + merged.dropped > 0) {
+        info(dim(`  [narrate] ${merged.carried} unfinished item(s) from the previous narration carried forward${merged.dropped > 0 ? `, ${merged.dropped} dropped (zone no longer exists)` : ""}`));
+      }
+    }
+
+    // --wait: narrate the escalated zones (and generate pending names) now,
+    // before the outputs are written.
+    const anythingPending = (ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0;
+    if (anythingPending && ctx.wait) {
+      await cmdNarrate(absDir, { inline: true, zoneIds: ctx.pendingNarration ?? [], nameZoneIds: ctx.pendingNames ?? [], deps: narrateDeps() });
+      ctx.pendingNarration = undefined;
+      ctx.pendingNames = undefined;
+    }
+
+    if (filter.type === "all") {
+      await generateOutputFiles(ctx);
+      await generatePrMarkdownStep(ctx);
+    }
+
+    finalizeTokenUsage(ctx, llmConfig);
+
+    // Otherwise the results are on disk already; narration continues in a
+    // detached child so this command can return.
+    if ((ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0) {
+      await scheduleDetachedNarration(ctx.absDir, ctx.svDir, ctx.pendingNarration ?? [], ctx.pendingNames ?? []);
+    }
+
+    // Hint about zone pins when move-file or structural findings exist
+    try {
+      const zonesPath = join(ctx.svDir, "zones.json");
+      const zonesRaw = readFileSync(zonesPath, "utf-8");
+      const zonesData = JSON.parse(zonesRaw);
+      const findings = zonesData.findings ?? [];
+      const moveCount = findings.filter((f: { type: string }) => f.type === "move-file").length;
+      const structuralCount = findings.filter((f: { category?: string }) => f.category === "structural").length;
+      if (moveCount > 0 || structuralCount > 0) {
+        info("");
+        info(`${cyan("Tip:")} ${moveCount > 0 ? `${bold(String(moveCount))} file-move suggestion${moveCount === 1 ? "" : "s"} detected. ` : ""}If zone assignments look wrong, you can override them with zone pins:`);
+        info(`  ${dim("ndx config sourcevision.zones.pins '{\"path/to/file.ts\": \"target-zone-id\"}'")}`);
+      }
+    } catch {
+      // Non-critical — don't fail the analysis
+    }
+
+    info("");
+    info(green("Done."));
+  } finally {
+    if (ownsProgressReporter) setActiveProgressReporter(null);
+  }
 }
 
 // ── PR markdown generation ───────────────────────────────────────────

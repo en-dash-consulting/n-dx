@@ -53,7 +53,7 @@ import type {
   InventoryResult,
 } from "../sourcevision-core.js";
 import { info } from "../output.js";
-import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx/llm-client";
+import { bold, cyan, dim, yellow, green, red, loadProjectOverrides, getActiveProgressReporter } from "@n-dx/llm-client";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 
 // ── Shared context passed between phases ─────────────────────────────
@@ -398,7 +398,15 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
 
       let prevFingerprint = fingerprint(zones);
       for (let p = 0; p < passesNeeded; p++) {
-        info(`\n${bold(cyan("[phase 4]"))} Enrichment pass ${currentPass + p + 2}...`);
+        // Route through the active progress reporter (if any) so a `--deep`
+        // sub-analysis — which re-enters this phase from scratch for each
+        // sub-package and would otherwise restart the pass number at 2 —
+        // never prints a lower pass number than the parent analysis already
+        // showed. Falls back to the raw computed number when this phase
+        // runs without a reporter registered (e.g. direct unit tests).
+        const passNumber = currentPass + p + 2;
+        const displayPass = getActiveProgressReporter()?.advance("zones:enrichment-pass", passNumber, targetPass) ?? passNumber;
+        info(`\n${bold(cyan("[phase 4]"))} Enrichment pass ${displayPass}...`);
         zonesResult = await analyzeZones(inventory, importsData, {
           enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset, hints,
           narrate: ctx.narrate,
