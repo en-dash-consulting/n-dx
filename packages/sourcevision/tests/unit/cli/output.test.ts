@@ -57,6 +57,11 @@ describe("CLI output", () => {
     beforeEach(() => {
       wasTTY = process.stderr.isTTY;
       (process.stderr as unknown as { isTTY: boolean }).isTTY = true;
+      // ora only animates on an interactive terminal: a TTY, TERM not "dumb",
+      // and no CI variable. CI runners set CI, which would leave the spinner
+      // static with nothing to redraw.
+      vi.stubEnv("CI", undefined);
+      vi.stubEnv("TERM", "xterm-256color");
       // ora drives real readline/tty methods when it believes the stream is
       // interactive; stub the ones it calls so it doesn't blow up on a
       // stream that lacks them under the test runner.
@@ -73,6 +78,7 @@ describe("CLI output", () => {
 
     afterEach(() => {
       (process.stderr as unknown as { isTTY: boolean | undefined }).isTTY = wasTTY;
+      vi.unstubAllEnvs();
       stderrWriteSpy.mockRestore();
       cursorToSpy?.mockRestore();
       clearLineSpy?.mockRestore();
