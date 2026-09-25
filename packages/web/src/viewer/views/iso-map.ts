@@ -45,6 +45,7 @@ import {
   type IsoMapControls,
   type IsoMapSource,
 } from "./iso-map-url.js";
+import { appUrl } from "../base-path.js";
 
 type LoadState = "loading" | "ready" | "empty" | "error";
 
@@ -69,7 +70,7 @@ async function readRouteError(res: Response): Promise<IsoMapError> {
   return { status: res.status, message, suggestScan: res.status === 404 };
 }
 
-export function IsoMapView() {
+export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = {}) {
   const deployed = isDeployedMode();
   const cliName = useCliName();
 
@@ -139,6 +140,17 @@ export function IsoMapView() {
     if (deployed) return;
     void generate(ISO_MAP_DEFAULTS);
   }, [deployed, generate]);
+
+  // Regenerate with the applied controls when the analysis changes (a new
+  // run, or narration landing names), so the map never shows stale zones.
+  const appliedRef = useRef(applied);
+  appliedRef.current = applied;
+  const lastStampRef = useRef(analysisStamp);
+  useEffect(() => {
+    if (deployed || analysisStamp === lastStampRef.current) return;
+    lastStampRef.current = analysisStamp;
+    void generate(appliedRef.current);
+  }, [analysisStamp, deployed, generate]);
 
   const appliedUrl = buildIsoMapUrl(applied);
 
@@ -256,15 +268,18 @@ export function IsoMapView() {
         }, state === "loading"
           ? "Generating…"
           : html !== null ? "Regenerate" : "Generate"),
+        // The in-app fetch is base-path aware (installBasePathFetch); a raw
+        // href is not, and under the hub `/api/iso-map` at the root answers
+        // 409 "several projects are registered". Prefix it here.
         h("a", {
           class: "cmd-btn cmd-btn-secondary",
-          href: appliedUrl,
+          href: appUrl(appliedUrl),
           target: "_blank",
           rel: "noopener noreferrer",
         }, "Open in new tab"),
         h("a", {
           class: "cmd-btn cmd-btn-secondary",
-          href: appliedUrl,
+          href: appUrl(appliedUrl),
           download: isoMapDownloadName(applied),
         }, "Download HTML"),
       ),

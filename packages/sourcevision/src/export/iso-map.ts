@@ -49,8 +49,9 @@ export function renderIsoMap(model: IsoModel, options: RenderIsoMapOptions = {})
   const title = options.title ?? `${model.meta.project} — architecture map`;
   const meta = model.meta;
 
+  const areaCount = model.level === "areas" ? model.nodes.filter((n) => n.kind !== "external" && n.kind !== "infra").length : 0;
   const stats = [
-    `${meta.shownZones} of ${meta.totalZones} zones`,
+    areaCount > 0 ? `${areaCount} areas · ${meta.totalZones} zones` : `${meta.shownZones} of ${meta.totalZones} zones`,
     `${meta.totalFiles.toLocaleString("en-US")} files`,
     `${meta.totalLines.toLocaleString("en-US")} lines`,
     meta.origin === "sourcevision" ? "sourcevision analysis" : "direct scan",
@@ -94,6 +95,7 @@ ${STYLES}
 <header class="top">
   <div class="ttl">
     <h1>${esc(meta.project)}</h1>
+    <nav class="crumbs" id="crumbs" aria-label="Map level" hidden></nav>
     <p>${stats.map((s) => `<span>${s}</span>`).join("")}</p>
   </div>
   <div class="tools">
@@ -124,6 +126,18 @@ ${STYLES}
 (function(){
 "use strict";
 var MODEL = ${embedJSON(model)};
+var ROOT = MODEL;
+// An areas-level map carries one zone scene per area. The URL hash picks the
+// scene at load, and scenes switch in the page — never by navigating, which a
+// sandboxed srcdoc frame (the dashboard's) cannot do.
+function sceneFromHash(){
+  var id = "";
+  try { id = decodeURIComponent((location.hash || "").slice(1)); } catch (e) { id = ""; }
+  return id && ROOT.scenes && ROOT.scenes[id] ? id : "";
+}
+MODEL = sceneFromHash() ? ROOT.scenes[sceneFromHash()] : ROOT;
+window.addEventListener("hashchange", function(){ switchScene(sceneFromHash()); });
+window.addEventListener("popstate", function(){ switchScene(sceneFromHash()); });
 ${RUNTIME}
 })();
 </script>
@@ -174,6 +188,12 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
   padding:.85rem 1.15rem;border-bottom:1px solid var(--line);background:var(--panel);
 }
 .ttl h1{font-size:1.12rem}
+.crumbs{font-size:.86rem;margin-top:.15rem}
+.crumbs a,.dossier .body a{color:var(--ink);text-decoration:underline}
+.crumbs span{color:var(--muted)}
+.dossier .open{margin:.7rem 0 .2rem;background:var(--chip);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:.45rem .8rem;font:inherit;font-size:.84rem;cursor:pointer}
+.dossier .open:hover{background:var(--chip-hover)}
+.dossier .acts{display:flex;gap:.4rem;flex-wrap:wrap}
 .ttl p{margin:.2rem 0 0;color:var(--muted);font-size:.82rem;display:flex;gap:.5rem;flex-wrap:wrap}
 .ttl p span:not(:last-child)::after{content:" ·";color:var(--line)}
 .tools{display:flex;gap:.4rem}
@@ -280,6 +300,16 @@ var NODES = MODEL.nodes, EDGES = MODEL.edges, B = MODEL.bounds;
 var COLOR = {}, LABEL = {}, GLYPH = {};
 MODEL.kinds.forEach(function(k){ COLOR[k.id] = k.color; LABEL[k.id] = k.label; GLYPH[k.id] = k.glyph; });
 var BY = {}; NODES.forEach(function(n){ BY[n.id] = n; });
+function renderCrumbs(){
+  var crumbs = document.getElementById("crumbs");
+  if (!crumbs) return;
+  if (!MODEL.scene) { crumbs.hidden = true; crumbs.innerHTML = ""; return; }
+  crumbs.hidden = false;
+  crumbs.innerHTML = '<a href="#" data-scene="">All areas</a> <span>&rsaquo;</span> <b>' + esc(MODEL.scene.name) + '</b>';
+  var back = crumbs.querySelector("[data-scene]");
+  if (back) back.addEventListener("click", function(ev){ ev.preventDefault(); openScene(""); });
+}
+renderCrumbs();
 
 /**
  * A declared seam the call graph was checked against and did not support.
@@ -330,13 +360,179 @@ var defs = el("defs");
 });
 svg.appendChild(defs);
 
+
+/* ---------- in-place expansion ---------- */
+// Any block with drawn children can be expanded where it stands: areas (their
+// zones), zones (their sub-zones), and so on down. The block becomes a flat
+// frame carrying its own precomputed scene, composed recursively so a frame is
+// as big as everything expanded inside it; its column and row grow to fit and
+// the rest of the grid keeps its place. Area nodes are renamed "area:<id>" so
+// they cannot collide with a zone of the same id. Connectors between nodes at
+// different depths come from leaf-level edges lifted to the deepest visible
+// node at each end, drawn as arcs where no ground route already shows them.
+var EXPANDED = {};
+var FRAME_PAD = 1.5, FRAME_H = 0.3;
+function isAreaMap(){ return MODEL.level === "areas" && !!ROOT.scenes; }
+function copy(o){ var r = {}; for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) r[k] = o[k]; return r; }
+function sceneFor(n){
+  if (n.kind === "external" || n.kind === "infra") return null;
+  if (n.areaId) return ROOT.scenes ? ROOT.scenes[n.areaId] : null;
+  return ROOT.zoneScenes ? ROOT.zoneScenes[n.id] || null : null;
+}
+function expandable(n){ return !!sceneFor(n); }
+
+function composeLevel(model, isRoot){
+  var rename = {};
+  var base = model.nodes.map(function(n){
+    var c = copy(n);
+    if (isRoot && isAreaMap() && ROOT.scenes[n.id]) { c.areaId = n.id; c.id = "area:" + n.id; rename[n.id] = c.id; }
+    return c;
+  });
+  var subs = {};
+  base.forEach(function(n){
+    var sc = EXPANDED[n.id] ? sceneFor(n) : null;
+    if (sc) subs[n.id] = composeLevel(sc, false);
+  });
+  function footprint(n){
+    var sub = subs[n.id];
+    return sub ? { w: sub.bounds.uMax + 2 * FRAME_PAD, d: sub.bounds.vMax + 2 * FRAME_PAD } : { w: n.w, d: n.d };
+  }
+  function axis(key, startKey, lenKey){
+    var m = {};
+    base.forEach(function(n){
+      var e = m[n[key]] || (m[n[key]] = { start: n[startKey], oldLen: 0, newLen: 0 });
+      e.start = Math.min(e.start, n[startKey]);
+      e.oldLen = Math.max(e.oldLen, n[lenKey]);
+      e.newLen = Math.max(e.newLen, footprint(n)[lenKey]);
+    });
+    var list = Object.keys(m).map(function(c){ return m[c]; }).sort(function(a, b){ return a.start - b.start; });
+    var shift = 0;
+    list.forEach(function(x){ x.newStart = x.start + shift; shift += x.newLen - x.oldLen; });
+    return list;
+  }
+  var cols = axis("col", "u", "w"), rows = axis("row", "v", "d");
+  function mapAxis(x, list){
+    var prev = null;
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i];
+      if (x < c.start) break;
+      if (x <= c.start + c.oldLen) return c.newStart + (c.oldLen ? (x - c.start) * c.newLen / c.oldLen : 0);
+      prev = c;
+    }
+    return prev ? prev.newStart + prev.newLen + (x - (prev.start + prev.oldLen)) : x;
+  }
+
+  var nodes = [], placed = {}, inner = [], innerEdges = [];
+  base.forEach(function(n){
+    var f = footprint(n), p = copy(n);
+    p.u = mapAxis(n.u, cols); p.v = mapAxis(n.v, rows); p.w = f.w; p.d = f.d;
+    placed[n.id] = { old: n, now: p };
+    var sub = subs[n.id];
+    if (sub) {
+      p.frame = true; p.h = FRAME_H; p.tiles = null;
+      var ou = p.u + FRAME_PAD, ov = p.v + FRAME_PAD;
+      sub.nodes.forEach(function(z){
+        var c = copy(z); c.u = z.u + ou; c.v = z.v + ov;
+        c.ancestors = [n.id].concat(z.ancestors || []);
+        inner.push(c);
+      });
+      sub.edges.forEach(function(e){
+        var c = copy(e);
+        c.points = (e.points || []).map(function(q){ return [q[0] + ou, q[1] + ov]; });
+        innerEdges.push(c);
+      });
+    }
+    nodes.push(p);
+  });
+
+  function snap(q, geo){
+    var o = geo.old, n = geo.now;
+    return [n.u + (q[0] - o.u) * (o.w ? n.w / o.w : 1), n.v + (q[1] - o.v) * (o.d ? n.d / o.d : 1)];
+  }
+  var edges = [];
+  model.edges.forEach(function(e){
+    var c = copy(e);
+    c.from = rename[e.from] || e.from; c.to = rename[e.to] || e.to;
+    // A connector touching an expanded node is replaced by leaf-level arcs.
+    if (!e.seam && !e.infra && (subs[c.from] || subs[c.to])) return;
+    var src = e.points, out = src.map(function(q){ return [mapAxis(q[0], cols), mapAxis(q[1], rows)]; });
+    var last = src.length - 1, gf = placed[c.from], gt = placed[c.to];
+    // Endpoints follow their block's face; the adjacent segment stays orthogonal.
+    if (gf && last > 0) {
+      out[0] = snap(src[0], gf);
+      if (src[0][1] === src[1][1]) out[1][1] = out[0][1]; else if (src[0][0] === src[1][0]) out[1][0] = out[0][0];
+    }
+    if (gt && last > 0) {
+      out[last] = snap(src[last], gt);
+      if (src[last][1] === src[last - 1][1]) out[last - 1][1] = out[last][1];
+      else if (src[last][0] === src[last - 1][0]) out[last - 1][0] = out[last][0];
+    }
+    c.points = out;
+    edges.push(c);
+  });
+
+  nodes = nodes.concat(inner);
+  edges = edges.concat(innerEdges);
+  var uM = 1, vM = 1;
+  nodes.forEach(function(n){ uM = Math.max(uM, n.u + n.w); vM = Math.max(vM, n.v + n.d); });
+  return { nodes: nodes, edges: edges, bounds: { uMin: 0, uMax: uM, vMin: 0, vMax: vM } };
+}
+
+function compose(){
+  var S = composeLevel(MODEL, true);
+  var shown = {}, routed = {};
+  S.nodes.forEach(function(n){ if (!n.frame) shown[n.id] = true; });
+  S.edges.forEach(function(e){ routed[e.from + "\u0001" + e.to] = true; });
+  var parents = ROOT.parents || {};
+  function lift(id){
+    var cur = id, guard = 0;
+    while (cur && !shown[cur] && guard++ < 24) cur = parents[cur];
+    return cur && shown[cur] ? cur : null;
+  }
+  var arcs = {};
+  (ROOT.leafEdges || []).forEach(function(x){
+    var from = lift(x.from), to = lift(x.to);
+    if (!from || !to || from === to || routed[from + "\u0001" + to]) return;
+    var k = from + "\u0001" + to;
+    var a = arcs[k] || (arcs[k] = { from: from, to: to, weight: 0, calls: 0, back: false, arc: true, points: [] });
+    a.weight += x.weight;
+  });
+  for (var ak in arcs) if (Object.prototype.hasOwnProperty.call(arcs, ak)) S.edges.push(arcs[ak]);
+  return S;
+}
+
+/** True when node n sits (at any depth) on the frame with id frameId. */
+function within(n, frameId){ return !!(n && n.ancestors && n.ancestors.indexOf(frameId) !== -1); }
+
+function toggleExpand(id){
+  EXPANDED[id] = !EXPANDED[id];
+  if (!EXPANDED[id]) {
+    // Collapsing a node forgets what was expanded inside it.
+    for (var k in EXPANDED) if (EXPANDED[k] && BY[k] && within(BY[k], id)) EXPANDED[k] = false;
+  }
+  build();
+  curEdge = null;
+  curNode = BY[id] ? id : null;
+  refresh(false);
+}
+
 var camera = el("g", { id: "camera" });
 svg.appendChild(camera);
-var gGround = el("g"), gEdge = el("g"), gBlock = el("g"), gTag = el("g");
+var gGround = el("g"), gEdge = el("g"), gBlock = el("g"), gArc = el("g"), gTag = el("g");
 camera.appendChild(gGround); camera.appendChild(gEdge);
-camera.appendChild(gBlock); camera.appendChild(gTag);
+camera.appendChild(gBlock); camera.appendChild(gArc); camera.appendChild(gTag);
 
-var uMin = B.uMin - 3, uMax = B.uMax + 3, vMin = B.vMin - 3, vMax = B.vMax + 5;
+var uMin, uMax, vMin, vMax, minX, maxX, minY, maxY;
+var edgeEls = [], blockEls = {};
+function clearGroup(g){ while (g.firstChild) g.removeChild(g.firstChild); }
+
+/** Draw the composed scene: ground, connectors, blocks, and the viewBox. */
+function build(){
+[gGround, gEdge, gBlock, gArc, gTag].forEach(clearGroup);
+var S = compose();
+NODES = S.nodes; EDGES = S.edges; B = S.bounds;
+BY = {}; NODES.forEach(function(n){ BY[n.id] = n; });
+uMin = B.uMin - 3; uMax = B.uMax + 3; vMin = B.vMin - 3; vMax = B.vMax + 5;
 var ground = el("polygon", {
   points: pts([P(uMin, vMin, 0), P(uMax, vMin, 0), P(uMax, vMax, 0), P(uMin, vMax, 0)])
 });
@@ -365,7 +561,7 @@ for (var gv = vMin; gv <= vMax; gv += 3) {
 // They are deliberately NOT in the tab order — a large map has hundreds, which
 // would bury the blocks. Keyboard users reach every edge from the panel of
 // either zone it touches.
-var edgeEls = [];
+edgeEls = [];
 EDGES.forEach(function(e, index){
   var projected = e.points.map(function(q){ return P(q[0], q[1], 0); });
   var from = BY[e.from], to = BY[e.to];
@@ -382,11 +578,23 @@ EDGES.forEach(function(e, index){
         ? (unver ? ", declared but no supporting calls in the call graph" : "")
         : (e.infra ? "" : ", " + e.weight + " references"))
   });
-  var hit = el("polyline", {
-    points: pts(projected), fill: "none", stroke: "transparent",
-    "stroke-width": "14", "stroke-linejoin": "round", "stroke-linecap": "round"
-  });
-  var line = el("polyline", { points: pts(projected), "marker-end": "url(#wire)" });
+  var hit, line;
+  if (e.arc && from && to) {
+    // Lifted arc between block tops, drawn above the blocks: these zone-level
+    // connectors have no ground route, and would hide behind blocks otherwise.
+    var a = P(from.u + from.w / 2, from.v + from.d / 2, from.h), b = P(to.u + to.w / 2, to.v + to.d / 2, to.h);
+    var dist = Math.sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]));
+    var d = "M" + a[0].toFixed(1) + "," + a[1].toFixed(1) + " Q" + ((a[0] + b[0]) / 2).toFixed(1) + "," +
+      (Math.min(a[1], b[1]) - 30 - dist * 0.25).toFixed(1) + " " + b[0].toFixed(1) + "," + b[1].toFixed(1);
+    hit = el("path", { d: d, fill: "none", stroke: "transparent", "stroke-width": "14", "stroke-linecap": "round" });
+    line = el("path", { d: d, fill: "none", "marker-end": "url(#wire)" });
+  } else {
+    hit = el("polyline", {
+      points: pts(projected), fill: "none", stroke: "transparent",
+      "stroke-width": "14", "stroke-linejoin": "round", "stroke-linecap": "round"
+    });
+    line = el("polyline", { points: pts(projected), "marker-end": "url(#wire)" });
+  }
   line.setAttribute("class", "wire" + (e.seam ? " seam" : "") + (unver ? " unver" : "") +
     (e.infra ? " infra" : ""));
   // Dash pattern, not just hue: an unsupported claim has to read as different
@@ -395,7 +603,7 @@ EDGES.forEach(function(e, index){
   else if (e.infra) line.setAttribute("stroke-dasharray", "10 4");
   else if (e.back) line.setAttribute("stroke-dasharray", "7 6");
   g.appendChild(hit); g.appendChild(line);
-  gEdge.appendChild(g);
+  (e.arc ? gArc : gEdge).appendChild(g);
   edgeEls.push({ e: e, g: g, node: line });
 
   g.addEventListener("click", function(ev){
@@ -408,8 +616,11 @@ EDGES.forEach(function(e, index){
 
 /* ---------- blocks ---------- */
 // Painter's algorithm: ascending (u+v) draws far boxes before near ones.
-var order = NODES.slice().sort(function(x, y){ return (x.u + x.v) - (y.u + y.v); });
-var blockEls = {};
+// Frames first: they are flat and their zones stand on them.
+var order = NODES.slice().sort(function(x, y){
+  return (x.frame ? 0 : 1) - (y.frame ? 0 : 1) || (x.u + x.v) - (y.u + y.v);
+});
+blockEls = {};
 order.forEach(function(n){
   var base = COLOR[n.kind] || "#6F7BA6";
   var g = el("g", {
@@ -430,9 +641,32 @@ order.forEach(function(n){
     fill: base, stroke: shade(base, 0.28), "stroke-width": "1"
   });
   g.appendChild(faceL); g.appendChild(faceR); g.appendChild(top);
+  if (n.frame) {
+    // An expanded area: a low platform with a dashed rim under its zones.
+    top.setAttribute("fill", shade(base, -0.62));
+    top.setAttribute("fill-opacity", "0.55");
+    top.setAttribute("stroke", shade(base, 0.15));
+    top.setAttribute("stroke-dasharray", "5 4");
+    g.setAttribute("class", "node frame");
+  }
+  // Sub-zones: tiles on the top face, alternating tints so neighbours read
+  // apart, each with a title for hover. Not focusable — the dossier lists them.
+  (n.tiles || []).forEach(function(t, i){
+    var tu = u + t.u, tv = v + t.v;
+    var tile = el("polygon", {
+      points: pts([P(tu, tv, h), P(tu + t.w, tv, h), P(tu + t.w, tv + t.d, h), P(tu, tv + t.d, h)]),
+      fill: shade(base, i % 2 ? 0.14 : 0.04), stroke: shade(base, -0.3), "stroke-width": "0.8"
+    });
+    tile.setAttribute("class", "tile");
+    var tt = el("title");
+    tt.textContent = t.name + " \u00b7 " + num(t.files) + " files";
+    tile.appendChild(tt);
+    g.appendChild(tile);
+  });
   gBlock.appendChild(g);
 
-  var cTop = P(u + w / 2, v + d / 2, h);
+  // A frame's label sits at its far corner, clear of the zones on it.
+  var cTop = n.frame ? P(u + 1.4, v + 0.6, h) : P(u + w / 2, v + d / 2, h);
   var tagY = cTop[1] - 28, tagX = cTop[0];
   var label = n.name.toUpperCase();
   var glyph = GLYPH[n.kind] || "";
@@ -479,6 +713,10 @@ order.forEach(function(n){
   }
   g.addEventListener("click", pick);
   tg.addEventListener("click", pick);
+  if (expandable(n)) {
+    g.addEventListener("dblclick", function(ev){ ev.stopPropagation(); toggleExpand(n.id); });
+    tg.addEventListener("dblclick", function(ev){ ev.stopPropagation(); toggleExpand(n.id); });
+  }
   g.addEventListener("keydown", function(ev){
     if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectNode(n.id); }
   });
@@ -492,23 +730,41 @@ var xs = [], ys = [];
 NODES.forEach(function(n){
   var p = P(n.u + n.w / 2, n.v + n.d / 2, n.h); ys.push(p[1] - 46);
 });
-var minX = Math.min.apply(null, xs) - 20, maxX = Math.max.apply(null, xs) + 20;
-var minY = Math.min.apply(null, ys) - 14, maxY = Math.max.apply(null, ys) + 20;
+minX = Math.min.apply(null, xs) - 20; maxX = Math.max.apply(null, xs) + 20;
+minY = Math.min.apply(null, ys) - 14; maxY = Math.max.apply(null, ys) + 20;
 svg.setAttribute("viewBox", minX + " " + minY + " " + (maxX - minX) + " " + (maxY - minY));
 svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+}
+build();
 
 /* ---------- detail panel ---------- */
 var dossier = document.getElementById("dossier");
-var INTRO =
+function introHtml(){ return (
   '<h3>' + esc(MODEL.meta.project) + '</h3>' +
-  '<div class="sub">' + num(MODEL.meta.shownZones) + ' zones &middot; ' +
+  '<div class="sub">' + (MODEL.level === "areas"
+    ? num(NODES.filter(function(n){ return n.tiles; }).length) + ' areas &middot; ' + num(MODEL.meta.totalZones) + ' zones &middot; '
+    : num(MODEL.meta.shownZones) + ' zones &middot; ') +
   (MODEL.meta.origin === "sourcevision" ? 'from sourcevision analysis' : 'from a direct scan') + '</div>' +
+  (MODEL.level === "areas"
+    ? '<div class="body">Each block is an <b>area</b>: a group of zones that belong together. The tiles on ' +
+      'top are its zones, sized by file count. Lines are imports between areas. Expand an area to see its ' +
+      'zones and the imports between them, in place.</div>'
+    : '') +
+  (MODEL.scene
+    ? '<div class="body">The zones of <b>' + esc(MODEL.scene.name) + '</b>. Imports to other areas are not drawn here; ' +
+      '<a href="#" data-scene="">all areas</a> shows them.</div>'
+    : '') +
+  (MODEL.level === "areas" ? '' :
   '<div class="body">Each block is a zone of the codebase. Footprint scales with file count and ' +
   'height with line count, so the tall wide blocks are where the code actually is. Colour and glyph ' +
   'show what the zone mostly does. Solid lines are import dependencies pointing from the importer ' +
-  'to what it imports; dashed lines run backwards through the layering and mark a dependency cycle.</div>' +
+  'to what it imports; dashed lines run backwards through the layering and mark a dependency cycle.</div>') +
   '<h4>Try this</h4><ul>' +
-  '<li>Click a block to see its files and cross-zone edges.</li>' +
+  (MODEL.level === "areas"
+    ? '<li>Double-click an area (or click it, then <b>Expand here</b>) to open its zones in place; ' +
+      'zones with tiles on top open the same way, as deep as the analysis goes. ' +
+      '<b>Open on its own</b> shows one area by itself.</li>'
+    : '<li>Click a block to see its files and cross-zone edges.</li>') +
   '<li>Click a connector, or a reference count in a panel, to inspect one dependency.</li>' +
   (MODEL.meta.seamCount || MODEL.meta.infraCount
     ? '<li>Pink connectors are <b>declared</b>, not inferred: runtime seams and infrastructure ' +
@@ -521,7 +777,7 @@ var INTRO =
     : '') +
   '<li>Use the legend to isolate one kind of zone.</li>' +
   '<li>Drag to pan, scroll to zoom, <b>Reset view</b> to recentre. <b>Esc</b> clears.</li>' +
-  '</ul>';
+  '</ul>'); }
 
 /** Index of the edge joining two zones, or -1. */
 function edgeIndex(fromId, toId){
@@ -551,6 +807,17 @@ function renderNode(n){
     esc(GLYPH[n.kind] || "") + ' ' + esc(n.stage) + ' &middot; ' + esc(LABEL[n.kind] || n.kind) + '</div>';
   h += '<h3>' + esc(n.name) + '</h3>';
   h += '<div class="sub">' + esc(n.sub) + '</div>';
+  if (expandable(n)) {
+    h += '<div class="acts"><button type="button" class="open" data-expand="' + esc(n.id) + '">' +
+      (EXPANDED[n.id] ? 'Collapse' : 'Expand here') + '</button>' +
+      (n.areaId ? ' <button type="button" class="open" data-open="' + esc(n.areaId) + '">Open on its own &rarr;</button>' : '') +
+      '</div>';
+  }
+  var parentId = n.ancestors && n.ancestors[0];
+  if (parentId && BY[parentId]) {
+    h += '<div class="sub">Inside <button type="button" class="link" data-goto="' + esc(parentId) + '">' +
+      esc(BY[parentId].name) + '</button></div>';
+  }
 
   if (n.kind !== "external") {
     h += '<div class="mx">' +
@@ -566,6 +833,11 @@ function renderNode(n){
   if (n.mix.length) {
     h += '<h4>Contents</h4><div class="mx">' + n.mix.map(function(a){
       return '<span>' + esc(LABEL[a[0]] || a[0]) + ' <b>' + num(a[1]) + '</b></span>';
+    }).join("") + '</div>';
+  }
+  if (n.tiles && n.tiles.length) {
+    h += '<h4>Sub-zones</h4><div class="mx">' + n.tiles.map(function(t){
+      return '<span>' + esc(t.name) + ' <b>' + num(t.files) + '</b></span>';
     }).join("") + '</div>';
   }
   if (n.insights.length) {
@@ -587,6 +859,15 @@ function renderNode(n){
   }
   h += '<h4>Imported by</h4>' + linkList(n.inbound, n.id, true);
   h += '<h4>Imports</h4>' + linkList(n.outbound, n.id, false);
+  // Expanded areas: the zone-level connectors to and from other areas.
+  var arcOut = [], arcIn = [];
+  EDGES.forEach(function(e){
+    if (!e.arc) return;
+    if (e.from === n.id && BY[e.to]) arcOut.push({ id: e.to, name: BY[e.to].name, weight: e.weight });
+    if (e.to === n.id && BY[e.from]) arcIn.push({ id: e.from, name: BY[e.from].name, weight: e.weight });
+  });
+  if (arcIn.length) h += '<h4>Imported from other areas</h4>' + linkList(arcIn, n.id, true);
+  if (arcOut.length) h += '<h4>Imports in other areas</h4>' + linkList(arcOut, n.id, false);
   return h;
 }
 
@@ -670,7 +951,35 @@ function renderEdge(e){
   return h;
 }
 
+/** Show one area's scene ("" for the areas map) in place, recording it in history when allowed. */
+function openScene(id){
+  switchScene(id);
+  try { history.pushState(null, "", id ? "#" + encodeURIComponent(id) : location.pathname + location.search); } catch (e) { /* sandboxed frame */ }
+}
+function switchScene(id){
+  var next = id && ROOT.scenes && ROOT.scenes[id] ? ROOT.scenes[id] : ROOT;
+  if (next === MODEL) return;
+  MODEL = next;
+  EXPANDED = {};
+  curNode = null; curEdge = null;
+  renderCrumbs();
+  build();
+  k = 1; tx = 0; ty = 0; apply();
+  refresh(false);
+}
 function bindPanel(){
+  var scenes = dossier.querySelectorAll("[data-scene]");
+  for (var sc = 0; sc < scenes.length; sc++) {
+    scenes[sc].addEventListener("click", function(ev){ ev.preventDefault(); openScene(ev.currentTarget.getAttribute("data-scene") || ""); });
+  }
+  var expands = dossier.querySelectorAll("[data-expand]");
+  for (var x = 0; x < expands.length; x++) {
+    expands[x].addEventListener("click", function(ev){ toggleExpand(ev.currentTarget.getAttribute("data-expand")); });
+  }
+  var opens = dossier.querySelectorAll("[data-open]");
+  for (var o = 0; o < opens.length; o++) {
+    opens[o].addEventListener("click", function(ev){ openScene(ev.currentTarget.getAttribute("data-open")); });
+  }
   var gotos = dossier.querySelectorAll("[data-goto]");
   for (var i = 0; i < gotos.length; i++) {
     gotos[i].addEventListener("click", function(ev){
@@ -703,6 +1012,16 @@ function highlighted(){
       if (e.from === curNode) set[e.to] = true;
       if (e.to === curNode) set[e.from] = true;
     });
+    // A selected expanded node keeps everything on it lit, and whatever that
+    // connects to.
+    var sel = BY[curNode];
+    if (sel && sel.frame) {
+      NODES.forEach(function(n){ if (within(n, sel.id)) set[n.id] = true; });
+      EDGES.forEach(function(e){
+        if (within(BY[e.from], sel.id)) set[e.to] = true;
+        if (within(BY[e.to], sel.id)) set[e.from] = true;
+      });
+    }
   } else if (curEdge !== null) {
     var e = EDGES[curEdge];
     set[e.from] = true; set[e.to] = true;
@@ -732,7 +1051,9 @@ function refresh(scrollPanel){
   });
 
   edgeEls.forEach(function(x, i){
-    var hot = (i === curEdge) || (curNode !== null && (x.e.from === curNode || x.e.to === curNode));
+    var selFrame = curNode !== null && BY[curNode] && BY[curNode].frame ? curNode : null;
+    var hot = (i === curEdge) || (curNode !== null && (x.e.from === curNode || x.e.to === curNode)) ||
+      (selFrame !== null && (within(BY[x.e.from], selFrame) || within(BY[x.e.to], selFrame)));
     var ends = kindVisible((BY[x.e.from] || {}).kind) && kindVisible((BY[x.e.to] || {}).kind);
     var weight = edgeWeight(x.e);
     var declared = (x.e.seam ? " seam" : "") + (unverifiedSeam(x.e) ? " unver" : "") +
@@ -745,7 +1066,7 @@ function refresh(scrollPanel){
 
   if (curNode !== null && BY[curNode]) dossier.innerHTML = renderNode(BY[curNode]);
   else if (curEdge !== null) dossier.innerHTML = renderEdge(EDGES[curEdge]);
-  else dossier.innerHTML = INTRO;
+  else dossier.innerHTML = introHtml();
   bindPanel();
   dossier.scrollTop = 0;
 

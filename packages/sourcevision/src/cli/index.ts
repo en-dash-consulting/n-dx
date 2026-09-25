@@ -19,7 +19,8 @@ import { resolve } from "node:path";
 import { usage, showCommandHelp } from "./help.js";
 import { cmdInit } from "./commands/init.js";
 import { cmdReset } from "./commands/reset.js";
-import { cmdAnalyze } from "./commands/analyze.js";
+import { cmdAnalyze, narrateDeps } from "./commands/analyze.js";
+import { cmdNarrate } from "./commands/narrate.js";
 import { cmdValidate } from "./commands/validate.js";
 import { cmdExportPdf } from "./commands/export-pdf.js";
 import { cmdIso, parseIsoArgs } from "./commands/iso.js";
@@ -60,7 +61,7 @@ for (const a of args.slice(1)) {
     help = true;
   } else if (
     a.startsWith("--phase=") || a.startsWith("--only=") || a.startsWith("--target-pass=")
-    || a === "--fast" || a === "--full" || a === "--deep" || a === "--lite"
+    || a === "--fast" || a === "--full" || a === "--deep" || a === "--lite" || a === "--narrate" || a === "--per-zone" || a === "--wait"
   ) {
     passthrough.push(a);
   }
@@ -88,7 +89,7 @@ async function cmdMcp(dir: string): Promise<void> {
 // Commands that require .sourcevision/ to exist
 // `iso` is absent deliberately: --source=scan derives zones from the file tree
 // and must work on a project that has never been analyzed. cmdIso gates itself.
-const NEEDS_SV_DIR = new Set(["serve", "validate", "reset", "pr-markdown", "mcp"]);
+const NEEDS_SV_DIR = new Set(["serve", "validate", "reset", "pr-markdown", "mcp", "narrate"]);
 
 try {
   // Show help: per-command help when --help/-h is given with a command,
@@ -110,6 +111,9 @@ try {
       break;
     case "analyze":
       await cmdAnalyze(targetArg || ".", passthrough);
+      break;
+    case "narrate":
+      await cmdNarrate(targetArg || ".", { deps: narrateDeps() });
       break;
     case "serve":
       await cmdServe(targetArg || ".", port);

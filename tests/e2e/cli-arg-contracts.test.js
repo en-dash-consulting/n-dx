@@ -139,6 +139,7 @@ const SOURCEVISION_COMMANDS = [
 const SOURCEVISION_SUBCOMMANDS = [
   "init",
   "analyze",
+  "narrate",
   "serve",
   "validate",
   "export-pdf",

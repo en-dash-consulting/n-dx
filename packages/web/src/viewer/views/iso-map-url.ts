@@ -110,3 +110,22 @@ export function buildIsoMapUrl(controls: IsoMapControls): string {
 export function isoMapDownloadName(controls: IsoMapControls): string {
   return `iso-map-${controls.source}-${clampMaxNodes(controls.maxNodes)}.html`;
 }
+
+/**
+ * A cheap fingerprint of the analysis the map is drawn from. The view
+ * regenerates the map whenever it changes — a new analyze run, or the
+ * background narrator finishing and landing its names — so the dashboard
+ * always shows what `sv iso` would write for the same data.
+ */
+export function isoMapAnalysisStamp(data: {
+  manifest?: { analyzedAt?: string; narration?: { status?: string; finishedAt?: string } } | null;
+  zones?: { structureHash?: string } | null;
+} | null | undefined): string {
+  if (!data) return "";
+  return [
+    data.manifest?.analyzedAt ?? "",
+    data.manifest?.narration?.status ?? "",
+    data.manifest?.narration?.finishedAt ?? "",
+    data.zones?.structureHash ?? "",
+  ].join("|");
+}

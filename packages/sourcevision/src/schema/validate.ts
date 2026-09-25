@@ -13,6 +13,45 @@ const ModuleInfoSchema = z.object({
   chunks: z.number().int().positive().optional(),
 });
 
+const LLMClassUsageSchema = z.object({
+  calls: z.number().int().nonnegative(),
+  inputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  durationMs: z.number().nonnegative(),
+  vendor: z.string(),
+  model: z.string(),
+});
+
+const PartitionHealthSchema = z.object({
+  zones: z.number().int().nonnegative(),
+  smallZones: z.number().int().nonnegative(),
+  smallShare: z.number().min(0).max(1),
+  numericIds: z.number().int().nonnegative(),
+  largestShare: z.number().min(0).max(1),
+  verdict: z.enum(["healthy", "borderline", "fragmented"]),
+  reasons: z.array(z.string()).optional(),
+});
+
+const PartitionReviewSchema = z.object({
+  fingerprint: z.string(),
+  health: PartitionHealthSchema,
+  rejected: z.boolean(),
+  mapProbability: z.number().min(0).max(1).optional(),
+  after: PartitionHealthSchema.optional(),
+});
+
+const AnalysisRunSchema = z.object({
+  at: z.string(),
+  mode: z.enum(["fast", "generative", "narrate", "cascade", "narration"]),
+  durationMs: z.number().nonnegative(),
+  phases: z.record(z.string(), z.number().nonnegative()),
+  llm: z.object({
+    byTaskClass: z.record(z.string(), LLMClassUsageSchema),
+    judgmentCache: z.object({ hits: z.number().int().nonnegative(), misses: z.number().int().nonnegative() }).optional(),
+  }),
+  partition: PartitionReviewSchema.extend({ reused: z.boolean() }).optional(),
+});
+
 export const ManifestSchema = z.object({
   schemaVersion: z.string(),
   toolVersion: z.string(),
@@ -21,6 +60,17 @@ export const ManifestSchema = z.object({
   gitBranch: z.string().optional(),
   targetPath: z.string(),
   modules: z.record(z.string(), ModuleInfoSchema),
+  lastAnalysis: AnalysisRunSchema.optional(),
+  narration: z.object({
+    status: z.enum(["pending", "done", "failed"]),
+    zones: z.array(z.string()),
+    names: z.array(z.string()).optional(),
+    startedAt: z.string(),
+    finishedAt: z.string().optional(),
+    pid: z.number().int().optional(),
+    log: z.string().optional(),
+    reason: z.string().optional(),
+  }).optional(),
 });
 
 // ── Inventory ───────────────────────────────────────────────────────────────
@@ -168,6 +218,7 @@ const FindingTypeSchema = z.enum([
 
 const MoveFileReasonSchema = z.enum([
   "zone-pin-override",
+  "zone-judgment",
   "import-neighbor-majority",
   "directory-consolidation",
 ]);
@@ -197,6 +248,7 @@ const ZoneSchema = z.object({
   cohesion: z.number().min(0).max(1),
   coupling: z.number().min(0).max(1),
   insights: z.array(z.string()).optional(),
+  previousIds: z.array(z.string()).optional(),
 });
 
 const ZoneCrossingSchema = z.object({
@@ -213,10 +265,20 @@ export const ZonesSchema = z.object({
   insights: z.array(z.string()).optional(),
   findings: z.array(FindingSchema).optional(),
   enrichmentPass: z.number().int().nonnegative().optional(),
+  enrichmentMode: z.enum(["cascade", "generative"]).optional(),
   metaEvaluationCount: z.number().int().nonnegative().optional(),
   structureHash: z.string().optional(),
   zoneContentHashes: z.record(z.string()).optional(),
   lastReset: z.object({ from: z.number().int().positive(), to: z.number().int().positive() }).optional(),
+  partitionReview: PartitionReviewSchema.optional(),
+  algorithmVersion: z.number().int().positive().optional(),
+  areas: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    zones: z.array(z.string()),
+    files: z.number().int().nonnegative(),
+    nameSource: z.enum(["package", "route", "member", "template", "judged", "generated", "support", "tests"]).optional(),
+  })).optional(),
 });
 
 // ── Components ──────────────────────────────────────────────────────────────

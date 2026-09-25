@@ -131,3 +131,50 @@ describe("claude-client model resolution", () => {
     vi.unstubAllEnvs();
   });
 });
+
+describe("getJudgmentRoute", () => {
+  it("returns typesafe for a default judgment class when the key is present, without warning", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { getJudgmentRoute } = await import("../../../src/analyzers/claude-client.js");
+      setLLMConfig({ vendor: "claude" });
+      expect(getJudgmentRoute("code.classify")).toBe("typesafe");
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("falls back silently when nothing routed the class to typesafe", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { getJudgmentRoute } = await import("../../../src/analyzers/claude-client.js");
+      setLLMConfig({ vendor: "claude" });
+      expect(getJudgmentRoute("zone.judge-silent")).toBeUndefined();
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("warns once per class when llm.routes names typesafe but the key is missing", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { getJudgmentRoute } = await import("../../../src/analyzers/claude-client.js");
+      setLLMConfig({ vendor: "claude", routes: { "zone.judge-noticed": "typesafe" } });
+      expect(getJudgmentRoute("zone.judge-noticed")).toBeUndefined();
+      expect(getJudgmentRoute("zone.judge-noticed")).toBeUndefined();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain("TYPESAFE_API_KEY is not set");
+      expect(warn.mock.calls[0][0]).toContain("claude vendor");
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+});

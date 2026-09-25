@@ -117,6 +117,7 @@ import {
 } from "./child-lifecycle.js";
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
+import { formatNarrationStatus, readNarrationState } from "./narration-status.js";
 import { resolveExistingDir } from "./resolve-existing-dir.js";
 import {
   readRexTestCommand,
@@ -1619,8 +1620,11 @@ async function handlePlan(rest) {
 
   // Skip sourcevision when importing from a specific file
   if (!hasFile) {
+    // --wait: rex analyze reads zone names and insights, so background
+    // narration must land first or proposals are built from placeholders.
     await runOrDie(tools.sourcevision, [
       "analyze",
+      "--wait",
       ...flags.filter((f) => f === "--quiet" || f === "-q"),
       ...(flags.includes("--no-llm") ? ["--fast"] : []),
       dir,
@@ -1971,6 +1975,10 @@ async function handleStatus(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["status", ...flags, dir]);
+  if (!flags.some((f) => f.startsWith("--format="))) {
+    const narration = formatNarrationStatus(readNarrationState(dir));
+    if (narration) console.log(`\n${narration}`);
+  }
   exitWithCleanup(0);
 }
 

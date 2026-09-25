@@ -38,7 +38,9 @@ export function ProductLogoPng({ product, size = 20, class: cls }: LogoProps & {
   const src = PRODUCT_PNG[product];
   if (!src) return null;
   return h("img", {
-    src,
+    // Through appUrl: behind the hub the viewer lives under /p/<id>/, and a
+    // bare "/Rex-F.png" would be requested from the hub root instead.
+    src: appUrl(src),
     width: size,
     height: size,
     alt: "",

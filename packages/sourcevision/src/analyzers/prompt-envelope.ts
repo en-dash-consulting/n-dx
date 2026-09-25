@@ -95,11 +95,55 @@ export const ONLY_NEW_INSIGHTS =
  *
  * @param withCategory - include the category enum (batch prompts only)
  */
-export function findingsContract(withCategory: boolean): string {
+export function findingsContract(withCategory: boolean, judged = false): string {
+  if (judged) return "";
   const severity = 'Findings: severity ("info"|"warning"|"critical")';
   return withCategory
     ? `${severity}, category ("structural"|"code"|"documentation").`
     : `${severity}.`;
+}
+
+/**
+ * Drop the `severity` and `category` keys from a JSON response example when
+ * Jev supplies both (see enrich-judge.ts). The contract line above already goes
+ * quiet; leaving the keys in the example would still invite the model to fill
+ * them, spending output tokens on values the pipeline is about to overwrite.
+ * Identity when `judged` is false, so the inactive path emits the same bytes.
+ */
+export function stripJudgedFields(example: string, judged: boolean): string {
+  if (!judged) return example;
+  return example
+    .replace(/,"severity":"[a-z]+"/g, "")
+    .replace(/,"category":"[a-z]+"/g, "")
+    // type and scope are selected by Jev from the finding text and the zone
+    // list (enrich-judge.ts), so the model is asked for text only.
+    .replace(/"type":"[^"]*",/g, "")
+    .replace(/"scope":"[^"]*",/g, "");
+}
+
+/** The finding-type instruction, or nothing when Jev selects the type. */
+export function findingTypesHint(types: readonly string[], judged: boolean): string {
+  return judged ? "" : `Use finding types: ${types.join(", ")}.`;
+}
+
+/** Join a sentence and an optional hint with one space, byte-identical when the hint is present. */
+export function withHint(base: string, hint: string): string {
+  return hint ? `${base} ${hint}` : base;
+}
+
+/**
+ * Assemble an output section from lines, dropping the blank spacer that
+ * follows a contract line the judged path turned into `""`. Identity for the
+ * inactive path: every non-empty line keeps its spacer.
+ */
+export function outputLines(lines: string[]): string {
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] === "" && i + 1 < lines.length && lines[i + 1] === "" ) continue;
+    out.push(lines[i]);
+  }
+  while (out.length > 0 && out[0] === "") out.shift();
+  return out.join("\n");
 }
 
 /**

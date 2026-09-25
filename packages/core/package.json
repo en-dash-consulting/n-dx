@@ -78,6 +78,7 @@
     "gitignore.js",
     "self-heal-confirm.js",
     "stale-check.js",
+    "narration-status.js",
     "commit-trailers.js",
     "install-identity.js",
     "resolve-existing-dir.js"
