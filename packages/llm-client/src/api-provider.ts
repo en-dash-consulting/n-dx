@@ -43,6 +43,7 @@ import {
   DEFAULT_AUTO_RETRY_THRESHOLD_MS,
 } from "./rate-limit.js";
 import { classifyAuthError } from "./llm-error-classifier.js";
+import { printRetryLine } from "./progress-reporter.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
 const DEFAULT_MAX_RETRIES = 3;
@@ -51,7 +52,7 @@ const DEFAULT_MAX_TOKENS = 8192;
 
 function defaultApiRateLimitOnRetry(attempt: number, maxAttempts: number, delayMs: number): void {
   const countdown = formatRetryCountdown(Math.round(delayMs / 1000));
-  process.stderr.write(`Rate limited — retry in ${countdown} (attempt ${attempt} of ${maxAttempts})\n`);
+  printRetryLine(attempt, maxAttempts, `rate limited, waiting ${countdown}`);
 }
 
 /**
