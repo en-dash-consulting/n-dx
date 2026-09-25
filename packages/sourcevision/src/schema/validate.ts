@@ -19,6 +19,7 @@ export const ManifestSchema = z.object({
   analyzedAt: z.string(),
   gitSha: z.string().optional(),
   gitBranch: z.string().optional(),
+  analysisFingerprint: z.string().optional(),
   targetPath: z.string(),
   modules: z.record(z.string(), ModuleInfoSchema),
 });

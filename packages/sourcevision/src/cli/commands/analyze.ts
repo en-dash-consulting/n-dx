@@ -39,7 +39,7 @@ import {
 import type { AnalyzeContext } from "./analyze-phases.js";
 import { generatePrMarkdownFile } from "./pr-markdown.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
-import { generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
+import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import type { Manifest } from "../sourcevision-core.js";
 
@@ -368,8 +368,13 @@ async function writePrimerIfPossible(
     // reachable: the vendor and auth-mode getters both fall back to defaults
     // when nothing is configured, so consulting them would have this attempt
     // a spawn in every environment without one — including `ndx ci` and the
-    // test suite, where it costs a timeout rather than a primer. A cached
-    // primer is still served in those runs; only generation is gated.
+    // test suite, where it costs a timeout rather than a primer.
+    //
+    // Only generation is gated. A cached primer keeps whatever stamp it was
+    // written with, and that stamp still matches when this analysis produced
+    // the same CONTEXT.md — which is why the stamp is a content fingerprint
+    // and not a timestamp. Returning here therefore leaves a still-valid
+    // primer valid, rather than orphaning it until the next LLM-enabled run.
     if (ctx.tokenUsage.calls === 0) {
       if (!cachedPrimer) {
         info(`${dim("[primer]")} skipped — no LLM calls in this analysis`);
@@ -471,10 +476,20 @@ async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     const contextMd = generateContext(manifest, inventory, importsData, zonesData, componentsData, classData);
     writeFileSync(join(ctx.svDir, SUPPLEMENTARY_FILES[1]), contextMd);
 
+    // Record what this analysis found, as a value that is equal whenever the
+    // finding is equal. Persisted before the primer step so the stamp and the
+    // manifest field are written from the same computation, and so a run that
+    // distils nothing still republishes the fingerprint its CONTEXT.md implies.
+    manifest.analysisFingerprint = computeAnalysisFingerprint({
+      gitSha: manifest.gitSha,
+      contextMd,
+    });
+    writeManifest(ctx.absDir, manifest);
+
     // Distil a short primer for agent startup context. Best-effort by design:
     // consumers fall back to CONTEXT.md, so no primer is a known-good state
     // and this must never fail an analysis. Skipped entirely when the run made
-    // no LLM calls (`--lite`), since there is no configured model to ask.
+    // no LLM calls (`--fast`), since there is no configured model to ask.
     await writePrimerIfPossible(ctx, manifest, contextMd);
 
     // Emit per-zone output files

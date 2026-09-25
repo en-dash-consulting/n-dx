@@ -197,14 +197,53 @@ describe("sourcevisionFingerprint", () => {
     expect(a).toBeTruthy();
   });
 
-  it("changes when the analysis is re-run", async () => {
+  it("reads the fingerprint sourcevision published", async () => {
+    await writeManifest({
+      analyzedAt: "2026-08-17T13:41:10.697Z",
+      gitSha: "abc123",
+      analysisFingerprint: "0123456789abcdef",
+    });
+    expect(await sourcevisionFingerprint(projectDir)).toBe("0123456789abcdef");
+  });
+
+  it("survives a re-analysis that found the same thing", async () => {
+    // Keying the warm parent on `analyzedAt` threw the orientation session away
+    // on every re-analysis, including one that changed nothing. sourcevision now
+    // republishes the same analysisFingerprint in that case.
+    const analysis = { gitSha: "abc123", analysisFingerprint: "0123456789abcdef" };
+    await writeManifest({ ...analysis, analyzedAt: "2026-08-17T13:41:10.697Z" });
+    const before = await sourcevisionFingerprint(projectDir);
+
+    await writeManifest({ ...analysis, analyzedAt: "2026-08-28T09:00:00.000Z" });
+
+    expect(await sourcevisionFingerprint(projectDir)).toBe(before);
+  });
+
+  it("changes when the re-analysis found something different", async () => {
+    await writeManifest({
+      analyzedAt: "2026-08-17T13:41:10.697Z",
+      gitSha: "abc123",
+      analysisFingerprint: "0123456789abcdef",
+    });
+    const before = await sourcevisionFingerprint(projectDir);
+
+    await writeManifest({
+      analyzedAt: "2026-08-17T13:41:10.697Z",
+      gitSha: "abc123",
+      analysisFingerprint: "fedcba9876543210",
+    });
+
+    expect(await sourcevisionFingerprint(projectDir)).not.toBe(before);
+  });
+
+  it("falls back to analyzedAt for a manifest written before the field existed", async () => {
     await writeManifest({ analyzedAt: "2026-08-17T13:41:10.697Z", gitSha: "abc123" });
     const before = await sourcevisionFingerprint(projectDir);
     await writeManifest({ analyzedAt: "2026-08-28T09:00:00.000Z", gitSha: "abc123" });
     expect(await sourcevisionFingerprint(projectDir)).not.toBe(before);
   });
 
-  it("changes when the analyzed commit changes", async () => {
+  it("falls back when the analyzed commit changes on a legacy manifest", async () => {
     await writeManifest({ analyzedAt: "2026-08-17T13:41:10.697Z", gitSha: "abc123" });
     const before = await sourcevisionFingerprint(projectDir);
     await writeManifest({ analyzedAt: "2026-08-17T13:41:10.697Z", gitSha: "def456" });

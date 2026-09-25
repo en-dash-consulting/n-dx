@@ -347,11 +347,13 @@ export function isParentUsable(
 /**
  * Fingerprint the sourcevision analysis the orientation session was built on.
  *
- * Derived from `manifest.json`'s `analyzedAt` and `gitSha` rather than by
- * hashing `.sourcevision/` wholesale: those two fields change on exactly the
- * event that invalidates an orientation (a re-analysis, or an analysis of a
- * different commit), and reading one small file keeps this cheap enough to
- * run before every task.
+ * Reads `manifest.analysisFingerprint` rather than hashing `.sourcevision/`
+ * wholesale: sourcevision already computes that value from CONTEXT.md when it
+ * writes the analysis, so reading one small file keeps this cheap enough to run
+ * before every task, and it changes on exactly the event that invalidates an
+ * orientation — a re-analysis that *found something different*. An analysis
+ * that found the same thing republishes the same value, which is what keeps the
+ * warm parent usable across a no-op re-analysis.
  *
  * A missing, unreadable, or empty manifest returns a stable sentinel rather
  * than throwing: projects without sourcevision output still get forking, they
@@ -359,21 +361,28 @@ export function isParentUsable(
  *
  * ## Cross-tier contract
  *
- * This must produce byte-identical output to sourcevision's `primerFingerprint`
- * and core's `sourcevisionAnalysisFingerprint`. The three tiers cannot share one
- * implementation — sourcevision stamps the primer, core reads it from the
+ * This value must equal what sourcevision stamped on `PRIMER.md` and what
+ * core's `sourcevisionAnalysisFingerprint` reads. The three tiers cannot share
+ * one implementation — sourcevision stamps the primer, core reads it from the
  * orchestration tier (spawn-only, no library imports), and hench reads it
- * without a sourcevision gateway — so the agreement is enforced by
- * `tests/integration/primer-fingerprint-contract.test.js` instead. Divergence is
- * silent rather than loud: the hashes simply never match, every primer looks
- * stale, and the optimization quietly stops paying. The separator and the
- * `unknown` sentinel are therefore load-bearing and must not be changed on one
- * side alone.
+ * without a sourcevision gateway — so they agree by reading one published
+ * field instead of recomputing a hash three times. The legacy fallback below is
+ * the last remaining copy, and `tests/integration/primer-fingerprint-contract.test.js`
+ * holds it in agreement. Divergence is silent rather than loud: the values
+ * simply never match, every primer looks stale, and the optimization quietly
+ * stops paying.
  */
 export async function sourcevisionFingerprint(projectDir: string): Promise<string> {
   try {
     const raw = await readFile(join(projectDir, ".sourcevision", "manifest.json"), "utf-8");
-    const manifest = JSON.parse(raw) as { analyzedAt?: unknown; gitSha?: unknown };
+    const manifest = JSON.parse(raw) as {
+      analysisFingerprint?: unknown;
+      analyzedAt?: unknown;
+      gitSha?: unknown;
+    };
+    if (typeof manifest.analysisFingerprint === "string" && manifest.analysisFingerprint) {
+      return manifest.analysisFingerprint;
+    }
     const analyzedAt = typeof manifest.analyzedAt === "string" ? manifest.analyzedAt : "";
     const gitSha = typeof manifest.gitSha === "string" ? manifest.gitSha : "";
     if (!analyzedAt && !gitSha) return "unknown";

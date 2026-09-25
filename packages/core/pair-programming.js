@@ -36,30 +36,47 @@ const PRIMER_FINGERPRINT_PREFIX = "<!-- sourcevision-primer fingerprint:";
 /**
  * Fingerprint the current sourcevision analysis.
  *
- * Mirrors sourcevision's own `primerFingerprint` — same two manifest fields,
- * same separator, same `unknown` sentinel — because this tier compares against
- * a marker that sourcevision wrote. It is re-implemented rather than imported:
- * the orchestration tier spawns CLIs and does not import from packages, so a
- * plain read of `manifest.json` is the only shape available here. The three
- * copies (sourcevision, core, hench) are held in agreement by
- * `tests/integration/primer-fingerprint-contract.test.js`; a divergence would
- * be silent, making every primer look stale rather than raising an error.
+ * Reads `manifest.analysisFingerprint`, which `sourcevision analyze` computes
+ * from CONTEXT.md and stamps onto the primer in the same step. Reading the
+ * published value rather than recomputing a hash is deliberate: this tier
+ * spawns CLIs and does not import from packages, so any locally computed hash
+ * would be a copy of sourcevision's, and a copy that drifted would be silent —
+ * the hashes would simply stop matching and every primer would look stale.
  *
  * @param {string} dir  Project root directory.
- * @returns {string}  16-hex-char fingerprint, or "unknown" when there is no
- *                    readable analysis to fingerprint.
+ * @returns {string}  Fingerprint as published by sourcevision, or "unknown"
+ *                    when there is no readable analysis to fingerprint.
  */
 export function sourcevisionAnalysisFingerprint(dir) {
   try {
     const raw = readFileSync(join(dir, ".sourcevision", "manifest.json"), "utf-8");
     const manifest = JSON.parse(raw);
-    const analyzedAt = typeof manifest?.analyzedAt === "string" ? manifest.analyzedAt : "";
-    const gitSha = typeof manifest?.gitSha === "string" ? manifest.gitSha : "";
-    if (!analyzedAt && !gitSha) return "unknown";
-    return createHash("sha256").update(`${analyzedAt} ${gitSha}`).digest("hex").slice(0, 16);
+    if (typeof manifest?.analysisFingerprint === "string" && manifest.analysisFingerprint) {
+      return manifest.analysisFingerprint;
+    }
+    return legacyManifestFingerprint(manifest);
   } catch {
     return "unknown";
   }
+}
+
+/**
+ * The pre-`analysisFingerprint` stamp, for a manifest written by an older
+ * sourcevision.
+ *
+ * Such a manifest is paired with a primer stamped the same way, so the two keep
+ * matching until the next analysis re-stamps both. This is the one remaining
+ * copy of sourcevision's `legacyManifestFingerprint`, still held in agreement by
+ * `tests/integration/primer-fingerprint-contract.test.js`.
+ *
+ * @param {unknown} manifest  Parsed `manifest.json`, or any non-object.
+ * @returns {string}
+ */
+function legacyManifestFingerprint(manifest) {
+  const analyzedAt = typeof manifest?.analyzedAt === "string" ? manifest.analyzedAt : "";
+  const gitSha = typeof manifest?.gitSha === "string" ? manifest.gitSha : "";
+  if (!analyzedAt && !gitSha) return "unknown";
+  return createHash("sha256").update(`${analyzedAt} ${gitSha}`).digest("hex").slice(0, 16);
 }
 
 /**
