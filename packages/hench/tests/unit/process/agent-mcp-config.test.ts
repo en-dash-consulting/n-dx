@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, mkdir, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   agentMcpConfigPath,
@@ -41,6 +41,9 @@ afterEach(async () => {
 
 describe("buildAgentMcpServers", () => {
   it("names both servers with an absolute project directory", () => {
+    // Resolved rather than literal: on Windows "/work/tree" is drive-relative,
+    // and the builder absolutizes it to e.g. "D:\work\tree".
+    const tree = resolve("/work/tree");
     const doc = buildAgentMcpServers({
       cliPath: "/install/packages/core/cli.js",
       projectDir: "/work/tree",
@@ -50,12 +53,12 @@ describe("buildAgentMcpServers", () => {
     expect(doc.mcpServers.rex).toEqual({
       type: "stdio",
       command: "/usr/bin/node",
-      args: ["/install/packages/core/cli.js", "rex", "mcp", "/work/tree"],
+      args: ["/install/packages/core/cli.js", "rex", "mcp", tree],
     });
     expect(doc.mcpServers.sourcevision).toEqual({
       type: "stdio",
       command: "/usr/bin/node",
-      args: ["/install/packages/core/cli.js", "sv", "mcp", "/work/tree"],
+      args: ["/install/packages/core/cli.js", "sv", "mcp", tree],
     });
   });
 
@@ -65,7 +68,7 @@ describe("buildAgentMcpServers", () => {
     const doc = buildAgentMcpServers({ cliPath: "/i/cli.js", projectDir: "." });
     const projectArg = doc.mcpServers.rex.args.at(-1)!;
     expect(projectArg).toBe(resolve("."));
-    expect(projectArg.startsWith("/")).toBe(true);
+    expect(isAbsolute(projectArg)).toBe(true);
   });
 
   it("keeps the server names the agent's tool permissions are written against", () => {

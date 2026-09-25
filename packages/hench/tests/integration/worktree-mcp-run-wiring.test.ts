@@ -25,6 +25,7 @@ import { fileURLToPath } from "node:url";
 import { initConfig } from "../../src/store/config.js";
 import { serializeDocument } from "@n-dx/rex";
 import { cliSpawnsOnly } from "../helpers/index.js";
+import { decodeWindowsCommandLine } from "../helpers/scripted-claude-cli.js";
 
 /** The launcher a real `ndx work` exports; must resolve back to this hench. */
 const REAL_CORE_CLI = resolve(
@@ -148,6 +149,23 @@ afterEach(async () => {
   await rm(sandbox, { recursive: true, force: true });
 });
 
+/**
+ * The vendor CLI's own argv for one recorded spawn call.
+ *
+ * On Windows `spawnCli` launches the CLI as `cmd.exe /d /s /c "<quoted line>"`,
+ * so the raw argv is the wrapper's and every flag sits inside one token. Decode
+ * it back, so these assertions see the argv the CLI actually parses on both
+ * platforms rather than passing or failing on the wrapper's shape.
+ */
+function cliArgv(call: unknown[]): string[] {
+  const [command, args] = call as [string, string[]];
+  if (!/(^|[\\/])cmd(\.exe)?$/i.test(command)) return args;
+  const wrapped = args[args.length - 1] ?? "";
+  const line = wrapped.startsWith('"') && wrapped.endsWith('"') ? wrapped.slice(1, -1) : wrapped;
+  // Drop the binary: callers compare against the CLI's own arguments.
+  return decodeWindowsCommandLine(line).slice(1);
+}
+
 describe("an autonomous run spawns with its own MCP config", () => {
   it("passes --mcp-config and --strict-mcp-config naming this project", async () => {
     const mockSpawn = vi.fn();
@@ -172,7 +190,7 @@ describe("an autonomous run spawns with its own MCP config", () => {
     // orientation session and then the task itself — from separate call sites,
     // and each one reaches the PRD. Asserting only `calls[0]` passes while the
     // task spawn inherits, which is the failure this whole change is about.
-    const argvs = mockSpawn.mock.calls.map((call) => call[1] as string[]);
+    const argvs = mockSpawn.mock.calls.map(cliArgv);
 
     for (const args of argvs) {
       const idx = args.indexOf("--mcp-config");
@@ -219,7 +237,7 @@ describe("an autonomous run spawns with its own MCP config", () => {
     // The orientation spawn runs in plan mode and is read-only; the task spawn
     // is the one that is not. Identify it by that, not by position.
     const taskSpawns = mockSpawn.mock.calls
-      .map((call) => call[1] as string[])
+      .map(cliArgv)
       .filter((args) => args[args.indexOf("--permission-mode") + 1] !== "plan");
 
     expect(
@@ -250,7 +268,7 @@ describe("an autonomous run spawns with its own MCP config", () => {
 
     const result = await cliLoop({ config, store, projectDir, henchDir, taskId: "task-1" });
 
-    const args = mockSpawn.mock.calls[0]![1] as string[];
+    const args = cliArgv(mockSpawn.mock.calls[0]!);
     const configPath = args[args.indexOf("--mcp-config") + 1]!;
     expect(configPath).toBe(join(henchDir, "mcp", `${result.run.id}.json`));
   });
@@ -276,7 +294,7 @@ describe("an autonomous run spawns with its own MCP config", () => {
 
     await cliLoop({ config, store, projectDir, henchDir, taskId: "task-1" });
 
-    const args = mockSpawn.mock.calls[0]![1] as string[];
+    const args = cliArgv(mockSpawn.mock.calls[0]!);
     expect(args).not.toContain("--mcp-config");
     expect(args).not.toContain("--strict-mcp-config");
   });
