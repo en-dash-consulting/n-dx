@@ -1,5 +1,229 @@
 # @n-dx/core
 
+## 0.7.1
+
+### Patch Changes
+
+- [#390](https://github.com/en-dash-consulting/n-dx/pull/390) [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396) Thanks [@endash-shal](https://github.com/endash-shal)! - Check the sourcevision primer's fingerprint before trusting it, and seed hench orientation with it.
+  
+  `ndx work` preferred `.sourcevision/PRIMER.md` over CONTEXT.md whenever the file existed, with no freshness check — so a primer left behind by an earlier analysis was served to every task as current. It is now used only when the fingerprint it was stamped with matches the current `manifest.json`; a stale, unstamped, or empty primer falls back to CONTEXT.md.
+  
+  hench's orientation session now starts from that same primer instead of rediscovering the repo layout with an LLM, and asks the session to confirm and correct it rather than explore from zero. A primer that fails the fingerprint check is ignored, so orientation never inherits a stale description.
+  
+  hench's warm-parent session cache now keys on the same fingerprint as the primer check. Before, hench joined the manifest fields with a NUL byte where sourcevision used a space, so its `sourcevisionFingerprint` and sourcevision's `primerFingerprint` could never agree; `tests/integration/primer-fingerprint-contract.test.js` now holds the implementations in agreement. Existing `.hench/session-cache.json` entries re-orient after upgrading, and once more after the first analysis that stamps the primer's content fingerprint.
+
+- [#405](https://github.com/en-dash-consulting/n-dx/pull/405) [`9369d40`](https://github.com/en-dash-consulting/n-dx/commit/9369d409ceec8e9fe3834adb5614a086cb2e6c23) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx claim` accepts its directory argument from outside the project
+  
+  `ndx claim list <dir>` and `ndx claim release <id> <dir>` checked for an
+  initialized project in the *current* directory before forwarding to rex, so
+  running them from outside the project — exactly what the completion-refusal
+  hint suggests — failed the init check even though rex resolves the directory
+  argument itself. The check now looks at the same directory rex will act on,
+  mirroring rex's own subcommand-aware slicing (`list [dir]` and
+  `release --all [dir]` take it second, `release <taskId> [dir]` third). A bare
+  `ndx claim list` in an uninitialized directory still refuses as before.
+
+- [#392](https://github.com/en-dash-consulting/n-dx/pull/392) [`ee16578`](https://github.com/en-dash-consulting/n-dx/commit/ee165780ecdc34ad0349ab7028875f04bff769e0) Thanks [@endash-shal](https://github.com/endash-shal)! - A refused completion no longer hands the task back to other worktrees, and claims can now be inspected and freed from the CLI.
+  
+  When the uncommitted-work gate refuses to mark a task complete, the run's cross-worktree claim is held instead of released: the work is real and it is in that worktree, so freeing the task invited a second worktree to redo it. A held claim records why it is held, survives its holder's exit (an ordinary claim dies with its pid), and does not expire — it ends only when someone deals with the work: `ndx claim release <id>`, `release --all` from the worktree that left the work, `release --force`, or a fresh claim from that worktree (a re-run there clears the hold). Another worktree passes the task over; `hench run` and the dashboard's Execute, asked for it explicitly, say the task is held, that the hold does not expire, and how to clear it, rather than "is being worked on". Ordinary claims keep their existing lease-and-pid liveness exactly as before.
+  
+  New `ndx claim` (`rex claim`): `list` shows every live claim with task title, worktree, holder liveness, state and expiry (a held claim reads `expires: never — held until released`); `release <taskId>` frees one — from whichever worktree the operator is standing in when the claim is held or its holder is dead — refusing while the holder is alive unless `--force`; `release --all` frees this worktree's held and dead-holder claims, keeping any a live run is still working unless `--force`. `--format=json` throughout.
+
+- [#406](https://github.com/en-dash-consulting/n-dx/pull/406) [`8040ca0`](https://github.com/en-dash-consulting/n-dx/commit/8040ca0b8d04c21e4c8857fc95ccd5f54c327fd7) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `hench.promptCache` to disable Anthropic `cache_control` breakpoints
+  
+  The API loop's new `cache_control` breakpoints are sent on every request, so a
+  `claude.api_endpoint` pointing at a gateway or proxy that rejects the field
+  (some OpenAI-to-Anthropic shims, some enterprise gateways, Bedrock's legacy
+  InvokeModel path for models without caching) would fail every run's first turn
+  with a 400 without a way to turn the markers off.
+  
+  `hench.promptCache` (boolean, default `true`) is the escape hatch. When set
+  to `false`, the API loop sends the request as it looked before prompt caching
+  was added: `system` as a plain string, tools and messages untouched, zero
+  `cache_control` markers anywhere. `ndx config hench.promptCache false`
+  persists it to `.hench/config.json`.
+
+- [#406](https://github.com/en-dash-consulting/n-dx/pull/406) [`8040ca0`](https://github.com/en-dash-consulting/n-dx/commit/8040ca0b8d04c21e4c8857fc95ccd5f54c327fd7) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `hench.promptCacheTtl` to opt in to Anthropic's 1-hour cache TTL
+  
+  Both `cache_control` breakpoints in the Anthropic API loop used the
+  5-minute TTL unconditionally. Anthropic measures the TTL from the start of
+  the request that wrote or read the entry, so a turn whose tool call runs
+  long (a slow test gate, for example) leaves the next request outside that
+  5-minute window: the conversation prefix is re-written at the 1.25x-input
+  rate instead of read at 0.1x.
+  
+  `hench.promptCacheTtl` (`"5m"` | `"1h"`, default `"5m"`) lets both
+  breakpoints move to the 1-hour TTL. It is opt-in: a 1-hour write costs 2x
+  input rather than 1.25x, so it only pays off when the gap between turns
+  regularly falls between 5 and 60 minutes. Cost estimates price every write
+  at 1.25x regardless of TTL — see the caveat above `MODEL_COSTS` in
+  llm-client's `config.ts` — so enabling `"1h"` under-reports
+  estimated spend by that difference. `ndx config hench.promptCacheTtl 1h`
+  persists it to `.hench/config.json`.
+
+- [#406](https://github.com/en-dash-consulting/n-dx/pull/406) [`8040ca0`](https://github.com/en-dash-consulting/n-dx/commit/8040ca0b8d04c21e4c8857fc95ccd5f54c327fd7) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Make the context prune's retention and transcript limits configurable
+  
+  The summarizing prune in the API loops keeps the most recent turn-pairs
+  verbatim and shows its summarizer a capped excerpt of each dropped message.
+  Together those bound how much of a run the agent can still read and how much of
+  it can reach the summary, so both are tunable rather than hard-coded.
+  
+  `ConversationPruner` takes the limits as constructor options, and all three API
+  loops resolve them from the new `hench.prune` config group:
+  `prune.triggerPairs` (default 20), `prune.retainPairs` (default 10) and
+  `prune.transcriptMessageChars` (default 2,000). At the pair defaults a prune
+  fires roughly once every ten turns, which keeps the cached prefix stable between
+  prunes. Validation refuses a retention at or above the trigger, and either below
+  2, naming both keys.
+  
+  The 2,000-character per-message excerpt matches the size at which hench
+  truncates a tool result for the run record, so a result the run recorded in
+  full reaches the summarizer in full. The overall transcript is capped at 40,000
+  characters; since roughly half of a dropped span's messages are tool results at
+  the cap, a typical span lands well under it and is not cut from the end.
+  
+  The pruner also clamps its own limits rather than trusting the schema, because
+  `loadConfig` merges `.n-dx.json`'s `hench` section after validation — so a
+  `hench.prune` override in that file reaches the agent loop unchecked. An
+  out-of-range value falls back to the default, and a retention at or above the
+  trigger falls back to one pair below it and says so in the run log, instead of
+  ending the run.
+  
+  The group is CLI- and file-only for now (`ndx config hench.prune.retainPairs
+  15`). Exposing it in the dashboard first needs a config-aware write gate:
+  `retainPairs` is only valid relative to `triggerPairs`, and the dashboard's
+  gate validates one field at a time.
+
+- [#379](https://github.com/en-dash-consulting/n-dx/pull/379) [`be8bb61`](https://github.com/en-dash-consulting/n-dx/commit/be8bb61741d98a527c8c2e3d310a835981cf5400) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx start --open` no longer flashes a visible cmd.exe console window on Windows: the browser-opener spawn now passes `windowsHide`, matching the hub and background-server spawns.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - A fragmented zone partition is no longer frozen. Before a previous partition is reused or used as the Louvain seed, sourcevision checks its health: one where at least 40% of zones hold two files or fewer is rebuilt from scratch, and in the borderline band Jev decides. The rebuild happens once per input fingerprint and needs no `sv reset`. Background narration no longer loses work: a new `analyze` stops a still-running narrator and queues what it had not finished. `ndx status` and the dashboard overview report pending or failed narration, and `ndx plan` waits for narration before `rex analyze`.
+
+- [#390](https://github.com/en-dash-consulting/n-dx/pull/390) [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396) Thanks [@endash-shal](https://github.com/endash-shal)! - Price token usage at each model's own rates instead of Claude Sonnet's.
+  
+  **Reported costs rise on upgrade — typically by about half, and Opus-heavy
+  projects by up to about two-thirds.** Dashboard and CLI cost figures go up
+  because runs are now priced at each model's own rates instead of a flat
+  Sonnet rate; no tokens were added and nothing runs more expensively. On this
+  repo's baseline batch the same runs moved from $161.08 (flat Sonnet) to
+  $247.53 (per model), a 54% rise — the old figure under-reported by about 35%.
+  Budget alerts or dashboards keyed to the old under-reported figures will see
+  a one-time jump.
+  
+  `estimateCost` took a `ModelPricing` parameter that every caller left at a
+  single hardcoded Sonnet default (3/15 per MTok, cache write 3.75, cache read
+  0.30). Opus (5/25) usage was therefore quoted at three-fifths of its real cost —
+  on this repo's own run history, which is not all Opus, $124 quoted against a
+  real $186. The `(based on Sonnet pricing)`
+  label made that honest rather than silently wrong, but it left the figures
+  unusable for the before/after comparisons the cost work depends on.
+  
+  - `@n-dx/llm-client` — `MODEL_COSTS` gains cache-write and cache-read rates,
+    so the existing catalog now covers all four billed token kinds for every
+    model in `TIER_MODELS` across claude, codex and google. New `model-pricing`
+    module exports `resolveModelPricing` (exact id → Claude alias → Codex legacy
+    remap → lower-case retry → labelled fallback) and `priceTokens`. Two known under-reporting
+    caveats are documented on the table: a 1-hour cache write bills at 2x input
+    rather than 1.25x, and long-context surcharges apply above 200K input on
+    some models. Neither is recoverable from aggregate token counts.
+  - `@n-dx/rex` — token aggregation carries a per-model split (`byModel`) drawn
+    from hench per-turn records, which already recorded vendor and model, so a
+    run that switched models mid-flight is priced per segment rather than at its
+    run-level model. `estimateCost` prices each bucket at its own rates and
+    reports a per-model breakdown; tokens with no recorded model, and any
+    remainder between the buckets and the totals, form a separate `unattributed`
+    line at the fallback rate. An unrecognised model id degrades to that same
+    labelled fallback rather than throwing or pricing at zero. `ndx usage` now
+    prints the per-model split in place of the blanket Sonnet caveat, and emits
+    it in `--format=json`.
+  - `@n-dx/web` — the dashboard's duplicate pricing literal is gone; it resolves
+    the same fallback rates from the shared table. Its aggregation now carries
+    its own per-model split and prices it through rex's arithmetic, so dashboard
+    and CLI figures agree for the same runs (see the dashboard-per-model-pricing
+    changeset in this release).
+
+- [#412](https://github.com/en-dash-consulting/n-dx/pull/412) [`87c0af9`](https://github.com/en-dash-consulting/n-dx/commit/87c0af99fd7f9bdc4f563d74f323166307bb3e26) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Stamp the primer with a content fingerprint, so an analysis that changed nothing
+  stops invalidating it.
+  
+  `.sourcevision/PRIMER.md` is the distilled startup context `ndx work` feeds every
+  task. It was stamped with a hash of `analyzedAt` and `gitSha` — but every
+  `sourcevision analyze` rewrites `analyzedAt`, so the stamp went stale on *every*
+  run. A run that makes no LLM call (no vendor reachable, a CI runner, `ndx ci`, a
+  provider outage) cannot re-distil and cannot re-stamp, so from that point on both
+  readers rejected a primer that was still perfectly accurate: `ndx work` silently
+  fell back to the full CONTEXT.md and orientation re-explored from scratch. Two
+  cheaper losses came with it — an LLM-enabled analyse never hit the primer cache,
+  so it bought a `context.distill` call on every run, and hench's warm-parent
+  session cache, keyed on the same value, was thrown away by every re-analysis of
+  an unchanged tree.
+  
+  `sourcevision analyze` now computes `analysisFingerprint` from `gitSha` and the
+  CONTEXT.md it just wrote — the primer's actual input, with no timestamp in it —
+  and publishes it in `manifest.json`. Two analyses that found the same thing
+  produce the same value; a changed tree produces a different one and the primer is
+  correctly rejected until re-distilled.
+  
+  Consumers now *read* that field rather than recomputing the hash, so the current
+  path has one producer and no copies to hold in agreement. A manifest written
+  before the field falls back to the old `analyzedAt + gitSha` hash, so an existing
+  manifest and the primer beside it keep matching until the next analysis re-stamps
+  both — that fallback is still implemented in all three tiers, and the cross-tier
+  contract test still holds those three copies in agreement.
+
+- [#403](https://github.com/en-dash-consulting/n-dx/pull/403) [`6bee073`](https://github.com/en-dash-consulting/n-dx/commit/6bee073fd946866760cced673afd9ac4fcaa0675) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx start` (and `ndx web`) now print how to stop the server as the last line
+  of the success block: `Stop: ndx start stop .   (or 'ndx hub stop' for every
+  project)` (`ndx web stop .` after `ndx web`). Previously the server ran through the hub daemon and returned
+  immediately with no indication that Ctrl-C does nothing — the stop commands
+  existed but were documented only under `--help`, which is read before the
+  command, not after.
+
+- [#381](https://github.com/en-dash-consulting/n-dx/pull/381) [`4407245`](https://github.com/en-dash-consulting/n-dx/commit/4407245b939afa8aced70fd85641cfe4f709594b) Thanks [@endash-shal](https://github.com/endash-shal)! - Release workflow creates git tags and GitHub releases again. Moved to `changesets/action@v2`, which reads the `CHANGESETS_OUTPUT` NDJSON that Changesets CLI v3 writes instead of scraping stdout for `New tag:` lines (which CLI v3 no longer prints — so 0.5.0 through 0.7.0 reached npm untagged while every run stayed green). A publish run now fails if the version it just published is on npm but its tags are missing from origin or its GitHub releases were not created, and `scripts/backfill-release-tags.mjs` recreates missing tags and releases from the CHANGELOGs.
+
+- [#405](https://github.com/en-dash-consulting/n-dx/pull/405) [`9369d40`](https://github.com/en-dash-consulting/n-dx/commit/9369d409ceec8e9fe3834adb5614a086cb2e6c23) Thanks [@endash-shal](https://github.com/endash-shal)! - Make refusal recovery commands safe to paste into cmd.exe and PowerShell, not just POSIX shells. A path outside the shell-inert charset no longer rides inline with POSIX single-quoting (literal characters to cmd.exe — `&` still split the command, spaces still separated, and `%VAR%` expansion cannot be escaped interactively): the paths are written to `.hench/recovery/pathspec*.txt` and the suggested commands use `git … --pathspec-from-file`, so the copyable line contains no arbitrary text for any shell to expand or split. The POSIX-quoted form survives only as a fallback when the pathspec file cannot be written, now carrying an explicit "POSIX shells only" caveat. `.hench/recovery/` is declared a hench runtime artifact (gitignored by `hench init`, discounted by the gates) and added to the `ndx init` ignore template. Covered by execution tests that run the emitted commands through real cmd.exe, PowerShell, and sh against hostile filenames (spaces, `&`, `%`, `$`, backticks, embedded single quotes).
+
+- [#416](https://github.com/en-dash-consulting/n-dx/pull/416) [`e70e787`](https://github.com/en-dash-consulting/n-dx/commit/e70e787b40ada9ecaf17069b7e4f11246ebb235f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Keep a worktree run's MCP PRD writes in its own worktree.
+  
+  A run in a linked worktree could have its `update_task_status` write the task
+  file in a different checkout. `claude mcp add --scope local` — the pre-0.7
+  `ndx init` path — records the project directory absolutely, and Claude Code
+  applies a repository's local-scope entry to sessions started in that
+  repository's *other* worktrees, shadowing the tracked `.mcp.json` that resolves
+  `.` per worktree. The per-workspace PRD lock cannot help: the write never
+  reaches the right workspace to contend for its lock.
+  
+  Three changes close it:
+  
+  - A Claude run now writes its own MCP config to `.hench/mcp/<runId>.json`
+    and spawns with `--mcp-config <file> --strict-mcp-config`, so the session's
+    rex and sourcevision servers name the run's project directory absolutely and
+    nothing inherited can shadow them. Both servers are spawned through the core
+    CLI that launched the run, which keeps the agent's rex the same build as
+    hench's own. That CLI is taken from `NDX_CLI_PATH` only after confirming it
+    resolves back to the running hench; otherwise the run keeps today's behaviour
+    and says why. The Codex adapter is unchanged.
+  - `ndx init` no longer registers an absolute project directory under
+    `--mcp-scope=local`; it records `.`, as the tracked `.mcp.json` already did.
+    It removes the pinned entries it can reach and reports the ones it cannot,
+    with the `claude mcp remove --scope local` command.
+  - The `ndx work` pre-flight warns when a local-scope registration pins another
+    checkout of this repository. It is silent for Claude runs that pinned their
+    own servers, and applies to Codex runs, to Claude runs that fell back (a
+    standalone `hench run`, or an `NDX_CLI_PATH` that does not lead back to this
+    hench), and to interactive sessions.
+  
+  Note that `--strict-mcp-config` drops the operator's user-scope and other MCP
+  servers from every Claude run that pins its servers, attended or not — the
+  spawned session sees only rex and sourcevision.
+  
+  Known gap: the agent's shell `rex` / `ndx` / `n-dx` commands still resolve from
+  `PATH`, which can reach a different install than the one running hench. Pinning
+  those behind per-run shims is not part of this change.
+- Updated dependencies [[`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396), [`0415d3e`](https://github.com/en-dash-consulting/n-dx/commit/0415d3e2232787f9277de56c0e25e2c1b9959df6), [`0415d3e`](https://github.com/en-dash-consulting/n-dx/commit/0415d3e2232787f9277de56c0e25e2c1b9959df6), [`ee16578`](https://github.com/en-dash-consulting/n-dx/commit/ee165780ecdc34ad0349ab7028875f04bff769e0), [`7b5d253`](https://github.com/en-dash-consulting/n-dx/commit/7b5d253faec104a417505d4baa4aa3a7ec0348f1), [`7b5d253`](https://github.com/en-dash-consulting/n-dx/commit/7b5d253faec104a417505d4baa4aa3a7ec0348f1), [`a746332`](https://github.com/en-dash-consulting/n-dx/commit/a746332b35978c1023e65cf6530a295eccb02f8a), [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb), [`92524ac`](https://github.com/en-dash-consulting/n-dx/commit/92524acfe7057a4ba8cdefdf74f8c88a7806a37b), [`92524ac`](https://github.com/en-dash-consulting/n-dx/commit/92524acfe7057a4ba8cdefdf74f8c88a7806a37b), [`fdb8376`](https://github.com/en-dash-consulting/n-dx/commit/fdb8376fa554f7ef92c65e3819def5dbbf74e933), [`6bee073`](https://github.com/en-dash-consulting/n-dx/commit/6bee073fd946866760cced673afd9ac4fcaa0675), [`bb4f829`](https://github.com/en-dash-consulting/n-dx/commit/bb4f829b0d676024fce715ee5da4db0ed2a429b5), [`8040ca0`](https://github.com/en-dash-consulting/n-dx/commit/8040ca0b8d04c21e4c8857fc95ccd5f54c327fd7), [`8040ca0`](https://github.com/en-dash-consulting/n-dx/commit/8040ca0b8d04c21e4c8857fc95ccd5f54c327fd7), [`8040ca0`](https://github.com/en-dash-consulting/n-dx/commit/8040ca0b8d04c21e4c8857fc95ccd5f54c327fd7), [`d50fce8`](https://github.com/en-dash-consulting/n-dx/commit/d50fce83b1ba7709b047cb41f998c3250dda0655), [`9369d40`](https://github.com/en-dash-consulting/n-dx/commit/9369d409ceec8e9fe3834adb5614a086cb2e6c23), [`9369d40`](https://github.com/en-dash-consulting/n-dx/commit/9369d409ceec8e9fe3834adb5614a086cb2e6c23), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`daef846`](https://github.com/en-dash-consulting/n-dx/commit/daef846d95ffbbd0ca3517e88139d1493dccf4f0), [`fdd864c`](https://github.com/en-dash-consulting/n-dx/commit/fdd864c4db245e5d69a0ae78534f07c0cc752c0e), [`9369d40`](https://github.com/en-dash-consulting/n-dx/commit/9369d409ceec8e9fe3834adb5614a086cb2e6c23), [`e70e787`](https://github.com/en-dash-consulting/n-dx/commit/e70e787b40ada9ecaf17069b7e4f11246ebb235f), [`e70e787`](https://github.com/en-dash-consulting/n-dx/commit/e70e787b40ada9ecaf17069b7e4f11246ebb235f), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396), [`6bee073`](https://github.com/en-dash-consulting/n-dx/commit/6bee073fd946866760cced673afd9ac4fcaa0675), [`a136bbc`](https://github.com/en-dash-consulting/n-dx/commit/a136bbc4f21719624f96d98bb82420c8fce9b649), [`87c0af9`](https://github.com/en-dash-consulting/n-dx/commit/87c0af99fd7f9bdc4f563d74f323166307bb3e26), [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396), [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396), [`9369d40`](https://github.com/en-dash-consulting/n-dx/commit/9369d409ceec8e9fe3834adb5614a086cb2e6c23), [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396), [`5866f4e`](https://github.com/en-dash-consulting/n-dx/commit/5866f4eddf660fb4d254dd9a6e66e1fbc4aae7d7), [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb), [`a136bbc`](https://github.com/en-dash-consulting/n-dx/commit/a136bbc4f21719624f96d98bb82420c8fce9b649), [`a746332`](https://github.com/en-dash-consulting/n-dx/commit/a746332b35978c1023e65cf6530a295eccb02f8a), [`bb4f829`](https://github.com/en-dash-consulting/n-dx/commit/bb4f829b0d676024fce715ee5da4db0ed2a429b5), [`92524ac`](https://github.com/en-dash-consulting/n-dx/commit/92524acfe7057a4ba8cdefdf74f8c88a7806a37b), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`92524ac`](https://github.com/en-dash-consulting/n-dx/commit/92524acfe7057a4ba8cdefdf74f8c88a7806a37b), [`5866f4e`](https://github.com/en-dash-consulting/n-dx/commit/5866f4eddf660fb4d254dd9a6e66e1fbc4aae7d7), [`9369d40`](https://github.com/en-dash-consulting/n-dx/commit/9369d409ceec8e9fe3834adb5614a086cb2e6c23), [`9369d40`](https://github.com/en-dash-consulting/n-dx/commit/9369d409ceec8e9fe3834adb5614a086cb2e6c23), [`6bee073`](https://github.com/en-dash-consulting/n-dx/commit/6bee073fd946866760cced673afd9ac4fcaa0675), [`a136bbc`](https://github.com/en-dash-consulting/n-dx/commit/a136bbc4f21719624f96d98bb82420c8fce9b649), [`a136bbc`](https://github.com/en-dash-consulting/n-dx/commit/a136bbc4f21719624f96d98bb82420c8fce9b649), [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb), [`5866f4e`](https://github.com/en-dash-consulting/n-dx/commit/5866f4eddf660fb4d254dd9a6e66e1fbc4aae7d7), [`5866f4e`](https://github.com/en-dash-consulting/n-dx/commit/5866f4eddf660fb4d254dd9a6e66e1fbc4aae7d7), [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396), [`737b396`](https://github.com/en-dash-consulting/n-dx/commit/737b39611b68c04dbfdebfb94933102483ee9417), [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396), [`8040ca0`](https://github.com/en-dash-consulting/n-dx/commit/8040ca0b8d04c21e4c8857fc95ccd5f54c327fd7), [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396), [`e70e787`](https://github.com/en-dash-consulting/n-dx/commit/e70e787b40ada9ecaf17069b7e4f11246ebb235f), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4)]:
+  - @n-dx/hench@0.7.1
+  - @n-dx/sourcevision@0.7.1
+  - @n-dx/web@0.7.1
+  - @n-dx/rex@0.7.1
+  - @n-dx/llm-client@0.7.1
+
 ## 0.7.0
 
 ### Minor Changes

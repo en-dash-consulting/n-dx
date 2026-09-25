@@ -1,5 +1,339 @@
 # @n-dx/web
 
+## 0.7.1
+
+### Patch Changes
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - The dashboard's Architecture, Problems and Suggestions views now unlock after a cascade analysis. They were gated on generative passes 2–4, which a cascade run never performs even though its single judged pass already produces all of those findings, so they stayed locked however often the project was re-scanned. `zones.json` now records `enrichmentMode`. For files written before that field existed, the dashboard falls back to the manifest's last run mode.
+
+- [#393](https://github.com/en-dash-consulting/n-dx/pull/393) [`0415d3e`](https://github.com/en-dash-consulting/n-dx/commit/0415d3e2232787f9277de56c0e25e2c1b9959df6) Thanks [@endash-shal](https://github.com/endash-shal)! - A claim takeover in a linked worktree now reaches the Sessions tray when the run file is saved, not on the next poll.
+  
+  `GET /api/worktrees` now watches every non-served worktree's `.hench/runs/` itself — previously only the Runs view registered those watchers, so with the tray open and the Runs view never visited, a takeover waited up to 15s. A runs-directory change also drops the worktrees answer cache, so the tray's refetch is not served a pre-change answer. On the hench side, a takeover observed before the run loop attached its listener is now stamped on the run too.
+
+- [#393](https://github.com/en-dash-consulting/n-dx/pull/393) [`0415d3e`](https://github.com/en-dash-consulting/n-dx/commit/0415d3e2232787f9277de56c0e25e2c1b9959df6) Thanks [@endash-shal](https://github.com/endash-shal)! - A run whose task another worktree takes over mid-run now says so in the dashboard's Sessions tray.
+  
+  Since claims began being renewed for the length of a run, a refused renewal meant the task quietly left the run's held set: the run carried on by design, and nothing anywhere recorded that the task was no longer its to finish. The renewal now emits the takeover, the run loop stamps it on the run record as an additive `claimLost` entry and saves immediately, and the Sessions tray renders "claim taken over by <worktree>" beside that run. Run records written without the field load unchanged.
+
+- [#394](https://github.com/en-dash-consulting/n-dx/pull/394) [`7b5d253`](https://github.com/en-dash-consulting/n-dx/commit/7b5d253faec104a417505d4baa4aa3a7ec0348f1) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard prices token usage per model and shows the split. Its aggregation now carries a `byModel` split (from hench turn records, the rex execution log, sourcevision, and the dashboard's own Ask ledger) and prices it through rex's `estimateCostFromTotals` — imported via the rex gateway, so there is one copy of the pricing arithmetic and both surfaces quote the same figure for the same runs. The Token Usage view gains a Cost by Model table (input/output/cache write/cache read/cost per model, with unknown ids labelled "priced as claude-sonnet-5" and an unattributed line for model-less tokens) and drops its hardcoded per-million rate labels. Also fixes `ndx usage`'s headline undercount: the package rollup now counts `smart_add_token_usage` events, which its own By-command breakdown (and the dashboard) already included.
+
+- [#403](https://github.com/en-dash-consulting/n-dx/pull/403) [`6bee073`](https://github.com/en-dash-consulting/n-dx/commit/6bee073fd946866760cced673afd9ac4fcaa0675) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add a dashboard glossary and render definition lines for terms an outside
+  first-use review could not explain.
+  
+  An outside first-use review could not tell what "zone", "zone pin",
+  "enrichment pass", "archetype", "guard rail", "epic / feature / task" or
+  "worktree anchor" meant, because the dashboard showed those terms with no
+  explanation.
+  
+  - `packages/web/src/viewer/components/glossary-terms.ts` is the single source
+    of truth: one plain-language sentence per term. `GlossaryLine` (a new
+    viewer component) renders it where each term first appears.
+  - Wired at: Files (`archetype`, the Archetype column), Zones (`zone`, under
+    the page's stat line), the zone detail slideout (`zone pin`, only when the
+    zone has a pinned file, so the definition sits beside the "pinned" badge
+    it explains), enrichment-gated views (`enrichment pass`, under the
+    "Requires enrichment pass N" gate), the PRD tree (`epic / feature / task`,
+    under the Tasks header), Workspaces (`worktree anchor`, under the page
+    subtitle), and hench Config's Guard Rails category (`guard rail`).
+  - The Files table reads the archetype definition to screen readers once, as
+    the table's description (`aria-describedby`); the copy shown in the column
+    header is marked decorative, so it is not repeated for every cell.
+  - "weight" is not in the glossary: the dashboard never shows the word (the
+    Zones view shows call counts), and CONTEXT.md's "weighted avg cohesion"
+    means weighted by file count, a different thing.
+  - Tests: every glossary term is wired to a view, and render tests check the
+    conditional placements (guard rail, zone pin) and the Files table's
+    accessibility markup.
+  
+  No route, view id, config key, or `--format=json` output changed, and no
+  gateway export was added. The web boundary check's two-consumer rule for
+  `src/shared/` now counts a zone only when it imports that module's own
+  symbols; before, any import of the shared barrel counted for every module,
+  so the rule could not fail.
+
+- [#391](https://github.com/en-dash-consulting/n-dx/pull/391) [`bb4f829`](https://github.com/en-dash-consulting/n-dx/commit/bb4f829b0d676024fce715ee5da4db0ed2a429b5) Thanks [@endash-shal](https://github.com/endash-shal)! - An invalid `.hench/config.json` no longer bricks `ndx work`, and the dashboard can no longer write one.
+  
+  - hench's schema now fills a partial `retry` group with per-field defaults (sourced from `DEFAULT_RETRY_CONFIG`), so a config carrying only `retry.maxRetries` loads instead of failing with `NDX_CLI_INVALID_CONFIGURATION`.
+  - `hench run` loads config leniently: an invalid top-level setting is replaced with its default and reported as a warning naming it, instead of refusing the whole run. Salvage works per top-level key, so one bad field inside a group (say `retry.maxDelayMs`) resets that whole group (`retry`). A file that is not valid JSON still fails as before; a document that fails validation and cannot be salvaged (a non-object document, for example) now names the offending fields instead of a generic "corrupted" message.
+  - Every dashboard write path (`PUT /api/hench/config`, adaptive apply/override, workflow suggestion apply, template apply) completes a partially-written nested group from `CONFIG_GROUP_DEFAULTS` before serializing, so a single `retry.*` edit can never leave a one-member group on disk. The mirror between web's group defaults and hench's config defaults is pinned by `tests/e2e/hench-config-gate-contract.test.js`.
+
+- [#405](https://github.com/en-dash-consulting/n-dx/pull/405) [`9369d40`](https://github.com/en-dash-consulting/n-dx/commit/9369d409ceec8e9fe3834adb5614a086cb2e6c23) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard tells a held claim from a live run
+  
+  A claim kept by a finished run (uncommitted work left in its worktree) looked
+  identical to a run in progress: `GET /api/rex/claims` omitted the hold
+  reason, the PRD tree chip said `claimed · <worktree>`, and Execute's 409 said
+  the task "is being worked on" — sending the operator to look for a process
+  that ended hours ago. Claims entries now carry `reason` when (and only when)
+  a claim is held; the chip reads `held · <worktree>` with a tooltip naming the
+  uncommitted work and `ndx claim release <id>`; and the Execute 409 for a held
+  task explains the hold and how to free it. A live claim keeps today's wording
+  everywhere.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - Product logos, the per-view favicon and the notification icon load again when the dashboard is served through the hub at `/p/<id>/`. The dashboard's Isometric Map now behaves like the `sv iso` output: "Open on its own" and the breadcrumb switch scenes in place (they were dead inside the dashboard's sandboxed frame), and the map regenerates when a new analysis or background narration lands.
+
+- [#378](https://github.com/en-dash-consulting/n-dx/pull/378) [`daef846`](https://github.com/en-dash-consulting/n-dx/commit/daef846d95ffbbd0ca3517e88139d1493dccf4f0) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix project-settings validation of `sourcevision.zones.mergeThreshold`: the dashboard capped it to 0–1 as if it were a Louvain modularity ratio, but it is the small-zone merge threshold — a minimum zone size in files, default 3. The server route and settings view now accept any non-negative integer, and the field's description, placeholder, and default hint describe the real semantics.
+
+- [#405](https://github.com/en-dash-consulting/n-dx/pull/405) [`9369d40`](https://github.com/en-dash-consulting/n-dx/commit/9369d409ceec8e9fe3834adb5614a086cb2e6c23) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard's next-task suggestion skips tasks other worktrees hold
+  
+  `GET /api/rex/next` and the dashboard's Up Next card (`GET /api/rex/dashboard`) suggested the
+  highest-priority task without consulting the cross-worktree claims store,
+  while the Execute button refuses a claimed task with 409 — so the dashboard
+  could recommend exactly the task it would then refuse to start. Both reads
+  now exclude foreign live claims for the request's workspace — the same set
+  Execute's check consults — so the suggestion is always a task Execute will
+  accept. When a higher-priority task was passed over because another worktree
+  holds it, the response says which task and which worktree
+  (`skipped`/`nextTaskSkipped`), and the Up Next card shows it: `"<task>" is
+  claimed by <worktree> — showing the next unclaimed task`.
+
+- [#416](https://github.com/en-dash-consulting/n-dx/pull/416) [`e70e787`](https://github.com/en-dash-consulting/n-dx/commit/e70e787b40ada9ecaf17069b7e4f11246ebb235f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Offer to migrate a non-conformant PRD tree at the gate, and stop rather than continue
+  
+  A tree whose slug-rule marker names another rule, or whose paths do not match the
+  running rule, used to dead-end a run with a refusal and an instruction to go and
+  run `rex migrate-slugs` by hand. `ndx work` and the dashboard's Execute now close
+  that loop — and stop there.
+  
+  Stopping is the point. On a non-conformant tree `migrate-slugs` is not a no-op: it
+  rewrites every path that does not match the running rule, which can be the whole
+  tree. The command exists to perform that rename deliberately, in one reviewable
+  commit, instead of letting the next ordinary save produce a surprise mass diff.
+  Running it inside a task run and carrying on would turn it straight back into that
+  surprise diff, with the rename landing in whatever commit the task makes next under
+  a message about something else — the 2026-09-17 incident (a pull request merging
+  1,570 re-slugged files through green CI) with the human step deleted rather than
+  automated. So the migration gets its own commit, and the operator reviews it and
+  starts the run again.
+  
+  - **CLI.** An interactive `ndx work` prints the paths the migration would rename
+    and asks. Accepting spawns `rex migrate-slugs`, reports what changed, and exits
+    without executing the task. Declining rethrows the refusal unchanged.
+  - **Autonomous runs are never offered it.** `--auto`, `--loop`, `--epic-by-epic`,
+    `--yes`, a non-terminal stdin and CI all refuse exactly as before, and the
+    message now names which of those withheld the offer instead of the run silently
+    behaving differently from an interactive one. `--dry-run` is never offered it
+    either, even on a terminal: a dry run promises not to touch the working tree.
+  - **Dashboard.** The 412 from Execute now carries `migratable`, and Start Task
+    offers a "Migrate the PRD tree" button under a refusal a migration would fix.
+    Accepting sends a second explicit `{ migrateSlugs: true }` request — consent is
+    carried by the request rather than inferred, since the server has no session —
+    which migrates and returns without starting the task.
+  - **A tree on a newer rule gets no offer at all**, in either surface.
+    `TreeConformanceRefusal` gained a `migratable` flag computed from the same
+    direction rule `assertSlugRuleAdoptable` enforces, so a gate cannot offer a
+    migration the command would refuse.
+  
+  The store-level write guard is unchanged and still refuses from inside the PRD
+  lock, which is where it has to stay: `migrate-slugs` needs that same lock, so
+  recovering there would deadlock.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - A fragmented zone partition is no longer frozen. Before a previous partition is reused or used as the Louvain seed, sourcevision checks its health: one where at least 40% of zones hold two files or fewer is rebuilt from scratch, and in the borderline band Jev decides. The rebuild happens once per input fingerprint and needs no `sv reset`. Background narration no longer loses work: a new `analyze` stops a still-running narrator and queues what it had not finished. `ndx status` and the dashboard overview report pending or failed narration, and `ndx plan` waits for narration before `rex analyze`.
+
+- [#390](https://github.com/en-dash-consulting/n-dx/pull/390) [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396) Thanks [@endash-shal](https://github.com/endash-shal)! - Price token usage at each model's own rates instead of Claude Sonnet's.
+  
+  **Reported costs rise on upgrade — typically by about half, and Opus-heavy
+  projects by up to about two-thirds.** Dashboard and CLI cost figures go up
+  because runs are now priced at each model's own rates instead of a flat
+  Sonnet rate; no tokens were added and nothing runs more expensively. On this
+  repo's baseline batch the same runs moved from $161.08 (flat Sonnet) to
+  $247.53 (per model), a 54% rise — the old figure under-reported by about 35%.
+  Budget alerts or dashboards keyed to the old under-reported figures will see
+  a one-time jump.
+  
+  `estimateCost` took a `ModelPricing` parameter that every caller left at a
+  single hardcoded Sonnet default (3/15 per MTok, cache write 3.75, cache read
+  0.30). Opus (5/25) usage was therefore quoted at three-fifths of its real cost —
+  on this repo's own run history, which is not all Opus, $124 quoted against a
+  real $186. The `(based on Sonnet pricing)`
+  label made that honest rather than silently wrong, but it left the figures
+  unusable for the before/after comparisons the cost work depends on.
+  
+  - `@n-dx/llm-client` — `MODEL_COSTS` gains cache-write and cache-read rates,
+    so the existing catalog now covers all four billed token kinds for every
+    model in `TIER_MODELS` across claude, codex and google. New `model-pricing`
+    module exports `resolveModelPricing` (exact id → Claude alias → Codex legacy
+    remap → lower-case retry → labelled fallback) and `priceTokens`. Two known under-reporting
+    caveats are documented on the table: a 1-hour cache write bills at 2x input
+    rather than 1.25x, and long-context surcharges apply above 200K input on
+    some models. Neither is recoverable from aggregate token counts.
+  - `@n-dx/rex` — token aggregation carries a per-model split (`byModel`) drawn
+    from hench per-turn records, which already recorded vendor and model, so a
+    run that switched models mid-flight is priced per segment rather than at its
+    run-level model. `estimateCost` prices each bucket at its own rates and
+    reports a per-model breakdown; tokens with no recorded model, and any
+    remainder between the buckets and the totals, form a separate `unattributed`
+    line at the fallback rate. An unrecognised model id degrades to that same
+    labelled fallback rather than throwing or pricing at zero. `ndx usage` now
+    prints the per-model split in place of the blanket Sonnet caveat, and emits
+    it in `--format=json`.
+  - `@n-dx/web` — the dashboard's duplicate pricing literal is gone; it resolves
+    the same fallback rates from the shared table. Its aggregation now carries
+    its own per-model split and prices it through rex's arithmetic, so dashboard
+    and CLI figures agree for the same runs (see the dashboard-per-model-pricing
+    changeset in this release).
+
+- [#395](https://github.com/en-dash-consulting/n-dx/pull/395) [`a136bbc`](https://github.com/en-dash-consulting/n-dx/commit/a136bbc4f21719624f96d98bb82420c8fce9b649) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Preserve unknown `tree-meta.json` keys, and check a PRD tree that carries no slug-rule marker before writing it.
+  
+  Two changes to the same fault. A rex MCP server running a build older than the
+  `slugRule` field saved the PRD and rewrote `.rex/tree-meta.json` from a type
+  that had no such field, erasing the marker. No path moved and no item changed —
+  the two builds shared a slug rule — but the write guard was silently disarmed
+  for whoever wrote next.
+  
+  - **Every `tree-meta.json` write now reads the file first and carries forward
+    keys it does not recognise.** This cannot repair a sidecar an older build has
+    already stripped; it stops the next such loss, between this version and the
+    ones after it.
+  - **A tree with no marker is no longer adopted *silently*.** It is still
+    adopted when every path already matches the running slug rule — the save
+    records the marker and prints a one-line notice naming `rex migrate-slugs` as
+    the way to verify, and `rex validate` reports the same thing as a warning
+    rather than an error. What changed is that adoption is now visible, and that
+    it is conditional: an unmarked tree with a path this build did not write is
+    refused outright, by the store guard, `rex validate`, the `ndx work` pre-run
+    gate and the dashboard's Execute gate, all saying `slug rule marker missing;
+    run rex migrate-slugs`.
+  
+  Absence covers two states — a tree older than the guard, and one whose sidecar
+  a build older than the field rewrote without the marker — and nothing on disk
+  separates them. The path scan is not a perfect tiebreak either: it can only
+  recognise a rule this build can reproduce, so a tree re-slugged by a *future*
+  build would scan clean. That hazard is not yet reachable, because there is no
+  such rule to have written one; whoever adds one moves the guard back to a
+  refusal in the same commit.
+  
+  `rex migrate-slugs` remains the way to re-derive every path rather than trust
+  the scan, and it now reports `slugRuleRecorded` in its JSON output — on an
+  already-conformant tree it renames nothing, so the counts alone read as
+  "nothing happened" when it was the run that recorded the marker.
+  
+  **Upgrading costs nothing on a conformant repository.** The marker is new in
+  this release, so every existing tree arrives without one; those written by 0.5.2
+  and later already follow the current rule and are adopted on their next save. A
+  tree predating that carries paths from a superseded rule (0.5.1 suffixed every
+  slug with `-{id6}`; the current rule first shipped in 0.5.2), and its writes are
+  refused until `rex migrate-slugs` is run — `rex validate` already reported those
+  paths before this release, but nothing stopped a write from re-slugging them. A new project
+  is unaffected: an empty tree has nothing a marker could be wrong about, so a
+  first save proceeds and records one.
+
+- [#405](https://github.com/en-dash-consulting/n-dx/pull/405) [`9369d40`](https://github.com/en-dash-consulting/n-dx/commit/9369d409ceec8e9fe3834adb5614a086cb2e6c23) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard closes a removed worktree's run watcher
+  
+  The Sessions tray watches every other worktree's `.hench/runs/` so a claim
+  takeover or a finishing run reaches it as a push. Nothing closed those
+  watchers when a worktree was removed, so a long-running dashboard accumulated
+  handles on directories that no longer existed (the OS error event covers some
+  platforms, not all). The `/api/worktrees` refresh now prunes watchers whose
+  worktree left `git worktree list`; a worktree that comes back re-registers
+  lazily as before, and server shutdown still closes everything.
+
+- [#384](https://github.com/en-dash-consulting/n-dx/pull/384) [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx work` and the dashboard's Execute now refuse to start against a PRD tree written under a different slug rule, instead of discovering it at the completion write.
+  
+  An autonomous run writes the PRD when it finishes its task, so a run started with a mismatched build does not fail — it succeeds, and carries a whole-tree re-slug into whatever branch is open under a "task completed" commit. The store's write guard refuses that write, but only after the run has claimed the task, spent its tokens and edited the code.
+  
+  Both surfaces now ask the question first, through rex's new `checkTreeConformance`: the CLI refuses before taking a claim or writing anything (including on `--dry-run`, so a preview cannot report that the real run would have been fine), and `POST /api/hench/execute` answers 412 with the same message, which the viewer already surfaces on the run card. Unlike the write-time guard, a tree whose marker agrees is still path-scanned, so one whose paths were disturbed is refused too. There is no override flag: the fix is `rex migrate-slugs`, or upgrading rex when the tree was written by a newer rule. An interactive `ndx work` or the dashboard can offer to run the migration for you and then stop without executing the task.
+
+- [#403](https://github.com/en-dash-consulting/n-dx/pull/403) [`6bee073`](https://github.com/en-dash-consulting/n-dx/commit/6bee073fd946866760cced673afd9ac4fcaa0675) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Show analysed, inventoried-only, and skipped languages with counts on the Files page.
+  
+  The Files table only ever showed `byLanguage`, so a project with a language sourcevision doesn't recognize (e.g. Zig) had its files silently dropped from the inventory during the code-only walk — nothing on the page said so. `analyzeInventory`'s summary now additionally records `skippedExtensions` (extension -> file count, for files the walker saw but excluded) and `analysedLanguages` (the subset of `byLanguage` whose files take part in import-graph and zone analysis). Both fields are optional and additive, so inventories written before this change still load.
+  
+  The Files page now renders a strip above the table stating which languages were analysed, which were inventoried only, and which extensions were skipped, each with counts — reading the new fields when present and degrading to a single neutral "Inventoried" group when they're absent.
+
+- [#417](https://github.com/en-dash-consulting/n-dx/pull/417) [`737b396`](https://github.com/en-dash-consulting/n-dx/commit/737b39611b68c04dbfdebfb94933102483ee9417) Thanks [@ryrykeith](https://github.com/ryrykeith)! - test: make test results independent of machine load
+  
+  Tests and test configuration only. No production code changes, so published output is unaffected; these packages ship `dist` only.
+  
+  - **web:** viewer tests now commit every preact render, update and unmount inside `act()`. Previously, a render outside `act()` left preact's after-paint fallback timer pending, and if it fired after jsdom teardown it threw `ReferenceError: cancelAnimationFrame is not defined`, failing a suite whose summary said every test passed. A new setup file, `tests/setup/preact-frame-leak-guard.ts`, fails any test file that still leaves that timer pending, and names the file.
+  - **web:** the watcher-based waits in the worktree integration tests now scale with `NDX_TEST_TIME_MULTIPLIER`, and their git fixtures are removed with retries.
+  - **sourcevision:** every spawn in `cli-hints.test.ts` gets a load-scaled kill budget instead of a fixed 10 seconds.
+
+- [#406](https://github.com/en-dash-consulting/n-dx/pull/406) [`8040ca0`](https://github.com/en-dash-consulting/n-dx/commit/8040ca0b8d04c21e4c8857fc95ccd5f54c327fd7) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `hench.tokenBudget` counts cache writes and excludes cache reads
+  
+  `checkTokenBudget` summed `input + output`. With prompt caching, `input` holds
+  only the uncached slice — an 83-turn API-loop run recorded 534 uncached input
+  tokens against 876K cache writes and 34.1M cache reads — so a configured budget
+  bounded output plus a rounding error, and the run continued to `maxTurns`
+  instead of stopping.
+  
+  The budget now counts **uncached input + cache writes + output**, on the API
+  loops and the Claude and Codex CLI paths alike, and excludes cache reads. A
+  cache read is by construction a re-read of tokens already counted when they
+  were written, so counting reads would charge the same tokens once per turn:
+  across the 27 recorded runs in this repository, face value ran a median of
+  **70x** the counted total. On the Claude CLI path, where the check runs after
+  the session has finished, that would have marked every non-trivial run
+  `budget_exceeded` and reset its task before the review and commit steps. The
+  rule needs no price table and stays vendor-neutral, and runaway loops remain
+  bounded because cache writes and output both grow with turn count.
+  
+  A run that writes no cache counts exactly what it did before. A Claude Code
+  session always writes one, so on the CLI path every run now also counts its
+  cache writes, and a budget tuned to the old accounting may need raising on
+  either path.
+  
+  Also:
+  
+  - Built-in template budgets re-derived from measured runs. Counted cost is
+    affine in turn count — roughly `190,000 + 5,400 x turns`, where the constant
+    is the initial context write — so each budget is that fit at the template's
+    `maxTurns`, doubled for headroom: quick-iteration 50K -> 600K,
+    thorough-execution 200K -> 1.5M, budget-conscious 30K -> 600K,
+    api-direct 150K -> 850K. The old values predated prompt caching and sat
+    below a single median run. `budget-conscious` is not tightened below
+    `quick-iteration` despite its name: measured runs in its turn class
+    *completed* at 484K and 489K, so a lower budget would fail finished work —
+    it economises through `maxTurns` and its 4096 `maxTokens` cap instead. The
+    dashboard's template list carries the same values.
+  - The budget-exceeded message now names the token classes that counted and how
+    many cache-read tokens were excluded, so a genuine overrun can be told apart
+    from cache-read inflation.
+
+- [#390](https://github.com/en-dash-consulting/n-dx/pull/390) [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396) Thanks [@endash-shal](https://github.com/endash-shal)! - test(web): count render and traversal work in the viewer tree performance suites instead of timing it
+  
+  `large-tree-performance.test.ts` and `prd-tree-live-tick-perf.test.ts` held 25 of
+  the repo's elapsed-time assertions, all comparing `performance.now()` against an
+  absolute budget scaled by a `BUDGET_MULTIPLIER` hardcoded to `10` rather than read
+  from `NDX_TEST_TIME_MULTIPLIER`. Under full-suite load, the live-tick budget of
+  160ms measured 420.10ms while the same file completed in 108ms run alone. Raising
+  the budgets is not available — TESTING.md forbids padding one to green a suite,
+  and the next busier machine just fails at the new number.
+  
+  Growth-ratio timing was tried first and rejected on measurement: `diffItems` timed
+  across an 8x size step read 7.7x idle and 46.5x loaded, because min-of-N filters
+  a ~4ms block and a ~30ms block differently. A ratio only cancels load when both
+  readings face the same preemption risk, which sub-millisecond work cannot give.
+  
+  Both files now count work (TESTING.md Family 2, technique 1) via a new
+  `tests/helpers/tree-work-count.ts`:
+  
+  - `countTreeReads` instruments the fixture's `children` arrays, so a traversal's
+    step count is exact. Reads per node hold to three significant figures across a
+    7.97x size range and are unchanged with every core saturated; an injected O(n²)
+    reads 197.8 per node against a clean 1.18, and grows 62.91x against a 15.94x
+    bound.
+  - `countRenderWork` counts vnodes diffed via Preact's `options.diffed` hook and
+    DOM records via a `MutationObserver`. Both counters are needed: a broken
+    `shouldComponentUpdate` gives 7 805 diffs / 442 mutations against a clean
+    1 033 / 1, while churning row keys gives 263 / 512 — each regression is
+    invisible to the other counter. Both were injected and confirmed failing.
+  
+  Two non-timing assertions in the same file were also failing under load. Every
+  render is now unmounted: `useLiveTick` starts a real 1s `setInterval` while an
+  in-progress row is visible, so each render previously left a live interval
+  re-rendering a 500–2000 row tree for the rest of the file, free to interrupt a
+  later test mid-measurement.
+  
+  The DOM-per-item assertion also stops guessing. It subtracted a hardcoded
+  `overheadEstimate = 200` for the tree's chrome; the real figure, measured by
+  rendering an empty document in the same process, is 9. It had been reporting 18.6
+  DOM nodes per row where the true value is 21.7 — passing, but not for the reason
+  it stated.
+  
+  Full suite verified green with a concurrent `pnpm build` and every core saturated
+  (15-minute load average 24.6). No production behaviour changes.
+- Updated dependencies [[`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`ee16578`](https://github.com/en-dash-consulting/n-dx/commit/ee165780ecdc34ad0349ab7028875f04bff769e0), [`7b5d253`](https://github.com/en-dash-consulting/n-dx/commit/7b5d253faec104a417505d4baa4aa3a7ec0348f1), [`7b5d253`](https://github.com/en-dash-consulting/n-dx/commit/7b5d253faec104a417505d4baa4aa3a7ec0348f1), [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb), [`fdb8376`](https://github.com/en-dash-consulting/n-dx/commit/fdb8376fa554f7ef92c65e3819def5dbbf74e933), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`fdd864c`](https://github.com/en-dash-consulting/n-dx/commit/fdd864c4db245e5d69a0ae78534f07c0cc752c0e), [`e70e787`](https://github.com/en-dash-consulting/n-dx/commit/e70e787b40ada9ecaf17069b7e4f11246ebb235f), [`e70e787`](https://github.com/en-dash-consulting/n-dx/commit/e70e787b40ada9ecaf17069b7e4f11246ebb235f), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396), [`6bee073`](https://github.com/en-dash-consulting/n-dx/commit/6bee073fd946866760cced673afd9ac4fcaa0675), [`a136bbc`](https://github.com/en-dash-consulting/n-dx/commit/a136bbc4f21719624f96d98bb82420c8fce9b649), [`87c0af9`](https://github.com/en-dash-consulting/n-dx/commit/87c0af99fd7f9bdc4f563d74f323166307bb3e26), [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb), [`a136bbc`](https://github.com/en-dash-consulting/n-dx/commit/a136bbc4f21719624f96d98bb82420c8fce9b649), [`bb4f829`](https://github.com/en-dash-consulting/n-dx/commit/bb4f829b0d676024fce715ee5da4db0ed2a429b5), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`5866f4e`](https://github.com/en-dash-consulting/n-dx/commit/5866f4eddf660fb4d254dd9a6e66e1fbc4aae7d7), [`6bee073`](https://github.com/en-dash-consulting/n-dx/commit/6bee073fd946866760cced673afd9ac4fcaa0675), [`a136bbc`](https://github.com/en-dash-consulting/n-dx/commit/a136bbc4f21719624f96d98bb82420c8fce9b649), [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb), [`5866f4e`](https://github.com/en-dash-consulting/n-dx/commit/5866f4eddf660fb4d254dd9a6e66e1fbc4aae7d7), [`737b396`](https://github.com/en-dash-consulting/n-dx/commit/737b39611b68c04dbfdebfb94933102483ee9417), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4)]:
+  - @n-dx/sourcevision@0.7.1
+  - @n-dx/rex@0.7.1
+  - @n-dx/llm-client@0.7.1
+
 ## 0.7.0
 
 ### Minor Changes
