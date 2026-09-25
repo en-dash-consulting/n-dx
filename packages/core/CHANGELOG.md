@@ -1,5 +1,16 @@
 # @n-dx/core
 
+## 0.7.2
+
+### Patch Changes
+
+- Updated dependencies [[`b7f8559`](https://github.com/en-dash-consulting/n-dx/commit/b7f8559c1ef4f38d5df9f042a65094b4e4136013), [`fd7cd17`](https://github.com/en-dash-consulting/n-dx/commit/fd7cd175680673d9e79798bd69501731590ac53b), [`b7f8559`](https://github.com/en-dash-consulting/n-dx/commit/b7f8559c1ef4f38d5df9f042a65094b4e4136013)]:
+  - @n-dx/hench@0.7.2
+  - @n-dx/llm-client@0.7.2
+  - @n-dx/rex@0.7.2
+  - @n-dx/sourcevision@0.7.2
+  - @n-dx/web@0.7.2
+
 ## 0.7.1
 
 ### Patch Changes
