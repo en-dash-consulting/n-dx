@@ -22,9 +22,26 @@ const UNKNOWN_COMMAND_CODE = "NDX_CLI_UNKNOWN_COMMAND";
 // elsewhere in the suite rather than a hand-picked constant.
 const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
 
+// Per-spawn kill guardrails, scaled by BUDGET_MULTIPLIER instead of a fixed
+// constant (see the comment above) so a loaded machine grows the ceiling
+// rather than getting its spawn killed mid-work. Two sizes: SPAWN_TIMEOUT for
+// trivial commands (unknown-command hints, init, validate, --help), and
+// larger ceilings for the heavier 'analyze' and 'serve --help' spawns,
+// preserving their original relative sizing.
+const SPAWN_TIMEOUT = 10_000 * BUDGET_MULTIPLIER;
+const ANALYZE_SPAWN_TIMEOUT = 30_000 * BUDGET_MULTIPLIER;
+const SERVE_HELP_SPAWN_TIMEOUT = 15_000 * BUDGET_MULTIPLIER;
+
+// TESTING.md Family 3: "keep testTimeout above the spawn guardrail so a
+// genuine hang surfaces as a precise spawn timeout instead of an opaque test
+// timeout." Every it() below must set its own vitest-level timeout above
+// whichever spawn guardrail(s) it uses, or vitest's own timeout fires first
+// and hides the more precise signal.
+const TEST_TIMEOUT_BUFFER = 5_000;
+
 function runResult(
   args: string[],
-  timeout = 10_000,
+  timeout = SPAWN_TIMEOUT,
 ): { stdout: string; stderr: string; code: number } {
   try {
     const stdout = execFileSync("node", [CLI_PATH, ...args], {
@@ -51,13 +68,17 @@ describe("sourcevision CLI hint surfacing and follow-through", () => {
   });
 
   describe("typo-correction hints", () => {
-    it("hint text matches valid command: 'valdate' → 'validate'", () => {
-      const { stderr, code } = runResult(["valdate"]);
-      expect(code).toBe(1);
-      expect(stderr).toContain(`[${UNKNOWN_COMMAND_CODE}]`);
-      expect(stderr).toContain("Did you mean");
-      expect(stderr).toContain("validate");
-    });
+    it(
+      "hint text matches valid command: 'valdate' → 'validate'",
+      () => {
+        const { stderr, code } = runResult(["valdate"]);
+        expect(code).toBe(1);
+        expect(stderr).toContain(`[${UNKNOWN_COMMAND_CODE}]`);
+        expect(stderr).toContain("Did you mean");
+        expect(stderr).toContain("validate");
+      },
+      SPAWN_TIMEOUT + TEST_TIMEOUT_BUFFER,
+    );
 
     it(
       "follow-through: hinted 'validate' exits 0 after init",
@@ -69,12 +90,13 @@ describe("sourcevision CLI hint surfacing and follow-through", () => {
         const { code } = runResult(["validate", tmpDir]);
         expect(code).toBe(0);
       },
-      // Two cold-start node spawns back to back. A hand-picked 15s cap
-      // measured 25.8s under a concurrent `pnpm build` (2.4s isolated) —
-      // Family 3: the guardrail was sized for an idle machine. Scaled by
-      // BUDGET_MULTIPLIER instead of a new fixed number so it grows with
-      // the same signal that inflates the spawn.
-      15_000 * BUDGET_MULTIPLIER,
+      // Two cold-start node spawns back to back, each guarded by
+      // SPAWN_TIMEOUT. A hand-picked 15s cap measured 25.8s under a
+      // concurrent `pnpm build` (2.4s isolated) — Family 3: the guardrail was
+      // sized for an idle machine. Must stay above 2x SPAWN_TIMEOUT (worst
+      // case: both spawns run to their own ceiling) or vitest's own timeout
+      // would fire first and hide the more precise spawn-timeout signal.
+      SPAWN_TIMEOUT * 2 + TEST_TIMEOUT_BUFFER,
     );
 
     it(
@@ -86,6 +108,7 @@ describe("sourcevision CLI hint surfacing and follow-through", () => {
         expect(stderr).toContain("Did you mean");
         expect(stderr).toContain("analyze");
       },
+      SPAWN_TIMEOUT + TEST_TIMEOUT_BUFFER,
     );
 
     it(
@@ -93,34 +116,46 @@ describe("sourcevision CLI hint surfacing and follow-through", () => {
       async () => {
         // Copy fixture to avoid writing .sourcevision/ into the source tree.
         await cp(SMALL_FIXTURE, tmpDir, { recursive: true });
-        const { code } = runResult(["analyze", tmpDir, "--fast"], 30_000);
+        const { code } = runResult(["analyze", tmpDir, "--fast"], ANALYZE_SPAWN_TIMEOUT);
         expect(code).toBe(0);
       },
-      30_000,
+      ANALYZE_SPAWN_TIMEOUT + TEST_TIMEOUT_BUFFER,
     );
 
-    it("hint text matches valid command: 'servce' → 'serve'", () => {
-      const { stderr, code } = runResult(["servce"]);
-      expect(code).toBe(1);
-      expect(stderr).toContain(`[${UNKNOWN_COMMAND_CODE}]`);
-      expect(stderr).toContain("Did you mean");
-      expect(stderr).toContain("serve");
-    });
+    it(
+      "hint text matches valid command: 'servce' → 'serve'",
+      () => {
+        const { stderr, code } = runResult(["servce"]);
+        expect(code).toBe(1);
+        expect(stderr).toContain(`[${UNKNOWN_COMMAND_CODE}]`);
+        expect(stderr).toContain("Did you mean");
+        expect(stderr).toContain("serve");
+      },
+      SPAWN_TIMEOUT + TEST_TIMEOUT_BUFFER,
+    );
 
-    it("follow-through: hinted 'serve' is a recognized command", () => {
-      // 'serve' starts a long-running HTTP server; invoke command-specific
-      // help to confirm the command is recognized without starting the server.
-      const { code, stdout } = runResult(["serve", "--help"], 15_000);
-      expect(code).toBe(0);
-      expect(stdout).toContain("sourcevision serve");
-    });
+    it(
+      "follow-through: hinted 'serve' is a recognized command",
+      () => {
+        // 'serve' starts a long-running HTTP server; invoke command-specific
+        // help to confirm the command is recognized without starting the server.
+        const { code, stdout } = runResult(["serve", "--help"], SERVE_HELP_SPAWN_TIMEOUT);
+        expect(code).toBe(0);
+        expect(stdout).toContain("sourcevision serve");
+      },
+      SERVE_HELP_SPAWN_TIMEOUT + TEST_TIMEOUT_BUFFER,
+    );
   });
 
   describe("related-command hints after unknown-command errors", () => {
-    it("hint: orchestrator-only command 'plan' redirects to ndx plan", () => {
-      const { stderr, code } = runResult(["plan"]);
-      expect(code).toBe(1);
-      expect(stderr).toContain("ndx plan");
-    }, 15_000);
+    it(
+      "hint: orchestrator-only command 'plan' redirects to ndx plan",
+      () => {
+        const { stderr, code } = runResult(["plan"]);
+        expect(code).toBe(1);
+        expect(stderr).toContain("ndx plan");
+      },
+      SPAWN_TIMEOUT + TEST_TIMEOUT_BUFFER,
+    );
   });
 });
