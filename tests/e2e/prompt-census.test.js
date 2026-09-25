@@ -23,7 +23,7 @@
 
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync, existsSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
@@ -35,6 +35,7 @@ import {
   REPRESENTATIVE,
   extractStaticPromptText,
   contentHash,
+  currentCommit,
 } from "../../scripts/prompt-census.mjs";
 
 const ROOT = join(import.meta.dirname, "../..");
@@ -525,6 +526,50 @@ describe("prompt census: baseline", () => {
       ).toBe(before);
     } finally {
       rmSync(marker, { force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("stamps the worktree's own HEAD when run from a linked worktree", () => {
+    // `--write` stamps currentCommit(). In a linked worktree `.git` is a
+    // file pointing at <main>/.git/worktrees/<name>, and the old reader —
+    // which joined ".git/HEAD" onto the checkout path — found nothing and
+    // stamped "unknown": a baseline its own gate rejects, and one nobody
+    // could regenerate from a worktree. Exercised against a throwaway repo
+    // so the developer's checkout is never touched, and against every ref
+    // shape a worktree can be left in: a loose branch, a packed branch, and
+    // a detached HEAD.
+    const dir = mkdtempSync(join(tmpdir(), "prompt-census-wt-"));
+    const repo = join(dir, "repo");
+    const wt = join(dir, "wt");
+    const git = (cwd, ...args) =>
+      execFileSync("git", ["-c", "user.email=census@test", "-c", "user.name=census", ...args], {
+        cwd,
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+        env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
+      }).trim();
+
+    try {
+      mkdirSync(repo);
+      git(repo, "init", "-q", "-b", "main");
+      git(repo, "commit", "-q", "--allow-empty", "-m", "base");
+      git(repo, "worktree", "add", "-q", "-b", "side", wt);
+      git(wt, "commit", "-q", "--allow-empty", "-m", "side");
+
+      const mainSha = git(repo, "rev-parse", "HEAD").slice(0, 12);
+      const sideSha = git(wt, "rev-parse", "HEAD").slice(0, 12);
+      expect(sideSha).not.toBe(mainSha);
+
+      expect(currentCommit(repo), "main checkout").toBe(mainSha);
+      expect(currentCommit(wt), "linked worktree, loose branch ref").toBe(sideSha);
+
+      git(repo, "pack-refs", "--all");
+      expect(currentCommit(wt), "linked worktree, packed branch ref").toBe(sideSha);
+
+      git(wt, "checkout", "-q", "--detach");
+      expect(currentCommit(wt), "linked worktree, detached HEAD").toBe(sideSha);
+    } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });

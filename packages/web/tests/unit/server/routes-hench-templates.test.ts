@@ -249,7 +249,8 @@ describe("Hench Templates API routes", () => {
     expect(body.templateName).toBe("Quick Iteration");
     expect(body.config).toBeDefined();
     expect(body.config.maxTurns).toBe(15);
-    expect(body.config.tokenBudget).toBe(50000);
+    // Must match hench/src/schema/templates.ts quick-iteration.
+    expect(body.config.tokenBudget).toBe(600000);
 
     // Verify persisted
     const raw = await readFile(join(henchDir, "config.json"), "utf-8");

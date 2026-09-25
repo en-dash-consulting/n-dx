@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../src/prd/rex-gateway.js";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 /** The agent's proposed commit message, as the commit prompt expects to find it. */
 const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
@@ -130,7 +130,7 @@ describe("tree-meta sidecar — commit paths", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("completes when the only dirt is a rewritten sidecar, and commits it (autoCommit)", async () => {

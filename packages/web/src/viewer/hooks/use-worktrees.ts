@@ -25,6 +25,8 @@ export interface WorktreeLatestRun {
   taskTitle: string | null;
   startedAt: string | null;
   finishedAt: string | null;
+  /** Worktree root that took this run's task over mid-run, or null. */
+  claimLostTo: string | null;
 }
 
 /** Mirrors WorktreeRunsSummary in server/routes-worktrees.ts. */

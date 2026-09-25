@@ -175,6 +175,86 @@ describe("validateInventory", () => {
     });
     expect(result.ok).toBe(false);
   });
+
+  // ── skippedExtensions / analysedLanguages (additive, optional) ─────────
+
+  it("accepts a summary written before skippedExtensions/analysedLanguages existed", () => {
+    // Simulates an old .sourcevision/inventory.json on disk from before this
+    // field was added — the point of the field being optional.
+    const result = validateInventory({
+      files: [{
+        path: "src/index.ts",
+        size: 100,
+        language: "TypeScript",
+        lineCount: 10,
+        hash: "abc",
+        role: "source",
+        category: "root",
+      }],
+      summary: {
+        totalFiles: 1,
+        totalLines: 10,
+        byLanguage: { TypeScript: 1 },
+        byRole: { source: 1 },
+        byCategory: { root: 1 },
+      },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts a summary with skippedExtensions and analysedLanguages", () => {
+    const result = validateInventory({
+      files: [{
+        path: "src/index.ts",
+        size: 100,
+        language: "TypeScript",
+        lineCount: 10,
+        hash: "abc",
+        role: "source",
+        category: "root",
+      }],
+      summary: {
+        totalFiles: 1,
+        totalLines: 10,
+        byLanguage: { TypeScript: 1, Zig: 1 },
+        byRole: { source: 2 },
+        byCategory: { root: 2 },
+        skippedExtensions: { ".md": 3, ".toml": 1 },
+        analysedLanguages: ["TypeScript"],
+      },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects negative counts in skippedExtensions", () => {
+    const result = validateInventory({
+      files: [],
+      summary: {
+        totalFiles: 0,
+        totalLines: 0,
+        byLanguage: {},
+        byRole: {},
+        byCategory: {},
+        skippedExtensions: { ".md": -1 },
+      },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects non-string entries in analysedLanguages", () => {
+    const result = validateInventory({
+      files: [],
+      summary: {
+        totalFiles: 0,
+        totalLines: 0,
+        byLanguage: {},
+        byRole: {},
+        byCategory: {},
+        analysedLanguages: [42],
+      },
+    });
+    expect(result.ok).toBe(false);
+  });
 });
 
 describe("validateImports", () => {

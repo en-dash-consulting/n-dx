@@ -6,6 +6,7 @@
  *
  * - **title**, which belongs to the document rather than to any item.
  * - **schema**, the version the tree was written at.
+ * - **slugRule**, the version of the path rule the tree was written under.
  *
  * The schema marker exists because omitting it defeated forward compatibility
  * at one remove. The tree load path used to report the *running*
@@ -22,26 +23,94 @@
  * durability needs. The *shape* is built here so those four cannot drift apart
  * — which is how the schema field would quietly go missing from one writer.
  *
+ * **Every write is a read-modify-write**, because the file is rewritten
+ * wholesale from a type that knows only its own fields. Observed live: a rex
+ * MCP server started before `slugRule` existed saved the PRD, and its
+ * `TreeMeta` — which had no such field — erased the marker written by the
+ * build beside it. Nothing was corrupted and no path moved, because the two
+ * builds shared a slug rule; what was lost was the guard, silently, for
+ * whoever wrote next. A version older than a field cannot be taught to keep
+ * it, so the fix only protects the versions after this one: from here on a
+ * writer carries forward every key it does not recognise instead of dropping
+ * it. See {@link treeMetaContents}.
+ *
  * @module store/tree-meta
  */
 
+import { readFile } from "node:fs/promises";
 import { SCHEMA_VERSION } from "../schema/index.js";
+import { SLUG_RULE_VERSION } from "./folder-tree-serializer.js";
 
 /** The document-level facts the tree cannot hold on its own. */
 export interface TreeMeta {
   title: string;
   schema: string;
+  /**
+   * Version of the slug rule that produced the paths in this tree.
+   *
+   * Unlike `schema`, this is never carried on the in-memory document: it
+   * describes the *writing build*, not the document, and the build is always
+   * this one. A tree whose marker disagrees with `SLUG_RULE_VERSION` is a tree
+   * this build must not write — see `assertSlugRuleWritable`.
+   *
+   * Deliberately a named field rather than a positional or derived one: the
+   * 1.0.0 storage change folds this whole sidecar into the root `index.md`
+   * frontmatter, and a named field moves there as-is. Anything that inferred
+   * the rule from the file's shape would have to be rewritten instead.
+   */
+  slugRule: number;
 }
 
 /**
- * Build the contents of `tree-meta.json` for a document.
+ * Build the contents of `tree-meta.json` for a document, over whatever the
+ * file already holds.
  *
  * `schema` falls back to the running version for a document assembled in
  * memory without one — a bundle import or a legacy migration, neither of which
  * has a tree to have read it from.
+ *
+ * `slugRule` is unconditionally the running version, because the serializer
+ * about to run *is* the running version — there is no way to write a tree
+ * under any other rule. What stops that from quietly re-slugging someone
+ * else's tree is the guard in the save path, which refuses before this file is
+ * written; by the time the shape is built, the write has already been allowed.
+ *
+ * **Keys this build does not know are carried through untouched.** The three
+ * fields above are the ones it owns and always rewrites; anything else in the
+ * file was put there by a build that knew something this one does not, and
+ * dropping it turns a routine save into a silent downgrade of the sidecar.
+ * This cannot repair a file an older build has already stripped — it stops the
+ * next such loss.
+ *
+ * Takes the path rather than the prior contents so a caller cannot forget to
+ * read first: the read is the point, and an argument that can be omitted is an
+ * argument that will be.
+ *
+ * @param metaPath Absolute path to the `tree-meta.json` being written. Absent
+ *   (a first save) and malformed (a damaged sidecar) both carry nothing —
+ *   there is no key worth preserving out of either, and the three owned fields
+ *   are written correctly regardless.
  */
-export function treeMetaContents(doc: { title: string; schema?: string }): TreeMeta {
-  return { title: doc.title, schema: doc.schema ?? SCHEMA_VERSION };
+export async function treeMetaContents(
+  metaPath: string,
+  doc: { title: string; schema?: string },
+): Promise<TreeMeta & Record<string, unknown>> {
+  let carried: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(await readFile(metaPath, "utf-8"));
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      carried = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Absent or unreadable. Neither is an error here: the write about to
+    // happen replaces the file either way.
+  }
+  return {
+    ...carried,
+    title: doc.title,
+    schema: doc.schema ?? SCHEMA_VERSION,
+    slugRule: SLUG_RULE_VERSION,
+  };
 }
 
 /**
@@ -74,5 +143,13 @@ export function parseTreeMeta(raw: string): Partial<TreeMeta> {
   const out: Partial<TreeMeta> = {};
   if (typeof meta["title"] === "string") out.title = meta["title"];
   if (typeof meta["schema"] === "string") out.schema = meta["schema"];
+  // Absent on every tree written before the guard, which is the case the guard
+  // is built to handle rather than an error. A non-integer is treated the same
+  // as absent: the marker is only ever written from `SLUG_RULE_VERSION`, so a
+  // string or a float is corruption, and the conformance fallback checks the
+  // paths themselves — a stricter answer than trusting a damaged number.
+  if (typeof meta["slugRule"] === "number" && Number.isInteger(meta["slugRule"])) {
+    out.slugRule = meta["slugRule"];
+  }
   return out;
 }

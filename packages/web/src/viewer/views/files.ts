@@ -4,7 +4,7 @@ import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { FileEntry } from "../external.js";
 import { buildFileToZoneMap, getZoneColorByIndex } from "../visualization/index.js";
 import { basename } from "../utils.js";
-import { BrandedHeader } from "../components/index.js";
+import { BrandedHeader, LanguageAnalysisStrip, GlossaryLine } from "../components/index.js";
 
 const FILE_SEARCH_LISTBOX_ID = "file-search-listbox";
 const FILE_SEARCH_MAX_OPTIONS = 10;
@@ -438,9 +438,21 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
       ),
     ),
 
+    h(LanguageAnalysisStrip, { summary: inventory.summary }),
+
     // Table
+    // The archetype definition is read once, as the table's description,
+    // rather than from inside its <th>, where a screen reader would repeat
+    // it before every cell in the column. The header keeps a visual copy
+    // marked decorative.
+    classifications
+      ? h(GlossaryLine, { term: "archetype", id: "files-archetype-definition", srOnly: true })
+      : null,
     h("div", { class: "data-table-wrapper" },
-    h("table", { class: "data-table" },
+    h("table", {
+      class: "data-table",
+      ...(classifications ? { "aria-describedby": "files-archetype-definition" } : {}),
+    },
       h("thead", null,
         h("tr", null,
           h("th", { onClick: () => toggleSort("path") }, `Path${sortIndicator("path")}`),
@@ -450,7 +462,9 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
           h("th", { onClick: () => toggleSort("size") }, `Size${sortIndicator("size")}`),
           h("th", { onClick: () => toggleSort("role") }, `Role${sortIndicator("role")}`),
           h("th", { onClick: () => toggleSort("category") }, `Category${sortIndicator("category")}`),
-          classifications ? h("th", null, "Archetype") : null
+          classifications
+            ? h("th", null, "Archetype", h(GlossaryLine, { term: "archetype", decorative: true }))
+            : null
         )
       ),
       h("tbody", null,

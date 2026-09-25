@@ -7,7 +7,7 @@
  * only a real layout exercises that join end to end.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -16,8 +16,11 @@ import type { ServerContext } from "../../src/server/types.js";
 import {
   handleWorktreesRoute,
   clearWorktreesCache,
+  invalidateWorktreesAnswer,
   type WorktreeEntry,
 } from "../../src/server/routes-worktrees.js";
+import { closeWorktreeRunWatchers, setWorktreeRunWatchFactory } from "../../src/server/routes-hench.js";
+import type { FSWatcher } from "node:fs";
 import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 
 function git(cwd: string, ...args: string[]): string {
@@ -104,6 +107,9 @@ afterAll(() => {
 
 beforeEach(() => {
   clearWorktreesCache();
+  // Watchers are module-level, one per runs directory: a test must not
+  // inherit one registered (with another test's broadcaster) earlier.
+  closeWorktreeRunWatchers();
 });
 
 describe("GET /api/worktrees", () => {
@@ -154,6 +160,8 @@ describe("GET /api/worktrees", () => {
         taskTitle: "title for run-b",
         startedAt: "2026-09-16T10:00:00.000Z",
         finishedAt: "2026-09-16T11:00:00.000Z",
+        // No worktree took this run's task over.
+        claimLostTo: null,
       },
     });
     expect(list.find((w) => w.path === linked)!.runs).toEqual({
@@ -166,7 +174,64 @@ describe("GET /api/worktrees", () => {
         taskTitle: "title for run-c",
         startedAt: "2026-09-16T10:00:00.000Z",
         finishedAt: null,
+        claimLostTo: null,
       },
+    });
+    await server.close();
+  });
+
+  it("reports the worktree that took a run's task over, and null when none did", async () => {
+    // Written the way hench writes it: the run is still `running`, because a
+    // run whose claim is taken over deliberately carries on.
+    const runsDir = join(linked, ".hench", "runs");
+    mkdirSync(runsDir, { recursive: true });
+    writeFileSync(
+      join(runsDir, "run-taken.json"),
+      JSON.stringify({
+        id: "run-taken",
+        taskId: "task-1",
+        taskTitle: "taken over",
+        startedAt: "2026-09-16T12:00:00.000Z",
+        status: "running",
+        claimLost: { at: "2026-09-16T12:30:00.000Z", taskId: "task-1", holderWorktree: repo },
+      }),
+    );
+    clearWorktreesCache();
+
+    server = await startRouteTestServer((req, res) => handleWorktreesRoute(req, res, ctxFor(repo)));
+    const list = await fetchWorktrees(server);
+    expect(list.find((w) => w.path === linked)!.runs.latest).toMatchObject({
+      id: "run-taken",
+      status: "running",
+      claimLostTo: repo,
+    });
+    // The anchor's own runs are untouched by another worktree's record.
+    expect(list.find((w) => w.path === repo)!.runs.latest!.claimLostTo).toBeNull();
+    await server.close();
+  });
+
+  it("treats a malformed claimLost as no takeover rather than losing the run", async () => {
+    // Run files are read across worktrees, so one may come from a different
+    // hench version. A bad entry must not cost the whole digest.
+    const runsDir = join(linked, ".hench", "runs");
+    mkdirSync(runsDir, { recursive: true });
+    writeFileSync(
+      join(runsDir, "run-odd.json"),
+      JSON.stringify({
+        id: "run-odd",
+        taskTitle: "odd",
+        startedAt: "2026-09-16T13:00:00.000Z",
+        status: "running",
+        claimLost: { at: "2026-09-16T13:30:00.000Z", holderWorktree: 42 },
+      }),
+    );
+    clearWorktreesCache();
+
+    server = await startRouteTestServer((req, res) => handleWorktreesRoute(req, res, ctxFor(repo)));
+    const list = await fetchWorktrees(server);
+    expect(list.find((w) => w.path === linked)!.runs.latest).toMatchObject({
+      id: "run-odd",
+      claimLostTo: null,
     });
     await server.close();
   });
@@ -233,6 +298,95 @@ describe("GET /api/worktrees", () => {
     server = await startRouteTestServer((req, res) => handleWorktreesRoute(req, res, ctxFor(repo)));
     expect((await fetch(`${server.baseUrl}/api/worktrees/x`)).status).toBe(404);
     expect((await fetch(`${server.baseUrl}/api/worktrees`, { method: "POST" })).status).toBe(404);
+    await server.close();
+  });
+
+  it("a run file saved in another worktree pushes hench:run-changed without the Runs view", async () => {
+    // The Sessions tray is open but the Runs view (the only other caller that
+    // watches linked worktrees) was never visited: GET /api/worktrees alone
+    // must register the watcher, or a mid-run claim takeover waits for a poll.
+    const broadcast = vi.fn();
+    const onStatusInvalidate = vi.fn(invalidateWorktreesAnswer);
+    server = await startRouteTestServer((req, res) =>
+      handleWorktreesRoute(req, res, ctxFor(repo), { broadcast, onStatusInvalidate }),
+    );
+    try {
+      await fetchWorktrees(server);
+
+      writeRun(linked, "run-c", "running");
+
+      await vi.waitFor(() => {
+        expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: "hench:run-changed" }));
+      }, { timeout: 4_000, interval: 50 });
+      expect(onStatusInvalidate).toHaveBeenCalled();
+    } finally {
+      closeWorktreeRunWatchers();
+      await server.close();
+    }
+  });
+
+  it("a request scoped to another workspace does not prune that worktree's live watcher", async () => {
+    // Regression: the prune keep-set excluded the request's served worktree,
+    // and `isServed` is per-request (ctx is workspace-scoped) — so a viewer
+    // mounted on the linked worktree, whose /api/worktrees arrives with ctx
+    // scoped to `linked`, closed the watcher the anchor's dashboard had
+    // registered for `linked`. Pushes to the anchor's Sessions view went dark
+    // until something re-registered it.
+    const opened: string[] = [];
+    const closed: string[] = [];
+    setWorktreeRunWatchFactory((dir) => {
+      opened.push(dir);
+      return { close: () => { closed.push(dir); }, on: () => {} } as unknown as FSWatcher;
+    });
+    const linkedRuns = join(linked, ".hench", "runs");
+    const anchorServer = await startRouteTestServer((req, res) =>
+      handleWorktreesRoute(req, res, ctxFor(repo), { broadcast: vi.fn() }),
+    );
+    const linkedServer = await startRouteTestServer((req, res) =>
+      handleWorktreesRoute(req, res, ctxFor(linked), { broadcast: vi.fn() }),
+    );
+    try {
+      await fetchWorktrees(anchorServer);
+      expect(opened).toContain(linkedRuns);
+
+      // A different projectDir misses the answer cache, so this request
+      // recomputes the worktree list and runs the prune.
+      await fetchWorktrees(linkedServer);
+      expect(closed).not.toContain(linkedRuns);
+    } finally {
+      setWorktreeRunWatchFactory(null);
+      closeWorktreeRunWatchers();
+      await anchorServer.close();
+      await linkedServer.close();
+    }
+  });
+
+  it("does not watch the served worktree's runs — start.ts already does", async () => {
+    const broadcast = vi.fn();
+    server = await startRouteTestServer((req, res) =>
+      handleWorktreesRoute(req, res, ctxFor(linked), { broadcast }),
+    );
+    try {
+      await fetchWorktrees(server);
+      writeRun(linked, "run-c", "running");
+      await new Promise((r) => setTimeout(r, 1_000));
+      expect(broadcast).not.toHaveBeenCalled();
+    } finally {
+      closeWorktreeRunWatchers();
+      await server.close();
+    }
+  });
+
+  it("a runs-dir change drops the cached answer so the refetch sees it", async () => {
+    server = await startRouteTestServer((req, res) => handleWorktreesRoute(req, res, ctxFor(repo)));
+    const before = (await fetchWorktrees(server)).find((w) => w.path === repo)!.runs.total;
+
+    writeRun(repo, "run-d", "completed", "2026-09-16T12:00:00.000Z");
+    expect((await fetchWorktrees(server)).find((w) => w.path === repo)!.runs.total).toBe(before);
+
+    invalidateWorktreesAnswer();
+    expect((await fetchWorktrees(server)).find((w) => w.path === repo)!.runs.total).toBe(before + 1);
+    rmSync(join(repo, ".hench", "runs", "run-d.json"));
     await server.close();
   });
 });

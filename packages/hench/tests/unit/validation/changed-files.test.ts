@@ -14,7 +14,7 @@ import { mkdtemp, rm, writeFile, mkdir, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { initGitFixtureRepoSync } from "../../helpers/index.js";
+import { initGitFixtureRepoSync, RM_RETRY } from "../../helpers/index.js";
 import { discoverChangedFiles } from "../../../src/validation/changed-files.js";
 
 function git(dir: string, ...args: string[]): string {
@@ -35,7 +35,7 @@ describe("discoverChangedFiles", () => {
   });
 
   afterEach(async () => {
-    await rm(repoDir, { recursive: true, force: true });
+    await rm(repoDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("returns an empty list when nothing changed since the baseline", async () => {
@@ -173,7 +173,7 @@ describe("discoverChangedFiles", () => {
     try {
       expect(await discoverChangedFiles({ projectDir: notARepo })).toBeUndefined();
     } finally {
-      await rm(notARepo, { recursive: true, force: true });
+      await rm(notARepo, { recursive: true, force: true, ...RM_RETRY });
     }
   });
 
@@ -243,7 +243,7 @@ describe("discoverChangedFiles", () => {
     });
 
     afterEach(async () => {
-      await rm(freshDir, { recursive: true, force: true });
+      await rm(freshDir, { recursive: true, force: true, ...RM_RETRY });
     });
 
     it("counts a file the run created", async () => {

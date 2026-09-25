@@ -16,7 +16,77 @@
  * @module store/contracts
  */
 
+import { relative, sep } from "node:path";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
+
+// ---------------------------------------------------------------------------
+// Save file report
+// ---------------------------------------------------------------------------
+
+/**
+ * The files a store's PRD saves touched on disk, project-relative.
+ *
+ * Paths are relative to the project directory (the directory containing
+ * `.rex/`) and use forward slashes on every platform, so they can be handed
+ * to `git add`/`git commit` pathspecs as-is. The report covers what the
+ * folder-tree serializer wrote and deleted; the `tree-meta.json` sidecar is
+ * rewritten by every save but is NOT listed — a caller staging a save must
+ * add it alongside these paths (hench's staging helper already does).
+ *
+ * Retrieved with {@link takeSaveFileReport}, which drains what accumulated —
+ * a store may save several times between commit points (`--reset-deferred`
+ * updates one item per task), and the consumer needs the union of those
+ * saves, not just the last one.
+ */
+export interface SaveFileReport {
+  /** Files written (new or content-changed) since the last take. */
+  written: string[];
+  /** Files deleted since the last take, including files inside removed directories. */
+  deleted: string[];
+}
+
+/**
+ * Convert the serializer's absolute path lists into a project-relative
+ * {@link SaveFileReport}. `projectDir` is the directory containing `.rex/`.
+ */
+export function buildSaveFileReport(
+  save: { writtenPaths: string[]; deletedPaths: string[] },
+  projectDir: string,
+): SaveFileReport {
+  const rel = (p: string) => relative(projectDir, p).split(sep).join("/");
+  return {
+    written: save.writtenPaths.map(rel),
+    deleted: save.deletedPaths.map(rel),
+  };
+}
+
+/**
+ * Union of two reports, deduplicated, for stores that save more than once
+ * between takes. A path that was written and later deleted stays in both
+ * lists — the consumer stages paths, and git stages whatever the current
+ * on-disk state is.
+ */
+export function mergeSaveFileReports(
+  base: SaveFileReport | null,
+  next: SaveFileReport,
+): SaveFileReport {
+  if (base === null) return next;
+  return {
+    written: [...new Set([...base.written, ...next.written])],
+    deleted: [...new Set([...base.deleted, ...next.deleted])],
+  };
+}
+
+/**
+ * Drain a store's accumulated {@link SaveFileReport}.
+ *
+ * Returns the union of every save since construction or the previous take,
+ * then resets the accumulator; `null` when nothing was saved in that span or
+ * the adapter does not track saves (remote adapters have no local files).
+ */
+export function takeSaveFileReport(store: PRDStore): SaveFileReport | null {
+  return store.takeSaveFileReport?.() ?? null;
+}
 
 // ---------------------------------------------------------------------------
 // Capabilities
@@ -219,6 +289,28 @@ export interface PRDStore {
    * @throws If the lock cannot be acquired (another writer is active).
    */
   withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T>;
+
+  /**
+   * Rewrite the whole tree under this build's slug rule and record the marker.
+   *
+   * Optional, and implemented only by the two local folder-tree stores: a
+   * remote adapter has no slugs and nothing to migrate. `rex migrate-slugs` is
+   * the only caller, and it is the only sanctioned way past the slug-rule
+   * write guard — every ordinary writer is refused precisely because it would
+   * re-slug someone else's tree, which is what this does deliberately.
+   *
+   * @see {@link file://./slug-rule-guard.ts}
+   */
+  adoptSlugRule?(): Promise<void>;
+
+  /**
+   * Drain the accumulated {@link SaveFileReport} for this store's PRD saves.
+   *
+   * Optional, and implemented only by the local folder-tree stores — a
+   * remote adapter writes no local files a caller could stage. Prefer the
+   * standalone {@link takeSaveFileReport}, which handles absence.
+   */
+  takeSaveFileReport?(): SaveFileReport | null;
 
   // ---- Introspection -------------------------------------------------------
 

@@ -22,7 +22,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initConfig } from "../../src/store/config.js";
-import { cliSpawnsOnly } from "../helpers/index.js";
+import { cliSpawnsOnly, RM_RETRY } from "../helpers/index.js";
 
 // The temp project dirs created below have no git repo, so the real
 // `validateCompletion` would fail (`git diff --stat HEAD` exits non-zero,
@@ -188,7 +188,7 @@ describe("Codex self-heal batch pipeline — integration", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   // ── AC-1: Successful Codex self-heal batch ─────────────────────────────────

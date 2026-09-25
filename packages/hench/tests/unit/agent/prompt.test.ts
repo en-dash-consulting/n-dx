@@ -70,6 +70,35 @@ describe("buildSystemPrompt", () => {
     });
   });
 
+  // ── Foreground Invariant regression ─────────────────────────────────────────
+  // The other canary. Three of three autonomous runs on 2026-09-22 ended with
+  // their work uncommitted because the agent backgrounded `pnpm preflight` and
+  // parked on a wake-up that nothing in a hench run will ever fire. If this
+  // rule leaves buildSystemPrompt, that failure comes back. Do not skip or
+  // weaken these.
+  describe("foreground invariant", () => {
+    it("cli provider system prompt forbids backgrounding and parking", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), provider: "cli" as const };
+      const prompt = buildSystemPrompt(project, config);
+      expect(prompt).toContain("Foreground Invariant");
+      expect(prompt).toContain("Never background one");
+      expect(prompt).toContain("scheduled wake-up");
+      expect(prompt).toContain("nothing will resume this session");
+    });
+
+    it("tells the agent the suite is run again afterwards, under the project's own CLI name", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), provider: "cli" as const };
+      const prompt = buildSystemPrompt({ ...project, cliName: "widget" }, config);
+      expect(prompt).toContain("run again after you finish, by widget itself");
+    });
+
+    it("absent from api provider (it drives its own loop; parking is not expressible)", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), provider: "api" as const };
+      const prompt = buildSystemPrompt(project, config);
+      expect(prompt).not.toContain("Foreground Invariant");
+    });
+  });
+
   describe("cli provider", () => {
     it("omits rex tools from workflow", () => {
       const config = { ...DEFAULT_HENCH_CONFIG(), provider: "cli" as const };

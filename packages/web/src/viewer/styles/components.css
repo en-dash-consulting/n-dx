@@ -241,3 +241,29 @@
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* Glossary definition line — the one-sentence plain-language definition
+   rendered under the field or column header that uses a term (see
+   src/shared/glossary.ts). Sized and dimmed like the other explanatory
+   strips so it reads as annotation rather than as content.
+
+   `text-transform` and `letter-spacing` are reset rather than merely unset:
+   this line is rendered inside a `.data-table th`, which sets uppercase and
+   letter-spacing, and a nested <p> inherits both — leaving a whole sentence
+   shouting in the Files table header. `max-width` is what stops the same
+   sentence from stretching its column. */
+.glossary-line {
+  font-size: var(--font-sm);
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--text-dim);
+  text-transform: none;
+  letter-spacing: normal;
+  margin: var(--space-1) 0 var(--space-3);
+  max-width: 68ch;
+}
+
+.data-table th .glossary-line {
+  margin: var(--space-1) 0 0;
+  max-width: 32ch;
+}

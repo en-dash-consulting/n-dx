@@ -10,7 +10,10 @@
  * - the moment a task is selected — explicitly or automatically — claim it,
  *   before the pre-run gate, the brief, or any LLM turn;
  * - refresh what it holds for as long as it runs;
- * - when the run ends, however it ends, release what it claimed.
+ * - when the run ends, however it ends, release what it claimed — with one
+ *   exception: a completion refused because the run's work is still
+ *   uncommitted *holds* the claim instead, so another worktree cannot pick
+ *   the task up and redo work that already exists. See {@link TaskClaims.hold}.
  *
  * A claim from the same worktree is never a conflict: a retry in the checkout
  * that already holds the task (after a crash, or a second attempt in a loop)
@@ -40,7 +43,7 @@
  */
 
 import { openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
-import type { ClaimsStore, ClaimHolder, TaskClaim } from "../prd/rex-gateway.js";
+import type { ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason } from "../prd/rex-gateway.js";
 import { CLIError } from "../prd/llm-gateway.js";
 
 /** Thrown when an explicitly requested task is being worked on in another worktree. */
@@ -50,14 +53,38 @@ export class TaskClaimedElsewhereError extends CLIError {
 
   constructor(taskId: string, claim: TaskClaim, title?: string) {
     const label = title ? `"${title}" (${taskId})` : taskId;
-    super(
-      `Task ${label} is being worked on in another worktree: ${claim.worktreeRoot} (pid ${claim.pid}, claim expires ${claim.expiresAt}).`,
-      "Pick a different task, wait for that run to finish, or run from that worktree — a run there takes the claim over.",
-    );
+    // A held claim is not a running one, and saying "is being worked on"
+    // about a run that ended hours ago sends the reader looking for a process
+    // that is not there. Name what actually happened instead.
+    const message = claim.reason === "uncommitted-work"
+      ? `Task ${label} is claimed by another worktree: ${claim.worktreeRoot}. ` +
+        `A run there refused to complete it because its work is still uncommitted, ` +
+        `so the claim is held until someone deals with that work — it does not expire.`
+      : `Task ${label} is being worked on in another worktree: ${claim.worktreeRoot} (pid ${claim.pid}, claim expires ${claim.expiresAt}).`;
+    const hint = claim.reason === "uncommitted-work"
+      ? `Commit or discard the work in ${claim.worktreeRoot} and re-run the task there, or free the task with 'ndx claim release ${taskId}'.`
+      : "Pick a different task, wait for that run to finish, or run from that worktree — a run there takes the claim over.";
+    super(message, hint);
     this.name = "TaskClaimedElsewhereError";
     this.taskId = taskId;
     this.claim = claim;
   }
+}
+
+/**
+ * A claim this run held that another worktree has taken over.
+ *
+ * Emitted by the renewal timer, not by anything the run does, so it can
+ * arrive at any point during a run. The run deliberately keeps going — see
+ * {@link TaskClaims.renewNow} — which is exactly why it has to be said out
+ * loud somewhere the operator is looking.
+ */
+export interface ClaimLostEvent {
+  /** When the refusal was observed. */
+  at: string;
+  taskId: string;
+  /** Worktree root that now holds the task. */
+  holderWorktree: string;
 }
 
 /**
@@ -83,6 +110,20 @@ export class TaskClaims {
 
   private renewalTimer: ReturnType<typeof setTimeout> | null = null;
   private renewalActive = false;
+
+  /** The renewal pass currently in flight, if any. {@link hold} waits it out. */
+  private renewalTick: Promise<void> | null = null;
+
+  /** The most recent claim this run lost to another worktree, if any. */
+  claimLost: ClaimLostEvent | null = null;
+
+  /**
+   * Notified when a renewal is refused because another worktree took the
+   * task. The run loop uses this to stamp the run record and save it, so the
+   * dashboard's Sessions tray learns about it while the run is still going
+   * rather than at the end. Set by `recordClaimLoss` in agent/lifecycle.
+   */
+  onClaimLost: ((event: ClaimLostEvent) => void) | null = null;
 
   constructor(
     readonly store: ClaimsStore,
@@ -135,6 +176,62 @@ export class TaskClaims {
     return null;
   }
 
+  /**
+   * Keep a claim this run holds instead of releasing it on the way out, and
+   * record why.
+   *
+   * The one caller is the completion gate refusing to mark a task done
+   * because the run's work is still uncommitted (`agent/lifecycle`). The work
+   * is real and it is in this worktree, so releasing would invite a second
+   * worktree to redo it. Dropping the task from {@link held} is what makes the
+   * hold stick: {@link releaseAll} in the run's `finally` only releases what is
+   * still held, and renewal stops caring about a claim it no longer tracks.
+   *
+   * The claim is re-asserted when the store no longer carries it. That is the
+   * ordinary shape of this path, not an edge case: the spawned agent calls
+   * `rex_update_status(completed)` itself through the rex MCP server, whose
+   * handler releases the claim for every completing status — and it is
+   * exactly that completion this gate then refuses. Observed live on
+   * 2026-09-23 (run 01c990df): the claims file was empty at refusal time, so
+   * `store.hold` had nothing to hold and the task went straight back on the
+   * market with its work uncommitted. Re-claiming is safe because the work is
+   * in this worktree; a claim another worktree took meanwhile refuses the
+   * re-claim, and theirs is not ours to overwrite.
+   *
+   * A no-op in read-only mode, and when this run does not hold the task.
+   * Returns the held claim, or null when the hold could not stick.
+   */
+  async hold(taskId: string, reason: ClaimHoldReason): Promise<TaskClaim | null> {
+    if (this.readOnly || !this.held.has(taskId)) return null;
+    // A renewal tick may already be in flight with this task in its snapshot,
+    // waiting on the claims lock. Landing after the hold, its `store.claim`
+    // would rewrite the claim without the reason — and a reasonless claim
+    // dies with this pid, which is exactly what holding exists to prevent.
+    // Stand renewal down and wait the tick out, so the hold is the last
+    // write this process makes to the claim.
+    const wasRenewing = this.renewalActive;
+    this.stopRenewal();
+    try {
+      await this.renewalTick;
+      let claim = await this.store.hold(taskId, this.holder, reason);
+      if (claim === null) {
+        const attempt = await this.store.claim(taskId, {
+          worktreeRoot: this.holder.worktreeRoot,
+          pid: this.holder.pid,
+        });
+        if (attempt.ok) {
+          claim = await this.store.hold(taskId, this.holder, reason);
+        }
+      }
+      this.held.delete(taskId);
+      this.expiries.delete(taskId);
+      return claim;
+    } finally {
+      // Resume for whatever is left; scheduling stands down when nothing is.
+      if (wasRenewing) this.startRenewal();
+    }
+  }
+
   /** Release one claim this run holds. */
   async release(taskId: string): Promise<void> {
     if (!this.held.delete(taskId)) return;
@@ -176,6 +273,19 @@ export class TaskClaims {
    * Exposed for tests; the timer is the only production caller.
    */
   async renewNow(): Promise<void> {
+    // Recorded so {@link hold} can wait a tick out instead of racing it: a
+    // refresh queued behind the claims lock when the hold is written would
+    // land after it and erase the reason.
+    const tick = this.renewalPass();
+    this.renewalTick = tick;
+    try {
+      await tick;
+    } finally {
+      if (this.renewalTick === tick) this.renewalTick = null;
+    }
+  }
+
+  private async renewalPass(): Promise<void> {
     for (const taskId of [...this.held]) {
       try {
         const result = await this.store.claim(taskId, {
@@ -187,6 +297,18 @@ export class TaskClaims {
         } else {
           this.held.delete(taskId);
           this.expiries.delete(taskId);
+          const event: ClaimLostEvent = {
+            at: new Date().toISOString(),
+            taskId,
+            holderWorktree: result.heldBy.worktreeRoot,
+          };
+          this.claimLost = event;
+          try {
+            this.onClaimLost?.(event);
+          } catch {
+            // A listener that throws must not stop the remaining claims being
+            // refreshed, nor fail a run that is otherwise fine.
+          }
         }
       } catch {
         // Transient: a locked or unwritable store must not fail the run. The

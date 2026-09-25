@@ -6,16 +6,20 @@ export {
   PERMISSION_MODES,
   isPermissionMode,
   DEFAULT_CHECKPOINT_THRESHOLD,
+  DEFAULT_PRUNE_CONFIG,
+  MIN_PRUNE_PAIRS,
 } from "./v1.js";
 
 export type {
   GuardConfig,
   PolicyLimitsConfig,
   RetryConfig,
+  PruneConfig,
   GitSafetyConfig,
   HenchConfig,
   Provider,
   PermissionMode,
+  PromptCacheTtl,
   ProjectLanguage,
   RunStatus,
   ToolCallRecord,
@@ -33,6 +37,7 @@ export type {
   PersistedRuntimeEvent,
   RunReviewRecord,
   RunRecord,
+  RunCommitRecord,
   TaskBrief,
   TaskBriefTask,
   TaskBriefParent,

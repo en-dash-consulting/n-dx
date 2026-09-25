@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initConfig } from "../../../src/store/config.js";
+import { RM_RETRY } from "../../helpers/index.js";
 
 const { mockResolveActor, mockResolveHost } = vi.hoisted(() => ({
   mockResolveActor: vi.fn(async () => "Test Actor <test@example.com>"),
@@ -77,7 +78,7 @@ describe("shared lifecycle", () => {
   });
 
   afterEach(async () => {
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   describe("prepareBrief", () => {
@@ -400,12 +401,60 @@ describe("shared lifecycle", () => {
         model: "claude-sonnet-4-6",
       };
 
-      await handleBudgetExceeded(store, "task-1", run, 100000, 50000);
+      const { checkTokenBudget } = await import("../../../src/agent/lifecycle/token-budget.js");
+      await handleBudgetExceeded(store, "task-1", run, checkTokenBudget(run.tokenUsage, 50000));
 
       expect(run.status).toBe("budget_exceeded");
       expect(run.error).toContain("Token budget exceeded");
-      expect(run.error).toContain("100000");
-      expect(run.error).toContain("50000");
+      expect(run.error).toContain("100,000");
+      expect(run.error).toContain("50,000");
+
+      vi.restoreAllMocks();
+    });
+
+    // Pins the caller contract both loops rely on: the figure in the error
+    // message is whatever checkTokenBudget counted, so a prompt-cached run
+    // must report its cache writes rather than the bare uncached input, and
+    // must name the classes so the number can be read without guessing.
+    it("reports the counted total and names the token classes", async () => {
+      const { handleBudgetExceeded } = await import("../../../src/agent/lifecycle/shared.js");
+      const { checkTokenBudget } = await import("../../../src/agent/lifecycle/token-budget.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+      const { randomUUID } = await import("node:crypto");
+
+      const store = createStore("file", join(projectDir, ".rex"));
+      vi.spyOn(console, "log");
+      await store.updateItem("task-1", { status: "in_progress" });
+
+      const tokenUsage = {
+        input: 534,
+        output: 40,
+        cacheCreationInput: 876_000,
+        cacheReadInput: 34_100_000,
+      };
+      const run = {
+        id: randomUUID(),
+        taskId: "task-1",
+        taskTitle: "Test task",
+        startedAt: new Date().toISOString(),
+        status: "running" as const,
+        turns: 83,
+        tokenUsage,
+        toolCalls: [],
+        model: "claude-sonnet-4-6",
+      };
+
+      const check = checkTokenBudget(tokenUsage, 200_000);
+      expect(check.exceeded).toBe(true);
+
+      await handleBudgetExceeded(store, "task-1", run, check);
+
+      // 534 + 876_000 + 40 — not the 574 an uncached sum reports, and not the
+      // 34,976,574 that counting cache reads at face value produced.
+      expect(run.error).toBe(
+        "Token budget exceeded: 876,574 of 200,000 " +
+          "(uncached input + cache writes + output; 34,100,000 cache-read tokens not counted)",
+      );
 
       vi.restoreAllMocks();
     });
@@ -790,6 +839,95 @@ describe("shared lifecycle", () => {
       });
 
       expect(result.run.invocationContext).toBe("api");
+    });
+  });
+
+  describe("recordClaimLoss", () => {
+    const OTHER = "/repo/other-worktree";
+
+    /**
+     * A real TaskClaims over a scripted store: the first claim succeeds, every
+     * later one (the renewals) is refused by another worktree. Real rather
+     * than a bare `{ onClaimLost }` object, so the test pins the wiring the
+     * loops depend on — renewal refusing → listener → run file on disk.
+     */
+    async function claimsThatLoseTask(taskId: string) {
+      const { TaskClaims } = await import("../../../src/process/task-claims.js");
+      const claimFor = (worktreeRoot: string) => ({
+        taskId,
+        worktreeRoot,
+        pid: 1,
+        host: "h",
+        claimedAt: "2026-09-23T00:00:00.000Z",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      });
+      let calls = 0;
+      const store = {
+        path: "/fake/claims.json",
+        claim: vi.fn(async () =>
+          calls++ === 0
+            ? { ok: true as const, claim: claimFor("/repo/this") }
+            : { ok: false as const, heldBy: claimFor(OTHER) },
+        ),
+      };
+      const claims = new TaskClaims(store as never, { worktreeRoot: "/repo/this", pid: process.pid });
+      expect(await claims.claim(taskId)).toBeNull();
+      return claims;
+    }
+
+    async function readSavedRun(id: string): Promise<Record<string, unknown>> {
+      const { readFile } = await import("node:fs/promises");
+      return JSON.parse(await readFile(join(henchDir, "runs", `${id}.json`), "utf-8"));
+    }
+
+    it("stamps claimLost on the run and saves it when renewal is refused", async () => {
+      const { initRunRecord, recordClaimLoss } = await import("../../../src/agent/lifecycle/shared.js");
+      const { run } = await initRunRecord({ taskId: "task-1", taskTitle: "Test task", model: "sonnet", henchDir, vendor: "claude" });
+      const claims = await claimsThatLoseTask("task-1");
+
+      recordClaimLoss(claims, run, henchDir);
+      await claims.renewNow();
+
+      expect(run.claimLost).toMatchObject({ taskId: "task-1", holderWorktree: OTHER });
+      await vi.waitFor(async () => {
+        const saved = await readSavedRun(run.id);
+        expect(saved.claimLost).toEqual({ at: expect.any(String), taskId: "task-1", holderWorktree: OTHER });
+      });
+    });
+
+    it("stamps a loss observed before the listener was attached", async () => {
+      const { initRunRecord, recordClaimLoss } = await import("../../../src/agent/lifecycle/shared.js");
+      const { run } = await initRunRecord({ taskId: "task-1", taskTitle: "Test task", model: "sonnet", henchDir, vendor: "claude" });
+      const claims = await claimsThatLoseTask("task-1");
+
+      // Refused between the claim and the loop attaching — no listener yet.
+      await claims.renewNow();
+      expect(run.claimLost).toBeUndefined();
+
+      recordClaimLoss(claims, run, henchDir);
+
+      expect(run.claimLost).toMatchObject({ taskId: "task-1", holderWorktree: OTHER });
+      await vi.waitFor(async () => {
+        expect((await readSavedRun(run.id)).claimLost).toMatchObject({ taskId: "task-1", holderWorktree: OTHER });
+      });
+    });
+
+    it("does not stamp an earlier loss of a different task", async () => {
+      const { initRunRecord, recordClaimLoss } = await import("../../../src/agent/lifecycle/shared.js");
+      const { run } = await initRunRecord({ taskId: "task-1", taskTitle: "Test task", model: "sonnet", henchDir, vendor: "claude" });
+      const claims = await claimsThatLoseTask("task-other");
+      await claims.renewNow();
+
+      recordClaimLoss(claims, run, henchDir);
+
+      expect(run.claimLost).toBeUndefined();
+    });
+
+    it("is a no-op without claims", async () => {
+      const { initRunRecord, recordClaimLoss } = await import("../../../src/agent/lifecycle/shared.js");
+      const { run } = await initRunRecord({ taskId: "task-1", taskTitle: "Test task", model: "sonnet", henchDir, vendor: "claude" });
+      expect(() => recordClaimLoss(undefined, run, henchDir)).not.toThrow();
+      expect(run.claimLost).toBeUndefined();
     });
   });
 });

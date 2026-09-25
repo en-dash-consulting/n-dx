@@ -1982,6 +1982,33 @@ async function handleUsage(rest) {
   exitWithCleanup(0);
 }
 
+/**
+ * `ndx claim` — see and free cross-worktree task claims.
+ *
+ * Forwarded verbatim, but the init check must look at the directory rex will
+ * act on, not process.cwd() — `ndx claim list <dir>` run from outside the
+ * project used to fail the check even though rex resolves the argument
+ * itself. Where the optional [dir] sits depends on the subcommand, so this
+ * mirrors the slicing rex's own dispatch does (packages/rex/src/cli/index.ts,
+ * case "claim"): `claim list [dir]` and `claim release --all [dir]` put it
+ * second, `claim release <taskId> [dir]` third.
+ */
+async function handleClaim(rest) {
+  const positionals = rest.filter((a) => !a.startsWith("-"));
+  // Rex's flag parser reads bare `--all` and `--all=true` as the same flag —
+  // recognize both spellings here, or the [dir] slicing disagrees with the
+  // slicing rex itself will do and the init check validates the wrong
+  // directory.
+  const releaseAll = rest.some((a) => a === "--all" || a === "--all=true");
+  const dirArgs =
+    positionals[0] === "release" && !releaseAll
+      ? positionals.slice(2)
+      : positionals.slice(1);
+  requireInit(resolveDir(dirArgs), [".rex"]);
+  await runOrDie(tools.rex, ["claim", ...rest]);
+  exitWithCleanup(0);
+}
+
 async function handleSync(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, [".rex"]);
@@ -2888,6 +2915,7 @@ const COMMAND_DISPATCH = new Map([
   ["status",            handleStatus],
   ["usage",             handleUsage],
   ["sync",              handleSync],
+  ["claim",             handleClaim],
   ["ci",                handleCI],
   ["dev",               handleDev],
   ["start",             (rest) => handleStart(rest, "start")],

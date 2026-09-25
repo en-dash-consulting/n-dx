@@ -61,8 +61,9 @@ export {
   CLAIMS_DIRNAME,
   CLAIMS_FILENAME,
 } from "./store/claims.js";
-export type { ClaimsStore, ClaimsStoreOptions, ClaimOptions, ClaimResult, ClaimHolder, ClaimOwner, TaskClaim } from "./store/claims.js";
-export type { PRDStore } from "./store/contracts.js";
+export type { ClaimsStore, ClaimsStoreOptions, ClaimOptions, ClaimResult, ClaimHolder, ClaimOwner, TaskClaim, ClaimHoldReason, ReleaseOptions } from "./store/claims.js";
+export type { PRDStore, SaveFileReport } from "./store/contracts.js";
+export { takeSaveFileReport } from "./store/contracts.js";
 
 // ---- Markdown serializer / parser ------------------------------------------
 
@@ -83,10 +84,20 @@ export {
   slugifyTitle,
   resolveSiblingSlugs,
   findTreeIdentityFaults,
+  findNonConformingSlugs,
+  SLUG_RULE_VERSION,
 } from "./store/folder-tree-serializer.js";
+export {
+  assertSlugRuleWritable,
+  checkTreeConformance,
+  readSlugRuleMarker,
+  SlugRuleMismatchError,
+} from "./store/slug-rule-guard.js";
+export type { TreeConformanceRefusal } from "./store/slug-rule-guard.js";
 export type {
   SerializeResult,
   TreeIdentityFault,
+  SlugMismatch,
 } from "./store/folder-tree-serializer.js";
 
 // ---- Title-to-filename normalization ----------------------------------------
@@ -406,6 +417,14 @@ export type {
   ItemTokenTotals,
   ItemTokenAggregation,
 } from "./core/item-token-rollup.js";
+
+// ---- Core: per-model cost estimation ------------------------------------------
+// The dashboard aggregates its own token shape (it has a `web` bucket) but must
+// quote the same dollar figure as `ndx usage`. It imports the arithmetic — not
+// a copy of it — through its rex gateway.
+
+export { estimateCostFromTotals, estimateCost, aggregateTokenUsage } from "./core/token-usage.js";
+export type { CostEstimate, ModelCostLine, AggregateTokenUsage } from "./core/token-usage.js";
 
 // ---- Core: per-item duration rollup -----------------------------------------
 

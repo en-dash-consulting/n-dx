@@ -8,8 +8,9 @@ import { exec as execCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
-import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { PRD_TREE_DIRNAME, openClaimsStore, resolveClaimHolder } from "../../src/prd/rex-gateway.js";
+import { TaskClaims } from "../../src/process/task-claims.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -70,6 +71,7 @@ describe("finalizeRun — uncommitted-work gate", () => {
     // picks up whatever it left behind. The commit-prompt path (autoCommit
     // false) has its own describe below.
     autoCommit = true,
+    claims?: TaskClaims,
   ): Promise<void> {
     const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
     await (finalizeRun as Function)({
@@ -80,6 +82,7 @@ describe("finalizeRun — uncommitted-work gate", () => {
       skipFullTestGate: true,
       autonomous: true,
       store,
+      claims,
     });
   }
 
@@ -131,7 +134,7 @@ describe("finalizeRun — uncommitted-work gate", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("completes as before when the agent committed its work", async () => {
@@ -200,6 +203,79 @@ describe("finalizeRun — uncommitted-work gate", () => {
 
     expect(run.status).toBe("completed");
     expect(statuses).toEqual(["completed"]);
+  });
+
+  /**
+   * The cross-worktree claim across the refusal (PR E, audit item c943aa11).
+   *
+   * The refusal must leave the claims store holding the task with reason
+   * `uncommitted-work` — through the run's own `releaseAll` in its `finally` —
+   * so another worktree cannot pick the task up and redo work that is sitting
+   * uncommitted here. Observed broken on 2026-09-23 (run 01c990df): the
+   * spawned agent's own `rex_update_status(completed)` released the claim
+   * through the MCP server mid-run, and the hold at refusal time then found
+   * nothing to hold.
+   */
+  describe("cross-worktree claim on refusal", () => {
+    async function readClaimEntries() {
+      return openClaimsStore(projectDir).readClaims();
+    }
+
+    it("a refused completion leaves the claim held with reason uncommitted-work", async () => {
+      const claims = TaskClaims.forProject(projectDir);
+      expect(await claims.claim(taskId)).toBeNull();
+      await writeFile(join(projectDir, "leaked.ts"), "export const leaked = true;\n", "utf-8");
+
+      const run = buildCompletedRun();
+      await runFinalize(run, buildStore(), true, claims);
+      // The run's `finally` — must not free what the refusal held. This is
+      // the assertion that fails if the hold in finalizeRun were replaced
+      // with a release.
+      await claims.releaseAll();
+
+      expect(run.status).toBe("failed");
+      const entries = await readClaimEntries();
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({ taskId, reason: "uncommitted-work" });
+    });
+
+    it("re-asserts a claim the agent's own status write already released (run 01c990df)", async () => {
+      const claims = TaskClaims.forProject(projectDir);
+      await claims.claim(taskId);
+      // What the CLI provider's spawned agent does mid-run: it calls
+      // rex_update_status(completed) through the rex MCP server, whose
+      // handler releases the claim for every completing status
+      // (CLAIM_RELEASING_STATUSES in rex's mcp-tools). The completion is then
+      // refused here, after the claim is already gone.
+      const holder = resolveClaimHolder(projectDir);
+      await openClaimsStore(projectDir).release(taskId, { worktreeRoot: holder.worktreeRoot });
+      expect(await readClaimEntries()).toHaveLength(0);
+
+      await writeFile(join(projectDir, "leaked.ts"), "export const leaked = true;\n", "utf-8");
+      const run = buildCompletedRun();
+      await runFinalize(run, buildStore(), true, claims);
+      await claims.releaseAll();
+
+      expect(run.status).toBe("failed");
+      const entries = await readClaimEntries();
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({ taskId, reason: "uncommitted-work" });
+    });
+
+    it("an ordinary completion still releases the claim", async () => {
+      const claims = TaskClaims.forProject(projectDir);
+      await claims.claim(taskId);
+      await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+      await execAsync("git add .", { cwd: projectDir });
+      await execAsync('git commit -m "feat: the work"', { cwd: projectDir });
+
+      const run = buildCompletedRun();
+      await runFinalize(run, buildStore(), true, claims);
+      await claims.releaseAll();
+
+      expect(run.status).toBe("completed");
+      expect(await readClaimEntries()).toHaveLength(0);
+    });
   });
 
   /**

@@ -29,11 +29,14 @@ import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "../..");
 
-const { CONFIG_FIELD_META, validateFieldValue, setConfigValue } = await import(
+const { CONFIG_FIELD_META, CONFIG_GROUP_DEFAULTS, completeConfigGroups, validateFieldValue, setConfigValue } = await import(
   join(ROOT, "packages/web/dist/server/hench-config-fields.js")
 );
 const { HenchConfigSchema } = await import(
   join(ROOT, "packages/hench/dist/schema/validate.js")
+);
+const { DEFAULT_HENCH_CONFIG } = await import(
+  join(ROOT, "packages/hench/dist/schema/v1.js")
 );
 
 /** A config hench accepts, used as the base every probe is applied to. */
@@ -145,5 +148,63 @@ describe("dashboard hench-config gate agrees with hench's schema", () => {
       parsed.success,
       parsed.success ? "" : JSON.stringify(parsed.error.issues),
     ).toBe(true);
+  });
+
+  describe("nested group completion", () => {
+    // The drift this pins: web's CONFIG_GROUP_DEFAULTS mirrors hench's
+    // DEFAULT_HENCH_CONFIG() because web cannot import hench at runtime. If
+    // hench changes a default, the dashboard would silently write stale values
+    // into completed groups.
+    it("web's group defaults equal hench's config defaults", () => {
+      const henchDefaults = DEFAULT_HENCH_CONFIG();
+      for (const group of Object.keys(CONFIG_GROUP_DEFAULTS)) {
+        expect(CONFIG_GROUP_DEFAULTS[group], `group "${group}"`).toEqual(henchDefaults[group]);
+      }
+      // Iterating web's keys alone would pass vacuously if the mirror lost a
+      // group, so name the one that must be there. `prune` is deliberately not
+      // mirrored — see the note under CONFIG_GROUP_DEFAULTS.
+      expect(Object.keys(CONFIG_GROUP_DEFAULTS)).toEqual(["retry"]);
+    });
+
+    // A group completed from web's mirror must satisfy hench's cross-field
+    // refinements, not just its per-field types.
+    it("a config completed from web's mirror alone still loads", () => {
+      for (const group of Object.keys(CONFIG_GROUP_DEFAULTS)) {
+        const config = baseConfig();
+        config[group] = {};
+        completeConfigGroups(config);
+
+        const parsed = HenchConfigSchema.safeParse(JSON.parse(JSON.stringify(config)));
+        expect(
+          parsed.success,
+          `an empty "${group}" completed from web's defaults leaves a config hench rejects: ` +
+          (parsed.success ? "" : JSON.stringify(parsed.error.issues)),
+        ).toBe(true);
+      }
+    });
+
+    // The regression this pins: writing one retry.* key into a config with no
+    // retry block used to leave a one-member group on disk that hench refused,
+    // and `ndx work` failed with NDX_CLI_INVALID_CONFIGURATION until the file
+    // was hand-edited. Every dashboard write path now runs
+    // completeConfigGroups before serializing.
+    it("a single group-member write into a config without the group still loads", () => {
+      for (const field of CONFIG_FIELD_META) {
+        const [group] = field.path.split(".");
+        if (!(group in CONFIG_GROUP_DEFAULTS) || !field.path.includes(".")) continue;
+
+        const config = baseConfig();
+        delete config[group];
+        setConfigValue(config, field.path, CONFIG_GROUP_DEFAULTS[group][field.path.split(".")[1]]);
+        completeConfigGroups(config);
+
+        const parsed = HenchConfigSchema.safeParse(JSON.parse(JSON.stringify(config)));
+        expect(
+          parsed.success,
+          `${field.path} written alone leaves a config hench rejects: ` +
+          (parsed.success ? "" : JSON.stringify(parsed.error.issues)),
+        ).toBe(true);
+      }
+    });
   });
 });

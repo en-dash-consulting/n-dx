@@ -13,7 +13,11 @@ import { resolveStore, ensureLegacyPrdMigrated, LegacyPrdMigrationError } from "
 import {
   findNonConformingSlugs,
   findTreeIdentityFaults,
+  readSlugRuleMarker,
+  parseFolderTree,
   PRD_TREE_DIRNAME,
+  SLUG_RULE_VERSION,
+  SLUG_RULE_MARKER_MISSING,
 } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { REX_DIR } from "./constants.js";
@@ -259,7 +263,9 @@ export async function cmdValidate(
     // Slug conformance: catch a tree rewritten by a foreign rex build. Every
     // other check reads item fields, so a whole-tree re-slug — lossless
     // renames, untouched content — passes them all and shows up only as an
-    // 800-file diff in whatever branch is open.
+    // 800-file diff in whatever branch is open. This is an error, not a
+    // warning: a non-conformant tree means the *next* write rewrites it again,
+    // so silence here is exactly what let a 1,570-file re-slug merge to main.
     const slugMismatches = await findNonConformingSlugs(
       doc.items,
       join(dir, REX_DIR, PRD_TREE_DIRNAME),
@@ -268,15 +274,94 @@ export async function cmdValidate(
       checks.push({
         name: "tree slug convention",
         pass: false,
-        severity: "warn",
-        errors: slugMismatches.slice(0, 10).map(
-          (m) =>
-            `Path does not match the current slug rule: "${m.found}" should be ` +
-            `"${m.expected}" in ${m.parentDir} (${m.title}). ` +
-            `A rex build using a different slug rule may have rewritten the tree; ` +
-            `run 'rex migrate-slugs' to restore it.`,
-        ),
+        severity: "error",
+        errors: [
+          ...slugMismatches.slice(0, 10).map(
+            (m) =>
+              `Path does not match the current slug rule: "${m.found}" should be ` +
+              `"${m.expected}" in ${m.parentDir} (${m.title}).`,
+          ),
+          `A rex build using a different slug rule wrote this tree; run rex migrate-slugs on the default branch.`,
+        ],
       });
+    }
+
+    // Slug-rule marker: the same fault as above, caught by declaration rather
+    // than by inspection. The path scan can only see a rule it can reproduce —
+    // a tree written by a *future* rule looks conformant to nothing this build
+    // knows how to compute, so the recorded version is the only evidence. This
+    // is an error for the same reason: the tree's next writer rewrites it.
+    const slugRuleMarker = await readSlugRuleMarker(join(dir, REX_DIR));
+    if (slugRuleMarker !== undefined && slugRuleMarker !== SLUG_RULE_VERSION) {
+      checks.push({
+        name: "tree slug rule marker",
+        pass: false,
+        severity: "error",
+        errors: [
+          `Tree was written under slug rule ${slugRuleMarker}, but this build implements slug rule ${SLUG_RULE_VERSION}.`,
+          `Every write from this build would rewrite every path. Run rex migrate-slugs on the default branch, ` +
+            `or use a rex build that implements rule ${slugRuleMarker}.`,
+        ],
+      });
+    }
+
+    // Absent marker. Judged by the paths, exactly as the store guard judges it
+    // — a clean scan is adopted by the next write, so reporting it as an error
+    // would fail CI on every upgraded checkout for a fault the next save
+    // repairs by itself. It is still reported, at warning severity, because
+    // adoption is a build claiming a tree it cannot prove it wrote and that
+    // should be visible in the validate output rather than only in the save's
+    // stderr.
+    //
+    // A dirty scan is an error, and is what makes the store's refusal
+    // reviewable: a tree that no longer says who wrote it *and* does not match
+    // this build's rule fails CI here rather than surfacing as a refused save
+    // mid-run.
+    //
+    // Guarded on the items **the folder tree itself holds**, not on
+    // `doc.items`, and the difference is the whole correctness of this check.
+    // `doc` may have been loaded from a legacy `prd.md` or a branch-scoped
+    // file, which `ensureLegacyPrdMigrated` above only converts when the
+    // source is `prd.json` — so a project still on `prd.md` reaches here with
+    // items and no tree at all. Judged by `doc.items` it failed validation and
+    // was told to run `rex migrate-slugs`, which refuses a project with no
+    // tree: an error with no way out of it, on a checkout that had nothing
+    // wrong with it.
+    //
+    // Reading the tree makes the predicate identical to the store guard's, so
+    // validate is a faithful preview of what the next write will do rather
+    // than a second opinion that can disagree with it.
+    const treeRoot = join(dir, REX_DIR, PRD_TREE_DIRNAME);
+    const { items: treeItems } = await parseFolderTree(treeRoot);
+    if (slugRuleMarker === undefined && treeItems.length > 0) {
+      // Scanned against the tree's own items for the same reason the block is
+      // guarded on them: this is a statement about what is on disk, and must
+      // match the store guard's verdict exactly so validate previews the next
+      // write rather than second-guessing it.
+      const unmarkedMismatches = await findNonConformingSlugs(treeItems, treeRoot);
+      checks.push(
+        unmarkedMismatches.length === 0
+          ? {
+              name: "tree slug rule marker",
+              pass: false,
+              severity: "warn",
+              errors: [
+                `The PRD tree carries no slug-rule marker; every path matches rule ${SLUG_RULE_VERSION}, ` +
+                  `so the next write adopts the tree and records it — run rex migrate-slugs to verify.`,
+              ],
+            }
+          : {
+              name: "tree slug rule marker",
+              pass: false,
+              severity: "error",
+              errors: [
+                `The PRD tree carries no slug-rule marker — ${SLUG_RULE_MARKER_MISSING}.`,
+                `${unmarkedMismatches.length} path(s) do not match rule ${SLUG_RULE_VERSION} either, so ` +
+                  `nothing identifies the build that wrote them. rex migrate-slugs brings every path onto ` +
+                  `rule ${SLUG_RULE_VERSION} and records the marker in the same write.`,
+              ],
+            },
+      );
     }
   }
 

@@ -27,7 +27,7 @@ import type { PRDStore, PRDItem } from "../../src/prd/rex-gateway.js";
 import { toolRexUpdateStatus } from "../../src/tools/rex.js";
 import { finalizeRun } from "../../src/agent/lifecycle/shared.js";
 import { initConfig } from "../../src/store/config.js";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 import type { RunRecord } from "../../src/schema/index.js";
 
 const run = promisify(execFile);
@@ -145,7 +145,7 @@ describe("withdrawCompletionClaim — ancestor reopening", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   describe("ancestors the run's own cascade closed", () => {

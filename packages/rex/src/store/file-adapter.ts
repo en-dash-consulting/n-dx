@@ -1,5 +1,5 @@
 import { readFile, writeFile, appendFile, mkdir, rename, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { SCHEMA_VERSION } from "../schema/index.js";
@@ -18,6 +18,7 @@ import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import { atomicWrite } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
 import { parseTreeMeta, treeMetaContents } from "./tree-meta.js";
+import { assertSlugRuleWritable, assertSlugRuleAdoptable } from "./slug-rule-guard.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
 import {
   PRD_MARKDOWN_FILENAME,
@@ -29,7 +30,8 @@ import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
-import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
+import type { PRDStore, StoreCapabilities, WriteOptions, SaveFileReport } from "./contracts.js";
+import { buildSaveFileReport, mergeSaveFileReports } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
 export const PRD_FILENAME = "prd.json";
@@ -47,6 +49,8 @@ export class FileStore implements PRDStore {
    * last load or save left on disk — see FolderTreeStore.loadedFiles.
    */
   private loadedFiles: ReadonlyMap<string, string> = new Map();
+  /** Files written/deleted by saves since the last {@link takeSaveFileReport}. */
+  private pendingSaveReport: SaveFileReport | null = null;
   private itemToFile: Map<string, string> = new Map();
   private fileMetadata: Map<string, { schema: string; title: string }> = new Map();
   private ownershipLoaded = false;
@@ -272,19 +276,7 @@ export class FileStore implements PRDStore {
       if (!valid.ok) {
         throw new Error(`Invalid document after mutation: ${valid.errors.message}`);
       }
-      await mkdir(this.treeRoot, { recursive: true });
-      await atomicWrite(
-        this.path(TREE_META_FILENAME),
-        JSON.stringify(treeMetaContents(doc)),
-      );
-      const written = await serializeFolderTree(doc.items, this.treeRoot, {
-        loadedAt: this.loadedAt,
-        loadedFiles: this.loadedFiles,
-      });
-      // A completed save makes this instance's view current again — see writeFolderTree.
-      this.loadedAt = Date.now();
-      this.loadedFiles = written.fileDigests;
-      this.rebuildOwnershipFromItems(doc);
+      await this.writeFolderTree(doc);
       return result;
     });
   }
@@ -495,13 +487,30 @@ export class FileStore implements PRDStore {
     );
   }
 
-  /** Serialize the document to the folder tree. Callers must hold the tree lock. */
-  private async writeFolderTree(doc: PRDDocument): Promise<void> {
+  /**
+   * Serialize the document to the folder tree. Callers must hold the tree lock.
+   *
+   * @param adoptSlugRule Skip the ordinary slug-rule guard and take ownership
+   *   of the tree under this build's rule instead. Only `rex migrate-slugs`
+   *   may pass this — see {@link adoptSlugRule}. The direction check still
+   *   runs; only the *comparison* changes, from "matches exactly" to "is not
+   *   newer".
+   */
+  private async writeFolderTree(doc: PRDDocument, adoptSlugRule = false): Promise<void> {
+    // Before mkdir, before the sidecar, before the serializer: a refusal has
+    // to leave the tree byte-identical, which it only does if nothing has been
+    // written yet. Both branches read the marker fresh, here, under the lock
+    // `writeFolderTree` is always called while holding — reading it any
+    // earlier leaves a window where a concurrent writer's newer marker is
+    // read, then silently overwritten by this write once it takes the lock.
+    if (adoptSlugRule) {
+      await assertSlugRuleAdoptable(this.rexDir);
+    } else {
+      await assertSlugRuleWritable(this.rexDir, this.treeRoot);
+    }
     await mkdir(this.treeRoot, { recursive: true });
-    await atomicWrite(
-      this.path(TREE_META_FILENAME),
-      JSON.stringify(treeMetaContents(doc)),
-    );
+    const metaPath = this.path(TREE_META_FILENAME);
+    await atomicWrite(metaPath, JSON.stringify(await treeMetaContents(metaPath, doc)));
     const written = await serializeFolderTree(doc.items, this.treeRoot, {
       loadedAt: this.loadedAt,
       loadedFiles: this.loadedFiles,
@@ -509,9 +518,25 @@ export class FileStore implements PRDStore {
     // A completed save makes this instance's view of the tree current again:
     // its own writes must not read as "another writer's work" on the next save,
     // and the files it just wrote are the ones it can vouch for relocating.
-    this.loadedAt = Date.now();
+    // Folding in the written files' own mtimes matters on Windows, where the
+    // file clock can run ahead of Date.now() by more than the guard's
+    // tolerance — a bare Date.now() intermittently read this save's own files
+    // as newer than the save.
+    this.loadedAt = Math.max(Date.now(), written.maxWrittenMtimeMs);
     this.loadedFiles = written.fileDigests;
+    // Accumulated rather than replaced: a caller may save several times
+    // between commit points and needs the union at take time.
+    this.pendingSaveReport = mergeSaveFileReports(
+      this.pendingSaveReport,
+      buildSaveFileReport(written, dirname(this.rexDir)),
+    );
     this.rebuildOwnershipFromItems(doc);
+  }
+
+  takeSaveFileReport(): SaveFileReport | null {
+    const report = this.pendingSaveReport;
+    this.pendingSaveReport = null;
+    return report;
   }
 
   /**
@@ -536,6 +561,41 @@ export class FileStore implements PRDStore {
   }
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
+    return this.runTransaction(fn);
+  }
+
+  /**
+   * Rewrite the whole tree under this build's slug rule and record the marker.
+   *
+   * The one sanctioned way past {@link assertSlugRuleWritable}, and the reason
+   * `rex migrate-slugs` can do its job at all: every other writer is refused
+   * precisely because it would re-slug the tree, which is what this command
+   * exists to do deliberately.
+   *
+   * Rewrite and marker land in the same locked write, so there is no window in
+   * which the marker claims a rule the paths do not yet follow — a crash
+   * between the two would disarm the guard on a tree it was meant to protect.
+   *
+   * Bounded to the adopt-older direction by {@link assertSlugRuleAdoptable},
+   * checked by {@link writeFolderTree} under the lock, ahead of `mkdir` — not
+   * here. A pre-lock check here would read the marker, then race a concurrent
+   * writer that records a newer one before this call takes the lock; the stale
+   * "adoptable" verdict would let the migration overwrite it anyway.
+   */
+  async adoptSlugRule(): Promise<void> {
+    await this.runTransaction(async () => {}, true);
+  }
+
+  /**
+   * `withTransaction` plus the knob the public contract has no place for.
+   *
+   * `adoptSlugRule` suppresses the slug-rule guard for this one write. It is
+   * passed by {@link adoptSlugRule} and nothing else.
+   */
+  private async runTransaction<T>(
+    fn: (doc: PRDDocument) => Promise<T>,
+    adoptSlugRule = false,
+  ): Promise<T> {
     const folderTreeLockPath = prdLockPath(this.rexDir);
     // Resolved before the lock is taken: the first call in a process shells
     // out to git, and that is not work to do while holding the PRD lock. The
@@ -557,7 +617,7 @@ export class FileStore implements PRDStore {
       // would deadlock on the in-process mutex, and an instance flag to skip
       // its lock would let a concurrent direct saveDocument bypass the lock
       // while a transaction is open.
-      await this.writeFolderTree(doc);
+      await this.writeFolderTree(doc, adoptSlugRule);
       return result;
     });
   }

@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
-import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION, SELF_HEAL_TAG } from "../../prd/rex-gateway.js";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
@@ -14,10 +14,12 @@ import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
 import {
   PRD_COMMIT_PATHS,
+  deletedAmong,
   findUncommittedWork,
   formatLoopRefusal,
   formatResetDeferredCommitSkipped,
   listUncommittedPrdPaths,
+  prepareRecoveryPathspecs,
 } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims } from "../../process/task-claims.js";
@@ -27,7 +29,7 @@ import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.j
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
-import { info, result as output, setQuiet } from "../output.js";
+import { info, result as output, setQuiet, warn } from "../output.js";
 import { section, detail } from "../../types/output.js";
 import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
 import {
@@ -363,6 +365,92 @@ function countTasksByStatus(items: PRDItem[], statuses: string[]): number {
   return count;
 }
 
+/**
+ * Refuse the run when this build's first PRD write would re-slug the tree.
+ *
+ * An autonomous run is a PRD writer: it records the status transition when it
+ * finishes the task. So a run started with a build whose slug rule disagrees
+ * with the tree does not merely fail — it succeeds, and ships a whole-tree
+ * rewrite inside a feature branch under a "task completed" message. That is
+ * the 2026-09-17 incident (1,570 renamed files) with the agent as the sweeper.
+ *
+ * The store's write guard would refuse that write, but only after the run had
+ * claimed the task, spent its tokens and edited the code. This gate asks the
+ * same question first, and answers it by not starting.
+ *
+ * There is deliberately **no override flag**. A sweep is never an acceptable
+ * thing to do from inside a run, so an escape hatch would only ever be used to
+ * cause the damage the gate exists to prevent; the fix is always
+ * `rex migrate-slugs` on the default branch, run on its own.
+ *
+ * Applies to `--dry-run` too: a preview whose refusal is hidden is a preview
+ * that tells you the run would have worked.
+ *
+ * @throws {CLIError} When the tree does not match this build's slug rule.
+ */
+export async function assertPrdTreeConformant(rexDir: string): Promise<void> {
+  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
+  // No folder tree, nothing to be non-conformant. Checked before the load
+  // because loading a project that has no PRD at all throws, and reporting
+  // that is the job of the task selection this gate runs ahead of.
+  if (!existsSync(treeRoot)) return;
+
+  const store = await resolveStore(rexDir);
+  const doc = await store.loadDocument();
+  const refusal = await checkTreeConformance(rexDir, treeRoot, doc.items);
+  if (!refusal) return;
+
+  throw new CLIError(
+    refusal.message,
+    "This run would write the PRD when it completed the task, carrying the rewrite " +
+      "into your branch under a 'task completed' commit. Nothing has been claimed or " +
+      "written. Migrate the tree on the default branch, then start the run again.",
+  );
+}
+
+/** Re-checks the PRD tree before a task starts. @see createPerTaskTreeGate */
+export type PerTaskTreeGate = () => Promise<void>;
+
+/**
+ * The per-task form of {@link assertPrdTreeConformant}, run at the top of
+ * `runOne` so every task in an invocation is gated, not only the first.
+ *
+ * The pre-flight check answers the question once, before the run begins. A
+ * `--loop` or `--epic-by-epic` invocation outlives that answer: another
+ * worktree writes the tree, an operator pulls, a migration lands, and from the
+ * second task onward the run is working against a tree nobody asked about
+ * again. Its own completion write then re-slugs whatever drifted — the run
+ * becomes the sweeper, which is the thing the gate exists to prevent.
+ *
+ * Placed inside `runOne` rather than in the three loop bodies deliberately.
+ * `runOne` is the single funnel — `runIterations`, `runLoop` and
+ * `runEpicByEpic` each call it, and a fix applied at the loops would cover
+ * some call sites and leave others unguarded while still passing a test
+ * written against the covered one.
+ *
+ * `alreadyChecked` is consumed once: `cmdRun` runs the pre-flight check before
+ * the commit gate and before `--reset-deferred` (both of which must not happen
+ * ahead of a refusal), so the first task is already covered and re-parsing the
+ * tree for it would double a single-task run's cost for nothing. Every task
+ * after the first re-checks.
+ *
+ * @param rexDir The `.rex` directory to re-check.
+ * @param alreadyChecked True when the caller already ran the pre-flight check.
+ */
+export function createPerTaskTreeGate(
+  rexDir: string,
+  alreadyChecked = false,
+): PerTaskTreeGate {
+  let satisfiedByPreflight = alreadyChecked;
+  return async () => {
+    if (satisfiedByPreflight) {
+      satisfiedByPreflight = false;
+      return;
+    }
+    await assertPrdTreeConformant(rexDir);
+  };
+}
+
 export interface ResetDeferredOptions {
   /**
    * List what would be reset and write nothing.
@@ -453,14 +541,25 @@ export async function resetDeferredAndCommit(
   if (dryRun) return resetCount;
 
   if (prdDirtyBeforeReset.length > 0) {
-    info(formatResetDeferredCommitSkipped(prdDirtyBeforeReset));
+    const deleted = deletedAmong(projectDir, prdDirtyBeforeReset);
+    info(formatResetDeferredCommitSkipped(
+      prdDirtyBeforeReset,
+      deleted,
+      await prepareRecoveryPathspecs(projectDir, prdDirtyBeforeReset, deleted),
+    ));
     return resetCount;
   }
 
   // Commit the reset's own PRD-tree write immediately so the pre-run commit
   // gate sees a clean tree instead of refusing the very run --reset-deferred
-  // exists to resume (GitHub #365).
-  const commitResult = await commitResetDeferredChanges(projectDir, resetCount);
+  // exists to resume (GitHub #365). The save report is drained here so the
+  // commit stages exactly the files the per-task resets wrote — the store
+  // saves once per reset task, and the report accumulates across them.
+  const commitResult = await commitResetDeferredChanges(
+    projectDir,
+    resetCount,
+    takeSaveFileReport(store),
+  );
   if (commitResult.error) {
     throw commitResult.error;
   }
@@ -770,10 +869,30 @@ function hasPrdStatusUpdate(toolCalls: ToolCallRecord[]): boolean {
  *   "Changes: 3 files (2 code, 1 test) + PRD status update"
  *   "Changes: PRD status update only (no code changes)"
  *   "Changes: 1 file (1 docs)"
+ *   "Changes: 2 commits"
+ *   "Changes: 7 uncommitted paths"
+ *   "Changes: 1 commit, 1 uncommitted path"
+ *
+ * `commits` and `uncommittedPaths` are both authoritative over the
+ * toolCalls-derived heuristic below, which only recognizes changes it can
+ * infer from tool calls: a run can land a commit it does not recognize (no
+ * `rex_update`/`rex_add` tool call, e.g. a bookkeeping-only commit), and a
+ * run driven through a CLI provider can edit seven files without the
+ * heuristic seeing one of them. Reporting "none" in either case is the bug
+ * this guards — "none" is printed only when no source found anything, which
+ * means no commit landed and the tree came out clean.
+ *
+ * Exported for testing.
  */
-function formatChangeClassification(toolCalls: ToolCallRecord[]): string {
+export function formatChangeClassification(
+  toolCalls: ToolCallRecord[],
+  commits?: RunRecord["commits"],
+  uncommittedPaths?: RunRecord["uncommittedPaths"],
+): string {
   const classified = classifyChangedFiles(toolCalls);
   const prdUpdate = hasPrdStatusUpdate(toolCalls);
+  const commitCount = commits?.length ?? 0;
+  const uncommittedCount = uncommittedPaths?.length ?? 0;
 
   // Remove metadata from the classified map for display purposes
   // (metadata = prd.json, shown separately as "PRD status update")
@@ -786,7 +905,15 @@ function formatChangeClassification(toolCalls: ToolCallRecord[]): string {
   }
 
   if (totalFiles === 0 && !prdUpdate) {
-    return "Changes: none";
+    const parts: string[] = [];
+    if (commitCount > 0) {
+      parts.push(`${commitCount} commit${commitCount === 1 ? "" : "s"}`);
+    }
+    if (uncommittedCount > 0) {
+      parts.push(`${uncommittedCount} uncommitted path${uncommittedCount === 1 ? "" : "s"}`);
+    }
+    if (parts.length === 0) return "Changes: none";
+    return `Changes: ${parts.join(", ")}`;
   }
 
   // Build category breakdown
@@ -807,6 +934,90 @@ function formatChangeClassification(toolCalls: ToolCallRecord[]): string {
 }
 
 // ---------------------------------------------------------------------------
+// Run outcome — distinguish work failure from record (bookkeeping) failure
+// ---------------------------------------------------------------------------
+
+/**
+ * The three outcomes a finished run can report. `run.status` alone cannot
+ * carry the third: a run whose work landed but whose follow-up PRD record
+ * commit failed stays `"completed"` with `recordCommitPending` set (records
+ * from before WM2085 read `"failed"` with a boolean flag instead, which
+ * printed "Status: failed" beside "Summary: Task complete" — a bookkeeping
+ * failure reading as a failed task).
+ */
+export type RunOutcome = "work_failed" | "work_completed" | "work_completed_record_pending";
+
+/**
+ * Classify a finished run into one of the three outcomes. Reads
+ * `run.recordCommitPending` before `run.status` so the pending-record case is
+ * told apart from a genuine task failure — necessary for legacy records,
+ * where a record-commit failure also flipped `status` to `"failed"`.
+ * Exported for testing.
+ */
+export function classifyRunOutcome(run: RunRecord): RunOutcome {
+  if (run.recordCommitPending) return "work_completed_record_pending";
+  return run.status === "completed" ? "work_completed" : "work_failed";
+}
+
+/**
+ * Format the run's "Status:" line so it always agrees with the outcome
+ * {@link classifyRunOutcome} computes, rather than printing the raw
+ * (possibly misleading) `run.status` value directly. Exported for testing.
+ */
+export function formatRunStatusLine(run: RunRecord): string {
+  if (classifyRunOutcome(run) === "work_completed_record_pending") {
+    return `Status: ${colorStatus("completed")} ${colorWarn("(record commit pending)")}`;
+  }
+  return `Status: ${colorStatus(run.status)}`;
+}
+
+/**
+ * Format the "Commits:" block naming every commit the run produced (work
+ * commit, review-repair commit, completion-metadata commit — whichever
+ * landed), oldest first. Returns an empty array when the run produced no
+ * commits, so callers can splice the result in unconditionally.
+ * Exported for testing.
+ */
+export function formatRunCommitsLines(commits: RunRecord["commits"]): string[] {
+  if (!commits || commits.length === 0) return [];
+  return ["Commits:", ...commits.map((c) => `  ${c.sha.slice(0, 8)} ${c.subject}`)];
+}
+
+/**
+ * Format the run's "Summary:" line (the LLM's own account of the run).
+ * Unconditional on outcome — a failed run's summary can still describe what
+ * was attempted before the failure, which is real signal. Exported for
+ * testing.
+ */
+export function formatRunSummaryLine(run: RunRecord): string | undefined {
+  return run.summary ? `\nSummary: ${run.summary}` : undefined;
+}
+
+/**
+ * Format the run's error/record line so it names what actually failed:
+ *
+ * - `work_failed`: `run.error`, as before.
+ * - `work_completed`: nothing — the run succeeded outright.
+ * - `work_completed_record_pending`: a "Record:" line saying the work is
+ *   done and only the PRD bookkeeping commit is still pending, instead of an
+ *   "Error:" line that would contradict "Summary: Task complete".
+ *
+ * Exported for testing.
+ */
+export function formatRunErrorLine(run: RunRecord): string | undefined {
+  const outcome = classifyRunOutcome(run);
+  if (outcome === "work_completed") return undefined;
+  if (outcome === "work_completed_record_pending") {
+    const reason = run.error ? ` (${run.error})` : "";
+    return (
+      `\n${colorWarn("Record:")} the task's work is complete, but the PRD record commit ` +
+      `did not land${reason}. Rerun the task to retry recording it.`
+    );
+  }
+  return run.error ? `\n${red("Error:")} ${run.error}` : undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Single task execution
 // ---------------------------------------------------------------------------
 
@@ -814,6 +1025,7 @@ async function runOne(
   dir: string,
   henchDir: string,
   rexDir: string,
+  gateTree: PerTaskTreeGate,
   provider: "cli" | "api",
   taskId: string | undefined,
   dryRun: boolean,
@@ -834,7 +1046,14 @@ async function runOne(
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
 ): Promise<{ status: string; taskTitle: string; selectedTaskId?: string }> {
-  const config = await loadConfig(henchDir);
+  // First statement in the task: a tree this build would re-slug stops the task
+  // before the claim below is taken and before any token is spent. The tree can
+  // have changed since the previous task finished.
+  await gateTree();
+
+  // Lenient without a warning: cmdRun already loaded the same file leniently
+  // and warned once — repeating it per task would spam loop mode.
+  const config = await loadConfig(henchDir, { onInvalid: "use-defaults" });
   const store = await resolveStore(rexDir);
   await assertSchemaCompatibility(store);
 
@@ -921,7 +1140,8 @@ async function runOne(
   info(`\n${bold("=== Run Complete ===")}`);
   output(`Run ID: ${run.id}`);
   output(`Task: ${colorPink(run.taskTitle)}`);
-  output(`Status: ${colorStatus(run.status)}`);
+  output(formatRunStatusLine(run));
+  for (const line of formatRunCommitsLines(run.commits)) output(line);
   if (run.actor) output(`Actor: ${run.actor}${run.host ? ` @ ${run.host}` : ""}`);
 
   // Invocation context
@@ -973,17 +1193,15 @@ async function runOne(
   // mid-run line is long gone behind the test gate and the commit prompt by
   // the time anyone reads the result, and "completed" with no review line
   // beneath it is precisely the ambiguity `--review` exists to remove.
-  for (const line of formatRunReviewStatus(run.review)) info(line);
+  for (const line of formatRunReviewStatus(run.review, run.id)) info(line);
 
   // Change classification
-  info(formatChangeClassification(run.toolCalls));
+  info(formatChangeClassification(run.toolCalls, run.commits, run.uncommittedPaths));
 
-  if (run.summary) {
-    info(`\nSummary: ${run.summary}`);
-  }
-  if (run.error) {
-    output(`\n${red("Error:")} ${run.error}`);
-  }
+  const summaryLine = formatRunSummaryLine(run);
+  if (summaryLine) info(summaryLine);
+  const errorLine = formatRunErrorLine(run);
+  if (errorLine) output(errorLine);
 
   return { status: run.status, taskTitle: run.taskTitle, selectedTaskId: run.taskId };
 }
@@ -1061,7 +1279,13 @@ export async function cmdRun(
   flags: Record<string, string>,
 ): Promise<void> {
   const henchDir = join(dir, HENCH_DIR);
-  const config = await loadConfig(henchDir);
+  // An invalid field in .hench/config.json must not refuse the whole run —
+  // fall back to that field's default and say so, so a bad edit (often made
+  // from the dashboard) degrades to a warning instead of blocking `ndx work`.
+  const config = await loadConfig(henchDir, {
+    onInvalid: "use-defaults",
+    onWarning: (message) => warn(message),
+  });
   const rexDir = join(dir, config.rexDir);
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
@@ -1270,6 +1494,24 @@ export async function cmdRun(
         "before the commit.\n(The diff-approval gate that used to be --review is now --approve-diff.)",
     );
   }
+
+  // Refuse a tree this build would re-slug, before anything is claimed, reset
+  // or written — `--reset-deferred` below is the run's first PRD write, the
+  // commit gate further down can commit the working tree, and the claims store
+  // is opened later still. Unconditional: a dry run that hid the refusal would
+  // report that the real run was going to be fine.
+  //
+  // This check cannot be the one the first task relies on, so `gateTree` is
+  // built without consuming it: every task re-asks inside runOne, the first
+  // included. Between here and that first task sit `--reset-deferred` below
+  // and the commit gate further down, and the commit gate blocks on an
+  // operator prompt — unbounded wall-clock time. An operator who starts a run,
+  // is asked about uncommitted changes, and answers an hour later would
+  // otherwise execute task one against a tree last verified an hour ago, and
+  // task one's completion write would be the sweeper. The cost of re-asking is
+  // one extra loadDocument, ~0.33s on a 405-item tree, once per run.
+  await assertPrdTreeConformant(rexDir);
+  const gateTree = createPerTaskTreeGate(rexDir);
 
   // --reset-deferred: reset all deferred/failing tasks to pending before running.
   // This lets the user retry tasks that were deferred by infrastructure failures
@@ -1580,7 +1822,7 @@ export async function cmdRun(
     }
 
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
+      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
       return;
     }
 
@@ -1594,9 +1836,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
+      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
     } else {
-      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
+      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
     }
   } finally {
     await limiter.release();
@@ -1645,7 +1887,12 @@ export async function shouldStopForUncommittedWork(
     discountPaths: PRD_COMMIT_PATHS,
   });
   if (leftover.clean) return false;
-  info(`\n${colorWarn(formatLoopRefusal(leftover.paths))}`);
+  const deleted = deletedAmong(projectDir, leftover.paths);
+  info(`\n${colorWarn(formatLoopRefusal(
+    leftover.paths,
+    deleted,
+    await prepareRecoveryPathspecs(projectDir, leftover.paths, deleted),
+  ))}`);
   process.exitCode = 1;
   return true;
 }
@@ -1658,6 +1905,7 @@ async function runIterations(
   dir: string,
   henchDir: string,
   rexDir: string,
+  gateTree: PerTaskTreeGate,
   provider: "cli" | "api",
   taskId: string | undefined,
   dryRun: boolean,
@@ -1703,7 +1951,7 @@ async function runIterations(
       : forcedExclusionIds;
 
     const { status, selectedTaskId } = await runOne(
-      dir, henchDir, rexDir, provider,
+      dir, henchDir, rexDir, gateTree, provider,
       // Only use the explicit taskId for the first iteration;
       // subsequent iterations autoselect the next task
       i === 0 ? taskId : undefined,
@@ -1765,6 +2013,7 @@ async function runLoop(
   dir: string,
   henchDir: string,
   rexDir: string,
+  gateTree: PerTaskTreeGate,
   provider: "cli" | "api",
   taskId: string | undefined,
   dryRun: boolean,
@@ -1867,7 +2116,7 @@ async function runLoop(
 
         try {
           const result = await runOne(
-            dir, henchDir, rexDir, provider,
+            dir, henchDir, rexDir, gateTree, provider,
             // Only use explicit taskId on the very first iteration
             effectiveTaskId,
             dryRun, model, spawnModel, maxTurns, tokenBudget,
@@ -2030,6 +2279,7 @@ async function runEpicByEpic(
   dir: string,
   henchDir: string,
   rexDir: string,
+  gateTree: PerTaskTreeGate,
   provider: "cli" | "api",
   dryRun: boolean,
   model: string | undefined,
@@ -2189,7 +2439,7 @@ async function runEpicByEpic(
 
           try {
             const result = await runOne(
-              dir, henchDir, rexDir, provider,
+              dir, henchDir, rexDir, gateTree, provider,
               undefined, // autoselect within epic
               dryRun, model, spawnModel, maxTurns, tokenBudget,
               reviewOpts,

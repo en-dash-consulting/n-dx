@@ -63,9 +63,21 @@ export function updateInTree(
   return rexUpdateInTree(items, id, updates);
 }
 
-/** Find the next actionable task, returning just the item (or null). */
-export function findNextTask(items: PRDItem[], completedIds: Set<string>): PRDItem | null {
-  const entry = rexFindNextTask(items, completedIds);
+/**
+ * Find the next actionable task, returning just the item (or null).
+ *
+ * `options` passes straight through to rex — the callers in reads.ts use
+ * `excludeIds` to skip tasks other worktrees hold, the same seam hench's
+ * selection uses. Typed via Parameters<> rather than re-exporting rex's
+ * PrioritizationOptions through the gateway, which would spend gateway
+ * export budget on a type only this wrapper needs.
+ */
+export function findNextTask(
+  items: PRDItem[],
+  completedIds: Set<string>,
+  options?: Parameters<typeof rexFindNextTask>[2],
+): PRDItem | null {
+  const entry = rexFindNextTask(items, completedIds, options);
   return entry ? entry.item : null;
 }
 

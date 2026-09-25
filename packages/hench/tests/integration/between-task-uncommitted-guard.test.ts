@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../src/prd/rex-gateway.js";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -65,7 +65,7 @@ describe("shouldStopForUncommittedWork", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     process.exitCode = undefined;
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("continues the loop on a clean tree", async () => {

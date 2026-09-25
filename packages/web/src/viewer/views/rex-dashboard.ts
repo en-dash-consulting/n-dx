@@ -68,12 +68,25 @@ interface HealthData {
   suggestions: string[];
 }
 
+/**
+ * A higher-priority task the server passed over because another worktree
+ * holds it. Mirrors `SkippedForClaimWire` in server/routes-rex/reads.ts.
+ */
+interface NextTaskSkipped {
+  taskId: string;
+  title: string;
+  worktreeRoot: string;
+  worktree: string;
+}
+
 interface DashboardData {
   title: string;
   stats: TreeStats;
   percentComplete: number;
   epics: EpicStats[];
   nextTask: NextTask | null;
+  /** Present when the top of the queue is claimed elsewhere — the card says so. */
+  nextTaskSkipped?: NextTaskSkipped;
   priorities: PriorityDistribution;
 }
 
@@ -383,6 +396,17 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                 )
               : null,
           ),
+          // The top of the queue is claimed in another worktree: say so here,
+          // rather than letting Execute's 409 say it a click later.
+          data.nextTaskSkipped
+            ? h("div", { class: "rex-dash-next-skipped" },
+                h("span", { class: "rex-dash-next-skipped-icon" }, "⊘"),
+                h("span", null,
+                  `"${data.nextTaskSkipped.title}" is claimed by ${data.nextTaskSkipped.worktree}`,
+                  nextTask ? " — showing the next unclaimed task" : "",
+                ),
+              )
+            : null,
           nextTask
             ? h("div", { class: `rex-dash-next-card${nextTask.priority === "critical" ? " rex-dash-next-critical" : nextTask.priority === "high" ? " rex-dash-next-high" : ""}` },
                 h("div", { class: "rex-dash-next-top" },

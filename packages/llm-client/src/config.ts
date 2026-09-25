@@ -185,36 +185,115 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   "gpt-5.5": 200_000,
 };
 
+/** All four billed token kinds for one model, in USD per million tokens. */
+export interface ModelCost {
+  inputPerMToken: number;
+  outputPerMToken: number;
+  /** Writing a token into the prompt cache. At or above the input rate. */
+  cacheWritePerMToken: number;
+  /** Reading a token back out of the prompt cache. Below the input rate. */
+  cacheReadPerMToken: number;
+}
+
 /**
  * Per-model cost constants (USD per million tokens).
  *
- * Used by budget preflight to estimate request cost. Values are approximate
- * public list pricing as of 2026-08 and should be updated when vendors change
- * rates. Gemini Pro and Claude Sonnet 5 have tiered/introductory rates; the
- * values here are the standard (higher) tier so estimates never under-report.
+ * The single price table for the monorepo. Budget preflight reads the input
+ * rate; `resolveModelPricing` in `model-pricing.ts` serves every other caller
+ * (`ndx usage`, the dashboard's spend views). Values are approximate public
+ * list pricing as of 2026-08 and should be updated when vendors change rates.
+ * Gemini Pro and Claude Sonnet 5 have tiered/introductory rates; the values
+ * here are the standard (higher) tier so estimates never under-report.
+ *
+ * Cache rates are written out rather than computed from the input rate: a
+ * multiplier expression such as `3.00 * 0.1` evaluates to 0.30000000000000004,
+ * and a price table that cannot be compared with `toEqual` is a trap for every
+ * downstream parity test. The multiplier each rate was derived from is here:
+ *
+ * | Vendor | Cache write | Cache read |
+ * |--------|-------------|------------|
+ * | Claude | 1.25x input | 0.1x input |
+ * | OpenAI | 1x input (caching is automatic and carries no write premium) | 0.1x input |
+ * | Google | 1x input (explicit cache write is billed as input) | 0.25x input |
+ *
+ * Two known inaccuracies, both of which under-report and neither of which the
+ * aggregate data can currently distinguish:
+ *
+ * - **1-hour cache TTL.** Anthropic bills a 1h cache write at 2x input, not
+ *   1.25x. Recorded token counts carry no TTL, so a run using the long TTL is
+ *   priced as though it used the 5-minute one.
+ * - **Long-context surcharge.** Several models charge a higher rate above
+ *   200K input tokens in a single request. Aggregates are summed across
+ *   requests, so per-request input size is not recoverable here.
  */
-export const MODEL_COSTS: Readonly<
-  Record<string, { inputPerMToken: number; outputPerMToken: number }>
-> = {
-  // Google Gemini
-  "gemini-3.7-flash": { inputPerMToken: 0.75, outputPerMToken: 3.75 },
-  "gemini-3.5-flash-lite": { inputPerMToken: 0.30, outputPerMToken: 2.50 },
-  "gemini-2.5-flash": { inputPerMToken: 0.30, outputPerMToken: 2.50 },
-  "gemini-2.5-pro": { inputPerMToken: 1.25, outputPerMToken: 10.00 },
-  // Claude
-  "claude-haiku-4-5": { inputPerMToken: 1.00, outputPerMToken: 5.00 },
-  "claude-fable-5": { inputPerMToken: 10.00, outputPerMToken: 50.00 },
-  "claude-opus-5": { inputPerMToken: 5.00, outputPerMToken: 25.00 },
-  "claude-opus-4-8": { inputPerMToken: 5.00, outputPerMToken: 25.00 },
-  "claude-sonnet-5": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
-  "claude-sonnet-4-6": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
-  "claude-opus-4-7": { inputPerMToken: 5.00, outputPerMToken: 25.00 },
-  // Codex / OpenAI
-  "gpt-5.6-sol": { inputPerMToken: 4.00, outputPerMToken: 20.00 },
-  "gpt-5.6-terra": { inputPerMToken: 2.00, outputPerMToken: 12.00 },
-  "gpt-5.6-luna": { inputPerMToken: 0.20, outputPerMToken: 1.20 },
-  "gpt-5.4-mini": { inputPerMToken: 0.40, outputPerMToken: 1.60 },
-  "gpt-5.5": { inputPerMToken: 7.00, outputPerMToken: 21.00 },
+export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
+  // Google Gemini — cache write at input, read at 0.25x.
+  "gemini-3.7-flash": {
+    inputPerMToken: 0.75, outputPerMToken: 3.75,
+    cacheWritePerMToken: 0.75, cacheReadPerMToken: 0.1875,
+  },
+  "gemini-3.5-flash-lite": {
+    inputPerMToken: 0.30, outputPerMToken: 2.50,
+    cacheWritePerMToken: 0.30, cacheReadPerMToken: 0.075,
+  },
+  "gemini-2.5-flash": {
+    inputPerMToken: 0.30, outputPerMToken: 2.50,
+    cacheWritePerMToken: 0.30, cacheReadPerMToken: 0.075,
+  },
+  "gemini-2.5-pro": {
+    inputPerMToken: 1.25, outputPerMToken: 10.00,
+    cacheWritePerMToken: 1.25, cacheReadPerMToken: 0.3125,
+  },
+  // Claude — cache write at 1.25x input, read at 0.1x.
+  "claude-haiku-4-5": {
+    inputPerMToken: 1.00, outputPerMToken: 5.00,
+    cacheWritePerMToken: 1.25, cacheReadPerMToken: 0.10,
+  },
+  "claude-fable-5": {
+    inputPerMToken: 10.00, outputPerMToken: 50.00,
+    cacheWritePerMToken: 12.50, cacheReadPerMToken: 1.00,
+  },
+  "claude-opus-5": {
+    inputPerMToken: 5.00, outputPerMToken: 25.00,
+    cacheWritePerMToken: 6.25, cacheReadPerMToken: 0.50,
+  },
+  "claude-opus-4-8": {
+    inputPerMToken: 5.00, outputPerMToken: 25.00,
+    cacheWritePerMToken: 6.25, cacheReadPerMToken: 0.50,
+  },
+  "claude-sonnet-5": {
+    inputPerMToken: 3.00, outputPerMToken: 15.00,
+    cacheWritePerMToken: 3.75, cacheReadPerMToken: 0.30,
+  },
+  "claude-sonnet-4-6": {
+    inputPerMToken: 3.00, outputPerMToken: 15.00,
+    cacheWritePerMToken: 3.75, cacheReadPerMToken: 0.30,
+  },
+  "claude-opus-4-7": {
+    inputPerMToken: 5.00, outputPerMToken: 25.00,
+    cacheWritePerMToken: 6.25, cacheReadPerMToken: 0.50,
+  },
+  // Codex / OpenAI — no cache-write premium, read at 0.1x.
+  "gpt-5.6-sol": {
+    inputPerMToken: 4.00, outputPerMToken: 20.00,
+    cacheWritePerMToken: 4.00, cacheReadPerMToken: 0.40,
+  },
+  "gpt-5.6-terra": {
+    inputPerMToken: 2.00, outputPerMToken: 12.00,
+    cacheWritePerMToken: 2.00, cacheReadPerMToken: 0.20,
+  },
+  "gpt-5.6-luna": {
+    inputPerMToken: 0.20, outputPerMToken: 1.20,
+    cacheWritePerMToken: 0.20, cacheReadPerMToken: 0.02,
+  },
+  "gpt-5.4-mini": {
+    inputPerMToken: 0.40, outputPerMToken: 1.60,
+    cacheWritePerMToken: 0.40, cacheReadPerMToken: 0.04,
+  },
+  "gpt-5.5": {
+    inputPerMToken: 7.00, outputPerMToken: 21.00,
+    cacheWritePerMToken: 7.00, cacheReadPerMToken: 0.70,
+  },
 };
 
 /**

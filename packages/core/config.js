@@ -1701,6 +1701,46 @@ Hench settings (.hench/config.json):
                                      livelocked (default: 6). 0 disables the check. Raise it if a
                                      legitimate workload repeats one read-only call many times
                                      without editing anything.
+  hench.promptCache        boolean   Mark cache_control breakpoints on hench.provider=api Claude
+                                     requests (default: true). Set to false when
+                                     claude.api_endpoint points at a gateway or proxy that rejects
+                                     the cache_control field (some OpenAI-to-Anthropic shims, some
+                                     enterprise gateways, Bedrock's legacy InvokeModel path for
+                                     models without caching) and turn 1 fails with a 400. With
+                                     false, requests are sent exactly as before prompt caching was
+                                     added: plain-string system prompt, untouched tools/messages.
+  hench.promptCacheTtl     string    TTL for both cache_control breakpoints: "5m" or "1h"
+                                     (default: "5m"). Raise to "1h" only when tool calls
+                                     (e.g. a slow test gate) regularly push the gap between
+                                     turns past 5 minutes, so the prefix would otherwise be
+                                     re-written at the 1.25x-input rate instead of read at
+                                     0.1x. "1h" writes cost 2x input, not 1.25x — pays off
+                                     only when that turn gap regularly falls between 5 and
+                                     60 minutes. Cost estimates price every write at 1.25x
+                                     regardless of TTL (see llm-client's config.ts), so enabling
+                                     "1h" under-reports estimated spend by that difference.
+
+Hench context-prune settings (hench.provider=api runs only; the CLI loops let the
+vendor binary manage its own window). Every key trades the same two things: how much
+of the run the agent can still read verbatim, against how often the cached prompt
+prefix is thrown away.
+  hench.prune.triggerPairs           number   Turn-pairs tolerated before a prune fires
+                                              (default: 20). Sets peak context — the prompt
+                                              grows by pure append until it crosses this, so
+                                              raising it raises the largest request a run sends.
+  hench.prune.retainPairs            number   Turn-pairs kept verbatim after a prune
+                                              (default: 10); everything older becomes a summary.
+                                              Must be at least 2 and below triggerPairs — the gap
+                                              between the two is how many turns of cache-friendly
+                                              append-only growth follow each prune, so raising
+                                              retention buys verbatim history by resetting the
+                                              cache more often.
+  hench.prune.transcriptMessageChars number   Characters of each dropped message the summarizer
+                                              is shown (default: 2000, matching the size at which
+                                              hench truncates a tool result for the run record).
+                                              Anything past the cap cannot reach the summary.
+                                              Raising it gives the summarizer more to work from at
+                                              the cost of a larger light-tier prompt per prune.
 
 Hench test-gate settings (mandatory full-suite gate before commit):
   hench.fullTestCommand    string    Command that runs the whole suite. Resolved from this key,

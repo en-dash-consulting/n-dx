@@ -51,6 +51,7 @@ import {
   CONFIG_FIELD_META,
   validateFieldValue,
   validateConfigKeyValue,
+  completeConfigGroups,
   getConfigValue as getNestedValue,
   setConfigValue as setNestedValue,
 } from "./hench-config-fields.js";
@@ -62,6 +63,9 @@ import {
   aggregateItemDurations,
   openClaimsStore,
   resolveClaimHolder,
+  checkTreeConformance,
+  resolveStore,
+  PRD_TREE_DIRNAME,
 } from "./rex-gateway.js";
 import type {
   PRDDocument,
@@ -70,6 +74,7 @@ import type {
 } from "./rex-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
 import { resolveNdxBin } from "./routes-commands.js";
+import { readCliName } from "./cli-name.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { ProcessMemoryTracker } from "./process-memory-tracker.js";
 import { ConcurrentExecutionMetrics } from "./concurrent-execution-metrics.js";
@@ -321,15 +326,30 @@ async function resolveRunSources(ctx: ServerContext): Promise<WorktreeRunsSource
  * run written in another worktree fires `hench:run-changed` exactly as one in
  * the served directory does (start.ts's registerHenchWatcher covers that one).
  *
- * Lazy — registered on the first `?scope=repo` request that sees the
- * directory — rather than at startup, because worktrees and their
- * `.hench/runs/` come and go while the server is up. Each poll re-checks, so
- * a worktree added later is picked up without a restart.
+ * Lazy — registered on the first request that sees the directory, from
+ * either `?scope=repo` here or `GET /api/worktrees` (the Sessions tray) —
+ * rather than at startup, because worktrees and their `.hench/runs/` come
+ * and go while the server is up. Each poll re-checks, so a worktree added
+ * later is picked up without a restart. Idempotent per directory: whichever
+ * route registers first owns the watcher, so both must pass the same
+ * `onStatusInvalidate`.
  */
 const worktreeRunWatchers = new Map<string, FSWatcher>();
 const WORKTREE_WATCH_DEBOUNCE_MS = 500;
 
-function ensureWorktreeRunWatcher(
+/**
+ * How a watcher is made. Injectable so the lifecycle tests can count opens
+ * and closes without racing real fs.watch handles; production never sets it.
+ */
+type WorktreeWatchFactory = (dir: string, listener: (eventType: string, filename: string | Buffer | null) => void) => FSWatcher;
+let worktreeWatchFactory: WorktreeWatchFactory = watch as WorktreeWatchFactory;
+
+/** Test seam — pass null to restore the real fs.watch. */
+export function setWorktreeRunWatchFactory(factory: WorktreeWatchFactory | null): void {
+  worktreeWatchFactory = factory ?? (watch as WorktreeWatchFactory);
+}
+
+export function ensureWorktreeRunWatcher(
   runsDir: string,
   broadcast: WebSocketBroadcaster | undefined,
   onStatusInvalidate: (() => void) | undefined,
@@ -344,7 +364,7 @@ function ensureWorktreeRunWatcher(
   };
 
   try {
-    const watcher = watch(runsDir, (_eventType, filename) => {
+    const watcher = worktreeWatchFactory(runsDir, (_eventType, filename) => {
       if (!filename || !String(filename).endsWith(".json")) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(fire, WORKTREE_WATCH_DEBOUNCE_MS);
@@ -358,6 +378,24 @@ function ensureWorktreeRunWatcher(
     worktreeRunWatchers.set(runsDir, watcher);
   } catch {
     // fs.watch unavailable here — polling still works, just without the push.
+  }
+}
+
+/**
+ * Close every watcher whose runs directory is not in `liveRunsDirs`.
+ *
+ * Called by the /api/worktrees refresh with the runs dirs of the worktrees
+ * `git worktree list` currently reports: a removed worktree's watcher is
+ * closed on the next refresh instead of accumulating for the life of the
+ * server (the error-event cleanup above only fires if the OS reports the
+ * vanished directory, which not every platform does). A worktree that comes
+ * back re-registers through the same lazy {@link ensureWorktreeRunWatcher}.
+ */
+export function pruneWorktreeRunWatchers(liveRunsDirs: ReadonlySet<string>): void {
+  for (const [runsDir, watcher] of worktreeRunWatchers) {
+    if (liveRunsDirs.has(runsDir)) continue;
+    watcher.close();
+    worktreeRunWatchers.delete(runsDir);
   }
 }
 
@@ -841,6 +879,11 @@ async function handleConfigUpdate(
     return true;
   }
 
+  // A single-member write into a group hench reads whole (e.g. the first
+  // retry.* edit on a config with no retry block) must not leave a partial
+  // group on disk — complete it from the defaults before serializing.
+  completeConfigGroups(current);
+
   // Write back
   try {
     writeFileSync(configPath, JSON.stringify(current, null, 2) + "\n", "utf-8");
@@ -866,7 +909,15 @@ interface WorkflowTemplateData {
   createdAt?: string;
 }
 
-/** Built-in templates — matches hench/src/schema/templates.ts. */
+/**
+ * Built-in templates — a hand-kept copy of hench/src/schema/templates.ts.
+ *
+ * Web does not depend on `@n-dx/hench`, so there is no gateway to import these
+ * through and no test that can pin the two lists together. Any edit to the
+ * hench list must be mirrored here in the same change, `tokenBudget` above all:
+ * these values are derived from measured runs and their basis is documented at
+ * the top of the hench file.
+ */
 const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
   {
     id: "quick-iteration",
@@ -874,7 +925,7 @@ const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
     description: "Short, fast runs for rapid prototyping and small fixes",
     useCases: ["Bug fixes and small patches", "Quick refactors with clear scope", "Exploratory changes with fast feedback"],
     tags: ["fast", "lightweight", "prototyping"],
-    config: { maxTurns: 15, tokenBudget: 50000, loopPauseMs: 500, retry: { maxRetries: 2, baseDelayMs: 1000, maxDelayMs: 10000 } },
+    config: { maxTurns: 15, tokenBudget: 600000, loopPauseMs: 500, retry: { maxRetries: 2, baseDelayMs: 1000, maxDelayMs: 10000 } },
     builtIn: true,
   },
   {
@@ -883,7 +934,7 @@ const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
     description: "Extended runs with generous limits for complex multi-file tasks",
     useCases: ["New feature implementation across multiple files", "Large refactoring efforts", "Tasks requiring extensive test writing"],
     tags: ["thorough", "complex", "multi-file"],
-    config: { maxTurns: 80, maxTokens: 16384, tokenBudget: 200000, loopPauseMs: 2000, retry: { maxRetries: 5, baseDelayMs: 2000, maxDelayMs: 60000 } },
+    config: { maxTurns: 80, maxTokens: 16384, tokenBudget: 1500000, loopPauseMs: 2000, retry: { maxRetries: 5, baseDelayMs: 2000, maxDelayMs: 60000 } },
     builtIn: true,
   },
   {
@@ -892,7 +943,7 @@ const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
     description: "Optimized for minimal token usage while maintaining quality",
     useCases: ["Cost-sensitive environments", "High-volume task processing", "Routine maintenance tasks"],
     tags: ["budget", "cost-effective", "efficient"],
-    config: { maxTurns: 20, maxTokens: 4096, tokenBudget: 30000, loopPauseMs: 3000, retry: { maxRetries: 2, baseDelayMs: 3000, maxDelayMs: 15000 } },
+    config: { maxTurns: 20, maxTokens: 4096, tokenBudget: 600000, loopPauseMs: 3000, retry: { maxRetries: 2, baseDelayMs: 3000, maxDelayMs: 15000 } },
     builtIn: true,
   },
   {
@@ -910,7 +961,7 @@ const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
     description: "Use Anthropic API directly instead of Claude Code CLI for headless environments",
     useCases: ["CI/CD pipeline integration", "Headless server environments", "Custom API key management"],
     tags: ["api", "headless", "ci-cd"],
-    config: { provider: "api", maxTurns: 40, tokenBudget: 150000, retry: { maxRetries: 4, baseDelayMs: 3000, maxDelayMs: 30000 } },
+    config: { provider: "api", maxTurns: 40, tokenBudget: 850000, retry: { maxRetries: 4, baseDelayMs: 3000, maxDelayMs: 30000 } },
     builtIn: true,
   },
 ];
@@ -1131,6 +1182,9 @@ function handleTemplateApply(
   }
 
   const updated = mergeTemplateConfig(config, template.config);
+  // A template overlay carrying part of a nested group (or merging into a
+  // config that never had it) must not leave a partial group on disk.
+  completeConfigGroups(updated);
   const configPath = join(ctx.projectDir, ".hench", "config.json");
 
   try {
@@ -1214,6 +1268,48 @@ interface ActiveExecution {
 /** Load and parse prd.json from disk. */
 function loadPRDForExecute(ctx: ServerContext): Record<string, unknown> | null {
   return loadPRDSync(ctx.rexDir) as Record<string, unknown> | null;
+}
+
+/**
+ * Refuse the Execute request when this build would re-slug the PRD tree.
+ *
+ * The same gate `ndx work` applies, for the same reason: the run this route
+ * spawns writes the PRD when it completes its task, so starting one against a
+ * tree written under a different slug rule turns a whole-tree rewrite into a
+ * "task completed" commit. Refusing here rather than letting the spawned run
+ * refuse means the dashboard can say why — a run that exits non-zero a second
+ * after it starts reads as a crash.
+ *
+ * Goes to the store rather than `loadPRDSync`, which answers from
+ * `.rex/.cache/prd.json` and the legacy flat files. The question here is about
+ * the tree on disk, so the tree is what has to be read: a cache hit would let
+ * the gate pass on a repository whose `.rex/prd_tree/` it never looked at.
+ *
+ * @returns `true` when a refusal was written to `res` and the caller must stop.
+ */
+async function refuseNonConformantTree(
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  // No folder tree, nothing to be non-conformant. Checked before the load
+  // because loading a project that has no PRD at all throws, and "there is no
+  // PRD" is the caller's 404 to report, not this gate's failure.
+  if (!existsSync(join(ctx.rexDir, PRD_TREE_DIRNAME))) return false;
+
+  const store = await resolveStore(ctx.rexDir);
+  const doc = await store.loadDocument();
+
+  const refusal = await checkTreeConformance(
+    ctx.rexDir,
+    join(ctx.rexDir, PRD_TREE_DIRNAME),
+    doc.items,
+  );
+  if (!refusal) return false;
+
+  // 412 Precondition Failed: the request is well-formed and the task is fine;
+  // the repository is in a state that forbids acting on it.
+  errorResponse(res, 412, refusal.message);
+  return true;
 }
 
 /**
@@ -1338,6 +1434,11 @@ async function handleExecute(
     return true;
   }
 
+  // Tree-level fault first: on a tree this build would re-slug, no task is
+  // runnable, so reporting it before the per-task checks keeps the operator
+  // from reading a repository fault as a problem with the task they picked.
+  if (await refuseNonConformantTree(res, ctx)) return true;
+
   // Validate task exists in PRD
   const doc = loadPRDForExecute(ctx);
   if (!doc) {
@@ -1387,8 +1488,17 @@ async function handleExecute(
   const claimedBy = await openClaimsStore(ctx.projectDir)
     .isClaimedByOther(taskId, resolveClaimHolder(ctx.projectDir));
   if (claimedBy) {
+    // A held claim is not a running one: its run ended by refusing to
+    // complete the task because work was left uncommitted, and "is being
+    // worked on" would send the operator looking for a process that is not
+    // there. Name the hold and the way to free it instead.
+    const error = claimedBy.reason === "uncommitted-work"
+      ? `Task is held by another worktree: a run in ${claimedBy.worktreeRoot} refused to complete it ` +
+        `because its work is still uncommitted. Deal with that work there, or free the task with ` +
+        `'${readCliName(ctx.projectDir)} claim release ${taskId}'.`
+      : `Task is being worked on in another worktree: ${claimedBy.worktreeRoot}`;
     jsonResponse(res, 409, {
-      error: `Task is being worked on in another worktree: ${claimedBy.worktreeRoot}`,
+      error,
       taskId,
       claimedBy: {
         worktreeRoot: claimedBy.worktreeRoot,
@@ -1396,6 +1506,7 @@ async function handleExecute(
         host: claimedBy.host,
         claimedAt: claimedBy.claimedAt,
         expiresAt: claimedBy.expiresAt,
+        ...(claimedBy.reason ? { reason: claimedBy.reason } : {}),
       },
     });
     return true;

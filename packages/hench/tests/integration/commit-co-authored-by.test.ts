@@ -19,7 +19,7 @@ import { exec as execCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
-import { initGitFixtureRepo } from "../helpers/index.js";
+import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -114,7 +114,7 @@ describe("Co-Authored-By trailer — autonomous path (--auto/--loop)", () => {
       value: originalIsTTY,
       configurable: true,
     });
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("appends Co-Authored-By trailer in autonomous mode", async () => {
@@ -203,7 +203,7 @@ describe("Co-Authored-By trailer — interactive path (--yes)", () => {
       value: originalIsTTY,
       configurable: true,
     });
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("appends Co-Authored-By trailer when --yes bypasses the interactive prompt", async () => {
@@ -310,7 +310,7 @@ describe("Co-Authored-By trailer — rollback path", () => {
       value: originalIsTTY,
       configurable: true,
     });
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("no commit is created on a failed run — Co-Authored-By trailer absent from HEAD", async () => {

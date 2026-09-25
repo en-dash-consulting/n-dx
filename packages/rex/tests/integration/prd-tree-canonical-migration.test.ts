@@ -145,9 +145,13 @@ describe("PRD tree canonical migration", () => {
       migrationResult.migrations.some((m) => m.type === "title-md-renamed-to-index"),
     ).toBe(true);
 
+    // The fixture above is a tree of legacy shapes with legacy slugs, so
+    // canonicalizing it *is* a re-slug — precisely what the slug-rule write
+    // guard refuses an ordinary save for. `adoptSlugRule` is the sanctioned
+    // way to perform one deliberately; `saveDocument` here would (correctly)
+    // be refused, which is what `rex migrate-slugs` exists to do instead.
     const store = new FolderTreeStore(rexDir);
-    const loaded = await store.loadDocument();
-    await store.saveDocument(loaded);
+    await store.adoptSlugRule();
 
     // ── Assert canonical layout ──────────────────────────────────────────────
     // After load+save, item folders are renamed to their canonical slug

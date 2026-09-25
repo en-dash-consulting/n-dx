@@ -9,7 +9,15 @@
 
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { PROJECT_DIRS } from "@n-dx/llm-client";
+import {
+  PROJECT_DIRS,
+  FALLBACK_MODEL_PRICING,
+  FALLBACK_PRICING_MODEL,
+  priceTokens,
+  resolveModelPricing,
+  type BillableTokens,
+  type ModelTokenPricing,
+} from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,7 +32,7 @@ import { PROJECT_DIRS } from "@n-dx/llm-client";
  * by an order of magnitude, so a rollup that omits them is not an
  * approximation, it is the wrong number.
  */
-export interface PackageTokenUsage {
+export interface TokenCounts {
   /** Fresh (uncached) input tokens. */
   inputTokens: number;
   /** Total output tokens. */
@@ -35,6 +43,32 @@ export interface PackageTokenUsage {
   cacheReadTokens: number;
   /** Number of LLM calls. */
   calls: number;
+}
+
+export interface PackageTokenUsage extends TokenCounts {
+  /**
+   * Distinct agent runs behind these counts. Only hench sets it — a hench run
+   * spans many LLM calls (turns), so `calls` alone reads ~200x too large when
+   * labelled "runs", which is exactly what `ndx usage` used to do. rex and
+   * sourcevision have no run concept and leave it undefined rather than
+   * reporting a meaningless zero.
+   */
+  runs?: number;
+  /**
+   * The same tokens split by the model that spent them.
+   *
+   * Optional, and frequently a partial view: sourcevision's manifest records
+   * no model at all, and a hench run whose per-turn records are incomplete
+   * attributes less than its run-level total. Cost estimation therefore treats
+   * the difference between these buckets and the flat counters above as
+   * unattributed rather than assuming they agree.
+   *
+   * Deliberately carries no `calls`. The unit is not the same across sources —
+   * a run-level record contributes one call while a turn-level one contributes
+   * many — so a per-model call count would mean different things in adjacent
+   * rows. These buckets exist to be priced, and pricing needs only tokens.
+   */
+  byModel?: Record<string, BillableTokens>;
 }
 
 /** Combined token usage across all packages. */
@@ -51,6 +85,8 @@ export interface AggregateTokenUsage {
   totalCacheCreationTokens: number;
   totalCacheReadTokens: number;
   totalCalls: number;
+  /** Per-model split of the totals above. See {@link PackageTokenUsage.byModel}. */
+  byModel?: Record<string, BillableTokens>;
 }
 
 /** Time-based filter options for token usage queries. */
@@ -95,14 +131,55 @@ export interface TokenUsageLogEntry {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function emptyPackageUsage(): PackageTokenUsage {
+function emptyBillableTokens(): BillableTokens {
   return {
     inputTokens: 0,
     outputTokens: 0,
     cacheCreationTokens: 0,
     cacheReadTokens: 0,
-    calls: 0,
   };
+}
+
+function emptyPackageUsage(): PackageTokenUsage {
+  return { ...emptyBillableTokens(), calls: 0, byModel: {} };
+}
+
+/**
+ * Add one bucket of tokens to the per-model split under `model`.
+ *
+ * A missing, blank, or placeholder model id is dropped rather than bucketed
+ * under a made-up key: those tokens fall through to the unattributed residual,
+ * which cost estimation prices at the fallback rate *and labels as such*. An
+ * "unknown" bucket would look like a real model in every breakdown.
+ */
+function attributeToModel(
+  target: Record<string, BillableTokens>,
+  model: string | undefined,
+  tokens: BillableTokens,
+): void {
+  const key = model?.trim();
+  if (!key || key === "unknown") return;
+
+  const bucket = (target[key] ??= emptyBillableTokens());
+  bucket.inputTokens += tokens.inputTokens;
+  bucket.outputTokens += tokens.outputTokens;
+  bucket.cacheCreationTokens += tokens.cacheCreationTokens;
+  bucket.cacheReadTokens += tokens.cacheReadTokens;
+}
+
+/** The per-model split of a usage record, created on first use. */
+function modelBuckets(usage: PackageTokenUsage): Record<string, BillableTokens> {
+  return (usage.byModel ??= {});
+}
+
+/** Fold `source`'s per-model buckets into `target`. */
+function mergeByModel(
+  target: Record<string, BillableTokens>,
+  source: Record<string, BillableTokens> | undefined,
+): void {
+  for (const [model, tokens] of Object.entries(source ?? {})) {
+    attributeToModel(target, model, tokens);
+  }
 }
 
 /**
@@ -130,6 +207,9 @@ function combinePackages(
   hench: PackageTokenUsage,
   sv: PackageTokenUsage,
 ): AggregateTokenUsage {
+  const byModel: Record<string, BillableTokens> = {};
+  for (const pkg of [rex, hench, sv]) mergeByModel(byModel, pkg.byModel);
+
   return {
     packages: { rex, hench, sv },
     totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
@@ -139,6 +219,7 @@ function combinePackages(
     totalCacheReadTokens:
       rex.cacheReadTokens + hench.cacheReadTokens + sv.cacheReadTokens,
     totalCalls: rex.calls + hench.calls + sv.calls,
+    byModel,
   };
 }
 
@@ -159,10 +240,22 @@ function normalizeEventMetadata(value: unknown): string | undefined {
 // ---------------------------------------------------------------------------
 
 /**
+ * The execution-log events that carry rex token spend. One set for the package
+ * rollup and the per-command event stream both: when the rollup read only
+ * `analyze_token_usage`, every smart-add call was in the By-command breakdown
+ * (and the dashboard's totals) but missing from the headline `ndx usage`
+ * figure, so the two surfaces could never agree to the cent.
+ */
+const REX_TOKEN_EVENTS: Record<string, string> = {
+  analyze_token_usage: "analyze",
+  smart_add_token_usage: "smart-add",
+};
+
+/**
  * Extract rex token usage from execution log entries.
  *
- * Looks for `analyze_token_usage` events whose `detail` field
- * contains JSON-serialized AnalyzeTokenUsage data.
+ * Reads every event kind in {@link REX_TOKEN_EVENTS} whose `detail` field
+ * contains JSON-serialized token usage data.
  */
 export function extractRexTokenUsage(
   logEntries: TokenUsageLogEntry[],
@@ -171,7 +264,7 @@ export function extractRexTokenUsage(
   const usage = emptyPackageUsage();
 
   for (const entry of logEntries) {
-    if (entry.event !== "analyze_token_usage") continue;
+    if (!REX_TOKEN_EVENTS[entry.event]) continue;
     if (!entry.detail) continue;
     if (!isInRange(entry.timestamp, filter)) continue;
 
@@ -182,16 +275,23 @@ export function extractRexTokenUsage(
         outputTokens?: number;
         cacheCreationInputTokens?: number;
         cacheReadInputTokens?: number;
+        model?: string;
       };
-      if (typeof data.calls === "number") usage.calls += data.calls;
-      if (typeof data.inputTokens === "number") usage.inputTokens += data.inputTokens;
-      if (typeof data.outputTokens === "number") usage.outputTokens += data.outputTokens;
-      if (typeof data.cacheCreationInputTokens === "number") {
-        usage.cacheCreationTokens += data.cacheCreationInputTokens;
-      }
-      if (typeof data.cacheReadInputTokens === "number") {
-        usage.cacheReadTokens += data.cacheReadInputTokens;
-      }
+      const counts: TokenCounts = {
+        inputTokens: typeof data.inputTokens === "number" ? data.inputTokens : 0,
+        outputTokens: typeof data.outputTokens === "number" ? data.outputTokens : 0,
+        cacheCreationTokens:
+          typeof data.cacheCreationInputTokens === "number" ? data.cacheCreationInputTokens : 0,
+        cacheReadTokens:
+          typeof data.cacheReadInputTokens === "number" ? data.cacheReadInputTokens : 0,
+        calls: typeof data.calls === "number" ? data.calls : 0,
+      };
+      usage.calls += counts.calls;
+      usage.inputTokens += counts.inputTokens;
+      usage.outputTokens += counts.outputTokens;
+      usage.cacheCreationTokens += counts.cacheCreationTokens;
+      usage.cacheReadTokens += counts.cacheReadTokens;
+      attributeToModel(modelBuckets(usage), normalizeEventMetadata(data.model), counts);
     } catch {
       // Malformed detail — skip
     }
@@ -216,10 +316,18 @@ export interface TokenEvent {
   calls: number;
   vendor?: string;
   model?: string;
+  /**
+   * The run this event came from, for counting distinct runs downstream.
+   * Hench fans one run out into one event per turn; without this id the
+   * per-command and per-period groupers can only count events, which is the
+   * turn count. Only hench events carry it.
+   */
+  runId?: string;
 }
 
 /** Minimal shape of a hench RunRecord for token extraction. */
 interface HenchRunSummary {
+  id?: string;
   startedAt: string;
   model?: string;
   tokenUsage: {
@@ -249,6 +357,7 @@ export async function extractHenchTokenUsage(
   filter: TokenUsageFilter = {},
 ): Promise<PackageTokenUsage> {
   const usage = emptyPackageUsage();
+  usage.runs = 0;
   const runsDir = join(projectDir, PROJECT_DIRS.HENCH, "runs");
 
   let files: string[];
@@ -268,11 +377,42 @@ export async function extractHenchTokenUsage(
       if (!run.startedAt || !run.tokenUsage) continue;
       if (!isInRange(run.startedAt, filter)) continue;
 
-      usage.calls += 1; // Each run counts as one aggregate call
+      usage.runs = (usage.runs ?? 0) + 1;
+      // `calls` counts LLM calls (turns), matching what the per-turn event
+      // stream sums to. A run without turn records is at least one call — the
+      // real number is unrecoverable, so the floor is the honest choice.
+      usage.calls += Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0
+        ? run.turnTokenUsage.length
+        : 1;
       usage.inputTokens += run.tokenUsage.input ?? 0;
       usage.outputTokens += run.tokenUsage.output ?? 0;
       usage.cacheCreationTokens += run.tokenUsage.cacheCreationInput ?? 0;
       usage.cacheReadTokens += run.tokenUsage.cacheReadInput ?? 0;
+
+      // Model attribution comes from the per-turn records where they exist:
+      // a single run can switch models mid-flight (light-tier routing, retry
+      // escalation, vendor failover), so the run-level `model` field is only
+      // the fallback. The flat counters above still come from the run-level
+      // total, so a run whose turns do not sum to it leaves a remainder that
+      // `estimateCost` reports as unattributed rather than silently absorbing.
+      const buckets = modelBuckets(usage);
+      if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
+        for (const turn of run.turnTokenUsage) {
+          attributeToModel(buckets, turn.model ?? run.model, {
+            inputTokens: turn.input ?? 0,
+            outputTokens: turn.output ?? 0,
+            cacheCreationTokens: turn.cacheCreationInput ?? 0,
+            cacheReadTokens: turn.cacheReadInput ?? 0,
+          });
+        }
+      } else {
+        attributeToModel(buckets, run.model, {
+          inputTokens: run.tokenUsage.input ?? 0,
+          outputTokens: run.tokenUsage.output ?? 0,
+          cacheCreationTokens: run.tokenUsage.cacheCreationInput ?? 0,
+          cacheReadTokens: run.tokenUsage.cacheReadInput ?? 0,
+        });
+      }
     } catch {
       // Invalid run file — skip
     }
@@ -339,14 +479,8 @@ export function extractRexTokenEvents(
 ): TokenEvent[] {
   const events: TokenEvent[] = [];
 
-  /** Map log event types to human-readable command names. */
-  const EVENT_COMMAND_MAP: Record<string, string> = {
-    analyze_token_usage: "analyze",
-    smart_add_token_usage: "smart-add",
-  };
-
   for (const entry of logEntries) {
-    const command = EVENT_COMMAND_MAP[entry.event];
+    const command = REX_TOKEN_EVENTS[entry.event];
     if (!command) continue;
     if (!entry.detail) continue;
     if (!isInRange(entry.timestamp, filter)) continue;
@@ -409,6 +543,10 @@ export async function extractHenchTokenEvents(
       if (!run.startedAt || !run.tokenUsage) continue;
       if (!isInRange(run.startedAt, filter)) continue;
 
+      // One file is one run; the id lets groupers count runs while the events
+      // themselves stay one-per-turn for model attribution.
+      const runId = run.id?.trim() || file.replace(/\.json$/, "");
+
       if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
         for (const turn of run.turnTokenUsage) {
           events.push({
@@ -422,6 +560,7 @@ export async function extractHenchTokenEvents(
             calls: 1,
             vendor: turn.vendor,
             model: turn.model ?? run.model,
+            runId,
           });
         }
         continue;
@@ -437,6 +576,7 @@ export async function extractHenchTokenEvents(
         cacheReadTokens: run.tokenUsage.cacheReadInput ?? 0,
         calls: 1,
         model: run.model,
+        runId,
       });
     } catch {
       // Invalid run file — skip
@@ -510,6 +650,10 @@ export async function collectTokenEvents(
  */
 export function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
   const map = new Map<string, CommandTokenUsage>();
+  // Distinct runs per command entry. Summing event calls counts turns for
+  // hench, and turns must never be printed as "runs" — that was the 1,459-vs-8
+  // disagreement between the By-command and By-package lines.
+  const runIds = new Map<string, Set<string>>();
 
   for (const ev of events) {
     const key = `${ev.package}:${ev.command}`;
@@ -531,6 +675,15 @@ export function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
     entry.cacheCreationTokens += ev.cacheCreationTokens;
     entry.cacheReadTokens += ev.cacheReadTokens;
     entry.calls += ev.calls;
+    if (ev.runId) {
+      let ids = runIds.get(key);
+      if (!ids) {
+        ids = new Set();
+        runIds.set(key, ids);
+      }
+      ids.add(ev.runId);
+      entry.runs = ids.size;
+    }
   }
 
   // Sort by total tokens descending — cache included, since a command whose
@@ -614,6 +767,9 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
   const rex = emptyPackageUsage();
   const hench = emptyPackageUsage();
   const sv = emptyPackageUsage();
+  // Distinct runs per package, so period buckets report the same run counts
+  // as the all-time package rollup does. Only hench events carry a runId.
+  const runIds = { rex: new Set<string>(), hench: new Set<string>(), sv: new Set<string>() };
 
   for (const ev of events) {
     const pkg = ev.package === "rex" ? rex : ev.package === "hench" ? hench : sv;
@@ -622,6 +778,17 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
     pkg.cacheCreationTokens += ev.cacheCreationTokens;
     pkg.cacheReadTokens += ev.cacheReadTokens;
     pkg.calls += ev.calls;
+    if (ev.runId) {
+      const ids = runIds[ev.package];
+      ids.add(ev.runId);
+      pkg.runs = ids.size;
+    }
+    attributeToModel(modelBuckets(pkg), ev.model, {
+      inputTokens: ev.inputTokens,
+      outputTokens: ev.outputTokens,
+      cacheCreationTokens: ev.cacheCreationTokens,
+      cacheReadTokens: ev.cacheReadTokens,
+    });
   }
 
   return combinePackages(rex, hench, sv);
@@ -656,27 +823,43 @@ export async function aggregateTokenUsage(
 // Cost estimation
 // ---------------------------------------------------------------------------
 
-/** Per-million-token pricing for a model. */
-export interface ModelPricing {
-  inputPerMillion: number;
-  outputPerMillion: number;
-  /** Writing a token to the prompt cache. Above the input rate. */
-  cacheWritePerMillion: number;
-  /** Reading a token back from the prompt cache. Well below the input rate. */
-  cacheReadPerMillion: number;
-}
+/**
+ * Per-million-token pricing for a model.
+ *
+ * Structurally the foundation-tier {@link ModelTokenPricing}; aliased rather
+ * than redeclared so the two cannot drift, and kept exported under the old
+ * name because it is part of rex's published surface.
+ */
+export type ModelPricing = ModelTokenPricing;
 
 /**
- * Default pricing uses Claude Sonnet rates since that's the primary model
- * across all packages. This gives a reasonable ballpark even when exact
- * model info isn't available per-call.
+ * Rates applied to tokens whose model is unknown or unrecorded.
+ *
+ * This is the fallback, not the default: usage that *does* carry a model is
+ * priced at that model's rates. Sourced from the shared table so the CLI, the
+ * dashboard, and budget preflight cannot quote three different numbers.
  */
-const DEFAULT_PRICING: ModelPricing = {
-  inputPerMillion: 3, // $3 per 1M input tokens
-  outputPerMillion: 15, // $15 per 1M output tokens
-  cacheWritePerMillion: 3.75, // 1.25x input — a cache write costs a premium
-  cacheReadPerMillion: 0.3, // 0.1x input — the discount caching exists for
-};
+const DEFAULT_PRICING: ModelPricing = FALLBACK_MODEL_PRICING;
+
+/** What one model contributed to the bill. */
+export interface ModelCostLine {
+  /** The model id as recorded, or "unattributed" for the residual line. */
+  model: string;
+  /**
+   * The catalog model whose rates were actually applied. Equals {@link model}
+   * for a known id; {@link FALLBACK_PRICING_MODEL} otherwise. Kept distinct so
+   * a display can say "priced as X" without the caller re-deriving it.
+   */
+  pricedAs: string;
+  /** False when the id had no entry in the price table and fallback rates were used. */
+  known: boolean;
+  /** True for the synthetic line covering tokens with no model attribution. */
+  unattributed: boolean;
+  /** Total tokens in this line, all four kinds. */
+  tokens: number;
+  /** Cost of this line in USD. */
+  totalRaw: number;
+}
 
 /** Estimated cost breakdown. */
 export interface CostEstimate {
@@ -692,39 +875,161 @@ export interface CostEstimate {
   cacheWriteCost: number;
   /** Cost from tokens served out of the prompt cache. */
   cacheReadCost: number;
+  /** Per-model contribution, most expensive first. Empty when no model was recorded. */
+  byModel: ModelCostLine[];
+  /**
+   * True when every token was priced at its own model's rates — i.e. no line
+   * is unattributed and no recorded model id was missing from the price table.
+   * Callers use this to decide whether the figure needs a caveat.
+   */
+  fullyAttributed: boolean;
+}
+
+/** Sum the four billed kinds in a counts record. */
+function billableTotal(t: BillableTokens): number {
+  return t.inputTokens + t.outputTokens + t.cacheCreationTokens + t.cacheReadTokens;
 }
 
 /**
  * Estimate cost from aggregate token usage.
  *
- * Uses default Sonnet pricing as a baseline. Cost is approximate since
- * individual calls may use different models.
+ * Prices each model's tokens at that model's rates. The previous behaviour —
+ * one hardcoded Sonnet rate over the collapsed aggregate — understated an
+ * Opus-configured repo by the Sonnet-to-Opus ratio (40%), which is enough to
+ * make before/after cost comparisons meaningless.
+ *
+ * Tokens that carry no model, and any remainder between the per-model buckets
+ * and the flat totals, are priced at the fallback rate and reported as a
+ * separate unattributed line. That line is why the arithmetic works on partial
+ * data: sourcevision records no model, so its tokens have to land somewhere
+ * visible rather than being dropped or silently spread across the models that
+ * happen to be present.
  *
  * All four token kinds are priced. Cache tokens used to be omitted entirely,
  * which did not merely make the estimate approximate — on a cache-heavy agent
  * workload it made it wrong by more than an order of magnitude, and it hid the
  * one term the cost work is trying to move.
+ *
+ * @param pricing Force a single rate over every token, bypassing per-model
+ *   pricing. For callers that genuinely want one hypothetical rate (a
+ *   what-if comparison, a test fixture) — not for production reporting.
  */
 export function estimateCost(
   usage: AggregateTokenUsage,
-  pricing: ModelPricing = DEFAULT_PRICING,
+  pricing?: ModelPricing,
 ): CostEstimate {
-  const inputCost = (usage.totalInputTokens / 1_000_000) * pricing.inputPerMillion;
-  const outputCost = (usage.totalOutputTokens / 1_000_000) * pricing.outputPerMillion;
-  const cacheWriteCost =
-    (usage.totalCacheCreationTokens / 1_000_000) * pricing.cacheWritePerMillion;
-  const cacheReadCost =
-    (usage.totalCacheReadTokens / 1_000_000) * pricing.cacheReadPerMillion;
+  return estimateCostFromTotals(
+    {
+      inputTokens: usage.totalInputTokens,
+      outputTokens: usage.totalOutputTokens,
+      cacheCreationTokens: usage.totalCacheCreationTokens,
+      cacheReadTokens: usage.totalCacheReadTokens,
+    },
+    usage.byModel,
+    pricing,
+  );
+}
+
+/**
+ * The per-model pricing arithmetic behind {@link estimateCost}, over bare
+ * totals and buckets rather than rex's aggregate shape.
+ *
+ * Exported (and re-exported through the web package's rex gateway) because the
+ * dashboard aggregates its own four-package shape — it has a `web` bucket rex's
+ * aggregate does not model — but must quote the same dollar figure as
+ * `ndx usage` for the same tokens. One arithmetic, two aggregations;
+ * `tests/unit/token-pricing-parity.test.js` pins that the dashboard has no
+ * local copy of this loop.
+ */
+export function estimateCostFromTotals(
+  totals: BillableTokens,
+  byModel?: Record<string, BillableTokens>,
+  pricing?: ModelPricing,
+): CostEstimate {
+  if (pricing) {
+    const flat = priceTokens(totals, pricing);
+    return { ...flat, total: fmtUsd(flat.totalRaw), byModel: [], fullyAttributed: false };
+  }
+
+  const buckets = Object.entries(byModel ?? {});
+  const lines: ModelCostLine[] = [];
+  let inputCost = 0;
+  let outputCost = 0;
+  let cacheWriteCost = 0;
+  let cacheReadCost = 0;
+
+  // Track what the buckets account for so the remainder can be priced too.
+  const attributed: BillableTokens = emptyBillableTokens();
+
+  for (const [model, tokens] of buckets) {
+    const resolved = resolveModelPricing(model);
+    const cost = priceTokens(tokens, resolved.pricing);
+    inputCost += cost.inputCost;
+    outputCost += cost.outputCost;
+    cacheWriteCost += cost.cacheWriteCost;
+    cacheReadCost += cost.cacheReadCost;
+
+    attributed.inputTokens += tokens.inputTokens;
+    attributed.outputTokens += tokens.outputTokens;
+    attributed.cacheCreationTokens += tokens.cacheCreationTokens;
+    attributed.cacheReadTokens += tokens.cacheReadTokens;
+
+    lines.push({
+      model,
+      pricedAs: resolved.modelId,
+      known: resolved.known,
+      unattributed: false,
+      tokens: billableTotal(tokens),
+      totalRaw: cost.totalRaw,
+    });
+  }
+
+  // Clamp at zero: per-turn records can overshoot the run-level total, and a
+  // negative residual would refund tokens that were genuinely billed.
+  const residual: BillableTokens = {
+    inputTokens: Math.max(0, totals.inputTokens - attributed.inputTokens),
+    outputTokens: Math.max(0, totals.outputTokens - attributed.outputTokens),
+    cacheCreationTokens: Math.max(
+      0,
+      totals.cacheCreationTokens - attributed.cacheCreationTokens,
+    ),
+    cacheReadTokens: Math.max(0, totals.cacheReadTokens - attributed.cacheReadTokens),
+  };
+
+  const residualTokens = billableTotal(residual);
+  if (residualTokens > 0) {
+    const cost = priceTokens(residual, DEFAULT_PRICING);
+    inputCost += cost.inputCost;
+    outputCost += cost.outputCost;
+    cacheWriteCost += cost.cacheWriteCost;
+    cacheReadCost += cost.cacheReadCost;
+    lines.push({
+      model: "unattributed",
+      pricedAs: FALLBACK_PRICING_MODEL,
+      known: false,
+      unattributed: true,
+      tokens: residualTokens,
+      totalRaw: cost.totalRaw,
+    });
+  }
+
+  lines.sort((a, b) => b.totalRaw - a.totalRaw);
   const totalRaw = inputCost + outputCost + cacheWriteCost + cacheReadCost;
 
   return {
-    total: `$${totalRaw.toFixed(2)}`,
+    total: fmtUsd(totalRaw),
     totalRaw,
     inputCost,
     outputCost,
     cacheWriteCost,
     cacheReadCost,
+    byModel: lines,
+    fullyAttributed: lines.length > 0 && lines.every((l) => l.known && !l.unattributed),
   };
+}
+
+function fmtUsd(value: number): string {
+  return `$${value.toFixed(2)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -784,7 +1089,7 @@ export interface BudgetCheckResult {
 export function checkBudget(
   usage: AggregateTokenUsage,
   budget: BudgetConfig,
-  pricing: ModelPricing = DEFAULT_PRICING,
+  pricing?: ModelPricing,
 ): BudgetCheckResult {
   const warnAt = budget.warnAt ?? 80;
   const warnings: string[] = [];

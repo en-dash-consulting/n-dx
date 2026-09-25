@@ -1,4 +1,5 @@
 import { z, ZodError } from "zod";
+import { DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MIN_PRUNE_PAIRS } from "./v1.js";
 
 export type ValidationResult<T> =
   | { ok: true; data: T }
@@ -41,11 +42,54 @@ const GuardConfigSchema = z.object({
   memoryMonitor: MemoryMonitorConfigSchema,
 });
 
+// Per-field defaults so a partial retry group loads: the dashboard's config
+// editor writes one dotted key at a time (`retry.maxRetries`), which can put
+// a `retry` object with a single member on disk. Requiring the other members
+// bricked the next `ndx work` over a file every present value of which was valid.
 const RetryConfigSchema = z.object({
-  maxRetries: z.number().int().nonnegative(),
-  baseDelayMs: z.number().positive(),
-  maxDelayMs: z.number().positive(),
+  maxRetries: z.number().int().nonnegative().default(DEFAULT_RETRY_CONFIG.maxRetries),
+  baseDelayMs: z.number().positive().default(DEFAULT_RETRY_CONFIG.baseDelayMs),
+  maxDelayMs: z.number().positive().default(DEFAULT_RETRY_CONFIG.maxDelayMs),
 });
+
+/**
+ * Per-field defaults for the same reason RetryConfigSchema has them: the
+ * dashboard's config editor writes one dotted key at a time (`prune.retainPairs`),
+ * so a single-member group reaches disk and must still load.
+ *
+ * {@link MIN_PRUNE_PAIRS} is the floor, shared with the pruner rather than
+ * restated: this schema refuses a bad value in `.hench/config.json`, but
+ * `loadConfig` merges `.n-dx.json` overrides after validation, so the pruner
+ * has to clamp to the same floor for values that never reach here.
+ */
+const PruneConfigSchema = z
+  .object({
+    triggerPairs: z
+      .number()
+      .int("prune.triggerPairs must be a whole number of turn-pairs")
+      .min(MIN_PRUNE_PAIRS, `prune.triggerPairs must be at least ${MIN_PRUNE_PAIRS}`)
+      .default(DEFAULT_PRUNE_CONFIG.triggerPairs),
+    retainPairs: z
+      .number()
+      .int("prune.retainPairs must be a whole number of turn-pairs")
+      .min(MIN_PRUNE_PAIRS, `prune.retainPairs must be at least ${MIN_PRUNE_PAIRS}`)
+      .default(DEFAULT_PRUNE_CONFIG.retainPairs),
+    transcriptMessageChars: z
+      .number()
+      .int("prune.transcriptMessageChars must be a whole number of characters")
+      .positive("prune.transcriptMessageChars must be greater than zero")
+      .default(DEFAULT_PRUNE_CONFIG.transcriptMessageChars),
+  })
+  // Equal values would prune every turn and drop nothing; a retention above the
+  // trigger would never let a prune reach a droppable span at all. Both are
+  // configuration mistakes with no useful reading, so they fail the load rather
+  // than being silently clamped.
+  .refine((prune) => prune.retainPairs < prune.triggerPairs, {
+    path: ["retainPairs"],
+    message:
+      "prune.retainPairs must be below prune.triggerPairs — the gap between them is " +
+      "how many turns of cache-friendly growth follow each prune",
+  });
 
 const ProjectLanguageSchema = z.enum(["typescript", "javascript", "go"]).optional();
 
@@ -59,11 +103,11 @@ export const HenchConfigSchema = z.object({
   rexDir: z.string(),
   apiKeyEnv: z.string(),
   guard: GuardConfigSchema,
-  retry: RetryConfigSchema.optional().default({
-    maxRetries: 3,
-    baseDelayMs: 2000,
-    maxDelayMs: 30000,
-  }),
+  retry: RetryConfigSchema.optional().default(() => ({ ...DEFAULT_RETRY_CONFIG })),
+  // Left optional rather than defaulted: an absent group means "the pruner's own
+  // defaults", which are the same numbers, and defaulting here would write them
+  // into every config that round-trips through validation.
+  prune: PruneConfigSchema.optional(),
   loopPauseMs: z.number().int().nonnegative().optional().default(2000),
   maxFailedAttempts: z.number().int().positive().optional().default(3),
   language: ProjectLanguageSchema,
@@ -95,6 +139,8 @@ export const HenchConfigSchema = z.object({
       requireCleanTree: z.boolean().optional(),
     })
     .optional(),
+  promptCache: z.boolean().optional(),
+  promptCacheTtl: z.enum(["5m", "1h"]).optional(),
 });
 
 const RunStatusSchema = z.enum([
@@ -201,6 +247,7 @@ const RunDiagnosticsSchema = z.object({
   vendor: z.string().optional(),
   sandbox: z.string().optional(),
   approvals: z.string().optional(),
+  testGateOutputTail: z.string().optional(),
 });
 
 const PersistedRuntimeEventSchema = z.object({
@@ -266,6 +313,12 @@ const RunReviewRecordSchema = z
  */
 const OpaqueRunSectionSchema = z.object({}).passthrough();
 
+/** A single commit a run produced. See `RunRecord.commits`. */
+const RunCommitRecordSchema = z.object({
+  sha: z.string(),
+  subject: z.string(),
+});
+
 export const RunRecordSchema = z.object({
   id: z.string(),
   taskId: z.string(),
@@ -298,6 +351,16 @@ export const RunRecordSchema = z.object({
   review: RunReviewRecordSchema.optional(),
   actor: z.string().optional(),
   host: z.string().optional(),
+  commits: z.array(RunCommitRecordSchema).optional(),
+  // Boolean is the legacy shape (records written before the paths existed);
+  // new records carry the paths the record commit tried to stage.
+  recordCommitPending: z
+    .union([z.boolean(), z.object({ paths: z.array(z.string()), error: z.string() })])
+    .optional(),
+  uncommittedPaths: z.array(z.string()).optional(),
+  claimLost: z
+    .object({ at: z.string(), taskId: z.string(), holderWorktree: z.string() })
+    .optional(),
   // Fields the record has gained over time that this schema had not been
   // told about. Zod strips what it does not declare, so each was written to
   // disk by `saveRun` and then dropped by every `loadRun` that read it back

@@ -130,3 +130,12 @@ export { WorkspaceSwitcher, buildWorkspaceOptions, workspaceUrl, fmtElapsed } fr
 export type { WorkspaceSwitcherProps, WorkspaceOption } from "./workspace-switcher.js";
 export { WorkspaceWriteStrip, workspaceWriteNotice } from "./workspace-write-strip.js";
 export type { WorkspaceWriteStripProps } from "./workspace-write-strip.js";
+export { LanguageAnalysisStrip, buildLanguageStripGroups } from "./language-analysis-strip.js";
+export type {
+  LanguageAnalysisStripProps,
+  LanguageAnalysisSummary,
+  LanguageStripEntry,
+  LanguageStripGroup,
+} from "./language-analysis-strip.js";
+export { GlossaryLine } from "./glossary-line.js";
+export type { GlossaryLineProps } from "./glossary-line.js";

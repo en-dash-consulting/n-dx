@@ -151,7 +151,23 @@ describe("assessAllZoneRisks", () => {
     expect(finding!.severity).toBe("critical");
     expect(finding!.type).toBe("suggestion");
     expect(finding!.pass).toBe(0);
-    expect(finding!.text).toContain("catastrophic");
+    expect(finding!.text).toContain("severely fragile");
+    expect(finding!.text).toContain("immediate architectural intervention");
+  });
+
+  it("leads catastrophic finding text with plain language before the metric", () => {
+    const zones = [
+      makeZone({ id: "web-16", name: "Web 16", cohesion: 0.2, coupling: 0.8 }),
+    ];
+    const result = assessAllZoneRisks(makeZones(zones));
+
+    const finding = result.findings.find((f) => f.scope === "web-16")!;
+    const dashIndex = finding.text.indexOf(" — ");
+    expect(dashIndex).toBeGreaterThan(0);
+    const lead = finding.text.slice(0, dashIndex);
+    expect(lead).not.toMatch(/\d\.\d/);
+    expect(lead).not.toContain("cohesion");
+    expect(lead).not.toContain("coupling");
   });
 
   it("emits warning finding for critical zones", () => {
@@ -196,7 +212,24 @@ describe("assessAllZoneRisks", () => {
     expect(global).toBeDefined();
     expect(global!.severity).toBe("warning");
     expect(global!.text).toContain("3");
+    expect(global!.text).toContain("3 zones are fragile");
     expect(global!.related).toEqual(["bad-1", "bad-2", "bad-3"]);
+  });
+
+  it("leads the global summary with plain language, keeping the threshold expression in the detail", () => {
+    const zones = [
+      makeZone({ id: "bad-1", name: "Bad 1", cohesion: 0.2, coupling: 0.8 }),
+      makeZone({ id: "bad-2", name: "Bad 2", cohesion: 0.3, coupling: 0.7 }),
+    ];
+    const result = assessAllZoneRisks(makeZones(zones));
+
+    const global = result.findings.find((f) => f.scope === "global")!;
+    const dashIndex = global.text.indexOf(" — ");
+    expect(dashIndex).toBeGreaterThan(0);
+    const lead = global.text.slice(0, dashIndex);
+    expect(lead).toBe("2 zones are fragile: they hold loosely related files and depend heavily on other zones");
+    expect(lead).not.toContain("cohesion");
+    expect(global.text).toContain(`cohesion < ${RISK_THRESHOLDS.cohesionFloor}, coupling > ${RISK_THRESHOLDS.couplingCeiling}`);
   });
 
   it("sorts findings by risk score (worst first)", () => {

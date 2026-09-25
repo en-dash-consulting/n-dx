@@ -247,7 +247,11 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
+  // maxRetries/retryDelay: the MCP servers under test run with cwd: tmpDir, so
+  // on Windows a child that has not fully exited yet holds the directory and
+  // the first rm attempts fail EPERM. Same pattern as e2e-helpers.js and the
+  // cli-*-cleanup suites (#400).
+  if (tmpDir) rmSync(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // ── Command structure: cwd-relative, no absolute paths ────────────────────

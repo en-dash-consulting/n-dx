@@ -166,6 +166,7 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
     expect(result.stdout).toContain(`http://localhost:${hubPort}/p/alpha-app/`);
     expect(result.stdout).toContain(`/p/alpha-app/mcp/rex`);
     expect(result.stdout).toContain("n-dx hub started");
+    expect(result.stdout).toContain("Stop: ndx start stop .   (or 'ndx hub stop' for every project)");
 
     const { status, body } = await getJson(`http://127.0.0.1:${hubPort}/api/hub/projects`);
     expect(status).toBe(200);

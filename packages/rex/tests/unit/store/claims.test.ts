@@ -301,3 +301,140 @@ setTimeout(() => {}, 20000);
     expect(results.filter((r) => r.ok)).toHaveLength(1);
   }, 30_000);
 });
+
+// ── Held claims (0.7.1 PR D) ────────────────────────────────────────────────
+//
+// An ordinary claim dies with its pid, which is what stops a crashed run
+// wedging a task. That is exactly wrong when the run ended by *refusing* to
+// complete the task because its work is still uncommitted: the work is real
+// and it is in that worktree, so a second worktree picking the task up would
+// redo it. A held claim therefore survives a dead holder and does not expire:
+// it ends only on release, release --force, or a fresh claim from the
+// worktree that left the work. The uncommitted work does not clean itself up
+// overnight, so neither does the hold that guards it.
+
+describe("held claims", () => {
+  /** A store that reads the same file but declares every holder dead. */
+  const afterHolderExits = (dir: string) => openClaimsStore(dir, { isPidAlive: () => false });
+
+  it("outlives its holder's process, where an ordinary claim does not", async () => {
+    const mine = openClaimsStore(repo);
+    await mine.claim("T-held", { worktreeRoot: repo });
+    await mine.claim("T-plain", { worktreeRoot: repo });
+
+    const held = await mine.hold("T-held", { worktreeRoot: repo }, "uncommitted-work");
+    expect(held).toMatchObject({ taskId: "T-held", worktreeRoot: repo, reason: "uncommitted-work" });
+
+    // The run ends; both pids are now dead.
+    const later = afterHolderExits(repo);
+    expect((await later.readClaims()).map((c) => c.taskId)).toEqual(["T-held"]);
+
+    // And the other worktree is told, with the reason.
+    const theirs = afterHolderExits(linked);
+    expect(await theirs.isClaimedByOther("T-held", { worktreeRoot: linked })).toMatchObject({
+      worktreeRoot: repo,
+      reason: "uncommitted-work",
+    });
+    expect([...(await theirs.claimedElsewhere(linked)).keys()]).toEqual(["T-held"]);
+    expect(await theirs.isClaimedByOther("T-plain", { worktreeRoot: linked })).toBeNull();
+  });
+
+  it("survives past its lease expiry — a hold ends only by release, re-claim, or force", async () => {
+    const mine = openClaimsStore(repo);
+    const claimed = await mine.claim("T1", { worktreeRoot: repo, ttlMs: 60_000 });
+    expect(claimed.ok).toBe(true);
+    if (!claimed.ok) return;
+
+    const held = await mine.hold("T1", { worktreeRoot: repo }, "uncommitted-work");
+    // The expiry is carried over unchanged, but for a held claim it is
+    // informational — when the ordinary lease would have lapsed — and no
+    // longer retires the claim.
+    expect(held?.expiresAt).toBe(claimed.claim.expiresAt);
+    expect(held?.claimedAt).toBe(claimed.claim.claimedAt);
+
+    // Dead holder, clock past the carried-over expiry AND past the 4h default
+    // lease — the overnight case the old behaviour silently lost.
+    const overnight = Date.parse(claimed.claim.expiresAt) + DEFAULT_CLAIM_TTL_MS + 60_000;
+    const later = openClaimsStore(repo, { isPidAlive: () => false, now: () => overnight });
+    expect(await later.readClaims()).toMatchObject([{ taskId: "T1", reason: "uncommitted-work" }]);
+
+    // Another worktree still cannot take the task — and its attempt runs the
+    // store's prune pass, which must not drop the hold either.
+    const theirs = openClaimsStore(linked, { isPidAlive: () => false, now: () => overnight });
+    const attempt = await theirs.claim("T1", { worktreeRoot: linked });
+    expect(attempt.ok).toBe(false);
+    if (attempt.ok) return;
+    expect(attempt.heldBy).toMatchObject({ worktreeRoot: repo, reason: "uncommitted-work" });
+
+    // An operator's forced release is one of the three ways it ends.
+    expect(await theirs.release("T1", { worktreeRoot: linked }, { force: true })).toBe(true);
+    expect(await later.readClaims()).toEqual([]);
+  });
+
+  it("releases like any other claim — that is how the work is declared dealt with", async () => {
+    const mine = openClaimsStore(repo);
+    await mine.claim("T1", { worktreeRoot: repo });
+    await mine.hold("T1", { worktreeRoot: repo }, "uncommitted-work");
+
+    const later = afterHolderExits(repo);
+    expect(await later.release("T1", { worktreeRoot: repo })).toBe(true);
+    expect(await later.readClaims()).toEqual([]);
+  });
+
+  it("is cleared by a fresh claim in the worktree that left the work", async () => {
+    const mine = openClaimsStore(repo);
+    await mine.claim("T1", { worktreeRoot: repo });
+    await mine.hold("T1", { worktreeRoot: repo }, "uncommitted-work");
+
+    // Re-running the task there is one of the ways to resolve a hold.
+    const again = await mine.claim("T1", { worktreeRoot: repo });
+    expect(again.ok).toBe(true);
+    if (!again.ok) return;
+    expect(again.claim.reason).toBeUndefined();
+    expect((await mine.readClaims())[0]!.reason).toBeUndefined();
+  });
+
+  it("refuses to hold what this worktree does not hold", async () => {
+    const mine = openClaimsStore(repo);
+    const theirs = openClaimsStore(linked);
+
+    expect(await mine.hold("nothing-here", { worktreeRoot: repo }, "uncommitted-work")).toBeNull();
+
+    await mine.claim("T1", { worktreeRoot: repo });
+    expect(await theirs.hold("T1", { worktreeRoot: linked }, "uncommitted-work")).toBeNull();
+    expect((await mine.readClaims())[0]!.reason).toBeUndefined();
+  });
+
+  it("still blocks another worktree from claiming the task", async () => {
+    const mine = openClaimsStore(repo);
+    await mine.claim("T1", { worktreeRoot: repo });
+    await mine.hold("T1", { worktreeRoot: repo }, "uncommitted-work");
+
+    const theirs = afterHolderExits(linked);
+    const attempt = await theirs.claim("T1", { worktreeRoot: linked });
+    expect(attempt.ok).toBe(false);
+    if (attempt.ok) return;
+    expect(attempt.heldBy).toMatchObject({ worktreeRoot: repo, reason: "uncommitted-work" });
+  });
+});
+
+describe("release --force", () => {
+  it("crosses the worktree boundary, where an ordinary release does not", async () => {
+    const mine = openClaimsStore(repo);
+    await mine.claim("T1", { worktreeRoot: repo });
+
+    const theirs = openClaimsStore(linked);
+    // Ownership is absolute by default: one checkout cannot clear another's.
+    expect(await theirs.release("T1", { worktreeRoot: linked })).toBe(false);
+    expect(await theirs.readClaims()).toHaveLength(1);
+
+    // The operator's deliberate override.
+    expect(await theirs.release("T1", { worktreeRoot: linked }, { force: true })).toBe(true);
+    expect(await theirs.readClaims()).toEqual([]);
+  });
+
+  it("is still false when there is nothing to release", async () => {
+    const theirs = openClaimsStore(linked);
+    expect(await theirs.release("absent", { worktreeRoot: linked }, { force: true })).toBe(false);
+  });
+});

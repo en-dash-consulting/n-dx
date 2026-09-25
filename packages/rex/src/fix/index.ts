@@ -45,6 +45,26 @@ import type { FixAction, FixItem, FixItemStatus, FixKind, FixResult } from "./ty
 
 export type { FixAction, FixItem, FixItemStatus, FixKind, FixResult };
 
+/** The later of two ISO timestamps; `b` may be absent. */
+function laterOf(a: string, b?: string): string {
+  return b && Date.parse(b) > Date.parse(a) ? b : a;
+}
+
+/**
+ * A completed item whose startedAt is after its completedAt — the damage #375
+ * reported. Gated on `completed` because on any other status the stale-clear
+ * rule removes completedAt, dissolving the inversion; firing there too would
+ * put an action in the dry-run plan that the run never performs.
+ */
+function isInvertedPair(item: FixItem): boolean {
+  return (
+    item.status === "completed" &&
+    !!item.startedAt &&
+    !!item.completedAt &&
+    Date.parse(item.startedAt) > Date.parse(item.completedAt)
+  );
+}
+
 export function detectTimestampIssues(items: FixItem[]): FixAction[] {
   const actions: FixAction[] = [];
 
@@ -57,14 +77,21 @@ export function detectTimestampIssues(items: FixItem[]): FixAction[] {
       });
     }
 
-    if (
-      (item.status === "in_progress" || item.status === "completed") &&
-      !item.startedAt
-    ) {
+    if (item.status === "in_progress" && !item.startedAt) {
       actions.push({
         kind: "missing_timestamp",
         itemId: item.id,
-        description: `Add startedAt to ${item.status} item "${item.title}"`,
+        description: `Add startedAt to in_progress item "${item.title}"`,
+      });
+    }
+
+    // #375: a completed item's start time is derived from its own completedAt,
+    // never the clock — anything completed before today would invert.
+    if (item.status === "completed" && !item.startedAt) {
+      actions.push({
+        kind: "missing_timestamp",
+        itemId: item.id,
+        description: `Backfill startedAt from completedAt on completed item "${item.title}"`,
       });
     }
 
@@ -73,6 +100,29 @@ export function detectTimestampIssues(items: FixItem[]): FixAction[] {
         kind: "missing_timestamp",
         itemId: item.id,
         description: `Clear stale completedAt from ${item.status} item "${item.title}"`,
+      });
+    }
+  }
+
+  return actions;
+}
+
+/**
+ * Inverted pairs (startedAt > completedAt) on completed items. `rex fix`
+ * manufactured these itself before #375 by backfilling startedAt with the
+ * current clock, then reported "No issues found" on the result. The true
+ * start is unrecoverable, so the repair clamps startedAt back to completedAt
+ * — the only bound the item's own data supports.
+ */
+export function detectInvertedTimestamps(items: FixItem[]): FixAction[] {
+  const actions: FixAction[] = [];
+
+  for (const { item } of walkFixTree(items)) {
+    if (isInvertedPair(item)) {
+      actions.push({
+        kind: "inverted_timestamps",
+        itemId: item.id,
+        description: `Clamp startedAt back to completedAt on "${item.title}" (startedAt was after completedAt)`,
       });
     }
   }
@@ -257,20 +307,41 @@ function applyTimestampFixes(items: FixItem[], now: string): number {
 
   for (const { item } of walkFixTree(items)) {
     if (item.status === "completed" && !item.completedAt) {
-      item.completedAt = now;
+      // Floored at a future startedAt (clock skew) so this backfill can never
+      // invert the pair it is repairing.
+      item.completedAt = laterOf(now, item.startedAt);
       count++;
     }
 
-    if (
-      (item.status === "in_progress" || item.status === "completed") &&
-      !item.startedAt
-    ) {
+    if (item.status === "in_progress" && !item.startedAt) {
       item.startedAt = now;
+      count++;
+    }
+
+    // #375: completedAt is the floor for a completed item's unknown start —
+    // it exists by here, backfilled just above if it was absent. Using `now`
+    // instead inverted the pair on anything completed before today.
+    if (item.status === "completed" && !item.startedAt) {
+      item.startedAt = item.completedAt;
       count++;
     }
 
     if (item.status !== "completed" && item.completedAt) {
       delete item.completedAt;
+      count++;
+    }
+  }
+
+  return count;
+}
+
+/** Clamp startedAt back to completedAt on inverted pairs (#375 damage). */
+function applyInvertedTimestampFixes(items: FixItem[]): number {
+  let count = 0;
+
+  for (const { item } of walkFixTree(items)) {
+    if (isInvertedPair(item)) {
+      item.startedAt = item.completedAt;
       count++;
     }
   }
@@ -342,8 +413,9 @@ function applyStuckParentFixes(items: FixItem[], now: string): number {
     item.status = "completed";
     // The timestamp pass has already run by now and saw this item as pending,
     // so it will not backfill these — set them here or leave the tree in a
-    // state the next `rex fix` immediately flags.
-    item.completedAt = now;
+    // state the next `rex fix` immediately flags. Floored at a future
+    // startedAt for the same reason that pass floors its completedAt backfill.
+    item.completedAt = laterOf(now, item.startedAt);
     if (!item.startedAt) item.startedAt = now;
     count++;
   }
@@ -354,6 +426,7 @@ function applyStuckParentFixes(items: FixItem[], now: string): number {
 export function detectIssues(items: FixItem[]): FixAction[] {
   return [
     ...detectTimestampIssues(items),
+    ...detectInvertedTimestamps(items),
     ...detectOrphanBlockedBy(items),
     ...detectParentChildMisalignment(items),
     ...detectStuckParents(items),
@@ -373,6 +446,9 @@ export function applyFixes(
   const timestamp = now ?? new Date().toISOString();
 
   const tsCount = applyTimestampFixes(items, timestamp);
+  // After the timestamp pass, whose backfills never invert by construction —
+  // this clamp only ever repairs pre-existing damage.
+  const invertedCount = applyInvertedTimestampFixes(items);
   const orphanCount = applyOrphanBlockedByFixes(items);
   // Reopen before sweeping: a parent this pass moves to `pending` still holds
   // an unfinished child, so the sweep below cannot then close it again.
@@ -381,6 +457,6 @@ export function applyFixes(
 
   return {
     actions,
-    mutatedCount: tsCount + orphanCount + parentCount + stuckCount,
+    mutatedCount: tsCount + invertedCount + orphanCount + parentCount + stuckCount,
   };
 }

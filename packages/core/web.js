@@ -1210,7 +1210,7 @@ function openBrowser(url) {
  * `ndx start --hub`: register this repository with the per-user hub and print
  * where it is served. Returns an exit code.
  */
-async function runHubMode(absDir, flags, { tools, __dir, label }) {
+async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   const home = hubHome();
   let hubPort = await loadHubPort(home);
   if (flags.port) {
@@ -1277,6 +1277,8 @@ async function runHubMode(absDir, flags, { tools, __dir, label }) {
   log(`  Claude:  claude mcp add --transport http rex ${base}/mcp/rex`);
   log(`           claude mcp add --transport http sourcevision ${base}/mcp/sourcevision`);
   log("  Codex:   configured automatically via .codex/config.toml (stdio)");
+  log("");
+  log(`Stop: ${stopCmd} .   (or 'ndx hub stop' for every project)`);
   if (flags.open) openBrowser(`${base}/`);
   return 0;
 }
@@ -1367,7 +1369,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   // accepted, and the way to override web.mode "here" for one run), then the
   // config, then the hub.
   if (!flags.here && (flags.hub || (await loadConfigMode(absDir)) !== "here")) {
-    return runHubMode(absDir, flags, { tools, __dir, label });
+    return runHubMode(absDir, flags, { tools, __dir, label, stopCmd });
   }
 
   // --- Check for stale PID / already running ---

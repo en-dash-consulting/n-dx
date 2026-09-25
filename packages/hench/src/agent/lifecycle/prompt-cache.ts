@@ -1,0 +1,224 @@
+/**
+ * Anthropic prompt-cache breakpoint placement for the API agent loop.
+ *
+ * The API loop re-sends the system prompt, every tool definition and the whole
+ * conversation on every turn. Without `cache_control` markers the entire prompt
+ * is billed at full input rate each time, which for a 20-turn run means the
+ * stable prefix is paid for 20 times.
+ *
+ * Two ephemeral breakpoints fix that:
+ *
+ * 1. **Stable prefix** — a marker on the system block. Anthropic orders the
+ *    cacheable prompt as `tools` → `system` → `messages`, and a breakpoint
+ *    caches everything from the start of the prompt up to and including the
+ *    marked block. A single marker on the system block therefore covers the
+ *    tool definitions as well; a second marker on the tools would consume one
+ *    of the four available breakpoints for no gain. When there is no system
+ *    prompt the marker moves to the last tool so the tool block is still cached.
+ * 2. **Trailing conversation boundary** — a marker on the last block of the last
+ *    message. Each turn writes a cache entry covering the whole conversation so
+ *    far, and the following turn reads the longest matching cached prefix rather
+ *    than re-sending it. This is Anthropic's documented incremental-conversation
+ *    pattern: the breakpoint moves forward each turn.
+ *
+ * Callers pass their own conversation array untouched — every function here is
+ * copy-on-write. That matters for two reasons: the run's message history stays
+ * free of transport-level markers, and the bytes of already-sent messages never
+ * change, which is what makes the next turn's cache read hit.
+ *
+ * This module is Anthropic-only. The Gemini, OpenAI-compatible and CLI paths in
+ * `loop.ts` / `cli-loop.ts` do not call into it.
+ *
+ * Some gateways and proxies placed in front of the Claude API via
+ * `claude.api_endpoint` reject the `cache_control` field outright (some
+ * OpenAI-to-Anthropic shims, some enterprise gateways, Bedrock's legacy
+ * InvokeModel path for models without caching), returning a 400 on turn 1.
+ * `CachedRequestInput.promptCache: false` (surfaced as the `hench.promptCache`
+ * config key) is the escape hatch: `buildCachedMessageRequest` then emits the
+ * request as it looked before caching was added — no breakpoints, `system` as
+ * a plain string, tools and messages passed through untouched.
+ *
+ * Both breakpoints default to Anthropic's 5-minute TTL. `CachedRequestInput.
+ * promptCacheTtl: "1h"` (surfaced as `hench.promptCacheTtl`) extends both to
+ * the 1-hour TTL — see the field doc on `HenchConfig.promptCacheTtl` for when
+ * that pays off. The default omits `ttl` from the wire request entirely
+ * rather than sending `"5m"` explicitly, so a default-config request stays
+ * byte-identical to the pre-TTL-support build.
+ */
+
+import type Anthropic from "@anthropic-ai/sdk";
+import type { AnthropicToolDef } from "../../prd/llm-gateway.js";
+import type { PromptCacheTtl } from "../../schema/index.js";
+
+/**
+ * A fresh ephemeral `cache_control` marker.
+ *
+ * Returned per call rather than shared so no two blocks alias one object.
+ * Omits `ttl` unless it is `"1h"` — Anthropic's default 5-minute TTL applies
+ * whenever the field is absent, and omitting it keeps the default request
+ * byte-identical to before TTL support existed.
+ */
+function ephemeral(ttl?: PromptCacheTtl): Anthropic.CacheControlEphemeral {
+  return ttl === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
+}
+
+/** Inputs needed to build one cached Anthropic request. */
+export interface CachedRequestInput {
+  model: string;
+  /** Response token ceiling (`config.maxTokens`). */
+  maxTokens: number;
+  /** System prompt; an empty or absent prompt moves the prefix marker to the tools. */
+  systemPrompt: string | undefined;
+  tools: readonly AnthropicToolDef[];
+  /** Conversation so far. Never mutated. */
+  messages: readonly Anthropic.MessageParam[];
+  /**
+   * When false, skip cache breakpoints entirely: `system` is sent as a plain
+   * string and `tools`/`messages` pass through untouched — no copy-on-write
+   * normalization, no `cache_control` anywhere in the request. Default: true.
+   * See the module header for why this exists.
+   */
+  promptCache?: boolean;
+  /**
+   * TTL for both cache breakpoints. Default: `"5m"` (Anthropic's default —
+   * see `ephemeral`). `"1h"` extends both. See the module header and
+   * `HenchConfig.promptCacheTtl` for the cost tradeoff.
+   */
+  promptCacheTtl?: PromptCacheTtl;
+}
+
+/**
+ * Build the system field carrying the stable-prefix breakpoint.
+ *
+ * Returns `undefined` for an absent or empty prompt so the request omits the
+ * field entirely rather than sending an empty block.
+ */
+export function buildCachedSystem(
+  systemPrompt: string | undefined,
+  ttl?: PromptCacheTtl,
+): Anthropic.TextBlockParam[] | undefined {
+  if (!systemPrompt) return undefined;
+  return [{ type: "text", text: systemPrompt, cache_control: ephemeral(ttl) }];
+}
+
+/**
+ * Copy the tool definitions, optionally marking the last one.
+ *
+ * `markLast` is only set when there is no system block to carry the
+ * stable-prefix breakpoint — see the module header.
+ */
+export function buildCachedTools(
+  tools: readonly AnthropicToolDef[],
+  markLast: boolean,
+  ttl?: PromptCacheTtl,
+): Anthropic.ToolUnion[] {
+  const copied: Anthropic.ToolUnion[] = [...tools];
+  if (!markLast || copied.length === 0) return copied;
+
+  const lastIndex = copied.length - 1;
+  copied[lastIndex] = { ...tools[lastIndex], cache_control: ephemeral(ttl) };
+  return copied;
+}
+
+/**
+ * Normalize string content to a single text block.
+ *
+ * This is what keeps the cache prefix byte-stable, and it is the reason the
+ * normalization applies to *every* message rather than only the marked one.
+ * `content: "text"` and `content: [{ type: "text", text: "text" }]` are the same
+ * prompt, but they are not the same bytes. If only the trailing message were
+ * expanded into block form, then on the next turn — when that message is no
+ * longer the trailing one — it would revert to its string form, the prefix would
+ * differ from what was cached, and the read would miss. Expanding all of them
+ * means a message's serialized shape never changes once it has been sent, so
+ * each turn genuinely extends the previous turn's cached prefix.
+ *
+ * An empty string is left alone: the API rejects empty text blocks.
+ */
+function normalizeContent(
+  message: Anthropic.MessageParam,
+): Anthropic.MessageParam {
+  if (typeof message.content !== "string" || message.content.length === 0) {
+    return message;
+  }
+  return {
+    role: message.role,
+    content: [{ type: "text", text: message.content }],
+  };
+}
+
+/**
+ * Copy the conversation with a cache breakpoint on the trailing boundary.
+ *
+ * The marker goes on the last cacheable block of the last message. Hench only
+ * ever ends a request with a user message whose content is either the brief /
+ * reminder text or an array of tool results, so `text` and `tool_result` are the
+ * shapes handled here. Anything else (notably `thinking` blocks, which the API
+ * rejects a `cache_control` on) is left unmarked: the stable-prefix breakpoint
+ * still applies, so the worst case is the pre-caching cost, not an API error.
+ */
+export function withTrailingCacheBreakpoint(
+  messages: readonly Anthropic.MessageParam[],
+  ttl?: PromptCacheTtl,
+): Anthropic.MessageParam[] {
+  const copied = messages.map(normalizeContent);
+  if (copied.length === 0) return copied;
+
+  const lastIndex = copied.length - 1;
+  const last = copied[lastIndex];
+  if (typeof last.content === "string") return copied;
+
+  const blocks = [...last.content];
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const block = blocks[i];
+    if (block.type === "text") {
+      blocks[i] = { ...block, cache_control: ephemeral(ttl) };
+    } else if (block.type === "tool_result") {
+      blocks[i] = { ...block, cache_control: ephemeral(ttl) };
+    } else {
+      continue;
+    }
+    copied[lastIndex] = { role: last.role, content: blocks };
+    return copied;
+  }
+
+  return copied;
+}
+
+/**
+ * Assemble a non-streaming Anthropic request with both cache breakpoints.
+ *
+ * The returned object is what `client.messages.create` is called with; the
+ * caller's `tools` and `messages` inputs are left untouched.
+ *
+ * `input.promptCache === false` takes the escape hatch: no `cache_control`
+ * anywhere, `system` as a plain string, `tools`/`messages` passed through as
+ * given (still copied, never the caller's own arrays, but otherwise
+ * byte-identical to the pre-caching request).
+ */
+export function buildCachedMessageRequest(
+  input: CachedRequestInput,
+): Anthropic.MessageCreateParamsNonStreaming {
+  if (input.promptCache === false) {
+    const params: Anthropic.MessageCreateParamsNonStreaming = {
+      model: input.model,
+      max_tokens: input.maxTokens,
+      tools: [...input.tools],
+      messages: [...input.messages],
+    };
+    if (input.systemPrompt) params.system = input.systemPrompt;
+    return params;
+  }
+
+  const system = buildCachedSystem(input.systemPrompt, input.promptCacheTtl);
+
+  const params: Anthropic.MessageCreateParamsNonStreaming = {
+    model: input.model,
+    max_tokens: input.maxTokens,
+    tools: buildCachedTools(input.tools, system === undefined, input.promptCacheTtl),
+    messages: withTrailingCacheBreakpoint(input.messages, input.promptCacheTtl),
+  };
+  if (system !== undefined) params.system = system;
+
+  return params;
+}

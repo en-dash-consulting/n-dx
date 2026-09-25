@@ -14,8 +14,9 @@
  *   `formatTaskBrief` emitted `## Project` with the same four values under
  *   different labels. Every autonomous run paid for both.
  * - **Staging and the commit message.** Rule 5 and Workflow step 4 gave the
- *   same `git add -A` + `.hench-commit-msg.txt` + "do NOT run git commit"
- *   instruction, in full, within the same system prompt.
+ *   same staging + `.hench-commit-msg.txt` + "do NOT run git commit"
+ *   instruction, in full, within the same system prompt. (The staging
+ *   instruction is pathspec-scoped since WM2048 — never a blanket stage.)
  * - **Read before you change, and run the tests.** Rules 1 and 4 restated
  *   Workflow steps 1 and 3.
  *
@@ -103,8 +104,13 @@ describe("the assembled prompt states each project fact once", () => {
 });
 
 describe("the assembled prompt gives each instruction once", () => {
-  it.each(PROVIDERS)("%s: explains staging exactly once", (provider) => {
-    expect(count(assembled(provider), /git add -A/g)).toBeLessThanOrEqual(1);
+  it.each(PROVIDERS)("%s: explains staging exactly once, and pathspec-scoped", (provider) => {
+    const text = assembled(provider);
+    expect(count(text, /git add -- /g)).toBeLessThanOrEqual(1);
+    // WM2048: a blanket stage sweeps changes that are not the agent's to
+    // commit. The instruction names each path instead.
+    expect(text).not.toMatch(/git add -A/);
+    expect(text).not.toMatch(/git add \.(?![\w/])/);
   });
 
   it.each(PROVIDERS)("%s: names the commit-message file once", (provider) => {

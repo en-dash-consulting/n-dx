@@ -25,7 +25,7 @@
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type {PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage} from "../../schema/index.js";import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { toolRexAppendLog } from "../../tools/rex.js";
-import {checkTokenBudget} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
+import {checkTokenBudget, formatBudgetExceeded} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
@@ -40,8 +40,15 @@ import {
   formatReviewSummary,
   classifyUnresolved,
   formatUnresolvedWarning,
+  parkDeferredFindings,
+  deferredFindings,
+  mergeDispositionsIntoRaw,
 } from "../analysis/adversarial-review.js";
-import type { ReviewPassOutcome } from "../analysis/adversarial-review.js";
+import type {
+  ReviewPassOutcome,
+  ReviewReport,
+  DeferredFinding,
+} from "../analysis/adversarial-review.js";
 import { snapshotDirtyState, diffDirtyState } from "../analysis/review-repairs.js";
 import type { DirtySnapshot } from "../analysis/review-repairs.js";
 import { ensureWarmParent } from "./orientation.js";
@@ -62,7 +69,7 @@ import {
   type SpawnReason,
 } from "./spawn-budget.js";
 import { DEFAULT_TASKS_PER_SESSION } from "./session-cache.js";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
   loadLLMConfig,
@@ -90,6 +97,7 @@ import {
   captureBaselineUntracked,
   runReviewGate,
   finalizeRun,
+  recordClaimLoss,
   handleRunFailure,
   formatModelLabel,
 } from "./shared.js";
@@ -1384,10 +1392,23 @@ async function runAdversarialReviewPass(
     return outcome;
   }
 
-  for (const line of formatReviewSummary(outcome.report)) info(line);
+  // Park what nobody ruled on, before anything else reads the report.
+  const { report, deferred } = await resolveReviewDispositions(
+    reportPath,
+    outcome.report,
+    ctx.autonomous,
+  );
 
-  const unresolved = classifyUnresolved(outcome.report);
-  for (const line of formatUnresolvedWarning(outcome.report)) info(line);
+  for (const line of formatReviewSummary(report)) info(line);
+
+  const unresolved = classifyUnresolved(report);
+  for (const line of formatUnresolvedWarning(report)) info(line);
+  if (deferred.length > 0) {
+    info(
+      `${deferred.length} finding(s) deferred — no one was at the capture prompt. ` +
+        `List them with: hench review pending ${inv.run.id}`,
+    );
+  }
 
   // What the reviewer actually changed, from the snapshot pair. `.rex/` is
   // the completion-metadata commit's territory and `.hench/` holds the report
@@ -1408,16 +1429,79 @@ async function runAdversarialReviewPass(
   inv.run.review = {
     model: ctx.reviewModel,
     resumedSession: !!resumeSessionId,
-    findingCount: outcome.report.findings.length,
+    findingCount: report.findings.length,
     unresolvedCount: unresolved.all.length,
     unrepairedMustFixCount: unresolved.unrepairedMustFix.length,
     failedActionCount: unresolved.failedActions.length,
-    fixesApplied: outcome.report.fixesApplied,
+    deferredCount: deferred.length > 0 ? deferred.length : undefined,
+    fixesApplied: report.fixesApplied,
     reportPath,
     repairedFiles,
   };
 
-  return outcome;
+  return { ok: true, report };
+}
+
+/**
+ * Settle each finding's fate, parking the undecided ones when no human was
+ * there to decide.
+ *
+ * **Interactive runs are left alone.** A person stood at the capture prompt, so
+ * a finding the reviewer recorded as `dropped` really was declined; rewriting
+ * it to `deferred` would manufacture a queue out of decisions that were
+ * already made.
+ *
+ * **Autonomous runs get the report rewritten.** There was nobody to decline
+ * anything, so the reviewer's `dropped` records a decision that never
+ * happened. The run replaces it with the fate it can justify from `action` and
+ * `verdict` — see {@link deriveDisposition} — and writes the result back.
+ *
+ * The write-back is the mechanism, not a nicety: `hench review pending` reads
+ * dispositions off this file, so a report left saying `dropped` is a queue
+ * with nothing in it. That is why a failed write is announced rather than
+ * swallowed — the operator is told the findings printed above are the only
+ * copy, which is the state this feature exists to end, instead of being
+ * pointed at a command that will come back empty.
+ *
+ * The in-memory report is returned parked either way, so the run record and
+ * the end-of-run lines agree with what was just printed even when the disk
+ * copy could not be updated.
+ *
+ * @internal Exported for testing.
+ */
+export async function resolveReviewDispositions(
+  reportPath: string,
+  raw: ReviewReport,
+  autonomous: boolean,
+): Promise<{ report: ReviewReport; deferred: DeferredFinding[] }> {
+  if (!autonomous) return { report: raw, deferred: [] };
+
+  const report = parkDeferredFindings(raw);
+  const deferred = deferredFindings(report);
+
+  try {
+    // Patch the reviewer's own JSON rather than re-serializing the parsed
+    // projection — see mergeDispositionsIntoRaw. Writing the projection back
+    // would erase every key the parser does not model, including findings it
+    // skipped as malformed.
+    const merged = mergeDispositionsIntoRaw(await readFile(reportPath, "utf-8"), report);
+    if (merged === null) {
+      throw new Error("the report on disk is no longer a findings array the merge can align to");
+    }
+    await writeFile(reportPath, merged, "utf-8");
+  } catch (err) {
+    info(
+      `⚠ Could not record finding dispositions to ${reportPath} (${(err as Error).message}).`,
+    );
+    if (deferred.length > 0) {
+      info(
+        `  ${deferred.length} deferred finding(s) exist only in the output above — ` +
+          "`hench review pending` will not find them.",
+      );
+    }
+  }
+
+  return { report, deferred };
 }
 
 /**
@@ -1520,7 +1604,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
   if (budgetCheck.exceeded) {
     run.status = "budget_exceeded";
     run.summary = result.summary;
-    run.error = `Token budget exceeded: ${budgetCheck.totalUsed} used of ${budgetCheck.budget} budget`;
+    run.error = formatBudgetExceeded(budgetCheck);
     info(`\n${run.error}`);
     await handleRunFailure(store, taskId, "pending", "budget_exceeded", run.error);
     return "break";
@@ -1798,6 +1882,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // subprocess doesn't appear stale to the web dashboard during long tool calls,
   // and carries the in-flight spawn's turns and tokens so the dashboard does not
   // read a busy run as an idle one (GH #362).
+  recordClaimLoss(opts.claims, run, henchDir);
   const heartbeat = startHeartbeat(henchDir, run, undefined, () => {
     run.turns = accumulated.turns + liveProgress.turns;
     run.tokenUsage = addTokenUsage(accumulated.tokenUsage, liveProgress.tokenUsage);
@@ -2214,6 +2299,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   // Shared: finalize run (build summary, memory stats, post-task tests, save)
   await finalizeRun({
+    claims: opts.claims,
     run,
     henchDir,
     projectDir,

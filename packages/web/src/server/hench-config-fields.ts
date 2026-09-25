@@ -61,6 +61,67 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
 export const FORBIDDEN_CONFIG_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
 
 /**
+ * Nested config groups the dashboard writes member-by-member but hench reads
+ * whole. Writing `retry.maxRetries` into a config with no `retry` used to
+ * leave a one-member group on disk, which hench's schema then refused — a 200
+ * response that bricked the next `ndx work`. Every write path completes a
+ * partially-present group from these defaults before serializing.
+ *
+ * The values mirror hench's `DEFAULT_HENCH_CONFIG()` (web cannot import hench
+ * at runtime — hench sits above web's domain dependencies); the agreement is
+ * pinned by `tests/e2e/hench-config-gate-contract.test.js`.
+ */
+export const CONFIG_GROUP_DEFAULTS: Record<string, Record<string, unknown>> = {
+  retry: { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000 },
+};
+
+/**
+ * Why hench's `prune` group is deliberately NOT in the table above.
+ *
+ * A group belongs here when the dashboard can leave a partial one on disk, and
+ * that only happens for members it can write. `prune.*` is absent from
+ * {@link CONFIG_FIELD_META}, so no route can produce a partial `prune` group
+ * and completing one would mean the dashboard rewriting config a human hand-
+ * edited, in keys it cannot show. That is what the "every group member is a
+ * writable field" assertion in `tests/unit/server/hench-config-fields.test.ts`
+ * exists to stop.
+ *
+ * Nothing is at risk from the omission: every member of hench's
+ * `PruneConfigSchema` carries its own default, so a partial group already
+ * loads.
+ *
+ * Making `prune` editable here needs more than three `CONFIG_FIELD_META` rows.
+ * hench refuses a config whose `prune.retainPairs` is at or above its
+ * `prune.triggerPairs`, and {@link validateFieldValue} sees one field at a time
+ * — it cannot check a sibling. Adding the rows without a config-aware gate
+ * would let a 200 response write a file the next `ndx work` refuses, which is
+ * exactly the drift `tests/e2e/hench-config-gate-contract.test.js` catches. Do
+ * that work first, or leave the group to the CLI (`ndx config hench.prune.*`).
+ */
+
+/**
+ * Fill in missing members of any partially-present group in-place. A group
+ * that is absent entirely stays absent (hench applies its own defaults);
+ * a group that is present but not a plain object is left for the schema to
+ * refuse. Returns the dotted paths that were filled.
+ */
+export function completeConfigGroups(config: Record<string, unknown>): string[] {
+  const filled: string[] = [];
+  for (const [group, defaults] of Object.entries(CONFIG_GROUP_DEFAULTS)) {
+    const value = config[group];
+    if (value === undefined || value === null || typeof value !== "object" || Array.isArray(value)) continue;
+    const members = value as Record<string, unknown>;
+    for (const [member, fallback] of Object.entries(defaults)) {
+      if (members[member] === undefined) {
+        members[member] = fallback;
+        filled.push(`${group}.${member}`);
+      }
+    }
+  }
+  return filled;
+}
+
+/**
  * Validate a single field value against its declared type.
  * Returns an error message, or null when the value is acceptable.
  *

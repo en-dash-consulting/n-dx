@@ -46,6 +46,16 @@ export const CLAIMS_FILENAME = "claims.json";
 const CLAIMS_LOCK_FILENAME = "claims.lock";
 const CLAIMS_FILE_VERSION = 1;
 
+/**
+ * Why a claim is being kept after the run that took it has ended.
+ *
+ * `uncommitted-work`: the completion gate refused to mark the task done
+ * because the run's work is still uncommitted in that worktree. Releasing
+ * then would let a second worktree claim the task and redo work that already
+ * exists on disk, so the claim is held instead — see {@link ClaimsStore.hold}.
+ */
+export type ClaimHoldReason = "uncommitted-work";
+
 export interface TaskClaim {
   taskId: string;
   /** Realpath of the worktree root working the task. */
@@ -55,7 +65,20 @@ export interface TaskClaim {
   /** Informational — claims are only meaningful on one machine. */
   host: string;
   claimedAt: string;
+  /**
+   * When the lease lapses for an ordinary claim. On a held claim (see
+   * {@link reason}) this is informational only — the moment the ordinary
+   * lease would have lapsed — and does not retire the claim.
+   */
   expiresAt: string;
+  /**
+   * Set when the claim is deliberately held past its holder's exit. A held
+   * claim's {@link pid} is expected to be dead and its {@link expiresAt} does
+   * not apply: the claim lives until released, force-released, or re-claimed
+   * by its own worktree. Absent on an ordinary claim held by a running
+   * process.
+   */
+  reason?: ClaimHoldReason;
 }
 
 interface ClaimsFile {
@@ -74,6 +97,19 @@ export interface ClaimOptions {
 export type ClaimResult =
   | { ok: true; claim: TaskClaim }
   | { ok: false; heldBy: TaskClaim };
+
+export interface ReleaseOptions {
+  /**
+   * Release the claim whoever holds it.
+   *
+   * Ownership is otherwise absolute: a run may only free what its own
+   * worktree took, which is what stops one checkout clearing another's claim
+   * by accident. `rex claim release --force` is the deliberate exception —
+   * an operator clearing a claim whose holder is gone, or whose hold they
+   * have dealt with, standing in whichever worktree they happen to be in.
+   */
+  force?: boolean;
+}
 
 /**
  * Who is asking, for the operations that only need identity.
@@ -105,7 +141,10 @@ export function resolveClaimHolder(projectDir: string): ClaimHolder {
 export interface ClaimsStore {
   /** Where claims are kept, or null for the no-op store outside a repository. */
   readonly path: string | null;
-  /** Every live claim — dead pids and expired entries are filtered out. */
+  /**
+   * Every live claim — dead pids and expired entries are filtered out, except
+   * held claims, which neither the pid nor the clock retires.
+   */
   readClaims(): Promise<TaskClaim[]>;
   /**
    * Claim a task. Succeeds when no live claim exists, or when the live claim
@@ -115,9 +154,28 @@ export interface ClaimsStore {
   claim(taskId: string, options: ClaimOptions): Promise<ClaimResult>;
   /**
    * Release a claim this worktree holds. False when no such claim exists, or
-   * when it belongs to another worktree.
+   * when it belongs to another worktree. Held claims release like any other —
+   * that is what frees a task after the work is dealt with.
    */
-  release(taskId: string, holder: ClaimOwner): Promise<boolean>;
+  release(taskId: string, holder: ClaimOwner, options?: ReleaseOptions): Promise<boolean>;
+  /**
+   * Keep a claim this worktree holds after its process exits, recording why.
+   *
+   * An ordinary claim dies with its pid, which is what stops a crashed run
+   * wedging a task. That is exactly wrong when the run ended by *refusing* to
+   * complete the task because its work is still uncommitted: the work exists,
+   * in this worktree, and a second worktree picking the task up would redo it.
+   * A held claim therefore survives a dead pid and does not expire — the
+   * uncommitted work it guards does not clean itself up overnight, so neither
+   * does the hold. It ends only on {@link release} (the work was dealt with),
+   * `release --force`, or a fresh {@link claim} from the holding worktree
+   * (a re-run there clears the reason). `expiresAt` is carried over as an
+   * informational value: when the ordinary lease would have lapsed.
+   *
+   * Returns the held claim, or null when this worktree holds no live claim on
+   * the task.
+   */
+  hold(taskId: string, holder: ClaimOwner, reason: ClaimHoldReason): Promise<TaskClaim | null>;
   /**
    * The live claim held by another worktree, or null when the task is free or
    * held by this one.
@@ -176,6 +234,10 @@ export const NOOP_CLAIMS_STORE: ClaimsStore = {
   async release() {
     return true;
   },
+  async hold() {
+    // Nothing was recorded, so there is nothing to hold.
+    return null;
+  },
   async isClaimedByOther() {
     return null;
   },
@@ -209,6 +271,13 @@ class FileClaimsStore implements ClaimsStore {
   }
 
   private isLive(claim: TaskClaim): boolean {
+    // A held claim outlives its process AND its lease: neither the pid nor
+    // the clock retires it, because the uncommitted work it guards does not
+    // clean itself up overnight. It ends only by an explicit release (the
+    // operator dealt with the work), release --force, or a fresh claim from
+    // the holding worktree (a re-run there clears the reason). See
+    // {@link ClaimsStore.hold}.
+    if (claim.reason) return true;
     const expires = Date.parse(claim.expiresAt);
     if (!Number.isFinite(expires) || expires <= this.now()) return false;
     return this.isPidAlive(claim.pid);
@@ -273,17 +342,36 @@ class FileClaimsStore implements ClaimsStore {
         claimedAt: existing?.claimedAt ?? new Date(nowMs).toISOString(),
         expiresAt: new Date(nowMs + ttlMs).toISOString(),
       };
+      // Deliberately no `reason`: a live process has taken the task, so
+      // whatever hold was recorded is over. Re-running in the worktree that
+      // left uncommitted work is one of the ways to resolve a hold.
       claims[taskId] = claim;
       return { ok: true, claim };
     });
   }
 
-  async release(taskId: string, holder: ClaimOwner): Promise<boolean> {
+  async release(taskId: string, holder: ClaimOwner, options: ReleaseOptions = {}): Promise<boolean> {
     return this.update((claims) => {
       const existing = claims[taskId];
-      if (!existing || !sameHolder(existing, holder.worktreeRoot)) return false;
+      if (!existing) return false;
+      if (!options.force && !sameHolder(existing, holder.worktreeRoot)) return false;
       delete claims[taskId];
       return true;
+    });
+  }
+
+  async hold(taskId: string, holder: ClaimOwner, reason: ClaimHoldReason): Promise<TaskClaim | null> {
+    return this.update((claims) => {
+      const existing = claims[taskId];
+      if (!existing || !sameHolder(existing, holder.worktreeRoot)) return null;
+      // The expiry is carried over untouched, and for a held claim it is
+      // informational only — the moment the ordinary lease would have lapsed.
+      // `isLive` never retires a claim that carries a reason, so the hold
+      // ends by release, release --force, or a fresh claim from this
+      // worktree, never by the clock.
+      const held: TaskClaim = { ...existing, reason };
+      claims[taskId] = held;
+      return held;
     });
   }
 
@@ -342,6 +430,7 @@ function isClaim(value: unknown): value is TaskClaim {
     typeof c.worktreeRoot === "string" &&
     typeof c.pid === "number" &&
     typeof c.expiresAt === "string" &&
-    typeof c.claimedAt === "string"
+    typeof c.claimedAt === "string" &&
+    (c.reason === undefined || typeof c.reason === "string")
   );
 }

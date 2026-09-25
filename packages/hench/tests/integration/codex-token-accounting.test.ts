@@ -169,7 +169,8 @@ describe("codex token accounting integration", () => {
       { turn: 1, input: 40, output: 10, vendor: "codex", model: "sonnet", diagnosticStatus: "complete" },
       { turn: 1, input: 70, output: 30, vendor: "codex", model: "sonnet", diagnosticStatus: "complete" },
     ]);
-    expect(result.run.error).toContain("150 used of 130 budget");
+    // Codex reports no cache classes, so counted total == input + output.
+    expect(result.run.error).toContain("150 of 130 (uncached input + cache writes + output)");
 
     const afterRuns = await listRuns(henchDir);
     const afterTotal = totalTokens(afterRuns);

@@ -25,9 +25,21 @@ async function waitFor(fn: () => void, timeout = 2000) {
   fn(); // Final attempt — let it throw
 }
 
+// Titles lead with plain language and the metric that produced the finding
+// stays in the description — see packages/sourcevision/src/analyzers/next-steps.ts.
 const STEPS = [
-  { priority: "high", title: "Fix circular dependency", description: "Break the hench cycle", category: "fix" },
-  { priority: "medium", title: "Extract shared helpers", description: "Reduce duplication", category: "extract" },
+  {
+    priority: "high",
+    title: "Files are tightly coupled to the hench zone",
+    description: "High coupling (0.82) — 4 imports target the hench zone",
+    category: "fix",
+  },
+  {
+    priority: "medium",
+    title: "2 related findings: files are loosely related, consider splitting",
+    description: "Low cohesion (0.24) — files are loosely related, consider splitting this zone",
+    category: "extract",
+  },
 ];
 
 describe("NextStepsPanel", () => {
@@ -97,8 +109,8 @@ describe("NextStepsPanel", () => {
 
     const items = section.querySelectorAll(".next-step-item");
     expect(items).toHaveLength(2);
-    expect(items[0].textContent).toContain("Fix circular dependency");
-    expect(items[0].textContent).toContain("Break the hench cycle");
+    expect(items[0].textContent).toContain("Files are tightly coupled to the hench zone");
+    expect(items[0].textContent).toContain("High coupling (0.82)");
     expect(items[0].querySelector(".next-step-priority-high")).toBeTruthy();
     expect(items[1].querySelector(".next-step-priority-medium")).toBeTruthy();
   });
@@ -114,8 +126,8 @@ describe("NextStepsPanel", () => {
       expect(clipboardWrite).toHaveBeenCalledTimes(1);
     });
     const copied = clipboardWrite.mock.calls[0][0] as string;
-    expect(copied).toContain("Fix circular dependency");
-    expect(copied).toContain("Break the hench cycle");
+    expect(copied).toContain("Files are tightly coupled to the hench zone");
+    expect(copied).toContain("High coupling (0.82)");
   });
 
   it("copies all steps as a markdown list", async () => {
@@ -129,8 +141,8 @@ describe("NextStepsPanel", () => {
       expect(clipboardWrite).toHaveBeenCalledTimes(1);
     });
     const md = clipboardWrite.mock.calls[0][0] as string;
-    expect(md).toContain("1. **[high]** Fix circular dependency");
-    expect(md).toContain("2. **[medium]** Extract shared helpers");
+    expect(md).toContain("1. **[high]** Files are tightly coupled to the hench zone");
+    expect(md).toContain("2. **[medium]** 2 related findings: files are loosely related, consider splitting");
   });
 
   it("captures steps to the PRD after confirmation and shows the result", async () => {
@@ -165,7 +177,7 @@ describe("NextStepsPanel", () => {
     const call = fetchSpy.mock.calls.find(([u]) => String(u) === "/api/rex/capture-next-steps")!;
     const body = JSON.parse((call[1] as RequestInit).body as string);
     expect(body.steps).toHaveLength(2);
-    expect(body.steps[0].title).toBe("Fix circular dependency");
+    expect(body.steps[0].title).toBe("Files are tightly coupled to the hench zone");
   });
 
   it("cancelling the confirmation makes no request", async () => {

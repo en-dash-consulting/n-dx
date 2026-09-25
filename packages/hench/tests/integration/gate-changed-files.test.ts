@@ -13,7 +13,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
-import { initGitFixtureRepoSync } from "../helpers/index.js";
+import { initGitFixtureRepoSync, RM_RETRY } from "../helpers/index.js";
 // These cases assert the gate actually RAN, which needs the `sh -c` that
 // runTestGate spawns on every platform — so they are shell-dependent for real,
 // not shape-only. See tests/shell-spawn-inventory.md.
@@ -43,7 +43,7 @@ describe("full-suite gate no longer skips changed runs", () => {
   });
 
   afterEach(async () => {
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
 
   it("runs the gate when only the reviewer changed files after a self-committing executor", async () => {

@@ -54,6 +54,8 @@
  * **In-scope (re-export permitted):**
  * - Schema version contract (read/validate prd.json compatibility)
  * - Store factory (open a PRDStore for reading/writing)
+ * - Save file report (takeSaveFileReport — the files the last PRD save(s)
+ *   wrote and deleted, so completion commits stage those paths, not the tree)
  * - Tree traversal (findItem, walkTree — locate items in the tree)
  * - Task selection (findNextTask, findActionableTasks, collectCompletedIds)
  * - Cross-worktree task claims (openClaimsStore, resolveClaimHolder — the
@@ -65,6 +67,8 @@
  * - Requirements validation (verify task acceptance criteria)
  * - Level helpers (isRootLevel, isWorkItem — classify items)
  * - Finding acknowledgment (load/save/acknowledge sourcevision findings)
+ * - PRD tree conformance (checkTreeConformance — refuse to start a run whose
+ *   completion write would re-slug the whole tree)
  *
  * **Out-of-scope (must NOT be re-exported):**
  * - PRD mutation (insertChild, updateInTree, removeFromTree — hench
@@ -96,6 +100,21 @@ export { resolveStore } from "@n-dx/rex";
 
 // ---- Folder-tree storage path -----------------------------------------------
 export { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "@n-dx/rex";
+
+// ---- Save file report ---------------------------------------------------------
+// What the last PRD save(s) actually wrote and deleted, project-relative.
+// Hench's completion and --reset-deferred commits stage exactly these paths
+// (plus the tree-meta sidecar) instead of the whole tree — staging
+// `.rex/prd_tree/` wholesale once swept a 1,378-file in-flight rename into a
+// "task completed" commit. Only rex's serializer knows which files a save
+// touched, so the list must come from the store, not from a hench-side scan.
+export { takeSaveFileReport } from "@n-dx/rex";
+
+// ---- PRD tree slug conformance ----------------------------------------------
+// The pre-run gate. A run writes the PRD when it completes, so starting one
+// against a tree this build would re-slug is how a whole-tree rewrite lands in
+// a feature branch under a "task completed" commit.
+export { checkTreeConformance } from "@n-dx/rex";
 
 // ---- Tree utilities ---------------------------------------------------------
 export { findItem, walkTree } from "@n-dx/rex";
@@ -138,4 +157,4 @@ export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "@n-dx/re
 // All type imports from rex must flow through this gateway to prevent
 // type-import promotion erosion (a type import can be promoted to a
 // runtime import during refactoring, silently bypassing the gateway).
-export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim } from "@n-dx/rex";
+export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason, SaveFileReport } from "@n-dx/rex";

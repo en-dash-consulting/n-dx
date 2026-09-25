@@ -109,15 +109,26 @@ describe("GET /api/rex/claims", () => {
         taskId: "t-expired", worktreeRoot: "/repos/app/.claude/worktrees/feature-z", pid: otherPid, host: "box",
         claimedAt: "2026-09-16T08:00:00.000Z", expiresAt: "2026-09-16T08:00:01.000Z",
       },
+      // A hold left by a finished run: the pid is dead on purpose, and the
+      // claim is still live because it carries a reason.
+      "t-held": {
+        taskId: "t-held", worktreeRoot: "/repos/app/.claude/worktrees/feature-w", pid: 2 ** 22 + 4243, host: "box",
+        claimedAt: "2026-09-16T09:30:00.000Z", expiresAt: soon, reason: "uncommitted-work",
+      },
     });
 
     const res = await fetch(`http://127.0.0.1:${port}/api/rex/claims`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.servedWorktree).toBe(tmpDir);
-    expect(body.claims.map((c: { taskId: string }) => c.taskId)).toEqual(["t-known", "t-elsewhere-only", "t-mine"]);
+    expect(body.claims.map((c: { taskId: string }) => c.taskId)).toEqual(["t-held", "t-known", "t-elsewhere-only", "t-mine"]);
 
-    const [known, elsewhere, mine] = body.claims;
+    const [held, known, elsewhere, mine] = body.claims;
+    // The reason rides along on a held claim, and only there — a live run's
+    // claim must not grow the field, so the dashboard can tell them apart.
+    expect(held).toMatchObject({ taskId: "t-held", reason: "uncommitted-work", worktree: "feature-w" });
+    expect(known.reason).toBeUndefined();
+    expect(mine.reason).toBeUndefined();
     expect(known).toMatchObject({
       taskId: "t-known",
       taskTitle: "Known task",

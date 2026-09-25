@@ -71,6 +71,89 @@ export interface RetryConfig {
 }
 
 /**
+ * Canonical retry defaults — the single source for {@link DEFAULT_HENCH_CONFIG}
+ * and the per-field defaults in `validate.ts`'s RetryConfigSchema, so a config
+ * carrying only some retry members loads with the same values init would write.
+ */
+export const DEFAULT_RETRY_CONFIG: Readonly<RetryConfig> = {
+  maxRetries: 3,
+  baseDelayMs: 2000,
+  maxDelayMs: 30000,
+};
+
+/**
+ * Tuning for the summarizing context prune in `agent/lifecycle/context-prune.ts`.
+ *
+ * Every member trades the same two things against each other: how much of the
+ * run the agent can still read verbatim, and how often the prompt prefix the
+ * provider cached is invalidated. See {@link DEFAULT_PRUNE_CONFIG} for what the
+ * defaults are and why.
+ *
+ * Only the API loops prune — the CLI loops hand the conversation to the vendor
+ * binary, which manages its own window.
+ */
+export interface PruneConfig {
+  /**
+   * Turn-pairs tolerated before a prune fires. Sets peak context: the prompt
+   * grows by pure append until it crosses this, so raising it raises the
+   * largest request the run will send.
+   */
+  triggerPairs?: number;
+  /**
+   * Turn-pairs kept verbatim after a prune. Everything older is replaced by a
+   * summary, so this is how much of the recent run the agent can still read
+   * word-for-word.
+   *
+   * The gap between this and {@link triggerPairs} is how many turns of
+   * append-only, cache-friendly growth follow each prune — raising retention
+   * toward the trigger narrows that gap and invalidates the cached prefix more
+   * often. Must stay below the trigger.
+   */
+  retainPairs?: number;
+  /**
+   * Characters of each dropped message the summarizer is shown. A message
+   * longer than this is truncated with a visible marker before the light model
+   * ever sees it, so anything past the cap cannot reach the summary.
+   */
+  transcriptMessageChars?: number;
+}
+
+/**
+ * Canonical prune defaults — the single source for {@link DEFAULT_HENCH_CONFIG},
+ * the per-field defaults in `validate.ts`'s PruneConfigSchema, and the exported
+ * constants in `agent/lifecycle/context-prune.ts`.
+ *
+ * `20`/`10`: unchanged from the pre-configuration behavior, so peak context and
+ * the cache cadence (one prune per ten turns) stay where they were measured.
+ *
+ * `2000`: matches `MAX_TOOL_OUTPUT_STORED` in `agent/lifecycle/loop.ts`, the
+ * size at which hench truncates a tool result for the run record. Below that the
+ * summarizer sees less of a tool result than the run itself keeps — at the
+ * original 800 a 2,000-character result lost 60% of its characters before
+ * summarization, which is the finding this config surface came from.
+ */
+export const DEFAULT_PRUNE_CONFIG: Readonly<Required<PruneConfig>> = {
+  triggerPairs: 20,
+  retainPairs: 10,
+  transcriptMessageChars: 2000,
+};
+
+/**
+ * Floor on {@link PruneConfig.triggerPairs} and {@link PruneConfig.retainPairs}.
+ *
+ * A floor on usefulness rather than on arithmetic: one retained pair leaves the
+ * agent a single turn of verbatim history, and a trigger of 1 prunes on every
+ * turn — the front-splice behavior the summarizing prune exists to replace.
+ *
+ * Lives here, with the defaults, because both places that enforce it are
+ * downstream of this module: `validate.ts` refuses a smaller value in
+ * `.hench/config.json`, and `agent/lifecycle/context-prune.ts` clamps to it at
+ * runtime for the `.n-dx.json` overrides that `loadConfig` merges *after*
+ * validation. One constant, so the refusal and the clamp cannot disagree.
+ */
+export const MIN_PRUNE_PAIRS = 2;
+
+/**
  * Git-safety configuration embedded in {@link HenchConfig}.
  *
  * Governs how checkpoint decisions (currently the pre-run commit gate) react
@@ -131,7 +214,15 @@ export interface HenchConfig {
   model: string;
   maxTurns: number;
   maxTokens: number;
-  /** Total token budget per run (input + output). 0 = unlimited. */
+  /**
+   * Total token budget per run. 0 = unlimited.
+   *
+   * Counts every token the run processed at face value: uncached input,
+   * cache-write input, cache-read input, and output. Cached input counts
+   * toward the budget — otherwise a prompt-cached run would bound only its
+   * output, since caching moves nearly all input tokens out of the uncached
+   * `input` field.
+   */
   tokenBudget: number;
   rexDir: string;
   apiKeyEnv: string;
@@ -309,7 +400,58 @@ export interface HenchConfig {
    * See {@link GitSafetyConfig} for field semantics and defaults.
    */
   git?: GitSafetyConfig;
+  /**
+   * Whether the Anthropic API loop marks `cache_control` breakpoints on the
+   * request (see `agent/lifecycle/prompt-cache.ts`). Default: true.
+   *
+   * Set to false when `claude.api_endpoint` points at a gateway or proxy that
+   * rejects the `cache_control` field (some OpenAI-to-Anthropic shims, some
+   * enterprise gateways, Bedrock's legacy InvokeModel path for models without
+   * caching) — those return a 400 on turn 1 with no other way to disable the
+   * markers. When false, the request is sent as it was before prompt caching
+   * was added: `system` as a plain string, tools and messages untouched.
+   * Only meaningful when `provider === "api"` with the Claude vendor; the CLI
+   * loop never calls into `prompt-cache.ts`.
+   */
+  promptCache?: boolean;
+  /**
+   * TTL for the Anthropic API loop's `cache_control` breakpoints (see
+   * `agent/lifecycle/prompt-cache.ts`). Default: `"5m"`.
+   *
+   * Anthropic measures a cache entry's TTL from the start of the request
+   * that wrote or read it, so time spent on generation and tool calls
+   * counts against the window. A turn whose tool call runs long (the test
+   * gate alone allows up to `fullTestTimeoutMs`) commonly exceeds the
+   * 5-minute default before the next request, so the cached prefix is
+   * re-written at the 1.25x-input rate instead of read at 0.1x.
+   *
+   * `"1h"` extends both breakpoints (there are always exactly two — see the
+   * module header on `prompt-cache.ts`) to Anthropic's one-hour TTL. It only
+   * pays off when the start-to-start gap between turns regularly falls
+   * between 5 and 60 minutes: below 5 minutes the default window already
+   * covers it, and above 60 minutes neither TTL helps. A 1-hour write costs
+   * 2x input rather than 1.25x — cost estimates do not price that
+   * difference; see the caveat above `MODEL_COSTS` in llm-client's
+   * `config.ts`, which documents that every write is priced at the
+   * 1.25x rate regardless of TTL, so enabling `"1h"` makes estimated spend
+   * under-report the real bill by the gap between 1.25x and 2x on writes.
+   * Enable it only when turns are consistently slow enough to miss the
+   * default window.
+   *
+   * Only meaningful when `provider === "api"` with the Claude vendor and
+   * `promptCache !== false`.
+   */
+  promptCacheTtl?: PromptCacheTtl;
+  /**
+   * Tuning for the summarizing context prune the API loops run once a
+   * conversation outgrows the trigger. See {@link PruneConfig} for field
+   * semantics and {@link DEFAULT_PRUNE_CONFIG} for the defaults.
+   */
+  prune?: PruneConfig;
 }
+
+/** The two prompt-cache TTLs Anthropic's `cache_control` breakpoints support. */
+export type PromptCacheTtl = "5m" | "1h";
 
 // ── Language-specific guard defaults ──────────────────────────────────
 
@@ -398,11 +540,8 @@ export function DEFAULT_HENCH_CONFIG(language?: ProjectLanguage): HenchConfig {
     rexDir: PROJECT_DIRS.REX,
     apiKeyEnv: "ANTHROPIC_API_KEY",
     guard: guardDefaultsForLanguage(language),
-    retry: {
-      maxRetries: 3,
-      baseDelayMs: 2000,
-      maxDelayMs: 30000,
-    },
+    retry: { ...DEFAULT_RETRY_CONFIG },
+    prune: { ...DEFAULT_PRUNE_CONFIG },
     loopPauseMs: 2000,
     maxFailedAttempts: 3,
     autoCommit: false,
@@ -546,6 +685,15 @@ export interface RunDiagnostics {
    * v1 additive field — old records without this field load normally.
    */
   approvals?: string;
+  /**
+   * Last 200 lines of the full test suite gate's combined stdout/stderr,
+   * copied from `RunRecord.testGate.outputTail` when the gate fails or
+   * cannot be launched. Kept here too (not just on `testGate`) so gate
+   * output is discoverable wherever diagnostics are already being read.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  testGateOutputTail?: string;
 }
 
 /**
@@ -709,6 +857,12 @@ export interface TestGateResult {
   totalDurationMs?: number;
   /** Why the gate could not produce a verdict (never launched, or timed out) */
   error?: string;
+  /**
+   * Last 200 lines of the gate's combined stdout/stderr, for post-hoc
+   * diagnosis. Only populated when the gate did not pass (or could not be
+   * launched) and produced some output — a green gate needs no post-mortem.
+   */
+  outputTail?: string;
 }
 
 export interface DependencyVulnerability {
@@ -916,6 +1070,19 @@ export type RunReviewRecord =
        * counts under `unrepairedMustFixCount`, never here.
        */
       failedActionCount: number;
+      /**
+       * Findings an autonomous run parked for the operator instead of
+       * dropping, because no human was at the capture prompt to rule on them.
+       * See `deriveDisposition` in `agent/analysis/adversarial-review.ts` for
+       * what earns a deferral; `hench review pending <run-id>` lists them.
+       *
+       * v1 additive field, and orthogonal to `unresolvedCount` rather than a
+       * slice of it: an unrepaired must-fix is counted by both, while a
+       * should-fix nobody answered for is deferred but not unresolved. Absent
+       * on records written before the field existed and on interactive runs,
+       * which have a human to decide and so park nothing.
+       */
+      deferredCount?: number;
       /** True when the reviewer edited a file. */
       fixesApplied: boolean;
       /** Absolute path of the JSON report the reviewer wrote. */
@@ -949,6 +1116,18 @@ export type RunReviewRecord =
        */
       gated?: boolean;
     };
+
+/**
+ * A completion whose PRD "record" commit did not land — the work itself is
+ * committed and the task stays completed; only the bookkeeping is pending.
+ * See {@link RunRecord.recordCommitPending}.
+ */
+export interface RecordCommitPending {
+  /** Project-relative paths the record commit tried to stage. */
+  paths: string[];
+  /** Why the commit failed, verbatim from git. */
+  error: string;
+}
 
 export interface RunRecord {
   id: string;
@@ -1124,6 +1303,79 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   host?: string;
+  /**
+   * Commits this run produced — the task's own work commit, the
+   * review-repair commit, and the completion-metadata ("record") commit,
+   * whichever landed — in the order git created them.
+   *
+   * Read by the run summary printer to name what actually happened instead of
+   * inferring it from `status` alone: a run can land its work commits and
+   * still have the follow-up record commit pending (see
+   * {@link recordCommitPending}), and without this list the summary had
+   * nothing to point at.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  commits?: RunCommitRecord[];
+  /**
+   * Set when the task's own work already succeeded but the follow-up PRD
+   * "record" commit (completion metadata) could not be committed.
+   *
+   * The run stays `"completed"` — the work landed and validated; a failed
+   * bookkeeping commit is a pending record, not a failed task. The object
+   * form carries the project-relative paths the record commit tried to
+   * stage and why it failed, so the operator (or a later resume) can land
+   * the record with commands scoped to exactly those paths.
+   *
+   * The bare `true` form is the legacy shape: records written before the
+   * paths existed set a boolean, and on that era's runs `status` also read
+   * `"failed"`. Readers should treat any truthy value as "work completed,
+   * record pending" (see `classifyRunOutcome` in cli/commands/run.ts).
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  recordCommitPending?: boolean | RecordCommitPending;
+  /**
+   * Operator-visible paths still dirty in the working tree when the run
+   * finished, after any rollback — what the run actually left behind rather
+   * than what it touched along the way. Hench's own runtime artifacts are
+   * discounted, the same list the pre-run gate discounts.
+   *
+   * Read by the run summary beside {@link commits} so "Changes: none" means
+   * it: a run that lands no commit and whose edits the tool-call heuristic
+   * does not recognize used to report "none" while its finished work sat
+   * uncommitted in the tree — the very state the completion gate had just
+   * refused on, printed two lines below the refusal.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  uncommittedPaths?: string[];
+  /**
+   * Set when another worktree took this run's task over while it was still
+   * running — the renewal timer's refresh was refused. The run continues by
+   * design (abandoning work in progress would be worse than the overlap), so
+   * this is the only trace that the task is no longer this run's to finish.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  claimLost?: RunClaimLost;
+}
+
+/** See {@link RunRecord.claimLost}. Mirrors ClaimLostEvent in process/task-claims.ts. */
+export interface RunClaimLost {
+  /** When the refusal was observed. */
+  at: string;
+  taskId: string;
+  /** Worktree root that now holds the task. */
+  holderWorktree: string;
+}
+
+/** A single commit a run produced. See {@link RunRecord.commits}. */
+export interface RunCommitRecord {
+  /** Full commit SHA. */
+  sha: string;
+  /** First line of the commit message. */
+  subject: string;
 }
 
 export interface TaskBriefTask {

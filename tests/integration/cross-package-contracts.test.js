@@ -157,6 +157,7 @@ describe("hench → rex gateway contract", () => {
    */
   const GATEWAY_FUNCTIONS = [
     "resolveStore",
+    "takeSaveFileReport",
     "isCompatibleSchema",
     "assertSchemaVersion",
     "findItem",
@@ -395,6 +396,7 @@ describe("web → rex gateway contract", () => {
     "handleEditItem",
     "aggregateItemTokenUsage",
     "aggregateItemDurations",
+    "estimateCostFromTotals",
     "parseFolderTree",
     "resolveSiblingSlugs",
     "resolveStore",
@@ -594,7 +596,7 @@ describe("gateway export auto-detection", () => {
 
     // The contract test lists above
     const testedSymbols = new Set([
-      ...["resolveStore", "isCompatibleSchema", "assertSchemaVersion",
+      ...["resolveStore", "takeSaveFileReport", "isCompatibleSchema", "assertSchemaVersion",
         "findItem", "walkTree", "findNextTask", "findActionableTasks",
         "collectCompletedIds", "explainSelection", "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates",
@@ -602,7 +604,8 @@ describe("gateway export auto-detection", () => {
         "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding"],
-      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "TREE_META_FILENAME", "SELF_HEAL_TAG"],
+      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "TREE_META_FILENAME", "SELF_HEAL_TAG",
+        "checkTreeConformance"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));
@@ -700,8 +703,8 @@ describe("gateway export auto-detection", () => {
         "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "cascadeParentReset",
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId",
         "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
-        "VALID_VALIDATION_TYPES", "CHILD_LEVEL"],
-      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME"],
+        "VALID_VALIDATION_TYPES", "CHILD_LEVEL", "estimateCostFromTotals"],
+      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));

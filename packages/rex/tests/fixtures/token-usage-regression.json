@@ -22,6 +22,7 @@
         "id": "run-1",
         "startedAt": "2026-02-02T12:00:00.000Z",
         "status": "completed",
+        "model": "claude-opus-5",
         "tokenUsage": {
           "input": 900,
           "output": 300
@@ -31,6 +32,7 @@
         "id": "run-2",
         "startedAt": "2026-02-05T12:00:00.000Z",
         "status": "completed",
+        "model": "claude-haiku-4-5",
         "tokenUsage": {
           "input": 1200,
           "output": 400
@@ -48,31 +50,48 @@
     "allTime": {
       "packages": {
         "rex": {
-          "inputTokens": 3000,
-          "outputTokens": 700,
-          "calls": 5,
+          "inputTokens": 3500,
+          "outputTokens": 800,
+          "calls": 6,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {}
         },
         "hench": {
           "inputTokens": 2100,
           "outputTokens": 700,
           "calls": 2,
+          "runs": 2,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {
+            "claude-opus-5": {
+              "inputTokens": 900,
+              "outputTokens": 300,
+              "cacheCreationTokens": 0,
+              "cacheReadTokens": 0
+            },
+            "claude-haiku-4-5": {
+              "inputTokens": 1200,
+              "outputTokens": 400,
+              "cacheCreationTokens": 0,
+              "cacheReadTokens": 0
+            }
+          }
         },
         "sv": {
           "inputTokens": 600,
           "outputTokens": 150,
           "calls": 2,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {}
         }
       },
       "totals": {
-        "inputTokens": 5700,
-        "outputTokens": 1550,
-        "calls": 9
+        "inputTokens": 6200,
+        "outputTokens": 1650,
+        "calls": 10
       },
       "commands": {
         "rex:analyze": {
@@ -102,31 +121,42 @@
       "until": "2026-02-04T23:59:59.000Z",
       "packages": {
         "rex": {
-          "inputTokens": 2000,
-          "outputTokens": 500,
-          "calls": 3,
+          "inputTokens": 2500,
+          "outputTokens": 600,
+          "calls": 4,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {}
         },
         "hench": {
           "inputTokens": 900,
           "outputTokens": 300,
           "calls": 1,
+          "runs": 1,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {
+            "claude-opus-5": {
+              "inputTokens": 900,
+              "outputTokens": 300,
+              "cacheCreationTokens": 0,
+              "cacheReadTokens": 0
+            }
+          }
         },
         "sv": {
           "inputTokens": 600,
           "outputTokens": 150,
           "calls": 2,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {}
         }
       },
       "totals": {
-        "inputTokens": 3500,
-        "outputTokens": 950,
-        "calls": 6
+        "inputTokens": 4000,
+        "outputTokens": 1050,
+        "calls": 7
       }
     }
   },
