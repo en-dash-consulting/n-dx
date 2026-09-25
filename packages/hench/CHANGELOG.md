@@ -1,5 +1,71 @@
 # @n-dx/hench
 
+## 0.7.2
+
+### Patch Changes
+
+- [#422](https://github.com/en-dash-consulting/n-dx/pull/422) [`b7f8559`](https://github.com/en-dash-consulting/n-dx/commit/b7f8559c1ef4f38d5df9f042a65094b4e4136013) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Allow the rex MCP write tools hench's own prompts direct the agent to call.
+  
+  A run attaches its own rex MCP server (`--mcp-config … --strict-mcp-config`) and
+  its brief directs the agent to `update_task_status`, `append_log` and `add_item`.
+  Nothing granted those tools: `--allowed-tools` carried only `Bash(<cmd>:*)` plus
+  the file tools, and `ndx init` deliberately auto-approves just rex's *read* tools,
+  so a headless `claude -p` spawn had nobody to approve the rest. The agent was
+  being pointed at tools the run had not allowed.
+  
+  Both failure shapes were seen in a consumer project. One run's agent, denied,
+  hand-edited the task's `index.md` frontmatter and committed it — recording a
+  completion outside hench's hold, which exists to apply it only after the test
+  gate passes. Another was denied twice and ended its turn asking for permission;
+  with `autoCommit: false` it never wrote `.hench-commit-msg.txt`, so the run
+  failed with all of its work uncommitted.
+  
+  The three tools are now granted on every Claude CLI spawn — the work spawn, its
+  retries, the adversarial review pass and the reviewer's background-wait resume
+  all build their args through one function. Nothing else is granted, and the tool
+  names are derived from the server name the run registers, so renaming the server
+  cannot silently orphan the grant.
+  
+  Granting the write tools does not weaken the PRD: while a run holds a task's
+  claim, rex records the agent's status request on the claim and hench applies it
+  only once the test gate passes. Denying the tool added no safeguard — it pushed
+  the agent into hand-editing the task file, which has none.
+
+- [#420](https://github.com/en-dash-consulting/n-dx/pull/420) [`fd7cd17`](https://github.com/en-dash-consulting/n-dx/commit/fd7cd175680673d9e79798bd69501731590ac53b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Count the per-run MCP config as hench's own runtime state, not operator work.
+  
+  0.7.1 began writing `.hench/mcp/<runId>.json` for every Claude-vendor run but
+  left it out of `HENCH_RUNTIME_GITIGNORE_ENTRIES`, the list the pre-run, loop and
+  completion gates discount. In any project whose `.gitignore` did not already
+  name `.hench/mcp/`, the file read back as the run's own uncommitted work: the
+  completion was refused and the task reset to pending, and because the config is
+  swept by age rather than at run end, the next run could be refused too.
+  
+  Workaround on 0.7.1: add `.hench/mcp/` to the project's `.gitignore`.
+
+- [#422](https://github.com/en-dash-consulting/n-dx/pull/422) [`b7f8559`](https://github.com/en-dash-consulting/n-dx/commit/b7f8559c1ef4f38d5df9f042a65094b4e4136013) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Count review repairs as uncommitted work unless a commit will really follow.
+  
+  The completion gate excluded `review.repairedFiles` on the promise that a later
+  step of the run commits them — `commitReviewRepairsIfNeeded` on `autoCommit`, or
+  the commit prompt's `stageReviewRepairs` otherwise. But that prompt returns early
+  when `.hench-commit-msg.txt` is missing or empty, so with `autoCommit: false` and
+  no message file nothing committed the repairs. The staged-index exclusion beside
+  it was already conditioned on a non-empty message file; this one was not.
+  
+  It mattered more than the index does. A "repair" is every path the review pass
+  changed, so it covers files the agent created and the reviewer then edited — in
+  one consumer run that was the entire feature, a new module and its test. The
+  refusal named only `package.json` and `package-lock.json`, and its "commit exactly
+  these paths" commands would have left both new files behind. With nothing else
+  dirty the same discount made the tree look clean, and the task reached `completed`
+  with its whole diff still untracked.
+  
+  Repairs are now excluded only when `autoCommit` is on or a non-empty commit message
+  file exists — the same condition as the staged index. When neither holds, they are
+  named in the refusal and in its recovery commands along with everything else.
+- Updated dependencies []:
+  - @n-dx/llm-client@0.7.2
+  - @n-dx/rex@0.7.2
+
 ## 0.7.1
 
 ### Patch Changes
