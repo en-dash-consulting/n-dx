@@ -25,8 +25,9 @@ and publishes it in `manifest.json`. Two analyses that found the same thing
 produce the same value; a changed tree produces a different one and the primer is
 correctly rejected until re-distilled.
 
-Consumers now *read* that field rather than recomputing the hash, which also
-retires two of the three copies the cross-tier contract test existed to police.
-A manifest written before the field falls back to the old `analyzedAt + gitSha`
-hash, so an existing manifest and the primer beside it keep matching until the
-next analysis re-stamps both.
+Consumers now *read* that field rather than recomputing the hash, so the current
+path has one producer and no copies to hold in agreement. A manifest written
+before the field falls back to the old `analyzedAt + gitSha` hash, so an existing
+manifest and the primer beside it keep matching until the next analysis re-stamps
+both — that fallback is still implemented in all three tiers, and the cross-tier
+contract test still holds those three copies in agreement.

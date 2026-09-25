@@ -65,9 +65,12 @@ export function sourcevisionAnalysisFingerprint(dir) {
  * sourcevision.
  *
  * Such a manifest is paired with a primer stamped the same way, so the two keep
- * matching until the next analysis re-stamps both. This is the one remaining
- * copy of sourcevision's `legacyManifestFingerprint`, still held in agreement by
- * `tests/integration/primer-fingerprint-contract.test.js`.
+ * matching until the next analysis re-stamps both. This hash is still
+ * implemented in all three tiers — sourcevision's `legacyManifestFingerprint`,
+ * hench's `sourcevisionFingerprint` fallback, and here — because any of them may
+ * meet a pair another wrote. Only the *current* path got down to one producer;
+ * `tests/integration/primer-fingerprint-contract.test.js` is what keeps these
+ * three in agreement until the fallback can be deleted.
  *
  * @param {unknown} manifest  Parsed `manifest.json`, or any non-object.
  * @returns {string}

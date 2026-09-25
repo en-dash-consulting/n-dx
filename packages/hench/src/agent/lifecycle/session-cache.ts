@@ -365,12 +365,13 @@ export function isParentUsable(
  * core's `sourcevisionAnalysisFingerprint` reads. The three tiers cannot share
  * one implementation — sourcevision stamps the primer, core reads it from the
  * orchestration tier (spawn-only, no library imports), and hench reads it
- * without a sourcevision gateway — so they agree by reading one published
- * field instead of recomputing a hash three times. The legacy fallback below is
- * the last remaining copy, and `tests/integration/primer-fingerprint-contract.test.js`
- * holds it in agreement. Divergence is silent rather than loud: the values
- * simply never match, every primer looks stale, and the optimization quietly
- * stops paying.
+ * without a sourcevision gateway — so on the current path they agree by reading
+ * one published field instead of recomputing a hash three times. The legacy
+ * fallback below is still one of three copies (sourcevision, core, here), kept
+ * only for manifests written before the field existed, and
+ * `tests/integration/primer-fingerprint-contract.test.js` holds those three in
+ * agreement. Divergence is silent rather than loud: the values simply never
+ * match, every primer looks stale, and the optimization quietly stops paying.
  */
 export async function sourcevisionFingerprint(projectDir: string): Promise<string> {
   try {
