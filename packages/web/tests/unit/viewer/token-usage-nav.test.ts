@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { Sidebar } from "../../../src/viewer/components/sidebar.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 import { parsePathnameRoute } from "../../../src/viewer/route-state.js";
@@ -49,17 +50,19 @@ describe("token usage sidebar navigation", () => {
   function renderSidebar(view: ViewId): HTMLDivElement {
     const root = document.createElement("div");
     document.body.appendChild(root);
-    render(
-      h(Sidebar, {
-        view,
-        onNavigate: vi.fn(),
-        manifest: null,
-        zones: null,
-        sidebarCollapsed: false,
-        onToggleSidebar: vi.fn(),
-      }),
-      root,
-    );
+    act(() => {
+      render(
+        h(Sidebar, {
+          view,
+          onNavigate: vi.fn(),
+          manifest: null,
+          zones: null,
+          sidebarCollapsed: false,
+          onToggleSidebar: vi.fn(),
+        }),
+        root,
+      );
+    });
     return root;
   }
 
@@ -100,17 +103,19 @@ describe("token usage sidebar navigation", () => {
 
   it("keeps Token Usage highlighted after in-app navigation from Settings", () => {
     const root = renderSidebar("feature-toggles");
-    render(
-      h(Sidebar, {
-        view: TOKEN_USAGE_VIEW_ID,
-        onNavigate: vi.fn(),
-        manifest: null,
-        zones: null,
-        sidebarCollapsed: false,
-        onToggleSidebar: vi.fn(),
-      }),
-      root,
-    );
+    act(() => {
+      render(
+        h(Sidebar, {
+          view: TOKEN_USAGE_VIEW_ID,
+          onNavigate: vi.fn(),
+          manifest: null,
+          zones: null,
+          sidebarCollapsed: false,
+          onToggleSidebar: vi.fn(),
+        }),
+        root,
+      );
+    });
 
     const tokenUsageItem = findNavItem(root, "Token Usage");
     const settingsItem = findNavItem(root, "Feature Flags");

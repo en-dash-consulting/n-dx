@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { SuggestionsView } from "../../../src/viewer/views/suggestions.js";
 import type { LoadedData } from "../../../src/viewer/types.js";
 
@@ -31,13 +32,13 @@ describe("SuggestionsView", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    act(() => { render(null, root); });
     if (root.parentNode) root.parentNode.removeChild(root);
   });
 
   it("shows locked view when enrichment pass is below threshold", () => {
     const data = makeData({ enrichmentPass: 2 });
-    render(h(SuggestionsView, { data }), root);
+    act(() => { render(h(SuggestionsView, { data }), root); });
 
     expect(root.textContent).toContain("Suggestions");
     expect(root.textContent).toContain("Requires enrichment pass 4");
@@ -46,7 +47,7 @@ describe("SuggestionsView", () => {
 
   it("shows locked view with current pass number", () => {
     const data = makeData({ enrichmentPass: 3 });
-    render(h(SuggestionsView, { data }), root);
+    act(() => { render(h(SuggestionsView, { data }), root); });
 
     expect(root.textContent).toContain("current: 3");
   });
@@ -59,7 +60,7 @@ describe("SuggestionsView", () => {
         { type: "suggestion", severity: "warning", scope: "zone-a", text: "Extract shared utils", pass: 2 },
       ],
     });
-    render(h(SuggestionsView, { data }), root);
+    act(() => { render(h(SuggestionsView, { data }), root); });
 
     expect(root.querySelector(".locked-view")).toBeNull();
     expect(root.textContent).toContain("Suggestions");
@@ -76,7 +77,7 @@ describe("SuggestionsView", () => {
         { type: "observation", severity: "info", scope: "global", text: "Not a suggestion", pass: 1 },
       ],
     });
-    render(h(SuggestionsView, { data }), root);
+    act(() => { render(h(SuggestionsView, { data }), root); });
 
     // Should only count suggestion-type findings
     expect(root.textContent).toContain("3 suggestions for improvement");
@@ -96,7 +97,7 @@ describe("SuggestionsView", () => {
         { type: "anti-pattern", severity: "warning", scope: "zone-a", text: "Anti-pattern", pass: 1 },
       ],
     });
-    render(h(SuggestionsView, { data }), root);
+    act(() => { render(h(SuggestionsView, { data }), root); });
 
     expect(root.textContent).toContain("0 suggestions for improvement");
   });
@@ -110,7 +111,7 @@ describe("SuggestionsView", () => {
       components: null,
       callGraph: null,
     };
-    render(h(SuggestionsView, { data }), root);
+    act(() => { render(h(SuggestionsView, { data }), root); });
 
     // enrichmentPass defaults to 0, should show locked view
     expect(root.querySelector(".locked-view")).not.toBeNull();
@@ -126,7 +127,7 @@ describe("SuggestionsView", () => {
         { type: "suggestion", severity: "info", scope: "zone-c", text: "S4", pass: 2 },
       ],
     });
-    render(h(SuggestionsView, { data }), root);
+    act(() => { render(h(SuggestionsView, { data }), root); });
 
     const values = root.querySelectorAll(".stat-card .value");
     expect(values[2]?.textContent).toBe("3"); // 3 distinct zones

@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { Guide } from "../../../src/viewer/components/guide.js";
 import { SidebarThemeToggle } from "../../../src/viewer/components/theme-toggle.js";
 import { SidebarDensitySelector, initDensity } from "../../../src/viewer/components/density-selector.js";
@@ -36,8 +37,13 @@ async function waitFor(
 function renderToDiv(vnode: ReturnType<typeof h>) {
   const root = document.createElement("div");
   document.body.appendChild(root);
-  render(vnode, root);
+  act(() => { render(vnode, root); });
   return root;
+}
+
+function unmount(root: HTMLDivElement): void {
+  act(() => { render(null, root); });
+  root.parentNode?.removeChild(root);
 }
 
 // ── Guide Modal Accessibility ────────────────────────────────────────
@@ -46,8 +52,7 @@ describe("Guide modal accessibility", () => {
   let root: HTMLDivElement;
 
   afterEach(() => {
-    if (root) render(null, root);
-    if (root?.parentNode) root.parentNode.removeChild(root);
+    if (root) unmount(root);
   });
 
   it("guide button has aria-label", () => {
@@ -131,8 +136,7 @@ describe("ThemeToggle accessibility", () => {
   });
 
   afterEach(() => {
-    if (root) render(null, root);
-    if (root?.parentNode) root.parentNode.removeChild(root);
+    if (root) unmount(root);
   });
 
   it("SidebarThemeToggle has aria-label describing the action", () => {
@@ -154,8 +158,7 @@ describe("DensitySelector accessibility", () => {
   });
 
   afterEach(() => {
-    if (root) render(null, root);
-    if (root?.parentNode) root.parentNode.removeChild(root);
+    if (root) unmount(root);
   });
 
   it("container has role=group and aria-label", () => {
@@ -230,8 +233,7 @@ describe("StatusFilter accessibility", () => {
   const onChange = vi.fn();
 
   afterEach(() => {
-    if (root) render(null, root);
-    if (root?.parentNode) root.parentNode.removeChild(root);
+    if (root) unmount(root);
     onChange.mockClear();
   });
 
@@ -352,8 +354,7 @@ describe("PRDTree accessibility", () => {
   };
 
   afterEach(() => {
-    if (root) render(null, root);
-    if (root?.parentNode) root.parentNode.removeChild(root);
+    if (root) unmount(root);
   });
 
   it("tree container has role=tree and aria-label", () => {

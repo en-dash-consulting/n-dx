@@ -68,7 +68,7 @@ describe("AskView a11y", () => {
   function mount(): HTMLDivElement {
     root = document.createElement("div");
     document.body.appendChild(root);
-    render(h(AskView, null), root);
+    act(() => { render(h(AskView, null), root); });
     return root;
   }
 
@@ -152,7 +152,7 @@ describe("AskView a11y", () => {
   });
 
   afterEach(() => {
-    if (root) render(null, root);
+    if (root) act(() => { render(null, root); });
     if (root?.parentNode) root.parentNode.removeChild(root);
     document.body.innerHTML = "";
     delete window.__NDX_DEPLOYED__;

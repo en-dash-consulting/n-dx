@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { TaskDetail } from "../../../src/viewer/components/prd-tree/task-detail.js";
 import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 
 function renderToDiv(vnode: ReturnType<typeof h>) {
   const root = document.createElement("div");
-  render(vnode, root);
+  act(() => { render(vnode, root); });
   return root;
 }
 

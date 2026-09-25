@@ -10,9 +10,19 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { EnrichmentGate } from "../../../src/viewer/components/enrichment-gate.js";
 
-/** Poll until an assertion passes or timeout is reached. */
+/**
+ * Poll until an assertion passes or timeout is reached.
+ *
+ * The wait itself runs inside act(): `useSvAnalyze`'s poll effect re-arms on
+ * every state transition (its deps are `[state, pollIntervalMs]`), driven by
+ * a real setInterval this test doesn't control directly. Wrapping only the
+ * assertion would let that interval's fetch → setState commit land outside
+ * act() and take Preact's real rAF/setTimeout(35) fallback path instead of
+ * act's synchronous flush.
+ */
 async function waitFor(fn: () => void, timeout = 3000) {
   const start = Date.now();
   while (Date.now() - start < timeout) {
@@ -20,7 +30,9 @@ async function waitFor(fn: () => void, timeout = 3000) {
       fn();
       return;
     } catch {
-      await new Promise<void>((r) => setTimeout(r, 10));
+      await act(async () => {
+        await new Promise<void>((r) => setTimeout(r, 10));
+      });
     }
   }
   fn(); // Final attempt — let it throw
@@ -38,14 +50,16 @@ describe("EnrichmentGate", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    act(() => { render(null, root); });
     root.remove();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
   function mount() {
-    render(h(EnrichmentGate, { title: "Problems", requiredPass: 3, currentPass: 1, pollIntervalMs: 20 }), root);
+    act(() => {
+      render(h(EnrichmentGate, { title: "Problems", requiredPass: 3, currentPass: 1, pollIntervalMs: 20 }), root);
+    });
   }
 
   function postCalls() {
@@ -76,7 +90,7 @@ describe("EnrichmentGate", () => {
     });
 
     mount();
-    (root.querySelector(".enrichment-gate-unlock") as HTMLButtonElement).click();
+    act(() => { (root.querySelector(".enrichment-gate-unlock") as HTMLButtonElement).click(); });
 
     await waitFor(() => {
       expect(postCalls()).toHaveLength(1);
@@ -107,7 +121,7 @@ describe("EnrichmentGate", () => {
     });
 
     mount();
-    (root.querySelector(".enrichment-gate-full") as HTMLButtonElement).click();
+    act(() => { (root.querySelector(".enrichment-gate-full") as HTMLButtonElement).click(); });
 
     await waitFor(() => {
       expect(postCalls()).toHaveLength(1);
@@ -125,7 +139,7 @@ describe("EnrichmentGate", () => {
     });
 
     mount();
-    (root.querySelector(".enrichment-gate-unlock") as HTMLButtonElement).click();
+    act(() => { (root.querySelector(".enrichment-gate-unlock") as HTMLButtonElement).click(); });
 
     await waitFor(() => {
       expect((root.querySelector(".enrichment-gate-unlock") as HTMLButtonElement).disabled).toBe(true);
@@ -142,7 +156,7 @@ describe("EnrichmentGate", () => {
     });
 
     mount();
-    (root.querySelector(".enrichment-gate-unlock") as HTMLButtonElement).click();
+    act(() => { (root.querySelector(".enrichment-gate-unlock") as HTMLButtonElement).click(); });
 
     await waitFor(() => {
       expect(root.querySelector('[role="alert"]')?.textContent).toContain("sourcevision binary not found");
@@ -162,7 +176,7 @@ describe("EnrichmentGate", () => {
     });
 
     mount();
-    (root.querySelector(".enrichment-gate-unlock") as HTMLButtonElement).click();
+    act(() => { (root.querySelector(".enrichment-gate-unlock") as HTMLButtonElement).click(); });
     await waitFor(() => {
       expect(postCalls()).toHaveLength(1);
     });

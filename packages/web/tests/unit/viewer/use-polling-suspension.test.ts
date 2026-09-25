@@ -55,9 +55,10 @@ describe("usePollingSuspension", () => {
   });
 
   afterEach(() => {
-    // Unmount inside act() so Preact's after-paint effect queue is flushed
-    // synchronously here, rather than leaking a real requestAnimationFrame +
-    // setTimeout fallback pair that can fire after jsdom is torn down.
+    // Unmount inside act() to keep it symmetric with the act()-wrapped
+    // mount/updates above, so no commit in this file escapes act(). Unmount
+    // itself commits no effects — it is act()'s coverage of every earlier
+    // commit that keeps the real rAF/setTimeout(35) fallback from arming.
     act(() => { render(null, root); });
     if (root.parentNode) root.parentNode.removeChild(root);
     resetPollingState();

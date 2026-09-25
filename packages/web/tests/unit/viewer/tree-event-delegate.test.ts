@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { PRDTree } from "../../../src/viewer/components/prd-tree/prd-tree.js";
 import type { PRDDocumentData, PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 
 function renderToDiv(vnode: ReturnType<typeof h>) {
   const root = document.createElement("div");
-  render(vnode, root);
+  act(() => { render(vnode, root); });
   return root;
 }
 
@@ -126,9 +127,10 @@ describe("Tree event delegation", () => {
       const chevron = epic1.querySelector(".prd-chevron") as HTMLElement;
       expect(chevron).not.toBeNull();
       // Use dispatchEvent with bubbles to ensure proper event delegation
-      chevron.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-      // Wait for Preact's async render batch to flush
-      await new Promise((r) => setTimeout(r, 10));
+      await act(async () => {
+        chevron.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        await new Promise((r) => setTimeout(r, 10));
+      });
       // Now the feature should be visible
       expect(root.textContent).toContain("Login Flow");
     });
@@ -139,9 +141,10 @@ describe("Tree event delegation", () => {
       // With no onSelectItem, clicking a node with children should toggle expand
       const epic1 = root.querySelector('[data-node-id="epic-1"]') as HTMLElement;
       const title = epic1.querySelector(".prd-node-title") as HTMLElement;
-      title.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-      // Wait for Preact's async render batch to flush
-      await new Promise((r) => setTimeout(r, 10));
+      await act(async () => {
+        title.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        await new Promise((r) => setTimeout(r, 10));
+      });
       expect(root.textContent).toContain("Login Flow");
     });
 
