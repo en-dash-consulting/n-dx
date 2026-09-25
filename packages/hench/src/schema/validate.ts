@@ -345,6 +345,7 @@ export const RunRecordSchema = z.object({
   retryAttempts: z.number().int().nonnegative().optional(),
   spawnCount: z.number().int().nonnegative().optional(),
   spawnBreakdown: z.record(z.number().int().nonnegative()).optional(),
+  backgroundResume: z.object({ tool: z.string(), detail: z.string() }).optional(),
   structuredSummary: RunSummaryDataSchema.optional(),
   memoryStats: RunMemoryStatsSchema.optional(),
   diagnostics: RunDiagnosticsSchema.optional(),

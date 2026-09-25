@@ -109,6 +109,13 @@ import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-dia
 import type { PromptSectionDiagnostic, PersistedRuntimeEvent } from "../../schema/index.js";
 import { handlePlanModeStall, formatPlanModeAppendix } from "./plan-mode-prompt.js";
 import { startCommitMsgWatcher } from "./commit-msg-watcher.js";
+import {
+  hasUnfinishedWork,
+  WORK_SESSION_RESUME_MESSAGE,
+  buildReviewResumeMessage,
+  formatBackgroundWaitFailure,
+} from "./background-wait.js";
+import type { BackgroundWaitSignal } from "./vendor-adapter.js";
 import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
 
 // ── normalizeCodexResponse ────────────────────────────────────────────────
@@ -183,6 +190,19 @@ export interface SpawnResult {
    * transient error, and a retry re-enters the same loop.
    */
   livelock?: LivelockDetection;
+  /**
+   * Set when the session handed work to the background: a `Bash` call with
+   * `run_in_background: true`, or a `ScheduleWakeup` / `Monitor` call. Holds
+   * the most recent such call.
+   *
+   * Unlike the plan-mode intercept this does not kill the spawn — the agent
+   * may still finish in the foreground. The caller decides once the process
+   * has exited: a work session that left its work uncommitted is resumed once
+   * (see {@link cliLoop}), and a reviewer that wrote no report is resumed once
+   * (see {@link runAdversarialReviewPass}). In a `claude -p` session nothing
+   * ever delivers the notification these calls wait for.
+   */
+  backgroundWait?: BackgroundWaitSignal;
   /**
    * Vendor session identifier reported by the CLI, when it reports one.
    *
@@ -1035,6 +1055,13 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
         void terminateProcessTree(proc);
       }
 
+      // Background-wait signal: recorded, not acted on. Which calls count is
+      // the adapter's business. See SpawnResult.backgroundWait.
+      if (event?.type === "tool_use" && event.toolCall && adapter.detectBackgroundWait) {
+        const signal = adapter.detectBackgroundWait(event.toolCall);
+        if (signal) result.backgroundWait = signal;
+      }
+
       // Livelock intercept: the agent is repeating a call that changes nothing.
       // Terminated the same way plan mode is, for the same reason — the outer
       // loop cannot act on something the child will never stop doing.
@@ -1276,6 +1303,13 @@ interface ReviewPassInvocation {
   startingHead: string | undefined;
   /** Work-session id to resume, when the vendor CLI reported one. */
   sessionId: string | undefined;
+  /**
+   * True when the work session handed something to the background. A resumed
+   * reviewer inherits that transcript, and with it the belief that a result
+   * is on its way — which is how run 01d15d75's reviewer came to defer its
+   * report for a suite that would never report back.
+   */
+  inheritedBackgroundWait?: boolean;
 }
 
 /**
@@ -1348,56 +1382,81 @@ async function runAdversarialReviewPass(
     preReviewState = undefined;
   }
 
-  let result: SpawnResult;
-  try {
-    result = await withHeartbeat(
-      "waiting on review pass",
-      spawnWithAdapter({
-        adapter: ctx.adapter,
-        spawnConfig,
-        cliBinary: ctx.cliBinary,
-        cliEnv: ctx.cliEnv,
-        cwd: inv.projectDir,
-        tokenMetadata: { vendor: ctx.vendor, model: ctx.reviewModel },
+  type ReviewFailure = ReviewPassOutcome & { ok: false };
+  const spawnReviewer = async (
+    config: SpawnConfig,
+  ): Promise<{ ok: true; spawned: SpawnResult } | ReviewFailure> => {
+    let spawned: SpawnResult;
+    try {
+      spawned = await withHeartbeat(
+        "waiting on review pass",
+        spawnWithAdapter({
+          adapter: ctx.adapter,
+          spawnConfig: config,
+          cliBinary: ctx.cliBinary,
+          cliEnv: ctx.cliEnv,
+          cwd: inv.projectDir,
+          tokenMetadata: { vendor: ctx.vendor, model: ctx.reviewModel },
+        }),
+      );
+    } catch (err) {
+      return { ok: false, reason: "spawn-failed", detail: (err as Error).message };
+    }
+    // Charge the review to the run it reviewed. It is part of the cost of
+    // completing this task, and leaving it out would make `--review` look free
+    // in `ndx usage`.
+    chargeReviewToRun(inv.run, spawned, ctx.reviewModel);
+    if (spawned.error) return { ok: false, reason: "spawn-failed", detail: spawned.error };
+    return { ok: true, spawned };
+  };
+
+  let backgroundResumed = false;
+  const failReview = (failed: ReviewFailure): ReviewPassOutcome => {
+    reportReviewFailure(inv.run, failed);
+    if (backgroundResumed && inv.run.review) inv.run.review.backgroundResumed = true;
+    return failed;
+  };
+
+  const first = await spawnReviewer(spawnConfig);
+  if (!first.ok) return failReview(first);
+
+  let outcome = await readReviewReport(reportPath);
+
+  // A reviewer that ended waiting on a background command, with no report
+  // written, is resumed once and told to write the report now. It had usually
+  // done the review — run 01d15d75's reviewer printed its findings and then
+  // deferred the file for a suite that would never report back.
+  const reviewerSession = ctx.adapter.resumesUnfinishedSessions
+    ? first.spawned.sessionId ?? resumeSessionId
+    : undefined;
+  if (
+    !outcome.ok && outcome.reason === "no-report" && reviewerSession &&
+    (first.spawned.backgroundWait !== undefined || inv.inheritedBackgroundWait === true)
+  ) {
+    backgroundResumed = true;
+    info(
+      "⚠ The reviewer ended waiting on a background command without writing its report. " +
+        "Resuming it once to write the report now.",
+    );
+    const resumeEnvelope = createPromptEnvelope([
+      { name: "system" as PromptSectionName, content: buildReviewSystemPrompt() } as PromptSection,
+      { name: "brief" as PromptSectionName, content: buildReviewResumeMessage(reportPath) } as PromptSection,
+    ]);
+    const resumed = await spawnReviewer(
+      ctx.adapter.buildSpawnConfig(resumeEnvelope, ctx.policy, {
+        model: ctx.reviewModel || undefined,
+        permissionMode: ctx.permissionMode,
+        resumeSessionId: reviewerSession,
       }),
     );
-  } catch (err) {
-    const outcome: ReviewPassOutcome = {
-      ok: false,
-      reason: "spawn-failed",
-      detail: (err as Error).message,
-    };
-    reportReviewFailure(inv.run, outcome);
-    return outcome;
+    if (!resumed.ok) return failReview(resumed);
+    outcome = await readReviewReport(reportPath);
   }
 
-  // Charge the review to the run it reviewed. It is part of the cost of
-  // completing this task, and leaving it out would make `--review` look free
-  // in `ndx usage`.
-  chargeReviewToRun(inv.run, result, ctx.reviewModel);
-
-  if (result.error) {
-    const outcome: ReviewPassOutcome = {
-      ok: false,
-      reason: "spawn-failed",
-      detail: result.error,
-    };
-    reportReviewFailure(inv.run, outcome);
-    return outcome;
-  }
-
-  const outcome = await readReviewReport(reportPath);
-  if (!outcome.ok) {
-    reportReviewFailure(inv.run, outcome);
-    return outcome;
-  }
+  if (!outcome.ok) return failReview(outcome);
 
   // Park what nobody ruled on, before anything else reads the report.
-  const { report, deferred } = await resolveReviewDispositions(
-    reportPath,
-    outcome.report,
-    ctx.autonomous,
-  );
+  const { report, deferred } = await resolveReviewDispositions(reportPath, outcome.report);
 
   for (const line of formatReviewSummary(report)) info(line);
 
@@ -1405,7 +1464,9 @@ async function runAdversarialReviewPass(
   for (const line of formatUnresolvedWarning(report)) info(line);
   if (deferred.length > 0) {
     info(
-      `${deferred.length} finding(s) deferred — no one was at the capture prompt. ` +
+      (ctx.autonomous
+        ? `${deferred.length} finding(s) deferred — no one was at the capture prompt. `
+        : `${deferred.length} finding(s) queued for your decision — the reviewer cannot ask you. `) +
         `List them with: hench review pending ${inv.run.id}`,
     );
   }
@@ -1437,23 +1498,23 @@ async function runAdversarialReviewPass(
     fixesApplied: report.fixesApplied,
     reportPath,
     repairedFiles,
+    backgroundResumed: backgroundResumed || undefined,
   };
 
   return { ok: true, report };
 }
 
 /**
- * Settle each finding's fate, parking the undecided ones when no human was
- * there to decide.
+ * Settle each finding's fate, parking the undecided ones for the operator.
  *
- * **Interactive runs are left alone.** A person stood at the capture prompt, so
- * a finding the reviewer recorded as `dropped` really was declined; rewriting
- * it to `deferred` would manufacture a queue out of decisions that were
- * already made.
- *
- * **Autonomous runs get the report rewritten.** There was nobody to decline
- * anything, so the reviewer's `dropped` records a decision that never
- * happened. The run replaces it with the fate it can justify from `action` and
+ * **Every run gets the report rewritten.** The reviewer is a headless `claude
+ * -p` session whether or not a human is attached to the run, so nobody ever
+ * stood at its capture prompt. An attended run once skipped this step on the
+ * assumption that someone had, and its offered findings reached no queue:
+ * `hench review pending` answered "No deferred findings" and they survived
+ * only in the run log (runs a32aeeb0, 8dc53406). So a reviewer's `dropped` on
+ * anything above `not-worth-fixing` records a decision that never happened,
+ * and the run replaces it with the fate it can justify from `action` and
  * `verdict` — see {@link deriveDisposition} — and writes the result back.
  *
  * The write-back is the mechanism, not a nicety: `hench review pending` reads
@@ -1472,10 +1533,7 @@ async function runAdversarialReviewPass(
 export async function resolveReviewDispositions(
   reportPath: string,
   raw: ReviewReport,
-  autonomous: boolean,
 ): Promise<{ report: ReviewReport; deferred: DeferredFinding[] }> {
-  if (!autonomous) return { report: raw, deferred: [] };
-
   const report = parkDeferredFindings(raw);
   const deferred = deferredFindings(report);
 
@@ -1621,6 +1679,8 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
         projectDir,
         startingHead: ctx.startingHead,
         sessionId: result.sessionId,
+        inheritedBackgroundWait:
+          run.backgroundResume !== undefined || result.backgroundWait !== undefined,
       });
     }
 
@@ -2031,6 +2091,23 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
    * should join.
    */
   let lastSessionId: string | undefined;
+  /**
+   * Session to resume because it ended waiting on a background command with
+   * its work uncommitted. Set for exactly one spawn, then cleared.
+   *
+   * Once per task: a session that ends the same way after being told nothing
+   * will notify it is not going to be talked out of it by a second message,
+   * so the next occurrence fails the run instead of spawning again.
+   */
+  let backgroundResumeSessionId: string | undefined;
+  let backgroundResumes = 0;
+  /**
+   * True when the run failed because the session ended waiting a second time.
+   * Its work is still in the tree, uncommitted — the same situation as an
+   * uncommitted-work refusal, so it gets the same protections: no rollback
+   * offer, and the claim held.
+   */
+  let backgroundWaitFailed = false;
 
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries - planRespawnsChargedToRetries; attempt++) {
@@ -2068,7 +2145,14 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // Build the per-attempt PromptEnvelope. On the first attempt with
         // no plan-mode appendix we reuse the base envelope from prepareBrief.
         // Otherwise we rebuild it so the augmented brief is delivered.
-        const envelope = attempt === 0 && !planModeAppendix
+        // A background-wait resume sends only the fixed message: the resumed
+        // session already holds the task, and repeating the brief would restart it.
+        const envelope = backgroundResumeSessionId
+          ? createPromptEnvelope([
+              { name: "system" as PromptSectionName, content: systemPrompt } as PromptSection,
+              { name: "brief" as PromptSectionName, content: WORK_SESSION_RESUME_MESSAGE } as PromptSection,
+            ])
+          : attempt === 0 && !planModeAppendix
           ? baseEnvelope
           : createPromptEnvelope([
               { name: "system" as PromptSectionName, content: systemPrompt } as PromptSection,
@@ -2089,8 +2173,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           // Retry-resume wins over the warm parent: continuing the attempt
           // that just failed is more useful than re-forking orientation, and
           // it is a plain resume (no fork) because we want that transcript.
-          resumeSessionId: retryResumeSessionId ?? warmParentId ?? batchResumeId,
-          forkSession: !retryResumeSessionId && warmParentId ? true : undefined,
+          // A background-wait resume continues the session that stopped, so it
+          // wins over everything and never forks.
+          resumeSessionId:
+            backgroundResumeSessionId ?? retryResumeSessionId ?? warmParentId ?? batchResumeId,
+          forkSession:
+            !backgroundResumeSessionId && !retryResumeSessionId && warmParentId ? true : undefined,
         });
 
         // Capture prompt section diagnostics on the first attempt for run-level storage.
@@ -2100,7 +2188,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           promptSectionDiagnostics = sectionDiags;
         }
 
-        if (attempt > 0 && planRespawns === 0) {
+        if (backgroundResumeSessionId) {
+          subsection("Resuming the session: it ended waiting on a background command");
+        } else if (attempt > 0 && planRespawns === 0) {
           subsection(`Retry ${attempt}/${retryConfig.maxRetries}`);
         } else if (planRespawns > 0) {
           subsection(`Re-spawn after plan-mode approval (${planRespawns}/${MAX_PLAN_RESPAWNS})`);
@@ -2151,6 +2241,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // This attempt's numbers are about to be added to `accumulated`; the
         // live counters must stop claiming them or the two would be summed.
         resetLiveSpawnProgress(liveProgress);
+        const wasBackgroundResume = backgroundResumeSessionId !== undefined;
+        backgroundResumeSessionId = undefined;
 
         // Merge per-attempt events into the cross-retry accumulator. Includes
         // events from spawns terminated by plan-mode interception so token
@@ -2165,7 +2257,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // nothing was learned about the task itself.
         // A livelock is excluded: its error is our own SIGTERM, not a fork that
         // failed, and re-spawning cold would restart the loop we just stopped.
-        if (result.error && !result.livelock && warmParentId && !forkFallbackUsed) {
+        // A background-wait resume did not fork, so its failure says nothing
+        // about the parent.
+        if (
+          result.error && !result.livelock && !wasBackgroundResume &&
+          warmParentId && !forkFallbackUsed
+        ) {
           forkFallbackUsed = true;
           nextSpawnReason = "fork-fallback";
           warmParentId = undefined;
@@ -2181,6 +2278,46 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         if (result.sessionId) lastSessionId = result.sessionId;
 
         accumulateResult(accumulated, result);
+
+        // Background wait: the session handed work to the background and then
+        // ended, and nothing will ever notify it. Only a session that left its
+        // work uncommitted needs anything — one that backgrounded a command
+        // but still committed has finished.
+        if (
+          result.backgroundWait && !result.error && !result.planModeIntercept &&
+          (await hasUnfinishedWork({ projectDir, autoCommit: config.autoCommit === true }))
+        ) {
+          const signal = result.backgroundWait;
+          const resumeId = adapter.resumesUnfinishedSessions ? result.sessionId : undefined;
+          if (backgroundResumes === 0 && resumeId) {
+            backgroundResumes++;
+            backgroundResumeSessionId = resumeId;
+            nextSpawnReason = "background-resume";
+            run.backgroundResume = { ...signal };
+            info(
+              `\n⚠ The session ended waiting on a background command (${signal.tool}` +
+                `${signal.detail ? `: ${signal.detail}` : ""}) with its work uncommitted. ` +
+                "Resuming it once to finish in the foreground.",
+            );
+            await toolRexAppendLog(store, taskId, {
+              event: "background_wait_resumed",
+              detail: `Session ${resumeId.slice(0, 8)} ended waiting on ${signal.tool}; resumed once.`,
+            });
+            continue;
+          }
+          if (backgroundResumes > 0) {
+            syncRunFromAccumulated(run, accumulated, attempt);
+            run.status = "failed";
+            run.summary = result.summary;
+            run.error = formatBackgroundWaitFailure(signal);
+            info(`\n${run.error}`);
+            await handleRunFailure(store, taskId, "pending", "background_wait", run.error);
+            backgroundWaitFailed = true;
+            break;
+          }
+          // Not resumable (a vendor without resume, or no session id): the
+          // run proceeds as it always did and the completion gate decides.
+        }
 
         if (!result.planModeIntercept) break;
 
@@ -2222,7 +2359,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // else: re-enter the inner loop with new permissionMode + appendix
       }
 
-      if (cancelledByUser) break;
+      // A background-wait failure has its own flag: it is not a user cancel,
+      // and `cancelledByUser` should not have to mean both.
+      if (cancelledByUser || backgroundWaitFailed) break;
 
       if (!result.error) {
         const action = await processSuccessfulResult({
@@ -2297,6 +2436,18 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     run.diagnostics.promptSections = promptSectionDiagnostics;
   }
 
+  // A background-wait failure leaves finished work uncommitted, like an
+  // uncommitted-work refusal, and gets the same two protections: hold the
+  // claim so another worktree does not redo the work, and never offer to
+  // revert it.
+  if (backgroundWaitFailed && opts.claims) {
+    try {
+      await opts.claims.hold(taskId, "uncommitted-work");
+    } catch {
+      // A claims-store failure must not change the run's outcome.
+    }
+  }
+
   // Shared: finalize run (build summary, memory stats, post-task tests, save)
   await finalizeRun({
     claims: opts.claims,
@@ -2308,7 +2459,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     heartbeat,
     memoryCtx,
     selfHeal: config.selfHeal,
-    rollbackOnFailure: opts.rollbackOnFailure,
+    rollbackOnFailure: backgroundWaitFailed ? false : opts.rollbackOnFailure,
     yes: opts.yes,
     autonomous,
     store,
