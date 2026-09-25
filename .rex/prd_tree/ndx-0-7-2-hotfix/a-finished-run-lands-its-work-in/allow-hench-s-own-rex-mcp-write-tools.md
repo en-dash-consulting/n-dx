@@ -2,7 +2,7 @@
 id: "475b386b-41c5-4f01-8ec3-168a994f0cde"
 level: "task"
 title: "Allow hench's own rex MCP write tools in the spawned Claude session"
-status: "pending"
+status: "in_progress"
 priority: "critical"
 tags:
   - "0.7.2"
@@ -10,6 +10,7 @@ tags:
   - "hotfix"
   - "permissions"
 source: "ndx-capture"
+startedAt: "2026-09-25T19:15:06.746Z"
 acceptanceCriteria:
   - "Every Claude CLI spawn hench makes (the work spawn and the review pass) passes mcp__rex__update_task_status and mcp__rex__append_log in --allowed-tools"
   - "No other rex write tool is added unless a hench prompt directs the agent to call it; a test pins the exact set of MCP tools granted"
@@ -19,6 +20,6 @@ acceptanceCriteria:
   - "A patch changeset for @n-dx/hench describes the fix"
   - "hench unit tests pass"
 description: "`buildAllowedTools` (packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts) grants only `Bash(<cmd>:*)` for `guard.allowedCommands` plus Read/Edit/Write/Glob/Grep. The rex MCP server hench attaches with `--mcp-config ... --strict-mcp-config` (packages/hench/src/process/agent-mcp-config.ts, server name `rex`) is therefore reachable but its write tools are never allowed. The comment on `buildAgentMcpServers` relies on the project's `.claude/settings` files to allow them, but `ndx init` deliberately auto-approves only read tools (packages/core/claude-integration.js, AUTO_APPROVED_TOOLS). In a non-interactive `claude -p` spawn there is no one to approve, so `mcp__rex__update_task_status` and `mcp__rex__append_log` are denied.\n\nObserved in consumer project caos. Run e3fe956f (Opus): denied, so the agent hand-edited the task's index.md frontmatter and committed it, bypassing the completion hold. Run 2fb96507 (Sonnet): denied twice, then the agent ended its turn asking for permission. With `autoCommit: false` it never wrote `.hench-commit-msg.txt`, so the run failed with all of its work uncommitted.\n\nAllowing the tools is safe because of the completion hold: while a run holds the task's claim, rex records the agent's status request on the claim instead of writing it (`TaskClaims.pendingCompletion`), and hench applies it only after the test gate passes.\n\nOut of scope: moving the MCP config out of the repo, and changing which tools `ndx init` auto-approves for interactive sessions.\n\nWorking notes for this run: do not edit anything under .rex/ by hand — hench records the task's completion after the gate. `pnpm` is not an allowed command in this project; run tests with `npx vitest run <path>` from the repo root (for hench: `npx vitest run --root packages/hench <path>`)."
-lastModified: "2026-09-25T19:14:43.209Z"
+lastModified: "2026-09-25T19:15:07.106Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

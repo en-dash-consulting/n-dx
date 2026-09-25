@@ -26,6 +26,10 @@ import {
 import type { ClaudeCliInput } from "../../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
 import type { VendorAdapter, SpawnConfig } from "../../../src/agent/lifecycle/vendor-adapter.js";
 import {
+  AGENT_REX_MCP_TOOLS,
+  buildAgentMcpServers,
+} from "../../../src/process/agent-mcp-config.js";
+import {
   DEFAULT_EXECUTION_POLICY,
   createPromptEnvelope,
   classifyVendorError,
@@ -715,7 +719,7 @@ describe("ClaudeCliAdapter: buildAllowedTools", () => {
 
   it("always includes CLI_FILE_TOOLS", () => {
     const tools = buildAllowedTools([]);
-    expect(tools).toEqual(["Read", "Edit", "Write", "Glob", "Grep"]);
+    expect(tools).toEqual(["Read", "Edit", "Write", "Glob", "Grep", ...AGENT_REX_MCP_TOOLS]);
   });
 
   it("prepends Bash tools before file tools", () => {
@@ -727,7 +731,8 @@ describe("ClaudeCliAdapter: buildAllowedTools", () => {
 
   it("handles many commands", () => {
     const tools = buildAllowedTools(["npm", "git", "node", "tsc", "pnpm"]);
-    expect(tools).toHaveLength(10); // 5 bash + 5 file tools
+    // 5 bash + 5 file tools + the rex MCP grants.
+    expect(tools).toHaveLength(10 + AGENT_REX_MCP_TOOLS.length);
   });
 
   it("falls back to blanket Bash(git:*) when no subcommand allowlist is given", () => {
@@ -1131,5 +1136,109 @@ describe("claudeCliAdapter.extractSessionId", () => {
     expect(
       claudeCliAdapter.extractSessionId?.({ type: "thread.started", thread_id: "codex-shape" }),
     ).toBeUndefined();
+  });
+});
+
+// ── 7. rex MCP write tools ───────────────────────────────────────────────
+
+/**
+ * The run attaches its own rex MCP server (`--mcp-config … --strict-mcp-config`)
+ * and its prompts direct the agent to call that server's write tools. Nothing
+ * granted them: `ndx init` auto-approves only rex's *read* tools, and a
+ * `claude -p` spawn has nobody to answer a permission prompt. Two runs in the
+ * consumer project caos show both failure shapes — one agent hand-edited the
+ * task's `index.md` instead (bypassing the completion hold), the other ended
+ * its turn asking for permission with all of its work uncommitted.
+ */
+describe("ClaudeCliAdapter: rex MCP write tools", () => {
+  const rexTools = [...AGENT_REX_MCP_TOOLS];
+
+  /** Every `--allowed-tools` entry naming an MCP tool, in order. */
+  function mcpGrants(tools: readonly string[]): string[] {
+    return tools.filter((t) => t.startsWith("mcp__"));
+  }
+
+  it("grants exactly the three tools hench's own prompts direct", () => {
+    // Pinned, not open-ended. `update_task_status` and `append_log` are steps 6
+    // and 7 of the base workflow; `add_item` is steps 3 and 9 of the same
+    // workflow and the autonomous adversarial-review pass's `should-fix`
+    // action. A tool no hench prompt asks for does not belong here — the
+    // session reaches the whole rex server, and this list is the only thing
+    // deciding what it may call.
+    expect(rexTools).toEqual([
+      "mcp__rex__update_task_status",
+      "mcp__rex__append_log",
+      "mcp__rex__add_item",
+    ]);
+  });
+
+  it("adds no MCP tool beyond that set, whatever the policy allows", () => {
+    expect(mcpGrants(buildAllowedTools(["npm", "git", "node"]))).toEqual(rexTools);
+    expect(mcpGrants(buildAllowedTools([]))).toEqual(rexTools);
+    expect(mcpGrants(buildAllowedTools(["git"], ["commit", "status"]))).toEqual(rexTools);
+  });
+
+  it("keeps the Bash and file grants it already made", () => {
+    // The MCP entries are additive: nothing that used to be allowed stops being.
+    const tools = buildAllowedTools(["npm"]);
+    expect(tools.slice(0, 6)).toEqual(["Bash(npm:*)", "Read", "Edit", "Write", "Glob", "Grep"]);
+  });
+
+  it("names the server buildAgentMcpServers actually registers", () => {
+    // The desync this guards: renaming the key in buildAgentMcpServers while
+    // leaving the grant spelled `mcp__rex__*` would deny every write again,
+    // silently and only in a headless spawn. Derived from the document rather
+    // than restated, so the rename cannot pass this file.
+    const doc = buildAgentMcpServers({ cliPath: "/i/cli.js", projectDir: "/p" });
+    const rexServer = Object.entries(doc.mcpServers).find(([, s]) => s.args[1] === "rex");
+    expect(rexServer).toBeDefined();
+    for (const tool of rexTools) {
+      expect(tool.startsWith(`mcp__${rexServer![0]}__`)).toBe(true);
+    }
+  });
+
+  it("passes each tool as its own argument on POSIX", () => {
+    const { args } = buildClaudeCliArgs(
+      { systemPrompt: "SP", promptText: "TP", allowedTools: buildAllowedTools(["npm"]) },
+      "linux",
+    );
+
+    const after = args.slice(args.indexOf("--allowed-tools") + 1);
+    expect(after).toEqual([
+      "Bash(npm:*)", "Read", "Edit", "Write", "Glob", "Grep",
+      ...rexTools,
+    ]);
+  });
+
+  it("includes each tool in the single comma-joined token on Windows", () => {
+    // cmd.exe gets one token, so a tool only counts if it survives the join —
+    // the POSIX assertion above says nothing about this shape.
+    const { args } = buildClaudeCliArgs(
+      { systemPrompt: "SP", promptText: "TP", allowedTools: buildAllowedTools(["npm"]) },
+      "win32",
+    );
+
+    const joined = args[args.indexOf("--allowed-tools") + 1]!;
+    expect(joined.split(",")).toEqual([
+      "Bash(npm:*)", "Read", "Edit", "Write", "Glob", "Grep",
+      ...rexTools,
+    ]);
+  });
+
+  it("reaches every spawn, because every spawn is built here", () => {
+    // The work spawn, its retries, the adversarial review pass and the
+    // reviewer's background-wait resume all call buildSpawnConfig — it is the
+    // only place Claude CLI args are produced. Asserting on it is what makes
+    // "every Claude CLI spawn" true rather than only the one that was tested.
+    const config = claudeCliAdapter.buildSpawnConfig(
+      createMinimalEnvelope(),
+      DEFAULT_EXECUTION_POLICY,
+      {},
+    );
+
+    const granted = config.args
+      .slice(config.args.indexOf("--allowed-tools") + 1)
+      .flatMap((a) => a.split(","));
+    for (const tool of rexTools) expect(granted).toContain(tool);
   });
 });

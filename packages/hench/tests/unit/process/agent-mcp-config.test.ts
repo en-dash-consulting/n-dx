@@ -16,6 +16,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   agentMcpConfigPath,
+  AGENT_REX_MCP_TOOLS,
   buildAgentMcpServers,
   LAUNCHER_REJECTION_DETAIL,
   prepareAgentMcpConfig,
@@ -72,10 +73,68 @@ describe("buildAgentMcpServers", () => {
   });
 
   it("keeps the server names the agent's tool permissions are written against", () => {
-    // `.claude/settings.json` permits `mcp__rex__*` / `mcp__sourcevision__*`,
-    // not `--allowed-tools`, so a rename would hit permission denials in `-p`.
+    // Tool permissions are spelled `mcp__<server>__<tool>`, so a rename here
+    // renames every grant. `AGENT_REX_MCP_TOOLS` is derived from the same
+    // constant for that reason — see the next test.
     const doc = buildAgentMcpServers({ cliPath: "/i/cli.js", projectDir: "/p" });
     expect(Object.keys(doc.mcpServers).sort()).toEqual(["rex", "sourcevision"]);
+  });
+});
+
+// ── AGENT_REX_MCP_TOOLS ──────────────────────────────────────────────────
+
+/**
+ * The grant that makes the attached rex server usable.
+ *
+ * The run passes `--mcp-config … --strict-mcp-config`, so the session can see
+ * rex — but seeing is not permission. `ndx init` auto-approves only rex's read
+ * tools (`AUTO_APPROVED_TOOLS` in `packages/core/claude-integration.js`), and a
+ * `claude -p` spawn has nobody to approve the rest. Both write tools the base
+ * workflow directs were therefore denied in consumer-project runs.
+ *
+ * Safe because of the completion hold: while a run holds the task's claim, rex
+ * records the agent's status request on the claim (`TaskClaims.pendingCompletion`)
+ * instead of writing it, and hench applies it only after the test gate passes.
+ */
+describe("AGENT_REX_MCP_TOOLS", () => {
+  it("is derived from the server name buildAgentMcpServers registers", () => {
+    // Not restated as a literal prefix: the point is that renaming the server
+    // key cannot leave the grant behind, spelled for a server that no longer
+    // exists — a failure that is silent, and only reproduces headless.
+    const doc = buildAgentMcpServers({ cliPath: "/i/cli.js", projectDir: "/p" });
+    const rexServerName = Object.entries(doc.mcpServers).find(
+      ([, server]) => server.args[1] === "rex",
+    )?.[0];
+
+    expect(rexServerName).toBeDefined();
+    for (const tool of AGENT_REX_MCP_TOOLS) {
+      expect(tool.startsWith(`mcp__${rexServerName}__`)).toBe(true);
+    }
+  });
+
+  it("grants only the tools a hench prompt directs the agent to call", () => {
+    // Pinned exactly. The session reaches the whole rex server through the
+    // config this module writes, so this list is the only thing deciding what
+    // it may call — every entry needs a prompt behind it:
+    //   update_task_status — base workflow step 6
+    //   append_log         — base workflow step 7
+    //   add_item           — base workflow steps 3 and 9, and the autonomous
+    //                        adversarial-review pass's `should-fix` action
+    expect([...AGENT_REX_MCP_TOOLS]).toEqual([
+      "mcp__rex__update_task_status",
+      "mcp__rex__append_log",
+      "mcp__rex__add_item",
+    ]);
+  });
+
+  it("names no tool from the sourcevision server", () => {
+    // sourcevision is attached too, but nothing hench prompts asks the agent to
+    // write through it, and its MCP surface includes `set_file_archetype`.
+    const doc = buildAgentMcpServers({ cliPath: "/i/cli.js", projectDir: "/p" });
+    expect(Object.keys(doc.mcpServers)).toContain("sourcevision");
+    for (const tool of AGENT_REX_MCP_TOOLS) {
+      expect(tool).not.toContain("sourcevision");
+    }
   });
 });
 

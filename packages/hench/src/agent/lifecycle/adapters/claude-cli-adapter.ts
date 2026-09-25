@@ -44,6 +44,7 @@ import {
   classifyVendorError,
 } from "../../../prd/llm-gateway.js";
 import type { PermissionMode } from "../../../schema/index.js";
+import { AGENT_REX_MCP_TOOLS } from "../../../process/agent-mcp-config.js";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -69,6 +70,16 @@ const MAX_SUMMARY_LENGTH = 500;
  * fall through to a permission prompt (denied under a non-interactive
  * `acceptEdits` spawn). When the list is omitted/empty, `git` keeps its legacy
  * blanket grant for backward compatibility.
+ *
+ * The list also carries {@link AGENT_REX_MCP_TOOLS} — the rex MCP tools hench's
+ * own prompts direct the agent to call, on the rex server hench itself attaches.
+ * They are granted unconditionally rather than only alongside `--mcp-config`,
+ * because a session that inherits its registrations reads the same tools from
+ * the same server name, and naming a tool no attached server provides is inert.
+ * Applying here rather than at a call site is what makes the grant reach *every*
+ * Claude spawn: `buildSpawnConfig` is the only producer of Claude CLI args, so
+ * the work spawn, its retries, the adversarial review pass and the reviewer's
+ * background-wait resume all pass through this function.
  */
 export function buildAllowedTools(
   allowedCommands: ReadonlyArray<string>,
@@ -80,7 +91,7 @@ export function buildAllowedTools(
       ? allowedGitSubcommands!.map((sub) => `Bash(git ${sub}:*)`)
       : [`Bash(${cmd}:*)`],
   );
-  return [...bashTools, ...CLI_FILE_TOOLS];
+  return [...bashTools, ...CLI_FILE_TOOLS, ...AGENT_REX_MCP_TOOLS];
 }
 
 /**
