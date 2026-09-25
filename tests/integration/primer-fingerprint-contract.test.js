@@ -11,11 +11,18 @@
  * | hench         | `sourcevisionFingerprint`           | verifies |
  *
  * None of them may import the others — core is orchestration-tier (spawn-only)
- * and hench has no sourcevision gateway — so the hash is implemented three
- * times and this test is the only thing holding the copies in agreement.
+ * and hench has no sourcevision gateway.
+ *
+ * The current contract is a *published field*: sourcevision computes
+ * `analysisFingerprint` from CONTEXT.md and writes it into `manifest.json`, and
+ * both consumers read that field rather than recomputing anything. The older
+ * contract — three independent `analyzedAt + gitSha` hashes — survives only as a
+ * fallback for manifests written before the field existed, and is still pinned
+ * here because a manifest and the primer beside it are stamped as a pair: if the
+ * copies drifted, an old pair would stop matching itself.
  *
  * The agreement is worth a dedicated test because a divergence is *silent*.
- * Nothing throws and nothing warns: the hashes simply stop matching, every
+ * Nothing throws and nothing warns: the values simply stop matching, every
  * primer is judged stale forever, and both consumers fall back to the slower
  * path they were built to avoid. That is exactly what a stray edit to the
  * separator produced once already — a NUL byte on one side against a space on
@@ -58,11 +65,12 @@ const writePrimer = (content) =>
   writeFileSync(join(dir, ".sourcevision", "PRIMER.md"), content, "utf-8");
 
 /**
- * Manifest shapes the three implementations must agree on. `gitSha` is absent
- * outside a git checkout and `analyzedAt` is absent from a hand-edited or
- * truncated manifest, so neither is safe to assume present.
+ * Manifest shapes the three implementations must agree on, for manifests
+ * written before `analysisFingerprint` existed. `gitSha` is absent outside a
+ * git checkout and `analyzedAt` is absent from a hand-edited or truncated
+ * manifest, so neither is safe to assume present.
  */
-const MANIFESTS = [
+const LEGACY_MANIFESTS = [
   ["a complete manifest", { analyzedAt: "2026-08-17T13:41:10.697Z", gitSha: "abc123" }],
   ["no gitSha (not a git checkout)", { analyzedAt: "2026-08-17T13:41:10.697Z" }],
   ["no analyzedAt", { gitSha: "abc123" }],
@@ -70,12 +78,59 @@ const MANIFESTS = [
   ["non-string fields", { analyzedAt: 17, gitSha: null }],
 ];
 
-describe("primer fingerprint — three implementations, one value", () => {
-  for (const [label, manifest] of MANIFESTS) {
+/** Manifest shapes where `analysisFingerprint` is present but unusable. */
+const UNUSABLE_FIELD = [
+  ["an empty string", ""],
+  ["a non-string", 17],
+  ["null", null],
+];
+
+describe("primer fingerprint — the published field is the contract", () => {
+  it("has all three tiers read analysisFingerprint verbatim", async () => {
+    const manifest = writeManifest({
+      analyzedAt: "2026-08-17T13:41:10.697Z",
+      gitSha: "abc123",
+      analysisFingerprint: "0123456789abcdef",
+    });
+
+    expect(sv.primerFingerprint(manifest)).toBe("0123456789abcdef");
+    expect(core.sourcevisionAnalysisFingerprint(dir)).toBe("0123456789abcdef");
+    expect(await henchCache.sourcevisionFingerprint(dir)).toBe("0123456789abcdef");
+  });
+
+  it("ignores analyzedAt entirely once the field is present", async () => {
+    // The defect this field exists to fix: every analysis rewrites analyzedAt,
+    // so a timestamp-derived value went stale on runs that changed nothing.
+    const base = { gitSha: "abc123", analysisFingerprint: "0123456789abcdef" };
+    writeManifest({ ...base, analyzedAt: "2026-08-17T13:41:10.697Z" });
+    const first = await henchCache.sourcevisionFingerprint(dir);
+
+    writeManifest({ ...base, analyzedAt: "2026-09-24T22:05:00.000Z" });
+
+    expect(await henchCache.sourcevisionFingerprint(dir)).toBe(first);
+    expect(core.sourcevisionAnalysisFingerprint(dir)).toBe(first);
+  });
+
+  for (const [label, value] of UNUSABLE_FIELD) {
+    it(`falls back to the legacy hash when the field is ${label}`, async () => {
+      const legacy = { analyzedAt: "2026-08-17T13:41:10.697Z", gitSha: "abc123" };
+      const manifest = writeManifest({ ...legacy, analysisFingerprint: value });
+      const expected = sv.legacyManifestFingerprint(legacy);
+
+      expect(sv.primerFingerprint(manifest)).toBe(expected);
+      expect(core.sourcevisionAnalysisFingerprint(dir)).toBe(expected);
+      expect(await henchCache.sourcevisionFingerprint(dir)).toBe(expected);
+    });
+  }
+});
+
+describe("primer fingerprint — the legacy fallback still agrees", () => {
+  for (const [label, manifest] of LEGACY_MANIFESTS) {
     it(`agrees on ${label}`, async () => {
       writeManifest(manifest);
 
       const stamped = sv.primerFingerprint(manifest);
+      expect(stamped).toBe(sv.legacyManifestFingerprint(manifest));
       expect(core.sourcevisionAnalysisFingerprint(dir)).toBe(stamped);
       expect(await henchCache.sourcevisionFingerprint(dir)).toBe(stamped);
     });
@@ -121,7 +176,46 @@ describe("primer marker — what sourcevision stamps, both consumers read", () =
     ).toContain(BODY);
   });
 
-  it("rejects a primer stamped from an earlier analysis", async () => {
+  it("keeps a primer valid across a re-analysis that found the same thing", async () => {
+    // The whole defect in one case: `ndx ci` (or any run with no reachable
+    // vendor) re-analyses, rewrites analyzedAt, and cannot re-distil. Both
+    // consumers must still accept the primer the previous analysis left.
+    const analysisFingerprint = "0123456789abcdef";
+    writeManifest({
+      analyzedAt: "2026-08-17T13:41:10.697Z",
+      gitSha: "abc123",
+      analysisFingerprint,
+    });
+    writePrimer(sv.stampPrimer(BODY, analysisFingerprint));
+
+    // Re-analysis: new timestamp, same finding, no LLM call and so no restamp.
+    writeManifest({
+      analyzedAt: "2026-09-24T22:05:00.000Z",
+      gitSha: "abc123",
+      analysisFingerprint,
+    });
+
+    expect(core.readContextMd(dir).source).toBe("primer");
+    expect(
+      await hench.readFreshPrimer(dir, await henchCache.sourcevisionFingerprint(dir)),
+    ).toContain(BODY);
+  });
+
+  it("rejects a primer stamped from an analysis that found something else", async () => {
+    writeManifest({
+      analyzedAt: "2026-08-17T13:41:10.697Z",
+      gitSha: "abc123",
+      analysisFingerprint: "ffffffffffffffff",
+    });
+    writePrimer(sv.stampPrimer(BODY, "0123456789abcdef"));
+
+    expect(core.readContextMd(dir).source).not.toBe("primer");
+    expect(
+      await hench.readFreshPrimer(dir, await henchCache.sourcevisionFingerprint(dir)),
+    ).toBeUndefined();
+  });
+
+  it("rejects a primer stamped from an earlier analysis (legacy manifest)", async () => {
     writeManifest({ analyzedAt: "2026-08-28T09:00:00.000Z", gitSha: "def456" });
     writePrimer(
       sv.stampPrimer(

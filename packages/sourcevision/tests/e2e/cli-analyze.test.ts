@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtemp, cp, rm } from "node:fs/promises";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { validate, InventorySchema, ImportsSchema, ClassificationsSchema, ZonesSchema, ComponentsSchema } from "../../src/schema/validate.js";
@@ -145,6 +145,59 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
     const svDir = join(tmpDir, ".sourcevision");
     const inventory = JSON.parse(readFileSync(join(svDir, "inventory.json"), "utf-8"));
     expect(validateInventory(inventory).ok).toBe(true);
+  });
+
+  it("republishes the same analysisFingerprint when nothing changed", async () => {
+    // A primer is distilled once and stamped with this value; every consumer
+    // compares against it before trusting the primer. It must therefore survive
+    // a re-analysis that found the same thing — including one that made no LLM
+    // call and so could not have re-stamped anything. `analyzedAt` moves on
+    // every run and is the reason this is not derived from the manifest alone.
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
+    await cp(FIXTURE_DIR, tmpDir, { recursive: true });
+    const manifestPath = join(tmpDir, ".sourcevision", "manifest.json");
+    const readManifest = () => JSON.parse(readFileSync(manifestPath, "utf-8"));
+
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
+      encoding: "utf-8",
+      timeout: 30000,
+    });
+    const first = readManifest();
+
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
+      encoding: "utf-8",
+      timeout: 30000,
+    });
+    const second = readManifest();
+
+    expect(first.analysisFingerprint).toMatch(/^[0-9a-f]{16}$/);
+    expect(second.analysisFingerprint).toBe(first.analysisFingerprint);
+    // Guard the premise: the timestamp really did move between the two runs,
+    // so this is not passing because nothing was rewritten.
+    expect(second.analyzedAt).not.toBe(first.analyzedAt);
+  });
+
+  it("changes analysisFingerprint when the tree changes", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
+    await cp(FIXTURE_DIR, tmpDir, { recursive: true });
+    const manifestPath = join(tmpDir, ".sourcevision", "manifest.json");
+
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
+      encoding: "utf-8",
+      timeout: 30000,
+    });
+    const before = JSON.parse(readFileSync(manifestPath, "utf-8")).analysisFingerprint;
+
+    writeFileSync(
+      join(tmpDir, "src", "added-by-test.ts"),
+      "export const addedByTest = 1;\n",
+    );
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
+      encoding: "utf-8",
+      timeout: 30000,
+    });
+
+    expect(JSON.parse(readFileSync(manifestPath, "utf-8")).analysisFingerprint).not.toBe(before);
   });
 
   it("detects route modules in remix-app fixture", async () => {
