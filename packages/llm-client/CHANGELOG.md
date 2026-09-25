@@ -1,5 +1,92 @@
 # @n-dx/llm-client
 
+## 0.7.1
+
+### Patch Changes
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - Sourcevision can send file archetype classification (`code.classify`) to TypeSafe's Jev, a System One model that answers a Choice over the archetype catalog with a probability per option instead of free-text JSON. Setting `TYPESAFE_API_KEY` opts in; `llm.routes["code.classify"] = "light"` sends the class back to the vendor tier, and `llm.routes["<class>"] = "typesafe"` names the route explicitly. Classifications made this way carry Jev's probability as their confidence rather than a fixed 0.7. A confident `none` leaves the file unclassified; a low-confidence answer is escalated to the text classifier with the file's doc comment. Without the key nothing changes. `@n-dx/llm-client` gains `resolveJudgmentRoute` and `DEFAULT_JUDGMENT_ROUTES`; `LLM_VENDOR` and `ClaudeClient.complete` are untouched.
+  
+  With the same key, finding severity and category are graded by Jev (`finding.judge`: a Score and a Choice per finding, applied when confidence clears 0.5, with the confidence recorded on the finding) and each enriched zone gets two fragility Nouls (`zone.judge`) that become structural observations above 0.7. The enrichment prompts, including the meta pass, stop asking the text model for severity and category when the route is active; without the key every prompt is byte-identical to before. `enforceSeverityRules` still runs last.
+  
+  With the key present, `analyze` now runs a judgment-first cascade by default: zone names are selected by Jev from deterministic candidates (package, directory, archetype) and merged by a pair judgment; descriptions are templated from facts; fragility is judged once and only zones inside the 0.4–0.6 band, at most six per run (measured on three repositories), are escalated to generative narration; every generated finding is then judged for evidential support, metric paraphrase, anchor file, type and scope, and dropped or annotated accordingly. `--narrate` restores the full generative pass. Jev answers are cached per question in `.sourcevision/.cache/judgments.json`, and every run records per-phase and per-task-class cost on `manifest.lastAnalysis` and in `.sourcevision/.cache/analyses.jsonl`. Without the key, nothing changes.
+  
+  Also: warning- and critical-level heuristic (pass 0) findings are judged real-problem-or-artifact and demoted to `info` at 0.3 or below; the most cross-linked files get a `move-file` finding (`moveReason: "zone-judgment"`) when Jev places them confidently in another zone; a finding emitted under both a zone and `global` is kept once; `--per-zone` now reaches the analyzer.
+  
+  Re-runs are idempotent: a zone whose generated-name fallback already failed on the same files is not asked again, an escalated zone the previous run narrated on (nearly) the same files keeps its insights instead of being narrated again, and judged state carries no zone names so cache keys are stable across renames. Naming prints progress per Jev batch and per chunk of generated names.
+  
+  Generation is now one call per kind and off the critical path: `zone-naming` proposes names for the `none` zones in one prompt per chunk of up to 20 and verifies each chunk in one Jev request; `enrich-multiplex` narrates every escalated zone in one prompt; and `analyze` returns once its judged results are written, leaving narration to a detached `sv narrate` child (`manifest.narration`, `.sourcevision/.cache/narration.log`; `--wait` narrates inline).
+
+- [#414](https://github.com/en-dash-consulting/n-dx/pull/414) [`fdd864c`](https://github.com/en-dash-consulting/n-dx/commit/fdd864c4db245e5d69a0ae78534f07c0cc752c0e) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Retries now print as their own `retry n/m: <reason>` line across the LLM
+  providers and hench, and `@n-dx/llm-client` gains a monotonic progress
+  reporter for counters that span phases or batches.
+  
+  `@n-dx/llm-client` adds a `ProgressReporter` (`createProgressReporter`) that
+  turns phase-qualified counters into a running total — switching phases or
+  batches never produces a lower displayed number than was already shown — plus
+  `printRetryLine`/`formatRetryLine`, which print rate-limit retries in the
+  `retry n/m: <reason>` form on their own line and redraw the active progress
+  line afterward. `api-provider.ts`, `cli-provider.ts` and
+  `codex-cli-provider.ts` all route their default rate-limit message through
+  it, replacing the old `Rate limited — retry in Ns… (attempt n of m)` text.
+  
+  `sourcevision analyze` registers a reporter for the life of the command
+  (including recursive `--deep` sub-analyses), and its spinners register
+  themselves as the active reporter while they own the terminal line, so a
+  rate-limit retry raised inside an enrichment or classification batch pauses
+  the spinner, prints its line, and redraws the spinner after it. The zone
+  enrichment pass number is deliberately left unclamped: it is an absolute
+  identifier (`--target-pass=N` names it) rather than a progress tick, so
+  forcing it upward would report the wrong pass.
+  
+  `hench run` prints its own retries in the same form: the API loop's
+  `API returned 429, retrying in 1000ms...` becomes `retry 1/3: API returned
+  429, waiting 1000ms`, and the CLI loop's `Transient error on attempt n,
+  retrying in Xms...` becomes `retry n/m: transient error, waiting Xms`, where
+  `m` is the configured `retry.maxRetries`.
+
+- [#390](https://github.com/en-dash-consulting/n-dx/pull/390) [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396) Thanks [@endash-shal](https://github.com/endash-shal)! - Price token usage at each model's own rates instead of Claude Sonnet's.
+  
+  **Reported costs rise on upgrade — typically by about half, and Opus-heavy
+  projects by up to about two-thirds.** Dashboard and CLI cost figures go up
+  because runs are now priced at each model's own rates instead of a flat
+  Sonnet rate; no tokens were added and nothing runs more expensively. On this
+  repo's baseline batch the same runs moved from $161.08 (flat Sonnet) to
+  $247.53 (per model), a 54% rise — the old figure under-reported by about 35%.
+  Budget alerts or dashboards keyed to the old under-reported figures will see
+  a one-time jump.
+  
+  `estimateCost` took a `ModelPricing` parameter that every caller left at a
+  single hardcoded Sonnet default (3/15 per MTok, cache write 3.75, cache read
+  0.30). Opus (5/25) usage was therefore quoted at three-fifths of its real cost —
+  on this repo's own run history, which is not all Opus, $124 quoted against a
+  real $186. The `(based on Sonnet pricing)`
+  label made that honest rather than silently wrong, but it left the figures
+  unusable for the before/after comparisons the cost work depends on.
+  
+  - `@n-dx/llm-client` — `MODEL_COSTS` gains cache-write and cache-read rates,
+    so the existing catalog now covers all four billed token kinds for every
+    model in `TIER_MODELS` across claude, codex and google. New `model-pricing`
+    module exports `resolveModelPricing` (exact id → Claude alias → Codex legacy
+    remap → lower-case retry → labelled fallback) and `priceTokens`. Two known under-reporting
+    caveats are documented on the table: a 1-hour cache write bills at 2x input
+    rather than 1.25x, and long-context surcharges apply above 200K input on
+    some models. Neither is recoverable from aggregate token counts.
+  - `@n-dx/rex` — token aggregation carries a per-model split (`byModel`) drawn
+    from hench per-turn records, which already recorded vendor and model, so a
+    run that switched models mid-flight is priced per segment rather than at its
+    run-level model. `estimateCost` prices each bucket at its own rates and
+    reports a per-model breakdown; tokens with no recorded model, and any
+    remainder between the buckets and the totals, form a separate `unattributed`
+    line at the fallback rate. An unrecognised model id degrades to that same
+    labelled fallback rather than throwing or pricing at zero. `ndx usage` now
+    prints the per-model split in place of the blanket Sonnet caveat, and emits
+    it in `--format=json`.
+  - `@n-dx/web` — the dashboard's duplicate pricing literal is gone; it resolves
+    the same fallback rates from the shared table. Its aggregation now carries
+    its own per-model split and prices it through rex's arithmetic, so dashboard
+    and CLI figures agree for the same runs (see the dashboard-per-model-pricing
+    changeset in this release).
+
 ## 0.7.0
 
 ### Patch Changes

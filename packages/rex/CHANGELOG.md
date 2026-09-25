@@ -1,5 +1,225 @@
 # @n-dx/rex
 
+## 0.7.1
+
+### Patch Changes
+
+- [#392](https://github.com/en-dash-consulting/n-dx/pull/392) [`ee16578`](https://github.com/en-dash-consulting/n-dx/commit/ee165780ecdc34ad0349ab7028875f04bff769e0) Thanks [@endash-shal](https://github.com/endash-shal)! - A refused completion no longer hands the task back to other worktrees, and claims can now be inspected and freed from the CLI.
+  
+  When the uncommitted-work gate refuses to mark a task complete, the run's cross-worktree claim is held instead of released: the work is real and it is in that worktree, so freeing the task invited a second worktree to redo it. A held claim records why it is held, survives its holder's exit (an ordinary claim dies with its pid), and does not expire — it ends only when someone deals with the work: `ndx claim release <id>`, `release --all` from the worktree that left the work, `release --force`, or a fresh claim from that worktree (a re-run there clears the hold). Another worktree passes the task over; `hench run` and the dashboard's Execute, asked for it explicitly, say the task is held, that the hold does not expire, and how to clear it, rather than "is being worked on". Ordinary claims keep their existing lease-and-pid liveness exactly as before.
+  
+  New `ndx claim` (`rex claim`): `list` shows every live claim with task title, worktree, holder liveness, state and expiry (a held claim reads `expires: never — held until released`); `release <taskId>` frees one — from whichever worktree the operator is standing in when the claim is held or its holder is dead — refusing while the holder is alive unless `--force`; `release --all` frees this worktree's held and dead-holder claims, keeping any a live run is still working unless `--force`. `--format=json` throughout.
+
+- [#394](https://github.com/en-dash-consulting/n-dx/pull/394) [`7b5d253`](https://github.com/en-dash-consulting/n-dx/commit/7b5d253faec104a417505d4baa4aa3a7ec0348f1) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx usage` counts hench runs, not turns. The By-command breakdown summed one call per turn and printed it as "runs", so a batch of 10 runs could report 1,851 — disagreeing with the By-package line for the same tokens. Hench usage now carries both counts: `runs` (distinct run records, printed as the human unit) and `calls` (LLM calls, i.e. turns, kept in `--format=json` so nothing downstream loses the turn count). Package, per-command, and per-period surfaces all report the same run count for the same data.
+
+- [#394](https://github.com/en-dash-consulting/n-dx/pull/394) [`7b5d253`](https://github.com/en-dash-consulting/n-dx/commit/7b5d253faec104a417505d4baa4aa3a7ec0348f1) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard prices token usage per model and shows the split. Its aggregation now carries a `byModel` split (from hench turn records, the rex execution log, sourcevision, and the dashboard's own Ask ledger) and prices it through rex's `estimateCostFromTotals` — imported via the rex gateway, so there is one copy of the pricing arithmetic and both surfaces quote the same figure for the same runs. The Token Usage view gains a Cost by Model table (input/output/cache write/cache read/cost per model, with unknown ids labelled "priced as claude-sonnet-5" and an unattributed line for model-less tokens) and drops its hardcoded per-million rate labels. Also fixes `ndx usage`'s headline undercount: the package rollup now counts `smart_add_token_usage` events, which its own By-command breakdown (and the dashboard) already included.
+
+- [#384](https://github.com/en-dash-consulting/n-dx/pull/384) [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex validate`'s "tree slug convention" check is now an error, not a warning: a PRD tree written by a foreign slug rule means the next write will rewrite it, so it must fail validation and CI rather than pass silently. Its closing line now says to run `rex migrate-slugs` on the default branch.
+
+- [#413](https://github.com/en-dash-consulting/n-dx/pull/413) [`fdb8376`](https://github.com/en-dash-consulting/n-dx/commit/fdb8376fa554f7ef92c65e3819def5dbbf74e933) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A hench run no longer leaves its task `completed` when the full test gate fails. The agent still marks its own task completed, but while the run holds the task's claim, rex records that request on the claim instead of writing it, for rex MCP (Claude CLI, Codex CLI, or the dashboard's HTTP server), `rex update`, and the API loop's `rex_update_status` alike. The agent's `git add -A && git commit` therefore cannot carry the status into the work commit. hench applies the completion, with the agent's resolution type and detail, once the gate passes — in its own record commit on `autoCommit`, or before the commit prompt otherwise. When the gate fails, the task stays not completed and the resolution is kept on the run record (`completionHold`) and in the execution log for the retry. Review repairs from a failed gate are committed as their own commit on `autoCommit`, and named as left uncommitted otherwise. Inside the run, the agent's own MCP server can no longer take over or release the run's claim, so it cannot drop the hold (`rex claim release --force` still can). Outside a hench run, MCP and the rex CLI behave as before. The hold is recorded by rex, so it engages only where the agent's rex includes this change. A Claude CLI run launched through `ndx` pins the agent's rex MCP server to the run's own build; the agent's shell `rex`, a Codex run's MCP server, and a Claude run that cannot pin (a standalone `hench run`) still use the `n-dx` on PATH. The API loop's `rex_update_status` runs inside hench, so it always holds.
+  
+  A failed gate's record now names the failing test. `testGate.failureDigest`, which is also printed and copied to `diagnostics.testGateFailureDigest`, holds the FAIL lines, the first assertion blocks and the per-suite summary, extracted from the whole output so that a long stderr stream from passing suites cannot push them out.
+  
+  The timeout already killed the whole test process tree (llm-client `exec`'s tree kill). A timed-out gate now reports when the kill took effect ("the whole process tree was gone 0.4s after the kill began"). When hench itself reached the deadline late, the delay is reported as a stall of this process rather than charged to the kill. A signal from outside hench and runaway output are no longer reported as timeouts. The gate's output ceiling rises from 5 MB to 32 MB, so a large suite's failure summary is not cut off.
+
+- [#416](https://github.com/en-dash-consulting/n-dx/pull/416) [`e70e787`](https://github.com/en-dash-consulting/n-dx/commit/e70e787b40ada9ecaf17069b7e4f11246ebb235f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Offer to migrate a non-conformant PRD tree at the gate, and stop rather than continue
+  
+  A tree whose slug-rule marker names another rule, or whose paths do not match the
+  running rule, used to dead-end a run with a refusal and an instruction to go and
+  run `rex migrate-slugs` by hand. `ndx work` and the dashboard's Execute now close
+  that loop — and stop there.
+  
+  Stopping is the point. On a non-conformant tree `migrate-slugs` is not a no-op: it
+  rewrites every path that does not match the running rule, which can be the whole
+  tree. The command exists to perform that rename deliberately, in one reviewable
+  commit, instead of letting the next ordinary save produce a surprise mass diff.
+  Running it inside a task run and carrying on would turn it straight back into that
+  surprise diff, with the rename landing in whatever commit the task makes next under
+  a message about something else — the 2026-09-17 incident (a pull request merging
+  1,570 re-slugged files through green CI) with the human step deleted rather than
+  automated. So the migration gets its own commit, and the operator reviews it and
+  starts the run again.
+  
+  - **CLI.** An interactive `ndx work` prints the paths the migration would rename
+    and asks. Accepting spawns `rex migrate-slugs`, reports what changed, and exits
+    without executing the task. Declining rethrows the refusal unchanged.
+  - **Autonomous runs are never offered it.** `--auto`, `--loop`, `--epic-by-epic`,
+    `--yes`, a non-terminal stdin and CI all refuse exactly as before, and the
+    message now names which of those withheld the offer instead of the run silently
+    behaving differently from an interactive one. `--dry-run` is never offered it
+    either, even on a terminal: a dry run promises not to touch the working tree.
+  - **Dashboard.** The 412 from Execute now carries `migratable`, and Start Task
+    offers a "Migrate the PRD tree" button under a refusal a migration would fix.
+    Accepting sends a second explicit `{ migrateSlugs: true }` request — consent is
+    carried by the request rather than inferred, since the server has no session —
+    which migrates and returns without starting the task.
+  - **A tree on a newer rule gets no offer at all**, in either surface.
+    `TreeConformanceRefusal` gained a `migratable` flag computed from the same
+    direction rule `assertSlugRuleAdoptable` enforces, so a gate cannot offer a
+    migration the command would refuse.
+  
+  The store-level write guard is unchanged and still refuses from inside the PRD
+  lock, which is where it has to stay: `migrate-slugs` needs that same lock, so
+  recovering there would deadlock.
+
+- [#416](https://github.com/en-dash-consulting/n-dx/pull/416) [`e70e787`](https://github.com/en-dash-consulting/n-dx/commit/e70e787b40ada9ecaf17069b7e4f11246ebb235f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex validate --post-merge` reports a `## Children` table that disagrees with its own directory
+  
+  A feature reached `main` with four children missing from its Children table and was repaired by hand twice before anything noticed. A fixture test now settles what that state costs: nothing. The parser walks the directory and never reads the table, so the omitted items load normally, survive a full-tree save, and the save rewrites the table complete. The shape is cosmetic — but it still makes the tree lie to anyone reading it as documentation, and it was invisible.
+  
+  `children-table-out-of-sync` reports it, in both directions (a child on disk that no row lists, and a row pointing at a file that is gone). It is repairable — `--repair` rewrites the table from the directory — so the CI gate reports it without blocking the merge.
+  
+  Two corrections came out of building it. Link targets are read as each row's last `](…)` rather than by matching a `[label](target)` pair, because titles are not escaped into the label and a real item titled "Color-code [Tool], [Agent], …" would otherwise read as unlisted. And the tree-root banner `index.md` written by `rex init` is skipped, since it has no frontmatter and is not an item — every epic in the tree would otherwise read as an unlisted child of it.
+  
+  `docs/architecture/prd-folder-tree-schema.md` said tasks never carry a Children table (contradicting its own compatibility matrix and the serializer) and described the child link format as `./{slug}/{title}.md` (the serializer writes `./{slug}.md` or `./{slug}/index.md`). Both corrected.
+
+- [#390](https://github.com/en-dash-consulting/n-dx/pull/390) [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396) Thanks [@endash-shal](https://github.com/endash-shal)! - Price token usage at each model's own rates instead of Claude Sonnet's.
+  
+  **Reported costs rise on upgrade — typically by about half, and Opus-heavy
+  projects by up to about two-thirds.** Dashboard and CLI cost figures go up
+  because runs are now priced at each model's own rates instead of a flat
+  Sonnet rate; no tokens were added and nothing runs more expensively. On this
+  repo's baseline batch the same runs moved from $161.08 (flat Sonnet) to
+  $247.53 (per model), a 54% rise — the old figure under-reported by about 35%.
+  Budget alerts or dashboards keyed to the old under-reported figures will see
+  a one-time jump.
+  
+  `estimateCost` took a `ModelPricing` parameter that every caller left at a
+  single hardcoded Sonnet default (3/15 per MTok, cache write 3.75, cache read
+  0.30). Opus (5/25) usage was therefore quoted at three-fifths of its real cost —
+  on this repo's own run history, which is not all Opus, $124 quoted against a
+  real $186. The `(based on Sonnet pricing)`
+  label made that honest rather than silently wrong, but it left the figures
+  unusable for the before/after comparisons the cost work depends on.
+  
+  - `@n-dx/llm-client` — `MODEL_COSTS` gains cache-write and cache-read rates,
+    so the existing catalog now covers all four billed token kinds for every
+    model in `TIER_MODELS` across claude, codex and google. New `model-pricing`
+    module exports `resolveModelPricing` (exact id → Claude alias → Codex legacy
+    remap → lower-case retry → labelled fallback) and `priceTokens`. Two known under-reporting
+    caveats are documented on the table: a 1-hour cache write bills at 2x input
+    rather than 1.25x, and long-context surcharges apply above 200K input on
+    some models. Neither is recoverable from aggregate token counts.
+  - `@n-dx/rex` — token aggregation carries a per-model split (`byModel`) drawn
+    from hench per-turn records, which already recorded vendor and model, so a
+    run that switched models mid-flight is priced per segment rather than at its
+    run-level model. `estimateCost` prices each bucket at its own rates and
+    reports a per-model breakdown; tokens with no recorded model, and any
+    remainder between the buckets and the totals, form a separate `unattributed`
+    line at the fallback rate. An unrecognised model id degrades to that same
+    labelled fallback rather than throwing or pricing at zero. `ndx usage` now
+    prints the per-model split in place of the blanket Sonnet caveat, and emits
+    it in `--format=json`.
+  - `@n-dx/web` — the dashboard's duplicate pricing literal is gone; it resolves
+    the same fallback rates from the shared table. Its aggregation now carries
+    its own per-model split and prices it through rex's arithmetic, so dashboard
+    and CLI figures agree for the same runs (see the dashboard-per-model-pricing
+    changeset in this release).
+
+- [#395](https://github.com/en-dash-consulting/n-dx/pull/395) [`a136bbc`](https://github.com/en-dash-consulting/n-dx/commit/a136bbc4f21719624f96d98bb82420c8fce9b649) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Preserve unknown `tree-meta.json` keys, and check a PRD tree that carries no slug-rule marker before writing it.
+  
+  Two changes to the same fault. A rex MCP server running a build older than the
+  `slugRule` field saved the PRD and rewrote `.rex/tree-meta.json` from a type
+  that had no such field, erasing the marker. No path moved and no item changed —
+  the two builds shared a slug rule — but the write guard was silently disarmed
+  for whoever wrote next.
+  
+  - **Every `tree-meta.json` write now reads the file first and carries forward
+    keys it does not recognise.** This cannot repair a sidecar an older build has
+    already stripped; it stops the next such loss, between this version and the
+    ones after it.
+  - **A tree with no marker is no longer adopted *silently*.** It is still
+    adopted when every path already matches the running slug rule — the save
+    records the marker and prints a one-line notice naming `rex migrate-slugs` as
+    the way to verify, and `rex validate` reports the same thing as a warning
+    rather than an error. What changed is that adoption is now visible, and that
+    it is conditional: an unmarked tree with a path this build did not write is
+    refused outright, by the store guard, `rex validate`, the `ndx work` pre-run
+    gate and the dashboard's Execute gate, all saying `slug rule marker missing;
+    run rex migrate-slugs`.
+  
+  Absence covers two states — a tree older than the guard, and one whose sidecar
+  a build older than the field rewrote without the marker — and nothing on disk
+  separates them. The path scan is not a perfect tiebreak either: it can only
+  recognise a rule this build can reproduce, so a tree re-slugged by a *future*
+  build would scan clean. That hazard is not yet reachable, because there is no
+  such rule to have written one; whoever adds one moves the guard back to a
+  refusal in the same commit.
+  
+  `rex migrate-slugs` remains the way to re-derive every path rather than trust
+  the scan, and it now reports `slugRuleRecorded` in its JSON output — on an
+  already-conformant tree it renames nothing, so the counts alone read as
+  "nothing happened" when it was the run that recorded the marker.
+  
+  **Upgrading costs nothing on a conformant repository.** The marker is new in
+  this release, so every existing tree arrives without one; those written by 0.5.2
+  and later already follow the current rule and are adopted on their next save. A
+  tree predating that carries paths from a superseded rule (0.5.1 suffixed every
+  slug with `-{id6}`; the current rule first shipped in 0.5.2), and its writes are
+  refused until `rex migrate-slugs` is run — `rex validate` already reported those
+  paths before this release, but nothing stopped a write from re-slugging them. A new project
+  is unaffected: an empty tree has nothing a marker could be wrong about, so a
+  first save proceeds and records one.
+
+- [#384](https://github.com/en-dash-consulting/n-dx/pull/384) [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The PRD tree now records which slug rule wrote it, and a build that implements a different rule refuses to write it.
+  
+  `tree-meta.json` gains a `slugRule` integer beside `title` and `schema`, sourced from a single `SLUG_RULE_VERSION` constant declared next to the slug functions. Every save checks the marker before writing a single file: a different version refuses the whole save, naming both versions and `rex migrate-slugs`; an absent marker is adopted only if the tree's paths already conform, and refused otherwise. `rex validate` reports a marker mismatch as an error, which catches a tree written by a *future* rule — one whose paths this build cannot derive and so cannot inspect.
+  
+  `rex migrate-slugs` is the one command that may re-slug a tree, and it sets the marker in the same locked write. Older builds ignore the unknown key, so a marked tree still loads everywhere.
+
+- [#384](https://github.com/en-dash-consulting/n-dx/pull/384) [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx work` and the dashboard's Execute now refuse to start against a PRD tree written under a different slug rule, instead of discovering it at the completion write.
+  
+  An autonomous run writes the PRD when it finishes its task, so a run started with a mismatched build does not fail — it succeeds, and carries a whole-tree re-slug into whatever branch is open under a "task completed" commit. The store's write guard refuses that write, but only after the run has claimed the task, spent its tokens and edited the code.
+  
+  Both surfaces now ask the question first, through rex's new `checkTreeConformance`: the CLI refuses before taking a claim or writing anything (including on `--dry-run`, so a preview cannot report that the real run would have been fine), and `POST /api/hench/execute` answers 412 with the same message, which the viewer already surfaces on the run card. Unlike the write-time guard, a tree whose marker agrees is still path-scanned, so one whose paths were disturbed is refused too. There is no override flag: the fix is `rex migrate-slugs`, or upgrading rex when the tree was written by a newer rule. An interactive `ndx work` or the dashboard can offer to run the migration for you and then stop without executing the task.
+
+- [#395](https://github.com/en-dash-consulting/n-dx/pull/395) [`a136bbc`](https://github.com/en-dash-consulting/n-dx/commit/a136bbc4f21719624f96d98bb82420c8fce9b649) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Removed the test-only `writePRD` option `omitSlugRuleMarker` (`tests/helpers/rex-dir-test-support.ts`): nothing called it, so the absent-marker branch it existed to reach was never exercised through it — the branch is already covered directly in `tests/unit/store/slug-rule-guard.test.ts`, which writes `tree-meta.json` without the marker on disk. No production code changed.
+
+- [#391](https://github.com/en-dash-consulting/n-dx/pull/391) [`bb4f829`](https://github.com/en-dash-consulting/n-dx/commit/bb4f829b0d676024fce715ee5da4db0ed2a429b5) Thanks [@endash-shal](https://github.com/endash-shal)! - `rex fix` no longer inverts timestamps when backfilling `startedAt` on completed items ([#375](https://github.com/en-dash-consulting/n-dx/issues/375)). The backfill now derives from the item's own `completedAt` — never the current clock, which produced `startedAt > completedAt` on anything completed before today. Already-inverted pairs are now a detectable, repairable issue (new `inverted_timestamps` fix kind): the repair clamps `startedAt` back to `completedAt`, so trees damaged by the old backfill heal in one `rex fix` run.
+
+- [#404](https://github.com/en-dash-consulting/n-dx/pull/404) [`5866f4e`](https://github.com/en-dash-consulting/n-dx/commit/5866f4eddf660fb4d254dd9a6e66e1fbc4aae7d7) Thanks [@endash-shal](https://github.com/endash-shal)! - Hench's completion and `--reset-deferred` commits stage the PRD files the save actually touched, not the whole tree
+  
+  Staging `.rex/prd_tree/` wholesale once swept a 1,378-file in-flight rename
+  into a "task completed" commit. The serializer always knew exactly which files
+  each save wrote and deleted; that list now crosses the package boundary.
+  
+  - `@n-dx/rex` — every folder-tree save records the paths it wrote and
+    deleted (`SerializeResult.writtenPaths`/`deletedPaths`; files
+    skipped as unchanged are not listed, and a removed directory is reported as
+    the files inside it). Both local stores accumulate the lists across saves
+    and expose them, relative to the project directory, through the new
+    `takeSaveFileReport(store)`, which drains
+    the accumulator — a caller that saves several times between commit points
+    (`--reset-deferred` saves once per task) gets the union, not the last save.
+  - `@n-dx/hench` — the completion-metadata commit and the `--reset-deferred`
+    commit build their `git add` list and commit pathspec from that report plus
+    the `tree-meta.json` sidecar. An operator's unrelated dirty file under
+    `.rex/prd_tree/` is no longer staged or committed by either; it stays dirty
+    in the working tree for the operator to own. A deleted file is staged only
+    when git tracks it, and a written file only while it still exists, so the
+    staging loop cannot abort on a missing path. Stores that do not report
+    saves keep the previous wholesale staging.
+
+- [#395](https://github.com/en-dash-consulting/n-dx/pull/395) [`a136bbc`](https://github.com/en-dash-consulting/n-dx/commit/a136bbc4f21719624f96d98bb82420c8fce9b649) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex migrate-slugs` decides whether a tree is adoptable against the marker it reads inside the PRD lock, immediately before the write, rather than against one read before the lock was taken. A concurrent writer that records a newer marker in that window therefore cannot have it silently overwritten by the migration — exactly the whole-tree downgrade the direction check exists to prevent.
+  
+  This holds in both local stores. `FileStore` is the one that matters in practice: `resolveStore` returns it, and `rex migrate-slugs` resolves its store through `resolveStore`, so it is the path every real migration takes.
+
+- [#384](https://github.com/en-dash-consulting/n-dx/pull/384) [`95fe231`](https://github.com/en-dash-consulting/n-dx/commit/95fe2311fafc93a7f6aaa76bcdf44b99ff9f03cb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The slug-rule write guard judges an unmarked tree by the paths already on disk, not by the slugs the pending save implies, so a write that renames an item (`rex update <id> --title="…"`) is never mistaken for a foreign build's re-slug. A genuinely foreign unmarked tree is still refused.
+  
+  `rex migrate-slugs` is bounded to the direction it can actually migrate. It rewrites the tree under this build's rule, so on a tree marked with a *newer* rule it would perform a downgrade — and since the newer build would then refuse the tree and advise the same command, two builds could trade whole-tree renames by following their own instructions. `adoptSlugRule` refuses a newer marker, and the guard's refusals recommend upgrading rex rather than migrating when the tree is newer. A migration that only recorded the marker says so rather than reporting that nothing changed, and refusal sample lines use the platform path separator.
+
+- [#404](https://github.com/en-dash-consulting/n-dx/pull/404) [`5866f4e`](https://github.com/en-dash-consulting/n-dx/commit/5866f4eddf660fb4d254dd9a6e66e1fbc4aae7d7) Thanks [@endash-shal](https://github.com/endash-shal)! - A PRD save no longer risks refusing to clean up its own previous write
+  
+  The stale-save guard judges deletion candidates by mtime against the
+  `loadedAt` the store adopted after its last save. That `loadedAt` was a bare
+  `Date.now()` taken after the files were written — and on Windows the
+  filesystem clock can run ahead of `Date.now()` by more than the guard's
+  tolerance, so a store's next save intermittently read its *own* just-written
+  files as another writer's newer work and refused. The serializer now reports
+  the largest mtime it wrote (`SerializeResult.maxWrittenMtimeMs`) and both
+  local stores adopt `max(Date.now(), that)` instead.
+- Updated dependencies [[`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`fdd864c`](https://github.com/en-dash-consulting/n-dx/commit/fdd864c4db245e5d69a0ae78534f07c0cc752c0e), [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396)]:
+  - @n-dx/llm-client@0.7.1
+
 ## 0.7.0
 
 ### Minor Changes

@@ -1,5 +1,140 @@
 # @n-dx/sourcevision
 
+## 0.7.1
+
+### Patch Changes
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - The dashboard's Architecture, Problems and Suggestions views now unlock after a cascade analysis. They were gated on generative passes 2–4, which a cascade run never performs even though its single judged pass already produces all of those findings, so they stayed locked however often the project was re-scanned. `zones.json` now records `enrichmentMode`. For files written before that field existed, the dashboard falls back to the manifest's last run mode.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - Product logos, the per-view favicon and the notification icon load again when the dashboard is served through the hub at `/p/<id>/`. The dashboard's Isometric Map now behaves like the `sv iso` output: "Open on its own" and the breadcrumb switch scenes in place (they were dead inside the dashboard's sandboxed frame), and the map regenerates when a new analysis or background narration lands.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - Areas on the architecture map expand in place. Double-click an area (or use **Expand here**) and its zones appear on a platform where the area was, with the rest of the map shifting to make room and connectors staying attached. Several areas can be open at once; **Open on its own** still shows one area by itself.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - When an area is expanded on the architecture map, its connectors to other areas now leave from the specific zones that import, drawn as arcs over the blocks. They end at the other area, or at its zones when that area is expanded too. A zone's panel lists what it imports in other areas and what imports it.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - Sourcevision can send file archetype classification (`code.classify`) to TypeSafe's Jev, a System One model that answers a Choice over the archetype catalog with a probability per option instead of free-text JSON. Setting `TYPESAFE_API_KEY` opts in; `llm.routes["code.classify"] = "light"` sends the class back to the vendor tier, and `llm.routes["<class>"] = "typesafe"` names the route explicitly. Classifications made this way carry Jev's probability as their confidence rather than a fixed 0.7. A confident `none` leaves the file unclassified; a low-confidence answer is escalated to the text classifier with the file's doc comment. Without the key nothing changes. `@n-dx/llm-client` gains `resolveJudgmentRoute` and `DEFAULT_JUDGMENT_ROUTES`; `LLM_VENDOR` and `ClaudeClient.complete` are untouched.
+  
+  With the same key, finding severity and category are graded by Jev (`finding.judge`: a Score and a Choice per finding, applied when confidence clears 0.5, with the confidence recorded on the finding) and each enriched zone gets two fragility Nouls (`zone.judge`) that become structural observations above 0.7. The enrichment prompts, including the meta pass, stop asking the text model for severity and category when the route is active; without the key every prompt is byte-identical to before. `enforceSeverityRules` still runs last.
+  
+  With the key present, `analyze` now runs a judgment-first cascade by default: zone names are selected by Jev from deterministic candidates (package, directory, archetype) and merged by a pair judgment; descriptions are templated from facts; fragility is judged once and only zones inside the 0.4–0.6 band, at most six per run (measured on three repositories), are escalated to generative narration; every generated finding is then judged for evidential support, metric paraphrase, anchor file, type and scope, and dropped or annotated accordingly. `--narrate` restores the full generative pass. Jev answers are cached per question in `.sourcevision/.cache/judgments.json`, and every run records per-phase and per-task-class cost on `manifest.lastAnalysis` and in `.sourcevision/.cache/analyses.jsonl`. Without the key, nothing changes.
+  
+  Also: warning- and critical-level heuristic (pass 0) findings are judged real-problem-or-artifact and demoted to `info` at 0.3 or below; the most cross-linked files get a `move-file` finding (`moveReason: "zone-judgment"`) when Jev places them confidently in another zone; a finding emitted under both a zone and `global` is kept once; `--per-zone` now reaches the analyzer.
+  
+  Re-runs are idempotent: a zone whose generated-name fallback already failed on the same files is not asked again, an escalated zone the previous run narrated on (nearly) the same files keeps its insights instead of being narrated again, and judged state carries no zone names so cache keys are stable across renames. Naming prints progress per Jev batch and per chunk of generated names.
+  
+  Generation is now one call per kind and off the critical path: `zone-naming` proposes names for the `none` zones in one prompt per chunk of up to 20 and verifies each chunk in one Jev request; `enrich-multiplex` narrates every escalated zone in one prompt; and `analyze` returns once its judged results are written, leaving narration to a detached `sv narrate` child (`manifest.narration`, `.sourcevision/.cache/narration.log`; `--wait` narrates inline).
+
+- [#414](https://github.com/en-dash-consulting/n-dx/pull/414) [`fdd864c`](https://github.com/en-dash-consulting/n-dx/commit/fdd864c4db245e5d69a0ae78534f07c0cc752c0e) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Retries now print as their own `retry n/m: <reason>` line across the LLM
+  providers and hench, and `@n-dx/llm-client` gains a monotonic progress
+  reporter for counters that span phases or batches.
+  
+  `@n-dx/llm-client` adds a `ProgressReporter` (`createProgressReporter`) that
+  turns phase-qualified counters into a running total — switching phases or
+  batches never produces a lower displayed number than was already shown — plus
+  `printRetryLine`/`formatRetryLine`, which print rate-limit retries in the
+  `retry n/m: <reason>` form on their own line and redraw the active progress
+  line afterward. `api-provider.ts`, `cli-provider.ts` and
+  `codex-cli-provider.ts` all route their default rate-limit message through
+  it, replacing the old `Rate limited — retry in Ns… (attempt n of m)` text.
+  
+  `sourcevision analyze` registers a reporter for the life of the command
+  (including recursive `--deep` sub-analyses), and its spinners register
+  themselves as the active reporter while they own the terminal line, so a
+  rate-limit retry raised inside an enrichment or classification batch pauses
+  the spinner, prints its line, and redraws the spinner after it. The zone
+  enrichment pass number is deliberately left unclamped: it is an absolute
+  identifier (`--target-pass=N` names it) rather than a progress tick, so
+  forcing it upward would report the wrong pass.
+  
+  `hench run` prints its own retries in the same form: the API loop's
+  `API returned 429, retrying in 1000ms...` becomes `retry 1/3: API returned
+  429, waiting 1000ms`, and the CLI loop's `Transient error on attempt n,
+  retrying in Xms...` becomes `retry n/m: transient error, waiting Xms`, where
+  `m` is the configured `retry.maxRetries`.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - Zones stay balanced. A subdivision that leaves one child holding most of its parent is retried, and dropped if it can't be balanced, so nested zones no longer form a chain of one dominant child plus slivers. When the zone count is capped, the zones most tightly bound to a neighbour are merged first, so one zone no longer absorbs whole features. An oversized zone now makes the partition borderline. Test directories nested in code (`__tests__`, `packages/x/tests/<suite>`) form one zone per parent or suite instead of one project-wide test zone. The iso map draws sub-zones as tiles on their parent block and lists them in its side panel.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - A fragmented zone partition is no longer frozen. Before a previous partition is reused or used as the Louvain seed, sourcevision checks its health: one where at least 40% of zones hold two files or fewer is rebuilt from scratch, and in the borderline band Jev decides. The rebuild happens once per input fingerprint and needs no `sv reset`. Background narration no longer loses work: a new `analyze` stops a still-running narrator and queues what it had not finished. `ndx status` and the dashboard overview report pending or failed narration, and `ndx plan` waits for narration before `rex analyze`.
+
+- [#403](https://github.com/en-dash-consulting/n-dx/pull/403) [`6bee073`](https://github.com/en-dash-consulting/n-dx/commit/6bee073fd946866760cced673afd9ac4fcaa0675) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Lead Next Steps and Problems titles with plain language, not the metric.
+  
+  Findings and their Next Step titles read metric-first — "Zone X has critical
+  risk (score: 0.65, cohesion: 0.30, coupling: 0.70) — requires refactoring…",
+  "N zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6):
+  …", "Low cohesion (0.2) — files are loosely related…" — and the 80-character
+  title truncation could cut a title off mid-metric, hiding the explanation. An
+  outside first-use review could not tell what a finding meant without opening
+  its detail.
+  
+  - Architectural-risk findings (`risk-scoring.ts`) now lead with the problem
+    ("Zone X is fragile and needs refactoring before new feature development",
+    "N zones are fragile: they hold loosely related files and depend heavily on
+    other zones") and put the cohesion, coupling and score numbers after an
+    em-dash. The Problems view, CONTEXT.md and llms.txt show this new wording.
+  - Next Step titles drop any trailing metric clause after an em-dash, and
+    strip a leading "<Metric label> (<value>) —" or "<Metric label>:" prefix
+    from findings that still start with one, so a title is plain language even
+    when truncated. The full finding text, metric included, is still the Next
+    Step's description.
+  - A grouped Next Step states its count first ("2 related findings: …")
+    instead of appending "(+N related)".
+  
+  The findings and next-steps JSON shapes, and the CONTEXT.md and llms.txt
+  section structure, are unchanged; only wording changed. Anything that matched
+  on the old risk-finding wording should match on the new text.
+
+- [#412](https://github.com/en-dash-consulting/n-dx/pull/412) [`87c0af9`](https://github.com/en-dash-consulting/n-dx/commit/87c0af99fd7f9bdc4f563d74f323166307bb3e26) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Stamp the primer with a content fingerprint, so an analysis that changed nothing
+  stops invalidating it.
+  
+  `.sourcevision/PRIMER.md` is the distilled startup context `ndx work` feeds every
+  task. It was stamped with a hash of `analyzedAt` and `gitSha` — but every
+  `sourcevision analyze` rewrites `analyzedAt`, so the stamp went stale on *every*
+  run. A run that makes no LLM call (no vendor reachable, a CI runner, `ndx ci`, a
+  provider outage) cannot re-distil and cannot re-stamp, so from that point on both
+  readers rejected a primer that was still perfectly accurate: `ndx work` silently
+  fell back to the full CONTEXT.md and orientation re-explored from scratch. Two
+  cheaper losses came with it — an LLM-enabled analyse never hit the primer cache,
+  so it bought a `context.distill` call on every run, and hench's warm-parent
+  session cache, keyed on the same value, was thrown away by every re-analysis of
+  an unchanged tree.
+  
+  `sourcevision analyze` now computes `analysisFingerprint` from `gitSha` and the
+  CONTEXT.md it just wrote — the primer's actual input, with no timestamp in it —
+  and publishes it in `manifest.json`. Two analyses that found the same thing
+  produce the same value; a changed tree produces a different one and the primer is
+  correctly rejected until re-distilled.
+  
+  Consumers now *read* that field rather than recomputing the hash, so the current
+  path has one producer and no copies to hold in agreement. A manifest written
+  before the field falls back to the old `analyzedAt + gitSha` hash, so an existing
+  manifest and the primer beside it keep matching until the next analysis re-stamps
+  both — that fallback is still implemented in all three tiers, and the cross-tier
+  contract test still holds those three copies in agreement.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - Zones get sub-zones again, and the map opens them at any depth. A zone is split whenever the split is balanced once it reaches 15% of the project's files, capped at 30 files (and never below 12) — previously the 15% trigger was uncapped, so large projects never split their zones. Slivers are folded into their siblings, and sub-zones are named the same way zones are, with numbered sub-zone ids following their chosen names. On the architecture map, any block with tiles on top expands in place: areas into zones, zones into sub-zones, and so on. Connectors are drawn from the deepest visible block at each end.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - Zones understand file-based routing. React Router/Remix, Next and SvelteKit route roots are detected from the inventory. Route directories no longer name zones (no more `routes-2`, `routes-3`, …), each route feature's files are grouped together instead of by the shared components they import, and a zone's route path is offered as a name. The zone algorithm version is now recorded in `zones.json`; a partition from an older version is re-derived rather than reused or used as a seed, and names chosen earlier carry over to the new zones.
+
+- [#403](https://github.com/en-dash-consulting/n-dx/pull/403) [`6bee073`](https://github.com/en-dash-consulting/n-dx/commit/6bee073fd946866760cced673afd9ac4fcaa0675) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Show analysed, inventoried-only, and skipped languages with counts on the Files page.
+  
+  The Files table only ever showed `byLanguage`, so a project with a language sourcevision doesn't recognize (e.g. Zig) had its files silently dropped from the inventory during the code-only walk — nothing on the page said so. `analyzeInventory`'s summary now additionally records `skippedExtensions` (extension -> file count, for files the walker saw but excluded) and `analysedLanguages` (the subset of `byLanguage` whose files take part in import-graph and zone analysis). Both fields are optional and additive, so inventories written before this change still load.
+  
+  The Files page now renders a strip above the table stating which languages were analysed, which were inventoried only, and which extensions were skipped, each with counts — reading the new fields when present and degrading to a single neutral "Inventoried" group when they're absent.
+
+- [#417](https://github.com/en-dash-consulting/n-dx/pull/417) [`737b396`](https://github.com/en-dash-consulting/n-dx/commit/737b39611b68c04dbfdebfb94933102483ee9417) Thanks [@ryrykeith](https://github.com/ryrykeith)! - test: make test results independent of machine load
+  
+  Tests and test configuration only. No production code changes, so published output is unaffected; these packages ship `dist` only.
+  
+  - **web:** viewer tests now commit every preact render, update and unmount inside `act()`. Previously, a render outside `act()` left preact's after-paint fallback timer pending, and if it fired after jsdom teardown it threw `ReferenceError: cancelAnimationFrame is not defined`, failing a suite whose summary said every test passed. A new setup file, `tests/setup/preact-frame-leak-guard.ts`, fails any test file that still leaves that timer pending, and names the file.
+  - **web:** the watcher-based waits in the worktree integration tests now scale with `NDX_TEST_TIME_MULTIPLIER`, and their git fixtures are removed with retries.
+  - **sourcevision:** every spawn in `cli-hints.test.ts` gets a load-scaled kill budget instead of a fixed 10 seconds.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - The architecture map opens on areas instead of every zone. `zones.json` now groups zones into 4–10 areas: route-app containers and monorepo packages start as areas, the rest are grouped by imports without letting one area take over, and test suites join the area they test. Areas with a composite name get a judged or generated one. The iso map draws one block per area with its zones as tiles, **Open on its own** shows one area's zones with a breadcrumb back (double-click or **Expand here** opens an area in place), and an over-tall dependency column now wraps into several instead of drawing as one long diagonal.
+
+- [#410](https://github.com/en-dash-consulting/n-dx/pull/410) [`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4) Thanks [@dnaniel](https://github.com/dnaniel)! - Zone ids and names stay readable across runs. A placeholder name left over from an earlier numbered id ("Routes 8" on `routes-6`) is renamed instead of being kept as if someone chose it. A numbered zone with a chosen name takes its id from that name, and the old id still works in pins and `get_zone`. IDs come from the most specific directory the files share, and filename-based IDs split camelCase and drop route syntax. Renaming a zone renames its sub-zones too, and two zones no longer share a name.
+- Updated dependencies [[`89990ff`](https://github.com/en-dash-consulting/n-dx/commit/89990ffa0c86f7ca9bc41d10eeb3b295973b6ac4), [`fdd864c`](https://github.com/en-dash-consulting/n-dx/commit/fdd864c4db245e5d69a0ae78534f07c0cc752c0e), [`11634bb`](https://github.com/en-dash-consulting/n-dx/commit/11634bb4c60b66ecf9afda843ac4f03ea9b6a396)]:
+  - @n-dx/llm-client@0.7.1
+
 ## 0.7.0
 
 ### Patch Changes
