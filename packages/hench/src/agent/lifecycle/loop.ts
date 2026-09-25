@@ -145,7 +145,7 @@ async function callWithRetry(
 
       if (status && RETRY_STATUS_CODES.has(status) && attempt < MAX_RETRIES) {
         const delay = BASE_DELAY_MS * Math.pow(2, attempt);
-        stream("Retry", `API returned ${status}, retrying in ${delay}ms...`);
+        stream("Retry", `retry ${attempt + 1}/${MAX_RETRIES}: API returned ${status}, waiting ${delay}ms`);
         await new Promise((r) => setTimeout(r, delay));
         continue;
       }

@@ -398,7 +398,18 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
 
       let prevFingerprint = fingerprint(zones);
       for (let p = 0; p < passesNeeded; p++) {
-        info(`\n${bold(cyan("[phase 4]"))} Enrichment pass ${currentPass + p + 2}...`);
+        // The enrichment pass number is an absolute identifier, not a
+        // progress tick: `--target-pass=N` names it, the convergence message
+        // below counts remaining passes from it, and it is persisted as
+        // `zones.enrichmentPass`. It must NOT be routed through a monotonic
+        // progress reporter — clamping it to a running maximum would freeze
+        // the label at a stale higher value and report the wrong pass under
+        // `--deep` (every sub-analysis restarts at pass 2, so scope two
+        // onward would print the first scope's final pass number). The
+        // restart across sub-analyses is already disambiguated by the
+        // `[deep] Analyzing <prefix>...` header that precedes each scope.
+        const passNumber = currentPass + p + 2;
+        info(`\n${bold(cyan("[phase 4]"))} Enrichment pass ${passNumber}...`);
         zonesResult = await analyzeZones(inventory, importsData, {
           enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset, hints,
           narrate: ctx.narrate,

@@ -34,6 +34,8 @@ import type { ExecutionPolicy, SandboxMode, ApprovalPolicy } from "./runtime-con
 import { DEFAULT_EXECUTION_POLICY } from "./runtime-contract.js";
 import { NEWEST_MODELS } from "./config.js";
 import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
+import { printRetryLine } from "./progress-reporter.js";
+import { formatRetryCountdown } from "./rate-limit.js";
 
 const AUTH_PATTERNS = /unauthorized|invalid api key|api key was rejected|forbidden|not logged in|login required|auth failed|\b401\b/i;
 const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
@@ -366,8 +368,8 @@ async function spawnOnce(
 }
 
 function defaultRateLimitOnRetry(attempt: number, maxAttempts: number, delayMs: number): void {
-  const delaySec = Math.round(delayMs / 1000);
-  process.stderr.write(`Rate limited — retrying in ${delaySec}s… (attempt ${attempt} of ${maxAttempts})\n`);
+  const countdown = formatRetryCountdown(Math.round(delayMs / 1000));
+  printRetryLine(attempt, maxAttempts, `rate limited, waiting ${countdown}`);
 }
 
 export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeClient {

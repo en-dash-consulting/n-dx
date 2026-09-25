@@ -13,7 +13,12 @@ export {
   info, result, verbose, debug,
 } from "@n-dx/llm-client";
 
-import { isQuiet, isVerbose, info, verbose } from "@n-dx/llm-client";
+import {
+  isQuiet, isVerbose, info, verbose,
+  formatRetryLine,
+  getActiveProgressReporter, setActiveProgressReporter,
+} from "@n-dx/llm-client";
+import type { ProgressReporter } from "@n-dx/llm-client";
 import ora from "ora";
 
 /**
@@ -62,6 +67,35 @@ export function startSpinner(message: string): Spinner {
   const spinner = ora({ text: message, stream: process.stderr }).start();
   let stopped = false;
 
+  // While this spinner owns the terminal line, register it as the active
+  // progress reporter. An LLM call made under this spinner (e.g. an
+  // enrichment/classification batch) may hit a rate limit deep inside
+  // @n-dx/llm-client, whose retry line would otherwise interleave with the
+  // spinner's own in-place redraw and corrupt the line. Registering here
+  // lets that retry pause the spinner, print its own line, and resume the
+  // spinner afterward. `advance()` still delegates to whatever reporter
+  // was active before this spinner started (e.g. the whole-command
+  // reporter `cmdAnalyze` registers) so phase-qualified counters stay
+  // monotonic across spinners, not just within one.
+  const outerReporter = getActiveProgressReporter();
+  const spinnerReporter: ProgressReporter = {
+    advance(phase, current, total) {
+      return outerReporter ? outerReporter.advance(phase, current, total) : current;
+    },
+    render(text) {
+      if (!stopped) spinner.text = text;
+    },
+    retryLine(attempt, maxAttempts, reason) {
+      const line = formatRetryLine(attempt, maxAttempts, reason);
+      const wasSpinning = !stopped && spinner.isSpinning;
+      const resumeText = spinner.text;
+      if (wasSpinning) spinner.stop();
+      process.stderr.write(`${line}\n`);
+      if (wasSpinning) spinner.start(resumeText);
+    },
+  };
+  setActiveProgressReporter(spinnerReporter);
+
   return {
     update(msg: string) {
       if (stopped) return;
@@ -71,6 +105,7 @@ export function startSpinner(message: string): Spinner {
       if (stopped) return;
       stopped = true;
       spinner.stop();
+      setActiveProgressReporter(outerReporter);
       if (finalMessage) info(finalMessage);
     },
   };
