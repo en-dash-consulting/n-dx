@@ -131,6 +131,23 @@ describe("cmdRun after the migration offer", () => {
     expect(mockedAgentLoop).not.toHaveBeenCalled();
   });
 
+  // The offer's policy is unit-tested in slug-migration-offer.test.ts, but that
+  // protects nothing if cmdRun hands it the wrong run description. The offer is
+  // mocked above, so these assert on what cmdRun passes, not what it returns.
+  // The unattended flags are covered by "tells the offer that %s is unattended".
+  it.each([
+    ["an interactive run", {}, { dryRun: false, autonomous: false, assumeYes: false }],
+    ["--dry-run", { "dry-run": "true" }, { dryRun: true, autonomous: false }],
+  ])("describes %s to the offer", async (_name, flags, expected) => {
+    await reSuffixEpicDir();
+    mockedOffer.mockResolvedValue({ outcome: "declined" });
+
+    await cmdRun(projectDir, flags as Record<string, string>).catch(() => {});
+
+    expect(mockedOffer).toHaveBeenCalledTimes(1);
+    expect(mockedOffer.mock.calls[0][2]).toMatchObject(expected);
+  });
+
   it("rethrows the refusal unchanged when the operator declines", async () => {
     await reSuffixEpicDir();
     mockedOffer.mockResolvedValue({ outcome: "declined" });
@@ -173,19 +190,21 @@ describe("cmdRun after the migration offer", () => {
   // The autonomous decision is made from the flags, and `--epic-by-epic` is
   // parsed further down cmdRun than the gate is. Reading it from the wrong
   // place would offer a migration to an unattended run.
+  // Each flag is pinned to the field it must set: `autonomous || assumeYes`
+  // would still pass with --auto described as --yes, and the two are withheld
+  // with different notes.
   it.each([
-    ["--auto", { auto: "true" }],
-    ["--loop", { loop: "true" }],
-    ["--epic-by-epic", { "epic-by-epic": "true" }],
-    ["--yes", { yes: "true" }],
-  ])("tells the offer that %s is unattended", async (_label, flags) => {
+    ["--auto", { auto: "true" }, { autonomous: true }],
+    ["--loop", { loop: "true" }, { autonomous: true }],
+    ["--epic-by-epic", { "epic-by-epic": "true" }, { autonomous: true }],
+    ["--yes", { yes: "true" }, { assumeYes: true, autonomous: false }],
+  ])("tells the offer that %s is unattended", async (_label, flags, expected) => {
     await reSuffixEpicDir();
     mockedOffer.mockResolvedValue({ outcome: "withheld", reason: "autonomous", note: "n" });
 
     await cmdRun(projectDir, flags).catch(() => {});
 
     expect(mockedOffer).toHaveBeenCalledTimes(1);
-    const run = mockedOffer.mock.calls[0][2] as { autonomous: boolean; assumeYes: boolean };
-    expect(run.autonomous || run.assumeYes).toBe(true);
+    expect(mockedOffer.mock.calls[0][2]).toMatchObject(expected);
   });
 });

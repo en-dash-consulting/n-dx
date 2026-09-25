@@ -208,6 +208,27 @@ describe("offering the slug migration at the gate", () => {
     expect(await snapshotTree(treeRoot)).toEqual(before);
   });
 
+  // A dry run promises not to touch the working tree. On an interactive
+  // terminal every other check passes, so this is the only thing standing
+  // between `--dry-run` and a whole-tree rename.
+  it("never asks a dry run, even on a terminal, and says why", async () => {
+    await reSuffixEpicDir();
+    const before = await snapshotTree(treeRoot);
+    const prompt = vi.fn(async () => true);
+
+    const result = await offerSlugMigration(
+      projectDir,
+      await refusal(),
+      { dryRun: true, autonomous: false, assumeYes: false },
+      { isTTY: true, prompt, write: () => {}, env: { ...process.env, CI: "" } },
+    );
+
+    expect(result).toMatchObject({ outcome: "withheld", reason: "dry-run" });
+    expect((result as { note: string }).note).toMatch(/--dry-run/);
+    expect(prompt).not.toHaveBeenCalled();
+    expect(await snapshotTree(treeRoot)).toEqual(before);
+  });
+
   // `assertSlugRuleAdoptable` refuses this direction, so an offer here would
   // send the operator into a command that declines — and if it did not decline,
   // the two builds would ping-pong whole-tree renames between them.
@@ -248,6 +269,7 @@ describe("who may be offered the migration", () => {
   });
 
   it.each([
+    ["dry-run", { dryRun: true }],
     ["autonomous", { autonomous: true }],
     ["ci", { ci: true }],
     ["not-a-terminal", { isTTY: false }],

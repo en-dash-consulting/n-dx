@@ -26,6 +26,8 @@
  * safeguard. So `--auto`, `--loop`, `--epic-by-epic`, `--yes`, a non-terminal
  * stdin and CI all refuse exactly as before — and say which of those withheld
  * the offer, rather than silently behaving differently from an interactive run.
+ * `--dry-run` is withheld too, even on a terminal, because a dry run promises
+ * not to touch the working tree and accepting would rewrite all of it.
  *
  * **Why not in the store guard.** `assertSlugRuleWritable` throws from inside
  * `writeFolderTree`, which runs holding the PRD lock, and `migrate-slugs` needs
@@ -57,6 +59,7 @@ const MIGRATION_TIMEOUT_MS = 10 * 60_000;
 
 /** Why an offer that could have been made was not. */
 export type OfferWithheldReason =
+  | "dry-run"
   | "autonomous"
   | "assume-yes"
   | "ci"
@@ -129,6 +132,8 @@ export function resolveRexCli(env: NodeJS.ProcessEnv = process.env): RexCliComma
 export interface OfferConditions {
   /** `TreeConformanceRefusal.migratable` — false for a tree on a *newer* rule. */
   readonly migratable: boolean;
+  /** `--dry-run`. Optional so callers that predate it read as a real run. */
+  readonly dryRun?: boolean;
   /** `--auto`, `--loop` or `--epic-by-epic`. */
   readonly autonomous: boolean;
   /** `--yes`. */
@@ -154,6 +159,20 @@ export function decideOffer(
   // already tells them to upgrade rex and *not* to run the migration. Adding
   // "an offer was withheld" would contradict it.
   if (!conditions.migratable) return { outcome: "no-offer" };
+
+  // Ahead of every other withholding reason: a dry run promises not to touch
+  // the working tree, and accepting the offer would rewrite all of it. That
+  // holds on an interactive terminal too, where every later check would pass.
+  if (conditions.dryRun) {
+    return {
+      outcome: "withheld",
+      reason: "dry-run",
+      note:
+        "This is a dry run (--dry-run), which never writes, so it was not offered the migration: " +
+        "accepting would rewrite the tree. Re-run without --dry-run to be asked, or run the " +
+        "migration yourself on the default branch.",
+    };
+  }
 
   if (conditions.autonomous) {
     return {
@@ -422,7 +441,7 @@ export async function offerSlugMigration(
     readonly migratable: boolean;
     readonly mismatches: readonly { readonly parentDir: string; readonly found: string }[];
   },
-  run: { readonly autonomous: boolean; readonly assumeYes: boolean },
+  run: { readonly dryRun?: boolean; readonly autonomous: boolean; readonly assumeYes: boolean },
   deps: OfferDeps = {},
 ): Promise<SlugMigrationOffer> {
   const env = deps.env ?? process.env;
@@ -431,6 +450,7 @@ export async function offerSlugMigration(
 
   const decision = decideOffer({
     migratable: refusal.migratable,
+    dryRun: run.dryRun,
     autonomous: run.autonomous,
     assumeYes: run.assumeYes,
     isTTY: deps.isTTY ?? Boolean(process.stdin.isTTY),

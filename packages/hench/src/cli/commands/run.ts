@@ -1610,7 +1610,11 @@ export async function cmdRun(
     const offer = await offerSlugMigration(
       dir,
       treeRefusal,
-      { autonomous: auto || loop || flags["epic-by-epic"] === "true", assumeYes: yes },
+      {
+        dryRun,
+        autonomous: auto || loop || flags["epic-by-epic"] === "true",
+        assumeYes: yes,
+      },
     );
     if (offer.outcome === "migrated") {
       output(offer.report);

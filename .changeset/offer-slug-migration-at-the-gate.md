@@ -28,7 +28,8 @@ starts the run again.
 - **Autonomous runs are never offered it.** `--auto`, `--loop`, `--epic-by-epic`,
   `--yes`, a non-terminal stdin and CI all refuse exactly as before, and the
   message now names which of those withheld the offer instead of the run silently
-  behaving differently from an interactive one.
+  behaving differently from an interactive one. `--dry-run` is never offered it
+  either, even on a terminal: a dry run promises not to touch the working tree.
 - **Dashboard.** The 412 from Execute now carries `migratable`, and Start Task
   offers a "Migrate the PRD tree" button under a refusal a migration would fix.
   Accepting sends a second explicit `{ migrateSlugs: true }` request — consent is
