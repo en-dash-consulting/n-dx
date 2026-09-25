@@ -123,12 +123,16 @@ export function sortZonesData(zones: Zones): Zones {
     ...(zones.insights ? { insights: zones.insights } : {}),
     ...(zones.findings?.length ? { findings: sortFindings(zones.findings) } : {}),
     ...(zones.enrichmentPass != null ? { enrichmentPass: zones.enrichmentPass } : {}),
+    ...(zones.enrichmentMode ? { enrichmentMode: zones.enrichmentMode } : {}),
     ...(zones.metaEvaluationCount != null ? { metaEvaluationCount: zones.metaEvaluationCount } : {}),
     ...(zones.structureHash ? { structureHash: zones.structureHash } : {}),
     ...(zones.inputFingerprint ? { inputFingerprint: zones.inputFingerprint } : {}),
     ...(zones.zoneContentHashes ? { zoneContentHashes: zones.zoneContentHashes } : {}),
     ...(zones.lastReset ? { lastReset: zones.lastReset } : {}),
     ...(zones.stability ? { stability: zones.stability } : {}),
+    ...(zones.partitionReview ? { partitionReview: zones.partitionReview } : {}),
+    ...(zones.algorithmVersion != null ? { algorithmVersion: zones.algorithmVersion } : {}),
+    ...(zones.areas?.length ? { areas: zones.areas } : {}),
   };
 }
 

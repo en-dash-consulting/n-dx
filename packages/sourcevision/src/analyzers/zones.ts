@@ -32,8 +32,13 @@ import type {
   AnalyzeTokenUsage,
   SubAnalysisRef,
   ProjectProfile,
+  PartitionReview,
+  ZoneArea,
 } from "../schema/index.js";
 import type { SubAnalysis } from "./workspace.js";
+import { assessPartitionHealth, formatPartitionLine, reviewPreviousPartition } from "./partition-review.js";
+import { addRouteFeatureEdges, buildRouteLayout, detectRouteConventions, routeFeatureZoneId } from "./route-convention.js";
+import type { RouteLayout } from "./route-convention.js";
 import {
   buildPackageMap,
   computeCrossRepoCrossings,
@@ -54,9 +59,19 @@ import {
   mergeSatelliteCommunities,
   capZoneCount,
   splitLargeCommunities,
+  splitByFirstDifferingDirectory,
 } from "./louvain.js";
 import type { MergeLogEntry } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
+import { judgeFindings, judgeZoneFragility, judgeHeuristicFindings, judgeMoves } from "./enrich-judge.js";
+import { cascadeEnrichment } from "./enrich-cascade.js";
+import { dedupeZoneNames, deepestDistinguishingSegment, idFromStems, idsFollowNames, isAlgorithmicName, renameZoneRefs, reprefixSubZones, zoneIdsOf } from "./zone-identity.js";
+import { getJudgmentRoute } from "./claude-client.js";
+import { recordPartitionReview, setRunMode } from "./run-ledger.js";
+import { computeAreas } from "./zone-areas.js";
+import { nameAreas } from "./area-naming.js";
+import { nameSubZones } from "./subzone-naming.js";
+import { emptyAnalyzeTokenUsage } from "./token-usage.js";
 import { deduplicateFindings, enforceSeverityRules } from "./enrich-parsing.js";
 import { detectPinDivergence, detectImportNeighborMoves } from "./move-recommendations.js";
 import type { MoveContext } from "./move-recommendations.js";
@@ -67,6 +82,10 @@ export interface AnalyzeZonesResult {
   tokenUsage?: AnalyzeTokenUsage;
   /** True when zone structure changed and enrichment pass was reset to 1 */
   structureChanged: boolean;
+  /** Final ids of zones the cascade left for `sv narrate` (with `deferNarration`). */
+  pendingNarration?: string[];
+  /** Final ids of zones whose generated names `sv narrate` still has to produce. */
+  pendingNames?: string[];
 }
 
 /** Options for the reusable zone detection pipeline. */
@@ -118,6 +137,25 @@ export interface ZonePipelineOptions {
    * import edge weight. Default: 0.5. Set to 0 to disable stability bias.
    */
   stabilityWeight?: number;
+  /**
+   * File-based routing layout (see `route-convention.ts`). Its generic
+   * segments are skipped in id derivation and its route features are tied
+   * together with proximity edges.
+   */
+  routeLayout?: RouteLayout;
+  /** Louvain resolution; above 1.0 favours smaller communities. Default 1.0. */
+  resolution?: number;
+  /**
+   * Use this file → community assignment for production files instead of
+   * Louvain (subdivision's directory fallback). Tests are still quarantined.
+   */
+  presetCommunity?: Map<string, string>;
+  /**
+   * Put tests in test-only directories into their own communities. Default
+   * true; subdivision turns it off — inside a zone, a test belongs with the
+   * code it tests, not in a one-file sliver of its own.
+   */
+  quarantineTests?: boolean;
 }
 
 /** Result of running the zone detection pipeline. */
@@ -246,6 +284,14 @@ function addStabilityEdges(
 const ZONE_OVERLAP_THRESHOLD = 0.5;
 
 /**
+ * Overlap required to inherit identity from a partition the review rejected.
+ * Its ids and names were derived from fragments; at the default 0.5 a new
+ * zone that merges two fragments takes one fragment's label. Only a zone that
+ * is substantially the same set of files keeps the old identity.
+ */
+const REJECTED_PARTITION_OVERLAP_THRESHOLD = 0.8;
+
+/**
  * Preserve previous zone IDs and names when a new zone has high file overlap
  * with a previous zone. Uses a greedy best-match approach: for each new zone,
  * find the previous zone with the strongest reciprocal overlap; if both the
@@ -259,6 +305,7 @@ export function preservePreviousZoneIdentity(
   newZones: Zone[],
   previousZones: Zone[],
   threshold: number = ZONE_OVERLAP_THRESHOLD,
+  opts: { keepIds?: boolean } = {},
 ): Zone[] {
   if (previousZones.length === 0) return newZones;
 
@@ -296,19 +343,46 @@ export function preservePreviousZoneIdentity(
 
     if (bestMatch) {
       usedPrevIds.add(bestMatch.zone.id);
+      if (opts.keepIds) {
+        // The id derivation changed on purpose; only a chosen name carries over.
+        const chosen = !isAlgorithmicName(bestMatch.zone.name, zoneIdsOf(bestMatch.zone));
+        if (chosen) console.log(`  [zones] keeping name "${bestMatch.zone.name}" for "${zone.id}" (was "${bestMatch.zone.id}", ${(bestMatch.overlap * 100).toFixed(0)}% file overlap)`);
+        result.push(chosen
+          ? { ...zone, name: bestMatch.zone.name, description: bestMatch.zone.description || zone.description }
+          : zone);
+        continue;
+      }
       console.log(`  [zones] preserving identity: "${zone.id}" → "${bestMatch.zone.id}" (${(bestMatch.overlap * 100).toFixed(0)}% file overlap)`);
-      result.push({
+      result.push(reprefixSubZones({
         ...zone,
         id: bestMatch.zone.id,
         name: bestMatch.zone.name,
         description: bestMatch.zone.description || zone.description,
-      });
+        ...(bestMatch.zone.previousIds?.length ? { previousIds: bestMatch.zone.previousIds } : {}),
+      }, zone.id));
     } else {
       result.push(zone);
     }
   }
 
   return result;
+}
+
+/**
+ * After identity preservation restores a previous zone's name and
+ * description, put the cascade's labels back where they should win: the
+ * description is templated from current facts, so it is always the cascade's;
+ * the name is the cascade's only when the preserved one is the algorithmic
+ * default (a chosen name from an earlier run stays, for stability).
+ */
+export function reapplyCascadeLabels(preserved: Zone[], cascade: Zone[]): Zone[] {
+  const byFiles = new Map(cascade.map((z) => [[...z.files].sort().join("\u0000"), z]));
+  return preserved.map((zone) => {
+    const source = byFiles.get([...zone.files].sort().join("\u0000"));
+    if (!source) return zone;
+    const keepName = !isAlgorithmicName(zone.name, zoneIdsOf(zone));
+    return { ...zone, description: source.description, name: keepName ? zone.name : source.name };
+  });
 }
 
 // ── Zone ID / name derivation ───────────────────────────────────────────────
@@ -336,10 +410,10 @@ const SKIPPABLE_SEGMENTS = new Set([
  * segments are treated as generic and skipped, producing deeper, more
  * specific names (e.g., "agent" instead of "hench").
  */
-export function deriveZoneId(files: string[], parentId?: string): string {
+export function deriveZoneId(files: string[], parentId?: string, extraSkip?: ReadonlySet<string>): string {
   // When deriving sub-zone IDs, treat parent's ID segments as generic
-  const skip = parentId
-    ? new Set([...SKIPPABLE_SEGMENTS, ...parentId.split("/").map(s => s.toLowerCase())])
+  const skip = parentId || extraSkip?.size
+    ? new Set([...SKIPPABLE_SEGMENTS, ...(extraSkip ?? []), ...(parentId ? parentId.split("/").map(s => s.toLowerCase()) : [])])
     : SKIPPABLE_SEGMENTS;
 
   const segmentCounts = new Map<string, number>();
@@ -397,11 +471,13 @@ export function deriveZoneId(files: string[], parentId?: string): string {
 export function disambiguateZoneId(
   baseId: string,
   files: string[],
-  parentId?: string
+  parentId?: string,
+  extraSkip?: ReadonlySet<string>,
 ): string {
-  const parentSegments = parentId
-    ? new Set(parentId.split("/").map(s => s.toLowerCase()))
-    : new Set<string>();
+  const parentSegments = new Set([
+    ...(parentId ? parentId.split("/").map(s => s.toLowerCase()) : []),
+    ...(extraSkip ?? []),
+  ]);
 
   const nextCounts = new Map<string, number>();
 
@@ -534,13 +610,18 @@ function deriveZoneIdFromFileStems(
   const stems = [...new Set(
     sourceFiles
       .map((file) => basename(file).replace(/\.[^.]+$/, ""))
-      .map((stem) => stem.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, ""))
-      .filter((stem) => stem && !SMALL_COMMUNITY_STEM_SKIP_WORDS.has(stem) && !skipWords.has(stem))
+      .filter((stem) => {
+        const norm = stem.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "");
+        return norm && !SMALL_COMMUNITY_STEM_SKIP_WORDS.has(norm) && !skipWords.has(norm);
+      })
       .sort()
   )];
 
   if (stems.length < 2) return null;
-  return stems.slice(0, 2).join("-");
+  // Words, not raw stems: camelCase split and route syntax stripped, so
+  // CosmicCallout + DashboardGrid → cosmic-callout-dashboard-grid rather
+  // than cosmiccallout-dashboardgrid.
+  return idFromStems(stems.slice(0, 2));
 }
 
 /**
@@ -549,6 +630,7 @@ function deriveZoneIdFromFileStems(
 export function deriveZoneName(id: string): string {
   return id
     .split("-")
+    .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
@@ -565,8 +647,8 @@ function isGenericZoneName(name: string, id: string): boolean {
   // "Src 2", "Lib 3" etc — generic base + numeric suffix
   const match = name.match(/^(\w+)\s+(\d+)$/);
   if (match && GENERIC_BASES.has(match[1].toLowerCase())) return true;
-  // Name unchanged from algorithmic default when ID has numeric suffix
-  if (/-\d+$/.test(id) && name === deriveZoneName(id)) return true;
+  // A placeholder from this or an earlier numbered id ("Routes 8" on routes-6)
+  if (/-\d+$/.test(id) && isAlgorithmicName(name, [id])) return true;
   return false;
 }
 
@@ -730,6 +812,10 @@ export function applyZonePins(
 
   // Build zone ID → index
   const zoneIdToIdx = new Map<string, number>();
+  for (let i = 0; i < zones.length; i++) {
+    // Earlier ids first, so a current id always wins over someone's alias.
+    for (const prev of zones[i].previousIds ?? []) if (!zoneIdToIdx.has(prev)) zoneIdToIdx.set(prev, i);
+  }
   for (let i = 0; i < zones.length; i++) {
     zoneIdToIdx.set(zones[i].id, i);
   }
@@ -947,38 +1033,129 @@ export const SUBDIVISION_THRESHOLD_PCT = 0.15;
  * external consumer pinning to the constant still gets reasonable behavior.
  */
 export function subdivisionThreshold(totalFiles: number): number {
-  return Math.max(SUBDIVISION_THRESHOLD_MIN, Math.floor(totalFiles * SUBDIVISION_THRESHOLD_PCT));
+  return Math.max(SUBDIVISION_THRESHOLD_MIN, Math.min(SUBDIVISION_THRESHOLD_CAP, Math.floor(totalFiles * SUBDIVISION_THRESHOLD_PCT)));
 }
+
+/**
+ * Upper bound on the subdivision trigger. With areas as the top level, a zone
+ * is a leaf of a hierarchy rather than the whole map, and a 100-file zone
+ * inside a 1,000-file project still has structure worth drawing: 15% of the
+ * project (150 files) meant nothing below the zones ever split.
+ */
+export const SUBDIVISION_THRESHOLD_CAP = 30;
 
 /** @deprecated use {@link subdivisionThreshold}(totalFiles) — kept for back-compat */
 export const SUBDIVISION_THRESHOLD = SUBDIVISION_THRESHOLD_MIN;
+
+/** A subdivision whose largest child holds this share of the parent or more is rejected. */
+export const LOPSIDED_CHILD_SHARE = 0.7;
+/** Louvain resolution for the second subdivision attempt. */
+const SUBDIVISION_RETRY_RESOLUTION = 2.0;
+/** Smallest directory group kept on its own by the directory fallback. */
+const SUBDIVISION_MIN_CHILD = 3;
+
+/** At least two children and none holding {@link LOPSIDED_CHILD_SHARE} of the parent. */
+export function isBalancedSubdivision(children: Zone[], parentSize: number): boolean {
+  if (children.length < 2 || parentSize === 0) return false;
+  const largest = children.reduce((n, z) => Math.max(n, z.files.length), 0);
+  return largest / parentSize < LOPSIDED_CHILD_SHARE;
+}
 
 /** Maximum recursion depth for subdivision to prevent infinite loops. */
 export const MAX_SUBDIVISION_DEPTH = 3;
 
 /**
- * Map a test file path to its community ID. Groups test files by their
- * top-level Tests/<suite>/ prefix so projects with multiple test targets
- * (e.g. `Tests/GoToBedCoreTests`, `Tests/GoToBedTests`) get one zone per
- * suite. Files not under a Tests/<suite>/ path fall back to a single
- * "tests" community.
+ * Map a test file path to its community ID.
+ *
+ * - A top-level test root groups by suite: `Tests/<suite>/…` → one community
+ *   per suite (multi-target Swift projects), `tests/x.test.ts` → the root.
+ * - A test directory nested in a production tree (`app/utils/__tests__/`,
+ *   `src/core/tests/`) groups with its parent directory: `tests:app/utils`.
+ *   Lumping every nested `__tests__` directory together produced one
+ *   250-file zone named after whichever parent was most common.
+ * - Anything else falls back to a single "tests" community.
  */
 export function deriveTestSuiteCommunity(filePath: string): string {
   const segments = filePath.split("/");
-  // Look for a "Tests" or "tests" or "test" segment near the top of the path.
   for (let i = 0; i < segments.length - 1; i++) {
     const lc = segments[i].toLowerCase();
-    if (lc === "tests" || lc === "test") {
-      const suite = segments[i + 1];
-      // Only use the suite if it's itself a directory (not the test file
-      // sitting directly in Tests/) — otherwise lump under generic tests.
-      if (i + 2 < segments.length) {
-        return `tests:${segments[i]}/${suite}`;
-      }
-      return `tests:${segments[i]}`;
+    if (!TEST_DIR_SEGMENTS.has(lc)) continue;
+    if (i > 0) {
+      // A test root inside a package (`packages/web/tests/unit/…`) keeps its
+      // suite; a `__tests__` directory is itself the suite.
+      const parent = segments.slice(0, i).join("/");
+      const suite = lc !== "__tests__" && i + 2 < segments.length ? segments[i + 1] : undefined;
+      return suite ? `tests:${parent}#${suite}` : `tests:${parent}`;
     }
+    // Top-level test root: per suite when the file sits in a subdirectory.
+    if (i + 2 < segments.length) return `tests:${segments[i]}#${segments[i + 1]}`;
+    return `tests:${segments[i]}`;
   }
   return "tests";
+}
+
+const TEST_DIR_SEGMENTS = new Set(["tests", "test", "__tests__", "spec", "specs", "e2e"]);
+
+/**
+ * Zone id for a test community keyed by its parent path: `tests-<leaf>`,
+ * walking up the path (`tests-digest-utils`) until the id is unused, so two
+ * `utils/__tests__` directories in different features stay two zones.
+ */
+function testCommunityZoneId(key: string, used: ReadonlySet<string>, extraSkip?: ReadonlySet<string>): string {
+  const [parentPath, suiteRaw] = key.split("#");
+  const suite = suiteRaw ? suiteRaw.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "") : "";
+  const withSuite = (id: string) => (suite ? `${id}-${suite}` : id);
+  const all = parentPath
+    .split("/")
+    .map((p) => p.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, ""))
+    .filter((p) => p && !TEST_DIR_SEGMENTS.has(p));
+  const meaningful = all.filter((p) => !GENERIC_SEGMENTS.has(p) && !extraSkip?.has(p));
+  if (all.length === 0) {
+    const id = withSuite("tests");
+    return used.has(id) ? uniqueSuffix(id, used) : id;
+  }
+  // Shortest meaningful suffix first; then the full path, generic segments
+  // included, so `app/utils` becomes `tests-app-utils` when `tests-utils` is taken.
+  for (const segs of [meaningful, all]) {
+    for (let k = 1; k <= segs.length; k++) {
+      const id = withSuite(`tests-${segs.slice(-k).join("-")}`);
+      if (!used.has(id)) return id;
+    }
+  }
+  return uniqueSuffix(withSuite(`tests-${all.join("-")}`), used);
+}
+
+function uniqueSuffix(base: string, used: ReadonlySet<string>): string {
+  let n = 2;
+  while (used.has(`${base}-${n}`)) n++;
+  return `${base}-${n}`;
+}
+
+/**
+ * Test communities below `minSize` files are folded into their nearest
+ * ancestor test community (`tests:app/utils/format` → `tests:app/utils` →
+ * `tests:app`), so nested test directories of one or two files do not each
+ * become a zone.
+ */
+export function foldSmallTestCommunities(assignments: Map<string, string>, minSize: number): void {
+  for (let pass = 0; pass < 8; pass++) {
+    const sizes = new Map<string, number>();
+    for (const c of assignments.values()) sizes.set(c, (sizes.get(c) ?? 0) + 1);
+    let moved = false;
+    for (const [file, c] of assignments) {
+      if ((sizes.get(c) ?? 0) >= minSize || !c.startsWith("tests:")) continue;
+      const path = c.slice("tests:".length);
+      const hash = path.indexOf("#");
+      const slash = path.lastIndexOf("/");
+      const parent = hash !== -1
+        ? `tests:${path.slice(0, hash)}`
+        : slash === -1 ? "tests" : `tests:${path.slice(0, slash)}`;
+      if (parent === c) continue;
+      assignments.set(file, parent);
+      moved = true;
+    }
+    if (!moved) break;
+  }
 }
 
 /**
@@ -994,7 +1171,8 @@ export function subdivideZone(
   imports: Imports,
   inventory: Inventory,
   testFiles: Set<string> = new Set(),
-  depth: number = 0
+  depth: number = 0,
+  routeLayout?: RouteLayout,
 ): Zone[] {
   // Don't subdivide small zones or if we've hit max depth. The threshold is
   // project-size-relative — a 29-file zone in a 111-file project is 26 % of
@@ -1018,8 +1196,11 @@ export function subdivideZone(
     return [];
   }
 
-  // Run full pipeline on the zone's internal graph
-  const result = runZonePipeline({
+  // Run full pipeline on the zone's internal graph. A split whose largest
+  // child keeps most of the parent is not a subdivision — it is the parent
+  // again plus slivers, and recursing on it built three-deep chains of one
+  // dominant child. Retry finer, then by directory, then give up.
+  const base = {
     edges: internalEdges,
     inventory,
     imports,
@@ -1028,11 +1209,53 @@ export function subdivideZone(
     parentId: zone.id,
     depth: depth + 1,
     testFiles,
-  });
+    routeLayout,
+    quarantineTests: false,
+  };
+  const attempts: Array<() => ZonePipelineResult | null> = [
+    () => runZonePipeline(base),
+    () => runZonePipeline({ ...base, resolution: SUBDIVISION_RETRY_RESOLUTION }),
+    () => {
+      const preset = splitByFirstDifferingDirectory(zone.files, SUBDIVISION_MIN_CHILD);
+      return preset ? runZonePipeline({ ...base, presetCommunity: preset }) : null;
+    },
+  ];
+  let result: ZonePipelineResult | undefined;
+  for (const attempt of attempts) {
+    const r = attempt();
+    if (r && isBalancedSubdivision(r.zones, zone.files.length)) {
+      result = r;
+      break;
+    }
+  }
+  if (!result) return [];
 
-  // If pipeline found only 1 or 0 zones, no meaningful subdivision
-  if (result.zones.length <= 1) {
-    return [];
+  // Slivers: children below the minimum join the sibling they share the most
+  // import edges with (else the largest), and the split is rebuilt from that
+  // assignment so ids, metrics and crossings are computed as usual.
+  const small = result.zones.filter((z) => z.files.length < SUBDIVISION_MIN_CHILD);
+  if (small.length > 0 && result.zones.length - small.length >= 2) {
+    const childOf = new Map<string, string>();
+    for (const z of result.zones) for (const f of z.files) childOf.set(f, z.id);
+    const big = result.zones.filter((z) => z.files.length >= SUBDIVISION_MIN_CHILD);
+    const largest = [...big].sort((a, b) => b.files.length - a.files.length)[0];
+    const preset = new Map<string, string>();
+    for (const z of big) for (const f of z.files) preset.set(f, z.id);
+    for (const z of small) {
+      const members = new Set(z.files);
+      const links = new Map<string, number>();
+      for (const e of internalEdges) {
+        const other = members.has(e.from) ? e.to : members.has(e.to) ? e.from : undefined;
+        const target = other && !members.has(other) ? childOf.get(other) : undefined;
+        if (target && big.some((b) => b.id === target)) links.set(target, (links.get(target) ?? 0) + 1);
+      }
+      const best = [...links.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? largest.id;
+      for (const f of z.files) preset.set(f, best);
+    }
+    const folded = runZonePipeline({ ...base, presetCommunity: preset });
+    // Balanced only thanks to slivers is not balanced: no sub-zones then.
+    if (!isBalancedSubdivision(folded.zones, zone.files.length)) return [];
+    result = folded;
   }
 
   // Store sub-crossings on parent zone
@@ -1070,7 +1293,7 @@ export function computeStructureHash(zones: Zone[]): string {
  * silently keep stale zones — and, e.g., an empty codebase map — until they
  * delete `.sourcevision`. Monotonic integer; history is intentionally terse.
  */
-export const ZONE_ALGORITHM_VERSION = 2;
+export const ZONE_ALGORITHM_VERSION = 5;
 
 /**
  * Hash the analysis inputs that determine the Louvain partition, independent
@@ -1510,7 +1733,8 @@ function collectFileStructureFindings(
  */
 function mergeSameIdCommunities(
   community: Map<string, string>,
-  maxSize?: number
+  maxSize?: number,
+  extraSkip?: ReadonlySet<string>,
 ): void {
   const tempMembers = new Map<string, string[]>();
   for (const [node, comm] of community) {
@@ -1520,7 +1744,7 @@ function mergeSameIdCommunities(
   }
 
   // Pass 1: merge communities with the same derived zone ID
-  mergeByKey(community, tempMembers, (members) => deriveZoneId(members), maxSize);
+  mergeByKey(community, tempMembers, (members) => deriveZoneId(members, undefined, extraSkip), maxSize);
 
   // Rebuild member map after pass 1 (community assignments may have changed)
   tempMembers.clear();
@@ -1706,7 +1930,9 @@ function buildZonesFromCommunities(
   parentId?: string,
   depth: number = 0,
   maxMergeSize?: number,
+  routeLayout?: RouteLayout,
 ): { zones: Zone[]; filenameBasedZoneIds: Set<string> } {
+  const extraSkip = routeLayout?.genericSegments;
   const communityMembers = new Map<string, string[]>();
   for (const [node, comm] of community) {
     let list = communityMembers.get(comm);
@@ -1734,18 +1960,27 @@ function buildZonesFromCommunities(
     // collides with `src/core/`). Honor the community ID directly so test
     // zones get a stable test-flavored id (`tests-<suite>`).
     let id: string;
-    if (communityId.startsWith("tests:")) {
-      const suiteRaw = communityId.slice("tests:".length);
-      const suite = suiteRaw.split("/").pop() ?? suiteRaw;
-      const normalized = suite.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "");
-      id = normalized ? `tests-${normalized}` : "tests";
+    if (communityId === "tests" || communityId.startsWith("tests:")) {
+      id = testCommunityZoneId(communityId.slice("tests:".length), usedIds, extraSkip);
     } else {
-      id = deriveZoneId(members, parentId);
+      id = deriveZoneId(members, parentId, extraSkip);
+      // Directory derivation fell through to a route-generic segment: flat
+      // route files directly under the root. Name the zone after the route.
+      if (routeLayout && extraSkip?.has(id)) {
+        id = routeFeatureZoneId(members, routeLayout) ?? id;
+      }
     }
     if (usedIds.has(id)) {
-      const disambiguated = disambiguateZoneId(id, members, parentId);
+      const disambiguated = disambiguateZoneId(id, members, parentId, extraSkip);
+      // One segment below the base was not enough (or was taken): walk the
+      // shared directory prefix from its deepest segment up.
+      const deeper = disambiguated !== id && !usedIds.has(disambiguated)
+        ? undefined
+        : deepestDistinguishingSegment(members, new Set([...SKIPPABLE_SEGMENTS, ...(extraSkip ?? []), id]), usedIds);
       if (disambiguated !== id && !usedIds.has(disambiguated)) {
         id = disambiguated;
+      } else if (deeper) {
+        id = deeper;
       } else {
         // Try filename-based derivation before merging or adding numeric suffix
         const filenameId = deriveZoneIdFromFilenames(members);
@@ -1775,7 +2010,7 @@ function buildZonesFromCommunities(
             existing.coupling = metrics.coupling;
             // Re-subdivide with merged files
             existing.subZones = undefined;
-            const subZones = subdivideZone(existing, imports, inventory, testFiles, depth);
+            const subZones = subdivideZone(existing, imports, inventory, testFiles, depth, routeLayout);
             if (subZones.length > 0) {
               existing.subZones = subZones;
             }
@@ -1802,7 +2037,9 @@ function buildZonesFromCommunities(
 
     const zone: Zone = {
       id,
-      name: deriveZoneName(id),
+      // A sub-zone is named for itself, not its path ("Global Nav", not
+      // "Components/global Nav"); the parent is already on screen around it.
+      name: deriveZoneName(id.slice(id.lastIndexOf("/") + 1)),
       description: describeZone(members, inventory),
       files: members,
       entryPoints,
@@ -1811,7 +2048,9 @@ function buildZonesFromCommunities(
       ...(depth > 0 ? { depth } : {}),
     };
 
-    const subZones = subdivideZone(zone, imports, inventory, testFiles, depth);
+    // Test zones are not subdivided: their structure mirrors the code's.
+    const isTestCommunity = communityId === "tests" || communityId.startsWith("tests:");
+    const subZones = isTestCommunity ? [] : subdivideZone(zone, imports, inventory, testFiles, depth, routeLayout);
     if (subZones.length > 0) {
       zone.subZones = subZones;
     }
@@ -1890,6 +2129,18 @@ interface EnrichmentResult {
   enrichmentPass: number;
   metaUpdatedFindings: Finding[] | null;
   enrichTokenUsage?: AnalyzeTokenUsage;
+  /** Files of the zones the LLM actually enriched this pass — the ones worth a fragility judgment. */
+  enrichedFiles?: Set<string>;
+  /** The cascade already judged fragility; the assemble-time hook must not ask again. */
+  fragilityJudged?: boolean;
+  /** The cascade ran: descriptions are templated from facts and must survive identity preservation. */
+  cascade?: boolean;
+  /** Judgment-made findings that bypass the support/paraphrase judgment. */
+  prejudgedFindings?: Finding[];
+  /** Files of zones whose narration was deferred; mapped to final ids after pins. */
+  deferredFiles?: Set<string>;
+  /** Files of zones whose generated names were deferred; mapped to final ids after pins. */
+  deferredNameFiles?: Set<string>;
 }
 
 /**
@@ -1907,6 +2158,8 @@ async function applyEnrichment(
   currentContentHashes?: Record<string, string>,
   hints?: string,
   projectProfile?: ProjectProfile,
+  narrate = false,
+  deferNarration = false,
 ): Promise<EnrichmentResult> {
   let finalZones = expandedZones;
   let aiZoneInsights = new Map<string, string[]>();
@@ -1915,6 +2168,13 @@ async function applyEnrichment(
   let enrichmentPass = 0;
   let metaUpdatedFindings: Finding[] | null = null;
   let enrichTokenUsage: AnalyzeTokenUsage | undefined;
+  let enrichedZoneIds: Set<string> | undefined;
+  let enrichedFiles: Set<string> | undefined;
+  let fragilityJudged = false;
+  let cascadeRan = false;
+  let prejudgedFindings: Finding[] | undefined;
+  let deferredFiles: Set<string> | undefined;
+  let deferredNameFiles: Set<string> | undefined;
 
   if (enrich) {
     // Build pre-enrichment crossings for prompt context
@@ -1936,7 +2196,34 @@ async function applyEnrichment(
       }
     }
 
-    if (perZone) {
+    // The cascade (enrich-cascade.ts) is the default whenever a judgment
+    // route resolves; --narrate forces the generative prompts over every
+    // zone. Without a route this branch is never taken, so the no-key path
+    // is exactly the one below.
+    const cascade = !narrate && getJudgmentRoute("zone.judge") === "typesafe";
+    if (cascade) {
+      setRunMode("cascade");
+      const result = await cascadeEnrichment(
+        expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes, hints, projectProfile,
+        { deferNarration },
+      );
+      if (result.deferredZoneIds.size > 0) {
+        deferredFiles = new Set(result.zones.filter((z) => result.deferredZoneIds.has(z.id)).flatMap((z) => z.files));
+      }
+      if (result.deferredNameZoneIds.size > 0) {
+        deferredNameFiles = new Set(result.zones.filter((z) => result.deferredNameZoneIds.has(z.id)).flatMap((z) => z.files));
+      }
+      finalZones = result.zones;
+      aiZoneInsights = result.newZoneInsights;
+      aiGlobalInsights = result.newGlobalInsights;
+      aiFindings = result.newFindings;
+      enrichmentPass = result.pass;
+      enrichTokenUsage = result.tokenUsage;
+      enrichedZoneIds = result.enrichedZoneIds;
+      fragilityJudged = result.fragilityJudged;
+      cascadeRan = true;
+      prejudgedFindings = result.prejudgedFindings;
+    } else if (perZone) {
       const result = await enrichZonesPerZone(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes, hints,
       );
@@ -1946,6 +2233,7 @@ async function applyEnrichment(
       aiFindings = result.newFindings;
       enrichmentPass = result.pass;
       enrichTokenUsage = result.tokenUsage;
+      enrichedZoneIds = result.enrichedZoneIds;
     } else {
       const result = await enrichZonesWithAI(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes,
@@ -1957,9 +2245,18 @@ async function applyEnrichment(
       aiFindings = result.newFindings;
       enrichmentPass = result.pass;
       enrichTokenUsage = result.tokenUsage;
+      enrichedZoneIds = result.enrichedZoneIds;
       if (result._updatedFindings) {
         metaUpdatedFindings = result._updatedFindings;
       }
+    }
+
+    // Zone ids can still change after this point (identity preservation,
+    // pins), so remember the enriched zones by file rather than by id.
+    if (enrichedZoneIds) {
+      enrichedFiles = new Set(
+        finalZones.filter((z) => enrichedZoneIds!.has(z.id)).flatMap((z) => z.files),
+      );
     }
   } else if (validPrevious) {
     // --fast with unchanged structure: apply previous AI names, preserve insights
@@ -1997,6 +2294,12 @@ async function applyEnrichment(
     enrichmentPass,
     metaUpdatedFindings,
     enrichTokenUsage,
+    enrichedFiles,
+    fragilityJudged,
+    cascade: cascadeRan,
+    prejudgedFindings,
+    deferredFiles,
+    deferredNameFiles,
   };
 }
 
@@ -2289,6 +2592,10 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     smallZoneMergeThreshold = 3,
     previousZoneAssignment,
     stabilityWeight = 0.5,
+    routeLayout,
+    resolution = 1.0,
+    presetCommunity,
+    quarantineTests: quarantine = true,
   } = options;
 
   // ── Resolve directory-targeted edges ──
@@ -2341,6 +2648,12 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   });
   addDirectoryProximityEdges(graph, clusterableNonImportFiles);
 
+  // ── Route features ──
+  // Route modules are wired by path, not by importing each other; tie each
+  // route feature's files together so shared-component imports do not decide
+  // the grouping. Added after the import-only snapshot, like proximity edges.
+  if (routeLayout) addRouteFeatureEdges(graph, scopeFiles, routeLayout);
+
   // ── Add co-zone stability bias from previous run ──
   // When previous zones exist, add synthetic edges between files that shared
   // a zone. This biases Louvain toward preserving the previous topology while
@@ -2367,7 +2680,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     productionDirs.add(slash === -1 ? "" : f.slice(0, slash));
   }
   const quarantineTests = new Set<string>();
-  for (const t of testFiles) {
+  for (const t of quarantine ? testFiles : []) {
     if (!scopeFileSet.has(t)) continue;
     const slash = t.lastIndexOf("/");
     const dir = slash === -1 ? "" : t.slice(0, slash);
@@ -2409,17 +2722,26 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
 
   // ── Louvain community detection (production only) ──
   const smallZoneMergeLog: MergeLogEntry[] = [];
-  let community = louvainPhase1(productionGraph, 100, 1.0, previousZoneAssignment);
-  community = mergeBidirectionalCoupling(community, productionGraph);
-  community = mergeSmallCommunities(community, productionGraph, smallZoneMergeThreshold, smallZoneMergeLog);
-  community = mergeSatelliteCommunities(community, productionGraph);
-  community = capZoneCount(community, productionGraph, scaledMaxZones);
+  let community: Map<string, string>;
+  if (presetCommunity) {
+    community = new Map();
+    for (const node of productionGraph.keys()) {
+      const c = presetCommunity.get(node);
+      if (c !== undefined) community.set(node, c);
+    }
+  } else {
+    community = louvainPhase1(productionGraph, 100, resolution, previousZoneAssignment);
+    community = mergeBidirectionalCoupling(community, productionGraph);
+    community = mergeSmallCommunities(community, productionGraph, smallZoneMergeThreshold, smallZoneMergeLog);
+    community = mergeSatelliteCommunities(community, productionGraph);
+    community = capZoneCount(community, productionGraph, scaledMaxZones, maxPct < 100 ? maxZoneSize : undefined);
 
-  // ── Split oversized communities (production only) ──
-  community = splitLargeCommunities(community, productionGraph, maxZoneSize);
+    // ── Split oversized communities (production only) ──
+    community = splitLargeCommunities(community, productionGraph, maxZoneSize);
 
-  mergeSameIdCommunities(community, maxPct < 100 ? maxZoneSize : undefined);
-  community = capZoneCount(community, productionGraph, scaledMaxZones);  // re-cap after split
+    mergeSameIdCommunities(community, maxPct < 100 ? maxZoneSize : undefined, routeLayout?.genericSegments);
+    community = capZoneCount(community, productionGraph, scaledMaxZones, maxPct < 100 ? maxZoneSize : undefined);  // re-cap after split
+  }
 
   // ── Drop quarantined tests into their own per-suite zones ──
   // Group quarantined test files by their top-level Tests/<suite>/ prefix
@@ -2427,14 +2749,17 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   // zone per suite rather than one mega-tests zone. Colocated tests
   // (`internal/foo/*_test.go`) stayed in productionGraph and are already
   // partitioned alongside their package.
+  const testAssignments = new Map<string, string>();
   for (const testFile of quarantineTests) {
-    community.set(testFile, deriveTestSuiteCommunity(testFile));
+    testAssignments.set(testFile, deriveTestSuiteCommunity(testFile));
   }
+  foldSmallTestCommunities(testAssignments, smallZoneMergeThreshold);
+  for (const [testFile, c] of testAssignments) community.set(testFile, c);
 
   // ── Build zones from communities ──
   const { zones, filenameBasedZoneIds } = buildZonesFromCommunities(
     community, graph, importOnlyGraph, imports, inventory, testFiles, parentId, depth,
-    maxPct < 100 ? maxZoneSize : undefined,
+    maxPct < 100 ? maxZoneSize : undefined, routeLayout,
   );
 
   // ── Assign unzoned files by directory proximity ──
@@ -2661,7 +2986,7 @@ function computeMoveFindings(
 /**
  * Compute zone stability metrics by comparing new zones against previous zones.
  */
-function computeZoneStability(
+export function computeZoneStability(
   newZones: Zone[],
   previousZones: Zone[],
 ): ZoneStability {
@@ -2671,6 +2996,15 @@ function computeZoneStability(
   for (const z of previousZones) {
     prevZoneIds.add(z.id);
     for (const f of z.files) prevFileZone.set(f, z.id);
+  }
+
+  // A zone renamed from a numbered id is the same zone: map its old id to
+  // the new one so the rename is not counted as a removal plus an addition.
+  const canonical = new Map<string, string>();
+  for (const z of newZones) for (const prev of z.previousIds ?? []) canonical.set(prev, z.id);
+  for (const [f, id] of prevFileZone) prevFileZone.set(f, canonical.get(id) ?? id);
+  for (const [prev, now] of canonical) {
+    if (prevZoneIds.delete(prev)) prevZoneIds.add(now);
   }
 
   const newZoneIds = new Set(newZones.map(z => z.id));
@@ -2728,11 +3062,17 @@ function buildAnalyzeZonesResult(opts: {
   structureChanged: boolean;
   enrichTokenUsage: AnalyzeTokenUsage | undefined;
   stability?: ZoneStability;
+  pendingNarration?: string[];
+  pendingNames?: string[];
+  partitionReview?: PartitionReview;
+  areas?: ZoneArea[];
+  enrichmentMode?: Zones["enrichmentMode"];
 }): AnalyzeZonesResult {
   const {
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
-    previousZones, structureChanged, enrichTokenUsage, stability,
+    previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration, pendingNames,
+    partitionReview, areas, enrichmentMode,
   } = opts;
 
   const prevMetaCount = previousZones?.metaEvaluationCount ?? 0;
@@ -2752,15 +3092,21 @@ function buildAnalyzeZonesResult(opts: {
       insights: allGlobalInsights.length > 0 ? allGlobalInsights : undefined,
       findings: allFindings.length > 0 ? allFindings : undefined,
       enrichmentPass: enrichmentPass > 0 ? displayPass : undefined,
+      ...(enrichmentPass > 0 && enrichmentMode ? { enrichmentMode } : {}),
       ...(metaEvaluationCount ? { metaEvaluationCount } : {}),
       structureHash,
       inputFingerprint,
       zoneContentHashes: remappedContentHashes,
       ...(lastReset ? { lastReset } : {}),
       ...(stability ? { stability } : {}),
+      ...(partitionReview ? { partitionReview } : {}),
+      algorithmVersion: ZONE_ALGORITHM_VERSION,
+      ...(areas && areas.length > 0 ? { areas } : {}),
     }),
     tokenUsage: enrichTokenUsage,
     structureChanged,
+    ...(pendingNarration && pendingNarration.length > 0 ? { pendingNarration } : {}),
+    ...(pendingNames && pendingNames.length > 0 ? { pendingNames } : {}),
   };
 }
 
@@ -2809,6 +3155,13 @@ export async function analyzeZones(
      */
     reuseStructure?: boolean;
     /**
+     * Force the generative enrichment prompts over every zone even when a
+     * judgment route would otherwise select the cascade (`--narrate`).
+     */
+    narrate?: boolean;
+    /** Cascade only: leave escalated zones for `sv narrate`; their final ids come back in `pendingNarration`. */
+    deferNarration?: boolean;
+    /**
      * Detected project profile (frameworks, release infra, import-graph quality).
      * Forwarded to the AI enrichment prompt so the LLM can suppress
      * recommendations that contradict the project's actual shape.
@@ -2831,6 +3184,9 @@ export async function analyzeZones(
   let structureHash: string;
   let structureChanged: boolean;
 
+  const inventoryPaths = inventory.files.map((f) => f.path);
+  const routeLayout = buildRouteLayout(inventoryPaths, detectRouteConventions(inventoryPaths));
+
   const inputFingerprint = computeInputFingerprint(
     inventory,
     options?.zonePins,
@@ -2848,7 +3204,30 @@ export async function analyzeZones(
     !!previousZones?.zones?.length &&
     !!previousZones.structureHash &&
     previousZones.inputFingerprint === inputFingerprint;
-  const reuseStructure = (options?.reuseStructure ?? false) || inputsUnchanged;
+
+  // A previous partition is reused (inputs unchanged) or seeds Louvain
+  // (inputs changed) only after it passes review — otherwise a fragmented
+  // partition is frozen across runs and upgrades. An explicit reuse request
+  // (--full passes within one analyze) skips the review.
+  let partitionReview: PartitionReview | undefined = previousZones?.partitionReview;
+  let trustPrevious = true;
+  let freshReview = false;
+  // A partition from another algorithm version is neither reused nor used as
+  // the stability seed: seeding would pull the new algorithm back toward the
+  // old grouping, which is exactly what the version bump is meant to escape.
+  const algorithmChanged =
+    !!previousZones?.zones?.length && previousZones.algorithmVersion !== ZONE_ALGORITHM_VERSION;
+  if (algorithmChanged && !options?.reuseStructure) {
+    trustPrevious = false;
+    partitionReview = undefined;
+    console.log(`  [partition] zone algorithm changed (v${previousZones?.algorithmVersion ?? "?"} → v${ZONE_ALGORITHM_VERSION}) — re-partitioned without stability bias`);
+  } else if (previousZones?.zones?.length && !options?.reuseStructure) {
+    const decision = await reviewPreviousPartition(previousZones, inputFingerprint, { maxZonePercent: options?.maxZonePercent });
+    partitionReview = decision.review;
+    trustPrevious = decision.trustPrevious;
+    freshReview = decision.fresh;
+  }
+  const reuseStructure = (options?.reuseStructure ?? false) || (inputsUnchanged && trustPrevious);
 
   if (reuseStructure && previousZones) {
     // Reuse existing zone structure — skip Louvain to avoid non-deterministic
@@ -2861,7 +3240,7 @@ export async function analyzeZones(
   } else {
     // ── Build previous zone assignment for stability bias ──
     let previousZoneAssignment: Map<string, string> | undefined;
-    if (previousZones?.zones) {
+    if (previousZones?.zones && trustPrevious) {
       previousZoneAssignment = new Map<string, string>();
       for (const zone of previousZones.zones) {
         for (const file of zone.files) {
@@ -2872,6 +3251,7 @@ export async function analyzeZones(
 
     // ── Run zone detection pipeline ──
     const pipeline = runZonePipeline({
+      routeLayout,
       edges: filteredEdges,
       inventory,
       imports,
@@ -2897,9 +3277,20 @@ export async function analyzeZones(
     // ── Structure hash & change detection ──
     structureHash = computeStructureHash(expandedZones);
     structureChanged = previousZones?.structureHash !== structureHash;
+    if (partitionReview?.rejected && !trustPrevious) {
+      partitionReview = { ...partitionReview, after: assessPartitionHealth(expandedZones, options?.maxZonePercent) };
+    }
+  }
+  if (partitionReview && freshReview) {
+    const line = formatPartitionLine(partitionReview);
+    if (line) console.log(line);
+    recordPartitionReview({ ...partitionReview, reused: reuseStructure });
   }
 
-  const validPrevious = structureChanged ? undefined : previousZones;
+  // After an algorithm change the previous zones' ids are the old derivation's;
+  // their enrichment is not valid for the new ids even when file sets match.
+  // Chosen names still carry over through identity preservation below.
+  const validPrevious = structureChanged || algorithmChanged ? undefined : previousZones;
 
   if (structureChanged && previousZones?.enrichmentPass && options?.onReset) {
     options.onReset(previousZones.enrichmentPass, 1);
@@ -2912,15 +3303,53 @@ export async function analyzeZones(
   // ── AI enrichment or preserve previous ──
   const enrichResult = await applyEnrichment(
     expandedZones, imports, inventory, validPrevious, enrich, perZone, options?.fileArchetypes,
-    zoneContentHashes, options?.hints, options?.projectProfile,
+    zoneContentHashes, options?.hints, options?.projectProfile, options?.narrate === true,
+    options?.deferNarration === true,
   );
-  const { finalZones: enrichedZones, aiZoneInsights, aiGlobalInsights, aiFindings,
-    enrichmentPass, metaUpdatedFindings, enrichTokenUsage } = enrichResult;
+  const { finalZones: enrichedZones, aiZoneInsights, aiGlobalInsights,
+    enrichmentPass, metaUpdatedFindings, enrichedFiles, fragilityJudged } = enrichResult;
+  let { aiFindings, enrichTokenUsage } = enrichResult;
 
   // ── Preserve previous zone identity for high-overlap zones ──
-  const finalZones = previousZones
-    ? preservePreviousZoneIdentity(enrichedZones, previousZones.zones)
+  let finalZones = previousZones
+    ? preservePreviousZoneIdentity(
+        enrichedZones,
+        previousZones.zones,
+        trustPrevious ? ZONE_OVERLAP_THRESHOLD : REJECTED_PARTITION_OVERLAP_THRESHOLD,
+        { keepIds: algorithmChanged },
+      )
     : enrichedZones;
+  if (enrichResult.cascade && previousZones) {
+    finalZones = reapplyCascadeLabels(finalZones, enrichedZones);
+  }
+  // Preservation can hand two zones the same name; the smaller falls back.
+  finalZones = dedupeZoneNames(finalZones);
+
+  // ── Sub-zone names, at every depth ──
+  let pendingSubZoneNames: string[] = [];
+  if (enrich) {
+    const sub = await nameSubZones(finalZones, {
+      projectDir: options?.projectProfile?.projectDir,
+      fileArchetypes: options?.fileArchetypes,
+      routeLayout,
+      previous: previousZones?.zones,
+      defer: options?.deferNarration === true,
+    });
+    finalZones = sub.zones;
+    pendingSubZoneNames = sub.pending;
+  }
+
+  // ── Numbered ids follow chosen names ──
+  const idRename = idsFollowNames(finalZones);
+  if (idRename.renamed.size > 0) {
+    finalZones = idRename.zones;
+    aiFindings = renameZoneRefs(aiFindings, idRename.renamed);
+    for (const [from, to] of idRename.renamed) {
+      const ins = aiZoneInsights.get(from);
+      if (ins) { aiZoneInsights.delete(from); aiZoneInsights.set(to, ins); }
+      console.log(`  [zones] id follows name: "${from}" → "${to}"`);
+    }
+  }
 
   // ── Remap content hashes to post-enrichment zone IDs ──
   const remappedContentHashes = remapContentHashKeys(
@@ -2962,6 +3391,41 @@ export async function analyzeZones(
     ...computeEmptyAnchorFindings(emptyAnchors),
   );
 
+  // ── Move judgment (enrich-judge.ts) ──
+  // Where do the most cross-linked files belong? Inert without a route.
+  const moves = await judgeMoves(pinnedFinalZones, crossings, Math.max(1, enrichmentPass));
+  structural.findings.push(...moves.findings);
+  if (moves.calls > 0) {
+    enrichTokenUsage ??= emptyAnalyzeTokenUsage();
+    enrichTokenUsage.calls += moves.calls;
+    enrichTokenUsage.inputTokens += moves.tokenUsage?.input ?? 0;
+    enrichTokenUsage.outputTokens += moves.tokenUsage?.output ?? 0;
+  }
+
+  // ── Judgment step (enrich-judge.ts) ──
+  // After extraction, before assembleFindings' enforceSeverityRules, for every
+  // enrichment mode at once. Inert without a judgment route. Here — not inside
+  // applyEnrichment — because the evidence a finding is judged against
+  // (post-rename crossings, heuristic findings) only exists at this point.
+  const judged = await judgeFindings(aiFindings, {
+    zones: pinnedFinalZones,
+    crossings,
+    heuristics: structural.findings,
+    projectDir: options?.projectProfile?.projectDir,
+  });
+  const fragilityZones = enrichedFiles && !fragilityJudged
+    ? pinnedFinalZones.filter((z) => z.files.some((f) => enrichedFiles.has(f)))
+    : [];
+  const fragility = await judgeZoneFragility(fragilityZones, crossings, enrichmentPass);
+  aiFindings = [...judged.findings, ...fragility.findings, ...(enrichResult.prejudgedFindings ?? [])];
+  for (const r of [judged, fragility]) {
+    if (r.calls === 0) continue;
+    enrichTokenUsage ??= emptyAnalyzeTokenUsage();
+    enrichTokenUsage.calls += r.calls;
+    enrichTokenUsage.inputTokens += r.tokenUsage?.input ?? 0;
+    enrichTokenUsage.outputTokens += r.tokenUsage?.output ?? 0;
+  }
+
   // ── Merge insights ──
   mergeZoneInsights(pinnedFinalZones, structural, aiZoneInsights, validPrevious);
   const allGlobalInsights = mergeGlobalInsights(
@@ -2969,10 +3433,29 @@ export async function analyzeZones(
   );
 
   // ── Assemble findings ──
-  const allFindings = assembleFindings(
+  let allFindings = assembleFindings(
     pinnedFinalZones, structural, aiFindings, metaUpdatedFindings,
     validPrevious, previousZones, remappedContentHashes, globalContentHash
   );
+
+  // ── Heuristic judgment (enrich-judge.ts) ──
+  // After assembly, because assembleFindings builds the per-zone heuristic
+  // warnings itself (entry-point width, cohesion/coupling) on top of
+  // `structural.findings`. Is each warning a real problem or a detection
+  // artifact? Inert without a route; only demotes, never escalates, so
+  // running after enforceSeverityRules changes nothing that rule guards.
+  const heuristicJudged = await judgeHeuristicFindings(allFindings, {
+    zones: pinnedFinalZones,
+    crossings,
+    projectDir: options?.projectProfile?.projectDir,
+  });
+  allFindings = heuristicJudged.findings;
+  if (heuristicJudged.calls > 0) {
+    enrichTokenUsage ??= emptyAnalyzeTokenUsage();
+    enrichTokenUsage.calls += heuristicJudged.calls;
+    enrichTokenUsage.inputTokens += heuristicJudged.tokenUsage?.input ?? 0;
+    enrichTokenUsage.outputTokens += heuristicJudged.tokenUsage?.output ?? 0;
+  }
 
   // ── Back-populate findings into insights for backward compatibility ──
   backPopulateInsights(pinnedFinalZones, allFindings, allGlobalInsights);
@@ -2989,9 +3472,41 @@ export async function analyzeZones(
   }
 
   // ── Build result ──
+  // Deferred narration: the cascade knew the zones by their pre-pin ids;
+  // hand the narrator the final ids by file membership.
+  const byFiles = (files: Set<string> | undefined): string[] | undefined =>
+    files && files.size > 0
+      ? pinnedFinalZones.filter((z) => z.files.some((f) => files.has(f))).map((z) => z.id)
+      : undefined;
+  const pendingNarration = byFiles(enrichResult.deferredFiles);
+  const pendingNames = byFiles(enrichResult.deferredNameFiles);
+
+  // ── Areas: the level above zones ──
+  let areas = computeAreas({ zones: allZones, crossings, testFiles, routeLayout });
+  const pendingAreaNames: string[] = [];
+  if (areas.length > 0 && enrich) {
+    const named = await nameAreas(areas, allZones, {
+      projectDir: options?.projectProfile?.projectDir,
+      fileArchetypes: options?.fileArchetypes,
+      routeLayout,
+      previous: previousZones?.areas,
+      defer: options?.deferNarration === true,
+    });
+    areas = named.areas;
+    pendingAreaNames.push(...named.pending);
+  }
+  if (areas.length > 0) {
+    console.log(`  [areas] ${allZones.length} zones in ${areas.length} areas: ${areas.map((a) => `${a.name} (${a.zones.length})`).join(", ")}`);
+  }
+
   return buildAnalyzeZonesResult({
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
-    previousZones, structureChanged, enrichTokenUsage, stability,
+    previousZones, structureChanged, enrichTokenUsage, stability, pendingNarration,
+    partitionReview, areas,
+    pendingNames: [...(pendingNames ?? []), ...pendingAreaNames, ...pendingSubZoneNames],
+    // A run that enriched says how; one that reused the previous enrichment
+    // (--fast on an unchanged structure) keeps the previous mode.
+    enrichmentMode: enrichResult.cascade ? "cascade" : enrich && enrichTokenUsage ? "generative" : validPrevious?.enrichmentMode,
   });
 }

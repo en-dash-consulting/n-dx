@@ -48,6 +48,7 @@ vi.mock("../../../src/analyzers/claude-client.js", async () => {
   const actual = await import("@n-dx/llm-client");
   return {
     callClaude: vi.fn(),
+    getJudgmentRoute: vi.fn(() => undefined),
     ClaudeClientError: actual.ClaudeClientError,
     setClaudeConfig: vi.fn(),
     getAuthMode: vi.fn(),

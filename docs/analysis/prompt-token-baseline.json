@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 22227,
-    "uniqueTokens": 13740,
+    "perCallTokens": 22290,
+    "uniqueTokens": 13787,
     "skills": 13,
     "skillTokens": 17483
   },
@@ -108,8 +108,8 @@
     },
     "sourcevision": {
       "surfaces": 7,
-      "perCallTokens": 2659,
-      "uniqueTokens": 2194
+      "perCallTokens": 2722,
+      "uniqueTokens": 2241
     },
     "hench": {
       "surfaces": 9,
@@ -247,6 +247,7 @@
       "usedBy": [
         "buildFirstPassEnvelope",
         "buildLaterPassEnvelope",
+        "buildMetaEnvelope",
         "buildSingleZoneFirstPassEnvelope",
         "buildSingleZoneLaterPassEnvelope"
       ]
@@ -626,15 +627,15 @@
       "builder": "buildFirstPassEnvelope",
       "purpose": "First-pass zone enrichment for a batch of zones.",
       "inline": false,
-      "literals": 57,
+      "literals": 55,
       "constants": {
         "formatProjectShape": 393,
         "formatFileHeaders": 54,
         "JSON_OBJECT_ONLY": 16
       },
-      "ownTokens": 317,
-      "fixedChars": 3117,
-      "fixedTokens": 780
+      "ownTokens": 310,
+      "fixedChars": 3091,
+      "fixedTokens": 773
     },
     {
       "pkg": "sourcevision",
@@ -642,15 +643,15 @@
       "builder": "buildLaterPassEnvelope",
       "purpose": "Later-pass zone enrichment, given the previous pass's output.",
       "inline": false,
-      "literals": 50,
+      "literals": 49,
       "constants": {
         "formatProjectShape": 393,
         "ONLY_NEW_INSIGHTS": 25,
         "JSON_OBJECT_ONLY": 16
       },
-      "ownTokens": 265,
-      "fixedChars": 2794,
-      "fixedTokens": 699
+      "ownTokens": 259,
+      "fixedChars": 2769,
+      "fixedTokens": 693
     },
     {
       "pkg": "sourcevision",
@@ -658,13 +659,14 @@
       "builder": "buildMetaEnvelope",
       "purpose": "Meta-evaluation choosing the enrichment strategy for a repo.",
       "inline": false,
-      "literals": 23,
+      "literals": 45,
       "constants": {
-        "formatAnnotatedFinding": 15
+        "formatAnnotatedFinding": 15,
+        "JSON_OBJECT_ONLY": 16
       },
-      "ownTokens": 531,
-      "fixedChars": 2179,
-      "fixedTokens": 545
+      "ownTokens": 559,
+      "fixedChars": 2355,
+      "fixedTokens": 589
     },
     {
       "pkg": "sourcevision",
@@ -672,13 +674,13 @@
       "builder": "buildSingleZoneFirstPassEnvelope",
       "purpose": "Per-zone enrichment, first pass — names and describes one zone.",
       "inline": false,
-      "literals": 25,
+      "literals": 22,
       "constants": {
         "JSON_OBJECT_ONLY": 16
       },
-      "ownTokens": 138,
-      "fixedChars": 613,
-      "fixedTokens": 154
+      "ownTokens": 131,
+      "fixedChars": 587,
+      "fixedTokens": 147
     },
     {
       "pkg": "sourcevision",
@@ -691,9 +693,9 @@
         "ONLY_NEW_INSIGHTS": 25,
         "JSON_OBJECT_ONLY": 16
       },
-      "ownTokens": 120,
-      "fixedChars": 642,
-      "fixedTokens": 161
+      "ownTokens": 131,
+      "fixedChars": 685,
+      "fixedTokens": 172
     },
     {
       "pkg": "sourcevision",
@@ -701,11 +703,11 @@
       "builder": "buildLLMClassifyEnvelope",
       "purpose": "Classify file archetypes the heuristic classifier could not.",
       "inline": false,
-      "literals": 19,
+      "literals": 27,
       "constants": {},
-      "ownTokens": 91,
-      "fixedChars": 361,
-      "fixedTokens": 91
+      "ownTokens": 119,
+      "fixedChars": 475,
+      "fixedTokens": 119
     },
     {
       "pkg": "sourcevision",
@@ -914,13 +916,13 @@
     "hench": {
       "surface": "buildPromptEnvelope",
       "describe": "Full agent envelope (system + brief) for a CLI-provider run.",
-      "chars": 2822,
-      "tokens": 706,
+      "chars": 2954,
+      "tokens": 739,
       "sections": [
         {
           "name": "system",
-          "chars": 2152,
-          "tokens": 538
+          "chars": 2284,
+          "tokens": 571
         },
         {
           "name": "brief",
@@ -930,7 +932,7 @@
       ],
       "fixedTokens": 1137,
       "branchConditional": true,
-      "unreachedTokens": 431
+      "unreachedTokens": 398
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -985,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "49b2a205b4b8b2d0",
-  "recordedAt": "2026-09-24T16:18:52.203Z",
-  "commit": "61c655cb869a",
+  "contentHash": "295e060ead0c29dc",
+  "recordedAt": "2026-09-25T04:42:28.012Z",
+  "commit": "7ab535bfce97",
   "dirty": false
 }

@@ -15,6 +15,57 @@ export interface ModuleInfo {
   chunks?: number;
 }
 
+/** Calls, tokens and wall-clock for one LLM task class in one analyze run. */
+export interface LLMClassUsage {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  durationMs: number;
+  vendor: string;
+  model: string;
+}
+
+/**
+ * What one `sv analyze` run cost, per phase and per LLM task class. The
+ * aggregate `tokenUsage` bucket cannot say which model answered or how long
+ * anything took; this can, which is what a decision to route a class
+ * elsewhere has to be made on.
+ */
+export interface AnalysisRun {
+  at: string;
+  /**
+   * `fast`: no LLM. `generative`: the enrichment prompts. `narrate`: the same,
+   * forced by `--narrate`. `cascade`: deterministic facts plus Jev judgments,
+   * generation only where a judgment was uncertain.
+   */
+  mode: "fast" | "generative" | "narrate" | "cascade" | "narration";
+  durationMs: number;
+  /** Phase name → wall-clock ms. */
+  phases: Record<string, number>;
+  llm: {
+    byTaskClass: Record<string, LLMClassUsage>;
+    judgmentCache?: { hits: number; misses: number };
+  };
+  /** This run's partition review, when a previous partition existed; `reused` says whether its zones were kept verbatim. */
+  partition?: PartitionReview & { reused: boolean };
+}
+
+/** See `Manifest.narration`. */
+export interface NarrationState {
+  status: "pending" | "done" | "failed";
+  /** Zone ids awaiting (or given) narration. */
+  zones: string[];
+  /** Zone ids whose generated names are still to be produced. */
+  names?: string[];
+  startedAt: string;
+  finishedAt?: string;
+  /** Detached narrator's pid while pending. */
+  pid?: number;
+  /** Path of the narrator's log, relative to the project root. */
+  log?: string;
+  reason?: string;
+}
+
 export interface Manifest {
   schemaVersion: string;
   toolVersion: string;
@@ -34,6 +85,15 @@ export interface Manifest {
   modules: Record<string, ModuleInfo>;
   /** Aggregate token usage from the most recent analyze run. */
   tokenUsage?: AnalyzeTokenUsage;
+  /** Per-phase and per-task-class cost of the most recent analyze run. */
+  lastAnalysis?: AnalysisRun;
+  /**
+   * Narration the cascade deferred past the end of `analyze`: the escalated
+   * zones the text model still has to describe. `pending` while the detached
+   * `sv narrate` child runs (its log is at `log`); `done` once insights and
+   * findings were merged into zones.json; `failed` with `reason` otherwise.
+   */
+  narration?: NarrationState;
   /** Whether per-zone output files were emitted to zones/ directory. */
   zoneOutputs?: boolean;
   /** Incorporated sub-analyses (nested .sourcevision/ directories). */
@@ -229,7 +289,7 @@ export interface Finding {
 }
 
 /** Reason a file-move is recommended. */
-export type MoveFileReason = "zone-pin-override" | "import-neighbor-majority" | "directory-consolidation";
+export type MoveFileReason = "zone-pin-override" | "import-neighbor-majority" | "directory-consolidation" | "zone-judgment";
 
 /**
  * Concrete file-move recommendation with predicted metric impact.
@@ -274,6 +334,8 @@ export interface Zone {
   depth?: number;
   /** Sub-zones from recursive subdivision of large zones. */
   subZones?: Zone[];
+  /** Ids this zone was known by in earlier runs; resolved as aliases (pins, `get_zone`). */
+  previousIds?: string[];
   /** Cross-zone import edges within this zone's sub-zones. */
   subCrossings?: ZoneCrossing[];
   /** Computed architectural risk metrics (deterministic, from cohesion/coupling). */
@@ -372,6 +434,12 @@ export interface Zones {
   findings?: Finding[];
   /** Number of AI enrichment passes completed */
   enrichmentPass?: number;
+  /**
+   * How the enrichment was produced. `cascade` is one judged pass that yields
+   * every finding kind the generative passes 2–4 add one at a time, so
+   * consumers gating on the pass number treat a cascade pass as complete.
+   */
+  enrichmentMode?: "cascade" | "generative";
   /** Number of meta-evaluation passes completed (pass 5+) */
   metaEvaluationCount?: number;
   /** Hash of structural zone groupings for change detection */
@@ -389,6 +457,56 @@ export interface Zones {
   lastReset?: { from: number; to: number };
   /** Zone stability metrics compared to the previous analysis run. */
   stability?: ZoneStability;
+  /** Whether the previous partition was judged fit to reuse (see `analyzers/partition-review.ts`). */
+  partitionReview?: PartitionReview;
+  /** `ZONE_ALGORITHM_VERSION` that produced this partition; a different version is not reused or used as a seed. */
+  algorithmVersion?: number;
+  /** The level above zones: 4–10 groups of top-level zones (see `analyzers/zone-areas.ts`). */
+  areas?: ZoneArea[];
+}
+
+/** A group of top-level zones: the first level of the project map. */
+export interface ZoneArea {
+  id: string;
+  name: string;
+  /** Top-level zone ids in this area. */
+  zones: string[];
+  /** Total files across the area's zones. */
+  files: number;
+  /**
+   * Where the name came from. `template` names (joined member names, a
+   * directory) are candidates for a judged or generated name; the others are
+   * already specific.
+   */
+  nameSource?: "package" | "route" | "member" | "template" | "judged" | "generated" | "support" | "tests";
+}
+
+/** Deterministic signals of how fragmented a zone partition is. */
+export interface PartitionHealth {
+  zones: number;
+  /** Zones holding two files or fewer. */
+  smallZones: number;
+  smallShare: number;
+  /** Zone ids ending in a numeric suffix (`routes-7`). */
+  numericIds: number;
+  /** Largest zone's share of all zoned files. */
+  largestShare: number;
+  verdict: "healthy" | "borderline" | "fragmented";
+  reasons?: string[];
+}
+
+/** The partition review recorded with the zones it produced. */
+export interface PartitionReview {
+  /** `inputFingerprint` the review was made for. */
+  fingerprint: string;
+  /** Health of the partition that was reviewed (the previous one). */
+  health: PartitionHealth;
+  /** True when the reviewed partition was discarded and re-derived without stability bias. */
+  rejected: boolean;
+  /** Jev's probability that the map is sensible, when it was asked. */
+  mapProbability?: number;
+  /** Health of the partition this run produced, when it re-partitioned. */
+  after?: PartitionHealth;
 }
 
 /** Zone stability metrics: how much the zone topology changed between runs. */
@@ -795,6 +913,8 @@ export interface ProjectProfile {
   ciSurfaces: ProjectSurface[];
   /** Quality of the import graph that backed zone detection. */
   importGraphQuality: "rich" | "sparse" | "absent";
+  /** File-based routing roots (see `analyzers/route-convention.ts`); absent when none. */
+  routeConventions?: Array<{ framework: "react-router" | "nextjs" | "sveltekit"; root: string }>;
 }
 
 /** A release-versioning system detected in the repo. */

@@ -3,7 +3,9 @@ import {
   resolveTaskModel,
   resolveVendorModel,
   resolveModel,
+  resolveJudgmentRoute,
   DEFAULT_ROUTES,
+  DEFAULT_JUDGMENT_ROUTES,
   TIER_MODELS,
 } from "../../src/config.js";
 import type { LLMConfig } from "../../src/llm-types.js";
@@ -191,5 +193,58 @@ describe("resolveTaskModel — effort", () => {
     expect(resolveTaskModel("agent.execute", config).effort).toBe("high");
     expect(resolveTaskModel("prd.rename", config).effort).toBe("medium");
     expect(resolveTaskModel("git.commit-message", config).effort).toBeUndefined();
+  });
+});
+
+/**
+ * resolveJudgmentRoute sits beside resolveTaskModel for calls whose answer
+ * is a typed judgment rather than generated text. Its gate is the TypeSafe
+ * API key: without it the helper is inert and every call site keeps using
+ * the vendor tier resolveTaskModel picks, so an exported key is the only
+ * thing that changes analysis behavior.
+ */
+describe("resolveJudgmentRoute", () => {
+  const withKey = { TYPESAFE_API_KEY: "tsk_test" } as NodeJS.ProcessEnv;
+  const noKey = {} as NodeJS.ProcessEnv;
+
+  it("routes a default judgment class to typesafe when the key is present", () => {
+    expect(resolveJudgmentRoute("code.classify", {}, withKey)).toBe("typesafe");
+    for (const cls of ["code.classify", "finding.judge", "zone.judge"]) {
+      expect(DEFAULT_JUDGMENT_ROUTES.has(cls), cls).toBe(true);
+      expect(resolveJudgmentRoute(cls, {}, withKey), cls).toBe("typesafe");
+    }
+  });
+
+  it("returns undefined for every class when the key is absent or blank", () => {
+    expect(resolveJudgmentRoute("code.classify", {}, noKey)).toBeUndefined();
+    expect(resolveJudgmentRoute("code.classify", {}, { TYPESAFE_API_KEY: "  " } as NodeJS.ProcessEnv)).toBeUndefined();
+    const explicit: LLMConfig = { routes: { "zone.enrich-scan": "typesafe" } };
+    expect(resolveJudgmentRoute("zone.enrich-scan", explicit, noKey)).toBeUndefined();
+  });
+
+  it("lets llm.routes send a default judgment class back to a tier", () => {
+    const config: LLMConfig = { routes: { "code.classify": "light" } };
+    expect(resolveJudgmentRoute("code.classify", config, withKey)).toBeUndefined();
+  });
+
+  it("lets llm.routes name typesafe explicitly for a class outside the default set", () => {
+    const config: LLMConfig = { routes: { "prd.assess": "typesafe" } };
+    expect(resolveJudgmentRoute("prd.assess", config, withKey)).toBe("typesafe");
+    expect(resolveJudgmentRoute("prd.assess", {}, withKey)).toBeUndefined();
+  });
+
+  it("applies the same exact-then-longest-glob matching as resolveTaskModel", () => {
+    const config: LLMConfig = { routes: { "code.*": "typesafe", "code.classify": "light" } };
+    expect(resolveJudgmentRoute("code.classify", config, withKey)).toBeUndefined();
+    expect(resolveJudgmentRoute("code.review", config, withKey)).toBe("typesafe");
+    const optOutAll: LLMConfig = { routes: { "*": "standard" } };
+    expect(resolveJudgmentRoute("code.classify", optOutAll, withKey)).toBeUndefined();
+  });
+
+  it("does not disturb resolveTaskModel: a typesafe route falls through to the registry tier", () => {
+    const config: LLMConfig = { vendor: "claude", routes: { "code.classify": "typesafe" } };
+    const r = resolveTaskModel("code.classify", config);
+    expect(r.tier).toBe(DEFAULT_ROUTES["code.classify"]);
+    expect(r.model).toBe(resolveVendorModel("claude", config, DEFAULT_ROUTES["code.classify"]));
   });
 });

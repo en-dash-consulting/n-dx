@@ -906,6 +906,8 @@ describe("analyzeZones stale content hash filtering", () => {
         { type: "anti-pattern", pass: 2, scope: zoneId, text: "Legacy AI finding", severity: "warning" },
       ],
       enrichmentPass: 2,
+      // Same partitioning algorithm; only the content hashes are missing.
+      algorithmVersion: firstRun.algorithmVersion,
       // No zoneContentHashes — old format
     };
 

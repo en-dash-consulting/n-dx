@@ -13,7 +13,7 @@
  * health status (stale detection).
  */
 
-import { getWebSocketUrl, acceptsFrame } from "../base-path.js";
+import { appUrl, getWebSocketUrl, acceptsFrame } from "../base-path.js";
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { RexTaskLink } from "./rex-task-link.js";
@@ -207,7 +207,7 @@ function requestNotificationPermission() {
 function fireNotification(title: string, body: string) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   try {
-    new Notification(title, { body, icon: "/favicon.png", silent: false });
+    new Notification(title, { body, icon: appUrl("/n-dx.png"), silent: false });
   } catch {
     // Notifications blocked or unavailable in this context
   }

@@ -18,6 +18,7 @@ import type {
   ReleaseInfrastructure,
   ProjectSurface,
 } from "../schema/v1.js";
+import { detectRouteConventions } from "./route-convention.js";
 
 const SCHEMA_VERSION = "1.0.0";
 
@@ -34,6 +35,11 @@ export function buildProjectProfile(
   const buildSurfaces = detectBuildSurfaces(projectDir);
   const ciSurfaces = detectCiSurfaces(projectDir);
   const importGraphQuality = classifyImportGraph(inventory, imports);
+  const routeConventions = detectRouteConventions(inventory.files.map((f) => f.path));
+  for (const c of routeConventions) {
+    if (!frameworks.includes(c.framework)) frameworks.push(c.framework);
+  }
+  frameworks.sort();
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -45,6 +51,7 @@ export function buildProjectProfile(
     buildSurfaces,
     ciSurfaces,
     importGraphQuality,
+    ...(routeConventions.length > 0 ? { routeConventions } : {}),
   };
 }
 

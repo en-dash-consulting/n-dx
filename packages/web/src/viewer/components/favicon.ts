@@ -7,6 +7,7 @@
  */
 
 import type { ViewId } from "../types.js";
+import { appUrl } from "../base-path.js";
 
 type Product = "sourcevision" | "rex" | "hench";
 
@@ -90,7 +91,7 @@ export function updateFavicon(view: ViewId): void {
   currentProduct = product;
   const link = getFaviconLink();
   link.type = "image/png";
-  link.href = FAVICON_PNGS[product];
+  link.href = appUrl(FAVICON_PNGS[product]);
 }
 
 /**

@@ -701,7 +701,8 @@ export function addDirectoryProximityEdges(
 export function capZoneCount(
   community: Map<string, string>,
   graph: UndirectedGraph,
-  maxZones: number
+  maxZones: number,
+  maxSize?: number,
 ): Map<string, string> {
   const result = new Map(community);
 
@@ -751,12 +752,30 @@ export function capZoneCount(
       continue;
     }
 
+    // Score each pair by its connection weight relative to the smaller
+    // community's size. Raw weight always favours the largest communities —
+    // they have the most cross-edges — so a big zone kept absorbing whole
+    // features until the cap was met. Relative weight merges the community
+    // that is most bound to a neighbour, which is usually a small one.
+    // Merges that would exceed `maxSize` are taken only when nothing else is.
     let bestPair = "";
-    let bestWeight = -1;
+    let bestScore = -1;
+    let bestOversized = true;
     for (const [pair, w] of communityPairWeight) {
-      if (w > bestWeight || (w === bestWeight && pair < bestPair)) {
+      const [a, b] = pair.split("\x01");
+      const sa = members.get(a)?.length ?? 0;
+      const sb = members.get(b)?.length ?? 0;
+      const score = w / Math.max(1, Math.min(sa, sb));
+      const oversized = maxSize !== undefined && sa + sb > maxSize;
+      const better = bestOversized && !oversized
+        ? true
+        : oversized && !bestOversized
+          ? false
+          : score > bestScore || (score === bestScore && pair < bestPair);
+      if (better) {
         bestPair = pair;
-        bestWeight = w;
+        bestScore = score;
+        bestOversized = oversized;
       }
     }
 
@@ -833,4 +852,52 @@ function groupByPrefix(files: string[], depth: number): Map<string, string[]> {
     list.push(file);
   }
   return groups;
+}
+
+/**
+ * Split files by the first directory segment where they differ: the common
+ * prefix is stripped and each file is keyed by the next directory below it
+ * (files directly in the common directory form their own group). Groups
+ * smaller than `minSize` join the largest group sharing the longest path
+ * prefix with them. Returns null when fewer than two groups remain.
+ *
+ * Used when Louvain subdivides a zone into one dominant child plus slivers:
+ * the directory tree is then the only structure left to split on.
+ */
+export function splitByFirstDifferingDirectory(
+  files: string[],
+  minSize: number,
+): Map<string, string> | null {
+  if (files.length < 2) return null;
+  const dirs = files.map((f) => f.split("/").slice(0, -1));
+  let common = 0;
+  while (dirs.every((d) => d.length > common && d[common] === dirs[0][common])) common++;
+  const keyOf = (d: string[]) => (d.length > common ? d.slice(0, common + 1).join("/") : `${d.join("/")}/.`);
+  const groups = new Map<string, string[]>();
+  files.forEach((f, i) => {
+    const k = keyOf(dirs[i]);
+    let g = groups.get(k);
+    if (!g) groups.set(k, (g = []));
+    g.push(f);
+  });
+  // Fold small groups into their nearest large sibling (longest shared prefix, then size).
+  const large = [...groups.entries()].filter(([, g]) => g.length >= minSize);
+  if (large.length < 2) return null;
+  const shared = (a: string, b: string) => {
+    const x = a.split("/"), y = b.split("/");
+    let n = 0;
+    while (n < x.length && n < y.length && x[n] === y[n]) n++;
+    return n;
+  };
+  const result = new Map<string, string>();
+  for (const [key, group] of groups) {
+    let target = key;
+    if (group.length < minSize) {
+      target = large
+        .map(([k, g]) => ({ k, s: shared(k, key), n: g.length }))
+        .sort((a, b) => b.s - a.s || b.n - a.n || a.k.localeCompare(b.k))[0].k;
+    }
+    for (const f of group) result.set(f, `dir:${target}`);
+  }
+  return result;
 }

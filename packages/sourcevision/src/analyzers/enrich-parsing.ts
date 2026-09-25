@@ -127,7 +127,15 @@ function isSpeculativeFinding(text: string): boolean {
 export function extractFindings(
   parsed: any,
   passNumber: number,
-  expectedTypes: FindingType[]
+  expectedTypes: FindingType[],
+  opts?: {
+    /**
+     * Skip the hedge-phrase backstop. Set when Jev judges each finding's
+     * support against the evidence (enrich-judge.ts) — a probability over
+     * the actual files beats a regex over the first 120 characters.
+     */
+    skipSpeculativeFilter?: boolean;
+  },
 ): Finding[] {
   const findings: Finding[] = [];
   const defaultType = expectedTypes[0] ?? "observation";
@@ -138,7 +146,7 @@ export function extractFindings(
 
   const parseFinding = (f: any, fallbackScope: string) => {
     if (f && typeof f === "object" && typeof f.text === "string") {
-      if (isSpeculativeFinding(f.text)) {
+      if (!opts?.skipSpeculativeFilter && isSpeculativeFinding(f.text)) {
         speculativeDropped++;
         return;
       }
@@ -507,7 +515,20 @@ export function deduplicateFindings(findings: Finding[]): Finding[] {
     }
   }
 
-  return result;
+  // Cross-scope duplicates: the per-zone prompt emits the same finding under
+  // its zone and again under `global`, and the type judgment can grade the
+  // two copies differently, so the (scope, type) grouping above keeps both.
+  // The zone-scoped copy is the useful one; the global copy goes.
+  const byText = new Map<string, Finding[]>();
+  for (const f of result) {
+    const key = normalizeText(f.text);
+    byText.set(key, [...(byText.get(key) ?? []), f]);
+  }
+  return result.filter((f) => {
+    if (f.scope !== "global") return true;
+    const twins = byText.get(normalizeText(f.text)) ?? [];
+    return !twins.some((o) => o !== f && o.scope !== "global");
+  });
 }
 
 // ── Zone ID deduplication ────────────────────────────────────────────────────
@@ -563,6 +584,8 @@ export interface EnrichResult {
   pass: number;
   /** Updated findings with reassessed severities from meta-evaluation */
   _updatedFindings?: Finding[];
+  /** Ids (post-rename) of the zones the LLM actually enriched this pass — the ones worth a fragility judgment. */
+  enrichedZoneIds?: Set<string>;
   /** Aggregated token usage across all LLM calls in this enrichment */
   tokenUsage?: AnalyzeTokenUsage;
 }

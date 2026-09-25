@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {resolve, join} from "node:path";import {
   SV_DIR,
   DATA_FILES,
@@ -23,7 +24,7 @@ import {resolve, join} from "node:path";import {
 import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
-import { DEFAULT_LLM_VENDOR, loadLLMConfig, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, loadLLMConfig, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool } from "@n-dx/llm-client";
 import type { RiskJustificationEntry, ZoneType } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
@@ -41,6 +42,10 @@ import { generatePrMarkdownFile } from "./pr-markdown.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
+import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger } from "../../analyzers/run-ledger.js";
+import { configureJudgmentCache } from "../../analyzers/judgment-cache.js";
+import { carryNarration, cmdNarrate, NARRATION_LOG, takeOverNarration } from "./narrate.js";
+import type { NarrateDeps } from "./narrate.js";
 import type { Manifest } from "../sourcevision-core.js";
 
 type PhaseFilter =
@@ -117,7 +122,7 @@ function shouldRunPhase(filter: PhaseFilter, phase: number, moduleName: string):
  *
  * Returns the loaded LLM config and the resolved svDir path.
  */
-async function initAndLoadLLMConfig(absDir: string): Promise<{
+export async function initAndLoadLLMConfig(absDir: string): Promise<{
   svDir: string;
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>;
 }> {
@@ -131,6 +136,7 @@ async function initAndLoadLLMConfig(absDir: string): Promise<{
   const llmConfig = await loadLLMConfig(absDir);
   setLLMConfig(llmConfig);
   setProjectDir(absDir);
+  configureJudgmentCache({ svDir: join(absDir, SV_DIR) });
   const vendor = getLLMVendor();
   if (vendor) {
     printVendorModelHeader(vendor, llmConfig);
@@ -176,6 +182,7 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
   for (const { phase, module, run, critical } of phases) {
     if (!shouldRunPhase(filter, phase, module)) continue;
 
+    const phaseStartedAt = Date.now();
     try {
       await run();
     } catch (err) {
@@ -212,12 +219,76 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
           throw err;
         }
       }
+    } finally {
+      recordPhaseDuration(module, Date.now() - phaseStartedAt);
     }
   }
 }
 
+/** The analyze helpers `sv narrate` reuses (see NarrateDeps for why they are injected). */
+export function narrateDeps(): NarrateDeps {
+  return {
+    bootstrap: initAndLoadLLMConfig,
+    generateOutputs: generateOutputFiles,
+    appendHistory: appendAnalysisHistory,
+  };
+}
+
 /**
- * Report and persist token usage to manifest for cross-package aggregation.
+ * Spawn `sv narrate <dir>` detached, log to `.sourcevision/.cache/narration.log`,
+ * and record the pending state on the manifest so the dashboard and the
+ * next `analyze` can see it. The child regenerates the outputs when done.
+ */
+async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds: string[], nameZoneIds: string[]): Promise<void> {
+  const logPath = join(absDir, NARRATION_LOG);
+  const startedAt = new Date().toISOString();
+  try {
+    mkdirSync(join(svDir, ".cache"), { recursive: true });
+    const cli = fileURLToPath(new URL("../index.js", import.meta.url));
+    const child = await spawnTool(process.execPath, [cli, "narrate", absDir], {
+      detached: true,
+      detachedLogFile: logPath,
+      env: process.env,
+    });
+    const manifest = readManifest(absDir);
+    manifest.narration = { status: "pending", zones: zoneIds, ...(nameZoneIds.length > 0 ? { names: nameZoneIds } : {}), startedAt, pid: child.pid, log: NARRATION_LOG };
+    writeManifest(absDir, manifest);
+    info("");
+    const parts = [
+      ...(zoneIds.length > 0 ? [`narrating ${bold(String(zoneIds.length))} zone${zoneIds.length === 1 ? "" : "s"}`] : []),
+      ...(nameZoneIds.length > 0 ? [`naming ${bold(String(nameZoneIds.length))} zone${nameZoneIds.length === 1 ? "" : "s"}`] : []),
+    ];
+    info(`${cyan("Background:")} ${parts.join(", ")} — results above are complete; names and insights land in zones.json when it finishes.`);
+    info(`  ${dim(`log: ${NARRATION_LOG} · pass --wait to block instead`)}`);
+  } catch (err) {
+    const manifest = readManifest(absDir);
+    manifest.narration = { status: "failed", zones: zoneIds, ...(nameZoneIds.length > 0 ? { names: nameZoneIds } : {}), startedAt, reason: `could not spawn narrator: ${err instanceof Error ? err.message : String(err)}` };
+    writeManifest(absDir, manifest);
+    warn(`  could not start background narration (${err instanceof Error ? err.message : String(err)}); run 'sv narrate .' or 'sv analyze --wait .'`);
+  }
+}
+
+function currentZoneIds(svDir: string): Set<string> {
+  try {
+    type Z = { id: string; subZones?: Z[] };
+    const zones = JSON.parse(readFileSync(join(svDir, DATA_FILES.zones), "utf-8")) as { zones?: Z[]; areas?: { id: string }[] };
+    const ids: string[] = [];
+    const walk = (z: Z) => { ids.push(z.id); (z.subZones ?? []).forEach(walk); };
+    (zones.zones ?? []).forEach(walk);
+    // Sub-zone ids and `area:<id>` names are queued alongside zone ids.
+    return new Set([...ids, ...(zones.areas ?? []).map((a) => `area:${a.id}`)]);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Runs kept in `.sourcevision/.cache/analyses.jsonl`; older lines are dropped. */
+const ANALYSIS_HISTORY_MAX = 200;
+
+/**
+ * Report and persist token usage to manifest for cross-package aggregation,
+ * and record the run — per phase and per task class — on the manifest and
+ * in the machine-local history.
  */
 function finalizeTokenUsage(
   ctx: AnalyzeContext,
@@ -227,16 +298,36 @@ function finalizeTokenUsage(
   if (usageLine) {
     info(`${dim("Token usage:")} ${usageLine}`);
   }
+  const run = snapshotRunLedger();
+  for (const line of formatRunLedger(run)) info(dim(line));
 
+  const manifest = readManifest(ctx.absDir);
   if (ctx.tokenUsage.calls > 0) {
     const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
-    const manifest = readManifest(ctx.absDir);
     manifest.tokenUsage = {
       ...ctx.tokenUsage,
       vendor: metadata.vendor,
       model: metadata.model,
     };
-    writeManifest(ctx.absDir, manifest);
+  }
+  manifest.lastAnalysis = run;
+  writeManifest(ctx.absDir, manifest);
+  appendAnalysisHistory(ctx.svDir, JSON.stringify(run));
+}
+
+/** Append one run to the history file, trimming it to {@link ANALYSIS_HISTORY_MAX} lines. */
+export function appendAnalysisHistory(svDir: string, line: string): void {
+  try {
+    const dir = join(svDir, ".cache");
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, "analyses.jsonl");
+    appendFileSync(path, line + "\n");
+    const lines = readFileSync(path, "utf-8").split("\n").filter(Boolean);
+    if (lines.length > ANALYSIS_HISTORY_MAX) {
+      writeFileSync(path, lines.slice(-ANALYSIS_HISTORY_MAX).join("\n") + "\n");
+    }
+  } catch {
+    // History is a convenience; never fail an analysis for it.
   }
 }
 
@@ -252,15 +343,27 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   const { svDir, llmConfig } = await initAndLoadLLMConfig(absDir);
   const filter = parsePhaseFilter(extraArgs);
 
+  startRunLedger(
+    extraArgs.includes("--fast") ? "fast" : extraArgs.includes("--narrate") ? "narrate" : "generative",
+  );
   const ctx: AnalyzeContext = {
     absDir,
     svDir,
     fullMode: extraArgs.includes("--full"),
     fastMode: extraArgs.includes("--fast"),
+    narrate: extraArgs.includes("--narrate"),
+    wait: extraArgs.includes("--wait"),
     targetPass: parseTargetPass(extraArgs),
     tokenUsage: emptyAnalyzeTokenUsage(),
     inventoryResult: null,
   };
+
+  // Stop a narrator still working on the previous analysis before this one
+  // rewrites zones.json; whatever it had not finished is queued again below.
+  const takenOver = takeOverNarration(absDir);
+  if (takenOver.stopped !== undefined) {
+    info(dim(`  [narrate] stopped the previous background narrator (pid ${takenOver.stopped}); its unfinished work is carried into this run`));
+  }
 
   await runDeepSubAnalyses(absDir, extraArgs);
 
@@ -269,12 +372,42 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
 
   await executePhases(ctx, filter, extraArgs);
 
+  // A --fast run makes no LLM calls, so it leaves the carried work recorded
+  // (as a retryable failure) for the next full run instead of spawning for it.
+  if (!ctx.fastMode && takenOver.zones.length + takenOver.names.length > 0) {
+    const merged = carryNarration(
+      takenOver,
+      { zones: ctx.pendingNarration, names: ctx.pendingNames },
+      currentZoneIds(svDir),
+    );
+    ctx.pendingNarration = merged.zones;
+    ctx.pendingNames = merged.names;
+    if (merged.carried + merged.dropped > 0) {
+      info(dim(`  [narrate] ${merged.carried} unfinished item(s) from the previous narration carried forward${merged.dropped > 0 ? `, ${merged.dropped} dropped (zone no longer exists)` : ""}`));
+    }
+  }
+
+  // --wait: narrate the escalated zones (and generate pending names) now,
+  // before the outputs are written.
+  const anythingPending = (ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0;
+  if (anythingPending && ctx.wait) {
+    await cmdNarrate(absDir, { inline: true, zoneIds: ctx.pendingNarration ?? [], nameZoneIds: ctx.pendingNames ?? [], deps: narrateDeps() });
+    ctx.pendingNarration = undefined;
+    ctx.pendingNames = undefined;
+  }
+
   if (filter.type === "all") {
     await generateOutputFiles(ctx);
     await generatePrMarkdownStep(ctx);
   }
 
   finalizeTokenUsage(ctx, llmConfig);
+
+  // Otherwise the results are on disk already; narration continues in a
+  // detached child so this command can return.
+  if ((ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0) {
+    await scheduleDetachedNarration(ctx.absDir, ctx.svDir, ctx.pendingNarration ?? [], ctx.pendingNames ?? []);
+  }
 
   // Hint about zone pins when move-file or structural findings exist
   try {
@@ -381,6 +514,16 @@ async function writePrimerIfPossible(
       }
       return;
     }
+    // The cascade's calls are judgments, not generation: they prove a Jev
+    // key works, not that a text model is reachable. The primer is prose,
+    // so it is generated only by a generative run (`--narrate`, or the
+    // default without a judgment route); a cached primer is still served.
+    if (snapshotRunLedger().mode === "cascade") {
+      if (!cachedPrimer) {
+        info(`${dim("[primer]")} skipped — cascade mode; run with --narrate to generate it`);
+      }
+      return;
+    }
 
     const result = await generatePrimer({
       contextMd,
@@ -400,7 +543,7 @@ async function writePrimerIfPossible(
   }
 }
 
-async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
+export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
   try {
     const manifestPath = join(ctx.svDir, DATA_FILES.manifest);
     const inventoryPath = join(ctx.svDir, DATA_FILES.inventory);
