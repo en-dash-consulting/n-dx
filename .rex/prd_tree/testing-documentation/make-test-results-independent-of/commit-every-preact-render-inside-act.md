@@ -1,0 +1,23 @@
+---
+id: "ecaa65cf-a0bb-4f22-8cb4-58d82b1ef9ea"
+level: "task"
+title: "Commit every preact render inside act() in the web viewer tests that still leak a frame-fallback timer"
+status: "pending"
+priority: "high"
+tags:
+  - "0.7.1"
+  - "test-determinism"
+  - "pr-t"
+  - "flake"
+  - "web"
+source: "Adversarial review of hench run 22a26185-d8b8-486b-af52-0e49778e1a05 (task 32083905), findings 2, 4 and 6; report at .hench/reviews/22a26185-d8b8-486b-af52-0e49778e1a05.json in the PR T worktree"
+acceptanceCriteria:
+  - "Each of the 19 listed files ends with zero live preact frame-fallback timers, verified with a temporary setTimeout(_, 35) tracking instrument, and the PR or resolution detail reports the before/after counts."
+  - "No test setup defines requestAnimationFrame or cancelAnimationFrame as globals."
+  - "The use-cli-name and use-pan-zoom afterEach comments (and any sibling with the same claim) describe what the act()-wrapped unmount actually does."
+  - "use-git-status 'fetches status once on mount' asserts the fetch ran exactly once."
+  - "The full @n-dx/web suite passes with no uncaught errors."
+description: "Task 32083905 closed the preact frame-fallback leak in six viewer hook tests. Its adversarial review instrumented the rest of packages/web/tests/unit/viewer and tests/integration and found 19 more files that still leave a timer pair live when the file ends, so the same `ReferenceError: cancelAnimationFrame is not defined` (suite says every test passed, exit code says failed) is still reachable from other files under load.\n\nMechanism (preact 10.29.8): when a commit with pending after-paint effects happens outside `preact/test-utils` `act()`, preact/hooks' `afterNextFrame` schedules a real `requestAnimationFrame` plus `setTimeout(done, 35)`. The fallback is 35ms, not 100ms as earlier prose said. If the file's jsdom environment is torn down before that pair fires, `done` evaluates the bare global `cancelAnimationFrame` in plain Node and throws. Wrapping only the afterEach unmount does not help: unmount commits no effects, and `act()` cannot retire a pair an earlier unwrapped commit already scheduled. What closes the leak is that no commit with changed effect deps lands outside `act()`: the mount, every re-render, and every state update driven from a test (poll callbacks, WebSocket handlers, fetch resolutions, user events).\n\nFiles the review found with a live pair at file end (zone-keyboard-nav had 3, the rest 1 each), all under packages/web/tests/unit/viewer/:\nzone-keyboard-nav, sidebar, explain-finding, prd-tree, ask-view-a11y, ask-refinements, accessibility, tree-event-delegate, task-detail-requirements, tree-view, token-usage-nav, add-item-form, enrichment-gate, suggestions-view, hench-run-toolchain, search-overlay, active-operations-tray, detail-panel, config-footer.\nFive of them (zone-keyboard-nav, explain-finding, ask-view-a11y, ask-refinements, search-overlay) already import act() but still commit outside it somewhere.\n\nApproach: fix the files that leave a live pair (the review's option b) rather than rewrapping every render in the suite. `use-active-operations.test.ts` shows the pattern for hooks whose effect deps change on every update: a `settleInAct()` helper that awaits a `setTimeout(0)` inside `act()`, so pending promise chains commit inside act. Watch for the case that test documents, where pumping a macrotask would fire a 0ms sweep timer the test is asserting against. To verify, temporarily add a setup file that wraps `globalThis.setTimeout`/`clearTimeout`, tracks outstanding `ms === 35` ids, and prints the count still live in afterAll. The follow-up guard task turns that instrument into a permanent check.\n\nFold in these two small findings from the same review:\n- The afterEach comments in `use-cli-name.test.ts` and `use-pan-zoom.test.ts` say the act()-wrapped unmount \"flushes Preact's after-paint effect queue ... rather than leaving a real rAF/setTimeout fallback pending\". That is not what it does. Reword them to say it keeps the unmount symmetric with the act()-wrapped mounts, so no commit in the file escapes act(). Check the same wording in the other four files touched by 32083905 and correct it where it makes the same claim.\n- `use-git-status.test.ts` \"fetches status once on mount\" never asserts a call count. Add `expect(fetchMock).toHaveBeenCalledTimes(1)`.\n\nDo not define requestAnimationFrame/cancelAnimationFrame globals in setup: that hides the leak instead of closing it. Test-only change: no production code and no changeset."
+lastModified: "2026-09-25T06:10:44.606Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

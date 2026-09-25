@@ -28,8 +28,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add stale-dist build guards to web integration tests that assert on built server output](./add-stale-dist-build-guards-to-web.md) | completed |
+| [Commit every preact render inside act() in the web viewer tests that still leak a frame-fallback timer](./commit-every-preact-render-inside-act.md) | pending |
 | [Convert write-path-profile's absolute budgets to scaling assertions](./convert-write-path-profile-s-absolute.md) | completed |
 | [exec-interrupt-forwarding.test.js justifies its location with a false claim about where CI runs tests](./exec-interrupt-forwarding-test-js.md) | completed |
+| [Fail a web test file that leaves a preact frame-fallback timer pending at teardown](./fail-a-web-test-file-that-leaves-a.md) | pending |
 | [Fake-CLI fixtures write .args into the repo root instead of a temp dir](./fake-cli-fixtures-write-args-into-the.md) | completed |
 | [Give add-auto-reshape's scaling gate a min-of-N, and fix its shared-tree confound](./give-add-auto-reshape-s-scaling-gate-a.md) | completed |
 | [Give each cli-hints spawn the load-scaled budget, not a fixed 10 seconds](./give-each-cli-hints-spawn-the-load.md) | completed |
@@ -39,6 +41,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [prd-tree-atomic-writes asserts raw 500ms latency budgets and compares two adjacent micro-spans](./prd-tree-atomic-writes-asserts-raw.md) | pending |
 | [Real-timer ordering assertions are load-sensitive and invisible to the wall-clock inventory scanner](./real-timer-ordering-assertions-are.md) | pending |
 | [run-loop puts a lower bound on a real timer and dom-performance-monitor keeps an absolute count budget](./run-loop-puts-a-lower-bound-on-a-real.md) | pending |
+| [Scale the remaining default-timeout waits and retry fixture teardown in the web worktree integration tests](./scale-the-remaining-default-timeout.md) | pending |
 | [Scale the web watcher-based integration waits with BUDGET_MULTIPLIER](./scale-the-web-watcher-based.md) | completed |
 | [Search index rebuild and search route elapsed budgets bypass the documented BUDGET_MULTIPLIER policy](./search-index-rebuild-and-search-route.md) | pending |
 | [Stabilize rex's load-sensitive performance assertions](./stabilize-rex-s-load-sensitive.md) | completed |
