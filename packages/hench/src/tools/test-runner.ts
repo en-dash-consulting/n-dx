@@ -461,6 +461,126 @@ function combineStreams(stdout: string, stderr: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Failure digest
+// ---------------------------------------------------------------------------
+
+/** SGR colour codes. Vitest colours its output even when piped under some CI settings. */
+const ANSI_SGR = /\u001b\[[0-9;]*m/g;
+
+/** A FAIL line (vitest's ` FAIL  file > test`, the run-all summary's `  FAIL  @n-dx/web`) or a failed-test marker. */
+const FAIL_LINE = /^\s*(FAIL\s+\S|[×✗]\s+\S)/;
+/** The line an assertion or thrown error announces itself with. */
+const ERROR_LINE = /\b(AssertionError|Error|expected)\b/;
+/** Vitest's `⎯⎯⎯` rule between failures. */
+const RULE_LINE = /^\s*⎯{3,}/;
+/** `──────── summary ────────`, printed by scripts/run-all-tests.mjs. */
+const SUITE_SUMMARY_START = /─{3,}\s*summary\s*─{3,}/;
+/** `5/6 suites passed — failed: @n-dx/web`, the summary's last line. */
+const SUITE_SUMMARY_END = /\d+\/\d+ suites passed/;
+
+const MAX_FAIL_LINES = 30;
+const MAX_ASSERTION_BLOCKS = 3;
+const MAX_ASSERTION_LINES = 20;
+const MAX_SUMMARY_LINES = 25;
+
+/**
+ * The lines that say what failed, pulled out of a failing gate's output so that
+ * no amount of other output can push them out of what is kept.
+ *
+ * WHY. The gate kept the last 200 lines, which is a fine post-mortem until one
+ * suite fails early and a later one writes a lot. Run 6eacca42's gate failed on
+ * `tests/e2e/cli-config.test.js`; the run record held 23 KB of stderr from
+ * passing web tests — deliberate "dispose boom" errors and the like — and not
+ * one FAIL line or suite summary, so the failure could only be found by
+ * running the suite again. This is extracted from the whole output instead:
+ *
+ * - every FAIL line and failed-test marker (deduplicated, capped);
+ * - the first few failures' assertion blocks — a FAIL line followed within
+ *   three lines by an error, through to vitest's `⎯⎯⎯` rule or the next FAIL;
+ * - the per-suite PASS/FAIL summary from `scripts/run-all-tests.mjs`, whole;
+ * - vitest's own `Test Files` / `Tests` count lines that report failures.
+ *
+ * Returns undefined when the output carries no FAIL line and no suite summary —
+ * a timeout, a crash, a runner this does not recognise — so callers keep the
+ * tail exactly as before. Colour codes are stripped; nothing else is rewritten.
+ *
+ * @internal Exported for testing.
+ */
+export function extractFailureDigest(output: string): string | undefined {
+  const lines = output.replace(ANSI_SGR, "").split(/\r?\n/);
+
+  const failLines: string[] = [];
+  const seen = new Set<string>();
+  const assertionBlocks: string[][] = [];
+  const counts: string[] = [];
+  let summary: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (SUITE_SUMMARY_START.test(line)) {
+      // The last summary wins: a nested run-all (tests of the runner itself)
+      // can print one mid-output, and the one that describes this gate is last.
+      const block: string[] = [];
+      for (let j = i; j < lines.length && block.length < MAX_SUMMARY_LINES; j++) {
+        block.push(lines[j]);
+        if (SUITE_SUMMARY_END.test(lines[j])) break;
+      }
+      summary = block;
+      continue;
+    }
+
+    if (/^\s*(Test Files|Tests)\s+.*\bfailed\b/.test(line)) {
+      if (counts.length < MAX_FAIL_LINES) counts.push(line.trim());
+      continue;
+    }
+
+    if (!FAIL_LINE.test(line)) continue;
+    const key = line.trim();
+    if (!seen.has(key) && failLines.length < MAX_FAIL_LINES) {
+      seen.add(key);
+      failLines.push(key);
+    }
+
+    if (assertionBlocks.length < MAX_ASSERTION_BLOCKS && /^\s*FAIL\s/.test(line)) {
+      const lookahead = lines.slice(i + 1, i + 4);
+      if (lookahead.some((l) => ERROR_LINE.test(l))) {
+        const block = [key];
+        for (let j = i + 1; j < lines.length && block.length < MAX_ASSERTION_LINES; j++) {
+          if (RULE_LINE.test(lines[j]) || FAIL_LINE.test(lines[j])) break;
+          block.push(lines[j]);
+        }
+        while (block.length > 1 && block[block.length - 1].trim() === "") block.pop();
+        assertionBlocks.push(block);
+      }
+    }
+  }
+
+  if (failLines.length === 0 && summary.length === 0) return undefined;
+
+  const sections: string[] = [];
+  if (failLines.length > 0) sections.push(["Failing tests:", ...failLines.map((l) => `  ${l}`)].join("\n"));
+  for (const [n, block] of assertionBlocks.entries()) {
+    sections.push([`Failure ${n + 1}:`, ...block.map((l) => `  ${l}`)].join("\n"));
+  }
+  if (counts.length > 0) sections.push(["Counts:", ...counts.map((l) => `  ${l}`)].join("\n"));
+  if (summary.length > 0) sections.push(["Suite summary:", ...summary.map((l) => `  ${l}`)].join("\n"));
+  return sections.join("\n\n");
+}
+
+/** How much of the raw tail to keep beneath a digest — the digest carries the verdict. */
+const TAIL_BENEATH_DIGEST_CHARS = 1000;
+
+/**
+ * A package's `failureOutput`: the digest when there is one, with a short raw
+ * tail beneath it; otherwise the raw output as before.
+ */
+function failureOutputWithDigest(digest: string | undefined, combined: string, rawOutput: string): string {
+  if (!digest) return rawOutput;
+  return `${digest}\n\nOutput tail:\n${truncateOutput(combined, "", TAIL_BENEATH_DIGEST_CHARS)}`;
+}
+
+// ---------------------------------------------------------------------------
 // Test suite gate (mandatory full test suite validation for self-heal mode)
 // ---------------------------------------------------------------------------
 
@@ -670,17 +790,21 @@ function parseVitestOutput(
     ]).filter(Boolean),
   );
 
+  // What failed, extracted from the whole output — a long stderr stream after
+  // the failure would otherwise leave only noise in the 2 KB raw slice.
+  const failureOutput = failureOutputWithDigest(extractFailureDigest(combined), combined, rawOutput);
+
   if (pkgNames.size > 0) {
     // Raw output goes on the FIRST entry only. Repeating a 2 KB dump per package
     // buries the one copy the operator needs to read.
     return Array.from(pkgNames).map((name, i) => ({
       name,
       passed: false,
-      failureOutput: i === 0 ? rawOutput : undefined,
+      failureOutput: i === 0 ? failureOutput : undefined,
     }));
   }
 
-  return [{ name: "workspace", passed: false, failureOutput: rawOutput }];
+  return [{ name: "workspace", passed: false, failureOutput }];
 }
 
 /**
@@ -712,11 +836,34 @@ export async function runTestGate(
   const command = testCommand || "pnpm test --reporter=json";
   const startMs = Date.now();
 
-  const { stdout, stderr, exitCode, launched, error } = await execShellCmd(command, {
+  // The gate's own view of the deadline, beside the one `exec` enforces. Armed
+  // just before exec arms its timer, with the same delay, so in a healthy
+  // process both fire in the same turn; what it records is when this process actually
+  // got to act on the deadline. See describeTermination.
+  let deadlineSeenAt: number | undefined;
+  const watchdog = timeout > 0
+    ? setTimeout(() => { deadlineSeenAt = Date.now(); }, timeout)
+    : undefined;
+
+  // The kill on timeout is exec's: the shell is spawned as a process-group
+  // leader, and terminateProcessTree signals the group and then sweeps every
+  // descendant found before signalling — so `npm` → `run-all-tests.mjs` →
+  // `pnpm` → vitest and its workers all go, including a grandchild that
+  // started its own group. POSIX only; on Windows it is `taskkill /T /F`, a
+  // tree walk by pid that is best-effort by construction (see
+  // llm-client/process-tree.ts). A descendant that daemonizes on purpose
+  // (double fork) escapes every strategy.
+  const execResult = await execShellCmd(command, {
     cwd: projectDir,
     timeout,
-    maxBuffer: 5 * 1024 * 1024, // 5MB for larger test output
+    // A full-monorepo run writes megabytes, mostly stderr from passing tests.
+    // Past this ceiling exec stops the suite and keeps only what came first —
+    // everything but the failure summary at the end — so it is a guard against
+    // runaway output, not a place to economise.
+    maxBuffer: GATE_MAX_BUFFER_BYTES,
   });
+  if (watchdog) clearTimeout(watchdog);
+  const { stdout, stderr, exitCode, launched, error } = execResult;
 
   const totalDurationMs = Date.now() - startMs;
 
@@ -764,6 +911,8 @@ export async function runTestGate(
     // output across both streams, and preferring one drops half the evidence.
     const combined = combineStreams(stdout, stderr);
     const partial = truncateOutput(combined, "", RAW_OUTPUT_CHARS);
+    // A suite that failed before it hung has already said what failed.
+    const digest = combined ? extractFailureDigest(combined) : undefined;
     return {
       ran: true,
       passed: false,
@@ -771,17 +920,23 @@ export async function runTestGate(
         {
           name: "workspace",
           passed: false,
-          failureOutput: partial || "No output was produced before the timeout.",
+          failureOutput: partial
+            ? failureOutputWithDigest(digest, combined, partial)
+            : "No output was produced before the timeout.",
         },
       ],
       command,
       totalDurationMs,
-      error:
-        `\`${command}\` did not finish within ${formatMs(timeout)} and was killed ` +
-        `(ran for ${formatMs(totalDurationMs)}). If the suite legitimately takes ` +
-        `longer, raise \`hench.fullTestTimeoutMs\` (in .hench/config.json or ` +
-        `.n-dx.json; 0 disables the limit) rather than skipping the gate.`,
+      error: describeTermination({
+        command,
+        error,
+        timeout,
+        startMs,
+        endMs: startMs + totalDurationMs,
+        deadlineSeenAt,
+      }),
       outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
+      ...(digest ? { failureDigest: digest } : {}),
     };
   }
 
@@ -790,6 +945,7 @@ export async function runTestGate(
   // No post-mortem for a green gate — attaching output to a pass is noise, and
   // it matches parseVitestOutput's own rule for the same case.
   const combined = overallPassed ? "" : combineStreams(stdout, stderr);
+  const digest = combined ? extractFailureDigest(combined) : undefined;
 
   return {
     ran: true,
@@ -798,7 +954,92 @@ export async function runTestGate(
     command,
     totalDurationMs,
     outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
+    ...(digest ? { failureDigest: digest } : {}),
   };
+}
+
+/** See the `maxBuffer` note in {@link runTestGate}. */
+const GATE_MAX_BUFFER_BYTES = 32 * 1024 * 1024;
+
+/**
+ * A process-side stall shorter than this is scheduling noise, not worth a
+ * sentence in the report.
+ */
+const STALL_REPORT_THRESHOLD_MS = 5_000;
+
+export interface TerminationFacts {
+  command: string;
+  error: Error | null | undefined;
+  timeout: number;
+  startMs: number;
+  endMs: number;
+  /** When the gate's own deadline timer fired, if it did. */
+  deadlineSeenAt: number | undefined;
+}
+
+/**
+ * Why a gate command ended without an exit code, in words that match what
+ * happened.
+ *
+ * Three causes produce `exitCode: null`, and all three used to be reported as
+ * "did not finish within <limit> and was killed (ran for <elapsed>)":
+ *
+ * - **Our timeout.** Reported with when the kill took effect: `exec` resolves
+ *   only once the whole tree is gone, so the time from the deadline to here is
+ *   the kill. Run 8dc53406 reported "did not finish within 15m 0s … (ran for
+ *   21m 45s)", which read as a kill that took seven minutes to land. The kill
+ *   (exec's treeKill) already reached the whole tree, so the likelier reading
+ *   is this process not getting to act on its deadline for seven minutes on a
+ *   heavily loaded machine — an inference, since the old message could not
+ *   tell the two apart and that run recorded nothing more. The gate's own
+ *   watchdog can: if it fired late, the delay is named as a stall of this
+ *   process, not charged to the kill. "Timeout plus grace" is therefore a
+ *   bound only for a process that is not stalled; a stall is reported.
+ * - **A signal from outside hench** (an operator, the OOM killer) before the
+ *   deadline. Not a timeout, and the limit is no knob for it.
+ * - **Runaway output** past the gate's buffer ceiling, which stops the suite.
+ */
+export function describeTermination(facts: TerminationFacts): string {
+  const { command, error, timeout, startMs, endMs, deadlineSeenAt } = facts;
+  const code = (error as NodeJS.ErrnoException | null | undefined)?.code;
+  const signal = (error as { signal?: string } | null | undefined)?.signal;
+  const elapsed = endMs - startMs;
+
+  if (code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
+    return (
+      `\`${command}\` wrote more than ${Math.round(GATE_MAX_BUFFER_BYTES / (1024 * 1024))} MB of output and was ` +
+      `stopped after ${formatMs(elapsed)}; only the first ${Math.round(GATE_MAX_BUFFER_BYTES / (1024 * 1024))} MB ` +
+      `were kept, so the end of the run (and its failure summary) is missing.`
+    );
+  }
+
+  if (signal && code !== "ETIMEDOUT") {
+    return (
+      `\`${command}\` was killed by ${signal} from outside hench after ${formatMs(elapsed)}` +
+      (timeout > 0 ? `, before its ${formatMs(timeout)} limit` : "") +
+      `. This is not a timeout; raising \`hench.fullTestTimeoutMs\` will not help.`
+    );
+  }
+
+  const deadlineAt = deadlineSeenAt ?? endMs;
+  const lateBy = deadlineAt - startMs - timeout;
+  const killTook = Math.max(0, endMs - deadlineAt);
+  const stall = lateBy >= STALL_REPORT_THRESHOLD_MS
+    ? ` This process only reached its deadline at ${formatMs(deadlineAt - startMs)} — it was stalled for ` +
+      `${formatMs(lateBy)} (an overloaded or suspended machine), so the suite ran that much past its limit ` +
+      `before the kill could start.`
+    : "";
+  return (
+    `\`${command}\` did not finish within ${formatMs(timeout)} and was killed; the whole process tree was gone ` +
+    `${formatPreciseMs(killTook)} after the kill began (ran for ${formatMs(elapsed)} in all).${stall} ` +
+    `If the suite legitimately takes longer, raise \`hench.fullTestTimeoutMs\` (in .hench/config.json or ` +
+    `.n-dx.json; 0 disables the limit) rather than skipping the gate.`
+  );
+}
+
+/** Tenths of a second below a minute — a kill is measured in fractions of one. */
+function formatPreciseMs(ms: number): string {
+  return ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : formatMs(ms);
 }
 
 /** Whole seconds for short spans, minutes and seconds beyond one minute. */

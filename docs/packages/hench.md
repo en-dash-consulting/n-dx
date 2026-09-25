@@ -79,6 +79,15 @@ The multi-iteration run loop (`--auto`, `--loop`, `--iterations=N`) enforces thr
 
 **I3 — Status transition before next selection.** `finalizeRun()` calls `updateCompletedTaskStatus()` (success) or `handleRunFailure()` (failure) before returning to the outer loop. The PRD write is synchronous with `runOne()`, so the next `collectCompletedIds()` call always sees the updated status.
 
+## Completion Waits for the Test Gate
+
+A task is never marked `completed` before hench's full test gate passes. The agent still marks its own task completed — through rex MCP, `rex update` from its shell, or the API loop's `rex_update_status` — but while the run holds the task's claim, rex records that request on the claim (in the git common directory, where no commit can pick it up) instead of writing it. The agent's `git add -A && git commit` therefore cannot carry the status into the work commit.
+
+- **Gate passes:** hench marks the task completed with the agent's resolution type and detail, in its own record commit.
+- **Gate fails:** the task is not completed on disk or in any commit. The agent's resolution is kept on the run record (`completionHold`) and in the execution log (`completion_not_applied`) for the retry. Review repairs are committed as their own commit on `autoCommit`, or named as left uncommitted otherwise.
+
+Outside a hench run nothing holds a completion, so interactive MCP use and the rex CLI behave as before. A failed gate's record also carries a failure digest (`testGate.failureDigest`): the FAIL lines, the first assertion blocks and the per-suite summary, taken from the whole output so that a long stream of stderr cannot push them out.
+
 ## Stuck Detection
 
 If a task fails repeatedly (default threshold: 3 consecutive failures including completion rejections), stuck detection kicks in and moves to the next task. This prevents infinite loops on unfixable tasks.

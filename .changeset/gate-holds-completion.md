@@ -1,0 +1,10 @@
+---
+"@n-dx/hench": patch
+"@n-dx/rex": patch
+---
+
+A hench run no longer leaves its task `completed` when the full test gate fails. The agent still marks its own task completed, but while the run holds the task's claim, rex records that request on the claim instead of writing it, for rex MCP (Claude CLI, Codex CLI, or the dashboard's HTTP server), `rex update`, and the API loop's `rex_update_status` alike. The agent's `git add -A && git commit` therefore cannot carry the status into the work commit. hench applies the completion, with the agent's resolution type and detail, in its own record commit once the gate passes. When the gate fails, the task stays not completed and the resolution is kept on the run record (`completionHold`) and in the execution log for the retry. Review repairs from a failed gate are committed as their own commit on `autoCommit`, and named as left uncommitted otherwise. Inside the run, the agent's own MCP server can no longer take over or release the run's claim, so it cannot drop the hold (`rex claim release --force` still can). Outside a hench run, MCP and the rex CLI behave as before. The hold engages only when the `n-dx` on PATH, which serves the agent's rex MCP server and `rex` CLI, includes this change.
+
+A failed gate's record now names the failing test. `testGate.failureDigest`, which is also printed and copied to `diagnostics.testGateFailureDigest`, holds the FAIL lines, the first assertion blocks and the per-suite summary, extracted from the whole output so that a long stderr stream from passing suites cannot push them out.
+
+The timeout already killed the whole test process tree (llm-client `exec`'s tree kill). A timed-out gate now reports when the kill took effect ("the whole process tree was gone 0.4s after the kill began"). When hench itself reached the deadline late, the delay is reported as a stall of this process rather than charged to the kill. A signal from outside hench and runaway output are no longer reported as timeouts. The gate's output ceiling rises from 5 MB to 32 MB, so a large suite's failure summary is not cut off.

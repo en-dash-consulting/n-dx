@@ -38,6 +38,7 @@ import { join } from "node:path";
 import { TOOL_VERSION, REX_DIR } from "./commands/constants.js";
 import { FileStore, resolvePRDFile } from "../store/index.js";
 import { syncFolderTree } from "./commands/folder-tree-sync.js";
+import { holdCompletionForRun, describeHeldCompletion } from "./completion-hold.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
 import type { PRDStore, ClaimsStore, TaskClaim } from "../store/index.js";
 
@@ -207,6 +208,29 @@ export async function handleUpdateTaskStatus(
       }
     }
 
+    // A hench run in this worktree applies the completion itself, after its
+    // test gate — see cli/completion-hold.ts. Recorded, not written: no PRD
+    // save, no claim release, and nothing in the tree for `git add -A`.
+    if (status === "completed") {
+      const held = await holdCompletionForRun(claims, id, { resolutionType, resolutionDetail });
+      if (held) {
+        await store.appendLog({
+          timestamp: new Date().toISOString(),
+          event: "completion_held",
+          itemId: id,
+          detail: `Completion held for hench run (pid ${held.pid}) until its test gate passes`,
+        });
+        return textResult(JSON.stringify({
+          id,
+          title: existing.title,
+          previousStatus: existing.status,
+          newStatus: existing.status,
+          completionHeld: true,
+          message: describeHeldCompletion(id, held),
+        }));
+      }
+    }
+
     // Starting work is where the claim is taken: it is the point the caller
     // commits to the task, and it is a step the ndx-work flow already
     // performs. Refuse rather than write a status that contradicts a live
@@ -367,6 +391,18 @@ export async function handleReleaseTask(
 ): Promise<McpResult> {
   try {
     const released = claims ? await claims.store.release(args.id, { worktreeRoot: claims.worktreeRoot }) : false;
+    if (!released && claims) {
+      const runClaim = (await claims.store.readClaims()).find(
+        (c) => c.taskId === args.id && c.holdsCompletion && c.worktreeRoot === claims.worktreeRoot,
+      );
+      if (runClaim) {
+        return textResult(JSON.stringify({
+          id: args.id,
+          released: false,
+          reason: `held by the hench run working this task (pid ${runClaim.pid}); it releases the claim when the run ends`,
+        }));
+      }
+    }
     return textResult(JSON.stringify({ id: args.id, released }));
   } catch (err) {
     return textResult(`Error: ${(err as Error).message}`, true);

@@ -694,6 +694,14 @@ export interface RunDiagnostics {
    * v1 additive field — old records without this field load normally.
    */
   testGateOutputTail?: string;
+  /**
+   * The gate's failure digest — FAIL lines, first assertion blocks, suite
+   * summary — copied from `RunRecord.testGate.failureDigest`. The tail above
+   * can be all noise from passing suites (run 6eacca42); this cannot.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  testGateFailureDigest?: string;
 }
 
 /**
@@ -863,6 +871,14 @@ export interface TestGateResult {
    * launched) and produced some output — a green gate needs no post-mortem.
    */
   outputTail?: string;
+  /**
+   * What failed, extracted from the whole output rather than its tail: the
+   * FAIL lines, the first failures' assertion blocks, and the per-suite
+   * summary. Present only when the output had a FAIL line or a suite summary,
+   * so a timeout or crash with neither keeps just {@link outputTail}. See
+   * `extractFailureDigest` in tools/test-runner.ts.
+   */
+  failureDigest?: string;
 }
 
 export interface DependencyVulnerability {
@@ -1359,6 +1375,34 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   claimLost?: RunClaimLost;
+  /**
+   * The completion the agent asked for while the run held its task — through
+   * rex MCP, `rex update`, or the API loop's `rex_update_status` — and what
+   * the run did with it. rex records such a completion on the run's claim
+   * instead of writing it (see `TaskClaims.pendingCompletion`), so it cannot
+   * ride the agent's work commit ahead of the test gate.
+   *
+   * - `applied`: the gate passed (or did not apply) and the run marked the
+   *   task completed with this resolution, in its own record commit.
+   * - `not-applied`: the run failed after the agent asked; the task was not
+   *   completed, and the resolution is kept here — and in the rex execution
+   *   log — for the retry.
+   * - `bypassed`: the task was already `completed` on disk with nothing
+   *   held, so the write did not go through the hold (a rex server that
+   *   predates it, or a direct edit). The run withdraws it if it then fails.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  completionHold?: RunCompletionHold;
+}
+
+/** See {@link RunRecord.completionHold}. */
+export interface RunCompletionHold {
+  outcome: "applied" | "not-applied" | "bypassed";
+  resolutionType?: string;
+  resolutionDetail?: string;
+  /** When the agent asked for the completion. Absent for `bypassed`. */
+  requestedAt?: string;
 }
 
 /** See {@link RunRecord.claimLost}. Mirrors ClaimLostEvent in process/task-claims.ts. */
