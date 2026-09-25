@@ -22,6 +22,7 @@ import {
 import { closeWorktreeRunWatchers, setWorktreeRunWatchFactory } from "../../src/server/routes-hench.js";
 import type { FSWatcher } from "node:fs";
 import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
 
 // Absolute wait budget for an fs.watch-delivered event: a hang guardrail, not
 // a latency SLA, scaled with the rest of the suite's load-sensitive budgets.
@@ -110,8 +111,8 @@ beforeAll(() => {
   mkdirSync(outside);
 });
 
-afterAll(() => {
-  if (tmpRoot) rmSync(tmpRoot, { recursive: true, force: true });
+afterAll(async () => {
+  if (tmpRoot) await removeTempDir(tmpRoot);
 });
 
 beforeEach(() => {

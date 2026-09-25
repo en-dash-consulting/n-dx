@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ServerContext } from "../../src/server/types.js";
@@ -19,6 +19,7 @@ import { WorkspaceRegistry } from "../../src/server/workspaces.js";
 import { PRD_CACHE_DIR, PRD_CACHE_JSON } from "../../src/server/prd-io.js";
 import type { createWebSocketManager } from "../../src/server/websocket.js";
 import { frameIsForWorkspace } from "../../src/viewer/messaging/ws-pipeline.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
 
 // Absolute wait budget for an fs.watch-delivered event: a hang guardrail, not
 // a latency SLA, scaled with the rest of the suite's load-sensitive budgets.
@@ -81,29 +82,43 @@ beforeAll(async () => {
   await registry.refresh();
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   registry?.closeAll();
   if (registry) hooks.teardown(registry.anchor.handles);
-  if (root) rmSync(root, { recursive: true, force: true });
+  if (root) await removeTempDir(root);
 });
 
 describe("workspace registry with two worktrees", () => {
-  it("knows both worktrees, the anchor eager and the linked one lazy", async () => {
-    expect(registry.list()).toEqual([
-      { key: "app", path: repo, branch: "main", isAnchor: true, active: true },
-      { key: "app-feature", path: linked, branch: "feature", isAnchor: false, active: false },
-    ]);
-    await vi.waitFor(() => expect(cachedTitle(repo)).toBe("A"));
-    expect(cachedTitle(linked)).toBeNull();
-  });
+  it(
+    "knows both worktrees, the anchor eager and the linked one lazy",
+    async () => {
+      expect(registry.list()).toEqual([
+        { key: "app", path: repo, branch: "main", isAnchor: true, active: true },
+        { key: "app-feature", path: linked, branch: "feature", isAnchor: false, active: false },
+      ]);
+      await vi.waitFor(() => expect(cachedTitle(repo)).toBe("A"), {
+        timeout: WATCHER_EVENT_TIMEOUT_MS,
+        interval: 50,
+      });
+      expect(cachedTitle(linked)).toBeNull();
+    },
+    WATCHER_EVENT_TIMEOUT_MS + TEST_TIMEOUT_BUFFER,
+  );
 
-  it("creates B's context, watchers and cache on first use", async () => {
-    const b = registry.get("app-feature")!;
-    expect(b.ctx.rexDir).toBe(join(linked, ".rex"));
-    expect(b.handles.watchers.length).toBeGreaterThan(0);
-    await vi.waitFor(() => expect(cachedTitle(linked)).toBe("B"));
-    expect(registry.list()[1].active).toBe(true);
-  });
+  it(
+    "creates B's context, watchers and cache on first use",
+    async () => {
+      const b = registry.get("app-feature")!;
+      expect(b.ctx.rexDir).toBe(join(linked, ".rex"));
+      expect(b.handles.watchers.length).toBeGreaterThan(0);
+      await vi.waitFor(() => expect(cachedTitle(linked)).toBe("B"), {
+        timeout: WATCHER_EVENT_TIMEOUT_MS,
+        interval: 50,
+      });
+      expect(registry.list()[1].active).toBe(true);
+    },
+    WATCHER_EVENT_TIMEOUT_MS + TEST_TIMEOUT_BUFFER,
+  );
 
   it(
     "editing B's PRD refreshes B's cache and broadcasts; A's cache is untouched",
