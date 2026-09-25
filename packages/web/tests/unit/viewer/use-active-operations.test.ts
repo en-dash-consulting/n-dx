@@ -9,6 +9,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,31 @@ function idleWire() {
   return { running: false, startedAt: null, finishedAt: null, error: null };
 }
 
+/**
+ * Let pending promise chains settle *inside* act().
+ *
+ * Wrapping render() alone is not enough for this hook: its sweep effect
+ * depends on [bySingleton, byHench], two Maps replaced on every state update
+ * (use-active-operations.ts:288). So every setState — from the mount catch-up
+ * fetch, a poll tick, or a WebSocket message — re-commits with *changed* deps
+ * and re-arms Preact's after-paint queue. A commit that lands outside act()
+ * takes preact/hooks' afterNextFrame path, which schedules a real
+ * requestAnimationFrame plus a 35ms setTimeout fallback; if the file ends
+ * before that pair fires, it fires with jsdom gone and throws
+ * "cancelAnimationFrame is not defined".
+ *
+ * The setTimeout(0) is a macrotask, so every already-queued microtask (the
+ * fetch → json → setState chain) drains before it runs — deterministically,
+ * not on a timing guess — and all of it happens while act() still holds
+ * options.requestAnimationFrame, so the effects are flushed into act's queue
+ * instead of a real timer pair.
+ */
+async function settleInAct(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 describe("useActiveOperations", () => {
   let root: HTMLDivElement;
   const originalFetch = globalThis.fetch;
@@ -65,24 +91,32 @@ describe("useActiveOperations", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    // Unmount inside act() to keep it symmetric with the act()-wrapped
+    // mount/updates above, so no commit in this file escapes act(). Unmount
+    // itself commits no effects — it is act()'s coverage of every earlier
+    // commit that keeps the real rAF/setTimeout(35) fallback from arming.
+    act(() => { render(null, root); });
     if (root.parentNode) root.parentNode.removeChild(root);
     globalThis.fetch = originalFetch;
   });
 
   it("returns no operations when everything is idle", async () => {
-    render(h(TestHarness, null), root);
-    await vi.waitFor(() => expect(capturedPoll).toBeInstanceOf(Function));
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    expect(capturedPoll).toBeInstanceOf(Function);
 
-    await capturedPoll!();
-    render(h(TestHarness, null), root);
+    await act(async () => { await capturedPoll!(); });
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(hookResult).toEqual([]);
   });
 
-  it("registers polling with the correct source name and interval", () => {
-    render(h(TestHarness, null), root);
+  it("registers polling with the correct source name and interval", async () => {
+    act(() => { render(h(TestHarness, null), root); });
     expect(usePolling).toHaveBeenCalledWith("active-operations", expect.any(Function), 3_000);
+    // The mount catch-up fetch is already in flight; settle it here so its
+    // state update commits inside act() rather than landing in a later test.
+    await settleInAct();
   });
 
   it("surfaces a running singleton action", async () => {
@@ -99,11 +133,12 @@ describe("useActiveOperations", () => {
       return { ok: true, json: async () => idleWire() } as Response;
     }) as typeof fetch;
 
-    render(h(TestHarness, null), root);
-    await vi.waitFor(() => expect(capturedPoll).toBeInstanceOf(Function));
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    expect(capturedPoll).toBeInstanceOf(Function);
 
-    await capturedPoll!();
-    render(h(TestHarness, null), root);
+    await act(async () => { await capturedPoll!(); });
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(hookResult).toHaveLength(1);
     expect(hookResult[0]).toMatchObject({
@@ -128,11 +163,12 @@ describe("useActiveOperations", () => {
       return { ok: true, json: async () => idleWire() } as Response;
     }) as typeof fetch;
 
-    render(h(TestHarness, null), root);
-    await vi.waitFor(() => expect(capturedPoll).toBeInstanceOf(Function));
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    expect(capturedPoll).toBeInstanceOf(Function);
 
-    await capturedPoll!();
-    render(h(TestHarness, null), root);
+    await act(async () => { await capturedPoll!(); });
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(hookResult).toHaveLength(1);
     expect(hookResult[0]).toMatchObject({ kind: "self-heal", status: "failed", error: "build failed" });
@@ -153,61 +189,71 @@ describe("useActiveOperations", () => {
       return { ok: true, json: async () => idleWire() } as Response;
     }) as typeof fetch;
 
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
 
-    await vi.waitFor(() => {
-      expect(hookResult.some((op) => op.kind === "hench")).toBe(true);
-    });
+    expect(hookResult.some((op) => op.kind === "hench")).toBe(true);
 
     const op = hookResult.find((o) => o.kind === "hench")!;
     expect(op).toMatchObject({ id: "hench:t1", label: "Add dark mode toggle", status: "running", detail: "editing settings.ts" });
   });
 
   it("updates hench state live from the WebSocket broadcast", async () => {
-    render(h(TestHarness, null), root);
-    await vi.waitFor(() => expect(capturedOnMessage).toBeInstanceOf(Function));
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    expect(capturedOnMessage).toBeInstanceOf(Function);
 
-    capturedOnMessage!({
-      type: "hench:task-execution-progress",
-      state: { taskId: "t2", taskTitle: "Fix flaky test", status: "completed", startedAt: "2026-08-26T09:00:00.000Z", finishedAt: "2026-08-26T09:10:00.000Z" },
+    act(() => {
+      capturedOnMessage!({
+        type: "hench:task-execution-progress",
+        state: { taskId: "t2", taskTitle: "Fix flaky test", status: "completed", startedAt: "2026-08-26T09:00:00.000Z", finishedAt: "2026-08-26T09:10:00.000Z" },
+      });
     });
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
-    await vi.waitFor(() => {
-      expect(hookResult.some((op) => op.id === "hench:t2")).toBe(true);
-    });
+    // No settle here: t2's finishedAt is already past the retention window, so
+    // the sweep effect arms a 0ms timer to drop it. act() has already committed
+    // the broadcast synchronously, and pumping a macrotask would let that timer
+    // fire and delete the very entry this test is about.
+    expect(hookResult.some((op) => op.id === "hench:t2")).toBe(true);
     const op = hookResult.find((o) => o.id === "hench:t2")!;
     expect(op.status).toBe("done");
   });
 
   it("ignores WebSocket messages of other types", async () => {
-    render(h(TestHarness, null), root);
-    await vi.waitFor(() => expect(capturedOnMessage).toBeInstanceOf(Function));
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    expect(capturedOnMessage).toBeInstanceOf(Function);
 
-    capturedOnMessage!({ type: "some:other-message" });
-    render(h(TestHarness, null), root);
+    act(() => { capturedOnMessage!({ type: "some:other-message" }); });
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
 
     expect(hookResult).toEqual([]);
   });
 
   it("drops a finished entry once past the retention window", async () => {
     capturedOnMessage = null;
-    render(h(TestHarness, null), root);
-    await vi.waitFor(() => expect(capturedOnMessage).toBeInstanceOf(Function));
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    expect(capturedOnMessage).toBeInstanceOf(Function);
 
     // finishedAt is already older than FINISHED_RETENTION_MS (10s), so the
     // sweep effect's setTimeout fires with ~0ms delay — no fake-timer
     // juggling needed alongside the real microtask chain above.
     const finishedAt = new Date(Date.now() - 20_000).toISOString();
-    capturedOnMessage!({
-      type: "hench:task-execution-progress",
-      state: { taskId: "t3", taskTitle: "Done task", status: "completed", startedAt: "2026-08-26T09:00:00.000Z", finishedAt },
+    act(() => {
+      capturedOnMessage!({
+        type: "hench:task-execution-progress",
+        state: { taskId: "t3", taskTitle: "Done task", status: "completed", startedAt: "2026-08-26T09:00:00.000Z", finishedAt },
+      });
     });
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
+    // The sweep timer fires with ~0ms delay, so one settle covers both it and
+    // the state update it triggers.
+    await settleInAct();
 
-    await vi.waitFor(() => {
-      expect(hookResult.some((op) => op.id === "hench:t3")).toBe(false);
-    });
+    expect(hookResult.some((op) => op.id === "hench:t3")).toBe(false);
   });
 
   it("handles fetch failure for a singleton source gracefully", async () => {
@@ -221,11 +267,15 @@ describe("useActiveOperations", () => {
       return { ok: true, json: async () => idleWire() } as Response;
     }) as typeof fetch;
 
-    render(h(TestHarness, null), root);
-    await vi.waitFor(() => expect(capturedPoll).toBeInstanceOf(Function));
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    expect(capturedPoll).toBeInstanceOf(Function);
 
-    await expect(capturedPoll!()).resolves.not.toThrow();
-    render(h(TestHarness, null), root);
+    await act(async () => {
+      await expect(capturedPoll!()).resolves.not.toThrow();
+    });
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
     expect(hookResult).toEqual([]);
   });
 });

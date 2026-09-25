@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { Guide } from "../../../src/viewer/components/guide.js";
 import { SidebarThemeToggle } from "../../../src/viewer/components/theme-toggle.js";
 import { SidebarDensitySelector, initDensity } from "../../../src/viewer/components/density-selector.js";
@@ -20,24 +21,16 @@ function flush(): Promise<void> {
   );
 }
 
-/** Wait for a condition to become true, polling up to maxMs. */
-async function waitFor(
-  condition: () => boolean,
-  maxMs = 500,
-  interval = 10,
-): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < maxMs) {
-    if (condition()) return;
-    await new Promise((r) => setTimeout(r, interval));
-  }
-}
-
 function renderToDiv(vnode: ReturnType<typeof h>) {
   const root = document.createElement("div");
   document.body.appendChild(root);
-  render(vnode, root);
+  act(() => { render(vnode, root); });
   return root;
+}
+
+function unmount(root: HTMLDivElement): void {
+  act(() => { render(null, root); });
+  root.parentNode?.removeChild(root);
 }
 
 // ── Guide Modal Accessibility ────────────────────────────────────────
@@ -46,8 +39,7 @@ describe("Guide modal accessibility", () => {
   let root: HTMLDivElement;
 
   afterEach(() => {
-    if (root) render(null, root);
-    if (root?.parentNode) root.parentNode.removeChild(root);
+    if (root) unmount(root);
   });
 
   it("guide button has aria-label", () => {
@@ -62,61 +54,53 @@ describe("Guide modal accessibility", () => {
     expect(btn?.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("guide button has aria-expanded=true when open", async () => {
+  it("guide button has aria-expanded=true when open", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
-    btn?.click();
-    await flush();
+    act(() => { btn?.click(); });
     expect(btn?.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("open guide modal has role=dialog and aria-modal", async () => {
+  it("open guide modal has role=dialog and aria-modal", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
-    btn?.click();
-    await flush();
+    act(() => { btn?.click(); });
     const overlay = root.querySelector(".guide-overlay");
     expect(overlay?.getAttribute("role")).toBe("dialog");
     expect(overlay?.getAttribute("aria-modal")).toBe("true");
   });
 
-  it("guide modal has descriptive aria-label", async () => {
+  it("guide modal has descriptive aria-label", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
-    btn?.click();
-    await flush();
+    act(() => { btn?.click(); });
     const overlay = root.querySelector(".guide-overlay");
     expect(overlay?.getAttribute("aria-label")).toContain("Guide:");
   });
 
-  it("close button has aria-label", async () => {
+  it("close button has aria-label", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
-    btn?.click();
-    await flush();
+    act(() => { btn?.click(); });
     const closeBtn = root.querySelector(".guide-close");
     expect(closeBtn?.getAttribute("aria-label")).toBe("Close guide");
   });
 
-  it("Escape key closes the guide modal", async () => {
+  it("Escape key closes the guide modal", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
-    btn?.click();
-    // Wait for the modal to open
-    await waitFor(() => root.querySelector(".guide-overlay") !== null);
+    act(() => { btn?.click(); });
     expect(root.querySelector(".guide-overlay")).not.toBeNull();
 
-    // Give the useEffect time to register the Escape handler
-    // Preact schedules effects via rAF -> needs multiple event loop ticks
-    await new Promise((r) => setTimeout(r, 50));
+    // Commit inside act() so the Escape handler's setOpen(false) flushes
+    // synchronously; no need to wait for preact's rAF/setTimeout(35)
+    // effect-scheduling fallback.
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+      );
+    });
 
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
-    );
-
-    // Wait for the modal to close
-    await new Promise((r) => setTimeout(r, 50));
-    await flush();
     expect(root.querySelector(".guide-overlay")).toBeNull();
   });
 });
@@ -131,8 +115,7 @@ describe("ThemeToggle accessibility", () => {
   });
 
   afterEach(() => {
-    if (root) render(null, root);
-    if (root?.parentNode) root.parentNode.removeChild(root);
+    if (root) unmount(root);
   });
 
   it("SidebarThemeToggle has aria-label describing the action", () => {
@@ -154,8 +137,7 @@ describe("DensitySelector accessibility", () => {
   });
 
   afterEach(() => {
-    if (root) render(null, root);
-    if (root?.parentNode) root.parentNode.removeChild(root);
+    if (root) unmount(root);
   });
 
   it("container has role=group and aria-label", () => {
@@ -230,8 +212,7 @@ describe("StatusFilter accessibility", () => {
   const onChange = vi.fn();
 
   afterEach(() => {
-    if (root) render(null, root);
-    if (root?.parentNode) root.parentNode.removeChild(root);
+    if (root) unmount(root);
     onChange.mockClear();
   });
 
@@ -352,8 +333,7 @@ describe("PRDTree accessibility", () => {
   };
 
   afterEach(() => {
-    if (root) render(null, root);
-    if (root?.parentNode) root.parentNode.removeChild(root);
+    if (root) unmount(root);
   });
 
   it("tree container has role=tree and aria-label", () => {

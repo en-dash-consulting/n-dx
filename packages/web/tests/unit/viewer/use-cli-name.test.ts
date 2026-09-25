@@ -19,7 +19,11 @@ describe("useCliName (shared-state CLI name accessor)", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    // Unmount inside act() to keep it symmetric with the act()-wrapped
+    // mount/updates above, so no commit in this file escapes act(). Unmount
+    // itself commits no effects — it is act()'s coverage of every earlier
+    // commit that keeps the real rAF/setTimeout(35) fallback from arming.
+    act(() => { render(null, root); });
     root.remove();
     vi.unstubAllGlobals();
   });

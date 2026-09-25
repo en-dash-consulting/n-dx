@@ -100,8 +100,13 @@ function loadedData(findings: Finding[]): LoadedData {
 function mount(vnode: ReturnType<typeof h>): HTMLElement {
   const root = document.createElement("div");
   document.body.appendChild(root);
-  render(vnode, root);
+  act(() => { render(vnode, root); });
   return root;
+}
+
+function unmount(root: HTMLElement): void {
+  act(() => { render(null, root); });
+  root.remove();
 }
 
 function explainButtons(root: HTMLElement): HTMLButtonElement[] {
@@ -116,8 +121,7 @@ describe("FindingsList Explain action", () => {
   let root: HTMLElement;
 
   afterEach(() => {
-    render(null, root);
-    root.remove();
+    unmount(root);
   });
 
   it("offers Explain on every finding row, whatever its type or severity", () => {
@@ -229,8 +233,7 @@ describe("Explain from the Problems and Suggestions views", () => {
   let root: HTMLElement;
 
   afterEach(() => {
-    render(null, root);
-    root.remove();
+    unmount(root);
   });
 
   function captureNavigation(): { calls: Array<{ view: ViewId; seed: AskSeed | undefined }>; navigateTo: NavigateTo } {
@@ -279,8 +282,7 @@ describe("Explain from the Problems and Suggestions views", () => {
     expect(problemRows).toBe(FINDINGS.filter((f) => f.type === "anti-pattern").length);
     expect(explainButtons(root)).toHaveLength(problemRows);
 
-    render(null, root);
-    root.remove();
+    unmount(root);
 
     root = mount(h(SuggestionsView, { data: loadedData(FINDINGS), navigateTo, askEnabled: true }));
     const suggestionRows = root.querySelectorAll("li.finding-card").length;
@@ -306,8 +308,7 @@ describe("Explain respects the sourcevision.ask toggle", () => {
   let root: HTMLElement;
 
   afterEach(() => {
-    render(null, root);
-    root.remove();
+    unmount(root);
   });
 
   const views = [
@@ -361,8 +362,7 @@ describe("Explain respects the sourcevision.ask toggle", () => {
       expect(root.querySelectorAll("li.finding-card").length).toBeGreaterThan(0);
       expect(explainButtons(root)).toHaveLength(0);
 
-      render(null, root);
-      root.remove();
+      unmount(root);
 
       root = mount(h(() => renderActiveView(view as ViewId, ctx(true)) as never, null));
       expect(explainButtons(root).length).toBeGreaterThan(0);
@@ -402,8 +402,7 @@ describe("AskView with a seed", () => {
   });
 
   afterEach(() => {
-    render(null, root);
-    root.remove();
+    unmount(root);
     vi.unstubAllGlobals();
   });
 

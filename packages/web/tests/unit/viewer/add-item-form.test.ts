@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { AddItemForm } from "../../../src/viewer/components/prd-tree/add-item-form.js";
 import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 
 function renderToDiv(vnode: ReturnType<typeof h>) {
   const root = document.createElement("div");
   document.body.appendChild(root);
-  render(vnode, root);
+  act(() => { render(vnode, root); });
   return root;
 }
 

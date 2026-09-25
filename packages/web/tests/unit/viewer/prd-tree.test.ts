@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { PRDTree } from "../../../src/viewer/components/prd-tree/prd-tree.js";
 import type { PRDDocumentData, ItemStatus } from "../../../src/viewer/components/prd-tree/types.js";
 
 function renderToDiv(vnode: ReturnType<typeof h>) {
   const root = document.createElement("div");
-  render(vnode, root);
+  act(() => { render(vnode, root); });
   return root;
 }
 
@@ -178,9 +179,9 @@ describe("PRDTree", () => {
 
       // Same mounted tree: claim present, then released (claimsById empties).
       const div = document.createElement("div");
-      render(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3, claimsById: { "task-2": claim } }), div);
+      act(() => { render(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3, claimsById: { "task-2": claim } }), div); });
       expect(div.querySelector(".prd-claim-chip")).not.toBeNull();
-      render(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3, claimsById: {} }), div);
+      act(() => { render(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3, claimsById: {} }), div); });
       expect(div.querySelector(".prd-claim-chip")).toBeNull();
     });
   });

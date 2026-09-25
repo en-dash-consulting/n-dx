@@ -23,7 +23,11 @@ describe("RefreshPanel", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    // Unmount inside act() to match every act()-wrapped render/update above —
+    // an unwrapped unmount still commits, which can re-arm preact's real
+    // requestAnimationFrame/setTimeout(35) after-paint fallback instead of
+    // flushing synchronously.
+    act(() => { render(null, root); });
     root.remove();
     vi.unstubAllGlobals();
     vi.useRealTimers();
@@ -41,7 +45,15 @@ describe("RefreshPanel", () => {
   });
 
   it("POSTs to /api/commands/refresh with the fast flag", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(202, { ok: true, startedAt: "t" }));
+    // A factory, not a shared instance: RefreshPanel mounts useCliName(), whose
+    // background effect also calls fetch("/api/project") against this same
+    // mock. A Response body can only be read once, so a single shared
+    // instance here means whichever of the two calls reads it second throws
+    // "TypeError: Body is unusable: Body has already been read" — which
+    // useCliName swallows, but which also lands RefreshPanel's own POST in
+    // that same failure path if it loses the race, flipping its state to
+    // "error" via a commit outside any act() call.
+    fetchMock.mockImplementation(async () => jsonResponse(202, { ok: true, startedAt: "t" }));
 
     act(() => {
       render(h(RefreshPanel, null), root);
@@ -65,7 +77,8 @@ describe("RefreshPanel", () => {
   });
 
   it("shows an error when the trigger request fails", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(500, { error: "refresh exploded" }));
+    // Factory, not a shared instance — see the comment in the previous test.
+    fetchMock.mockImplementation(async () => jsonResponse(500, { error: "refresh exploded" }));
 
     act(() => {
       render(h(RefreshPanel, null), root);
@@ -92,7 +105,7 @@ describe("CommandsView", () => {
     expect(root.textContent).toContain("Refresh Data");
     expect(root.textContent).toContain("Export Dashboard");
     expect(root.textContent).toContain("Self-Heal");
-    render(null, root);
+    act(() => { render(null, root); });
     root.remove();
     vi.unstubAllGlobals();
   });

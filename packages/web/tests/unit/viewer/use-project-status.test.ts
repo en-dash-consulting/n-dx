@@ -8,6 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -74,13 +75,17 @@ describe("useProjectStatus", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    // Unmount inside act() to keep it symmetric with the act()-wrapped
+    // mount/updates above, so no commit in this file escapes act(). Unmount
+    // itself commits no effects — it is act()'s coverage of every earlier
+    // commit that keeps the real rAF/setTimeout(35) fallback from arming.
+    act(() => { render(null, root); });
     if (root.parentNode) root.parentNode.removeChild(root);
     globalThis.fetch = originalFetch;
   });
 
   it("fetches status on mount", async () => {
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     await vi.waitFor(() => {
       expect(hookResult).not.toBeNull();
@@ -92,7 +97,7 @@ describe("useProjectStatus", () => {
   });
 
   it("registers polling via usePolling with correct source name", () => {
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     expect(usePolling).toHaveBeenCalledWith(
       "status-indicators",
@@ -103,7 +108,7 @@ describe("useProjectStatus", () => {
   });
 
   it("subscribes to degradation changes for autoRefresh", async () => {
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     // Wait for effects to run
     await vi.waitFor(() => {
@@ -112,7 +117,7 @@ describe("useProjectStatus", () => {
   });
 
   it("creates a WebSocket pipeline on mount", async () => {
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     await vi.waitFor(() => {
       expect(pipelineOnFlush).toBeInstanceOf(Function);
@@ -125,7 +130,7 @@ describe("useProjectStatus", () => {
       status: 500,
     });
 
-    render(h(TestHarness, null), root);
+    act(() => { render(h(TestHarness, null), root); });
 
     // Should not throw
     await new Promise((r) => setTimeout(r, 50));

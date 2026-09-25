@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { Sidebar } from "../../../src/viewer/components/sidebar.js";
 
 /** Flush Preact's microtask queue so state updates and effects are applied to the DOM.
@@ -45,18 +46,20 @@ describe("Sidebar", () => {
   function renderSidebar(props: Partial<Parameters<typeof Sidebar>[0]> = {}) {
     root = document.createElement("div");
     document.body.appendChild(root);
-    render(
-      h(Sidebar, {
-        view: "overview" as const,
-        onNavigate,
-        manifest: null,
-        zones: null,
-        sidebarCollapsed: false,
-        onToggleSidebar,
-        ...props,
-      }),
-      root
-    );
+    act(() => {
+      render(
+        h(Sidebar, {
+          view: "overview" as const,
+          onNavigate,
+          manifest: null,
+          zones: null,
+          sidebarCollapsed: false,
+          onToggleSidebar,
+          ...props,
+        }),
+        root
+      );
+    });
     return root;
   }
 
@@ -67,8 +70,9 @@ describe("Sidebar", () => {
   });
 
   afterEach(() => {
-    // Unmount Preact tree to clean up effects (event listeners)
-    if (root) render(null, root);
+    // Unmount inside act() to keep it symmetric with the act()-wrapped mount
+    // above, so no commit in this file escapes act().
+    if (root) act(() => { render(null, root); });
     if (root?.parentNode) root.parentNode.removeChild(root);
   });
 

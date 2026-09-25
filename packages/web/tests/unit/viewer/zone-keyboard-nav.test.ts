@@ -38,7 +38,7 @@ function makeData(zones: Zone[], crossings: ZoneCrossing[]): LoadedData {
 function renderToDiv(vnode: ReturnType<typeof h>): HTMLElement {
   const root = document.createElement("div");
   document.body.appendChild(root);
-  render(vnode, root);
+  act(() => { render(vnode, root); });
   return root;
 }
 
@@ -56,7 +56,7 @@ describe("zone graph keyboard navigation", () => {
 
   afterEach(() => {
     if (root) {
-      render(null, root);
+      act(() => { render(null, root); });
       root.parentNode?.removeChild(root);
     }
   });

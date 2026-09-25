@@ -12,6 +12,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import {
   ConfigFooter,
   identityLine,
@@ -94,12 +95,12 @@ describe("ConfigFooter", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    act(() => { render(null, root); });
     root.remove();
   });
 
   it("renders the identity line from the prop, without waiting for the config fetch", () => {
-    render(h(ConfigFooter, { server: SERVER }), root);
+    act(() => { render(h(ConfigFooter, { server: SERVER }), root); });
 
     const identity = root.querySelector(".config-footer-identity")!;
     expect(identity).not.toBeNull();
@@ -111,16 +112,16 @@ describe("ConfigFooter", () => {
   });
 
   it("renders nothing for a server too old to send an identity", () => {
-    render(h(ConfigFooter, { server: null }), root);
+    act(() => { render(h(ConfigFooter, { server: null }), root); });
     expect(root.children.length).toBe(0);
 
     // The prop being absent entirely is the same case.
-    render(h(ConfigFooter, {}), root);
+    act(() => { render(h(ConfigFooter, {}), root); });
     expect(root.children.length).toBe(0);
   });
 
   it("shows the project the server reports, not the one the URL implies", () => {
-    render(h(ConfigFooter, { server: { ...SERVER, projectDir: "/Users/dev/code/n-dx/.wt/feature" } }), root);
+    act(() => { render(h(ConfigFooter, { server: { ...SERVER, projectDir: "/Users/dev/code/n-dx/.wt/feature" } }), root); });
     expect(root.querySelector(".config-footer-identity")!.textContent).toContain("feature");
   });
 });

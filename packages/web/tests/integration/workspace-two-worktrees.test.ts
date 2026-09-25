@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ServerContext } from "../../src/server/types.js";
@@ -19,6 +19,17 @@ import { WorkspaceRegistry } from "../../src/server/workspaces.js";
 import { PRD_CACHE_DIR, PRD_CACHE_JSON } from "../../src/server/prd-io.js";
 import type { createWebSocketManager } from "../../src/server/websocket.js";
 import { frameIsForWorkspace } from "../../src/viewer/messaging/ws-pipeline.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
+
+// Absolute wait budget for an fs.watch-delivered event: a hang guardrail, not
+// a latency SLA, scaled with the rest of the suite's load-sensitive budgets.
+// See TESTING.md "Flake Resistance" Family 2.
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+const WATCHER_EVENT_TIMEOUT_MS = 5_000 * BUDGET_MULTIPLIER;
+// TESTING.md Family 3: testTimeout must stay above the internal wait budget(s)
+// a test can accumulate, so a genuine hang surfaces as vi.waitFor's own
+// timeout instead of vitest's opaque one.
+const TEST_TIMEOUT_BUFFER = 5_000;
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync(
@@ -71,43 +82,64 @@ beforeAll(async () => {
   await registry.refresh();
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   registry?.closeAll();
   if (registry) hooks.teardown(registry.anchor.handles);
-  if (root) rmSync(root, { recursive: true, force: true });
+  if (root) await removeTempDir(root);
 });
 
 describe("workspace registry with two worktrees", () => {
-  it("knows both worktrees, the anchor eager and the linked one lazy", async () => {
-    expect(registry.list()).toEqual([
-      { key: "app", path: repo, branch: "main", isAnchor: true, active: true },
-      { key: "app-feature", path: linked, branch: "feature", isAnchor: false, active: false },
-    ]);
-    await vi.waitFor(() => expect(cachedTitle(repo)).toBe("A"));
-    expect(cachedTitle(linked)).toBeNull();
-  });
+  it(
+    "knows both worktrees, the anchor eager and the linked one lazy",
+    async () => {
+      expect(registry.list()).toEqual([
+        { key: "app", path: repo, branch: "main", isAnchor: true, active: true },
+        { key: "app-feature", path: linked, branch: "feature", isAnchor: false, active: false },
+      ]);
+      await vi.waitFor(() => expect(cachedTitle(repo)).toBe("A"), {
+        timeout: WATCHER_EVENT_TIMEOUT_MS,
+        interval: 50,
+      });
+      expect(cachedTitle(linked)).toBeNull();
+    },
+    WATCHER_EVENT_TIMEOUT_MS + TEST_TIMEOUT_BUFFER,
+  );
 
-  it("creates B's context, watchers and cache on first use", async () => {
-    const b = registry.get("app-feature")!;
-    expect(b.ctx.rexDir).toBe(join(linked, ".rex"));
-    expect(b.handles.watchers.length).toBeGreaterThan(0);
-    await vi.waitFor(() => expect(cachedTitle(linked)).toBe("B"));
-    expect(registry.list()[1].active).toBe(true);
-  });
+  it(
+    "creates B's context, watchers and cache on first use",
+    async () => {
+      const b = registry.get("app-feature")!;
+      expect(b.ctx.rexDir).toBe(join(linked, ".rex"));
+      expect(b.handles.watchers.length).toBeGreaterThan(0);
+      await vi.waitFor(() => expect(cachedTitle(linked)).toBe("B"), {
+        timeout: WATCHER_EVENT_TIMEOUT_MS,
+        interval: 50,
+      });
+      expect(registry.list()[1].active).toBe(true);
+    },
+    WATCHER_EVENT_TIMEOUT_MS + TEST_TIMEOUT_BUFFER,
+  );
 
-  it("editing B's PRD refreshes B's cache and broadcasts; A's cache is untouched", async () => {
-    broadcast.mockClear();
-    writeFileSync(join(linked, ".rex", "prd.md"), prdMd("B-edited"));
+  it(
+    "editing B's PRD refreshes B's cache and broadcasts; A's cache is untouched",
+    async () => {
+      broadcast.mockClear();
+      writeFileSync(join(linked, ".rex", "prd.md"), prdMd("B-edited"));
 
-    await vi.waitFor(() => expect(cachedTitle(linked)).toBe("B-edited"), { timeout: 5_000, interval: 50 });
-    // …and the frame is tagged for B, so an anchor tab ignores it.
-    await vi.waitFor(
-      () => expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: "rex:prd-changed", workspace: "app-feature" })),
-      { timeout: 5_000, interval: 50 },
-    );
-    expect(broadcast).not.toHaveBeenCalledWith(expect.objectContaining({ type: "rex:prd-changed", workspace: "app" }));
-    expect(cachedTitle(repo)).toBe("A");
-  });
+      await vi.waitFor(() => expect(cachedTitle(linked)).toBe("B-edited"), {
+        timeout: WATCHER_EVENT_TIMEOUT_MS,
+        interval: 50,
+      });
+      // …and the frame is tagged for B, so an anchor tab ignores it.
+      await vi.waitFor(
+        () => expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: "rex:prd-changed", workspace: "app-feature" })),
+        { timeout: WATCHER_EVENT_TIMEOUT_MS, interval: 50 },
+      );
+      expect(broadcast).not.toHaveBeenCalledWith(expect.objectContaining({ type: "rex:prd-changed", workspace: "app" }));
+      expect(cachedTitle(repo)).toBe("A");
+    },
+    WATCHER_EVENT_TIMEOUT_MS * 2 + TEST_TIMEOUT_BUFFER,
+  );
 
   /**
    * The anchor's viewer is served at `/`, with no `/w/<key>/` slot, so its own
@@ -116,28 +148,41 @@ describe("workspace registry with two worktrees", () => {
    * basename therefore silenced the plain single-worktree dashboard: every
    * live update it was sent, it dropped.
    */
-  it("the anchor's frames are untagged, and its viewer accepts them", async () => {
-    broadcast.mockClear();
-    writeFileSync(join(repo, ".rex", "prd.md"), prdMd("A-edited"));
+  it(
+    "the anchor's frames are untagged, and its viewer accepts them",
+    async () => {
+      broadcast.mockClear();
+      writeFileSync(join(repo, ".rex", "prd.md"), prdMd("A-edited"));
 
-    await vi.waitFor(() => expect(cachedTitle(repo)).toBe("A-edited"), { timeout: 5_000, interval: 50 });
-    const frame = await vi.waitFor(() => {
-      const call = broadcast.mock.calls
-        .map(([value]) => value as Record<string, unknown>)
-        .find((value) => value?.type === "rex:prd-changed");
-      expect(call, "no rex:prd-changed frame for the anchor").toBeDefined();
-      return call!;
-    }, { timeout: 5_000, interval: 50 });
+      await vi.waitFor(() => expect(cachedTitle(repo)).toBe("A-edited"), {
+        timeout: WATCHER_EVENT_TIMEOUT_MS,
+        interval: 50,
+      });
+      const frame = await vi.waitFor(
+        () => {
+          const call = broadcast.mock.calls
+            .map(([value]) => value as Record<string, unknown>)
+            .find((value) => value?.type === "rex:prd-changed");
+          expect(call, "no rex:prd-changed frame for the anchor").toBeDefined();
+          return call!;
+        },
+        { timeout: WATCHER_EVENT_TIMEOUT_MS, interval: 50 },
+      );
 
-    expect(frame).not.toHaveProperty("workspace");
-    expect(frameIsForWorkspace(frame, null), "the anchor viewer accepts it").toBe(true);
-    expect(frameIsForWorkspace(frame, "app-feature"), "B's viewer does not").toBe(false);
+      expect(frame).not.toHaveProperty("workspace");
+      expect(frameIsForWorkspace(frame, null), "the anchor viewer accepts it").toBe(true);
+      expect(frameIsForWorkspace(frame, "app-feature"), "B's viewer does not").toBe(false);
 
-    // Put the anchor's PRD back: the cache assertions in the test below are
-    // about this same live registry.
-    writeFileSync(join(repo, ".rex", "prd.md"), prdMd("A"));
-    await vi.waitFor(() => expect(cachedTitle(repo)).toBe("A"), { timeout: 5_000, interval: 50 });
-  });
+      // Put the anchor's PRD back: the cache assertions in the test below are
+      // about this same live registry.
+      writeFileSync(join(repo, ".rex", "prd.md"), prdMd("A"));
+      await vi.waitFor(() => expect(cachedTitle(repo)).toBe("A"), {
+        timeout: WATCHER_EVENT_TIMEOUT_MS,
+        interval: 50,
+      });
+    },
+    WATCHER_EVENT_TIMEOUT_MS * 3 + TEST_TIMEOUT_BUFFER,
+  );
 
   it("closeAll removes B's cache and watchers but keeps the anchor's", () => {
     const b = registry.get("app-feature")!;

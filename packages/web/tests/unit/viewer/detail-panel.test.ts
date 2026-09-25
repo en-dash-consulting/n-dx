@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { DetailPanel } from "../../../src/viewer/components/detail-panel.js";
 
 describe("DetailPanel", () => {
   function renderToDiv(vnode: ReturnType<typeof h>) {
     const root = document.createElement("div");
-    render(vnode, root);
+    act(() => { render(vnode, root); });
     return root;
   }
 

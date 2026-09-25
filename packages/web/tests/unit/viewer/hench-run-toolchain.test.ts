@@ -10,6 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import { RunDetailView, type RunDetail } from "../../../src/viewer/views/hench-runs.js";
 
 const BASE_RUN: RunDetail = {
@@ -26,7 +27,7 @@ const BASE_RUN: RunDetail = {
 
 function renderRun(run: RunDetail): HTMLDivElement {
   const root = document.createElement("div");
-  render(h(RunDetailView, { run, onBack: () => {} }), root);
+  act(() => { render(h(RunDetailView, { run, onBack: () => {} }), root); });
   return root;
 }
 
