@@ -16,6 +16,8 @@ import {
   buildPrimerPrompt,
   validatePrimer,
   generatePrimer,
+  computeAnalysisFingerprint,
+  legacyManifestFingerprint,
   primerFingerprint,
   stampPrimer,
   readPrimerFingerprint,
@@ -81,12 +83,65 @@ describe("validatePrimer", () => {
   });
 });
 
+describe("computeAnalysisFingerprint", () => {
+  const CONTEXT = "# proj — CONTEXT\n\nFiles: 12, Lines: 400\n";
+
+  it("is equal for two analyses that found the same thing", () => {
+    // The property the whole fix rests on. `analyzedAt` is deliberately not an
+    // input: every analysis rewrites it, so including it made the stamp go
+    // stale on runs that changed nothing — and a run with no LLM call cannot
+    // re-stamp, which orphaned the primer until the next paid analysis.
+    expect(computeAnalysisFingerprint({ gitSha: "abc123", contextMd: CONTEXT })).toBe(
+      computeAnalysisFingerprint({ gitSha: "abc123", contextMd: CONTEXT }),
+    );
+  });
+
+  it("changes when the analysis found something different", () => {
+    const base = computeAnalysisFingerprint({ gitSha: "abc123", contextMd: CONTEXT });
+    expect(
+      computeAnalysisFingerprint({ gitSha: "abc123", contextMd: `${CONTEXT}Zones: 3\n` }),
+    ).not.toBe(base);
+    expect(computeAnalysisFingerprint({ gitSha: "def456", contextMd: CONTEXT })).not.toBe(base);
+  });
+
+  it("treats a missing gitSha as absent rather than throwing", () => {
+    // Not every analysed tree is a git checkout.
+    expect(computeAnalysisFingerprint({ contextMd: CONTEXT })).toBe(
+      computeAnalysisFingerprint({ gitSha: null, contextMd: CONTEXT }),
+    );
+  });
+
+  it("cannot be satisfied by a field-concatenation collision", () => {
+    expect(computeAnalysisFingerprint({ gitSha: "ab", contextMd: "c" })).not.toBe(
+      computeAnalysisFingerprint({ gitSha: "a", contextMd: "bc" }),
+    );
+  });
+});
+
 describe("primer fingerprint and staleness", () => {
+  const STAMPED = {
+    ...MANIFEST,
+    analysisFingerprint: "0123456789abcdef",
+  } as unknown as Manifest;
+
   it("is stable for the same analysis", () => {
     expect(primerFingerprint(MANIFEST)).toBe(primerFingerprint(MANIFEST));
   });
 
-  it("changes when the analysis is re-run or the commit differs", () => {
+  it("reads the manifest's published fingerprint when it has one", () => {
+    expect(primerFingerprint(STAMPED)).toBe("0123456789abcdef");
+  });
+
+  it("ignores analyzedAt once the manifest publishes a fingerprint", () => {
+    // A re-analysis that found the same thing keeps the cached primer fresh.
+    expect(
+      primerFingerprint({ ...STAMPED, analyzedAt: "2026-09-24T22:05:00.000Z" } as never),
+    ).toBe(primerFingerprint(STAMPED));
+  });
+
+  it("falls back to the legacy hash for a manifest written before the field", () => {
+    expect(primerFingerprint(MANIFEST)).toBe(legacyManifestFingerprint(MANIFEST));
+
     const base = primerFingerprint(MANIFEST);
     expect(primerFingerprint({ ...MANIFEST, analyzedAt: "2026-08-30T00:00:00.000Z" } as never)).not.toBe(base);
     expect(primerFingerprint({ ...MANIFEST, gitSha: "def456" } as never)).not.toBe(base);
@@ -135,6 +190,30 @@ describe("generatePrimer", () => {
     const cached = stampPrimer(GOOD_PRIMER, primerFingerprint(MANIFEST));
 
     const result = await generatePrimer({ ...baseArgs, cachedPrimer: cached, call });
+
+    expect(result.status).toBe("cached");
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it("does not pay for a re-distillation when the analysis found the same thing", async () => {
+    // Before the content fingerprint this was the steady state: every
+    // LLM-enabled analyse rewrote analyzedAt, so the cache never hit and every
+    // run bought a context.distill call it did not need.
+    const contextMd = baseArgs.contextMd;
+    const fingerprint = computeAnalysisFingerprint({ gitSha: "abc123", contextMd });
+    const cached = stampPrimer(GOOD_PRIMER, fingerprint);
+    const call = vi.fn();
+
+    const result = await generatePrimer({
+      contextMd,
+      manifest: {
+        analyzedAt: "2026-09-24T22:05:00.000Z",
+        gitSha: "abc123",
+        analysisFingerprint: fingerprint,
+      } as unknown as Manifest,
+      cachedPrimer: cached,
+      call,
+    });
 
     expect(result.status).toBe("cached");
     expect(call).not.toHaveBeenCalled();

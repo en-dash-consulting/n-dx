@@ -55,19 +55,68 @@ export const PRIMER_MIN_CHARS = 200;
 const FINGERPRINT_PREFIX = "<!-- sourcevision-primer fingerprint:";
 
 /**
- * Fingerprint the analysis a primer was built from.
+ * Fingerprint the analysis *content* a primer was distilled from.
  *
- * Uses the two manifest fields that change on exactly the events that
- * invalidate a primer — a re-analysis, or an analysis of a different commit —
- * so the check costs one small read rather than hashing the artifact tree.
+ * The primer is a distillation of CONTEXT.md, so CONTEXT.md is what decides
+ * whether a cached primer is still true. Hashing it — rather than the
+ * `analyzedAt` timestamp the manifest carries — is what makes the stamp stable
+ * across re-analyses that changed nothing: every `sourcevision analyze` rewrites
+ * `analyzedAt`, so a timestamp-derived stamp went stale on every run, including
+ * runs that made no LLM call and therefore could not re-distil. That combination
+ * silently demoted every subsequent `ndx work` to the CONTEXT.md fallback.
+ *
+ * `gitSha` is folded in explicitly rather than relied on via the `Git:` line
+ * CONTEXT.md happens to render, so the input stays stated rather than incidental.
+ *
+ * Written to `manifest.analysisFingerprint` at analysis time and read back from
+ * there by every consumer — see {@link primerFingerprint}.
  */
-export function primerFingerprint(manifest: Manifest | null | undefined): string {
+export function computeAnalysisFingerprint(input: {
+  gitSha?: string | null;
+  contextMd: string;
+}): string {
+  const gitSha = typeof input.gitSha === "string" ? input.gitSha : "";
+  return createHash("sha256")
+    .update(`${gitSha}\n${input.contextMd}`)
+    .digest("hex")
+    .slice(0, 16);
+}
+
+/**
+ * The pre-`analysisFingerprint` stamp: a hash of `analyzedAt` and `gitSha`.
+ *
+ * Retained only to read primers and manifests written by an older sourcevision.
+ * It is wrong as a freshness signal — `analyzedAt` moves on every analysis — so
+ * nothing should reach for it except {@link primerFingerprint}'s fallback and
+ * the cross-tier contract test that pins the fallback's three copies together.
+ *
+ * @deprecated Superseded by {@link computeAnalysisFingerprint}; remove once
+ *   manifests without `analysisFingerprint` are no longer in circulation.
+ */
+export function legacyManifestFingerprint(manifest: Manifest | null | undefined): string {
   const analyzedAt = typeof manifest?.analyzedAt === "string" ? manifest.analyzedAt : "";
   const gitSha = typeof (manifest as { gitSha?: unknown } | null)?.gitSha === "string"
     ? (manifest as { gitSha: string }).gitSha
     : "";
   if (!analyzedAt && !gitSha) return "unknown";
   return createHash("sha256").update(`${analyzedAt} ${gitSha}`).digest("hex").slice(0, 16);
+}
+
+/**
+ * The fingerprint a primer should be stamped with, or checked against.
+ *
+ * Reads `manifest.analysisFingerprint`, which `sourcevision analyze` writes
+ * alongside CONTEXT.md. Consumers read the field rather than recomputing the
+ * hash, so the value has one producer and no copies to hold in agreement.
+ *
+ * Falls back to {@link legacyManifestFingerprint} for a manifest written before
+ * the field existed: such a manifest still pairs with a primer stamped the old
+ * way, and the two must keep matching until the next analysis re-stamps both.
+ */
+export function primerFingerprint(manifest: Manifest | null | undefined): string {
+  const stored = (manifest as { analysisFingerprint?: unknown } | null)?.analysisFingerprint;
+  if (typeof stored === "string" && stored) return stored;
+  return legacyManifestFingerprint(manifest);
 }
 
 /** Wrap a primer body with its fingerprint marker for caching. */

@@ -72,6 +72,15 @@ export interface Manifest {
   analyzedAt: string;
   gitSha?: string;
   gitBranch?: string;
+  /**
+   * Content fingerprint of this analysis, covering `gitSha` and CONTEXT.md but
+   * no timestamp — so it is identical across two analyses that found the same
+   * thing. Consumers (`ndx work`'s context pipe, hench's warm-parent session
+   * cache) compare it against the stamp on `.sourcevision/PRIMER.md` to tell a
+   * current primer from a leftover one. Absent on manifests written before the
+   * field existed; consumers fall back to the older `analyzedAt + gitSha` hash.
+   */
+  analysisFingerprint?: string;
   targetPath: string;
   modules: Record<string, ModuleInfo>;
   /** Aggregate token usage from the most recent analyze run. */
