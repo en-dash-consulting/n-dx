@@ -149,3 +149,5 @@ export type {
 } from "./language-analysis-strip.js";
 export { GlossaryLine } from "./glossary-line.js";
 export type { GlossaryLineProps } from "./glossary-line.js";
+export { InfoTip } from "./info-tip.js";
+export type { InfoTipProps } from "./info-tip.js";
