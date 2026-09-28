@@ -128,6 +128,7 @@ const HENCH_COMMANDS = [
   "status",
   "show",
   "review",
+  "cache",
   "validate-tokens",
 ];
 

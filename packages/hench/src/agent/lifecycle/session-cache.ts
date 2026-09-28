@@ -67,6 +67,33 @@ export const DEFAULT_BATCH_MAX_IDLE_HOURS = 1;
 export const SESSION_STRATEGIES = ["fork", "batch", "cold"] as const;
 export type SessionStrategy = (typeof SESSION_STRATEGIES)[number];
 
+/**
+ * The independently addressable slots of the cache file.
+ *
+ * One per strategy that caches anything: `fork` keeps an orientation parent,
+ * `batch` keeps a running chain, `cold` keeps neither. They share a file but
+ * never a lifetime — see {@link clearSessionCache}.
+ */
+export const CACHE_SCOPES = ["parent", "batch"] as const;
+export type CacheScope = (typeof CACHE_SCOPES)[number];
+
+/**
+ * A fault in a cached entry that holds however it is read.
+ *
+ * The deliberate contrast is with the identity rejections
+ * (`worktree-changed`, `policy-changed`, …), which say the entry is wrong *for
+ * this caller* — it may be perfectly good for the run that wrote it. A defect
+ * says the entry is wrong for everyone: too old, unreadable, or written by a
+ * scheme this build does not have. Only defects are evicted, because only a
+ * defect makes the entry dead rather than merely unmatched.
+ */
+export type CacheDefect =
+  | "unversioned"
+  | "version-changed"
+  | "malformed"
+  | "expired"
+  | "idle";
+
 /** A cached orientation session. */
 export interface SessionCacheEntry {
   /** Vendor session id to fork from. */
@@ -373,6 +400,52 @@ export async function advanceBatchChain(
   });
 }
 
+/** A task's outcome, as the chain needs to know it. */
+export interface BatchChainOutcome {
+  /** Whether the task finished successfully. */
+  completed: boolean;
+  /** Session the task ran in, when the vendor reported one. */
+  sessionId?: string;
+  /** Identity the task ran under; absent when the run had no batch identity. */
+  identity?: BatchChainIdentity;
+  /** Title of the task that just ran. */
+  lastTaskTitle?: string;
+  /** Clock seam; defaults to `Date.now()`. */
+  now?: number;
+}
+
+/**
+ * Hand a finished task's session to the chain, or end the chain.
+ *
+ * A successful task passes its session on. A failed one does not: whatever
+ * went wrong is in that transcript, and the next task would start inside the
+ * failure. The same holds when the vendor reported no session id — there is
+ * nothing to hand on. Either way the old entry goes, so a later run cannot
+ * resume a session this one has stopped counting.
+ *
+ * Stated here rather than as an `if` in the loop so that "a failed task evicts
+ * the chain" is a property of the cache with a test, not an incidental branch
+ * in a two-thousand-line driver.
+ *
+ * @returns what happened, for the caller to report.
+ */
+export async function settleBatchChain(
+  henchDir: string,
+  outcome: BatchChainOutcome,
+): Promise<"advanced" | "cleared"> {
+  if (outcome.completed && outcome.sessionId && outcome.identity) {
+    await advanceBatchChain(henchDir, {
+      sessionId: outcome.sessionId,
+      identity: outcome.identity,
+      lastTaskTitle: outcome.lastTaskTitle,
+      now: outcome.now,
+    }).catch(() => { /* best effort — the next task just starts fresh */ });
+    return "advanced";
+  }
+  await clearBatchChain(henchDir);
+  return "cleared";
+}
+
 /** Drop the batch chain, leaving the orientation parent intact. */
 export async function clearBatchChain(henchDir: string): Promise<void> {
   const file = await readCacheFile(henchDir);
@@ -428,30 +501,64 @@ export function isBatchChainUsable(
   if (cap <= 1) return { usable: false, reason: "disabled" };
   if (!chain) return { usable: false, reason: "no-chain" };
 
-  if (chain.version !== BATCH_CHAIN_VERSION) {
-    // Nothing wrote a version before 0.8.0, so 0 means "older than this
-    // scheme" and any other value means a build we cannot reason about.
-    return { usable: false, reason: chain.version === 0 ? "unversioned" : "version-changed" };
+  // Every defect is also a rejection, but they are consulted at two different
+  // points: a version this build cannot read comes before identity (its fields
+  // may not mean what they look like), and staleness comes after (so the
+  // operator hears "that chain is another worktree's" rather than "it aged
+  // out", which sends them to tune the wrong thing).
+  const defect = batchChainDefect(chain, input);
+  if (defect === "unversioned" || defect === "version-changed") {
+    return { usable: false, reason: defect };
   }
 
   for (const [field, reason] of IDENTITY_CHECKS) {
     if (chain[field] !== input.identity[field]) return { usable: false, reason };
   }
 
+  if (defect) return { usable: false, reason: defect };
+
+  if (chain.tasksUsed >= cap) return { usable: false, reason: "cap-reached" };
+  return { usable: true };
+}
+
+/** Bounds a batch chain's freshness is judged against. */
+export interface BatchFreshnessInput {
+  /** Total-age bound; defaults to {@link DEFAULT_BATCH_MAX_AGE_HOURS}. */
+  maxAgeHours?: number;
+  /** Idle bound; defaults to {@link DEFAULT_BATCH_MAX_IDLE_HOURS}. */
+  maxIdleHours?: number;
+  /** Clock seam; defaults to `Date.now()`. */
+  now?: number;
+}
+
+/**
+ * What is wrong with this chain regardless of who is asking, or undefined.
+ *
+ * Split out of {@link isBatchChainUsable} so admission and eviction cannot
+ * drift: "expired" has to mean the same thing to the run that declines a chain
+ * and to the sweep that deletes it, or the cache would accumulate entries every
+ * run rejects and no run removes.
+ */
+export function batchChainDefect(
+  chain: BatchChainEntry,
+  input: BatchFreshnessInput = {},
+): CacheDefect | undefined {
+  if (chain.version !== BATCH_CHAIN_VERSION) {
+    // Nothing wrote a version before 0.8.0, so 0 means "older than this
+    // scheme" and any other value means a build we cannot reason about.
+    return chain.version === 0 ? "unversioned" : "version-changed";
+  }
+
   const createdAtMs = Date.parse(chain.createdAt);
   const lastUsedAtMs = Date.parse(chain.lastUsedAt);
-  if (Number.isNaN(createdAtMs) || Number.isNaN(lastUsedAtMs)) {
-    return { usable: false, reason: "malformed" };
-  }
+  if (Number.isNaN(createdAtMs) || Number.isNaN(lastUsedAtMs)) return "malformed";
 
   const now = input.now ?? Date.now();
   const maxAgeHours = input.maxAgeHours ?? DEFAULT_BATCH_MAX_AGE_HOURS;
   const maxIdleHours = input.maxIdleHours ?? DEFAULT_BATCH_MAX_IDLE_HOURS;
-  if (now - createdAtMs > maxAgeHours * 3_600_000) return { usable: false, reason: "expired" };
-  if (now - lastUsedAtMs > maxIdleHours * 3_600_000) return { usable: false, reason: "idle" };
-
-  if (chain.tasksUsed >= cap) return { usable: false, reason: "cap-reached" };
-  return { usable: true };
+  if (now - createdAtMs > maxAgeHours * 3_600_000) return "expired";
+  if (now - lastUsedAtMs > maxIdleHours * 3_600_000) return "idle";
+  return undefined;
 }
 
 /**
@@ -528,6 +635,40 @@ export interface ParentUsabilityInput {
   maxAgeHours?: number;
   /** `--fresh` — force a new orientation regardless of what is cached. */
   fresh?: boolean;
+  /** Clock seam; defaults to `Date.now()`. */
+  now?: number;
+}
+
+/** Bounds a cached parent's freshness is judged against. */
+export interface ParentFreshnessInput {
+  /** TTL override; defaults to {@link DEFAULT_PARENT_MAX_AGE_HOURS}. */
+  maxAgeHours?: number;
+  /** Clock seam; defaults to `Date.now()`. */
+  now?: number;
+}
+
+/**
+ * What is wrong with this parent regardless of who is asking, or undefined.
+ *
+ * The parent's counterpart to {@link batchChainDefect}, and split out for the
+ * same reason: eviction must not invent its own notion of "too old".
+ *
+ * Narrower than {@link CacheDefect}: a parent carries no version and no
+ * last-use stamp, so the other three defects cannot arise for it — and saying
+ * so in the type is what lets {@link isParentUsable} return the result
+ * directly as a {@link ParentRejection}.
+ */
+export function parentDefect(
+  entry: SessionCacheEntry,
+  input: ParentFreshnessInput = {},
+): Extract<CacheDefect, "malformed" | "expired"> | undefined {
+  const createdAtMs = Date.parse(entry.createdAt);
+  if (Number.isNaN(createdAtMs)) return "malformed";
+
+  const now = input.now ?? Date.now();
+  const maxAgeHours = input.maxAgeHours ?? DEFAULT_PARENT_MAX_AGE_HOURS;
+  if (now - createdAtMs > maxAgeHours * 3_600_000) return "expired";
+  return undefined;
 }
 
 /**
@@ -545,8 +686,10 @@ export function isParentUsable(
   if (!entry) return { usable: false, reason: "no-entry" };
   if (input.fresh) return { usable: false, reason: "fresh-requested" };
 
-  const createdAtMs = Date.parse(entry.createdAt);
-  if (Number.isNaN(createdAtMs)) return { usable: false, reason: "malformed" };
+  // Same two-point consultation as the batch chain: an unreadable timestamp
+  // before the fingerprint checks, staleness after them.
+  const defect = parentDefect(entry, input);
+  if (defect === "malformed") return { usable: false, reason: "malformed" };
 
   if (entry.svFingerprint !== input.svFingerprint) {
     return { usable: false, reason: "sourcevision-changed" };
@@ -554,10 +697,7 @@ export function isParentUsable(
   if (entry.vendor !== input.vendor) return { usable: false, reason: "vendor-changed" };
   if (entry.model !== input.model) return { usable: false, reason: "model-changed" };
 
-  const maxAgeHours = input.maxAgeHours ?? DEFAULT_PARENT_MAX_AGE_HOURS;
-  if (Date.now() - createdAtMs > maxAgeHours * 3_600_000) {
-    return { usable: false, reason: "expired" };
-  }
+  if (defect) return { usable: false, reason: defect };
   return { usable: true };
 }
 
@@ -638,4 +778,153 @@ export function resolveSessionStrategy(input: SessionStrategyInput): SessionStra
   // Default (or an explicit "fork"): only the Claude CLI can honor it.
   const canFork = input.vendor === "claude" && input.provider === "cli";
   return canFork ? "fork" : "cold";
+}
+
+/**
+ * The scopes a run under this strategy will never consult.
+ *
+ * A run that *does* consult a scope already evicts it with a named reason
+ * (`ensureWarmParent` drops an unusable parent, the loop drops a rejected
+ * chain). It is the other scope that rots: switch to `fork` and the batch
+ * chain sits there past every bound with nothing left to read it. Sweeping
+ * only the unused scopes is what keeps automatic eviction from swallowing the
+ * diagnostic the active strategy is about to print.
+ */
+export function unusedCacheScopes(strategy: SessionStrategy): CacheScope[] {
+  if (strategy === "fork") return ["batch"];
+  if (strategy === "batch") return ["parent"];
+  return [...CACHE_SCOPES];
+}
+
+// ── Inventory, eviction and scoped clearing ──────────────────────────────
+
+/** Freshness bounds for every scope, as `hench.*` configures them. */
+export interface CacheFreshnessInput {
+  /** `hench.parentMaxAgeHours`. */
+  parentMaxAgeHours?: number;
+  /** `hench.batchMaxAgeHours`. */
+  batchMaxAgeHours?: number;
+  /** `hench.batchMaxIdleHours`. */
+  batchMaxIdleHours?: number;
+  /** Clock seam; defaults to `Date.now()`. */
+  now?: number;
+}
+
+/**
+ * What the cache holds, per scope, with each entry's defect if it has one.
+ *
+ * Entries are surfaced verbatim. Nothing is summarised or redacted on the way
+ * out because nothing sensitive goes in: the cache stores session ids,
+ * fingerprints, counters and timestamps, and the one free-text field is a task
+ * title the PRD already publishes. `cache-contents.test.ts` holds that line.
+ */
+export interface CacheInventory {
+  parent?: SessionCacheEntry & { defect?: CacheDefect };
+  batch?: BatchChainEntry & { defect?: CacheDefect };
+}
+
+/**
+ * Report what is cached, so an operator can answer "why did it re-orient?"
+ * without opening `session-cache.json` and dating the timestamps by hand.
+ *
+ * Read-only: a defect is reported, not acted on, because listing and deleting
+ * should be separate things the operator asks for separately.
+ */
+export async function listCacheEntries(
+  henchDir: string,
+  input: CacheFreshnessInput = {},
+): Promise<CacheInventory> {
+  const inventory: CacheInventory = {};
+
+  const parent = await readSessionCache(henchDir);
+  if (parent) {
+    inventory.parent = {
+      ...parent,
+      defect: parentDefect(parent, { maxAgeHours: input.parentMaxAgeHours, now: input.now }),
+    };
+  }
+
+  const batch = await readBatchChain(henchDir);
+  if (batch) {
+    inventory.batch = {
+      ...batch,
+      defect: batchChainDefect(batch, {
+        maxAgeHours: input.batchMaxAgeHours,
+        maxIdleHours: input.batchMaxIdleHours,
+        now: input.now,
+      }),
+    };
+  }
+
+  return inventory;
+}
+
+/** One evicted entry, named so the caller can say what it removed and why. */
+export interface CacheEviction {
+  scope: CacheScope;
+  defect: CacheDefect;
+}
+
+export interface EvictionInput extends CacheFreshnessInput {
+  /** Scopes to sweep; defaults to all of them. */
+  scopes?: readonly CacheScope[];
+}
+
+/**
+ * Delete cached entries that are dead rather than merely unmatched.
+ *
+ * Only {@link CacheDefect}s qualify. An entry rejected for identity — another
+ * worktree, another policy — is left alone: it is the correct entry for the
+ * run that wrote it, and deleting it here would mean the strategies quietly
+ * cost each other their caches.
+ *
+ * Eviction is a convenience, never a precondition: an entry that survives a
+ * sweep is still refused by {@link isBatchChainUsable} and
+ * {@link isParentUsable}, which are the checks that actually protect a run.
+ * So a failed delete is not worth failing anything over.
+ */
+export async function evictDeadCacheEntries(
+  henchDir: string,
+  input: EvictionInput = {},
+): Promise<CacheEviction[]> {
+  const scopes = input.scopes ?? CACHE_SCOPES;
+  const inventory = await listCacheEntries(henchDir, input);
+  const evicted: CacheEviction[] = [];
+
+  if (scopes.includes("parent") && inventory.parent?.defect) {
+    await clearSessionCache(henchDir);
+    evicted.push({ scope: "parent", defect: inventory.parent.defect });
+  }
+  if (scopes.includes("batch") && inventory.batch?.defect) {
+    await clearBatchChain(henchDir);
+    evicted.push({ scope: "batch", defect: inventory.batch.defect });
+  }
+
+  return evicted;
+}
+
+/**
+ * Clear the named scopes, reporting only those that held something.
+ *
+ * The two clears stay separate underneath — {@link clearSessionCache} and
+ * {@link clearBatchChain} each preserve the other's slot — so clearing one
+ * scope never costs the other its state, which is the whole reason the cache
+ * is addressable by scope at all.
+ */
+export async function clearCacheScopes(
+  henchDir: string,
+  scopes: readonly CacheScope[],
+): Promise<CacheScope[]> {
+  const cleared: CacheScope[] = [];
+
+  if (scopes.includes("parent") && (await readSessionCache(henchDir))) {
+    await clearSessionCache(henchDir);
+    cleared.push("parent");
+  }
+  if (scopes.includes("batch") && (await readBatchChain(henchDir))) {
+    await clearBatchChain(henchDir);
+    cleared.push("batch");
+  }
+
+  return cleared;
 }

@@ -56,12 +56,14 @@ import {
   resolveSessionStrategy,
   clearSessionCache,
   readBatchChain,
-  advanceBatchChain,
   clearBatchChain,
+  settleBatchChain,
   isBatchChainUsable,
   chainRefIdentity,
   policyFingerprint,
   sourcevisionFingerprint,
+  evictDeadCacheEntries,
+  unusedCacheScopes,
   type BatchChainIdentity,
 } from "./session-cache.js";
 import { buildTaskBoundaryDivider } from "./batch-divider.js";
@@ -2024,6 +2026,19 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     provider: config.provider,
     configured: config.sessionStrategy,
   });
+
+  // Sweep the scopes this strategy will not read. The scope it *does* read is
+  // left alone: the strategy's own check is about to reject and clear it with
+  // a named reason, and pre-emptively deleting it here would turn that
+  // diagnostic into a bare "no chain". Best-effort — eviction is tidiness, and
+  // the admission checks are what actually keep a stale entry out of a run.
+  await evictDeadCacheEntries(henchDir, {
+    scopes: unusedCacheScopes(sessionStrategy),
+    parentMaxAgeHours: config.parentMaxAgeHours,
+    batchMaxAgeHours: config.batchMaxAgeHours,
+    batchMaxIdleHours: config.batchMaxIdleHours,
+  }).catch(() => { /* best effort */ });
+
   let warmParentId: string | undefined;
 
   // Batch strategy: resume the *previous task's* session so the transcript
@@ -2547,15 +2562,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // start the next task inside the failure. The same applies when the vendor
   // reported no session id — there is nothing to hand on.
   if (sessionStrategy === "batch") {
-    if (run.status === "completed" && lastSessionId && batchIdentity) {
-      await advanceBatchChain(henchDir, {
-        sessionId: lastSessionId,
-        identity: batchIdentity,
-        lastTaskTitle: brief.task.title,
-      }).catch(() => { /* best effort — the next task just starts fresh */ });
-    } else {
-      await clearBatchChain(henchDir);
-    }
+    await settleBatchChain(henchDir, {
+      completed: run.status === "completed",
+      sessionId: lastSessionId,
+      identity: batchIdentity,
+      lastTaskTitle: brief.task.title,
+    });
   }
 
   return { run };
