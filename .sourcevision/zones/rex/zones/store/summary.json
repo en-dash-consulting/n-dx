@@ -1,0 +1,29 @@
+{
+  "id": "rex/store",
+  "name": "Store Integration Schemas",
+  "description": "8 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/adapter.ts",
+    "packages/rex/src/store/adapter-registry.ts",
+    "packages/rex/src/store/integration-schema.ts",
+    "packages/rex/src/store/integration-schemas/asana.ts",
+    "packages/rex/src/store/integration-schemas/github.ts",
+    "packages/rex/src/store/integration-schemas/index.ts",
+    "packages/rex/src/store/integration-schemas/jira.ts",
+    "packages/rex/src/store/integration-schemas/notion.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/adapter.ts",
+    "packages/rex/src/store/adapter-registry.ts",
+    "packages/rex/src/store/integration-schema.ts",
+    "packages/rex/src/store/integration-schemas/asana.ts",
+    "packages/rex/src/store/integration-schemas/github.ts",
+    "packages/rex/src/store/integration-schemas/index.ts",
+    "packages/rex/src/store/integration-schemas/jira.ts",
+    "packages/rex/src/store/integration-schemas/notion.ts"
+  ],
+  "cohesion": 0.54,
+  "coupling": 0.46,
+  "fileCount": 8,
+  "lineCount": 1651
+}

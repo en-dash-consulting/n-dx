@@ -1,0 +1,19 @@
+{
+  "id": "rex/cli/archive-git-utils",
+  "name": "Archive Git Utils",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/reshape.ts",
+    "packages/rex/src/core/archive.ts",
+    "packages/rex/src/core/git-utils.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/reshape.ts",
+    "packages/rex/src/core/archive.ts",
+    "packages/rex/src/core/git-utils.ts"
+  ],
+  "cohesion": 0.21,
+  "coupling": 0.79,
+  "fileCount": 3,
+  "lineCount": 668
+}

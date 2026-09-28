@@ -1,0 +1,33 @@
+{
+  "id": "sourcevision/cli-commands",
+  "name": "Cli Commands",
+  "description": "12 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/cli/commands/constants.ts",
+    "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
+    "packages/sourcevision/src/cli/commands/init.ts",
+    "packages/sourcevision/src/cli/commands/iso.ts",
+    "packages/sourcevision/src/cli/commands/reset.ts",
+    "packages/sourcevision/src/cli/commands/validate.ts",
+    "packages/sourcevision/src/cli/commands/workspace.ts",
+    "packages/sourcevision/src/cli/errors.ts",
+    "packages/sourcevision/src/cli/help.ts",
+    "packages/sourcevision/src/cli/index.ts",
+    "packages/sourcevision/src/cli/output.ts",
+    "packages/sourcevision/src/cli/serve.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/cli/commands/constants.ts",
+    "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
+    "packages/sourcevision/src/cli/commands/init.ts",
+    "packages/sourcevision/src/cli/commands/workspace.ts",
+    "packages/sourcevision/src/cli/errors.ts",
+    "packages/sourcevision/src/cli/help.ts",
+    "packages/sourcevision/src/cli/output.ts",
+    "packages/sourcevision/src/cli/serve.ts"
+  ],
+  "cohesion": 0.64,
+  "coupling": 0.36,
+  "fileCount": 12,
+  "lineCount": 1442
+}

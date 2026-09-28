@@ -1,0 +1,24 @@
+{
+  "id": "core/core-2",
+  "name": "Core 2",
+  "description": "6 files, primarily JavaScript",
+  "files": [
+    "packages/core/cli-log.js",
+    "packages/core/commit-trailers.js",
+    "packages/core/export.js",
+    "packages/core/gitignore.js",
+    "packages/core/win-spawn.js",
+    "scripts/run-all-tests.mjs"
+  ],
+  "entryPoints": [
+    "packages/core/cli-log.js",
+    "packages/core/commit-trailers.js",
+    "packages/core/export.js",
+    "packages/core/gitignore.js",
+    "packages/core/win-spawn.js"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 6,
+  "lineCount": 1520
+}

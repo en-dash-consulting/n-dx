@@ -1,0 +1,20 @@
+{
+  "id": ".claude",
+  "name": ".Claude Scripts",
+  "description": "Build, packaging, and CI scripts: iso-map.mjs",
+  "files": [
+    ".claude/skills/iso-map/scripts/iso-map.mjs"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 1,
+  "lineCount": 3268,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

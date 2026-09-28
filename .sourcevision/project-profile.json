@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0.0",
+  "primaryLanguage": "typescript",
+  "languages": [
+    "typescript",
+    "javascript",
+    "go",
+    "zig",
+    "python"
+  ],
+  "frameworks": [
+    "vitest"
+  ],
+  "releaseInfrastructure": [
+    {
+      "kind": "changesets",
+      "evidence": ".changeset"
+    }
+  ],
+  "buildSurfaces": [
+    {
+      "path": "pnpm-workspace.yaml",
+      "kind": "pnpm workspace"
+    }
+  ],
+  "ciSurfaces": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "kind": "GitHub Actions"
+    },
+    {
+      "path": ".github/workflows/docs.yml",
+      "kind": "GitHub Actions"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "kind": "GitHub Actions"
+    }
+  ],
+  "importGraphQuality": "rich"
+}

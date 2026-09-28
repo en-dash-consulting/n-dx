@@ -1,0 +1,31 @@
+{
+  "id": "tests-hench",
+  "name": "Tests Hench",
+  "description": "Non-source files in packages: cli-hints.test.ts, cli-init.test.ts, cross-vendor-run-record-smoke.test.ts (+4 more)",
+  "files": [
+    "packages/hench/tests/e2e/cli-hints.test.ts",
+    "packages/hench/tests/e2e/cli-init.test.ts",
+    "packages/hench/tests/e2e/cross-vendor-run-record-smoke.test.ts",
+    "packages/hench/tests/fixtures/cross-vendor-runtime.ts",
+    "packages/hench/tests/helpers/index.ts",
+    "packages/hench/tests/helpers/posix-shell.ts",
+    "packages/hench/tests/helpers/scripted-claude-cli.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/tests/fixtures/cross-vendor-runtime.ts",
+    "packages/hench/tests/helpers/index.ts",
+    "packages/hench/tests/helpers/posix-shell.ts",
+    "packages/hench/tests/helpers/scripted-claude-cli.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 7,
+  "lineCount": 2337,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

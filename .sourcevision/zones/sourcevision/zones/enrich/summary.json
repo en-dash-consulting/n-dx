@@ -1,0 +1,33 @@
+{
+  "id": "sourcevision/enrich",
+  "name": "Enrich",
+  "description": "10 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/enrich-batch.ts",
+    "packages/sourcevision/src/analyzers/enrich-config.ts",
+    "packages/sourcevision/src/analyzers/enrich-multiplex.ts",
+    "packages/sourcevision/src/analyzers/enrich-parsing.ts",
+    "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
+    "packages/sourcevision/src/analyzers/enrich.ts",
+    "packages/sourcevision/src/analyzers/file-headers.ts",
+    "packages/sourcevision/src/analyzers/primer.ts",
+    "packages/sourcevision/src/analyzers/prompt-envelope.ts",
+    "packages/sourcevision/src/analyzers/token-usage.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/enrich-batch.ts",
+    "packages/sourcevision/src/analyzers/enrich-config.ts",
+    "packages/sourcevision/src/analyzers/enrich-multiplex.ts",
+    "packages/sourcevision/src/analyzers/enrich-parsing.ts",
+    "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
+    "packages/sourcevision/src/analyzers/enrich.ts",
+    "packages/sourcevision/src/analyzers/file-headers.ts",
+    "packages/sourcevision/src/analyzers/primer.ts",
+    "packages/sourcevision/src/analyzers/prompt-envelope.ts",
+    "packages/sourcevision/src/analyzers/token-usage.ts"
+  ],
+  "cohesion": 0.55,
+  "coupling": 0.45,
+  "fileCount": 10,
+  "lineCount": 3288
+}

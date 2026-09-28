@@ -1,0 +1,41 @@
+{
+  "id": "sourcevision/sourcevision",
+  "name": "Sourcevision",
+  "description": "14 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/classify.ts",
+    "packages/sourcevision/src/analyzers/claude-client.ts",
+    "packages/sourcevision/src/analyzers/enrich-cascade.ts",
+    "packages/sourcevision/src/analyzers/enrich-judge.ts",
+    "packages/sourcevision/src/analyzers/jev-client.ts",
+    "packages/sourcevision/src/analyzers/judgment-cache.ts",
+    "packages/sourcevision/src/analyzers/louvain.ts",
+    "packages/sourcevision/src/analyzers/partition-review.ts",
+    "packages/sourcevision/src/analyzers/route-convention.ts",
+    "packages/sourcevision/src/analyzers/subzone-naming.ts",
+    "packages/sourcevision/src/analyzers/zone-hash.ts",
+    "packages/sourcevision/src/analyzers/zone-identity.ts",
+    "packages/sourcevision/src/analyzers/zone-naming.ts",
+    "packages/sourcevision/src/analyzers/zones.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/classify.ts",
+    "packages/sourcevision/src/analyzers/claude-client.ts",
+    "packages/sourcevision/src/analyzers/enrich-cascade.ts",
+    "packages/sourcevision/src/analyzers/enrich-judge.ts",
+    "packages/sourcevision/src/analyzers/jev-client.ts",
+    "packages/sourcevision/src/analyzers/judgment-cache.ts",
+    "packages/sourcevision/src/analyzers/louvain.ts",
+    "packages/sourcevision/src/analyzers/partition-review.ts",
+    "packages/sourcevision/src/analyzers/route-convention.ts",
+    "packages/sourcevision/src/analyzers/subzone-naming.ts",
+    "packages/sourcevision/src/analyzers/zone-hash.ts",
+    "packages/sourcevision/src/analyzers/zone-identity.ts",
+    "packages/sourcevision/src/analyzers/zone-naming.ts",
+    "packages/sourcevision/src/analyzers/zones.ts"
+  ],
+  "cohesion": 0.45,
+  "coupling": 0.55,
+  "fileCount": 14,
+  "lineCount": 8760
+}

@@ -1,0 +1,34 @@
+{
+  "id": "viewer-message-pipeline",
+  "name": "Viewer Message Pipeline",
+  "description": "Declared zone anchor (7 files).",
+  "files": [
+    "packages/web/src/viewer/messaging/call-rate-limiter.ts",
+    "packages/web/src/viewer/messaging/fetch-pipeline.ts",
+    "packages/web/src/viewer/messaging/index.ts",
+    "packages/web/src/viewer/messaging/message-coalescer.ts",
+    "packages/web/src/viewer/messaging/message-throttle.ts",
+    "packages/web/src/viewer/messaging/request-dedup.ts",
+    "packages/web/src/viewer/messaging/ws-pipeline.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/messaging/call-rate-limiter.ts",
+    "packages/web/src/viewer/messaging/fetch-pipeline.ts",
+    "packages/web/src/viewer/messaging/index.ts",
+    "packages/web/src/viewer/messaging/message-coalescer.ts",
+    "packages/web/src/viewer/messaging/message-throttle.ts",
+    "packages/web/src/viewer/messaging/request-dedup.ts",
+    "packages/web/src/viewer/messaging/ws-pipeline.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 7,
+  "lineCount": 1001,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

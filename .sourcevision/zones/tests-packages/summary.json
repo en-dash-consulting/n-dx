@@ -1,0 +1,29 @@
+{
+  "id": "tests-packages",
+  "name": "Tests Packages",
+  "description": "Non-source files in packages: folder-tree-index-generator.test.ts, index.ts, rex-dir-test-support.ts (+3 more)",
+  "files": [
+    "packages/rex/src/store/tests/folder-tree-index-generator.test.ts",
+    "packages/rex/tests/helpers/index.ts",
+    "packages/rex/tests/helpers/rex-dir-test-support.ts",
+    "packages/sourcevision/tests/helpers/index.ts",
+    "packages/web/tests/setup/local-storage.ts",
+    "packages/web/tests/setup/preact-frame-leak-guard.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/tests/helpers/index.ts",
+    "packages/rex/tests/helpers/rex-dir-test-support.ts",
+    "packages/web/tests/setup/preact-frame-leak-guard.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 1746,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

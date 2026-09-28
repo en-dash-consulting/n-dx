@@ -1,0 +1,31 @@
+{
+  "id": "rex/recommend",
+  "name": "Recommend",
+  "description": "9 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/analyze/acknowledge.ts",
+    "packages/rex/src/cli/commands/recommend.ts",
+    "packages/rex/src/recommend/conflict-detection.ts",
+    "packages/rex/src/recommend/create-from-recommendations.ts",
+    "packages/rex/src/recommend/similarity.ts",
+    "packages/rex/src/recommend/text-similarity-shared.ts",
+    "packages/rex/src/recommend/tree.ts",
+    "packages/rex/src/recommend/types.ts",
+    "packages/rex/src/store/self-heal-tag.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/analyze/acknowledge.ts",
+    "packages/rex/src/cli/commands/recommend.ts",
+    "packages/rex/src/recommend/conflict-detection.ts",
+    "packages/rex/src/recommend/create-from-recommendations.ts",
+    "packages/rex/src/recommend/similarity.ts",
+    "packages/rex/src/recommend/text-similarity-shared.ts",
+    "packages/rex/src/recommend/tree.ts",
+    "packages/rex/src/recommend/types.ts",
+    "packages/rex/src/store/self-heal-tag.ts"
+  ],
+  "cohesion": 0.67,
+  "coupling": 0.33,
+  "fileCount": 9,
+  "lineCount": 2270
+}

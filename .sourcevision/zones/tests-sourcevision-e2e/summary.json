@@ -1,0 +1,24 @@
+{
+  "id": "tests-sourcevision-e2e",
+  "name": "Tests Sourcevision E2e",
+  "description": "Non-source files in packages: cli-analyze.test.ts, cli-hints.test.ts, cli-iso.test.ts (+2 more)",
+  "files": [
+    "packages/sourcevision/tests/e2e/cli-analyze.test.ts",
+    "packages/sourcevision/tests/e2e/cli-hints.test.ts",
+    "packages/sourcevision/tests/e2e/cli-iso.test.ts",
+    "packages/sourcevision/tests/e2e/cli-serve.test.ts",
+    "packages/sourcevision/tests/e2e/prd-epic-resolver-contract.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 5,
+  "lineCount": 989,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}
