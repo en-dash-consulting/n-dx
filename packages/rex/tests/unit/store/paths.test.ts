@@ -7,6 +7,7 @@ import {
   TREE_META_FILENAME,
   resolveRexPaths,
 } from "../../../src/store/paths.js";
+import * as storeBarrel from "../../../src/store/index.js";
 
 let legacyRoot: string;
 let ndxRoot: string;
@@ -56,5 +57,13 @@ describe("resolveRexPaths", () => {
     // The point of the module: renaming the folder tree stays a one-line
     // change here, and moving `.rex/` itself stays a decision in the resolver.
     expect(resolveRexPaths(legacyRoot).prdTreeDir).toContain(PRD_TREE_DIRNAME);
+  });
+
+  it("is reachable through the store barrel, like the constants beside it", () => {
+    // `store/index.ts` is how everything outside `src/store/` reaches this
+    // module — the call sites the routing task rewires included. A resolver
+    // that only the barrel's siblings can see would send those sites back to
+    // joining `.rex` themselves, which is the habit being retired.
+    expect(storeBarrel.resolveRexPaths).toBe(resolveRexPaths);
   });
 });
