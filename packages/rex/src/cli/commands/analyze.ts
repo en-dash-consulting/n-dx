@@ -12,7 +12,7 @@ import { REX_DIR } from "./constants.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { parseIntSafe } from "../validate-input.js";
-import { info, warn, result, startSpinner } from "../output.js";
+import { info, warn, result, startSpinner, withCommandProgressReporter } from "../output.js";
 import {
   preflightBudgetCheck,
   formatBudgetWarnings,
@@ -44,7 +44,7 @@ import type { ScanResult, Proposal } from "../../analyze/index.js";
 import type {PRDItem, AnalyzeTokenUsage, LoEConfig} from "../../schema/index.js";import { LOE_DEFAULTS } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "../../analyze/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
-import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor, printVendorModelHeader, resolveVendorModel, cyan, yellow, dim } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor, printVendorModelHeader, priceTokens, resolveModelPricing, resolveVendorModel, cyan, yellow, dim } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 import { resolveVendorCompatibleRexModel } from "../model-resolution.js";
 
@@ -60,6 +60,28 @@ const UNKNOWN_PROVIDER_METADATA = "unknown";
 function normalizeProviderMetadata(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+/**
+ * What one analyze run's tokens cost in USD, at the model that answered.
+ *
+ * Written into the `analyze_token_usage` log entry by the command that spent
+ * it. `ndx`'s run summary sits at the orchestration tier and cannot import the
+ * price table from `@n-dx/llm-client` at all, and a second copy of that table
+ * would drift from the first — so the spender records the figure and readers
+ * only read it.
+ */
+export function priceAnalyzeTokenUsage(usage: AnalyzeTokenUsage, model: string): number {
+  const { pricing } = resolveModelPricing(model);
+  return priceTokens(
+    {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      cacheCreationTokens: usage.cacheCreationInputTokens ?? 0,
+      cacheReadTokens: usage.cacheReadInputTokens ?? 0,
+    },
+    pricing,
+  ).totalRaw;
 }
 
 function resolveAnalyzeTokenEventMetadata(
@@ -423,6 +445,19 @@ export async function cmdAnalyze(
   flags: Record<string, string>,
   multiFlags: Record<string, string[]> = {},
 ): Promise<void> {
+  return withCommandProgressReporter(() => runAnalyze(dir, flags, multiFlags));
+}
+
+/**
+ * The analyze pipeline itself, run under the command-scoped progress reporter
+ * registered by {@link cmdAnalyze}. Every spinner below reports through it, so
+ * their per-phase counters read as one monotonic total.
+ */
+async function runAnalyze(
+  dir: string,
+  flags: Record<string, string>,
+  multiFlags: Record<string, string[]>,
+): Promise<void> {
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading/writing PRD
   await ensureLegacyPrdMigrated(dir);
 
@@ -783,6 +818,7 @@ async function logUsageAndCache(
           ...tokenUsage,
           vendor: metadata.vendor,
           model: metadata.model,
+          costUsd: priceAnalyzeTokenUsage(tokenUsage, metadata.model),
         }),
       });
     }

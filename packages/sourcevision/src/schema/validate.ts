@@ -48,6 +48,7 @@ const AnalysisRunSchema = z.object({
   llm: z.object({
     byTaskClass: z.record(z.string(), LLMClassUsageSchema),
     judgmentCache: z.object({ hits: z.number().int().nonnegative(), misses: z.number().int().nonnegative() }).optional(),
+    costUsd: z.number().nonnegative().optional(),
   }),
   partition: PartitionReviewSchema.extend({ reused: z.boolean() }).optional(),
 });

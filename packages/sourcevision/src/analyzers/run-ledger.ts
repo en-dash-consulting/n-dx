@@ -12,12 +12,14 @@
  * `.sourcevision/.cache/analyses.jsonl`.
  *
  * Module-level state, reset by {@link startRunLedger} at the top of each
- * analyze command. It imports nothing from the LLM clients so both of them
- * can record into it without a cycle.
+ * analyze command. It imports nothing from sourcevision's own LLM clients so
+ * both of them can record into it without a cycle — only the foundation-tier
+ * price table from `@n-dx/llm-client`, which imports nothing from here.
  *
  * @module sourcevision/analyzers/run-ledger
  */
 
+import { priceTokens, resolveModelPricing } from "@n-dx/llm-client";
 import type { AnalysisRun, LLMClassUsage, TokenUsage } from "../schema/index.js";
 
 /** One LLM call, as the client that made it saw it. */
@@ -111,7 +113,42 @@ export function snapshotRunLedger(): AnalysisRun {
     run.llm.judgmentCache = { hits: _cacheHits, misses: _cacheMisses };
   }
   if (_partition) run.partition = structuredClone(_partition);
+  const costUsd = priceRunLedger(run);
+  if (costUsd !== undefined) run.llm.costUsd = costUsd;
   return run;
+}
+
+/**
+ * Total USD cost of a run's LLM calls, priced per task class at the model that
+ * answered that class — not at one run-wide model. A cascade run routes cheap
+ * judgments to Jev and escalations to the text model, so a single-model price
+ * is wrong by whatever the split happens to be that day.
+ *
+ * Returns `undefined` when no call was made, so the manifest carries no field
+ * rather than a misleading `0`.
+ *
+ * Cache tokens are not broken out per task class in {@link LLMClassUsage}, so
+ * they price as zero here; today's sourcevision call sites do not use prompt
+ * caching. If one starts to, widen `LLMClassUsage` rather than approximating.
+ */
+export function priceRunLedger(run: AnalysisRun): number | undefined {
+  const buckets = Object.values(run.llm.byTaskClass);
+  if (buckets.length === 0) return undefined;
+
+  let total = 0;
+  for (const bucket of buckets) {
+    const { pricing } = resolveModelPricing(bucket.model);
+    total += priceTokens(
+      {
+        inputTokens: bucket.inputTokens,
+        outputTokens: bucket.outputTokens,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
+      },
+      pricing,
+    ).totalRaw;
+  }
+  return total;
 }
 
 /** One line per task class for the CLI's token report; empty when nothing ran. */
