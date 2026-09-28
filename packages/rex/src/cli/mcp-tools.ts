@@ -17,6 +17,7 @@ import { computeTimestampUpdates } from "../core/timestamps.js";
 import { findAutoCompletions } from "../core/parent-completion.js";
 import { validateDAG } from "../core/dag.js";
 import { cascadeParentReset } from "../core/parent-reset.js";
+import { appendExecutionLogEntry } from "../core/execution-log.js";
 import { validateMove, moveItem } from "../core/move.js";
 import { validateMerge, previewMerge, mergeItems } from "../core/merge.js";
 import { verify } from "../core/verify.js";
@@ -626,12 +627,7 @@ export async function handleAppendLog(
   args: { event: string; itemId?: string; detail?: string },
 ): Promise<McpResult> {
   try {
-    await store.appendLog({
-      timestamp: new Date().toISOString(),
-      event: args.event,
-      itemId: args.itemId,
-      detail: args.detail,
-    });
+    await appendExecutionLogEntry(store, args);
     return textResult(JSON.stringify({ logged: true, event: args.event }));
   } catch (err) {
     return textResult(`Error: ${(err as Error).message}`, true);
