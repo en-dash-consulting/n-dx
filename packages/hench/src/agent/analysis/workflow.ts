@@ -171,16 +171,31 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
 // ── Suggestion generators ────────────────────────────────────────────
 
 /**
- * Where "high token consumption" starts, in budgeted units.
- *
- * This was 100,000 while `avgTokensPerRun` summed input + output. Counting
- * cache writes moved the measure by roughly 12x — across the completed runs in
- * this repository's `.hench/runs/` (2026-09) the median went from 39.5K to
- * 489K — so the old number now sits below the median run and the suggestion
- * would fire on almost every prompt-cached project. 1.2M keeps it at the same
- * place it used to occupy: about 2.5x the median completed run.
+ * Where "high token consumption" starts, in budgeted units, for a run set
+ * whose `contextWriteFloor` is 0 — no completed run in the set ever paid a
+ * cache write, so `avgTokensPerRun` is still an input + output sum. This is
+ * the original threshold, unchanged.
  */
-const HIGH_COUNTED_TOKENS_PER_RUN = 1_200_000;
+const HIGH_COUNTED_TOKENS_PER_RUN_UNCACHED = 100_000;
+
+/**
+ * Where "high token consumption" starts once the run set has a non-zero
+ * `contextWriteFloor` — at least one completed run paid a cache write, so
+ * `avgTokensPerRun` counts cache writes too.
+ *
+ * Counting cache writes moved the measure by roughly 12x — across the
+ * completed runs in this repository's `.hench/runs/` (2026-09) the median went
+ * from 39.5K to 489K — so the uncached number would fire on almost every
+ * prompt-cached project. 1.2M keeps it at the same place the uncached
+ * threshold used to occupy relative to that population: about 2.5x the median
+ * completed run.
+ *
+ * Gating on `contextWriteFloor` rather than switching globally matters
+ * because a project with no cache writes never gets the 12x inflation: the
+ * 100K threshold still fits its `avgTokensPerRun`, and raising it 12x for
+ * those runs would silence a suggestion that should fire.
+ */
+const HIGH_COUNTED_TOKENS_PER_RUN_CACHED = 1_200_000;
 
 function suggestTokenEfficiency(
   runs: RunRecord[],
@@ -188,9 +203,12 @@ function suggestTokenEfficiency(
   config?: HenchConfig,
 ): WorkflowSuggestion[] {
   const suggestions: WorkflowSuggestion[] = [];
+  const highCountedTokensPerRun = stats.contextWriteFloor > 0
+    ? HIGH_COUNTED_TOKENS_PER_RUN_CACHED
+    : HIGH_COUNTED_TOKENS_PER_RUN_UNCACHED;
 
   // High token usage with low success rate
-  if (stats.avgTokensPerRun > HIGH_COUNTED_TOKENS_PER_RUN && stats.successRate < 0.5) {
+  if (stats.avgTokensPerRun > highCountedTokensPerRun && stats.successRate < 0.5) {
     suggestions.push({
       id: nextId("token-efficiency"),
       category: "token-efficiency",

@@ -199,17 +199,32 @@ describe("contextWriteFloor", () => {
 
 describe("neither tuner proposes a budget below the arrival cost", () => {
   it("adaptive: no tokenBudget proposal under the floor against a template budget", () => {
+    // The two newest runs regress to failure so successRateTrend < -0.1 and
+    // tokenUsageTrend > 0.2 both hold (tokens rise with recency in this
+    // fixture — see the file header), firing the complexity-scaling branch.
+    // Without this, the six-run all-completed fixture trips neither
+    // tokenBudget branch in adaptive.ts (successRateTrend stays 0, and
+    // recentAvgTokens sits well above tokenBudget * 0.3), so the loop over
+    // proposals ran zero times and the assertions below never executed.
     const runs = recordedRuns();
-    const analysis = analyzeAdaptive(runs, makeConfig({ tokenBudget: 600_000 }));
+    runs[4].status = "failed";
+    runs[5].status = "failed";
+
+    const metrics = collectMetrics(runs);
+    expect(metrics.successRateTrend).toBeLessThan(-0.1);
+    expect(metrics.tokenUsageTrend).toBeGreaterThan(0.2);
+    expect(metrics.contextWriteFloor).toBe(RECORDED_FLOOR);
+
+    // A 100K template budget scaled by 1.3x lands under the arrival cost;
+    // the clamp in adjustComplexityScaling must raise it back to the floor.
+    const config = makeConfig({ tokenBudget: 100_000 });
+    expect(Math.round(config.tokenBudget * 1.3)).toBeLessThan(RECORDED_FLOOR);
+
+    const analysis = analyzeAdaptive(runs, config);
     const budgets = proposedBudgets(analysis.adjustments.map((a) => a.configChanges));
 
+    expect(budgets.length).toBeGreaterThan(0);
     for (const b of budgets) expect(b).toBeGreaterThanOrEqual(RECORDED_FLOOR);
-
-    // The regression this guards: measured as input + output, the efficiency
-    // tuner fitted 2.5x an average of 44,695 and proposed ~112K — below the
-    // 184,930 arrival cost, so every later run died on arrival.
-    const oldAverage = inputPlusOutput(runs) / runs.length;
-    expect(Math.round(oldAverage * 2.5)).toBeLessThan(RECORDED_FLOOR);
   });
 
   it("adaptive: clamps to the floor when abandoned runs drag the average down", () => {
@@ -271,5 +286,48 @@ describe("neither tuner proposes a budget below the arrival cost", () => {
     );
     expect(highUsage).toBeDefined();
     expect(highUsage!.configChanges?.["tokenBudget"]).toBe(floor);
+  });
+});
+
+// ── High-usage threshold depends on whether cache writes were counted ──
+
+describe("workflow high-usage threshold switches on contextWriteFloor", () => {
+  it("uncached runs above 100K at low success rate produce the high-usage suggestion", () => {
+    const runs = [
+      makeRun("u1", "failed", "2026-09-01T00:00:00Z", { input: 50_000, output: 100_000 }),
+      makeRun("u2", "failed", "2026-09-02T00:00:00Z", { input: 60_000, output: 90_000 }),
+      makeRun("u3", "completed", "2026-09-03T00:00:00Z", { input: 40_000, output: 110_000 }),
+    ];
+    const stats = computeStats(runs);
+    expect(stats.contextWriteFloor).toBe(0);
+    expect(stats.avgTokensPerRun).toBeGreaterThan(100_000);
+    expect(stats.avgTokensPerRun).toBeLessThan(1_200_000);
+
+    const analysis = analyzeWorkflow(runs, makeConfig({ tokenBudget: 0 }));
+    const highUsage = analysis.suggestions.find(
+      (s) => s.category === "token-efficiency" && s.priority === "high",
+    );
+    expect(highUsage).toBeDefined();
+  });
+
+  it("prompt-cached runs below 1.2M do not produce the high-usage suggestion", () => {
+    const runs = [
+      makeRun("c1", "completed", "2026-09-01T00:00:00Z",
+        { input: 1_000, output: 50_000, cacheCreationInput: 100_000 }),
+      makeRun("c2", "failed", "2026-09-02T00:00:00Z",
+        { input: 2_000, output: 80_000, cacheCreationInput: 600_000 }),
+      makeRun("c3", "failed", "2026-09-03T00:00:00Z",
+        { input: 1_500, output: 90_000, cacheCreationInput: 550_000 }),
+    ];
+    const stats = computeStats(runs);
+    expect(stats.contextWriteFloor).toBeGreaterThan(0);
+    expect(stats.avgTokensPerRun).toBeGreaterThan(100_000);
+    expect(stats.avgTokensPerRun).toBeLessThan(1_200_000);
+
+    const analysis = analyzeWorkflow(runs, makeConfig({ tokenBudget: 0 }));
+    const highUsage = analysis.suggestions.find(
+      (s) => s.category === "token-efficiency" && s.priority === "high",
+    );
+    expect(highUsage).toBeUndefined();
   });
 });
