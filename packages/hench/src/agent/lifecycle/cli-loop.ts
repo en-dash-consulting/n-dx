@@ -64,6 +64,7 @@ import {
   sourcevisionFingerprint,
   evictDeadCacheEntries,
   unusedCacheScopes,
+  cacheEntryAgeMs,
   type BatchChainIdentity,
 } from "./session-cache.js";
 import { buildTaskBoundaryDivider } from "./batch-divider.js";
@@ -547,7 +548,7 @@ function extractTokenUsage(
 
   if (!usage) return;
 
-  const { usage: parsed, diagnosticStatus } = parseTokenUsageWithDiagnostic(usage);
+  const { usage: parsed, diagnosticStatus, cacheProvenance } = parseTokenUsageWithDiagnostic(usage);
 
   result.tokenUsage.input += parsed.input;
   result.tokenUsage.output += parsed.output;
@@ -557,6 +558,10 @@ function extractTokenUsage(
     input: parsed.input,
     output: parsed.output,
     diagnosticStatus,
+    // Recorded even when it is "unavailable" — that is the value the whole
+    // field exists to carry, and omitting it would put the turn back to being
+    // indistinguishable from one that measured zero.
+    cacheProvenance,
     vendor: tokenMetadata.vendor,
     model: tokenMetadata.model,
   };
@@ -2069,6 +2074,24 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         }
       : undefined;
 
+  // The decision this run was started under, recorded on the run record so it
+  // outlives the terminal the `detail()` lines below were printed to. Seeded
+  // with the cold answer; the two strategies that consult a cache overwrite it.
+  run.session = {
+    strategy: sessionStrategy,
+    outcome: "miss",
+    reason:
+      sessionStrategy !== "cold"
+        ? "not-consulted"
+        : config.sessionStrategy === "cold"
+          ? "configured-cold"
+          // `resolveSessionStrategy` degrades to cold for any vendor or
+          // provider that cannot resume a session by id. Saying so is the
+          // difference between "forking is off" and "forking was asked for and
+          // this vendor cannot do it".
+          : "fork-unsupported",
+  };
+
   if (sessionStrategy === "batch" && batchIdentity) {
     const chain = await readBatchChain(henchDir);
     const verdict = isBatchChainUsable(chain, {
@@ -2077,10 +2100,18 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       maxAgeHours: config.batchMaxAgeHours,
       maxIdleHours: config.batchMaxIdleHours,
     });
+    const chainAgeMs = chain ? cacheEntryAgeMs(chain.createdAt) : undefined;
     if (verdict.usable && chain) {
       batchResumeId = chain.sessionId;
       batchTaskNumber = chain.tasksUsed + 1;
       batchPreviousTaskTitle = chain.lastTaskTitle;
+      run.session = {
+        strategy: "batch",
+        outcome: "hit",
+        reason: "chain-continued",
+        ageMs: chainAgeMs,
+        sessionId: chain.sessionId,
+      };
       detail(
         `Batch session: continuing ${chain.sessionId.slice(0, 8)} ` +
           `(task ${batchTaskNumber} of up to ${tasksPerSession})`,
@@ -2089,12 +2120,14 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       // Any rejection means this task opens a new session. Drop the old chain
       // so a later failure cannot resume a session we have stopped counting.
       if (chain) await clearBatchChain(henchDir);
+      const reason = verdict.usable ? "no-chain" : verdict.reason;
+      run.session = { strategy: "batch", outcome: "miss", reason, ageMs: chainAgeMs };
       detail(`Batch session: starting fresh (${verdict.usable ? "new chain" : verdict.reason})`);
     }
   }
 
   if (sessionStrategy === "fork") {
-    warmParentId = await ensureWarmParent({
+    const decision = await ensureWarmParent({
       adapter,
       vendor,
       cliBinary,
@@ -2115,6 +2148,16 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           tokenMetadata,
         }),
     });
+    warmParentId = decision.parentId;
+    run.session = {
+      strategy: "fork",
+      outcome: decision.outcome,
+      reason: decision.reason,
+      ageMs: decision.ageMs,
+      // On a hit this is the parent that was forked. On a miss followed by a
+      // fresh orientation there is nothing reused to name, so it stays absent.
+      sessionId: decision.outcome === "hit" ? decision.parentId : undefined,
+    };
     if (warmParentId) run.parentSessionId = warmParentId;
   }
 

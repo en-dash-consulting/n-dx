@@ -33,7 +33,7 @@ import {
   createContextSummarizer,
 } from "./context-prune.js";
 import type { PruneOutcome, PruneShape } from "./context-prune.js";
-import { parseTokenUsage } from "./token-usage.js";
+import { parseTokenUsageWithDiagnostic } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD } from "../analysis/spin.js";
 import { createLivelockDetector } from "../analysis/livelock.js";
@@ -337,7 +337,7 @@ function recordTurnTokenUsage(
   vendor: string,
   model: string,
 ): void {
-  const parsed = parseTokenUsage(rawUsage);
+  const { usage: parsed, cacheProvenance } = parseTokenUsageWithDiagnostic(rawUsage);
 
   // Accumulate into run totals
   run.tokenUsage.input += parsed.input;
@@ -354,6 +354,7 @@ function recordTurnTokenUsage(
     turn,
     input: parsed.input,
     output: parsed.output,
+    cacheProvenance,
     vendor,
     model,
   };
@@ -539,6 +540,14 @@ function recordTurnTokenUsageNormalized(
     turn,
     input: usage.input,
     output: usage.output,
+    // The provider already normalized this, so the raw payload is gone and
+    // presence of a cache field is the only signal left. That under-reports a
+    // provider that measured zero — which is the safe direction: claiming
+    // "measured" for a number nobody measured is the error worth avoiding.
+    cacheProvenance:
+      usage.cacheCreationInput !== undefined || usage.cacheReadInput !== undefined
+        ? "measured"
+        : "unavailable",
     vendor,
     model,
   };

@@ -274,6 +274,14 @@ export class EventAccumulator {
         input: usage.input,
         output: usage.output,
         diagnosticStatus: turnDiagnostic,
+        // A RuntimeEvent carries the parsed usage, not the payload it came
+        // from, so presence of a cache field is all this layer can see. It
+        // errs toward "unavailable" rather than claiming a measurement the
+        // event never proved. See `recordTurnTokenUsageNormalized`.
+        cacheProvenance:
+          usage.cacheCreationInput !== undefined || usage.cacheReadInput !== undefined
+            ? "measured"
+            : "unavailable",
         vendor: event.vendor,
         ...(usage.cacheCreationInput ? { cacheCreationInput: usage.cacheCreationInput } : {}),
         ...(usage.cacheReadInput ? { cacheReadInput: usage.cacheReadInput } : {}),
@@ -440,7 +448,8 @@ export function processStreamLine(
 
         // Extract per-turn token usage from message.usage
         if (msg.usage && typeof msg.usage === "object") {
-          const { usage: parsed, diagnosticStatus } = parseTokenUsageWithDiagnostic(msg.usage as Record<string, unknown>);
+          const { usage: parsed, diagnosticStatus, cacheProvenance } =
+            parseTokenUsageWithDiagnostic(msg.usage as Record<string, unknown>);
 
           result.tokenUsage.input += parsed.input;
           result.tokenUsage.output += parsed.output;
@@ -450,6 +459,7 @@ export function processStreamLine(
             input: parsed.input,
             output: parsed.output,
             diagnosticStatus,
+            cacheProvenance,
             ...(tokenMetadata ? { vendor: tokenMetadata.vendor, model: tokenMetadata.model } : {}),
           };
 
@@ -662,9 +672,16 @@ export function processCodexJsonLine(
         result.summary = event.text.slice(0, MAX_SUMMARY_LENGTH);
       }
 
-      // Token usage embedded in the message event
+      // Token usage embedded in the message event.
+      //
+      // The cache halves are accumulated here for the same reason the Claude
+      // branch does it: this parser used to read `usage` and keep only input
+      // and output, so a Codex turn reporting 35k cached input tokens landed
+      // on the record as a run that cached nothing. `cross-vendor-run-record-
+      // smoke.test.ts` holds the two branches to the same shape.
       if (event.usage && typeof event.usage === "object") {
-        const { usage: parsed, diagnosticStatus } = parseTokenUsageWithDiagnostic(event.usage as Record<string, unknown>);
+        const { usage: parsed, diagnosticStatus, cacheProvenance } =
+          parseTokenUsageWithDiagnostic(event.usage as Record<string, unknown>);
         result.tokenUsage.input += parsed.input;
         result.tokenUsage.output += parsed.output;
 
@@ -673,8 +690,21 @@ export function processCodexJsonLine(
           input: parsed.input,
           output: parsed.output,
           diagnosticStatus,
+          cacheProvenance,
           ...(tokenMetadata ? { vendor: tokenMetadata.vendor, model: tokenMetadata.model } : {}),
         };
+
+        if (parsed.cacheCreationInput) {
+          result.tokenUsage.cacheCreationInput =
+            (result.tokenUsage.cacheCreationInput ?? 0) + parsed.cacheCreationInput;
+          turnUsage.cacheCreationInput = parsed.cacheCreationInput;
+        }
+        if (parsed.cacheReadInput) {
+          result.tokenUsage.cacheReadInput =
+            (result.tokenUsage.cacheReadInput ?? 0) + parsed.cacheReadInput;
+          turnUsage.cacheReadInput = parsed.cacheReadInput;
+        }
+
         result.turnTokenUsage.push(turnUsage);
       }
 

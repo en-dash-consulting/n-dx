@@ -860,6 +860,20 @@ export async function listCacheEntries(
   return inventory;
 }
 
+/**
+ * How old a cached entry was when it was consulted, or undefined when its
+ * stamp cannot be read.
+ *
+ * Undefined rather than 0 on an unparseable stamp: a run that reports "the
+ * entry was 0ms old" has said something false, where one that reports nothing
+ * has only declined to answer. The same distinction {@link CacheDefect}'s
+ * `malformed` draws, at the one place the number reaches a reader.
+ */
+export function cacheEntryAgeMs(createdAt: string, now: number = Date.now()): number | undefined {
+  const createdAtMs = Date.parse(createdAt);
+  return Number.isNaN(createdAtMs) ? undefined : Math.max(0, now - createdAtMs);
+}
+
 /** One evicted entry, named so the caller can say what it removed and why. */
 export interface CacheEviction {
   scope: CacheScope;
