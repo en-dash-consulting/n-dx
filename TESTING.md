@@ -199,10 +199,27 @@ bound that matches the failure mode:
 ## Flake Resistance
 
 A test that passes alone but fails inside the full suite — or on one developer's
-machine but not in CI — is a defect in the test, not noise to be retried. Four
+machine but not in CI — is a defect in the test, not noise to be retried. Five
 failure families have produced every such flake observed so far; each has a
-standing rule. (The headings below run 1, 3, 2, 4: they were written in the
+standing rule. (The headings below run 1, 3, 2, 4, 5: they were written in the
 order the families were found, and renumbering them would break inbound links.)
+
+### Reproducing a load-sensitive flake
+
+A flake you cannot reproduce is a flake you cannot fix, and "it only fails on a
+busy machine" is not a reproduction.
+
+```sh
+node scripts/soak-under-build-load.mjs           # 3 suite runs under concurrent build load
+node scripts/soak-under-build-load.mjs --runs=1
+```
+
+The script keeps the machine compiling the repo's TypeScript packages for as
+long as the suite runs, then reports each run's verdict alongside how many
+compilations finished beside it — a cycle count of zero means the load never
+ran and the result proves nothing. It emits to a temp directory rather than
+`dist/`, so the e2e suite's CLI spawns are never handed a half-written entry
+point; see the header comment for why that distinction matters.
 
 ### Family 1 — Foreign responses in HTTP route tests
 
