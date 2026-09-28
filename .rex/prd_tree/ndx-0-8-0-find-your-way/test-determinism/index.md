@@ -25,4 +25,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Prove the full suite passes under concurrent build load three times in a row](./prove-the-full-suite-passes-under.md) | pending |
 | [Real-timer ordering assertions are load-sensitive and invisible to the wall-clock inventory scanner](./real-timer-ordering-assertions-are.md) | pending |
 | [run-loop puts a lower bound on a real timer and dom-performance-monitor keeps an absolute count budget](./run-loop-puts-a-lower-bound-on-a-real.md) | completed |
-| [Search index rebuild and search route elapsed budgets bypass the documented BUDGET_MULTIPLIER policy](./search-index-rebuild-and-search-route.md) | in_progress |
+| [Search index rebuild and search route elapsed budgets bypass the documented BUDGET_MULTIPLIER policy](./search-index-rebuild-and-search-route.md) | completed |
