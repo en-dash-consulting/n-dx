@@ -224,7 +224,36 @@ describe("Search API routes", () => {
 
   // ── Response time ──────────────────────────────────────────────────────
 
-  it("responds under 200ms for typical PRD sizes", async () => {
+  /**
+   * This replaced `expect(data.elapsed_ms).toBeLessThan(200)`.
+   *
+   * That budget was absolute and unscaled, sitting beside a round-trip budget
+   * that does scale, and it measured the MACHINE: server-side search over 100
+   * items reads 0.15ms here, so 200ms carried three orders of magnitude of
+   * headroom and could only fire on a stall.
+   *
+   * A GROWTH RATIO IS NOT AVAILABLE FOR THIS ONE — measured, not assumed.
+   * `elapsed_ms` times `index.search()` alone, which is dominated by fixed
+   * per-query cost at any size a route test would serve: 0.150ms at 250 items
+   * against 0.182ms at 1000, a 1.21x reading for a 4x size step. A ratio built
+   * on sub-millisecond readings is noise, and the inventory is explicit that a
+   * ratio only cancels load when both readings are big enough to face the same
+   * preemption. The index's complexity claim is carried where the work is, in
+   * `search-index.test.ts`, not over HTTP.
+   *
+   * So assert what the route is actually responsible for: that `elapsed_ms` is
+   * a duration measured inside this request, not a reading of something else.
+   * The server's span is nested inside the round trip the client times around
+   * it, so it must be smaller — on any machine, under any load, because load
+   * inflates both. Injected `performance.now()` in place of the delta (process
+   * uptime, the mistake this shape of bug actually takes): 1506.64ms against a
+   * 1.25ms round trip, fails.
+   *
+   * Its limit, stated so nobody reads more into a green run than is there: a
+   * span that is wrong but still nested — timing the whole handler rather than
+   * the query — stays smaller than the round trip and passes.
+   */
+  it("reports a search time measured inside the round trip", async () => {
     const items = Array.from({ length: 100 }, (_, i) =>
       makeItem({
         id: `item-${i}`,
@@ -239,17 +268,24 @@ describe("Search API routes", () => {
     // Warm up the index
     await fetch(`http://127.0.0.1:${port}/api/search?q=implement`);
 
-    // Measure actual search time
+    // Time the round trip from outside. The server times the search from
+    // inside it, so one span strictly contains the other.
     const start = performance.now();
     const res = await fetch(`http://127.0.0.1:${port}/api/search?q=implement`);
-    const elapsed = performance.now() - start;
+    const roundTripMs = performance.now() - start;
     expect(res.status).toBe(200);
 
     const data = await res.json();
-    // The server-side elapsed time should be well under 200ms
-    expect(data.elapsed_ms).toBeLessThan(200);
-    // Total round-trip should also be reasonable
-    expect(elapsed).toBeLessThan(500 * BUDGET_MULTIPLIER); // generous for network overhead
+    expect(data.elapsed_ms).toBeGreaterThanOrEqual(0);
+    expect(
+      data.elapsed_ms,
+      `elapsed_ms (${data.elapsed_ms}ms) is supposed to time work done inside this ` +
+      `request, so it must be smaller than the ${roundTripMs.toFixed(2)}ms round trip ` +
+      `that contains it. A value at or above the round trip means the field is reading ` +
+      `a different clock (process uptime, an epoch timestamp) or a different unit.`,
+    ).toBeLessThan(roundTripMs);
+    // Standalone hang guardrail on the round trip, scaled per TESTING.md.
+    expect(roundTripMs).toBeLessThan(500 * BUDGET_MULTIPLIER); // generous for network overhead
   });
 
   // ── Query features ─────────────────────────────────────────────────────

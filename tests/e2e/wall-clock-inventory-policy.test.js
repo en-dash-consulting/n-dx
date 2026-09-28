@@ -123,8 +123,10 @@ describe("wall-clock assertion inventory completeness", () => {
   it("flags the known clock-decided suites (detector self-test)", () => {
     const flagged = findClockDecidedTestFiles();
     // If the detector regresses to flagging nothing, the inventory check below
-    // turns vacuously green. These three are open items in the inventory, so
-    // they are expected to keep matching until they are converted.
+    // turns vacuously green. All three still read a clock — the two search
+    // suites keep a multiplier-scaled hang guardrail beside the assertions that
+    // were converted, and tree-hardened is an open scaled budget — so they are
+    // expected to keep matching.
     expect(flagged).toContain("packages/web/tests/unit/server/routes-search.test.ts");
     expect(flagged).toContain("packages/web/tests/unit/server/search-index.test.ts");
     expect(flagged).toContain("packages/rex/tests/unit/core/tree-hardened.test.ts");
