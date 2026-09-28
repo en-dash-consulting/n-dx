@@ -31,7 +31,7 @@ import { info, result } from "../output.js";
 
 const USAGE_TEXT =
   "Usage: hench cache list [--scope=parent|batch|all] [--format=json] [dir]\n" +
-  "       hench cache clear [--scope=parent|batch|all] [dir]";
+  "       hench cache clear [--scope=parent|batch|all] [--dead] [dir]";
 
 /** Why an entry is dead, in words an operator can act on. */
 const DEFECT_DETAIL: Record<CacheDefect, string> = {

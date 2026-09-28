@@ -816,7 +816,8 @@ export interface CacheFreshnessInput {
  * Entries are surfaced verbatim. Nothing is summarised or redacted on the way
  * out because nothing sensitive goes in: the cache stores session ids,
  * fingerprints, counters and timestamps, and the one free-text field is a task
- * title the PRD already publishes. `cache-contents.test.ts` holds that line.
+ * title the PRD already publishes. The "cache file contents" block in
+ * `cache-inventory.test.ts` holds that line.
  */
 export interface CacheInventory {
   parent?: SessionCacheEntry & { defect?: CacheDefect };
