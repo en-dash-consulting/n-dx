@@ -4,6 +4,43 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { acquireLock, withLock } from "../../../src/store/file-lock.js";
 
+/**
+ * An explicit promise gate: whoever awaits `promise` resumes when `open()` is
+ * called, and not a millisecond before or after.
+ *
+ * The ordering tests below are about which side of a critical section runs
+ * first. Expressing that with real sleeps makes the verdict a function of
+ * machine load; expressing it with gates makes it a function of the lock.
+ * `packages/rex/tests/integration/concurrent-write-lost-update.test.ts` is the
+ * same technique applied to the store.
+ */
+function gate(): { promise: Promise<void>; open: () => void } {
+  let open!: () => void;
+  const promise = new Promise<void>((resolve) => { open = resolve; });
+  return { promise, open };
+}
+
+/**
+ * Let the event loop run to quiescence: microtasks, then the check phase,
+ * repeatedly, so completed filesystem callbacks get to run.
+ *
+ * This is a phase barrier, not a delay — it names no duration and cannot be
+ * "too short for a loaded machine" the way `setTimeout(5)` can. It is used
+ * below only to give a *wrongly* unblocked waiter every chance to reach the
+ * lock file before the holder lets go; the verdict itself comes from the gates.
+ * Measured limit, recorded so nobody re-derives it: with the in-process mutex
+ * removed, this catches the waiter jumping the queue only some of the time.
+ * The file lock refuses the second entrant independently, so a broken mutex
+ * surfaces as a rejection whose timing is decided by the filesystem rather
+ * than as a reordering. The mutex's own coverage is elsewhere; what this
+ * barrier buys here is that the *passing* verdict is not a timing accident.
+ */
+async function drainEventLoop(turns = 3): Promise<void> {
+  for (let i = 0; i < turns; i++) {
+    await new Promise<void>((resolve) => { setImmediate(resolve); });
+  }
+}
+
 describe("file-lock", () => {
   let tmpDir: string;
 
@@ -123,19 +160,34 @@ describe("file-lock", () => {
     const lockPath = await makeLockPath();
     const order: number[] = [];
 
+    // Gates, not delays. The ordering used to rest on a real 5 ms sleep
+    // landing inside a real 50 ms critical section — true on an idle machine,
+    // and nothing but a bet once the suite is saturating the event loop.
+    // `held` proves p1 owns the lock before p2 is created, and p2 joins the
+    // in-process queue synchronously (acquireInProcess appends to the queue
+    // before its first await), so releasing the holder afterwards cannot let
+    // p2 in early.
+    const held = gate();
+    const holderMayFinish = gate();
+
     const p1 = withLock(lockPath, async () => {
       order.push(1);
-      await new Promise((r) => setTimeout(r, 50));
+      held.open();
+      await holderMayFinish.promise;
       order.push(2);
     });
 
-    // Small delay so p1 acquires first
-    await new Promise((r) => setTimeout(r, 5));
+    await held.promise;
 
     const p2 = withLock(lockPath, async () => {
       order.push(3);
     });
 
+    // p2 is queued and the holder is still inside: it must not have run.
+    await drainEventLoop();
+    expect(order).toEqual([1]);
+
+    holderMayFinish.open();
     await Promise.all([p1, p2]);
     // p1 should complete (1, 2) before p2 starts (3)
     expect(order).toEqual([1, 2, 3]);
@@ -149,16 +201,24 @@ describe("file-lock", () => {
     // and entering concurrently (the root cause of folder-tree corruption).
     // In-process this is guaranteed by the mutex; across processes it is the
     // liveness check in assessLock.
+    // "However long it is held" is what the gate expresses: the holder stays
+    // inside until this test lets it out, which is an unbounded hold rather
+    // than the 300 ms one a real sleep could only approximate — and the waiter
+    // is queued behind it with no delay deciding the outcome.
+    const held = gate();
+    const holderMayFinish = gate();
+
     const p1 = withLock(
       lockPath,
       async () => {
         order.push("h-start");
-        await new Promise((r) => setTimeout(r, 300));
+        held.open();
+        await holderMayFinish.promise;
         order.push("h-end");
       },
     );
 
-    await new Promise((r) => setTimeout(r, 5));
+    await held.promise;
 
     const p2 = withLock(
       lockPath,
@@ -167,6 +227,10 @@ describe("file-lock", () => {
       },
     );
 
+    await drainEventLoop();
+    expect(order).toEqual(["h-start"]);
+
+    holderMayFinish.open();
     await Promise.all([p1, p2]);
     expect(order).toEqual(["h-start", "h-end", "w-start"]);
   });
