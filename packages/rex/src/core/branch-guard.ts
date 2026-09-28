@@ -9,7 +9,8 @@
  * PR's actual change don't catch that every item in the tree was touched.
  *
  * `checkBranchGuard` refuses those commands unless the caller is on the
- * default branch (`main`/`master`) or passed `--allow-on-branch`. It fails
+ * default branch (the branch `origin/HEAD` names, else `main`/`master`) or
+ * passed `--allow-on-branch`. It fails
  * open *only* when the branch cannot be determined at all — no git repo, or
  * git unavailable — both of which `resolveGitBranch` reports as `"unknown"`.
  * Blocking those would break every `.rex/` tree that is not (yet) inside a
@@ -25,10 +26,33 @@
  * @module core/branch-guard
  */
 
-import { resolveGitBranch } from "../store/branch-naming.js";
+import { execFileSync } from "node:child_process";
+import { resolveGitBranch, DEFAULT_BRANCHES } from "../store/branch-naming.js";
 
-/** Branch names treated as the default/trunk branch. */
-const DEFAULT_BRANCHES = new Set(["main", "master"]);
+const ORIGIN_PREFIX = "refs/remotes/origin/";
+
+/**
+ * The branch `origin/HEAD` points at, or null when the clone has no
+ * `origin/HEAD` (no remote, or one added without `--set-head`).
+ */
+function resolveOriginDefaultBranch(cwd: string): string | null {
+  try {
+    const ref = execFileSync(
+      "git",
+      ["symbolic-ref", "--quiet", `${ORIGIN_PREFIX}HEAD`],
+      { cwd, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+    return ref.startsWith(ORIGIN_PREFIX) ? ref.slice(ORIGIN_PREFIX.length) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** origin/HEAD's branch when the clone has one, else the well-known names. */
+function isDefaultBranch(cwd: string, branch: string): boolean {
+  const origin = resolveOriginDefaultBranch(cwd);
+  return origin ? branch === origin : (DEFAULT_BRANCHES as readonly string[]).includes(branch);
+}
 
 /** CLI flag that opts a command back into running on a feature branch. */
 export const ALLOW_ON_BRANCH_FLAG = "allow-on-branch";
@@ -56,7 +80,7 @@ export function checkBranchGuard(
 ): BranchGuardResult {
   const branch = resolveGitBranch(cwd);
   const allowed = flags[ALLOW_ON_BRANCH_FLAG] === "true";
-  const isFeatureBranch = branch !== "unknown" && !DEFAULT_BRANCHES.has(branch);
+  const isFeatureBranch = branch !== "unknown" && !isDefaultBranch(cwd, branch);
   return { blocked: isFeatureBranch && !allowed, branch };
 }
 

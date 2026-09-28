@@ -89,12 +89,12 @@ describe("branch guard: whole-tree rewrite commands", () => {
     initRepoOnMain(dir);
     git(dir, "checkout", "-b", FEATURE_BRANCH);
 
-    const blocked = await runGuarded(() => cmdReorganize(dir, {}));
+    const blocked = await runGuarded(() => cmdReorganize(dir, { accept: "true" }));
     expect(blocked.blockedByGuard).toBe(true);
     expect(blocked.message).toContain(FEATURE_BRANCH);
     expect(blocked.message).toContain("--allow-on-branch");
 
-    const allowed = await runGuarded(() => cmdReorganize(dir, { "allow-on-branch": "true" }));
+    const allowed = await runGuarded(() => cmdReorganize(dir, { accept: "true", "allow-on-branch": "true" }));
     expect(allowed.blockedByGuard).toBe(false);
   });
 
@@ -113,7 +113,7 @@ describe("branch guard: whole-tree rewrite commands", () => {
     expect(blocked.message).toContain(FEATURE_BRANCH);
     expect(blocked.message).toContain("--allow-on-branch");
 
-    const blockedSmart = await runGuarded(() => cmdPrune(dir, { smart: "true", "dry-run": "true" }));
+    const blockedSmart = await runGuarded(() => cmdPrune(dir, { smart: "true" }));
     expect(blockedSmart.blockedByGuard).toBe(true);
 
     const allowed = await runGuarded(() => cmdPrune(dir, { "allow-on-branch": "true" }));
@@ -124,6 +124,18 @@ describe("branch guard: whole-tree rewrite commands", () => {
     initRepoOnMain(dir);
     const result = await runGuarded(() => cmdPrune(dir, {}));
     expect(result.blockedByGuard).toBe(false);
+  });
+
+  it("read-only previews are not guarded on a feature branch", async () => {
+    initRepoOnMain(dir);
+    git(dir, "checkout", "-b", FEATURE_BRANCH);
+    for (const run of [
+      () => cmdReshape(dir, { "dry-run": "true" }),
+      () => cmdPrune(dir, { "dry-run": "true" }),
+      () => cmdReorganize(dir, {}),
+    ]) {
+      expect((await runGuarded(run)).blockedByGuard).toBe(false);
+    }
   });
 
   it("import-bundle --replace refuses on a feature branch and proceeds with --allow-on-branch", async () => {

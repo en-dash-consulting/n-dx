@@ -281,7 +281,9 @@ export async function cmdReorganize(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const guard = checkBranchGuard(dir, flags);
+  // Without --accept or --accept-llm, reorganize only prints proposals.
+  const writes = flags.accept !== undefined || flags["accept-llm"] !== undefined;
+  const guard = writes ? checkBranchGuard(dir, flags) : { blocked: false, branch: "" };
   if (guard.blocked) {
     const { message, suggestion } = branchGuardRefusal("reorganize", guard.branch);
     throw new CLIError(message, suggestion);

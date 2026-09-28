@@ -45,7 +45,7 @@ export function resolveGitBranch(cwd: string): string {
 }
 
 /** Well-known default branch names, checked in order. */
-const DEFAULT_BRANCHES = ["main", "master"] as const;
+export const DEFAULT_BRANCHES = ["main", "master"] as const;
 
 /**
  * Get the YYYY-MM-DD date of the first commit on the current branch.

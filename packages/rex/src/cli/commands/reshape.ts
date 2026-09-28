@@ -31,7 +31,8 @@ export async function cmdReshape(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const guard = checkBranchGuard(dir, flags);
+  // --dry-run only previews proposals, so it is not a whole-tree rewrite.
+  const guard = flags["dry-run"] === "true" ? { blocked: false, branch: "" } : checkBranchGuard(dir, flags);
   if (guard.blocked) {
     const { message, suggestion } = branchGuardRefusal("reshape", guard.branch);
     throw new CLIError(message, suggestion);

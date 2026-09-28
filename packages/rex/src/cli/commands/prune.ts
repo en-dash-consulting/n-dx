@@ -105,7 +105,8 @@ export async function cmdPrune(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const guard = checkBranchGuard(dir, flags);
+  // --dry-run only previews what would be pruned, so it is not a rewrite.
+  const guard = flags["dry-run"] === "true" ? { blocked: false, branch: "" } : checkBranchGuard(dir, flags);
   if (guard.blocked) {
     const { message, suggestion } = branchGuardRefusal("prune", guard.branch);
     throw new CLIError(message, suggestion);

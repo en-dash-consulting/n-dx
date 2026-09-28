@@ -48,6 +48,17 @@ describe("checkBranchGuard", () => {
     expect(result.branch).toBe("master");
   });
 
+  it("treats origin/HEAD's branch as the default, over main", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    git(tmpDir, "update-ref", "refs/remotes/origin/develop", "HEAD");
+    git(tmpDir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/develop");
+    git(tmpDir, "checkout", "-b", "develop");
+    expect(checkBranchGuard(tmpDir, {}).blocked).toBe(false);
+    git(tmpDir, "checkout", "main");
+    expect(checkBranchGuard(tmpDir, {}).blocked).toBe(true);
+  });
+
   it("blocks on a feature branch", () => {
     initRepo(tmpDir);
     git(tmpDir, "commit", "--allow-empty", "-m", "init");

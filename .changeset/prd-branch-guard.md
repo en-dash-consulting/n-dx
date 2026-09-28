@@ -9,9 +9,11 @@ Refuse whole-tree PRD rewrites off the default branch without `--allow-on-branch
 `reshape`, `reorganize`, `prune`, the `migrate-*` commands, and
 `import-bundle --replace` each rewrite the entire `.rex/prd_tree/` in one
 pass. Run on a feature branch, that rewrite has repeatedly ridden into `main`
-inside an unrelated pull request. These commands now refuse to run on any
-branch other than `main`/`master` unless `--allow-on-branch` is passed; the
-refusal names the branch and the flag. A tree with no resolvable git branch
+inside an unrelated pull request. These commands now refuse to run off the
+repository's default branch (the branch `origin/HEAD` names, else
+`main`/`master`) unless `--allow-on-branch` is passed; the refusal names the
+branch and the flag. Read-only previews (`--dry-run`, and `reorganize`
+without `--accept`) still run anywhere. A tree with no resolvable git branch
 (no repo, or git unavailable) is unaffected — the guard only fires on a real,
 named feature branch.
 
