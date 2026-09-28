@@ -94,6 +94,7 @@ const REX_COMMANDS = [
   "update",
   "remove",
   "move",
+  "log",
   "reshape",
   "prune",
   "usage",

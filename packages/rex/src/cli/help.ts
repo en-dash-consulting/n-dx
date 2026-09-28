@@ -201,6 +201,30 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["update", "prune"],
   },
+  log: {
+    tool: "rex",
+    command: "log",
+    summary: "append an execution-log entry (the non-MCP route to append_log)",
+    usage: 'rex log <event> [--item=<id>] [--detail="..."] [dir]',
+    description:
+      "Appends a structured entry to .rex/execution-log.jsonl. This is the same\n" +
+      "write the append_log MCP tool performs, reached without a rex MCP server:\n" +
+      "use it whenever the calling session has no MCP server connected (a\n" +
+      "claude/codex CLI-provider run is the common case). Detail is truncated to\n" +
+      "2,000 characters and the log rotates to execution-log.1.jsonl past 1 MB,\n" +
+      "same as the MCP route.",
+    options: [
+      { flag: "--item=<id>", description: "Related PRD item ID" },
+      { flag: "--detail=\"...\"", description: "Event details" },
+      { flag: "--format=json", description: "Machine-readable output" },
+    ],
+    examples: [
+      { command: "rex log task_started --item=abc123", description: "Log an event tied to a task" },
+      { command: "rex log implementation_note --detail=\"Extracted shared writer\"", description: "Log a freeform note" },
+      { command: "rex log task_completed --item=abc123 --format=json", description: "JSON output for scripting" },
+    ],
+    related: ["status"],
+  },
   move: {
     tool: "rex",
     command: "move",
@@ -698,6 +722,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   usage: ["status"],
   report: ["validate"],
   verify: ["status"],
+  log: ["status"],
   recommend: ["analyze", "status"],
   analyze: ["add", "recommend"],
   import: ["add", "recommend"],

@@ -29,6 +29,7 @@ export function usage(): void {
           { name: "fix [dir]", description: "Auto-fix common validation issues (timestamps, refs, status)" },
           { name: "report [dir]", description: "Generate JSON health report for CI dashboards" },
           { name: "verify [dir]", description: "Run tests for acceptance criteria" },
+          { name: "log <event> [dir]", description: "Append an execution-log entry — the non-MCP route to append_log" },
           { name: "recommend [dir]", description: "Get SourceVision recommendations" },
           { name: "analyze [dir]", description: "Build PRD from project analysis" },
           { name: "import [dir]", description: "Alias for analyze (file import shorthand)" },

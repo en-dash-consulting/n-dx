@@ -5,7 +5,7 @@
     "perCallTokens": 22345,
     "uniqueTokens": 13842,
     "skills": 13,
-    "skillTokens": 17483
+    "skillTokens": 17511
   },
   "skills": [
     {
@@ -58,18 +58,18 @@
       "tokens": 1139
     },
     {
+      "name": "ndx-work",
+      "file": "packages/core/assistant-assets/skills/ndx-work.md",
+      "shipped": true,
+      "chars": 3495,
+      "tokens": 874
+    },
+    {
       "name": "ndx-config",
       "file": "packages/core/assistant-assets/skills/ndx-config.md",
       "shipped": true,
       "chars": 3444,
       "tokens": 861
-    },
-    {
-      "name": "ndx-work",
-      "file": "packages/core/assistant-assets/skills/ndx-work.md",
-      "shipped": true,
-      "chars": 3382,
-      "tokens": 846
     },
     {
       "name": "ndx-feedback",
@@ -987,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "7ef26d414db5dc63",
-  "recordedAt": "2026-09-25T06:08:44.745Z",
-  "commit": "ffc467d3c36e",
+  "contentHash": "0be70d41f3b64518",
+  "recordedAt": "2026-09-28T19:34:04.378Z",
+  "commit": "79d0d9b72d19",
   "dirty": false
 }

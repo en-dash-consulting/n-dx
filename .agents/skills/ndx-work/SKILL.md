@@ -16,7 +16,7 @@ Pick up a task from the PRD and begin working on it.
 8. After user approves the plan, call `update_task_status` (rex MCP) to mark as `in_progress`, then mark where this task's token usage starts: run `ndx hench usage mark --task=<id> .`. The CLI snapshots the session transcript's cumulative usage and position under the task id; step 13's record computes the task's spend as the difference between that snapshot and the transcript then — arithmetic done by code, not a timestamp typed by hand. If the command reports no session or transcript, continue; the record will say it fell back
 9. Implement the changes following the workflow discipline
 10. Run validation and tests as specified in the workflow
-11. Call `append_log` (rex MCP) with what was done, decisions made, and issues encountered
+11. Call `append_log` (rex MCP) with what was done, decisions made, and issues encountered. If the rex MCP server is not connected, run `ndx log <event> --detail="..."` instead (rex CLI, no MCP required)
 12. When done, use `update_task_status` (rex MCP) to mark as `completed`
 13. Record the work in hench run history so it is auditable alongside `ndx work` runs, together with what it cost: run `ndx hench record --task=<id> --status=completed --title="<task title>" --summary="<one-line summary>" .`. Token usage is computed by the CLI as the difference between the mark from step 8 and the session transcript now, per token class, and attributed to the task — several tasks in one session each get exactly their own slice. The run's start time is taken from the mark, so there is no timestamp to pass. Use `--status=cancelled` (or `failed`) instead if the task was not completed, and `--no-tokens` to record without usage.
 
