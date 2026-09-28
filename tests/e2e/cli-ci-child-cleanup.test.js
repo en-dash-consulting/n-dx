@@ -51,12 +51,57 @@ const CI_DOUBLE_PATH = join(
   "../fixtures/ci-child-cleanup/ci-child-double.mjs",
 );
 
-// Mirror child-lifecycle.js defaults so the timing budget is consistent.
+/**
+ * The documented load allowance — TESTING.md, Family 3.
+ *
+ * Every wait below is a hang guardrail around a REAL spawned process: `ndx ci`
+ * has to start Node, reach its first tracked spawn, and be reaped. None of them
+ * decides a verdict — the assertions are about which PIDs are alive and what the
+ * parent printed, and those read the same on an idle machine and a saturated
+ * one. So widening them costs no detection and buys the whole documented 20x.
+ *
+ * Sized for the idle case, these timed out under `scripts/soak-under-build-load.mjs`:
+ * the SIGINT case took 8678ms against the 3000ms first-record deadline and failed
+ * with a suite that had nothing wrong with it. The file is 4.90s idle.
+ */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
+/**
+ * Mirror of child-lifecycle.js's force-kill default.
+ *
+ * NOT scaled, deliberately: this is the product's own timer, a real 5s that the
+ * CLI waits between SIGTERM and SIGKILL. Multiplying it here would describe a
+ * product that does not exist. The test's own allowance for observing that timer
+ * complete under load is SHUTDOWN_ASSERTION_BUFFER_MS, which does scale.
+ */
 const CHILD_FORCE_KILL_TIMEOUT_MS = 5_000;
-const SHUTDOWN_ASSERTION_BUFFER_MS = 1_500;
+
+/** Test-side allowance on top of the product's force-kill timer. */
+const SHUTDOWN_ASSERTION_BUFFER_MS = 1_500 * BUDGET_MULTIPLIER;
+
+/** How long to wait for a spawned fixture child to write its first PID record. */
+const PID_RECORD_TIMEOUT_MS = 3_000 * BUDGET_MULTIPLIER;
 
 /** How long teardown waits for an already-killed child to leave the process table. */
-const ORPHAN_REAP_GRACE_MS = 2_000;
+const ORPHAN_REAP_GRACE_MS = 2_000 * BUDGET_MULTIPLIER;
+
+/** How long a normally-completed ci child gets to exit once its parent has. */
+const NORMAL_EXIT_GRACE_MS = 500 * BUDGET_MULTIPLIER;
+
+/**
+ * Per-test ceiling for the SIGINT case, kept ABOVE the guardrails inside it so a
+ * hang is reported by the helper that owns it — "timed out waiting for required
+ * CI child records" — rather than as an opaque test timeout. TESTING.md requires
+ * that ordering, and the previous constant no longer satisfied it once the
+ * record deadline scaled. The sum is the file's worst sequential path: wait for
+ * both PID records, then for the product's force-kill timer to complete.
+ *
+ * 100s at the default multiplier, inside the root config's 120s testTimeout. The
+ * other case in this file needs no override: its guardrails sum to 70s, already
+ * under that default.
+ */
+const FORCE_KILL_TEST_TIMEOUT_MS =
+  PID_RECORD_TIMEOUT_MS + CHILD_FORCE_KILL_TIMEOUT_MS + SHUTDOWN_ASSERTION_BUFFER_MS + 5_000;
 
 function isPidRunning(pid) {
   if (!Number.isInteger(pid)) return false;
@@ -113,7 +158,7 @@ async function readPidRecords(pidFile) {
  * Read the first PID record written by ci-child-double.mjs.
  * Polls until the record appears or the timeout elapses.
  */
-async function readFirstPidRecord(pidFile, timeoutMs = 3_000) {
+async function readFirstPidRecord(pidFile, timeoutMs = PID_RECORD_TIMEOUT_MS) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -129,7 +174,7 @@ async function readFirstPidRecord(pidFile, timeoutMs = 3_000) {
   throw new Error(`Timed out waiting for CI child PID record at ${pidFile}`);
 }
 
-async function readPidRecordsUntil(pidFile, predicate, timeoutMs = 3_000) {
+async function readPidRecordsUntil(pidFile, predicate, timeoutMs = PID_RECORD_TIMEOUT_MS) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const records = await readPidRecords(pidFile);
@@ -307,27 +352,37 @@ describe("n-dx ci child-process cleanup regression coverage", () => {
     //    failing or timing-out case leaves a node process reparented to PID 1
     //    on every single run — a sweep of one dev machine found 31 of them
     //    holding 431 MB, the oldest alive for over 11 hours.
-    const survivors = [];
+    const candidates = [];
     for (const run of activeRuns) {
       for (const record of await readPidRecords(run.pidFile)) {
-        if (!isPidRunning(record.pid)) continue;
+        if (isPidRunning(record.pid)) candidates.push(record);
+      }
+    }
 
-        // Bounded grace before calling it a survivor: a child SIGKILLed moments
-        // before its parent exited can still answer signal 0 while it is a
-        // zombie awaiting reparenting, and signal 0 cannot tell the two apart.
-        try {
-          await waitForPidExit(record.pid, ORPHAN_REAP_GRACE_MS);
-          continue;
-        } catch {
-          // Genuinely still running.
-        }
+    // Bounded grace before calling one a survivor: a child SIGKILLed moments
+    // before its parent exited can still answer signal 0 while it is a zombie
+    // awaiting reparenting, and signal 0 cannot tell the two apart.
+    //
+    // Concurrently, because the grace now scales with BUDGET_MULTIPLIER. Run in
+    // series these would sum, and a handful of survivors would outrun the hook
+    // timeout — turning a loud, named survivor list into an opaque "hook timed
+    // out". The waits are independent, so one grace period covers all of them.
+    // Nothing is paid in the green case: a reaped PID never becomes a candidate.
+    const stillAlive = await Promise.all(
+      candidates.map((record) =>
+        waitForPidExit(record.pid, ORPHAN_REAP_GRACE_MS).then(() => null, () => record),
+      ),
+    );
 
-        survivors.push(`${record.pid} (${(record.argv ?? []).join(" ")})`);
-        try {
-          process.kill(record.pid, "SIGKILL");
-        } catch {
-          // Raced us to exit.
-        }
+    const survivors = [];
+    for (const record of stillAlive) {
+      if (!record) continue;
+
+      survivors.push(`${record.pid} (${(record.argv ?? []).join(" ")})`);
+      try {
+        process.kill(record.pid, "SIGKILL");
+      } catch {
+        // Raced us to exit.
       }
     }
     activeRuns.length = 0;
@@ -355,13 +410,13 @@ describe("n-dx ci child-process cleanup regression coverage", () => {
 
     // The parent may exit non-zero if other steps (e.g. docs build) fail in
     // the temp dir — that's fine.  We only care that the tracked subprocess exited.
-    await waitForPidExit(pidRecord.pid, 500);
+    await waitForPidExit(pidRecord.pid, NORMAL_EXIT_GRACE_MS);
     expect(result.code).not.toBeNull(); // parent exited
   });
 
   it(
     "force-kills the ci subprocess after SIGINT interruption",
-    { timeout: CHILD_FORCE_KILL_TIMEOUT_MS + SHUTDOWN_ASSERTION_BUFFER_MS + 5_000 },
+    { timeout: FORCE_KILL_TEST_TIMEOUT_MS },
     async () => {
       const run = spawnCI(tmpDir, "hang");
       const records = await readPidRecordsUntil(

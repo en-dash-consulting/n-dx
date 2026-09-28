@@ -2,18 +2,19 @@
 id: "9830182a-29a4-4d1a-a141-4fd921cdf6b7"
 level: "task"
 title: "cli-ci-child-cleanup polls on a raw 3000ms deadline that bypasses BUDGET_MULTIPLIER and times out under build load"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "0.8.0"
   - "test-determinism"
   - "pr-16"
 source: "soak under concurrent build load, run 1 at the write-volume fix"
+startedAt: "2026-09-28T19:53:25.527Z"
 acceptanceCriteria:
   - "Both polling deadlines in tests/e2e/cli-ci-child-cleanup.test.js scale with NDX_TEST_TIME_MULTIPLIER, and any other raw wait in the file is either scaled or justified in place."
   - "The file passes under `node scripts/soak-under-build-load.mjs --runs=1`, with the idle and loaded timings recorded in the task."
   - "No assertion about the child's PID records is weakened to buy margin."
 description: "Found by the closing soak for the write-volume task (4c318f7c), on the run that proved `@n-dx/rex` green under load. Same harness (`node scripts/soak-under-build-load.mjs --runs=1`), same machine (Intel Core Ultra 5 225F, 10 logical CPUs, 31.5 GB, Windows 11 26200, Node 24.16.0). 5 of 6 suites passed; `root (tests/**)` failed with 1 of 2750 tests red:\n\n    FAIL tests/e2e/cli-ci-child-cleanup.test.js > n-dx ci child-process cleanup regression coverage\n         > force-kills the ci subprocess after SIGINT interruption  (8678ms)\n    Error: Timed out waiting for required CI child records at <tmp>/ci-child-pids.jsonl\n      at readPidRecordsUntil tests/e2e/cli-ci-child-cleanup.test.js:140:9\n      at tests/e2e/cli-ci-child-cleanup.test.js:367:23\n\n    (cascade) Error: EBUSY: resource busy or locked, rmdir <tmp>  — fixture teardown,\n    failing because the child the test was still waiting for held the directory.\n\nThe whole file passes idle in 4.90s.\n\nNot a regression, and unrelated to the write-volume change, which touched only `packages/rex/tests/integration/prd-tree-atomic-writes.test.ts` and `tests/wall-clock-assertion-inventory.md`.\n\nThe cause is two raw polling deadlines in the file's own helpers:\n\n    async function readFirstPidRecord(pidFile, timeoutMs = 3_000)              // line 116\n    async function readPidRecordsUntil(pidFile, predicate, timeoutMs = 3_000)  // line 132\n\nBoth poll a real spawned `ndx ci` child at 25ms intervals for a fixed 3000ms and throw when it elapses. Neither reads `NDX_TEST_TIME_MULTIPLIER`, so the 20x load allowance TESTING.md documents for exactly this shape never reaches them — the same defect already fixed in `search-index.test.ts` and `routes-search.test.ts` under this feature. Three seconds is a plausible budget for a child that has to start Node and reach its first write on an idle machine and not on a loaded one; at 8678ms the test had spent well past the deadline.\n\nThis is a polling deadline, not an assertion, so it is Family 3 (subprocess guardrails too tight for a loaded machine), not a wall-clock assertion — the inventory scanner does not and should not flag it.\n\nImplementation notes: scale both defaults by the documented multiplier, the way `packages/sourcevision/tests/e2e/cli-hints.test.ts` and `packages/web/tests/integration/worktrees-route.test.ts` already do (`const BUDGET_MULTIPLIER = Number(process.env[\"NDX_TEST_TIME_MULTIPLIER\"] ?? 20)`). Check the file for other raw waits at the same time. Do not weaken the predicates — the timeout is a hang guardrail, and what the test asserts about the child's PID records must not move. The EBUSY teardown failure is a cascade of the first and should resolve with it; if it survives, it is its own finding.\n\nConstraints that apply to every n-dx change: cross-package imports go only through the package's gateway module; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name with a patch bump; run pnpm preflight before opening the PR."
-lastModified: "2026-09-28T19:40:29.536Z"
+lastModified: "2026-09-28T19:53:26.575Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
