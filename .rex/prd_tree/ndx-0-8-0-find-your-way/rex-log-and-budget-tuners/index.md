@@ -23,6 +23,10 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [append_log is MCP-only — no CLI equivalent, so ndx work runs cannot write execution-log entries](./append-log-is-mcp-only-no-cli.md) | pending |
-| [Make the adaptive and workflow tuners measure run cost in the same token classes as checkTokenBudget](./make-the-adaptive-and-workflow-tuners.md) | pending |
+| [append_log is MCP-only — no CLI equivalent, so ndx work runs cannot write execution-log entries](./append-log-is-mcp-only-no-cli.md) | completed |
+| [Close the rex log follow-ups from the db878e62 review: [dir] handling, --item in the workflow step, --format=json help, workflow refresh, rotation race](./close-the-rex-log-follow-ups-from-the.md) | pending |
+| [Close the two should-fix gaps the 114c4bc8 review dropped: vacuous floor test and non-cached high-usage threshold](./close-the-two-should-fix-gaps-the.md) | completed |
+| [Fix the dashboard's duplicate tuners, which recommend a token budget below the arrival cost](./fix-the-dashboard-s-duplicate-tuners.md) | pending |
+| [Make the adaptive and workflow tuners measure run cost in the same token classes as checkTokenBudget](./make-the-adaptive-and-workflow-tuners.md) | completed |
+| [Make the tuners' context-write floor hold when no cached run completed, and harden the two threshold tests](./make-the-tuners-context-write-floor.md) | pending |
 | [Set the prune defaults from the 0.7.1 post-release measurement batch](./set-the-prune-defaults-from-the-0-7-1.md) | pending |

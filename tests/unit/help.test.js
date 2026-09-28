@@ -10,6 +10,7 @@ import {
   formatToolHelp,
   getRelatedCommands,
   formatRelatedCommands,
+  formatOrchestratorCommandHelp,
 } from "../../packages/core/help.js";
 
 describe("help.js", () => {
@@ -248,6 +249,21 @@ describe("help.js", () => {
 
     it("returns null for empty array", () => {
       expect(formatRelatedCommands([])).toBeNull();
+    });
+  });
+
+  describe("formatOrchestratorCommandHelp", () => {
+    it("ndx log names event, item and detail and says it is the non-MCP route to append_log", () => {
+      const output = formatOrchestratorCommandHelp("log");
+      expect(output).toContain("<event>");
+      expect(output).toContain("--item");
+      expect(output).toContain("--detail");
+      expect(output).toContain("append_log");
+      expect(output.toLowerCase()).toContain("mcp");
+    });
+
+    it("returns null for a command with no help definition", () => {
+      expect(formatOrchestratorCommandHelp("nonexistent")).toBeNull();
     });
   });
 });
