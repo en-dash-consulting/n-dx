@@ -281,6 +281,18 @@ bounds a clock reading and is not named there fails
 assertion; read the register before adding one, because the site you are about
 to write may already be recorded as open.
 
+**A real sleep in front of an assertion is the same defect without the clock.**
+`await sleep(50); expect(scheduler).toHaveBeenCalled()` names no duration, so it
+reads as an ordering or a count — but the sleep is still the barrier deciding
+the verdict, and a machine busy enough to swallow the window fails it with the
+code unchanged. The same scan flags this shape (awaited non-zero sleep, then an
+`expect` with no `await` in between) and holds it to the same register. Prefer
+waiting for the event itself: a promise the production code resolves, or fake
+timers advanced by a named interval. A sleep that only widens the window for a
+*bug* to appear is sound and is not flagged, because the gate that follows it
+decides the verdict — see
+`packages/rex/tests/integration/concurrent-write-lost-update.test.ts`.
+
 Almost every wall-clock assertion in this repo is standing in for a *complexity*
 claim — "this must not go quadratic" — not a latency SLA. Three techniques can
 carry that claim. Prefer them in this order; each is strictly more load-immune

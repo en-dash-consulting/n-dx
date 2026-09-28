@@ -20,8 +20,16 @@ Resistance → Family 2.** Read it first. In short, and in preference order:
    scaled through
    `const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20)`.
 
-`tests/e2e/wall-clock-inventory-policy.test.js` scans for clock-derived
-assertions and fails if a file holding one is not named anywhere in this file.
+`tests/e2e/wall-clock-inventory-policy.test.js` scans for two shapes and fails
+if a file holding either is not named anywhere in this file:
+
+1. **A clock decides a bound** — the file reads a clock and an `expect` whose
+   subject names a duration is bounded by a comparison matcher.
+2. **A real sleep is the barrier before the assertion** — an awaited non-zero
+   `setTimeout`/`sleep` followed by an `expect(` with no `await` in between.
+   Nothing here names a duration; the verdict is an ordering or a count that
+   real timers produced, and the sleep is a bet on the event landing inside it.
+
 Being listed does not mean an assertion is *good* — it means somebody looked at
 it and wrote down why it is still there.
 
@@ -102,22 +110,76 @@ than scaling it" — and every one of these is named for a complexity claim.
 
 ## Not clock-derived, but load-sensitive for a different reason
 
-The scanner does not detect these, and they are a different family: real timers
-driving an *ordering* or *count* assertion. Recorded here so the sweep is
-honest about its own edges rather than implying the register is complete.
+A second family: real timers driving an *ordering* or a *count*. Nothing in
+these assertions names a duration, so the clock detector cannot see them — they
+were listed by hand here until 0.8.0, which is the arrangement that goes stale.
+**`wall-clock-inventory-policy.test.js` now scans for them too**: an awaited
+non-zero sleep followed by an `expect(` with no `await` in between. The hand
+list below is now a record of what was done, not the mechanism.
 
-| Site | Assertion | Note |
+### Converted
+
+| Site | Was | Now |
 |---|---|---|
-| `packages/web/tests/unit/server/register-scheduler.test.ts:159,180` | `expect(maxConcurrent).toBe(1)`, `expect(callCount).toBeGreaterThanOrEqual(1)` | 15–30ms intervals observed over a 100–150ms real window. A starved event loop yields zero ticks. |
-| `packages/web/tests/integration/seam-register-scheduler.test.ts:83,121,166` | `toHaveBeenCalled()`, `expect(fired).toBe(true)` | 10ms intervals, 50–100ms real waits. |
-| `packages/hench/tests/unit/store/run-retention-scheduler.test.ts:256` | `expect(broadcasts.length).toBeGreaterThanOrEqual(1)` | 50ms interval, 600ms wait. The comment already acknowledges 100–200ms event-loop delays; the response was widening the window, not removing the dependency. |
-| `packages/rex/tests/unit/store/file-lock.test.ts:75,106` | `expect(order).toEqual([...])` | Ordering rests on a real 5ms delay landing inside a 50ms / 300ms critical section. |
-| `packages/hench/tests/unit/queue/execution-queue.test.ts:213,345,346,366,384,385` | `expect(order).toEqual([...])`, `expect(maxObserved).toBeLessThanOrEqual(2)` | Real 1–10ms sleeps as the only settling barrier; line 361 adds `Math.random()` to the mix. |
-| `packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts:138,143` | `expect(formatElapsed(...)).toBe("30s")` | Fixture built from `Date.now()` a few statements before the assertion reads it again; ≥1s of drift between the two flips the expected string. |
+| `packages/web/tests/unit/server/register-scheduler.test.ts` | `expect(maxConcurrent).toBe(1)` after a real 150ms sleep with a 15ms interval and a 50ms callback, and `expect(callCount).toBeGreaterThanOrEqual(1)` after 100ms with a 30ms interval. A starved event loop delivers no tick in either window, and `maxConcurrent` comes back 0 with the overlap guard working perfectly. | Fake timers. The overlap test holds one cycle open with a gate across ten firings and asserts `getTaskUsage` was called once, then releases it and asserts the next firing runs a cycle — the guard must also let go. The interval test asserts nothing fired at 29ms and one tick fired at 30ms. Regressions injected: disabling the `running` guard gives 10 concurrent calls against a bound of 1; adding 5ms to the resolved interval fails the second — where `≥ 1` after 100ms passed it. |
+| `packages/web/tests/integration/seam-register-scheduler.test.ts` | Four real 50–100ms waits for a 10ms interval, then `toHaveBeenCalled()` / `expect(fired).toBe(true)`. | Each test waits on a promise the injected callback resolves. A seam that never fires now trips vitest's timeout ("never called") instead of failing an assertion about something that merely had not happened yet. The broadcast test also gained the assertion it was named for: it slept 80ms and then checked only `collectAllIds`, never `broadcast`. |
+| `packages/hench/tests/unit/store/run-retention-scheduler.test.ts` | `expect(broadcasts.length).toBeGreaterThanOrEqual(1)` after a 600ms wait on a 50ms interval. The comment acknowledged 100–200ms event-loop delays under full-monorepo load; the response had been to widen the window rather than remove the dependency on it. | Gated on the first `broadcast` call. |
+| `packages/rex/tests/unit/store/file-lock.test.ts` | `expect(order).toEqual([...])` in two tests, resting on a real 5ms delay landing inside a real 50ms / 300ms critical section. | Promise gates: the holder signals that it owns the lock, the waiter is created, and the holder is released only afterwards — an unbounded hold rather than a 300ms approximation of one. An intermediate assertion proves the waiter did not run while the holder was inside. **Measured limit, recorded so it is not re-derived:** removing the in-process mutex is caught only intermittently, because the file lock refuses the second entrant independently and produces a rejection whose timing the filesystem decides. What the conversion guarantees is that the *passing* verdict is not a timing accident. |
+| `packages/hench/tests/unit/queue/execution-queue.test.ts` | `expect(order).toEqual([...])` after a 10ms "allow all microtasks to settle" sleep, and three "simulate async work" sleeps of 1–10ms — one of them `Math.random() * 5`, so the interleaving a passing run exercised was unknown and unrepeatable. | `release()` shifts and resolves synchronously, so the FIFO test releases all three slots and awaits the three acquisitions; hand-off order is then microtask order. Work sleeps became microtask yields, staggered by index rather than by `Math.random()`. Injecting LIFO insertion fails the converted test in 0ms with a real diff — while the neighbouring unconverted FIFO test, which awaits each acquisition before the next release, deadlocks and reports a 30s timeout instead. |
+| `packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts` | `expect(formatElapsed(...)).toBe("30s")` on a fixture built from `Date.now()` a few statements before `formatElapsed` reads the clock again; a second of drift flips the string. | `vi.setSystemTime` pins the instant for the block. Fake timers were already installed by the outer `beforeEach`, but nothing fixed the instant they started from, so the two reads were equal by luck rather than by construction. |
 
 `packages/rex/tests/integration/concurrent-write-lost-update.test.ts:224,284`
 looks like this family and is not: its ordering is forced by explicit promise
-gates, so load cannot reorder the verdict.
+gates, so load cannot reorder the verdict. Its `await sleep(150)` is a
+*negative* window — it only gives the bug more chance to appear, and the gate
+decides the verdict — which is why the scanner's `await`-free rule does not
+flag it. That distinction is the rule, not an exemption: a sleep that must be
+long enough for *correct* behaviour is the defect; a sleep that widens the
+window for *broken* behaviour is sound.
+
+### Open — real sleep before the assertion, not yet converted
+
+Captured mechanically by the scanner at the time it was added, not reviewed
+one by one. They are listed so the gate ratchets: anything **not** on this list
+that matches must be converted or argued for. Do not read inclusion as
+approval — read it as "this existed before the detector did".
+
+Waiting on a spawned process or CLI:
+
+- `tests/e2e/cli-prd-no-json-writes.test.js`
+- `tests/e2e/cli-refresh.test.js`
+- `tests/e2e/cli-start.test.js`
+- `tests/e2e/cli-web.test.js`
+- `tests/e2e/pair-programming-timeout-tree-kill.test.js`
+- `tests/e2e/stop-orphan-children.test.js`
+- `tests/integration/exec-interrupt-forwarding.test.js`
+- `tests/integration/scheduler-startup.test.js`
+- `tests/unit/web-port-occupant.test.js`
+- `packages/hench/tests/integration/commit-msg-timer.test.ts`
+- `packages/hench/tests/integration/git-mutation-failures.test.ts`
+- `packages/hench/tests/integration/livelock-cli-spawn.test.ts`
+- `packages/hench/tests/integration/stale-commit-msg-quarantine.test.ts`
+- `packages/llm-client/tests/integration/exec-timeout-tree-kill.test.ts`
+- `packages/rex/tests/e2e/cli-no-json-writes.test.ts`
+- `packages/rex/tests/integration/backup-snapshots.test.ts`
+
+Waiting on a server or socket:
+
+- `packages/web/tests/integration/hench-runs-dashboard.test.ts`
+- `packages/web/tests/integration/ws-health-integration.test.ts`
+- `packages/web/tests/unit/server/routes-commands.test.ts`
+- `packages/web/tests/unit/server/websocket.test.ts`
+- `packages/web/tests/unit/server/ws-health-tracker.test.ts`
+
+Waiting on a viewer effect or render:
+
+- `packages/web/tests/unit/viewer/a11y-semantic-html.test.ts`
+- `packages/web/tests/unit/viewer/next-steps-panel.test.ts`
+- `packages/web/tests/unit/viewer/prune-diff-tree.test.ts`
+- `packages/web/tests/unit/viewer/tier3-surfaces.test.ts`
+- `packages/web/tests/unit/viewer/tree-event-delegate.test.ts`
+- `packages/web/tests/unit/viewer/workspace-switcher.test.ts`
+- `packages/web/tests/unit/viewer/workspaces-view.test.ts`
 
 ---
 

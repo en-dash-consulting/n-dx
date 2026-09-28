@@ -65,11 +65,35 @@ async function writeRun(
   );
 }
 
+// ─── Gates ───────────────────────────────────────────────────────────────────
+
+/**
+ * A promise resolved by the first call to `signal`.
+ *
+ * Every test below used to start a 10 ms interval, sleep for a real 50–100 ms
+ * and then assert the injected callback had run. That window is not a property
+ * of the seam — it is a bet that the event loop will deliver a tick inside it,
+ * and the bet loses whenever the rest of the suite is saturating the machine.
+ * Waiting for the call itself cannot be reordered by load: a slow machine only
+ * makes the wait longer, and a seam that never fires trips vitest's own
+ * timeout, which reports "never called" rather than an assertion about a
+ * callback that simply had not happened yet.
+ */
+function callGate(): { signal: () => void; called: Promise<void> } {
+  let signal!: () => void;
+  const called = new Promise<void>((resolve) => { signal = resolve; });
+  return { signal, called };
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("RegisterSchedulerOptions seam contract", () => {
   it("getAggregator is called when the scheduler interval fires", async () => {
-    const getAggregator = vi.fn(() => makeAggregator());
+    const gate = callGate();
+    const getAggregator = vi.fn(() => {
+      gate.signal();
+      return makeAggregator();
+    });
 
     const handle = registerUsageScheduler({
       ctx: { rexDir: join(tmpDir, ".rex"), projectDir: tmpDir },
@@ -77,15 +101,18 @@ describe("RegisterSchedulerOptions seam contract", () => {
       overrideIntervalMs: 10,
     });
 
-    // Wait for the interval to fire at least once
-    await new Promise((r) => setTimeout(r, 50));
+    await gate.called;
     clearInterval(handle);
 
     expect(getAggregator).toHaveBeenCalled();
   });
 
   it("broadcast is called when orphaned entries are pruned", async () => {
-    const broadcast = vi.fn();
+    // The gate is on `broadcast` — the seam this test is named for. It used to
+    // sleep 80 ms and then assert only that `collectAllIds` had run, so the
+    // broadcast half of the contract was never checked at all.
+    const gate = callGate();
+    const broadcast = vi.fn(() => gate.signal());
 
     // Write a run for a task, then supply an empty valid-IDs set so it's "orphaned"
     await writeRun("run-1.json", "orphaned-task", { input: 100, output: 50 });
@@ -114,12 +141,15 @@ describe("RegisterSchedulerOptions seam contract", () => {
       overrideIntervalMs: 10,
     });
 
-    await new Promise((r) => setTimeout(r, 80));
+    await gate.called;
     clearInterval(handle);
 
-    // broadcast is only called when there are orphaned entries to remove
-    // collectAllIds must have been called to determine valid IDs
+    // broadcast is only called when there are orphaned entries to remove, and
+    // collectAllIds is what determines which IDs are still valid.
     expect(collectAllIds).toHaveBeenCalled();
+    expect(broadcast).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "hench:usage-cleanup", totalOrphaned: 1 }),
+    );
   });
 
   it("returns a clearable interval handle", () => {
@@ -135,33 +165,43 @@ describe("RegisterSchedulerOptions seam contract", () => {
   });
 
   it("options without broadcast do not throw when scheduler fires", async () => {
+    // Gated on the tick, because the claim is about what happens *when the
+    // scheduler fires*. Sleeping instead meant a window with no tick in it
+    // satisfied the test without the minimal-options path ever running.
+    const gate = callGate();
     const options: RegisterSchedulerOptions = {
       ctx: { rexDir: join(tmpDir, ".rex"), projectDir: tmpDir },
-      getAggregator: () => makeAggregator(),
+      getAggregator: () => {
+        gate.signal();
+        return makeAggregator();
+      },
       overrideIntervalMs: 10,
       // no broadcast, no collectAllIds, no loadPRD
     };
 
     const handle = registerUsageScheduler(options);
-    await new Promise((r) => setTimeout(r, 50));
+    await gate.called;
     clearInterval(handle);
-    // Reaching here means no unhandled errors
+    // Reaching here means the tick ran and raised no unhandled error.
   });
 
   it("overrideIntervalMs is respected over config file defaults", async () => {
     // The scheduler interval should be 10ms, not the default 7-day interval.
-    // If overrideIntervalMs is ignored, the callback would never fire in 50ms.
+    // If overrideIntervalMs is ignored, the gate never opens and the test
+    // fails on vitest's timeout naming this test.
+    const gate = callGate();
     let fired = false;
     const handle = registerUsageScheduler({
       ctx: { rexDir: join(tmpDir, ".rex"), projectDir: tmpDir },
       getAggregator: () => {
         fired = true;
+        gate.signal();
         return makeAggregator();
       },
       overrideIntervalMs: 10,
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await gate.called;
     clearInterval(handle);
 
     expect(fired).toBe(true);

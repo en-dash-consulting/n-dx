@@ -239,17 +239,24 @@ describe("RunRetentionScheduler", () => {
 
       const broadcasts: unknown[] = [];
 
-      // Use a short interval for testing
+      // Wait for the tick, not for a window it is expected to fall inside.
+      // This used to sleep 600 ms for a 50 ms interval and the comment
+      // acknowledged 100–200 ms of event-loop delay under full-monorepo load —
+      // widening the window rather than removing the dependency on it. A
+      // machine so busy that no tick lands still fails, but as vitest's own
+      // timeout, which says "never fired" instead of "fired the wrong number
+      // of times".
+      let firstTick!: () => void;
+      const ticked = new Promise<void>((resolve) => { firstTick = resolve; });
+
       const timer = await startRetentionScheduler({
         runsDir,
         projectDir,
-        broadcast: (data) => broadcasts.push(data),
+        broadcast: (data) => { broadcasts.push(data); firstTick(); },
         overrideIntervalMs: 50,
       });
 
-      // Wait long enough for at least one tick even under full-monorepo
-      // parallel load, where the event loop can be delayed by 100–200 ms.
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      await ticked;
       clearInterval(timer);
 
       // Should have executed at least once
