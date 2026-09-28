@@ -104,6 +104,7 @@ const VALUE_KEYS = new Set([
   "port",
   "group-by",
   "accept-llm",
+  "detail",
   ...MULTI_VALUE_KEYS,
 ]);
 
@@ -364,7 +365,7 @@ async function dispatchCommand(
   // their own dir resolution and requireRexDir check inside the case block.
   const SKIP_DIR_CHECK = new Set([
     "init", "analyze", "import", "update", "move", "add", "reshape", "remove",
-    "parse-md",
+    "log", "parse-md",
     // Invoked by git with three temp-file paths (%O %A %B) from any cwd —
     // there is no project dir to check.
     "merge-driver",
@@ -429,6 +430,20 @@ async function dispatchCommand(
     }
     case "remove": {
       await dispatchRemove(positional, flags);
+      break;
+    }
+    case "log": {
+      const event = positional[0];
+      if (!event) {
+        throw new CLIError(
+          "Missing event name.",
+          'Usage: rex log <event> [--item=<id>] [--detail="..."] [dir]',
+        );
+      }
+      const dir =
+        positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
+      const { cmdLog } = await import("./commands/log.js");
+      await cmdLog(dir, event, flags);
       break;
     }
     case "reshape": {
@@ -588,7 +603,7 @@ async function dispatchCommand(
 
       const REX_COMMANDS = [
         "init", "status", "tree", "next", "add", "update", "move", "remove", "reshape",
-        "prune", "restore", "validate", "fix", "sync", "usage", "report", "verify",
+        "prune", "restore", "validate", "fix", "sync", "usage", "report", "verify", "log",
         "recommend", "analyze", "import", "export", "import-bundle", "adapter",
         "reorganize", "health", "mcp",
         "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "parse-md",
