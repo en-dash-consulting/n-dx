@@ -32,4 +32,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Release readiness](./release-readiness/index.md) | pending |
 | [rex log and budget tuners](./rex-log-and-budget-tuners/index.md) | pending |
 | [Settings consolidation](./settings-consolidation/index.md) | pending |
-| [Test determinism](./test-determinism/index.md) | pending |
+| [Test determinism](./test-determinism/index.md) | completed |
