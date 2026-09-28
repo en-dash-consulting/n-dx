@@ -249,6 +249,22 @@ describe("StagePage", () => {
     expect([...new Set(rendered)]).toEqual(["rex-dashboard"]);
   });
 
+  it("shows each stage's lead section in the page itself, with no dropdown", async () => {
+    for (const stage of STAGE_ORDER) {
+      const lead = STAGES[stage].sections[0];
+      expect(lead.plain, `${stage} lead is plain`).toBe(true);
+      expect(STAGES[stage].sections.filter((s) => s.plain)).toHaveLength(1);
+
+      rendered.length = 0;
+      if (root) { render(null, root); root.remove(); }
+      await mount(page(stage));
+      const el = root.querySelector(`.stage-section[data-view="${lead.view}"]`)!;
+      expect(el.classList.contains("stage-section--plain")).toBe(true);
+      expect(el.querySelector(".stage-section-toggle")).toBeNull();
+      expect(el.querySelector(`[data-rendered="${lead.view}"]`)).not.toBeNull();
+    }
+  });
+
   it("opens and closes a section, remembering the choice", async () => {
     await mount(page("work"));
     const toggle = root.querySelector<HTMLButtonElement>('.stage-section[data-view="activity"] .stage-section-toggle')!;
@@ -263,6 +279,34 @@ describe("StagePage", () => {
     root.remove();
     await mount(page("work"));
     expect(root.querySelector('.stage-section[data-view="activity"] .stage-section-toggle')?.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("keeps History a bounded scroll region until Expand, remembering the choice", async () => {
+    expect(STAGES.work.sections.find((s) => s.view === "activity")?.scroll).toBe(true);
+    expect(STAGES.plan.sections.find((s) => s.view === "hench-runs")?.scroll).toBe(true);
+    expect(STAGES.analyze.sections.find((s) => s.view === "files")?.scroll).toBe(true);
+
+    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:activity": true }));
+    await mount(page("work"));
+    const history = () => root.querySelector('.stage-section[data-view="activity"]')!;
+    const body = () => history().querySelector<HTMLElement>(".stage-section-body")!;
+    const expand = () => history().querySelector<HTMLButtonElement>(".stage-section-expand")!;
+
+    expect(body().classList.contains("stage-section-body--scroll")).toBe(true);
+    expect(body().getAttribute("tabindex")).toBe("0");
+    expect(expand().getAttribute("aria-expanded")).toBe("false");
+
+    act(() => { expand().click(); });
+    expect(body().classList.contains("stage-section-body--scroll")).toBe(false);
+    expect(expand().getAttribute("aria-expanded")).toBe("true");
+    expect(JSON.parse(localStorage.getItem("ndx.stage-sections")!)).toMatchObject({ "work:activity:full": true });
+
+    // Sections without the option get no Expand control.
+    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:hench-templates": true }));
+    render(null, root);
+    root.remove();
+    await mount(page("work"));
+    expect(root.querySelector('.stage-section[data-view="hench-templates"] .stage-section-expand')).toBeNull();
   });
 
   it("flips the map section between the 2D and 3D projections", async () => {

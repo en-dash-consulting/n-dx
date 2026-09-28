@@ -30,10 +30,21 @@ export interface StageSection {
   /** Expanded when the stage page first opens. */
   open?: boolean;
   /**
+   * The stage's lead section, shown in the page itself with no dropdown
+   * header: always rendered, never collapsible. One per stage, first.
+   */
+  plain?: boolean;
+  /**
    * A second projection of the same content behind a toggle in the section
    * header — the 2D import map and the 3D isometric map are one section.
    */
   alt?: { view: ViewId; label: string; primaryLabel: string };
+  /**
+   * A long list (run history, the execution log): the open section is a
+   * bounded scroll region, with an Expand control in its header that shows it
+   * at full length. The choice is remembered per section.
+   */
+  scroll?: boolean;
   /**
    * The view owns a full-height layout of its own (the Tasks tree: a pinned
    * filter bar over a virtual scroller that sizes itself from its container),
@@ -67,7 +78,7 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     product: "sourcevision",
     blurb: "What the codebase looks like: files, zones, imports and the findings worth acting on.",
     sections: [
-      { view: "overview", title: "General repository information", blurb: "Counts, health and coupling, the largest zones.", open: true },
+      { view: "overview", title: "General repository information", blurb: "Counts, health and coupling, the largest zones.", plain: true },
       {
         view: "graph",
         title: "Repository map",
@@ -75,7 +86,7 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
         alt: { view: "iso-map", label: "3D", primaryLabel: "2D" },
       },
       { view: "zones", title: "Zones", blurb: "Clusters of files that import each other more than the rest." },
-      { view: "files", title: "Files", blurb: "The inventory, by role and language." },
+      { view: "files", title: "Files", blurb: "The inventory, by role and language.", scroll: true },
       { view: "problems", title: "Problems", blurb: "Findings from the enrichment passes." },
       { view: "suggestions", title: "Suggestions", blurb: "Improvements the analysis proposes." },
       { view: "architecture", title: "Architecture", blurb: "Patterns and layering across zones." },
@@ -92,10 +103,10 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     product: "rex",
     blurb: "What to build next: the PRD, proposals from analysis, and the planning commands.",
     sections: [
-      { view: "analysis", title: "Add items", blurb: "Describe work, import a document, or turn analysis into proposals.", open: true },
+      { view: "analysis", title: "Add items", blurb: "Describe work, import a document, or turn analysis into proposals.", plain: true },
       { view: "prd", title: "Tasks", blurb: "The full PRD tree — epics, features, tasks.", open: true, fill: true },
       { view: "command-reference", title: "CLI help", blurb: "Every command, with the ones you can run from here." },
-      { view: "hench-runs", title: "History", blurb: "What the agent has run, most recent first." },
+      { view: "hench-runs", title: "History", blurb: "What the agent has run, most recent first.", scroll: true },
       { view: "merge-graph", title: "Context graph", blurb: "How the PRD's items connect." },
       { view: "validation", title: "Validation", blurb: "Structural checks on the PRD." },
       { view: "requirements", title: "Requirements", blurb: "Acceptance criteria and where they are tested." },
@@ -108,8 +119,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     product: "hench",
     blurb: "Get it done: hand the next task to the agent, pick a run mode, watch what it costs.",
     sections: [
-      { view: "rex-dashboard", title: "Up next and PRD items", blurb: "The next task with its run button, progress and open epics.", open: true },
-      { view: "activity", title: "History", blurb: "The execution log — completions as the agent recorded them." },
+      { view: "rex-dashboard", title: "Up next and PRD items", blurb: "The next task with its run button, progress and open epics.", plain: true },
+      { view: "activity", title: "History", blurb: "The execution log — completions as the agent recorded them.", scroll: true },
       { view: "hench-templates", title: "Templates", blurb: "Run presets: limits, guard rails, provider." },
       { view: "token-usage", title: "Usage", blurb: "Tokens and estimated cost by period and package." },
       { view: "hench-audit", title: "Audit", blurb: "Per-task run logs and outcomes." },

@@ -50,10 +50,21 @@ interface SectionProps {
   renderView: RenderView;
 }
 
+/** The stage's lead section: the view itself, in the page, no dropdown. */
+function PlainSection({ section, renderView }: Pick<SectionProps, "section" | "renderView">) {
+  return h("section", { class: "stage-section stage-section--plain", "data-view": section.view, "aria-label": section.title },
+    renderView(section.view),
+  );
+}
+
 function Section({ stage, section, showAlt, navigateTo, renderView }: SectionProps) {
   const key = `${stage}:${section.view}`;
   const [open, setOpen] = useState<boolean>(() => readOpenState()[key] ?? !!section.open);
   const [useAlt, setUseAlt] = useState(false);
+  // Scroll sections: bounded by default, full length on Expand. Stored beside
+  // the open state under "<stage>:<view>:full".
+  const fullKey = `${key}:full`;
+  const [full, setFull] = useState<boolean>(() => readOpenState()[fullKey] ?? false);
   const shown: ViewId = useAlt && section.alt ? section.alt.view : section.view;
   const bodyId = `stage-section-${stage}-${section.view}`;
 
@@ -62,6 +73,17 @@ function Section({ stage, section, showAlt, navigateTo, renderView }: SectionPro
     setOpen(next);
     writeOpenState(key, next);
   };
+  const toggleFull = () => {
+    const next = !full;
+    setFull(next);
+    writeOpenState(fullKey, next);
+  };
+
+  const bodyClass = [
+    "stage-section-body",
+    section.fill ? "stage-section-body--fill" : "",
+    section.scroll && !full ? "stage-section-body--scroll" : "",
+  ].filter(Boolean).join(" ");
 
   return h("section", { class: `stage-section${open ? " stage-section--open" : ""}`, "data-view": section.view },
     h("div", { class: "stage-section-head" },
@@ -92,6 +114,16 @@ function Section({ stage, section, showAlt, navigateTo, renderView }: SectionPro
             }, section.alt.label),
           )
         : null,
+      section.scroll && open
+        ? h("button", {
+            type: "button",
+            class: "stage-section-expand",
+            onClick: toggleFull,
+            "aria-expanded": String(full),
+            "aria-controls": bodyId,
+            title: full ? "Show as a scrollable list" : "Show at full length",
+          }, full ? "Collapse ▴" : "Expand ▾")
+        : null,
       h("button", {
         type: "button",
         class: "stage-section-open",
@@ -100,7 +132,12 @@ function Section({ stage, section, showAlt, navigateTo, renderView }: SectionPro
       }, "Open ↗"),
     ),
     open
-      ? h("div", { class: `stage-section-body${section.fill ? " stage-section-body--fill" : ""}`, id: bodyId },
+      ? h("div", {
+          class: bodyClass,
+          id: bodyId,
+          // A bounded scroll region must be reachable by keyboard.
+          tabIndex: section.scroll && !full ? 0 : undefined,
+        },
           renderView(shown),
         )
       : null,
@@ -140,6 +177,7 @@ export function StagePage({ stage, validViews, navigateTo, renderView }: StagePa
     ),
     sections.map((s) => {
       // The second projection is a server-built view too (the isometric map).
+      if (s.plain) return h(PlainSection, { key: s.view, section: s, renderView });
       const showAlt = !!s.alt && validViews.has(s.alt.view) && !deployed;
       return h(Section, { key: s.view, stage, section: s, showAlt, navigateTo, renderView });
     }),

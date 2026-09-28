@@ -356,6 +356,8 @@
 
 .stage-section { margin-bottom: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-surface); }
 .stage-section--open { border-color: var(--border-strong, var(--border)); }
+/* The lead section sits in the page itself — no card, no header, no toggle. */
+.stage-section--plain { border: none; background: none; margin-bottom: var(--space-5); }
 .stage-section-head { display: flex; align-items: center; gap: var(--space-2); padding-right: var(--space-3); }
 .stage-section-toggle {
   flex: 1;
@@ -378,6 +380,16 @@
 .stage-section-projection { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
 .stage-section-projection-btn { padding: 4px 11px; border: none; background: transparent; color: var(--text-dim); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
 .stage-section-projection-btn.active { background: var(--accent); color: var(--bg); }
+/* Long lists (History): a bounded scroll region until Expand. */
+.stage-section-body--scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+}
+.stage-section-body--scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.stage-section-expand { flex-shrink: 0; padding: 3px 9px; border: 1px solid var(--border); border-radius: var(--radius-md); background: transparent; color: var(--text-dim); font: inherit; font-size: 11px; cursor: pointer; }
+.stage-section-expand:hover, .stage-section-expand:focus-visible { color: var(--text); border-color: var(--accent); outline: none; }
 .stage-section-open { flex-shrink: 0; padding: 3px 9px; border: 1px solid var(--border); border-radius: var(--radius-md); background: transparent; color: var(--text-dim); font: inherit; font-size: 11px; cursor: pointer; }
 .stage-section-open:hover, .stage-section-open:focus-visible { color: var(--text); border-color: var(--accent); outline: none; }
 .stage-section-body { padding: 0 var(--space-4) var(--space-4); border-top: 1px solid var(--border); padding-top: var(--space-4); }
