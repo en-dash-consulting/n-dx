@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  activeStageTab,
   bootViewer,
   ensureBrowserStubs,
   jsonResponse,
@@ -79,8 +80,7 @@ describe("token usage route regression", { timeout: 120_000 }, () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
     ensureBrowserStubs();
-    localStorage.removeItem("sidebar-collapsed");
-    localStorage.removeItem("sidebar-expanded-section");
+    localStorage.removeItem("ndx.stage-sections");
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -99,10 +99,14 @@ describe("token usage route regression", { timeout: 120_000 }, () => {
     await waitFor(() => document.querySelector(".token-usage-container") !== null);
     await waitFor(() => document.querySelector(".token-header h2")?.textContent === "LLM Utilization");
 
-    expect(document.querySelector(".nav-item.active")?.textContent).toContain("Token Usage");
+    // Token Usage is listed by Analysis and Work; a Rex-only viewer has
+    // neither, so no stage is lit and the breadcrumb names no stage — in
+    // particular not Rex's, which is what the legacy route used to claim.
+    expect(activeStageTab()).toBeNull();
     expect(window.history.state?.view).toBe("token-usage");
     expect(document.querySelector(".breadcrumb-current")?.textContent).toContain("Token Usage");
     expect(document.querySelector(".breadcrumb-product-rex")).toBeNull();
+    expect(document.querySelector(".breadcrumb-product")).toBeNull();
     expect(document.title).toContain("Token Usage");
     expect(document.title).toContain("Global");
   });
@@ -116,7 +120,7 @@ describe("token usage route regression", { timeout: 120_000 }, () => {
     expect(window.location.pathname).toBe("/token-usage");
     expect(window.location.pathname.startsWith("/rex-dashboard/")).toBe(false);
     expect(window.history.state?.view).toBe("token-usage");
-    expect(document.querySelector(".nav-item.active")?.textContent).toContain("Token Usage");
+    expect(activeStageTab()).toBeNull();
   });
 
   it("renders token usage in non-rex scoped viewers because it is global", async () => {
@@ -126,6 +130,8 @@ describe("token usage route regression", { timeout: 120_000 }, () => {
     await waitFor(() => document.querySelector(".token-usage-container") !== null);
 
     expect(window.history.state?.view).toBe("token-usage");
-    expect(document.querySelector(".nav-item.active")?.textContent).toContain("Token Usage");
+    // In a SourceVision viewer, Analysis exists and lists Token Usage.
+    expect(activeStageTab()).toBe("Analysis");
+    expect(document.querySelector(".breadcrumb-product")?.textContent).toBe("Analysis");
   });
 });

@@ -36,6 +36,10 @@ test.afterAll(async () => {
 // Every ViewId from src/shared/view-id.ts. If a view is added or renamed
 // there, update this list — that mismatch is itself worth catching.
 const VIEWS = [
+  "home",
+  "analyze",
+  "plan",
+  "work",
   "workspaces",
   "overview",
   "graph",
@@ -77,9 +81,9 @@ for (const view of VIEWS) {
     const res = await page.goto(`${dashboard.baseUrl}/${view}`, { waitUntil: "domcontentloaded" });
     expect(res?.ok(), `HTTP status for /${view}`).toBeTruthy();
 
-    // The app shell (sidebar) is the one element every view shares.
-    await expect(page.locator('nav[aria-label="View navigation"], nav[aria-label="Section navigation"]'))
-      .toBeVisible({ timeout: 10_000 });
+    // The top navigation is the one element every view shares — settings
+    // views open as an overlay over it, so check presence, not visibility.
+    await expect(page.locator('nav[aria-label="View navigation"]')).toHaveCount(1, { timeout: 10_000 });
 
     // Give async data fetches a moment to resolve/reject.
     await page.waitForTimeout(500);
@@ -88,19 +92,59 @@ for (const view of VIEWS) {
   });
 }
 
-test("sidebar navigation click updates the active view", async ({ page }) => {
+test("a bare URL lands on home; a stage tab and a section link update the active view", async ({ page }) => {
   const tracker = trackConsoleErrors(page);
-  await page.goto(`${dashboard.baseUrl}/overview`, { waitUntil: "domcontentloaded" });
-  await expect(page.locator('nav[aria-label="View navigation"], nav[aria-label="Section navigation"]'))
-    .toBeVisible();
+  await page.goto(`${dashboard.baseUrl}/`, { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".stage-card")).toHaveCount(3, { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/home$/);
 
-  // Expand the REX section (if collapsed) and click "Tasks" (id: "prd").
-  const rexSectionHeader = page.locator('.nav-section-header[aria-controls="nav-section-REX"]');
-  if ((await rexSectionHeader.getAttribute("aria-expanded")) !== "true") {
-    await rexSectionHeader.click();
-  }
-  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  // The Plan column goes to the Plan stage and lights its tab.
+  await page.locator('.stage-card[data-stage="plan"]').click();
+  await expect(page).toHaveURL(/\/plan$/);
+  await expect(page.locator(".topnav-tab.active .topnav-tab-label")).toHaveText("Plan");
 
+  // Tasks is offered as a link: open its section, then follow it.
+  const tasks = page.locator('.stage-section[data-view="prd"]');
+  await tasks.locator(".stage-section-toggle").click();
+  await tasks.getByRole("button", { name: "Open Tasks \u2192" }).click();
   await expect(page).toHaveURL(/\/prd$/);
+  // The view keeps its stage lit.
+  await expect(page.locator(".topnav-tab.active .topnav-tab-label")).toHaveText("Plan");
+
+  // The side stage link steps on to Work.
+  await page.locator(".stage-link-next").click();
+  await expect(page).toHaveURL(/\/work$/);
+  expect(tracker.errors).toEqual([]);
+});
+
+test("settings open over the page from the cog and close back to it", async ({ page }) => {
+  const tracker = trackConsoleErrors(page);
+  await page.goto(`${dashboard.baseUrl}/work`, { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".bottombar-settings")).toBeVisible({ timeout: 10_000 });
+
+  await page.locator(".bottombar-settings").click();
+  await expect(page).toHaveURL(/\/llm-provider$/);
+  await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
+  await expect(page.locator('main .stage-page[data-stage="work"]')).toHaveCount(1); // still mounted underneath
+
+  await page.getByRole("button", { name: "Close settings" }).click();
+  await expect(page).toHaveURL(/\/work$/);
+  await expect(page.getByRole("dialog", { name: "Settings" })).toHaveCount(0);
+  expect(tracker.errors).toEqual([]);
+});
+
+test("the commands sheet lifts over the page and lowers again", async ({ page }) => {
+  const tracker = trackConsoleErrors(page);
+  await page.goto(`${dashboard.baseUrl}/analyze`, { waitUntil: "domcontentloaded" });
+  const toggle = page.locator(".bottombar-commands");
+  await expect(toggle).toBeVisible({ timeout: 10_000 });
+
+  await toggle.click();
+  await expect(page.locator("#commands-sheet")).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(page).toHaveURL(/\/analyze$/); // UI state, not a route
+
+  await page.getByRole("button", { name: "Close commands" }).click();
+  await expect(page.locator("#commands-sheet")).toBeHidden();
   expect(tracker.errors).toEqual([]);
 });

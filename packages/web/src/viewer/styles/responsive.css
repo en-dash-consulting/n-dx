@@ -1,7 +1,6 @@
 /* Responsive — tablet */
 @media (max-width: 1024px) {
   :root {
-    --sidebar-w: 180px;
     --panel-w: 280px;
   }
 
@@ -38,109 +37,9 @@
 
 /* Responsive — mobile */
 @media (max-width: 768px) {
-  #app {
-    flex-direction: column;
-  }
-
-  /* On mobile, sidebar becomes overlay — reset desktop collapsed state */
-  .sidebar,
-  .sidebar.sidebar-collapsed {
-    width: 100%;
-    min-width: 100%;
-    height: auto;
-    max-height: 56px;
-    overflow: hidden;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    transition: max-height 0.3s ease;
-    position: relative;
-  }
-
-  .sidebar.sidebar-collapsed .sidebar-header,
-  .sidebar.sidebar-collapsed .sidebar-nav {
-    opacity: 1;
-    pointer-events: auto;
-    position: static;
-    visibility: visible;
-  }
-
-  /* Hide collapsed rail on mobile — use full overlay instead */
-  .sidebar-rail {
-    display: none;
-  }
-
-  .sidebar.mobile-open {
-    max-height: 100vh;
-    max-height: 100dvh;
-    overflow-y: auto;
-    position: fixed;
-    inset: 0;
-    z-index: 600;
-    background: var(--bg-surface);
-  }
-
-  /* Mobile backdrop */
-  .sidebar-backdrop {
-    display: none;
-  }
-
-  .sidebar.mobile-open + .sidebar-backdrop,
-  .sidebar.mobile-open .sidebar-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 599;
-  }
-
-  .sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-  }
-
-  .sidebar-header h1 { font-size: 14px; }
-
-  .mobile-menu-btn {
-    display: block;
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    font-size: 18px;
-    cursor: pointer;
-    padding: 4px;
-  }
-
-  .sidebar-nav {
-    padding: 4px 8px 8px;
-  }
-
-  .nav-item { padding: 10px 12px; }
-
+  /* The shell (top nav, bottom bar, overlays) handles narrow screens in shell.css. */
   .main {
     padding: 16px;
-    height: calc(100vh - 56px);
-    height: calc(100dvh - 56px);
-  }
-
-  /* Hide sidebar footer on mobile — sidebar is a compact top bar */
-  .sidebar-footer {
-    display: none;
-  }
-
-  /* Promote global FAQ to a viewport-fixed FAB when sidebar footer is hidden */
-  .global-faq-btn {
-    position: fixed;
-    bottom: 16px;
-    left: 16px;
-    z-index: 500;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    background: var(--bg-surface);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   }
 
   .page-context-bar {
@@ -220,11 +119,6 @@
   .faq-modal {
     width: 95vw;
     max-height: 85vh;
-  }
-
-  /* Touch-friendly section headers on mobile */
-  .nav-section-header {
-    padding: 10px 12px 6px;
   }
 
   /* Command bar wraps on mobile */

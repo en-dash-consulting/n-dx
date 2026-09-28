@@ -1,7 +1,7 @@
 /**
- * Sidebar status indicators — compact health badges for each product section.
+ * Status indicators — compact health badges, one per stage, in the bottom bar.
  *
- * Pure presentation components that render status data as sidebar badges.
+ * Pure presentation components that render status data as badges.
  * The infrastructure coupling (polling, WebSocket, messaging) lives in the
  * `use-project-status` hook, following the consistent hook abstraction
  * pattern used across all infrastructure services.

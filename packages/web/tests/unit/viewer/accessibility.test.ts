@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { Guide } from "../../../src/viewer/components/guide.js";
-import { SidebarThemeToggle } from "../../../src/viewer/components/theme-toggle.js";
+import { ThemeToggle } from "../../../src/viewer/components/theme-toggle.js";
 import { SidebarDensitySelector, initDensity } from "../../../src/viewer/components/density-selector.js";
 import { StatusFilter, defaultStatusFilter } from "../../../src/viewer/views/status-filter.js";
 import { PRDTree } from "../../../src/viewer/components/prd-tree/prd-tree.js";
@@ -112,17 +112,42 @@ describe("ThemeToggle accessibility", () => {
 
   beforeEach(() => {
     document.documentElement.setAttribute("data-theme", "dark");
+    localStorage.removeItem("sv-theme");
   });
 
   afterEach(() => {
     if (root) unmount(root);
+    localStorage.removeItem("sv-theme");
   });
 
-  it("SidebarThemeToggle has aria-label describing the action", () => {
-    root = renderToDiv(h(SidebarThemeToggle, null));
-    const btn = root.querySelector(".sidebar-control-btn");
-    expect(btn?.getAttribute("aria-label")).toBeTruthy();
-    expect(btn?.getAttribute("aria-label")).toContain("Switch to");
+  it("is a labelled group of three pressable choices, System pressed by default", () => {
+    root = renderToDiv(h(ThemeToggle, null));
+    const group = root.querySelector(".theme-toggle");
+    expect(group?.getAttribute("role")).toBe("group");
+    expect(group?.getAttribute("aria-label")).toBe("Theme");
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>(".theme-toggle-btn"));
+    expect(buttons.map((b) => b.textContent)).toEqual([expect.stringContaining("System"), expect.stringContaining("Light"), expect.stringContaining("Dark")]);
+    expect(buttons.map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
+  });
+
+  it("pins light or dark on <html> and remembers it; System forgets the pin", () => {
+    root = renderToDiv(h(ThemeToggle, null));
+    const pick = (pref: string) => root.querySelector<HTMLButtonElement>(`.theme-toggle-btn[data-theme-pref="${pref}"]`)!;
+
+    act(() => { pick("light").click(); });
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    expect(localStorage.getItem("sv-theme")).toBe("light");
+    expect(pick("light").getAttribute("aria-pressed")).toBe("true");
+
+    act(() => { pick("dark").click(); });
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    expect(localStorage.getItem("sv-theme")).toBe("dark");
+
+    act(() => { pick("system").click(); });
+    expect(localStorage.getItem("sv-theme")).toBeNull();
+    expect(document.documentElement.getAttribute("data-theme-pref")).toBe("system");
+    // System still resolves to a concrete theme: every stylesheet keys on it.
+    expect(["light", "dark"]).toContain(document.documentElement.getAttribute("data-theme"));
   });
 });
 

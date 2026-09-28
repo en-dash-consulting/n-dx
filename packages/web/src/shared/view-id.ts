@@ -7,6 +7,12 @@
  */
 
 export type ViewId =
+  // Shell pages: the landing page and the three stage pages that compose
+  // the product views below into the analyze → plan → work loop.
+  | "home"
+  | "analyze"
+  | "plan"
+  | "work"
   | "overview"
   | "graph"
   | "zones"

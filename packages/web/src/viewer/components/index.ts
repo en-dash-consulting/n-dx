@@ -43,7 +43,8 @@ export { ConfigFooter, installRootLabel, identityLine, identityTooltip } from ".
 export type { ConfigFooterProps, ServerIdentity } from "./config-footer.js";
 export { ElapsedTime } from "./elapsed-time.js";
 export { updateFavicon, resetFavicon, FAVICON_PNGS, VIEW_TO_PRODUCT } from "./favicon.js";
-export { SidebarThemeToggle, initTheme } from "./theme-toggle.js";
+export { ThemeToggle, initTheme } from "./theme-toggle.js";
+export type { ThemePref } from "./theme-toggle.js";
 export { SidebarDensitySelector, initDensity } from "./density-selector.js";
 export { NdxLogoPng, ProductLogoPng, BrandedHeader } from "./logos.js";
 export { AnalyzeControls } from "./analyze-controls.js";
@@ -97,9 +98,18 @@ export {
   type TaskRef,
 } from "./rex-task-link.js";
 
-// ── Navigation ──────────────────────────────────────────────────────
+// ── Shell: top nav · stage links · bottom bar · settings overlay · commands sheet ──
 
-export { Sidebar } from "./sidebar.js";
+export { TopNav } from "./top-nav.js";
+export type { TopNavProps } from "./top-nav.js";
+export { StageLinks } from "./stage-links.js";
+export type { StageLinksProps } from "./stage-links.js";
+export { BottomBar } from "./bottom-bar.js";
+export type { BottomBarProps } from "./bottom-bar.js";
+export { SettingsOverlay } from "./settings-overlay.js";
+export type { SettingsOverlayProps } from "./settings-overlay.js";
+export { CommandsSheet } from "./commands-sheet.js";
+export type { CommandsSheetProps } from "./commands-sheet.js";
 
 // ── Content ─────────────────────────────────────────────────────────
 
