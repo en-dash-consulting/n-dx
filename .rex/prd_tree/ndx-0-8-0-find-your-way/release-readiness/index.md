@@ -24,5 +24,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Audit the 0.8.0 changesets and run the package vulnerability scan](./audit-the-0-8-0-changesets-and-run-the.md) | pending |
+| [Make the ci child-cleanup e2e test deterministic under full-suite load](./make-the-ci-child-cleanup-e2e-test.md) | pending |
 | [Regenerate the 0.8.0 documents, run the navigation contract and compare pages against the wireframes](./regenerate-the-0-8-0-documents-run-the.md) | pending |
 | [Write the 0.8.0 release note and confirm per-package tags and GitHub releases after publish](./write-the-0-8-0-release-note-and.md) | pending |
