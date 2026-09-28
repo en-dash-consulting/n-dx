@@ -34,9 +34,12 @@ export interface AppendLogArgs {
 /**
  * Build a log entry from `args` and persist it via `store.appendLog`.
  *
- * Returns the entry as constructed here (pre-stamp, pre-truncation) so
- * callers that want to report back what was logged don't have to guess at
- * the shape the store will end up writing.
+ * The returned entry is the one built *here* — before the store stamps the
+ * actor and truncates `detail`. It is therefore safe to read for `event`,
+ * `itemId` and `timestamp`, which the store writes through unchanged, but
+ * **not** for `detail`: past 2,000 characters the persisted value differs
+ * from the one returned, so echoing it back to a caller reports text the log
+ * does not contain. Read the log if you need what was stored.
  */
 export async function appendExecutionLogEntry(
   store: PRDStore,
