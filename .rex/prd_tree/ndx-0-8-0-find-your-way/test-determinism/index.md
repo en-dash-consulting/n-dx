@@ -23,7 +23,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 |-------|--------|
 | [prd-tree-atomic-writes asserts raw 500ms latency budgets and compares two adjacent micro-spans](./prd-tree-atomic-writes-asserts-raw.md) | completed |
 | [prd-tree-atomic-writes write-volume tests time out under load: 1000-item fixtures leave ~7x headroom against rex's 30s testTimeout](./prd-tree-atomic-writes-write-volume.md) | pending |
-| [Prove the full suite passes under concurrent build load three times in a row](./prove-the-full-suite-passes-under.md) | completed |
+| [Prove the full suite passes under concurrent build load three times in a row](./prove-the-full-suite-passes-under.md) | pending |
 | [Real-timer ordering assertions are load-sensitive and invisible to the wall-clock inventory scanner](./real-timer-ordering-assertions-are.md) | completed |
 | [run-loop puts a lower bound on a real timer and dom-performance-monitor keeps an absolute count budget](./run-loop-puts-a-lower-bound-on-a-real.md) | completed |
 | [Search index rebuild and search route elapsed budgets bypass the documented BUDGET_MULTIPLIER policy](./search-index-rebuild-and-search-route.md) | completed |
