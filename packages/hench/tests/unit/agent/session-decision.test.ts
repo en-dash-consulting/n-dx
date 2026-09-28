@@ -20,6 +20,7 @@ import { saveRun, loadRun } from "../../../src/store/runs.js";
 import { formatSessionDecision } from "../../../src/cli/session-report.js";
 import { formatTokenReport } from "../../../src/cli/token-logging.js";
 import { cacheEntryAgeMs } from "../../../src/agent/lifecycle/session-cache.js";
+import { initRunRecord, API_SESSION_DECISION } from "../../../src/agent/lifecycle/shared.js";
 import type { RunRecord, RunSessionRecord } from "../../../src/schema/index.js";
 
 const FIXTURE = fileURLToPath(
@@ -110,6 +111,64 @@ describe("session decision", () => {
       );
 
       expect(report).toContain("(estimated)");
+    });
+  });
+
+  describe("runs that never consult a cache (acceptance criterion 1)", () => {
+    let tmpBase: string;
+    let henchDir: string;
+
+    beforeEach(async () => {
+      tmpBase = await mkdtemp(join(tmpdir(), "hench-api-session-"));
+      henchDir = join(tmpBase, ".hench");
+      await mkdir(join(henchDir, "runs"), { recursive: true });
+    });
+
+    afterEach(async () => {
+      await rm(tmpBase, { recursive: true, force: true });
+    });
+
+    it("states that the API path holds no resumable session", () => {
+      // "Every run record reports strategy and decision reason" has to hold for
+      // an API run too. The honest answer is not silence — silence is what a
+      // CLI run looks like when the decision was never written.
+      expect(formatSessionDecision(API_SESSION_DECISION)).toBe(
+        "Session: cold miss — the API path holds no resumable session",
+      );
+    });
+
+    it("carries a supplied decision onto the record it creates", async () => {
+      const { run } = await initRunRecord({
+        taskId: "t-1",
+        taskTitle: "Any task",
+        model: "claude-opus-5",
+        henchDir,
+        projectDir: tmpBase,
+        invocationContext: "api",
+        session: API_SESSION_DECISION,
+      });
+
+      expect(run.session).toEqual(API_SESSION_DECISION);
+
+      // And it survives the round trip, which is the only reason to record it.
+      const loaded = await loadRun(henchDir, run.id);
+      expect(loaded.session).toEqual(API_SESSION_DECISION);
+    });
+
+    it("leaves the decision absent when the caller has not made one yet", async () => {
+      // The CLI loop initializes its record well before it consults the cache.
+      // Seeding a default here would let a run that died in between claim a
+      // decision nobody made.
+      const { run } = await initRunRecord({
+        taskId: "t-2",
+        taskTitle: "Any task",
+        model: "claude-opus-5",
+        henchDir,
+        projectDir: tmpBase,
+        invocationContext: "cli",
+      });
+
+      expect(run.session).toBeUndefined();
     });
   });
 

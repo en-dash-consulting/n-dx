@@ -43,6 +43,7 @@ import {
   executeDryRun,
   transitionToInProgress,
   initRunRecord,
+  API_SESSION_DECISION,
   captureStartingHead,
   captureBaselineUntracked,
   runReviewGate,
@@ -744,6 +745,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     approvals: DEFAULT_EXECUTION_POLICY.approvals,
     parseMode: hasToolCalling ? "gemini-tools" : "provider-api",
     invocationContext: "api",
+    session: API_SESSION_DECISION,
   });
 
   section(
@@ -1341,6 +1343,7 @@ async function runLocalToolLoop(params: {
     approvals: DEFAULT_EXECUTION_POLICY.approvals,
     parseMode: "openai-tools",
     invocationContext: "api",
+    session: API_SESSION_DECISION,
   });
 
   section(
@@ -1831,6 +1834,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     approvals: DEFAULT_EXECUTION_POLICY.approvals,
     parseMode: "api-sdk",
     invocationContext: "api",
+    session: API_SESSION_DECISION,
   });
 
   const messages: Anthropic.MessageParam[] = [

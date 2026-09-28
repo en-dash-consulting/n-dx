@@ -288,6 +288,7 @@ const SESSION_REASON_PROSE: Record<string, string> = {
   "configured-cold": "cold spawns are configured",
   "fork-unsupported": "this vendor cannot resume a session by id",
   "not-consulted": "no cache was consulted",
+  "api-provider": "the API path holds no resumable session",
   "no-entry": "nothing was cached",
   "fresh-requested": "a fresh session was requested",
   "sourcevision-changed": "the analysis changed since it was built",

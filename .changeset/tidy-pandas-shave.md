@@ -13,6 +13,10 @@ as one line; the dashboard's run detail gains a Session section. Until now the o
 trace of that decision was a terminal line nobody was capturing, so "is batching
 actually hitting?" could not be answered from run history.
 
+API-provider runs record the decision too, as `cold` / `api-provider` — that path holds
+no session resumable by id, and saying so is not the same as saying nothing, which is
+also what a run that died before reaching the decision looks like.
+
 Cache token counts now say where they came from. `tokens.cachedProvenance` and the
 per-turn `cacheProvenance` distinguish a vendor that accounted for caching and
 reported none from a vendor that never reported it at all — both of which used to
