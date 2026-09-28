@@ -36,6 +36,8 @@ it and wrote down why it is still there.
 | `tests/e2e/vitest-timeout-failure.test.js:115` | `expect(result.durationMs).toBeLessThan(10_000)` next to an independent `spawnSync` `timeout: 10_000`. Two literals that had to stay equal, presented as a latency budget when a reading at the bound only ever means the child was killed. | Single named `FIXTURE_SPAWN_TIMEOUT_MS`, used for both, with the failure message stating that a reading at the bound means termination and that the guardrail — not the product — is what to raise. |
 | `packages/hench/tests/unit/cli/commands/run-loop.test.ts:75` | `expect(elapsed).toBeGreaterThanOrEqual(40)` around a real `loopPause(50)`. A *lower* bound, which multiplier scaling cannot widen — `BUDGET_MULTIPLIER` only helps a `toBeLessThan` — and which a coarse or early-firing platform timer under-fires with the code unchanged. | Fake timers. The test asserts the claim exactly: the promise is still pending after `advanceTimersByTimeAsync(49)` and resolved after one more millisecond. Regression injected by raising `loopPause`'s immediate-resolve threshold from `ms <= 0` to `ms <= 100`: fails. Lines 85 and 99 in the same file still read a real clock and remain in the scaled-budget section below. |
 | `packages/web/tests/unit/viewer/dom-performance-monitor.test.ts:824` | `expect(elapsed).toBeLessThan(COUNT_1000_BUDGET_MS)` — 250ms, widened to 500ms under `CODEX_CI` but never scaled by `NDX_TEST_TIME_MULTIPLIER`, so the documented load allowance did not reach it. | Counts pointer moves, reusing the `firstChild`/`nextSibling`/`parentNode` counter the file's linearity test already had — now hoisted to module scope and returning the snapshot alongside the count, so neither test needs its own copy. The walk makes 7002 moves over 2001 nodes (3.50/node); the bound is 6 per node. Regression injected by rescanning siblings from the parent's `firstChild`: 254.12 moves per node, and 15.48× on the linearity test beside it. |
+| `packages/web/tests/unit/server/search-index.test.ts:524` | `expect(rebuildElapsed).toBeLessThan(5000)` on a 1000-item rebuild that reads 3.98ms — 1250x headroom, and unscalable, since `5000 * 20` exceeds the package's 30s `testTimeout`. | A growth ratio across a 16x size step (500 vs 8000 items), `fastestMs` min-of-5, bound at `sizeRatio * 2`. Both directions measured: clean 13.61x, injected quadratic 63.26x. The `* 4` headroom `folder-tree-parser.test.ts` uses would be 64 and would let that regression through — `rebuild()` re-reads and re-parses the PRD file each call, so I/O dominates the linear baseline and compresses the separation. Confirmed failing at 55.8x with the regression in place. |
+| `packages/web/tests/unit/server/routes-search.test.ts:250` | `expect(data.elapsed_ms).toBeLessThan(200)` on a server-measured search that reads 0.15ms. | A nested-span assertion: `elapsed_ms` must be non-negative and strictly smaller than the round trip the client times around it. True on any machine — load inflates both spans — so no clock decides the verdict. **A growth ratio was tried and rejected on measurement:** `elapsed_ms` times `index.search()` alone, which is fixed-cost dominated at route-test sizes (0.150ms at 250 items vs 0.182ms at 1000 — 1.21x for a 4x step). The index's complexity claim stays where the work is, in `search-index.test.ts`. Regression injected by returning `performance.now()` instead of the delta: 1506.64ms against a 1.25ms round trip, fails. Limit recorded in place: a wrong-but-still-nested span (timing the handler rather than the query) passes. |
 | `packages/rex/tests/integration/prd-tree-atomic-writes.test.ts` | Three assertions, all inside a `describe.skip` marked DEFERRED: `expect(median).toBeLessThan(500)` and `expect(latency).toBeLessThan(500)` (raw constants, no multiplier) and `expect(addTime).toBeLessThanOrEqual(reserializeTime)` (two adjacent micro-spans with a small expected gap). | Counts files written, via the paths the serializer already reports through `takeSaveFileReport()` — technique 1. A single add writes 2 files (the item and its parent's `index.md`) identically at 6 items and at 1000, a 167× size step; `updateItem` writes that exact pair of paths; a root-level add writes exactly its own file against 1110 for a full serialization of the same tree in the same process. Regression injected by disabling `writeIfChanged`'s skip: 1111 vs 1, 1110 vs 2, and 6 vs 2 — all three fail. Now unskipped and running: the Mocha-only `this.timeout()` calls that would have thrown under vitest are gone. |
 
 A row naming a bare file converted every clock-decided assertion in it. A row
@@ -75,16 +77,8 @@ time-to-first-PID is 111ms.
 
 ## Open — clock-derived and not yet converted
 
-Each of these is a real instance of the pattern this register exists to retire.
-They were left alone rather than half-converted: each needs its own measurement
-in both directions to pick a bound, which is the work TESTING.md rule 3 asks for
-and not something to do blind. Tracked as PRD tasks under the "Make test results
-independent of ambient environment and machine load" feature.
-
-| Site | Assertion | Problem |
-|---|---|---|
-| `packages/web/tests/unit/server/search-index.test.ts:524` | `expect(rebuildElapsed).toBeLessThan(5000)` | Absolute, no multiplier, directly beside a sibling on line 531 that does scale. Cannot simply be scaled: `5000 * 20` exceeds the package's 30s `testTimeout`, so the assertion would become unfailable. The claim is "rebuild is not super-linear" and wants a growth ratio over two index sizes. |
-| `packages/web/tests/unit/server/routes-search.test.ts:250` | `expect(data.elapsed_ms).toBeLessThan(200)` | Absolute, no multiplier, beside a sibling on line 252 that scales. Server-measured elapsed returned over HTTP. |
+No unscaled absolute budgets remain. Every site below follows the documented
+policy; they are listed because policy-compliant is not the same as good.
 
 ### Open, scaled through `BUDGET_MULTIPLIER`
 
@@ -101,8 +95,8 @@ than scaling it" — and every one of these is named for a complexity claim.
 | `packages/sourcevision/tests/unit/analyzers/dedup-findings.test.ts:193` | `expect(elapsed).toBeLessThan(1000 * BUDGET_MULTIPLIER)` |
 | `packages/llm-client/tests/unit/cli-provider.test.ts:82` | `expect(elapsed).toBeLessThan(2000 * BUDGET_MULTIPLIER)` |
 | `packages/hench/tests/unit/cli/commands/run-loop.test.ts:85,99` | `expect(elapsed).toBeLessThan(50 or 200 * BUDGET_MULTIPLIER)` |
-| `packages/web/tests/unit/server/routes-search.test.ts:252` | `expect(elapsed).toBeLessThan(500 * BUDGET_MULTIPLIER)` |
-| `packages/web/tests/unit/server/search-index.test.ts:531` | `expect(searchElapsed).toBeLessThan(200 * BUDGET_MULTIPLIER)` |
+| `packages/web/tests/unit/server/routes-search.test.ts:288` | `expect(roundTripMs).toBeLessThan(500 * BUDGET_MULTIPLIER)` |
+| `packages/web/tests/unit/server/search-index.test.ts:550` | `expect(searchElapsed).toBeLessThan(200 * BUDGET_MULTIPLIER)` |
 
 ---
 
@@ -140,8 +134,19 @@ gates, so load cannot reorder the verdict.
 3. A ratio only cancels load when both readings face the same preemption risk.
    Measured here: `diffItems` timed across an 8x size step read 7.7x idle and
    46.5x loaded, because the small-size batch fits in a clean scheduler slice and
-   the large one does not. Check that before trusting a ratio on cheap work.
-4. Absolute budget as a last resort, scaled through `BUDGET_MULTIPLIER`, named
+   the large one does not. Check that before trusting a ratio on cheap work — and
+   be willing to conclude a ratio is not available. `SearchIndex.search` is
+   fixed-cost dominated at any size a route test would serve (0.150ms at 250
+   items, 0.182ms at 1000 — 1.21x for a 4x step), so the route's budget became a
+   containment assertion instead.
+4. A ratio's bound comes from the separation you measure, not from a convention.
+   `folder-tree-parser.test.ts` uses `sizeRatio * 4` because its injected
+   quadratic reads 128x against a linear 11x. `SearchIndex.rebuild` re-reads and
+   re-parses the PRD file on every call, so I/O dominates the linear baseline and
+   compresses the gap — clean 13.61x against an injected 63.26x, where `* 4`
+   would be 64 and let the regression pass. Its bound is `sizeRatio * 2`. Copying
+   the headroom from a neighbouring test is how a ratio goes quietly vacuous.
+5. Absolute budget as a last resort, scaled through `BUDGET_MULTIPLIER`, named
    for the property it guards rather than for a millisecond figure — and never
    where the bound's job is to sit below another number.
-5. Add a row here.
+6. Add a row here.
