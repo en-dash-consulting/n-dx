@@ -120,6 +120,13 @@ export const HenchConfigSchema = z.object({
   sessionStrategy: z.enum(["fork", "batch", "cold"]).optional(),
   tasksPerSession: z.number().int().positive().optional().default(4),
   parentMaxAgeHours: z.number().positive().optional().default(24),
+  // No `.default()` on these two: leaving them undefined lets
+  // isBatchChainUsable apply DEFAULT_BATCH_MAX_AGE_HOURS /
+  // DEFAULT_BATCH_MAX_IDLE_HOURS, so the defaults live in exactly one place
+  // rather than being mirrored here (which is what the note above had to do,
+  // and what keeps needing a comment to stay honest).
+  batchMaxAgeHours: z.number().positive().optional(),
+  batchMaxIdleHours: z.number().positive().optional(),
   maxSpawnsPerTask: z.number().int().positive().optional().default(8),
   // 0 disables livelock detection — see the field docs on HenchConfig. Mirrors
   // DEFAULT_LIVELOCK_THRESHOLD in agent/analysis/livelock.ts (schema cannot

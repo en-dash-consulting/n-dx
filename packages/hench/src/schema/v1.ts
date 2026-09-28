@@ -310,6 +310,19 @@ export interface HenchConfig {
    */
   parentMaxAgeHours?: number;
   /**
+   * Total lifetime of a `"batch"` chain, measured from the task that opened
+   * it, in hours (default: 8). Bounds how far the repository can move beneath
+   * a long-running loop before the shared transcript is retired.
+   */
+  batchMaxAgeHours?: number;
+  /**
+   * Idle window of a `"batch"` chain, measured from its last task, in hours
+   * (default: 1). Separate from {@link batchMaxAgeHours} because the two catch
+   * different drift: a loop that has run a long time, versus one that stopped
+   * while someone worked in the same tree by hand.
+   */
+  batchMaxIdleHours?: number;
+  /**
    * Ceiling on vendor spawns for a single task (default: 8).
    *
    * Every spawn counts — the initial one, failure retries, plan-mode

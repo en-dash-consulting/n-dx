@@ -59,6 +59,10 @@ import {
   advanceBatchChain,
   clearBatchChain,
   isBatchChainUsable,
+  chainRefIdentity,
+  policyFingerprint,
+  sourcevisionFingerprint,
+  type BatchChainIdentity,
 } from "./session-cache.js";
 import { buildTaskBoundaryDivider } from "./batch-divider.js";
 import {
@@ -2031,12 +2035,32 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   let batchTaskNumber = 1;
   let batchPreviousTaskTitle: string | undefined;
   const tasksPerSession = config.tasksPerSession ?? DEFAULT_TASKS_PER_SESSION;
-  if (sessionStrategy === "batch") {
+
+  // What a resumed session must still be true of. Computed once and used for
+  // both the admission check and the advance, so the chain is always stamped
+  // with exactly the identity it was admitted under. The git half comes off
+  // the run record, which `initRunRecord` captured from this checkout under
+  // these exact names. Only the batch strategy resumes anything, so the other
+  // two do not pay for the manifest read.
+  const batchIdentity: BatchChainIdentity | undefined =
+    sessionStrategy === "batch"
+      ? {
+          worktreeRoot: run.worktreeRoot ?? "",
+          ref: chainRefIdentity(run),
+          svFingerprint: await sourcevisionFingerprint(projectDir),
+          policyHash: policyFingerprint(policy),
+          vendor,
+          model: opts.spawnModel ?? "",
+        }
+      : undefined;
+
+  if (sessionStrategy === "batch" && batchIdentity) {
     const chain = await readBatchChain(henchDir);
     const verdict = isBatchChainUsable(chain, {
-      vendor,
-      model: opts.spawnModel ?? "",
+      identity: batchIdentity,
       tasksPerSession,
+      maxAgeHours: config.batchMaxAgeHours,
+      maxIdleHours: config.batchMaxIdleHours,
     });
     if (verdict.usable && chain) {
       batchResumeId = chain.sessionId;
@@ -2523,11 +2547,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // start the next task inside the failure. The same applies when the vendor
   // reported no session id — there is nothing to hand on.
   if (sessionStrategy === "batch") {
-    if (run.status === "completed" && lastSessionId) {
+    if (run.status === "completed" && lastSessionId && batchIdentity) {
       await advanceBatchChain(henchDir, {
         sessionId: lastSessionId,
-        vendor,
-        model: opts.spawnModel ?? "",
+        identity: batchIdentity,
         lastTaskTitle: brief.task.title,
       }).catch(() => { /* best effort — the next task just starts fresh */ });
     } else {
