@@ -10,11 +10,17 @@
  *
  * `checkBranchGuard` refuses those commands unless the caller is on the
  * default branch (`main`/`master`) or passed `--allow-on-branch`. It fails
- * open when the branch cannot be determined — no git repo, git unavailable,
- * or a detached HEAD hash `resolveGitBranch` had to fall back to fully
- * synthesizing. The risk this guards against is a *named* feature branch;
- * a directory with no resolvable branch is not one, and blocking it would
- * break every `.rex/` tree that is not (yet) inside a git repository.
+ * open *only* when the branch cannot be determined at all — no git repo, or
+ * git unavailable — both of which `resolveGitBranch` reports as `"unknown"`.
+ * Blocking those would break every `.rex/` tree that is not (yet) inside a
+ * git repository.
+ *
+ * A detached HEAD does **not** fail open. `resolveGitBranch` returns the
+ * short commit hash, which is neither `"unknown"` nor a default branch, so
+ * the guard refuses and names the hash. That is deliberate — a detached HEAD
+ * is not the default branch — but note the consequence: a CI checkout that
+ * detaches (the default for `actions/checkout`) needs `--allow-on-branch`
+ * even when the commit it detached at is the tip of `main`.
  *
  * @module core/branch-guard
  */

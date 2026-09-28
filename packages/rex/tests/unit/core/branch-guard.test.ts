@@ -66,6 +66,31 @@ describe("checkBranchGuard", () => {
     expect(result.branch).toBe("feature/branch-guard");
   });
 
+  // A detached HEAD is deliberately NOT treated as unresolvable: resolveGitBranch
+  // returns the short commit hash, which is neither "unknown" nor a default
+  // branch. Pinned because the module's contract turns on this distinction —
+  // "fails open when the branch cannot be determined" must not be read as
+  // covering a detached HEAD, which is the common shape of a CI checkout.
+  it("blocks on a detached HEAD, naming the commit hash", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    const hash = git(tmpDir, "rev-parse", "--short", "HEAD");
+    git(tmpDir, "checkout", "--detach", hash);
+
+    const result = checkBranchGuard(tmpDir, {});
+    expect(result.blocked).toBe(true);
+    expect(result.branch).toBe(hash);
+    expect(result.branch).not.toBe("unknown");
+  });
+
+  it("does not block on a detached HEAD when --allow-on-branch is passed", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    git(tmpDir, "checkout", "--detach", git(tmpDir, "rev-parse", "HEAD"));
+
+    expect(checkBranchGuard(tmpDir, { [ALLOW_ON_BRANCH_FLAG]: "true" }).blocked).toBe(false);
+  });
+
   it("does not block when the branch cannot be resolved (no git repo)", async () => {
     const nonGit = await mkdtemp(join(tmpdir(), "rex-branch-guard-no-git-"));
     try {
