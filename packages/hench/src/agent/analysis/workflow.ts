@@ -6,6 +6,7 @@
  */
 
 import type { RunRecord, RunStatus, HenchConfig } from "../../schema/index.js";
+import { contextWriteFloor, runBudgetedTokens } from "../token-cost.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -48,7 +49,17 @@ export interface WorkflowAnalysis {
 export interface WorkflowStats {
   successRate: number;
   avgTurns: number;
+  /**
+   * Average tokens per run in the units `checkTokenBudget` enforces
+   * (uncached input + cache writes + output).
+   */
   avgTokensPerRun: number;
+  /**
+   * Lowest counted cost of a completed prompt-cached run — the floor a
+   * proposed `tokenBudget` must clear. 0 when unmeasurable.
+   * See {@link contextWriteFloor}.
+   */
+  contextWriteFloor: number;
   avgDurationMs: number;
   failuresByStatus: Record<string, number>;
   /** Tasks with the most failures. */
@@ -66,10 +77,6 @@ const FAILURE_STATUSES: Set<RunStatus> = new Set(["failed", "timeout", "budget_e
 function runDurationMs(run: RunRecord): number {
   if (!run.finishedAt) return 0;
   return new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
-}
-
-function totalTokens(run: RunRecord): number {
-  return (run.tokenUsage.input ?? 0) + (run.tokenUsage.output ?? 0);
 }
 
 function median(values: number[]): number {
@@ -99,6 +106,7 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
       successRate: 0,
       avgTurns: 0,
       avgTokensPerRun: 0,
+      contextWriteFloor: 0,
       avgDurationMs: 0,
       failuresByStatus: {},
       troubleTaskIds: [],
@@ -114,7 +122,7 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
   const totalTurns = runs.reduce((sum, r) => sum + r.turns, 0);
   const avgTurns = totalTurns / runs.length;
 
-  const tokenSums = runs.map(totalTokens);
+  const tokenSums = runs.map(runBudgetedTokens);
   const avgTokensPerRun = tokenSums.reduce((a, b) => a + b, 0) / runs.length;
 
   const durations = runs.map(runDurationMs).filter((d) => d > 0);
@@ -151,6 +159,7 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
     successRate,
     avgTurns,
     avgTokensPerRun,
+    contextWriteFloor: contextWriteFloor(runs),
     avgDurationMs,
     failuresByStatus,
     troubleTaskIds,
@@ -161,6 +170,18 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
 
 // ── Suggestion generators ────────────────────────────────────────────
 
+/**
+ * Where "high token consumption" starts, in budgeted units.
+ *
+ * This was 100,000 while `avgTokensPerRun` summed input + output. Counting
+ * cache writes moved the measure by roughly 12x — across the completed runs in
+ * this repository's `.hench/runs/` (2026-09) the median went from 39.5K to
+ * 489K — so the old number now sits below the median run and the suggestion
+ * would fire on almost every prompt-cached project. 1.2M keeps it at the same
+ * place it used to occupy: about 2.5x the median completed run.
+ */
+const HIGH_COUNTED_TOKENS_PER_RUN = 1_200_000;
+
 function suggestTokenEfficiency(
   runs: RunRecord[],
   stats: WorkflowStats,
@@ -169,7 +190,7 @@ function suggestTokenEfficiency(
   const suggestions: WorkflowSuggestion[] = [];
 
   // High token usage with low success rate
-  if (stats.avgTokensPerRun > 100000 && stats.successRate < 0.5) {
+  if (stats.avgTokensPerRun > HIGH_COUNTED_TOKENS_PER_RUN && stats.successRate < 0.5) {
     suggestions.push({
       id: nextId("token-efficiency"),
       category: "token-efficiency",
@@ -179,7 +200,12 @@ function suggestTokenEfficiency(
       rationale: `Average ${Math.round(stats.avgTokensPerRun).toLocaleString()} tokens/run with only ${Math.round(stats.successRate * 100)}% success rate.`,
       impact: "Reduces wasted tokens on tasks that are unlikely to succeed.",
       configChanges: config?.tokenBudget === 0
-        ? { tokenBudget: Math.round(stats.avgTokensPerRun * 0.7) }
+        ? {
+            tokenBudget: Math.max(
+              Math.round(stats.avgTokensPerRun * 0.7),
+              stats.contextWriteFloor,
+            ),
+          }
         : undefined,
       autoApplicable: config?.tokenBudget === 0 || false,
     });
@@ -188,13 +214,17 @@ function suggestTokenEfficiency(
   // Runs that complete quickly could use a lower budget
   const completedRuns = runs.filter((r) => r.status === "completed");
   if (completedRuns.length >= 3) {
-    const completedTokens = completedRuns.map(totalTokens);
+    const completedTokens = completedRuns.map(runBudgetedTokens);
     const medianTokens = median(completedTokens);
     const currentBudget = config?.tokenBudget ?? 0;
 
     if (currentBudget === 0 && medianTokens > 0) {
-      // No budget set — suggest one based on median usage with headroom
-      const suggestedBudget = Math.round(medianTokens * 2);
+      // No budget set — suggest one based on median usage with headroom,
+      // never below the measured arrival cost (see contextWriteFloor).
+      const suggestedBudget = Math.max(
+        Math.round(medianTokens * 2),
+        stats.contextWriteFloor,
+      );
       suggestions.push({
         id: nextId("token-efficiency"),
         category: "token-efficiency",
@@ -202,7 +232,9 @@ function suggestTokenEfficiency(
         title: "Set a token budget based on historical usage",
         description: `Successful runs use a median of ${medianTokens.toLocaleString()} tokens. A budget would cap runaway costs.`,
         rationale: `${completedRuns.length} completed runs analyzed. Median: ${medianTokens.toLocaleString()} tokens.`,
-        impact: `Budget of ${suggestedBudget.toLocaleString()} (2x median) protects against unbounded runs.`,
+        impact: suggestedBudget > medianTokens * 2
+          ? `Budget of ${suggestedBudget.toLocaleString()} (the cheapest completed run) protects against unbounded runs without failing on arrival.`
+          : `Budget of ${suggestedBudget.toLocaleString()} (2x median) protects against unbounded runs.`,
         configChanges: { tokenBudget: suggestedBudget },
         autoApplicable: true,
       });

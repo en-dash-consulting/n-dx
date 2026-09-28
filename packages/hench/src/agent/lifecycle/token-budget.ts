@@ -1,7 +1,9 @@
 import type { TokenUsage } from "../../schema/index.js";
+import { BUDGET_TOKEN_CLASSES, countBudgetedTokens } from "../token-cost.js";
 
-/** The token classes that count against `hench.tokenBudget`. */
-export const BUDGET_TOKEN_CLASSES = "uncached input + cache writes + output";
+// Re-exported from its new home so existing importers of this module keep
+// resolving it. The definition lives beside the counter it describes.
+export { BUDGET_TOKEN_CLASSES };
 
 export interface TokenBudgetResult {
   /** Whether the token budget has been met or exceeded. */
@@ -21,35 +23,23 @@ export interface TokenBudgetResult {
  *
  * A budget of 0 or undefined means unlimited — the check always passes.
  *
- * The budget counts the tokens a run caused to be *newly* processed: uncached
- * input, cache writes, and output. Cache reads are excluded.
+ * The budget counts what {@link countBudgetedTokens} counts — uncached input,
+ * cache writes, and output, excluding cache reads. That measure is shared with
+ * the adaptive and workflow tuners so a proposed budget and an enforced one
+ * are in the same units; see `agent/token-cost.ts` for why each class is in or
+ * out. Runaway loops are still bounded, because cache writes and output both
+ * grow with turn count.
  *
- * Both halves of that rule are load-bearing:
- *
- * - Cached input MUST be counted, or the budget stops applying. On a
- *   prompt-cached loop `usage.input` holds only the uncached slice — one
- *   83-turn run recorded 534 uncached input tokens against 876K cache writes,
- *   so an `input + output` total bounds output plus a rounding error.
- *
- * - Cache reads MUST NOT be counted, or the budget fires on healthy runs. A
- *   cache read is by construction a re-read of tokens already counted when
- *   they were written, so counting reads charges the same tokens once per
- *   turn. Across the 27 recorded runs in this repository (`.hench/runs/`,
- *   2026-09) face value ran a median of 70x the counted total — a Claude Code
- *   session reading millions of cached tokens tripped every built-in template
- *   budget after finishing its work, and the task was reset to pending before
- *   the review and commit steps.
- *
- * This is a double-counting argument, not a pricing one: the rule needs no
- * price table and stays vendor-neutral. Runaway loops are still bounded,
- * because cache writes and output both grow with turn count.
+ * Counting cache reads used to make this fire on healthy runs: a Claude Code
+ * session reading millions of cached tokens tripped every built-in template
+ * budget after finishing its work, and the task was reset to pending before
+ * the review and commit steps.
  */
 export function checkTokenBudget(
   usage: TokenUsage,
   budget: number | undefined,
 ): TokenBudgetResult {
-  const totalUsed =
-    (usage?.input ?? 0) + (usage?.cacheCreationInput ?? 0) + (usage?.output ?? 0);
+  const totalUsed = countBudgetedTokens(usage);
   const cacheReadNotCounted = usage?.cacheReadInput ?? 0;
 
   if (!budget) {

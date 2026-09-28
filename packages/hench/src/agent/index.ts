@@ -44,6 +44,13 @@ export type {
 // Token budget
 export { checkTokenBudget } from "./lifecycle/token-budget.js";
 export type { TokenBudgetResult } from "./lifecycle/token-budget.js";
+// The measure `checkTokenBudget` enforces and the tuners propose against.
+export {
+  BUDGET_TOKEN_CLASSES,
+  countBudgetedTokens,
+  runBudgetedTokens,
+  contextWriteFloor,
+} from "./token-cost.js";
 
 // Token usage parsing & accumulation
 export {

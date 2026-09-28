@@ -24,5 +24,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [append_log is MCP-only — no CLI equivalent, so ndx work runs cannot write execution-log entries](./append-log-is-mcp-only-no-cli.md) | completed |
-| [Make the adaptive and workflow tuners measure run cost in the same token classes as checkTokenBudget](./make-the-adaptive-and-workflow-tuners.md) | pending |
+| [Fix the dashboard's duplicate tuners, which auto-apply a token budget below the arrival cost](./fix-the-dashboard-s-duplicate-tuners.md) | pending |
+| [Make the adaptive and workflow tuners measure run cost in the same token classes as checkTokenBudget](./make-the-adaptive-and-workflow-tuners.md) | in_progress |
 | [Set the prune defaults from the 0.7.1 post-release measurement batch](./set-the-prune-defaults-from-the-0-7-1.md) | pending |
