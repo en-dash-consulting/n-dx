@@ -1,0 +1,22 @@
+{
+  "id": "web-landing",
+  "name": "Web Landing",
+  "description": "1 file, mostly pages; entry points landing.ts; imported by Packages.",
+  "files": [
+    "packages/web/src/landing/landing.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/landing/landing.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 1,
+  "lineCount": 531,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

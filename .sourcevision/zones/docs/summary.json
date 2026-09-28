@@ -1,0 +1,20 @@
+{
+  "id": "docs",
+  "name": "Documentation Site",
+  "description": "Documentation and static-site assets: config.ts",
+  "files": [
+    "docs/.vitepress/config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 1,
+  "lineCount": 171,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "schemaVersion": "1.0.0",
+  "toolVersion": "0.1.0",
+  "analyzedAt": "2026-09-28T21:20:03.858Z",
+  "gitSha": "793b025725b7d138927861b783403d03ace103c7",
+  "gitBranch": "feature/sv-20260928",
+  "targetPath": "/Users/ryankeith/work-internal/n-dx",
+  "modules": {
+    "inventory": {
+      "status": "complete",
+      "startedAt": "2026-09-28T21:18:33.537Z",
+      "completedAt": "2026-09-28T21:18:33.685Z"
+    },
+    "imports": {
+      "status": "complete",
+      "startedAt": "2026-09-28T21:18:33.685Z",
+      "completedAt": "2026-09-28T21:18:35.581Z"
+    },
+    "classifications": {
+      "status": "complete",
+      "startedAt": "2026-09-28T21:18:35.581Z",
+      "completedAt": "2026-09-28T21:19:53.697Z"
+    },
+    "zones": {
+      "status": "complete",
+      "startedAt": "2026-09-28T21:19:53.698Z",
+      "completedAt": "2026-09-28T21:19:55.823Z"
+    },
+    "components": {
+      "status": "complete",
+      "startedAt": "2026-09-28T21:19:55.827Z",
+      "completedAt": "2026-09-28T21:19:56.299Z"
+    },
+    "callgraph": {
+      "status": "complete",
+      "startedAt": "2026-09-28T21:19:56.299Z",
+      "completedAt": "2026-09-28T21:20:03.858Z"
+    }
+  },
+  "children": [
+    {
+      "id": "packages-llm-client",
+      "prefix": "packages/llm-client",
+      "manifestPath": "packages/llm-client/.sourcevision/manifest.json"
+    },
+    {
+      "id": "packages-rex",
+      "prefix": "packages/rex",
+      "manifestPath": "packages/rex/.sourcevision/manifest.json"
+    },
+    {
+      "id": "packages-sourcevision",
+      "prefix": "packages/sourcevision",
+      "manifestPath": "packages/sourcevision/.sourcevision/manifest.json"
+    }
+  ],
+  "zoneOutputs": true,
+  "tokenUsage": {
+    "calls": 10,
+    "inputTokens": 159619,
+    "outputTokens": 17158,
+    "vendor": "claude",
+    "model": "claude-opus-5"
+  },
+  "language": "typescript",
+  "languages": [
+    "typescript"
+  ],
+  "lastAnalysis": {
+    "at": "2026-09-28T21:18:33.536Z",
+    "mode": "cascade",
+    "durationMs": 90747,
+    "phases": {
+      "inventory": 148,
+      "imports": 1896,
+      "classifications": 78116,
+      "zones": 2130,
+      "components": 472,
+      "callgraph": 7860
+    },
+    "llm": {
+      "byTaskClass": {
+        "code.classify": {
+          "calls": 3,
+          "inputTokens": 106424,
+          "outputTokens": 11916,
+          "durationMs": 1325,
+          "vendor": "typesafe",
+          "model": "jev-1.13.0"
+        },
+        "code.classify/claude": {
+          "calls": 3,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "durationMs": 76707,
+          "vendor": "claude",
+          "model": "claude-haiku-4-5"
+        },
+        "zone.judge": {
+          "calls": 5,
+          "inputTokens": 75726,
+          "outputTokens": 8451,
+          "durationMs": 1252,
+          "vendor": "typesafe",
+          "model": "jev-1.13.0"
+        },
+        "finding.judge": {
+          "calls": 1,
+          "inputTokens": 12815,
+          "outputTokens": 210,
+          "durationMs": 199,
+          "vendor": "typesafe",
+          "model": "jev-1.13.0"
+        }
+      },
+      "judgmentCache": {
+        "hits": 3,
+        "misses": 322
+      }
+    }
+  },
+  "analysisFingerprint": "5dbfb4b06a867f49",
+  "narration": {
+    "status": "pending",
+    "zones": [
+      "web-server",
+      "web-viewer",
+      "rex-cli"
+    ],
+    "names": [],
+    "startedAt": "2026-09-28T21:20:04.283Z",
+    "pid": 30689,
+    "log": ".sourcevision/.cache/narration.log"
+  }
+}

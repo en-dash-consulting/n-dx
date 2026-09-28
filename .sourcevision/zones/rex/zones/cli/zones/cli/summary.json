@@ -1,0 +1,29 @@
+{
+  "id": "rex/cli/cli",
+  "name": "Cli",
+  "description": "8 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/add.ts",
+    "packages/rex/src/cli/commands/merge-driver.ts",
+    "packages/rex/src/cli/commands/migrate-to-md.ts",
+    "packages/rex/src/cli/commands/parse-md.ts",
+    "packages/rex/src/cli/commands/update.ts",
+    "packages/rex/src/cli/errors.ts",
+    "packages/rex/src/cli/validate-input.ts",
+    "packages/rex/src/core/merge-driver.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/add.ts",
+    "packages/rex/src/cli/commands/merge-driver.ts",
+    "packages/rex/src/cli/commands/migrate-to-md.ts",
+    "packages/rex/src/cli/commands/parse-md.ts",
+    "packages/rex/src/cli/commands/update.ts",
+    "packages/rex/src/cli/errors.ts",
+    "packages/rex/src/cli/validate-input.ts",
+    "packages/rex/src/core/merge-driver.ts"
+  ],
+  "cohesion": 0.39,
+  "coupling": 0.61,
+  "fileCount": 8,
+  "lineCount": 1308
+}

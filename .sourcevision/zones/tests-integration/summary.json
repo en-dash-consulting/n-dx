@@ -1,0 +1,41 @@
+{
+  "id": "tests-integration",
+  "name": "Tests Integration",
+  "description": "Non-source files in tests: assistant-integration.test.js, claude-config-validation.test.js, codex-config-validation.test.js (+19 more)",
+  "files": [
+    "tests/integration/assistant-integration.test.js",
+    "tests/integration/claude-config-validation.test.js",
+    "tests/integration/codex-config-validation.test.js",
+    "tests/integration/cross-package-contracts.test.js",
+    "tests/integration/exec-interrupt-forwarding.test.js",
+    "tests/integration/gateway-pipeline.test.js",
+    "tests/integration/google-config-validation.test.js",
+    "tests/integration/hench-rex-gateway-pipeline.test.js",
+    "tests/integration/late-arrival-child-cleanup.test.js",
+    "tests/integration/light-tier-routes.test.js",
+    "tests/integration/llm-client-adapter.test.js",
+    "tests/integration/llm-routing-config-roundtrip.test.js",
+    "tests/integration/mcp-shim-bridge.test.js",
+    "tests/integration/pair-programming.test.js",
+    "tests/integration/primer-fingerprint-contract.test.js",
+    "tests/integration/scheduler-startup.test.js",
+    "tests/integration/self-heal-capture-only.test.js",
+    "tests/integration/skill-commit-behavior.test.js",
+    "tests/integration/task-class-registry.test.js",
+    "tests/integration/task-class-sync.test.js",
+    "tests/integration/terminate-tree-liveness.test.js",
+    "tests/integration/web-server-viewer-boundary.test.js"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 22,
+  "lineCount": 7075,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

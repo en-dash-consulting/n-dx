@@ -1,0 +1,37 @@
+{
+  "id": "sourcevision/cli",
+  "name": "Cli",
+  "description": "12 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/branch-work-collector.ts",
+    "packages/sourcevision/src/analyzers/convergence.ts",
+    "packages/sourcevision/src/analyzers/run-ledger.ts",
+    "packages/sourcevision/src/cli/commands/analyze-phases.ts",
+    "packages/sourcevision/src/cli/commands/analyze.ts",
+    "packages/sourcevision/src/cli/commands/export-pdf.ts",
+    "packages/sourcevision/src/cli/commands/narrate.ts",
+    "packages/sourcevision/src/cli/commands/pr-markdown.ts",
+    "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
+    "packages/sourcevision/src/cli/mcp.ts",
+    "packages/sourcevision/src/cli/sourcevision-core.ts",
+    "packages/sourcevision/src/util/exec-cli.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/branch-work-collector.ts",
+    "packages/sourcevision/src/analyzers/convergence.ts",
+    "packages/sourcevision/src/analyzers/run-ledger.ts",
+    "packages/sourcevision/src/cli/commands/analyze-phases.ts",
+    "packages/sourcevision/src/cli/commands/analyze.ts",
+    "packages/sourcevision/src/cli/commands/export-pdf.ts",
+    "packages/sourcevision/src/cli/commands/narrate.ts",
+    "packages/sourcevision/src/cli/commands/pr-markdown.ts",
+    "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
+    "packages/sourcevision/src/cli/mcp.ts",
+    "packages/sourcevision/src/cli/sourcevision-core.ts",
+    "packages/sourcevision/src/util/exec-cli.ts"
+  ],
+  "cohesion": 0.3,
+  "coupling": 0.7,
+  "fileCount": 12,
+  "lineCount": 3954
+}

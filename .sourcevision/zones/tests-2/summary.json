@@ -1,0 +1,22 @@
+{
+  "id": "tests-2",
+  "name": "Tests 2",
+  "description": "Non-source files in tests: setup-color-env.js, setup-judgment-env.js, setup-session-env.js",
+  "files": [
+    "tests/setup-color-env.js",
+    "tests/setup-judgment-env.js",
+    "tests/setup-session-env.js"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 84,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

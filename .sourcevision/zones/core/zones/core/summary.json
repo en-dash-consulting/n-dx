@@ -1,0 +1,23 @@
+{
+  "id": "core/core",
+  "name": "Core",
+  "description": "5 files, primarily JavaScript",
+  "files": [
+    "packages/core/assistant-assets.js",
+    "packages/core/assistant-integration.js",
+    "packages/core/claude-integration.js",
+    "packages/core/cli-identity.js",
+    "packages/core/codex-integration.js"
+  ],
+  "entryPoints": [
+    "packages/core/assistant-assets.js",
+    "packages/core/assistant-integration.js",
+    "packages/core/claude-integration.js",
+    "packages/core/cli-identity.js",
+    "packages/core/codex-integration.js"
+  ],
+  "cohesion": 0.74,
+  "coupling": 0.26,
+  "fileCount": 5,
+  "lineCount": 1852
+}
