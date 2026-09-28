@@ -28,7 +28,7 @@
  * @module core/run-summary
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -124,12 +124,46 @@ function readDetail(detail) {
 }
 
 /**
+ * Newest mtime at or under `path`, or `-Infinity` when it does not exist.
+ *
+ * A directory's own mtime is not enough. Most filesystems bump it when an
+ * entry is added or removed, but *not* when an existing file is overwritten —
+ * and overwriting is exactly what `sv analyze` does to a `.sourcevision/` that
+ * already has an inventory.json. Reading only the directory would report
+ * "wrote nothing" for the commonest case there is.
+ *
+ * Recursion is bounded by the shallow, tool-owned trees this is pointed at
+ * (`.sourcevision/`, `.rex/prd_tree/`), and it stops at the first entry it
+ * cannot stat rather than failing the summary.
+ */
+function newestMtimeMs(path) {
+  let stat;
+  try {
+    stat = statSync(path);
+  } catch {
+    return -Infinity; // Never written, or removed again.
+  }
+  if (!stat.isDirectory()) return stat.mtimeMs;
+
+  let newest = stat.mtimeMs;
+  try {
+    for (const entry of readdirSync(path)) {
+      newest = Math.max(newest, newestMtimeMs(join(path, entry)));
+    }
+  } catch {
+    // Unreadable directory — the mtime we already have is the best answer.
+  }
+  return newest;
+}
+
+/**
  * Collect what the run produced.
  *
- * A declared write target counts as written when it exists and its mtime is at
- * or after `startedAt`. That is a claim about the filesystem, not about the
- * command's intent: a path the command chose not to touch (an `--accept` the
- * user did not pass, a cached analysis reused verbatim) is correctly absent.
+ * A declared write target counts as written when it exists and the newest
+ * mtime at or under it is at or after `startedAt`. That is a claim about the
+ * filesystem, not about the command's intent: a path the command chose not to
+ * touch (an `--accept` the user did not pass, a cached analysis reused
+ * verbatim) is correctly absent.
  *
  * Second-resolution filesystems exist, so `startedAt` is floored to the second
  * before comparison — otherwise a file written in the same second the command
@@ -145,12 +179,7 @@ export function collectRunSummary(dir, effects, startedAt) {
 
   const filesWritten = [];
   for (const write of effects.writes) {
-    const full = join(dir, write.path);
-    try {
-      if (statSync(full).mtimeMs >= threshold) filesWritten.push(write.path);
-    } catch {
-      // Never written, or removed again — either way, not a result of this run.
-    }
+    if (newestMtimeMs(join(dir, write.path)) >= threshold) filesWritten.push(write.path);
   }
 
   // Both are consulted because `ndx plan` drives sourcevision and rex in turn

@@ -74,6 +74,20 @@ describe("collectRunSummary — files written", () => {
     expect(summary.filesWritten).toEqual([]);
   });
 
+  it("sees a file overwritten inside a declared directory", async () => {
+    // The commonest case, and the one a directory's own mtime misses: most
+    // filesystems bump a directory's mtime when an entry is added or removed
+    // but not when an existing file is rewritten in place, which is exactly
+    // what `sv analyze` does to a .sourcevision/ that already exists.
+    await mkdir(join(dir, ".sourcevision"), { recursive: true });
+    await writeFile(join(dir, ".sourcevision", "inventory.json"), "{}");
+    const old = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+    await utimes(join(dir, ".sourcevision"), old, old);
+
+    const summary = collectRunSummary(dir, EFFECTS, Date.now() - 1000);
+    expect(summary.filesWritten).toEqual([".sourcevision/"]);
+  });
+
   it("reports nothing written when nothing exists", () => {
     expect(collectRunSummary(dir, EFFECTS, Date.now()).filesWritten).toEqual([]);
   });
