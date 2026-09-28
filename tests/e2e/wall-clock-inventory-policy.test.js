@@ -125,12 +125,12 @@ describe("wall-clock assertion inventory completeness", () => {
     // If the detector regresses to flagging nothing, the inventory check below
     // turns vacuously green. These three are open items in the inventory, so
     // they are expected to keep matching until they are converted.
-    expect(flagged).toContain("packages/rex/tests/integration/prd-tree-atomic-writes.test.ts");
+    expect(flagged).toContain("packages/web/tests/unit/server/routes-search.test.ts");
     expect(flagged).toContain("packages/web/tests/unit/server/search-index.test.ts");
     expect(flagged).toContain("packages/rex/tests/unit/core/tree-hardened.test.ts");
   });
 
-  it("does not flag the two viewer performance suites that were converted to counters", () => {
+  it("does not flag the suites that were converted to counters", () => {
     const flagged = findClockDecidedTestFiles();
     // These held 25 of the elapsed-time assertions in the repo and now hold
     // none. If a clock reappears in either, it should arrive with a row in the
@@ -138,6 +138,9 @@ describe("wall-clock assertion inventory completeness", () => {
     // makes that a conversation rather than a silent regression.
     expect(flagged).not.toContain("packages/web/tests/unit/viewer/large-tree-performance.test.ts");
     expect(flagged).not.toContain("packages/web/tests/unit/viewer/prd-tree-live-tick-perf.test.ts");
+    // Two `< 500ms` budgets and an `addTime <= reserializeTime` comparison of
+    // adjacent micro-spans, now counts of files written.
+    expect(flagged).not.toContain("packages/rex/tests/integration/prd-tree-atomic-writes.test.ts");
   });
 
   it("every test file that decides a verdict from a clock is in the inventory", () => {
