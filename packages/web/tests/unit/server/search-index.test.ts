@@ -31,6 +31,38 @@ function makeItem(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** `n` items with every indexed field populated, for the performance tests. */
+function perfItems(n: number) {
+  return Array.from({ length: n }, (_, i) =>
+    makeItem({
+      id: `item-${i}`,
+      title: `Task ${i}: implement feature ${i % 10 === 0 ? "authentication" : "module"} part ${i}`,
+      description: `Description for task ${i} with various keywords like search, index, query`,
+      acceptanceCriteria: [`Criteria ${i} must pass`, `Performance must be under 200ms`],
+      tags: i % 5 === 0 ? ["search", "performance"] : ["general"],
+    }),
+  );
+}
+
+/**
+ * Fastest of `runs` timings, in ms.
+ *
+ * Min rather than mean or median: the thing being measured is how long the work
+ * takes, and a slower reading only ever means the machine was busy. Taking the
+ * minimum treats load as the noise it is, and a transient spike has to land on
+ * every single run to skew the result. Same helper, same reasoning, as
+ * `packages/rex/tests/unit/store/folder-tree-parser.test.ts`.
+ */
+function fastestMs(fn: () => unknown, runs = 3): number {
+  let best = Infinity;
+  for (let i = 0; i < runs; i++) {
+    const start = performance.now();
+    fn();
+    best = Math.min(best, performance.now() - start);
+  }
+  return best;
+}
+
 // ── parseQuery tests ─────────────────────────────────────────────────────────
 
 describe("parseQuery", () => {
@@ -504,24 +536,11 @@ describe("SearchIndex", () => {
   // ── Performance ────────────────────────────────────────────────────────
 
   it("handles large PRDs efficiently (1000+ items)", async () => {
-    const items = Array.from({ length: 1000 }, (_, i) =>
-      makeItem({
-        id: `item-${i}`,
-        title: `Task ${i}: implement feature ${i % 10 === 0 ? "authentication" : "module"} part ${i}`,
-        description: `Description for task ${i} with various keywords like search, index, query`,
-        acceptanceCriteria: [`Criteria ${i} must pass`, `Performance must be under 200ms`],
-        tags: i % 5 === 0 ? ["search", "performance"] : ["general"],
-      }),
-    );
-    const prd = makePrd(items);
+    const prd = makePrd(perfItems(1000));
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd));
 
-    // Rebuild should be fast
-    const rebuildStart = performance.now();
     const count = index.rebuild();
-    const rebuildElapsed = performance.now() - rebuildStart;
     expect(count).toBe(1000);
-    expect(rebuildElapsed).toBeLessThan(5000); // Under 5 seconds
 
     // Search should be fast
     const searchStart = performance.now();
@@ -530,6 +549,78 @@ describe("SearchIndex", () => {
     expect(results.length).toBeGreaterThan(0);
     expect(searchElapsed).toBeLessThan(200 * BUDGET_MULTIPLIER); // scaled: guards against super-linear search
   });
+
+  /**
+   * This replaced `expect(rebuildElapsed).toBeLessThan(5000)` on the 1000-item
+   * test above. That budget measured the MACHINE: rebuild of 1000 items reads
+   * 3.98ms on this machine, so the bound carried 1250x headroom and could only
+   * ever fire on a stall. It could not be brought into line by scaling either —
+   * `5000 * 20` exceeds the package's 30s `testTimeout`, so a scaled version
+   * would be unfailable, and TESTING.md forbids a bound whose job is to sit
+   * below another number.
+   *
+   * What it was guarding is complexity, so assert that directly: two sizes
+   * measured back-to-back in the same process. Ambient load scales both
+   * readings together, so the ratio survives a busy machine.
+   *
+   * SIZE STEP AND BOUND ARE BOTH MEASURED, not conventional. Clean vs an
+   * injected quadratic rebuild (re-reading every already-indexed item inside
+   * `indexItem`), fastest-of-N on this machine:
+   *
+   *     500 -> 4000  (8x)    clean  5.75x   injected 15.25x
+   *     500 -> 8000  (16x)   clean 13.61x   injected 63.26x
+   *     1000 -> 8000 (8x)    clean  7.67x   injected 31.00x
+   *
+   * 250 -> 1000, the step the task proposed, is unusable: rebuild of 250 items
+   * reads 1.61ms, small enough that one scheduler slice distorts it, and the
+   * injected regression only reached 2.39x there.
+   *
+   * The bound is `sizeRatio * 2`, not the `* 4` that
+   * `folder-tree-parser.test.ts` uses — at 16x that would be 64, and the
+   * injected regression measures 63.26x, i.e. it would pass. The headroom is
+   * smaller here because `rebuild()` re-reads and re-parses the PRD file on
+   * every call, so I/O and `JSON.parse` dominate the linear baseline and
+   * compress the separation between clean and broken.
+   */
+  it("rebuild time scales sub-quadratically with PRD size", async () => {
+    const smallCount = 500;
+    const largeCount = 8000;
+    const sizeRatio = largeCount / smallCount;
+
+    const smallDir = join(tmpDir, "rex-small");
+    const largeDir = join(tmpDir, "rex-large");
+    await mkdir(smallDir, { recursive: true });
+    await mkdir(largeDir, { recursive: true });
+    await writeFile(join(smallDir, "prd.json"), JSON.stringify(makePrd(perfItems(smallCount))));
+    await writeFile(join(largeDir, "prd.json"), JSON.stringify(makePrd(perfItems(largeCount))));
+
+    const smallIndex = new SearchIndex(smallDir);
+    const largeIndex = new SearchIndex(largeDir);
+
+    // Warm both so the comparison is index-build cost, not cold-read cost,
+    // which would otherwise inflate whichever ran first.
+    expect(smallIndex.rebuild()).toBe(smallCount);
+    expect(largeIndex.rebuild()).toBe(largeCount);
+
+    const smallMs = fastestMs(() => smallIndex.rebuild(), 5);
+    const largeMs = fastestMs(() => largeIndex.rebuild(), 5);
+
+    // Linear gives timeRatio ~= sizeRatio (16); measured 13.61x, just under,
+    // because per-rebuild file read and parse overhead inflates the small
+    // reading and so only ever makes this assertion more forgiving.
+    const timeRatio = largeMs / Math.max(smallMs, 0.1);
+    expect(
+      timeRatio,
+      `rebuild scaled ${timeRatio.toFixed(1)}x for a ${sizeRatio.toFixed(1)}x size increase ` +
+      `(${smallCount} items: ${smallMs.toFixed(2)}ms, ${largeCount} items: ${largeMs.toFixed(2)}ms). ` +
+      `Linear would be ~${sizeRatio.toFixed(0)}x; this suggests a complexity regression.`,
+    ).toBeLessThan(sizeRatio * 2);
+    // Explicit timeout, for the same reason the assertion is a ratio: this test
+    // builds 8500 items and rebuilds twelve times, ~1s idle, and the suite has
+    // been observed 20x slower under full-suite load — enough to blow the 30s
+    // default and go red for the machine rather than for the code. Extra
+    // wall-clock cannot weaken a ratio, since load scales both readings together.
+  }, 60000);
 
   // ── Edge cases ─────────────────────────────────────────────────────────
 

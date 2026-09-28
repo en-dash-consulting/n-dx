@@ -801,14 +801,56 @@ describe("setObservedContainer", () => {
 // Performance characteristics
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// jsdom property accesses (getAttribute, firstChild, nextSibling…) are pure-JS and
-// significantly slower than native browser DOM — measured at ~60 µs/node, giving
-// ~120 ms for 2 001 nodes.  Budget raised to accommodate jsdom overhead while still
-// ruling out any O(n²) regression (which would be orders of magnitude slower).
-const COUNT_1000_BUDGET_MS = process.env["CODEX_CI"] === "1" ? 500 : 250;
+/**
+ * Run `countDOMNodes` with `Node.prototype`'s traversal accessors instrumented,
+ * returning both the snapshot and the number of pointer moves the walk made.
+ *
+ * Complexity here is measured by counting traversal steps, not wall-clock time.
+ * The counts are exact and identical on every machine, so a regression is
+ * caught deterministically instead of by a budget that a loaded runner can
+ * overshoot with the code unchanged. See TESTING.md, Flake Resistance →
+ * Family 2, technique 1.
+ */
+const TRAVERSAL_PROPS = ["firstChild", "nextSibling", "parentNode"] as const;
+
+function countTraversalOps(root: HTMLDivElement): {
+  ops: number;
+  snapshot: ReturnType<typeof countDOMNodes>;
+} {
+  const originals = TRAVERSAL_PROPS.map((prop) => {
+    const descriptor = Object.getOwnPropertyDescriptor(Node.prototype, prop);
+    if (!descriptor?.get) throw new Error(`Node.prototype.${prop} is not an accessor`);
+    return { prop, descriptor, get: descriptor.get };
+  });
+
+  let ops = 0;
+  for (const { prop, get } of originals) {
+    Object.defineProperty(Node.prototype, prop, {
+      configurable: true,
+      get(this: Node) {
+        ops++;
+        return get.call(this);
+      },
+    });
+  }
+  try {
+    const snapshot = countDOMNodes(root);
+    return { ops, snapshot };
+  } finally {
+    for (const { prop, descriptor } of originals) {
+      Object.defineProperty(Node.prototype, prop, descriptor);
+    }
+  }
+}
 
 describe("counting performance", () => {
-  it(`counts 1000-element tree under ${COUNT_1000_BUDGET_MS}ms`, () => {
+  // Was `expect(elapsed).toBeLessThan(COUNT_1000_BUDGET_MS)`, a 250ms budget
+  // widened to 500ms under CODEX_CI but never scaled by
+  // NDX_TEST_TIME_MULTIPLIER, so the documented load allowance did not reach
+  // it. The claim — the walk does a bounded amount of work per node at the
+  // scale the viewer actually renders — is a count, and the instrument for it
+  // already existed in the linearity test below.
+  it("counts a 1000-element tree with bounded work per node", () => {
     const root = document.createElement("div");
     for (let i = 0; i < 1000; i++) {
       const el = document.createElement("div");
@@ -817,13 +859,20 @@ describe("counting performance", () => {
       root.appendChild(el);
     }
 
-    const start = performance.now();
-    const snapshot = countDOMNodes(root);
-    const elapsed = performance.now() - start;
+    const { ops, snapshot } = countTraversalOps(root);
 
-    expect(elapsed).toBeLessThan(COUNT_1000_BUDGET_MS);
     expect(snapshot.treeItemCount).toBe(1000);
-    expect(snapshot.totalNodes).toBeGreaterThan(1000); // text nodes add to count
+    expect(snapshot.totalNodes).toBe(2001); // root + 1000 divs + 1000 text nodes
+
+    // Measured: 7002 pointer moves for 2001 nodes — 3.50 per node. Exactly
+    // 2 on the root and 7 on each of the 1000 element/text pairs (2 descending
+    // into the text node, 5 unwinding back out to the next sibling). An O(n²)
+    // walk that rescanned its siblings from the parent's firstChild measures
+    // 254.12 moves per node — injected and confirmed failing, and it fails the
+    // linearity test below at 15.48× too. 6 therefore leaves room for a benign
+    // refactor of the pointer dance while staying far below a quadratic one.
+    expect(ops / snapshot.totalNodes).toBeLessThan(6);
+    expect(ops / snapshot.totalNodes).toBeGreaterThan(2);
   });
 
   it("counting scales linearly (not quadratically)", () => {
@@ -837,42 +886,8 @@ describe("counting performance", () => {
       return root;
     }
 
-    // Complexity is measured by counting traversal steps, not wall-clock time.
-    // The previous version compared medians of batched runs and allowed a 30×
-    // ratio to absorb timing noise; under parallel-suite load it still
-    // measured 43× and failed. Traversal-step counts are exact and identical
-    // on every machine, so the same regression is caught deterministically.
-    const traversalProps = ["firstChild", "nextSibling", "parentNode"] as const;
-
-    function countTraversalOps(root: HTMLDivElement): number {
-      const originals = traversalProps.map((prop) => {
-        const descriptor = Object.getOwnPropertyDescriptor(Node.prototype, prop);
-        if (!descriptor?.get) throw new Error(`Node.prototype.${prop} is not an accessor`);
-        return { prop, descriptor, get: descriptor.get };
-      });
-
-      let ops = 0;
-      for (const { prop, get } of originals) {
-        Object.defineProperty(Node.prototype, prop, {
-          configurable: true,
-          get(this: Node) {
-            ops++;
-            return get.call(this);
-          },
-        });
-      }
-      try {
-        countDOMNodes(root);
-      } finally {
-        for (const { prop, descriptor } of originals) {
-          Object.defineProperty(Node.prototype, prop, descriptor);
-        }
-      }
-      return ops;
-    }
-
-    const smallOps = countTraversalOps(createFlat(200));
-    const largeOps = countTraversalOps(createFlat(800));
+    const smallOps = countTraversalOps(createFlat(200)).ops;
+    const largeOps = countTraversalOps(createFlat(800)).ops;
 
     // 4× the nodes ⇒ ~4× the traversal steps when O(n).
     // An O(n²) walk would be ~16×, so anything under 6× proves linearity

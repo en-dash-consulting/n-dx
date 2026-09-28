@@ -298,8 +298,8 @@ async function guardStaleEntries(
  *
  * Directory mtimes are deliberately ignored — a directory's mtime bumps on
  * any child rename and identifies nothing; only files carry items. A newer
- * file with no parseable id stays protected by mtime alone: unknown content
- * is guarded, not assumed safe.
+ * file with no parseable id and no load-time digest stays protected by mtime
+ * alone: unknown content is guarded, not assumed safe.
  */
 async function deletesUnseenWork(
   path: string,
@@ -318,13 +318,29 @@ async function deletesUnseenWork(
     }
     if (info.mtimeMs <= newerThan) return null;
     const raw = await readFile(path, "utf8");
+    // Strongest evidence first, and the only check here that reads no clock:
+    // if the file still digests to exactly what this snapshot loaded from this
+    // path, the snapshot has seen its current contents, so deleting it destroys
+    // nothing unseen — whatever its mtime says, and whether or not its
+    // frontmatter still parses.
+    //
+    // It has to precede the id check, not follow it. `mtimeMs` and `Date.now()`
+    // are different clocks: the file clock was measured running up to ~4ms ahead
+    // of Date.now() on Windows, past MTIME_TOLERANCE_MS, so a file written just
+    // *before* a load can read as newer than it. A corrupted or truncated file
+    // has no id to fall back on, so behind the id check it was reported as
+    // another writer's work and the save that would have rewritten it was
+    // refused — the tree stayed corrupt and every later save failed the same
+    // way. The parser records a digest for every `.md` file it reads, before
+    // parsing it, so an unparseable file the snapshot read is covered here.
+    const loadedDigest = loadedFiles?.get(resolve(path));
+    if (loadedDigest !== undefined && loadedDigest === digestItemFile(raw)) return null;
     const id = /^id:\s*"?([^"\n]+?)"?\s*$/m.exec(raw)?.[1];
     if (!id || !savedIds.has(id)) return path;
-    // Relocation candidate: the item lives on elsewhere in the saved tree.
-    // Exempt only if the file is byte-for-byte what this snapshot loaded from
-    // it — otherwise the copy being written elsewhere is missing an edit.
-    const loadedDigest = loadedFiles?.get(resolve(path));
-    return loadedDigest === undefined || loadedDigest !== digestItemFile(raw) ? path : null;
+    // Relocation candidate: the item lives on elsewhere in the saved tree, but
+    // the digest check above already established this file is not what the
+    // snapshot read — so the copy being written elsewhere is missing an edit.
+    return path;
   } catch {
     // Vanished mid-scan — nothing left to protect.
     return null;
