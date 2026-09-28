@@ -21,7 +21,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [cli-ci-child-cleanup polls on a raw 3000ms deadline that bypasses BUDGET_MULTIPLIER and times out under build load](./cli-ci-child-cleanup-polls-on-a-raw.md) | in_progress |
+| [cli-ci-child-cleanup polls on a raw 3000ms deadline that bypasses BUDGET_MULTIPLIER and times out under build load](./cli-ci-child-cleanup-polls-on-a-raw.md) | completed |
 | [prd-tree-atomic-writes asserts raw 500ms latency budgets and compares two adjacent micro-spans](./prd-tree-atomic-writes-asserts-raw.md) | completed |
 | [prd-tree-atomic-writes write-volume tests time out under load: 1000-item fixtures leave ~7x headroom against rex's 30s testTimeout](./prd-tree-atomic-writes-write-volume.md) | completed |
 | [Prove the full suite passes under concurrent build load three times in a row](./prove-the-full-suite-passes-under.md) | in_progress |
