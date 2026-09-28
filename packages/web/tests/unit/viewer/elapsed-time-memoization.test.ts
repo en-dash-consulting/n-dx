@@ -111,6 +111,20 @@ describe("useTick equality check", () => {
 
 describe("formatElapsed patterns", () => {
   /**
+   * Pin the clock for this block.
+   *
+   * Every fixture below is built from `Date.now()` and `formatElapsed` reads
+   * the clock again a statement later; a second of drift between the two reads
+   * flips the expected string ("30s" becomes "29s"). The outer `beforeEach`
+   * installs fake timers, but nothing here fixed the instant they start from,
+   * so the two reads were equal by luck rather than by construction. Pinning
+   * makes them the same instant.
+   */
+  beforeEach(() => {
+    vi.setSystemTime(new Date("2026-01-01T12:00:00.000Z"));
+  });
+
+  /**
    * Mirrors the formatElapsed function used in active-tasks-panel.ts.
    * Tests the formatting logic directly to ensure correctness after
    * memoization changes.

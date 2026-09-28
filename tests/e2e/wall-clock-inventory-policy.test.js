@@ -13,7 +13,9 @@
  * hand audit demonstrably misses sites. This scan makes the next new one a test
  * failure at the moment it is written instead of a mystery months later.
  *
- * Detection requires both:
+ * There are two detectors, because there are two shapes.
+ *
+ * **Detector 1 — the clock decides a bound.** Requires both:
  *   1. The file reads a clock — `performance.now()`, `Date.now()`, or
  *      `process.hrtime`.
  *   2. An `expect(...)` whose subject names a duration is bounded by a
@@ -23,18 +25,31 @@
  * for other reasons; condition 1 alone catches every file that stamps a fixture
  * with `Date.now()`, which is most of them.
  *
+ * **Detector 2 — a real sleep is the barrier before the assertion.** An awaited
+ * non-zero `setTimeout`/`sleep`, followed by an `expect(` with no `await` in
+ * between. Here nothing names a duration — the verdict is an ordering or a
+ * count produced by real timers, and the sleep is the bet that the event will
+ * have happened by the time it elapses. On a machine busy enough, it has not,
+ * and the assertion fails with the code unchanged. These were listed by hand in
+ * the inventory until 0.8.0, which is exactly the arrangement that goes stale.
+ *
+ * The `await`-free run between sleep and assertion is what separates this from
+ * the legitimate idiom. A sleep that only widens the window for a *bug* to
+ * appear — `concurrent-write-lost-update.test.ts`, where the sleep gives an
+ * unlocked reader every chance to slip past and an explicit promise gate then
+ * decides the verdict — has that gate's `await` in between and is not flagged.
+ *
  * A flagged file satisfies the policy by being mentioned anywhere in the
  * inventory. The inventory itself records whether the mention is a conversion, a
  * justification, or an acknowledged open item — this scan only guarantees the
  * site was looked at.
  *
- * ### What this scan cannot see
+ * ### What these scans still cannot see
  *
- * Assertions on *ordering* or *counts* produced by real timers — a 10ms interval
- * observed over a 50ms window, say — are equally load-sensitive and carry no
- * duration identifier to match on. The inventory lists the known ones by hand
- * under "Not clock-derived, but load-sensitive for a different reason". Do not
- * read a green run here as proof the suite is load-independent.
+ * A real sleep separated from its assertion by an unrelated `await`, and any
+ * load-sensitivity that is not expressed as either a bounded duration or a
+ * sleep — a fixed retry count, say. Do not read a green run here as proof the
+ * suite is load-independent.
  *
  * @see tests/wall-clock-assertion-inventory.md
  * @see TESTING.md — Flake Resistance, Family 2
@@ -71,6 +86,46 @@ const CLOCK_BOUNDED_ASSERTION = new RegExp(
   String.raw`expect\(\s*[^;{}]{0,120}?\w*${DURATION_WORD}\w*[^;{}]{0,400}?` +
     String.raw`\.toBe(?:Less|Greater)Than(?:OrEqual)?\(`,
   "gs",
+);
+
+/**
+ * An awaited real-timer sleep of non-zero length: the `setTimeout`-in-a-Promise
+ * idiom, a helper named `sleep`/`delay`, or `setTimeout` from
+ * `node:timers/promises`.
+ *
+ * Zero is deliberately excluded. `setTimeout(resolve, 0)` names no duration —
+ * it is a macrotask yield, the "let the current turn finish" barrier that
+ * flushing a Preact state update needs, and it cannot be too short for a
+ * loaded machine because it was never long to begin with.
+ */
+const NONZERO_DELAY = String.raw`(?:[1-9]\d*|[A-Za-z_$][\w$.]*)`;
+const REAL_SLEEP =
+  String.raw`await\s+(?:` +
+  // await new Promise((r) => setTimeout(r, 50)) / (r, SETTLE_MS)
+  String.raw`new\s+Promise\s*(?:<[^>]*>)?\s*\([^;]*?setTimeout\s*\([^;,]*,\s*${NONZERO_DELAY}\s*\)\s*\)` +
+  // await sleep(150) / await delay(150)
+  String.raw`|(?:sleep|delay)\s*\(\s*[1-9][^;]*?\)` +
+  // await setTimeout(50) — node:timers/promises
+  String.raw`|setTimeout\s*\(\s*[1-9]\d*\s*\)` +
+  String.raw`)\s*;`;
+
+/**
+ * A real sleep used as the barrier before an assertion — "wait a while, then
+ * check it happened". This is the second family, and the one the duration
+ * detector above is blind to: the verdict is an ordering or a count produced
+ * by real timers, so no identifier in it names a duration.
+ *
+ * The tempered run rejects any `await` between the sleep and the `expect`,
+ * which is what separates the two idioms. A sleep followed by a *gate* — the
+ * `concurrent-write-lost-update.test.ts` pattern, where the sleep only widens
+ * the window for a bug to show itself and correctness is decided by an
+ * explicit promise — has that promise's `await` in between, and is not
+ * flagged. A sleep followed directly by `expect` has nothing in between, which
+ * is exactly the case where the sleep's length is the verdict.
+ */
+const SLEEP_THEN_ASSERT = new RegExp(
+  REAL_SLEEP + String.raw`(?:(?!\bawait\b)[\s\S]){0,600}?\bexpect\s*\(`,
+  "g",
 );
 
 function walkTestFiles(dir, files = []) {
@@ -119,18 +174,34 @@ function findClockDecidedTestFiles() {
   return [...new Set(flagged)].sort();
 }
 
+function findSleepDecidedTestFiles() {
+  const flagged = [];
+  for (const root of collectScanRoots()) {
+    for (const file of walkTestFiles(root)) {
+      const relPath = toPosixRelative(file);
+      if (relPath === SELF) continue;
+      SLEEP_THEN_ASSERT.lastIndex = 0;
+      if (!SLEEP_THEN_ASSERT.test(readFileSync(file, "utf8"))) continue;
+      flagged.push(relPath);
+    }
+  }
+  return [...new Set(flagged)].sort();
+}
+
 describe("wall-clock assertion inventory completeness", () => {
   it("flags the known clock-decided suites (detector self-test)", () => {
     const flagged = findClockDecidedTestFiles();
     // If the detector regresses to flagging nothing, the inventory check below
-    // turns vacuously green. These three are open items in the inventory, so
-    // they are expected to keep matching until they are converted.
-    expect(flagged).toContain("packages/rex/tests/integration/prd-tree-atomic-writes.test.ts");
+    // turns vacuously green. All three still read a clock — the two search
+    // suites keep a multiplier-scaled hang guardrail beside the assertions that
+    // were converted, and tree-hardened is an open scaled budget — so they are
+    // expected to keep matching.
+    expect(flagged).toContain("packages/web/tests/unit/server/routes-search.test.ts");
     expect(flagged).toContain("packages/web/tests/unit/server/search-index.test.ts");
     expect(flagged).toContain("packages/rex/tests/unit/core/tree-hardened.test.ts");
   });
 
-  it("does not flag the two viewer performance suites that were converted to counters", () => {
+  it("does not flag the suites that were converted to counters", () => {
     const flagged = findClockDecidedTestFiles();
     // These held 25 of the elapsed-time assertions in the repo and now hold
     // none. If a clock reappears in either, it should arrive with a row in the
@@ -138,6 +209,9 @@ describe("wall-clock assertion inventory completeness", () => {
     // makes that a conversation rather than a silent regression.
     expect(flagged).not.toContain("packages/web/tests/unit/viewer/large-tree-performance.test.ts");
     expect(flagged).not.toContain("packages/web/tests/unit/viewer/prd-tree-live-tick-perf.test.ts");
+    // Two `< 500ms` budgets and an `addTime <= reserializeTime` comparison of
+    // adjacent micro-spans, now counts of files written.
+    expect(flagged).not.toContain("packages/rex/tests/integration/prd-tree-atomic-writes.test.ts");
   });
 
   it("every test file that decides a verdict from a clock is in the inventory", () => {
@@ -153,6 +227,53 @@ describe("wall-clock assertion inventory completeness", () => {
         `If a clock is genuinely required, derive the bound by measuring both a ` +
         `clean run and an injected regression, record both numbers beside the ` +
         `constant, and add a row to the inventory.`,
+    ).toEqual([]);
+  });
+
+  it("flags the known sleep-decided suites (detector self-test)", () => {
+    const flagged = findSleepDecidedTestFiles();
+    // Same guard as above, for the second detector: if it regresses to matching
+    // nothing, the inventory check below goes vacuously green. These three
+    // sleep for a spawned CLI, a websocket handshake and a DOM effect
+    // respectively — three different reasons, so a narrowing that breaks one
+    // idiom is unlikely to break all three at once.
+    expect(flagged).toContain("tests/e2e/cli-start.test.js");
+    expect(flagged).toContain("packages/web/tests/unit/server/websocket.test.ts");
+    expect(flagged).toContain("packages/web/tests/unit/viewer/workspaces-view.test.ts");
+  });
+
+  it("does not flag the suites converted to gates or fake timers", () => {
+    const flagged = findSleepDecidedTestFiles();
+    // The six sites the inventory's "Not clock-derived, but load-sensitive for
+    // a different reason" section listed by hand. Each now waits for the event
+    // it is asserting about — a promise gate, or a fake clock advanced by a
+    // named number of milliseconds — rather than for a window the event was
+    // expected to fall inside. A real sleep reappearing in front of an
+    // assertion in any of them is a regression to the shape this whole scan
+    // exists to stop.
+    expect(flagged).not.toContain("packages/web/tests/unit/server/register-scheduler.test.ts");
+    expect(flagged).not.toContain("packages/web/tests/integration/seam-register-scheduler.test.ts");
+    expect(flagged).not.toContain("packages/hench/tests/unit/store/run-retention-scheduler.test.ts");
+    expect(flagged).not.toContain("packages/rex/tests/unit/store/file-lock.test.ts");
+    expect(flagged).not.toContain("packages/hench/tests/unit/queue/execution-queue.test.ts");
+    expect(flagged).not.toContain("packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts");
+  });
+
+  it("every test file that asserts straight after a real sleep is in the inventory", () => {
+    const inventory = readFileSync(INVENTORY_PATH, "utf8");
+    const missing = findSleepDecidedTestFiles().filter((relPath) => !inventory.includes(relPath));
+
+    expect(
+      missing,
+      `Test file(s) assert immediately after a real-timer sleep but have no ` +
+        `entry in tests/wall-clock-assertion-inventory.md:\n` +
+        missing.map((f) => `  - ${f}`).join("\n") +
+        `\nThe sleep is the barrier deciding the verdict: if the event has not ` +
+        `happened by the time it elapses, the assertion fails with the code ` +
+        `unchanged. Prefer waiting for the event itself — a promise the ` +
+        `production code resolves, or fake timers advanced by a named ` +
+        `interval. If the sleep must stay, add a row to the inventory saying ` +
+        `why load cannot flip the result.`,
     ).toEqual([]);
   });
 });
