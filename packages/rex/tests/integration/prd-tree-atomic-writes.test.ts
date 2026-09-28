@@ -74,6 +74,18 @@ function createHierarchy(epicCount: number, featureCount: number, taskCount: num
   return epics;
 }
 
+/** `items` and every descendant, counted. */
+function countItems(items: PRDItem[]): number {
+  return items.reduce((n, item) => n + 1 + countItems(item.children ?? []), 0);
+}
+
+/**
+ * How much slower than idle a loaded machine may be before a test that is
+ * merely slow counts as hung. TESTING.md's documented allowance, read from the
+ * same env var every other budgeted test in the repo reads.
+ */
+const LOAD_ALLOWANCE = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
 // ── Test suite ──────────────────────────────────────────────────────────────
 
 describe("prd_tree atomic writes and crash-safety", () => {
@@ -298,8 +310,71 @@ describe("prd_tree atomic writes and crash-safety", () => {
    * whose content is byte-identical, and the paths it actually wrote reach the
    * caller through `takeSaveFileReport()`. No clock is read here, so no ambient
    * load can change a verdict.
+   *
+   * ### Fixture size is the whole timeout budget
+   *
+   * The assertions below are load-immune; the real `saveDocument` each one pays
+   * for before reaching them is not. That cost is linear in items — measured at
+   * 5.9ms per item for a save + load + update + add cycle, flat from 18 items to
+   * 1110 (Intel Core Ultra 5 225F, 10 logical CPUs, Windows 11 26200, Node
+   * 24.16.0):
+   *
+   * | items | save | load | updateItem | addItem |
+   * |------:|-----:|-----:|-----------:|--------:|
+   * |  1110 | 1120 | 1393 |       1946 |    2050 |
+   * |   155 |  163 |  171 |        283 |     256 |
+   * |    39 |   42 |   42 |         70 |      67 |
+   *
+   * So a 1110-item fixture cost the two exact-set tests below 21.2s and 10.7s
+   * idle against rex's 30s `testTimeout` — a third of the 20x load allowance the
+   * repo documents, and both timed out under concurrent build load. Neither gets
+   * anything from scale: they assert an exact set of written paths, which is
+   * exact at any size, and a handful of siblings at each level is all it takes
+   * for "only these files" to mean something. They use {@link SIBLING_TREE}.
+   *
+   * The first test is the one whose subject *is* scale, so it keeps the large
+   * tree and takes an explicit timeout derived from its measured idle cost
+   * instead. See {@link SIZE_STEP_TIMEOUT_MS}.
+   *
+   * Where the three land afterwards, idle and under four concurrent `tsc`
+   * workers — twice the load the soak harness applies:
+   *
+   * | test | idle | loaded | timeout | headroom left |
+   * |---|---:|---:|---:|---:|
+   * | size step (1110 items)    | 3055ms | 9785ms | 102000ms | 10.4x |
+   * | updateItem exact set (39) |  175ms |  863ms |  30000ms | 34.8x |
+   * | full-tree count (39)      |  123ms |  507ms |  30000ms | 59.2x |
+   *
+   * Load costs each of them about 3-4x, so the failure mode this replaces —
+   * a 1110-item fixture at 21.2s idle meeting a 30s default — is now roughly
+   * an order of magnitude out of reach.
    */
   describe("write volume: single-item mutations don't re-serialize the tree", () => {
+    /**
+     * Small enough to be cheap, large enough that "only the updated item and
+     * its parent" excludes something: 3 epics x 3 features x 3 tasks is 39
+     * items, with two siblings beside the target at every level and a
+     * grandparent above it. The two tests using it went from 21156ms and
+     * 10721ms idle at 1110 items to 182-192ms and 130-145ms over three runs —
+     * a margin of 150x or better against the package's 30s `testTimeout`,
+     * comfortably past the documented 20x.
+     */
+    const SIBLING_TREE: [number, number, number] = [3, 3, 3];
+
+    /**
+     * Idle cost of the size-step test below, worst of four runs on the machine
+     * described above — 5011ms cold, then 3636/3112/3055ms — and 2867ms on the
+     * soak machine that filed this task.
+     *
+     * Times the documented load allowance this is a hang guardrail, not a
+     * latency budget. The test's verdict comes from comparing two exact path
+     * sets, so nothing about it gets easier or harder to pass as this bound
+     * moves; it exists so a serializer that deadlocks fails with a named cause
+     * instead of silently inheriting a package default that this fixture — the
+     * only 1110-item one left in the file — does not fit.
+     */
+    const SIZE_STEP_TIMEOUT_MS = 5_100 * LOAD_ALLOWANCE;
+
     /** Project-relative paths written by `mutate`, with earlier saves drained first. */
     async function writesDuring(mutate: () => Promise<void>): Promise<string[]> {
       store.takeSaveFileReport();
@@ -335,25 +410,29 @@ describe("prd_tree atomic writes and crash-safety", () => {
       return written;
     }
 
-    it("a single add writes the same files on a 1000-item tree as on a 6-item one", async () => {
-      // The replacement for a `median < 500ms` budget on a 1000-item add. What
-      // that budget was guarding is that the cost of an add tracks the change,
-      // not the tree — so the two counts are taken across a 167× size step and
-      // must be identical, not merely both small.
-      const small = await addWritesOnTree([1, 1, 3]);
-      const large = await addWritesOnTree([10, 10, 10]);
+    it(
+      "a single add writes the same files on a 1000-item tree as on a 6-item one",
+      async () => {
+        // The replacement for a `median < 500ms` budget on a 1000-item add. What
+        // that budget was guarding is that the cost of an add tracks the change,
+        // not the tree — so the two counts are taken across a 167× size step and
+        // must be identical, not merely both small.
+        const small = await addWritesOnTree([1, 1, 3]);
+        const large = await addWritesOnTree([10, 10, 10]);
 
-      // The new task's own file plus its parent feature's `index.md`, which
-      // renders its children. Depth-bounded, and the same at either size.
-      expect(small).toHaveLength(2);
-      expect(large).toEqual(small);
-    });
+        // The new task's own file plus its parent feature's `index.md`, which
+        // renders its children. Depth-bounded, and the same at either size.
+        expect(small).toHaveLength(2);
+        expect(large).toEqual(small);
+      },
+      SIZE_STEP_TIMEOUT_MS,
+    );
 
     it("updateItem writes only the updated item and its parent", async () => {
       await store.saveDocument({
         schema: SCHEMA_VERSION,
-        title: "Large PRD",
-        items: createHierarchy(10, 10, 10),
+        title: "Sibling PRD",
+        items: createHierarchy(...SIBLING_TREE),
       });
 
       const doc = await store.loadDocument();
@@ -364,8 +443,9 @@ describe("prd_tree atomic writes and crash-safety", () => {
       );
 
       // The exact set, not a count: a regression that wrote one *different*
-      // file — the epic above, or a sibling — still fails. The parent's
-      // `index.md` is in the set because it renders its children's status.
+      // file — the epic above, or either sibling task, or either sibling
+      // feature — still fails. The parent's `index.md` is in the set because it
+      // renders its children's status.
       expect(written.sort()).toEqual([
         `${PRD_TREE_DIRNAME}/epic-0/feature-0-0/index.md`,
         `${PRD_TREE_DIRNAME}/epic-0/feature-0-0/task-0-0-0.md`,
@@ -373,20 +453,27 @@ describe("prd_tree atomic writes and crash-safety", () => {
     });
 
     it("no full-tree re-serialization on single-item add", async () => {
-      const items = createHierarchy(10, 10, 10);
-      await store.saveDocument({ schema: SCHEMA_VERSION, title: "Large PRD", items });
+      const items = createHierarchy(...SIBLING_TREE);
+      await store.saveDocument({ schema: SCHEMA_VERSION, title: "Sibling PRD", items });
       const fullTreeWrites = store.takeSaveFileReport()?.written.length ?? 0;
 
       const added = await writesDuring(() => store.addItem(makeItem("epic-new", "New Epic", "epic")));
 
-      // The added epic's own file and nothing else — a root-level add has no
-      // parent index to refresh, and a childless item is a bare `<slug>.md`
-      // leaf rather than a folder. `fullTreeWrites` is what re-serializing the
-      // same tree costs, measured in this same process moments earlier, so the
-      // comparison is between two counts rather than two timings and no
-      // threshold has to be guessed.
+      // What a full serialization of this tree costs, measured in this same
+      // process moments earlier: one file per item, exactly. Pinned that way
+      // rather than to the `> 1000` this line used to carry, which was the old
+      // 1110-item fixture's own size wearing the costume of a threshold — it
+      // moved with the fixture and bounded nothing. The count holds at any
+      // fixture size (verified exact at 18, 39, 84, 155, 258 and 1110 items)
+      // and is the stronger claim: dropping one leaf write from a full save
+      // fails here at 38-vs-39, where `> 1000` — or `> 38` — would not.
+      expect(fullTreeWrites).toBe(countItems(items));
+
+      // Against that, the add: the new epic's own file and nothing else. A
+      // root-level add has no parent index to refresh, and a childless item is
+      // a bare `<slug>.md` leaf rather than a folder. Two counts rather than
+      // two timings, so no threshold has to be guessed.
       expect(added).toEqual([`.rex/${PRD_TREE_DIRNAME}/new-epic.md`]);
-      expect(fullTreeWrites).toBeGreaterThan(1000);
     });
   });
 
