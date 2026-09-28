@@ -737,39 +737,45 @@ export function TokenUsageView() {
         )
       : null,
 
-    // Summary metrics row
+    // Summary metrics: two fixed rows — the headline figures, then the four
+    // token classes that make up the total — rather than seven cards wrapping
+    // wherever the width happens to break them.
     usage
       ? h("div", { class: "overview-metrics token-metrics" },
-          h(MetricCard, {
-            value: fmtTokens(aggregateTotal(usage)),
-            label: "Total Tokens",
-          }),
-          h(MetricCard, {
-            value: cost?.total ?? "$0.00",
-            label: "Est. Cost",
-            color: "var(--brand-green)",
-          }),
-          h(MetricCard, {
-            value: usage.totalCalls,
-            label: "API Calls",
-            color: "var(--brand-purple)",
-          }),
-          h(MetricCard, {
-            value: fmtTokens(usage.totalInputTokens),
-            label: "Input Tokens",
-          }),
-          h(MetricCard, {
-            value: fmtTokens(usage.totalOutputTokens),
-            label: "Output Tokens",
-          }),
-          h(MetricCard, {
-            value: fmtTokens(usage.totalCacheCreationTokens ?? 0),
-            label: "Cache Write Tokens",
-          }),
-          h(MetricCard, {
-            value: fmtTokens(usage.totalCacheReadTokens ?? 0),
-            label: "Cache Read Tokens",
-          }),
+          h("div", { class: "token-metrics-row token-metrics-row--headline" },
+            h(MetricCard, {
+              value: fmtTokens(aggregateTotal(usage)),
+              label: "Total Tokens",
+            }),
+            h(MetricCard, {
+              value: cost?.total ?? "$0.00",
+              label: "Est. Cost",
+              color: "var(--brand-green)",
+            }),
+            h(MetricCard, {
+              value: usage.totalCalls,
+              label: "API Calls",
+              color: "var(--brand-purple)",
+            }),
+          ),
+          h("div", { class: "token-metrics-row token-metrics-row--classes" },
+            h(MetricCard, {
+              value: fmtTokens(usage.totalInputTokens),
+              label: "Input Tokens",
+            }),
+            h(MetricCard, {
+              value: fmtTokens(usage.totalOutputTokens),
+              label: "Output Tokens",
+            }),
+            h(MetricCard, {
+              value: fmtTokens(usage.totalCacheCreationTokens ?? 0),
+              label: "Cache Write Tokens",
+            }),
+            h(MetricCard, {
+              value: fmtTokens(usage.totalCacheReadTokens ?? 0),
+              label: "Cache Read Tokens",
+            }),
+          ),
         )
       : null,
 
