@@ -549,7 +549,7 @@ async function dispatchCommand(
     }
     case "migrate-to-md": {
       const { cmdMigrateToMd } = await import("./commands/migrate-to-md.js");
-      await cmdMigrateToMd(resolveDir(positional));
+      await cmdMigrateToMd(resolveDir(positional), flags);
       break;
     }
     case "migrate-to-folder-tree": {

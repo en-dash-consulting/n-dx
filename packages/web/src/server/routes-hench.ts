@@ -1342,7 +1342,11 @@ async function runTreeMigration(
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
   const result = await exec(
     bin,
-    [...prefixArgs, "rex", "migrate-slugs", "--format=json", ctx.projectDir],
+    // rex's branch guard refuses whole-tree rewrites off the default branch
+    // unless asked to proceed. The double-confirm above (a 412 naming the
+    // fix, then a second explicit `{ migrateSlugs: true }`) is this route's
+    // own "on purpose" signal, so it is carried through here too.
+    [...prefixArgs, "rex", "migrate-slugs", "--format=json", "--allow-on-branch", ctx.projectDir],
     { cwd: ctx.projectDir, timeout: MIGRATION_TIMEOUT_MS },
   );
 

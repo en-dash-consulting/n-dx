@@ -254,6 +254,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--dry-run", description: "Preview proposals without applying" },
       { flag: "--accept", description: "Auto-accept proposals without review" },
       { flag: "--model=<name>", description: "Override LLM model" },
+      { flag: "--allow-on-branch", description: "Allow this whole-tree rewrite off the default branch" },
     ],
     examples: [
       { command: "rex reshape", description: "Interactive review of proposals" },
@@ -277,6 +278,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--accept", description: "Auto-accept all changes without review" },
       { flag: "--yes, -y", description: "Skip confirmation prompt" },
       { flag: "--no-consolidate", description: "Skip the post-prune consolidation pass" },
+      { flag: "--allow-on-branch", description: "Allow this whole-tree rewrite off the default branch" },
     ],
     examples: [
       { command: "rex prune", description: "Interactive prune with confirmation" },
@@ -567,6 +569,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--replace", description: "Overwrite the tree with the bundle instead of merging" },
       { flag: "--yes, -y", description: "Skip the --replace confirmation prompt" },
       { flag: "--no-snapshot", description: "Skip the pre-import snapshot ('rex restore' cannot undo the import)" },
+      { flag: "--allow-on-branch", description: "Allow --replace's whole-tree rewrite off the default branch" },
       { flag: "--format=json", description: "Print a JSON summary instead of human output" },
     ],
     examples: [
@@ -621,6 +624,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--model=<model>", description: "LLM model to use for analysis" },
       { flag: "--include-completed", description: "Include completed items in similarity analysis" },
       { flag: "--format=json", description: "Machine-readable output" },
+      { flag: "--allow-on-branch", description: "Allow this whole-tree rewrite off the default branch" },
     ],
     examples: [
       { command: "rex reorganize", description: "Detect issues and show all proposals" },
@@ -663,6 +667,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "Pass --yes to auto-confirm deletion.\n\n" +
       `Idempotent: re-running on an already-migrated project (where .rex/${PRD_TREE_DIRNAME}/ exists) is a no-op.\n` +
       "Prints a summary of item counts per PRD level and folders/files created.",
+    options: [
+      { flag: "--yes, -y", description: "Auto-confirm deletion of legacy files" },
+      { flag: "--allow-on-branch", description: "Allow this whole-tree rewrite off the default branch" },
+    ],
     examples: [
       { command: "rex migrate-to-folder-tree", description: "Migrate and prompt to delete legacy files" },
       { command: "rex migrate-to-folder-tree --yes", description: "Migrate and auto-delete legacy files" },
@@ -679,6 +687,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "DEPRECATED: This command migrates from .rex/prd.json to a legacy markdown format.\n" +
       "The folder-tree format (.rex/prd_tree/) is now the recommended migration target.\n" +
       "Use 'rex migrate-to-folder-tree' instead for new projects.",
+    options: [
+      { flag: "--allow-on-branch", description: "Allow this whole-tree rewrite off the default branch" },
+    ],
     examples: [
       { command: "rex migrate-to-md", description: "Migrate to markdown in the current project (deprecated)" },
       { command: "rex migrate-to-md ./my-project", description: "Migrate to markdown in a specific project (deprecated)" },

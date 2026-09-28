@@ -23,6 +23,7 @@ import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
 import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
+import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 
 // ── LLM analysis ──────────────────────────────────────────────────────
 
@@ -280,6 +281,12 @@ export async function cmdReorganize(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  const guard = checkBranchGuard(dir, flags);
+  if (guard.blocked) {
+    const { message, suggestion } = branchGuardRefusal("reorganize", guard.branch);
+    throw new CLIError(message, suggestion);
+  }
+
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
 
