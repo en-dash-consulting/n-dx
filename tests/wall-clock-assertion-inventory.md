@@ -67,6 +67,15 @@ phase whose children the suite tracks, so pnpm's startup was charged against the
 The docs spawn is now redirected to a stub and the deadline is unchanged;
 time-to-first-PID is 111ms.
 
+That fix removed the cost but not the exposure: the 3s deadline was still a raw
+constant, and the closing soak for 0.8.0 (`scripts/soak-under-build-load.mjs`)
+hit it at 8678ms under concurrent build load. Every wait in that file is now
+`BUDGET_MULTIPLIER`-scaled — the two PID-record deadlines, the orphan-reap grace,
+the normal-exit grace and the SIGINT case's per-test ceiling — except the mirror
+of the product's own 5s force-kill timer, which is not the test's to widen. These
+are Family 3 polling guardrails, not clock-decided assertions, so neither
+detector flags them and the file is listed here only for the narrative above.
+
 ---
 
 ## Justified — clock retained deliberately
