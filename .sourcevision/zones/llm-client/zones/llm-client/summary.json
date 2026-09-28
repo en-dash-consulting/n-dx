@@ -1,0 +1,27 @@
+{
+  "id": "llm-client/llm-client",
+  "name": "Llm Client",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/llm-client/src/budget-preflight.ts",
+    "packages/llm-client/src/codex-cli-provider.ts",
+    "packages/llm-client/src/config.ts",
+    "packages/llm-client/src/model-pricing.ts",
+    "packages/llm-client/src/prompt-diagnostics.ts",
+    "packages/llm-client/src/runtime-contract.ts",
+    "packages/llm-client/src/token-usage.ts"
+  ],
+  "entryPoints": [
+    "packages/llm-client/src/budget-preflight.ts",
+    "packages/llm-client/src/codex-cli-provider.ts",
+    "packages/llm-client/src/config.ts",
+    "packages/llm-client/src/model-pricing.ts",
+    "packages/llm-client/src/prompt-diagnostics.ts",
+    "packages/llm-client/src/runtime-contract.ts",
+    "packages/llm-client/src/token-usage.ts"
+  ],
+  "cohesion": 0.32,
+  "coupling": 0.68,
+  "fileCount": 7,
+  "lineCount": 2559
+}

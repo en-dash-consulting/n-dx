@@ -1,0 +1,29 @@
+{
+  "id": "tests-llm-client",
+  "name": "Tests Llm Client",
+  "description": "Non-source files in packages: fake-cli.ts, fake-spawn.ts, posix-shell.ts (+4 more)",
+  "files": [
+    "packages/llm-client/tests/helpers/fake-cli.ts",
+    "packages/llm-client/tests/helpers/fake-spawn.ts",
+    "packages/llm-client/tests/helpers/posix-shell.ts",
+    "packages/llm-client/tests/integration/exec-shell-windows.test.ts",
+    "packages/llm-client/tests/integration/exec-timeout-tree-kill.test.ts",
+    "packages/llm-client/tests/integration/git-worktree-helpers.test.ts",
+    "packages/llm-client/tests/integration/weight-aware-model-resolution.test.ts"
+  ],
+  "entryPoints": [
+    "packages/llm-client/tests/helpers/fake-cli.ts",
+    "packages/llm-client/tests/helpers/fake-spawn.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 7,
+  "lineCount": 1073,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

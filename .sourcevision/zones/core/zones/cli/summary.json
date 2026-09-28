@@ -1,0 +1,21 @@
+{
+  "id": "core/cli",
+  "name": "Cli",
+  "description": "4 files, primarily JavaScript",
+  "files": [
+    "packages/core/cli-brand.js",
+    "packages/core/cli-ink.js",
+    "packages/core/git-preflight.js",
+    "packages/core/sample-app.js"
+  ],
+  "entryPoints": [
+    "packages/core/cli-brand.js",
+    "packages/core/cli-ink.js",
+    "packages/core/git-preflight.js",
+    "packages/core/sample-app.js"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 4,
+  "lineCount": 1363
+}

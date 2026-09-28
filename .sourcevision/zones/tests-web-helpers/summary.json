@@ -1,0 +1,34 @@
+{
+  "id": "tests-web-helpers",
+  "name": "Tests Web Helpers",
+  "description": "Non-source files in packages: built-server-guard.ts, crash-detector-test-support.ts, temp-dir.ts (+3 more)",
+  "files": [
+    "packages/web/tests/helpers/built-server-guard.ts",
+    "packages/web/tests/helpers/crash-detector-test-support.ts",
+    "packages/web/tests/helpers/temp-dir.ts",
+    "packages/web/tests/helpers/tree-work-count.ts",
+    "packages/web/tests/helpers/viewer-boot.ts",
+    "packages/web/tests/helpers/visibility-test-support.ts"
+  ],
+  "entryPoints": [
+    "packages/web/tests/helpers/built-server-guard.ts",
+    "packages/web/tests/helpers/crash-detector-test-support.ts",
+    "packages/web/tests/helpers/preact-test-support.ts",
+    "packages/web/tests/helpers/server-route-test-support.ts",
+    "packages/web/tests/helpers/temp-dir.ts",
+    "packages/web/tests/helpers/tree-work-count.ts",
+    "packages/web/tests/helpers/viewer-boot.ts",
+    "packages/web/tests/helpers/visibility-test-support.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 552,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

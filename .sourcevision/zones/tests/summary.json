@@ -1,0 +1,32 @@
+{
+  "id": "tests",
+  "name": "Tests",
+  "description": "Non-source files in tests: evals.test.js, record-goldens.js, score.js (+5 more)",
+  "files": [
+    "tests/gauntlet/sourcevision-evals/evals.test.js",
+    "tests/gauntlet/sourcevision-evals/record-goldens.js",
+    "tests/gauntlet/sourcevision-evals/score.js",
+    "tests/gauntlet/sourcevision-evals/score.test.js",
+    "tests/helpers/all-skills.js",
+    "tests/helpers/posix-shell.js",
+    "tests/helpers/real-process-tree.js",
+    "tests/helpers/symlink-support.js"
+  ],
+  "entryPoints": [
+    "tests/helpers/all-skills.js",
+    "tests/helpers/posix-shell.js",
+    "tests/helpers/real-process-tree.js",
+    "tests/helpers/symlink-support.js"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 8,
+  "lineCount": 971,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

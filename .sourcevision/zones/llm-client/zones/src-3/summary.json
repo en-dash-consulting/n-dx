@@ -1,0 +1,21 @@
+{
+  "id": "llm-client/src-3",
+  "name": "Src 3",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/llm-client/src/cli-log.ts",
+    "packages/llm-client/src/exec.ts",
+    "packages/llm-client/src/interrupt-forwarding.ts",
+    "packages/llm-client/src/process-tree.ts"
+  ],
+  "entryPoints": [
+    "packages/llm-client/src/cli-log.ts",
+    "packages/llm-client/src/exec.ts",
+    "packages/llm-client/src/interrupt-forwarding.ts",
+    "packages/llm-client/src/process-tree.ts"
+  ],
+  "cohesion": 0.55,
+  "coupling": 0.45,
+  "fileCount": 4,
+  "lineCount": 2675
+}

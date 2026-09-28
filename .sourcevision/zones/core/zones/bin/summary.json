@@ -1,0 +1,20 @@
+{
+  "id": "core/bin",
+  "name": "Bin",
+  "description": "5 files, primarily JavaScript",
+  "files": [
+    "packages/core/bin/hench.js",
+    "packages/core/bin/rex.js",
+    "packages/core/bin/sourcevision.js",
+    "packages/core/child-lifecycle.js",
+    "packages/core/pair-programming.js"
+  ],
+  "entryPoints": [
+    "packages/core/child-lifecycle.js",
+    "packages/core/pair-programming.js"
+  ],
+  "cohesion": 0.62,
+  "coupling": 0.38,
+  "fileCount": 5,
+  "lineCount": 1873
+}

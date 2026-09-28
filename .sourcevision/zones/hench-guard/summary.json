@@ -1,0 +1,29 @@
+{
+  "id": "hench-guard",
+  "name": "Hench Guard",
+  "description": "5 files, mostly cli commands and schemas; entry points index.ts, paths.ts, commands.ts; imports Hench; imported by Packages and Hench.",
+  "files": [
+    "packages/hench/src/guard/commands.ts",
+    "packages/hench/src/guard/contracts.ts",
+    "packages/hench/src/guard/index.ts",
+    "packages/hench/src/guard/paths.ts",
+    "packages/hench/src/guard/policy.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/guard/commands.ts",
+    "packages/hench/src/guard/index.ts",
+    "packages/hench/src/guard/paths.ts",
+    "packages/hench/src/guard/policy.ts"
+  ],
+  "cohesion": 0.75,
+  "coupling": 0.25,
+  "fileCount": 5,
+  "lineCount": 835,
+  "riskMetrics": {
+    "cohesion": 0.75,
+    "coupling": 0.25,
+    "riskScore": 0.25,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

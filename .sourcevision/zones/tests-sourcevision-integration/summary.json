@@ -1,0 +1,30 @@
+{
+  "id": "tests-sourcevision-integration",
+  "name": "Tests Sourcevision Integration",
+  "description": "Non-source files in packages: analyze-model-resolution.test.ts, claude-config.test.ts, context.test.ts (+8 more)",
+  "files": [
+    "packages/sourcevision/tests/integration/analyze-model-resolution.test.ts",
+    "packages/sourcevision/tests/integration/claude-config.test.ts",
+    "packages/sourcevision/tests/integration/context.test.ts",
+    "packages/sourcevision/tests/integration/go-zones.test.ts",
+    "packages/sourcevision/tests/integration/imports-go.test.ts",
+    "packages/sourcevision/tests/integration/inventory-go.test.ts",
+    "packages/sourcevision/tests/integration/inventory-zig.test.ts",
+    "packages/sourcevision/tests/integration/llms-txt.test.ts",
+    "packages/sourcevision/tests/integration/mixed-language.test.ts",
+    "packages/sourcevision/tests/integration/pipeline.test.ts",
+    "packages/sourcevision/tests/integration/pr-markdown-reviewer-output.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 11,
+  "lineCount": 1851,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

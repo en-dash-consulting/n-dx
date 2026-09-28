@@ -1,0 +1,41 @@
+{
+  "id": "rex/rex",
+  "name": "Rex",
+  "description": "15 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/status-sections.ts",
+    "packages/rex/src/cli/commands/status-shared.ts",
+    "packages/rex/src/cli/commands/status-work-cycle.ts",
+    "packages/rex/src/cli/commands/status.ts",
+    "packages/rex/src/cli/commands/tree.ts",
+    "packages/rex/src/core/code-coverage.ts",
+    "packages/rex/src/core/durations.ts",
+    "packages/rex/src/core/item-duration-rollup.ts",
+    "packages/rex/src/core/item-token-rollup.ts",
+    "packages/rex/src/core/keywords.ts",
+    "packages/rex/src/core/stats.ts",
+    "packages/rex/src/core/verify.ts",
+    "packages/rex/src/public.ts",
+    "packages/rex/src/schema/levels.ts",
+    "packages/rex/src/schema/v1.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/status-sections.ts",
+    "packages/rex/src/cli/commands/status-work-cycle.ts",
+    "packages/rex/src/cli/commands/status.ts",
+    "packages/rex/src/cli/commands/tree.ts",
+    "packages/rex/src/core/durations.ts",
+    "packages/rex/src/core/item-duration-rollup.ts",
+    "packages/rex/src/core/item-token-rollup.ts",
+    "packages/rex/src/core/keywords.ts",
+    "packages/rex/src/core/stats.ts",
+    "packages/rex/src/core/verify.ts",
+    "packages/rex/src/public.ts",
+    "packages/rex/src/schema/levels.ts",
+    "packages/rex/src/schema/v1.ts"
+  ],
+  "cohesion": 0.47,
+  "coupling": 0.53,
+  "fileCount": 15,
+  "lineCount": 3720
+}
