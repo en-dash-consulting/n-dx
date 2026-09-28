@@ -26,4 +26,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Add deterministic contract tests for Codex session resume that run in CI without credentials](./add-deterministic-contract-tests-for.md) | pending |
 | [Add scoped list and clear for Codex cache entries with automatic eviction](./add-scoped-list-and-clear-for-codex.md) | pending |
 | [Record the session strategy, hit or miss reason and token-data provenance on every run](./record-the-session-strategy-hit-or.md) | pending |
-| [Version the Codex batch-cache entry and key it by worktree, revision, source fingerprint and policy](./version-the-codex-batch-cache-entry.md) | in_progress |
+| [Version the Codex batch-cache entry and key it by worktree, revision, source fingerprint and policy](./version-the-codex-batch-cache-entry.md) | completed |
