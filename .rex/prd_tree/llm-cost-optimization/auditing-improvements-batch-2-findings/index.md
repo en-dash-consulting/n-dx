@@ -18,6 +18,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [append_log is MCP-only — no CLI equivalent, so ndx work runs cannot write execution-log entries](./append-log-is-mcp-only-no-cli.md) | pending |
 | [PACKAGE_GUIDELINES .rex/ write-access protocol documented a PRD layout that no longer exists](./package-guidelines-rex-write-access.md) | completed |
 | [Run summary omits cache tokens, understating input ~65,000x](./run-summary-omits-cache-tokens.md) | completed |
