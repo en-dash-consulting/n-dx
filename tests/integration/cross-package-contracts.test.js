@@ -292,6 +292,8 @@ describe("hench → llm-client gateway contract", () => {
     "terminateProcessTree",
     "diagnoseCliInvocation",
     "diagnoseCliNotFound",
+    "resolveLayout",
+    "detectLayoutMode",
   ];
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
@@ -660,7 +662,11 @@ describe("gateway export auto-detection", () => {
         "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry",
         "classifyLLMError", "isAuthError", "parseLmStudioError", "resolveLocalTimeoutMs", "getNextFailoverAttempt",
         "quoteWindowsToken", "buildWindowsCliCommandLine", "spawnCli", "terminateProcessTree",
-        "diagnoseCliInvocation", "diagnoseCliNotFound", "isLLMVendor"],
+        "diagnoseCliInvocation", "diagnoseCliNotFound", "isLLMVendor",
+        // Folder-layout resolution. Lives in llm-client so every package
+        // resolves `.hench/` against the same lookup order; a hench-local copy
+        // would disagree exactly on projects that are mid-migration.
+        "resolveLayout", "detectLayoutMode"],
       ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "REVIEW_MODELS", "GOOGLE_MODELS",
         "VENDOR_CONTEXT_CHAR_LIMITS",
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
