@@ -176,6 +176,8 @@ function StatChip({ value, label, color, accent }: {
 }
 
 /** Epic card with enhanced progress and status display */
+const EPICS_EXPANDED_KEY = "ndx.rex-dash.epics-expanded";
+
 function EpicCard({ epic, navigateTo }: { epic: EpicStats; navigateTo?: NavigateTo }) {
   const { stats } = epic;
   const isComplete = epic.percentComplete >= 100;
@@ -241,6 +243,19 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
   const [reorgOpen, setReorgOpen] = useState(false);
   const [reorgCount, setReorgCount] = useState(0);
   const [restoreOpen, setRestoreOpen] = useState(false);
+  // Epic Progress is a bounded, scrollable list by default — a PRD with dozens
+  // of epics otherwise pushes everything below it off the page. Expand shows
+  // the full list; the choice is remembered.
+  const [epicsExpanded, setEpicsExpanded] = useState<boolean>(() => {
+    try { return localStorage.getItem(EPICS_EXPANDED_KEY) === "true"; } catch { return false; }
+  });
+  const toggleEpicsExpanded = useCallback(() => {
+    setEpicsExpanded((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(EPICS_EXPANDED_KEY, String(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, []);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -471,9 +486,26 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
             h("span", { class: "rex-dash-section-meta" },
               `${epics.length} epic${epics.length !== 1 ? "s" : ""}`,
             ),
+            sortedEpics.length > 0
+              ? h("button", {
+                  type: "button",
+                  class: "rex-dash-epics-toggle",
+                  onClick: toggleEpicsExpanded,
+                  "aria-expanded": String(epicsExpanded),
+                  "aria-controls": "rex-dash-epic-list",
+                  title: epicsExpanded ? "Show as a scrollable list" : "Show every epic",
+                }, epicsExpanded ? "Collapse ▴" : "Expand ▾")
+              : null,
           ),
           sortedEpics.length > 0
-            ? h("div", { class: "rex-dash-epic-list" },
+            ? h("div", {
+                id: "rex-dash-epic-list",
+                class: `rex-dash-epic-list${epicsExpanded ? " rex-dash-epic-list--expanded" : " rex-dash-epic-list--scroll"}`,
+                // A scroll region must be reachable by keyboard.
+                tabIndex: epicsExpanded ? undefined : 0,
+                role: "region",
+                "aria-label": "Epic progress",
+              },
                 sortedEpics.map((epic) =>
                   h(EpicCard, { key: epic.id, epic, navigateTo }),
                 ),
