@@ -1,0 +1,19 @@
+{
+  "id": "rex/cli/rex",
+  "name": "Rex",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/export.ts",
+    "packages/rex/src/cli/commands/import-bundle.ts",
+    "packages/rex/src/core/prd-bundle.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/export.ts",
+    "packages/rex/src/cli/commands/import-bundle.ts",
+    "packages/rex/src/core/prd-bundle.ts"
+  ],
+  "cohesion": 0.33,
+  "coupling": 0.67,
+  "fileCount": 3,
+  "lineCount": 1346
+}

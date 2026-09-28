@@ -1,0 +1,36 @@
+{
+  "id": "scripts",
+  "name": "Build & CI Scripts",
+  "description": "Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+8 more)",
+  "files": [
+    "scripts/backfill-release-tags.mjs",
+    "scripts/build-iso-skill.mjs",
+    "scripts/check-dependency-drift.mjs",
+    "scripts/check-obfuscated-code.mjs",
+    "scripts/cli-smoke-parity.mjs",
+    "scripts/hench-callgraph-analysis.mjs",
+    "scripts/preflight.mjs",
+    "scripts/profile-prd-tree-write.mjs",
+    "scripts/profile-store-write.mjs",
+    "scripts/prompt-census.mjs",
+    "scripts/run-vitest-bind-aware.mjs"
+  ],
+  "entryPoints": [
+    "scripts/build-iso-skill.mjs",
+    "scripts/check-dependency-drift.mjs",
+    "scripts/check-obfuscated-code.mjs",
+    "scripts/cli-smoke-parity.mjs",
+    "scripts/prompt-census.mjs"
+  ],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 11,
+  "lineCount": 5008,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

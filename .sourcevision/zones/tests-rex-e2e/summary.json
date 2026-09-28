@@ -1,0 +1,37 @@
+{
+  "id": "tests-rex-e2e",
+  "name": "Tests Rex E2e",
+  "description": "Non-source files in packages: add-stdin-hang.test.ts, cli-adapter.test.ts, cli-add-path-regression.test.ts (+15 more)",
+  "files": [
+    "packages/rex/tests/e2e/add-stdin-hang.test.ts",
+    "packages/rex/tests/e2e/cli-adapter.test.ts",
+    "packages/rex/tests/e2e/cli-add-path-regression.test.ts",
+    "packages/rex/tests/e2e/cli-analyze.test.ts",
+    "packages/rex/tests/e2e/cli-fix.test.ts",
+    "packages/rex/tests/e2e/cli-folder-tree.test.ts",
+    "packages/rex/tests/e2e/cli-hints.test.ts",
+    "packages/rex/tests/e2e/cli-import.test.ts",
+    "packages/rex/tests/e2e/cli-init.test.ts",
+    "packages/rex/tests/e2e/cli-migrate-to-md.test.ts",
+    "packages/rex/tests/e2e/cli-no-json-writes.test.ts",
+    "packages/rex/tests/e2e/cli-prd-bundle.test.ts",
+    "packages/rex/tests/e2e/cli-prune.test.ts",
+    "packages/rex/tests/e2e/cli-quiet.test.ts",
+    "packages/rex/tests/e2e/cli-recommend.test.ts",
+    "packages/rex/tests/e2e/cli-smart-add.test.ts",
+    "packages/rex/tests/e2e/cli-sync.test.ts",
+    "packages/rex/tests/e2e/cli-workflow.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 18,
+  "lineCount": 5423,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "llm-client/src-2",
+  "name": "Src 2",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/llm-client/src/cli-brand.ts",
+    "packages/llm-client/src/help-format.ts",
+    "packages/llm-client/src/output.ts",
+    "packages/llm-client/src/vendor-header.ts"
+  ],
+  "entryPoints": [
+    "packages/llm-client/src/cli-brand.ts",
+    "packages/llm-client/src/help-format.ts",
+    "packages/llm-client/src/output.ts",
+    "packages/llm-client/src/vendor-header.ts"
+  ],
+  "cohesion": 0.57,
+  "coupling": 0.43,
+  "fileCount": 4,
+  "lineCount": 874
+}

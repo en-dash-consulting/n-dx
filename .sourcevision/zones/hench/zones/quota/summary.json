@@ -1,0 +1,37 @@
+{
+  "id": "hench/quota",
+  "name": "Quota",
+  "description": "13 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/lifecycle/plan-mode-prompt.ts",
+    "packages/hench/src/agent/lifecycle/prompt-diagnostics.ts",
+    "packages/hench/src/agent/lifecycle/task-display.ts",
+    "packages/hench/src/cli/commands/validate-tokens.ts",
+    "packages/hench/src/quota/claude-quota.ts",
+    "packages/hench/src/quota/codex-quota.ts",
+    "packages/hench/src/quota/format.ts",
+    "packages/hench/src/quota/google-quota.ts",
+    "packages/hench/src/quota/index.ts",
+    "packages/hench/src/quota/token-validation-hook.ts",
+    "packages/hench/src/quota/types.ts",
+    "packages/hench/src/types/index.ts",
+    "packages/hench/src/types/output.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/lifecycle/plan-mode-prompt.ts",
+    "packages/hench/src/agent/lifecycle/prompt-diagnostics.ts",
+    "packages/hench/src/agent/lifecycle/task-display.ts",
+    "packages/hench/src/cli/commands/validate-tokens.ts",
+    "packages/hench/src/quota/claude-quota.ts",
+    "packages/hench/src/quota/codex-quota.ts",
+    "packages/hench/src/quota/format.ts",
+    "packages/hench/src/quota/google-quota.ts",
+    "packages/hench/src/quota/index.ts",
+    "packages/hench/src/quota/types.ts",
+    "packages/hench/src/types/output.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 13,
+  "lineCount": 1769
+}

@@ -1,0 +1,25 @@
+{
+  "id": "tests-web-e2e-ui",
+  "name": "Tests Web E2e Ui",
+  "description": "Non-source files in packages: console-errors.ts, fixture-project.ts, hench-runs-workflow.spec.ts (+3 more)",
+  "files": [
+    "packages/web/tests/e2e-ui/helpers/console-errors.ts",
+    "packages/web/tests/e2e-ui/helpers/fixture-project.ts",
+    "packages/web/tests/e2e-ui/hench-runs-workflow.spec.ts",
+    "packages/web/tests/e2e-ui/navigation.spec.ts",
+    "packages/web/tests/e2e-ui/prd-workflow.spec.ts",
+    "packages/web/tests/e2e-ui/setup-wizard.spec.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 541,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

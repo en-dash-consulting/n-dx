@@ -1,0 +1,35 @@
+{
+  "id": "sourcevision/analyzers-2",
+  "name": "Analyzers 2",
+  "description": "12 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/components.ts",
+    "packages/sourcevision/src/analyzers/manifest.ts",
+    "packages/sourcevision/src/analyzers/route-detection.ts",
+    "packages/sourcevision/src/analyzers/server-route-detection.ts",
+    "packages/sourcevision/src/analyzers/workspace-aggregate.ts",
+    "packages/sourcevision/src/analyzers/workspace-crossings.ts",
+    "packages/sourcevision/src/analyzers/workspace.ts",
+    "packages/sourcevision/src/constants.ts",
+    "packages/sourcevision/src/schema/data-files.ts",
+    "packages/sourcevision/src/util/debug-stopwatch.ts",
+    "packages/sourcevision/src/util/debug-timing.ts",
+    "packages/sourcevision/src/util/paths.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/components.ts",
+    "packages/sourcevision/src/analyzers/manifest.ts",
+    "packages/sourcevision/src/analyzers/route-detection.ts",
+    "packages/sourcevision/src/analyzers/server-route-detection.ts",
+    "packages/sourcevision/src/analyzers/workspace-aggregate.ts",
+    "packages/sourcevision/src/analyzers/workspace-crossings.ts",
+    "packages/sourcevision/src/analyzers/workspace.ts",
+    "packages/sourcevision/src/constants.ts",
+    "packages/sourcevision/src/schema/data-files.ts",
+    "packages/sourcevision/src/util/paths.ts"
+  ],
+  "cohesion": 0.54,
+  "coupling": 0.46,
+  "fileCount": 12,
+  "lineCount": 3049
+}

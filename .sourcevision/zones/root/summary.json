@@ -1,0 +1,23 @@
+{
+  "id": "root",
+  "name": "Root",
+  "description": "4 files.",
+  "files": [
+    "pr-check.js",
+    "scan_transcripts.py",
+    "test-token-format.js",
+    "vitest.config.js"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 4,
+  "lineCount": 350,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

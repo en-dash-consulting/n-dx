@@ -1,0 +1,35 @@
+{
+  "id": "rex/cli/commands",
+  "name": "Rex",
+  "description": "12 files, primarily TypeScript, JavaScript",
+  "files": [
+    "packages/rex/scripts/migrate-md-to-frontmatter.mjs",
+    "packages/rex/src/cli/commands/backfill-commit-attribution.ts",
+    "packages/rex/src/cli/commands/init.ts",
+    "packages/rex/src/cli/commands/migrate-folder-tree-filenames.ts",
+    "packages/rex/src/cli/commands/next.ts",
+    "packages/rex/src/cli/commands/remove.ts",
+    "packages/rex/src/cli/commands/restore.ts",
+    "packages/rex/src/cli/commands/sync.ts",
+    "packages/rex/src/cli/commands/verify.ts",
+    "packages/rex/src/cli/output.ts",
+    "packages/rex/src/store/title-to-filename.ts",
+    "packages/rex/src/workflow/default.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/backfill-commit-attribution.ts",
+    "packages/rex/src/cli/commands/init.ts",
+    "packages/rex/src/cli/commands/migrate-folder-tree-filenames.ts",
+    "packages/rex/src/cli/commands/next.ts",
+    "packages/rex/src/cli/commands/remove.ts",
+    "packages/rex/src/cli/commands/restore.ts",
+    "packages/rex/src/cli/commands/sync.ts",
+    "packages/rex/src/cli/commands/verify.ts",
+    "packages/rex/src/cli/output.ts",
+    "packages/rex/src/store/title-to-filename.ts"
+  ],
+  "cohesion": 0.43,
+  "coupling": 0.57,
+  "fileCount": 12,
+  "lineCount": 1771
+}

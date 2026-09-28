@@ -1,0 +1,32 @@
+{
+  "id": "sourcevision/language",
+  "name": "Language",
+  "description": "11 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/callgraph.ts",
+    "packages/sourcevision/src/analyzers/go-imports.ts",
+    "packages/sourcevision/src/analyzers/imports.ts",
+    "packages/sourcevision/src/analyzers/index.ts",
+    "packages/sourcevision/src/analyzers/inventory.ts",
+    "packages/sourcevision/src/language/detect.ts",
+    "packages/sourcevision/src/language/go.ts",
+    "packages/sourcevision/src/language/python.ts",
+    "packages/sourcevision/src/language/registry.ts",
+    "packages/sourcevision/src/language/swift.ts",
+    "packages/sourcevision/src/language/typescript.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/callgraph.ts",
+    "packages/sourcevision/src/analyzers/go-imports.ts",
+    "packages/sourcevision/src/analyzers/imports.ts",
+    "packages/sourcevision/src/analyzers/inventory.ts",
+    "packages/sourcevision/src/language/detect.ts",
+    "packages/sourcevision/src/language/go.ts",
+    "packages/sourcevision/src/language/registry.ts",
+    "packages/sourcevision/src/language/typescript.ts"
+  ],
+  "cohesion": 0.61,
+  "coupling": 0.39,
+  "fileCount": 11,
+  "lineCount": 3379
+}

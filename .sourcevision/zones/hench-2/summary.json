@@ -1,0 +1,20 @@
+{
+  "id": "hench-2",
+  "name": "Hench 2",
+  "description": "Project configuration and manifest files: vitest.config.ts",
+  "files": [
+    "packages/hench/vitest.config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 1,
+  "lineCount": 40,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

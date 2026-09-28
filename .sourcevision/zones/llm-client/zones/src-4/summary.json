@@ -1,0 +1,25 @@
+{
+  "id": "llm-client/src-4",
+  "name": "Src 4",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/llm-client/src/json.ts",
+    "packages/llm-client/src/progress-reporter.ts",
+    "packages/llm-client/src/project-dirs.ts",
+    "packages/llm-client/src/public.ts",
+    "packages/llm-client/src/suggest.ts",
+    "packages/llm-client/src/suppress-deprecations.ts",
+    "packages/llm-client/src/tool-schema.ts"
+  ],
+  "entryPoints": [
+    "packages/llm-client/src/json.ts",
+    "packages/llm-client/src/progress-reporter.ts",
+    "packages/llm-client/src/public.ts",
+    "packages/llm-client/src/suggest.ts",
+    "packages/llm-client/src/tool-schema.ts"
+  ],
+  "cohesion": 0.24,
+  "coupling": 0.76,
+  "fileCount": 7,
+  "lineCount": 1239
+}
