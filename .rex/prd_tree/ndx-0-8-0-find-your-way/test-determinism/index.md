@@ -21,8 +21,9 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [cli-ci-child-cleanup polls on a raw 3000ms deadline that bypasses BUDGET_MULTIPLIER and times out under build load](./cli-ci-child-cleanup-polls-on-a-raw.md) | pending |
 | [prd-tree-atomic-writes asserts raw 500ms latency budgets and compares two adjacent micro-spans](./prd-tree-atomic-writes-asserts-raw.md) | completed |
-| [prd-tree-atomic-writes write-volume tests time out under load: 1000-item fixtures leave ~7x headroom against rex's 30s testTimeout](./prd-tree-atomic-writes-write-volume.md) | pending |
+| [prd-tree-atomic-writes write-volume tests time out under load: 1000-item fixtures leave ~7x headroom against rex's 30s testTimeout](./prd-tree-atomic-writes-write-volume.md) | in_progress |
 | [Prove the full suite passes under concurrent build load three times in a row](./prove-the-full-suite-passes-under.md) | pending |
 | [Real-timer ordering assertions are load-sensitive and invisible to the wall-clock inventory scanner](./real-timer-ordering-assertions-are.md) | completed |
 | [run-loop puts a lower bound on a real timer and dom-performance-monitor keeps an absolute count budget](./run-loop-puts-a-lower-bound-on-a-real.md) | completed |
