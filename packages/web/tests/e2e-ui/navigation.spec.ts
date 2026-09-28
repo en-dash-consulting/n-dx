@@ -103,12 +103,16 @@ test("a bare URL lands on home; a stage tab and a section link update the active
   await expect(page).toHaveURL(/\/plan$/);
   await expect(page.locator(".topnav-tab.active .topnav-tab-label")).toHaveText("Plan");
 
-  // Tasks is offered as a link: open its section, then follow it.
+  // Tasks opens on arrival and shows the PRD's items, not an empty frame \u2014
+  // the tree's virtual scroller needs the section's bounded height to render rows.
   const tasks = page.locator('.stage-section[data-view="prd"]');
-  await tasks.locator(".stage-section-toggle").click();
-  await tasks.getByRole("button", { name: "Open Tasks \u2192" }).click();
+  await expect(tasks.locator(".stage-section-toggle")).toHaveAttribute("aria-expanded", "true");
+  await expect(tasks.getByText("E2E Fixture Epic").first()).toBeVisible({ timeout: 10_000 });
+
+  // Its full page shows them too, and keeps the stage lit.
+  await tasks.locator(".stage-section-open").click();
   await expect(page).toHaveURL(/\/prd$/);
-  // The view keeps its stage lit.
+  await expect(page.locator("main").getByText("E2E Fixture Epic").first()).toBeVisible({ timeout: 10_000 });
   await expect(page.locator(".topnav-tab.active .topnav-tab-label")).toHaveText("Plan");
 
   // The side stage link steps on to Work.

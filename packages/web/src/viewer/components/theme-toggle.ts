@@ -62,12 +62,15 @@ export function initTheme() {
 }
 
 const OPTIONS: ReadonlyArray<{ value: ThemePref; glyph: string; label: string; title: string }> = [
-  { value: "system", glyph: "◐", label: "System", title: "Follow the system setting" },
-  { value: "light", glyph: "☀", label: "Light", title: "Always light" },
-  { value: "dark", glyph: "☾", label: "Dark", title: "Always dark" },
+  { value: "system", glyph: "◐", label: "System theme", title: "System: follow the OS setting" },
+  { value: "light", glyph: "☀", label: "Light theme", title: "Light" },
+  { value: "dark", glyph: "☾", label: "Dark theme", title: "Dark" },
 ];
 
-/** Segmented System / Light / Dark control for the bottom bar. */
+/**
+ * Segmented System / Light / Dark control for the bottom bar. Icons only —
+ * each button's name comes from its aria-label, and its tooltip says what it does.
+ */
 export function ThemeToggle() {
   const [pref, setPrefState] = useState<ThemePref>(readPref);
 
@@ -85,11 +88,11 @@ export function ThemeToggle() {
         class: `theme-toggle-btn${pref === o.value ? " theme-toggle-btn--active" : ""}`,
         "data-theme-pref": o.value,
         "aria-pressed": String(pref === o.value),
+        "aria-label": o.label,
         title: o.title,
         onClick: () => choose(o.value),
       },
         h("span", { class: "theme-toggle-glyph", "aria-hidden": "true" }, o.glyph),
-        h("span", { class: "theme-toggle-label" }, o.label),
       ),
     ),
   );

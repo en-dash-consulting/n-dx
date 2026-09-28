@@ -285,11 +285,14 @@ describe("StagePage", () => {
     expect(navigateTo).toHaveBeenCalledWith("validation");
   });
 
-  it("offers the Tasks tree as a link rather than embedding it", async () => {
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "plan:prd": true }));
+  it("embeds the Tasks tree, open on arrival, in a bounded-height body it can fill", async () => {
     await mount(page("plan"));
-    expect(rendered).not.toContain("prd");
-    expect(root.querySelector('.stage-section[data-view="prd"] .stage-section-link')).not.toBeNull();
+    expect(rendered).toContain("prd");
+    const body = root.querySelector('.stage-section[data-view="prd"] .stage-section-body');
+    // The tree's virtual scroller sizes itself from this container; without a
+    // bounded height it measures zero and shows no items.
+    expect(body?.classList.contains("stage-section-body--fill")).toBe(true);
+    expect(body?.querySelector('[data-rendered="prd"]')).not.toBeNull();
   });
 
   it("drops sections outside the viewer's scope", async () => {

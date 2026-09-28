@@ -126,7 +126,10 @@ describe("ThemeToggle accessibility", () => {
     expect(group?.getAttribute("role")).toBe("group");
     expect(group?.getAttribute("aria-label")).toBe("Theme");
     const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>(".theme-toggle-btn"));
-    expect(buttons.map((b) => b.textContent)).toEqual([expect.stringContaining("System"), expect.stringContaining("Light"), expect.stringContaining("Dark")]);
+    // Icons only: the name is the aria-label, and no visible text rides along.
+    expect(buttons.map((b) => b.getAttribute("aria-label"))).toEqual(["System theme", "Light theme", "Dark theme"]);
+    expect(buttons.every((b) => b.querySelector(".theme-toggle-glyph")?.getAttribute("aria-hidden") === "true")).toBe(true);
+    expect(buttons.map((b) => b.textContent)).toEqual(["◐", "☀", "☾"]);
     expect(buttons.map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
   });
 

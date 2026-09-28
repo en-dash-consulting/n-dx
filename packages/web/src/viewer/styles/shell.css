@@ -159,7 +159,12 @@
   position: relative;
   z-index: 41; /* above the commands sheet scrim, so its button stays reachable */
 }
-.bottombar-server { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* One line, never taller than the bar. The server identity and the status
+   badges give way (ellipsis, then clipping) before anything overlaps; the
+   cog and the controls on the right never shrink. */
+.bottombar > * { flex-shrink: 0; }
+.bottombar-server { display: block; flex: 0 1 auto; max-width: 40%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.bottombar-server .bottombar-dot { display: inline-block; margin-right: 8px; vertical-align: middle; }
 .bottombar-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
 .bottombar-dot--off { background: var(--text-muted); }
 .bottombar-icon-btn {
@@ -182,8 +187,24 @@
   border-color: var(--border);
   outline: none;
 }
-.bottombar-status { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
-.bottombar-status .sidebar-indicator { margin: 0; }
+.bottombar-status { display: flex; align-items: center; gap: var(--space-2); flex: 1 1 0; min-width: 0; height: 100%; overflow: hidden; }
+/* The badges were built for the sidebar: full-width buttons, and the PRD one a
+   three-row stack ending in the next task's title. Here they are one short
+   line each; the full detail is still in each badge's aria-label. */
+.bottombar-status .sidebar-indicator {
+  width: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 2px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bottombar-status .sidebar-indicator-prd { flex-direction: row; align-items: center; gap: 6px; }
+.bottombar-status .sidebar-indicator-prd .indicator-row { display: flex; align-items: center; gap: 6px; }
+.bottombar-status .sidebar-indicator-prd .indicator-bar { width: 48px; flex-shrink: 0; margin: 0; }
+.bottombar-status .indicator-next { display: none; }
 .bottombar-controls { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
 .bottombar-commands {
   display: flex;
@@ -206,17 +227,17 @@
 /* Theme: System · Light · Dark */
 .theme-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
 .theme-toggle-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 9px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 22px;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--text-dim);
   font: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .04em;
+  font-size: 12px;
+  line-height: 1;
   cursor: pointer;
 }
 .theme-toggle-btn:hover { color: var(--text); }
@@ -360,8 +381,17 @@
 .stage-section-open { flex-shrink: 0; padding: 3px 9px; border: 1px solid var(--border); border-radius: var(--radius-md); background: transparent; color: var(--text-dim); font: inherit; font-size: 11px; cursor: pointer; }
 .stage-section-open:hover, .stage-section-open:focus-visible { color: var(--text); border-color: var(--accent); outline: none; }
 .stage-section-body { padding: 0 var(--space-4) var(--space-4); border-top: 1px solid var(--border); padding-top: var(--space-4); }
-.stage-section-link { display: flex; align-items: center; gap: var(--space-4); color: var(--text-dim); }
-.stage-section-link p { margin: 0; }
+/* A view that owns a single internal scroll region (the Tasks tree) gets a
+   bounded flex column to fill — the same shape .main--fill gives it on its
+   own page. Without a height, its virtual scroller measures zero and renders
+   no rows. */
+.stage-section-body--fill {
+  display: flex;
+  flex-direction: column;
+  height: min(72vh, 820px);
+  min-height: 360px;
+  overflow: hidden;
+}
 
 /* ── Landing ─ three stage columns side by side ─────────────────────── */
 
@@ -417,7 +447,8 @@
   .home-stages, .home-stages-2 { grid-template-columns: 1fr; }
   .stage-card { min-height: 0; }
   .stage-card-mark { max-width: 110px; }
-  .bottombar-status, .theme-toggle-label { display: none; }
+  .bottombar-status { display: none; }
+  .bottombar-server { max-width: none; flex: 1 1 0; }
   .settings-overlay-body { flex-direction: column; }
   .settings-overlay-nav { width: auto; max-height: 40%; border-right: none; border-bottom: 1px solid var(--border); }
   .stage-section-blurb { display: none; }

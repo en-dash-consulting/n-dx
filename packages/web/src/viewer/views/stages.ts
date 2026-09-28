@@ -35,10 +35,11 @@ export interface StageSection {
    */
   alt?: { view: ViewId; label: string; primaryLabel: string };
   /**
-   * The view owns a full-height layout of its own (the Tasks tree) and is
-   * offered as a link rather than embedded.
+   * The view owns a full-height layout of its own (the Tasks tree: a pinned
+   * filter bar over a virtual scroller that sizes itself from its container),
+   * so the section gives it a bounded-height flex body to fill.
    */
-  linkOnly?: boolean;
+  fill?: boolean;
   /** Hidden when this feature toggle is off (same keys as `useFeatureToggle`). */
   featureGate?: string;
   /** Built on demand by the server — absent from a static export. */
@@ -92,7 +93,7 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     blurb: "What to build next: the PRD, proposals from analysis, and the planning commands.",
     sections: [
       { view: "analysis", title: "Add items", blurb: "Describe work, import a document, or turn analysis into proposals.", open: true },
-      { view: "prd", title: "Tasks", blurb: "The full PRD tree — epics, features, tasks.", linkOnly: true },
+      { view: "prd", title: "Tasks", blurb: "The full PRD tree — epics, features, tasks.", open: true, fill: true },
       { view: "command-reference", title: "CLI help", blurb: "Every command, with the ones you can run from here." },
       { view: "hench-runs", title: "History", blurb: "What the agent has run, most recent first." },
       { view: "merge-graph", title: "Context graph", blurb: "How the PRD's items connect." },

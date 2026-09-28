@@ -100,13 +100,8 @@ function Section({ stage, section, showAlt, navigateTo, renderView }: SectionPro
       }, "Open ↗"),
     ),
     open
-      ? h("div", { class: "stage-section-body", id: bodyId },
-          section.linkOnly
-            ? h("div", { class: "stage-section-link" },
-                h("p", null, section.blurb),
-                h("button", { type: "button", class: "btn btn-primary", onClick: () => navigateTo(section.view) }, `Open ${section.title} →`),
-              )
-            : renderView(shown),
+      ? h("div", { class: `stage-section-body${section.fill ? " stage-section-body--fill" : ""}`, id: bodyId },
+          renderView(shown),
         )
       : null,
   );
