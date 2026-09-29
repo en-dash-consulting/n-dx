@@ -10,6 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import type { ViewId, LoadedData } from "../../../src/viewer/types.js";
+import { emptyJobTray } from "../../helpers/job-tray.js";
 import {
   renderActiveView,
   type ViewRenderContext,
@@ -44,6 +45,7 @@ function makeCtx(): ViewRenderContext {
     navigateTo: () => {},
     isFeatureDisabled: () => false,
     askEnabled: false,
+    jobs: emptyJobTray(),
   };
 }
 

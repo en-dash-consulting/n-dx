@@ -17,6 +17,7 @@ import { SOURCEVISION_TABS } from "../../../src/viewer/views/index.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import type { LoadedData, ViewId } from "../../../src/viewer/types.js";
+import { emptyJobTray } from "../../helpers/job-tray.js";
 
 const MAP_HTML = "<!doctype html><title>map</title><body><div id=\"stage\"></div></body>";
 
@@ -351,6 +352,7 @@ describe("iso-map view registration", () => {
       navigateTo: () => {},
       isFeatureDisabled: () => false,
       askEnabled: false,
+      jobs: emptyJobTray(),
     };
   }
 

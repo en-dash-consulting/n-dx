@@ -23,6 +23,7 @@ import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project
 import { buildValidViews } from "../../../src/shared/index.js";
 import { resolveLocationRoute } from "../../../src/viewer/route-state.js";
 import type { LoadedData, ViewId } from "../../../src/viewer/types.js";
+import { emptyJobTray } from "../../helpers/job-tray.js";
 
 // ---------------------------------------------------------------------------
 // Harness
@@ -80,7 +81,7 @@ describe("AskView", () => {
   function mount() {
     root = document.createElement("div");
     document.body.appendChild(root);
-    render(h(AskView, null), root);
+    render(h(AskView, { jobs: emptyJobTray() }), root);
     return root;
   }
 
@@ -921,6 +922,7 @@ describe("Ask view registration", () => {
       selectedTaskId: null,
       navigateTo: () => {},
       isFeatureDisabled: () => false,
+      jobs: emptyJobTray(),
     } as unknown as ViewRenderContext;
 
     expect(renderActiveView("ask", ctx)).not.toBeNull();

@@ -43,6 +43,7 @@ import { act } from "preact/test-utils";
 import { ArchitectureView } from "../../../src/viewer/views/architecture.js";
 import { ProblemsView } from "../../../src/viewer/views/problems.js";
 import { SuggestionsView } from "../../../src/viewer/views/suggestions.js";
+import { emptyJobTray } from "../../helpers/job-tray.js";
 import { ENRICHMENT_THRESHOLDS } from "../../../src/viewer/views/enrichment-thresholds.js";
 import type { Finding } from "../../../src/viewer/external.js";
 import type { LoadedData } from "../../../src/viewer/types.js";
@@ -214,7 +215,8 @@ describe("gated views across the enrichment threshold", () => {
       ungatedText: "suggestions for improvement",
       finding: "Extract shared helpers",
       otherFinding: "High coupling",
-      props: {},
+      // Suggestions starts `rex recommend`, so it takes the shared job tray.
+      props: { jobs: emptyJobTray() },
     },
   ] as const;
 

@@ -3,9 +3,15 @@
  *
  * Quick re-analyze is a synchronous structural refresh. Full analysis runs all
  * four enrichment passes (unlocking the Architecture, Problems, and Suggestions
- * tabs) as a background job — 202 + status polling — because the LLM passes can
- * take many minutes. Tab data repopulates automatically via the viewer's data
- * polling once new files land.
+ * tabs) as a background job, because the LLM passes can take many minutes.
+ * Tab data repopulates automatically via the viewer's data polling once new
+ * files land.
+ *
+ * The full run's progress is *not* tracked here. It is a shared job like any
+ * other: this component starts it and then reads its state from the job tray
+ * (`jobs`), which shows phase, elapsed time and Stop from whichever view the
+ * user is on. Only the synchronous quick path keeps local state, because it
+ * has no tray presence to have — it is over before the request returns.
  *
  * Lifted out of `views/overview.ts` when the Ask panel needed the same
  * affordance: a panel that cannot answer because there is no analysis should
@@ -17,52 +23,21 @@
  */
 
 import { h } from "preact";
-import { useState, useCallback, useEffect } from "preact/hooks";
+import { useState, useCallback } from "preact/hooks";
+import { findOperation } from "../hooks/index.js";
+import type { JobTray } from "../hooks/index.js";
 
-interface SvAnalyzeStatusData {
-  running: boolean;
-  startedAt: string | null;
-  finishedAt: string | null;
-  recentOutput: string;
-  error: string | null;
+export interface AnalyzeControlsProps {
+  jobs: JobTray;
 }
 
-export function AnalyzeControls() {
-  const [state, setState] = useState<"idle" | "running" | "running-full" | "done" | "done-full" | "error">("idle");
+export function AnalyzeControls({ jobs }: AnalyzeControlsProps) {
+  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<string | null>(null);
   const [deep, setDeep] = useState(false);
 
-  // Poll full-analysis status while running
-  useEffect(() => {
-    if (state !== "running-full") return;
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/commands/sv-analyze/status");
-        if (!res.ok) return;
-        const data = await res.json() as SvAnalyzeStatusData;
-        const lastLine = data.recentOutput.split("\n").filter(Boolean).pop();
-        if (lastLine) setProgress(lastLine.slice(0, 120));
-        if (!data.running && data.finishedAt) {
-          clearInterval(interval);
-          if (data.error) {
-            setError(data.error);
-            setState("error");
-            setTimeout(() => setState("idle"), 10000);
-          } else {
-            setProgress(null);
-            setState("done-full");
-            setTimeout(() => setState("idle"), 8000);
-          }
-        }
-      } catch {
-        // Ignore transient fetch errors
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [state]);
+  const fullOp = findOperation(jobs.operations, "sv-analyze");
+  const fullRunning = fullOp?.status === "running";
 
   const handleQuick = useCallback(async () => {
     setState("running");
@@ -87,32 +62,28 @@ export function AnalyzeControls() {
   }, [deep]);
 
   const handleFull = useCallback(async () => {
-    setState("running-full");
     setError(null);
-    setProgress(null);
     try {
       const res = await fetch("/api/commands/sv-analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ full: true, deep }),
       });
-      if (res.status === 409) {
-        // Already running — the polling loop will track it
-        return;
-      }
-      if (!res.ok) {
+      // 409 means one is already running — the tray reports that one.
+      if (!res.ok && res.status !== 409) {
         const d = await res.json().catch(() => ({ error: "Full analysis failed to start" })) as { error?: string };
         throw new Error(d.error || `HTTP ${res.status}`);
       }
-      // 202 accepted — polling loop handles the rest
     } catch (err) {
       setError(String(err));
       setState("error");
       setTimeout(() => setState("idle"), 10000);
     }
-  }, [deep]);
+    // Show the run in the tray now rather than at the next poll tick.
+    await jobs.refresh();
+  }, [deep, jobs]);
 
-  const busy = state === "running" || state === "running-full";
+  const busy = state === "running" || fullRunning;
 
   return h("div", { class: "overview-reanalyze cmd-panel-actions" },
     h("label", {
@@ -143,22 +114,22 @@ export function AnalyzeControls() {
       class: "cmd-btn cmd-btn-secondary",
       onClick: handleFull,
       disabled: busy,
-      "aria-busy": state === "running-full",
+      "aria-busy": fullRunning,
       title: "Run all four enrichment passes — unlocks the Architecture, Problems, and Suggestions tabs. Takes several minutes.",
     },
-      state === "running-full"
+      fullRunning
         ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" })
         : h("span", { "aria-hidden": "true" }, "✨"),
-      state === "running-full" ? "Running full analysis..." : "Full analysis",
+      fullRunning ? "Running full analysis..." : "Full analysis",
     ),
     h("span", { role: "status", "aria-live": "polite" },
-      state === "running-full" && progress
-        ? h("span", { class: "cmd-inline-progress" }, progress)
+      fullRunning && fullOp?.detail
+        ? h("span", { class: "cmd-inline-progress" }, fullOp.detail.slice(0, 120))
         : null,
       state === "done"
         ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, "✓ Done")
         : null,
-      state === "done-full"
+      !fullRunning && fullOp?.status === "done" && !fullOp.stopped
         ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" },
             "✓ Full analysis complete — tabs unlock as data refreshes")
         : null,

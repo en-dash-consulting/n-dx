@@ -29,6 +29,7 @@ import { ProblemsView } from "../../../src/viewer/views/problems.js";
 import { ArchitectureView } from "../../../src/viewer/views/architecture.js";
 import { SuggestionsView } from "../../../src/viewer/views/suggestions.js";
 import { RoutesView } from "../../../src/viewer/views/routes.js";
+import { emptyJobTray } from "../../helpers/job-tray.js";
 
 // ── Axe-core loader ───────────────────────────────────────────────────────────
 
@@ -328,14 +329,14 @@ describe.skipIf(!axeRun)("[a11y] OverviewView — axe audit", () => {
 
   it("has zero critical/serious violations (light theme)", async () => {
     cleanup = setTheme("light");
-    root = renderToDiv(h(Overview, { data: makeLoadedData(), onSelect: () => {} }));
+    root = renderToDiv(h(Overview, { data: makeLoadedData(), onSelect: () => {}, jobs: emptyJobTray() }));
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });
 
   it("has zero critical/serious violations (dark theme)", async () => {
     cleanup = setTheme("dark");
-    root = renderToDiv(h(Overview, { data: makeLoadedData(), onSelect: () => {} }));
+    root = renderToDiv(h(Overview, { data: makeLoadedData(), onSelect: () => {}, jobs: emptyJobTray() }));
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });
@@ -460,14 +461,14 @@ describe.skipIf(!axeRun)("[a11y] SuggestionsView — axe audit", () => {
 
   it("has zero critical/serious violations (light theme)", async () => {
     cleanup = setTheme("light");
-    root = renderToDiv(h(SuggestionsView, { data: unlockedData() }));
+    root = renderToDiv(h(SuggestionsView, { data: unlockedData(), jobs: emptyJobTray() }));
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });
 
   it("has zero critical/serious violations (dark theme)", async () => {
     cleanup = setTheme("dark");
-    root = renderToDiv(h(SuggestionsView, { data: unlockedData() }));
+    root = renderToDiv(h(SuggestionsView, { data: unlockedData(), jobs: emptyJobTray() }));
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });
@@ -475,7 +476,7 @@ describe.skipIf(!axeRun)("[a11y] SuggestionsView — axe audit", () => {
   it("has zero violations in locked/insufficient-data state", async () => {
     cleanup = setTheme("light");
     const data = makeLoadedData({ zones: { zones: [], crossings: [], unzoned: [], enrichmentPass: 0 } });
-    root = renderToDiv(h(SuggestionsView, { data }));
+    root = renderToDiv(h(SuggestionsView, { data, jobs: emptyJobTray() }));
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });
@@ -717,7 +718,7 @@ describe.skipIf(!axeRun)("[a11y] AskView — axe audit", () => {
   /** Mount the panel and drive it into `state` through its own form. */
   async function renderAskAt(state: AskAuditState): Promise<void> {
     const { AskView } = await import("../../../src/viewer/views/ask.js");
-    root = renderToDiv(h(AskView, {}));
+    root = renderToDiv(h(AskView, { jobs: emptyJobTray() }));
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     if (state === "idle") return;
 
@@ -772,7 +773,7 @@ describe.skipIf(!axeRun)("[a11y] AskView — axe audit", () => {
     window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "2026-01-01T00:00:00.000Z" };
     try {
       const { AskView } = await import("../../../src/viewer/views/ask.js");
-      root = renderToDiv(h(AskView, {}));
+      root = renderToDiv(h(AskView, { jobs: emptyJobTray() }));
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
       const violations = await runAxe(root);
       expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
