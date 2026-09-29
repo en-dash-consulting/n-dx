@@ -181,6 +181,48 @@ describe("loadConfig", () => {
       expect(warnings[0]).toContain(".n-dx.local.json");
     });
 
+    // HenchConfig carries fields HenchConfigSchema does not declare
+    // (skipFullTestGate, planOnlyMaxRetries, selfHeal), and a zod parse drops
+    // every one of them. Reverting one invalid field must not take unrelated
+    // valid overrides down with it — the result would otherwise depend on
+    // whether some other field happened to be valid.
+    it("keeps overrides of fields the schema does not declare while reverting an invalid one", async () => {
+      await writeProjectConfig({
+        hench: { skipFullTestGate: true, planOnlyMaxRetries: 0, maxTurns: -5 },
+      });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+      expect(config.skipFullTestGate).toBe(true);
+      expect(config.planOnlyMaxRetries).toBe(0);
+      // Exactly one warning: only maxTurns was reverted. A silently dropped
+      // field with no warning is the defect this guards.
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("hench.maxTurns");
+    });
+
+    it("resolves undeclared-field overrides identically whether or not another field is invalid", async () => {
+      await writeProjectConfig({ hench: { skipFullTestGate: true, maxTurns: 25 } });
+      const valid = await loadConfig(henchDir, { onWarning: () => {} });
+      await writeProjectConfig({ hench: { skipFullTestGate: true, maxTurns: -5 } });
+      const invalid = await loadConfig(henchDir, { onWarning: () => {} });
+      expect(valid.skipFullTestGate).toBe(true);
+      expect(invalid.skipFullTestGate).toBe(valid.skipFullTestGate);
+    });
+
+    it("reverts to an explicitly-set base value, not the schema default", async () => {
+      await writeConfig((c) => { c.promptCacheTtl = "1h"; });
+      await writeProjectConfig({ hench: { promptCacheTtl: "1hour" } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.promptCacheTtl).toBe("1h");
+      expect(warnings[0]).toContain("hench.promptCacheTtl");
+    });
+
     it("does not warn when overrides are absent", async () => {
       const warnings: string[] = [];
       await loadConfig(henchDir, { onWarning: (message) => warnings.push(message) });

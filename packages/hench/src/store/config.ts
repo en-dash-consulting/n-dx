@@ -123,7 +123,13 @@ export async function loadConfig(
       `Invalid hench.${key} in ${file} — keeping the current config value. (${detail})`,
     );
   }
-  return repaired ? repaired.config : config;
+  // `candidate`, not `config`: the success path above returns the merged
+  // object unparsed, and HenchConfig carries fields the schema does not
+  // declare (skipFullTestGate, planOnlyMaxRetries, selfHeal). Returning the
+  // parsed config here would let one invalid field silently discard every
+  // valid override of those — a loss no warning above mentions, and one that
+  // would depend on whether some unrelated field happened to be valid.
+  return repaired ? (repaired.candidate as unknown as HenchConfig) : config;
 }
 
 export async function saveConfig(

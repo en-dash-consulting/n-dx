@@ -22,6 +22,7 @@ import {
   isValidTemplateId,
 } from "../../store/templates.js";
 import type { WorkflowTemplate } from "../../schema/templates.js";
+import type { HenchConfig } from "../../schema/index.js";
 import { CLIError } from "../errors.js";
 import { info, result, warn } from "../output.js";
 
@@ -190,7 +191,13 @@ async function cmdTemplateApply(
       const detail = formatFieldIssues(validation.errors.issues, key);
       warn(`Invalid hench.${key} in template "${template.name}" — keeping the current config value. (${detail})`);
     }
-    toSave = repaired ? repaired.config : config;
+    // `candidate`, not `config`: this command persists the result, and the
+    // valid-template path above saves the unparsed object. Saving the parsed
+    // one would rewrite .hench/config.json with every schema default
+    // materialized and every undeclared field (skipFullTestGate,
+    // planOnlyMaxRetries) deleted — an on-disk edit the user never asked for,
+    // triggered by one bad field elsewhere in the template.
+    toSave = repaired ? (repaired.candidate as unknown as HenchConfig) : config;
   }
 
   await saveConfig(henchDir, toSave);

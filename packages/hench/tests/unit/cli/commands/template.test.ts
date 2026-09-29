@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { join } from "node:path";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { cmdTemplate } from "../../../../src/cli/commands/template.js";
 import { saveTemplate } from "../../../../src/store/templates.js";
@@ -68,5 +68,30 @@ describe("cmdTemplate apply", () => {
 
     const warnings = errorSpy.mock.calls.map((args) => args.join(" "));
     expect(warnings.some((line) => line.includes("hench.maxTurns") && line.includes("Bad Template"))).toBe(true);
+  });
+
+  // This command persists its result. Saving the schema-parsed object would
+  // rewrite .hench/config.json with undeclared fields deleted and every
+  // optional default materialized — an on-disk edit triggered by one bad
+  // field elsewhere in the template.
+  it("does not strip undeclared fields from the saved config when reverting a bad template field", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const template: WorkflowTemplate = {
+      id: "mixed-template",
+      name: "Mixed Template",
+      description: "test",
+      useCases: [],
+      tags: [],
+      config: { skipFullTestGate: true, maxTurns: -5 },
+      builtIn: false,
+      createdAt: new Date().toISOString(),
+    };
+    await saveTemplate(henchDir, template);
+
+    await cmdTemplate(tmpDir, ["apply", "mixed-template"], {});
+
+    const saved = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
+    expect(saved.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+    expect(saved.skipFullTestGate).toBe(true);
   });
 });

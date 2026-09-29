@@ -433,7 +433,25 @@ export function validateConfig(
 }
 
 export interface FieldRevertResult {
+  /**
+   * The repaired document as {@link HenchConfigSchema} parsed it: schema
+   * defaults materialized, keys the schema does not declare stripped. Right
+   * for a caller whose non-repair path also returns a parsed config (the
+   * `.hench/config.json` salvage in `loadConfig`).
+   */
   config: HenchConfig;
+  /**
+   * The repaired document as it was built — the input with each implicated
+   * top-level field replaced, and nothing else touched.
+   *
+   * Prefer this over {@link config} when the caller's own success path
+   * returns or persists an *unparsed* object. `HenchConfig` carries fields
+   * `HenchConfigSchema` does not declare (`skipFullTestGate`,
+   * `planOnlyMaxRetries`, `selfHeal`), and a parse silently drops every one
+   * of them — so returning {@link config} would make one bad field discard
+   * unrelated good ones, a difference the caller never warned about.
+   */
+  candidate: Record<string, unknown>;
   /** Top-level field names that were replaced, sorted for stable messages. */
   replacedFields: string[];
 }
@@ -475,7 +493,11 @@ export function revertInvalidFields(
   }
   const result = validateConfig(candidate);
   if (!result.ok) return null;
-  return { config: result.data as HenchConfig, replacedFields: [...badKeys].sort() };
+  return {
+    config: result.data as HenchConfig,
+    candidate,
+    replacedFields: [...badKeys].sort(),
+  };
 }
 
 /**
