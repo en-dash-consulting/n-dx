@@ -281,6 +281,37 @@ describe("layout resolver: core twin matches the foundation implementation", () 
     });
   }
 
+  for (const layout of ["legacy", "ndx"]) {
+    it(`names every field the same way relative to a ${layout} root`, () => {
+      const root = layout === "ndx" ? ndxRoot : legacyRoot;
+      const fromCore = core.resolveLayout(root);
+      const fromFoundation = foundation.resolveLayout(root);
+
+      // `container` is null on legacy, and relativeToRoot takes a path.
+      const pathFields = LAYOUT_FIELDS.filter(
+        (f) => f !== "mode" && f !== "root" && fromCore[f] !== null,
+      );
+      for (const field of pathFields) {
+        expect(
+          core.relativeToRoot(fromCore, fromCore[field]),
+          `relativeToRoot disagrees on "${field}"`,
+        ).toBe(foundation.relativeToRoot(fromFoundation, fromFoundation[field]));
+      }
+    });
+  }
+
+  it("gives gitignore-shaped names — root-relative, forward slashes", () => {
+    // These strings go into .gitignore and .gitattributes, where a Windows
+    // backslash matches nothing at all, so the separator is load-bearing.
+    const ndxLayout = core.resolveLayout(ndxRoot);
+    expect(core.relativeToRoot(ndxLayout, ndxLayout.rexDir)).toBe(".ndx/rex");
+    expect(core.relativeToRoot(ndxLayout, ndxLayout.configFile)).toBe(".ndx/config.json");
+
+    const legacyLayout = core.resolveLayout(legacyRoot);
+    expect(core.relativeToRoot(legacyLayout, legacyLayout.rexDir)).toBe(".rex");
+    expect(core.relativeToRoot(legacyLayout, legacyLayout.configFile)).toBe(".n-dx.json");
+  });
+
   it("returns exactly the documented field set from both copies", () => {
     const fromCore = Object.keys(core.resolveLayout(legacyRoot)).sort();
     const fromFoundation = Object.keys(foundation.resolveLayout(legacyRoot)).sort();

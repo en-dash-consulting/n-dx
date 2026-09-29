@@ -2,6 +2,7 @@ import { join, basename } from "node:path";
 import { readFile, writeFile, access, mkdir } from "node:fs/promises";
 import { DEFAULT_CONFIG } from "../../schema/index.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
+import { relativeToRoot, resolveLayout } from "@n-dx/llm-client";
 import { ensureRexDir, resolveRexPaths } from "../../store/index.js";
 import { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "../../workflow/default.js";
 
@@ -12,7 +13,11 @@ export async function cmdInit(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  const layout = resolveLayout(dir);
   const rexDir = resolveRexPaths(dir).rexDir;
+  // What to call the directory in output and in `.gitignore` — `.rex` or
+  // `.ndx/rex`, whichever this project is on.
+  const rexDirName = relativeToRoot(layout, rexDir);
 
   await ensureRexDir(rexDir);
 
@@ -54,7 +59,7 @@ export async function cmdInit(
     info("Created workflow.md (edit to add project-specific rules)");
   }
 
-  // .rex/prd_tree/ — folder-tree scaffold (created once; not overwritten)
+  // The folder-tree scaffold (created once; not overwritten)
   const treeDir = join(rexDir, FOLDER_TREE_SUBDIR);
   await mkdir(treeDir, { recursive: true });
   const treeRootStub = join(treeDir, "index.md");
@@ -88,13 +93,16 @@ export async function cmdInit(
   // facts, and signalling tree ownership — is what would let init record it,
   // and that is a change to the migration path rather than to the guard.
 
-  // Ensure .gitignore covers generated rex files
+  // Ensure .gitignore covers generated rex files. Named for the layout: a
+  // `.rex/…` pattern ignores nothing on a project whose PRD lives in
+  // `.ndx/rex/`, so the regenerated workflow file and the execution log would
+  // show up as operator changes on the first `rex` command after init.
   await ensureGitignoreEntries(dir, [
-    ".rex/n-dx_workflow.md",
-    ".rex/execution-log*.jsonl",
+    `${rexDirName}/n-dx_workflow.md`,
+    `${rexDirName}/execution-log*.jsonl`,
   ]);
 
-  info(`\nInitialized .rex/ in ${dir}`);
+  info(`\nInitialized ${rexDirName}/ in ${dir}`);
   info("Next steps:");
   info("  rex add epic --title=\"Your first epic\" " + dir);
   info("  rex status " + dir);

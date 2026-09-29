@@ -31,7 +31,8 @@ import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
-import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
+import { safeParseInt, safeParseNonNegInt } from "./constants.js";
+import { resolveHenchPaths } from "../../store/paths.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { offerSlugMigration } from "../slug-migration-offer.js";
@@ -1366,8 +1367,8 @@ export async function cmdRun(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const henchDir = join(dir, HENCH_DIR);
-  // An invalid field in .hench/config.json must not refuse the whole run —
+  const henchDir = resolveHenchPaths(dir).henchDir;
+  // An invalid field in hench's config.json must not refuse the whole run —
   // fall back to that field's default and say so, so a bad edit (often made
   // from the dashboard) degrades to a warning instead of blocking `ndx work`.
   const config = await loadConfig(henchDir, {

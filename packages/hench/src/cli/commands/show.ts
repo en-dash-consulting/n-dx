@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { PersistedRuntimeEvent } from "../../schema/index.js";
 import { loadRun } from "../../store/runs.js";
-import { HENCH_DIR } from "./constants.js";
+import { resolveHenchPaths } from "../../store/paths.js";
 import { info, result } from "../output.js";
 import { colorStatus } from "../../prd/llm-gateway.js";
 import { lookupTaskInRex, formatTaskLine } from "./task-lookup.js";
@@ -13,7 +13,7 @@ export async function cmdShow(
   runId: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const henchDir = join(dir, HENCH_DIR);
+  const henchDir = resolveHenchPaths(dir).henchDir;
   const run = await loadRun(henchDir, runId);
 
   // --events mode: display the event stream and exit

@@ -15,7 +15,7 @@ import {
   type SessionUsageDelta,
   type UsageMark,
 } from "../../store/session-usage.js";
-import { HENCH_DIR } from "./constants.js";
+import { resolveHenchPaths } from "../../store/paths.js";
 import { CLIError } from "../errors.js";
 import { result, info, warn } from "../output.js";
 import type { RunRecord, RunStatus, TokenUsage } from "../../schema/index.js";
@@ -83,7 +83,7 @@ export async function cmdRecord(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const henchDir = join(dir, HENCH_DIR);
+  const henchDir = resolveHenchPaths(dir).henchDir;
 
   const taskId = flags.task;
   if (!taskId) {

@@ -100,9 +100,25 @@ export async function configExists(henchDir: string): Promise<boolean> {
   }
 }
 
-export async function initConfig(henchDir: string, language?: ProjectLanguage): Promise<HenchConfig> {
+/**
+ * Write a fresh `config.json` into `henchDir`.
+ *
+ * `rexDir` is passed in rather than left at {@link DEFAULT_HENCH_CONFIG}'s
+ * value because that default is `.rex` — the right answer on the legacy layout
+ * and the wrong one on a project that keeps its PRD in `.ndx/rex`, where every
+ * run would then look for the PRD in a directory that does not exist. The
+ * default has to stay as it is (it is public API, and a function with no
+ * project root cannot resolve a layout), so the caller that *does* know the
+ * root supplies it.
+ */
+export async function initConfig(
+  henchDir: string,
+  language?: ProjectLanguage,
+  rexDir?: string,
+): Promise<HenchConfig> {
   await ensureHenchDir(henchDir);
   const config = DEFAULT_HENCH_CONFIG(language);
+  if (rexDir) config.rexDir = rexDir;
   await saveConfig(henchDir, config);
   return config;
 }
