@@ -2,11 +2,17 @@
  * SourceVision's paths module — the only place sourcevision names a folder of
  * its own.
  *
- * `constants.ts` already held `SV_DIR`, but as a bare directory *name*: every
+ * `constants.ts` used to hold `SV_DIR`, but as a bare directory *name*: every
  * call site joined it to a project root itself, which is exactly the pattern
- * that made the folder layout a decision taken in ~380 places. Where the
- * directory lives now depends on which layout the project is on, and that
- * question is answered once, by {@link resolveLayout} in the foundation tier.
+ * that made the folder layout a decision taken in ~380 places. That constant is
+ * gone; where the directory lives depends on which layout the project is on,
+ * and that question is answered once, by {@link resolveLayout} in the
+ * foundation tier.
+ *
+ * The one place that cannot ask is `src/export/`, which bundles into the
+ * dependency-free standalone iso-map skill and carries a hand-written twin
+ * (`analysisDirFor`) pinned by
+ * `tests/integration/layout-resolver-contract.test.js`.
  *
  * The artifact filenames inside it stay in `schema/data-files.ts` — that is
  * already their single source of truth, and duplicating them here would create

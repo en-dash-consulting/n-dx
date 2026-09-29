@@ -28,7 +28,7 @@ import { tmpdir } from "node:os";
 import { cmdInit } from "../../src/cli/commands/init.js";
 import { cmdImportBundle } from "../../src/cli/commands/import-bundle.js";
 import { resolveStore } from "../../src/store/index.js";
-import { REX_DIR } from "../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../src/store/index.js";
 import { SCHEMA_VERSION } from "../../src/schema/index.js";
 import { isModifiedSinceSync } from "../../src/core/sync.js";
 import type { PRDItem } from "../../src/schema/index.js";
@@ -66,7 +66,7 @@ describe("rex import-bundle --replace and the destination's sync pointers", () =
     projectDir = await mkdtemp(join(tmpdir(), "rex-bundle-sync-"));
     await cmdInit(projectDir, {});
 
-    const store = await resolveStore(join(projectDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(projectDir).rexDir);
     await store.withTransaction(async (doc) => {
       doc.items = [syncedEpic("keep-1", "Unchanged Epic"), syncedEpic("edit-1", "Edited Epic")];
     });
@@ -103,7 +103,7 @@ describe("rex import-bundle --replace and the destination's sync pointers", () =
   }
 
   async function itemsAfterImport(): Promise<Map<string, PRDItem>> {
-    const store = await resolveStore(join(projectDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(projectDir).rexDir);
     const doc = await store.loadDocument();
     return new Map(doc.items.map((i) => [i.id, i]));
   }

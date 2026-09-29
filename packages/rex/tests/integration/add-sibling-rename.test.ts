@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { cmdInit } from "../../src/cli/commands/init.js";
 import { resolveStore } from "../../src/store/index.js";
-import { REX_DIR } from "../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../src/store/index.js";
 import { loadArchive, ARCHIVE_FILE } from "../../src/core/archive.js";
 import type { PRDItem } from "../../src/schema/index.js";
 
@@ -24,7 +24,7 @@ import type { PRDItem } from "../../src/schema/index.js";
 async function setupDir(): Promise<{ tmpDir: string; rexDir: string }> {
   const tmpDir = await mkdtemp(join(tmpdir(), "rex-sibling-rename-"));
   await cmdInit(tmpDir, {});
-  return { tmpDir, rexDir: join(tmpDir, REX_DIR) };
+  return { tmpDir, rexDir: resolveRexPaths(tmpDir).rexDir };
 }
 
 async function cleanup(tmpDir: string): Promise<void> {

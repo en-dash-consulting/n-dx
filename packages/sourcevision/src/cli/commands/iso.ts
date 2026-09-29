@@ -12,10 +12,11 @@
 
 import { writeFileSync, existsSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
-import { SV_DIR } from "./constants.js";
+
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import type { IsoSourceMode } from "../../export/iso-sources.js";
+import { resolveSourcevisionPaths } from "../../paths.js";
 
 export interface IsoOptions {
   /** Output path. Defaults to `.sourcevision/iso-map.html`. */
@@ -82,7 +83,7 @@ export function parseIsoArgs(args: string[]): IsoOptions {
  */
 export async function cmdIso(dir: string, options: IsoOptions = {}): Promise<void> {
   const absDir = resolve(dir);
-  const svDir = join(absDir, SV_DIR);
+  const svDir = resolveSourcevisionPaths(absDir).svDir;
   const mode: IsoSourceMode = options.source ?? "auto";
 
   // Scan mode works on any directory; the analysis modes need the output dir.

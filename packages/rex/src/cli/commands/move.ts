@@ -1,7 +1,7 @@
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { validateMove, moveItem } from "../../core/move.js";
-import { REX_DIR } from "./constants.js";
+
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
@@ -15,7 +15,7 @@ export async function cmdMove(
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before writing PRD
   await ensureLegacyPrdMigrated(dir);
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   // Snapshot the tree before any mutation so `rex restore` can undo this move.

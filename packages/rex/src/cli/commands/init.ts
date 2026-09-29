@@ -1,10 +1,10 @@
-import { join, basename } from "node:path";
+import { join, basename, relative, sep } from "node:path";
 import { readFile, writeFile, access, mkdir } from "node:fs/promises";
 import { DEFAULT_CONFIG } from "../../schema/index.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
-import { ensureRexDir } from "../../store/index.js";
+import { ensureRexDir, resolveRexPaths } from "../../store/index.js";
 import { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "../../workflow/default.js";
-import { REX_DIR } from "./constants.js";
+
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
 import { info } from "../output.js";
 
@@ -12,7 +12,7 @@ export async function cmdInit(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   await ensureRexDir(rexDir);
 
@@ -88,13 +88,21 @@ export async function cmdInit(
   // facts, and signalling tree ownership — is what would let init record it,
   // and that is a change to the migration path rather than to the guard.
 
-  // Ensure .gitignore covers generated rex files
+  // Ensure .gitignore covers generated rex files.
+  //
+  // Derived from the resolved rexDir, not written as `.rex/...`: on a project
+  // with `.ndx/` present these files are created under `.ndx/rex/`, and a
+  // literal `.rex/execution-log*.jsonl` then ignores a path nothing writes
+  // to while the log that IS written stays trackable and gets committed by
+  // accident. Posix separators because .gitignore takes those on every
+  // platform.
+  const rexRel = relative(dir, rexDir).split(sep).join("/");
   await ensureGitignoreEntries(dir, [
-    ".rex/n-dx_workflow.md",
-    ".rex/execution-log*.jsonl",
+    `${rexRel}/n-dx_workflow.md`,
+    `${rexRel}/execution-log*.jsonl`,
   ]);
 
-  info(`\nInitialized .rex/ in ${dir}`);
+  info(`\nInitialized ${rexRel}/ in ${dir}`);
   info("Next steps:");
   info("  rex add epic --title=\"Your first epic\" " + dir);
   info("  rex status " + dir);

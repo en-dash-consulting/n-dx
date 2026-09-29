@@ -31,7 +31,7 @@
 
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { PROJECT_DIRS } from "@n-dx/llm-client";
+import { resolveLayout } from "@n-dx/llm-client";
 import type { PRDItem } from "../schema/v1.js";
 
 // ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ function tokensFromRecord(run: MinimalRunRecord): ItemTokenTuple {
 export async function readRunTokensFromHench(
   projectDir: string,
 ): Promise<ItemRunTokens[]> {
-  const runsDir = join(projectDir, PROJECT_DIRS.HENCH, "runs");
+  const runsDir = join(resolveLayout(projectDir).henchDir, "runs");
   let files: string[];
   try {
     files = await readdir(runsDir);

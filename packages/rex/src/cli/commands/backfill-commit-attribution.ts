@@ -13,7 +13,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join } from "node:path";
 import { info, warn } from "../output.js";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import type { PRDItem, CommitAttribution } from "../../schema/index.js";
 
 const execAsync = promisify(execFile);
@@ -145,8 +145,7 @@ export async function cmdBackfillCommitAttribution(
   dir: string,
   flags?: Record<string, string>,
 ): Promise<void> {
-  const REX_DIR = ".rex";
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   // Load PRD document
   const store = await resolveStore(rexDir);

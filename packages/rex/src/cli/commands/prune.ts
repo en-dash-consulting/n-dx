@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import { findPrunableItems, pruneItems, countSubtree } from "../../core/prune.js";
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
@@ -10,7 +10,7 @@ import {ARCHIVE_FILE, loadArchive} from "../../core/archive.js";import {  hashPR
   loadPendingSmartPrune,
   clearPendingSmartPrune,
 } from "../../core/pending-cache.js";
-import { REX_DIR } from "./constants.js";
+
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
@@ -119,7 +119,7 @@ export async function cmdPrune(
     return;
   }
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   // Snapshot the tree before any mutation so `rex restore` can undo this prune.
@@ -548,7 +548,7 @@ async function smartPrune(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
 

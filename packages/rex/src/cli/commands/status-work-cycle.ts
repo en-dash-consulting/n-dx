@@ -27,7 +27,7 @@
 
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { PROJECT_DIRS, green, red, yellow, dim } from "@n-dx/llm-client";
+import { green, red, yellow, dim, resolveLayout } from "@n-dx/llm-client";
 import { result } from "../output.js";
 import { formatTimestamp } from "./status-shared.js";
 
@@ -66,7 +66,7 @@ const FAILURE_LABELS: Readonly<Record<string, string>> = {
  * cycle) are skipped. A missing runs directory is an empty history.
  */
 export async function readHenchRuns(projectDir: string): Promise<WorkCycleRun[]> {
-  const runsDir = join(projectDir, PROJECT_DIRS.HENCH, "runs");
+  const runsDir = join(resolveLayout(projectDir).henchDir, "runs");
 
   let files: string[];
   try {

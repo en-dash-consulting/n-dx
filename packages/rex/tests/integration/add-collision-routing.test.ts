@@ -15,14 +15,14 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { cmdInit } from "../../src/cli/commands/init.js";
 import { resolveStore } from "../../src/store/index.js";
-import { REX_DIR } from "../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../src/store/index.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function setupDir(): Promise<{ tmpDir: string; rexDir: string }> {
   const tmpDir = await mkdtemp(join(tmpdir(), "rex-collision-routing-"));
   await cmdInit(tmpDir, {});
-  return { tmpDir, rexDir: join(tmpDir, REX_DIR) };
+  return { tmpDir, rexDir: resolveRexPaths(tmpDir).rexDir };
 }
 
 async function cleanup(tmpDir: string): Promise<void> {

@@ -1,8 +1,8 @@
 import { join } from "node:path";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import { detectIssues, applyFixes } from "../../fix/index.js";
 import type { FixAction, FixKind } from "../../fix/index.js";
-import { REX_DIR } from "./constants.js";
+
 import { info, result } from "../output.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
 
@@ -17,7 +17,7 @@ export async function cmdFix(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   // Snapshot the tree before any mutation so `rex restore` can undo this fix.

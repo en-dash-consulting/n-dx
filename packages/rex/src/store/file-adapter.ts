@@ -22,6 +22,7 @@ import { assertSlugRuleWritable, assertSlugRuleAdoptable } from "./slug-rule-gua
 import { discoverPRDFiles } from "./prd-discovery.js";
 import {
   PRD_MARKDOWN_FILENAME,
+  LEGACY_SOURCE_FILE_PREFIX,
   toMarkdownSourcePath,
 } from "./prd-md-migration.js";
 import { parseDocument } from "./markdown-parser.js";
@@ -216,7 +217,9 @@ export class FileStore implements PRDStore {
   private deriveOwnerFile(item: PRDItem): string {
     const md = (item as unknown as { sourceFile?: string }).sourceFile;
     if (typeof md === "string" && md.length > 0) {
-      const stripped = md.startsWith(".rex/") ? md.slice(".rex/".length) : md;
+      const stripped = md.startsWith(LEGACY_SOURCE_FILE_PREFIX)
+        ? md.slice(LEGACY_SOURCE_FILE_PREFIX.length)
+        : md;
       return stripped.endsWith(".md") ? stripped.slice(0, -3) + ".json" : stripped;
     }
     return this.currentBranchFile;

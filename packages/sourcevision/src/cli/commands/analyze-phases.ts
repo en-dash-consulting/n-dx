@@ -437,7 +437,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     // Update manifest with children if sub-analyses were detected
     if (subAnalyses.length > 0) {
       const manifest = readManifest(ctx.absDir);
-      manifest.children = buildSubAnalysisRefs(subAnalyses);
+      manifest.children = buildSubAnalysisRefs(subAnalyses, ctx.absDir);
       writeManifest(ctx.absDir, manifest);
     }
 

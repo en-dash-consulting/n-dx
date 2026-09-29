@@ -15,8 +15,6 @@ import { toCanonicalJSON } from "./canonical.js";
 import type { ReshapeProposal } from "./reshape.js";
 import type { PRDItem } from "../schema/index.js";
 
-const REX_DIR = ".rex";
-
 export const PENDING_SMART_PRUNE_FILE = "pending-smart-prune.json";
 
 export interface PendingSmartPruneCache {
