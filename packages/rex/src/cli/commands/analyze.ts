@@ -63,25 +63,53 @@ function normalizeProviderMetadata(value: string | undefined): string | undefine
 }
 
 /**
- * What one analyze run's tokens cost in USD, at the model that answered.
+ * What one analyze run's tokens cost in USD, at the model that answered — or
+ * `undefined` when that cannot be known.
  *
  * Written into the `analyze_token_usage` log entry by the command that spent
  * it. `ndx`'s run summary sits at the orchestration tier and cannot import the
  * price table from `@n-dx/llm-client` at all, and a second copy of that table
  * would drift from the first — so the spender records the figure and readers
  * only read it.
+ *
+ * ## Why unknown is returned rather than priced
+ *
+ * Two inputs can be missing, and neither announces itself:
+ *
+ * - **The model is not in the price table.** `resolveModelPricing` answers with
+ *   fallback rates and `known: false` rather than throwing, so pricing against
+ *   its `pricing` field alone turns a guess into a dollar figure.
+ * - **The provider omitted usage.** A run can report calls with every token
+ *   count at zero, which prices to exactly `0`.
+ *
+ * Both used to reach the log as a number, and the run summary presents whatever
+ * number it finds as actual spend — so a guess and a gap both read as
+ * measurement. `undefined` is dropped by `JSON.stringify`, leaving the key off
+ * the entry, and `formatCost` renders a missing cost as "not recorded". An
+ * operator reading "not recorded" knows to go and look; one reading "$0.00"
+ * does not.
+ *
+ * A genuinely free run is not a case this has to separate out: the only caller
+ * logs at all when `calls > 0`, and a call that spent nothing does not happen.
  */
-export function priceAnalyzeTokenUsage(usage: AnalyzeTokenUsage, model: string): number {
-  const { pricing } = resolveModelPricing(model);
-  return priceTokens(
-    {
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      cacheCreationTokens: usage.cacheCreationInputTokens ?? 0,
-      cacheReadTokens: usage.cacheReadInputTokens ?? 0,
-    },
-    pricing,
-  ).totalRaw;
+export function priceAnalyzeTokenUsage(
+  usage: AnalyzeTokenUsage,
+  model: string,
+): number | undefined {
+  const { pricing, known } = resolveModelPricing(model);
+  if (!known) return undefined;
+
+  const tokens = {
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    cacheCreationTokens: usage.cacheCreationInputTokens ?? 0,
+    cacheReadTokens: usage.cacheReadInputTokens ?? 0,
+  };
+  const billed =
+    tokens.inputTokens + tokens.outputTokens + tokens.cacheCreationTokens + tokens.cacheReadTokens;
+  if (billed === 0) return undefined;
+
+  return priceTokens(tokens, pricing).totalRaw;
 }
 
 function resolveAnalyzeTokenEventMetadata(
@@ -814,6 +842,9 @@ async function logUsageAndCache(
       await store.appendLog({
         timestamp: new Date().toISOString(),
         event: "analyze_token_usage",
+        // costUsd is undefined when the model is unpriced or the provider
+        // reported no tokens; JSON.stringify drops the key, which the run
+        // summary reads as "not recorded" rather than as zero spend.
         detail: JSON.stringify({
           ...tokenUsage,
           vendor: metadata.vendor,
