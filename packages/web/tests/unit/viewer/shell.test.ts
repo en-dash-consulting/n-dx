@@ -138,9 +138,24 @@ describe("stages.ts", () => {
     expect(stageForView("work")).toBe("work");
     expect(stageForView("home")).toBeNull();
     expect(stageForView("llm-provider")).toBeNull();
-    // Token Usage is on Analysis and Work; a Rex-only viewer has neither.
+    // Token Usage is on Work only; a Rex-only viewer has no Work stage.
+    expect(stageForView("token-usage")).toBe("work");
     expect(stageForView("token-usage", buildValidViews("rex"))).toBeNull();
     expect(stageForView("token-usage", buildValidViews("hench"))).toBe("work");
+  });
+
+  it("lists each view in at most one stage", () => {
+    // stageForView returns the first stage in loop order, so a view listed
+    // twice lights the wrong stage when opened from the later one.
+    const owner = new Map<ViewId, string>();
+    for (const id of STAGE_ORDER) {
+      for (const s of STAGES[id].sections) {
+        for (const view of [s.view, s.alt?.view].filter(Boolean) as ViewId[]) {
+          expect(owner.get(view), `${view} is on both ${owner.get(view)} and ${id}`).toBeUndefined();
+          owner.set(view, id);
+        }
+      }
+    }
   });
 
   it("gives a scoped viewer only its own stage", () => {
@@ -339,6 +354,19 @@ describe("StagePage", () => {
     expect(body?.querySelector('[data-rendered="prd"]')).not.toBeNull();
   });
 
+  it("keeps Work lit when its Usage section is opened", async () => {
+    const navigateTo = vi.fn();
+    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:token-usage": true }));
+    await mount(page("work", ALL, navigateTo));
+    act(() => { root.querySelector<HTMLButtonElement>('.stage-section[data-view="token-usage"] .stage-section-open')!.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("token-usage");
+
+    render(null, root);
+    root.remove();
+    await mount(h(TopNav, { view: "token-usage", validViews: ALL, onNavigate: vi.fn(), onOpenSearch: vi.fn() }));
+    expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Work");
+  });
+
   it("drops sections outside the viewer's scope", async () => {
     await mount(page("work", buildValidViews("hench")));
     // Up next is Rex's dashboard: not in a Hench-only viewer.
@@ -378,7 +406,7 @@ describe("BottomBar", () => {
     const onToggleCommands = vi.fn();
     await mount(h(BottomBar, {
       server: { version: "0.7.2", cliPath: "", projectDir: "/work/demo" },
-      onNavigate: vi.fn(), onOpenSettings, settingsOpen: false, onToggleCommands, commandsOpen: true,
+      validViews: ALL, onNavigate: vi.fn(), onOpenSettings, settingsOpen: false, onToggleCommands, commandsOpen: true,
     }));
     expect(root.querySelector(".bottombar-server")?.textContent).toContain("n-dx 0.7.2");
     const cog = root.querySelector<HTMLButtonElement>(".bottombar-settings")!;
@@ -390,6 +418,36 @@ describe("BottomBar", () => {
     act(() => { commands.click(); });
     expect(onToggleCommands).toHaveBeenCalledOnce();
     expect(root.querySelector(".theme-toggle")).not.toBeNull();
+  });
+});
+
+describe("BottomBar status indicators", () => {
+  function bar(validViews: ReadonlySet<ViewId>, onNavigate = vi.fn()) {
+    return h(BottomBar, {
+      validViews, onNavigate, onOpenSettings: vi.fn(), settingsOpen: false, onToggleCommands: vi.fn(), commandsOpen: false,
+    });
+  }
+  const indicators = () => Array.from(root.querySelectorAll<HTMLButtonElement>(".bottombar-status button"));
+
+  it("shows all three in the full dashboard, each opening its product's view", async () => {
+    const onNavigate = vi.fn();
+    await mount(bar(ALL, onNavigate));
+    expect(indicators()).toHaveLength(3);
+    for (const b of indicators()) act(() => { b.click(); });
+    expect(onNavigate.mock.calls.map((c) => c[0])).toEqual(["overview", "rex-dashboard", "hench-runs"]);
+  });
+
+  it("scoped: shows only the indicators whose view is in scope", async () => {
+    // /api/status reports every product even to a scoped viewer.
+    for (const scope of ["sourcevision", "rex", "hench"] as const) {
+      const onNavigate = vi.fn();
+      const validViews = buildValidViews(scope);
+      if (root) { render(null, root); root.remove(); }
+      await mount(bar(validViews, onNavigate));
+      expect(indicators(), scope).toHaveLength(1);
+      act(() => { indicators()[0].click(); });
+      expect(validViews.has(onNavigate.mock.calls[0][0]), `${scope} navigated to ${onNavigate.mock.calls[0][0]}`).toBe(true);
+    }
   });
 });
 

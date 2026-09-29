@@ -22,7 +22,7 @@
  */
 
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { readFile } from "node:fs/promises";
@@ -116,6 +116,21 @@ describe("preview server", () => {
     }
   });
 
+  it("answers a malformed percent-escape with 404 and keeps serving", async () => {
+    const dir = await scratch();
+    const doc = join(dir, "mock.html");
+    await writeFile(doc, "<html><body>doc</body></html>", "utf-8");
+
+    handle = await startPreviewServer(dir, 0, { file: doc });
+    const base = `http://127.0.0.1:${handle.port}`;
+
+    // decodeURIComponent throws URIError on these; uncaught, it killed the process.
+    for (const path of ["/%E0%A4%A", "/%", "/assets/%ZZ.css"]) {
+      expect((await fetch(base + path)).status).toBe(404);
+    }
+    expect((await fetch(base + "/")).status).toBe(200);
+  });
+
   it("fails loudly when the requested document does not exist", async () => {
     const dir = await scratch();
     await expect(startPreviewServer(dir, 0, { file: join(dir, "absent.html") })).rejects.toThrow(
@@ -201,5 +216,24 @@ describe("preview layout endpoint", () => {
 
     // The previous good layout survived — a rejected write is not a write.
     expect(JSON.parse(await readFile(layoutPathFor(doc), "utf-8"))).toEqual(JSON.parse(good));
+  });
+
+  it("keeps overlapping saves whole — every one succeeds and no temp file is left", async () => {
+    const { base, doc } = await serveDoc();
+
+    // Two tabs saving at once shared one PID-named temp file: a rename could
+    // consume the other's file (ENOENT → 400) or publish its contents.
+    const layouts = Array.from({ length: 20 }, (_, i) => ({ nav: [{ id: `n${i}`, kind: "folder", label: `L${i}`, children: [] }] }));
+    const responses = await Promise.all(layouts.map((layout) =>
+      fetch(base + "/__preview/layout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(layout),
+      })));
+    expect(responses.map((r) => r.status)).toEqual(layouts.map(() => 200));
+
+    // The last rename wins, and whichever it was, the file is one complete layout.
+    expect(layouts).toContainEqual(JSON.parse(await readFile(layoutPathFor(doc), "utf-8")));
+    expect((await readdir(join(doc, ".."))).filter((name) => name.endsWith(".tmp"))).toEqual([]);
   });
 });

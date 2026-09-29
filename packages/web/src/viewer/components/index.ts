@@ -65,6 +65,7 @@ export {
   SvFreshnessIndicator,
   RexCompletionIndicator,
   HenchActivityIndicator,
+  INDICATOR_VIEWS,
   type ProjectStatus,
   type SourceVisionStatus,
   type RexStatus,

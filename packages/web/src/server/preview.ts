@@ -18,6 +18,7 @@
  * makes it safe to run alongside `ndx start` on a second port.
  */
 
+import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { writeFile, rename, unlink } from "node:fs/promises";
@@ -203,10 +204,17 @@ function withReloadSnippet(html: string, intervalMs: number): string {
  * Resolve a request path to a file next to the document.
  *
  * Returns null for anything that escapes the document's directory, so a
- * `../../../etc/passwd` style request cannot read outside the preview folder.
+ * `../../../etc/passwd` style request cannot read outside the preview folder,
+ * and for a malformed escape like `/%E0%A4%A` — `decodeURIComponent` throws on
+ * those, and uncaught here it would take the whole preview process down.
  */
 function resolveSibling(docDir: string, urlPath: string): string | null {
-  const relative = decodeURIComponent(urlPath.replace(/^\/+/, ""));
+  let relative: string;
+  try {
+    relative = decodeURIComponent(urlPath.replace(/^\/+/, ""));
+  } catch {
+    return null;
+  }
   if (!relative) return null;
   const target = resolve(docDir, relative);
   let realDir: string;
@@ -249,11 +257,23 @@ function readBody(req: IncomingMessage, limit: number): Promise<string> {
   });
 }
 
-/** Write via a temp file in the same directory, then rename — never a torn layout on disk. */
+/**
+ * Write via a temp file in the same directory, then rename — never a torn layout on disk.
+ *
+ * The temp name is unique per call, not per process: two tabs saving at once
+ * would otherwise share one temp file, so one rename could consume the other's
+ * file (ENOENT) or publish its contents. With distinct names each save is
+ * whole and the last rename wins.
+ */
 async function writeAtomic(path: string, contents: string): Promise<void> {
-  const tmp = `${path}.${process.pid}.tmp`;
-  await writeFile(tmp, contents, "utf-8");
-  await rename(tmp, path);
+  const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(tmp, contents, "utf-8");
+    await rename(tmp, path);
+  } catch (err) {
+    await unlink(tmp).catch(() => {});
+    throw err;
+  }
 }
 
 function send(res: ServerResponse, status: number, body: string | Buffer, type: string): void {

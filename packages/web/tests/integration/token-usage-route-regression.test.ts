@@ -99,8 +99,8 @@ describe("token usage route regression", { timeout: 120_000 }, () => {
     await waitFor(() => document.querySelector(".token-usage-container") !== null);
     await waitFor(() => document.querySelector(".token-header h2")?.textContent === "LLM Utilization");
 
-    // Token Usage is listed by Analysis and Work; a Rex-only viewer has
-    // neither, so no stage is lit and the breadcrumb names no stage — in
+    // Token Usage is listed by Work alone; a Rex-only viewer has no Work
+    // stage, so no stage is lit and the breadcrumb names no stage — in
     // particular not Rex's, which is what the legacy route used to claim.
     expect(activeStageTab()).toBeNull();
     expect(window.history.state?.view).toBe("token-usage");
@@ -130,8 +130,9 @@ describe("token usage route regression", { timeout: 120_000 }, () => {
     await waitFor(() => document.querySelector(".token-usage-container") !== null);
 
     expect(window.history.state?.view).toBe("token-usage");
-    // In a SourceVision viewer, Analysis exists and lists Token Usage.
-    expect(activeStageTab()).toBe("Analysis");
-    expect(document.querySelector(".breadcrumb-product")?.textContent).toBe("Analysis");
+    // The view is global, so it renders — but it is listed by Work alone, and
+    // a SourceVision viewer has no Work stage, so no stage claims it.
+    expect(activeStageTab()).toBeNull();
+    expect(document.querySelector(".breadcrumb-product")).toBeNull();
   });
 });

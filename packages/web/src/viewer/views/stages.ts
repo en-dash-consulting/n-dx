@@ -93,7 +93,6 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "routes", title: "Routes", blurb: "Pages, API routes and layouts." },
       { view: "pr-markdown", title: "PR Markdown", blurb: "The analysis as a pull-request summary.", featureGate: "sourcevision.prMarkdown" },
       { view: "ask", title: "Ask", blurb: "Question the analysis in plain language.", featureGate: "sourcevision.ask", requiresServer: true },
-      { view: "token-usage", title: "Token usage", blurb: "What analysis, planning and runs have spent." },
     ],
   },
   plan: {
@@ -168,10 +167,12 @@ export function isStageId(view: ViewId): view is StageId {
 
 /**
  * The stage a view belongs to: the stage itself for a stage page, else the
- * first stage listing it as a section. Given `validViews`, only stages this
- * viewer has count — Token Usage is listed by Analysis and Work, and a Rex-only
- * viewer has neither, so there it belongs to no stage. Null for home,
- * settings, and anything no (available) stage lists.
+ * stage listing it as a section. Each view is listed by at most one stage, so
+ * the answer never depends on where the user came from — a view listed twice
+ * would light the first stage in loop order even when opened from the second.
+ * Given `validViews`, only stages this viewer has count: Token Usage is on
+ * Work, so a Rex-only viewer has it in no stage. Null for home, settings, and
+ * anything no (available) stage lists.
  */
 export function stageForView(view: ViewId, validViews?: ReadonlySet<ViewId>): StageId | null {
   if (isStageId(view)) return view;

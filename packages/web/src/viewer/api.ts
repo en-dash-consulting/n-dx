@@ -46,6 +46,7 @@ export {
   SvFreshnessIndicator,
   RexCompletionIndicator,
   HenchActivityIndicator,
+  INDICATOR_VIEWS,
 } from "./components/index.js";
 
 // --- Layout: stages, their sections, and the settings list (shell components) ---

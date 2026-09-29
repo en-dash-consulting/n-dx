@@ -11,6 +11,7 @@ import {
   SvFreshnessIndicator,
   RexCompletionIndicator,
   HenchActivityIndicator,
+  INDICATOR_VIEWS,
 } from "../api.js";
 import { identityLine, identityTooltip, type ServerIdentity } from "./config-footer.js";
 import { ThemeToggle } from "./theme-toggle.js";
@@ -18,6 +19,12 @@ import { GlobalFAQ } from "./faq.js";
 
 export interface BottomBarProps {
   server?: ServerIdentity | null;
+  /**
+   * Views this viewer may show. `/api/status` reports all three products even
+   * to a scoped viewer, so an indicator is shown only when the view it opens
+   * is in scope — otherwise `--scope=sourcevision` would offer a way into Rex.
+   */
+  validViews: ReadonlySet<ViewId>;
   onNavigate: (view: ViewId) => void;
   onOpenSettings: () => void;
   settingsOpen: boolean;
@@ -27,6 +34,7 @@ export interface BottomBarProps {
 
 export function BottomBar({
   server = null,
+  validViews,
   onNavigate,
   onOpenSettings,
   settingsOpen,
@@ -51,9 +59,12 @@ export function BottomBar({
     }, "⚙"),
 
     h("div", { class: "bottombar-status", role: "group", "aria-label": "Project status" },
-      status?.sv ? h(SvFreshnessIndicator, { status: status.sv, onNavigate, tabIndex: 0 }) : null,
-      status?.rex ? h(RexCompletionIndicator, { status: status.rex, onNavigate, tabIndex: 0 }) : null,
-      status?.hench ? h(HenchActivityIndicator, { status: status.hench, onNavigate, tabIndex: 0 }) : null,
+      status?.sv && validViews.has(INDICATOR_VIEWS.sv)
+        ? h(SvFreshnessIndicator, { status: status.sv, onNavigate, tabIndex: 0 }) : null,
+      status?.rex && validViews.has(INDICATOR_VIEWS.rex)
+        ? h(RexCompletionIndicator, { status: status.rex, onNavigate, tabIndex: 0 }) : null,
+      status?.hench && validViews.has(INDICATOR_VIEWS.hench)
+        ? h(HenchActivityIndicator, { status: status.hench, onNavigate, tabIndex: 0 }) : null,
     ),
 
     h("div", { class: "bottombar-controls" },

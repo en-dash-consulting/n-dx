@@ -266,6 +266,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     ),
     h(BottomBar, {
       server,
+      validViews,
       onNavigate: handleSidebarNav,
       onOpenSettings: openSettings,
       settingsOpen,
