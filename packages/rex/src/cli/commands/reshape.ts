@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
-import { resolveStore, FileStore } from "../../store/index.js";
+import { resolveStore, FileStore, resolveRexPaths } from "../../store/index.js";
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
@@ -14,7 +14,6 @@ import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
-import { REX_DIR } from "./constants.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
@@ -38,7 +37,7 @@ export async function cmdReshape(
     throw new CLIError(message, suggestion);
   }
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   // Acquire reshape lock so concurrent `add` commands skip their scoped pass.
   const releaseReshapeLock = await acquireReshapeLock(rexDir);

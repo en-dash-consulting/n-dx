@@ -17,9 +17,9 @@ import { join } from "node:path";
 import { readdir, readFile, rename, stat, appendFile } from "node:fs/promises";
 import { info } from "../output.js";
 import { appendFilenameSuffix, titleToFilename } from "../../store/title-to-filename.js";
+import { resolveRexPaths } from "../../store/index.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { CLIError } from "../errors.js";
-import { REX_DIR } from "./constants.js";
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ export async function cmdMigrateFolderTreeFilenames(
     throw new CLIError(message, suggestion);
   }
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
 
   const result = await migrateFolderTreeFilenames(treeRoot);

@@ -1,9 +1,9 @@
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated, openClaimsStore, resolveClaimHolder } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, openClaimsStore, resolveClaimHolder, resolveRexPaths } from "../../store/index.js";
 import { collectForeignClaims } from "../mcp-tools.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { findNextTask, collectCompletedIds, explainSelection } from "../../core/next-task.js";
-import { REX_DIR } from "./constants.js";
+
 import { info, result } from "../output.js";
 import { bold, yellow, red, dim, colorStatus } from "@n-dx/llm-client";
 import { emitMigrationNotification } from "../migration-notification.js";
@@ -24,7 +24,7 @@ export async function cmdNext(
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD
   const migrationResult = await ensureLegacyPrdMigrated(dir);
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   // Emit migration notification to CLI and execution log

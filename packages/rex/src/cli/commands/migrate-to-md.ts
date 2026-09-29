@@ -3,10 +3,8 @@ import { CLIError } from "../errors.js";
 import { info } from "../output.js";
 import {
   migrateJsonPrdToMarkdown,
-  PRDMarkdownMigrationError,
-} from "../../store/index.js";
+  PRDMarkdownMigrationError, resolveRexPaths } from "../../store/index.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
-import { REX_DIR } from "./constants.js";
 
 export async function cmdMigrateToMd(
   dir: string,
@@ -18,7 +16,7 @@ export async function cmdMigrateToMd(
     throw new CLIError(message, suggestion);
   }
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   try {
     const result = await migrateJsonPrdToMarkdown(rexDir);

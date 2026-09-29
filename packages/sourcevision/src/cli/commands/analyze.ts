@@ -1,7 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {resolve, join} from "node:path";import {
-  SV_DIR,
   DATA_FILES,
   SUPPLEMENTARY_FILES,
   readManifest,
@@ -44,9 +43,10 @@ import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../a
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger } from "../../analyzers/run-ledger.js";
 import { configureJudgmentCache } from "../../analyzers/judgment-cache.js";
-import { carryNarration, cmdNarrate, NARRATION_LOG, takeOverNarration } from "./narrate.js";
+import { carryNarration, cmdNarrate, narrationLogPath, takeOverNarration } from "./narrate.js";
 import type { NarrateDeps } from "./narrate.js";
 import type { Manifest } from "../sourcevision-core.js";
+import { resolveSourcevisionPaths } from "../../paths.js";
 
 type PhaseFilter =
   | { type: "all" }
@@ -126,7 +126,7 @@ export async function initAndLoadLLMConfig(absDir: string): Promise<{
   svDir: string;
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>;
 }> {
-  const svDir = join(absDir, SV_DIR);
+  const svDir = resolveSourcevisionPaths(absDir).svDir;
   if (!existsSync(join(svDir, DATA_FILES.manifest))) {
     info("No .sourcevision/ found — initializing...");
     cmdInit(absDir);
@@ -136,7 +136,7 @@ export async function initAndLoadLLMConfig(absDir: string): Promise<{
   const llmConfig = await loadLLMConfig(absDir);
   setLLMConfig(llmConfig);
   setProjectDir(absDir);
-  configureJudgmentCache({ svDir: join(absDir, SV_DIR) });
+  configureJudgmentCache({ svDir: resolveSourcevisionPaths(absDir).svDir });
   const vendor = getLLMVendor();
   if (vendor) {
     printVendorModelHeader(vendor, llmConfig);
@@ -240,7 +240,8 @@ export function narrateDeps(): NarrateDeps {
  * next `analyze` can see it. The child regenerates the outputs when done.
  */
 async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds: string[], nameZoneIds: string[]): Promise<void> {
-  const logPath = join(absDir, NARRATION_LOG);
+  const narrationLog = narrationLogPath(absDir);
+  const logPath = join(absDir, narrationLog);
   const startedAt = new Date().toISOString();
   try {
     mkdirSync(join(svDir, ".cache"), { recursive: true });
@@ -251,7 +252,7 @@ async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds:
       env: process.env,
     });
     const manifest = readManifest(absDir);
-    manifest.narration = { status: "pending", zones: zoneIds, ...(nameZoneIds.length > 0 ? { names: nameZoneIds } : {}), startedAt, pid: child.pid, log: NARRATION_LOG };
+    manifest.narration = { status: "pending", zones: zoneIds, ...(nameZoneIds.length > 0 ? { names: nameZoneIds } : {}), startedAt, pid: child.pid, log: narrationLog };
     writeManifest(absDir, manifest);
     info("");
     const parts = [
@@ -259,7 +260,7 @@ async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds:
       ...(nameZoneIds.length > 0 ? [`naming ${bold(String(nameZoneIds.length))} zone${nameZoneIds.length === 1 ? "" : "s"}`] : []),
     ];
     info(`${cyan("Background:")} ${parts.join(", ")} — results above are complete; names and insights land in zones.json when it finishes.`);
-    info(`  ${dim(`log: ${NARRATION_LOG} · pass --wait to block instead`)}`);
+    info(`  ${dim(`log: ${narrationLog} · pass --wait to block instead`)}`);
   } catch (err) {
     const manifest = readManifest(absDir);
     manifest.narration = { status: "failed", zones: zoneIds, ...(nameZoneIds.length > 0 ? { names: nameZoneIds } : {}), startedAt, reason: `could not spawn narrator: ${err instanceof Error ? err.message : String(err)}` };

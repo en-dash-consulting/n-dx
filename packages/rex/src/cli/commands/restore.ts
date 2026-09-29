@@ -14,8 +14,9 @@ import { join } from "node:path";
 import { readdir, stat } from "node:fs/promises";
 import { CLIError, requireRexDir } from "../errors.js";
 import { info, result, warn } from "../output.js";
-import { REX_DIR } from "./constants.js";
+
 import { getAvailableBackups, restoreFromBackup } from "../../core/backup-snapshots.js";
+import { resolveRexPaths } from "../../store/index.js";
 
 /** Render a snapshot id back into a readable timestamp. */
 function formatSnapshotId(id: string): string {
@@ -55,7 +56,7 @@ export async function cmdRestore(
   flags: Record<string, string>,
 ): Promise<void> {
   requireRexDir(dir);
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const backupsDir = join(rexDir, ".backups");
   const isJson = flags.format === "json";
 

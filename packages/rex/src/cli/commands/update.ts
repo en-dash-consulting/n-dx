@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
-import { REX_DIR } from "./constants.js";
+import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
+
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { parseCsvList } from "../parse-utils.js";
 import { CLIError, requireRexDir } from "../errors.js";
@@ -32,7 +32,7 @@ export async function cmdUpdate(
   const migrationResult = await ensureLegacyPrdMigrated(dir);
 
   requireRexDir(dir);
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   // Emit migration notification to CLI and execution log

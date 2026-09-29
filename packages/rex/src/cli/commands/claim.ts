@@ -27,8 +27,8 @@ import {
   defaultIsPidAlive,
   type TaskClaim,
 } from "../../store/claims.js";
-import { resolveStore } from "../../store/index.js";
-import { REX_DIR } from "./constants.js";
+import { resolveStore, resolveRexPaths } from "../../store/index.js";
+
 
 /** One claim as `list` reports it, with everything the file does not store directly. */
 export interface ClaimReport {
@@ -77,7 +77,7 @@ export async function collectClaims(dir: string): Promise<ClaimReport[]> {
   const titles = new Map<string, string>();
   if (claims.length > 0) {
     try {
-      const prd = await resolveStore(join(dir, REX_DIR));
+      const prd = await resolveStore(resolveRexPaths(dir).rexDir);
       for (const claim of claims) {
         const item = await prd.getItem(claim.taskId);
         if (item) titles.set(claim.taskId, item.title);

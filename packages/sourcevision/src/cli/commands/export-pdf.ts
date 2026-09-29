@@ -7,7 +7,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
-import { SV_DIR } from "./constants.js";
+
 import { CLIError } from "../errors.js";
 import { DATA_FILES } from "../sourcevision-core.js";
 import { info, result } from "../output.js";
@@ -18,6 +18,7 @@ import type {
   Zones,
   Components,
 } from "../sourcevision-core.js";
+import { resolveSourcevisionPaths } from "../../paths.js";
 
 export interface ExportPdfOptions {
   output?: string;
@@ -37,7 +38,7 @@ export function cmdExportPdf(
   options?: ExportPdfOptions
 ): Promise<void> | void {
   const absDir = resolve(dir);
-  const svDir = join(absDir, SV_DIR);
+  const svDir = resolveSourcevisionPaths(absDir).svDir;
 
   // ── Validate .sourcevision/ exists ────────────────────────────────────
 

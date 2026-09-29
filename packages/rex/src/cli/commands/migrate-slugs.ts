@@ -26,15 +26,13 @@ import {
   resolveStore,
   PRD_TREE_DIRNAME,
   SLUG_RULE_VERSION,
-  readSlugRuleMarker,
-} from "../../store/index.js";
+  readSlugRuleMarker, resolveRexPaths } from "../../store/index.js";
 import {
   findUnresolvableSiblingCollisions,
   fingerprintTree,
   diffFingerprints,
   isLossless,
 } from "../../core/slug-migration.js";
-import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
@@ -55,7 +53,7 @@ export async function cmdMigrateSlugs(
     throw new CLIError(message, suggestion);
   }
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   const store = await resolveStore(rexDir);
 

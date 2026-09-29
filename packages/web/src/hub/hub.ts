@@ -49,7 +49,7 @@ const LOOPBACK_HOST = "127.0.0.1";
 export interface HubOptions {
   /** Port to listen on. 0 asks the OS for a free one (tests). Default 3117. */
   port?: number;
-  /** Directory holding hub.json and hub.pid. Default `$N_DX_HOME` or `~/.n-dx`. */
+  /** Directory holding hub.json and hub.pid. Defaults to {@link resolveHubHome}. */
   homeDir?: string;
   /** How often each project server is health-checked. Default 15 s. */
   healthIntervalMs?: number;
@@ -57,7 +57,7 @@ export interface HubOptions {
   supervisor?: SupervisorOptions;
   /**
    * Stay up when the last project unregisters. Defaults to `hub.keepAlive`
-   * in `~/.n-dx/config.json`, which itself defaults to false.
+   * in the per-user `config.json`, which itself defaults to false.
    */
   keepAlive?: boolean;
   /**
@@ -149,7 +149,7 @@ export class Hub {
   readonly keepAlive: boolean;
   /** Machine-wide admission control for dashboard-started runs. */
   readonly admission: AdmissionGate;
-  /** Keys `~/.n-dx/config.json` got wrong, for {@link startHub} to report once. */
+  /** Keys the per-user `config.json` got wrong, for {@link startHub} to report once. */
   readonly configProblems: HubConfigProblem[];
   private readonly registry: HubRegistry;
   private readonly supervisors = new Map<string, ProjectSupervisor>();
@@ -409,7 +409,11 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
   const hub = new Hub({
     ...options,
     onEmpty: () => {
-      log("[hub] last project unregistered — exiting (set hub.keepAlive in ~/.n-dx/config.json to stay up)");
+      // Naming the resolved file rather than a tilde path: which of ~/.ndx and
+      // ~/.n-dx is in force is exactly what the reader cannot guess.
+      log(
+        `[hub] last project unregistered — exiting (set hub.keepAlive in ${hubConfigPath(hub.hubHome)} to stay up)`,
+      );
       void closeSelf?.();
       options.onEmpty?.();
     },
@@ -460,7 +464,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
   // otherwise invisible — the hub runs on the default and the limit gets
   // blamed for not working.
   for (const problem of hub.configProblems) {
-    log(`[hub] ~/.n-dx/config.json: ${problem.key} — ${problem.message} (using the default)`);
+    log(`[hub] ${hubConfigPath(hub.hubHome)}: ${problem.key} — ${problem.message} (using the default)`);
   }
 
   await hub.attachAll();

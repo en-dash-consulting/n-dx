@@ -36,8 +36,8 @@ import {
   type ItemDurationTotals,
 } from "../core/item-duration-rollup.js";
 import { join } from "node:path";
-import { TOOL_VERSION, REX_DIR } from "./commands/constants.js";
-import { FileStore, resolvePRDFile } from "../store/index.js";
+import { TOOL_VERSION } from "./commands/constants.js";
+import { FileStore, resolvePRDFile, resolveRexPaths } from "../store/index.js";
 import { syncFolderTree } from "./commands/folder-tree-sync.js";
 import { holdCompletionForRun, describeHeldCompletion } from "./completion-hold.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
@@ -264,7 +264,7 @@ export async function handleUpdateTaskStatus(
         detail: `Deleted ${existing.level}: ${existing.title} (${deletedIds.length} item(s) removed)`,
       });
 
-      await syncFolderTree(join(projectDir, REX_DIR), store);
+      await syncFolderTree(resolveRexPaths(projectDir).rexDir, store);
 
       return textResult(
         JSON.stringify({
@@ -334,7 +334,7 @@ export async function handleUpdateTaskStatus(
       }
     }
 
-    await syncFolderTree(join(projectDir, REX_DIR), store);
+    await syncFolderTree(resolveRexPaths(projectDir).rexDir, store);
 
     return textResult(
       JSON.stringify({
@@ -734,10 +734,9 @@ export async function handleReorganize(
         const { reasonForReshape } = await import("../analyze/reshape-reason.js");
         const { setLLMConfig, setClaudeConfig, setProjectDir } = await import("../analyze/reason.js");
         const { loadLLMConfig, loadClaudeConfig } = await import("../store/project-config.js");
-        const { REX_DIR } = await import("./commands/constants.js");
         const { join } = await import("node:path");
 
-        const rexDir = join(dir, REX_DIR);
+        const rexDir = resolveRexPaths(dir).rexDir;
         const llmConfig = await loadLLMConfig(rexDir);
         setLLMConfig(llmConfig);
         const claudeConfig = await loadClaudeConfig(rexDir);
@@ -930,7 +929,7 @@ export async function handleEditItem(
       detail: `Edited ${existing.level} "${existing.title}": ${changedFields.join(", ")}`,
     });
 
-    await syncFolderTree(join(projectDir, REX_DIR), store);
+    await syncFolderTree(resolveRexPaths(projectDir).rexDir, store);
 
     const updated = await store.getItem(args.id);
     return textResult(

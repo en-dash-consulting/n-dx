@@ -322,7 +322,7 @@ export async function runMcpShim(server, dir, { tools = {}, spawnImpl } = {}) {
  * `runHubMode` writes `.n-dx-web.pid` with `via: "hub"` in the directory it
  * registered, naming the hub's port and the id it was registered under. That
  * is the only place either is written down: a hub started with `--port=N`
- * leaves nothing in `~/.n-dx/config.json`, so a shim that read only the
+ * leaves nothing in the per-user `config.json`, so a shim that read only the
  * config would look on 3117, find nothing, and quietly serve in-process
  * while a perfectly good hub ran on another port.
  *
@@ -348,7 +348,7 @@ async function readHubMarker(dir) {
  *
  * 1. The marker `ndx start` left in this worktree (or the repository root),
  *    which names both the port and the project id.
- * 2. `~/.n-dx/config.json` plus a registry lookup by repository root, for a
+ * 2. The per-user `config.json` plus a registry lookup by repository root, for a
  *    worktree that was never registered from itself.
  *
  * @returns {Promise<{url: string, workspace: string|null}|null>}

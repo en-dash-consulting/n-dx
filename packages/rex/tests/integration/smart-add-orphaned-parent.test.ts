@@ -7,7 +7,7 @@ import { cmdSmartAdd } from "../../src/cli/commands/smart-add.js";
 import { cmdValidate } from "../../src/cli/commands/validate.js";
 import { resolveStore } from "../../src/store/index.js";
 import { validateStructure } from "../../src/core/structural.js";
-import { REX_DIR } from "../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../src/store/index.js";
 import type { Proposal } from "../../src/analyze/index.js";
 import type { PRDItem } from "../../src/schema/index.js";
 
@@ -74,7 +74,7 @@ describe("smart-add orphaned parent regression", () => {
 
   it("merge into existing item where proposed parent is new leaves no orphaned containers", async () => {
     // Seed: existing epic/feature/task tree
-    const store = await resolveStore(join(tmpDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(tmpDir).rexDir);
     await store.addItem({
       id: "epic-existing",
       title: "Platform Core",
@@ -147,7 +147,7 @@ describe("smart-add orphaned parent regression", () => {
 
   it("cross-level merge with parent already existing leaves no empty containers", async () => {
     // Seed: epic with two features, each with a task
-    const store = await resolveStore(join(tmpDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(tmpDir).rexDir);
     await store.addItem({
       id: "epic-1",
       title: "API Layer",
@@ -251,7 +251,7 @@ describe("smart-add orphaned parent regression", () => {
 
   it("merge followed by rex validate returns no structural errors", async () => {
     // Seed: a simple tree
-    const store = await resolveStore(join(tmpDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(tmpDir).rexDir);
     await store.addItem({
       id: "epic-v",
       title: "Core Features",

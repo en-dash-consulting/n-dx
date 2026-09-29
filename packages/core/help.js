@@ -1080,7 +1080,7 @@ const ORCHESTRATOR_HELP_DEFS = {
           "'ndx start stop' unregisters the worktree it runs in. While another\n" +
           "worktree of the repository is still registered, the project keeps being\n" +
           "served; the last one unregisters the project and stops its server. A hub\n" +
-          "with no projects left exits, unless ~/.n-dx/config.json sets\n" +
+          "with no projects left exits, unless ~/.ndx/config.json sets\n" +
           "hub.keepAlive to true. 'ndx hub stop' stops the hub and every project.",
       },
       {
@@ -1108,7 +1108,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       },
     ],
     options: [
-      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.n-dx/config.json); with --here, this server's port; with --preview, 3118" },
+      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.ndx/config.json); with --here, this server's port; with --preview, 3118" },
       { flag: "--here", description: "Single-project server instead of the hub (also: web.mode \"here\" in .n-dx.json)" },
       { flag: "--hub", description: "Register with the hub — the default since 0.7.0; accepted for compatibility" },
       { flag: "--background", description: "With --here, run as a background daemon" },
@@ -1131,9 +1131,10 @@ const ORCHESTRATOR_HELP_DEFS = {
     summary: "inspect or stop the per-user n-dx hub",
     description:
       "The hub is one process per user: it owns port 3117, keeps the project\n" +
-      "registry in ~/.n-dx/hub.json, and runs one dashboard server per registered\n" +
+      "registry in ~/.ndx/hub.json, and runs one dashboard server per registered\n" +
       "repository. 'ndx start' starts and registers with it; these subcommands\n" +
-      "address the hub itself, from any directory.",
+      "address the hub itself, from any directory. A machine that still has\n" +
+      "~/.n-dx keeps using it; $NDX_HOME overrides either.",
     usage: "ndx hub [status|stop] [options]",
     sections: [
       {
@@ -1144,7 +1145,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       },
     ],
     options: [
-      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.n-dx/config.json)" },
+      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.ndx/config.json)" },
     ],
     examples: [
       { command: "ndx hub status", description: "What the hub is serving right now" },
