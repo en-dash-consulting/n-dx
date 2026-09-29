@@ -284,8 +284,10 @@ export {
   extractTaskKeywords,
   matchTasksByKeywords,
   requirementsScore,
+  matchesAssignee,
+  traversalBlock,
 } from "./core/next-task.js";
-export type { SelectionExplanation, SelectionReasonCode, TaskMatch, PrioritizationOptions, RiskTolerance } from "./core/next-task.js";
+export type { SelectionExplanation, SelectionReasonCode, TaskMatch, PrioritizationOptions, RiskTolerance, TraversalBlock } from "./core/next-task.js";
 
 // ---- Core: identity -----------------------------------------------------------
 

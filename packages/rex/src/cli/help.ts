@@ -412,8 +412,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     usage: "rex ready [options] [dir]",
     description:
       "Marks an item ready when it has at least one automated or metric\n" +
-      "requirement (own or inherited) and no open blocker. Items already\n" +
-      "completed, deferred, cancelled, or deleted never qualify. Explains\n" +
+      "requirement (own or inherited) and no open blocker on itself or any\n" +
+      "ancestor. Items already completed, deferred, cancelled, or deleted\n" +
+      "never qualify. Explains\n" +
       "why items that don't qualify don't. `ready` is never read by task\n" +
       "selection (`rex next`) — it is purely informational.",
     options: [

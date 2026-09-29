@@ -57,7 +57,9 @@
  * - Save file report (takeSaveFileReport — the files the last PRD save(s)
  *   wrote and deleted, so completion commits stage those paths, not the tree)
  * - Tree traversal (findItem, walkTree — locate items in the tree)
- * - Task selection (findNextTask, findActionableTasks, collectCompletedIds)
+ * - Task selection (findNextTask, findActionableTasks, collectCompletedIds,
+ *   matchesAssignee — selection's own `--mine` rule, for the non-selection
+ *   operations hench also has to scope to it)
  * - Cross-worktree task claims (openClaimsStore, resolveClaimHolder — the
  *   run claims the task it selected so other worktrees pass over it)
  * - Timestamp computation (status change timestamps)
@@ -123,6 +125,14 @@ export { findItem, walkTree } from "@n-dx/rex";
 
 // ---- Task selection ---------------------------------------------------------
 export { findNextTask, findActionableTasks, collectCompletedIds, explainSelection } from "@n-dx/rex";
+
+// `matchesAssignee` is selection's own `--mine` rule (own field, or inherited
+// from any ancestor). Anything hench scopes to `--mine` that is *not* selection
+// — the deferred/failing reset offer, the counts behind an empty menu — has to
+// use this, not a second comparison written locally. The reset offered by an
+// empty `--mine` menu reset every deferred task in the PRD, including other
+// people's, because it was scoped by nothing at all.
+export { matchesAssignee } from "@n-dx/rex";
 
 // ---- Cross-worktree task claims ---------------------------------------------
 export { openClaimsStore, resolveClaimHolder } from "@n-dx/rex";
