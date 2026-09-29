@@ -13,8 +13,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readdir, utimes, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, rm, readdir, utimes, stat, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { serializeFolderTree } from "../../../src/store/folder-tree-serializer.js";
 import { parseFolderTree } from "../../../src/store/folder-tree-parser.js";
@@ -268,6 +268,50 @@ describe("stale-save guard", () => {
     const after = await seed.loadDocument();
     const alphaAfter = after.items.find((i) => i.id === "a")!;
     expect(alphaAfter.children?.find((c) => c.id === "x")?.description).toBe("edited by A");
+  });
+
+  it("lets a save rewrite a corrupt file the snapshot read, whatever its mtime says", async () => {
+    // The guard compares file mtimes against a `Date.now()` load stamp, and
+    // those are two different clocks — the file clock was measured up to ~4ms
+    // ahead of Date.now() here, past the guard's 2ms tolerance. So a file
+    // written just *before* a load can read as newer than it.
+    //
+    // A corrupt file has no id, which used to end the check right there: it was
+    // reported as another writer's work and the save that would have rewritten
+    // it was refused. That made the corruption permanent — every later save
+    // failed the same way. The snapshot did read the file (the parser digests
+    // every `.md` before parsing it), so it is not unseen work.
+    await serializeFolderTree([epic("a", "Alpha", [task("x", "Item X")])], treeRoot);
+    const { fileDigests: loadedFiles } = await parseFolderTree(treeRoot);
+    const loadedAt = Date.now();
+
+    const corrupt = join(treeRoot, "alpha", "item-x.md");
+    expect(loadedFiles.has(resolve(corrupt))).toBe(true);
+    const future = new Date(Date.now() + 5_000);
+    await utimes(corrupt, future, future);
+
+    // Dropping X is a deliberate edit of a tree this snapshot fully read.
+    await serializeFolderTree([epic("a", "Alpha")], treeRoot, { loadedAt, loadedFiles });
+    await expect(stat(corrupt)).rejects.toThrow();
+  });
+
+  it("still refuses an unreadable file the snapshot never read", async () => {
+    // The exemption above is keyed on having a load-time digest for the path.
+    // A file with no id AND no digest is exactly the "unknown content" case the
+    // guard exists for, and stays protected by mtime alone.
+    await serializeFolderTree([epic("a", "Alpha")], treeRoot);
+    const { fileDigests: loadedFiles } = await parseFolderTree(treeRoot);
+    const loadedAt = Date.now();
+
+    // Written after the load, so the snapshot has no digest for it.
+    const intruder = join(treeRoot, "intruder.md");
+    await writeFile(intruder, "CORRUPTED", "utf8");
+    const future = new Date(Date.now() + 5_000);
+    await utimes(intruder, future, future);
+
+    await expect(
+      serializeFolderTree([epic("a", "Alpha")], treeRoot, { loadedAt, loadedFiles }),
+    ).rejects.toThrow(/intruder\.md/);
   });
 
   it("guards the store write path end to end", async () => {

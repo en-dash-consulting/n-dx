@@ -31,6 +31,7 @@ describe("registerUsageScheduler", () => {
       clearInterval(timer);
     }
     activeTimers.length = 0;
+    vi.useRealTimers();
   });
 
   it("returns a clearable interval handle", () => {
@@ -126,14 +127,24 @@ describe("registerUsageScheduler", () => {
   });
 
   it("a loadPRD callback that delays longer than the interval does not cause overlapping tick execution", async () => {
+    // Fake timers plus an explicit gate. This used to start a 15 ms interval
+    // against a 50 ms callback and read `maxConcurrent` after a real 150 ms
+    // sleep: a starved event loop delivers no tick at all in that window, and
+    // `maxConcurrent` comes back 0 — a failure produced by load, with the
+    // guard working perfectly. Holding one tick open across ten firings states
+    // the claim without a clock: while a cycle is in flight, no second cycle
+    // starts, and when it finishes the next firing runs.
+    vi.useFakeTimers();
     let activeCount = 0;
     let maxConcurrent = 0;
+    let releaseTick!: () => void;
+    const tickMayFinish = new Promise<void>((resolve) => { releaseTick = resolve; });
 
     const slowAggregator = {
       getTaskUsage: vi.fn(async () => {
         activeCount++;
         maxConcurrent = Math.max(maxConcurrent, activeCount);
-        await new Promise<void>((resolve) => setTimeout(resolve, 50));
+        await tickMayFinish;
         activeCount--;
         return {} as Record<string, never>;
       }),
@@ -152,14 +163,27 @@ describe("registerUsageScheduler", () => {
     const handle = registerUsageScheduler(options);
     activeTimers.push(handle);
 
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    // Ten interval firings while the first cycle is still inside getTaskUsage.
+    await vi.advanceTimersByTimeAsync(150);
+    expect(slowAggregator.getTaskUsage).toHaveBeenCalledTimes(1);
+    expect(maxConcurrent).toBe(1);
+
+    // The guard must also let go: the cycle finishes, the next firing runs one.
+    releaseTick();
+    await vi.advanceTimersByTimeAsync(15);
     clearInterval(handle);
 
-    // The running guard must prevent concurrent tick execution.
+    expect(slowAggregator.getTaskUsage).toHaveBeenCalledTimes(2);
     expect(maxConcurrent).toBe(1);
   });
 
   it("uses overrideIntervalMs when provided", async () => {
+    // Stated exactly rather than approximated: nothing fires before the
+    // override elapses, and a tick lands on it. The real-clock version waited
+    // 100 ms for a 30 ms interval and asserted "at least one", which passes
+    // for any interval up to 100 ms and fails for a correct one whenever the
+    // event loop is busy enough to swallow the window.
+    vi.useFakeTimers();
     let callCount = 0;
     const options: RegisterSchedulerOptions = {
       ctx: { rexDir: "/tmp/nonexistent/.rex", projectDir: "/tmp/nonexistent" },
@@ -167,16 +191,17 @@ describe("registerUsageScheduler", () => {
         callCount++;
         return mockAggregator() as any;
       },
-      overrideIntervalMs: 30, // Very short for testing
+      overrideIntervalMs: 30,
     };
 
     const handle = registerUsageScheduler(options);
     activeTimers.push(handle);
 
-    // Wait for at least one cycle
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    clearInterval(handle);
+    await vi.advanceTimersByTimeAsync(29);
+    expect(callCount).toBe(0);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(callCount).toBe(1);
 
-    expect(callCount).toBeGreaterThanOrEqual(1);
+    clearInterval(handle);
   });
 });

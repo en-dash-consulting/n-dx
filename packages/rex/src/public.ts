@@ -547,3 +547,16 @@ export { createRexMcpServer } from "./cli/mcp.js";
 // ---- MCP tool handlers (for direct invocation by web/gateway) ---------------
 
 export { handleEditItem } from "./cli/mcp-tools.js";
+
+// ---- Execution log -----------------------------------------------------------
+// Shared writer behind `append_log` (MCP) and `rex log` / `ndx log` (CLI).
+
+export { appendExecutionLogEntry } from "./core/execution-log.js";
+export type { AppendLogArgs } from "./core/execution-log.js";
+
+// ---- Default workflow --------------------------------------------------------
+// Exported so consumers (e.g. hench tests asserting the CLI-provider prompt
+// carries the non-MCP `append_log` route) can check against the canonical
+// text rather than a hand-copied fixture.
+
+export { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "./workflow/default.js";

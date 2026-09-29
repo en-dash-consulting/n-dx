@@ -2520,6 +2520,22 @@ async function handleMove(rest) {
   exitWithCleanup(0);
 }
 
+/**
+ * `ndx log` — append a structured entry to the rex execution log.
+ *
+ * Delegates to `rex log`, the CLI route for `append_log`. Exists so a hench
+ * run can log to `.rex/execution-log.jsonl` in a session with no rex MCP
+ * server connected — the ordinary case for a `claude`/`codex` CLI-provider
+ * spawn, where the workflow's log step would otherwise be impossible.
+ *
+ * First positional arg is the event name, not a dir — same shape as `move`.
+ */
+async function handleLog(rest) {
+  requireInit(process.cwd(), [".rex"]);
+  await runOrDie(tools.rex, ["log", ...rest]);
+  exitWithCleanup(0);
+}
+
 async function handleReshape(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, [".rex"]);
@@ -2945,6 +2961,7 @@ const COMMAND_DISPATCH = new Map([
   ["update",            handleUpdate],
   ["remove",            handleRemove],
   ["move",              handleMove],
+  ["log",               handleLog],
   ["reshape",           handleReshape],
   ["reorganize",        handleReorganize],
   ["prune",             handlePrune],

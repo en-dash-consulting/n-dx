@@ -295,6 +295,13 @@ const COMMAND_REGISTRY = [
     related: ["status", "validate"],
   },
   {
+    name: "log",
+    category: "Manage",
+    summary: "Append an execution-log entry (non-MCP route to append_log)",
+    keywords: ["log", "append_log", "execution-log", "MCP", "record"],
+    related: ["status"],
+  },
+  {
     name: "update",
     category: "Manage",
     summary: "Update item status, priority, or title",
@@ -417,6 +424,7 @@ const SUBCOMMAND_REGISTRY = {
     { name: "usage", parent: "rex", category: "Rex", summary: "Token usage analytics", keywords: ["tokens", "cost", "analytics"], related: ["status"] },
     { name: "report", parent: "rex", category: "Rex", summary: "Generate JSON health report", keywords: ["health", "CI", "JSON", "dashboard"], related: ["validate"] },
     { name: "verify", parent: "rex", category: "Rex", summary: "Run tests for acceptance criteria", keywords: ["test", "acceptance", "criteria", "coverage"], related: ["status"] },
+    { name: "log", parent: "rex", category: "Rex", summary: "Append an execution-log entry (non-MCP route to append_log)", keywords: ["log", "append_log", "execution-log", "MCP"], related: ["status"] },
     { name: "recommend", parent: "rex", category: "Rex", summary: "Get SourceVision-based recommendations", keywords: ["recommendations", "suggestions", "sourcevision"], related: ["analyze"] },
     { name: "analyze", parent: "rex", category: "Rex", summary: "Build PRD from project analysis", keywords: ["scan", "codebase", "proposals", "LLM", "import"], related: ["add", "recommend"] },
     { name: "export", parent: "rex", category: "Rex", summary: "Write the PRD to a portable JSON bundle", keywords: ["bundle", "portable", "transport", "backup", "move"], related: ["import-bundle", "sync"] },
@@ -1356,6 +1364,24 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx verify .", description: "Verify in target directory" },
     ],
     related: ["status", "validate"],
+  },
+  log: {
+    summary: "append an execution-log entry (non-MCP route to append_log)",
+    description:
+      "Appends a structured entry to .rex/execution-log.jsonl. Use this when the\n" +
+      "session has no rex MCP server connected — the ordinary case for a\n" +
+      "claude/codex CLI-provider run — since append_log is otherwise only\n" +
+      "reachable as an MCP tool. Delegates to 'rex log'.",
+    usage: 'ndx log <event> [--item=<id>] [--detail="..."] [dir]',
+    options: [
+      { flag: "--item=<id>", description: "Related PRD item ID" },
+      { flag: "--detail=\"...\"", description: "Event details" },
+    ],
+    examples: [
+      { command: "ndx log task_started --item=abc123", description: "Log an event tied to a task" },
+      { command: "ndx log implementation_note --detail=\"Extracted shared writer\"", description: "Log a freeform note" },
+    ],
+    related: ["status"],
   },
   update: {
     summary: "update a PRD item",

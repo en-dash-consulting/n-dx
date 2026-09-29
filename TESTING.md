@@ -199,10 +199,27 @@ bound that matches the failure mode:
 ## Flake Resistance
 
 A test that passes alone but fails inside the full suite — or on one developer's
-machine but not in CI — is a defect in the test, not noise to be retried. Four
+machine but not in CI — is a defect in the test, not noise to be retried. Five
 failure families have produced every such flake observed so far; each has a
-standing rule. (The headings below run 1, 3, 2, 4: they were written in the
+standing rule. (The headings below run 1, 3, 2, 4, 5: they were written in the
 order the families were found, and renumbering them would break inbound links.)
+
+### Reproducing a load-sensitive flake
+
+A flake you cannot reproduce is a flake you cannot fix, and "it only fails on a
+busy machine" is not a reproduction.
+
+```sh
+node scripts/soak-under-build-load.mjs           # 3 suite runs under concurrent build load
+node scripts/soak-under-build-load.mjs --runs=1
+```
+
+The script keeps the machine compiling the repo's TypeScript packages for as
+long as the suite runs, then reports each run's verdict alongside how many
+compilations finished beside it — a cycle count of zero means the load never
+ran and the result proves nothing. It emits to a temp directory rather than
+`dist/`, so the e2e suite's CLI spawns are never handed a half-written entry
+point; see the header comment for why that distinction matters.
 
 ### Family 1 — Foreign responses in HTTP route tests
 
@@ -280,6 +297,18 @@ bounds a clock reading and is not named there fails
 `tests/e2e/wall-clock-inventory-policy.test.js`. Add a row when you add such an
 assertion; read the register before adding one, because the site you are about
 to write may already be recorded as open.
+
+**A real sleep in front of an assertion is the same defect without the clock.**
+`await sleep(50); expect(scheduler).toHaveBeenCalled()` names no duration, so it
+reads as an ordering or a count — but the sleep is still the barrier deciding
+the verdict, and a machine busy enough to swallow the window fails it with the
+code unchanged. The same scan flags this shape (awaited non-zero sleep, then an
+`expect` with no `await` in between) and holds it to the same register. Prefer
+waiting for the event itself: a promise the production code resolves, or fake
+timers advanced by a named interval. A sleep that only widens the window for a
+*bug* to appear is sound and is not flagged, because the gate that follows it
+decides the verdict — see
+`packages/rex/tests/integration/concurrent-write-lost-update.test.ts`.
 
 Almost every wall-clock assertion in this repo is standing in for a *complexity*
 claim — "this must not go quadratic" — not a latency SLA. Three techniques can

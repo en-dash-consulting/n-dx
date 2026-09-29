@@ -196,11 +196,18 @@ describe("analyzeWorkflow", () => {
 // ── Token efficiency suggestions ─────────────────────────────────────
 
 describe("token efficiency suggestions", () => {
+  // Token figures here are in the units `checkTokenBudget` enforces: uncached
+  // input + cache writes + output. On a prompt-cached run almost all of that
+  // is cache writes, so a fixture built from `input`/`output` alone no longer
+  // reaches the high-consumption threshold.
   it("suggests token budget when high usage and low success rate", () => {
     const runs = [
-      makeRun("t1", "failed", "2024-01-01T01:00:00Z", { tokenUsage: { input: 100000, output: 20000 } }),
-      makeRun("t2", "failed", "2024-01-01T02:00:00Z", { tokenUsage: { input: 120000, output: 25000 } }),
-      makeRun("t3", "completed", "2024-01-01T03:00:00Z", { tokenUsage: { input: 90000, output: 15000 } }),
+      makeRun("t1", "failed", "2024-01-01T01:00:00Z",
+        { tokenUsage: { input: 534, output: 60000, cacheCreationInput: 1_400_000, cacheReadInput: 40_000_000 } }),
+      makeRun("t2", "failed", "2024-01-01T02:00:00Z",
+        { tokenUsage: { input: 900, output: 65000, cacheCreationInput: 1_500_000, cacheReadInput: 44_000_000 } }),
+      makeRun("t3", "completed", "2024-01-01T03:00:00Z",
+        { tokenUsage: { input: 700, output: 50000, cacheCreationInput: 1_250_000, cacheReadInput: 36_000_000 } }),
     ];
     const config = makeConfig({ tokenBudget: 0 });
     const result = analyzeWorkflow(runs, config);

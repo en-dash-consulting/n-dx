@@ -28,6 +28,7 @@ describe("rex CLI help", () => {
     "usage",
     "report",
     "verify",
+    "log",
     "recommend",
     "analyze",
     "import",
@@ -104,6 +105,16 @@ describe("rex CLI help", () => {
       expect(output).toContain("p=proceed anyway");
       expect(output).toContain("--title");
       expect(output).toContain("--file");
+    });
+
+    it("log help names event, item and detail and says it is the non-MCP route to append_log", () => {
+      showCommandHelp("log");
+      const output = logSpy.mock.calls[0][0] as string;
+      expect(output).toContain("<event>");
+      expect(output).toContain("--item");
+      expect(output).toContain("--detail");
+      expect(output).toContain("append_log");
+      expect(output.toLowerCase()).toContain("mcp");
     });
 
     it("analyze help mentions --accept and --guided", () => {
