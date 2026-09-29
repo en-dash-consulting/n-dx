@@ -118,6 +118,21 @@ function makeSubAnalysis(id: string, prefix: string, zones: Zone[]): SubAnalysis
   };
 }
 
+/**
+ * `statSync` for a fixture that is on the legacy folder layout.
+ *
+ * Every directory in these fixtures exists, so the obvious mock is a blanket
+ * `isDirectory: () => true`. That stopped being harmless once the scan resolved
+ * the analysis directory through the layout resolver: the resolver probes for a
+ * `.ndx/` container on each directory it visits, a blanket yes puts every
+ * fixture on the `.ndx` layout, and the analysis directories the test does lay
+ * down are then looked for in a container that is not there.
+ */
+function statSyncOnLegacyLayout(p: unknown) {
+  if (String(p).replace(/\\/g, "/").endsWith("/.ndx")) return undefined as any;
+  return { isDirectory: () => true } as any;
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("promoteZones", () => {
@@ -260,7 +275,7 @@ describe("buildSubAnalysisRefs", () => {
       makeSubAnalysis("packages-hench", "packages/hench", []),
     ];
 
-    const refs = buildSubAnalysisRefs(subAnalyses);
+    const refs = buildSubAnalysisRefs(subAnalyses, ".");
 
     expect(refs).toHaveLength(2);
     expect(refs[0]).toEqual({
@@ -273,6 +288,18 @@ describe("buildSubAnalysisRefs", () => {
       prefix: "packages/hench",
       manifestPath: "packages/hench/.sourcevision/manifest.json",
     });
+  });
+
+  // The ref points at where the sub-analysis actually keeps its manifest, which
+  // is `sub.svDir` — not `prefix` joined to a fixed directory name. A member on
+  // the `.ndx` layout inside a legacy root has to come out right.
+  it("follows the sub-analysis's own folder layout", () => {
+    const sub = makeSubAnalysis("packages-web", "packages/web", []);
+    sub.svDir = "packages/web/.ndx/sourcevision";
+
+    const [ref] = buildSubAnalysisRefs([sub], ".");
+
+    expect(ref.manifestPath).toBe("packages/web/.ndx/sourcevision/manifest.json");
   });
 });
 
@@ -304,9 +331,7 @@ describe("detectSubAnalyses", () => {
       return [] as any;
     });
 
-    mockedStatSync.mockImplementation((p: any) => {
-      return { isDirectory: () => true } as any;
-    });
+    mockedStatSync.mockImplementation(statSyncOnLegacyLayout);
 
     mockedExistsSync.mockImplementation((p: any) => {
       const s = n(String(p));
@@ -339,9 +364,7 @@ describe("detectSubAnalyses", () => {
       return [] as any;
     });
 
-    mockedStatSync.mockImplementation((p: any) => {
-      return { isDirectory: () => true } as any;
-    });
+    mockedStatSync.mockImplementation(statSyncOnLegacyLayout);
 
     mockedExistsSync.mockReturnValue(false);
 
@@ -363,7 +386,7 @@ describe("detectSubAnalyses", () => {
       return [] as any;
     });
 
-    mockedStatSync.mockImplementation(() => ({ isDirectory: () => true } as any));
+    mockedStatSync.mockImplementation(statSyncOnLegacyLayout);
     mockedExistsSync.mockImplementation((p: any) => {
       const pathStr = n(String(p));
       return pathStr === "/root/tests/fixtures/sv-evals/toy-app/.sourcevision" ||
@@ -386,9 +409,7 @@ describe("detectSubAnalyses", () => {
       return [] as any;
     });
 
-    mockedStatSync.mockImplementation((p: any) => {
-      return { isDirectory: () => true } as any;
-    });
+    mockedStatSync.mockImplementation(statSyncOnLegacyLayout);
 
     mockedExistsSync.mockReturnValue(false);
 
@@ -408,7 +429,7 @@ describe("detectSubAnalyses", () => {
       return [] as any;
     });
 
-    mockedStatSync.mockImplementation(() => ({ isDirectory: () => true } as any));
+    mockedStatSync.mockImplementation(statSyncOnLegacyLayout);
 
     mockedExistsSync.mockImplementation((p: any) => {
       const pathStr = n(String(p));
@@ -450,7 +471,7 @@ describe("detectSubAnalyses", () => {
       return [] as any;
     });
 
-    mockedStatSync.mockImplementation(() => ({ isDirectory: () => true } as any));
+    mockedStatSync.mockImplementation(statSyncOnLegacyLayout);
 
     mockedExistsSync.mockImplementation((p: any) => {
       const pathStr = n(String(p));
@@ -505,7 +526,7 @@ describe("detectSubAnalyses — git worktree exclusion", () => {
       return [] as any;
     });
 
-    mockedStatSync.mockImplementation(() => ({ isDirectory: () => true } as any));
+    mockedStatSync.mockImplementation(statSyncOnLegacyLayout);
 
     const svDirs = new Set([WT, REX, claudeWt].map((d) => path.join(d, ".sourcevision")));
     mockedExistsSync.mockImplementation((p: any) => {

@@ -2,8 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { join } from "node:path";
-import { resolveStore, resolveRemoteStore, SyncEngine, ensureLegacyPrdMigrated, openClaimsStore, resolveClaimHolder } from "../store/index.js";
-import { REX_DIR, TOOL_VERSION } from "./commands/constants.js";
+import { resolveStore, resolveRemoteStore, SyncEngine, ensureLegacyPrdMigrated, openClaimsStore, resolveClaimHolder, resolveRexPaths, PRD_TREE_DIRNAME } from "../store/index.js";
+import { TOOL_VERSION } from "./commands/constants.js";
 import { getAllLevels } from "../schema/index.js";
 import { formatMigrationBanner, getMigrationMcpWarning } from "./migration-notification.js";
 import {
@@ -46,7 +46,7 @@ import {
  * ```
  */
 export async function createRexMcpServer(dir: string): Promise<McpServer> {
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before any PRD operations
   const migrationResult = await ensureLegacyPrdMigrated(dir);
@@ -54,6 +54,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
     const banner = formatMigrationBanner(
       migrationResult.backupPath ?? "(unknown)",
       migrationResult.itemCount ?? 0,
+      migrationResult.folderTreePath ?? PRD_TREE_DIRNAME,
     );
     console.error(banner);
   }

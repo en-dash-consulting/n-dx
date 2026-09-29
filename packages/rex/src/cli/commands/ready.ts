@@ -6,11 +6,10 @@
  */
 
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { evaluateReady, applyReadyMarking } from "../../core/ready.js";
 import type { ReadyEvaluation, ReadyMarkOutcome } from "../../core/ready.js";
 import { findItem } from "../../core/tree.js";
-import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import { CLIError, requireRexDir } from "../errors.js";
 import { emitMigrationNotification } from "../migration-notification.js";
@@ -33,7 +32,7 @@ export async function cmdReady(
   }
   const migrationResult = await ensureLegacyPrdMigrated(dir);
   requireRexDir(dir);
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   await emitMigrationNotification(migrationResult, flags, (entry) => store.appendLog(entry));

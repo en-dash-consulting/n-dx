@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import { cmdInit } from "../../src/cli/commands/init.js";
 import { cmdAdd } from "../../src/cli/commands/add.js";
 import { resolveStore } from "../../src/store/index.js";
-import { REX_DIR } from "../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../src/store/index.js";
 import {
   stripHashSuffix,
   detectHashSuffixDuplicates,
@@ -60,7 +60,7 @@ vi.mock("../../src/analyze/dedupe.js", async (importOriginal) => {
 async function setupDir(): Promise<{ tmpDir: string; rexDir: string }> {
   const tmpDir = await mkdtemp(join(tmpdir(), "rex-add-reshape-"));
   await cmdInit(tmpDir, {});
-  return { tmpDir, rexDir: join(tmpDir, REX_DIR) };
+  return { tmpDir, rexDir: resolveRexPaths(tmpDir).rexDir };
 }
 
 async function cleanup(tmpDir: string): Promise<void> {
@@ -175,11 +175,11 @@ describe("isReshapeInProgress", () => {
   afterEach(async () => { await cleanup(tmpDir); });
 
   it("returns false when lock file is absent", async () => {
-    expect(await isReshapeInProgress(join(tmpDir, REX_DIR))).toBe(false);
+    expect(await isReshapeInProgress(resolveRexPaths(tmpDir).rexDir)).toBe(false);
   });
 
   it("returns false when lock file contains dead PID", async () => {
-    const rexDir = join(tmpDir, REX_DIR);
+    const rexDir = resolveRexPaths(tmpDir).rexDir;
     // Use PID 1 on non-root — sending signal 0 to PID 1 typically succeeds
     // (init is always running). Use a PID that is almost certainly not running:
     // a large number unlikely to be a running process.
@@ -192,7 +192,7 @@ describe("isReshapeInProgress", () => {
   });
 
   it("returns true when lock file contains current PID", async () => {
-    const rexDir = join(tmpDir, REX_DIR);
+    const rexDir = resolveRexPaths(tmpDir).rexDir;
     await writeFile(join(rexDir, RESHAPE_LOCK_FILENAME), encodeReshapeLock());
     expect(await isReshapeInProgress(rexDir)).toBe(true);
   });

@@ -10,6 +10,7 @@ import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from
 import { isItemLevel } from "../schema/index.js";
 import { join } from "node:path";
 import { resolveDir } from "./resolve-dir.js";
+import { resolveRexPaths } from "../store/index.js";
 
 suppressKnownDeprecations();
 
@@ -18,8 +19,7 @@ async function postWriteHealthWarning(dir: string, isJson: boolean): Promise<voi
   try {
     const { warnOnStructureDegradation } = await import("./commands/health-warning.js");
     const { resolveStore } = await import("../store/index.js");
-    const REX_DIR = ".rex";
-    const store = await resolveStore(join(dir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(dir).rexDir);
     await warnOnStructureDegradation(store, isJson);
   } catch {
     // Non-fatal

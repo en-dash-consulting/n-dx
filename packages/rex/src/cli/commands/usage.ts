@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { CLIError, PROJECT_DIRS, info, result, warn } from "@n-dx/llm-client";
+import { CLIError, info, result, warn } from "@n-dx/llm-client";
 import {
   aggregateTokenUsage,
   estimateCost,
@@ -20,6 +20,7 @@ import type {
   TimePeriod,
   PeriodBucket,
 } from "../../core/token-usage.js";
+import { resolveRexPaths } from "../../store/index.js";
 
 const VALID_FORMATS = ["json", "tree"] as const;
 const VALID_GROUPS: TimePeriod[] = ["day", "week", "month"];
@@ -159,7 +160,7 @@ export async function cmdUsage(
     );
   }
 
-  const rexDir = join(dir, PROJECT_DIRS.REX);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   // Build time filter
   const tokenFilter: TokenUsageFilter = {};

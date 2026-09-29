@@ -13,7 +13,7 @@
  * the standalone skill script.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
 import { join, basename, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import type {
@@ -421,9 +421,31 @@ export function balancedChildren(zone: Zone): Array<{ id: string; name: string; 
   return kids.map((k) => ({ id: k.id, name: k.name, files: k.files.length }));
 }
 
+/**
+ * The analysis directory for a project root, on either folder layout.
+ *
+ * A hand-written twin of `resolveLayout(root).sourcevisionDir`. This module
+ * bundles into the standalone skill script and may import nothing but `node:`
+ * builtins (see the module header), so it cannot reach the resolver in
+ * `@n-dx/llm-client` — the same constraint that gives `packages/core/layout.js`
+ * its own copy. `tests/integration/layout-resolver-contract.test.js` pins this
+ * to the canonical implementation, because a third copy of a rule drifts just
+ * as silently as a second one.
+ */
+export function analysisDirFor(root: string): string {
+  const container = join(root, ".ndx");
+  let containerIsDir = false;
+  try {
+    containerIsDir = statSync(container).isDirectory();
+  } catch {
+    containerIsDir = false;
+  }
+  return containerIsDir ? join(container, "sourcevision") : join(root, ".sourcevision");
+}
+
 /** Whether a directory holds a usable analysis. */
 export function hasSourcevision(root: string): boolean {
-  const svDir = join(root, ".sourcevision");
+  const svDir = analysisDirFor(root);
   return existsSync(svDir) && REQUIRED_FILES.every((f) => existsSync(join(svDir, f)));
 }
 
@@ -436,7 +458,7 @@ function readJson<T>(path: string): T | null {
 }
 
 export function loadFromSourcevision(root: string, options: LoadOptions = {}): IsoModelInput | null {
-  const svDir = join(root, ".sourcevision");
+  const svDir = analysisDirFor(root);
   if (!hasSourcevision(root)) return null;
 
   const zonesData = readJson<Zones>(join(svDir, "zones.json"));

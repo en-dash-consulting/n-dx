@@ -28,7 +28,7 @@ import { tmpdir } from "node:os";
 import { cmdInit } from "../../src/cli/commands/init.js";
 import { cmdImportBundle } from "../../src/cli/commands/import-bundle.js";
 import { resolveStore } from "../../src/store/index.js";
-import { REX_DIR } from "../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../src/store/index.js";
 import { SCHEMA_VERSION } from "../../src/schema/index.js";
 import type { PRDItem } from "../../src/schema/index.js";
 
@@ -95,7 +95,7 @@ describe("rex import-bundle --replace confirmation prompt", () => {
     projectDir = await mkdtemp(join(tmpdir(), "rex-replace-prompt-"));
     await cmdInit(projectDir, {});
 
-    const store = await resolveStore(join(projectDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(projectDir).rexDir);
     await store.withTransaction(async (doc) => {
       doc.items = nestedTree();
     });
@@ -171,13 +171,13 @@ describe("rex import-bundle --replace confirmation prompt", () => {
       cmdImportBundle(projectDir, { in: bundlePath, replace: "true" }),
     ).rejects.toThrow(/Replace declined/);
 
-    const store = await resolveStore(join(projectDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(projectDir).rexDir);
     const doc = await store.loadDocument();
     expect(doc.items.map((i) => i.title)).toEqual(["First Epic", "Second Epic"]);
   });
 
   it("says '1 item' rather than '1 items' for a single-item PRD", async () => {
-    const store = await resolveStore(join(projectDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(projectDir).rexDir);
     await store.withTransaction(async (doc) => {
       doc.items = [item("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "Only Epic", "epic")];
     });

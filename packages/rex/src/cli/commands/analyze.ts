@@ -6,9 +6,9 @@ import { randomUUID } from "node:crypto";
 // store/self-heal-tag.js directly: cli/commands/ has a capped bypass surface
 // (tests/integration/domain-layer-boundary.test.ts), and the barrel is already
 // on it, so this needs no new tracked exception.
-import { resolveStore, ensureLegacyPrdMigrated, withSelfHealTag } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, withSelfHealTag, resolveRexPaths } from "../../store/index.js";
 import { stampModified } from "../../core/sync.js";
-import { REX_DIR } from "./constants.js";
+
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { parseIntSafe } from "../validate-input.js";
@@ -115,7 +115,7 @@ export function formatTokenUsage(usage: AnalyzeTokenUsage): string {
 
 async function hasRexDir(dir: string): Promise<boolean> {
   try {
-    await access(join(dir, REX_DIR));
+    await access(resolveRexPaths(dir).rexDir);
     return true;
   } catch {
     return false;
@@ -154,12 +154,12 @@ function formatProposals(proposals: Proposal[], thresholdWeeks?: number): string
 }
 
 async function savePending(dir: string, proposals: Proposal[]): Promise<void> {
-  const filePath = join(dir, REX_DIR, PENDING_FILE);
+  const filePath = join(resolveRexPaths(dir).rexDir, PENDING_FILE);
   await atomicWriteJSON(filePath, proposals);
 }
 
 async function loadPending(dir: string): Promise<Proposal[] | null> {
-  const filePath = join(dir, REX_DIR, PENDING_FILE);
+  const filePath = join(resolveRexPaths(dir).rexDir, PENDING_FILE);
   try {
     const raw = await readFile(filePath, "utf-8");
     return JSON.parse(raw) as Proposal[];
@@ -170,7 +170,7 @@ async function loadPending(dir: string): Promise<Proposal[] | null> {
 
 async function clearPending(dir: string): Promise<void> {
   try {
-    await unlink(join(dir, REX_DIR, PENDING_FILE));
+    await unlink(join(resolveRexPaths(dir).rexDir, PENDING_FILE));
   } catch {
     // Already gone
   }
@@ -180,7 +180,7 @@ async function clearPending(dir: string): Promise<void> {
 async function writeSentinel(dir: string): Promise<void> {
   const { writeFile } = await import("node:fs/promises");
   await writeFile(
-    join(dir, REX_DIR, ACCEPT_SENTINEL),
+    join(resolveRexPaths(dir).rexDir, ACCEPT_SENTINEL),
     JSON.stringify({ startedAt: new Date().toISOString(), pid: process.pid }),
   );
 }
@@ -188,7 +188,7 @@ async function writeSentinel(dir: string): Promise<void> {
 /** Remove sentinel file after successful accept. */
 async function clearSentinel(dir: string): Promise<void> {
   try {
-    await unlink(join(dir, REX_DIR, ACCEPT_SENTINEL));
+    await unlink(join(resolveRexPaths(dir).rexDir, ACCEPT_SENTINEL));
   } catch {
     // Already gone
   }
@@ -200,7 +200,7 @@ async function clearSentinel(dir: string): Promise<void> {
  */
 async function checkSentinel(dir: string): Promise<boolean> {
   try {
-    await access(join(dir, REX_DIR, ACCEPT_SENTINEL));
+    await access(join(resolveRexPaths(dir).rexDir, ACCEPT_SENTINEL));
     return true;
   } catch {
     return false;
@@ -324,7 +324,7 @@ async function acceptProposals(
     return;
   }
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   // Write sentinel before starting — if we crash between here and
@@ -474,7 +474,7 @@ async function initLLMClients(
   noLlm: boolean,
   format: string | undefined,
 ): Promise<Awaited<ReturnType<typeof loadLLMConfig>>> {
-  const rexConfigDir = join(dir, REX_DIR);
+  const rexConfigDir = resolveRexPaths(dir).rexDir;
   const llmConfig = await loadLLMConfig(rexConfigDir);
   setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
@@ -502,7 +502,7 @@ async function resolveModel(dir: string, flagModel?: string): Promise<string | u
   if (flagModel) return flagModel;
   if (await hasRexDir(dir)) {
     try {
-      const rexDir = join(dir, REX_DIR);
+      const rexDir = resolveRexPaths(dir).rexDir;
       const store = await resolveStore(rexDir);
       const config = await store.loadConfig();
       const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
@@ -519,7 +519,7 @@ async function resolveModel(dir: string, flagModel?: string): Promise<string | u
 async function runBudgetPreflight(dir: string): Promise<void> {
   if (!(await hasRexDir(dir))) return;
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const budgetResult = await preflightBudgetCheck(rexDir, dir);
   if (!budgetResult) return;
 
@@ -555,7 +555,7 @@ async function replayCachedProposals(dir: string): Promise<boolean> {
 async function loadExistingItems(dir: string): Promise<PRDItem[]> {
   if (!(await hasRexDir(dir))) return [];
   try {
-    const rexDir = join(dir, REX_DIR);
+    const rexDir = resolveRexPaths(dir).rexDir;
     const store = await resolveStore(rexDir);
     const doc = await store.loadDocument();
     return doc.items;
@@ -661,7 +661,7 @@ function accumulateTokenUsage(
 async function loadLoEConfig(dir: string, noLlm: boolean): Promise<LoEConfig | undefined> {
   if (noLlm || !(await hasRexDir(dir))) return undefined;
   try {
-    const rexDir = join(dir, REX_DIR);
+    const rexDir = resolveRexPaths(dir).rexDir;
     const store = await resolveStore(rexDir);
     const config = await store.loadConfig();
     return config.loe;
@@ -771,7 +771,7 @@ async function logUsageAndCache(
   }
 
   if (await hasRexDir(dir)) {
-    const rexDir = join(dir, REX_DIR);
+    const rexDir = resolveRexPaths(dir).rexDir;
     const store = await resolveStore(rexDir);
 
     if (tokenUsage.calls > 0) {
@@ -888,7 +888,7 @@ async function runScannerMode(
 
     // Apply update candidates if --accept and we have a store
     if (accept && await hasRexDir(dir)) {
-      const rexDir = join(dir, REX_DIR);
+      const rexDir = resolveRexPaths(dir).rexDir;
       const store = await resolveStore(rexDir);
       let updatedCount = 0;
       for (const uc of updateCandidates) {
@@ -961,7 +961,7 @@ async function handleAcceptance(
     } else {
       // Log the rejection decision even when nothing was accepted
       if (await hasRexDir(dir)) {
-        const rexDir = join(dir, REX_DIR);
+        const rexDir = resolveRexPaths(dir).rexDir;
         const store = await resolveStore(rexDir);
         await store.appendLog({
           timestamp: new Date().toISOString(),

@@ -22,6 +22,18 @@ export function jsonToMarkdownFilename(jsonFilename: string): string {
 }
 
 /**
+ * Prefix carried by `sourceFile` attributions from the legacy PRD backends.
+ *
+ * Frozen, and deliberately not resolved through the layout: the flat `prd.md`
+ * and `prd.json` backends this names were only ever written under `.rex/`, and
+ * `ensureLegacyPrdMigrated` converts them to the folder tree before a project
+ * can be moved to `.ndx/`. It is a value in existing data, not a path this
+ * process constructs — rewriting it would orphan every attribution already
+ * recorded. `FileAdapter.deriveOwnerFile` strips the same prefix.
+ */
+export const LEGACY_SOURCE_FILE_PREFIX = ".rex/";
+
+/**
  * Repo-relative markdown source path for a PRD JSON filename.
  *
  * Example: `prd.json` → `.rex/prd.md`,
@@ -30,7 +42,7 @@ export function jsonToMarkdownFilename(jsonFilename: string): string {
  * Mirrors the value written into `sourceFile` when items are attributed.
  */
 export function toMarkdownSourcePath(jsonFilename: string): string {
-  return `.rex/${jsonToMarkdownFilename(jsonFilename)}`;
+  return `${LEGACY_SOURCE_FILE_PREFIX}${jsonToMarkdownFilename(jsonFilename)}`;
 }
 
 type MarkdownMigrationSkipReason = "markdown-exists" | "json-missing";

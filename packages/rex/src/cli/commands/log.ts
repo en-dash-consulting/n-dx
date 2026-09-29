@@ -15,11 +15,11 @@
  */
 
 import { join } from "node:path";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import { appendExecutionLogEntry } from "../../core/execution-log.js";
 import { CLIError, requireRexDir } from "../errors.js";
 import { result } from "../output.js";
-import { REX_DIR } from "./constants.js";
+
 
 /**
  * The `--item` value, or undefined when the flag was absent.
@@ -58,7 +58,7 @@ export async function cmdLog(
 
   const itemId = readItemId(flags);
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   const entry = await appendExecutionLogEntry(store, {

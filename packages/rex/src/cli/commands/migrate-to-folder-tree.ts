@@ -1,14 +1,13 @@
 import { join } from "node:path";
 import { readdir, readFile, stat, unlink } from "node:fs/promises";
 import { info, warn } from "../output.js";
-import { serializeFolderTree, parseFolderTree, TREE_META_FILENAME } from "../../store/index.js";
+import { serializeFolderTree, parseFolderTree, TREE_META_FILENAME, resolveRexPaths } from "../../store/index.js";
 import { parseDocument } from "../../store/markdown-parser.js";
 import { validateDocument } from "../../schema/validate.js";
 import { SCHEMA_VERSION } from "../../schema/index.js";
 import { walkTree } from "../../core/tree.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { CLIError } from "../errors.js";
-import { REX_DIR } from "./constants.js";
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
 import type { PRDDocument, PRDItem } from "../../schema/index.js";
 import type { PromptFn } from "./validate-interactive.js";
@@ -49,7 +48,7 @@ export async function cmdMigrateToFolderTree(
     throw new CLIError(message, suggestion);
   }
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
 
   const { doc, fromTree } = await loadSourceDocument(rexDir, treeRoot);

@@ -12,7 +12,8 @@ import {
   CLIError as BaseCLIError,
   type CLIErrorCode,
 } from "@n-dx/llm-client";
-import { SV_DIR } from "./commands/constants.js";
+
+import { resolveSourcevisionPaths } from "../paths.js";
 
 /**
  * Sourcevision CLI error — extends the foundation CLIError.
@@ -125,7 +126,7 @@ export function handleCLIError(err: unknown, debug = false): never {
  * Throws a CLIError with an init suggestion if missing.
  */
 export function requireSvDir(dir: string): void {
-  if (!existsSync(join(dir, SV_DIR))) {
+  if (!existsSync(resolveSourcevisionPaths(dir).svDir)) {
     throw new CLIError(
       `Sourcevision directory not found in ${dir}`,
       "Run 'n-dx init' to set up the project, or 'sourcevision init' if using sourcevision standalone.",

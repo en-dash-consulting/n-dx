@@ -1,9 +1,9 @@
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { access, readFile } from "node:fs/promises";
-import { PROJECT_DIRS } from "@n-dx/llm-client";
-import { resolveStore } from "../../store/index.js";
-import { REX_DIR } from "./constants.js";
+import { resolveLayout } from "@n-dx/llm-client";
+import { resolveStore, resolveRexPaths } from "../../store/index.js";
+
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { parseIntList } from "../parse-utils.js";
 import { info, result } from "../output.js";
@@ -206,7 +206,7 @@ export function parseSelectionIndices(input: string, total: number): number[] {
 
 async function detectSourceVision(dir: string): Promise<boolean> {
   try {
-    await access(join(dir, PROJECT_DIRS.SOURCEVISION));
+    await access(resolveLayout(dir).sourcevisionDir);
     return true;
   } catch {
     return false;
@@ -227,7 +227,7 @@ async function readFindings(
   dir: string,
   severities: string[],
 ): Promise<Finding[]> {
-  const zonesPath = join(dir, PROJECT_DIRS.SOURCEVISION, "zones.json");
+  const zonesPath = join(resolveLayout(dir).sourcevisionDir, "zones.json");
   const raw = await readFile(zonesPath, "utf-8");
   const data = JSON.parse(raw);
 
@@ -788,7 +788,7 @@ export async function cmdRecommend(
     return;
   }
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const ackStore = await loadAcknowledged(rexDir);
 
   // Handle --acknowledge flag

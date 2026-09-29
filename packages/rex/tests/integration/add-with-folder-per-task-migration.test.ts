@@ -13,7 +13,7 @@ import { cmdInit } from "../../src/cli/commands/init.js";
 import { cmdAdd } from "../../src/cli/commands/add.js";
 import { resolveStore } from "../../src/store/index.js";
 import { migrateToFolderPerTask } from "../../src/core/folder-per-task-migration.js";
-import { REX_DIR } from "../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../src/store/index.js";
 
 describe("add command with folder-per-task migration", () => {
   let tmpDir: string;
@@ -32,7 +32,7 @@ describe("add command with folder-per-task migration", () => {
   });
 
   it("is idempotent with conforming tree created via add commands", async () => {
-    const rexDir = join(tmpDir, REX_DIR);
+    const rexDir = resolveRexPaths(tmpDir).rexDir;
     const treeRoot = join(rexDir, "prd_tree");
 
     // Create a proper conforming tree structure using add command
@@ -80,7 +80,7 @@ describe("add command with folder-per-task migration", () => {
   });
 
   it("runs successfully multiple times to add items", async () => {
-    const rexDir = join(tmpDir, REX_DIR);
+    const rexDir = resolveRexPaths(tmpDir).rexDir;
 
     const store = await resolveStore(rexDir);
     const epicId = randomUUID();

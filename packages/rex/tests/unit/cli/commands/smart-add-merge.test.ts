@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { cmdInit } from "../../../../src/cli/commands/init.js";
 import { applyDuplicateProposalMerges } from "../../../../src/cli/commands/smart-add.js";
 import { resolveStore } from "../../../../src/store/index.js";
-import { REX_DIR } from "../../../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../../../src/store/index.js";
 import type { Proposal } from "../../../../src/analyze/index.js";
 import type { ProposalDuplicateMatch } from "../../../../src/cli/commands/smart-add-duplicates.js";
 
@@ -27,7 +27,7 @@ describe("applyDuplicateProposalMerges", () => {
   // the assertion at line 115. Re-enable when storage policy persists merge provenance
   // to the tree (or to a sibling metadata file).
   it.skip("updates matched existing task and records merged proposal provenance", async () => {
-    const store = await resolveStore(join(tmpDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(tmpDir).rexDir);
     await store.addItem({
       id: "epic-1",
       title: "Auth Platform",

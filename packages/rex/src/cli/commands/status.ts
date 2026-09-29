@@ -1,10 +1,10 @@
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { computeStats } from "../../core/stats.js";
 import { verify } from "../../core/verify.js";
 import { CLIError } from "../errors.js";
-import { REX_DIR } from "./constants.js";
+
 import { result, isQuiet } from "../output.js";
 import { emitMigrationNotification } from "../migration-notification.js";
 import type { PRDItem } from "../../schema/index.js";
@@ -130,7 +130,7 @@ export async function cmdStatus(
     );
   }
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   // Emit migration notification to CLI and execution log

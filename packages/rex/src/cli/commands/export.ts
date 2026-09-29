@@ -26,14 +26,13 @@ import {
   resolveGitBranch,
   slugifyTitle,
   resolveSiblingSlugs,
-} from "../../store/index.js";
+ resolveRexPaths } from "../../store/index.js";
 import { atomicWrite, atomicWriteJSON } from "../../store/atomic-write.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
 import { buildBundle, countItems, scopeItems } from "../../core/prd-bundle.js";
 import type { ScopedSelection } from "../../core/prd-bundle.js";
 import { renderNarrative } from "../../core/prd-narrative.js";
 import type { PRDDocument, PRDItem } from "../../schema/index.js";
-import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { result, info, warn } from "../output.js";
 
@@ -150,13 +149,17 @@ export function resolveItemRef(items: PRDItem[], ref: string): ItemRefMatch[] {
  * every rex command. Nothing is ever legitimately exported into `.rex/`.
  */
 function assertOutsideRexDir(outPath: string, dir: string, noun: string, example: string): void {
-  const rexRoot = join(dir, REX_DIR);
+  const rexRoot = resolveRexPaths(dir).rexDir;
   const rel = relative(rexRoot, outPath);
   const inside = rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
   if (inside) {
+    // Named as the operator would see it in a listing — `.rex` or `.ndx/rex`
+    // depending on the layout, rather than a fixed string that is wrong on one
+    // of them.
+    const label = relative(dir, rexRoot).replaceAll("\\", "/");
     throw new CLIError(
-      `Refusing to write a ${noun} inside ${REX_DIR}/.`,
-      `${REX_DIR}/ is PRD storage — pick a path outside it, e.g. --out=${example}`,
+      `Refusing to write a ${noun} inside ${label}/.`,
+      `${label}/ is PRD storage — pick a path outside it, e.g. --out=${example}`,
     );
   }
 }
@@ -188,7 +191,7 @@ export async function cmdExport(dir: string, flags: Record<string, string>): Pro
     narrative ? "./prd.md" : "./prd-bundle.json",
   );
 
-  const store = await resolveStore(join(dir, REX_DIR));
+  const store = await resolveStore(resolveRexPaths(dir).rexDir);
 
   // Loaded under the PRD lock. The tree is written file-by-file, so an
   // unlocked read racing a writer can capture a mixed state — and unlike a
@@ -196,7 +199,7 @@ export async function cmdExport(dir: string, flags: Record<string, string>): Pro
   // later import. Read-only span, so this must never be withTransaction,
   // which rewrites the tree on the way out. The lock file lives in rexDir,
   // which may not exist on a project that was never initialised.
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   await mkdir(rexDir, { recursive: true });
   const doc = await withLock(prdLockPath(rexDir), () => store.loadDocument());
 

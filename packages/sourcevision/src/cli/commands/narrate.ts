@@ -13,10 +13,9 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import type { Finding, Manifest, NarrationState, Zone, Zones } from "../../schema/index.js";
 import { DATA_FILES, readManifest, writeManifest, toCanonicalJSON, deduplicateFindings, enforceSeverityRules } from "../sourcevision-core.js";
-import { SV_DIR } from "./constants.js";
 import { narrateZones } from "../../analyzers/enrich-multiplex.js";
 import { nameZonesBySelection } from "../../analyzers/zone-naming.js";
 import { routeLayoutFor } from "../../analyzers/route-convention.js";
@@ -32,9 +31,23 @@ import type { AnalyzeContext } from "./analyze-phases.js";
 import { emptyAnalyzeTokenUsage } from "../../analyzers/token-usage.js";
 import { info } from "../output.js";
 import { dim, bold, warn } from "@n-dx/llm-client";
+import { resolveSourcevisionPaths } from "../../paths.js";
 
-/** Relative to the project root; the detached narrator's stdio goes here. */
-export const NARRATION_LOG = `${SV_DIR}/.cache/narration.log`;
+/** Basename of the detached narrator's stdio log inside the analysis cache. */
+export const NARRATION_LOG_FILENAME = "narration.log";
+
+/**
+ * Where the detached narrator's stdio goes, relative to the project root.
+ *
+ * Project-relative because the value is written to `manifest.narration.log` and
+ * printed for the operator to `tail`; posix-separated so the manifest reads the
+ * same on every platform. Takes a root because the analysis directory's own
+ * location depends on the folder layout.
+ */
+export function narrationLogPath(root: string): string {
+  const absolute = join(resolveSourcevisionPaths(root).cacheDir, NARRATION_LOG_FILENAME);
+  return relative(root, absolute).replaceAll("\\", "/");
+}
 
 /**
  * The pieces of `analyze` the narrator reuses. Injected rather than imported
@@ -203,7 +216,7 @@ function setNarration(absDir: string, patch: Partial<NarrationState>): void {
 
 export async function cmdNarrate(targetDir: string, opts: NarrateOptions): Promise<void> {
   const absDir = resolve(targetDir);
-  const svDir = join(absDir, SV_DIR);
+  const svDir = resolveSourcevisionPaths(absDir).svDir;
   const manifestPath = join(svDir, DATA_FILES.manifest);
   if (!existsSync(manifestPath) || !existsSync(join(svDir, DATA_FILES.zones))) {
     warn(`  [narrate] nothing to narrate — run 'sv analyze' first (${dim(svDir)})`);
