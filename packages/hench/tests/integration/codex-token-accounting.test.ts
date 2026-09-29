@@ -165,11 +165,25 @@ describe("codex token accounting integration", () => {
 
     expect(result.run.status).toBe("budget_exceeded");
     expect(result.run.tokenUsage).toEqual({ input: 110, output: 40 });
+    // `cacheProvenance: "unavailable"` is the point of the next assertion too:
+    // this fixture's payloads carry no cache keys, so the zero below is a
+    // vendor that said nothing rather than one that cached nothing.
     expect(result.run.turnTokenUsage).toEqual([
-      { turn: 1, input: 40, output: 10, vendor: "codex", model: "sonnet", diagnosticStatus: "complete" },
-      { turn: 1, input: 70, output: 30, vendor: "codex", model: "sonnet", diagnosticStatus: "complete" },
+      { turn: 1, input: 40, output: 10, vendor: "codex", model: "sonnet", diagnosticStatus: "complete", cacheProvenance: "unavailable" },
+      { turn: 1, input: 70, output: 30, vendor: "codex", model: "sonnet", diagnosticStatus: "complete", cacheProvenance: "unavailable" },
     ]);
-    // Codex reports no cache classes, so counted total == input + output.
+    // Every run says which strategy it ran under and why, even one that never
+    // consulted a cache: Codex's CLI cannot resume a session by id, so the
+    // default fork strategy degrades to cold — which is a different fact from
+    // cold having been configured, and the reason is what tells them apart.
+    expect(result.run.session).toEqual({
+      strategy: "cold",
+      outcome: "miss",
+      reason: "fork-unsupported",
+    });
+    expect(result.run.tokens?.cachedProvenance).toBe("unavailable");
+
+    // Codex reports no cache classes here, so counted total == input + output.
     expect(result.run.error).toContain("150 of 130 (uncached input + cache writes + output)");
 
     const afterRuns = await listRuns(henchDir);

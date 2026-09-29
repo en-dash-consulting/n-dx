@@ -53,6 +53,7 @@ import { ProcessLimiter } from "../../process/limiter.js";
 import { MemoryThrottle } from "../../process/memory-throttle.js";
 import { checkQuotaRemaining, formatQuotaLog } from "../../quota/index.js";
 import { formatTokenReport } from "../token-logging.js";
+import { formatSessionDecision } from "../session-report.js";
 
 // ---------------------------------------------------------------------------
 // Attempt tracking (per-task within a single run invocation)
@@ -1245,7 +1246,8 @@ async function runOne(
   }
 
   info(`Turns: ${run.turns}`);
-  info(formatTokenReport(run.tokenUsage));
+  info(formatTokenReport(run.tokenUsage, run.tokens?.cachedProvenance));
+  if (run.session) info(formatSessionDecision(run.session));
   info(`Tool calls: ${run.toolCalls.length}`);
 
   // Memory stats

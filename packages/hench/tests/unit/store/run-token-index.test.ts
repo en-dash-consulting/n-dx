@@ -55,10 +55,17 @@ describe("run-token-index", () => {
       await saveRun(henchDir, run);
 
       // In-memory record is mutated so concurrent readers see the same value.
-      expect(run.tokens).toEqual({ input: 100, output: 50, cached: 30, total: 180 });
+      // `cachedProvenance` is "unavailable" because the fixture records no
+      // per-turn usage — the cache figure is real but nothing says the vendor
+      // reported it, and the tuple declines to claim otherwise.
+      expect(run.tokens).toEqual({
+        input: 100, output: 50, cached: 30, total: 180, cachedProvenance: "unavailable",
+      });
 
       const loaded = await loadRun(henchDir, "r1");
-      expect(loaded.tokens).toEqual({ input: 100, output: 50, cached: 30, total: 180 });
+      expect(loaded.tokens).toEqual({
+        input: 100, output: 50, cached: 30, total: 180, cachedProvenance: "unavailable",
+      });
     });
   });
 
@@ -80,7 +87,9 @@ describe("run-token-index", () => {
       expect(tuples[0]).toEqual({
         runId: "r-task",
         itemId: "task-1",
-        tokens: { input: 100, output: 50, cached: 30, total: 180 },
+        tokens: {
+          input: 100, output: 50, cached: 30, total: 180, cachedProvenance: "unavailable",
+        },
         status: "completed",
         finishedAt: "2026-04-23T00:01:00.000Z",
       });
@@ -103,7 +112,9 @@ describe("run-token-index", () => {
 
       expect(tuples).toHaveLength(1);
       expect(tuples[0].itemId).toBe("subtask-xyz");
-      expect(tuples[0].tokens).toEqual({ input: 40, output: 10, cached: 0, total: 50 });
+      expect(tuples[0].tokens).toEqual({
+        input: 40, output: 10, cached: 0, total: 50, cachedProvenance: "unavailable",
+      });
     });
   });
 
@@ -134,7 +145,9 @@ describe("run-token-index", () => {
       expect(tuples[0]).toEqual({
         runId: "r-aborted",
         itemId: "task-aborted",
-        tokens: { input: 500, output: 200, cached: 200, total: 900 },
+        tokens: {
+          input: 500, output: 200, cached: 200, total: 900, cachedProvenance: "unavailable",
+        },
         status: "cancelled",
         finishedAt: "2026-04-23T00:05:00.000Z",
       });
@@ -182,7 +195,9 @@ describe("run-token-index", () => {
 
       const tuples = await listCompletedRunTokens(henchDir);
       expect(tuples).toHaveLength(1);
-      expect(tuples[0].tokens).toEqual({ input: 0, output: 0, cached: 0, total: 0 });
+      expect(tuples[0].tokens).toEqual({
+        input: 0, output: 0, cached: 0, total: 0, cachedProvenance: "unavailable",
+      });
     });
   });
 
@@ -197,7 +212,9 @@ describe("run-token-index", () => {
       delete (legacy as { tokens?: unknown }).tokens;
 
       const tuple = runTokenTupleFromRecord(legacy);
-      expect(tuple.tokens).toEqual({ input: 7, output: 3, cached: 5, total: 15 });
+      expect(tuple.tokens).toEqual({
+        input: 7, output: 3, cached: 5, total: 15, cachedProvenance: "unavailable",
+      });
     });
   });
 
@@ -208,6 +225,7 @@ describe("run-token-index", () => {
         output: 0,
         cached: 0,
         total: 0,
+        cachedProvenance: "unavailable",
       });
     });
 
@@ -219,7 +237,25 @@ describe("run-token-index", () => {
           cacheCreationInput: 3,
           cacheReadInput: 4,
         }),
-      ).toEqual({ input: 1, output: 2, cached: 7, total: 10 });
+      ).toEqual({
+        input: 1, output: 2, cached: 7, total: 10, cachedProvenance: "unavailable",
+      });
+    });
+
+    it("reports the strongest provenance any turn recorded", () => {
+      const usage = { input: 1, output: 2, cacheReadInput: 4 };
+      const turn = (cacheProvenance?: "measured" | "estimated" | "unavailable") =>
+        ({ turn: 1, input: 1, output: 2, cacheProvenance });
+
+      expect(normalizeRunTokens(usage, [turn("unavailable"), turn("measured")]).cachedProvenance)
+        .toBe("measured");
+      expect(normalizeRunTokens(usage, [turn("unavailable"), turn("estimated")]).cachedProvenance)
+        .toBe("estimated");
+      expect(normalizeRunTokens(usage, [turn("unavailable")]).cachedProvenance)
+        .toBe("unavailable");
+      // A turn written before the field existed is not a measurement.
+      expect(normalizeRunTokens(usage, [turn(undefined)]).cachedProvenance)
+        .toBe("unavailable");
     });
   });
 

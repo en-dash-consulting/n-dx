@@ -42,6 +42,7 @@ export function usage(): void {
           { name: "status [dir]", description: "Show recent run history" },
           { name: "show <run-id> [dir]", description: "Show full details of a specific run" },
           { name: "review pending <run-id>", description: "List findings an autonomous review deferred for capture" },
+          { name: "cache [subcommand]", description: "Inspect or clear the session cache (list, clear)" },
           { name: "validate-tokens [dir]", description: "Validate Codex token reporting accuracy" },
         ],
       },
