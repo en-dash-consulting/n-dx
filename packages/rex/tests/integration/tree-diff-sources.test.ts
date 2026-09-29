@@ -225,11 +225,28 @@ describe("tree-diff against git refs", () => {
 
   it("leaves the caller's index and working tree untouched", async () => {
     // GIT_INDEX_FILE is what keeps `git checkout -- <path>` from staging the
-    // ref's version of every PRD file. Without it this reads as a huge
-    // staged diff the operator never asked for.
+    // ref's version of every PRD file into the caller's real index. Without
+    // it, `git commit` straight after a diff would commit the *baseline*
+    // tree — 1,750 files on this repository.
+    //
+    // The ref being read has to differ from HEAD for this to prove anything.
+    // Staging a blob the index already holds is a no-op that `git status`
+    // cannot see, so an earlier version of this test — which read HEAD's own
+    // tree — passed with the guard deleted. Here HEAD is `after()` and the
+    // ref read is `before()`, so an unredirected index write shows up as
+    // `M .rex/prd_tree/...`.
+    writePRD(dir, after());
+    commitAll(dir, "restructure");
+
     const statusBefore = git(dir, "status", "--porcelain");
-    await runJson(dir, { from: firstSha, to: secondSha });
+    expect(statusBefore).toBe("");
+
+    await runJson(dir, { from: secondSha, to: "HEAD" });
+
     expect(git(dir, "status", "--porcelain")).toBe(statusBefore);
+    // Belt and braces: the index must still agree with HEAD, which is the
+    // thing `git status` would report as staged if it did not.
+    expect(git(dir, "diff", "--cached", "--name-only")).toBe("");
   });
 
   it("refuses an unknown ref by name instead of diffing against nothing", async () => {
