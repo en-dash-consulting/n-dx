@@ -347,13 +347,16 @@ describe("branch-work-collector", () => {
 
     it("reports the base branch rex actually diffed against, not a local guess", async () => {
       await setupGitRepo(tmpDir, "feature/from-master", "master");
-      // rex's own default resolution landed on "master" — simulated here since
-      // there is no real rex/git-remote setup backing this fake.
-      const rex = fakeRex(TREE, [], { baseBranch: "master" });
+      // "origin/trunk" is deliberately a label `detectBaseBranch` can never
+      // produce — it only ever answers "main" or "master". A label the local
+      // guess could also have produced would let this assertion pass with the
+      // `baseBranch = diffed.baseBranch` assignment deleted, which is exactly
+      // the hole a mutation of that line proved: the whole suite stayed green.
+      const rex = fakeRex(TREE, [], { baseBranch: "origin/trunk" });
 
       const result = await collectBranchWork({ dir: tmpDir, rex });
 
-      expect(result.baseBranch).toBe("master");
+      expect(result.baseBranch).toBe("origin/trunk");
       expect(rex.calls[0].baseBranch).toBeUndefined();
     });
 

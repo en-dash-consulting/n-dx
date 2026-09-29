@@ -335,12 +335,21 @@ function resolveScope(doc: PRDDocument, scope: string): ItemRefMatch {
 /**
  * The `--item` value, or undefined when the flag was absent.
  *
- * A valueless `--item` is an error rather than a no-op. The parser turns a
- * bare flag into the string `"true"`, so `--item my-epic` (space-separated)
- * arrives here as `"true"` with `my-epic` swallowed as the project directory.
- * Silently rendering the whole PRD at that point would hand the operator a
- * thousand items when they asked for one, and they would have no reason to
- * look twice at a document that was produced without complaint.
+ * A valueless `--item` is an error rather than a no-op: silently rendering
+ * the whole PRD would hand the operator a thousand items when they asked for
+ * one, and they would have no reason to look twice at a document that was
+ * produced without complaint.
+ *
+ * **This guard is narrower than it used to be.** `item` was deliberately not
+ * a VALUE_KEY, so the parser turned every bare `--item` into `"true"` and
+ * this caught the whole space-separated family. `item` is now a VALUE_KEY (so
+ * `rex ready --item <id>` parses), so `--item <token>` consumes the next
+ * token and only reaches here as `"true"` when `--item` is last or is
+ * followed by another flag. `--item <dir>` now resolves the directory as a
+ * scope and fails in `resolveScope` with "No PRD item matches" instead —
+ * still refused, but by a different message. Note that `ndx prd export`
+ * refuses the space form ahead of rex, in core's `PRD_VALUE_FLAGS`, so the
+ * two surfaces no longer agree on this flag's shape.
  */
 function readScope(flags: Record<string, string>): string | undefined {
   const raw = flags.item;
@@ -349,7 +358,7 @@ function readScope(flags: Record<string, string>): string | undefined {
   if (trimmed === "" || trimmed === "true") {
     throw new CLIError(
       "--item needs a value.",
-      "Write it as --item=<id-or-slug>; the space-separated form is not supported.",
+      "Write it as --item=<id-or-slug>.",
     );
   }
   return trimmed;

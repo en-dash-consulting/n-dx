@@ -24,16 +24,24 @@ import { result } from "../output.js";
 /**
  * The `--item` value, or undefined when the flag was absent.
  *
- * A valueless `--item` is an error rather than a no-op. `item` is not a
- * VALUE_KEY (adding it swallows the trailing `[dir]` of `rex export --item
- * <dir>`, which that command's own test pins), so the parser turns a bare
- * flag into the string `"true"` and `rex log task_done --item abc123 .`
- * arrives here as `"true"` with `abc123` dropped. Logging that silently
+ * A valueless `--item` is an error rather than a no-op: logging one silently
  * writes an audit entry against an item id that does not exist, prints
- * "Logged: task_done (item true)", and exits 0 — the caller is told the
- * attribution succeeded when their id was discarded.
+ * "Logged: task_done (item …)", and exits 0 — the caller is told the
+ * attribution succeeded when their id was never read.
  *
- * `rex export` refuses the same shape for the same reason; see
+ * **This guard is narrower than it used to be.** `item` was deliberately not
+ * a VALUE_KEY, so the parser turned *every* bare `--item` into the string
+ * `"true"` and this check caught the whole space-separated family. `item` is
+ * now a VALUE_KEY (so `rex ready --item <id>` parses), which means
+ * `--item <token>` consumes the next token as its value and only reaches here
+ * as `"true"` when `--item` is last or is followed by another flag. The
+ * uncaught case is `rex log <event> --item <dir>` — the trailing directory is
+ * swallowed as the id and an entry naming a filesystem path is persisted.
+ * Closing that needs a decision about where validation belongs, since the
+ * `append_log` MCP tool shares `appendExecutionLogEntry` and does not
+ * validate either; see the note on that divergence in this module's header.
+ *
+ * `rex export` carries the same narrowed guard; see
  * `commands/export.ts#readScope`.
  */
 function readItemId(flags: Record<string, string>): string | undefined {
@@ -43,7 +51,7 @@ function readItemId(flags: Record<string, string>): string | undefined {
   if (trimmed === "" || trimmed === "true") {
     throw new CLIError(
       "--item needs a value.",
-      "Write it as --item=<id>; the space-separated form is not supported.",
+      "Write it as --item=<id>.",
     );
   }
   return trimmed;
