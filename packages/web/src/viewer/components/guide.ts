@@ -145,6 +145,20 @@ const GUIDE_CONTENT: Partial<Record<ViewId, { description: string; lookFor: stri
   },
 };
 
+/**
+ * The views that have guide prose of their own. Everything else falls back to
+ * `overview`, and is titled "Overview" to match the text it shows.
+ *
+ * Exported so a test can tell the two cases apart: an assertion that accepts
+ * *either* the view's label or "Overview" for every view passes just as well
+ * when every title is hardcoded to "Overview", which is no assertion at all.
+ */
+export const GUIDE_VIEWS: ReadonlySet<ViewId> = new Set(
+  // Truthiness, not key presence, so the set cannot disagree with the lookup
+  // below about an entry explicitly written as `undefined`.
+  Object.entries(GUIDE_CONTENT).filter(([, prose]) => prose).map(([view]) => view as ViewId),
+);
+
 export function Guide({ view }: GuideProps) {
   const [open, setOpen] = useState(false);
   // Title and prose are taken for the same view, so a page without its own

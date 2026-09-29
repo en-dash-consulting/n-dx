@@ -33,7 +33,7 @@ import {
   type StageId,
 } from "../../../src/viewer/views/index.js";
 import { Breadcrumb } from "../../../src/viewer/components/breadcrumb.js";
-import { Guide } from "../../../src/viewer/components/guide.js";
+import { Guide, GUIDE_VIEWS } from "../../../src/viewer/components/guide.js";
 import { TopNav } from "../../../src/viewer/components/top-nav.js";
 import { SettingsOverlay } from "../../../src/viewer/components/settings-overlay.js";
 import { HomeView, StagePage } from "../../../src/viewer/views/stage-pages.js";
@@ -214,6 +214,31 @@ describe("rendered surfaces take their labels from the model", () => {
     expect(wrong).toEqual([]);
   });
 
+  it("survives a view id the model has never heard of", async () => {
+    // The crash-recovery banner restores a nav state read from localStorage
+    // with an unchecked cast and passes it to `navigateTo`, which does not
+    // check it against `validViews`. A key written by an older build, naming
+    // a view since removed, reaches the breadcrumb — and a blind lookup would
+    // throw through the render, blanking the dashboard during a crash
+    // recovery. The project segment survives; the view's own is dropped.
+    const onError = vi.fn();
+    window.addEventListener("error", onError);
+    act(() => {
+      render(h(Breadcrumb, { view: "a-view-that-was-removed" as ViewId, navigateTo: () => {} }), root);
+    });
+    await settle();
+    window.removeEventListener("error", onError);
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(root.querySelector(".breadcrumb")).not.toBeNull();
+    expect(root.querySelector(".breadcrumb-current")).toBeNull();
+    expect(root.textContent).toContain("demo");
+    // No view segment: the title keeps whatever else it has, but emits no
+    // "<label> — <product>" pair for a view the model cannot name.
+    expect(document.title).not.toContain("—");
+    expect(document.title).not.toContain("undefined");
+  });
+
   it("the top nav names each stage with the model's label", async () => {
     act(() => {
       render(h(TopNav, {
@@ -297,6 +322,14 @@ describe("rendered surfaces take their labels from the model", () => {
   });
 
   it("the guide is titled with the model's label, for every view", async () => {
+    // Split the two cases rather than accepting either. An assertion that took
+    // "the view's label OR Overview" for every view would pass with every
+    // title hardcoded to "Overview" — it has to be exact on each side.
+    const ownGuide = ALL_VIEWS.filter((v) => GUIDE_VIEWS.has(v));
+    const fallback = ALL_VIEWS.filter((v) => !GUIDE_VIEWS.has(v));
+    expect(ownGuide.filter((v) => v !== "overview").length).toBeGreaterThan(0);
+    expect(fallback.length).toBeGreaterThan(0);
+
     const wrong: string[] = [];
     for (const view of ALL_VIEWS) {
       act(() => { render(h(Guide, { view }), root); });
@@ -309,12 +342,10 @@ describe("rendered surfaces take their labels from the model", () => {
       // titled to match the text it shows rather than the page it was opened
       // from — a title that named the page would be labelling someone else's
       // explanation.
-      if (heading !== viewLabel(view) && heading !== viewLabel("overview")) {
-        wrong.push(`${view}: guide titled "${heading}"`);
+      const expected = GUIDE_VIEWS.has(view) ? viewLabel(view) : viewLabel("overview");
+      if (heading !== expected) {
+        wrong.push(`${view}: guide titled "${heading}", expected "${expected}"`);
       }
-      // Whatever it is titled, it is a label the model issued.
-      const known = ALL_VIEWS.some((v) => viewLabel(v) === heading);
-      if (!known) wrong.push(`${view}: guide title "${heading}" is in no model entry`);
 
       render(null, root);
     }

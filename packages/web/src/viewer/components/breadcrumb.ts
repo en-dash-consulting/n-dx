@@ -19,7 +19,8 @@ import { h } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import { useProjectMetadata, useCliName, resolveCliLabel } from "../hooks/index.js";
-import { stageForView, isStageId, stageProduct, viewLabel, viewProductLabel } from "../api.js";
+import { stageForView, isStageId, stageProduct, viewLabel, VIEW_META, PRODUCT_LABELS } from "../api.js";
+import type { ViewMeta } from "../api.js";
 import { buildValidViews } from "../external.js";
 import { WorkspaceSwitcher } from "./workspace-switcher.js";
 
@@ -59,11 +60,23 @@ export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
 
   // The current view's name, from the one navigation model — the same string
   // the top nav, the stage page and the settings overlay show for it.
-  const label = resolveCliLabel(viewLabel(view), cliName);
+  //
+  // Looked up rather than asserted: `view` is not always a live view id. The
+  // crash-recovery banner restores a navigation state read out of
+  // localStorage with an unchecked cast (`getJSON<SavedNavigationState>`) and
+  // hands it straight to `navigateTo`, which does not check it against
+  // `validViews` — so a key saved by an older build, naming a view since
+  // removed, lands here. Indexing it blind would throw during render and take
+  // the whole dashboard down at exactly the moment the user is recovering
+  // from a crash. An unknown view keeps the project segment and drops its
+  // own, which is what this rendered before the model existed.
+  const meta = VIEW_META[view] as ViewMeta | undefined;
+  const label = meta ? resolveCliLabel(meta.label, cliName) : null;
 
   // Keep document.title in sync with project + current view
   useEffect(() => {
-    const parts = [`${label} — ${viewProductLabel(view)}`];
+    const parts: string[] = [];
+    if (label && meta) parts.push(`${label} — ${PRODUCT_LABELS[meta.product]}`);
     if (project) parts.push(project.name);
     parts.push("n-dx");
     document.title = parts.join(" | ");
@@ -118,7 +131,9 @@ export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
         : null,
 
       // ── Segment 3: Current view (active, not a link) ──
-      h("li", { class: "breadcrumb-item breadcrumb-current", "aria-current": "page" }, label),
+      label
+        ? h("li", { class: "breadcrumb-item breadcrumb-current", "aria-current": "page" }, label)
+        : null,
     ),
   );
 }
