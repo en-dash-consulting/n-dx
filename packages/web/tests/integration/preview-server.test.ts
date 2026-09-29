@@ -222,7 +222,9 @@ describe("preview layout endpoint", () => {
     const { base, doc } = await serveDoc();
 
     // Two tabs saving at once shared one PID-named temp file: a rename could
-    // consume the other's file (ENOENT → 400) or publish its contents.
+    // consume the other's file (ENOENT → 400) or publish its contents. And on
+    // Windows, concurrent renames onto one target fail with EPERM/EBUSY, so
+    // the renames must be serialized too — this is where CI caught that.
     const layouts = Array.from({ length: 20 }, (_, i) => ({ nav: [{ id: `n${i}`, kind: "folder", label: `L${i}`, children: [] }] }));
     const responses = await Promise.all(layouts.map((layout) =>
       fetch(base + "/__preview/layout", {

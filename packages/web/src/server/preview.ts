@@ -258,18 +258,38 @@ function readBody(req: IncomingMessage, limit: number): Promise<string> {
 }
 
 /**
+ * Tail of the in-flight renames onto each layout path. Renames onto one target
+ * run one at a time: on Windows, a rename over a file that another rename is
+ * replacing at that moment fails with EPERM/EBUSY, so overlapping saves lost
+ * some of their writes there even with distinct temp files.
+ */
+const renameQueues = new Map<string, Promise<void>>();
+
+function serializedRename(from: string, to: string): Promise<void> {
+  const prev = renameQueues.get(to) ?? Promise.resolve();
+  const next = prev.then(() => rename(from, to));
+  // The queue must survive a failed rename, or every later save would fail too.
+  const tail = next.catch(() => {});
+  renameQueues.set(to, tail);
+  void tail.then(() => {
+    if (renameQueues.get(to) === tail) renameQueues.delete(to);
+  });
+  return next;
+}
+
+/**
  * Write via a temp file in the same directory, then rename — never a torn layout on disk.
  *
  * The temp name is unique per call, not per process: two tabs saving at once
  * would otherwise share one temp file, so one rename could consume the other's
  * file (ENOENT) or publish its contents. With distinct names each save is
- * whole and the last rename wins.
+ * whole, the renames are serialized per target, and the last one wins.
  */
 async function writeAtomic(path: string, contents: string): Promise<void> {
   const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
   try {
     await writeFile(tmp, contents, "utf-8");
-    await rename(tmp, path);
+    await serializedRename(tmp, path);
   } catch (err) {
     await unlink(tmp).catch(() => {});
     throw err;
