@@ -19,6 +19,7 @@ describe("hench CLI help", () => {
     "show",
     "config",
     "template",
+    "cache",
   ];
 
   it("returns true for all known commands", () => {
@@ -86,6 +87,15 @@ describe("hench CLI help", () => {
       const output = logSpy.mock.calls[0][0] as string;
       expect(output).toContain("--interactive");
       expect(output).toContain("Display all current settings");
+    });
+
+    it("cache help names both scopes and the clear flags", () => {
+      showCommandHelp("cache");
+      const output = logSpy.mock.calls[0][0] as string;
+      expect(output).toContain("--scope");
+      expect(output).toContain("--dead");
+      expect(output).toContain("parent");
+      expect(output).toContain("batch");
     });
 
     it("template help includes subcommands", () => {

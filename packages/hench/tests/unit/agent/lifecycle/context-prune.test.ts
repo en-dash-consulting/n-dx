@@ -1072,7 +1072,14 @@ describe("recordPruneUsage", () => {
     );
 
     expect(run.turnTokenUsage).toEqual([
-      { turn: 7, input: 4200, output: 310, vendor: "claude", model: "claude-haiku-light" },
+      {
+        turn: 7,
+        input: 4200,
+        output: 310,
+        vendor: "claude",
+        model: "claude-haiku-light",
+        cacheProvenance: "unavailable",
+      },
     ]);
   });
 

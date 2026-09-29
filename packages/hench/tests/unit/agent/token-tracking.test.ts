@@ -51,6 +51,9 @@ describe("processStreamLine token tracking", () => {
       input: 1000,
       output: 500,
       diagnosticStatus: "complete",
+      // Complete input/output and still no cache accounting — the two are
+      // independent, which is why they are separate fields.
+      cacheProvenance: "unavailable",
     });
   });
 
@@ -72,9 +75,55 @@ describe("processStreamLine token tracking", () => {
       input: 200,
       output: 100,
       diagnosticStatus: "complete",
+      cacheProvenance: "unavailable",
       vendor: "codex",
       model: "gpt-5-codex",
     });
+  });
+
+  it("marks a turn measured when the vendor reported cache accounting", () => {
+    const result = makeResult();
+    const counter = { value: 0 };
+
+    const event = JSON.stringify({
+      type: "assistant",
+      message: {
+        usage: {
+          input_tokens: 534,
+          output_tokens: 120,
+          cache_creation_input_tokens: 876,
+          cache_read_input_tokens: 34_100,
+        },
+      },
+    });
+
+    processStreamLine(event, result, counter);
+
+    expect(result.turnTokenUsage[0]).toMatchObject({
+      input: 534,
+      cacheCreationInput: 876,
+      cacheReadInput: 34_100,
+      cacheProvenance: "measured",
+    });
+  });
+
+  it("treats an explicit zero cache field as a measurement, not a silence", () => {
+    const result = makeResult();
+    const counter = { value: 0 };
+
+    const event = JSON.stringify({
+      type: "assistant",
+      message: {
+        usage: { input_tokens: 500, output_tokens: 20, cache_read_input_tokens: 0 },
+      },
+    });
+
+    processStreamLine(event, result, counter);
+
+    // Nothing was cached, and the vendor said so — a different fact from a
+    // vendor that never mentioned caching, which is what the field records.
+    expect(result.turnTokenUsage[0].cacheProvenance).toBe("measured");
+    expect(result.turnTokenUsage[0].cacheReadInput).toBeUndefined();
   });
 
   it("accumulates tokens across multiple turns", () => {
