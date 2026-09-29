@@ -33,4 +33,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [rex log and budget tuners](./rex-log-and-budget-tuners/index.md) | pending |
 | [Settings consolidation](./settings-consolidation/index.md) | pending |
 | [Test determinism](./test-determinism/index.md) | completed |
-| [Vendor-aware hench model and provider settings](./vendor-aware-hench-model-and-provider/index.md) | pending |
+| [Vendor-aware hench model and provider settings](./vendor-aware-hench-model-and-provider/index.md) | completed |
