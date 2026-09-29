@@ -176,6 +176,14 @@ export interface PrioritizationOptions {
    * into `completedIds`, this never makes a parent look finished.
    */
   excludeIds?: ReadonlySet<string>;
+  /**
+   * Restrict candidates to items whose `assignee` field exactly matches this
+   * identity string (`ndx work --mine`). When unset (the default), selection
+   * ignores `assignee` entirely — a tree with no `assignee` fields at all
+   * selects exactly as it always has, regardless of whether this option is
+   * passed.
+   */
+  assignee?: string;
 }
 
 /**
@@ -385,6 +393,11 @@ function filterByTags(entries: TreeEntry[], tags: string[]): TreeEntry[] {
   );
 }
 
+/** Filter entries to those whose `assignee` exactly matches. */
+function filterByAssignee(entries: TreeEntry[], assignee: string): TreeEntry[] {
+  return entries.filter((e) => e.item.assignee === assignee);
+}
+
 export function findActionableTasks(
   items: PRDItem[],
   completedIds: Set<string>,
@@ -400,6 +413,9 @@ export function findActionableTasks(
   let results = collectActionable(scope, completedIds);
   if (options?.tags?.length) {
     results = filterByTags(results, options.tags);
+  }
+  if (options?.assignee) {
+    results = filterByAssignee(results, options.assignee);
   }
   results = filterExcluded(results, options?.excludeIds);
   results.sort(makeComparator(items, options));
@@ -420,6 +436,9 @@ export function findNextTask(
   let results = collectActionable(scope, completedIds);
   if (options?.tags?.length) {
     results = filterByTags(results, options.tags);
+  }
+  if (options?.assignee) {
+    results = filterByAssignee(results, options.assignee);
   }
   results = filterExcluded(results, options?.excludeIds);
   if (results.length === 0) return null;

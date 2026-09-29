@@ -39,6 +39,11 @@ export interface AssembleBriefOptions {
   /** Only select tasks with at least one of these tags. */
   tags?: string[];
   /**
+   * Only select tasks whose `assignee` field matches this identity string
+   * (`ndx work --mine`).
+   */
+  assignee?: string;
+  /**
    * Project root directory — used to resolve the project's CLI command name
    * (`cli.name` in `.n-dx.json`) for prompt/brief injection. Defaults to
    * "n-dx" when omitted.
@@ -183,6 +188,7 @@ export async function assembleTaskBrief(
   const config = await store.loadConfig();
   const excludeIds = options?.excludeTaskIds;
   const tags = options?.tags?.length ? options.tags : undefined;
+  const assignee = options?.assignee;
   const cliName = options?.projectDir
     ? resolveProjectCliName(options.projectDir)
     : DEFAULT_CLI_NAME;
@@ -239,6 +245,7 @@ export async function assembleTaskBrief(
     for (let attempt = 0; attempt < MAX_CLAIM_ATTEMPTS; attempt++) {
       const selectOptions = {
         ...(tags ? { tags } : {}),
+        ...(assignee ? { assignee } : {}),
         ...(claimedElsewhere.size > 0 ? { excludeIds: claimedElsewhere } : {}),
       };
       let candidate: TreeEntry | null;
@@ -326,7 +333,9 @@ export async function assembleTaskBrief(
       event: e.event,
       detail: e.detail,
     })),
-    ...(tags ? { sessionFilters: { tags } } : {}),
+    ...(tags || assignee
+      ? { sessionFilters: { ...(tags ? { tags } : {}), ...(assignee ? { assignee } : {}) } }
+      : {}),
   };
 
   return { brief, taskId: entry.item.id };
@@ -472,10 +481,15 @@ export function formatTaskBrief(brief: TaskBrief): string {
     }
   }
 
-  // Session filters (e.g. self-heal tag constraint)
-  if (brief.sessionFilters?.tags?.length) {
+  // Session filters (e.g. self-heal tag constraint, --mine assignee constraint)
+  if (brief.sessionFilters?.tags?.length || brief.sessionFilters?.assignee) {
     sections.push(`\n## Session Filters`);
-    sections.push(`Active tag filter: ${brief.sessionFilters.tags.join(", ")} — only tasks with these tags are eligible for selection.`);
+    if (brief.sessionFilters.tags?.length) {
+      sections.push(`Active tag filter: ${brief.sessionFilters.tags.join(", ")} — only tasks with these tags are eligible for selection.`);
+    }
+    if (brief.sessionFilters.assignee) {
+      sections.push(`Active assignee filter: ${brief.sessionFilters.assignee} — only tasks assigned to this identity are eligible for selection.`);
+    }
   }
 
   // Project

@@ -305,6 +305,16 @@ export interface PRDItem {
   tags?: string[];
   source?: string;
   blockedBy?: string[];
+  /**
+   * Identity string of the person this item is assigned to, in the same
+   * "Name <email>" form `core/identity.ts` resolves for the current actor.
+   * Optional and round-trips through the folder tree via the generic
+   * unknown-field path (like `lastModifiedBy`); omitted entirely when unset.
+   * Never read by `findNextTask`/`findActionableTasks` unless a caller opts
+   * in via `PrioritizationOptions.assignee` (`ndx work --mine`) — a tree with
+   * no `assignee` fields at all selects exactly as it always has.
+   */
+  assignee?: string;
   /** Structured requirements associated with this item. */
   requirements?: Requirement[];
   /**

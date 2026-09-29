@@ -287,6 +287,10 @@ export {
 } from "./core/next-task.js";
 export type { SelectionExplanation, SelectionReasonCode, TaskMatch, PrioritizationOptions, RiskTolerance } from "./core/next-task.js";
 
+// ---- Core: identity -----------------------------------------------------------
+
+export { resolveActor } from "./core/identity.js";
+
 // ---- Core: keywords ---------------------------------------------------------
 
 export { extractKeywords, scoreMatch } from "./core/keywords.js";

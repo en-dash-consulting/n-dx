@@ -44,6 +44,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--task=<id>", description: "Target a specific Rex task ID" },
       { flag: "--epic=<id|title>", description: "Only consider tasks within the specified epic" },
       { flag: "--epic-by-epic", description: "Process epics sequentially, advancing when done" },
+      { flag: "--mine", description: "Only autoselect tasks whose assignee matches the current user (resolved from git identity, like lastModifiedBy). An explicit --task bypasses this. Not supported with --epic-by-epic." },
       { flag: "--auto", description: "Skip interactive selection, autoselect by priority" },
       { flag: "--iterations=<n>", description: "Run multiple tasks sequentially (e.g. --iterations=5)" },
       { flag: "--loop", description: "Run continuously until all tasks complete or Ctrl+C" },

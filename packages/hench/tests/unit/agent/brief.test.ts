@@ -896,6 +896,81 @@ describe("assembleTaskBrief — epic-filtered selection", () => {
 });
 
 // ---------------------------------------------------------------------------
+// assembleTaskBrief — assignee-filtered selection (ndx work --mine)
+// ---------------------------------------------------------------------------
+
+describe("assembleTaskBrief — assignee-filtered selection", () => {
+  it("only returns the task assigned to the given identity", async () => {
+    const items: PRDItem[] = [
+      {
+        id: "epic-1",
+        title: "Epic One",
+        level: "epic",
+        status: "in_progress",
+        children: [
+          { id: "task-mine", title: "Mine", level: "task", status: "pending", assignee: "alice <alice@example.com>" },
+          { id: "task-other", title: "Other", level: "task", status: "pending", priority: "critical" },
+        ],
+      },
+    ];
+    const store = mockStoreWithDefaults(items);
+
+    // Without the filter, highest priority wins regardless of assignee.
+    const { taskId: noFilter } = await assembleTaskBrief(store);
+    expect(noFilter).toBe("task-other");
+
+    // With the assignee filter, only the matching task is considered.
+    const { taskId: withFilter } = await assembleTaskBrief(store, undefined, {
+      assignee: "alice <alice@example.com>",
+    });
+    expect(withFilter).toBe("task-mine");
+  });
+
+  it("throws when no task matches the assignee filter", async () => {
+    const items: PRDItem[] = [
+      { id: "task-1", title: "Unassigned", level: "task", status: "pending" },
+    ];
+    const store = mockStoreWithDefaults(items);
+
+    await expect(
+      assembleTaskBrief(store, undefined, { assignee: "bob <bob@example.com>" }),
+    ).rejects.toThrow("No actionable tasks found in PRD");
+  });
+
+  it("an explicit taskId bypasses the assignee filter", async () => {
+    const items: PRDItem[] = [
+      { id: "task-1", title: "Unassigned", level: "task", status: "pending" },
+    ];
+    const store = mockStoreWithDefaults(items);
+
+    const { taskId } = await assembleTaskBrief(store, "task-1", { assignee: "bob <bob@example.com>" });
+    expect(taskId).toBe("task-1");
+  });
+
+  it("surfaces the active assignee filter in sessionFilters", async () => {
+    const items: PRDItem[] = [
+      { id: "task-1", title: "Mine", level: "task", status: "pending", assignee: "alice <alice@example.com>" },
+    ];
+    const store = mockStoreWithDefaults(items);
+
+    const { brief } = await assembleTaskBrief(store, undefined, { assignee: "alice <alice@example.com>" });
+    expect(brief.sessionFilters?.assignee).toBe("alice <alice@example.com>");
+  });
+
+  it("a tree with no assignee fields selects tasks exactly as today", async () => {
+    const items: PRDItem[] = [
+      { id: "task-low", title: "Low", level: "task", status: "pending", priority: "low" },
+      { id: "task-high", title: "High", level: "task", status: "pending", priority: "high" },
+    ];
+    const store = mockStoreWithDefaults(items);
+
+    const { taskId } = await assembleTaskBrief(store);
+    expect(taskId).toBe("task-high");
+    expect((await assembleTaskBrief(store)).brief.sessionFilters).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // assembleTaskBrief — context assembly verification
 // ---------------------------------------------------------------------------
 

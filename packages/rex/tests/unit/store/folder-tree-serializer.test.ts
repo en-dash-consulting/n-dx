@@ -836,6 +836,39 @@ describe("serializeFolderTree: round-trip with parseFolderTree", () => {
     expect(warnings).toEqual([]);
     expect(items[0].ready).toBeUndefined();
   });
+
+  it("round-trips assignee through serialize -> parse", async () => {
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Assigned Task", {
+      assignee: "Alice <alice@example.com>",
+    } as Partial<PRDItem>);
+
+    await serializeFolderTree([task], testDir);
+    const content = await readFile(
+      join(testDir, `${slugify(task.title)}.md`),
+      "utf8",
+    );
+    expect(content).toContain("assignee");
+    expect(content).toContain("Alice <alice@example.com>");
+
+    const { items, warnings } = await parseFolderTree(testDir);
+    expect(warnings).toEqual([]);
+    expect((items[0] as Record<string, unknown>).assignee).toBe("Alice <alice@example.com>");
+  });
+
+  it("omits assignee from frontmatter when unset", async () => {
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Unassigned Task");
+
+    await serializeFolderTree([task], testDir);
+    const content = await readFile(
+      join(testDir, `${slugify(task.title)}.md`),
+      "utf8",
+    );
+    expect(content).not.toMatch(/^assignee:/m);
+
+    const { items, warnings } = await parseFolderTree(testDir);
+    expect(warnings).toEqual([]);
+    expect((items[0] as Record<string, unknown>).assignee).toBeUndefined();
+  });
 });
 
 // ── SerializeResult stats ─────────────────────────────────────────────────────
