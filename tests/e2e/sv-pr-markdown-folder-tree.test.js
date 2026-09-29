@@ -208,3 +208,125 @@ describe("sv pr-markdown on a folder-tree project", () => {
     expect(regenerated).not.toContain("Decoy");
   });
 });
+
+/**
+ * A PRD larger than `execFileSync`'s default stdout buffer.
+ *
+ * The collector reads the whole PRD as JSON over a pipe. `execFileSync` caps
+ * stdout at 1 MiB by default and does not truncate past it — it kills the child
+ * and throws `ENOBUFS`, which the collector cannot tell apart from "this project
+ * has no PRD". The result is an empty Completed Work section on exactly the
+ * large, real projects the report is for; n-dx's own PRD serialises to 3.2 MiB.
+ *
+ * This suite stands in for such a project with a rex stub, so it costs a couple
+ * of megabytes of string rather than the thousands of files a genuine tree of
+ * that size would need. It fails with the default buffer and passes with an
+ * explicit one.
+ */
+describe("sv pr-markdown on a PRD larger than the default stdout buffer", () => {
+  let root;
+  let projectDir;
+  let markdown;
+
+  beforeAll(async () => {
+    root = await createTmpDir("ndx-e2e-pr-md-big-");
+    projectDir = join(root, "project");
+    await mkdir(join(projectDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(projectDir, ".rex"), { recursive: true });
+
+    // One reportable task plus enough ballast to pass 1 MiB. The ballast is
+    // pending, so it never reaches the rendered markdown — only the pipe.
+    const ballast = "x".repeat(4096);
+    const padding = Array.from({ length: 400 }, (_, i) => ({
+      id: `pad-${i}`,
+      title: `Padding ${i}`,
+      level: "task",
+      status: "pending",
+      description: ballast,
+    }));
+
+    const tree = {
+      items: [
+        {
+          id: "epic-big",
+          title: "Big Epic",
+          level: "epic",
+          status: "in_progress",
+          children: [
+            {
+              id: "feat-big",
+              title: "Big Feature",
+              level: "feature",
+              status: "in_progress",
+              children: [
+                {
+                  id: "task-real",
+                  title: "Task in a large PRD",
+                  level: "task",
+                  status: "completed",
+                  completedAt: "2026-01-15T10:00:00.000Z",
+                },
+                ...padding,
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const treeJson = JSON.stringify(tree, null, 2);
+    expect(Buffer.byteLength(treeJson, "utf-8")).toBeGreaterThan(1024 * 1024);
+
+    const stubDir = join(root, "stub-bin");
+    await mkdir(stubDir, { recursive: true });
+    const treePath = join(stubDir, "tree.json");
+    await writeFile(treePath, treeJson, "utf-8");
+
+    // One stub script for both platforms; the shell wrappers only forward argv.
+    const stubJs = join(stubDir, "rex-stub.js");
+    await writeFile(
+      stubJs,
+      [
+        "const { readFileSync } = require('node:fs');",
+        "const args = process.argv.slice(2);",
+        "if (args.includes('tree-diff')) {",
+        "  process.stdout.write(JSON.stringify({ completed: [{ id: 'task-real' }] }));",
+        "} else {",
+        `  process.stdout.write(readFileSync(${JSON.stringify(treePath)}, 'utf-8'));`,
+        "}",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    const posix = join(stubDir, "rex");
+    await writeFile(posix, `#!/bin/sh\nexec "${process.execPath}" "${stubJs}" "$@"\n`, "utf-8");
+    await chmod(posix, 0o755);
+    await writeFile(
+      join(stubDir, "rex.cmd"),
+      `@echo off\r\n"${process.execPath}" "${stubJs}" %*\r\n`,
+      "utf-8",
+    );
+
+    run(["sv", "pr-markdown", "."], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        PATH: `${stubDir}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`,
+      },
+    });
+
+    markdown = await readFile(join(projectDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+  });
+
+  afterAll(async () => {
+    if (root) await removeTmpDir(root);
+  });
+
+  it("still reports the completed work", () => {
+    // With the default 1 MiB buffer the read throws ENOBUFS, the collector
+    // reads that as "no PRD", and this section is empty.
+    expect(markdown).not.toContain("No completed work items on this branch.");
+    expect(markdown).toContain("Task in a large PRD");
+  });
+});

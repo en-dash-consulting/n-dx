@@ -162,6 +162,22 @@ export interface CollectorOptions {
 // ---------------------------------------------------------------------------
 
 /**
+ * Stdout budget for the rex spawns below.
+ *
+ * `execFileSync` defaults `maxBuffer` to 1 MiB and does not truncate past it —
+ * it kills the child and throws `ENOBUFS`, which the callers here would read as
+ * "no PRD" and report as an empty Completed Work section. That is the exact
+ * defect this module was rewritten to fix, so the default is not survivable: a
+ * whole PRD serialised to JSON passes 1 MiB on any real project. n-dx's own
+ * tree measured 3.2 MiB, and it is not the largest PRD this will meet.
+ *
+ * 64 MiB is headroom of roughly twenty times that, while still bounded — an
+ * unbounded buffer would turn a runaway child into an out-of-memory crash
+ * rather than an error.
+ */
+const REX_STDOUT_MAX_BUFFER = 64 * 1024 * 1024;
+
+/**
  * Read the PRD of a checkout by spawning `rex tree --format=json`.
  *
  * This is the folder-tree replacement for the `rex parse-md --stdin` seam that
@@ -174,6 +190,7 @@ export function readPRDViaRex(dir: string): PRDDocumentShape | null {
     const out = execFileSyncCli("rex", ["tree", "--format=json", dir], {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
+      maxBuffer: REX_STDOUT_MAX_BUFFER,
     });
     const parsed = JSON.parse(out as string);
     if (!parsed || !Array.isArray(parsed.items)) return null;
@@ -204,7 +221,11 @@ export function diffCompletedViaRex(
     const out = execFileSyncCli(
       "rex",
       ["tree-diff", "--json", `--from=${baseBranch}`, dir],
-      { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
+      {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        maxBuffer: REX_STDOUT_MAX_BUFFER,
+      },
     );
     const parsed = JSON.parse(out as string) as TreeDiffOutput;
     if (!parsed || !Array.isArray(parsed.completed)) return null;
