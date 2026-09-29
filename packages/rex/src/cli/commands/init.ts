@@ -94,9 +94,10 @@ export async function cmdInit(
   // and that is a change to the migration path rather than to the guard.
 
   // Ensure .gitignore covers generated rex files. Named for the layout: a
-  // `.rex/…` pattern ignores nothing on a project whose PRD lives in
-  // `.ndx/rex/`, so the regenerated workflow file and the execution log would
-  // show up as operator changes on the first `rex` command after init.
+  // `.rex/…` pattern ignores a path nothing writes to on a project whose PRD
+  // lives in `.ndx/rex/`, while the log that IS written stays trackable and
+  // gets committed by accident — and the regenerated workflow file shows up as
+  // an operator change on the first `rex` command after init.
   await ensureGitignoreEntries(dir, [
     `${rexDirName}/n-dx_workflow.md`,
     `${rexDirName}/execution-log*.jsonl`,
