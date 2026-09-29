@@ -1,4 +1,5 @@
 import { PROJECT_DIRS } from "../prd/llm-gateway.js";
+import type { LLMVendor } from "../prd/llm-gateway.js";
 export type { MemoryThrottleConfig } from "../process/memory-throttle.js";
 export type { MemoryMonitorConfig } from "../process/memory-monitor.js";
 export type { RuntimePoolConfig } from "../process/pool.js";
@@ -211,10 +212,33 @@ export function isPermissionMode(value: unknown): value is PermissionMode {
   return typeof value === "string" && (PERMISSION_MODES as readonly string[]).includes(value);
 }
 
+/**
+ * Per-vendor agent model override. Only the entry matching the *active*
+ * vendor is consulted; the rest are inert, so a config can carry a pinned
+ * model for every vendor it switches between.
+ *
+ * Sits between `--model` and all `llm.*` model configuration in `ndx work`'s
+ * resolution order, which is what makes it an agent-only override: `analyze`,
+ * `plan` and Ask keep resolving from `llm.*` alone.
+ */
+export type HenchAgentModels = Partial<Record<LLMVendor, string>>;
+
 export interface HenchConfig {
   schema: string;
   provider: Provider;
+  /**
+   * @deprecated Never read. `ndx work` resolves its model from `--model`, then
+   * `hench.models.<vendor>`, then the `llm.*` fields — this scalar is consulted
+   * at no point, and its "sonnet" default is meaningless on a non-Claude vendor.
+   * Use {@link HenchConfig.models} instead. Retained so existing configs keep
+   * validating; setting it changes nothing.
+   */
   model: string;
+  /**
+   * Agent-only model override, keyed by vendor. See {@link HenchAgentModels}.
+   * Absent means `ndx work` resolves exactly as every other LLM command does.
+   */
+  models?: HenchAgentModels;
   maxTurns: number;
   maxTokens: number;
   /**

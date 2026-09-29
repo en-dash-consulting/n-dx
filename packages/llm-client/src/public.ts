@@ -401,7 +401,7 @@ export type { ProgressReporter } from "./progress-reporter.js";
 export {
   printVendorModelHeader,
 } from "./vendor-header.js";
-export type { VendorModelHeaderOptions } from "./vendor-header.js";
+export type { VendorModelHeaderOptions, ModelSource } from "./vendor-header.js";
 
 // Vendor-change detection and model reset
 export {

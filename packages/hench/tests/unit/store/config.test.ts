@@ -159,6 +159,54 @@ describe("loadConfig", () => {
       expect(config.model).toBe("opus");
     });
 
+    // ── hench.models: the agent-only per-vendor model override ──────────────
+
+    it("applies a valid hench.models override", async () => {
+      await writeProjectConfig({ hench: { models: { claude: "opus", codex: "gpt-5.6-terra" } } });
+      const config = await loadConfig(henchDir);
+      expect(config.models).toEqual({ claude: "opus", codex: "gpt-5.6-terra" });
+    });
+
+    it("reverts an unknown vendor key in hench.models and warns", async () => {
+      await writeProjectConfig({ hench: { models: { gemini: "gemini-2.5-pro" } } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      // Reverted wholesale, not partially kept: a map with one bad key is not
+      // evidence the rest was meant.
+      expect(config.models).toBeUndefined();
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("hench.models");
+      expect(warnings[0]).toContain(".n-dx.json");
+    });
+
+    it("reverts an empty model string in hench.models and warns", async () => {
+      await writeProjectConfig({ hench: { models: { claude: "" } } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.models).toBeUndefined();
+      expect(warnings[0]).toContain("hench.models");
+    });
+
+    it("does not stop the load when hench.models is the wrong shape", async () => {
+      await writeProjectConfig({ hench: { models: "opus" } });
+      const warnings: string[] = [];
+      await expect(
+        loadConfig(henchDir, { onWarning: (message) => warnings.push(message) }),
+      ).resolves.toMatchObject({ maxTurns: DEFAULT_HENCH_CONFIG().maxTurns });
+      expect(warnings[0]).toContain("hench.models");
+    });
+
+    it("keeps valid sibling overrides when hench.models is invalid", async () => {
+      await writeProjectConfig({ hench: { models: { claude: "" }, maxTurns: 12 } });
+      const config = await loadConfig(henchDir, { onWarning: () => {} });
+      expect(config.models).toBeUndefined();
+      expect(config.maxTurns).toBe(12);
+    });
+
     it("validates .n-dx.local.json overrides the same way, naming that file", async () => {
       await writeLocalConfig({ hench: { maxTurns: -5 } });
       const warnings: string[] = [];

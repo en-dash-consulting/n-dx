@@ -99,7 +99,23 @@ const ProjectLanguageSchema = z.enum(["typescript", "javascript", "go"]).optiona
 export const HenchConfigSchema = z.object({
   schema: z.string(),
   provider: z.enum(["cli", "api"]).default("cli"),
+  // Deprecated and never read — see the field docs on HenchConfig. Kept
+  // required so existing configs keep validating unchanged.
   model: z.string(),
+  // Agent-only per-vendor model override. Keys are spelled out rather than
+  // built from LLM_VENDORS so an unknown vendor key is a validation failure
+  // (which loadConfig reverts with a warning) instead of a silently inert
+  // entry the user would have no way to notice. Non-empty: an empty string
+  // would resolve to "no override" while reading as a deliberate pin.
+  models: z
+    .object({
+      claude: z.string().min(1).optional(),
+      codex: z.string().min(1).optional(),
+      google: z.string().min(1).optional(),
+      local: z.string().min(1).optional(),
+    })
+    .strict()
+    .optional(),
   maxTurns: z.number().positive(),
   maxTokens: z.number().positive(),
   tokenBudget: z.number().int().nonnegative().optional().default(0),
