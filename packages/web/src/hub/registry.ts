@@ -1,20 +1,29 @@
 /**
- * Hub registry and pid file — the machine-wide state under `~/.n-dx/`.
+ * Hub registry and pid file — the machine-wide state under the per-user home.
  *
- * One hub per user owns `~/.n-dx/hub.json` (which projects are registered,
- * and which server process serves each) and `~/.n-dx/hub.pid` (which
- * process is the hub). Both are plain JSON, written atomically — a
- * half-written registry read by the next hub start would drop projects.
+ * One hub per user owns `hub.json` (which projects are registered, and which
+ * server process serves each) and `hub.pid` (which process is the hub). Both
+ * are plain JSON, written atomically — a half-written registry read by the
+ * next hub start would drop projects.
  *
- * The directory is `$N_DX_HOME` when set, else `~/.n-dx`. Tests point it at
- * a temp directory through {@link resolveHubHome}'s argument.
+ * Which directory that is, is not decided here: {@link resolveNdxHome} owns the
+ * `~/.ndx` / `~/.n-dx` / `$NDX_HOME` question for the whole toolkit. Tests point
+ * the hub at a temp directory through {@link resolveHubHome}'s argument.
+ *
+ * The resolver is imported straight from `@n-dx/llm-client`, as
+ * `src/server/paths.ts` does for the project-side layout: foundation-tier
+ * imports are gated only in hench (`packages/core/gateway-rules.json`), and
+ * `hub/exec-gateway.ts` exists to concentrate the hub's *process control*, not
+ * to be the funnel for everything the foundation tier happens to export.
  *
  * @module web/hub/registry
+ * @see packages/llm-client/src/layout.ts — the lookup order and why it is that way
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+
+import { resolveNdxHome } from "@n-dx/llm-client";
 
 /** Bumped when the on-disk shape changes incompatibly. */
 export const HUB_REGISTRY_VERSION = 1;
@@ -60,7 +69,7 @@ export interface HubPidFile {
   startedAt: string;
 }
 
-/** The `hub` section of `~/.n-dx/config.json`. Everything is optional. */
+/** The `hub` section of the per-user `config.json`. Everything is optional. */
 export interface HubConfig {
   /** Port the hub listens on. Core reads the same key to find it. */
   port?: number;
@@ -101,9 +110,9 @@ export function emptyRegistry(): HubRegistry {
   return { version: HUB_REGISTRY_VERSION, projects: {} };
 }
 
-/** `$N_DX_HOME`, else `~/.n-dx`; an explicit argument wins over both. */
+/** The per-user home; an explicit argument wins over the resolver. */
 export function resolveHubHome(homeDir?: string): string {
-  return homeDir ?? process.env.N_DX_HOME ?? join(homedir(), ".n-dx");
+  return homeDir ?? resolveNdxHome();
 }
 
 export function registryPath(hubHome: string): string {
@@ -119,7 +128,7 @@ export function hubConfigPath(hubHome: string): string {
 }
 
 /**
- * Read `~/.n-dx/config.json`, reporting what it got wrong.
+ * Read the per-user `config.json`, reporting what it got wrong.
  *
  * A bad value never stops the hub: settings are a convenience, and refusing
  * to start over a stray comma would take every dashboard on the machine with

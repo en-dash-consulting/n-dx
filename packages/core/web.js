@@ -36,7 +36,7 @@
  * single-project server that owns the port itself. `stop` unregisters this
  * worktree rather than killing the shared hub — the project's server stays up
  * while another worktree is registered, and the hub exits with its last
- * project unless `hub.keepAlive` is set in `~/.n-dx/config.json`. `ndx hub
+ * project unless `hub.keepAlive` is set in the per-user `config.json`. `ndx hub
  * status` and `ndx hub stop` address the hub itself.
  */
 
@@ -44,10 +44,10 @@ import { spawn, execFileSync } from "child_process";
 import { get as httpGet, request as httpRequest } from "http";
 import { createConnection } from "net";
 import { createHash } from "crypto";
-import { homedir } from "os";
 import { readFile, writeFile, unlink, access } from "fs/promises";
 import { realpathSync } from "fs";
 import { basename, join, resolve } from "path";
+import { NDX_HOME_ENV, resolveNdxHome } from "./layout.js";
 import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
 
@@ -723,12 +723,12 @@ const HUB_UNREGISTER_TIMEOUT_MS = 30_000;
 /** `ndx hub stop`: long enough for the hub to stop every project server in order. */
 const HUB_STOP_GRACE_MS = Number(process.env.N_DX_STOP_GRACE_MS ?? 10_000);
 
-/** `$N_DX_HOME`, else `~/.n-dx` — the same resolution the hub itself uses. */
+/** The per-user directory — the same resolution the hub itself uses. */
 export function hubHome() {
-  return process.env.N_DX_HOME ?? join(homedir(), ".n-dx");
+  return resolveNdxHome();
 }
 
-/** Hub port: `~/.n-dx/config.json` → `{ "hub": { "port": N } }`, default 3117. */
+/** Hub port: `<hub home>/config.json` → `{ "hub": { "port": N } }`, default 3117. */
 export async function loadHubPort(home = hubHome()) {
   try {
     const raw = await readFile(join(home, HUB_CONFIG_FILE), "utf-8");
@@ -906,7 +906,10 @@ async function ensureHub(port, { tools, __dir, home }) {
     stdio: "ignore",
     detached: true,
     windowsHide: true,
-    env: { ...env, N_DX_HOME: home },
+    // `home` is already resolved, so the child is told the directory rather
+    // than left to repeat the lookup — which would disagree with us if the
+    // legacy `~/.n-dx` appeared between the two calls.
+    env: { ...env, [NDX_HOME_ENV]: home },
   });
   child.unref();
 
@@ -1173,7 +1176,7 @@ export async function runHub(rest, { commandName = "hub" } = {}) {
   return 1;
 }
 
-/** The hub's recorded pid from `~/.n-dx/hub.pid`, or null. */
+/** The hub's recorded pid from the per-user `hub.pid`, or null. */
 async function readHubPid(home = hubHome()) {
   try {
     const pid = JSON.parse(await readFile(join(home, HUB_PID_FILE), "utf-8"))?.pid;

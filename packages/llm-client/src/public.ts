@@ -339,10 +339,20 @@ export type { ProjectDir } from "./project-dirs.js";
 // Folder-layout resolver (.ndx/ container, falling back to the legacy layout)
 export {
   NDX_CONTAINER_DIRNAME,
+  NDX_HOME_DIRNAME,
+  LEGACY_NDX_HOME_DIRNAME,
+  NDX_HOME_ENV,
+  LEGACY_NDX_HOME_ENV,
   detectLayoutMode,
   resolveLayout,
+  resolveNdxHome,
 } from "./layout.js";
-export type { Layout, LayoutMode, ResolveLayoutOptions } from "./layout.js";
+export type {
+  Layout,
+  LayoutMode,
+  ResolveLayoutOptions,
+  ResolveNdxHomeOptions,
+} from "./layout.js";
 
 // Canonical JSON serialization
 export { toCanonicalJSON } from "./json.js";

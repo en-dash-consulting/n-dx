@@ -29,6 +29,8 @@ let isoBundle;
 let legacyRoot;
 /** A project on the new layout — a `.ndx/` container. */
 let ndxRoot;
+/** Stand-in user home directories for the per-user lookup. */
+let homes;
 
 /** The fields both implementations must agree on, for every root. */
 const LAYOUT_FIELDS = [
@@ -57,10 +59,23 @@ beforeAll(async () => {
 
   ndxRoot = mkdtempSync(join(tmpdir(), "ndx-layout-ndx-"));
   mkdirSync(join(ndxRoot, ".ndx", "rex"), { recursive: true });
+
+  // Four machines: one that has already moved, one still on 0.7.x, one with
+  // both, and a fresh install with neither.
+  homes = {
+    current: mkdtempSync(join(tmpdir(), "ndx-home-current-")),
+    legacy: mkdtempSync(join(tmpdir(), "ndx-home-legacy-")),
+    both: mkdtempSync(join(tmpdir(), "ndx-home-both-")),
+    fresh: mkdtempSync(join(tmpdir(), "ndx-home-fresh-")),
+  };
+  mkdirSync(join(homes.current, ".ndx"));
+  mkdirSync(join(homes.legacy, ".n-dx"));
+  mkdirSync(join(homes.both, ".ndx"));
+  mkdirSync(join(homes.both, ".n-dx"));
 });
 
 afterAll(() => {
-  for (const dir of [legacyRoot, ndxRoot]) {
+  for (const dir of [legacyRoot, ndxRoot, ...Object.values(homes ?? {})]) {
     if (dir) rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -160,6 +175,73 @@ describe("layout resolver: lookup order", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Acceptance criteria: the per-user directory
+// ---------------------------------------------------------------------------
+
+describe("per-user home: lookup order", () => {
+  it("uses ~/.ndx on a machine that has it", () => {
+    expect(foundation.resolveNdxHome({ env: {}, home: homes.current })).toBe(
+      join(homes.current, ".ndx"),
+    );
+  });
+
+  it("keeps using ~/.n-dx when that is the only one present", () => {
+    // The acceptance criterion: a 0.7.x machine's hub carries on unchanged.
+    expect(foundation.resolveNdxHome({ env: {}, home: homes.legacy })).toBe(
+      join(homes.legacy, ".n-dx"),
+    );
+  });
+
+  it("prefers ~/.ndx when both exist", () => {
+    expect(foundation.resolveNdxHome({ env: {}, home: homes.both })).toBe(
+      join(homes.both, ".ndx"),
+    );
+  });
+
+  it("starts a machine with neither on ~/.ndx", () => {
+    expect(foundation.resolveNdxHome({ env: {}, home: homes.fresh })).toBe(
+      join(homes.fresh, ".ndx"),
+    );
+  });
+
+  it("lets $NDX_HOME override the location", () => {
+    expect(
+      foundation.resolveNdxHome({
+        env: { NDX_HOME: "/override" },
+        home: homes.legacy,
+      }),
+    ).toBe("/override");
+  });
+
+  it("honours $N_DX_HOME when $NDX_HOME is unset", () => {
+    expect(
+      foundation.resolveNdxHome({
+        env: { N_DX_HOME: "/legacy-override" },
+        home: homes.current,
+      }),
+    ).toBe("/legacy-override");
+  });
+
+  it("takes $NDX_HOME ahead of $N_DX_HOME when both are set", () => {
+    expect(
+      foundation.resolveNdxHome({
+        env: { NDX_HOME: "/new", N_DX_HOME: "/old" },
+        home: homes.current,
+      }),
+    ).toBe("/new");
+  });
+
+  it("treats an empty override as unset, not as the working directory", () => {
+    expect(
+      foundation.resolveNdxHome({
+        env: { NDX_HOME: "", N_DX_HOME: "" },
+        home: homes.legacy,
+      }),
+    ).toBe(join(homes.legacy, ".n-dx"));
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The two copies must not drift
 // ---------------------------------------------------------------------------
 
@@ -206,6 +288,30 @@ describe("layout resolver: core twin matches the foundation implementation", () 
     expect(fromCore).toEqual([...LAYOUT_FIELDS].sort());
     expect(fromFoundation).toEqual([...LAYOUT_FIELDS].sort());
   });
+
+  it("names the per-user directory and its overrides identically", () => {
+    expect(core.NDX_HOME_DIRNAME).toBe(foundation.NDX_HOME_DIRNAME);
+    expect(core.LEGACY_NDX_HOME_DIRNAME).toBe(foundation.LEGACY_NDX_HOME_DIRNAME);
+    expect(core.NDX_HOME_ENV).toBe(foundation.NDX_HOME_ENV);
+    expect(core.LEGACY_NDX_HOME_ENV).toBe(foundation.LEGACY_NDX_HOME_ENV);
+  });
+
+  for (const [label, envVars] of [
+    ["no override", {}],
+    ["$NDX_HOME", { NDX_HOME: "/override" }],
+    ["$N_DX_HOME", { N_DX_HOME: "/legacy-override" }],
+    ["both overrides", { NDX_HOME: "/new", N_DX_HOME: "/old" }],
+    ["empty overrides", { NDX_HOME: "", N_DX_HOME: "" }],
+  ]) {
+    it(`resolves the per-user directory identically with ${label}`, () => {
+      for (const home of Object.values(homes)) {
+        expect(
+          core.resolveNdxHome({ env: envVars, home }),
+          `packages/core/layout.js and packages/llm-client/src/layout.ts disagree for ${home}`,
+        ).toBe(foundation.resolveNdxHome({ env: envVars, home }));
+      }
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------

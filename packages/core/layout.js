@@ -17,12 +17,15 @@
  *
  * The lookup order, the silence, the `null` container and the mode override all
  * carry the reasoning documented on the llm-client module — read that one first.
+ * The same applies to {@link resolveNdxHome}, the per-user directory the hub
+ * keeps its registry in, which `web.js` needs for exactly the same reason.
  *
  * @module n-dx/layout
  * @see packages/llm-client/src/layout.ts — the canonical implementation
  */
 
 import { statSync } from "fs";
+import { homedir } from "os";
 import { join } from "path";
 
 /** Name of the container directory that selects the new layout. */
@@ -84,10 +87,7 @@ const LEGACY_ENTRIES = {
  * @returns {LayoutMode}
  */
 export function detectLayoutMode(root) {
-  const stats = statSync(join(root, NDX_CONTAINER_DIRNAME), {
-    throwIfNoEntry: false,
-  });
-  return stats?.isDirectory() === true ? "ndx" : "legacy";
+  return isDirectory(join(root, NDX_CONTAINER_DIRNAME)) ? "ndx" : "legacy";
 }
 
 /**
@@ -132,4 +132,52 @@ export function resolveLayout(root, options = {}) {
     webPortFile: join(root, LEGACY_ENTRIES.WEB_PORT),
     webUsageFile: join(root, LEGACY_ENTRIES.WEB_USAGE),
   };
+}
+
+// ---------------------------------------------------------------------------
+// The per-user directory
+// ---------------------------------------------------------------------------
+
+/** Directory name of the per-user home, under the user's home directory. */
+export const NDX_HOME_DIRNAME = ".ndx";
+
+/** What the per-user home was called before the layout move. */
+export const LEGACY_NDX_HOME_DIRNAME = ".n-dx";
+
+/** Environment variable that overrides the per-user home outright. */
+export const NDX_HOME_ENV = "NDX_HOME";
+
+/** The override's previous name, still honoured when `NDX_HOME` is unset. */
+export const LEGACY_NDX_HOME_ENV = "N_DX_HOME";
+
+/**
+ * Where n-dx keeps its machine-wide state — the hub's registry, pid and config.
+ *
+ * Lookup order: `$NDX_HOME`, `$N_DX_HOME`, `~/.ndx` when it exists, `~/.n-dx`
+ * when it exists, else `~/.ndx`. The reasoning is on the llm-client twin; read
+ * that one first.
+ *
+ * @param {{env?: Record<string, string | undefined>, home?: string}} [options]
+ *   Injection points for tests — default to `process.env` and `os.homedir()`.
+ * @returns {string}
+ */
+export function resolveNdxHome(options = {}) {
+  const env = options.env ?? process.env;
+
+  const override = env[NDX_HOME_ENV] || env[LEGACY_NDX_HOME_ENV];
+  if (override) return override;
+
+  const home = options.home ?? homedir();
+  const current = join(home, NDX_HOME_DIRNAME);
+  if (isDirectory(current)) return current;
+
+  const legacy = join(home, LEGACY_NDX_HOME_DIRNAME);
+  if (isDirectory(legacy)) return legacy;
+
+  return current;
+}
+
+/** Never throws: an unreadable path is simply not a directory. */
+function isDirectory(path) {
+  return statSync(path, { throwIfNoEntry: false })?.isDirectory() === true;
 }
