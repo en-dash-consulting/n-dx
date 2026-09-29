@@ -797,6 +797,78 @@ describe("serializeFolderTree: round-trip with parseFolderTree", () => {
     const parsedTask = items[0].children?.[0];
     expect(parsedTask?.links).toEqual(task.links);
   });
+
+  it("round-trips ready as a real boolean, not the string \"true\"", async () => {
+    // Regression guard: emitYamlField used to always quote scalars
+    // (`JSON.stringify(String(value))`), so a boolean took the same path as
+    // a string and came back from parseScalar as the literal string "true"
+    // rather than the boolean. `ready` is the first PRDItem field that
+    // exercises the boolean branch.
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Ready Task", {
+      ready: true,
+    } as Partial<PRDItem>);
+
+    await serializeFolderTree([task], testDir);
+    const content = await readFile(
+      join(testDir, `${slugify(task.title)}.md`),
+      "utf8",
+    );
+    // Emitted unquoted — `ready: true`, not `ready: "true"`.
+    expect(content).toMatch(/^ready: true$/m);
+
+    const { items, warnings } = await parseFolderTree(testDir);
+    expect(warnings).toEqual([]);
+    expect(items[0].ready).toBe(true);
+    expect(typeof items[0].ready).toBe("boolean");
+  });
+
+  it("omits ready from frontmatter when unset", async () => {
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Not Evaluated");
+
+    await serializeFolderTree([task], testDir);
+    const content = await readFile(
+      join(testDir, `${slugify(task.title)}.md`),
+      "utf8",
+    );
+    expect(content).not.toMatch(/^ready:/m);
+
+    const { items, warnings } = await parseFolderTree(testDir);
+    expect(warnings).toEqual([]);
+    expect(items[0].ready).toBeUndefined();
+  });
+
+  it("round-trips assignee through serialize -> parse", async () => {
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Assigned Task", {
+      assignee: "Alice <alice@example.com>",
+    } as Partial<PRDItem>);
+
+    await serializeFolderTree([task], testDir);
+    const content = await readFile(
+      join(testDir, `${slugify(task.title)}.md`),
+      "utf8",
+    );
+    expect(content).toContain("assignee");
+    expect(content).toContain("Alice <alice@example.com>");
+
+    const { items, warnings } = await parseFolderTree(testDir);
+    expect(warnings).toEqual([]);
+    expect((items[0] as Record<string, unknown>).assignee).toBe("Alice <alice@example.com>");
+  });
+
+  it("omits assignee from frontmatter when unset", async () => {
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Unassigned Task");
+
+    await serializeFolderTree([task], testDir);
+    const content = await readFile(
+      join(testDir, `${slugify(task.title)}.md`),
+      "utf8",
+    );
+    expect(content).not.toMatch(/^assignee:/m);
+
+    const { items, warnings } = await parseFolderTree(testDir);
+    expect(warnings).toEqual([]);
+    expect((items[0] as Record<string, unknown>).assignee).toBeUndefined();
+  });
 });
 
 // ── SerializeResult stats ─────────────────────────────────────────────────────

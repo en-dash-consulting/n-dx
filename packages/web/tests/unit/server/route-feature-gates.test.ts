@@ -7,7 +7,7 @@
  * which boots the real dispatcher.
  *
  * The last block is the one that matters over time: it fails if a nav entry in
- * the viewer's sidebar carries a `featureGate` with no server entry, which is
+ * the viewer's navigation carries a `featureGate` with no server entry, which is
  * the exact state this work existed to end.
  *
  * @see packages/web/src/server/route-feature-gates.ts
@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -28,7 +29,31 @@ import {
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const WEB_PKG = resolve(fileURLToPath(import.meta.url), "../../../..");
-const SIDEBAR_SRC = join(WEB_PKG, "src/viewer/components/sidebar.ts");
+const VIEWER_SRC = join(WEB_PKG, "src/viewer");
+
+/**
+ * Every `featureGate:` the viewer's navigation declares, wherever it lives.
+ *
+ * This used to read `components/sidebar.ts` by path, which broke the moment
+ * the navigation was rewritten and the sidebar deleted — the declarations moved
+ * to `views/stages.ts` and `views/sourcevision-tabs.ts`. Scanning the viewer
+ * instead means the next such move does not quietly narrow what this checks,
+ * and the non-empty assertion below is what catches it if the scan ever finds
+ * nothing at all.
+ */
+function collectNavFeatureGates(dir: string): Set<string> {
+  const gates = new Set<string>();
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      for (const gate of collectNavFeatureGates(full)) gates.add(gate);
+    } else if (/\.tsx?$/.test(entry.name)) {
+      const src = readFileSync(full, "utf-8");
+      for (const m of src.matchAll(/featureGate:\s*"([^"]+)"/g)) gates.add(m[1]);
+    }
+  }
+  return gates;
+}
 
 /**
  * Every gated endpoint, paired with the flag that governs it.
@@ -163,11 +188,11 @@ describe("route feature gates", () => {
 
   // ── Completeness: no toggle may be nav-only ─────────────────────────────
 
-  it("covers every feature gate the sidebar hides a nav entry with", async () => {
-    const sidebar = await readFile(SIDEBAR_SRC, "utf-8");
-    const navGates = new Set(
-      [...sidebar.matchAll(/featureGate:\s*"([^"]+)"/g)].map((m) => m[1]),
-    );
+  it("covers every feature gate the navigation hides an entry with", () => {
+    const navGates = collectNavFeatureGates(VIEWER_SRC);
+    // Guards the scan itself: if the declarations move again and this finds
+    // none, the filter below would be vacuously empty and the test would pass
+    // while checking nothing.
     expect(navGates.size).toBeGreaterThan(0);
 
     const served = new Set(ROUTE_FEATURE_GATES.map((g) => g.feature));

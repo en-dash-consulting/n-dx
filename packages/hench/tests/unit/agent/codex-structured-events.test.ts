@@ -96,6 +96,42 @@ describe("processCodexJsonLine", () => {
         output: 50,
         vendor: "codex",
         model: "gpt-5-codex",
+        // No cache keys in the payload, so the zero cache figure is unknown
+        // rather than measured.
+        cacheProvenance: "unavailable",
+      });
+    });
+
+    it("keeps the cache halves a Codex turn reports", () => {
+      const result = createResult();
+      const turnCounter = { value: 0 };
+      const tokenMetadata = { vendor: "codex" as const, model: "gpt-5-codex" };
+
+      // The shape a real `codex exec --json` turn carries — see
+      // tests/fixtures/codex-file-change-real.jsonl. This parser used to read
+      // `usage` and keep only input and output, so a turn that read 35k cached
+      // tokens landed on the run record as one that cached nothing.
+      const line = JSON.stringify({
+        type: "message",
+        content: [{ type: "text", text: "Done" }],
+        usage: {
+          input_tokens: 45_472,
+          cached_input_tokens: 35_072,
+          cache_write_input_tokens: 0,
+          output_tokens: 180,
+        },
+      });
+
+      processCodexJsonLine(line, result, turnCounter, tokenMetadata);
+
+      // Codex counts the cached portion inside input_tokens, so it moves
+      // rather than adds: the turn still costs 45,652 tokens.
+      expect(result.tokenUsage.input).toBe(10_400);
+      expect(result.tokenUsage.cacheReadInput).toBe(35_072);
+      expect(result.turnTokenUsage[0]).toMatchObject({
+        input: 10_400,
+        cacheReadInput: 35_072,
+        cacheProvenance: "measured",
       });
     });
 

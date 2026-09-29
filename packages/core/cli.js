@@ -2716,6 +2716,14 @@ async function handleTree(rest) {
   exitWithCleanup(0);
 }
 
+async function handleTreeDiff(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["tree-diff", ...flags, dir]);
+  exitWithCleanup(0);
+}
+
 // ── Delegated sourcevision commands ───────────────────────────────────────────
 
 async function handleReset(rest) {
@@ -3046,6 +3054,7 @@ const COMMAND_DISPATCH = new Map([
   ["prune",             handlePrune],
   ["next",              handleNext],
   ["tree",              handleTree],
+  ["tree-diff",         handleTreeDiff],
   ["prd",               handlePrd],
   // ── Delegated sourcevision commands ──
   ["reset",             handleReset],

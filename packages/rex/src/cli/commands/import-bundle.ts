@@ -35,6 +35,7 @@ import type { ImportMode, MergeOutcome, PRDBundle } from "../../core/prd-bundle.
 import type { PRDItem } from "../../schema/index.js";
 import { appendArchiveBatch } from "../../core/archive.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
+import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { result, info, warn } from "../output.js";
@@ -149,6 +150,17 @@ export async function cmdImportBundle(dir: string, flags: Record<string, string>
   }
 
   const mode: ImportMode = flags.replace === "true" ? "replace" : "merge";
+
+  // --replace discards and rewrites the whole tree; --merge only grafts new
+  // items on, so it is exempt from the branch guard.
+  if (mode === "replace") {
+    const guard = checkBranchGuard(dir, flags);
+    if (guard.blocked) {
+      const { message, suggestion } = branchGuardRefusal("import-bundle --replace", guard.branch);
+      throw new CLIError(message, suggestion);
+    }
+  }
+
   // Resolved against the caller's cwd — see the note in export.ts.
   const bundle = await readBundleFile(resolve(input));
 

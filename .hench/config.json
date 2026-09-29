@@ -36,5 +36,6 @@
     "maxRetries": 3,
     "baseDelayMs": 2000,
     "maxDelayMs": 30000
-  }
+  },
+  "fullTestTimeoutMs": 1800000
 }

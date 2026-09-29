@@ -1,7 +1,8 @@
 /**
  * Breadcrumb navigation component.
  *
- * Displays a "project > tool > view" hierarchy in the page header area.
+ * Displays a "project > stage > view" hierarchy in the page header area —
+ * the stage being the Analysis / Plan / Work page that lists the view.
  * Fetches project metadata from the `/api/project` endpoint and combines
  * it with the current view to build a contextual breadcrumb trail.
  *
@@ -13,6 +14,8 @@ import { h } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import { useProjectMetadata, useCliName, resolveCliLabel } from "../hooks/index.js";
+import { STAGES, stageForView, isStageId } from "../api.js";
+import { buildValidViews } from "../external.js";
 import { WorkspaceSwitcher } from "./workspace-switcher.js";
 
 // ---------------------------------------------------------------------------
@@ -37,14 +40,11 @@ interface ViewMeta {
   productLabel: string;
 }
 
-/** Default view for each product section */
-const PRODUCT_DEFAULT_VIEW: Record<string, ViewId> = {
-  sourcevision: "overview",
-  rex: "rex-dashboard",
-  hench: "hench-runs",
-};
-
 const VIEW_META: Record<ViewId, ViewMeta> = {
+  home:                  { product: "global",       label: "Home",            productLabel: "n-dx" },
+  analyze:               { product: "sourcevision", label: "Analysis",        productLabel: "SourceVision" },
+  plan:                  { product: "rex",          label: "Plan",            productLabel: "Rex" },
+  work:                  { product: "hench",        label: "Work",            productLabel: "Hench" },
   workspaces:            { product: "global",       label: "Overview",        productLabel: "Workspaces" },
   overview:              { product: "sourcevision", label: "Overview",        productLabel: "SourceVision" },
   graph:                 { product: "sourcevision", label: "Map",             productLabel: "SourceVision" },
@@ -126,6 +126,12 @@ export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
 
   const gitBranch = project?.git?.branch ?? null;
 
+  // The stage page that lists this view — the middle segment, and where it
+  // leads. Absent on the stage pages themselves (they are the last segment),
+  // on home and settings, and when this viewer's scope has no such stage.
+  const validViews = useMemo(() => buildValidViews(scope ?? null), [scope]);
+  const stage = isStageId(view) ? null : stageForView(view, validViews);
+
   return h("nav", {
     class: "breadcrumb",
     "aria-label": "Breadcrumb",
@@ -147,14 +153,14 @@ export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
           )
         : null,
 
-      // ── Segment 2: Product / tool ──
-      meta && meta.product !== "global"
+      // ── Segment 2: Stage ──
+      stage
         ? h("li", { class: "breadcrumb-item" },
             h("button", {
-              class: `breadcrumb-link breadcrumb-product breadcrumb-product-${meta.product}`,
-              onClick: () => navigateTo(PRODUCT_DEFAULT_VIEW[meta.product]),
+              class: `breadcrumb-link breadcrumb-product breadcrumb-product-${STAGES[stage].product}`,
+              onClick: () => navigateTo(stage),
               type: "button",
-            }, meta.productLabel),
+            }, STAGES[stage].label),
             Separator(),
           )
         : null,

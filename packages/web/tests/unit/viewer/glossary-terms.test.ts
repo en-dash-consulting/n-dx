@@ -12,6 +12,9 @@ const REQUIRED_TERMS = [
   "guard rail",
   "epic / feature / task",
   "worktree anchor",
+  "cohesion",
+  "coupling",
+  "cross-zone import",
 ];
 
 describe("GLOSSARY_TERMS", () => {
@@ -101,7 +104,9 @@ describe("glossary term coverage", () => {
 
   function findGlossaryLineTerms(): Set<string> {
     const used = new Set<string>();
-    const re = /GlossaryLine,\s*\{\s*term:\s*"([^"]+)"/g;
+    // A term is wired by a visible GlossaryLine or by an InfoTip (the ⓘ) — both
+    // read the same definition, so either one puts it in front of a reader.
+    const re = /(?:GlossaryLine|InfoTip),\s*\{\s*term:\s*"([^"]+)"/g;
     for (const file of collectTsFiles(VIEWER_SRC)) {
       const content = readFileSync(file, "utf-8");
       let m: RegExpExecArray | null;

@@ -89,6 +89,7 @@ const REX_COMMANDS = [
   "init",
   "status",
   "tree",
+  "tree-diff",
   "next",
   "add",
   "update",
@@ -129,6 +130,7 @@ const HENCH_COMMANDS = [
   "status",
   "show",
   "review",
+  "cache",
   "validate-tokens",
 ];
 

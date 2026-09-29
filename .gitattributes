@@ -54,3 +54,11 @@ packages/core/export.js     text eol=lf
 # PRD tree markdown merges through the rex-prd driver (three-way,
 # frontmatter-aware). The driver is registered in git config by 'ndx init'.
 .rex/prd_tree/** merge=rex-prd
+
+# Vitest rewrites snapshot files with LF whenever it updates them, so on a
+# Windows checkout (core.autocrlf=true) every test run that touches a snapshot
+# leaves it "modified" in `git status` with an empty content diff. That is not
+# cosmetic here: hench refuses to mark a task completed while any path of its
+# work is uncommitted, so a phantom-dirty snapshot aborts an autonomous run
+# whose work was already finished and committed. Same class as the pins above.
+*.snap                      text eol=lf

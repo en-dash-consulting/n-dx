@@ -1,4 +1,22 @@
+/**
+ * Rex's paths module — the only place rex names a folder of its own.
+ *
+ * The constants below were already the single source of truth for what lives
+ * *inside* `.rex/`. {@link resolveRexPaths} extends that to the directory
+ * itself: where `.rex/` is depends on which layout the project is on, and that
+ * question is answered once, by {@link resolveLayout} in the foundation tier,
+ * rather than by every call site joining `PROJECT_DIRS.REX` to a root.
+ *
+ * Rex may import `@n-dx/llm-client` directly — foundation-tier imports are
+ * ungated for domain packages (see `packages/core/gateway-rules.json`).
+ *
+ * @module rex/store/paths
+ * @see packages/llm-client/src/layout.ts — the resolver and its lookup order
+ */
+
 import { join } from "node:path";
+
+import { resolveLayout, type ResolveLayoutOptions } from "@n-dx/llm-client";
 
 /**
  * Canonical folder-tree storage path.
@@ -39,4 +57,36 @@ export const PRD_LOCK_FILENAME = "prd.lock";
 /** Path to the folder-tree lock file for a given `.rex` directory. */
 export function prdLockPath(rexDir: string): string {
   return join(rexDir, PRD_LOCK_FILENAME);
+}
+
+/** Every path rex owns inside a project, already joined to the project root. */
+export interface RexPaths {
+  /** Rex's state directory — `.ndx/rex` or `.rex` depending on the layout. */
+  rexDir: string;
+  /** The folder-tree PRD backend, the sole writable PRD surface. */
+  prdTreeDir: string;
+  /** The tree's sidecar, rewritten by every store save. */
+  treeMetaPath: string;
+  /** The advisory lock guarding the folder tree. */
+  prdLockPath: string;
+}
+
+/**
+ * Resolve rex's paths for a project root.
+ *
+ * @param root     Absolute project root (the directory *containing* `.rex/`).
+ * @param options  Forwarded to {@link resolveLayout} — pass `{ mode }` to ask
+ *                 for a layout by name rather than detecting one.
+ */
+export function resolveRexPaths(
+  root: string,
+  options?: ResolveLayoutOptions,
+): RexPaths {
+  const { rexDir } = resolveLayout(root, options);
+  return {
+    rexDir,
+    prdTreeDir: join(rexDir, PRD_TREE_DIRNAME),
+    treeMetaPath: join(rexDir, TREE_META_FILENAME),
+    prdLockPath: prdLockPath(rexDir),
+  };
 }

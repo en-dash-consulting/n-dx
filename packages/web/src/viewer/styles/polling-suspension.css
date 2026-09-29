@@ -9,7 +9,7 @@
 
 .polling-suspension-indicator {
   position: fixed;
-  bottom: 1rem;
+  bottom: calc(1rem + var(--bottombar-h, 0px));
   left: 1rem;
   z-index: 998;
   padding: 0.4rem 0.75rem;
