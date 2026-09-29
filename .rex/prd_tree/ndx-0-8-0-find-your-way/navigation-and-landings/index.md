@@ -25,6 +25,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 |-------|--------|
 | [Add a next-step panel with four project states to the Home landing](./add-a-next-step-panel-with-four.md) | pending |
 | [Add redirect aliases for every moved dashboard path and a navigation contract test](./add-redirect-aliases-for-every-moved.md) | pending |
-| [Make stages.ts the single navigation model: one label, glyph, product and blurb per view, read by every navigation surface](./make-stages-ts-the-single-navigation.md) | pending |
+| [Make stages.ts the single navigation model: one label, glyph, product and blurb per view, read by every navigation surface](./make-stages-ts-the-single-navigation.md) | completed |
 | [Merge the Analysis stage's map, isometric map and zones into one tabbed Terrain section, and Architecture and Routes into one tabbed section](./merge-the-analysis-stage-s-map.md) | pending |
 | [Turn SourceVision Overview and Rex Dashboard into package landing pages, add a Hench landing, and move Rex execution panels to the Flight Deck](./turn-sourcevision-overview-and-rex.md) | cancelled |
