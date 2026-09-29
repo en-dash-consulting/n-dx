@@ -229,14 +229,22 @@ function show(v: string | null): string {
  * is simply missing from that side, so it reads as added or removed. Saying
  * so costs two lines and is the difference between a puzzling diff and an
  * explained one.
+ *
+ * The "no PRD tree at this source" notice is keyed off `present`, not off
+ * warning text: `loadTreeFromDir` explains an absent tree with a
+ * "Tree root directory does not exist" parser warning, but `loadTreeAtRef`
+ * reports the very same condition — a ref that predates the PRD — as
+ * `present: false` with an empty `warnings` array, since there is no on-disk
+ * tree for the parser to have warned about. Keying off the warning text alone
+ * left that case silent.
  */
 function reportWarnings(from: ResolvedTree, to: ResolvedTree): void {
   for (const [side, tree] of [[from.label, from], [to.label, to]] as const) {
+    if (!tree.present) {
+      info(`${side}: no PRD tree at this source.`);
+    }
     for (const w of tree.warnings) {
-      if (w.message === "Tree root directory does not exist") {
-        info(`${side}: no PRD tree at this source.`);
-        continue;
-      }
+      if (w.message === "Tree root directory does not exist") continue;
       warn(`${side}: ${w.path} — ${w.message}`);
     }
   }

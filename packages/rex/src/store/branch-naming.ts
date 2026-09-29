@@ -51,7 +51,17 @@ const ORIGIN_PREFIX = "refs/remotes/origin/";
 
 /**
  * The branch `origin/HEAD` points at, or null when the clone has no
- * `origin/HEAD` (no remote, or one added without `--set-head`).
+ * `origin/HEAD` (no remote, or one added without `--set-head`), or when the
+ * ref it names is gone.
+ *
+ * `git symbolic-ref` only resolves the symref file — it prints the name it
+ * points at and exits 0 whether or not that name still exists as a ref. After
+ * an upstream default-branch rename (main → master, say) followed by
+ * `git remote prune origin`, `origin/HEAD` keeps pointing at the old,
+ * now-absent name until the next `git remote set-head`. Trusting that name
+ * unverified would make every whole-tree rewrite command's "is this the
+ * default branch" answer wrong for exactly the clones this fallback exists to
+ * cover.
  */
 function resolveOriginDefaultBranch(cwd: string): string | null {
   try {
@@ -60,9 +70,23 @@ function resolveOriginDefaultBranch(cwd: string): string | null {
       ["symbolic-ref", "--quiet", `${ORIGIN_PREFIX}HEAD`],
       { cwd, encoding: "utf-8", ...QUIET_GIT },
     ).trim();
-    return ref.startsWith(ORIGIN_PREFIX) ? ref.slice(ORIGIN_PREFIX.length) : null;
+    if (!ref.startsWith(ORIGIN_PREFIX)) return null;
+    return refExists(cwd, ref) ? ref.slice(ORIGIN_PREFIX.length) : null;
   } catch {
     return null;
+  }
+}
+
+/** Whether `ref` resolves to a commit this repository actually has. */
+function refExists(cwd: string, ref: string): boolean {
+  try {
+    execFileSync("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], {
+      cwd,
+      ...QUIET_GIT,
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
 

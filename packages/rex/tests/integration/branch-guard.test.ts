@@ -252,6 +252,19 @@ describe("branch guard: whole-tree rewrite commands", () => {
     expect(result.blockedByGuard).toBe(false);
   });
 
+  it("falls back to main/master when origin/HEAD names a pruned ref", async () => {
+    initRepoOnMain(dir);
+    // A clone whose upstream default branch was renamed and pruned locally:
+    // origin/HEAD still names the old, now-absent remote-tracking ref.
+    git(dir, "remote", "add", "origin", "https://example.invalid/repo.git");
+    git(dir, "update-ref", "refs/remotes/origin/master", "HEAD");
+    git(dir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master");
+    git(dir, "update-ref", "-d", "refs/remotes/origin/master");
+
+    const result = await runGuarded(() => cmdReshape(dir, {}));
+    expect(result.blockedByGuard).toBe(false);
+  });
+
   it("does not block when the project directory has no resolvable git branch", async () => {
     // No git init at all — resolveGitBranch falls back to "unknown", which
     // the guard treats as safe (most test fixtures and some real projects
