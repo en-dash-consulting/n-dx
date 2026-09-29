@@ -19,7 +19,7 @@
  * @module rex/store/ensure-legacy-prd-migrated
  */
 
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { stat, readFile, copyFile, rename } from "node:fs/promises";
 import { withLock } from "./file-lock.js";
 import { treeMetaContents } from "./tree-meta.js";
@@ -27,7 +27,7 @@ import { validateDocument, PRDDocumentSchema } from "../schema/validate.js";
 import { serializeFolderTree } from "./index.js";
 import { atomicWriteJSON } from "./atomic-write.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
-import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "./paths.js";
+import { PRD_TREE_DIRNAME, TREE_META_FILENAME, resolveRexPaths } from "./paths.js";
 import type { z } from "zod";
 
 /** Result of a legacy-PRD migration attempt. */
@@ -45,6 +45,14 @@ export interface LegacyPrdMigrationResult {
   backupPath?: string;
   /** Number of items migrated when `migrated` is `true`. */
   itemCount?: number;
+  /**
+   * Where the tree was written, relative to the project root and posix-separated.
+   *
+   * Reported rather than recomputed by the caller because the location depends
+   * on the folder layout, and the banner that names it has only the migration
+   * result to go on.
+   */
+  folderTreePath?: string;
 }
 
 /** Error thrown when legacy-PRD migration fails. */
@@ -128,7 +136,7 @@ async function dirExists(path: string): Promise<boolean> {
  * ```
  */
 export async function ensureLegacyPrdMigrated(dir: string): Promise<LegacyPrdMigrationResult> {
-  const rexDir = join(dir, ".rex");
+  const rexDir = resolveRexPaths(dir).rexDir;
   const prdJsonPath = join(rexDir, "prd.json");
   const prdJsonMigratedMarker = join(rexDir, "prd.json.migrated");
   const treePath = join(rexDir, PRD_TREE_DIRNAME);
@@ -269,6 +277,7 @@ export async function ensureLegacyPrdMigrated(dir: string): Promise<LegacyPrdMig
       migrated: true,
       backupPath,
       itemCount: doc.items.length,
+      folderTreePath: relative(dir, treePath).replaceAll("\\", "/"),
     };
   });
 }

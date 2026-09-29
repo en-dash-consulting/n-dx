@@ -153,21 +153,30 @@ to a whole-board reload for a `"*"` frame or an unrecognised key.
 ## hub zone (`src/hub/`)
 
 `src/hub/` is the 0.7.0 hub daemon (`web hub`): one process per user that owns
-`~/.n-dx/hub.json` (project registry) and `~/.n-dx/hub.pid`, serves `/api/hub/*`,
-and runs one `web serve` child per registered repository on an ephemeral loopback
-port. It is its own zone with a deliberately small import surface:
+`hub.json` (project registry) and `hub.pid` in the per-user directory, serves
+`/api/hub/*`, and runs one `web serve` child per registered repository on an
+ephemeral loopback port. It is its own zone with a deliberately small import
+surface:
 
 - node built-ins, `src/shared/` through its barrel (the base-path helpers the hub
-  shares with the viewer), and `@n-dx/llm-client` exec helpers **only** through
-  `src/hub/exec-gateway.ts` (re-export only, no logic).
+  shares with the viewer), and `@n-dx/llm-client`'s **exec helpers only** through
+  `src/hub/exec-gateway.ts` (re-export only, no logic). That gateway exists to
+  keep `node:child_process` out of the hub, not to funnel everything the
+  foundation tier exports — `registry.ts` imports the layout resolver straight
+  from `@n-dx/llm-client`, as `src/server/paths.ts` does, because foundation-tier
+  imports are gated only in hench (`packages/core/gateway-rules.json`).
 - Nothing from `src/server/` or `src/viewer/`. The project servers it spawns are
   today's `web serve` unchanged; the hub talks to them over HTTP (`GET /api/status`),
   never by import. The two JSON response helpers in `hub/routes.ts` are local for
   that reason rather than shared with `server/response-utils.ts`.
 - Consumers import from `src/hub/index.ts`, the barrel.
 
-`$N_DX_HOME` overrides the `~/.n-dx` directory; tests pass `homeDir` explicitly.
-Core's `web.js` spawns the hub (PR 10) — the orchestration tier still never imports it.
+The per-user directory is `resolveNdxHome`'s answer, not the hub's: `$NDX_HOME`,
+then `$N_DX_HOME`, then whichever of `~/.ndx` and `~/.n-dx` exists, defaulting to
+`~/.ndx`. Tests pass `homeDir` explicitly, which wins over all of it. Core's
+`web.js` spawns the hub (PR 10) with the already-resolved directory in `$NDX_HOME`
+— the orchestration tier still never imports it, and uses its own hand-written
+twin of the resolver in `packages/core/layout.js`.
 
 **Proxy and base path.** `hub/proxy.ts` forwards `/p/<id>/…` to that project's
 server with the prefix stripped (HTTP streamed, WebSocket upgrades piped over

@@ -10,12 +10,12 @@ import {
   findPRDFileForBranch,
   resolveGitBranch,
   resolvePRDFilename,
-} from "../../store/index.js";
+ resolveRexPaths } from "../../store/index.js";
 import { findItem } from "../../core/tree.js";
 import { getFolderTreePath } from "../folder-tree-path.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
-import { REX_DIR } from "./constants.js";
+
 import { CLIError } from "../errors.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
 import { info, warn, result, startSpinner } from "../output.js";
@@ -63,7 +63,7 @@ function llmDebug(message: string): void {
 
 async function hasRexDir(dir: string): Promise<boolean> {
   try {
-    await access(join(dir, REX_DIR));
+    await access(resolveRexPaths(dir).rexDir);
     return true;
   } catch {
     return false;
@@ -479,7 +479,7 @@ export async function applyDuplicateProposalMerges(
   mergeTargetsByNodeKey: Record<string, string>;
   reopenedItemIds: string[];
 }> {
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
   const attributionOptions = { applyAttribution: true, projectDir: dir } as const;
   const proposalNodeIndex = buildMergeableProposalNodeIndex(proposals);
@@ -661,14 +661,14 @@ async function savePending(
   parentId?: string,
   prdHash?: string,
 ): Promise<void> {
-  const filePath = join(dir, REX_DIR, PENDING_FILE);
+  const filePath = join(resolveRexPaths(dir).rexDir, PENDING_FILE);
   await atomicWriteJSON(filePath, { proposals, parentId, prdHash });
 }
 
 async function loadPending(
   dir: string,
 ): Promise<{ proposals: Proposal[]; parentId?: string; prdHash?: string } | null> {
-  const filePath = join(dir, REX_DIR, PENDING_FILE);
+  const filePath = join(resolveRexPaths(dir).rexDir, PENDING_FILE);
   try {
     const raw = await readFile(filePath, "utf-8");
     return JSON.parse(raw) as { proposals: Proposal[]; parentId?: string; prdHash?: string };
@@ -679,7 +679,7 @@ async function loadPending(
 
 async function clearPending(dir: string): Promise<void> {
   try {
-    await unlink(join(dir, REX_DIR, PENDING_FILE));
+    await unlink(join(resolveRexPaths(dir).rexDir, PENDING_FILE));
   } catch {
     // Already gone
   }
@@ -694,7 +694,7 @@ async function resolveParentLevel(
   parentId: string | undefined,
 ): Promise<ItemLevel | null> {
   if (!parentId) return null;
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
   const entry = findItem(doc.items, parentId);
@@ -756,7 +756,7 @@ async function acceptProposals(
     mergedCount = 0,
     reopenedItemIds = [],
   } = options;
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   // Ensure the current branch's PRD file exists and is the write target.
@@ -1086,7 +1086,7 @@ async function acceptProposals(
     const doc = await store.loadDocument();
     const seen = new Set<string>();
     for (const id of addedItemIds) {
-      const path = getFolderTreePath(doc.items, id);
+      const path = getFolderTreePath(doc.items, id, dir);
       if (path && !seen.has(path)) {
         seen.add(path);
         folderTreePaths.push(path);
@@ -1152,7 +1152,7 @@ async function initializeSmartAddLLM(
   format?: string,
   requestedModel?: string,
 ): Promise<void> {
-  const rexConfigDir = join(dir, REX_DIR);
+  const rexConfigDir = resolveRexPaths(dir).rexDir;
   const llmConfig = await loadLLMConfig(rexConfigDir);
   setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
@@ -1197,7 +1197,7 @@ async function replayCachedIfRequested(
 
   // Staleness detection: compare current PRD hash with cached hash
   if (cached.prdHash) {
-    const rexDir = join(dir, REX_DIR);
+    const rexDir = resolveRexPaths(dir).rexDir;
     const store = await resolveStore(rexDir);
     const doc = await store.loadDocument();
     const currentHash = hashPRD(doc.items);
@@ -1234,7 +1234,7 @@ function emitPrdPaths(prdPaths: string[]): void {
  */
 async function resolveLightSmartAddModel(dir: string): Promise<string | undefined> {
   try {
-    const rexDir = join(dir, REX_DIR);
+    const rexDir = resolveRexPaths(dir).rexDir;
     const llmConfig = await loadLLMConfig(rexDir);
     const vendor = llmConfig.vendor ?? getLLMVendor() ?? DEFAULT_LLM_VENDOR;
     return resolveVendorModel(vendor, llmConfig, "light");
@@ -1253,7 +1253,7 @@ async function resolveSmartAddModel(
   }
 
   try {
-    const rexDir = join(dir, REX_DIR);
+    const rexDir = resolveRexPaths(dir).rexDir;
     const llmConfig = await loadLLMConfig(rexDir);
     const vendor = llmConfig.vendor ?? getLLMVendor() ?? DEFAULT_LLM_VENDOR;
     const configuredModel = resolveVendorModel(vendor, llmConfig);
@@ -1284,7 +1284,7 @@ async function loadSmartAddContext(
   dir: string,
   parentId?: string,
 ): Promise<SmartAddContext> {
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
   const existing = doc.items;
@@ -1862,7 +1862,7 @@ export async function cmdSmartAdd(
   // Load LoE config for consolidation guard and LoE display
   let loeConfig: LoEConfig | undefined;
   try {
-    const rexDir = join(dir, REX_DIR);
+    const rexDir = resolveRexPaths(dir).rexDir;
     const store = await resolveStore(rexDir);
     const config = await store.loadConfig();
     loeConfig = config.loe;
@@ -1908,7 +1908,7 @@ export async function cmdSmartAdd(
   // Resolve target filename for approval display (read-only, no file creation)
   let targetFile: string | undefined;
   {
-    const rexDir = join(dir, REX_DIR);
+    const rexDir = resolveRexPaths(dir).rexDir;
     const branch = resolveGitBranch(dir);
     if (branch !== "unknown") {
       const existingBranchFile = await findPRDFileForBranch(rexDir, branch);

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { cmdInit } from "../../../../src/cli/commands/init.js";
 import { cmdPrune } from "../../../../src/cli/commands/prune.js";
 import { resolveStore } from "../../../../src/store/index.js";
-import { REX_DIR } from "../../../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../../../src/store/index.js";
 import {
   PENDING_SMART_PRUNE_FILE,
   loadPendingSmartPrune,
@@ -106,7 +106,7 @@ const sampleProposals = [
 ];
 
 async function seedPRD(dir: string, items: PRDItem[]): Promise<void> {
-  const store = await resolveStore(join(dir, REX_DIR));
+  const store = await resolveStore(resolveRexPaths(dir).rexDir);
   const doc = await store.loadDocument();
   doc.items = items;
   await store.saveDocument(doc);
@@ -120,7 +120,7 @@ describe("smart prune caching integration", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-prune-cache-integ-"));
-    rexDir = join(tmpDir, REX_DIR);
+    rexDir = resolveRexPaths(tmpDir).rexDir;
     await cmdInit(tmpDir, {});
     await seedPRD(tmpDir, sampleItems);
     mockReasonForReshape.mockReset();

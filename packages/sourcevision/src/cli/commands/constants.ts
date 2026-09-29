@@ -1,1 +1,1 @@
-export { TOOL_VERSION, SV_DIR } from "../sourcevision-core.js";
+export { TOOL_VERSION } from "../sourcevision-core.js";

@@ -247,12 +247,14 @@ export function createJiraStore(
  * Remote adapters (e.g. Notion) are accessed only during explicit sync
  * operations via {@link resolveRemoteStore}.
  *
- * @param rexDir  Path to the `.rex/` directory.
+ * @param rexDir  Path to the rex state directory. Resolve it with
+ *                {@link resolveRexPaths} rather than joining a directory name
+ *                to the project root — where it lives depends on the layout.
  * @returns A FileStore instance.
  *
  * @example
  * ```ts
- * const store = await resolveStore(join(dir, ".rex"));
+ * const store = await resolveStore(resolveRexPaths(dir).rexDir);
  * const doc = await store.loadDocument();
  * ```
  */

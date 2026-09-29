@@ -1,10 +1,11 @@
 import { readFile, readdir, access } from "node:fs/promises";
 import { join, relative, dirname, basename, extname } from "node:path";
-import { PROJECT_DIRS } from "@n-dx/llm-client";
+import { PROJECT_DIRS, resolveLayout } from "@n-dx/llm-client";
 import type { Priority } from "../schema/index.js";
 import { computeFindingHash, loadAcknowledged, isAcknowledged } from "./acknowledge.js";
 import type { AcknowledgedStore } from "./acknowledge.js";
 import { cleanHeading, extractJsonItems, extractYamlItems } from "./analyze-shared.js";
+import { resolveRexPaths } from "../store/index.js";
 
 export interface ScanResult {
   name: string;
@@ -525,7 +526,7 @@ export async function scanSourceVision(
   dir: string,
   options?: { rexDir?: string },
 ): Promise<ScanSourceVisionResult> {
-  const svDir = join(dir, PROJECT_DIRS.SOURCEVISION);
+  const svDir = resolveLayout(dir).sourcevisionDir;
   try {
     await access(svDir);
   } catch {
@@ -533,7 +534,7 @@ export async function scanSourceVision(
   }
 
   // Load acknowledged findings to filter them out
-  const rexDir = options?.rexDir ?? join(dir, PROJECT_DIRS.REX);
+  const rexDir = options?.rexDir ?? resolveRexPaths(dir).rexDir;
   let ackStore: AcknowledgedStore | undefined;
   try {
     ackStore = await loadAcknowledged(rexDir);

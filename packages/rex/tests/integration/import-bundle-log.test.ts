@@ -28,7 +28,7 @@ import { tmpdir } from "node:os";
 import { cmdInit } from "../../src/cli/commands/init.js";
 import { cmdImportBundle } from "../../src/cli/commands/import-bundle.js";
 import { resolveStore } from "../../src/store/index.js";
-import { REX_DIR } from "../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../src/store/index.js";
 import { SCHEMA_VERSION } from "../../src/schema/index.js";
 import type { LogEntry, PRDItem } from "../../src/schema/index.js";
 
@@ -57,7 +57,7 @@ describe("rex import-bundle execution log", () => {
     projectDir = await mkdtemp(join(tmpdir(), "rex-bundle-log-"));
     await cmdInit(projectDir, {});
 
-    const store = await resolveStore(join(projectDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(projectDir).rexDir);
     await store.withTransaction(async (doc) => {
       doc.items = [epic("local-1", "Local Epic")];
     });
@@ -96,7 +96,7 @@ describe("rex import-bundle execution log", () => {
   async function logEntries(): Promise<LogEntry[]> {
     let raw: string;
     try {
-      raw = await readFile(join(projectDir, REX_DIR, "execution-log.jsonl"), "utf-8");
+      raw = await readFile(join(resolveRexPaths(projectDir).rexDir, "execution-log.jsonl"), "utf-8");
     } catch {
       return [];
     }

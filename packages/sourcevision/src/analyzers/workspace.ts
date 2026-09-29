@@ -17,9 +17,9 @@ import {join, relative, resolve, sep} from "node:path";import type {
   ZoneCrossing,
   SubAnalysisRef,
 } from "../schema/index.js";
-import { SV_DIR } from "../constants.js";
 import { DATA_FILES } from "../schema/data-files.js";
 import { toPosix } from "../util/paths.js";
+import { resolveSourcevisionPaths } from "../paths.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -165,9 +165,12 @@ function findSubSvDirs(
       continue;
     }
 
-    // Check if this directory has a .sourcevision subdirectory
-    if (entry === SV_DIR) {
-      // Skip the root's own .sourcevision
+    // This entry *is* currentDir's own analysis directory, so currentDir is a
+    // sub-analysis. Compared as a resolved path rather than a directory name:
+    // on the `.ndx` layout the analysis directory is nested inside the
+    // container and is never a direct child entry.
+    if (fullPath === resolveSourcevisionPaths(currentDir).svDir) {
+      // Skip the root's own analysis directory
       const relPath = relative(rootDir, currentDir);
       if (relPath !== "") {
         results.push(currentDir);
@@ -176,7 +179,7 @@ function findSubSvDirs(
     }
 
     // Check for .sourcevision inside this directory
-    const svPath = join(fullPath, SV_DIR);
+    const svPath = resolveSourcevisionPaths(fullPath).svDir;
     if (existsSync(svPath) && statSync(svPath).isDirectory()) {
       results.push(fullPath);
       // Don't recurse into sub-analyzed directories (they manage their own children)
@@ -203,7 +206,7 @@ function pathToId(relativePath: string): string {
  * Load a sub-analysis from a directory that has a .sourcevision folder.
  */
 function loadSubAnalysis(rootDir: string, subDir: string): SubAnalysis | null {
-  const svDir = join(subDir, SV_DIR);
+  const svDir = resolveSourcevisionPaths(subDir).svDir;
   const manifestPath = join(svDir, DATA_FILES.manifest);
 
   if (!existsSync(manifestPath)) {
@@ -369,11 +372,16 @@ export function getSubAnalyzedFiles(subAnalyses: SubAnalysis[]): Set<string> {
 
 /**
  * Build SubAnalysisRef entries for the manifest.
+ *
+ * `manifestPath` is relative to `rootDir`, so the root is required rather than
+ * reconstructed from `prefix`: a sub-analysis keeps its own folder layout, and
+ * the directory holding its manifest is `sub.svDir` — not `prefix` joined to a
+ * fixed directory name.
  */
-export function buildSubAnalysisRefs(subAnalyses: SubAnalysis[]): SubAnalysisRef[] {
+export function buildSubAnalysisRefs(subAnalyses: SubAnalysis[], rootDir: string): SubAnalysisRef[] {
   return subAnalyses.map((sub) => ({
     id: sub.id,
     prefix: sub.prefix,
-    manifestPath: toPosix(join(sub.prefix, SV_DIR, DATA_FILES.manifest)),
+    manifestPath: toPosix(relative(rootDir, join(sub.svDir, DATA_FILES.manifest))),
   }));
 }

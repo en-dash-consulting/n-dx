@@ -14,7 +14,8 @@ import {
   authFailureGuidance,
   type CLIErrorCode,
 } from "@n-dx/llm-client";
-import { REX_DIR } from "./commands/constants.js";
+
+import { resolveRexPaths } from "../store/index.js";
 
 /**
  * Rex CLI error — extends the foundation CLIError.
@@ -196,7 +197,7 @@ export function handleCLIError(err: unknown, debug = false): never {
  * Throws a CLIError with an init suggestion if missing.
  */
 export function requireRexDir(dir: string): void {
-  if (!existsSync(join(dir, REX_DIR))) {
+  if (!existsSync(resolveRexPaths(dir).rexDir)) {
     throw new CLIError(
       `Rex directory not found in ${dir}`,
       "Run 'n-dx init' to set up the project, or 'rex init' if using rex standalone.",

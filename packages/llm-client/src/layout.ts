@@ -31,11 +31,19 @@
  * container exists — that is precisely what they are about to create. Passing
  * `{ mode: "ndx" }` asks for a layout by name instead of by detection.
  *
+ * ## The per-user directory
+ *
+ * {@link resolveNdxHome} answers the same question one level up, for the hub's
+ * machine-wide state. It is deliberately a separate function rather than a
+ * field on {@link Layout}: the hub's directory belongs to the user, not to any
+ * project, and a project root is not an input to it.
+ *
  * @module layout
  * @see packages/core/layout.js — the orchestration tier's hand-written twin
  */
 
 import { statSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { PROJECT_DIRS } from "./project-dirs.js";
@@ -131,10 +139,7 @@ export interface ResolveLayoutOptions {
  * the new layout, which is the same answer the legacy fallback gives.
  */
 export function detectLayoutMode(root: string): LayoutMode {
-  const stats = statSync(join(root, NDX_CONTAINER_DIRNAME), {
-    throwIfNoEntry: false,
-  });
-  return stats?.isDirectory() === true ? "ndx" : "legacy";
+  return isDirectory(join(root, NDX_CONTAINER_DIRNAME)) ? "ndx" : "legacy";
 }
 
 /**
@@ -179,4 +184,75 @@ export function resolveLayout(
     webPortFile: join(root, LEGACY_ENTRIES.WEB_PORT),
     webUsageFile: join(root, LEGACY_ENTRIES.WEB_USAGE),
   };
+}
+
+// ---------------------------------------------------------------------------
+// The per-user directory
+// ---------------------------------------------------------------------------
+
+/** Directory name of the per-user home, under the user's home directory. */
+export const NDX_HOME_DIRNAME = ".ndx";
+
+/** What the per-user home was called before the layout move. */
+export const LEGACY_NDX_HOME_DIRNAME = ".n-dx";
+
+/** Environment variable that overrides the per-user home outright. */
+export const NDX_HOME_ENV = "NDX_HOME";
+
+/** The override's previous name, still honoured when {@link NDX_HOME_ENV} is unset. */
+export const LEGACY_NDX_HOME_ENV = "N_DX_HOME";
+
+/** Options accepted by {@link resolveNdxHome}. */
+export interface ResolveNdxHomeOptions {
+  /**
+   * Environment to read the overrides from. Defaults to `process.env`.
+   *
+   * Injected rather than read globally so a test can state the environment it
+   * means instead of mutating the process's and restoring it in a `finally`.
+   */
+  env?: Record<string, string | undefined>;
+  /** The user's home directory. Defaults to `os.homedir()`. */
+  home?: string;
+}
+
+/**
+ * Where n-dx keeps its machine-wide state — the hub's registry, pid and config.
+ *
+ * ## Lookup order
+ *
+ * 1. `$NDX_HOME`
+ * 2. `$N_DX_HOME` — the override's previous name
+ * 3. `~/.ndx` when it already exists
+ * 4. `~/.n-dx` when it already exists
+ * 5. `~/.ndx` — what a machine with neither gets
+ *
+ * Steps 3 and 4 are the same "detect, don't assume" rule {@link resolveLayout}
+ * applies to a project: a machine that only ever ran 0.7.x has its hub state in
+ * `~/.n-dx`, and moving it out from under a running hub is not something a path
+ * lookup gets to decide. Step 5 means a fresh install starts on the new name
+ * without anyone having to migrate anything.
+ *
+ * An empty-string override is treated as unset — `NDX_HOME=` in a shell profile
+ * means "I did not set this", and honouring it literally would put the hub's
+ * registry in the process's working directory.
+ */
+export function resolveNdxHome(options: ResolveNdxHomeOptions = {}): string {
+  const env = options.env ?? process.env;
+
+  const override = env[NDX_HOME_ENV] || env[LEGACY_NDX_HOME_ENV];
+  if (override) return override;
+
+  const home = options.home ?? homedir();
+  const current = join(home, NDX_HOME_DIRNAME);
+  if (isDirectory(current)) return current;
+
+  const legacy = join(home, LEGACY_NDX_HOME_DIRNAME);
+  if (isDirectory(legacy)) return legacy;
+
+  return current;
+}
+
+/** Never throws: an unreadable path is simply not a directory. */
+function isDirectory(path: string): boolean {
+  return statSync(path, { throwIfNoEntry: false })?.isDirectory() === true;
 }

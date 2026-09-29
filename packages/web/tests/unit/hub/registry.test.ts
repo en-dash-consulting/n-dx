@@ -28,18 +28,53 @@ afterEach(() => {
 });
 
 describe("resolveHubHome", () => {
-  it("prefers an explicit directory, then $N_DX_HOME, then ~/.n-dx", () => {
-    const previous = process.env.N_DX_HOME;
+  /** Run `body` with both home overrides set as given, then restore. */
+  function withEnv(
+    vars: Record<string, string | undefined>,
+    body: () => void,
+  ): void {
+    const previous = Object.fromEntries(
+      Object.keys(vars).map((key) => [key, process.env[key]]),
+    );
     try {
-      process.env.N_DX_HOME = "/env/home";
-      expect(resolveHubHome("/explicit")).toBe("/explicit");
-      expect(resolveHubHome()).toBe("/env/home");
-      delete process.env.N_DX_HOME;
-      expect(resolveHubHome()).toMatch(/[\\/]\.n-dx$/);
+      for (const [key, value] of Object.entries(vars)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      body();
     } finally {
-      if (previous === undefined) delete process.env.N_DX_HOME;
-      else process.env.N_DX_HOME = previous;
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
     }
+  }
+
+  it("prefers an explicit directory over everything else", () => {
+    withEnv({ NDX_HOME: "/env/new", N_DX_HOME: "/env/old" }, () => {
+      expect(resolveHubHome("/explicit")).toBe("/explicit");
+    });
+  });
+
+  it("takes $NDX_HOME ahead of $N_DX_HOME", () => {
+    withEnv({ NDX_HOME: "/env/new", N_DX_HOME: "/env/old" }, () => {
+      expect(resolveHubHome()).toBe("/env/new");
+    });
+  });
+
+  it("honours $N_DX_HOME when $NDX_HOME is unset", () => {
+    withEnv({ NDX_HOME: undefined, N_DX_HOME: "/env/old" }, () => {
+      expect(resolveHubHome()).toBe("/env/old");
+    });
+  });
+
+  it("falls back to a directory under the user's home with neither set", () => {
+    withEnv({ NDX_HOME: undefined, N_DX_HOME: undefined }, () => {
+      // Which of the two names depends on what exists on the machine running
+      // the suite; `resolveNdxHome`'s own tests pin that choice. Here the point
+      // is only that the hub asks the resolver rather than hard-coding a name.
+      expect(resolveHubHome()).toMatch(/[\\/]\.n-?dx$/);
+    });
   });
 });
 

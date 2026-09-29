@@ -29,14 +29,13 @@
 
 import { join, resolve } from "node:path";
 import { readFile } from "node:fs/promises";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import { parseBundle, mergeBundle, countItems, BundleError } from "../../core/prd-bundle.js";
 import type { ImportMode, MergeOutcome, PRDBundle } from "../../core/prd-bundle.js";
 import type { PRDItem } from "../../schema/index.js";
 import { appendArchiveBatch } from "../../core/archive.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
-import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { result, info, warn } from "../output.js";
 
@@ -164,7 +163,7 @@ export async function cmdImportBundle(dir: string, flags: Record<string, string>
   // Resolved against the caller's cwd — see the note in export.ts.
   const bundle = await readBundleFile(resolve(input));
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   // Confirmation happens before the transaction so the lock is not held while
