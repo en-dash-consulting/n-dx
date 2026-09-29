@@ -109,13 +109,15 @@ const DELAY_EXPR = String.raw`${NONZERO_DELAY}[^;)]*`;
 const REAL_SLEEP =
   String.raw`await\s+(?:` +
   // await new Promise((r) => setTimeout(r, 50)) / (r, SETTLE_MS) / (r, 10 * MULT)
+  // and the brace form `await new Promise((r) => { setTimeout(r, 50); })`.
   //
-  // The body is `[\s\S]*?` rather than `[^;]*?` because the brace form
-  // `await new Promise((r) => { setTimeout(r, 50); })` carries a semicolon
-  // INSIDE the callback — a body that cannot cross `;` never matches it, and
-  // the trailing `\)` had to become optional-brace-then-paren for the same
-  // reason. Both forms are equally load-sensitive, so both are scanned.
-  String.raw`new\s+Promise\s*(?:<[^>]*>)?\s*\([\s\S]*?setTimeout\s*\([^;,]*,\s*${DELAY_EXPR}\)\s*;?\s*\}?\s*\)` +
+  // Only the TAIL needed widening for the brace form: its semicolon falls
+  // after the setTimeout call, not before it, so the body still must not cross
+  // a `;`. Letting the body span statements instead matched a different thing
+  // entirely — a promise that resolves on a real event and arms
+  // `setTimeout(() => reject(...), 3000)` as a hang guard is not a sleep, and
+  // `[\s\S]*?` reached across its statements to flag it.
+  String.raw`new\s+Promise\s*(?:<[^>]*>)?\s*\([^;]*?setTimeout\s*\([^;,]*,\s*${DELAY_EXPR}\)\s*;?\s*\}?\s*\)` +
   // await sleep(150) / await delay(150)
   String.raw`|(?:sleep|delay)\s*\(\s*[1-9][^;]*?\)` +
   // await setTimeout(50) — node:timers/promises
