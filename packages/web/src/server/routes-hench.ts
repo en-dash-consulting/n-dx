@@ -51,10 +51,12 @@ import {
   CONFIG_FIELD_META,
   validateFieldValue,
   validateConfigKeyValue,
+  validateProviderForVendor,
   completeConfigGroups,
   getConfigValue as getNestedValue,
   setConfigValue as setNestedValue,
 } from "./hench-config-fields.js";
+import { resolveActiveVendor } from "./routes-llm.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { IncrementalTaskUsageAggregator } from "./task-usage.js";
 import {
@@ -862,6 +864,14 @@ async function handleConfigUpdate(
     if (validationError) {
       errors.push(validationError);
       continue;
+    }
+
+    if (fieldPath === "provider" && typeof newValue === "string") {
+      const vendorError = validateProviderForVendor(newValue, resolveActiveVendor(ctx.projectDir));
+      if (vendorError) {
+        errors.push(vendorError);
+        continue;
+      }
     }
 
     const oldValue = getNestedValue(current, fieldPath);

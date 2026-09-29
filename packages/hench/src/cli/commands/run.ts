@@ -46,6 +46,7 @@ import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../sto
 import type { LLMVendor } from "../../prd/llm-gateway.js";
 import { LLM_VENDOR, printVendorModelHeader, resolveModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, createSpinner } from "../../prd/llm-gateway.js";
 import { resolveAgentModel } from "./agent-model.js";
+import { isProviderSupported } from "./provider-support.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
 import { formatQueueStatus } from "../../queue/format.js";
 import { resolveSchedulingPriority } from "../../queue/priority-scheduler.js";
@@ -1528,20 +1529,23 @@ export async function cmdRun(
   }
   const assignee = mine ? await resolveActor(dir) : undefined;
 
-  // Codex only supports CLI mode (no API loop).
-  if (llmVendor === LLM_VENDOR.CODEX && provider === "api" && !dryRun) {
-    throw new CLIError(
-      "Hench API provider is only supported for vendor=claude or vendor=google.",
-      "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
-    );
-  }
-
-  // Google and local only support API mode (no CLI binary exists).
-  // Auto-switch silently — ndx config / ndx init persist hench.provider=api
-  // automatically when local or google is selected as the vendor, so this
-  // branch is a safety net for projects configured outside of those flows.
-  if ((llmVendor === LLM_VENDOR.GOOGLE || llmVendor === LLM_VENDOR.LOCAL) && provider === "cli" && !dryRun) {
-    provider = "api";
+  // VENDOR_PROVIDERS (provider-support.ts) is the single source of truth:
+  // claude accepts cli or api; codex only cli (no API loop); google and local
+  // only api (no CLI binary exists). A vendor that rejects "cli" always
+  // accepts "api" instead, so an unsupported "cli" auto-switches silently —
+  // ndx config / ndx init persist hench.provider=api automatically when
+  // local or google is selected as the vendor, so this branch is a safety
+  // net for projects configured outside of those flows. An unsupported "api"
+  // (codex only) has no such fallback and fails loudly instead.
+  if (!dryRun && !isProviderSupported(llmVendor, provider)) {
+    if (provider === "cli") {
+      provider = "api";
+    } else {
+      throw new CLIError(
+        "Hench API provider is only supported for vendor=claude or vendor=google.",
+        "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
+      );
+    }
   }
 
   // The adversarial review pass spawns a second vendor CLI session, so it
