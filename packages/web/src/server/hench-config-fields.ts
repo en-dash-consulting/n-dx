@@ -91,6 +91,8 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
   { path: "sessionStrategy", label: "Session Strategy", description: "How task spawns relate to vendor sessions: fork, batch or cold", type: "enum", enumValues: ["fork", "batch", "cold"], category: "session" },
   { path: "tasksPerSession", label: "Tasks per Session", description: 'Tasks per session under the "batch" strategy', type: "number", integer: true, positive: true, category: "session", defaultValue: 4 },
   { path: "parentMaxAgeHours", label: "Parent Session Max Age (h)", description: "How long a cached orientation session may be forked before it is rebuilt", type: "number", positive: true, category: "session", defaultValue: 24 },
+  { path: "batchMaxAgeHours", label: "Batch Chain Max Age (h)", description: "How long a \"batch\" chain may keep serving tasks, measured from the task that opened it", type: "number", positive: true, category: "session" },
+  { path: "batchMaxIdleHours", label: "Batch Chain Max Idle (h)", description: "How long a \"batch\" chain may sit unused before it is retired", type: "number", positive: true, category: "session" },
 
   // ── Task selection ──
   { path: "maxFailedAttempts", label: "Max Failed Attempts", description: "Consecutive failures before a task is considered stuck", type: "number", integer: true, positive: true, category: "task-selection", defaultValue: 3 },

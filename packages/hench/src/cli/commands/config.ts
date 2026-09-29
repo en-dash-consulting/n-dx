@@ -211,6 +211,22 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     category: "session",
     impact: (v) => `Orientation session rebuilt after ${v}h`,
   },
+  {
+    path: "batchMaxAgeHours",
+    label: "Batch Chain Max Age (h)",
+    description: 'How long a "batch" chain may keep serving tasks, measured from the task that opened it',
+    type: "number",
+    category: "session",
+    impact: (v) => `Batch chain retired ${v}h after the task that opened it`,
+  },
+  {
+    path: "batchMaxIdleHours",
+    label: "Batch Chain Max Idle (h)",
+    description: 'How long a "batch" chain may sit unused before it is retired',
+    type: "number",
+    category: "session",
+    impact: (v) => `Batch chain retired after ${v}h unused`,
+  },
 
   // ── Task selection ──
   {

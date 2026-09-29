@@ -157,6 +157,8 @@ describe("dashboard hench-config gate agrees with hench's schema", () => {
       sessionStrategy: "batch",
       tasksPerSession: 6,
       parentMaxAgeHours: 12,
+      batchMaxAgeHours: 12,
+      batchMaxIdleHours: 2,
       maxFailedAttempts: 5,
       rexDir: ".rex",
       "retry.maxRetries": 0,
