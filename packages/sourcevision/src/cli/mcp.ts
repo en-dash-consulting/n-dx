@@ -21,10 +21,10 @@ import {
   generateContext,
   deriveNextSteps,
   setArchetypeOverride,
-  SV_DIR,
   TOOL_VERSION,
 } from "./sourcevision-core.js";
 import { findZoneById } from "../analyzers/zone-identity.js";
+import { resolveSourcevisionPaths } from "../paths.js";
 
 interface SourcevisionData {
   manifest: Manifest | null;
@@ -36,7 +36,7 @@ interface SourcevisionData {
 }
 
 function loadData(targetDir: string): SourcevisionData {
-  const svDir = join(targetDir, SV_DIR);
+  const svDir = resolveSourcevisionPaths(targetDir).svDir;
   const data: SourcevisionData = {
     manifest: null,
     inventory: null,
@@ -113,7 +113,7 @@ interface McpContext {
 
 function createMcpContext(targetDir: string): McpContext {
   const absDir = resolve(targetDir);
-  const svDir = join(absDir, SV_DIR);
+  const svDir = resolveSourcevisionPaths(absDir).svDir;
   let cachedData = loadData(absDir);
   let cachedMtime = manifestMtime(svDir);
 
@@ -596,7 +596,7 @@ function registerMcpResources(server: McpServer, context: McpContext): void {
  */
 export async function startMcpServer(targetDir: string): Promise<void> {
   const absDir = resolve(targetDir);
-  const svDir = join(absDir, SV_DIR);
+  const svDir = resolveSourcevisionPaths(absDir).svDir;
 
   if (!existsSync(svDir)) {
     console.error(`No .sourcevision/ directory found in: ${absDir}`);

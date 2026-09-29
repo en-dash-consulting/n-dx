@@ -20,7 +20,7 @@
 import { writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { requireSvDir } from "../errors.js";
-import { SV_DIR } from "./constants.js";
+
 import { info } from "../output.js";
 import {
   collectBranchWork,
@@ -33,6 +33,7 @@ import type {
   BranchWorkEpicSummary,
   BranchWorkResult,
 } from "../sourcevision-core.js";
+import { resolveSourcevisionPaths } from "../../paths.js";
 
 /** Output filename for generated PR markdown. */
 export const PR_MARKDOWN_FILENAME = "pr-markdown.md";
@@ -149,7 +150,7 @@ export async function cmdPrMarkdown(targetDir: string): Promise<void> {
 
   const { outputPath, warnings } = await generatePrMarkdownFile(
     absDir,
-    join(absDir, SV_DIR),
+    resolveSourcevisionPaths(absDir).svDir,
   );
 
   for (const warning of warnings) {

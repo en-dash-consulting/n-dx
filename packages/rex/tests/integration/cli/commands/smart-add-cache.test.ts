@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { cmdInit } from "../../../../src/cli/commands/init.js";
 import { cmdSmartAdd } from "../../../../src/cli/commands/smart-add.js";
 import { resolveStore } from "../../../../src/store/index.js";
-import { REX_DIR } from "../../../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../../../src/store/index.js";
 import { hashPRD } from "../../../../src/core/pending-cache.js";
 import type { Proposal } from "../../../../src/analyze/index.js";
 import type { PRDItem } from "../../../../src/schema/index.js";
@@ -102,7 +102,7 @@ function makeReasonResult(proposals: Proposal[]) {
 }
 
 async function seedPRD(dir: string, items: PRDItem[]): Promise<void> {
-  const store = await resolveStore(join(dir, REX_DIR));
+  const store = await resolveStore(resolveRexPaths(dir).rexDir);
   const doc = await store.loadDocument();
   doc.items = items;
   await store.saveDocument(doc);
@@ -116,7 +116,7 @@ describe("smart-add cache staleness integration", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-smart-add-cache-integ-"));
-    rexDir = join(tmpDir, REX_DIR);
+    rexDir = resolveRexPaths(tmpDir).rexDir;
     await cmdInit(tmpDir, {});
     await seedPRD(tmpDir, sampleItems);
     mockReasonFromDescriptions.mockReset();

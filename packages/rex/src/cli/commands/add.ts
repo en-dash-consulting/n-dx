@@ -6,13 +6,13 @@ import {
   resolvePRDFile,
   resolveGitBranch,
   ensureLegacyPrdMigrated,
-} from "../../store/index.js";
+ resolveRexPaths } from "../../store/index.js";
 import { LEVEL_HIERARCHY, CHILD_LEVEL, isItemLevel } from "../../schema/index.js";
 import { findItem } from "../../core/tree.js";
 import { validateDAG } from "../../core/dag.js";
 import { migrateToFolderPerTask } from "../../core/folder-per-task-migration.js";
 import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
-import { REX_DIR } from "./constants.js";
+
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 import { parseCsvList } from "../parse-utils.js";
@@ -39,7 +39,7 @@ export async function cmdAdd(
     );
   }
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   // Emit migration notification to CLI and execution log
@@ -217,7 +217,7 @@ export async function cmdAdd(
 
   // Compute the folder-tree path where the item was written.
   const updatedDoc = await store.loadDocument();
-  const folderTreePath = getFolderTreePath(updatedDoc.items, id);
+  const folderTreePath = getFolderTreePath(updatedDoc.items, id, dir);
 
   if (flags.format === "json") {
     result(

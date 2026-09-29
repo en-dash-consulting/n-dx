@@ -6,8 +6,8 @@ import { validateDAG } from "../../core/dag.js";
 import { validateStructure } from "../../core/structural.js";
 import { walkTree } from "../../core/tree.js";
 import { computeStats } from "../../core/stats.js";
-import { resolveStore } from "../../store/index.js";
-import { REX_DIR } from "./constants.js";
+import { resolveStore, resolveRexPaths } from "../../store/index.js";
+
 import { result } from "../output.js";
 import type { PRDDocument, PRDItem, ItemLevel } from "../../schema/index.js";
 import type { TreeStats } from "../../core/stats.js";
@@ -56,7 +56,7 @@ async function runChecks(dir: string): Promise<{
   checks: CheckResult[];
   doc: PRDDocument | null;
 }> {
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const checks: CheckResult[] = [];
   let doc: PRDDocument | null = null;
 

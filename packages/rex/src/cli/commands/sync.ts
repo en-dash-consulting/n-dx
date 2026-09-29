@@ -1,7 +1,7 @@
 import { join } from "node:path";
-import { resolveStore, resolveRemoteStore, SyncEngine } from "../../store/index.js";
+import { resolveStore, resolveRemoteStore, SyncEngine, resolveRexPaths } from "../../store/index.js";
 import { CLIError } from "../errors.js";
-import { REX_DIR } from "./constants.js";
+
 import { info, result } from "../output.js";
 import type { SyncDirection, SyncReport } from "../../store/index.js";
 
@@ -19,7 +19,7 @@ export async function cmdSync(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   const direction: SyncDirection =
     flags.push === "true" ? "push" :

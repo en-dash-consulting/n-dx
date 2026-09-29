@@ -4,13 +4,13 @@ import { info } from "../output.js";
 import {
   migrateJsonPrdToMarkdown,
   PRDMarkdownMigrationError,
-} from "../../store/index.js";
-import { REX_DIR } from "./constants.js";
+ resolveRexPaths } from "../../store/index.js";
+
 
 export async function cmdMigrateToMd(
   dir: string,
 ): Promise<void> {
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   try {
     const result = await migrateJsonPrdToMarkdown(rexDir);

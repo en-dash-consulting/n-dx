@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { cmdInit } from "../../src/cli/commands/init.js";
 import { cmdSmartAdd } from "../../src/cli/commands/smart-add.js";
 import { resolveStore } from "../../src/store/index.js";
-import { REX_DIR } from "../../src/cli/commands/constants.js";
+import { resolveRexPaths } from "../../src/store/index.js";
 import type { Proposal } from "../../src/analyze/index.js";
 import type { PRDItem } from "../../src/schema/index.js";
 
@@ -84,7 +84,7 @@ function flatten(items: PRDItem[]): PRDItem[] {
 }
 
 async function seedExistingTree(dir: string): Promise<void> {
-  const store = await resolveStore(join(dir, REX_DIR));
+  const store = await resolveStore(resolveRexPaths(dir).rexDir);
   await store.addItem({
     id: "epic-existing",
     title: "Identity Platform",
@@ -135,7 +135,7 @@ describe("cmdSmartAdd duplicate outcomes integration", () => {
   });
 
   it("cancel path writes nothing", async () => {
-    const store = await resolveStore(join(tmpDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(tmpDir).rexDir);
     const before = flatten((await store.loadDocument()).items);
 
     promptAnswers.push("y", "c");
@@ -174,7 +174,7 @@ describe("cmdSmartAdd duplicate outcomes integration", () => {
     };
     mockReasonFromDescriptions.mockResolvedValueOnce({ proposals: [allDuplicateProposal] });
 
-    const store = await resolveStore(join(tmpDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(tmpDir).rexDir);
     const beforeItems = flatten((await store.loadDocument()).items);
     const beforeCount = beforeItems.length;
 
@@ -205,7 +205,7 @@ describe("cmdSmartAdd duplicate outcomes integration", () => {
   // is not persisted to the per-item frontmatter. Re-enable when the storage layer
   // round-trips merge provenance.
   it.skip("merge path updates existing duplicate and only creates non-duplicate items", async () => {
-    const store = await resolveStore(join(tmpDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(tmpDir).rexDir);
 
     promptAnswers.push("y", "m");
     await cmdSmartAdd(tmpDir, "Improve OAuth security", {}, {});
@@ -235,7 +235,7 @@ describe("cmdSmartAdd duplicate outcomes integration", () => {
   // is not persisted to the per-item frontmatter. Re-enable when the storage layer
   // round-trips override provenance.
   it.skip("proceed path creates duplicate with override marker and leaves normal items unmarked", async () => {
-    const store = await resolveStore(join(tmpDir, REX_DIR));
+    const store = await resolveStore(resolveRexPaths(tmpDir).rexDir);
 
     promptAnswers.push("y", "p");
     await cmdSmartAdd(tmpDir, "Improve OAuth security", {}, {});

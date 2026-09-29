@@ -1,7 +1,7 @@
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { computeHealthScore, formatHealthScore } from "../../core/health.js";
-import { REX_DIR } from "./constants.js";
+
 import { result } from "../output.js";
 
 /**
@@ -17,7 +17,7 @@ export async function cmdHealth(
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD
   await ensureLegacyPrdMigrated(dir);
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
 

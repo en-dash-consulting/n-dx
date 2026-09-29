@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { SV_DIR } from "./constants.js";
+import { resolveSourcevisionPaths } from "../../paths.js";
 import { CLIError } from "../errors.js";
 import {
   validate,
@@ -15,7 +15,7 @@ import { info, result } from "../output.js";
 import { green, red, dim } from "@n-dx/llm-client";
 
 export function cmdValidate(dir: string): void {
-  const svDir = join(resolve(dir), SV_DIR);
+  const svDir = resolveSourcevisionPaths(resolve(dir)).svDir;
 
   if (!existsSync(svDir)) {
     throw new CLIError(

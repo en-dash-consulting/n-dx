@@ -29,4 +29,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Make ndx init write the .ndx/ layout for new projects](./make-ndx-init-write-the-ndx-layout-for.md) | pending |
 | [Move the per-user directory to ~/.ndx/ with NDX_HOME, reading ~/.n-dx/ and N_DX_HOME as fallbacks](./move-the-per-user-directory-to-ndx.md) | pending |
 | [Route hench, web and core file access through their paths modules](./route-hench-web-and-core-file-access.md) | pending |
-| [Route rex and sourcevision file access through their paths modules](./route-rex-and-sourcevision-file-access.md) | pending |
+| [Route rex and sourcevision file access through their paths modules](./route-rex-and-sourcevision-file-access.md) | in_progress |

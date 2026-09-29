@@ -5,7 +5,7 @@
  * the analysis engine, schema, and shared utilities behind a single boundary.
  */
 
-export { SV_DIR, TOOL_VERSION } from "../constants.js";
+export { TOOL_VERSION } from "../constants.js";
 export { DATA_FILES, SUPPLEMENTARY_FILES } from "../schema/data-files.js";
 export {
   validate,

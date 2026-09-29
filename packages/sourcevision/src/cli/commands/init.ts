@@ -2,8 +2,9 @@ import { writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { getCurrentHead, getCurrentBranch } from "@n-dx/llm-client";
 import { SCHEMA_VERSION } from "../sourcevision-core.js";
-import { TOOL_VERSION, SV_DIR } from "./constants.js";
+import { TOOL_VERSION } from "./constants.js";
 import { info } from "../output.js";
+import { resolveSourcevisionPaths } from "../../paths.js";
 
 export const HINTS_TEMPLATE = `<!-- Sourcevision Hints -->
 <!-- Uncomment and edit the lines below to provide project context -->
@@ -18,7 +19,7 @@ export const HINTS_TEMPLATE = `<!-- Sourcevision Hints -->
 
 export function cmdInit(dir: string): void {
   const absDir = resolve(dir);
-  const svDir = join(absDir, SV_DIR);
+  const svDir = resolveSourcevisionPaths(absDir).svDir;
 
   if (existsSync(join(svDir, "manifest.json"))) {
     info(`.sourcevision/ already initialized in ${absDir}`);

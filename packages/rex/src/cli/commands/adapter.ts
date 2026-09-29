@@ -10,11 +10,12 @@
  */
 
 import { join } from "node:path";
-import { REX_DIR } from "./constants.js";
+
 import { info, result } from "../output.js";
 import { CLIError } from "../errors.js";
 import { getDefaultRegistry, isRedactedField, BUILT_IN_NAMES } from "../../store/adapter-registry.js";
 import type { AdapterConfig } from "../../store/adapter-registry.js";
+import { resolveRexPaths } from "../../store/index.js";
 
 // ---------------------------------------------------------------------------
 // Subcommands
@@ -25,7 +26,7 @@ async function adapterList(
   flags: Record<string, string>,
 ): Promise<void> {
   const registry = getDefaultRegistry();
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const adapters = registry.list();
   const configs = await registry.loadAdapterConfigs(rexDir);
   const configuredNames = new Set(configs.map((c) => c.name));
@@ -69,7 +70,7 @@ async function adapterAdd(
   flags: Record<string, string>,
 ): Promise<void> {
   const registry = getDefaultRegistry();
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   // Validate adapter exists
   const def = registry.get(name);
@@ -123,7 +124,7 @@ async function adapterRemove(
   name: string,
 ): Promise<void> {
   const registry = getDefaultRegistry();
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   // Check if config exists
   const existing = await registry.getAdapterConfig(rexDir, name);
@@ -144,7 +145,7 @@ async function adapterShow(
   flags: Record<string, string>,
 ): Promise<void> {
   const registry = getDefaultRegistry();
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   const def = registry.get(name);
   const config = await registry.getAdapterConfig(rexDir, name);

@@ -2,9 +2,9 @@ import { join, basename } from "node:path";
 import { readFile, writeFile, access, mkdir } from "node:fs/promises";
 import { DEFAULT_CONFIG } from "../../schema/index.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
-import { ensureRexDir } from "../../store/index.js";
+import { ensureRexDir, resolveRexPaths } from "../../store/index.js";
 import { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "../../workflow/default.js";
-import { REX_DIR } from "./constants.js";
+
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
 import { info } from "../output.js";
 
@@ -12,7 +12,7 @@ export async function cmdInit(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
 
   await ensureRexDir(rexDir);
 

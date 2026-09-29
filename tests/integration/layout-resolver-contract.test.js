@@ -22,6 +22,8 @@ import { join } from "node:path";
 let core;
 /** @type {Record<string, any>} */
 let foundation;
+/** @type {Record<string, any>} */
+let isoBundle;
 
 /** A project on the legacy layout — three dot-dirs, no container. */
 let legacyRoot;
@@ -46,6 +48,7 @@ const LAYOUT_FIELDS = [
 beforeAll(async () => {
   core = await import("../../packages/core/layout.js");
   foundation = await import("../../packages/llm-client/dist/public.js");
+  isoBundle = await import("../../packages/sourcevision/dist/export/iso-sources.js");
 
   legacyRoot = mkdtempSync(join(tmpdir(), "ndx-layout-legacy-"));
   mkdirSync(join(legacyRoot, ".rex"), { recursive: true });
@@ -202,5 +205,46 @@ describe("layout resolver: core twin matches the foundation implementation", () 
 
     expect(fromCore).toEqual([...LAYOUT_FIELDS].sort());
     expect(fromFoundation).toEqual([...LAYOUT_FIELDS].sort());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The iso bundle carries a third copy, for the same reason core carries a second
+// ---------------------------------------------------------------------------
+
+describe("layout resolver: iso bundle twin matches the foundation implementation", () => {
+  // `packages/sourcevision/src/export/` bundles into the dependency-free
+  // standalone skill script, so it may import nothing but `node:` builtins and
+  // cannot reach the resolver. It resolves only the analysis directory, which
+  // is the only path the map reads.
+  for (const layout of ["legacy", "ndx"]) {
+    it(`resolves the analysis directory identically for a ${layout} project`, () => {
+      const root = layout === "ndx" ? ndxRoot : legacyRoot;
+
+      expect(
+        isoBundle.analysisDirFor(root),
+        "packages/sourcevision/src/export/iso-sources.ts and packages/llm-client/src/layout.ts disagree",
+      ).toBe(foundation.resolveLayout(root).sourcevisionDir);
+    });
+  }
+
+  it("agrees for a root that does not exist at all", () => {
+    const missing = join(legacyRoot, "no-such-project");
+
+    expect(isoBundle.analysisDirFor(missing)).toBe(
+      foundation.resolveLayout(missing).sourcevisionDir,
+    );
+  });
+
+  it("agrees that a .ndx file is not a container", () => {
+    const root = mkdtempSync(join(tmpdir(), "ndx-layout-iso-file-"));
+    try {
+      writeFileSync(join(root, ".ndx"), "not a container\n");
+      expect(isoBundle.analysisDirFor(root)).toBe(
+        foundation.resolveLayout(root).sourcevisionDir,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

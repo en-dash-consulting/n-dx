@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import type { PRDStore } from "../../store/index.js";
 import type { PRDDocument } from "../../schema/index.js";
 import {
@@ -14,7 +14,7 @@ import {
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { appendArchiveBatch } from "../../core/archive.js";
-import { REX_DIR } from "./constants.js";
+
 import { parseIntList } from "../parse-utils.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";
@@ -280,7 +280,7 @@ export async function cmdReorganize(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   // Snapshot the tree before any mutation so `rex restore` can undo this reorganize.

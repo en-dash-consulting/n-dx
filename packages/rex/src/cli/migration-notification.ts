@@ -20,17 +20,21 @@ import type { LogEntry } from "../schema/v1.js";
  * The banner includes:
  * - "prd.json detected and migrated" heading
  * - Backup file path (yellow)
- * - Folder-tree location (.rex/prd_tree)
+ * - Folder-tree location
  * - Suggestion to inspect with rex status
+ *
+ * `folderTreePath` is supplied rather than defaulted because where the tree
+ * lives depends on the project's folder layout, and this module has no project
+ * root to resolve it from. The migration result carries the value.
  *
  * @param backupPath - Path to the timestamped backup file
  * @param itemCount - Number of items migrated
- * @param folderTreePath - Path to the new folder-tree root
+ * @param folderTreePath - Path to the new folder-tree root, as the operator should see it
  */
 export function formatMigrationBanner(
   backupPath: string,
   itemCount: number,
-  folderTreePath: string = `.rex/${PRD_TREE_DIRNAME}`,
+  folderTreePath: string,
 ): string {
   const lines: string[] = [];
 
@@ -106,7 +110,7 @@ export async function emitMigrationNotification(
   if (shouldEmitMigrationBanner(flags)) {
     const backupPath = result.backupPath ?? "(unknown)";
     const itemCount = result.itemCount ?? 0;
-    const banner = formatMigrationBanner(backupPath, itemCount);
+    const banner = formatMigrationBanner(backupPath, itemCount, result.folderTreePath ?? PRD_TREE_DIRNAME);
     console.error(banner);
   }
 

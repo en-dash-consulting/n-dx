@@ -29,7 +29,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { execFileSyncCli } from "../util/exec-cli.js";
-import { getCurrentBranch, PROJECT_DIRS } from "@n-dx/llm-client";
+import { getCurrentBranch, PROJECT_DIRS, resolveLayout } from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
 // Lightweight PRD types (mirrors rex schema — no runtime import from rex)
@@ -382,8 +382,8 @@ export async function collectBranchWork(
   // ── 2. Read current PRD from disk ────────────────────────────
   // Prefer prd.md (current source of truth); fall back to legacy prd.json.
 
-  const mdPath = join(dir, PROJECT_DIRS.REX, "prd.md");
-  const jsonPath = join(dir, PROJECT_DIRS.REX, "prd.json");
+  const mdPath = join(resolveLayout(dir).rexDir, "prd.md");
+  const jsonPath = join(resolveLayout(dir).rexDir, "prd.json");
   const sourcePath = existsSync(mdPath) ? mdPath : existsSync(jsonPath) ? jsonPath : null;
 
   let currentDoc: PRDDocumentShape | null = null;
