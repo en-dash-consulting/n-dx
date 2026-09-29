@@ -44,6 +44,7 @@ describe("rex public API contract", () => {
     // Tree utilities
     { name: "findItem", type: "function" },
     { name: "walkTree", type: "function" },
+    { name: "diffTrees", type: "function" },
     { name: "collectAllIds", type: "function" },
     { name: "insertChild", type: "function" },
     { name: "updateInTree", type: "function" },
@@ -179,6 +180,7 @@ describe("hench → rex gateway contract", () => {
     "loadAcknowledged",
     "saveAcknowledged",
     "acknowledgeFinding",
+    "resolveActor",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -367,6 +369,7 @@ describe("web → rex gateway contract", () => {
     "isCompatibleSchema",
     "findItem",
     "walkTree",
+    "diffTrees",
     "insertChild",
     "updateInTree",
     "removeFromTree",
@@ -605,7 +608,7 @@ describe("gateway export auto-detection", () => {
         "findAutoCompletions", "reconcileAutoCompletions", "findParentResets",
         "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
-        "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding"],
+        "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding", "resolveActor"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "TREE_META_FILENAME", "SELF_HEAL_TAG",
         "checkTreeConformance"],
     ]);
@@ -695,6 +698,7 @@ describe("gateway export auto-detection", () => {
 
     const testedSymbols = new Set([
       ...["createRexMcpServer", "ensureLegacyPrdMigrated", "isCompatibleSchema", "findItem", "walkTree",
+        "diffTrees",
         "insertChild", "updateInTree", "removeFromTree", "computeStats",
         "collectAllIds", "findNextTask", "collectCompletedIds",
         "openClaimsStore", "resolveClaimHolder",
@@ -1090,6 +1094,47 @@ describe("gateway behavioral tests: web → rex return shapes", () => {
     if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
     expect(typeof gw.LEVEL_HIERARCHY).toBe("object");
     expect(Object.keys(gw.LEVEL_HIERARCHY).length).toBeGreaterThan(0);
+  });
+
+  it("diffTrees returns the five categories the PRD delta projects", async () => {
+    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
+    const from = [
+      { id: "e1", title: "E", level: "epic", status: "pending", children: [
+        { id: "t1", title: "T1", level: "task", status: "pending", children: [] },
+        { id: "t2", title: "T2", level: "task", status: "pending", children: [] },
+      ] },
+    ];
+    const to = [
+      { id: "e1", title: "E", level: "epic", status: "pending", children: [
+        { id: "t1", title: "T1", level: "task", status: "completed", children: [] },
+        { id: "t3", title: "T3", level: "task", status: "pending", children: [] },
+      ] },
+    ];
+
+    const diff = gw.diffTrees(from, to);
+
+    // prd-delta.ts maps added→onlyHere, removed→onlyAnchor, and reads
+    // counts/totals off this shape, so all four must survive the boundary.
+    expect(diff.added.map((e) => e.id)).toEqual(["t3"]);
+    expect(diff.removed.map((e) => e.id)).toEqual(["t2"]);
+    expect(diff.changed.map((e) => e.id)).toEqual(["t1"]);
+    expect(diff.completed.map((e) => e.id)).toEqual(["t1"]);
+    expect(diff.moved).toEqual([]);
+    expect(diff.counts).toEqual({ added: 1, removed: 1, changed: 1, completed: 1, moved: 0 });
+    expect(diff.totals).toEqual({ from: 3, to: 3 });
+    expect(diff.identical).toBe(false);
+    expect(diff.added[0].ancestors.map((a) => a.id)).toEqual(["e1"]);
+  });
+
+  it("diffTrees honours the comparedFields prd-delta passes", async () => {
+    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
+    const from = [{ id: "t1", title: "before", level: "task", status: "pending", children: [] }];
+    const to = [{ id: "t1", title: "after", level: "task", status: "pending", children: [] }];
+
+    // The dashboard's PRD_DELTA_COMPARED_FIELDS is its own published
+    // contract; passing it must actually narrow the comparison.
+    expect(gw.diffTrees(from, to, { comparedFields: ["status"] }).changed).toEqual([]);
+    expect(gw.diffTrees(from, to, { comparedFields: ["title"] }).changed.length).toBe(1);
   });
 
   it("VALID_STATUSES contains expected status values", async () => {

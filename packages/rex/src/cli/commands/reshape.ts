@@ -12,6 +12,7 @@ import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
 import { migrateToFolderPerTask } from "../../core/folder-per-task-migration.js";
 import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
+import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
 import { REX_DIR } from "./constants.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
@@ -30,6 +31,13 @@ export async function cmdReshape(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  // --dry-run only previews proposals, so it is not a whole-tree rewrite.
+  const guard = flags["dry-run"] === "true" ? { blocked: false, branch: "" } : checkBranchGuard(dir, flags);
+  if (guard.blocked) {
+    const { message, suggestion } = branchGuardRefusal("reshape", guard.branch);
+    throw new CLIError(message, suggestion);
+  }
+
   const rexDir = join(dir, REX_DIR);
 
   // Acquire reshape lock so concurrent `add` commands skip their scoped pass.

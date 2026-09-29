@@ -89,6 +89,7 @@ const REX_COMMANDS = [
   "init",
   "status",
   "tree",
+  "tree-diff",
   "next",
   "add",
   "update",

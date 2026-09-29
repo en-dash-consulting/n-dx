@@ -5,11 +5,19 @@ import {
   migrateJsonPrdToMarkdown,
   PRDMarkdownMigrationError,
 } from "../../store/index.js";
+import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { REX_DIR } from "./constants.js";
 
 export async function cmdMigrateToMd(
   dir: string,
+  flags: Record<string, string> = {},
 ): Promise<void> {
+  const guard = checkBranchGuard(dir, flags);
+  if (guard.blocked) {
+    const { message, suggestion } = branchGuardRefusal("migrate-to-md", guard.branch);
+    throw new CLIError(message, suggestion);
+  }
+
   const rexDir = join(dir, REX_DIR);
 
   try {
