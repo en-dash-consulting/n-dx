@@ -1,4 +1,5 @@
 import { h } from "preact";
+import type { ComponentChild } from "preact";
 
 /**
  * Health Gauge - A radial progress indicator for metrics like cohesion/coupling.
@@ -110,9 +111,11 @@ interface MetricCardProps {
   label: string;
   trend?: "up" | "down" | "neutral";
   color?: string;
+  /** An explainer beside the label — typically an `InfoTip`. Kept outside the aria-hidden label. */
+  info?: ComponentChild;
 }
 
-export function MetricCard({ value, label, trend, color }: MetricCardProps) {
+export function MetricCard({ value, label, trend, color, info }: MetricCardProps) {
   const trendIcon = trend === "up" ? "\u2191" : trend === "down" ? "\u2193" : "";
   const trendText = trend === "up" ? "trending up" : trend === "down" ? "trending down" : "";
 
@@ -121,6 +124,11 @@ export function MetricCard({ value, label, trend, color }: MetricCardProps) {
       value,
       trend ? h("span", { class: `metric-trend metric-trend-${trend}` }, trendIcon) : null
     ),
-    h("div", { class: "metric-label", "aria-hidden": "true" }, label)
+    info
+      ? h("div", { class: "metric-label metric-label--with-info" },
+          h("span", { "aria-hidden": "true" }, label),
+          info,
+        )
+      : h("div", { class: "metric-label", "aria-hidden": "true" }, label)
   );
 }

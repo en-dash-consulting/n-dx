@@ -6,10 +6,12 @@
  * "zone pin", "enrichment pass", "archetype", "guard rail",
  * "epic / feature / task" or "worktree anchor" meant, because those words
  * appear on screen with no explanation. This module holds one definition per
- * term; `GlossaryLine` (`glossary-line.ts`, beside this file) renders it
- * where each term first appears on a page. Adding a term here and wiring one
- * `GlossaryLine` call is the whole change — there is no second place that
- * writes definition text.
+ * term; `GlossaryLine` (`glossary-line.ts`, beside this file) renders it as a
+ * visible line where each term first appears on a page, and `InfoTip`
+ * (`info-tip.ts`) renders it behind a hoverable ⓘ where a visible line would
+ * crowd the layout — a column header, a metric card. Adding a term here and
+ * wiring one `GlossaryLine` or `InfoTip` call is the whole change — there is
+ * no second place that writes definition text.
  *
  * Every term must be a word the dashboard actually shows: a definition for a
  * word the reader cannot find on screen explains nothing. "weight" was
@@ -64,6 +66,21 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = [
     term: "worktree anchor",
     definition:
       "The primary git worktree a project was registered from. Every other worktree's PRD and progress are shown as a difference against it.",
+  },
+  {
+    term: "cohesion",
+    definition:
+      "The share of a zone's imports that stay inside it. Higher means the zone holds together on its own; low cohesion together with high coupling is the combination worth watching.",
+  },
+  {
+    term: "coupling",
+    definition:
+      "The share of a zone's imports that cross its boundary into other zones. Higher means the zone is more entangled with the rest of the codebase, so a change inside it reaches further.",
+  },
+  {
+    term: "cross-zone import",
+    definition:
+      "An import whose file and target sit in different zones. The busiest boundaries are the zone pairs with the most of them — in most codebases, largely tests importing the code they test.",
   },
 ];
 
