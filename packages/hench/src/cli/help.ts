@@ -44,6 +44,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--task=<id>", description: "Target a specific Rex task ID" },
       { flag: "--epic=<id|title>", description: "Only consider tasks within the specified epic" },
       { flag: "--epic-by-epic", description: "Process epics sequentially, advancing when done" },
+      { flag: "--mine", description: "Only pick tasks whose assignee matches the current user (resolved from git identity, like lastModifiedBy). Filters both autoselection and the interactive menu; an explicit --task bypasses it. Refused with --epic-by-epic, which cannot filter by assignee." },
       { flag: "--auto", description: "Skip interactive selection, autoselect by priority" },
       { flag: "--iterations=<n>", description: "Run multiple tasks sequentially (e.g. --iterations=5)" },
       { flag: "--loop", description: "Run continuously until all tasks complete or Ctrl+C" },
@@ -321,6 +322,51 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["config"],
   },
+  cache: {
+    tool: "hench",
+    command: "cache",
+    summary: "inspect or clear the session cache",
+    usage: [
+      "hench cache list [options] [dir]",
+      "hench cache clear [options] [dir]",
+    ],
+    description:
+      "The session cache is what lets a task skip cold start. It holds two\n" +
+      "independent scopes in .hench/session-cache.json:\n" +
+      "\n" +
+      "  parent  the orientation session the \"fork\" strategy forks per task\n" +
+      "  batch   the running session the \"batch\" strategy resumes per task\n" +
+      "\n" +
+      "list shows what each scope holds — session id, age, vendor and model,\n" +
+      "and for a batch chain the worktree, ref, analysis fingerprint and\n" +
+      "policy hash it was opened under. An entry that is dead for everyone\n" +
+      "(too old, idle too long, unreadable, or written by another version) is\n" +
+      "marked [dead] with the reason.\n" +
+      "\n" +
+      "clear removes a scope. The scopes are cleared independently, so\n" +
+      "dropping a stale batch chain never costs you a good orientation\n" +
+      "parent. --dead removes only the dead entries and leaves live ones.\n" +
+      "\n" +
+      "Clearing is cheap and self-correcting: the next run re-orients or opens\n" +
+      "a new session, which costs one spawn. A run already evicts dead entries\n" +
+      "in the scopes its strategy does not read, so routine use needs no\n" +
+      "maintenance — this command is for when you want to see or force it.\n" +
+      "\n" +
+      "The cache never holds prompt or transcript content: only ids, hashes,\n" +
+      "counters, timestamps, and the previous task's title.",
+    options: [
+      { flag: "--scope=<scope>", description: "parent | batch | all (default: all)" },
+      { flag: "--dead", description: "clear: remove only entries that are dead, keeping live ones" },
+      { flag: "--format=json", description: "list: output as JSON" },
+    ],
+    examples: [
+      { command: "hench cache list", description: "Show both scopes and why an entry would be declined" },
+      { command: "hench cache clear --scope=batch", description: "Drop the batch chain, keep the orientation parent" },
+      { command: "hench cache clear --dead", description: "Evict only expired, idle or malformed entries" },
+      { command: "hench cache list --format=json .", description: "Machine-readable output" },
+    ],
+    related: ["run", "config"],
+  },
   "validate-tokens": {
     tool: "hench",
     command: "validate-tokens",
@@ -358,6 +404,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   show: ["status"],
   config: ["template"],
   template: ["config"],
+  cache: ["run", "config"],
   "validate-tokens": ["status", "show"],
 };
 

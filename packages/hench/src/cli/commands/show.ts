@@ -6,6 +6,7 @@ import { info, result } from "../output.js";
 import { colorStatus } from "../../prd/llm-gateway.js";
 import { lookupTaskInRex, formatTaskLine } from "./task-lookup.js";
 import { formatTokenReport } from "../token-logging.js";
+import { formatSessionDecision } from "../session-report.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
 
 export async function cmdShow(
@@ -52,7 +53,8 @@ export async function cmdShow(
   // formatTokenReport carries the cache halves itself — `show` used to print
   // its own Cache line here, which is where `ndx work`'s run summary diverged
   // from it and lost them.
-  info(formatTokenReport(run.tokenUsage));
+  info(formatTokenReport(run.tokenUsage, run.tokens?.cachedProvenance));
+  if (run.session) info(formatSessionDecision(run.session));
 
   // Whether this run was reviewed, next to the status it qualifies. The run
   // record is the only copy that outlives the terminal, so a run that was

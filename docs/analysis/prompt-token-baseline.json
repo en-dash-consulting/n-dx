@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 22345,
-    "uniqueTokens": 13842,
+    "perCallTokens": 22368,
+    "uniqueTokens": 13865,
     "skills": 13,
     "skillTokens": 17511
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4125,
-      "uniqueTokens": 4125
+      "perCallTokens": 4148,
+      "uniqueTokens": 4148
     },
     "core": {
       "surfaces": 1,
@@ -751,11 +751,11 @@
       "builder": "formatTaskBrief",
       "purpose": "Render the task brief section — task, parent chain, requirements.",
       "inline": false,
-      "literals": 42,
+      "literals": 43,
       "constants": {},
-      "ownTokens": 214,
-      "fixedChars": 854,
-      "fixedTokens": 214
+      "ownTokens": 237,
+      "fixedChars": 946,
+      "fixedTokens": 237
     },
     {
       "pkg": "hench",
@@ -930,9 +930,9 @@
           "tokens": 167
         }
       ],
-      "fixedTokens": 1137,
+      "fixedTokens": 1160,
       "branchConditional": true,
-      "unreachedTokens": 398
+      "unreachedTokens": 421
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -987,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "0be70d41f3b64518",
-  "recordedAt": "2026-09-28T19:34:04.378Z",
-  "commit": "79d0d9b72d19",
+  "contentHash": "584c7bf855939e5e",
+  "recordedAt": "2026-09-29T16:35:20.672Z",
+  "commit": "5909ca118eb7",
   "dirty": false
 }

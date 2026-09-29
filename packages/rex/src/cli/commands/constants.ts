@@ -13,6 +13,7 @@ export function usage(): void {
           { name: "init [dir]", description: "Initialize .rex/ in directory (default: .)" },
           { name: "status [dir]", description: "Show PRD tree (hides completed items by default)" },
           { name: "tree [dir]", description: "Show full PRD hierarchy with color-coded status" },
+          { name: "tree-diff [dir]", description: "Compare two PRD trees (commits, or a worktree against its anchor)" },
           { name: "next [dir]", description: "Print next actionable task" },
           { name: "add <level> [dir]", description: "Add item manually (epic|feature|task|subtask)" },
           { name: "add \"<desc>\" [\"<d2>\"]", description: "Smart add: LLM creates PRD from descriptions" },

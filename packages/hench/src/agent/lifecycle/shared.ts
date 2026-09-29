@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "nod
 import { join } from "node:path";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -149,6 +149,11 @@ export interface SharedLoopOptions {
   epicId?: string;
   /** Only select tasks with at least one of these tags (e.g. ["self-heal"]). */
   tags?: string[];
+  /**
+   * Only select tasks whose `assignee` field matches this identity string
+   * (`ndx work --mine`). Resolved once in `cmdRun` via rex's `resolveActor`.
+   */
+  assignee?: string;
   /**
    * Cross-worktree claims for this run: selection passes over tasks other
    * worktrees hold and claims the one it picks. The caller (`runOne`)
@@ -404,7 +409,32 @@ export interface InitRunOptions {
   invocationContext?: "cli" | "api";
   /** Task weight / tier ("light" | "standard"). Used for task-weight-aware model selection. */
   weight?: string;
+  /**
+   * The session-cache decision, when the caller has already made one.
+   *
+   * Only the API loops pass this, and they pass {@link API_SESSION_DECISION} —
+   * their answer is fixed and known before the record exists. The CLI loop
+   * leaves it absent and writes {@link RunRecord.session} later, at the point
+   * it consults the cache; a default seeded here would let a CLI run that died
+   * in between claim a decision nobody made.
+   */
+  session?: RunSessionRecord;
 }
+
+/**
+ * What the session cache answered for a run that never asked it.
+ *
+ * The API providers hold no session that can be resumed by id, so there is no
+ * cache to consult and no strategy to resolve — but "every run record reports
+ * strategy and decision reason" has to hold for them too. Silence is the wrong
+ * way to say this: an absent `session` is also what a CLI run looks like when
+ * it died before reaching the decision, and the two are not the same fact.
+ */
+export const API_SESSION_DECISION: RunSessionRecord = {
+  strategy: "cold",
+  outcome: "miss",
+  reason: "api-provider",
+};
 
 /**
  * System memory context captured at run start, passed through to
@@ -441,6 +471,7 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     invocationContext: opts.invocationContext,
     vendor: opts.vendor,
     weight: opts.weight ?? "standard",
+    session: opts.session,
     actor: await resolveActor(opts.projectDir ?? "."),
     host: resolveHost(),
     ndxVersion: resolveNdxVersion(),

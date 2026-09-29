@@ -41,6 +41,7 @@ import {
   clearSessionCache,
   isParentUsable,
   sourcevisionFingerprint,
+  cacheEntryAgeMs,
   type ParentRejection,
 } from "./session-cache.js";
 import { readFreshPrimer } from "./primer.js";
@@ -176,14 +177,37 @@ const REJECTION_DETAIL: Record<ParentRejection, string> = {
 };
 
 /**
+ * What the parent cache answered, and what the run did about it.
+ *
+ * Returned rather than just the id because the caller records the decision on
+ * the run: a run that forked and a run that oriented cost very different
+ * amounts, and "no parent" alone cannot tell the operator whether the analysis
+ * moved, the model changed, or nothing was ever cached.
+ */
+export interface WarmParentDecision {
+  /** Session to fork from, or undefined when the run must spawn cold. */
+  parentId?: string;
+  /** Whether an existing cached parent was reused. */
+  outcome: "hit" | "miss";
+  /**
+   * The {@link ParentRejection} on a miss, `"cached"` on a hit, or — when a
+   * miss was followed by a successful orientation — the rejection that caused
+   * it. The reason names why the cache did not serve this run, which stays
+   * true whether or not a replacement was built.
+   */
+  reason: string;
+  /** Age of the entry that was consulted, when there was one. */
+  ageMs?: number;
+}
+
+/**
  * Return a session id to fork task spawns from, orienting first if needed.
  *
- * Returns undefined when no parent could be established, which the caller
- * must treat as "spawn cold" rather than as an error.
+ * A decision with no `parentId` means "spawn cold" rather than an error.
  */
 export async function ensureWarmParent(
   opts: EnsureWarmParentOptions,
-): Promise<string | undefined> {
+): Promise<WarmParentDecision> {
   const svFingerprint = await sourcevisionFingerprint(opts.projectDir);
   const cached = await readSessionCache(opts.henchDir);
   const verdict = isParentUsable(cached, {
@@ -193,16 +217,25 @@ export async function ensureWarmParent(
     maxAgeHours: opts.maxAgeHours,
     fresh: opts.fresh,
   });
+  const ageMs = cached ? cacheEntryAgeMs(cached.createdAt) : undefined;
 
   if (verdict.usable && cached) {
     detail(`Warm session: forking cached orientation ${cached.parentId.slice(0, 8)}`);
-    return cached.parentId;
+    return { parentId: cached.parentId, outcome: "hit", reason: "cached", ageMs };
   }
+
+  const reason = verdict.usable ? "no-entry" : verdict.reason;
+  const miss = (parentId?: string): WarmParentDecision => ({
+    parentId,
+    outcome: "miss",
+    reason,
+    ageMs,
+  });
 
   // Drop the unusable entry before orienting so a failed orientation cannot
   // leave a parent behind that the next run would happily fork.
   if (cached) await clearSessionCache(opts.henchDir);
-  detail(`Warm session: orienting (${REJECTION_DETAIL[verdict.usable ? "no-entry" : verdict.reason]})`);
+  detail(`Warm session: orienting (${REJECTION_DETAIL[reason]})`);
 
   // Seeded from the same fingerprint the parent is keyed on, so the primer a
   // fork inherits always describes the analysis that fork was cached against.
@@ -227,7 +260,7 @@ export async function ensureWarmParent(
     result = await opts.spawn(spawnConfig);
   } catch (err) {
     detail(`Warm session unavailable (${(err as Error).message}); continuing with cold spawns`);
-    return undefined;
+    return miss();
   }
 
   if (result.error || !result.sessionId) {
@@ -235,7 +268,7 @@ export async function ensureWarmParent(
       `Warm session unavailable (${result.error ?? "no session id reported"}); ` +
         "continuing with cold spawns",
     );
-    return undefined;
+    return miss();
   }
 
   await writeSessionCache(opts.henchDir, {
@@ -249,5 +282,5 @@ export async function ensureWarmParent(
   });
 
   detail(`Warm session ready: ${result.sessionId.slice(0, 8)}`);
-  return result.sessionId;
+  return miss(result.sessionId);
 }

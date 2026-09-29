@@ -320,7 +320,7 @@
 
 .wf-toast {
   position: fixed;
-  bottom: 20px;
+  bottom: calc(20px + var(--bottombar-h, 0px));
   right: 20px;
   background: var(--green);
   color: var(--bg);

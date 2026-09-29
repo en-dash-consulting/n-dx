@@ -3,13 +3,19 @@ import { CLIError } from "../errors.js";
 import { info } from "../output.js";
 import {
   migrateJsonPrdToMarkdown,
-  PRDMarkdownMigrationError,
- resolveRexPaths } from "../../store/index.js";
-
+  PRDMarkdownMigrationError, resolveRexPaths } from "../../store/index.js";
+import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 
 export async function cmdMigrateToMd(
   dir: string,
+  flags: Record<string, string> = {},
 ): Promise<void> {
+  const guard = checkBranchGuard(dir, flags);
+  if (guard.blocked) {
+    const { message, suggestion } = branchGuardRefusal("migrate-to-md", guard.branch);
+    throw new CLIError(message, suggestion);
+  }
+
   const rexDir = resolveRexPaths(dir).rexDir;
 
   try {

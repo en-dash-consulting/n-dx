@@ -186,7 +186,7 @@
 /* Refresh toast */
 .refresh-toast {
   position: fixed;
-  bottom: 24px;
+  bottom: calc(24px + var(--bottombar-h, 0px));
   left: 50%;
   transform: translateX(-50%);
   background: var(--accent-dim);

@@ -132,18 +132,24 @@ describe("ensureWarmParent", () => {
       model: "claude-sonnet-5",
     });
 
-    const parentId = await ensureWarmParent(baseArgs({ spawn }));
+    const decision = await ensureWarmParent(baseArgs({ spawn }));
 
-    expect(parentId).toBe("cached-parent");
+    expect(decision.parentId).toBe("cached-parent");
+    expect(decision).toMatchObject({ outcome: "hit", reason: "cached" });
+    expect(decision.ageMs).toBeGreaterThanOrEqual(0);
     expect(spawn).not.toHaveBeenCalled();
   });
 
   it("orients once on a miss and caches the new parent", async () => {
     const spawn = vi.fn().mockResolvedValue({ sessionId: "new-parent" });
 
-    const parentId = await ensureWarmParent(baseArgs({ spawn }));
+    const decision = await ensureWarmParent(baseArgs({ spawn }));
 
-    expect(parentId).toBe("new-parent");
+    expect(decision.parentId).toBe("new-parent");
+    // Still a miss, even though an orientation replaced it: the reason names
+    // why the cache did not serve this run, not what was built afterwards.
+    expect(decision).toMatchObject({ outcome: "miss", reason: "no-entry" });
+    expect(decision.ageMs).toBeUndefined();
     expect(spawn).toHaveBeenCalledTimes(1);
     expect((await readSessionCache(henchDir))?.parentId).toBe("new-parent");
   });
@@ -157,9 +163,10 @@ describe("ensureWarmParent", () => {
     });
     const spawn = vi.fn().mockResolvedValue({ sessionId: "fresh-parent" });
 
-    const parentId = await ensureWarmParent(baseArgs({ spawn, fresh: true }));
+    const decision = await ensureWarmParent(baseArgs({ spawn, fresh: true }));
 
-    expect(parentId).toBe("fresh-parent");
+    expect(decision.parentId).toBe("fresh-parent");
+    expect(decision).toMatchObject({ outcome: "miss", reason: "fresh-requested" });
     expect(spawn).toHaveBeenCalledTimes(1);
     expect((await readSessionCache(henchDir))?.parentId).toBe("fresh-parent");
   });
@@ -176,24 +183,41 @@ describe("ensureWarmParent", () => {
     expect(opts.forkSession).toBeFalsy();
   });
 
-  it("returns undefined when the orientation spawn reports no session id", async () => {
+  it("returns no parent when the orientation spawn reports no session id", async () => {
     const spawn = vi.fn().mockResolvedValue({ sessionId: undefined });
 
-    expect(await ensureWarmParent(baseArgs({ spawn }))).toBeUndefined();
+    expect((await ensureWarmParent(baseArgs({ spawn }))).parentId).toBeUndefined();
     expect(await readSessionCache(henchDir)).toBeUndefined();
   });
 
-  it("returns undefined when the orientation spawn errors, without throwing", async () => {
+  it("returns no parent when the orientation spawn errors, without throwing", async () => {
     const spawn = vi.fn().mockResolvedValue({ sessionId: "p", error: "boom" });
 
-    expect(await ensureWarmParent(baseArgs({ spawn }))).toBeUndefined();
+    expect((await ensureWarmParent(baseArgs({ spawn }))).parentId).toBeUndefined();
     expect(await readSessionCache(henchDir)).toBeUndefined();
   });
 
   it("swallows a thrown spawn failure — a cold run beats a dead loop", async () => {
     const spawn = vi.fn().mockRejectedValue(new Error("CLI not found"));
 
-    await expect(ensureWarmParent(baseArgs({ spawn }))).resolves.toBeUndefined();
+    const decision = await ensureWarmParent(baseArgs({ spawn }));
+    expect(decision.parentId).toBeUndefined();
+    expect(decision.outcome).toBe("miss");
+  });
+
+  it("names the rejection that caused the miss, not just that there was one", async () => {
+    await writeSessionCache(henchDir, {
+      parentId: "other-model-parent",
+      svFingerprint: await sourcevisionFingerprint(projectDir),
+      vendor: "claude",
+      model: "claude-opus-5",
+    });
+    const spawn = vi.fn().mockResolvedValue({ sessionId: "p" });
+
+    const decision = await ensureWarmParent(baseArgs({ spawn, model: "claude-sonnet-5" }));
+
+    expect(decision).toMatchObject({ outcome: "miss", reason: "model-changed" });
+    expect(decision.ageMs).toBeGreaterThanOrEqual(0);
   });
 
   it("writes the vendor and model it oriented under, so a switch invalidates", async () => {
