@@ -639,6 +639,11 @@ export async function resetDeferredTasks(
  *
  * On a dry run nothing is written and nothing is committed.
  *
+ * {@link ResetDeferredOptions.assignee} is forwarded whole. Rebuilding the
+ * options here as `{ dryRun }` silently unscoped `ndx work --mine
+ * --reset-deferred` back to the entire PRD — the very defect the option was
+ * added to close, reintroduced one call below it. Pass `opts` through.
+ *
  * @returns the number of tasks reset, or that would be reset on a dry run
  */
 export async function resetDeferredAndCommit(
@@ -651,7 +656,7 @@ export async function resetDeferredAndCommit(
   // indistinguishable from anything that was already there.
   const prdDirtyBeforeReset = dryRun ? [] : await listUncommittedPrdPaths(projectDir);
 
-  const resetCount = await resetDeferredTasks(store, { dryRun });
+  const resetCount = await resetDeferredTasks(store, opts);
   if (resetCount === 0) {
     info("\nNo deferred or failing tasks to reset.");
     return 0;
@@ -731,6 +736,34 @@ export function formatNoAssignedTasksLines(
       : `  No actionable tasks exist without --mine either.`,
   );
   return lines;
+}
+
+/**
+ * The lines `--loop` prints when it runs out of the identity's tasks.
+ *
+ * Separate from {@link formatNoAssignedTasksLines} because the loop has a
+ * count of its own to report, and exported for the same reason: built inline
+ * at the call site, the one thing this message must never say — "All tasks
+ * complete", which is what it said when `--mine` matched nothing on the first
+ * iteration — was asserted by no test at all, and deleting the branch left the
+ * suite green.
+ *
+ * @param processedCount tasks this loop actually ran before running out.
+ * @param scope trailing scope phrase, e.g. `" in epic"` — `""` for the whole PRD.
+ */
+export function formatMineLoopCompletionLines(
+  assignee: string,
+  processedCount: number,
+  unfilteredCount: number,
+  scope = "",
+): string[] {
+  return [
+    `No tasks assigned to ${assignee}${scope} remain — ` +
+      `loop finished after ${processedCount} task(s).`,
+    unfilteredCount > 0
+      ? `  ${unfilteredCount} actionable task(s) remain without --mine.`
+      : `  No actionable tasks remain without --mine either.`,
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -2388,17 +2421,28 @@ async function runLoop(
             // operator's* tasks, which says nothing about the rest of the PRD.
             // On a first iteration that matched nothing it said the project was
             // finished.
-            info(
-              `\nNo tasks assigned to ${assignee}${scope} remain — ` +
-              `loop finished after ${completed - 1} task(s).`,
+            //
+            // The unfiltered count is best-effort: this is the loop's clean
+            // exit, and a store that cannot be read here must not turn a
+            // finished run into a crash. Reporting one number less is strictly
+            // better than losing the completion message entirely.
+            let unfiltered = 0;
+            try {
+              unfiltered = await countActionableIgnoringAssignee(
+                await resolveStore(rexDir),
+                epicId,
+              );
+            } catch {
+              unfiltered = 0;
+            }
+            const lines = formatMineLoopCompletionLines(
+              assignee,
+              completed - 1,
+              unfiltered,
+              scope,
             );
-            const store = await resolveStore(rexDir);
-            const unfiltered = await countActionableIgnoringAssignee(store, epicId);
-            info(
-              unfiltered > 0
-                ? `  ${unfiltered} actionable task(s) remain without --mine.`
-                : `  No actionable tasks remain without --mine either.`,
-            );
+            info("");
+            for (const line of lines) info(line);
           } else {
             info(`\nAll tasks${scope} complete — loop finished after ${completed - 1} task(s).`);
           }

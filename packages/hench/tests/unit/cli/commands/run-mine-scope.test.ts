@@ -23,6 +23,7 @@ import {
   countTasksByStatus,
   resetDeferredTasks,
   formatNoAssignedTasksLines,
+  formatMineLoopCompletionLines,
 } from "../../../../src/cli/commands/run.js";
 import type { PRDItem } from "../../../../src/prd/rex-gateway.js";
 
@@ -168,8 +169,6 @@ describe("formatNoAssignedTasksLines", () => {
   });
 
   it("never claims the project is finished", () => {
-    // The --loop path said "All tasks complete" when --mine matched nothing on
-    // the very first iteration.
     for (const count of [0, 1, 42]) {
       const text = formatNoAssignedTasksLines(ALICE, count).join("\n");
       expect(text).not.toMatch(/all tasks.*complete/i);
@@ -179,6 +178,56 @@ describe("formatNoAssignedTasksLines", () => {
   it("carries the epic scope into the first line when given", () => {
     expect(formatNoAssignedTasksLines(ALICE, 2, " in the specified epic")[0]).toContain(
       "in the specified epic",
+    );
+  });
+});
+
+/**
+ * The `--loop` exit is a separate message from the menu's, and needs its own
+ * test: asserting only on `formatNoAssignedTasksLines` left the loop branch —
+ * the one that actually printed "All tasks complete" when `--mine` matched
+ * nothing on the first iteration — covered by nothing, so deleting it kept the
+ * suite green.
+ */
+describe("formatMineLoopCompletionLines", () => {
+  it("never reports that all tasks are complete", () => {
+    for (const [processed, unfiltered] of [[0, 0], [0, 9], [3, 0], [3, 9]]) {
+      const text = formatMineLoopCompletionLines(ALICE, processed, unfiltered).join("\n");
+      expect(text).not.toMatch(/all tasks.*complete/i);
+    }
+  });
+
+  it("names the resolved identity", () => {
+    expect(formatMineLoopCompletionLines(ALICE, 2, 5)[0]).toContain(ALICE);
+  });
+
+  it("reports how many tasks the loop actually ran", () => {
+    expect(formatMineLoopCompletionLines(ALICE, 3, 5)[0]).toContain("3 task(s)");
+  });
+
+  it("says how many actionable tasks remain without the filter", () => {
+    expect(formatMineLoopCompletionLines(ALICE, 2, 5).join("\n")).toContain(
+      "5 actionable task(s) remain without --mine",
+    );
+  });
+
+  it("distinguishes a finished project from a finished slice of one", () => {
+    const none = formatMineLoopCompletionLines(ALICE, 2, 0).join("\n");
+    const some = formatMineLoopCompletionLines(ALICE, 2, 4).join("\n");
+    expect(none).toContain("No actionable tasks remain without --mine either");
+    expect(some).toContain("4 actionable task(s) remain without --mine");
+  });
+
+  it("carries the epic scope when given", () => {
+    expect(formatMineLoopCompletionLines(ALICE, 1, 0, " in epic")[0]).toContain(" in epic");
+  });
+
+  it("is the message the loop prints, not the menu's", () => {
+    // Two different situations with two different messages; a single formatter
+    // serving both would have to drop either the processed count or the
+    // "exist"/"remain" distinction.
+    expect(formatMineLoopCompletionLines(ALICE, 2, 5)).not.toEqual(
+      formatNoAssignedTasksLines(ALICE, 5),
     );
   });
 });
