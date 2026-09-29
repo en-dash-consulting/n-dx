@@ -31,5 +31,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Add the Workflow settings page for work settings, templates and timeouts](./add-the-workflow-settings-page-for.md) | pending |
 | [Back the hench agent model with a real per-vendor override that ndx work honours](./back-the-hench-agent-model-with-a-real.md) | pending |
 | [Build the shared settings page frame with explicit Save, a dirty indicator and redirects for the six old settings routes](./build-the-shared-settings-page-frame.md) | pending |
-| [List every key ndx config accepts for hench on the Workflow page and in hench config](./list-every-key-ndx-config-accepts-for.md) | pending |
+| [List every key ndx config accepts for hench on the Workflow page and in hench config](./list-every-key-ndx-config-accepts-for.md) | in_progress |
 | [Serve one per-vendor model catalog and offer only the providers each vendor supports on Robot Wrangler](./serve-one-per-vendor-model-catalog-and.md) | pending |

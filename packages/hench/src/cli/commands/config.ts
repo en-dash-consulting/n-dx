@@ -24,10 +24,22 @@ export interface ConfigFieldMeta {
   description: string;
   type: "string" | "number" | "boolean" | "enum" | "array";
   enumValues?: string[];
-  category: "execution" | "retry" | "guard" | "task-selection" | "general";
+  category: ConfigFieldCategory;
   /** Human-readable impact description shown when value changes. */
   impact: (value: unknown) => string;
 }
+
+/** Groupings the display and the interactive menu present fields under. */
+export type ConfigFieldCategory =
+  | "execution"
+  | "session"
+  | "task-selection"
+  | "retry"
+  | "prune"
+  | "test-gate"
+  | "git"
+  | "guard"
+  | "general";
 
 export const CONFIG_FIELDS: ConfigFieldMeta[] = [
   // ── Execution strategy ──
@@ -87,6 +99,118 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     category: "execution",
     impact: (v) => `${Number(v) / 1000}s pause between consecutive task runs`,
   },
+  {
+    path: "permissionMode",
+    label: "Permission Mode",
+    description: "Permission mode the vendor CLI session starts in",
+    type: "enum",
+    enumValues: ["default", "acceptEdits", "bypassPermissions", "plan"],
+    category: "execution",
+    impact: (v) =>
+      v === "plan"
+        ? "Sessions start in plan mode — autonomous runs will stall waiting for approval"
+        : `Vendor CLI sessions start with permission mode "${v}"`,
+  },
+  {
+    path: "autonomous",
+    label: "Autonomous",
+    description: "Run without interactive prompts (implies acceptEdits when permissionMode is unset)",
+    type: "boolean",
+    category: "execution",
+    impact: (v) =>
+      v ? "Runs proceed without prompting" : "Runs may stop to ask for confirmation",
+  },
+  {
+    path: "maxSpawnsPerTask",
+    label: "Max Spawns per Task",
+    description: "Ceiling on vendor spawns for one task, counting retries and fallbacks",
+    type: "number",
+    category: "execution",
+    impact: (v) => `Task fails with a breakdown after ${v} vendor spawns`,
+  },
+  {
+    path: "livelockThreshold",
+    label: "Livelock Threshold",
+    description: "Identical tool calls with no disk write in between before a run is stopped. 0 disables",
+    type: "number",
+    category: "execution",
+    impact: (v) =>
+      Number(v) === 0
+        ? "Livelock detection disabled"
+        : `Run stops after ${v} identical tool calls with nothing written`,
+  },
+  {
+    path: "promptCache",
+    label: "Prompt Cache",
+    description: "Mark cache_control breakpoints on provider=api Claude requests",
+    type: "boolean",
+    category: "execution",
+    impact: (v) =>
+      v
+        ? "API requests carry cache_control breakpoints"
+        : "API requests sent without cache_control — set this when a gateway rejects the field",
+  },
+  {
+    path: "promptCacheTtl",
+    label: "Prompt Cache TTL",
+    description: 'TTL for both cache_control breakpoints: "5m" or "1h"',
+    type: "enum",
+    enumValues: ["5m", "1h"],
+    category: "execution",
+    impact: (v) =>
+      v === "1h"
+        ? "Cache writes cost 2x input and survive an hour — only pays off past a 5-minute turn gap"
+        : "Cache writes cost 1.25x input and survive five minutes",
+  },
+  {
+    path: "useEventPipeline",
+    label: "Event Pipeline",
+    description: "Capture the RuntimeEvent stream (required by 'hench show --events')",
+    type: "boolean",
+    category: "execution",
+    impact: (v) => (v ? "Runs record their event stream" : "No event stream is recorded"),
+  },
+  {
+    path: "useRegistryProvider",
+    label: "Registry Provider",
+    description: "Resolve the vendor through the provider registry rather than the built-in path",
+    type: "boolean",
+    category: "execution",
+    impact: (v) =>
+      v ? "Vendor resolved through the provider registry" : "Vendor resolved through the built-in path",
+  },
+
+  // ── Session reuse ──
+  {
+    path: "sessionStrategy",
+    label: "Session Strategy",
+    description: "How task spawns relate to vendor sessions: fork, batch or cold",
+    type: "enum",
+    enumValues: ["fork", "batch", "cold"],
+    category: "session",
+    impact: (v) =>
+      v === "fork"
+        ? "Orient once, then fork that session per task — no task re-pays cold-start context"
+        : v === "batch"
+          ? "Several tasks share one session"
+          : "A fresh spawn per task",
+  },
+  {
+    path: "tasksPerSession",
+    label: "Tasks per Session",
+    description: 'Tasks per session under the "batch" strategy',
+    type: "number",
+    category: "session",
+    impact: (v) => `Up to ${v} tasks share one batched session`,
+  },
+  {
+    path: "parentMaxAgeHours",
+    label: "Parent Session Max Age (h)",
+    description: "How long a cached orientation session may be forked before it is rebuilt",
+    type: "number",
+    category: "session",
+    impact: (v) => `Orientation session rebuilt after ${v}h`,
+  },
 
   // ── Task selection ──
   {
@@ -132,6 +256,106 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     type: "number",
     category: "retry",
     impact: (v) => `Retry delay capped at ${Number(v) / 1000}s`,
+  },
+
+  // ── Context prune (provider=api runs only) ──
+  {
+    path: "prune.triggerPairs",
+    label: "Prune Trigger (turn-pairs)",
+    description: "Turn-pairs tolerated before a prune fires. Sets peak context",
+    type: "number",
+    category: "prune",
+    impact: (v) => `Prompt grows by append until ${v} turn-pairs, then a prune fires`,
+  },
+  {
+    path: "prune.retainPairs",
+    label: "Prune Retain (turn-pairs)",
+    description: "Turn-pairs kept verbatim after a prune. Must be at least 2 and below the trigger",
+    type: "number",
+    category: "prune",
+    impact: (v) => `${v} turn-pairs stay verbatim; everything older becomes a summary`,
+  },
+  {
+    path: "prune.transcriptMessageChars",
+    label: "Prune Summary Input (chars)",
+    description: "Characters of each dropped message the summarizer is shown",
+    type: "number",
+    category: "prune",
+    impact: (v) => `Summarizer sees the first ${Number(v).toLocaleString()} characters of each dropped message`,
+  },
+
+  // ── Test gate ──
+  {
+    path: "fullTestCommand",
+    label: "Full Test Command",
+    description: "Command that runs the whole suite before a commit. Auto-detected when unset",
+    type: "string",
+    category: "test-gate",
+    impact: (v) => `Test gate will run "${v}"`,
+  },
+  {
+    path: "fullTestTimeoutMs",
+    label: "Full Test Timeout (ms)",
+    description: "How long the test gate may run before it is killed. 0 means no limit",
+    type: "number",
+    category: "test-gate",
+    impact: (v) =>
+      Number(v) === 0
+        ? "Test gate runs without a time limit"
+        : `Test gate killed after ${Number(v) / 60000} minutes`,
+  },
+
+  // ── Git safety ──
+  {
+    path: "rollbackOnFailure",
+    label: "Rollback on Failure",
+    description: "Revert uncommitted changes when a run fails",
+    type: "boolean",
+    category: "git",
+    impact: (v) =>
+      v ? "Failed runs revert their uncommitted changes" : "Failed runs leave their changes in place",
+  },
+  {
+    path: "autoCommit",
+    label: "Auto Commit",
+    description: "Let the agent commit itself at the end of a run",
+    type: "boolean",
+    category: "git",
+    impact: (v) =>
+      v
+        ? "Agent runs 'git commit' directly — no approval prompt interrupts a loop"
+        : "Agent stages changes and waits for approval before committing",
+  },
+  {
+    path: "commitMsgTimeoutMs",
+    label: "Commit Message Timeout (ms)",
+    description: "How long the commit-message generation call may run. 0 means no limit",
+    type: "number",
+    category: "git",
+    impact: (v) =>
+      Number(v) === 0
+        ? "Commit-message generation runs without a time limit"
+        : `Commit-message generation killed after ${Number(v) / 60000} minutes`,
+  },
+  {
+    path: "git.checkpointThreshold",
+    label: "Checkpoint Threshold (lines)",
+    description: "Lines changed at/above which the pre-run gate defaults to committing a checkpoint. 0 disables",
+    type: "number",
+    category: "git",
+    impact: (v) =>
+      Number(v) === 0
+        ? "Pre-run gate never escalates on change size"
+        : `Pre-run gate escalates at ${v} changed lines`,
+  },
+  {
+    path: "git.requireCleanTree",
+    label: "Require Clean Tree",
+    description: "Refuse to start runs against a dirty working tree",
+    type: "boolean",
+    category: "git",
+    impact: (v) =>
+      v ? "Runs abort on a dirty working tree" : "Runs may start against a dirty working tree",
   },
 
   // ── Guard settings ──
@@ -215,6 +439,87 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     category: "guard",
     impact: (v) => `Runs delayed with backoff when system memory usage exceeds ${v}%`,
   },
+  {
+    path: "guard.memoryThrottle.baseDelayMs",
+    label: "Memory Throttle Base Delay (ms)",
+    description: "Initial backoff before a throttled run is retried (doubles each attempt)",
+    type: "number",
+    category: "guard",
+    impact: (v) => `First throttle backoff is ${Number(v) / 1000}s`,
+  },
+  {
+    path: "guard.memoryThrottle.maxDelayMs",
+    label: "Memory Throttle Max Delay (ms)",
+    description: "Maximum backoff between throttled retries",
+    type: "number",
+    category: "guard",
+    impact: (v) => `Throttle backoff capped at ${Number(v) / 1000}s`,
+  },
+  {
+    path: "guard.memoryThrottle.maxRetries",
+    label: "Memory Throttle Max Retries",
+    description: "How many times a throttled run waits before it is rejected",
+    type: "number",
+    category: "guard",
+    impact: (v) => `Throttled runs wait up to ${v} times before being rejected`,
+  },
+  {
+    path: "guard.memoryMonitor.enabled",
+    label: "Memory Monitor Enabled",
+    description: "Check system memory before the agent spawns a process",
+    type: "boolean",
+    category: "guard",
+    impact: (v) =>
+      v ? "Process spawns are checked against system memory first" : "Process spawns are not memory-checked",
+  },
+  {
+    path: "guard.memoryMonitor.spawnThreshold",
+    label: "Memory Spawn Threshold (%)",
+    description: "System memory usage % above which a process spawn is refused (0–100)",
+    type: "number",
+    category: "guard",
+    impact: (v) => `Process spawns refused when system memory usage exceeds ${v}%`,
+  },
+  {
+    path: "guard.spawnTimeout",
+    label: "Spawn Timeout (ms)",
+    description: "Maximum time a spawned vendor process may run",
+    type: "number",
+    category: "guard",
+    impact: (v) => `Spawned processes killed after ${Number(v) / 1000}s`,
+  },
+  {
+    path: "guard.policy.maxCommandsPerMinute",
+    label: "Max Commands per Minute",
+    description: "Rate limit on shell commands the agent may execute",
+    type: "number",
+    category: "guard",
+    impact: (v) => `Agent limited to ${v} commands per minute`,
+  },
+  {
+    path: "guard.policy.maxWritesPerMinute",
+    label: "Max Writes per Minute",
+    description: "Rate limit on file writes the agent may perform",
+    type: "number",
+    category: "guard",
+    impact: (v) => `Agent limited to ${v} file writes per minute`,
+  },
+  {
+    path: "guard.policy.maxTotalBytesWritten",
+    label: "Max Total Bytes Written",
+    description: "Ceiling on bytes the agent may write across one run",
+    type: "number",
+    category: "guard",
+    impact: (v) => `Agent may write ${(Number(v) / 1024 / 1024).toFixed(1)}MB in total per run`,
+  },
+  {
+    path: "guard.policy.maxTotalCommands",
+    label: "Max Total Commands",
+    description: "Ceiling on shell commands the agent may run across one run",
+    type: "number",
+    category: "guard",
+    impact: (v) => `Agent may run ${v} commands in total per run`,
+  },
 
   // ── General ──
   {
@@ -224,6 +529,23 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     type: "string",
     category: "general",
     impact: (v) => `API key will be read from $${v}`,
+  },
+  {
+    path: "claudePath",
+    label: "Claude CLI Path",
+    description: "Path to the Claude Code binary. Falls back to 'claude' on PATH",
+    type: "string",
+    category: "general",
+    impact: (v) => `Claude Code will be invoked as "${v}"`,
+  },
+  {
+    path: "language",
+    label: "Project Language",
+    description: "Project toolchain, which selects the guard defaults",
+    type: "enum",
+    enumValues: ["typescript", "javascript", "go", "swift"],
+    category: "general",
+    impact: (v) => `Guard defaults tuned for a ${v} toolchain`,
   },
 ];
 
@@ -332,23 +654,56 @@ export function previewChange(
 
 function formatValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(", ");
+  // Most of the config is optional, and an absent key means "hench's own
+  // default applies" — printing the literal "undefined" reads as a broken
+  // value rather than an unset one.
+  if (value === undefined || value === null) return "(unset)";
   return String(value);
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
+const CATEGORY_LABELS: Record<ConfigFieldCategory, string> = {
   execution: "Execution Strategy",
-  retry: "Retry Policy",
-  guard: "Guard Rails",
+  session: "Session Reuse",
   "task-selection": "Task Selection",
+  retry: "Retry Policy",
+  prune: "Context Prune",
+  "test-gate": "Test Gate",
+  git: "Git Safety",
+  guard: "Guard Rails",
   general: "General",
 };
 
-const CATEGORY_ORDER = ["execution", "task-selection", "retry", "guard", "general"];
+/** Display order of the categories, and the full set of valid ones. */
+export const CATEGORY_ORDER: ConfigFieldCategory[] = [
+  "execution",
+  "session",
+  "task-selection",
+  "retry",
+  "prune",
+  "test-gate",
+  "git",
+  "guard",
+  "general",
+];
+
+/**
+ * What hench applies to a config that omits a key.
+ *
+ * Not `DEFAULT_HENCH_CONFIG()` on its own: that factory only carries the keys
+ * it writes at init time, and the rest of the defaults live on the schema
+ * (`maxSpawnsPerTask`, `livelockThreshold`, `fullTestTimeoutMs`, the session
+ * trio…). Comparing against the bare factory marked every one of those as
+ * differing from a default it simply had not been told about.
+ */
+function appliedDefaults(): HenchConfig {
+  const parsed = validateConfig(DEFAULT_HENCH_CONFIG());
+  return parsed.ok ? (parsed.data as HenchConfig) : DEFAULT_HENCH_CONFIG();
+}
 
 /** Format the full config as a readable display. */
 export function formatConfigDisplay(config: HenchConfig): string {
   const lines: string[] = [];
-  const defaults = DEFAULT_HENCH_CONFIG();
+  const defaults = appliedDefaults();
 
   for (const category of CATEGORY_ORDER) {
     const fields = CONFIG_FIELDS.filter((f) => f.category === category);
@@ -361,7 +716,11 @@ export function formatConfigDisplay(config: HenchConfig): string {
     for (const field of fields) {
       const value = getConfigValue(config, field.path);
       const defaultValue = getConfigValue(defaults, field.path);
-      const isDefault = JSON.stringify(value) === JSON.stringify(defaultValue);
+      // An absent key is the default by definition — hench fills it in on load
+      // — so it is never marked as differing, whatever the default happens
+      // to be.
+      const isDefault =
+        value === undefined || JSON.stringify(value) === JSON.stringify(defaultValue);
       const marker = isDefault ? " " : "*";
       lines.push(
         `  ${marker} ${field.label.padEnd(maxLabel + 2)}${formatValue(value)}`,
@@ -406,7 +765,9 @@ async function runInteractiveMenu(henchDir: string): Promise<void> {
     }
     info(`  q. Save & exit`);
 
-    const categoryChoice = await promptUser("\nSelect category (1-5, q): ");
+    const categoryChoice = await promptUser(
+      `\nSelect category (1-${CATEGORY_ORDER.length}, q): `,
+    );
 
     if (categoryChoice === "q" || categoryChoice === "quit") {
       done = true;
@@ -415,7 +776,7 @@ async function runInteractiveMenu(henchDir: string): Promise<void> {
 
     const catIdx = parseInt(categoryChoice, 10) - 1;
     if (isNaN(catIdx) || catIdx < 0 || catIdx >= CATEGORY_ORDER.length) {
-      info("Invalid choice. Enter a number 1-5 or 'q'.");
+      info(`Invalid choice. Enter a number 1-${CATEGORY_ORDER.length} or 'q'.`);
       continue;
     }
 

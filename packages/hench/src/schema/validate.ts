@@ -91,7 +91,10 @@ const PruneConfigSchema = z
       "how many turns of cache-friendly growth follow each prune",
   });
 
-const ProjectLanguageSchema = z.enum(["typescript", "javascript", "go"]).optional();
+// Must list every member of `ProjectLanguage`: `DEFAULT_HENCH_CONFIG(language)`
+// writes the value straight into `.hench/config.json`, so a language this enum
+// omits produces a config hench itself then refuses to load. "swift" was missing.
+const ProjectLanguageSchema = z.enum(["typescript", "javascript", "go", "swift"]).optional();
 
 export const HenchConfigSchema = z.object({
   schema: z.string(),

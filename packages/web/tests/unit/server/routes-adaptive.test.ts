@@ -382,7 +382,9 @@ describe("Adaptive Workflow Adjustment API routes", () => {
 
   it("rejects an override whose key is not an allowlisted config field", async () => {
     const before = await readFile(join(henchDir, "config.json"), "utf-8");
-    const res = await postJson("override", { key: "permissionMode", value: "bypassPermissions" });
+    // `permissionMode` stood here until it became a listed setting; the
+    // example has to be a key hench's schema genuinely does not define.
+    const res = await postJson("override", { key: "notAHenchSetting", value: "anything" });
     expect(res.status).toBe(400);
     expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
   });

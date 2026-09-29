@@ -354,10 +354,12 @@ describe("Hench Templates API routes", () => {
     body,
   });
 
+  // `permissionMode` stood here until it became a listed setting; the example
+  // has to be a key hench's schema genuinely does not define.
   it("refuses a template that invents a config field", async () => {
-    const res = await postTemplate({ id: "sneaky", config: { permissionMode: "bypassPermissions" } });
+    const res = await postTemplate({ id: "sneaky", config: { notAHenchSetting: "anything" } });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toContain("permissionMode");
+    expect((await res.json()).error).toContain("notAHenchSetting");
 
     const stored = await readFile(join(henchDir, "templates.json"), "utf-8").catch(() => "[]");
     expect(JSON.parse(stored)).toHaveLength(0);
@@ -394,12 +396,12 @@ describe("Hench Templates API routes", () => {
     // hand, must not become a config write just because it is already there.
     await writeFile(
       join(henchDir, "templates.json"),
-      JSON.stringify([{ id: "legacy", name: "Legacy", description: "", useCases: [], tags: [], config: { permissionMode: "bypassPermissions" }, builtIn: false, createdAt: new Date().toISOString() }]),
+      JSON.stringify([{ id: "legacy", name: "Legacy", description: "", useCases: [], tags: [], config: { notAHenchSetting: "anything" }, builtIn: false, createdAt: new Date().toISOString() }]),
     );
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/legacy/apply`, { method: "POST" });
     expect(res.status).toBe(400);
     const config = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
-    expect(config.permissionMode).toBeUndefined();
+    expect(config.notAHenchSetting).toBeUndefined();
   });
 
   it("every built-in template passes the gate it now enforces", async () => {

@@ -34,27 +34,114 @@ export interface ConfigFieldInfo {
   integer?: true;
   /** Mirrors `.positive()` — zero is refused, not just negatives. */
   positive?: true;
+  /** Mirrors `.min(n)` — inclusive lower bound. */
+  min?: number;
+  /** Mirrors `.max(n)` — inclusive upper bound. */
+  max?: number;
   category: string;
+  /**
+   * The value hench applies when the key is absent, for the dashboard's
+   * "differs from default" marker.
+   *
+   * Some `guard.*` defaults are chosen by project language. The ones recorded
+   * here are hench's JS/TS values, so on a Go or Swift project the marker is
+   * approximate for `guard.commandTimeout` and `guard.spawnTimeout` — the
+   * dashboard has no language input to resolve it against, and the JS/TS answer
+   * is right for the common case. `guard.blockedPaths` and
+   * `guard.allowedCommands` differ wholesale rather than in one number, so they
+   * record nothing rather than record something wrong.
+   */
+  defaultValue?: unknown;
 }
 
-/** Known config field metadata — mirrors the CLI config module. */
+/**
+ * Floor on `prune.triggerPairs` and `prune.retainPairs`.
+ *
+ * Mirrors hench's `MIN_PRUNE_PAIRS` (web cannot import hench — hench is the
+ * execution tier, above web's domain dependencies); the agreement is pinned by
+ * `tests/e2e/hench-config-gate-contract.test.js`.
+ */
+export const MIN_PRUNE_PAIRS = 2;
+
+/**
+ * Known config field metadata — mirrors hench's `CONFIG_FIELDS`
+ * (`packages/hench/src/cli/commands/config.ts`) path-for-path, so the dashboard
+ * and `hench config` offer the same settings. `tests/e2e/hench-config-gate-
+ * contract.test.js` compares the two lists and pins every `defaultValue` and
+ * refinement against hench's own schema, because web cannot import hench.
+ */
 export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
-  { path: "provider", label: "Provider", description: "Claude provider: 'cli' (Claude Code) or 'api' (direct API)", type: "enum", enumValues: ["cli", "api"], category: "execution" },
-  { path: "model", label: "Model", description: "Claude model to use (e.g. sonnet, opus, haiku)", type: "string", category: "execution" },
-  { path: "maxTurns", label: "Max Turns", description: "Maximum conversation turns per run", type: "number", positive: true, category: "execution" },
-  { path: "maxTokens", label: "Max Tokens per Request", description: "Maximum tokens per API request", type: "number", positive: true, category: "execution" },
-  { path: "tokenBudget", label: "Token Budget", description: "Total token budget per run (input+output). 0 = unlimited", type: "number", integer: true, category: "execution" },
-  { path: "loopPauseMs", label: "Loop Pause (ms)", description: "Pause between loop/iteration runs in milliseconds", type: "number", integer: true, category: "execution" },
-  { path: "maxFailedAttempts", label: "Max Failed Attempts", description: "Consecutive failures before a task is considered stuck", type: "number", integer: true, positive: true, category: "task-selection" },
-  { path: "rexDir", label: "Rex Directory", description: "Path to the .rex directory for task data", type: "string", category: "task-selection" },
-  { path: "retry.maxRetries", label: "Max Retries", description: "Number of retry attempts for transient API errors", type: "number", integer: true, category: "retry" },
-  { path: "retry.baseDelayMs", label: "Base Retry Delay (ms)", description: "Initial delay before first retry (doubles each attempt)", type: "number", positive: true, category: "retry" },
-  { path: "retry.maxDelayMs", label: "Max Retry Delay (ms)", description: "Maximum delay between retries (caps exponential backoff)", type: "number", positive: true, category: "retry" },
+  // ── Execution strategy ──
+  { path: "provider", label: "Provider", description: "Claude provider: 'cli' (Claude Code) or 'api' (direct API)", type: "enum", enumValues: ["cli", "api"], category: "execution", defaultValue: "cli" },
+  { path: "model", label: "Model", description: "Claude model to use (e.g. sonnet, opus, haiku)", type: "string", category: "execution", defaultValue: "sonnet" },
+  { path: "maxTurns", label: "Max Turns", description: "Maximum conversation turns per run", type: "number", positive: true, category: "execution", defaultValue: 50 },
+  { path: "maxTokens", label: "Max Tokens per Request", description: "Maximum tokens per API request", type: "number", positive: true, category: "execution", defaultValue: 8192 },
+  { path: "tokenBudget", label: "Token Budget", description: "Total token budget per run (input+cached+output). 0 = unlimited", type: "number", integer: true, category: "execution", defaultValue: 0 },
+  { path: "loopPauseMs", label: "Loop Pause (ms)", description: "Pause between loop/iteration runs in milliseconds", type: "number", integer: true, category: "execution", defaultValue: 2000 },
+  { path: "permissionMode", label: "Permission Mode", description: "Permission mode the vendor CLI session starts in", type: "enum", enumValues: ["default", "acceptEdits", "bypassPermissions", "plan"], category: "execution" },
+  { path: "autonomous", label: "Autonomous", description: "Run without interactive prompts (implies acceptEdits when permissionMode is unset)", type: "boolean", category: "execution" },
+  { path: "maxSpawnsPerTask", label: "Max Spawns per Task", description: "Ceiling on vendor spawns for one task, counting retries and fallbacks", type: "number", integer: true, positive: true, category: "execution", defaultValue: 8 },
+  { path: "livelockThreshold", label: "Livelock Threshold", description: "Identical tool calls with no disk write in between before a run is stopped. 0 disables", type: "number", integer: true, category: "execution", defaultValue: 6 },
+  { path: "promptCache", label: "Prompt Cache", description: "Mark cache_control breakpoints on provider=api Claude requests", type: "boolean", category: "execution" },
+  { path: "promptCacheTtl", label: "Prompt Cache TTL", description: 'TTL for both cache_control breakpoints: "5m" or "1h"', type: "enum", enumValues: ["5m", "1h"], category: "execution" },
+  { path: "useEventPipeline", label: "Event Pipeline", description: "Capture the RuntimeEvent stream (required by 'hench show --events')", type: "boolean", category: "execution" },
+  { path: "useRegistryProvider", label: "Registry Provider", description: "Resolve the vendor through the provider registry rather than the built-in path", type: "boolean", category: "execution" },
+
+  // ── Session reuse ──
+  { path: "sessionStrategy", label: "Session Strategy", description: "How task spawns relate to vendor sessions: fork, batch or cold", type: "enum", enumValues: ["fork", "batch", "cold"], category: "session" },
+  { path: "tasksPerSession", label: "Tasks per Session", description: 'Tasks per session under the "batch" strategy', type: "number", integer: true, positive: true, category: "session", defaultValue: 4 },
+  { path: "parentMaxAgeHours", label: "Parent Session Max Age (h)", description: "How long a cached orientation session may be forked before it is rebuilt", type: "number", positive: true, category: "session", defaultValue: 24 },
+
+  // ── Task selection ──
+  { path: "maxFailedAttempts", label: "Max Failed Attempts", description: "Consecutive failures before a task is considered stuck", type: "number", integer: true, positive: true, category: "task-selection", defaultValue: 3 },
+  { path: "rexDir", label: "Rex Directory", description: "Path to the .rex directory for task data", type: "string", category: "task-selection", defaultValue: ".rex" },
+
+  // ── Retry policy ──
+  { path: "retry.maxRetries", label: "Max Retries", description: "Number of retry attempts for transient API errors", type: "number", integer: true, category: "retry", defaultValue: 3 },
+  { path: "retry.baseDelayMs", label: "Base Retry Delay (ms)", description: "Initial delay before first retry (doubles each attempt)", type: "number", positive: true, category: "retry", defaultValue: 2000 },
+  { path: "retry.maxDelayMs", label: "Max Retry Delay (ms)", description: "Maximum delay between retries (caps exponential backoff)", type: "number", positive: true, category: "retry", defaultValue: 30000 },
+
+  // ── Context prune (provider=api runs only) ──
+  { path: "prune.triggerPairs", label: "Prune Trigger (turn-pairs)", description: "Turn-pairs tolerated before a prune fires. Sets peak context", type: "number", integer: true, min: MIN_PRUNE_PAIRS, category: "prune", defaultValue: 20 },
+  { path: "prune.retainPairs", label: "Prune Retain (turn-pairs)", description: "Turn-pairs kept verbatim after a prune. Must be at least 2 and below the trigger", type: "number", integer: true, min: MIN_PRUNE_PAIRS, category: "prune", defaultValue: 10 },
+  { path: "prune.transcriptMessageChars", label: "Prune Summary Input (chars)", description: "Characters of each dropped message the summarizer is shown", type: "number", integer: true, positive: true, category: "prune", defaultValue: 2000 },
+
+  // ── Test gate ──
+  { path: "fullTestCommand", label: "Full Test Command", description: "Command that runs the whole suite before a commit. Auto-detected when unset", type: "string", category: "test-gate" },
+  { path: "fullTestTimeoutMs", label: "Full Test Timeout (ms)", description: "How long the test gate may run before it is killed. 0 means no limit", type: "number", integer: true, category: "test-gate", defaultValue: 900000 },
+
+  // ── Git safety ──
+  { path: "rollbackOnFailure", label: "Rollback on Failure", description: "Revert uncommitted changes when a run fails", type: "boolean", category: "git" },
+  { path: "autoCommit", label: "Auto Commit", description: "Let the agent commit itself at the end of a run", type: "boolean", category: "git", defaultValue: false },
+  { path: "commitMsgTimeoutMs", label: "Commit Message Timeout (ms)", description: "How long the commit-message generation call may run. 0 means no limit", type: "number", integer: true, category: "git", defaultValue: 300000 },
+  { path: "git.checkpointThreshold", label: "Checkpoint Threshold (lines)", description: "Lines changed at/above which the pre-run gate defaults to committing a checkpoint. 0 disables", type: "number", integer: true, category: "git" },
+  { path: "git.requireCleanTree", label: "Require Clean Tree", description: "Refuse to start runs against a dirty working tree", type: "boolean", category: "git" },
+
+  // ── Guard rails ──
   { path: "guard.blockedPaths", label: "Blocked Paths", description: "Glob patterns for paths the agent cannot modify", type: "array", category: "guard" },
   { path: "guard.allowedCommands", label: "Allowed Commands", description: "Shell commands the agent is permitted to execute", type: "array", category: "guard" },
-  { path: "guard.commandTimeout", label: "Command Timeout (ms)", description: "Maximum time for a single command execution", type: "number", positive: true, category: "guard" },
-  { path: "guard.maxFileSize", label: "Max File Size (bytes)", description: "Maximum file size the agent can write", type: "number", positive: true, category: "guard" },
-  { path: "apiKeyEnv", label: "API Key Env Var", description: "Environment variable name for Anthropic API key", type: "string", category: "general" },
+  { path: "guard.commandTimeout", label: "Command Timeout (ms)", description: "Maximum time for a single command execution", type: "number", positive: true, category: "guard", defaultValue: 30000 },
+  { path: "guard.maxFileSize", label: "Max File Size (bytes)", description: "Maximum file size the agent can write", type: "number", positive: true, category: "guard", defaultValue: 1048576 },
+  { path: "guard.maxConcurrentProcesses", label: "Max Concurrent Processes", description: "Maximum simultaneous hench processes allowed (prevents memory exhaustion)", type: "number", integer: true, positive: true, category: "guard", defaultValue: 3 },
+  { path: "guard.allowedGitSubcommands", label: "Git Subcommands", description: "Git subcommands the agent is permitted to execute", type: "array", category: "guard", defaultValue: ["status", "add", "commit", "diff", "log", "branch", "checkout", "stash", "show", "rev-parse"] },
+  { path: "guard.memoryThrottle.enabled", label: "Memory Throttle Enabled", description: "Enable memory-based throttling that delays/rejects runs when system memory is low", type: "boolean", category: "guard" },
+  { path: "guard.memoryThrottle.rejectThreshold", label: "Memory Reject Threshold (%)", description: "System memory usage % at which new runs are rejected outright (0–100, default: 95)", type: "number", min: 0, max: 100, category: "guard" },
+  { path: "guard.memoryThrottle.delayThreshold", label: "Memory Delay Threshold (%)", description: "System memory usage % at which new runs are delayed with backoff (0–100, default: 80)", type: "number", min: 0, max: 100, category: "guard" },
+  { path: "guard.memoryThrottle.baseDelayMs", label: "Memory Throttle Base Delay (ms)", description: "Initial backoff before a throttled run is retried (doubles each attempt)", type: "number", positive: true, category: "guard" },
+  { path: "guard.memoryThrottle.maxDelayMs", label: "Memory Throttle Max Delay (ms)", description: "Maximum backoff between throttled retries", type: "number", positive: true, category: "guard" },
+  { path: "guard.memoryThrottle.maxRetries", label: "Memory Throttle Max Retries", description: "How many times a throttled run waits before it is rejected", type: "number", integer: true, category: "guard" },
+  { path: "guard.memoryMonitor.enabled", label: "Memory Monitor Enabled", description: "Check system memory before the agent spawns a process", type: "boolean", category: "guard" },
+  { path: "guard.memoryMonitor.spawnThreshold", label: "Memory Spawn Threshold (%)", description: "System memory usage % above which a process spawn is refused (0–100)", type: "number", min: 0, max: 100, category: "guard" },
+  { path: "guard.spawnTimeout", label: "Spawn Timeout (ms)", description: "Maximum time a spawned vendor process may run", type: "number", category: "guard", defaultValue: 300000 },
+  { path: "guard.policy.maxCommandsPerMinute", label: "Max Commands per Minute", description: "Rate limit on shell commands the agent may execute", type: "number", integer: true, category: "guard" },
+  { path: "guard.policy.maxWritesPerMinute", label: "Max Writes per Minute", description: "Rate limit on file writes the agent may perform", type: "number", integer: true, category: "guard" },
+  { path: "guard.policy.maxTotalBytesWritten", label: "Max Total Bytes Written", description: "Ceiling on bytes the agent may write across one run", type: "number", integer: true, category: "guard" },
+  { path: "guard.policy.maxTotalCommands", label: "Max Total Commands", description: "Ceiling on shell commands the agent may run across one run", type: "number", integer: true, category: "guard" },
+
+  // ── General ──
+  { path: "apiKeyEnv", label: "API Key Env Var", description: "Environment variable name for Anthropic API key", type: "string", category: "general", defaultValue: "ANTHROPIC_API_KEY" },
+  { path: "claudePath", label: "Claude CLI Path", description: "Path to the Claude Code binary. Falls back to 'claude' on PATH", type: "string", category: "general" },
+  { path: "language", label: "Project Language", description: "Project toolchain, which selects the guard defaults", type: "enum", enumValues: ["typescript", "javascript", "go", "swift"], category: "general" },
 ];
 
 /** Path segments that would poison the prototype chain if used as an object key. */
@@ -73,31 +160,40 @@ export const FORBIDDEN_CONFIG_SEGMENTS = new Set(["__proto__", "constructor", "p
  */
 export const CONFIG_GROUP_DEFAULTS: Record<string, Record<string, unknown>> = {
   retry: { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000 },
+  prune: { triggerPairs: 20, retainPairs: 10, transcriptMessageChars: 2000 },
 };
 
 /**
- * Why hench's `prune` group is deliberately NOT in the table above.
+ * Cross-field constraints hench's schema enforces that {@link validateFieldValue}
+ * cannot see, because it is handed one field at a time.
  *
- * A group belongs here when the dashboard can leave a partial one on disk, and
- * that only happens for members it can write. `prune.*` is absent from
- * {@link CONFIG_FIELD_META}, so no route can produce a partial `prune` group
- * and completing one would mean the dashboard rewriting config a human hand-
- * edited, in keys it cannot show. That is what the "every group member is a
- * writable field" assertion in `tests/unit/server/hench-config-fields.test.ts`
- * exists to stop.
+ * Today there is one: hench refuses a config whose `prune.retainPairs` is at or
+ * above its `prune.triggerPairs` — equal values would prune every turn and drop
+ * nothing, and a retention above the trigger never reaches a droppable span.
+ * Without this check a single-key write (`prune.triggerPairs` on a config with
+ * no `prune` block, which {@link completeConfigGroups} then fills in from the
+ * defaults) could answer 200 and leave a file the next `ndx work` refuses.
  *
- * Nothing is at risk from the omission: every member of hench's
- * `PruneConfigSchema` carries its own default, so a partial group already
- * loads.
- *
- * Making `prune` editable here needs more than three `CONFIG_FIELD_META` rows.
- * hench refuses a config whose `prune.retainPairs` is at or above its
- * `prune.triggerPairs`, and {@link validateFieldValue} sees one field at a time
- * — it cannot check a sibling. Adding the rows without a config-aware gate
- * would let a 200 response write a file the next `ndx work` refuses, which is
- * exactly the drift `tests/e2e/hench-config-gate-contract.test.js` catches. Do
- * that work first, or leave the group to the CLI (`ndx config hench.prune.*`).
+ * Call it on the finished config, after group completion and before writing.
+ * Returns an error message, or null when the config is acceptable.
  */
+export function validateConfigConstraints(config: Record<string, unknown>): string | null {
+  const prune = config["prune"];
+  if (prune && typeof prune === "object" && !Array.isArray(prune)) {
+    const { triggerPairs, retainPairs } = prune as Record<string, unknown>;
+    if (
+      typeof triggerPairs === "number" &&
+      typeof retainPairs === "number" &&
+      retainPairs >= triggerPairs
+    ) {
+      return (
+        "Prune Retain (turn-pairs) must be below Prune Trigger (turn-pairs) — the gap " +
+        "between them is how many turns of cache-friendly growth follow each prune"
+      );
+    }
+  }
+  return null;
+}
 
 /**
  * Fill in missing members of any partially-present group in-place. A group
@@ -147,6 +243,10 @@ export function validateFieldValue(field: ConfigFieldInfo, value: unknown): stri
       }
       if (field.integer && !Number.isInteger(value))
         return `${field.label} must be a whole number`;
+      if (field.min !== undefined && value < field.min)
+        return `${field.label} must be at least ${field.min}`;
+      if (field.max !== undefined && value > field.max)
+        return `${field.label} must be at most ${field.max}`;
       return null;
     case "boolean":
       if (typeof value !== "boolean") return `${field.label} must be a boolean`;

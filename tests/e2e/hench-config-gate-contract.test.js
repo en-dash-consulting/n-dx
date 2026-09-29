@@ -29,15 +29,26 @@ import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "../..");
 
-const { CONFIG_FIELD_META, CONFIG_GROUP_DEFAULTS, completeConfigGroups, validateFieldValue, setConfigValue } = await import(
-  join(ROOT, "packages/web/dist/server/hench-config-fields.js")
-);
+const {
+  CONFIG_FIELD_META,
+  CONFIG_GROUP_DEFAULTS,
+  MIN_PRUNE_PAIRS: WEB_MIN_PRUNE_PAIRS,
+  completeConfigGroups,
+  validateFieldValue,
+  validateConfigConstraints,
+  getConfigValue,
+  setConfigValue,
+} = await import(join(ROOT, "packages/web/dist/server/hench-config-fields.js"));
 const { HenchConfigSchema } = await import(
   join(ROOT, "packages/hench/dist/schema/validate.js")
 );
-const { DEFAULT_HENCH_CONFIG } = await import(
+const { DEFAULT_HENCH_CONFIG, MIN_PRUNE_PAIRS } = await import(
   join(ROOT, "packages/hench/dist/schema/v1.js")
 );
+const { CONFIG_FIELDS } = await import(
+  join(ROOT, "packages/hench/dist/cli/commands/config.js")
+);
+const { HELP_TEXT } = await import(join(ROOT, "packages/core/config.js"));
 
 /** A config hench accepts, used as the base every probe is applied to. */
 function baseConfig() {
@@ -69,7 +80,11 @@ function baseConfig() {
  * non-finite shapes that a same-origin caller can send by hand.
  */
 const PROBES = {
-  number: [0, -0, 1, 2.5, -1, 1e15, Infinity, -Infinity, NaN, "1", null, [1], true, {}],
+  // 3 and 50 are the two mid-range values: without them the bounded fields
+  // (`prune.retainPairs` needs ≥2 and below the trigger, the memory thresholds
+  // need 0–100) would have every probe refused, and the "no probe was accepted"
+  // guard below would fire on a gate that is in fact correct.
+  number: [0, -0, 1, 2.5, 3, 50, -1, 1e15, Infinity, -Infinity, NaN, "1", null, [1], true, {}],
   string: ["x", ".rex", "", " ", 1, null, ["x"], true, {}],
   enum: ["cli", "api", "codex", "", ["cli"], ["cli", "api"], 1, null, true, { toString: () => "cli" }],
   array: [[], ["a"], ["a", "b"], [1], [null], [["a"]], [{ a: 1 }], "a", 1, null, {}],
@@ -87,12 +102,25 @@ describe("dashboard hench-config gate agrees with hench's schema", () => {
     it(`never accepts a value hench rejects for ${field.path}`, () => {
       let accepted = 0;
 
-      for (const probe of PROBES[field.type]) {
+      // An enum field's own members go in front of the hostile set: the shared
+      // enum probes are all drawn from `provider`, so a field like
+      // `promptCacheTtl` would have every probe refused and trip the
+      // "no probe was accepted" guard below on a gate that is working.
+      const probes =
+        field.type === "enum" ? [...field.enumValues, ...PROBES.enum] : PROBES[field.type];
+
+      for (const probe of probes) {
         if (validateFieldValue(field, probe) !== null) continue;
-        accepted++;
 
         const config = baseConfig();
         setConfigValue(config, field.path, probe);
+        // The routes' gate is the composition of three steps, not just the
+        // per-field check: complete the group, then apply the sibling
+        // constraints that only the finished config can decide.
+        completeConfigGroups(config);
+        if (validateConfigConstraints(config) !== null) continue;
+        accepted++;
+
         // Exactly what the routes write, and what hench then reads back.
         const onDisk = JSON.parse(JSON.stringify(config));
         const parsed = HenchConfigSchema.safeParse(onDisk);
@@ -118,16 +146,54 @@ describe("dashboard hench-config gate agrees with hench's schema", () => {
       maxTokens: 16384,
       tokenBudget: 500000,
       loopPauseMs: 0,
+      permissionMode: "acceptEdits",
+      autonomous: true,
+      maxSpawnsPerTask: 12,
+      livelockThreshold: 0,
+      promptCache: false,
+      promptCacheTtl: "1h",
+      useEventPipeline: true,
+      useRegistryProvider: false,
+      sessionStrategy: "batch",
+      tasksPerSession: 6,
+      parentMaxAgeHours: 12,
       maxFailedAttempts: 5,
       rexDir: ".rex",
       "retry.maxRetries": 0,
       "retry.baseDelayMs": 1000,
       "retry.maxDelayMs": 60000,
+      "prune.triggerPairs": 30,
+      "prune.retainPairs": 12,
+      "prune.transcriptMessageChars": 4000,
+      fullTestCommand: "pnpm test",
+      fullTestTimeoutMs: 0,
+      rollbackOnFailure: false,
+      autoCommit: true,
+      commitMsgTimeoutMs: 0,
+      "git.checkpointThreshold": 0,
+      "git.requireCleanTree": true,
       "guard.blockedPaths": ["dist/**"],
       "guard.allowedCommands": ["pnpm"],
       "guard.commandTimeout": 45000,
       "guard.maxFileSize": 2097152,
+      "guard.maxConcurrentProcesses": 2,
+      "guard.allowedGitSubcommands": ["status", "diff"],
+      "guard.memoryThrottle.enabled": true,
+      "guard.memoryThrottle.rejectThreshold": 90,
+      "guard.memoryThrottle.delayThreshold": 70,
+      "guard.memoryThrottle.baseDelayMs": 5000,
+      "guard.memoryThrottle.maxDelayMs": 60000,
+      "guard.memoryThrottle.maxRetries": 0,
+      "guard.memoryMonitor.enabled": true,
+      "guard.memoryMonitor.spawnThreshold": 85,
+      "guard.spawnTimeout": 0,
+      "guard.policy.maxCommandsPerMinute": 30,
+      "guard.policy.maxWritesPerMinute": 60,
+      "guard.policy.maxTotalBytesWritten": 10485760,
+      "guard.policy.maxTotalCommands": 500,
       apiKeyEnv: "MY_KEY",
+      claudePath: "/usr/local/bin/claude",
+      language: "swift",
     };
 
     // Every writable field must be covered, or the assertion below drifts
@@ -161,9 +227,8 @@ describe("dashboard hench-config gate agrees with hench's schema", () => {
         expect(CONFIG_GROUP_DEFAULTS[group], `group "${group}"`).toEqual(henchDefaults[group]);
       }
       // Iterating web's keys alone would pass vacuously if the mirror lost a
-      // group, so name the one that must be there. `prune` is deliberately not
-      // mirrored — see the note under CONFIG_GROUP_DEFAULTS.
-      expect(Object.keys(CONFIG_GROUP_DEFAULTS)).toEqual(["retry"]);
+      // group, so name the ones that must be there.
+      expect(Object.keys(CONFIG_GROUP_DEFAULTS).sort()).toEqual(["prune", "retry"]);
     });
 
     // A group completed from web's mirror must satisfy hench's cross-field
@@ -208,3 +273,157 @@ describe("dashboard hench-config gate agrees with hench's schema", () => {
     });
   });
 });
+
+/**
+ * The three curated lists of hench settings, and the rule that they are one list.
+ *
+ * `ndx config --help` documents what `ndx config hench.<key>` accepts, `hench
+ * config` offers its own curated menu, and the dashboard renders a third from
+ * `CONFIG_FIELD_META`. All three were maintained by hand and had drifted: the
+ * CLI menu was missing sixteen documented keys (`promptCacheTtl`, the whole
+ * `prune` and test-gate groups, the git-safety pair, session reuse), and the
+ * dashboard was missing those plus the guard keys the CLI already had —
+ * `guard.memoryMonitor.spawnThreshold` among them, which `memory-monitor.ts`
+ * tells the operator to set with a `hench config` command that then refused the
+ * key.
+ *
+ * hench's `CONFIG_FIELDS` is the source: it sits in the package that owns the
+ * schema. The other two mirror it, because neither can import it — web sits
+ * below hench in the tier order, and orchestration scripts import no package at
+ * all.
+ */
+describe("hench, the dashboard and ndx config offer the same settings", () => {
+  const henchPaths = CONFIG_FIELDS.map((f) => f.path).sort();
+  const webPaths = CONFIG_FIELD_META.map((f) => f.path).sort();
+
+  /**
+   * Setting rows in the help text: two-space indent, then the key. Prose
+   * continuation lines are indented further and the `Examples` section starts
+   * each line with the command, so neither is picked up.
+   */
+  const documentedPaths = [
+    ...new Set(
+      Array.from(HELP_TEXT.matchAll(/^ {2}hench\.([A-Za-z][A-Za-z0-9.]*)/gm), (m) => m[1]),
+    ),
+  ].sort();
+
+  it("hench config and the dashboard list the same keys", () => {
+    expect(webPaths).toEqual(henchPaths);
+  });
+
+  it("every key ndx config documents for hench is on both lists", () => {
+    expect(documentedPaths.filter((p) => !henchPaths.includes(p))).toEqual([]);
+    expect(documentedPaths.filter((p) => !webPaths.includes(p))).toEqual([]);
+  });
+
+  it("every key the two lists offer is documented by ndx config", () => {
+    expect(henchPaths.filter((p) => !documentedPaths.includes(p))).toEqual([]);
+  });
+
+  // A path neither list can explain is worse than a missing one: the menu
+  // offers a setting, the write succeeds, and hench drops it on load (zod
+  // strips unknown keys), so the operator sees a value that does nothing.
+  it("every listed key is a key hench's schema keeps", () => {
+    const config = baseConfig();
+    for (const field of CONFIG_FIELD_META) {
+      setConfigValue(config, field.path, sampleValue(field));
+    }
+    completeConfigGroups(config);
+    expect(validateConfigConstraints(config)).toBeNull();
+
+    const parsed = HenchConfigSchema.safeParse(JSON.parse(JSON.stringify(config)));
+    expect(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues)).toBe(true);
+
+    for (const field of CONFIG_FIELD_META) {
+      expect(
+        getConfigValue(parsed.data, field.path),
+        `hench's schema dropped "${field.path}" — the lists offer a key it does not define`,
+      ).toEqual(sampleValue(field));
+    }
+  });
+
+  it("the two lists agree on type and enum values for every key", () => {
+    for (const web of CONFIG_FIELD_META) {
+      const cli = CONFIG_FIELDS.find((f) => f.path === web.path);
+      expect(cli, `${web.path} missing from hench's CONFIG_FIELDS`).toBeTruthy();
+      expect(cli.type, `${web.path} type`).toBe(web.type);
+      expect(cli.enumValues ?? null, `${web.path} enum values`).toEqual(web.enumValues ?? null);
+    }
+  });
+
+  // web mirrors hench's floor rather than importing it.
+  it("web's prune floor equals hench's", () => {
+    expect(WEB_MIN_PRUNE_PAIRS).toBe(MIN_PRUNE_PAIRS);
+  });
+
+  /**
+   * The dashboard's "differs from default" marker reads `defaultValue` off each
+   * row. A stale copy shows an untouched config as modified, so pin every row
+   * against what hench actually applies to a config that omits the key.
+   *
+   * `guard.blockedPaths` and `guard.allowedCommands` are exempt in one
+   * direction: their defaults are chosen by project language, so there is no
+   * single value to record and the rows deliberately carry none.
+   */
+  describe("recorded defaults", () => {
+    const LANGUAGE_DEPENDENT = ["guard.blockedPaths", "guard.allowedCommands"];
+    const applied = HenchConfigSchema.parse(DEFAULT_HENCH_CONFIG());
+
+    it("match what hench applies when the key is absent", () => {
+      for (const field of CONFIG_FIELD_META) {
+        if (field.defaultValue === undefined) continue;
+        expect(field.defaultValue, `${field.path} default`).toEqual(
+          getConfigValue(applied, field.path),
+        );
+      }
+    });
+
+    it("are recorded for every key hench defaults", () => {
+      for (const field of CONFIG_FIELD_META) {
+        if (LANGUAGE_DEPENDENT.includes(field.path)) continue;
+        const henchDefault = getConfigValue(applied, field.path);
+        if (henchDefault === undefined) continue;
+        expect(
+          field.defaultValue,
+          `hench defaults ${field.path} to ${JSON.stringify(henchDefault)} but the row records none`,
+        ).not.toBeUndefined();
+      }
+    });
+  });
+});
+
+/**
+ * The one pair whose valid range is set by a sibling rather than a constant:
+ * hench refuses a config whose retained turn-pairs reach its prune trigger.
+ */
+const SAMPLE_OVERRIDES = {
+  "prune.triggerPairs": 50,
+  "prune.retainPairs": 5,
+};
+
+/**
+ * A value the gate accepts for `field`, chosen from its own declared
+ * refinements so the sample is valid by construction rather than by a table
+ * that would need updating with every new key.
+ */
+function sampleValue(field) {
+  if (field.path in SAMPLE_OVERRIDES) return SAMPLE_OVERRIDES[field.path];
+  switch (field.type) {
+    case "string":
+      return "x";
+    case "boolean":
+      return true;
+    case "array":
+      return ["x"];
+    case "enum":
+      return field.enumValues[0];
+    case "number": {
+      // Mid-range: above every floor in use, below the 0–100 ceilings, and
+      // clear of the prune pair's ordering rule once the group is completed.
+      const candidate = field.max !== undefined ? Math.min(50, field.max) : 50;
+      return Math.max(candidate, field.min ?? 1, field.positive ? 1 : 0);
+    }
+    default:
+      throw new Error(`no sample value for type "${field.type}"`);
+  }
+}
