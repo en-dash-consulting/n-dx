@@ -307,6 +307,18 @@ export interface PRDItem {
   blockedBy?: string[];
   /** Structured requirements associated with this item. */
   requirements?: Requirement[];
+  /**
+   * Whether `rex ready` last evaluated this item as ready to work: it has at
+   * least one automated or metric requirement (own or inherited) and no open
+   * blocker. Written only as `true`; a no-longer-qualifying item has the
+   * field cleared rather than flipped to `false`; so absence always means
+   * "not currently ready" (either never evaluated, or evaluated and found
+   * not ready) rather than a stale positive. Recomputed by `rex ready`, not
+   * maintained automatically by other mutations. Never read by task
+   * selection (`findNextTask`) — a tree with no `ready` fields at all
+   * selects exactly as it always has.
+   */
+  ready?: boolean;
   /** ISO timestamp of the first transition into `in_progress`. Preserved across re-opens. */
   startedAt?: string;
   /** ISO timestamp of the latest transition into `completed`. Cleared if the item is re-opened. */

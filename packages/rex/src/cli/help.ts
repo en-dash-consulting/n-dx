@@ -405,6 +405,28 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["status"],
   },
+  ready: {
+    tool: "rex",
+    command: "ready",
+    summary: "mark items ready to work",
+    usage: "rex ready [options] [dir]",
+    description:
+      "Marks an item ready when it has at least one automated or metric\n" +
+      "requirement (own or inherited) and no open blocker. Items already\n" +
+      "completed, deferred, cancelled, or deleted never qualify. Explains\n" +
+      "why items that don't qualify don't. `ready` is never read by task\n" +
+      "selection (`rex next`) — it is purely informational.",
+    options: [
+      { flag: "--item=<id>", description: "Evaluate and mark a single item only" },
+      { flag: "--format=json", description: "Machine-readable output" },
+    ],
+    examples: [
+      { command: "rex ready", description: "Evaluate and mark the whole tree" },
+      { command: "rex ready --item=abc123", description: "Evaluate a single item" },
+      { command: "rex ready --format=json .", description: "Machine-readable output for scripting" },
+    ],
+    related: ["next", "status"],
+  },
   recommend: {
     tool: "rex",
     command: "recommend",
@@ -764,6 +786,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   usage: ["status"],
   report: ["validate"],
   verify: ["status"],
+  ready: ["next", "status"],
   log: ["status"],
   recommend: ["analyze", "status"],
   analyze: ["add", "recommend"],

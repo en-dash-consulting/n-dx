@@ -491,6 +491,11 @@ async function dispatchCommand(
       await cmdVerify(resolveDir(positional), flags);
       break;
     }
+    case "ready": {
+      const { cmdReady } = await import("./commands/ready.js");
+      await cmdReady(resolveDir(positional), flags);
+      break;
+    }
     case "recommend": {
       const { cmdRecommend } = await import("./commands/recommend.js");
       await cmdRecommend(resolveDir(positional), flags);
@@ -608,7 +613,7 @@ async function dispatchCommand(
 
       const REX_COMMANDS = [
         "init", "status", "tree", "tree-diff", "next", "add", "update", "move", "remove", "reshape",
-        "prune", "restore", "validate", "fix", "sync", "usage", "report", "verify", "log",
+        "prune", "restore", "validate", "fix", "sync", "usage", "report", "verify", "ready", "log",
         "recommend", "analyze", "import", "export", "import-bundle", "adapter",
         "reorganize", "health", "mcp",
         "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "parse-md",

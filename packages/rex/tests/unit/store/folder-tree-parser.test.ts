@@ -657,6 +657,52 @@ describe("parseFolderTree: field fidelity", () => {
     expect(result.items[0].level).toBe("feature"); // frontmatter wins
     expect(result.warnings.some(w => w.message.includes("does not match"))).toBe(true);
   });
+
+  it("parses an unquoted ready: true/false as a real boolean", async () => {
+    const itemDir = join(testDir, "ready-item-11111111");
+    await mkdir(itemDir, { recursive: true });
+    await writeFile(join(itemDir, "index.md"), [
+      "---",
+      'id: "11111111-1111-1111-1111-111111111111"',
+      "level: epic",
+      'title: "Ready epic"',
+      "status: pending",
+      "ready: true",
+      "---",
+    ].join("\n"));
+
+    const result = await parseFolderTree(testDir);
+    expect(result.warnings).toHaveLength(0);
+    expect(result.items[0].ready).toBe(true);
+    expect(typeof result.items[0].ready).toBe("boolean");
+  });
+
+  it("leaves ready unset when absent from frontmatter", async () => {
+    const epic = makeEpic("11111111-1111-1111-1111-111111111111", "No ready field");
+    await buildFolderTree(testDir, [epic]);
+
+    const result = await parseFolderTree(testDir);
+    expect(result.warnings).toHaveLength(0);
+    expect(result.items[0].ready).toBeUndefined();
+  });
+
+  it("accepts a quoted legacy ready: \"true\" as a fallback", async () => {
+    const itemDir = join(testDir, "ready-legacy-11111111");
+    await mkdir(itemDir, { recursive: true });
+    await writeFile(join(itemDir, "index.md"), [
+      "---",
+      'id: "11111111-1111-1111-1111-111111111111"',
+      "level: epic",
+      'title: "Legacy quoted ready"',
+      "status: pending",
+      'ready: "true"',
+      "---",
+    ].join("\n"));
+
+    const result = await parseFolderTree(testDir);
+    expect(result.warnings).toHaveLength(0);
+    expect(result.items[0].ready).toBe(true);
+  });
 });
 
 // ── Round-trip fidelity (100-item tree) ───────────────────────────────────────
