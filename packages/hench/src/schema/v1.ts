@@ -310,6 +310,19 @@ export interface HenchConfig {
    */
   parentMaxAgeHours?: number;
   /**
+   * Total lifetime of a `"batch"` chain, measured from the task that opened
+   * it, in hours (default: 8). Bounds how far the repository can move beneath
+   * a long-running loop before the shared transcript is retired.
+   */
+  batchMaxAgeHours?: number;
+  /**
+   * Idle window of a `"batch"` chain, measured from its last task, in hours
+   * (default: 1). Separate from {@link batchMaxAgeHours} because the two catch
+   * different drift: a loop that has run a long time, versus one that stopped
+   * while someone worked in the same tree by hand.
+   */
+  batchMaxIdleHours?: number;
+  /**
    * Ceiling on vendor spawns for a single task (default: 8).
    *
    * Every spawn counts — the initial one, failure retries, plan-mode
@@ -585,6 +598,52 @@ export interface RunTokens {
   output: number;
   cached: number;
   total: number;
+  /**
+   * Whether {@link cached} is a measurement, a derivation, or unknown.
+   *
+   * `cached: 0` is two different facts wearing one number — a vendor that
+   * accounted for caching and cached nothing, and a vendor that never
+   * reported cache data at all. The second is the common case for a Codex
+   * run whose token counts were scraped from `Tokens used: N in, N out`, and
+   * reading it as "no cache" is what let those runs be priced as if they had
+   * spent nothing on context.
+   *
+   * v1 additive field — old records without it load normally, and readers
+   * should treat its absence the same way they treat `"unavailable"`.
+   */
+  cachedProvenance?: TokenProvenance;
+}
+
+/**
+ * Where a token count came from. Mirrors `TokenCacheProvenance` in
+ * `@n-dx/llm-client`, declared inline here for the same reason
+ * {@link RunDiagnostics.tokenDiagnosticStatus} is: the persisted schema owns
+ * its own literals so a foundation-layer rename cannot silently change what
+ * a run file is allowed to contain.
+ *
+ * Nothing produces `"estimated"` today. It is in the type so that a future
+ * estimator has somewhere to land that a reader cannot mistake for a
+ * measurement.
+ */
+export type TokenProvenance = "measured" | "estimated" | "unavailable";
+
+/** Ranked best-first, for {@link rollUpProvenance}. */
+const PROVENANCE_RANK: readonly TokenProvenance[] = ["measured", "estimated", "unavailable"];
+
+/**
+ * The strongest provenance any turn reported.
+ *
+ * A run whose first turn was measured and whose last reported nothing still
+ * has real cache numbers in its total, so the total is a measurement — it is
+ * simply an incomplete one, which {@link RunDiagnostics.tokenDiagnosticStatus}
+ * is the field that says so.
+ */
+function rollUpProvenance(turns: ReadonlyArray<TurnTokenUsage> | undefined): TokenProvenance {
+  if (!turns || turns.length === 0) return "unavailable";
+  for (const candidate of PROVENANCE_RANK) {
+    if (turns.some((turn) => turn.cacheProvenance === candidate)) return candidate;
+  }
+  return "unavailable";
 }
 
 /**
@@ -593,12 +652,26 @@ export interface RunTokens {
  * Accepts `undefined` (and missing cache fields) so it can be called
  * unconditionally at save time — aborted, failed, and zero-usage runs
  * all produce a valid tuple with the correct zeros.
+ *
+ * @param turns Per-turn usage, when the run recorded any. Supplies
+ *   {@link RunTokens.cachedProvenance}, which {@link TokenUsage} cannot carry:
+ *   an absent cache field and a zero one collapse to the same value there, and
+ *   telling them apart is the whole point of the provenance.
  */
-export function normalizeRunTokens(usage: TokenUsage | undefined): RunTokens {
+export function normalizeRunTokens(
+  usage: TokenUsage | undefined,
+  turns?: ReadonlyArray<TurnTokenUsage>,
+): RunTokens {
   const input = usage?.input ?? 0;
   const output = usage?.output ?? 0;
   const cached = (usage?.cacheCreationInput ?? 0) + (usage?.cacheReadInput ?? 0);
-  return { input, output, cached, total: input + output + cached };
+  return {
+    input,
+    output,
+    cached,
+    total: input + output + cached,
+    cachedProvenance: rollUpProvenance(turns),
+  };
 }
 
 /** Token usage for a single API turn. */
@@ -619,6 +692,16 @@ export interface TurnTokenUsage {
    * - `unavailable` — neither field was present; values are synthetic zeros
    */
   diagnosticStatus?: "complete" | "partial" | "unavailable";
+  /**
+   * Whether this turn's cache counts were reported by the vendor.
+   *
+   * Separate from {@link diagnosticStatus}, which is about input and output:
+   * a turn can report those two completely and still say nothing about
+   * caching, which is exactly what a Codex turn scraped from text does.
+   *
+   * v1 additive field — old records without it load normally.
+   */
+  cacheProvenance?: TokenProvenance;
 }
 
 /**
@@ -1236,6 +1319,13 @@ export interface RunRecord {
    */
   parentSessionId?: string;
   /**
+   * What the session cache was asked for at the start of this run, and what
+   * it answered. See {@link RunSessionRecord}.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  session?: RunSessionRecord;
+  /**
    * Total vendor spawns this task made, including retries, plan-mode
    * re-spawns, and fallbacks. Recorded so `ndx usage` can report retry
    * overhead: a task that cost four spawns to complete is a different story
@@ -1412,6 +1502,46 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   completionHold?: RunCompletionHold;
+}
+
+/**
+ * The session-cache decision this run was started under.
+ *
+ * Recorded because the decision is otherwise invisible after the fact. A run
+ * that forked a warm parent and a run that spawned cold differ by thousands of
+ * cached input tokens and several turns of re-exploration, and until this
+ * existed the only trace was a `detail()` line in a terminal nobody was
+ * capturing — so "is batching actually hitting?" could not be answered from
+ * the run history, and a strategy that silently never hit looked exactly like
+ * one that was working.
+ *
+ * Written once, at the point the decision is made, before the task spawns.
+ *
+ * @see RunRecord.session
+ */
+export interface RunSessionRecord {
+  /** Strategy resolved for this run — see `resolveSessionStrategy`. */
+  strategy: "fork" | "batch" | "cold";
+  /** Whether a cached session was reused. */
+  outcome: "hit" | "miss";
+  /**
+   * Why, in one token.
+   *
+   * Deliberately a bare `string` rather than a union of the rejection codes.
+   * Those live in `agent/lifecycle/session-cache.ts` and change as the
+   * identity checks do; pinning them here would mean either a schema bump per
+   * new check, or — worse — old run files failing to load because they name a
+   * reason this build has since renamed. A reason is a label to read, not a
+   * value to branch on.
+   */
+  reason: string;
+  /**
+   * Age of the cached entry when it was consulted, in milliseconds. Absent
+   * when there was nothing cached to measure, which is not the same as zero.
+   */
+  ageMs?: number;
+  /** Session that was reused, on a hit. */
+  sessionId?: string;
 }
 
 /** See {@link RunRecord.completionHold}. */

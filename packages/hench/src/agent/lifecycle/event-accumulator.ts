@@ -261,12 +261,24 @@ export class EventAccumulator {
         total.cacheReadInput = (total.cacheReadInput ?? 0) + usage.cacheReadInput;
       }
 
-      // Determine diagnostic status for this turn based on data quality
-      let turnDiagnostic: TokenDiagnosticStatus = "complete";
-      if (usage.input === 0 && usage.output === 0) {
+      // Prefer what the parser concluded from the raw payload. Inference from
+      // the parsed numbers is a fallback for events produced before the event
+      // carried these fields, and it is strictly weaker: the parser decides
+      // from field presence, while this layer can only test values. An
+      // explicit `input_tokens: 0` is a complete measurement that infers as
+      // "partial", and a zero-valued cache count is omitted from TokenUsage
+      // entirely, so it infers as "unavailable" where the parser said
+      // "measured". Keeping the fallback means a legacy event still gets a
+      // best-effort answer rather than none.
+      let turnDiagnostic: TokenDiagnosticStatus;
+      if (event.tokenDiagnosticStatus !== undefined) {
+        turnDiagnostic = event.tokenDiagnosticStatus;
+      } else if (usage.input === 0 && usage.output === 0) {
         turnDiagnostic = "unavailable";
       } else if (usage.input === 0 || usage.output === 0) {
         turnDiagnostic = "partial";
+      } else {
+        turnDiagnostic = "complete";
       }
 
       perTurn.push({
@@ -274,6 +286,11 @@ export class EventAccumulator {
         input: usage.input,
         output: usage.output,
         diagnosticStatus: turnDiagnostic,
+        cacheProvenance:
+          event.tokenCacheProvenance ??
+          (usage.cacheCreationInput !== undefined || usage.cacheReadInput !== undefined
+            ? "measured"
+            : "unavailable"),
         vendor: event.vendor,
         ...(usage.cacheCreationInput ? { cacheCreationInput: usage.cacheCreationInput } : {}),
         ...(usage.cacheReadInput ? { cacheReadInput: usage.cacheReadInput } : {}),
@@ -440,7 +457,8 @@ export function processStreamLine(
 
         // Extract per-turn token usage from message.usage
         if (msg.usage && typeof msg.usage === "object") {
-          const { usage: parsed, diagnosticStatus } = parseTokenUsageWithDiagnostic(msg.usage as Record<string, unknown>);
+          const { usage: parsed, diagnosticStatus, cacheProvenance } =
+            parseTokenUsageWithDiagnostic(msg.usage as Record<string, unknown>);
 
           result.tokenUsage.input += parsed.input;
           result.tokenUsage.output += parsed.output;
@@ -450,6 +468,7 @@ export function processStreamLine(
             input: parsed.input,
             output: parsed.output,
             diagnosticStatus,
+            cacheProvenance,
             ...(tokenMetadata ? { vendor: tokenMetadata.vendor, model: tokenMetadata.model } : {}),
           };
 
@@ -662,9 +681,16 @@ export function processCodexJsonLine(
         result.summary = event.text.slice(0, MAX_SUMMARY_LENGTH);
       }
 
-      // Token usage embedded in the message event
+      // Token usage embedded in the message event.
+      //
+      // The cache halves are accumulated here for the same reason the Claude
+      // branch does it: this parser used to read `usage` and keep only input
+      // and output, so a Codex turn reporting 35k cached input tokens landed
+      // on the record as a run that cached nothing. `cross-vendor-run-record-
+      // smoke.test.ts` holds the two branches to the same shape.
       if (event.usage && typeof event.usage === "object") {
-        const { usage: parsed, diagnosticStatus } = parseTokenUsageWithDiagnostic(event.usage as Record<string, unknown>);
+        const { usage: parsed, diagnosticStatus, cacheProvenance } =
+          parseTokenUsageWithDiagnostic(event.usage as Record<string, unknown>);
         result.tokenUsage.input += parsed.input;
         result.tokenUsage.output += parsed.output;
 
@@ -673,8 +699,21 @@ export function processCodexJsonLine(
           input: parsed.input,
           output: parsed.output,
           diagnosticStatus,
+          cacheProvenance,
           ...(tokenMetadata ? { vendor: tokenMetadata.vendor, model: tokenMetadata.model } : {}),
         };
+
+        if (parsed.cacheCreationInput) {
+          result.tokenUsage.cacheCreationInput =
+            (result.tokenUsage.cacheCreationInput ?? 0) + parsed.cacheCreationInput;
+          turnUsage.cacheCreationInput = parsed.cacheCreationInput;
+        }
+        if (parsed.cacheReadInput) {
+          result.tokenUsage.cacheReadInput =
+            (result.tokenUsage.cacheReadInput ?? 0) + parsed.cacheReadInput;
+          turnUsage.cacheReadInput = parsed.cacheReadInput;
+        }
+
         result.turnTokenUsage.push(turnUsage);
       }
 
