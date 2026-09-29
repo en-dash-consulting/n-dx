@@ -753,7 +753,8 @@ describe("server/client boundary", () => {
   /**
    * viewer-ui-hub gateway compliance guard.
    *
-   * viewer-ui-hub (sidebar, search-overlay, config-footer, faq, logos, theme-toggle)
+   * viewer-ui-hub (the shell — top-nav, stage-links, bottom-bar, settings-overlay,
+   * commands-sheet — plus search-overlay, config-footer, faq, logos, theme-toggle)
    * is the intentional Preact UI composition hub. Its dual-fragility metrics
    * (cohesion 0.38, coupling 0.63) and bidirectional 74-edge coupling with the
    * web dashboard platform zone are structurally expected — but the coupling must
@@ -766,8 +767,7 @@ describe("server/client boundary", () => {
    *    hooks/ leaf files, types.ts, or route-state.ts.
    *
    * 2. Files outside the viewer-ui-hub zone must not bypass components/index.ts
-   *    to import leaf component files (config-footer, faq, logos, search-overlay,
-   *    sidebar, theme-toggle) directly.
+   *    to import leaf component files (the UI_HUB_LEAVES below) directly.
    *
    * @see CLAUDE.md — viewer-ui-hub governance
    */
@@ -778,13 +778,19 @@ describe("server/client boundary", () => {
     const violations: string[] = [];
 
     // The ui-hub leaf files (not the barrel itself)
+    // The shell: top nav, side stage links, bottom bar, settings overlay and
+    // commands sheet replaced the sidebar, and inherit its rules.
     const UI_HUB_LEAVES = new Set([
+      "bottom-bar",
+      "commands-sheet",
       "config-footer",
       "faq",
       "logos",
       "search-overlay",
-      "sidebar",
+      "settings-overlay",
+      "stage-links",
       "theme-toggle",
+      "top-nav",
     ]);
 
     // Hooks leaf files (must NOT be imported directly from ui-hub — use api.js)

@@ -5,7 +5,7 @@
 import { h } from "preact";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
-import { BrandedHeader } from "../components/index.js";
+import { BrandedHeader, InfoTip } from "../components/index.js";
 import { useGraphArrowNav } from "../hooks/index.js";
 import { basename } from "../utils.js";
 import {
@@ -1639,7 +1639,10 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
               ),
             ),
             h("div", { class: "ig-boundary-strip" },
-              h("h4", null, activeZone ? "Boundaries in focus" : "Busiest boundaries"),
+              h("h4", null,
+                activeZone ? "Boundaries in focus" : "Busiest boundaries",
+                h(InfoTip, { term: "cross-zone import", label: "boundaries" }),
+              ),
               activeZoneBoundaryFlows.length
                 ? h("div", { class: "ig-boundary-list" },
                     ...activeZoneBoundaryFlows.map((flow) =>

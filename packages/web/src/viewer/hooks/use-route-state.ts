@@ -31,7 +31,12 @@ export interface RouteState {
   handleSidebarNav: (id: ViewId) => void;
 }
 
+/**
+ * The page a bare URL opens on: the landing page whenever it exists (it is a
+ * cross-cutting view, so it does in every scope), else the first valid view.
+ */
 function defaultView(validViews: Set<ViewId>): ViewId {
+  if (validViews.has("home")) return "home";
   return validViews.values().next().value as ViewId;
 }
 

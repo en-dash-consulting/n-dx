@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  activeStageTab,
   bootViewer,
   ensureBrowserStubs,
-  findNavItem,
+  findStageSection,
   jsonResponse,
+  openStageSection,
   teardownViewer,
   waitFor,
 } from "../helpers/viewer-boot.js";
@@ -69,8 +71,7 @@ describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
     ensureBrowserStubs();
-    localStorage.removeItem("sidebar-collapsed");
-    localStorage.removeItem("sidebar-expanded-section");
+    localStorage.removeItem("ndx.stage-sections");
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -82,23 +83,36 @@ describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
     vi.useRealTimers();
   });
 
-  it("shows PR Markdown as a SourceVision tab and selects it like existing tabs", async () => {
-    await bootViewer("/overview", createMockApi());
+  it("lists PR Markdown on the Analysis page when its toggle is on, and opens it like the other sections", async () => {
+    await bootViewer("/analyze", createMockApi());
 
-    await waitFor(() => findNavItem("PR Markdown") !== null);
-    const mapItem = findNavItem("Map");
-    const prMarkdownItem = findNavItem("PR Markdown");
-    expect(mapItem).not.toBeNull();
-    expect(prMarkdownItem).not.toBeNull();
+    await waitFor(() => findStageSection("pr-markdown") !== null);
+    expect(findStageSection("graph")).not.toBeNull();
+    expect(activeStageTab()).toBe("Analysis");
 
-    mapItem?.click();
+    openStageSection("graph");
     await waitFor(() => window.location.pathname === "/graph");
-    await waitFor(() => document.querySelector(".nav-item.active")?.textContent?.includes("Map") ?? false);
+    // A view keeps the stage that lists it lit.
+    expect(activeStageTab()).toBe("Analysis");
 
-    prMarkdownItem?.click();
+    document.querySelector<HTMLButtonElement>('.topnav-tab[data-stage="analyze"]')?.click();
+    await waitFor(() => findStageSection("pr-markdown") !== null);
+    openStageSection("pr-markdown");
     await waitFor(() => window.location.pathname === "/pr-markdown");
     await waitFor(() => document.querySelector(".section-header")?.textContent === "PR Markdown");
-    expect(document.querySelector(".nav-item.active")?.textContent).toContain("PR Markdown");
+    expect(activeStageTab()).toBe("Analysis");
+  });
+
+  it("leaves PR Markdown off the Analysis page when its toggle is off", async () => {
+    const base = createMockApi();
+    const toggleOff = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/features") return jsonResponse({ toggles: [] });
+      return base(input);
+    }) as unknown as typeof fetch;
+
+    await bootViewer("/analyze", toggleOff);
+    await waitFor(() => findStageSection("graph") !== null);
+    expect(findStageSection("pr-markdown")).toBeNull();
   });
 
   it("selects PR Markdown view from direct hash navigation", async () => {
@@ -106,7 +120,7 @@ describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
 
     await waitFor(() => window.location.pathname === "/pr-markdown");
     await waitFor(() => document.querySelector(".section-header")?.textContent === "PR Markdown");
-    expect(document.querySelector(".nav-item.active")?.textContent).toContain("PR Markdown");
+    expect(activeStageTab()).toBe("Analysis");
   });
 
   it("renders unavailable diagnostics for no-repo, unresolved base branch, and endpoint failures", async () => {
@@ -160,12 +174,12 @@ describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
   // "window is not defined" and fails the run even when every test passes.
   it("unmounts the viewer on teardown so no effects outlive the test", async () => {
     await bootViewer("/pr-markdown", createMockApi());
-    expect(document.querySelector(".sidebar")).not.toBeNull();
+    expect(document.querySelector(".topnav")).not.toBeNull();
 
     await teardownViewer();
 
     expect(document.getElementById("app")).toBeNull();
-    expect(document.querySelector(".sidebar")).toBeNull();
+    expect(document.querySelector(".topnav")).toBeNull();
   });
 
   it("does not render a manual refresh button", async () => {

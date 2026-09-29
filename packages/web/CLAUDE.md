@@ -32,7 +32,7 @@ Latest analysis (2026-08-24, `main`): `web-viewer` 205 files (cohesion 0.98 / co
 
 ## UI composition governance
 
-The viewer's UI composition layer (sidebar, config-footer, faq, logos) is a composition root: it imports broadly from `web-viewer` while its internal files serve distinct UI concerns. Louvain currently reports this as `web-composition-layer` (4 files, cohesion 0.65 / coupling 0.35); earlier revisions called it `viewer-ui-hub` with different metrics. Low cohesion here is **structurally expected** and not by itself a defect.
+The viewer's UI composition layer — the shell (top-nav, stage-links, bottom-bar, settings-overlay, commands-sheet) plus config-footer, faq, logos and theme-toggle — is a composition root: it imports broadly from `web-viewer` while its internal files serve distinct UI concerns. Louvain currently reports this as `web-composition-layer` (4 files, cohesion 0.65 / coupling 0.35); earlier revisions called it `viewer-ui-hub` with different metrics. Low cohesion here is **structurally expected** and not by itself a defect.
 
 - **No domain logic:** This layer must contain only UI composition components and their direct rendering helpers. Data fetching and state management belong in hooks or views.
 - **Monitor fan-out:** Its coupling with the dashboard platform zone is the largest cross-zone relationship in the web package — audit import direction periodically to ensure inbound imports enter through `api.ts` or composition-root wiring rather than ad-hoc leaf reach-ins.
@@ -49,10 +49,10 @@ The viewer's UI composition layer (sidebar, config-footer, faq, logos) is a comp
 ## Feature-toggle enforcement
 
 Toggles in `routes-features.ts`'s registry are enforced in the viewer by
-`useFeatureToggle` — the sidebar and the SourceVision tab list read them, and any
+`useFeatureToggle` — the stage pages and the settings overlay read them, and any
 *other* entry point into a gated surface must read the same toggle. The Explain
-button on Problems and Suggestions is the worked example: it is not in the sidebar,
-so gating the sidebar alone left a default-off feature reachable through a side door
+button on Problems and Suggestions is the worked example: it is not a stage section,
+so gating the stage pages alone left a default-off feature reachable through a side door
 whose only off switch the toggle itself had hidden. Views that cannot call the hook
 (both of those return early from an enrichment gate before their hooks run) take the
 value as a prop from `main.ts` via `ViewRenderContext`, defaulting to `false`.
