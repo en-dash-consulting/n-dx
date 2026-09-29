@@ -99,14 +99,26 @@ export async function waitFor(predicate: () => boolean, timeoutMs: number = 8_00
   throw new Error(`Timed out after ${timeoutMs}ms`);
 }
 
-export function findNavItem(label: string): HTMLElement | null {
-  const navItems = Array.from(document.querySelectorAll(".nav-item"));
-  return (navItems.find((item) => item.textContent?.includes(label)) ?? null) as HTMLElement | null;
+/** The section on the current stage page that renders `view`, if listed. */
+export function findStageSection(view: string): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`.stage-section[data-view="${view}"]`);
+}
+
+/** Click a stage section's "Open" link, which goes to the view's own page. */
+export function openStageSection(view: string): void {
+  const open = findStageSection(view)?.querySelector<HTMLButtonElement>(".stage-section-open");
+  if (!open) throw new Error(`No stage section for "${view}" on this page`);
+  open.click();
+}
+
+/** Label of the lit top-nav stage tab, or null when none is (home, say). */
+export function activeStageTab(): string | null {
+  return document.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent ?? null;
 }
 
 /**
- * Mount the viewer at `url` with `fetchImpl` stubbed in, and wait for the sidebar
- * to render.
+ * Mount the viewer at `url` with `fetchImpl` stubbed in, and wait for the top
+ * navigation to render.
  *
  * Any previously booted viewer is torn down first, so repeated boots inside a
  * single test do not orphan a mounted tree.
@@ -128,7 +140,7 @@ export async function bootViewer(url: string, fetchImpl: typeof fetch): Promise<
   const root = document.getElementById("app");
   if (root) mounted = { render, root };
 
-  await waitFor(() => document.querySelector(".sidebar") !== null);
+  await waitFor(() => document.querySelector(".topnav") !== null);
 }
 
 /**

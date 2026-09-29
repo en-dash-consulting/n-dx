@@ -12,7 +12,7 @@
 
 .sessions-panel {
   position: fixed;
-  bottom: 11.5rem;
+  bottom: calc(11.5rem + var(--bottombar-h, 0px));
   right: 1rem;
   z-index: 996;
   display: flex;

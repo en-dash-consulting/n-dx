@@ -36,6 +36,9 @@ const FAVICON_PNGS: Record<Product | "ndx", string> = {
  * Views not in this map default to the n-dx favicon.
  */
 const VIEW_TO_PRODUCT: Partial<Record<ViewId, Product>> = {
+  analyze: "sourcevision",
+  plan: "rex",
+  work: "hench",
   overview: "sourcevision",
   graph: "sourcevision",
   files: "sourcevision",

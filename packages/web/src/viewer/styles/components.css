@@ -295,7 +295,71 @@
   max-width: 68ch;
 }
 
-.data-table th .glossary-line {
-  margin: var(--space-1) 0 0;
-  max-width: 32ch;
+/* InfoTip — a circled ⓘ that shows the same glossary definition on hover or
+   focus, for places a visible line would crowd (headers, cards, gauges). */
+.info-tip {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 5px;
 }
+.info-tip-btn {
+  width: 15px;
+  height: 15px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-transform: none;
+  cursor: help;
+}
+.info-tip-btn:hover,
+.info-tip-btn:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  outline: none;
+}
+.info-tip-bubble {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  width: 280px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--bg-active, var(--bg-surface));
+  color: var(--text);
+  font-size: var(--font-sm);
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease, visibility 0s linear 0.12s;
+}
+.info-tip:hover .info-tip-bubble,
+.info-tip:focus-within .info-tip-bubble {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity 0.12s ease;
+}
+/* The Archetype header is the table's last column: open the bubble leftward. */
+.data-table th .info-tip-bubble {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.metric-label--with-info { display: flex; align-items: center; justify-content: center; }
+.health-gauge-with-info { display: flex; align-items: flex-start; }
+.health-gauge-with-info > .info-tip { margin-top: 4px; }
