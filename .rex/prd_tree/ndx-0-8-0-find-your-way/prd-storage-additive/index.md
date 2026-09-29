@@ -26,6 +26,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Add rex ready to mark items ready when they have an automated or metric requirement and no open blocker](./add-rex-ready-to-mark-items-ready-when.md) | completed |
 | [Add rex tree-diff --json to diff two PRD trees](./add-rex-tree-diff-json-to-diff-two-prd.md) | completed |
 | [Guard whole-tree rewrites reached through the rex MCP reorganize tool and the dashboard's bulk routes](./guard-whole-tree-rewrites-reached.md) | pending |
-| [Point the PRD delta route and SourceVision's PR markdown at rex tree-diff and drop the legacy prd.md read](./point-the-prd-delta-route-and.md) | in_progress |
+| [Point the PRD delta route and SourceVision's PR markdown at rex tree-diff and drop the legacy prd.md read](./point-the-prd-delta-route-and.md) | completed |
 | [Refuse whole-tree PRD rewrites off the default branch without --allow-on-branch](./refuse-whole-tree-prd-rewrites-off-the.md) | completed |
 | [Show where a long field changed in rex tree-diff's text output](./show-where-a-long-field-changed-in-rex.md) | pending |
