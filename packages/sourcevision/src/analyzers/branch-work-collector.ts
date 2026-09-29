@@ -4,32 +4,56 @@
  * ## Architecture
  *
  * Sourcevision and rex are peer domain packages that **never import each other
- * at runtime**. This module reads `.rex/prd.md` (the authoritative Markdown
- * source) by spawning `rex parse-md`, which converts the document to
- * canonical JSON on stdout. For legacy projects that still have `.rex/prd.json`,
- * we fall back to direct JSON.parse — no `import from "rex"` exists here.
+ * at runtime**. Everything this module knows about the PRD therefore comes from
+ * spawning the rex CLI, which is the only sanctioned route across that
+ * boundary:
+ *
+ * - `rex tree --format=json` — the PRD as it stands in this checkout, with the
+ *   item content a report needs (description, acceptance criteria, tags,
+ *   priority).
+ * - `rex tree-diff --json --from=<base>` — which items this branch completed
+ *   that the base branch had not.
+ *
+ * ## Why rex owns the diff
+ *
+ * This module used to compute the completion diff itself, over two documents it
+ * read and parsed here. That is the same question `rex tree-diff` answers for
+ * the CLI and for the dashboard's Workspaces board, and three implementations
+ * of "what did this branch finish" are free to disagree — the kind of defect
+ * nobody thinks to look for, because each one looks right on its own. rex is
+ * the domain owner, so rex computes it and this module projects the answer.
+ *
+ * It also fixes a live defect. The previous implementation read `.rex/prd.md`,
+ * which does not exist on a project migrated to the folder tree, so the
+ * Completed Work section of the pull-request markdown silently found nothing.
+ * **No code path here reads `.rex/prd.md` or `.rex/prd.json`.** Legacy projects
+ * are still handled, but by rex: `rex tree` migrates a legacy `prd.json` to the
+ * folder tree before reading it, which is why it is spawned first.
  *
  * ## Algorithm
  *
- * 1. Read the current PRD from `.rex/prd.md` (via `rex parse-md`) or
- *    `.rex/prd.json` (legacy) on disk.
- * 2. Detect the base branch (main or master) and read its PRD via `git show`,
- *    preferring `prd.md` and piping it through `rex parse-md --stdin`.
- * 3. Diff: completed IDs on current branch minus completed IDs on base branch.
- * 4. Build enriched work items with parent chain and epic summaries.
+ * 1. Read the current PRD via `rex tree --format=json`.
+ * 2. Detect the branch and its base (main or master unless told otherwise).
+ * 3. Ask `rex tree-diff` which items this branch completed.
+ * 4. Build enriched work items with parent chain and epic summaries from (1).
  *
- * When git is unavailable (non-repo directory), all completed items in the
- * current PRD are returned — the service degrades gracefully rather than
- * failing.
+ * ## Degradation
+ *
+ * A non-git directory, or a base branch git cannot resolve, leaves nothing to
+ * diff against. Rather than failing, every completed item in the current PRD is
+ * treated as branch work — a summary of the project's completed work is the
+ * most useful thing available when there is no branch to attribute it to. When
+ * that fallback is taken because the diff *failed* (as opposed to there being
+ * no git at all), the reason is recorded in `errors` so it surfaces as a
+ * warning rather than passing for a real answer.
  *
  * @module sourcevision/analyzers/branch-work-collector
  */
 
-import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { execFileSyncCli } from "../util/exec-cli.js";
-import { getCurrentBranch, PROJECT_DIRS } from "@n-dx/llm-client";
+import { getCurrentBranch } from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
 // Lightweight PRD types (mirrors rex schema — no runtime import from rex)
@@ -103,12 +127,34 @@ export interface BranchWorkResult {
   errors?: string[];
 }
 
+/**
+ * The two questions this module asks rex, as an injectable pair.
+ *
+ * Both default to spawning the real `rex` CLI. They are injectable so the
+ * collector's own branching — base-branch detection, the fallbacks, what lands
+ * in `errors` — can be unit-tested without a git repository and a built rex on
+ * PATH, which is the difference between a test that runs in milliseconds
+ * everywhere and one that is a small integration suite in disguise. The real
+ * wiring is covered end-to-end by the `sv pr-markdown` e2e test.
+ */
+export interface RexBridge {
+  /** The PRD as it stands in `dir`, or null when there is none to read. */
+  readPRD: (dir: string) => PRDDocumentShape | null;
+  /**
+   * Ids completed in `dir` that `baseBranch` had not completed, or null when
+   * the comparison could not be made at all.
+   */
+  diffCompleted: (dir: string, baseBranch: string) => Set<string> | null;
+}
+
 /** Options for the collector. */
 export interface CollectorOptions {
   /** Project root directory. */
   dir: string;
   /** Base branch to diff against. Auto-detected when omitted. */
   baseBranch?: string;
+  /** Overrides for the rex calls. Defaults to spawning the real CLI. */
+  rex?: Partial<RexBridge>;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,55 +162,84 @@ export interface CollectorOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Parse a PRD document from raw text. Accepts both Markdown (rex/v1
- * front-matter form, the current source-of-truth format) and legacy JSON.
- * Markdown is dispatched to `rex parse-md --stdin` so we never need to
- * depend on the rex parser at the code level.
+ * Stdout budget for the rex spawns below.
  *
- * Returns null if the input is empty, malformed, or lacks an `items` array.
+ * `execFileSync` defaults `maxBuffer` to 1 MiB and does not truncate past it —
+ * it kills the child and throws `ENOBUFS`, which the callers here would read as
+ * "no PRD" and report as an empty Completed Work section. That is the exact
+ * defect this module was rewritten to fix, so the default is not survivable: a
+ * whole PRD serialised to JSON passes 1 MiB on any real project. n-dx's own
+ * tree measured 3.2 MiB, and it is not the largest PRD this will meet.
+ *
+ * 64 MiB is headroom of roughly twenty times that, while still bounded — an
+ * unbounded buffer would turn a runaway child into an out-of-memory crash
+ * rather than an error.
  */
-export function parsePRDDocument(raw: string): PRDDocumentShape | null {
-  if (!raw || !raw.trim()) return null;
-
-  // Markdown: front-matter starts with "---" on the first non-empty line.
-  const trimmedStart = raw.replace(/^\s+/, "");
-  if (trimmedStart.startsWith("---")) {
-    return parseMarkdownViaRex(raw);
-  }
-
-  // Legacy JSON path
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.items)) return null;
-    return parsed as PRDDocumentShape;
-  } catch {
-    return null;
-  }
-}
+const REX_STDOUT_MAX_BUFFER = 64 * 1024 * 1024;
 
 /**
- * Convert a rex/v1 markdown PRD to the local document shape by spawning
- * `rex parse-md --stdin`. Returns null on any spawn / parse failure.
+ * Read the PRD of a checkout by spawning `rex tree --format=json`.
+ *
+ * This is the folder-tree replacement for the `rex parse-md --stdin` seam that
+ * used to serve `.rex/prd.md`: one command, canonical JSON on stdout, rex's own
+ * parser on the other side of it. Returns null on any spawn / parse failure —
+ * an uninitialised project is the common cause and is not an error here.
  */
-function parseMarkdownViaRex(markdown: string): PRDDocumentShape | null {
+export function readPRDViaRex(dir: string): PRDDocumentShape | null {
   try {
-    const out = execFileSyncCli("rex", ["parse-md", "--stdin"], {
-      input: markdown,
+    const out = execFileSyncCli("rex", ["tree", "--format=json", dir], {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
+      maxBuffer: REX_STDOUT_MAX_BUFFER,
     });
     const parsed = JSON.parse(out as string);
     if (!parsed || !Array.isArray(parsed.items)) return null;
-    return parsed as PRDDocumentShape;
+    return { schema: "rex/v1", title: "", ...parsed } as PRDDocumentShape;
+  } catch {
+    return null;
+  }
+}
+
+/** What `rex tree-diff --json` reports, narrowed to the part used here. */
+interface TreeDiffOutput {
+  completed?: { id: string }[];
+}
+
+/**
+ * Ask rex which items this branch completed that `baseBranch` had not.
+ *
+ * Returns null when the diff could not be computed at all — an unresolvable
+ * base ref, or no git. The caller decides what to do about that; this function
+ * does not invent an answer, because "nothing was completed" and "I could not
+ * tell" are different facts and only one of them is worth reporting as work.
+ */
+export function diffCompletedViaRex(
+  dir: string,
+  baseBranch: string,
+): Set<string> | null {
+  try {
+    const out = execFileSyncCli(
+      "rex",
+      ["tree-diff", "--json", `--from=${baseBranch}`, dir],
+      {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        maxBuffer: REX_STDOUT_MAX_BUFFER,
+      },
+    );
+    const parsed = JSON.parse(out as string) as TreeDiffOutput;
+    if (!parsed || !Array.isArray(parsed.completed)) return null;
+    return new Set(parsed.completed.map((entry) => entry.id));
   } catch {
     return null;
   }
 }
 
 /**
- * Walk the PRD tree and collect IDs of completed items.
+ * Every completed id in a tree — the fallback set when there is no baseline to
+ * diff against.
  */
-function collectCompletedIds(items: PRDItemShape[]): Set<string> {
+export function collectCompletedIds(items: PRDItemShape[]): Set<string> {
   const ids = new Set<string>();
   function walk(list: PRDItemShape[]): void {
     for (const item of list) {
@@ -178,29 +253,6 @@ function collectCompletedIds(items: PRDItemShape[]): Set<string> {
   }
   walk(items);
   return ids;
-}
-
-/**
- * Compute the set of item IDs completed on the current branch but not on the base.
- *
- * @param currentItems - PRD items from the current branch
- * @param baseItems    - PRD items from the base branch (empty array if unavailable)
- * @returns Set of item IDs uniquely completed on the current branch
- */
-export function diffCompletedItems(
-  currentItems: PRDItemShape[],
-  baseItems: PRDItemShape[],
-): Set<string> {
-  const currentCompleted = collectCompletedIds(currentItems);
-  const baseCompleted = collectCompletedIds(baseItems);
-
-  const branchSpecific = new Set<string>();
-  for (const id of currentCompleted) {
-    if (!baseCompleted.has(id)) {
-      branchSpecific.add(id);
-    }
-  }
-  return branchSpecific;
 }
 
 /**
@@ -250,23 +302,6 @@ export function buildBranchWorkItems(
 // ---------------------------------------------------------------------------
 // Git helpers (internal)
 // ---------------------------------------------------------------------------
-
-/**
- * Read a file from a specific git ref.
- * Returns null if the file doesn't exist on that ref or git fails.
- */
-function gitShowFile(dir: string, ref: string, filePath: string): string | null {
-  try {
-    return execFileSync("git", ["show", `${ref}:${filePath}`], {
-      cwd: dir,
-      encoding: "utf-8",
-      // Suppress stderr for expected failures (file not found on ref)
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Check whether a git branch exists locally.
@@ -361,9 +396,9 @@ function buildEpicSummaries(
  *
  * Gracefully handles:
  * - Non-git directories (returns all completed items)
- * - Missing `.rex/prd.json` (returns empty result)
- * - Corrupted PRD JSON (returns empty result with error)
- * - Missing base branch (falls back to treating all completions as branch work)
+ * - No readable PRD (returns empty result with an error)
+ * - Missing or unresolvable base branch (treats all completions as branch
+ *   work, and records why in `errors`)
  */
 export async function collectBranchWork(
   options: CollectorOptions,
@@ -371,6 +406,8 @@ export async function collectBranchWork(
   const dir = resolve(options.dir);
   const errors: string[] = [];
   const now = new Date().toISOString();
+  const readPRD = options.rex?.readPRD ?? readPRDViaRex;
+  const diffCompleted = options.rex?.diffCompleted ?? diffCompletedViaRex;
 
   // ── 1. Determine branch context ──────────────────────────────
 
@@ -379,69 +416,58 @@ export async function collectBranchWork(
 
   const baseBranch = options.baseBranch ?? (gitAvailable ? detectBaseBranch(dir) : "main");
 
-  // ── 2. Read current PRD from disk ────────────────────────────
-  // Prefer prd.md (current source of truth); fall back to legacy prd.json.
+  // ── 2. Read the current PRD through rex ──────────────────────
+  // Spawned before the diff because `rex tree` migrates a legacy prd.json to
+  // the folder tree on the way past, and tree-diff reads the folder tree.
 
-  const mdPath = join(dir, PROJECT_DIRS.REX, "prd.md");
-  const jsonPath = join(dir, PROJECT_DIRS.REX, "prd.json");
-  const sourcePath = existsSync(mdPath) ? mdPath : existsSync(jsonPath) ? jsonPath : null;
-
-  let currentDoc: PRDDocumentShape | null = null;
-  if (sourcePath) {
-    try {
-      const raw = readFileSync(sourcePath, "utf-8");
-      currentDoc = parsePRDDocument(raw);
-      if (!currentDoc) {
-        errors.push(`Current PRD file exists but could not be parsed: ${sourcePath}`);
-      }
-    } catch (err) {
-      errors.push(`Failed to read current PRD: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
+  const currentDoc = readPRD(dir);
 
   if (!currentDoc) {
+    errors.push(`No readable PRD in ${dir} (rex tree --format=json returned nothing usable)`);
     return {
       branch,
       baseBranch,
       collectedAt: now,
       items: [],
-      ...(errors.length > 0 && { errors }),
+      errors,
     };
   }
 
-  // ── 3. Read base branch PRD from git history ─────────────────
-  // Prefer prd.md from the base branch; fall back to legacy prd.json.
+  // Running on the base branch itself — there is no "this branch" to
+  // attribute anything to, so diffing it against itself is skipped entirely
+  // rather than asked of rex.
+  if (gitAvailable && branch === baseBranch) {
+    return {
+      branch,
+      baseBranch,
+      collectedAt: now,
+      items: [],
+    };
+  }
 
-  let baseDoc: PRDDocumentShape | null = null;
+  // ── 3. Ask rex what this branch completed ────────────────────
 
-  if (gitAvailable && branch !== baseBranch) {
-    const baseMdRaw = gitShowFile(dir, baseBranch, `${PROJECT_DIRS.REX}/prd.md`);
-    const baseRaw = baseMdRaw ?? gitShowFile(dir, baseBranch, `${PROJECT_DIRS.REX}/prd.json`);
+  let branchIds: Set<string>;
 
-    if (baseRaw) {
-      baseDoc = parsePRDDocument(baseRaw);
-      if (!baseDoc) {
-        errors.push(`Base branch PRD (${baseBranch}) exists but could not be parsed`);
-      }
+  if (gitAvailable) {
+    const diffed = diffCompleted(dir, baseBranch);
+    if (diffed === null) {
+      // The base ref did not resolve, or the diff failed. Fall back to the
+      // whole completed set, but say so — an unexplained full list reads as a
+      // branch that completed everything.
+      errors.push(
+        `Could not diff against "${baseBranch}" — reporting all completed items as branch work`,
+      );
+      branchIds = collectCompletedIds(currentDoc.items);
+    } else {
+      branchIds = diffed;
     }
-    // If baseRaw is null, the file doesn't exist on base — that's fine,
-    // all current completions are considered branch work.
-  } else if (gitAvailable && branch === baseBranch) {
-    // Running on the base branch itself — diff against itself yields nothing
-    return {
-      branch,
-      baseBranch,
-      collectedAt: now,
-      items: [],
-    };
+  } else {
+    // No git, no baseline, nothing to explain: the documented degradation.
+    branchIds = collectCompletedIds(currentDoc.items);
   }
 
-  // ── 4. Diff completed items ──────────────────────────────────
-
-  const baseItems = baseDoc?.items ?? [];
-  const branchIds = diffCompletedItems(currentDoc.items, baseItems);
-
-  // ── 5. Build enriched results ────────────────────────────────
+  // ── 4. Build enriched results ────────────────────────────────
 
   const items = buildBranchWorkItems(currentDoc.items, branchIds);
   const epicSummaries = buildEpicSummaries(currentDoc.items, branchIds);

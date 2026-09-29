@@ -69,6 +69,8 @@
  * - Finding acknowledgment (load/save/acknowledge sourcevision findings)
  * - PRD tree conformance (checkTreeConformance — refuse to start a run whose
  *   completion write would re-slug the whole tree)
+ * - Actor identity (resolveActor — resolve the current user's identity for
+ *   `ndx work --mine`, the same string rex stamps into `lastModifiedBy`)
  *
  * **Out-of-scope (must NOT be re-exported):**
  * - PRD mutation (insertChild, updateInTree, removeFromTree — hench
@@ -127,6 +129,13 @@ export { openClaimsStore, resolveClaimHolder } from "@n-dx/rex";
 
 // ---- Self-heal tag scoping --------------------------------------------------
 export { SELF_HEAL_TAG } from "@n-dx/rex";
+
+// ---- Actor identity ----------------------------------------------------------
+// `ndx work --mine` resolves the current user the same way rex stamps
+// `lastModifiedBy` on every mutation, so the identity string a task is
+// assigned under is the same one that matches it — a hench-local copy would
+// be a second definition of "who is running this", free to drift from rex's.
+export { resolveActor } from "@n-dx/rex";
 
 // ---- Timestamps -------------------------------------------------------------
 export { computeTimestampUpdates } from "@n-dx/rex";

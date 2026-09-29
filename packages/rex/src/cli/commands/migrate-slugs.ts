@@ -38,6 +38,7 @@ import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
+import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 
 /**
  * `rex migrate-slugs [dir]`
@@ -48,6 +49,12 @@ export async function cmdMigrateSlugs(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  const guard = checkBranchGuard(dir, flags);
+  if (guard.blocked) {
+    const { message, suggestion } = branchGuardRefusal("migrate-slugs", guard.branch);
+    throw new CLIError(message, suggestion);
+  }
+
   const rexDir = join(dir, REX_DIR);
   const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   const store = await resolveStore(rexDir);

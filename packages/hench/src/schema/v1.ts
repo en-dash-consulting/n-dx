@@ -1643,5 +1643,7 @@ export interface TaskBrief {
   sessionFilters?: {
     /** Only tasks with at least one of these tags were eligible for selection. */
     tags?: string[];
+    /** Only tasks assigned to this identity were eligible for selection (`ndx work --mine`). */
+    assignee?: string;
   };
 }

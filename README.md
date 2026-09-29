@@ -265,6 +265,7 @@ These are delegated to rex; `ndx <command>` and `rex <command>` are equivalent.
 | `ndx next [dir]` | Print the next actionable task |
 | `ndx claim list\|release [dir]` | Inspect and free cross-worktree task claims: `list` shows every live claim with its worktree, holder, state and expiry; `release <taskId>` frees one (`--force` while its holder is alive); `release --all` frees this worktree's held and dead-holder claims (`--format=json` throughout) |
 | `ndx tree [dir]` | Show the full PRD hierarchy with colour-coded status |
+| `ndx tree-diff [dir]` | Compare two PRD trees into added/changed/completed/moved/removed, each with its ancestor chain. Defaults to this checkout against the default branch; `--from=<ref> --to=<ref>` compares commits, `--against=<dir>` compares two checkouts, `--json` for machine output. Read-only — takes no PRD lock |
 | `ndx update <id> [dir]` | Update item status, priority, or title |
 | `ndx remove <id> [dir]` | Remove an item and its children |
 | `ndx move <id> [dir]` | Reparent an item under a new parent |

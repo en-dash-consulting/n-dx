@@ -17,6 +17,8 @@ import { join } from "node:path";
 import { readdir, readFile, rename, stat, appendFile } from "node:fs/promises";
 import { info } from "../output.js";
 import { appendFilenameSuffix, titleToFilename } from "../../store/title-to-filename.js";
+import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
+import { CLIError } from "../errors.js";
 import { REX_DIR } from "./constants.js";
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
 
@@ -48,6 +50,12 @@ export async function cmdMigrateFolderTreeFilenames(
   dir: string,
   flags?: Record<string, string>,
 ): Promise<void> {
+  const guard = checkBranchGuard(dir, flags ?? {});
+  if (guard.blocked) {
+    const { message, suggestion } = branchGuardRefusal("migrate-folder-tree-filenames", guard.branch);
+    throw new CLIError(message, suggestion);
+  }
+
   const rexDir = join(dir, REX_DIR);
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
 
