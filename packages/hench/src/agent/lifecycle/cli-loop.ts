@@ -94,6 +94,7 @@ import {
   type RuntimeEvent,
   type PromptSection,
   type PromptSectionName,
+  type TokenDiagnosticStatus,
 } from "../../prd/llm-gateway.js";
 import {
   prepareBrief,
@@ -506,7 +507,11 @@ export function rawJsonToTokenUsageEvent(
 
   if (!usage) return null;
 
-  const { usage: parsed } = parseTokenUsageWithDiagnostic(usage);
+  // Carry the parser's verdict on the event. Dropping it here is what forced
+  // the event pipeline to re-infer both values from the parsed numbers, and
+  // that inference cannot tell an explicit zero from an absent field.
+  const { usage: parsed, diagnosticStatus, cacheProvenance } =
+    parseTokenUsageWithDiagnostic(usage);
 
   return {
     type: "token_usage",
@@ -514,6 +519,8 @@ export function rawJsonToTokenUsageEvent(
     turn: turn || 1,
     timestamp: new Date().toISOString(),
     tokenUsage: parsed,
+    tokenDiagnosticStatus: diagnosticStatus,
+    tokenCacheProvenance: cacheProvenance,
   };
 }
 
@@ -975,10 +982,17 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
         // attempt — zeros when no usage data is available — so callers can
         // account for every attempt regardless of stdout output.
         if (adapter.vendor === LLM_VENDOR.CODEX && result.turnTokenUsage.length === 0) {
+          // The mapper's verdict, when this path got one. Same reason as the
+          // event pipeline: a status derived from the payload beats one
+          // inferred from the parsed numbers, which cannot see an explicit
+          // zero. Stays undefined on the text-format branch, which genuinely
+          // has no presence information to offer.
+          let mappedDiagnostic: TokenDiagnosticStatus | undefined;
           if (fullStdout.trim()) {
             try {
               const raw = JSON.parse(fullStdout);
               const codexMapping = mapCodexUsageToTokenUsage(raw);
+              mappedDiagnostic = codexMapping.diagnosticStatus;
               if (codexMapping.diagnosticStatus !== "unavailable") {
                 result.tokenUsage = codexMapping.usage;
               }
@@ -996,9 +1010,11 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
             output: result.tokenUsage.output,
             vendor: tokenMetadata.vendor,
             model: tokenMetadata.model,
-            diagnosticStatus: result.tokenUsage.input === 0 && result.tokenUsage.output === 0
-              ? "unavailable"
-              : undefined,
+            diagnosticStatus:
+              mappedDiagnostic ??
+              (result.tokenUsage.input === 0 && result.tokenUsage.output === 0
+                ? "unavailable"
+                : undefined),
           });
         }
       }

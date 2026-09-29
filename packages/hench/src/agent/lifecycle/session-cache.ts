@@ -35,7 +35,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm, open, rename, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 
 /** File under `.hench/` holding the cached parent session. */
@@ -226,6 +226,69 @@ function cachePath(henchDir: string): string {
   return join(henchDir, SESSION_CACHE_FILE);
 }
 
+function lockPath(henchDir: string): string {
+  return `${cachePath(henchDir)}.lock`;
+}
+
+/** A lock older than this is treated as abandoned by a dead process. */
+const LOCK_STALE_MS = 30_000;
+/** Give up waiting after this long and proceed unlocked rather than fail a run. */
+const LOCK_TIMEOUT_MS = 10_000;
+const LOCK_RETRY_MS = 50;
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Hold an exclusive lock on the session cache for the whole of `fn`.
+ *
+ * `maxConcurrentProcesses` defaults to 3, so several `hench run` processes in
+ * one checkout is the configured norm rather than an edge case. Every mutation
+ * here is a read-modify-write, and without a lock the last writer wins: two
+ * tasks resuming the same batch chain would each persist their own
+ * `tasksUsed` and session id over the other's, and `clearSessionCache` could
+ * delete a batch chain written between its own read and its `rm`.
+ *
+ * Deliberately best-effort. A cache is an optimisation, so a lock that cannot
+ * be taken must not fail the run — after the timeout this proceeds unlocked,
+ * which is no worse than the behaviour before the lock existed. A lock left by
+ * a killed process is stolen once it is `LOCK_STALE_MS` old; today's runs were
+ * killed often enough for that to matter.
+ */
+async function withCacheLock<T>(henchDir: string, fn: () => Promise<T>): Promise<T> {
+  const path = lockPath(henchDir);
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  let held = false;
+
+  while (Date.now() < deadline) {
+    try {
+      // "wx" is O_CREAT|O_EXCL: it fails if the file already exists, which is
+      // what makes acquisition atomic across processes.
+      const handle = await open(path, "wx");
+      await handle.writeFile(`${process.pid}\n`, "utf-8");
+      await handle.close();
+      held = true;
+      break;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== "EEXIST") break;
+      const age = await stat(path).then(
+        (s) => Date.now() - s.mtimeMs,
+        () => Number.POSITIVE_INFINITY,
+      );
+      if (age > LOCK_STALE_MS) {
+        await unlink(path).catch(() => { /* another waiter got there first */ });
+        continue;
+      }
+      await sleep(LOCK_RETRY_MS);
+    }
+  }
+
+  try {
+    return await fn();
+  } finally {
+    if (held) await unlink(path).catch(() => { /* already gone */ });
+  }
+}
+
 /** Read and parse the cache file, or undefined when there is nothing usable. */
 async function readCacheFile(henchDir: string): Promise<SessionCacheFile | undefined> {
   try {
@@ -249,10 +312,42 @@ async function updateCacheFile(
   henchDir: string,
   mutate: (file: SessionCacheFile) => void,
 ): Promise<void> {
+  await withCacheLock(henchDir, () => updateCacheFileLocked(henchDir, mutate));
+}
+
+/**
+ * The read-modify-write itself. Call only with the cache lock held — either
+ * through `updateCacheFile`, or from inside a `withCacheLock` span that needs
+ * to read and then write without another process intervening.
+ */
+async function updateCacheFileLocked(
+  henchDir: string,
+  mutate: (file: SessionCacheFile) => void,
+): Promise<void> {
   await mkdir(henchDir, { recursive: true });
   const file = (await readCacheFile(henchDir)) ?? {};
   mutate(file);
-  await writeFile(cachePath(henchDir), `${JSON.stringify(file, null, 2)}\n`, "utf-8");
+  await writeCacheFileAtomic(henchDir, file);
+}
+
+/**
+ * Write through a temp file and rename.
+ *
+ * `rename` is atomic on both platforms we run on, so a reader never observes
+ * a half-written file and a process killed mid-write leaves the previous
+ * contents rather than a truncated JSON document. A bare `writeFile`
+ * truncates first, which is exactly the window a kill lands in.
+ */
+async function writeCacheFileAtomic(henchDir: string, file: SessionCacheFile): Promise<void> {
+  const target = cachePath(henchDir);
+  const tmp = `${target}.${process.pid}.tmp`;
+  await writeFile(tmp, `${JSON.stringify(file, null, 2)}\n`, "utf-8");
+  try {
+    await rename(tmp, target);
+  } catch (err) {
+    await unlink(tmp).catch(() => { /* leave no scratch file behind */ });
+    throw err;
+  }
 }
 
 /**
@@ -303,22 +398,24 @@ export async function writeSessionCache(
  * make the two strategies quietly interfere.
  */
 export async function clearSessionCache(henchDir: string): Promise<void> {
-  const file = await readCacheFile(henchDir);
-  if (!file) {
-    await rm(cachePath(henchDir), { force: true }).catch(() => { /* best effort */ });
-    return;
-  }
-  if (!file.batch) {
-    await rm(cachePath(henchDir), { force: true }).catch(() => { /* best effort */ });
-    return;
-  }
-  await updateCacheFile(henchDir, (next) => {
-    delete next.parentId;
-    delete next.createdAt;
-    delete next.svFingerprint;
-    delete next.vendor;
-    delete next.model;
-  }).catch(() => { /* best effort */ });
+  // The read, the decision and the act are one span. Split, they race: the
+  // `rm` below is chosen because there was no batch chain at read time, and
+  // a chain written in between would be deleted by it — the preservation
+  // contract broken by the very call that documents it.
+  await withCacheLock(henchDir, async () => {
+    const file = await readCacheFile(henchDir);
+    if (!file || !file.batch) {
+      await rm(cachePath(henchDir), { force: true }).catch(() => { /* best effort */ });
+      return;
+    }
+    await updateCacheFileLocked(henchDir, (next) => {
+      delete next.parentId;
+      delete next.createdAt;
+      delete next.svFingerprint;
+      delete next.vendor;
+      delete next.model;
+    }).catch(() => { /* best effort */ });
+  });
 }
 
 // ── Batch chain ──────────────────────────────────────────────────────────

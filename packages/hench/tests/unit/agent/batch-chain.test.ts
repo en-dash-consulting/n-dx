@@ -25,6 +25,7 @@ import {
   readBatchChain,
   advanceBatchChain,
   clearBatchChain,
+  clearSessionCache,
   isBatchChainUsable,
   chainRefIdentity,
   policyFingerprint,
@@ -500,5 +501,58 @@ describe("policyFingerprint", () => {
     expect(policyFingerprint(withoutKey)).not.toBe(
       policyFingerprint({ ...POLICY, allowedGitSubcommands: [] }),
     );
+  });
+});
+
+// ── Concurrent mutation ──────────────────────────────────────────────────
+//
+// `maxConcurrentProcesses` defaults to 3, so several runs in one checkout is
+// the configured norm. Every mutation here is a read-modify-write, and the
+// failure it produces is a lost update: two tasks advance the same chain,
+// both read `tasksUsed: 1`, both write 2, and the cap silently counts one
+// task instead of two. These race deliberately rather than asserting on the
+// lock's existence, because a lock that is held but not honoured on every
+// path would still pass the latter.
+
+describe("batch chain — concurrent mutation", () => {
+  let dir: string;
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), "batch-race-")); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  it("counts every concurrent advance of the same chain", async () => {
+    const advances = 8;
+    await Promise.all(
+      Array.from({ length: advances }, () => advanceBatchChain(dir, ADVANCE)),
+    );
+
+    const chain = await readBatchChain(dir);
+    expect(chain?.sessionId).toBe("sess-1");
+    // Without serialisation the interleaved writes lose increments and this
+    // lands well under the number of advances.
+    expect(chain?.tasksUsed).toBe(advances);
+  });
+
+  it("never leaves the cache file unparseable under concurrent writes", async () => {
+    await Promise.all([
+      ...Array.from({ length: 6 }, () => advanceBatchChain(dir, ADVANCE)),
+      ...Array.from({ length: 3 }, () => readBatchChain(dir)),
+    ]);
+
+    // A torn write would throw here rather than return an entry. The write is
+    // a temp file plus a rename for exactly this reason.
+    const raw = await readFile(join(dir, "session-cache.json"), "utf-8");
+    expect(() => JSON.parse(raw) as unknown).not.toThrow();
+  });
+
+  it("preserves a batch chain written while a clear is deciding", async () => {
+    // clearSessionCache reads, decides on the absence of a chain, then
+    // removes the file. A chain arriving in that gap must survive.
+    await Promise.all([
+      clearSessionCache(dir),
+      advanceBatchChain(dir, ADVANCE),
+    ]);
+
+    const chain = await readBatchChain(dir);
+    expect(chain?.sessionId).toBe("sess-1");
   });
 });

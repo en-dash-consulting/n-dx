@@ -261,12 +261,24 @@ export class EventAccumulator {
         total.cacheReadInput = (total.cacheReadInput ?? 0) + usage.cacheReadInput;
       }
 
-      // Determine diagnostic status for this turn based on data quality
-      let turnDiagnostic: TokenDiagnosticStatus = "complete";
-      if (usage.input === 0 && usage.output === 0) {
+      // Prefer what the parser concluded from the raw payload. Inference from
+      // the parsed numbers is a fallback for events produced before the event
+      // carried these fields, and it is strictly weaker: the parser decides
+      // from field presence, while this layer can only test values. An
+      // explicit `input_tokens: 0` is a complete measurement that infers as
+      // "partial", and a zero-valued cache count is omitted from TokenUsage
+      // entirely, so it infers as "unavailable" where the parser said
+      // "measured". Keeping the fallback means a legacy event still gets a
+      // best-effort answer rather than none.
+      let turnDiagnostic: TokenDiagnosticStatus;
+      if (event.tokenDiagnosticStatus !== undefined) {
+        turnDiagnostic = event.tokenDiagnosticStatus;
+      } else if (usage.input === 0 && usage.output === 0) {
         turnDiagnostic = "unavailable";
       } else if (usage.input === 0 || usage.output === 0) {
         turnDiagnostic = "partial";
+      } else {
+        turnDiagnostic = "complete";
       }
 
       perTurn.push({
@@ -274,14 +286,11 @@ export class EventAccumulator {
         input: usage.input,
         output: usage.output,
         diagnosticStatus: turnDiagnostic,
-        // A RuntimeEvent carries the parsed usage, not the payload it came
-        // from, so presence of a cache field is all this layer can see. It
-        // errs toward "unavailable" rather than claiming a measurement the
-        // event never proved. See `recordTurnTokenUsageNormalized`.
         cacheProvenance:
-          usage.cacheCreationInput !== undefined || usage.cacheReadInput !== undefined
+          event.tokenCacheProvenance ??
+          (usage.cacheCreationInput !== undefined || usage.cacheReadInput !== undefined
             ? "measured"
-            : "unavailable",
+            : "unavailable"),
         vendor: event.vendor,
         ...(usage.cacheCreationInput ? { cacheCreationInput: usage.cacheCreationInput } : {}),
         ...(usage.cacheReadInput ? { cacheReadInput: usage.cacheReadInput } : {}),
