@@ -26,33 +26,7 @@
  * @module core/branch-guard
  */
 
-import { execFileSync } from "node:child_process";
-import { resolveGitBranch, DEFAULT_BRANCHES } from "../store/branch-naming.js";
-
-const ORIGIN_PREFIX = "refs/remotes/origin/";
-
-/**
- * The branch `origin/HEAD` points at, or null when the clone has no
- * `origin/HEAD` (no remote, or one added without `--set-head`).
- */
-function resolveOriginDefaultBranch(cwd: string): string | null {
-  try {
-    const ref = execFileSync(
-      "git",
-      ["symbolic-ref", "--quiet", `${ORIGIN_PREFIX}HEAD`],
-      { cwd, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
-    ).trim();
-    return ref.startsWith(ORIGIN_PREFIX) ? ref.slice(ORIGIN_PREFIX.length) : null;
-  } catch {
-    return null;
-  }
-}
-
-/** origin/HEAD's branch when the clone has one, else the well-known names. */
-function isDefaultBranch(cwd: string, branch: string): boolean {
-  const origin = resolveOriginDefaultBranch(cwd);
-  return origin ? branch === origin : (DEFAULT_BRANCHES as readonly string[]).includes(branch);
-}
+import { resolveGitBranch, isDefaultBranch } from "../store/branch-naming.js";
 
 /** CLI flag that opts a command back into running on a feature branch. */
 export const ALLOW_ON_BRANCH_FLAG = "allow-on-branch";
