@@ -25,7 +25,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 |-------|--------|
 | [Add a layout resolver in core and a paths module per package that read .ndx/ first and fall back to the legacy layout](./add-a-layout-resolver-in-core-and-a.md) | completed |
 | [Add an architecture-policy rule that rejects new literal .rex/, .hench/ and .sourcevision/ paths](./add-an-architecture-policy-rule-that.md) | pending |
-| [Add ndx migrate-layout to move an existing project to .ndx/](./add-ndx-migrate-layout-to-move-an.md) | pending |
+| [Add ndx migrate-layout to move an existing project to .ndx/](./add-ndx-migrate-layout-to-move-an.md) | in_progress |
 | [Make ndx init write the .ndx/ layout for new projects](./make-ndx-init-write-the-ndx-layout-for.md) | completed |
 | [Move the per-user directory to ~/.ndx/ with NDX_HOME, reading ~/.n-dx/ and N_DX_HOME as fallbacks](./move-the-per-user-directory-to-ndx.md) | completed |
 | [Route hench, web and core file access through their paths modules](./route-hench-web-and-core-file-access.md) | pending |

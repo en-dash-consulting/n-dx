@@ -82,7 +82,8 @@
     "commit-trailers.js",
     "install-identity.js",
     "resolve-existing-dir.js",
-    "layout.js"
+    "layout.js",
+    "migrate-layout.js"
   ],
   "scripts": {
     "build": "echo '@n-dx/core: plain JS, no build needed'"

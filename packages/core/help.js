@@ -91,6 +91,13 @@ const COMMAND_REGISTRY = [
     related: ["plan", "status"],
   },
   {
+    name: "migrate-layout",
+    category: "Orchestration",
+    summary: "Move an existing project's n-dx state into .ndx/",
+    keywords: ["migrate", "layout", "move", "folder", "ndx", "rex", "hench", "sourcevision", "relocate", "tidy"],
+    related: ["init", "which", "status"],
+  },
+  {
     name: "analyze",
     category: "Orchestration",
     summary: "Run SourceVision codebase analysis",
@@ -1136,6 +1143,34 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["start"],
   },
+  "migrate-layout": {
+    summary: "move an existing project's n-dx state into .ndx/",
+    description:
+      "Projects initialized before the .ndx/ layout keep their state in .rex/,\n" +
+      ".hench/, .sourcevision/ and five loose .n-dx* files at the project root.\n" +
+      "Every command reads either shape, so migrating is optional — this is how\n" +
+      "you do it when you choose to.\n\n" +
+      "The result is renames plus two dotfiles. Tracked paths move with 'git mv'\n" +
+      "so 'git log --follow' still reaches their history; ignored and untracked\n" +
+      "state moves with them; and the .gitignore and .gitattributes patterns are\n" +
+      "rewritten to name the new paths, because a '.rex/**' eol pin matches\n" +
+      "nothing once the PRD lives in .ndx/rex/.\n\n" +
+      "The move is then verified — every path arrived, and 'rex validate' gives\n" +
+      "the same answer it gave before. A failed check restores the project to\n" +
+      "the legacy layout and commits nothing. Running it on a project already on\n" +
+      ".ndx/ is a no-op.",
+    usage: "ndx migrate-layout [options] [dir]",
+    options: [
+      { flag: "--dry-run", description: "Print the moves and change nothing" },
+      { flag: "--no-commit", description: "Stage the migration but leave the commit to you" },
+    ],
+    examples: [
+      { command: "ndx migrate-layout --dry-run .", description: "See what would move" },
+      { command: "ndx migrate-layout .", description: "Migrate, verify, and commit" },
+      { command: "ndx migrate-layout --no-commit .", description: "Migrate and review before committing" },
+    ],
+    related: ["init", "which"],
+  },
   ci: {
     summary: "run analysis pipeline and validate PRD health",
     description: "Runs the full CI pipeline: SourceVision analysis followed by PRD\nvalidation. Reports pass/fail status suitable for CI systems.",
@@ -1683,6 +1718,7 @@ export function formatMainHelp() {
 
   section("SETUP", [
     ["init [dir]", "Initialize project"],
+    ["migrate-layout [dir]", "Move existing state into .ndx/ (--dry-run, --no-commit)"],
     ["which [dir]", "Show which n-dx is running (version, path, install, git)"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],

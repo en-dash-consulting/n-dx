@@ -104,6 +104,7 @@ import {
 import { runExport } from "./export.js";
 import { ensureGitignoreEntry } from "./gitignore.js";
 import { relativeToRoot, resolveLayout } from "./layout.js";
+import { runMigrateLayout } from "./migrate-layout.js";
 import {
   resolveInitLLMSelection,
   promptLLMSelection,
@@ -1659,6 +1660,24 @@ async function handleInit(rest) {
   exitWithCleanup(0);
 }
 
+/**
+ * `ndx migrate-layout` — move an initialized project onto the `.ndx/` layout.
+ *
+ * No `requireInit`: the migration's own "nothing to migrate" message names the
+ * paths it looked for, and a project on `.ndx/` already must report a no-op
+ * rather than be told it is uninitialized — which is what `requireInit` would
+ * say about a legacy project once the resolver had moved on.
+ *
+ * `runCapture` and `tools` are handed over rather than imported, the same way
+ * `runCI` takes its spawn helpers: the module is orchestration tier and must
+ * reach rex by spawning it.
+ */
+async function handleMigrateLayout(rest) {
+  const dir = resolveDir(rest);
+  const code = await runMigrateLayout(dir, extractFlags(rest), { runCapture, tools });
+  exitWithCleanup(code);
+}
+
 async function handleAnalyze(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, ["sourcevision"]);
@@ -3002,6 +3021,7 @@ const COMMAND_DISPATCH = new Map([
   ["which",             handleWhich],
   ["help",              handleHelp],
   ["init",              handleInit],
+  ["migrate-layout",    handleMigrateLayout],
   ["analyze",           handleAnalyze],
   ["recommend",         handleRecommend],
   ["plan",              handlePlan],

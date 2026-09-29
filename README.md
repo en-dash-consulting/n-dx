@@ -237,6 +237,7 @@ ndx config llm.codex.cli_path codex .
 | Command | Description |
 |---------|-------------|
 | `ndx plan [dir]` | Analyze codebase and generate PRD proposals (`--guided`, `--accept`) |
+| `ndx migrate-layout [dir]` | Move an existing project's state into `.ndx/` (`--dry-run`, `--no-commit`) |
 | `ndx status [dir]` | Show PRD status (`--format=json`, `--since`, `--until`) |
 | `ndx refresh [dir]` | Refresh dashboard artifacts (`--ui-only`, `--data-only`, `--no-build`) |
 | `ndx usage [dir]` | Token usage analytics (`--format=json`, `--group=day\|week\|month`) |
