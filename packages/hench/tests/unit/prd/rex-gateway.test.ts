@@ -64,6 +64,8 @@ const EXPECTED_EXPORTS = [
   "loadAcknowledged",
   "saveAcknowledged",
   "acknowledgeFinding",
+  // Actor identity
+  "resolveActor",
 ] as const;
 
 describe("rex-gateway compatibility", () => {

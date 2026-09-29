@@ -141,6 +141,20 @@ export async function cmdTree(dir: string, flags: Record<string, string>): Promi
   // Filter deleted items
   const visibleItems = filterDeleted(items);
 
+  // The machine-readable rendering of the same hierarchy. It exists so a
+  // consumer outside rex can read the PRD without a second parser — the
+  // folder-tree replacement for the `rex parse-md --stdin` seam that answered
+  // this for `.rex/prd.md`. sourcevision's PR markdown is the first caller.
+  //
+  // Deleted items are filtered here exactly as they are for the rendered
+  // tree: two renderings of one command that disagreed about which items
+  // exist would be a trap, and a reader reconciling a JSON dump against the
+  // tree they just looked at is entitled to see the same items.
+  if (flags.format === "json") {
+    result(JSON.stringify({ items: visibleItems }, null, 2));
+    return;
+  }
+
   // Render tree
   const lines = renderTreeWithColorScheme(visibleItems);
 

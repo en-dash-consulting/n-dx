@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
-import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG } from "../../prd/rex-gateway.js";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
@@ -785,6 +785,7 @@ export async function peekNextTaskPriority(
   excludeTaskIds?: Set<string>,
   epicId?: string,
   tags?: string[],
+  assignee?: string,
 ): Promise<TaskPriority> {
   const doc = await store.loadDocument();
 
@@ -808,12 +809,14 @@ export async function peekNextTaskPriority(
     ? new Set([...completedIds, ...excludeTaskIds])
     : completedIds;
 
-  const tagOptions = tags?.length ? { tags } : undefined;
+  const selectOptions = (tags?.length || assignee)
+    ? { ...(tags?.length ? { tags } : {}), ...(assignee ? { assignee } : {}) }
+    : undefined;
 
   if (epicId) {
     // Use the same logic as assembleTaskBrief for epic-scoped selection
     const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
-    const allActionable = findActionable(doc.items, skipIds, Infinity, tagOptions);
+    const allActionable = findActionable(doc.items, skipIds, Infinity, selectOptions);
     const epicActionable = allActionable.filter(
       (e) => epicTaskIds.has(e.item.id) && !excludeTaskIds?.has(e.item.id),
     );
@@ -826,7 +829,7 @@ export async function peekNextTaskPriority(
       });
     }
   } else {
-    const next = findNextTask(doc.items, skipIds, tagOptions);
+    const next = findNextTask(doc.items, skipIds, selectOptions);
     if (next) {
       return resolveSchedulingPriority({
         taskPriority: next.item.priority,
@@ -869,11 +872,14 @@ async function selectTask(
   dir: string,
   rexDir: string,
   epicId?: string,
+  assignee?: string,
 ): Promise<string> {
   const store = await resolveStore(rexDir);
   // Tasks another worktree is working on are left off the menu.
   const claims = TaskClaims.forProject(dir);
-  let tasks = await getActionableTasks(store, undefined, claims);
+  // `assignee` is --mine: the menu is the attended path's whole selection, so
+  // an unfiltered menu here is the flag silently doing nothing.
+  let tasks = await getActionableTasks(store, undefined, claims, assignee);
 
   // Filter to tasks within the specified epic if provided
   if (epicId) {
@@ -894,7 +900,7 @@ async function selectTask(
       if (answer.toLowerCase() === "y" || answer.toLowerCase() === "yes") {
         await resetDeferredTasks(store);
         // Reload tasks after reset
-        tasks = await getActionableTasks(store, undefined, claims);
+        tasks = await getActionableTasks(store, undefined, claims, assignee);
         if (epicId) {
           const freshDoc = await store.loadDocument();
           const epicTaskIds = collectEpicTaskIds(freshDoc.items, epicId);
@@ -1134,6 +1140,7 @@ async function runOne(
   runNumber?: number,
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
+  assignee?: string,
 ): Promise<{ status: string; taskTitle: string; selectedTaskId?: string }> {
   // First statement in the task: a tree this build would re-slug stops the task
   // before the claim below is taken and before any token is spent. The tree can
@@ -1187,6 +1194,7 @@ async function runOne(
         excludeTaskIds,
         epicId,
         tags,
+        assignee,
         runHistory: runs,
         rollbackOnFailure,
         yes,
@@ -1212,6 +1220,7 @@ async function runOne(
         excludeTaskIds,
         epicId,
         tags,
+        assignee,
         runHistory: runs,
         rollbackOnFailure,
         yes,
@@ -1549,6 +1558,28 @@ export async function cmdRun(
     // Tag filter can still be combined with other explicit tags via --tags.
     tagsFilter = tagsFilter ? [...tagsFilter, SELF_HEAL_TAG] : [SELF_HEAL_TAG];
   }
+
+  // --mine: restrict autoselection to tasks assigned to the current user.
+  // Resolved once, the same way rex stamps `lastModifiedBy` (git user.name +
+  // user.email, falling back to the OS username) — so a task's `assignee`
+  // matches only when it was set to that same identity string. Like --tags,
+  // this only constrains autoselection: an explicit --task bypasses it.
+  const mine = flags["mine"] === "true";
+  // --epic-by-epic walks every epic's tasks in order, and its selection path
+  // carries no assignee filter. Accepting --mine there would run — and commit
+  // under — tasks belonging to other people while the operator believes the
+  // run was scoped to their own, so refuse instead of no-opping. Same reason
+  // --review refuses on the api provider rather than reporting unreviewed runs
+  // as reviewed. Checked before resolveActor so a contradictory invocation
+  // fails on its arguments rather than after reading git config.
+  if (mine && flags["epic-by-epic"] === "true") {
+    throw new CLIError(
+      "Cannot use --mine with --epic-by-epic.",
+      "--epic-by-epic processes every epic in order and cannot filter by assignee. " +
+        "Drop --mine, or run without --epic-by-epic.",
+    );
+  }
+  const assignee = mine ? await resolveActor(dir) : undefined;
 
   // Codex only supports CLI mode (no API loop).
   if (llmVendor === LLM_VENDOR.CODEX && provider === "api" && !dryRun) {
@@ -1958,14 +1989,14 @@ export async function cmdRun(
     // Task selection: --task > interactive (TTY) > autoselect
     // In loop mode, always autoselect (skip interactive)
     if (!taskId && !auto && !loop && process.stdin.isTTY && !dryRun) {
-      taskId = await selectTask(dir, rexDir, epicId);
+      taskId = await selectTask(dir, rexDir, epicId, assignee);
     }
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
+      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee);
     } else {
-      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
+      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee);
     }
   } finally {
     await limiter.release();
@@ -2051,6 +2082,7 @@ async function runIterations(
   autonomous?: boolean,
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
+  assignee?: string,
 ): Promise<void> {
   // Track attempt counts per task ID within this run invocation
   const attemptTracker = createAttemptTracker();
@@ -2095,6 +2127,7 @@ async function runIterations(
       undefined,
       permissionMode,
       skipTestGate,
+      assignee,
     );
 
     // Track attempt count for the selected task
@@ -2161,6 +2194,7 @@ async function runLoop(
   autonomous?: boolean,
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
+  assignee?: string,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -2236,7 +2270,7 @@ async function runLoop(
         if (queue) {
           const store = await resolveStore(rexDir);
           schedulingPriority = await peekNextTaskPriority(
-            store, effectiveTaskId, priorityOverride, combinedExcludedIds, epicId, tags,
+            store, effectiveTaskId, priorityOverride, combinedExcludedIds, epicId, tags, assignee,
           );
           await queue.acquire(effectiveTaskId ?? "auto", schedulingPriority);
         }
@@ -2259,6 +2293,7 @@ async function runLoop(
             completed,
             permissionMode,
             skipTestGate,
+            assignee,
           );
           status = result.status;
 

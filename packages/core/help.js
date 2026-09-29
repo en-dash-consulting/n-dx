@@ -357,6 +357,13 @@ const COMMAND_REGISTRY = [
     keywords: ["tree", "hierarchy", "structure", "color", "status", "visualization"],
     related: ["status", "next"],
   },
+  {
+    name: "tree-diff",
+    category: "Manage",
+    summary: "Compare two PRD trees (commits, or a worktree against its anchor)",
+    keywords: ["diff", "compare", "changed", "moved", "added", "removed", "completed", "branch", "worktree", "anchor", "delta"],
+    related: ["tree", "status"],
+  },
   // ── Delegated sourcevision commands ──
   {
     name: "reset",
@@ -413,6 +420,7 @@ const SUBCOMMAND_REGISTRY = {
     { name: "status", parent: "rex", category: "Rex", summary: "Show PRD tree with completion stats", keywords: ["PRD", "tree", "progress"], related: ["next", "usage"] },
     { name: "next", parent: "rex", category: "Rex", summary: "Print next actionable task", keywords: ["task", "priority", "actionable"], related: ["status", "update"] },
     { name: "tree", parent: "rex", category: "Rex", summary: "Show full PRD hierarchy with color-coded status", keywords: ["tree", "hierarchy", "structure", "color", "status", "visualization"], related: ["status", "next"] },
+    { name: "tree-diff", parent: "rex", category: "Rex", summary: "Compare two PRD trees (commits, or a worktree against its anchor)", keywords: ["diff", "compare", "changed", "moved", "delta", "branch", "worktree", "anchor"], related: ["tree", "status"] },
     { name: "add", parent: "rex", category: "Rex", summary: "Add items to the PRD (manual or smart LLM mode)", keywords: ["create", "epic", "feature", "task", "subtask", "LLM", "smart"], related: ["analyze", "update"] },
     { name: "update", parent: "rex", category: "Rex", summary: "Update item status, priority, or title", keywords: ["modify", "change", "complete", "status"], related: ["add", "next"] },
     { name: "move", parent: "rex", category: "Rex", summary: "Reparent an item in the PRD tree", keywords: ["reparent", "hierarchy", "reorganize"], related: ["reshape"] },

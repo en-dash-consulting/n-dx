@@ -330,7 +330,12 @@ export async function runSlugMigration(
 ): Promise<MigrationSummary> {
   const res = await exec(
     cli.command,
-    [...cli.args, "migrate-slugs", "--format=json", dir],
+    // rex's branch guard refuses whole-tree rewrites off the default branch
+    // unless asked to proceed. This call only happens after `decideOffer`
+    // has already gated on a human answering yes at an interactive terminal
+    // (never autonomous, CI, or --yes) — that confirmation is the guard's
+    // "on purpose" signal, so it is passed through rather than asked twice.
+    [...cli.args, "migrate-slugs", "--format=json", "--allow-on-branch", dir],
     { cwd: dir, timeout: timeoutMs },
   );
 

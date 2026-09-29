@@ -3,6 +3,9 @@
  * Consolidates duplicate inventory, zone, and manifest builders used across test files.
  */
 
+import { existsSync as existsSyncFn, readFileSync as readFileSyncFn } from "node:fs";
+import { join as joinPath } from "node:path";
+
 /**
  * Creates a minimal file inventory entry for testing.
  */
@@ -222,5 +225,53 @@ export function mockClaudeError(overrides?: Record<string, unknown>): Record<str
     status: 400,
     error: { type: "invalid_request_error", message: "Test error" },
     ...overrides,
+  };
+}
+
+/** Every completed id in a fixture PRD tree, in walk order. */
+export function completedIn(items: { status?: string; id?: string; children?: unknown[] }[]): string[] {
+  return items.flatMap((item) => [
+    ...(item.status === "completed" && item.id ? [item.id] : []),
+    ...(item.children ? completedIn(item.children as typeof items) : []),
+  ]);
+}
+
+/**
+ * A rex double for the PR-markdown pipeline, serving a `.rex/prd.json` fixture.
+ *
+ * In production the collector spawns the real rex CLI twice — `rex tree
+ * --format=json` for the PRD and `rex tree-diff --json` for what this branch
+ * completed. Tests that are about what the *renderer* does with that pair use
+ * this instead, which keeps them independent of a built rex on PATH and of the
+ * fixture's git history. Which items count as branch work is rex's decision and
+ * is tested in rex's own suite and in the collector's.
+ *
+ * `completed` defaults to every completed id, matching what rex reports when
+ * the base branch has no PRD. Pass it explicitly to model a base branch that
+ * had already completed something.
+ */
+export function fixtureRex(
+  dir: string,
+  completed?: string[],
+): { readPRD: () => never; diffCompleted: () => Set<string> } {
+  const load = (): { items: unknown[] } | null => {
+    const path = joinPath(dir, ".rex", "prd.json");
+    if (!existsSyncFn(path)) return null;
+    const raw = readFileSyncFn(path, "utf-8");
+    if (!raw.trim()) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      // An unparseable fixture stands for a PRD rex could not read, which rex
+      // reports as "no document" rather than by failing. Mirrored here so the
+      // malformed-input tests exercise the same path as production.
+      return null;
+    }
+  };
+
+  return {
+    readPRD: () => load() as never,
+    diffCompleted: () =>
+      new Set(completed ?? completedIn((load()?.items ?? []) as Parameters<typeof completedIn>[0])),
   };
 }

@@ -72,7 +72,7 @@ export {
   DEFAULT_CODEX_MODEL,
 } from "../analyzers/claude-client.js";
 export { collectBranchWork } from "../analyzers/branch-work-collector.js";
-export type { BranchWorkResult } from "../analyzers/branch-work-collector.js";
+export type { BranchWorkResult, RexBridge } from "../analyzers/branch-work-collector.js";
 export { classifyItems } from "../analyzers/branch-work-classifier.js";
 export { deriveNextSteps } from "../analyzers/next-steps.js";
 export { setArchetypeOverride } from "../util/archetype-overrides.js";
