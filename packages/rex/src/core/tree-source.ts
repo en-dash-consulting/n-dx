@@ -127,7 +127,8 @@ export async function loadTreeAtRef(
       {
         cwd: repoRoot,
         timeout: GIT_TIMEOUT_MS,
-        env: { ...process.env, GIT_INDEX_FILE: join(scratch, "index") },
+        // C locale: isMissingPathspec parses git's English error text.
+        env: { ...process.env, GIT_INDEX_FILE: join(scratch, "index"), LC_ALL: "C" },
       },
     );
 
