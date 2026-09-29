@@ -11,7 +11,7 @@ import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ViewId } from "../api.js";
-import { SETTINGS_ENTRIES, useFeatureToggle, useCliName } from "../api.js";
+import { SETTINGS_ENTRIES, useFeatureToggle, useCliName, viewLabel, viewGlyph } from "../api.js";
 import { resolveCliLabel } from "../hooks/index.js";
 import { ConfigFooter, type ServerIdentity } from "./config-footer.js";
 import { SidebarDensitySelector } from "./density-selector.js";
@@ -39,7 +39,11 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
     return SETTINGS_ENTRIES
       .filter((e) => validViews.has(e.view))
       .filter((e) => !e.featureGate || gates[e.featureGate])
-      .map((e) => ({ ...e, label: resolveCliLabel(e.label, cliName) }));
+      .map((e) => ({
+        view: e.view,
+        glyph: viewGlyph(e.view),
+        label: resolveCliLabel(viewLabel(e.view), cliName),
+      }));
   }, [validViews, notionSync, integrations, cliName]);
 
   const current = entries.find((e) => e.view === view);

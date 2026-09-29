@@ -13,7 +13,7 @@ import { IsoMapView } from "../../../src/viewer/views/iso-map.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 import { ISO_MAP_EMPTY_HEADER } from "../../../src/viewer/views/iso-map-url.js";
 import { setBasePathForTests } from "../../../src/viewer/base-path.js";
-import { SOURCEVISION_TABS } from "../../../src/viewer/views/index.js";
+import { STAGES, viewLabel } from "../../../src/viewer/views/index.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import type { LoadedData, ViewId } from "../../../src/viewer/types.js";
@@ -364,13 +364,18 @@ describe("iso-map view registration", () => {
     expect(renderActiveView("iso-map" as ViewId, makeCtx())).toBeTruthy();
   });
 
-  it("appears in the SourceVision nav next to the 2D map", () => {
-    const ids = SOURCEVISION_TABS.map((t) => t.id);
-    expect(ids.indexOf("iso-map")).toBe(ids.indexOf("graph") + 1);
-    const tab = SOURCEVISION_TABS.find((t) => t.id === "iso-map")!;
-    expect(tab.label).toBe("Isometric Map");
-    expect(tab.minPass).toBe(0);
-    expect(tab.requiresServer).toBe(true);
+  // Moved off the retired SOURCEVISION_TABS table. The isometric map is no
+  // longer a sibling tab of the 2D map: it is the same section's second
+  // projection, which is a stronger form of "next to" than adjacency was.
+  it("is the second projection of the repository map section", () => {
+    const graph = STAGES.analyze.sections.find((s) => s.view === "graph")!;
+    expect(graph.alt?.view).toBe("iso-map");
+    expect(graph.alt?.primaryLabel).toBe("2D");
+    expect(graph.alt?.label).toBe("3D");
+  });
+
+  it("is named by the navigation model", () => {
+    expect(viewLabel("iso-map")).toBe("Isometric Map");
   });
 
 });

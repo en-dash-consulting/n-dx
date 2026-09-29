@@ -23,6 +23,7 @@ import {
   SETTINGS_ENTRIES,
   isSettingsView,
   stageForView,
+  viewLabel,
   visibleStages,
 } from "../../../src/viewer/views/stages.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
@@ -92,7 +93,7 @@ const ALL = buildValidViews(null);
 
 describe("stages.ts", () => {
   it("orders the loop Analysis → Plan → Work", () => {
-    expect(STAGE_ORDER.map((id) => STAGES[id].label)).toEqual(["Analysis", "Plan", "Work"]);
+    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work"]);
   });
 
   it("lists only real views, each with a registry renderer", () => {

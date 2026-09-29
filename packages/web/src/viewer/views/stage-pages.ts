@@ -14,7 +14,16 @@ import { h } from "preact";
 import type { ComponentChild } from "preact";
 import { useState } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
-import { STAGES, visibleStages, type StageId, type StageSection } from "./stages.js";
+import {
+  STAGES,
+  visibleStages,
+  stageProduct,
+  viewLabel,
+  viewBlurb,
+  viewGlyph,
+  type StageId,
+  type StageSection,
+} from "./stages.js";
 import { ProductLogoPng, useProjectStatus, type ProjectStatus } from "../components/index.js";
 import { useFeatureToggle } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
@@ -52,7 +61,7 @@ interface SectionProps {
 
 /** The stage's lead section: the view itself, in the page, no dropdown. */
 function PlainSection({ section, renderView }: Pick<SectionProps, "section" | "renderView">) {
-  return h("section", { class: "stage-section stage-section--plain", "data-view": section.view, "aria-label": section.title },
+  return h("section", { class: "stage-section stage-section--plain", "data-view": section.view, "aria-label": viewLabel(section.view) },
     renderView(section.view),
   );
 }
@@ -67,6 +76,9 @@ function Section({ stage, section, showAlt, navigateTo, renderView }: SectionPro
   const [full, setFull] = useState<boolean>(() => readOpenState()[fullKey] ?? false);
   const shown: ViewId = useAlt && section.alt ? section.alt.view : section.view;
   const bodyId = `stage-section-${stage}-${section.view}`;
+  // The section is a window onto a view, so it is named by that view — the
+  // same string the breadcrumb shows once the "Open" link has been followed.
+  const title = viewLabel(section.view);
 
   const toggle = () => {
     const next = !open;
@@ -95,8 +107,8 @@ function Section({ stage, section, showAlt, navigateTo, renderView }: SectionPro
         "aria-controls": bodyId,
       },
         h("span", { class: "stage-section-caret", "aria-hidden": "true" }, open ? "▾" : "▸"),
-        h("span", { class: "stage-section-title" }, section.title),
-        h("span", { class: "stage-section-blurb" }, section.blurb),
+        h("span", { class: "stage-section-title" }, title),
+        h("span", { class: "stage-section-blurb" }, viewBlurb(section.view)),
       ),
       section.alt && showAlt && open
         ? h("div", { class: "stage-section-projection", role: "group", "aria-label": "Projection" },
@@ -122,13 +134,17 @@ function Section({ stage, section, showAlt, navigateTo, renderView }: SectionPro
             "aria-expanded": String(full),
             "aria-controls": bodyId,
             title: full ? "Show as a scrollable list" : "Show at full length",
+            "aria-label": `${full ? "Collapse" : "Expand"} ${title}`,
           }, full ? "Collapse ▴" : "Expand ▾")
         : null,
       h("button", {
         type: "button",
         class: "stage-section-open",
         onClick: () => navigateTo(shown),
-        title: `Open ${section.title} on its own page`,
+        title: `Open ${viewLabel(shown)} on its own page`,
+        // Every section has an "Open ↗"; without this they are one repeated
+        // name in a screen reader's list of controls.
+        "aria-label": `Open ${viewLabel(shown)} on its own page`,
       }, "Open ↗"),
     ),
     open
@@ -155,6 +171,7 @@ export interface StagePageProps {
 
 export function StagePage({ stage, validViews, navigateTo, renderView }: StagePageProps) {
   const def = STAGES[stage];
+  const product = stageProduct(stage);
   const gates: Record<string, boolean> = {
     "sourcevision.prMarkdown": useFeatureToggle("sourcevision.prMarkdown", false),
     "sourcevision.ask": useFeatureToggle("sourcevision.ask", false),
@@ -167,12 +184,12 @@ export function StagePage({ stage, validViews, navigateTo, renderView }: StagePa
     && !(s.requiresServer && deployed),
   );
 
-  return h("div", { class: `stage-page stage-page-${def.product}`, "data-stage": stage },
+  return h("div", { class: `stage-page stage-page-${product}`, "data-stage": stage },
     h("div", { class: "stage-page-head" },
-      h(ProductLogoPng, { product: def.product, size: 36, class: "stage-page-logo" }),
+      h(ProductLogoPng, { product, size: 36, class: "stage-page-logo" }),
       h("div", null,
-        h("h1", { class: "stage-page-title" }, def.label),
-        h("p", { class: "stage-page-blurb" }, def.blurb),
+        h("h1", { class: "stage-page-title" }, viewLabel(stage)),
+        h("p", { class: "stage-page-blurb" }, viewBlurb(stage)),
       ),
     ),
     sections.map((s) => {
@@ -188,10 +205,22 @@ export function StagePage({ stage, validViews, navigateTo, renderView }: StagePa
 
 type Fact = [value: string, label: string];
 
-function stageFacts(stage: StageId, status: ProjectStatus | null): Fact[] {
+/**
+ * The headline numbers on a Home card.
+ *
+ * `Partial` is the honest type, not defensiveness for its own sake: the status
+ * comes from `/api/status` through `const data: ProjectStatus = await
+ * res.json()`, an unchecked cast, so a body missing a section arrives here
+ * typed as though it were complete. Home is the dashboard's default landing
+ * page — a truncated response should cost that card its numbers, the way a
+ * null status already does, rather than throw through the render and leave the
+ * whole page blank.
+ */
+function stageFacts(stage: StageId, status: Partial<ProjectStatus> | null): Fact[] {
   if (!status) return [];
   if (stage === "analyze") {
     const sv = status.sv;
+    if (!sv) return [];
     const age = sv.minutesAgo == null ? "—"
       : sv.minutesAgo < 60 ? `${sv.minutesAgo}m`
       : sv.minutesAgo < 1440 ? `${Math.round(sv.minutesAgo / 60)}h`
@@ -200,10 +229,11 @@ function stageFacts(stage: StageId, status: ProjectStatus | null): Fact[] {
   }
   if (stage === "plan") {
     const rex = status.rex;
-    if (!rex.exists || !rex.stats) return [["—", "no PRD yet"]];
+    if (!rex?.exists || !rex.stats) return [["—", "no PRD yet"]];
     return [[rex.stats.total.toLocaleString(), "items"], [`${Math.round(rex.percentComplete)}%`, "complete"], [String(rex.stats.pending), "pending"]];
   }
   const hench = status.hench;
+  if (!hench) return [];
   return [[hench.totalRuns.toLocaleString(), "runs"], [String(hench.activeRuns), "live"], [String(hench.staleRuns), "stale"]];
 }
 
@@ -223,20 +253,22 @@ export function HomeView({ validViews, navigateTo }: HomeViewProps) {
     ),
     h("div", { class: `home-stages home-stages-${stages.length}` },
       stages.map((id) => {
-        const def = STAGES[id];
+        const product = stageProduct(id);
+        const label = viewLabel(id);
         const facts = stageFacts(id, status);
         return h("button", {
           key: id,
           type: "button",
-          class: `stage-card stage-card-${def.product}`,
+          class: `stage-card stage-card-${product}`,
           "data-stage": id,
           onClick: () => navigateTo(id),
+          "aria-label": `Open ${label}`,
         },
-          h("span", { class: "stage-card-mark" }, h(ProductLogoPng, { product: def.product, size: 160 })),
-          h("span", { class: "stage-card-glyph", "aria-hidden": "true" }, def.glyph),
-          h("span", { class: "stage-card-name" }, def.label),
-          h("span", { class: "stage-card-hint" }, def.product),
-          h("span", { class: "stage-card-blurb" }, def.blurb),
+          h("span", { class: "stage-card-mark" }, h(ProductLogoPng, { product, size: 160 })),
+          h("span", { class: "stage-card-glyph", "aria-hidden": "true" }, viewGlyph(id)),
+          h("span", { class: "stage-card-name" }, label),
+          h("span", { class: "stage-card-hint" }, product),
+          h("span", { class: "stage-card-blurb" }, viewBlurb(id)),
           facts.length
             ? h("span", { class: "stage-card-facts" },
                 facts.map(([v, k]) => h("span", { key: k, class: "stage-card-fact" },
@@ -245,12 +277,12 @@ export function HomeView({ validViews, navigateTo }: HomeViewProps) {
                 )),
               )
             : null,
-          h("span", { class: "stage-card-go", "aria-hidden": "true" }, `Open ${def.label} →`),
+          h("span", { class: "stage-card-go", "aria-hidden": "true" }, `Open ${label} →`),
         );
       }),
     ),
     stages.length > 1
-      ? h("p", { class: "home-loop" }, stages.map((id) => STAGES[id].label.toLowerCase()).concat(STAGES[stages[0]].label.toLowerCase()).join(" → "))
+      ? h("p", { class: "home-loop" }, stages.map((id) => viewLabel(id).toLowerCase()).concat(viewLabel(stages[0]).toLowerCase()).join(" → "))
       : null,
   );
 }

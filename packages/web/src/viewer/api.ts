@@ -57,6 +57,20 @@ export {
   isSettingsView,
   isStageId,
   stageForView,
+  stageProduct,
   visibleStages,
 } from "./views/stages.js";
 export type { StageId, StageDef, StageSection, StageProduct, SettingsEntry } from "./views/stages.js";
+
+// --- Navigation model: the one name, glyph, product and blurb per view ---
+export {
+  VIEW_META,
+  PRODUCT_LABELS,
+  viewMeta,
+  viewLabel,
+  viewBlurb,
+  viewGlyph,
+  viewProduct,
+  viewProductLabel,
+} from "./views/view-meta.js";
+export type { ViewMeta, ViewProduct } from "./views/view-meta.js";

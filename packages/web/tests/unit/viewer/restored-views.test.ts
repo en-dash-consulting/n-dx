@@ -19,7 +19,7 @@ import {
   REX_SCOPE_VIEWS,
   buildValidViews,
 } from "../../../src/shared/index.js";
-import { SOURCEVISION_TABS } from "../../../src/viewer/views/index.js";
+import { STAGES, viewLabel } from "../../../src/viewer/views/index.js";
 
 const emptyData: LoadedData = {
   manifest: null,
@@ -81,12 +81,19 @@ describe("restored views: registry renderers", () => {
 });
 
 describe("restored views: navigation entries", () => {
-  it("zones appears in the sourcevision tab strip after Map", () => {
-    const ids = SOURCEVISION_TABS.map((t) => t.id);
-    const graphIdx = ids.indexOf("graph");
-    const zonesIdx = ids.indexOf("zones" as (typeof ids)[number]);
-    expect(zonesIdx).toBeGreaterThan(graphIdx);
-    expect(SOURCEVISION_TABS[zonesIdx].label).toBe("Zones");
-    expect(SOURCEVISION_TABS[zonesIdx].minPass).toBe(0);
+  // Moved off the retired SOURCEVISION_TABS table: the Analysis stage is now
+  // the only place SourceVision's views are arranged, so it is where the
+  // "zones is reachable, and sits after the map" guard belongs.
+  it("zones is a section of the Analysis stage, after the repository map", () => {
+    const ids = STAGES.analyze.sections.map((s) => s.view);
+    expect(ids.indexOf("zones")).toBeGreaterThan(ids.indexOf("graph"));
+  });
+
+  it("zones is named by the navigation model", () => {
+    expect(viewLabel("zones")).toBe("Zones");
+  });
+
+  it("analysis is a section of the Plan stage", () => {
+    expect(STAGES.plan.sections.map((s) => s.view)).toContain("analysis");
   });
 });
