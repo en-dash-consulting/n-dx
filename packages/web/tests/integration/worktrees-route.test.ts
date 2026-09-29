@@ -7,7 +7,7 @@
  * only a real layout exercises that join end to end.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -116,6 +116,18 @@ beforeEach(() => {
   // Watchers are module-level, one per runs directory: a test must not
   // inherit one registered (with another test's broadcaster) earlier.
   closeWorktreeRunWatchers();
+});
+
+// The watch factory is module-level global state, and the tests that install a
+// fake one must do so BEFORE the try/finally that restores it — the server has
+// to start with the fake already in place. A throw in `startRouteTestServer`
+// (a bind or port failure, say) therefore skips the restore, and every later
+// test in the file silently stops exercising real fs.watch: `beforeEach`
+// closes watchers but says nothing about the factory. Restoring here rather
+// than trusting each test's `finally` makes that unreachable, including for
+// tests added later.
+afterEach(() => {
+  setWorktreeRunWatchFactory(null);
 });
 
 describe("GET /api/worktrees", () => {
