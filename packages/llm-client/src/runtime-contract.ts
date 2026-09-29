@@ -37,6 +37,10 @@
 import type { LLMVendor } from "./provider-interface.js";
 import type { TokenUsage, ErrorReason } from "./types.js";
 import { ClaudeClientError } from "./types.js";
+// Type-only, and therefore erased: `token-usage.ts` imports
+// `TokenDiagnosticStatus` from this module, so a value import here would be a
+// cycle. Both directions are `import type`, so neither survives compilation.
+import type { TokenCacheProvenance } from "./token-usage.js";
 
 // ── Prompt envelope ──────────────────────────────────────────────────────
 
@@ -207,6 +211,31 @@ export interface RuntimeEvent {
 
   /** Token usage for this turn or cumulative (type: "token_usage"). */
   readonly tokenUsage?: TokenUsage;
+
+  /**
+   * What the parser concluded about this payload's usage fields, carried on
+   * the event rather than re-derived from `tokenUsage` downstream.
+   *
+   * The distinction cannot be recovered from the parsed numbers: the parser
+   * decides from field PRESENCE, while a consumer looking at `tokenUsage`
+   * alone can only test VALUES. An explicit `input_tokens: 0` is a complete
+   * measurement, but reads as `partial` — or, with a zero output, as
+   * `unavailable` — to anything inferring from the numbers.
+   *
+   * Absent on events from a producer that predates this field; consumers fall
+   * back to inference, which is what the event pipeline did throughout.
+   */
+  readonly tokenDiagnosticStatus?: TokenDiagnosticStatus;
+
+  /**
+   * Whether cache counts were measured from the payload or are absent.
+   *
+   * Also unrecoverable downstream: zero-valued cache counts are deliberately
+   * omitted from `TokenUsage`, so an explicit `cache_read_input_tokens: 0`
+   * and a payload with no cache accounting at all are indistinguishable once
+   * parsed — the first is `measured`, the second `unavailable`.
+   */
+  readonly tokenCacheProvenance?: TokenCacheProvenance;
 
   /** Failure details (type: "failure"). */
   readonly failure?: {

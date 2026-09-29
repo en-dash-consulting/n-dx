@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<!--
+  ════════════════════════════════════════════════════════════════════════════
+  n-dx dashboard — option 1, filled in
+  ════════════════════════════════════════════════════════════════════════════
+
+  A hand-built rendering of the layout in option1.json as if it were the live
+  dashboard. Every number, name and list on these pages comes from THIS repo's
+  own analysis, PRD and run history as of 2026-09-17 — nothing is invented and
+  no feature is shown that the dashboard does not already have. What changed
+  is only where things sit:
+
+    Analysis  ← SourceVision's Overview / Zones / Map / Isometric Map / Files /
+                Architecture / Problems, plus Rex's dashboard stats and the
+                Token Usage view, all as dropdown sections on ONE page
+    Plan      ← Rex: Analyze & Import, Activity, the command runner + reference,
+                and the analyze/plan settings shortcut
+    Work      ← Hench: Runs (next task + start), run modes, Templates, the
+                command runner + reference, and usage totals
+
+  The 2D / 3D zone graph is one panel with a toggle: the same 15 zones and the
+  same measured crossings, drawn as a node-link map or as an isometric block
+  map. Static, not a build artefact — edit and save, the page reloads.
+
+  Shell:  the three stages are tabs in a top bar beside the logo and project
+  info. The bottom bar holds the server status, a settings cog and a Commands
+  button: Commands lifts a sheet over the page with the runner and the full
+  reference; the cog opens the settings pages as a full overlay with an ✕ to
+  close. Each stage page carries two small vertical buttons on its edges that
+  step around the loop — Analysis → Plan → Work → Analysis — so the next move
+  is always one click away.
+
+  Landing: the page you arrive on is three stage columns side by side —
+  Analysis, Plan, Work — each headed by its package mark (the SourceVision, Rex
+  and Hench images, inlined as data URIs so the export stays self-contained),
+  with one line on what it is for and its headline numbers. Click a column to go
+  there; the logo brings you back. The columns and the side stage links share
+  one hover treatment, so the same highlight means the same thing everywhere:
+  "this takes you to a stage".
+
+  PRD Items (progress, open epics) and the execution-log History live on the
+  Work page, above Templates — the agent works the tree, so its state sits next
+  to the run controls rather than under analysis.
+
+  Served next to the editor:  ndx start --preview .  →  /option1-demo.html
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>n-dx · option 1 demo</title>
+<style>
+:root {
+  --brand-teal: #00E5B9; --brand-purple: #6c41f0; --brand-orange: #ff5926; --brand-green: #00bd81;
+  --sidebar-w: 236px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px;
+}
+/* Theme. No data-theme attribute means "system": the palette follows
+   prefers-color-scheme, in CSS, so it holds even with scripts off. The toggle
+   pins data-theme="light" or "dark" on <html>, which overrides the query.
+   Dark is the base; the light block is repeated once for the system case. */
+:root, [data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0c0e1a; --bg-surface: #151829; --bg-hover: #1e2240; --bg-active: #262b4a;
+  --border: #2a2f4a; --border-strong: #3d4470;
+  --text: #e8eaf0; --text-dim: #9ea3bc; --text-muted: #868aaa;
+  --accent: var(--brand-teal); --green: #00bd81; --orange: #ff8060; --red: #ff7f9c; --purple: var(--brand-purple); --blue: #6ea8ff;
+  --on-accent: #04121a;
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f6fa; --bg-surface: #ffffff; --bg-hover: #eef0f6; --bg-active: #e4e7f0;
+  --border: #d8dce6; --border-strong: #bcc2d4;
+  --text: #1a1d2e; --text-dim: #5c6078; --text-muted: #6b6e88;
+  --accent: #006E4E; --green: #006E4A; --orange: #B03800; --red: #B01A54; --purple: var(--brand-purple); --blue: #2f66d0;
+  --on-accent: #fff;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f5f6fa; --bg-surface: #ffffff; --bg-hover: #eef0f6; --bg-active: #e4e7f0;
+    --border: #d8dce6; --border-strong: #bcc2d4;
+    --text: #1a1d2e; --text-dim: #5c6078; --text-muted: #6b6e88;
+    --accent: #006E4E; --green: #006E4A; --orange: #B03800; --red: #B01A54; --purple: var(--brand-purple); --blue: #2f66d0;
+    --on-accent: #fff;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.5 var(--font-sans); -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
+[hidden] { display: none !important; }
+a { color: var(--accent); }
+
+/* ── demo banner (the only thing here that is not "the dashboard") ─────── */
+.demo-bar {
+  display: flex; align-items: center; gap: var(--space-3); padding: 6px var(--space-4);
+  background: var(--purple); color: #fff; font-size: 12px;
+}
+.demo-bar b { font-family: var(--font-mono); letter-spacing: .06em; text-transform: uppercase; font-size: 10px; border: 1px solid rgba(255,255,255,.5); border-radius: 999px; padding: 2px 7px; }
+.demo-bar a { color: #fff; margin-left: auto; }
+.demo-bar button { font: inherit; background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer; }
+
+/* ── shell: top nav · main (with stage links) · bottom bar ─────────────── */
+.shell { display: flex; flex-direction: column; flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.topnav { display: flex; align-items: center; gap: var(--space-3); height: 48px; padding: 0 var(--space-4); background: var(--bg-surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.brand { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-4) 0 0; border: none; border-right: 1px solid var(--border); border-radius: 0; font: inherit; color: inherit; text-align: left; background: none; cursor: pointer; }
+.brand:hover .logo-dot, .brand:focus-visible .logo-dot { outline: 2px solid var(--accent); outline-offset: 1px; }
+.brand:focus-visible { outline: none; }
+.logo-dot { width: 26px; height: 26px; border-radius: var(--radius-md); background: var(--purple); color: #fff; display: grid; place-items: center; font: 700 12px/1 var(--font-mono); }
+.project-name { font-weight: 600; line-height: 1.2; }
+.project-path { color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); line-height: 1.2; }
+.tabs { display: flex; align-self: stretch; }
+.nav-section { display: flex; align-items: center; gap: 8px; padding: 0 var(--space-4); color: var(--text-dim); cursor: pointer; font: inherit; background: none; border: none; border-top: 2px solid transparent; border-bottom: 2px solid transparent; }
+.nav-section:hover { background: var(--bg-hover); color: var(--text); }
+.nav-section.active { color: var(--text); border-bottom-color: var(--accent); }
+.nav-section .glyph { width: 18px; text-align: center; color: var(--text-muted); }
+.nav-section.active .glyph { color: var(--accent); }
+.nav-section .name { font-weight: 600; letter-spacing: .02em; }
+.nav-section .hint { font: 10px/1 var(--font-mono); color: var(--text-muted); }
+.search { margin-left: auto; min-width: 220px; padding: 5px var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text-muted); display: flex; justify-content: space-between; }
+kbd { font: 10px/1 var(--font-mono); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 2px 5px; color: var(--text-dim); }
+.btn { font: inherit; font-size: 12px; padding: 5px var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: var(--bg-active); color: var(--text); cursor: pointer; }
+.btn:hover { background: var(--bg-hover); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn-sm { padding: 3px 9px; font-size: 11px; }
+
+.main { flex: 1; display: flex; min-height: 0; position: relative; }
+.content { flex: 1; overflow-y: auto; padding: var(--space-5) 48px 60px; }
+.page-head { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-4); }
+.page-head h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.page-head .sub { color: var(--text-muted); font-size: 12px; }
+
+/* stage links: one pair per stage, the pair for the current stage is shown.
+   Analysis → Plan → Work → Analysis, so every page has a previous and a next. */
+.stage-link { position: absolute; top: 50%; transform: translateY(-50%); z-index: 5; display: none; flex-direction: column; align-items: center; gap: 8px; width: 30px; padding: 12px 0; font: inherit; color: var(--text-dim); background: var(--bg-surface); border: 1px solid var(--border-strong); cursor: pointer; }
+.stage-link.prev { left: 0; border-left: none; border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }
+.stage-link.next { right: 0; border-right: none; border-radius: var(--radius-lg) 0 0 var(--radius-lg); }
+.stage-link .n { transition: color .15s; }
+
+/* One highlight for everything that takes you to a stage: the landing cards
+   and the side stage links. Same border, same glow, same accent on the name. */
+.stage-link, .stage-card { transition: border-color .15s, box-shadow .15s, background .15s, color .15s, transform .15s; }
+.stage-link:hover, .stage-link:focus-visible, .stage-card:hover, .stage-card:focus-visible {
+  color: var(--text); background: var(--bg-hover); border-color: var(--accent); outline: none;
+  box-shadow: 0 0 0 1px var(--accent), 0 8px 24px rgba(0, 0, 0, .25);
+}
+.stage-link:hover .n, .stage-link:focus-visible .n, .stage-card:hover .name, .stage-card:focus-visible .name,
+.stage-card:hover .glyph, .stage-card:focus-visible .glyph { color: var(--accent); }
+
+/* landing: three tall stage columns side by side, each with its package mark */
+.landing { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); max-width: 1080px; margin: 0 auto; }
+.stage-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-2); min-height: 440px; padding: var(--space-6) var(--space-5) var(--space-5); font: inherit; color: var(--text-dim); background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: var(--radius-xl); cursor: pointer; }
+.stage-card:hover, .stage-card:focus-visible { transform: translateY(-4px); }
+.stage-card .mark { width: 100%; max-width: 200px; aspect-ratio: 1; display: grid; place-items: center; margin-bottom: var(--space-3); border-radius: var(--radius-lg); background: var(--bg); border: 1px solid var(--border); overflow: hidden; }
+.stage-card .mark img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.stage-card .glyph { font-size: 22px; color: var(--text-muted); transition: color .15s; }
+.stage-card .name { font-size: 20px; font-weight: 600; color: var(--text); transition: color .15s; }
+.stage-card .hint { font: 10px/1 var(--font-mono); color: var(--text-muted); letter-spacing: .1em; text-transform: uppercase; }
+.stage-card .what { font-size: 13px; color: var(--text-dim); margin: var(--space-2) 0 auto; max-width: 260px; }
+.stage-card .facts { display: flex; gap: var(--space-5); justify-content: center; margin-top: var(--space-4); }
+.stage-card .facts > span { display: flex; flex-direction: column; align-items: center; }
+.stage-card .facts .v { font-size: 20px; font-weight: 600; color: var(--text); line-height: 1.1; }
+.stage-card .facts .k { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.stage-card .go { margin-top: var(--space-4); color: var(--accent); font-weight: 600; font-size: 13px; }
+.landing-loop { grid-column: 1 / -1; text-align: center; color: var(--text-muted); font: 11px/1.6 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; margin: var(--space-2) 0 0; }
+@media (max-width: 760px) { .landing { grid-template-columns: 1fr; } .stage-card { min-height: 0; } .stage-card .mark { max-width: 120px; } }
+.stage-link .k { writing-mode: vertical-rl; font: 600 9px/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
+.stage-link .n { writing-mode: vertical-rl; font-weight: 600; font-size: 12px; letter-spacing: .04em; }
+.stage-link .arrow { color: var(--accent); font-size: 13px; line-height: 1; }
+.main[data-stage="analysis"] .stage-link[data-for="analysis"],
+.main[data-stage="plan"] .stage-link[data-for="plan"],
+.main[data-stage="work"] .stage-link[data-for="work"] { display: flex; }
+
+.bottombar { display: flex; align-items: center; gap: var(--space-3); height: 38px; padding: 0 var(--space-4); background: var(--bg-surface); border-top: 1px solid var(--border); color: var(--text-muted); font-size: 11px; flex-shrink: 0; position: relative; z-index: 31; }
+.status { display: flex; align-items: center; gap: 8px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; }
+.icon-btn { font: inherit; font-size: 15px; line-height: 1; width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--radius-md); border: 1px solid transparent; background: transparent; color: var(--text-dim); cursor: pointer; }
+.icon-btn:hover, .icon-btn:focus-visible, .icon-btn.active { background: var(--bg-hover); color: var(--text); border-color: var(--border-strong); outline: none; }
+.cmd { margin-left: auto; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 12px; padding: 4px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: var(--bg-active); color: var(--text); cursor: pointer; }
+.cmd:hover, .cmd[aria-expanded="true"] { background: var(--bg-hover); border-color: var(--accent); }
+.cmd .glyph { color: var(--text-muted); }
+.cmd .caret { font-size: 10px; color: var(--text-muted); transition: transform .2s; }
+.cmd[aria-expanded="true"] .caret { transform: rotate(180deg); }
+
+/* commands sheet: lifts from the bottom bar over the page */
+.scrim { position: absolute; inset: 0 0 38px 0; z-index: 29; background: rgba(0, 0, 0, .35); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 38px; max-height: 72%; z-index: 30; display: flex; flex-direction: column; background: var(--bg-surface); border-top: 1px solid var(--border-strong); box-shadow: 0 -12px 32px rgba(0, 0, 0, .35); transform: translateY(100%); visibility: hidden; transition: transform .22s ease; }
+.sheet.open { transform: none; visibility: visible; }
+.sheet-head { display: flex; align-items: center; gap: var(--space-3); padding: 6px var(--space-5); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sheet-head .close { margin-left: auto; }
+.sheet-body { overflow-y: auto; padding: var(--space-4) var(--space-5) var(--space-5); }
+.sheet-body .page-head { margin-bottom: var(--space-3); }
+
+/* settings overlay: a full page over the shell, ✕ in the top right */
+.overlay { position: absolute; inset: 0; z-index: 40; display: flex; flex-direction: column; background: var(--bg); }
+.overlay-head { display: flex; align-items: center; gap: var(--space-3); height: 48px; padding: 0 var(--space-5); background: var(--bg-surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.overlay-head .glyph { color: var(--text-muted); font-size: 15px; }
+.overlay-head .close { margin-left: auto; width: 30px; height: 30px; }
+.crumbs { color: var(--text-muted); font-size: 12px; }
+.crumbs b { color: var(--text); font-weight: 600; }
+.overlay-body { flex: 1; display: flex; min-height: 0; }
+.settings-nav { width: var(--sidebar-w); flex-shrink: 0; padding: var(--space-2) 0; background: var(--bg-surface); border-right: 1px solid var(--border); overflow-y: auto; }
+.nav-item { display: flex; align-items: center; gap: 8px; padding: 7px var(--space-4); color: var(--text-dim); cursor: pointer; }
+.nav-item:hover { background: var(--bg-hover); color: var(--text); }
+.nav-item.active { background: var(--bg-active); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+.nav-item .glyph { width: 16px; text-align: center; color: var(--text-muted); }
+.overlay-content { flex: 1; overflow-y: auto; padding: var(--space-5); }
+
+/* ── sections ("dropdowns") ─────────────────────────────────────────────── */
+.sec { margin-bottom: var(--space-5); }
+.sec-head { display: flex; align-items: center; gap: 8px; padding: 6px 0; margin-bottom: var(--space-3); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+.sec-head .caret { width: 14px; color: var(--text-muted); font-size: 11px; }
+.sec-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.sec-head .meta { margin-left: auto; color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
+.sec.plain .sec-head { display: none; }
+.grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--space-4); }
+.sec.collapsed .grid { display: none; }
+.sec.collapsed .sec-head .caret::before { content: "▸"; }
+.sec:not(.collapsed) .sec-head .caret::before { content: "▾"; }
+
+/* ── panels ─────────────────────────────────────────────────────────────── */
+.panel { grid-column: span 6; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4) var(--space-4); min-width: 0; }
+.w4 { grid-column: span 4; } .w6 { grid-column: span 6; } .w8 { grid-column: span 8; } .w12 { grid-column: span 12; }
+.panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: var(--space-3); }
+.panel-head h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.panel-head .meta { margin-left: auto; color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
+.muted { color: var(--text-muted); }
+.dim { color: var(--text-dim); }
+.mono { font-family: var(--font-mono); font-size: 11px; }
+.stats { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-6); }
+.stat { min-width: 96px; }
+.stat .v { font-size: 22px; font-weight: 600; line-height: 1.2; }
+.stat .k { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.stat .s { color: var(--text-muted); font-size: 11px; }
+
+.info { position: relative; cursor: help; color: var(--text-muted); border: 1px solid var(--border-strong); border-radius: 999px; width: 13px; height: 13px; display: inline-grid; place-items: center; font: 9px/1 var(--font-mono); flex-shrink: 0; }
+.info:hover, .info:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
+.info:hover::after, .info:focus-visible::after {
+  content: attr(data-info); position: absolute; left: 0; top: 150%; z-index: 20; width: 280px;
+  background: var(--bg-active); border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: var(--space-3);
+  font: 11px/1.5 var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--text); white-space: normal; box-shadow: 0 10px 24px rgba(0,0,0,.3);
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; color: var(--text-muted); font-weight: 500; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+td { padding: 5px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11px; }
+.bar { height: 6px; background: var(--bg-active); border-radius: 999px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.bar.thin { height: 4px; }
+.stack { display: flex; height: 10px; border-radius: 999px; overflow: hidden; gap: 1px; margin: 6px 0 8px; }
+.stack > i { display: block; height: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--text-dim); }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.badge { display: inline-block; font: 600 9px/1 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; padding: 3px 6px; border-radius: 999px; border: 1px solid currentColor; }
+.b-green { color: var(--green); } .b-orange { color: var(--orange); } .b-red { color: var(--red); } .b-blue { color: var(--blue); } .b-purple { color: var(--purple); } .b-muted { color: var(--text-muted); }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.list li:last-child { border-bottom: none; }
+.list .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card { border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-3); background: var(--bg); }
+.card + .card { margin-top: var(--space-2); }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--space-3); }
+.field label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.field input, .field textarea, .field select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 6px 8px; }
+.field textarea { min-height: 84px; resize: vertical; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 12px; }
+.kv dt { color: var(--text-muted); } .kv dd { margin: 0; font-family: var(--font-mono); font-size: 11px; }
+.toggle { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 999px; overflow: hidden; margin-left: auto; }
+.toggle button { font: 600 11px/1 var(--font-mono); letter-spacing: .06em; padding: 5px 12px; border: none; background: transparent; color: var(--text-dim); cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+/* theme control in the bottom bar: System · Light · Dark */
+.theme-toggle { margin-left: 0; }
+.theme-toggle button { padding: 4px 9px; font-size: 10px; }
+.theme-toggle button .g { margin-right: 4px; }
+.graph { width: 100%; height: 340px; display: block; }
+.graph text { font: 10px var(--font-mono); fill: var(--text-dim); }
+.graph .lbl { font: 11px var(--font-sans); fill: var(--text); }
+.graph line, .graph path.edge { stroke: var(--text-muted); stroke-opacity: .35; fill: none; }
+.hotkeys li { justify-content: space-between; }
+.log time { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.w3 { grid-column: span 3; }
+@media (max-width: 960px) { .panel { grid-column: span 12 !important; } .project-path, .topnav .search, .stage-link .k { display: none; } .settings-nav { width: 170px; } }
+</style>
+</head>
+<body>
+
+<div class="demo-bar">
+  <b>demo</b>
+  <span>Option 1 layout — stages across the top, commands and settings on the bottom bar — filled with this repo's real analysis, PRD and run history (as of 2026-09-17). Nothing here is new — only moved.</span>
+  <a href="./">← back to the editor</a>
+</div>
+
+<div class="shell">
+  <header class="topnav">
+    <button class="brand" data-page="home" title="Home">
+      <span class="logo-dot">n</span>
+      <div><div class="project-name">n-dx</div><div class="project-path">~/VSCodeProjects/n-dx</div></div>
+    </button>
+    <nav class="tabs" aria-label="Stages">
+      <button class="nav-section" data-page="analysis"><span class="glyph">▣</span><span class="name">Analysis</span><span class="hint">sv</span></button>
+      <button class="nav-section" data-page="plan"><span class="glyph">☑</span><span class="name">Plan</span><span class="hint">rex</span></button>
+      <button class="nav-section" data-page="work"><span class="glyph">▶</span><span class="name">Work</span><span class="hint">hench</span></button>
+    </nav>
+    <div class="search"><span>Search files, zones, tasks…</span><kbd>⌘K</kbd></div>
+    <button class="btn">Refresh</button>
+    <button class="btn btn-primary">Analyze</button>
+  </header>
+
+  <div class="main" id="main" data-stage="analysis">
+    <!-- Analysis → Plan → Work → Analysis. One pair per stage; CSS shows the current pair. -->
+    <button class="stage-link prev" data-page="work" data-for="analysis" title="Previous stage: Work"><span class="arrow">←</span><span class="k">prev</span><span class="n">Work</span></button>
+    <button class="stage-link next" data-page="plan" data-for="analysis" title="Next stage: Plan"><span class="k">next</span><span class="n">Plan</span><span class="arrow">→</span></button>
+    <button class="stage-link prev" data-page="analysis" data-for="plan" title="Previous stage: Analysis"><span class="arrow">←</span><span class="k">prev</span><span class="n">Analysis</span></button>
+    <button class="stage-link next" data-page="work" data-for="plan" title="Next stage: Work"><span class="k">next</span><span class="n">Work</span><span class="arrow">→</span></button>
+    <button class="stage-link prev" data-page="plan" data-for="work" title="Previous stage: Plan"><span class="arrow">←</span><span class="k">prev</span><span class="n">Plan</span></button>
+    <button class="stage-link next" data-page="analysis" data-for="work" title="Next stage: Analysis"><span class="k">next</span><span class="n">Analysis</span><span class="arrow">→</span></button>
+    <div class="content" id="content"></div>
+  </div>
+
+  <footer class="bottombar">
+    <span class="status"><span class="dot"></span> server :3117 · analysis fresh · 1 run live</span>
+    <button class="icon-btn" id="settings-toggle" title="Settings" aria-label="Settings" aria-haspopup="dialog" aria-controls="settings-overlay">⚙</button>
+    <div class="toggle theme-toggle" id="theme-toggle" role="group" aria-label="Theme">
+      <button data-theme-pref="system" aria-pressed="true" title="Follow the system setting"><span class="g">◐</span>System</button>
+      <button data-theme-pref="light" aria-pressed="false" title="Always light"><span class="g">☼</span>Light</button>
+      <button data-theme-pref="dark" aria-pressed="false" title="Always dark"><span class="g">☾</span>Dark</button>
+    </div>
+    <button class="cmd" id="commands-toggle" data-page="commands" data-toggle aria-expanded="false" aria-controls="commands-sheet"><span class="glyph">⌘</span> Commands <span class="caret">▲</span></button>
+  </footer>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <section class="sheet" id="commands-sheet" role="dialog" aria-label="Commands">
+    <div class="sheet-head">
+      <span class="muted mono">ndx · run a command or look one up</span>
+      <button class="icon-btn close" data-close aria-label="Close commands">✕</button>
+    </div>
+    <div class="sheet-body" id="commands-body"></div>
+  </section>
+
+  <section class="overlay" id="settings-overlay" role="dialog" aria-modal="true" aria-label="Settings" hidden>
+    <div class="overlay-head">
+      <span class="glyph">⚙</span>
+      <div class="crumbs" id="crumbs"></div>
+      <button class="icon-btn close" data-close aria-label="Close settings">✕</button>
+    </div>
+    <div class="overlay-body">
+      <nav class="settings-nav" aria-label="Settings pages">
+        <div class="nav-item" data-page="s-general"><span class="glyph">🧠</span> General</div>
+        <div class="nav-item" data-page="s-plan"><span class="glyph">▣</span> ndx analyze / plan</div>
+        <div class="nav-item" data-page="s-work"><span class="glyph">▶</span> ndx work</div>
+        <div class="nav-item" data-page="s-sync"><span class="glyph">🔌</span> ndx sync</div>
+        <div class="nav-item" data-page="s-export"><span class="glyph">📤</span> ndx export / refresh</div>
+        <div class="nav-item" data-page="s-flags"><span class="glyph">📌</span> Feature Flags</div>
+        <div class="nav-item" data-page="s-timeouts"><span class="glyph">⏱</span> CLI Timeouts</div>
+      </nav>
+      <div class="overlay-content" id="settings-body"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ═══ Real data, gathered 2026-09-17 from .sourcevision, .rex, .hench ═══ */
+
+  var REPO = {
+    files: 1933, lines: 577854, zones: 30, edges: 5622, external: 31, circular: 9, crossings: 2457,
+    languages: [["TypeScript", 1707], ["JavaScript", 206], ["Go", 19], ["Python", 1]],
+    roles: [["source", 805], ["test", 1106], ["build", 13], ["config", 8], ["docs", 1]],
+    packages: [["web", 592], ["rex", 453], ["hench", 335], ["sourcevision", 217], ["tests", 188], ["llm-client", 92], ["core", 39], ["scripts", 11]],
+    findings: { info: 56, warning: 23, critical: 1 },
+    avgCohesion: 0.89, avgCoupling: 0.02, dualFragility: 0,
+    warnings: [
+      "9 circular dependency chains — see imports.json",
+      "Bidirectional coupling: web-server ↔ web-viewer (8+8 crossings)",
+      "Fan-in hotspot: web/src/server/response-utils.ts is called from 34 files",
+      "rex-cli: 158 entry points — wide API surface",
+      "hench: 112 entry points — wide API surface",
+    ],
+    externals: ["@anthropic-ai/sdk", "@modelcontextprotocol/sdk", "preact", "zod", "d3-force", "d3-selection", "esbuild", "vitest"],
+    cycles: [
+      ["rex/src/store/file-adapter.ts", "rex/src/store/prd-md-migration.ts"],
+      ["rex/src/store/index.ts", "rex/src/store/ensure-legacy-prd-migrated.ts"],
+      ["web/src/hub/hub.ts", "web/src/hub/proxy.ts"],
+      ["web/src/hub/hub.ts", "web/src/hub/routes.ts", "web/src/hub/overview.ts"],
+    ],
+    profile: { primary: "TypeScript", frameworks: ["vitest"], build: "pnpm workspace", ci: "GitHub Actions ×3 (ci, docs, release)", release: "changesets" },
+  };
+
+  // id, label, files, cohesion, coupling, family, 2D position, 3D grid cell
+  var ZONES = [
+    { id: "tests-unit",        label: "tests-unit",        files: 722, coh: 1,    coup: 0,    fam: "tests", x: 360, y: 60,  gx: 2, gy: 0 },
+    { id: "web-viewer",        label: "web-viewer",        files: 231, coh: 0.98, coup: 0.02, fam: "web",   x: 610, y: 150, gx: 4, gy: 1 },
+    { id: "rex-cli",           label: "rex-cli",           files: 190, coh: 1,    coup: 0,    fam: "rex",   x: 200, y: 170, gx: 1, gy: 2 },
+    { id: "tests-integration", label: "tests-integration", files: 155, coh: 1,    coup: 0,    fam: "tests", x: 120, y: 60,  gx: 0, gy: 0 },
+    { id: "hench",             label: "hench",             files: 128, coh: 1,    coup: 0,    fam: "hench", x: 330, y: 210, gx: 2, gy: 2 },
+    { id: "tests-e2e",         label: "tests-e2e",         files: 103, coh: 1,    coup: 0,    fam: "tests", x: 600, y: 50,  gx: 4, gy: 0 },
+    { id: "sourcevision",      label: "sourcevision",      files: 90,  coh: 1,    coup: 0,    fam: "sv",    x: 470, y: 230, gx: 3, gy: 2 },
+    { id: "tests-fixtures",    label: "tests-fixtures",    files: 79,  coh: 1,    coup: 0,    fam: "tests", x: 40,  y: 150, gx: 0, gy: 1 },
+    { id: "web-server",        label: "web-server",        files: 77,  coh: 0.97, coup: 0.03, fam: "web",   x: 620, y: 280, gx: 4, gy: 2 },
+    { id: "llm-client",        label: "llm-client",        files: 41,  coh: 1,    coup: 0,    fam: "core",  x: 330, y: 320, gx: 2, gy: 3 },
+    { id: "core",              label: "core",              files: 40,  coh: 1,    coup: 0,    fam: "core",  x: 500, y: 330, gx: 3, gy: 3 },
+    { id: "tests-helpers",     label: "tests-helpers",     files: 14,  coh: 1,    coup: 0,    fam: "tests", x: 200, y: 290, gx: 1, gy: 3 },
+    { id: "web-hub",           label: "web-hub",           files: 10,  coh: 0.93, coup: 0.07, fam: "web",   x: 690, y: 210, gx: 5, gy: 2 },
+    { id: "viewer-message-pipeline", label: "viewer-msg-pipeline", files: 7, coh: 1, coup: 0, fam: "web", x: 700, y: 100, gx: 5, gy: 1 },
+    { id: "chunked",           label: "chunked",           files: 5,   coh: 0.67, coup: 0.33, fam: "rex",   x: 90,  y: 250, gx: 0, gy: 2 },
+  ];
+  // Measured cross-zone import counts (zones.json crossings, aggregated).
+  var CROSSINGS = [
+    ["tests-unit", "rex-cli", 528], ["tests-unit", "hench", 347], ["tests-unit", "web-viewer", 327],
+    ["tests-integration", "rex-cli", 212], ["tests-unit", "web-server", 203], ["tests-unit", "sourcevision", 189],
+    ["tests-integration", "hench", 154], ["tests-unit", "llm-client", 100], ["tests-unit", "tests-helpers", 47],
+    ["tests-integration", "tests-helpers", 42], ["tests-integration", "web-server", 36], ["tests-e2e", "core", 34],
+    ["tests-unit", "core", 33], ["tests-integration", "sourcevision", 30], ["tests-e2e", "rex-cli", 18],
+    ["tests-integration", "web-viewer", 14], ["web-server", "web-viewer", 8], ["web-viewer", "web-server", 8], ["chunked", "rex-cli", 5],
+  ];
+  var FAMILY_COLOR = { tests: "#868aaa", web: "#6ea8ff", rex: "#00E5B9", hench: "#ff8060", sv: "#00bd81", core: "#a98bff" };
+
+  var PRD = {
+    total: 1548, completed: 1493, pending: 54, inProgress: 1,
+    levels: [["epics", 32], ["features", 371], ["tasks", 1105], ["subtasks", 40]],
+    next: {
+      title: "Windows orphan-child E2E fixture can start without its grandchild",
+      epic: "Autonomous run reliability: four defects found running wave 1",
+      id: "8174c84e", priority: "high", status: "in_progress", criteria: 6,
+      why: "CLI Smoke (Windows) run 34735894891 failed stop-orphan-children.test.js:159 — the detached stand-in server's shell-launched Node grandchild never wrote child.pid or a tick file.",
+    },
+    epics: [
+      ["Autonomous run reliability: four defects found running wave 1", 26, 30, "critical"],
+      ["0.6.0 / PR 5 · Worktree awareness in the dashboard (read-only)", 0, 4, "high"],
+      ["0.6.0 / PR 6 · Cross-worktree task claims (may slip to 0.7.0)", 0, 3, "high"],
+      ["0.6.0 / PR 7 · ndx which and version identity everywhere", 0, 3, "high"],
+      ["0.7.0 / PR 8 · ndx hub daemon: registry, per-repo servers, reverse proxy", 0, 3, "high"],
+      ["0.7.0 / PR 9 · Hub home page with one card per project", 0, 1, "medium"],
+      ["0.7.0 / PR 10 · ndx start registers with the hub; --here keeps the legacy server", 0, 3, "high"],
+      ["0.8.0 / PR 11 · Repo server anchored at the main worktree", 0, 2, "high"],
+      ["0.8.0 / PR 12 · /w/:wt/ URL slot, workspace-tagged WebSocket frames", 0, 2, "high"],
+      ["0.8.0 / PR 13 · Workspaces Overview view, PRD delta versus the anchor", 0, 3, "high"],
+      ["0.8.0 / PR 14 · MCP shim: ndx mcp <server> . forwards to the hub", 0, 1, "medium"],
+      ["0.8.0 / PR 15 · Hub admission gate: session cap, memory headroom", 0, 1, "medium"],
+    ],
+    log: [
+      ["03:54:48", "task_completed", "Windows stale-lock contention regression test can deadlock — fixtures behave correctly"],
+      ["03:54:48", "auto_completed", "epic: CLI & Developer Tools"],
+      ["03:54:47", "auto_completed", "feature: Child Process Cleanup"],
+      ["03:54:46", "status_updated", "→ completed by hench agent"],
+      ["03:46:50", "status_updated", "→ in_progress by hench agent"],
+    ],
+  };
+
+  var USAGE = {
+    runs: 1146, completed: 943, failed: 201, cancelled: 1, running: 1,
+    input: 64050, output: 9140418, cacheWrite: 35844664, cacheRead: 3245254952,
+    cost: 1245.29, costInput: 0.19, costOutput: 137.11,
+    models: [["sonnet", 990], ["claude-opus-5", 109], ["claude-fable-5-1", 24], ["claude-opus-4-8", 8], ["claude-fable-5", 7], ["opus", 3]],
+    recent: [
+      ["terminateTree and terminateTreeByPid are never exercised against a real process tree", "claude-opus-5", 45, 8, 11404096, "completed"],
+      ["rex status tells the operator to run rex fix for parents rex fix will not touch", "claude-opus-5", 32, 6, 4623418, "completed"],
+      ["Hench task display branches on rex prose, so a reworded selection summary breaks it", "claude-opus-5", 64, 12, 11966563, "completed"],
+      ["readBody destroys an over-cap chunked request before any response", "claude-opus-5", 30, 4, 27458979, "completed"],
+      ["ndx export silently appends its out-dir to .gitignore", "claude-opus-5", 24, 5, 21481292, "completed"],
+    ],
+  };
+
+  var HENCH = { provider: "cli", model: "opus", permissionMode: "acceptEdits", maxTurns: 50, maxTokens: 8192, autoCommit: true, livelockThreshold: 6, commandTimeout: 30000,
+    allowed: ["npm", "npx", "node", "git", "tsc", "vitest"], blocked: [".hench/**", ".rex/**", ".git/**", "node_modules/**"] };
+  var TEMPLATES = [
+    ["quick-iteration", "Quick Iteration", "Short, fast runs for rapid prototyping and small fixes"],
+    ["thorough-execution", "Thorough Execution", "Extended runs with generous limits for complex multi-file tasks"],
+    ["budget-conscious", "Budget Conscious", "Optimized for minimal token usage while maintaining quality"],
+    ["strict-safety", "Strict Safety", "Maximum guard rails for sensitive codebases and production-adjacent work"],
+    ["api-direct", "API Direct", "Use the Anthropic API directly instead of the Claude Code CLI for headless environments"],
+    ["go-project", "Go Project", "Tuned for Go codebases: Go toolchain commands, vendor blocking, make support"],
+  ];
+  var COMMANDS = [
+    ["init", "Initialize all tools (sourcevision + rex + hench)", "setup"],
+    ["analyze", "Run SourceVision codebase analysis", "analysis"],
+    ["recommend", "Show or accept SourceVision-based recommendations", "plan"],
+    ["plan", "Analyze codebase and generate PRD proposals", "plan"],
+    ["add", "Add items to the PRD from descriptions or files", "plan"],
+    ["refresh", "Refresh SourceVision data and dashboard UI artifacts", "analysis"],
+    ["work", "Execute the next task autonomously with hench agent", "work"],
+    ["status", "Show PRD status tree with completion stats", "plan"],
+    ["usage", "Token usage analytics and cost estimation", "work"],
+    ["sync", "Sync local PRD with remote adapter (e.g. Notion)", "plan"],
+    ["start", "Start dashboard and MCP server", "setup"],
+    ["dev", "Start dev server with live reload", "setup"],
+    ["ci", "Run analysis pipeline and validate PRD health", "analysis"],
+    ["config", "View and edit settings across all packages", "setup"],
+    ["auth", "Verify LLM provider credentials for the active vendor", "setup"],
+    ["export", "Export static deployable dashboard", "setup"],
+    ["prd", "Export or import the PRD as a portable bundle", "plan"],
+    ["self-heal", "Iterative codebase improvement loop", "work"],
+    ["pair-programming", "Run agent then cross-vendor review (alias: bicker)", "work"],
+    ["validate", "Check PRD integrity (DAG, schema, references)", "plan"],
+    ["fix", "Auto-fix common PRD issues", "plan"],
+    ["health", "Show PRD health summary", "plan"],
+    ["verify", "Run tests for acceptance criteria", "plan"],
+    ["update", "Update item status, priority, or title", "plan"],
+    ["move", "Reparent an item in the PRD tree", "plan"],
+    ["reshape", "LLM-powered PRD restructuring", "plan"],
+    ["reorganize", "Reorganize PRD structure", "plan"],
+    ["prune", "Remove completed subtrees from PRD", "plan"],
+    ["next", "Print next actionable task", "work"],
+    ["tree", "Show full PRD hierarchy with color-coded status", "plan"],
+    ["show", "Show full details of a hench run", "work"],
+  ];
+
+  var INFO = {
+    zone: "A zone is a cluster of files that import each other more than they import the rest of the codebase — found by running Louvain community detection over the import graph, not by folder names. Zones are what the architecture views group, score and check boundaries against. This repo pins a few (web-server, web-viewer, rex-cli…) in .n-dx.json so they survive re-analysis.",
+    coupling: "Share of a zone's imports that cross its own boundary. Higher means the zone is more entangled with the rest of the codebase — a change inside it has a wider blast radius.",
+    cohesion: "Share of a zone's imports that stay inside it. Higher means the zone holds together on its own terms; low cohesion together with high coupling is the pair worth governing.",
+    crossings: "One import whose source file and target file sit in different zones. 2,457 of the 5,622 import edges cross a zone boundary; almost all of them are tests importing the code they test.",
+  };
+
+  /* ═══ tiny DOM helpers ═══ */
+  function h(tag, attrs, children) {
+    var el = document.createElement(tag);
+    if (attrs) for (var k in attrs) {
+      if (k === "class") el.className = attrs[k];
+      else if (k === "html") el.innerHTML = attrs[k];
+      else if (k.slice(0, 2) === "on") el.addEventListener(k.slice(2), attrs[k]);
+      else if (attrs[k] != null) el.setAttribute(k, attrs[k]);
+    }
+    (Array.isArray(children) ? children : children == null ? [] : [children]).forEach(function (c) {
+      if (c == null) return;
+      el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return el;
+  }
+  function fmt(n) { return Number(n).toLocaleString("en-US"); }
+  function short(n) { return n >= 1e9 ? (n / 1e9).toFixed(2) + "B" : n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n); }
+  function pct(a, b) { return (100 * a / b).toFixed(1) + "%"; }
+  function info(text) { return h("span", { class: "info", "data-info": text, tabindex: "0", role: "note", "aria-label": text }, "i"); }
+  function stat(value, label, sub, tip) {
+    return h("div", { class: "stat" }, [
+      h("div", { class: "v" }, value),
+      h("div", { class: "k" }, [label, tip ? info(tip) : null]),
+      sub ? h("div", { class: "s" }, sub) : null,
+    ]);
+  }
+  function panel(width, title, meta, body) {
+    return h("article", { class: "panel w" + width }, [
+      h("div", { class: "panel-head" }, [h("h3", null, title), meta ? h("span", { class: "meta" }, meta) : null]),
+    ].concat(body));
+  }
+  function section(title, meta, panels, opts) {
+    opts = opts || {};
+    var sec = h("section", { class: "sec" + (opts.plain ? " plain" : "") + (opts.collapsed ? " collapsed" : "") });
+    var head = h("div", { class: "sec-head", onclick: function () { sec.classList.toggle("collapsed"); } }, [
+      h("span", { class: "caret" }), h("h2", null, title), meta ? h("span", { class: "meta" }, meta) : null,
+    ]);
+    sec.appendChild(head);
+    sec.appendChild(h("div", { class: "grid" }, panels));
+    return sec;
+  }
+  function bar(ratio, color, thin) {
+    var b = h("div", { class: "bar" + (thin ? " thin" : "") }, h("i"));
+    b.firstChild.style.width = Math.max(0, Math.min(100, ratio * 100)) + "%";
+    if (color) b.firstChild.style.background = color;
+    return b;
+  }
+  function stackBar(parts, colors) {
+    var total = parts.reduce(function (a, p) { return a + p[1]; }, 0);
+    var s = h("div", { class: "stack" }, parts.map(function (p, i) {
+      var seg = h("i", { title: p[0] + " · " + fmt(p[1]) });
+      seg.style.width = (100 * p[1] / total) + "%";
+      seg.style.background = colors[i % colors.length];
+      return seg;
+    }));
+    var legend = h("div", { class: "legend" }, parts.map(function (p, i) {
+      var sw = h("i"); sw.style.background = colors[i % colors.length];
+      return h("span", null, [sw, p[0] + " ", h("span", { class: "muted mono" }, fmt(p[1]) + " · " + pct(p[1], total))]);
+    }));
+    return [s, legend];
+  }
+  function badge(text, cls) { return h("span", { class: "badge " + cls }, text); }
+  function table(headers, rows) {
+    return h("table", null, [
+      h("thead", null, h("tr", null, headers.map(function (x) { return h("th", { class: x.num ? "num" : null }, x.label || x); }))),
+      h("tbody", null, rows.map(function (r) { return h("tr", null, r.map(function (c, i) {
+        var hd = headers[i]; return h("td", { class: hd && hd.num ? "num" : null }, c);
+      })); })),
+    ]);
+  }
+  var PALETTE = ["#00E5B9", "#6ea8ff", "#a98bff", "#ff8060", "#00bd81", "#ffd166", "#868aaa", "#ff7f9c"];
+
+  /* ═══ Zone graph: one panel, two projections of the same data ═══ */
+  function zoneById(id) { return ZONES.filter(function (z) { return z.id === id; })[0]; }
+  function radius(files) { return 6 + Math.sqrt(files) * 1.1; }
+
+  function svg(tag, attrs) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
+  function graph2D() {
+    var g = svg("svg", { class: "graph", viewBox: "0 0 760 360" });
+    CROSSINGS.forEach(function (c) {
+      var a = zoneById(c[0]), b = zoneById(c[1]);
+      if (!a || !b) return;
+      var w = 0.6 + Math.log(c[2]) * 0.55;
+      var line = svg("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, "stroke-width": w.toFixed(1) });
+      line.appendChild(svg("title", {})).textContent = c[0] + " → " + c[1] + " · " + c[2] + " imports";
+      g.appendChild(line);
+    });
+    ZONES.forEach(function (z) {
+      var r = radius(z.files);
+      var node = svg("g", { transform: "translate(" + z.x + "," + z.y + ")" });
+      var circle = svg("circle", { r: r, fill: FAMILY_COLOR[z.fam], "fill-opacity": "0.85", stroke: "var(--bg)", "stroke-width": "2" });
+      circle.appendChild(svg("title", {})).textContent = z.label + " · " + z.files + " files · cohesion " + z.coh + " · coupling " + z.coup;
+      node.appendChild(circle);
+      var t = svg("text", { class: "lbl", x: 0, y: r + 12, "text-anchor": "middle" }); t.textContent = z.label; node.appendChild(t);
+      var n = svg("text", { x: 0, y: 3, "text-anchor": "middle", fill: "#04121a", "font-weight": "600" }); n.textContent = z.files; if (r > 12) node.appendChild(n);
+      g.appendChild(node);
+    });
+    return g;
+  }
+
+  function graph3D() {
+    var S = 58, ORIGIN_X = 380, ORIGIN_Y = 70;
+    var cos = Math.cos(Math.PI / 6), sin = Math.sin(Math.PI / 6);
+    function iso(x, y, z) { return [ORIGIN_X + (x - y) * cos * S, ORIGIN_Y + (x + y) * sin * S - z]; }
+    function pt(p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }
+    function shade(hex, f) {
+      var n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, gch = (n >> 8) & 255, b = n & 255;
+      return "rgb(" + Math.round(r * f) + "," + Math.round(gch * f) + "," + Math.round(b * f) + ")";
+    }
+    var g = svg("svg", { class: "graph", viewBox: "0 0 760 360" });
+
+    // ground grid
+    for (var i = 0; i <= 6; i++) {
+      var a = iso(i, 0, 0), b = iso(i, 4, 0), c = iso(0, i, 0), d = iso(6, i, 0);
+      g.appendChild(svg("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], "stroke-width": "0.5" }));
+      if (i <= 4) g.appendChild(svg("line", { x1: c[0], y1: c[1], x2: d[0], y2: d[1], "stroke-width": "0.5" }));
+    }
+
+    var W = 0.62;
+    function heightOf(files) { return 10 + Math.sqrt(files) * 3.2; }
+    function topCenter(z) { return iso(z.gx + 0.5, z.gy + 0.5, heightOf(z.files)); }
+
+    // edges between block tops, drawn before blocks so blocks occlude them
+    CROSSINGS.forEach(function (c) {
+      var a = zoneById(c[0]), b = zoneById(c[1]);
+      if (!a || !b) return;
+      var p = topCenter(a), q = topCenter(b);
+      var mid = [(p[0] + q[0]) / 2, Math.min(p[1], q[1]) - 18];
+      var path = svg("path", { class: "edge", d: "M" + pt(p) + " Q" + pt(mid) + " " + pt(q), "stroke-width": (0.5 + Math.log(c[2]) * 0.4).toFixed(1) });
+      path.appendChild(svg("title", {})).textContent = c[0] + " → " + c[1] + " · " + c[2] + " imports";
+      g.appendChild(path);
+    });
+
+    // blocks, painted back to front
+    ZONES.slice().sort(function (a, b) { return (a.gx + a.gy) - (b.gx + b.gy); }).forEach(function (z) {
+      var hgt = heightOf(z.files), col = FAMILY_COLOR[z.fam];
+      var x0 = z.gx + (1 - W) / 2, y0 = z.gy + (1 - W) / 2, x1 = x0 + W, y1 = y0 + W;
+      var top = [iso(x0, y0, hgt), iso(x1, y0, hgt), iso(x1, y1, hgt), iso(x0, y1, hgt)];
+      var left = [iso(x0, y1, hgt), iso(x1, y1, hgt), iso(x1, y1, 0), iso(x0, y1, 0)];
+      var right = [iso(x1, y0, hgt), iso(x1, y1, hgt), iso(x1, y1, 0), iso(x1, y0, 0)];
+      var block = svg("g", {});
+      block.appendChild(svg("polygon", { points: left.map(pt).join(" "), fill: shade(col, 0.55) }));
+      block.appendChild(svg("polygon", { points: right.map(pt).join(" "), fill: shade(col, 0.75) }));
+      block.appendChild(svg("polygon", { points: top.map(pt).join(" "), fill: col }));
+      block.appendChild(svg("title", {})).textContent = z.label + " · " + z.files + " files · cohesion " + z.coh + " · coupling " + z.coup;
+      var tc = topCenter(z);
+      var t = svg("text", { class: "lbl", x: tc[0], y: tc[1] - 6, "text-anchor": "middle" }); t.textContent = z.label;
+      block.appendChild(t);
+      g.appendChild(block);
+    });
+    return g;
+  }
+
+  function zoneGraphPanel() {
+    var mode = "2d";
+    try { mode = localStorage.getItem("ndx-demo-zone-mode") || "2d"; } catch (e) {}
+    var host = h("div");
+    var b2 = h("button", { onclick: function () { set("2d"); } }, "2D");
+    var b3 = h("button", { onclick: function () { set("3d"); } }, "3D");
+    function set(m) {
+      mode = m;
+      b2.setAttribute("aria-pressed", String(m === "2d"));
+      b3.setAttribute("aria-pressed", String(m === "3d"));
+      host.textContent = "";
+      host.appendChild(m === "2d" ? graph2D() : graph3D());
+      try { localStorage.setItem("ndx-demo-zone-mode", m); } catch (e) {}
+    }
+    var legend = h("div", { class: "legend" }, Object.keys(FAMILY_COLOR).map(function (f) {
+      var sw = h("i"); sw.style.background = FAMILY_COLOR[f];
+      return h("span", null, [sw, { tests: "tests", web: "web", rex: "rex", hench: "hench", sv: "sourcevision", core: "core / llm-client" }[f]]);
+    }));
+    var head = h("div", { class: "panel-head" }, [
+      h("h3", null, "Zone graph"),
+      h("span", { class: "meta" }, "15 zones · 20 measured crossings · size = files"),
+      info(INFO.crossings),
+      h("div", { class: "toggle", role: "group", "aria-label": "Projection" }, [b2, b3]),
+    ]);
+    set(mode);
+    return h("article", { class: "panel w12" }, [head, host, legend]);
+  }
+
+  /* ═══ Pages ═══ */
+
+  function analysisPage() {
+    var langColors = ["#6ea8ff", "#ffd166", "#00E5B9", "#a98bff"];
+    var fam = REPO.findings;
+    return [
+      section("General Repository Information", fmt(REPO.files) + " files · " + REPO.zones + " zones · analysed 2026-09-17", [
+        panel(6, "Counts", "inventory.json", [
+          h("div", { class: "stats" }, [
+            stat(fmt(REPO.files), "Files"),
+            stat(fmt(REPO.lines), "Lines"),
+            stat(String(REPO.zones), "Zones", "0 unzoned files", INFO.zone),
+          ]),
+        ]),
+        panel(6, "Health & coupling", "zones.json · imports.json", [
+          h("div", { class: "stats" }, [
+            stat(String(REPO.findings.info + REPO.findings.warning + REPO.findings.critical), "Findings", fam.critical + " critical · " + fam.warning + " warnings · " + fam.info + " info"),
+            stat(REPO.avgCohesion.toFixed(2), "Avg cohesion", null, INFO.cohesion),
+            stat(REPO.avgCoupling.toFixed(2), "Avg coupling", null, INFO.coupling),
+            stat(String(REPO.circular), "Circular deps", "chains in imports.json"),
+            stat(String(REPO.dualFragility), "Dual-fragility zones", "cohesion < 0.5 and coupling > 0.5"),
+          ]),
+        ]),
+        panel(6, "Top zones", "by file count", [
+          table([ "Zone", { label: "Files", num: true }, "Cohesion", "Coupling" ], ZONES.slice(0, 9).map(function (z) {
+            return [h("span", { class: "mono" }, z.label), fmt(z.files), [bar(z.coh, "var(--green)", true), h("span", { class: "muted mono" }, z.coh.toFixed(2))], [bar(z.coup, "var(--orange)", true), h("span", { class: "muted mono" }, z.coup.toFixed(2))]];
+          })),
+        ]),
+        panel(6, "Codebase", "by package · by role", [
+          h("div", { class: "muted", style: "font-size:11px;margin-bottom:2px" }, "Files per package"),
+        ].concat(stackBar(REPO.packages, PALETTE), [
+          h("div", { class: "muted", style: "font-size:11px;margin:12px 0 2px" }, "Files per role"),
+        ], stackBar(REPO.roles, ["#00E5B9", "#868aaa", "#ffd166", "#a98bff", "#6ea8ff"]))),
+      ]),
+
+      section("Repository Map", fmt(REPO.edges) + " import edges · " + fmt(REPO.crossings) + " cross zones", [
+        panel(12, "Context Graph", "PRD epics linked by release · 32 epics, showing the open chain", [contextGraph()]),
+        panel(6, "Primary language", "project-profile.json", [
+          h("div", { class: "stats", style: "margin-bottom:10px" }, [
+            stat("TypeScript", "Primary", pct(1707, 1933) + " of files"),
+            stat("vitest", "Framework"),
+            stat("pnpm", "Workspace", "changesets releases"),
+          ]),
+        ].concat(stackBar(REPO.languages, langColors), [
+          h("dl", { class: "kv", style: "margin-top:12px" }, [h("dt", null, "CI"), h("dd", null, REPO.profile.ci), h("dt", null, "Build"), h("dd", null, REPO.profile.build), h("dt", null, "Release"), h("dd", null, REPO.profile.release)]),
+        ])),
+        panel(6, "Import", "imports.json", [
+          h("div", { class: "stats", style: "margin-bottom:10px" }, [
+            stat(fmt(REPO.edges), "Edges"), stat(String(REPO.external), "External packages"), stat(String(REPO.circular), "Circular chains"),
+          ]),
+          h("div", { class: "muted", style: "font-size:11px;margin-bottom:4px" }, "Most-imported externals"),
+          h("div", { class: "row" }, REPO.externals.map(function (x) { return h("code", { class: "mono", style: "background:var(--bg-active);padding:2px 6px;border-radius:4px" }, x); })),
+          h("div", { class: "muted", style: "font-size:11px;margin:12px 0 4px" }, "Circular chains (first 4 of 9)"),
+          h("ul", { class: "list" }, REPO.cycles.map(function (c) { return h("li", null, [badge("cycle", "b-orange"), h("span", { class: "grow mono" }, c.join(" ↔ "))]); })),
+        ]),
+        zoneGraphPanel(),
+      ]),
+
+      section("Token Usage", fmt(USAGE.runs) + " runs · est. $" + USAGE.cost.toFixed(2), [
+        panel(4, "Total Tokens", "ndx usage", [
+          h("div", { class: "stats" }, [stat(short(USAGE.input + USAGE.output + USAGE.cacheWrite + USAGE.cacheRead), "All classes", "across " + fmt(USAGE.runs) + " runs")]),
+          h("dl", { class: "kv", style: "margin-top:12px" }, [
+            h("dt", null, "Input"), h("dd", null, fmt(USAGE.input)), h("dt", null, "Output"), h("dd", null, fmt(USAGE.output)),
+            h("dt", null, "Cache write"), h("dd", null, fmt(USAGE.cacheWrite)), h("dt", null, "Cache read"), h("dd", null, fmt(USAGE.cacheRead)),
+          ]),
+        ]),
+        panel(4, "Cost estimate", "list prices", [
+          h("div", { class: "stats" }, [stat("$" + fmt(USAGE.cost.toFixed(2)), "Estimated total")]),
+          h("dl", { class: "kv", style: "margin-top:12px" }, [
+            h("dt", null, "Output"), h("dd", null, "$" + USAGE.costOutput.toFixed(2)), h("dt", null, "Input"), h("dd", null, "$" + USAGE.costInput.toFixed(2)),
+            h("dt", null, "Cache"), h("dd", null, "$" + (USAGE.cost - USAGE.costOutput - USAGE.costInput).toFixed(2)),
+          ]),
+        ]),
+        panel(4, "Major Models used", "runs per model", [
+          h("ul", { class: "list" }, USAGE.models.map(function (m) {
+            return h("li", null, [h("span", { class: "grow mono" }, m[0]), h("span", { style: "width:80px" }, bar(m[1] / USAGE.runs, null, true)), h("span", { class: "muted mono" }, fmt(m[1]))]);
+          })),
+        ]),
+      ], { collapsed: false }),
+    ];
+  }
+
+  function contextGraph() {
+    var g = svg("svg", { class: "graph", viewBox: "0 0 760 150", style: "height:150px" });
+    var chain = [["0.6.0", ["PR 5 worktree awareness", "PR 6 cross-worktree claims", "PR 7 ndx which"]], ["0.7.0", ["PR 8 hub daemon", "PR 9 hub home", "PR 10 start registers"]], ["0.8.0", ["PR 11 repo server", "PR 12 /w/:wt/", "PR 13 workspaces view", "PR 14 MCP shim", "PR 15 admission gate"]]];
+    var x = 90;
+    var prev = null;
+    var rel = svg("g", {});
+    var reliability = [70, 75];
+    rel.appendChild(svg("circle", { cx: reliability[0], cy: reliability[1], r: 14, fill: "#ff7f9c", "fill-opacity": ".9" }));
+    var rt = svg("text", { class: "lbl", x: reliability[0], y: reliability[1] + 30, "text-anchor": "middle" }); rt.textContent = "run reliability 26/30"; rel.appendChild(rt);
+    g.appendChild(rel);
+    chain.forEach(function (rel, i) {
+      var cx = 230 + i * 220, cy = 75;
+      if (prev) g.appendChild(svg("line", { x1: prev[0] + 16, y1: prev[1], x2: cx - 16, y2: cy, "stroke-width": "1.5" }));
+      else g.appendChild(svg("line", { x1: reliability[0] + 14, y1: reliability[1], x2: cx - 16, y2: cy, "stroke-width": "1.5", "stroke-dasharray": "3 3" }));
+      g.appendChild(svg("circle", { cx: cx, cy: cy, r: 16, fill: "#6ea8ff", "fill-opacity": ".9" }));
+      var t = svg("text", { class: "lbl", x: cx, y: cy + 4, "text-anchor": "middle", fill: "#04121a", "font-weight": "600" }); t.textContent = rel[0]; g.appendChild(t);
+      rel[1].forEach(function (pr, j) {
+        var px = cx - 80 + j * (160 / Math.max(1, rel[1].length - 1)), py = cy + 45;
+        g.appendChild(svg("line", { x1: cx, y1: cy + 16, x2: px, y2: py - 6, "stroke-width": "0.8" }));
+        g.appendChild(svg("circle", { cx: px, cy: py, r: 5, fill: "var(--bg-active)", stroke: "#6ea8ff" }));
+        var l = svg("text", { x: px, y: py + 16, "text-anchor": "middle" }); l.textContent = pr; g.appendChild(l);
+      });
+      prev = [cx, cy];
+    });
+    return g;
+  }
+
+  function commandRunner(cmds) {
+    return [
+      h("div", { class: "field" }, [h("label", null, "Command"), h("select", null, cmds.map(function (c) { return h("option", null, "ndx " + c); }))]),
+      h("div", { class: "field" }, [h("label", null, "Options"), h("input", { placeholder: "--accept  --deep  --format=json", value: "" })]),
+      h("div", { class: "field" }, [h("label", null, "Directory"), h("input", { value: "." })]),
+      h("div", { class: "row" }, [h("button", { class: "btn btn-primary btn-sm" }, "▶ Run"), h("button", { class: "btn btn-sm" }, "Dry run"), h("span", { class: "muted", style: "font-size:11px" }, "output streams below via WebSocket")]),
+    ];
+  }
+  function commandReference(filter) {
+    return [h("ul", { class: "list" }, COMMANDS.filter(function (c) { return !filter || filter.indexOf(c[2]) >= 0; }).map(function (c) {
+      return h("li", null, [h("code", { class: "mono", style: "min-width:120px" }, "ndx " + c[0]), h("span", { class: "grow dim" }, c[1])]);
+    }))];
+  }
+
+  function planPage() {
+    return [
+      section("", null, [
+        panel(6, "Add Items", "ndx add", [
+          h("div", { class: "field" }, [h("label", null, "Describe what to add"), h("textarea", { placeholder: "e.g. The dashboard should warn when two worktrees claim the same task…" })]),
+          h("div", { class: "row" }, [h("button", { class: "btn btn-primary btn-sm" }, "Add to PRD"), h("button", { class: "btn btn-sm" }, "Import file…"), h("span", { class: "muted", style: "font-size:11px" }, "smart-add proposes epic / feature / task placement before writing")]),
+        ]),
+        panel(6, "Hotkeys / Work by epic", "ndx work --epic", [
+          h("ul", { class: "list" }, PRD.epics.slice(0, 5).map(function (e) {
+            return h("li", null, [h("span", { class: "grow" }, e[0]), h("span", { class: "muted mono" }, e[1] + "/" + e[2]), h("button", { class: "btn btn-sm" }, "▶ Work epic")]);
+          })),
+          h("ul", { class: "list hotkeys", style: "margin-top:8px" }, [
+            h("li", null, [h("span", { class: "dim" }, "Search files, zones, tasks"), h("kbd", null, "⌘ K")]),
+            h("li", null, [h("span", { class: "dim" }, "Step through graph nodes"), h("span", null, [h("kbd", null, "←"), " ", h("kbd", null, "→")])]),
+          ]),
+        ]),
+      ], { plain: true }),
+      section("CLI help", null, [
+        panel(6, "CLI buttons to run commands", "with options and text fields", commandRunner(["plan", "plan --accept", "recommend", "add", "analyze --deep", "status", "validate", "fix"])),
+        panel(6, "CLI reference", "planning commands", commandReference(["plan", "analysis"])),
+      ]),
+      section("History", "5 most recent of " + fmt(USAGE.runs) + " runs", [
+        panel(12, "Runs", ".hench/runs", [runsTable()]),
+      ]),
+      section("Basic Planning Settings", null, [
+        panel(12, "Planning specific Settings shortcut", ".n-dx.json · .rex/config.json", [
+          h("div", { class: "grid" }, [
+            h("div", { class: "w4" }, h("dl", { class: "kv" }, [h("dt", null, "LLM vendor"), h("dd", null, "claude"), h("dt", null, "Model"), h("dd", null, "claude-opus-5"), h("dt", null, "Rex adapter"), h("dd", null, "file"), h("dt", null, "SourceVision"), h("dd", null, "auto")])),
+            h("div", { class: "w4" }, h("dl", { class: "kv" }, [h("dt", null, "Zone merge threshold"), h("dd", null, "5"), h("dt", null, "Pinned zones"), h("dd", null, "web-server · viewer-message-pipeline · web-viewer · rex-cli"), h("dt", null, "Import graph"), h("dd", null, "rich")])),
+            h("div", { class: "w4", style: "display:flex;align-items:flex-start;justify-content:flex-end" }, h("button", { class: "btn btn-sm", onclick: function () { go("s-plan"); } }, "Open ndx analyze / plan settings →")),
+          ]),
+        ]),
+      ]),
+    ];
+  }
+
+  function runsTable() {
+    return table(["Task", "Model", { label: "Turns", num: true }, { label: "Min", num: true }, { label: "Tokens", num: true }, "Status"], USAGE.recent.map(function (r) {
+      return [h("span", { style: "display:block;max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, r[0]), h("span", { class: "mono" }, r[1]), String(r[2]), String(r[3]), short(r[4]), badge(r[5], "b-green")];
+    }));
+  }
+
+  function workPage() {
+    return [
+      section("", null, [
+        panel(8, "Up Next Task", "with run button", [
+          h("div", { class: "card" }, [
+            h("div", { class: "muted", style: "font-size:11px;margin-bottom:4px" }, PRD.next.epic),
+            h("div", { style: "font-weight:600;font-size:14px;margin-bottom:6px" }, PRD.next.title),
+            h("div", { class: "row", style: "margin-bottom:8px" }, [badge(PRD.next.status.replace("_", " "), "b-blue"), badge(PRD.next.priority, "b-orange"), h("span", { class: "muted mono" }, PRD.next.id), h("span", { class: "muted" }, PRD.next.criteria + " acceptance criteria")]),
+            h("p", { class: "dim", style: "margin:0 0 10px;font-size:12px" }, PRD.next.why),
+            h("div", { class: "row" }, [
+              h("button", { class: "btn btn-primary" }, "▶ Run this task with the agent"),
+              h("button", { class: "btn btn-sm" }, "Open in tree"), h("button", { class: "btn btn-sm" }, "Verify criteria"),
+              h("span", { class: "muted", style: "font-size:11px" }, "model " + HENCH.model + " · " + HENCH.permissionMode + " · max " + HENCH.maxTurns + " turns · auto-commit " + (HENCH.autoCommit ? "on" : "off")),
+            ]),
+          ]),
+        ]),
+        panel(4, "Auto run", "epic / next task, etc.", [
+          h("div", { class: "field" }, [h("label", null, "Mode"), h("select", null, [h("option", null, "Next task (ndx work)"), h("option", null, "Loop until none left (--loop)"), h("option", null, "Epic by epic (--epic-by-epic)"), h("option", null, "Autonomous (--auto)")])]),
+          h("div", { class: "field" }, [h("label", null, "Iterations"), h("input", { value: "1" })]),
+          h("div", { class: "field" }, [h("label", null, "Permission mode"), h("select", null, [h("option", null, "acceptEdits"), h("option", null, "default"), h("option", null, "bypassPermissions")])]),
+          h("button", { class: "btn btn-sm" }, "▶ Start"),
+        ]),
+      ], { plain: true }),
+      // PRD state sits with the work, not the analysis: the agent works the
+      // tree, so its progress and open epics belong next to the run controls.
+      section("PRD Items", fmt(PRD.total) + " items · " + pct(PRD.completed, PRD.total) + " complete", [
+        panel(6, "Progress", "rex status", [
+          h("div", { class: "stats", style: "margin-bottom:8px" }, [stat(pct(PRD.completed, PRD.total), "Complete", fmt(PRD.completed) + " of " + fmt(PRD.total))]),
+          bar(PRD.completed / PRD.total, "var(--green)"),
+          h("div", { class: "muted", style: "font-size:11px;margin:12px 0 2px" }, "Items by level"),
+        ].concat(stackBar(PRD.levels, ["#a98bff", "#6ea8ff", "#00E5B9", "#868aaa"]))),
+        panel(6, "Completed / In Progress / Pending", "open epics", [
+          h("div", { class: "stats", style: "margin-bottom:10px" }, [
+            stat(fmt(PRD.completed), "Completed"), stat(String(PRD.inProgress), "In progress"), stat(String(PRD.pending), "Pending"),
+          ]),
+          h("ul", { class: "list" }, PRD.epics.slice(0, 7).map(function (e) {
+            return h("li", null, [badge(e[3], e[3] === "critical" ? "b-red" : e[3] === "high" ? "b-orange" : "b-muted"), h("span", { class: "grow" }, e[0]), h("span", { style: "width:90px" }, bar(e[1] / e[2], null, true)), h("span", { class: "muted mono" }, e[1] + "/" + e[2])]);
+          })),
+          h("div", { class: "muted", style: "font-size:11px;margin-top:6px" }, "+ " + (PRD.epics.length - 7) + " more pending epics"),
+        ]),
+      ]),
+      section("History", ".rex/execution-log.jsonl · 2026-09-17", [
+        panel(12, "Recent activity", "task, feature and epic completions as the agent recorded them", [
+          h("ul", { class: "list log" }, PRD.log.map(function (e) {
+            return h("li", null, [h("time", null, e[0]), badge(e[1].replace("_", " "), e[1] === "task_completed" ? "b-green" : e[1] === "auto_completed" ? "b-purple" : "b-blue"), h("span", { class: "grow" }, e[2])]);
+          })),
+        ]),
+      ]),
+      section("Templates", TEMPLATES.length + " built-in", [
+        panel(12, "Copy of templates options", "hench templates", [
+          h("div", { class: "grid" }, TEMPLATES.map(function (t) {
+            return h("div", { class: "w4 card" }, [h("div", { style: "font-weight:600" }, t[1]), h("div", { class: "muted mono", style: "margin:2px 0 6px" }, t[0]), h("div", { class: "dim", style: "font-size:12px;margin-bottom:8px" }, t[2]), h("button", { class: "btn btn-sm" }, "Apply")]);
+          })),
+        ]),
+      ]),
+      section("Commands", null, [
+        panel(6, "Buttons and fields", "ndx work", commandRunner(["work", "work --task=ID", "work --auto --iterations=N", "work --loop", "work --epic-by-epic", "self-heal 3", "pair-programming", "usage"])),
+        panel(6, "Reference", "work commands", commandReference(["work"])),
+      ]),
+      section("Usage", fmt(USAGE.runs) + " runs", [
+        panel(4, "Runs", "outcomes", [h("div", { class: "stats" }, [stat(fmt(USAGE.runs), "Total")])].concat(stackBar([["completed", USAGE.completed], ["failed", USAGE.failed], ["running", USAGE.running], ["cancelled", USAGE.cancelled]], ["#00bd81", "#ff7f9c", "#6ea8ff", "#868aaa"]))),
+        panel(4, "Output tokens", "generated", [h("div", { class: "stats" }, [stat(short(USAGE.output), "Output", fmt(USAGE.output))])]),
+        panel(4, "Cache read", "prompt cache", [h("div", { class: "stats" }, [stat(short(USAGE.cacheRead), "Read", short(USAGE.cacheWrite) + " written")])]),
+        panel(6, "Estimated total cost", "current, list prices", [
+          h("div", { class: "stats" }, [stat("$" + fmt(USAGE.cost.toFixed(2)), "So far", "$" + (USAGE.cost / USAGE.runs).toFixed(2) + " per run")]),
+        ]),
+      ]),
+    ];
+  }
+
+  // Package marks from packages/{sourcevision,rex,hench}/*.png, inlined so the
+  // page and its static export never reach for a file or the network.
+  var LOGOS = {
+    sourcevision: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEwCAYAAAANaUyVAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAB5HSURBVHgB7d19cBz1fcfx30m25AckG5BrJBuECaE1pLEDNA1hAgacNhQSYkOepk0xM8GEzmQw09CZeBqeMk3+CC2mzHSCSQc7YUoeqIGUp5kaMLQkJYFgKLGnJmNsY8tpbYMs+Umyddf97mnt1d5v9357t7e7v7v3q1XiSKfT3e7eZ3/PP6UAAAAAAC2qoGbfXFIAYIE2BQCWILAAWIPAAmANAguANQgsANYgsABYg8ACYA0CC4A1CCwA1iCwAFiDwAJgDQILgDUILADWILAAWIPAAmANAguANQgsANYgsABYg8ACYA0CC4A1CCwA1iCwAFhjkgJqVOibptq+d0ms3yl+9T9UaeCgAmpBYKEuhb7pCkgLVUIA1iCwkK6TJiugVgQW0tVFYKF2BBYAaxBYAKxBYAGwBoEFwBoEFgBrEFhI1/BRBdSKwEK6DhBYqB1TczIi8/AKV/erQu90VdodPbeu0DVZFTfsVqXX9igkr3DBLOerx/wXtux3zseAQvoIrKw4QdW2/Fz3nwWDhxecqhSB1RgSVt65MFFcvUkpAisTVAkBWIPAsoRUHYFWR2Blhd4yIDYCKysHRhWAeAgsANYgsCxRokQGEFjWoM0LILCA2Lh5ZIbAAuJi1dTMEFgArMHUnKzEHAgq8wkL58wMvbuXtgymXlUpDRxy/2ZpOEaHQAabUMixU3Lson4OKxTU7JtLCpmQD0opJGRkQm77A+ablI7d9BJzDUMUPt2v2u+40PjxHMv8okqYoRKNt7kkK2kgnwgsANYgsPKKuzxQgcACYA0CK69o3wIqEFh5RWABFQgsIMAdX4ZcIrAAWIPAAmANAgsIKHQxYy2vCKy8asJxWJ1tU5QVujoU8om5hDnlTg+5YJb2Z22y8efV/RO/+doeVXEitwyqsb9/UzXK3Gnz1JL+G40fv+vQVrVu+/dVI8kE8ba//vCJb0hvq0wcDxzL0oYBVXwxZG/B1/Y6De/Rm9siG5R9c8rtqRrYrv1Z0flqDwaWhFjwOVS+jIwdUQ33+zMqwklLVpn4t+0KdqFKiNSMFFMILDQ1Ags1Gzo6qIA0EVgArEFgAbAGgQXAGvQSoqql/V853l41fPR997+7Jp+sOtunqL0jA8a9f7M6T1OXzL6qovFdnmvr8G+cr82qbqbzAFnH3UoElo1kbNH4+CIRNmYoqc0V5kw7S80J+dm6HQ+qXQffUSYkrBaccrH2ZxKEiQSWDFdgDFXTIrAsJIMej234mbJNZ/tU1Wiye9DYZ55VaE60YQGwBoEFwBqtUSWUuWSL+iZ+T9c4K20+slegU+VixU9kKWou6YRr12vH3DCgWkFLBJY0PsfaSHOAjTSRLZnc3rb8XLMHOzdXG9s0a0GVUIP1kGCVFhqiQWDpsB4SkEsEFgBrUPdBakbGDld9jKxKGhyvJb/XckvT0OmjRWDp9E6rXAROLqADR7WPtb2Bfv7M89UnZl+tRjWB0uGExy/3Puf+e2h8Wo7obJuq5kyfpxaf9hnn0OyPfP6uyTOVLCfYOemk0Md8tOcK90snjZVK01Dom+5eL2aPbb4lspNAYGkY984Ip4v52GeeUbZzSzYha66/suc57fe3Dm9S1599m+rumK0aqVnW3Sp86QOq7UsfVKgdbVhAWqjm1Y3AAmzXQjtVE1iA7RiH1WR6pyugabVQYLVEo7u75MhNLxk9tu3T/ZV7/gEZKD25XRXZimyC1ugllEXdDIcelC7oqdjfrxqjffDkcc5XkTmKTcX03LuPjVkSkoUImdM6EcMa6tU3TbU/cInRQ6cc61AHPvaIso0Md2BPQT3Tc49k0Oge1MCu52Lu9mIu6558cuTP01gpFDBBCSugdKD5xspIIMlGEjoykn3vkd3qqZ0Pu5tK6HzxrK85jymvt+QfxNntjmBvvLO6zlXLzr7N/XeXJlw37/+1Wj/wqELzI7BSVCpkV8LqiihFDbkbQGwK/fni3uvcjSjEHJW+qFH4aC1UCQMKvczhss2wb44jmhslrIDi6s3uV5DbwzO+TpZ/G6n2n32qPKnVYraXXmx5/bKM8djXf+H+2389HTc8qkpM34lEYBkqeXsBBhRiLPbnVQnlYs3ThRnWdmWLjgZ2CiR6rnzDGsKuJ0QjsOoVY2zNsbYxNenVa0N/LmNuTAe4IiWL+tSkGPsBoLFowwKiUArKFQIrT1po1r01CKxcIbDqxQUNpIY2rDp5vT7VtN9zUW5n1TfLip5ZMZ6kzM2tbgRWnYwnpzY4rGQ0e3dH+MjzsLFK0sMmwwLmTp/n/u+hUTvDy3v9QV3H3lM7jh5UB4vHVKMwSTk9BFaTcDeE6L0u9Of3b14Z+rPFfdepJWfcqGw1f8b57pfOwgPPq9Xvv61eOcAyLc2ANiy4cwmb1caTLldDk05VjVRggcjUEFh5ktHWTiPF6vsFAnlAlTAlRgNCaZTNHaPVancfVEgHgZUSGmUtFWO1WjQeVUIA1iCwAFiDwAJgDQILgDUILADWKKjZN+dzKxdU6JkyW32yd6nqaOs8/r3RsRE1UhpRXZNkak74AMldh7Zqvy/Tcro6TmnqNdPlvQ+Nvqe6J89w/pd3uZ/YffKpnY+wjZklGNZgkU4nqHqmyDYQ8QvG3iYSrUjee9T7l23MCCw7UCUEYA0CC4A1CCwA1iCwAFiDwAJgDXoJUeHpnQ+rPb41sromz4z1+8N1LLns/S3ptftk37Wqp7NPNdoQO0dbg8CyyMjYiEqjUHykeHjChzjND7T/b42MMdQAExFYOSG7L39i9tXuAM7gTszywZUSR2d7p0LyFvde4/xn0fcduSkUnP8vfzxk4OnmwV8rZI/AyonOtqmh65K3qmBwN8r8mX8c+fNhqoy5QaM7cquzLZslo4OomuZHrktYhb5pqnB1f/XHpbAJQMm/DO7uQ2b70FlqilPawwmNWPO+cMEs56tH5U3xkd/meqnufFcJnSBqW36uyoOC79/ukrk5D6x1Ox5UwzXsMdjhVMOGR/NRBfr3gZ/G6nGU1+5N4l7an+9tywrnzMjNte1XenKHKhFYSNuoU42pqXcvR9fqrkPvxHp8o157ZyNKnDndBVz1OtXwgfxuqkFgNakOwwbrhaderBae/HFlg0e23p/JqgppNf6jOgKr1ZXkZn+yskFWy8DQ6J4f9BK2ODZRrY4SVn4QWBaR0gULzSWL42kXqoQpmjt9XsX33FHszle3wXy9rcOb1PqBRxWqu3/zSqPHzZ95vlrce13VxwXP3dB4D6yUvoacXtW4wVfafUghPgIrJd1OO9GSM+rrao+z7nq3r12qu2N8QvF4OPp1WDTmSt6HBIRJFW3nwZg9jBE+2nOF859XhP587W+/S0ktJQSWReK0pSzuu7bp1nE3DXwJ5dVb7lZoPrRhoenQkdC8cl3CKm0ZVGN3vVqeKlDr6Nu+8flo9TyHnwz4y/FIYFjitT3la1tnwNe+1VfjfMqBkDYyuX7DBq06v+PO4sixfFcJnWAo1TsF5jVljc37o5cwSXPVgF/ueU4NHTP7e96yODaS6mPYno1i6OhgQ1bRKEmgDBhc2xZdv2mgDStH3JDIyVImOw9vVbsMG64lsGwlPa/yFYVlf/KDwLKI7Px8yewrlclp65lS39LCcVZsyFvpSub+Le3/itFjpQTFUBF7EFgWmdX5e07P39kqjb6SDotHd0tvqnEPaUR1EPlDLyEAaxBY1imoNLTKTjJMbLYLVcIEyehy07YTnYWnfHzCiGlpG+poP9GWVN6EIp3Aysp//+n/qV8tHVAj08ZCH/P5v52vTt2ezPLJPVN61eK+6lNzokSd843v/1xt3PeyQjIIrITVs1TLglMuVmnYd8ZhdWxqMfIxo3ucn2ewjlupdDQyrETHwXaVFLnJdM+ob3mdqHNu63CPvCKwWtBP/m6TaisVnK9yi0ChNLHUNmmsXR3e4ZT09qrUdTAnGBEIrBTtPTLgLvvrr+b51TreR6qR8txR3MnQveVqVOehdrcUUyzoSzIl5/8KJ+V0Cd8Aee+jY+WpOFHtbjLMI4vSDiWsZBFYKdoz8jv10v8+pf2ZBEqtgSUj4Ndt/37Vx7X/w6dUoc9ghyEpcJ3UoUzJRhFxt7MP/9PV2+ieuXWrGnUCd+SXO9Sh2/9TmVh29t/UHB4/euf+0Mb5q07/c9XTGT7mLezmhNoQWDnRXccHvsPwg2gUVqpcwjpp32Q1lsXSyYXqHdf7zijXG0sp9fCNRGzoQS9juggsVCgWSu6idqed3fj9Hm1HYKWLcVhNYLQBi8eNVumpQ9koC/elisBqAiNjya//dHRaUQF5Q2A1gcS36cpybGqJoEQ42rByYihkS3YZrrD1wObo3014a3lpdG82G997ueoS0+W125M13CJTnNJCYMVwVte5ataUXlWrOdPmHZ8GEuwVDOtyl3FGr+x5TqVt8qHmKnxLYFUTFliyPn6Yasv4nHXSfPe8e9yNQHztXnuP7DZ6bSgjsGL4gBNYf1DHYm5JTANJS8eh5Ka/2K6ezTyqBdpmFb3KLCYisKBVKqRdLSyqUmnUqYzShoVwBBa0RqYfU402MH9YPbFyi6pZXzIrNsAeBBa0nl++zakWTrw85r02Q1388OkKyAqBBS2ZHB1c5mVkKoNJkS3GYcFahS47VpRAcihh5YAsOfPKnvXan40kOPVj7KaXJvzvtk/3q8LV/coWpSe3q6J/n8qEN7Rdt/3B0J9JD3FaCywiHIGVCyU3tBr+V4K7+sYMq20XDqqHz31LJSXu0InSwMGG7kwcdQ7mTq99aAOSQ2DBmK5dC0gTbVgArEFgxdCIVRFgrnNGt2o2zDWMhyrhOJnLN2tq9DxBlrvNVjOu0dXTOVvNn/GHkY/ZOvx2op0vNiOwxsmk5iVn3Bj5GFk5QXqSujuitnWaqj4x+yqVNJmHmPTmpqVf71Gl3RP38ipcMMv9ylrxkd86xY/RE99wegRLW/arrDRqY9mzuj7kTqrXK1eA1u14QO06uF2BwIpFSljSkxTZm+SbmW9KJtd+bf63qz5u/e5H1ebB5CbLThgiMK5tucpFYJU2DDS0R9Azf+b57nLQ2arSMlNqvuV+akUblkW6J9ux0gPQKASWRYZaqIG2wMRmaBBYAKxBGxYmchq2i6s3aX9UWNSnCucks2GqKP2L07Au6255m7YeGFWl8ek2pf/JroEd+UVgWcRdsXS8Hau7Y2JwePvjeeuW7zm8u6au8KLT2K026Le9b++drlRCgTWp2K5GnZ7AYqCXMilzp89TQ6ODCs2FwLKIrDluulHCuh0POl3hyc5P7Jg2VY0VC6pU0K9IWigVjDfcaXcCq9DllKwaEFgS6tWGqMBOBFYMMsaqlY3+81uq8OPwFUJL418mRpyv4u4DqhGarXNi+OiQQhmBFUO1baKa3dgWppFkI8uNIvOFXsIYWmlYAfKjqyO5jg7bEVjjjow111yt0SZ7P4BoiSqhzBMMn69VJpOfpVctbENT7zEf7blUFQrhh21ODVNzGuGquX9h9DgpNa7b/n2Vd1Idr/ae5Px0NuEE9fkzLlBzq+yNuHHfyy0xQbolAku6/E161+7fvDLy5/KBWH7ON5wmhfyvJd5lOI3Hlllq0uFRz4amNptvsHlvFruDZ4EqYQxyBxs+1lwDGpmfCJsQWDE1287EI5a0dY0UWTwRDGtoedI2tOzs27RVyCxXwwy+HhawgyCwENre1ZWj6mJUZwhaB1VCANYgsOJi9UcgMwQWAGsQWACsQWDFVWAiKpAVegl9ZAcVj25ApUxjGR07qlT+B7oDTYnA8sl+uycAUZoisHqm9KoPdJ3rDi7UbSfPGB40O3/tQGfr0KamGHzbFIE1xV1FwWzpYKAZVasd3D8YPbHfFjS6A7AGgQXAGgQW0OSaaWlvAguANQgsANZoisDqaMJ1vAFUaorAavX9AoFWQZUQaHLNtGM5gQU0uWaqgRBYAKzRFFNz9hze7W6YIDur2LILDJAGKV01U5WwoGbfzJq/AKyQfQnryT9RAGAi+8Dqm6YAwASN7gCsQWABsAaBBcAaBBYAaxBYAKxBYAGwBoEFwBoEFgBrEFgArEFgAbAGgQXAGgQWAGsQWACskf1qDa/uVQBgggX8AFiDKiEAaxBYAKxBYAGwBoEFwBoEFgBrEFgArEFgAbAGgQXAGgQWAGsQWACsQWABsAaBBcAaBBYAaxBYAKxBYAGwBoEFwBoEFgBrZL9EcohFH/+gWvihuWpm9zTVf/qpanD/YbV/6JDa+NZOtfE3O9W2d/epuOS5Pnvlh9WZzvPJc4rtzvPEfU55noUfmjPhe9vefa/q78vfPfP0UyZ8b+Nbu9Sg8778yu97qqpmcOiw+9rr5R3r/rk9auaMqe4xGRw/1ht+/nbk75q+Vh3v9eueQ3dcoujOifccuuev9r7k+eS4nHnGKdrjUu31ye/6mVwfwfdS6znxC15zpq9Dd63G+buNkqvAkhN1y/LL1ArnS/4dRQ76qgdfUE8880bVEyAXzx1fv8r573MiH7fh51vU2h//l1rjfEWRC+mFdSsmfO+ue55SdzpfUZZ94WPu6/Cb90ffrLjwH3voJveCMWX6uv1Mj7UcW7lQ5f3pjvO9d19X9biGkdd7wy0/UMs+/zHntVw+4Wcmx9PvsTXLJ7wOea1ybHWv0f+zIDnuD933ZaP3FHbc5TleWHerivt+kjonfnc619v1znXn/92PXPGdqjeD4O+Jwml/pbKWmyph+SSvcA9UtbDyHr/KuRCDAaB7Trl4TC5AecxD9/2l+ztxAiNr3ut+51ffMnrd8qF459W7jY61PJ8ErRyTz35qgWqEx599U1W+xsuVKXmNwfO7NkZ4e+QD+vpz3zAOYO+4S6m9XrWek2WBUKnGDeR//LKyVW4CSw6+lFzieuLZjdrve2FVy91ffse20BLyel9/bmXk65aAX3X354xuCsHnfmzNTRV33SRISUW+/KQKF6xWhdHdtNbEDCx5f2uc8Il7XKTE8vgzb6p61HNOJDCjbto6cuOJ+zt5kYsqodwlgh8yKbLet/oFp23pXbfeLSdz5owpzsFeqC6VtgXn8WEXixdWug+uPO/aH72itu0sby92ptNGcM14u5buOUyKz43mVQH8pF3jzLmnVoS8fNClSnPZ0lUVzyMX6Z0hF6oExovO35C/Je99gfO8wRKVHIeCqu4uw6qcv/3trnueVovWnVPxejdo3oefV9rwk7CK28Z5rxMYQXJMnnj2jePtVV7b0qXODc07NvW264SdE6+9yn9O5LrX3YDl9/c77YGrVj+vTMnvyPPWUhLNUi4C6xonhIIkKHQXnRdQUUVhuQh0ASgfCt1JXXH7T93nu/db1024y3nF5yXLHlBZkuMgbT06Uh15KFAykItaSif+D5O8F90HQz4US254QHusvd+RUpUcPwlBk0b+OG1PHgkHLxSi3keQrhR234PmH1xPsFonx0MX+vI6Vzk3Ui8o19TxgQ87J/I3brjlh6HnRNo4gzcqueYfN2jP9Vv1rc+pN36zM5GOm7TkokooJSc/OejVDvyakEZm3R1XyMUXdQeS55LHBEtTcic1rZpkQQJcV6IJlo7uCPlgfGTxt0OPtXx/mROUtzqBbhpW9ZASdVC1drPg+5L3FPd16kri1UoecmzuNGj0jiIl4aDHnRKdHOuocyLnTFeFjlvNk9+J28GTtVwE1uD+IxP+txzAWhsyV9x4WcX35ANtchHLY2r50GRNVy2eMeNESUWqj8EQL5fafqhMSIkijbvwKqdkFLxhXP/Fi0LbdnRNCUlVca7XPHeSdB0Fck5u/eajRr8vpeKKm+uVC2prm3RCyxa5CKw3nHaqoMce+qrbyLss5oVzqaaOH6fYrvvQXHNlvgNL18bmH0OjKyFuGG8byRMZa7f2RxPPlZQCpJtf53pNCNdSRds2PsbJz2vDlOq2HL+4QVCNvir7gvE5CTtWiy4+u/rvasb9SXOIDXIRWHKR6T50UrLxuuvlyyTAgnV7KTrH+WDKhRAsTcjfS/qCTdLC806v+N4bvveg+3lY72oSSr/7p6pfYW2QusDR9UzqSih31dB2dvx3v/u09m+Uhw/cqt7fco96ff1Kt3E+iSaChedV9ohvfOtdFceGX2zRPO/pVX9PV4pbcePlzo3BfChJVnIRWF4DZ1SwuNVEX4DJfweDS6o+QfuHjqi4tju9kkG6584Db6BjkIzcjyLBnEfyuoPtM+VwmhgS+ja52nvspGRdLfDkZiilPQkwuQbrGRowc0blDXCb5rqLsm2H5jo1mHUgNwXdey0PsM1ve63IzTgsKdVIaK0NKW0FLXMH+a3M/QFOgnenD37J3V4GOgaDu9aqUV5Ib26QPxySGsoQJI3ocg0GA1PH6+GT4Mqq9K0LPVPyXqWBP+ixNV/NdSN8rqbmeL1SM785za2Ly5irBU7ROWxAqdvL4RzgeReWp7dIqSHYNb7gvDkqrv7AHCrvtWXFGyBoKljk17dxyUXZmLlhJmEZdTy9arz/gyPVP7kO5Mam6wSppzoY/Nsblm45XqqT9suoNqxah74M7q88JzLGK851FuxdF9t2mpfSZKjMwvUTBxrLZ0ra7vI61CGXk5/lAyY9X17vlzsRdTzAgu0ZXqOsN/ZHDrS/baM8ifNU4wtB1zYSrF7pnsukKF7rJGFTctwkrIJ3Thn4GHTNlQsbVgoLGzMWh5S0g1UuCSo5v7cEGuHjtlOaKJdST5RUJSwluG5x2nqCJRB5XXKNxhlgrKuyL7ronFij5nXjF+O0g8kNXkqUUkoPjj/MaynLiuVlvACT0pfuw9DvO7gvatox4rQ16B774stbKl5P0AKDaUXBx8hqBUl90OSDPO/C27UhJLMFKseXfTjXRX9db63ML5SbU6OGMkSR4yvDO2TStK4qZdI756d7DhnCYXpOdNVi3YyIauR3lixbrWyRm8AybYvSfSBP9tXldRe6bpUEHblz63qvZFUIP7kzBds5vFHZYbQlN8O7oXxYbhgPa+8rWGSXEkBweRX/69WNLzOdLymN+o2YQxhF95qlhBqcQpNke51pWMgKIfVyhyX8uHJYgoyJMpn8HFwtRNTa6SDXsun4r6zlIrC85TikAbPa7PNbNGNytu3Ye/zfYR9OaSDV9SwKuUCkh2SVZj7Zfauf15aCdCW5sOeXINNdYKYlAwlgb2S/96UbOPhQxORdXZB7F37YMfde97IvXORODE57wqxJECXVdiXHIKz3OUg3Li9uD5+QZgzdmKjyihH6m593TnQdLfUcC7k+7lsdf0pT2nLRhuWdHP/sc6njy1giLyxkWME17jSZyoGhwRKQXAjy2GBjvde7Vm7zeG/8b55yfKHAIPnbK27X33nkBAdHQ8u/5aIPPr/uNddbMnAv0O8+PWHAn/z9O277M+3dUoJcSmYyINcveMy94Q4LNZ0dppNsdeEc5rKIyc3lKs6W0BU3pEqd1KJyXhh714i3UN72nXuPH5MF553ulmJ1bZy1NFJ7I9uDHSreDVx+7j8nMvsj7IYkz1Nv84Jc6wvctrra1jdLQy4CK3jn9hr9TKbEhC1idtm196oX/vVWbQ+jyQnxJgWHKQfAD7UfzmrPL3fVqOc2JaEpK034/54MAJQqi+6DLO2AElq6HkeThlZ53SZd/kle8LpVHDxxJ/uG0Q1GLlexzZY7qmdyvNy03BuNpvRq2vgt51TXJlYLuS5fX7+SRvcotTaaShE2bGUACRSZJFpLMVmet9pAViEf3iU3fC/Wh8YbJJtUt7GEZpyqoTfJO+4H3Z0ofcV3Uu/ujprMnNxQhrdrWtOqvILFvYmN/4r7PN5E6CR7e72ew6yXVAqTi8CSEya9L7rG5CDvLi8XSlh1Tffca6sMLPTW35ILQJ7X9ITJhe4NeK32/PIBS/pD71UN/byxQWHk+Jke7/JSJz+o6QOVlLU/+UXF95549s3EXo/bU+bceEzOo/DOpfTKJlUlreWcyOMbcQOJMwk7bQU1++aSypnyQmlz3YFx/pKCu1HEjvfqSn95XmlXCj5vUide9/x5nGjs5x3viZsV7Iu9EUQz8apj/mNSXlRvVyrnknOil8vAAgAd9iUEYA0CC4A1CCwA1iCwAFiDwAJgDQILgDUILADWILAAWIPAAmANAguANQgsANYgsABYg8ACYA0CC4A1CCwA1iCwAFiDwAJgDQILgDUILADWILAAWIPAAmANAguANQgsANYgsABYg8ACYA0CC4A1CCwA1iCwAFiDwAJgDQILgDUILADWILAAWIPAAmANAguANQgsANYgsABYg8ACYA0CC4A1CCwA1iCwAFiDwAIAAEja/wMJbPKtSnKiaAAAAABJRU5ErkJggg==",
+    rex: "data:image/png;base64,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",
+    hench: "data:image/png;base64,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",
+  };
+  /* Landing: the three stages, top to bottom, each a card that goes there. */
+  // Three columns side by side, in loop order, each headed by its package mark
+  // (the SourceVision / Rex / Hench images from the package READMEs, inlined so
+  // the page and its static export stay self-contained — see LOGOS above).
+  var STAGES = [
+    { id: "analysis", glyph: "▣", name: "Analysis", hint: "sourcevision", logo: "sourcevision",
+      what: "What the codebase looks like: files, zones, imports and the findings worth acting on.",
+      facts: [[fmt(REPO.files), "files"], [String(REPO.zones), "zones"], [String(REPO.findings.info + REPO.findings.warning + REPO.findings.critical), "findings"]] },
+    { id: "plan", glyph: "☑", name: "Plan", hint: "rex", logo: "rex",
+      what: "What to build next: the PRD, proposals from analysis, and the planning commands.",
+      facts: [[fmt(PRD.total), "items"], [pct(PRD.completed, PRD.total), "complete"], [String(PRD.pending), "pending"]] },
+    { id: "work", glyph: "▶", name: "Work", hint: "hench", logo: "hench",
+      what: "Get it done: hand the next task to the agent, pick a run mode, watch what it costs.",
+      facts: [[fmt(USAGE.runs), "runs"], [String(USAGE.running), "live"], ["$" + fmt(USAGE.cost.toFixed(0)), "spent"]] },
+  ];
+  function homePage() {
+    return [
+      h("div", { class: "landing" }, STAGES.map(function (s) {
+        return h("button", { class: "stage-card", "data-page": s.id, onclick: function () { go(s.id); } }, [
+          h("span", { class: "mark" }, h("img", { src: LOGOS[s.logo], alt: s.hint + " mark", width: "200", height: "200" })),
+          h("span", { class: "glyph", "aria-hidden": "true" }, s.glyph),
+          h("span", { class: "name" }, s.name),
+          h("span", { class: "hint" }, s.hint),
+          h("span", { class: "what" }, s.what),
+          h("span", { class: "facts" }, s.facts.map(function (f) { return h("span", null, [h("span", { class: "v" }, f[0]), h("span", { class: "k" }, f[1])]); })),
+          h("span", { class: "go", "aria-hidden": "true" }, "Open " + s.name + " →"),
+        ]);
+      }).concat([h("p", { class: "landing-loop" }, "analysis → plan → work → analysis")])),
+    ];
+  }
+
+  function commandsPage() {
+    var order = ["setup", "analysis", "plan", "work"];
+    var colour = { setup: "b-muted", analysis: "b-green", plan: "b-blue", work: "b-orange" };
+    var sorted = COMMANDS.slice().sort(function (a, b) { return order.indexOf(a[2]) - order.indexOf(b[2]); });
+    return [section("", null, [
+      panel(4, "Run a command", "any ndx command · output streams below", commandRunner(COMMANDS.map(function (c) { return c[0]; }))),
+      panel(8, "All Commands", COMMANDS.length + " orchestrator commands · by stage", [
+        h("ul", { class: "list" }, sorted.map(function (c) {
+          return h("li", null, [badge(c[2], colour[c[2]]), h("code", { class: "mono", style: "min-width:130px" }, "ndx " + c[0]), h("span", { class: "grow dim" }, c[1])]);
+        })),
+      ]),
+    ], { plain: true })];
+  }
+
+  var SETTINGS_FORMS = {
+    "s-general": ["General", [["LLM vendor", "claude"], ["Model", "claude-opus-5"], ["Codex model", "—"], ["Web port", "3117"]]],
+    "s-plan": ["ndx analyze / plan", [["Zone merge threshold", "5"], ["Pinned zones", "4"], ["Analysis depth", "--deep"], ["SourceVision", "auto"]]],
+    "s-work": ["ndx work", [["Provider", HENCH.provider], ["Model", HENCH.model], ["Permission mode", HENCH.permissionMode], ["Max turns", String(HENCH.maxTurns)], ["Max tokens", String(HENCH.maxTokens)], ["Auto-commit", String(HENCH.autoCommit)], ["Livelock threshold", String(HENCH.livelockThreshold)], ["Allowed commands", HENCH.allowed.join(", ")], ["Blocked paths", HENCH.blocked.join(", ")]]],
+    "s-sync": ["ndx sync", [["Adapter", "file"], ["Notion", "disabled (rex.notionSync flag off)"]]],
+    "s-export": ["ndx export / refresh", [["Export out-dir", "—"], ["Deploy target", "github"], ["Refresh", "--ui-only · --data-only · --no-build"]]],
+    "s-flags": ["Feature Flags", [["rex.notionSync", "off"], ["rex.integrations", "off"], ["sourcevision.prMarkdown", "off"], ["sourcevision.ask", "off"]]],
+    "s-timeouts": ["CLI Timeouts", [["Command timeout", HENCH.commandTimeout + " ms"], ["Stop grace", "2000 ms"], ["Shutdown", "30000 ms"]]],
+  };
+  function settingsPage(id) {
+    var f = SETTINGS_FORMS[id];
+    return [section("", null, [panel(8, f[0], "settings", f[1].map(function (kv) {
+      return h("div", { class: "field" }, [h("label", null, kv[0]), h("input", { value: kv[1] })]);
+    }).concat([h("div", { class: "row" }, [h("button", { class: "btn btn-primary btn-sm" }, "Save"), h("button", { class: "btn btn-sm" }, "Reset")])]))], { plain: true })];
+  }
+
+  var PAGES = {
+    home: { title: "n-dx", sub: "three stages in a loop — understand the code, decide what to build, let the agent build it", crumbs: [], render: homePage },
+    analysis: { title: "Analysis", sub: "SourceVision · zones, imports, PRD state and spend on one page", crumbs: [], render: analysisPage },
+    plan: { title: "Plan", sub: "Rex · add work, run planning commands, see what happened", crumbs: [], render: planPage },
+    work: { title: "Work", sub: "Hench · run the next task, pick a template, watch spend", crumbs: [], render: workPage },
+    commands: { title: "All Commands", sub: "every ndx orchestrator command", crumbs: ["Commands"], render: commandsPage },
+  };
+  Object.keys(SETTINGS_FORMS).forEach(function (id) {
+    PAGES[id] = { title: SETTINGS_FORMS[id][0], sub: null, crumbs: ["Settings"], render: function () { return settingsPage(id); } };
+  });
+
+  /* ═══ Routing: three stage pages in #content; settings and commands render
+     into their own hosts and open as an overlay / a sheet over the stage. ═══ */
+  var mainEl = document.getElementById("main");
+  var overlay = document.getElementById("settings-overlay");
+  var sheet = document.getElementById("commands-sheet");
+  var scrim = document.getElementById("scrim");
+  var cmdToggle = document.getElementById("commands-toggle");
+  var HOSTS = { main: document.getElementById("content"), settings: document.getElementById("settings-body"), commands: document.getElementById("commands-body") };
+  var stage = "home";              // the page currently in #content (home or a stage)
+  var lastSettings = "s-general";  // where the cog reopens
+
+  function kindOf(id) { return id.slice(0, 2) === "s-" ? "settings" : id === "commands" ? "commands" : "main"; }
+
+  function render(host, id) {
+    var page = PAGES[id];
+    host.textContent = "";
+    host.appendChild(h("div", { class: "page-head" }, [h("h1", null, page.title), page.sub ? h("span", { class: "sub" }, page.sub) : null]));
+    page.render().forEach(function (b) { host.appendChild(b); });
+    host.scrollTop = 0;
+    return page.title;
+  }
+
+  function go(id) {
+    if (!PAGES[id]) id = "home";
+    location.hash = id;
+    var kind = kindOf(id);
+    if (kind === "main") stage = id;
+    else if (!HOSTS.main.firstChild) render(HOSTS.main, stage);   // opened by URL: the stage still needs to be beneath
+    if (kind === "settings") lastSettings = id;
+    var title = render(HOSTS[kind], id);
+
+    var crumbs = document.getElementById("crumbs");
+    crumbs.textContent = "";
+    PAGES[id].crumbs.forEach(function (c) { crumbs.appendChild(document.createTextNode(c + " / ")); });
+    crumbs.appendChild(h("b", null, title));
+
+    overlay.hidden = kind !== "settings";
+    sheet.classList.toggle("open", kind === "commands");
+    scrim.hidden = kind !== "commands";
+    cmdToggle.setAttribute("aria-expanded", String(kind === "commands"));
+    mainEl.dataset.stage = stage;
+    document.querySelectorAll("[data-page]").forEach(function (el) {
+      el.classList.toggle("active", el.dataset.page === id || (el.classList.contains("nav-section") && el.dataset.page === stage));
+    });
+    document.body.dataset.page = id;
+  }
+
+  document.querySelectorAll("[data-page]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      var id = el.dataset.page;
+      // data-toggle: a second click on the thing that opened a sheet closes it
+      go(el.hasAttribute("data-toggle") && document.body.dataset.page === id ? stage : id);
+    });
+  });
+  document.getElementById("settings-toggle").addEventListener("click", function () { go(lastSettings); });
+  document.querySelectorAll("[data-close], #scrim").forEach(function (el) { el.addEventListener("click", function () { go(stage); }); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && kindOf(document.body.dataset.page || "home") !== "main") go(stage);
+  });
+  /* Theme: "system" (default) leaves <html> without data-theme so the CSS
+     media query decides; "light" / "dark" pin the attribute. The choice is
+     remembered; system means nothing stored. */
+  var THEMES = ["system", "light", "dark"];
+  function applyTheme(pref) {
+    if (THEMES.indexOf(pref) < 0) pref = "system";
+    var root = document.documentElement;
+    if (pref === "system") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", pref);
+    document.querySelectorAll("#theme-toggle button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.themePref === pref)); });
+    try { if (pref === "system") localStorage.removeItem("ndx-preview-theme"); else localStorage.setItem("ndx-preview-theme", pref); } catch (e) {}
+  }
+  document.querySelectorAll("#theme-toggle button").forEach(function (b) {
+    b.addEventListener("click", function () { applyTheme(b.dataset.themePref); });
+  });
+  var storedTheme = null;
+  try { storedTheme = localStorage.getItem("ndx-preview-theme"); } catch (e) {}
+  applyTheme(storedTheme || "system");
+
+  window.addEventListener("hashchange", function () {
+    var id = location.hash.slice(1);
+    if (id !== document.body.dataset.page) go(id);
+  });
+  go(location.hash.slice(1) || "home");
+})();
+</script>
+</body>
+</html>

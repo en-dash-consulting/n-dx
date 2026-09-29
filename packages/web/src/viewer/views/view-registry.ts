@@ -55,6 +55,9 @@ import {
 
 import { WorkspacesView } from "./domain-workspaces.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
+import { HomeView, StagePage } from "./stage-pages.js";
+import type { StageId } from "./stages.js";
+import { buildValidViews as buildValidViewsForScope } from "../external.js";
 
 import {
   NotionConfigView,
@@ -92,13 +95,39 @@ export interface ViewRenderContext {
    * itself hidden when the toggle is off.
    */
   askEnabled: boolean;
+  /**
+   * The views this viewer has (scope-filtered). The landing and stage pages
+   * list only what exists here; absent, every view is assumed to exist.
+   */
+  validViews?: ReadonlySet<ViewId>;
 }
 
 // ── Registry ───────────────────────────────────────────────────
 
 type ViewRenderer = (ctx: ViewRenderContext) => ComponentChild;
 
+function validViewsOf(ctx: ViewRenderContext): ReadonlySet<ViewId> {
+  return ctx.validViews ?? buildValidViewsForScope(null);
+}
+
+/** A stage page, rendering each of its sections through this registry. */
+function stage(id: StageId): ViewRenderer {
+  return (ctx) => h(StagePage, {
+    stage: id,
+    validViews: validViewsOf(ctx),
+    navigateTo: ctx.navigateTo,
+    renderView: (view: ViewId) => renderActiveView(view, ctx),
+  });
+}
+
 const REGISTRY: Record<string, ViewRenderer> = {
+  "home": (ctx) =>
+    h(HomeView, { validViews: validViewsOf(ctx), navigateTo: ctx.navigateTo }),
+
+  "analyze": stage("analyze"),
+  "plan": stage("plan"),
+  "work": stage("work"),
+
   "workspaces": () =>
     h(WorkspacesView, null),
 

@@ -983,6 +983,15 @@
   color: var(--text-dim);
 }
 
+/* Session-cache outcome in detail */
+.hench-session-outcome-hit {
+  color: var(--green);
+}
+
+.hench-session-outcome-miss {
+  color: var(--text-dim);
+}
+
 /* Diagnostic notes */
 .hench-diag-notes {
   margin-top: 8px;

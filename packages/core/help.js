@@ -164,7 +164,7 @@ const COMMAND_REGISTRY = [
     name: "start",
     category: "Orchestration",
     summary: "Start dashboard and MCP server",
-    keywords: ["server", "web", "dashboard", "MCP", "HTTP", "background", "daemon"],
+    keywords: ["server", "web", "dashboard", "MCP", "HTTP", "background", "daemon", "preview", "mockup", "layout"],
     related: ["status"],
   },
   {
@@ -1083,13 +1083,30 @@ const ORCHESTRATOR_HELP_DEFS = {
           "server is left running and this one moves to the next free port in\n" +
           "3117–3200. A non-n-dx occupant is cleared to free the port.",
       },
+      {
+        title: "Preview mode (--preview)",
+        content:
+          "Serves an editable UI layout document (packages/web/src/preview/index.html)\n" +
+          "instead of the dashboard, on port 3118. Drag sections, tabs and panels\n" +
+          "around, rename them, group sections into named dropdowns; every change is\n" +
+          "saved to <document>.layout.json beside the document, which is also the file\n" +
+          "to hand-edit and to review as a diff. Renames render as\n" +
+          "'New name (previously Old name)', and moves/additions/removals are marked.\n" +
+          "\n" +
+          "It runs no analysis, opens no MCP endpoints and writes nothing under .rex/\n" +
+          "or .sourcevision/ — the layout file and its own .n-dx-preview.pid/.port are\n" +
+          "all it touches — so it is safe alongside a real 'ndx start'. It never kills\n" +
+          "a port occupant; it relocates instead.",
+      },
     ],
     options: [
-      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.ndx/config.json); with --here, this server's port" },
+      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.ndx/config.json); with --here, this server's port; with --preview, 3118" },
       { flag: "--here", description: "Single-project server instead of the hub (also: web.mode \"here\" in .n-dx.json)" },
       { flag: "--hub", description: "Register with the hub — the default since 0.7.0; accepted for compatibility" },
       { flag: "--background", description: "With --here, run as a background daemon" },
       { flag: "--open", description: "Open the project URL in the browser" },
+      { flag: "--preview", description: "Serve the UI layout preview document instead of the dashboard" },
+      { flag: "--file=<path>", description: "With --preview: serve this HTML document instead of the default" },
     ],
     examples: [
       { command: "ndx start .", description: "Register with the hub; several repos share port 3117" },
@@ -1097,6 +1114,8 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx start stop .", description: "Unregister this worktree" },
       { command: "ndx start --here .", description: "Single-project server on this port" },
       { command: "ndx start --here --background .", description: "Single-project server as a background daemon" },
+      { command: "ndx start --preview .", description: "Serve the UI layout preview on :3118" },
+      { command: "ndx start --preview stop .", description: "Stop a background preview server" },
     ],
     related: ["hub", "web", "dev"],
   },
