@@ -872,11 +872,14 @@ async function selectTask(
   dir: string,
   rexDir: string,
   epicId?: string,
+  assignee?: string,
 ): Promise<string> {
   const store = await resolveStore(rexDir);
   // Tasks another worktree is working on are left off the menu.
   const claims = TaskClaims.forProject(dir);
-  let tasks = await getActionableTasks(store, undefined, claims);
+  // `assignee` is --mine: the menu is the attended path's whole selection, so
+  // an unfiltered menu here is the flag silently doing nothing.
+  let tasks = await getActionableTasks(store, undefined, claims, assignee);
 
   // Filter to tasks within the specified epic if provided
   if (epicId) {
@@ -897,7 +900,7 @@ async function selectTask(
       if (answer.toLowerCase() === "y" || answer.toLowerCase() === "yes") {
         await resetDeferredTasks(store);
         // Reload tasks after reset
-        tasks = await getActionableTasks(store, undefined, claims);
+        tasks = await getActionableTasks(store, undefined, claims, assignee);
         if (epicId) {
           const freshDoc = await store.loadDocument();
           const epicTaskIds = collectEpicTaskIds(freshDoc.items, epicId);
@@ -1562,6 +1565,20 @@ export async function cmdRun(
   // matches only when it was set to that same identity string. Like --tags,
   // this only constrains autoselection: an explicit --task bypasses it.
   const mine = flags["mine"] === "true";
+  // --epic-by-epic walks every epic's tasks in order, and its selection path
+  // carries no assignee filter. Accepting --mine there would run — and commit
+  // under — tasks belonging to other people while the operator believes the
+  // run was scoped to their own, so refuse instead of no-opping. Same reason
+  // --review refuses on the api provider rather than reporting unreviewed runs
+  // as reviewed. Checked before resolveActor so a contradictory invocation
+  // fails on its arguments rather than after reading git config.
+  if (mine && flags["epic-by-epic"] === "true") {
+    throw new CLIError(
+      "Cannot use --mine with --epic-by-epic.",
+      "--epic-by-epic processes every epic in order and cannot filter by assignee. " +
+        "Drop --mine, or run without --epic-by-epic.",
+    );
+  }
   const assignee = mine ? await resolveActor(dir) : undefined;
 
   // Codex only supports CLI mode (no API loop).
@@ -1972,7 +1989,7 @@ export async function cmdRun(
     // Task selection: --task > interactive (TTY) > autoselect
     // In loop mode, always autoselect (skip interactive)
     if (!taskId && !auto && !loop && process.stdin.isTTY && !dryRun) {
-      taskId = await selectTask(dir, rexDir, epicId);
+      taskId = await selectTask(dir, rexDir, epicId, assignee);
     }
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 

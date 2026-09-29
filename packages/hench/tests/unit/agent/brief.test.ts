@@ -1282,6 +1282,37 @@ describe("assembleTaskBrief — context assembly", () => {
 // ---------------------------------------------------------------------------
 
 describe("getActionableTasks", () => {
+  // The interactive menu (`ndx work --mine` in a TTY) is built from this
+  // function, and the id it returns is passed back as an explicit --task,
+  // which bypasses the assignee filter by design. So if the filter is not
+  // applied here, --mine silently does nothing on the attended path.
+  it("restricts the menu to the current user's tasks when an assignee is given", async () => {
+    const items: PRDItem[] = [
+      { id: "task-mine", title: "Mine", status: "pending", level: "task", priority: "low", assignee: "alice <alice@example.com>" },
+      { id: "task-theirs", title: "Theirs", status: "pending", level: "task", priority: "critical", assignee: "bob <bob@example.com>" },
+      { id: "task-nobody", title: "Unassigned", status: "pending", level: "task", priority: "high" },
+    ];
+    const store = mockStoreWithDefaults(items);
+
+    const all = await getActionableTasks(store);
+    expect(all.map((t) => t.id)).toEqual(["task-theirs", "task-nobody", "task-mine"]);
+
+    const mine = await getActionableTasks(store, undefined, undefined, "alice <alice@example.com>");
+    expect(mine.map((t) => t.id)).toEqual(["task-mine"]);
+  });
+
+  it("returns an empty menu when nothing is assigned to the current user", async () => {
+    const items: PRDItem[] = [
+      { id: "task-1", title: "Unassigned", status: "pending", level: "task" },
+    ];
+    const store = mockStoreWithDefaults(items);
+
+    expect(await getActionableTasks(store, undefined, undefined, "alice <alice@example.com>")).toEqual([]);
+    // Without the filter the same tree still offers the task — proving the
+    // empty result above comes from the filter, not from an empty tree.
+    expect((await getActionableTasks(store)).map((t) => t.id)).toEqual(["task-1"]);
+  });
+
   it("returns actionable tasks sorted by priority", async () => {
     const items: PRDItem[] = [
       {

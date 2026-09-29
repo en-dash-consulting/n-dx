@@ -349,19 +349,34 @@ export interface ActionableTask {
   parentChain: string;
 }
 
+/**
+ * The interactive menu's task list.
+ *
+ * `assignee` is the `--mine` filter and has to be honored here as well as in
+ * {@link assembleTaskBrief}: the attended path (`ndx work --mine` in a TTY, no
+ * `--task`/`--auto`/`--loop`) never reaches autoselection — it builds this menu
+ * and passes the chosen id back as an explicit task, which bypasses the filter
+ * by design. Without it the flag silently did nothing on the most common human
+ * path, offering every actionable task regardless of who it belongs to.
+ */
 export async function getActionableTasks(
   store: PRDStore,
   limit = 20,
   claims?: TaskClaims,
+  assignee?: string,
 ): Promise<ActionableTask[]> {
   const doc = await store.loadDocument();
   const completedIds = collectCompletedIds(doc.items);
   const claimedElsewhere = claims ? new Set((await claims.foreignClaims()).keys()) : undefined;
+  const selectOptions = {
+    ...(claimedElsewhere?.size ? { excludeIds: claimedElsewhere } : {}),
+    ...(assignee ? { assignee } : {}),
+  };
   const entries = findActionableTasks(
     doc.items,
     completedIds,
     limit,
-    claimedElsewhere?.size ? { excludeIds: claimedElsewhere } : undefined,
+    Object.keys(selectOptions).length > 0 ? selectOptions : undefined,
   );
 
   return entries.map((e) => ({
