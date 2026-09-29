@@ -161,7 +161,9 @@ describe("sv pr-markdown on a folder-tree project", () => {
   it("gets its answers from this checkout's rex", async () => {
     // Without this, a passing suite could mean some other rex on PATH answered
     // — which on a machine with a globally linked n-dx is a different checkout.
-    const invocations = await readFile(shimMarker, "utf-8");
+    // rex.cmd logs %* as received, and on Windows execFileSyncCli quotes every
+    // argument, so drop the quotes before matching.
+    const invocations = (await readFile(shimMarker, "utf-8")).replaceAll('"', "");
     expect(invocations).toContain("tree --format=json");
     expect(invocations).toContain("tree-diff --json");
   });
