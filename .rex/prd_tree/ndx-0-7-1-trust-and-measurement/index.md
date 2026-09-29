@@ -15,7 +15,7 @@ acceptanceCriteria:
   - "Two concurrent ndx work runs in two worktrees select different tasks, and a refused completion does not free the task for another worktree."
   - "Every changeset is a patch; no route changed; new config keys and persisted fields are additive and optional, and older files load unchanged. (Amended 2026-09-23: PR M adds promptCache, promptCacheTtl and prune.* to hench config.)"
 description: "Patch release that makes n-dx's numbers true and its autonomous runs trustworthy before any new surface is added. It merges the prompt-caching and context-pruning work that is built and tested but has never run against a live provider, fixes the three defects that misprice runs in the dashboard and CLI, measures a real batch of autonomous tasks against the pre-optimization baseline ($247.53 over 10 runs), closes the gaps left in cross-worktree task claims, ships the plain-language copy fixes from the outside first-use review, and restores per-package git tags and GitHub releases, which have not been produced since 0.4.6 although 0.5.x and 0.6.0 are on npm. Nothing in this release moves a route, a config key or a persisted schema.\n\nGoal: Operators can believe what n-dx reports about cost and progress, two worktrees can no longer duplicate each other's work, and the release history is visible in the repository again."
-lastModified: "2026-09-23T18:54:45.405Z"
+lastModified: "2026-09-29T17:28:30.942Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
