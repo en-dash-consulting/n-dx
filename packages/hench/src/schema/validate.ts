@@ -120,6 +120,13 @@ export const HenchConfigSchema = z.object({
   sessionStrategy: z.enum(["fork", "batch", "cold"]).optional(),
   tasksPerSession: z.number().int().positive().optional().default(4),
   parentMaxAgeHours: z.number().positive().optional().default(24),
+  // No `.default()` on these two: leaving them undefined lets
+  // isBatchChainUsable apply DEFAULT_BATCH_MAX_AGE_HOURS /
+  // DEFAULT_BATCH_MAX_IDLE_HOURS, so the defaults live in exactly one place
+  // rather than being mirrored here (which is what the note above had to do,
+  // and what keeps needing a comment to stay honest).
+  batchMaxAgeHours: z.number().positive().optional(),
+  batchMaxIdleHours: z.number().positive().optional(),
   maxSpawnsPerTask: z.number().int().positive().optional().default(8),
   // 0 disables livelock detection — see the field docs on HenchConfig. Mirrors
   // DEFAULT_LIVELOCK_THRESHOLD in agent/analysis/livelock.ts (schema cannot
@@ -168,11 +175,14 @@ const TokenUsageSchema = z.object({
   cacheReadInput: z.number().optional(),
 });
 
+const TokenProvenanceSchema = z.enum(["measured", "estimated", "unavailable"]);
+
 const RunTokensSchema = z.object({
   input: z.number(),
   output: z.number(),
   cached: z.number(),
   total: z.number(),
+  cachedProvenance: TokenProvenanceSchema.optional(),
 });
 
 const TokenDiagnosticStatusSchema = z.enum(["complete", "partial", "unavailable"]);
@@ -186,6 +196,22 @@ const TurnTokenUsageSchema = z.object({
   vendor: z.string().optional(),
   model: z.string().optional(),
   diagnosticStatus: TokenDiagnosticStatusSchema.optional(),
+  cacheProvenance: TokenProvenanceSchema.optional(),
+});
+
+/**
+ * The session-cache decision (`RunSessionRecord`).
+ *
+ * `reason` is a plain string here for the same reason it is one in the type:
+ * the rejection codes belong to the cache, not to the schema, and a record
+ * naming a reason this build has since renamed must still load.
+ */
+const RunSessionRecordSchema = z.object({
+  strategy: z.enum(["fork", "batch", "cold"]),
+  outcome: z.enum(["hit", "miss"]),
+  reason: z.string(),
+  ageMs: z.number().optional(),
+  sessionId: z.string().optional(),
 });
 
 const CommandRecordSchema = z.object({
@@ -382,6 +408,7 @@ export const RunRecordSchema = z.object({
   vendor: z.string().optional(),
   weight: z.string().optional(),
   parentSessionId: z.string().optional(),
+  session: RunSessionRecordSchema.optional(),
   contextCondensations: z.number().optional(),
   // `"cli" | "api"` in the type, a bare string here: an enum would reject a
   // record carrying a third value rather than accept a field it does not

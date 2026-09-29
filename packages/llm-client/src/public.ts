@@ -208,6 +208,7 @@ export {
 
 export type {
   TokenParseResult,
+  TokenCacheProvenance,
   CodexTokenMapping,
 } from "./token-usage.js";
 
