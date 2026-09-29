@@ -23,6 +23,45 @@
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative, extname, sep } from "node:path";
 
+// ── Folder layout ───────────────────────────────────────────────────────────
+
+/**
+ * The `.ndx/` container for a project root, or `null` on the legacy layout.
+ *
+ * Hand-written twin of `resolveLayout(root).container`. This module bundles
+ * into the standalone skill script and may import nothing but `node:`
+ * builtins, so it cannot reach the resolver in `@n-dx/llm-client` — the same
+ * constraint that gives `packages/core/layout.js` its own copy.
+ * `tests/integration/layout-resolver-contract.test.js` pins what is built on
+ * it to the canonical implementation, because a third copy of a rule drifts
+ * just as silently as a second one.
+ *
+ * It lives here rather than beside `analysisDirFor` in `iso-sources.ts`
+ * because the bundle imports in that direction: `iso-sources` reads this
+ * module, so a helper placed there could not be reused from here.
+ */
+export function ndxContainer(root: string): string | null {
+  const container = join(root, ".ndx");
+  try {
+    return statSync(container).isDirectory() ? container : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The project config file for a root, on either folder layout.
+ *
+ * Twin of `resolveLayout(root).configFile`. Reading `.n-dx.json` verbatim on
+ * a project with `.ndx/` finds nothing, and declared seams and infrastructure
+ * are claims a human made — dropping them silently redraws the map as if the
+ * declaration had never been written.
+ */
+export function projectConfigFor(root: string): string {
+  const container = ndxContainer(root);
+  return container ? join(container, "config.json") : join(root, ".n-dx.json");
+}
+
 // ── Types ───────────────────────────────────────────────────────────────────
 
 /** A runtime control-flow edge that inverts, or has no, import. */
@@ -82,12 +121,12 @@ function readJson<T>(path: string): T | null {
   }
 }
 
-/** Read declared seams and infrastructure from `.n-dx.json`. */
+/** Read declared seams and infrastructure from the project config. */
 export function readDeclaredConfig(root: string): {
   seams: DeclaredSeam[];
   infrastructure: DeclaredInfra[];
 } {
-  const config = readJson<NdxConfigShape>(join(root, ".n-dx.json"));
+  const config = readJson<NdxConfigShape>(projectConfigFor(root));
   const isoMap = config?.sourcevision?.isoMap;
   if (!isoMap) return { seams: [], infrastructure: [] };
 

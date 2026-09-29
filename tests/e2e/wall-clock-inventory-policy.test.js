@@ -99,10 +99,25 @@ const CLOCK_BOUNDED_ASSERTION = new RegExp(
  * loaded machine because it was never long to begin with.
  */
 const NONZERO_DELAY = String.raw`(?:[1-9]\d*|[A-Za-z_$][\w$.]*)`;
+/**
+ * The delay argument, allowing an expression rather than only a bare literal
+ * or identifier: `setTimeout(r, 10 * MULT)` and `setTimeout(r, base + 5)` are
+ * the same barrier as `setTimeout(r, 50)`. Stops at the closing paren of the
+ * setTimeout call, and refuses a bare `0` via {@link NONZERO_DELAY} leading it.
+ */
+const DELAY_EXPR = String.raw`${NONZERO_DELAY}[^;)]*`;
 const REAL_SLEEP =
   String.raw`await\s+(?:` +
-  // await new Promise((r) => setTimeout(r, 50)) / (r, SETTLE_MS)
-  String.raw`new\s+Promise\s*(?:<[^>]*>)?\s*\([^;]*?setTimeout\s*\([^;,]*,\s*${NONZERO_DELAY}\s*\)\s*\)` +
+  // await new Promise((r) => setTimeout(r, 50)) / (r, SETTLE_MS) / (r, 10 * MULT)
+  // and the brace form `await new Promise((r) => { setTimeout(r, 50); })`.
+  //
+  // Only the TAIL needed widening for the brace form: its semicolon falls
+  // after the setTimeout call, not before it, so the body still must not cross
+  // a `;`. Letting the body span statements instead matched a different thing
+  // entirely — a promise that resolves on a real event and arms
+  // `setTimeout(() => reject(...), 3000)` as a hang guard is not a sleep, and
+  // `[\s\S]*?` reached across its statements to flag it.
+  String.raw`new\s+Promise\s*(?:<[^>]*>)?\s*\([^;]*?setTimeout\s*\([^;,]*,\s*${DELAY_EXPR}\)\s*;?\s*\}?\s*\)` +
   // await sleep(150) / await delay(150)
   String.raw`|(?:sleep|delay)\s*\(\s*[1-9][^;]*?\)` +
   // await setTimeout(50) — node:timers/promises
