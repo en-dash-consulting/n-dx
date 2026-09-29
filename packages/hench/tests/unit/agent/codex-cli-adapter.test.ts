@@ -22,6 +22,7 @@ import {
   normalizeCodexResponse as originalNormalizeCodexResponse,
 } from "../../../src/agent/lifecycle/adapters/codex-cli-adapter.js";
 import { isProgressTool } from "../../../src/agent/analysis/livelock.js";
+import { NDX_WORKFLOW } from "@n-dx/rex";
 import type { VendorAdapter, SpawnConfig } from "../../../src/agent/lifecycle/vendor-adapter.js";
 import {
   DEFAULT_EXECUTION_POLICY,
@@ -1121,5 +1122,34 @@ describe("codex batch chain seam", () => {
     expect(codexCliAdapter.extractSessionId?.(resumedSpawnFirstLine)).toBe(
       "01a05958-2931-73f1-9aba-38fa915bb8df",
     );
+  });
+});
+
+// ── 8. append_log route survives into a Codex-adapter run ────────────────
+
+/**
+ * The Codex CLI provider never gets hench's own `rex_append_log` tool (that
+ * only exists on the API loop's tool dispatch, see `tools/dispatch.ts`) — a
+ * Codex-provider run's only way to log is whatever `.rex/n-dx_workflow.md`
+ * says, delivered as the envelope's "workflow" section (see brief.ts, which
+ * loads it via `store.loadWorkflow()`). rex's default workflow (`rex log
+ * db878e62`) now names `ndx log` as the fallback for `append_log` when no
+ * MCP server is connected — the ordinary case for a CLI-provider spawn. This
+ * guards that the text actually reaches the codex binary: assemblePrompt
+ * folds "workflow" into the system channel (see runtime-contract.ts), and
+ * buildSpawnConfig concatenates that into stdinContent unmodified.
+ */
+describe("codex-adapter run: append_log route survives into the prompt", () => {
+  it("names the ndx log CLI command in the assembled stdin content", () => {
+    const envelope = createPromptEnvelope([
+      { name: "system", content: "You are Hench, an autonomous AI agent." },
+      { name: "workflow", content: NDX_WORKFLOW },
+      { name: "brief", content: "Fix the authentication bug in src/auth.ts." },
+    ]);
+
+    const config = codexCliAdapter.buildSpawnConfig(envelope, DEFAULT_EXECUTION_POLICY, {});
+
+    expect(config.stdinContent).toContain("ndx log");
+    expect(config.stdinContent).toContain("append_log");
   });
 });

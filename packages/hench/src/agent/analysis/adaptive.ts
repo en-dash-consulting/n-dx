@@ -7,6 +7,7 @@
  */
 
 import type { RunRecord, HenchConfig } from "../../schema/index.js";
+import { contextWriteFloor, runBudgetedTokens } from "../token-cost.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -29,8 +30,17 @@ export interface ProjectMetrics {
   recentSuccessRate: number;
   /** Average turns for recent completed runs. */
   recentAvgTurns: number;
-  /** Average tokens per run over recent window. */
+  /**
+   * Average tokens per run over recent window, in the units
+   * `checkTokenBudget` enforces (uncached input + cache writes + output).
+   */
   recentAvgTokens: number;
+  /**
+   * Lowest counted cost of a completed prompt-cached run in the window — the
+   * floor a proposed `tokenBudget` must clear. 0 when unmeasurable.
+   * See {@link contextWriteFloor}.
+   */
+  contextWriteFloor: number;
   /** Average duration in ms over recent window. */
   recentAvgDurationMs: number;
   /** Number of distinct tasks attempted in recent window. */
@@ -115,10 +125,6 @@ export function _resetIdCounter(): void {
   idCounter = 0;
 }
 
-function totalTokens(run: RunRecord): number {
-  return (run.tokenUsage.input ?? 0) + (run.tokenUsage.output ?? 0);
-}
-
 function runDurationMs(run: RunRecord): number {
   if (!run.finishedAt) return 0;
   return new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
@@ -145,6 +151,7 @@ export function collectMetrics(
       recentSuccessRate: 0,
       recentAvgTurns: 0,
       recentAvgTokens: 0,
+      contextWriteFloor: 0,
       recentAvgDurationMs: 0,
       recentTaskCount: 0,
       runsPerDay: 0,
@@ -168,7 +175,7 @@ export function collectMetrics(
     : 0;
 
   const recentAvgTokens = recent.length > 0
-    ? recent.map(totalTokens).reduce((a, b) => a + b, 0) / recent.length
+    ? recent.map(runBudgetedTokens).reduce((a, b) => a + b, 0) / recent.length
     : 0;
 
   const durations = recent.map(runDurationMs).filter((d) => d > 0);
@@ -208,10 +215,10 @@ export function collectMetrics(
     successRateTrend = newerRate - olderRate;
 
     const newerTokens = newerHalf.length > 0
-      ? newerHalf.map(totalTokens).reduce((a, b) => a + b, 0) / newerHalf.length
+      ? newerHalf.map(runBudgetedTokens).reduce((a, b) => a + b, 0) / newerHalf.length
       : 0;
     const olderTokens = olderHalf.length > 0
-      ? olderHalf.map(totalTokens).reduce((a, b) => a + b, 0) / olderHalf.length
+      ? olderHalf.map(runBudgetedTokens).reduce((a, b) => a + b, 0) / olderHalf.length
       : 0;
     tokenUsageTrend = olderTokens > 0
       ? (newerTokens - olderTokens) / olderTokens
@@ -224,6 +231,7 @@ export function collectMetrics(
     recentSuccessRate,
     recentAvgTurns,
     recentAvgTokens,
+    contextWriteFloor: contextWriteFloor(recent),
     recentAvgDurationMs,
     recentTaskCount,
     runsPerDay,
@@ -272,7 +280,10 @@ function adjustComplexityScaling(
     config.tokenBudget > 0 &&
     !settings.lockedKeys.includes("tokenBudget")
   ) {
-    const proposed = Math.round(config.tokenBudget * 1.3);
+    const proposed = Math.max(
+      Math.round(config.tokenBudget * 1.3),
+      metrics.contextWriteFloor,
+    );
     adjustments.push({
       id: nextId("complexity-scaling"),
       category: "complexity-scaling",
@@ -387,7 +398,12 @@ function adjustEfficiency(
     metrics.recentSuccessRate > 0.7 &&
     !settings.lockedKeys.includes("tokenBudget")
   ) {
-    const proposed = Math.round(metrics.recentAvgTokens * 2.5);
+    // Clamped to the measured arrival cost: a budget below the context write
+    // fails every run before it does any work, which is not a saving.
+    const proposed = Math.max(
+      Math.round(metrics.recentAvgTokens * 2.5),
+      metrics.contextWriteFloor,
+    );
     if (proposed < config.tokenBudget) {
       adjustments.push({
         id: nextId("efficiency-tuning"),

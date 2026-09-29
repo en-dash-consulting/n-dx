@@ -65,14 +65,33 @@ describe("loop mode helpers", () => {
   });
 
   describe("loopPause", () => {
-    it("resolves after the specified delay", async () => {
+    // Fake timers, not a real sleep. The claim is "loopPause waits for its
+    // delay", which used to be `expect(elapsed).toBeGreaterThanOrEqual(40)`
+    // around a real `loopPause(50)`. A *lower* bound cannot be made
+    // load-robust by scaling — BUDGET_MULTIPLIER only widens an upper bound —
+    // and a coarse or early-firing platform timer under-fires it with the code
+    // unchanged. Advancing a fake clock asserts the claim exactly: still
+    // pending at 49ms, resolved at 50ms.
+    it("resolves only once the specified delay has elapsed", async () => {
       const { loopPause } = await import(
         "../../../../src/cli/commands/run.js"
       );
-      const start = Date.now();
-      await loopPause(50);
-      const elapsed = Date.now() - start;
-      expect(elapsed).toBeGreaterThanOrEqual(40); // allow small timer variance
+      vi.useFakeTimers();
+      try {
+        let resolved = false;
+        const pause = loopPause(50).then(() => {
+          resolved = true;
+        });
+
+        await vi.advanceTimersByTimeAsync(49);
+        expect(resolved).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(1);
+        await pause;
+        expect(resolved).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("resolves immediately for 0ms delay", async () => {

@@ -5,6 +5,19 @@ import {
 } from "../../../src/queue/execution-queue.js";
 import type { TaskPriority, QueueStatus } from "../../../src/queue/execution-queue.js";
 
+/**
+ * Yield the microtask queue `turns` times.
+ *
+ * The tests below need a slot to be *held across an await* so other tasks
+ * contend for it; they never need any particular amount of time to pass. Real
+ * `setTimeout` sleeps stood in for that and made the interleaving — and so the
+ * verdict — a function of how busy the machine was. A microtask turn is a
+ * scheduling step, which is the thing actually being simulated.
+ */
+async function yieldTurns(turns: number): Promise<void> {
+  for (let i = 0; i < turns; i++) await Promise.resolve();
+}
+
 describe("normalizePriority", () => {
   it("returns known priorities unchanged", () => {
     expect(normalizePriority("critical")).toBe("critical");
@@ -195,20 +208,20 @@ describe("ExecutionQueue", () => {
       await q.acquire("task-1");
 
       const order: string[] = [];
-      q.acquire("high-1", "high").then(() => { order.push("high-1"); });
-      q.acquire("high-2", "high").then(() => { order.push("high-2"); });
-      q.acquire("high-3", "high").then(() => { order.push("high-3"); });
+      // Keep the promises. The settling barrier used to be a real 10 ms sleep,
+      // which is a guess at how long three microtask chains take; awaiting the
+      // acquisitions themselves is the same claim with no clock in it.
+      const p1 = q.acquire("high-1", "high").then(() => { order.push("high-1"); });
+      const p2 = q.acquire("high-2", "high").then(() => { order.push("high-2"); });
+      const p3 = q.acquire("high-3", "high").then(() => { order.push("high-3"); });
 
-      // Release all
+      // `release()` shifts the queue and resolves synchronously, so three
+      // releases queue three microtasks in hand-off order. A LIFO regression
+      // reorders them and this assertion says so.
       q.release();
-      await Promise.resolve();
       q.release();
-      await Promise.resolve();
       q.release();
-      await Promise.resolve();
-
-      // Allow all microtasks to settle
-      await new Promise((r) => setTimeout(r, 10));
+      await Promise.all([p1, p2, p3]);
 
       expect(order).toEqual(["high-1", "high-2", "high-3"]);
     });
@@ -333,8 +346,10 @@ describe("ExecutionQueue", () => {
       const promises = tasks.map(async (id) => {
         await q.acquire(id);
         results.push(`start:${id}`);
-        // Simulate brief async work
-        await new Promise((r) => setTimeout(r, 1));
+        // Simulate brief async work. A microtask yield, not a 1 ms timer: the
+        // point is that the slot is held across an await, and a real timer
+        // only adds a duration the assertions below never look at.
+        await yieldTurns(1);
         results.push(`end:${id}`);
         q.release();
       });
@@ -354,11 +369,15 @@ describe("ExecutionQueue", () => {
 
       const tasks = Array.from({ length: 8 }, (_, i) => `task-${i}`);
 
-      const promises = tasks.map(async (id) => {
+      const promises = tasks.map(async (id, i) => {
         await q.acquire(id);
         if (q.active > maxObserved) maxObserved = q.active;
-        // Simulate async work
-        await new Promise((r) => setTimeout(r, Math.random() * 5));
+        // Staggered work, deterministically. This was `setTimeout(Math.random()
+        // * 5)`: a random duration means the interleaving a passing run
+        // exercised is unknown and unrepeatable, so a failure cannot be
+        // reproduced from the seed. Varying the number of turns by index
+        // keeps the staggering and makes every run the same run.
+        await yieldTurns(i % 3);
         q.release();
       });
 
@@ -375,7 +394,7 @@ describe("ExecutionQueue", () => {
       const promises = Array.from({ length: 5 }, async (_, i) => {
         await q.acquire(`task-${i}`);
         order.push(i);
-        await new Promise((r) => setTimeout(r, 1));
+        await yieldTurns(1);
         q.release();
       });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -232,6 +232,48 @@ describe("orchestration script integration", () => {
       // sync requires a remote adapter; with file adapter it should exit non-zero
       expect(code).not.toBe(0);
       expect(stderr).toContain("adapter");
+    });
+  });
+
+  // ── ndx log ───────────────────────────────────────────────────────────────
+
+  describe("ndx log", () => {
+    it("requires .rex directory", () => {
+      // handleLog checks process.cwd() (repo root, always initialized) rather
+      // than the target dir — same shape as handleMove. rex's own
+      // requireRexDir is what actually catches the missing .rex here.
+      const { stderr, code } = runResult(["log", "task_started", tmpDir]);
+      expect(code).toBe(1);
+      expect(stderr).toMatch(/rex directory not found/i);
+    });
+
+    it("forwards the event, --item and --detail and appends an entry", async () => {
+      await setupRexDir(tmpDir);
+      const { code } = runResult([
+        "log", "task_started", "--item=t1", "--detail=hello from ndx log", tmpDir,
+      ]);
+      expect(code).toBe(0);
+
+      const raw = await readFile(join(tmpDir, ".rex", "execution-log.jsonl"), "utf-8");
+      const entry = JSON.parse(raw.trim().split("\n").pop());
+      expect(entry.event).toBe("task_started");
+      expect(entry.itemId).toBe("t1");
+      expect(entry.detail).toBe("hello from ndx log");
+    });
+
+    it("passes --format=json flag through to rex log", async () => {
+      await setupRexDir(tmpDir);
+      const { stdout, code } = runResult(["log", "task_started", "--format=json", tmpDir]);
+      expect(code).toBe(0);
+      const data = JSON.parse(stdout);
+      expect(data.logged).toBe(true);
+      expect(data.event).toBe("task_started");
+    });
+
+    it("shows help with --help flag", () => {
+      const { stdout, code } = runResult(["log", "--help"]);
+      expect(code).toBe(0);
+      expect(stdout).toContain("append_log");
     });
   });
 

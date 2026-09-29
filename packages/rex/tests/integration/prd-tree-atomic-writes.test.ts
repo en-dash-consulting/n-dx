@@ -4,8 +4,8 @@
  * Tests verify:
  * - All writes use temp + rename for crash-safety
  * - File-locking prevents concurrent mutations
- * - Single-item operations avoid full-tree re-serialization
- * - Performance targets (< 500ms for ndx add on 1000-item PRD)
+ * - Single-item operations avoid full-tree re-serialization, measured as the
+ *   number of files written rather than as elapsed time
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -39,39 +39,52 @@ function makeItem(
 }
 
 /**
- * Create a 1000-item fixture PRD with hierarchical structure.
- * Structure: 10 epics, each with 10 features, each with 10 tasks.
+ * Build a hierarchical fixture: `epicCount` epics, each with `featureCount`
+ * features, each with `taskCount` tasks.
+ *
+ * Parameterised rather than fixed at 1000 items because the write-volume tests
+ * below compare the same mutation across two tree sizes — a count that does not
+ * move with the size is what "no full-tree re-serialization" means.
  */
-async function create1000ItemFixture(treeRoot: string): Promise<PRDItem[]> {
+function createHierarchy(epicCount: number, featureCount: number, taskCount: number): PRDItem[] {
   const epics: PRDItem[] = [];
 
-  for (let e = 0; e < 10; e++) {
-    const epicId = `epic-${e}`;
+  for (let e = 0; e < epicCount; e++) {
     const features: PRDItem[] = [];
 
-    for (let f = 0; f < 10; f++) {
-      const featureId = `feature-${e}-${f}`;
+    for (let f = 0; f < featureCount; f++) {
       const tasks: PRDItem[] = [];
 
-      for (let t = 0; t < 10; t++) {
-        const taskId = `task-${e}-${f}-${t}`;
-        tasks.push(makeItem(taskId, `Task ${e}-${f}-${t}`, "task"));
+      for (let t = 0; t < taskCount; t++) {
+        tasks.push(makeItem(`task-${e}-${f}-${t}`, `Task ${e}-${f}-${t}`, "task"));
       }
 
       features.push({
-        ...makeItem(featureId, `Feature ${e}-${f}`, "feature"),
+        ...makeItem(`feature-${e}-${f}`, `Feature ${e}-${f}`, "feature"),
         children: tasks,
       });
     }
 
     epics.push({
-      ...makeItem(epicId, `Epic ${e}`, "epic"),
+      ...makeItem(`epic-${e}`, `Epic ${e}`, "epic"),
       children: features,
     });
   }
 
   return epics;
 }
+
+/** `items` and every descendant, counted. */
+function countItems(items: PRDItem[]): number {
+  return items.reduce((n, item) => n + 1 + countItems(item.children ?? []), 0);
+}
+
+/**
+ * How much slower than idle a loaded machine may be before a test that is
+ * merely slow counts as hung. TESTING.md's documented allowance, read from the
+ * same env var every other budgeted test in the repo reads.
+ */
+const LOAD_ALLOWANCE = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
 
 // ── Test suite ──────────────────────────────────────────────────────────────
 
@@ -281,92 +294,186 @@ describe("prd_tree atomic writes and crash-safety", () => {
     });
   });
 
-  // ── Performance baseline (deferred implementation) ──────────────────────────────
+  // ── Write volume ────────────────────────────────────────────────────────────
 
-  describe.skip("performance: sub-500ms latency on single-item operations (requires mutations optimization)", () => {
-    it("addItem on 1000-item PRD completes in under 500ms (median across 10 runs)", async function () {
-      // DEFERRED: This test is skipped until folder-tree-mutations are integrated.
-      // Current implementation uses full-tree re-serialization, not targeted writes.
-      // See folder-tree-mutations.ts for the optimized API.
-      this.timeout(60000);
-      // Create 1000-item fixture
-      const items = await create1000ItemFixture(join(rexDir, PRD_TREE_DIRNAME));
-      const emptyDoc = { schema: SCHEMA_VERSION, title: "Large PRD", items };
-      await store.saveDocument(emptyDoc);
+  /**
+   * These three tests used to decide their verdict from a clock: two raw
+   * `< 500ms` budgets and a comparison of two adjacent micro-spans
+   * (`addTime <= reserializeTime`), the last of which one scheduling hiccup
+   * inside the first span could flip. All three were registered Open in
+   * tests/wall-clock-assertion-inventory.md and skipped as DEFERRED.
+   *
+   * What they were standing in for is a claim about *write volume*, not latency:
+   * a single-item mutation must touch the files it changed, not re-serialize the
+   * tree. That is countable, so it is counted — TESTING.md Family 2 technique 1.
+   * The serializer already publishes the count: `writeIfChanged` skips files
+   * whose content is byte-identical, and the paths it actually wrote reach the
+   * caller through `takeSaveFileReport()`. No clock is read here, so no ambient
+   * load can change a verdict.
+   *
+   * ### Fixture size is the whole timeout budget
+   *
+   * The assertions below are load-immune; the real `saveDocument` each one pays
+   * for before reaching them is not. That cost is linear in items — measured at
+   * 5.9ms per item for a save + load + update + add cycle, flat from 18 items to
+   * 1110 (Intel Core Ultra 5 225F, 10 logical CPUs, Windows 11 26200, Node
+   * 24.16.0):
+   *
+   * | items | save | load | updateItem | addItem |
+   * |------:|-----:|-----:|-----------:|--------:|
+   * |  1110 | 1120 | 1393 |       1946 |    2050 |
+   * |   155 |  163 |  171 |        283 |     256 |
+   * |    39 |   42 |   42 |         70 |      67 |
+   *
+   * So a 1110-item fixture cost the two exact-set tests below 21.2s and 10.7s
+   * idle against rex's 30s `testTimeout` — a third of the 20x load allowance the
+   * repo documents, and both timed out under concurrent build load. Neither gets
+   * anything from scale: they assert an exact set of written paths, which is
+   * exact at any size, and a handful of siblings at each level is all it takes
+   * for "only these files" to mean something. They use {@link SIBLING_TREE}.
+   *
+   * The first test is the one whose subject *is* scale, so it keeps the large
+   * tree and takes an explicit timeout derived from its measured idle cost
+   * instead. See {@link SIZE_STEP_TIMEOUT_MS}.
+   *
+   * Where the three land afterwards, idle and under four concurrent `tsc`
+   * workers — twice the load the soak harness applies:
+   *
+   * | test | idle | loaded | timeout | headroom left |
+   * |---|---:|---:|---:|---:|
+   * | size step (1110 items)    | 3055ms | 9785ms | 102000ms | 10.4x |
+   * | updateItem exact set (39) |  175ms |  863ms |  30000ms | 34.8x |
+   * | full-tree count (39)      |  123ms |  507ms |  30000ms | 59.2x |
+   *
+   * Load costs each of them about 3-4x, so the failure mode this replaces —
+   * a 1110-item fixture at 21.2s idle meeting a 30s default — is now roughly
+   * an order of magnitude out of reach.
+   */
+  describe("write volume: single-item mutations don't re-serialize the tree", () => {
+    /**
+     * Small enough to be cheap, large enough that "only the updated item and
+     * its parent" excludes something: 3 epics x 3 features x 3 tasks is 39
+     * items, with two siblings beside the target at every level and a
+     * grandparent above it. The two tests using it went from 21156ms and
+     * 10721ms idle at 1110 items to 182-192ms and 130-145ms over three runs —
+     * a margin of 150x or better against the package's 30s `testTimeout`,
+     * comfortably past the documented 20x.
+     */
+    const SIBLING_TREE: [number, number, number] = [3, 3, 3];
 
-      const latencies: number[] = [];
+    /**
+     * Idle cost of the size-step test below, worst of four runs on the machine
+     * described above — 5011ms cold, then 3636/3112/3055ms — and 2867ms on the
+     * soak machine that filed this task.
+     *
+     * Times the documented load allowance this is a hang guardrail, not a
+     * latency budget. The test's verdict comes from comparing two exact path
+     * sets, so nothing about it gets easier or harder to pass as this bound
+     * moves; it exists so a serializer that deadlocks fails with a named cause
+     * instead of silently inheriting a package default that this fixture — the
+     * only 1110-item one left in the file — does not fit.
+     */
+    const SIZE_STEP_TIMEOUT_MS = 5_100 * LOAD_ALLOWANCE;
 
-      // Run 10 add operations and measure latency
-      for (let i = 0; i < 10; i++) {
-        const startTime = performance.now();
-        const newItem = makeItem(`new-${i}`, `New Item ${i}`);
-        await store.addItem(newItem);
-        const endTime = performance.now();
-        latencies.push(endTime - startTime);
+    /** Project-relative paths written by `mutate`, with earlier saves drained first. */
+    async function writesDuring(mutate: () => Promise<void>): Promise<string[]> {
+      store.takeSaveFileReport();
+      await mutate();
+      return store.takeSaveFileReport()?.written ?? [];
+    }
+
+    /** A store of its own, on its own temp dir, torn down after `use`. */
+    async function withStore(use: (store: FolderTreeStore) => Promise<void>): Promise<void> {
+      const dir = await mkdtemp(join(tmpdir(), "rex-atomic-size-"));
+      const ownRexDir = join(dir, ".rex");
+      await mkdir(ownRexDir, { recursive: true });
+      try {
+        await use(new FolderTreeStore(ownRexDir));
+      } finally {
+        await rm(dir, { recursive: true, force: true });
       }
+    }
 
-      // Calculate median latency
-      const sorted = latencies.sort((a, b) => a - b);
-      const median = sorted[Math.floor(sorted.length / 2)];
+    /** Files written by adding one task under `feature-0-0` of a fresh `size` tree. */
+    async function addWritesOnTree(size: [number, number, number]): Promise<string[]> {
+      let written: string[] = [];
+      await withStore(async (own) => {
+        await own.saveDocument({
+          schema: SCHEMA_VERSION,
+          title: "Sized PRD",
+          items: createHierarchy(...size),
+        });
+        own.takeSaveFileReport();
+        await own.addItem(makeItem("added-task", "Added Task"), "feature-0-0");
+        written = own.takeSaveFileReport()?.written ?? [];
+      });
+      return written;
+    }
 
-      // Log results for debugging
-      console.log(`Median latency: ${median.toFixed(2)}ms`);
-      console.log(`Min: ${Math.min(...latencies).toFixed(2)}ms, Max: ${Math.max(...latencies).toFixed(2)}ms`);
+    it(
+      "a single add writes the same files on a 1000-item tree as on a 6-item one",
+      async () => {
+        // The replacement for a `median < 500ms` budget on a 1000-item add. What
+        // that budget was guarding is that the cost of an add tracks the change,
+        // not the tree — so the two counts are taken across a 167× size step and
+        // must be identical, not merely both small.
+        const small = await addWritesOnTree([1, 1, 3]);
+        const large = await addWritesOnTree([10, 10, 10]);
 
-      // Verify under 500ms (acceptance criteria)
-      expect(median).toBeLessThan(500);
-    });
+        // The new task's own file plus its parent feature's `index.md`, which
+        // renders its children. Depth-bounded, and the same at either size.
+        expect(small).toHaveLength(2);
+        expect(large).toEqual(small);
+      },
+      SIZE_STEP_TIMEOUT_MS,
+    );
 
-    it("updateItem on 1000-item PRD completes quickly", async function () {
-      // DEFERRED: Requires mutations optimization integration.
-      this.timeout(30000);
-      // Create 1000-item fixture
-      const items = await create1000ItemFixture(join(rexDir, PRD_TREE_DIRNAME));
-      const emptyDoc = { schema: SCHEMA_VERSION, title: "Large PRD", items };
-      await store.saveDocument(emptyDoc);
+    it("updateItem writes only the updated item and its parent", async () => {
+      await store.saveDocument({
+        schema: SCHEMA_VERSION,
+        title: "Sibling PRD",
+        items: createHierarchy(...SIBLING_TREE),
+      });
 
-      // Get an existing item to update
       const doc = await store.loadDocument();
-      const targetItem = doc.items[0];
+      const target = doc.items[0].children![0].children![0];
 
-      const startTime = performance.now();
-      await store.updateItem(targetItem.id, { status: "in_progress" as const });
-      const endTime = performance.now();
+      const written = await writesDuring(() =>
+        store.updateItem(target.id, { status: "in_progress" as const }),
+      );
 
-      const latency = endTime - startTime;
-      console.log(`updateItem latency: ${latency.toFixed(2)}ms`);
-
-      // Should be fast (significantly less than 500ms for single updates)
-      expect(latency).toBeLessThan(500);
+      // The exact set, not a count: a regression that wrote one *different*
+      // file — the epic above, or either sibling task, or either sibling
+      // feature — still fails. The parent's `index.md` is in the set because it
+      // renders its children's status.
+      expect(written.sort()).toEqual([
+        `${PRD_TREE_DIRNAME}/epic-0/feature-0-0/index.md`,
+        `${PRD_TREE_DIRNAME}/epic-0/feature-0-0/task-0-0-0.md`,
+      ].map((p) => `.rex/${p}`));
     });
 
     it("no full-tree re-serialization on single-item add", async () => {
-      // DEFERRED: Requires mutations optimization integration.
-      // Create small initial PRD
-      const item1 = makeItem("epic-1", "Epic 1", "epic");
-      const item2 = makeItem("epic-2", "Epic 2", "epic");
-      const initialDoc = { schema: SCHEMA_VERSION, title: "Test", items: [item1, item2] };
-      await store.saveDocument(initialDoc);
+      const items = createHierarchy(...SIBLING_TREE);
+      await store.saveDocument({ schema: SCHEMA_VERSION, title: "Sibling PRD", items });
+      const fullTreeWrites = store.takeSaveFileReport()?.written.length ?? 0;
 
-      // Spy on serializeFolderTree to ensure it's called
-      // (Note: with current implementation, we still call saveDocument which calls serializeFolderTree,
-      //  but the serializer only re-writes changed files)
+      const added = await writesDuring(() => store.addItem(makeItem("epic-new", "New Epic", "epic")));
 
-      // Add one new epic
-      const newItem = makeItem("epic-3", "Epic 3", "epic");
-      const startTime = performance.now();
-      await store.addItem(newItem);
-      const addTime = performance.now() - startTime;
+      // What a full serialization of this tree costs, measured in this same
+      // process moments earlier: one file per item, exactly. Pinned that way
+      // rather than to the `> 1000` this line used to carry, which was the old
+      // 1110-item fixture's own size wearing the costume of a threshold — it
+      // moved with the fixture and bounded nothing. The count holds at any
+      // fixture size (verified exact at 18, 39, 84, 155, 258 and 1110 items)
+      // and is the stronger claim: dropping one leaf write from a full save
+      // fails here at 38-vs-39, where `> 1000` — or `> 38` — would not.
+      expect(fullTreeWrites).toBe(countItems(items));
 
-      // Re-serialize all should take longer than incremental add
-      const startReserialize = performance.now();
-      const doc = await store.loadDocument();
-      await store.saveDocument(doc);
-      const reserializeTime = performance.now() - startReserialize;
-
-      // With mutations optimization, add should be faster
-      console.log(`Add time: ${addTime.toFixed(2)}ms, Re-serialize time: ${reserializeTime.toFixed(2)}ms`);
-      expect(addTime).toBeLessThanOrEqual(reserializeTime);
+      // Against that, the add: the new epic's own file and nothing else. A
+      // root-level add has no parent index to refresh, and a childless item is
+      // a bare `<slug>.md` leaf rather than a folder. Two counts rather than
+      // two timings, so no threshold has to be guessed.
+      expect(added).toEqual([`.rex/${PRD_TREE_DIRNAME}/new-epic.md`]);
     });
   });
 
