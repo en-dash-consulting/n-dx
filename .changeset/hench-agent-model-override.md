@@ -1,5 +1,6 @@
 ---
 "@n-dx/hench": patch
+"@n-dx/core": patch
 ---
 
 Add `hench.models.<vendor>`, a per-vendor agent-only model override that
