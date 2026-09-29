@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, rmSync, readdirSync, copyFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
-import { SV_DIR } from "./constants.js";
 import { info } from "../output.js";
 import { detectSubAnalyses } from "../sourcevision-core.js";
+import { resolveSourcevisionPaths } from "../../paths.js";
 
 /** Reset a single .sourcevision/ directory: backup files then clear. */
 function resetSvDir(svDir: string, label: string): void {
@@ -35,7 +35,7 @@ function resetSvDir(svDir: string, label: string): void {
 
 export function cmdReset(dir: string): void {
   const absDir = resolve(dir);
-  const svDir = join(absDir, SV_DIR);
+  const svDir = resolveSourcevisionPaths(absDir).svDir;
 
   if (!existsSync(svDir)) {
     info(`No .sourcevision/ directory found in ${absDir} — nothing to reset.`);
@@ -50,7 +50,7 @@ export function cmdReset(dir: string): void {
 
   // Reset sub-analyses
   for (const sub of subs) {
-    const subSvDir = join(absDir, sub.prefix, SV_DIR);
+    const subSvDir = resolveSourcevisionPaths(join(absDir, sub.prefix)).svDir;
     if (existsSync(subSvDir)) {
       resetSvDir(subSvDir, relative(absDir, subSvDir));
     }

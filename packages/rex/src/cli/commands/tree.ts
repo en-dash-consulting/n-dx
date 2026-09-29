@@ -9,11 +9,11 @@
  */
 
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { computeStats } from "../../core/stats.js";
 import { isRootLevel } from "../../schema/index.js";
-import { REX_DIR } from "./constants.js";
+
 import { result } from "../output.js";
 import { emitMigrationNotification } from "../migration-notification.js";
 import type { PRDItem } from "../../schema/index.js";
@@ -131,7 +131,7 @@ export async function cmdTree(dir: string, flags: Record<string, string>): Promi
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD
   const migrationResult = await ensureLegacyPrdMigrated(dir);
 
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
 
   await emitMigrationNotification(migrationResult, flags, (entry) => store.appendLog(entry));

@@ -12,7 +12,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, resolve, relative, basename } from "node:path";
-import { SV_DIR, TOOL_VERSION } from "../constants.js";
+import { TOOL_VERSION } from "../constants.js";
 import { SCHEMA_VERSION } from "../schema/v1.js";
 import { DATA_FILES, SUPPLEMENTARY_FILES } from "../schema/data-files.js";
 import { toPosix } from "../util/paths.js";
@@ -50,6 +50,7 @@ import type {
   Zone,
   ZoneCrossing,
 } from "../schema/index.js";
+import { resolveSourcevisionPaths } from "../paths.js";
 
 // ── Config loading ──────────────────────────────────────────────────────────
 
@@ -130,7 +131,7 @@ export function resolveWorkspaceMembers(
 
   for (const member of config.members) {
     const memberDir = resolve(absRoot, member.path);
-    const svDir = join(memberDir, SV_DIR);
+    const svDir = resolveSourcevisionPaths(memberDir).svDir;
     const manifestPath = join(svDir, DATA_FILES.manifest);
 
     if (!existsSync(manifestPath)) {
@@ -356,7 +357,7 @@ export function writeWorkspaceOutput(
   members: SubAnalysis[],
 ): { zoneCount: number; fileCount: number; crossingCount: number } {
   const absRoot = resolve(rootDir);
-  const svDir = join(absRoot, SV_DIR);
+  const svDir = resolveSourcevisionPaths(absRoot).svDir;
   mkdirSync(svDir, { recursive: true });
 
   // Aggregate data
@@ -380,7 +381,7 @@ export function writeWorkspaceOutput(
       imports: { status: "complete", completedAt: new Date().toISOString() },
       zones: { status: "complete", completedAt: new Date().toISOString() },
     },
-    children: buildSubAnalysisRefs(members),
+    children: buildSubAnalysisRefs(members, absRoot),
     workspace: true,
   };
   writeFileSync(join(svDir, DATA_FILES.manifest), JSON.stringify(manifest, null, 2) + "\n");
@@ -430,7 +431,7 @@ export function getWorkspaceStatus(
 
   for (const member of config.members) {
     const memberDir = resolve(absRoot, member.path);
-    const manifestPath = join(memberDir, SV_DIR, DATA_FILES.manifest);
+    const manifestPath = join(resolveSourcevisionPaths(memberDir).svDir, DATA_FILES.manifest);
     const name = member.name ?? basename(member.path);
 
     if (!existsSync(manifestPath)) {
@@ -440,7 +441,7 @@ export function getWorkspaceStatus(
 
     try {
       const manifest: Manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
-      const zonesPath = join(memberDir, SV_DIR, DATA_FILES.zones);
+      const zonesPath = join(resolveSourcevisionPaths(memberDir).svDir, DATA_FILES.zones);
       let zoneCount: number | undefined;
       let fileCount: number | undefined;
 
@@ -451,7 +452,7 @@ export function getWorkspaceStatus(
         } catch { /* zones unavailable */ }
       }
 
-      const invPath = join(memberDir, SV_DIR, DATA_FILES.inventory);
+      const invPath = join(resolveSourcevisionPaths(memberDir).svDir, DATA_FILES.inventory);
       if (existsSync(invPath)) {
         try {
           const inv = JSON.parse(readFileSync(invPath, "utf-8"));

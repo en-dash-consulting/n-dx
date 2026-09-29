@@ -9,7 +9,7 @@ import {
   resolveEpiclessFeatures,
   applyEpiclessResolutions,
 } from "./validate-interactive.js";
-import { resolveStore, ensureLegacyPrdMigrated, LegacyPrdMigrationError } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, LegacyPrdMigrationError, resolveRexPaths } from "../../store/index.js";
 import {
   findNonConformingSlugs,
   findTreeIdentityFaults,
@@ -20,7 +20,7 @@ import {
   SLUG_RULE_MARKER_MISSING,
 } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
-import { REX_DIR } from "./constants.js";
+
 import { info, result } from "../output.js";
 import { green, yellow, red } from "@n-dx/llm-client";
 import { emitMigrationNotification } from "../migration-notification.js";
@@ -55,14 +55,14 @@ export async function cmdValidate(
   // must not share the document-loading pipeline below. Exit codes are
   // hook-friendly: 0 clean (including "no PRD tree here"), 1 issues remain.
   if (flags["post-merge"] === "true") {
-    await runPostMergeValidation(join(dir, REX_DIR), flags);
+    await runPostMergeValidation(resolveRexPaths(dir).rexDir, flags);
     return;
   }
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD.
   // A migration error (typically a malformed legacy prd.json) is surfaced as a
   // failed PRD schema check rather than an uncaught throw — the rest of the
   // validate pipeline still runs against whatever else is on disk.
-  const rexDir = join(dir, REX_DIR);
+  const rexDir = resolveRexPaths(dir).rexDir;
   const checks: CheckResult[] = [];
   let migrationError: LegacyPrdMigrationError | null = null;
   let migrationResult;
@@ -250,7 +250,7 @@ export async function cmdValidate(
     // string into every path forever.
     const identityFaults = await findTreeIdentityFaults(
       doc.items,
-      join(dir, REX_DIR, PRD_TREE_DIRNAME),
+      join(resolveRexPaths(dir).rexDir, PRD_TREE_DIRNAME),
     );
     checks.push({
       name: "tree identity",
@@ -268,7 +268,7 @@ export async function cmdValidate(
     // so silence here is exactly what let a 1,570-file re-slug merge to main.
     const slugMismatches = await findNonConformingSlugs(
       doc.items,
-      join(dir, REX_DIR, PRD_TREE_DIRNAME),
+      join(resolveRexPaths(dir).rexDir, PRD_TREE_DIRNAME),
     );
     if (slugMismatches.length > 0) {
       checks.push({
@@ -291,7 +291,7 @@ export async function cmdValidate(
     // a tree written by a *future* rule looks conformant to nothing this build
     // knows how to compute, so the recorded version is the only evidence. This
     // is an error for the same reason: the tree's next writer rewrites it.
-    const slugRuleMarker = await readSlugRuleMarker(join(dir, REX_DIR));
+    const slugRuleMarker = await readSlugRuleMarker(resolveRexPaths(dir).rexDir);
     if (slugRuleMarker !== undefined && slugRuleMarker !== SLUG_RULE_VERSION) {
       checks.push({
         name: "tree slug rule marker",
@@ -331,7 +331,7 @@ export async function cmdValidate(
     // Reading the tree makes the predicate identical to the store guard's, so
     // validate is a faithful preview of what the next write will do rather
     // than a second opinion that can disagree with it.
-    const treeRoot = join(dir, REX_DIR, PRD_TREE_DIRNAME);
+    const treeRoot = join(resolveRexPaths(dir).rexDir, PRD_TREE_DIRNAME);
     const { items: treeItems } = await parseFolderTree(treeRoot);
     if (slugRuleMarker === undefined && treeItems.length > 0) {
       // Scanned against the tree's own items for the same reason the block is

@@ -20,7 +20,7 @@
 import { writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { requireSvDir } from "../errors.js";
-import { SV_DIR } from "./constants.js";
+
 import { info } from "../output.js";
 import {
   collectBranchWork,
@@ -34,6 +34,7 @@ import type {
   BranchWorkResult,
   RexBridge,
 } from "../sourcevision-core.js";
+import { resolveSourcevisionPaths } from "../../paths.js";
 
 /**
  * Options shared by the two generation entry points.
@@ -167,7 +168,7 @@ export async function cmdPrMarkdown(
 
   const { outputPath, warnings } = await generatePrMarkdownFile(
     absDir,
-    join(absDir, SV_DIR),
+    resolveSourcevisionPaths(absDir).svDir,
     options,
   );
 

@@ -30,44 +30,42 @@ describe("Migration Notification", () => {
   });
 
   describe("formatMigrationBanner", () => {
+    const BACKUP = ".rex/prd.json.backup-20260430-123456";
+    const TREE = `.rex/${PRD_TREE_DIRNAME}`;
+
     it("includes migration header", () => {
-      const banner = formatMigrationBanner(".rex/prd.json.backup-20260430-123456", 5);
+      const banner = formatMigrationBanner(BACKUP, 5, TREE);
       expect(banner).toContain("Legacy PRD migration completed");
     });
 
     it("includes item count", () => {
-      const banner = formatMigrationBanner(".rex/prd.json.backup-20260430-123456", 5);
+      const banner = formatMigrationBanner(BACKUP, 5, TREE);
       expect(banner).toContain("5 item(s) migrated");
     });
 
     it("includes backup path", () => {
-      const backupPath = ".rex/prd.json.backup-20260430-123456";
-      const banner = formatMigrationBanner(backupPath, 5);
-      expect(banner).toContain(backupPath);
+      const banner = formatMigrationBanner(BACKUP, 5, TREE);
+      expect(banner).toContain(BACKUP);
     });
 
     it("includes folder-tree path", () => {
-      const banner = formatMigrationBanner(".rex/prd.json.backup-20260430-123456", 5);
-      expect(banner).toContain(`.rex/${PRD_TREE_DIRNAME}`);
+      const banner = formatMigrationBanner(BACKUP, 5, TREE);
+      expect(banner).toContain(TREE);
     });
 
     it("includes suggestion to run rex status", () => {
-      const banner = formatMigrationBanner(".rex/prd.json.backup-20260430-123456", 5);
+      const banner = formatMigrationBanner(BACKUP, 5, TREE);
       expect(banner).toContain("rex status");
     });
 
-    it("uses default folder-tree path when not provided", () => {
-      const banner = formatMigrationBanner(".rex/prd.json.backup-20260430-123456", 5);
-      expect(banner).toContain(`.rex/${PRD_TREE_DIRNAME}`);
-    });
-
-    it("uses custom folder-tree path when provided", () => {
-      const banner = formatMigrationBanner(
-        ".rex/prd.json.backup-20260430-123456",
-        5,
-        ".rex/tree-v2"
+    // The banner has no default for the tree path: where the tree lives depends
+    // on the folder layout, and this module has no project root to resolve it
+    // from. Whatever the caller passes is what the operator sees.
+    it("names the folder tree the caller supplied, wherever it is", () => {
+      expect(formatMigrationBanner(BACKUP, 5, ".rex/tree-v2")).toContain(".rex/tree-v2");
+      expect(formatMigrationBanner(BACKUP, 5, `.ndx/rex/${PRD_TREE_DIRNAME}`)).toContain(
+        `.ndx/rex/${PRD_TREE_DIRNAME}`,
       );
-      expect(banner).toContain(".rex/tree-v2");
     });
   });
 

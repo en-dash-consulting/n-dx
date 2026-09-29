@@ -10,10 +10,10 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  PROJECT_DIRS,
   FALLBACK_MODEL_PRICING,
   FALLBACK_PRICING_MODEL,
   priceTokens,
+  resolveLayout,
   resolveModelPricing,
   type BillableTokens,
   type ModelTokenPricing,
@@ -358,7 +358,7 @@ export async function extractHenchTokenUsage(
 ): Promise<PackageTokenUsage> {
   const usage = emptyPackageUsage();
   usage.runs = 0;
-  const runsDir = join(projectDir, PROJECT_DIRS.HENCH, "runs");
+  const runsDir = join(resolveLayout(projectDir).henchDir, "runs");
 
   let files: string[];
   try {
@@ -446,7 +446,7 @@ export async function extractSvTokenUsage(
   filter: TokenUsageFilter = {},
 ): Promise<PackageTokenUsage> {
   const usage = emptyPackageUsage();
-  const manifestPath = join(projectDir, PROJECT_DIRS.SOURCEVISION, "manifest.json");
+  const manifestPath = join(resolveLayout(projectDir).sourcevisionDir, "manifest.json");
 
   try {
     const raw = await readFile(manifestPath, "utf-8");
@@ -524,7 +524,7 @@ export async function extractHenchTokenEvents(
   filter: TokenUsageFilter = {},
 ): Promise<TokenEvent[]> {
   const events: TokenEvent[] = [];
-  const runsDir = join(projectDir, PROJECT_DIRS.HENCH, "runs");
+  const runsDir = join(resolveLayout(projectDir).henchDir, "runs");
 
   let files: string[];
   try {
@@ -595,7 +595,7 @@ export async function extractSvTokenEvents(
   filter: TokenUsageFilter = {},
 ): Promise<TokenEvent[]> {
   const events: TokenEvent[] = [];
-  const manifestPath = join(projectDir, PROJECT_DIRS.SOURCEVISION, "manifest.json");
+  const manifestPath = join(resolveLayout(projectDir).sourcevisionDir, "manifest.json");
 
   try {
     const raw = await readFile(manifestPath, "utf-8");

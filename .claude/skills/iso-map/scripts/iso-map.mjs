@@ -1881,7 +1881,7 @@ refresh(false);
 `;
 
 // packages/sourcevision/src/export/iso-sources.ts
-import { readFileSync as readFileSync3, existsSync as existsSync3 } from "node:fs";
+import { readFileSync as readFileSync3, existsSync as existsSync3, statSync as statSync3 } from "node:fs";
 import { join as join3, basename as basename2, resolve as resolve2 } from "node:path";
 import { execFileSync } from "node:child_process";
 
@@ -2967,8 +2967,18 @@ function balancedChildren(zone) {
   if (kids.reduce((n, k) => Math.max(n, k.files.length), 0) / total >= LOPSIDED_CHILD_SHARE) return void 0;
   return kids.map((k) => ({ id: k.id, name: k.name, files: k.files.length }));
 }
+function analysisDirFor(root) {
+  const container = join3(root, ".ndx");
+  let containerIsDir = false;
+  try {
+    containerIsDir = statSync3(container).isDirectory();
+  } catch {
+    containerIsDir = false;
+  }
+  return containerIsDir ? join3(container, "sourcevision") : join3(root, ".sourcevision");
+}
 function hasSourcevision(root) {
-  const svDir = join3(root, ".sourcevision");
+  const svDir = analysisDirFor(root);
   return existsSync3(svDir) && REQUIRED_FILES.every((f) => existsSync3(join3(svDir, f)));
 }
 function readJson2(path) {
@@ -2979,7 +2989,7 @@ function readJson2(path) {
   }
 }
 function loadFromSourcevision(root, options = {}) {
-  const svDir = join3(root, ".sourcevision");
+  const svDir = analysisDirFor(root);
   if (!hasSourcevision(root)) return null;
   const zonesData = readJson2(join3(svDir, "zones.json"));
   const inventory = readJson2(join3(svDir, "inventory.json"));
