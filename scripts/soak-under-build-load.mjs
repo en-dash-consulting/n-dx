@@ -93,14 +93,22 @@ function human(ms) {
  * a compile error in the tree under test should not abort the soak, it should
  * show up in the run's summary as a load that was not doing the work it claimed.
  */
-function compileOnce(pkg, state) {
+function compileOnce(pkg, state, worker) {
   return new Promise((resolve) => {
     const child = spawnCli(
       process.execPath,
       [
         TSC,
         "-p", join(ROOT, "packages", pkg, "tsconfig.json"),
-        "--outDir", join(LOAD_OUT, pkg),
+        // Per WORKER, not just per package. Workers start at different indices
+        // but compiles take different lengths of time, so the cursors drift and
+        // two workers land on the same package: both would emit into one
+        // directory, which on Windows surfaces as EBUSY/EPERM and a non-zero
+        // exit counted as a failed cycle — the summary would report a broken
+        // load that was never broken. The worker segment also keeps concurrent
+        // soak invocations out of each other's output, since LOAD_OUT is a
+        // fixed path under the OS temp directory.
+        "--outDir", join(LOAD_OUT, String(worker), pkg),
         // sourcevision and web set `"incremental": true`; left on, the second
         // cycle onward would find everything up to date and do no work at all.
         "--incremental", "false",
@@ -124,12 +132,14 @@ function compileOnce(pkg, state) {
  *
  * Each worker starts at a different package so two workers are not usually
  * compiling the same one at the same moment — the point is to occupy cores,
- * not to measure any single package.
+ * not to measure any single package. "Not usually" is why each worker emits
+ * into its own output directory: the cursors drift as compiles take different
+ * lengths of time, so an overlap is expected rather than excluded.
  */
 async function loadWorker(index, state) {
   let cursor = index % PACKAGES.length;
   while (!state.stop) {
-    const code = await compileOnce(PACKAGES[cursor], state);
+    const code = await compileOnce(PACKAGES[cursor], state, index);
     if (state.stop) break;
     state.cycles += 1;
     if (code !== 0) state.failedCycles += 1;

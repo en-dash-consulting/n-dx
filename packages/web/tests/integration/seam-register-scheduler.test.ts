@@ -165,14 +165,29 @@ describe("RegisterSchedulerOptions seam contract", () => {
   });
 
   it("options without broadcast do not throw when scheduler fires", async () => {
-    // Gated on the tick, because the claim is about what happens *when the
-    // scheduler fires*. Sleeping instead meant a window with no tick in it
-    // satisfied the test without the minimal-options path ever running.
+    // Gated on the SECOND getAggregator call, which is what proves the first
+    // tick finished. The tick body is wrapped in a `running` guard cleared in
+    // its `finally`, so a later tick returns immediately while the previous
+    // one is in flight — a second call therefore cannot happen until the first
+    // has run to completion. Gating on the first call instead proved only that
+    // the tick had *started*: the assertions then ran while the cleanup cycle
+    // was still going, and afterEach removed tmpDir underneath it.
+    //
+    // Completion alone is not enough, because that `finally` also runs when the
+    // body throws — the error goes to console.error and never reaches the test.
+    // So the spy is the other half of the claim, not decoration.
+    const errors: unknown[][] = [];
+    const consoleError = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      errors.push(args);
+    });
+
     const gate = callGate();
+    let calls = 0;
     const options: RegisterSchedulerOptions = {
       ctx: { rexDir: join(tmpDir, ".rex"), projectDir: tmpDir },
       getAggregator: () => {
-        gate.signal();
+        calls += 1;
+        if (calls === 2) gate.signal();
         return makeAggregator();
       },
       overrideIntervalMs: 10,
@@ -180,9 +195,16 @@ describe("RegisterSchedulerOptions seam contract", () => {
     };
 
     const handle = registerUsageScheduler(options);
-    await gate.called;
-    clearInterval(handle);
-    // Reaching here means the tick ran and raised no unhandled error.
+    try {
+      await gate.called;
+    } finally {
+      clearInterval(handle);
+      consoleError.mockRestore();
+    }
+
+    // A full tick completed on the minimal options, and raised nothing.
+    expect(calls).toBeGreaterThanOrEqual(2);
+    expect(errors).toEqual([]);
   });
 
   it("overrideIntervalMs is respected over config file defaults", async () => {

@@ -411,11 +411,11 @@ describe("prd_tree atomic writes and crash-safety", () => {
     }
 
     it(
-      "a single add writes the same files on a 1000-item tree as on a 6-item one",
+      "a single add writes the same files on a 1000-item tree as on a 5-item one",
       async () => {
         // The replacement for a `median < 500ms` budget on a 1000-item add. What
         // that budget was guarding is that the cost of an add tracks the change,
-        // not the tree — so the two counts are taken across a 167× size step and
+        // not the tree — so the two counts are taken across a 222× size step and
         // must be identical, not merely both small.
         const small = await addWritesOnTree([1, 1, 3]);
         const large = await addWritesOnTree([10, 10, 10]);
