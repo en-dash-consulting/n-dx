@@ -36,18 +36,27 @@ export {
   resolveLocationRoute,
 } from "./route-state.js";
 
-// --- Hooks consumed by sibling zones (e.g. viewer-ui-hub/sidebar) ---
+// --- Hooks consumed by sibling zones (e.g. the shell components) ---
 export { useProjectMetadata, useCliName } from "./hooks/index.js";
 export { useFeatureToggle } from "./hooks/index.js";
 export { useProjectStatus } from "./hooks/index.js";
 
-// --- Status indicator components (sidebar badges) ---
+// --- Status indicator components (bottom-bar badges) ---
 export {
   SvFreshnessIndicator,
   RexCompletionIndicator,
   HenchActivityIndicator,
+  INDICATOR_VIEWS,
 } from "./components/index.js";
 
-// --- Navigation config consumed outside web-viewer ---
-export { SOURCEVISION_TABS } from "./views/sourcevision-tabs.js";
-export type { SourceVisionTab } from "./views/sourcevision-tabs.js";
+// --- Layout: stages, their sections, and the settings list (shell components) ---
+export {
+  STAGES,
+  STAGE_ORDER,
+  SETTINGS_ENTRIES,
+  isSettingsView,
+  isStageId,
+  stageForView,
+  visibleStages,
+} from "./views/stages.js";
+export type { StageId, StageDef, StageSection, StageProduct, SettingsEntry } from "./views/stages.js";

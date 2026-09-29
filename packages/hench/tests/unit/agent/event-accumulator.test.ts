@@ -712,3 +712,71 @@ describe("EventAccumulator — edge cases", () => {
     }
   });
 });
+
+// ── Zero-valued usage through the event pipeline ─────────────────────────
+//
+// A zero is the case where inference and measurement disagree. The parser
+// decides from field PRESENCE, so an explicit `input_tokens: 0` is a complete
+// measurement; a consumer looking only at the parsed numbers sees a zero and
+// calls it partial. Zero-valued cache counts are omitted from TokenUsage
+// altogether, so "explicitly zero" and "never reported" are indistinguishable
+// downstream. These pin the carried values, and the fallback for events that
+// predate them.
+
+describe("EventAccumulator — zero-valued usage keeps the parser's verdict", () => {
+  it("treats an explicit zero input as complete, not partial", () => {
+    const acc = new EventAccumulator();
+    acc.push(makeEvent({
+      type: "token_usage",
+      turn: 1,
+      tokenUsage: { input: 0, output: 500 },
+      tokenDiagnosticStatus: "complete",
+    }));
+
+    expect(acc.tokenUsage.perTurn[0].diagnosticStatus).toBe("complete");
+    expect(acc.tokenUsage.overallDiagnostic).toBe("complete");
+  });
+
+  it("treats an explicit zero on both fields as complete, not unavailable", () => {
+    const acc = new EventAccumulator();
+    acc.push(makeEvent({
+      type: "token_usage",
+      turn: 1,
+      tokenUsage: { input: 0, output: 0 },
+      tokenDiagnosticStatus: "complete",
+    }));
+
+    expect(acc.tokenUsage.perTurn[0].diagnosticStatus).toBe("complete");
+    expect(acc.tokenUsage.overallDiagnostic).toBe("complete");
+  });
+
+  it("keeps cache provenance measured when the zero count was omitted", () => {
+    const acc = new EventAccumulator();
+    // `cache_read_input_tokens: 0` parses to a TokenUsage with no cache field
+    // at all, so only the carried provenance distinguishes it from a payload
+    // that reported no cache accounting.
+    acc.push(makeEvent({
+      type: "token_usage",
+      turn: 1,
+      tokenUsage: { input: 100, output: 50 },
+      tokenDiagnosticStatus: "complete",
+      tokenCacheProvenance: "measured",
+    }));
+
+    expect(acc.tokenUsage.perTurn[0].cacheProvenance).toBe("measured");
+  });
+
+  it("falls back to inference for an event carrying no verdict", () => {
+    const acc = new EventAccumulator();
+    acc.push(makeEvent({
+      type: "token_usage",
+      turn: 1,
+      tokenUsage: { input: 0, output: 500 },
+    }));
+
+    // Weaker, and knowingly so: without the parser's verdict the zero can
+    // only be read as a missing field.
+    expect(acc.tokenUsage.perTurn[0].diagnosticStatus).toBe("partial");
+    expect(acc.tokenUsage.perTurn[0].cacheProvenance).toBe("unavailable");
+  });
+});

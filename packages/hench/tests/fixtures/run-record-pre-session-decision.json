@@ -1,0 +1,56 @@
+{
+  "id": "5f2c1a90-pre-session",
+  "taskId": "task-legacy-1",
+  "taskTitle": "A task that ran before session decisions were recorded",
+  "startedAt": "2026-07-14T09:00:00.000Z",
+  "finishedAt": "2026-07-14T09:12:31.000Z",
+  "status": "completed",
+  "turns": 11,
+  "summary": "Landed the change and committed it.",
+  "model": "claude-sonnet-5",
+  "vendor": "claude",
+  "tokenUsage": {
+    "input": 534,
+    "output": 2104,
+    "cacheCreationInput": 876,
+    "cacheReadInput": 34100
+  },
+  "tokens": {
+    "input": 534,
+    "output": 2104,
+    "cached": 34976,
+    "total": 37614
+  },
+  "turnTokenUsage": [
+    {
+      "turn": 1,
+      "input": 300,
+      "output": 900,
+      "cacheReadInput": 20000,
+      "vendor": "claude",
+      "model": "claude-sonnet-5",
+      "diagnosticStatus": "complete"
+    },
+    {
+      "turn": 2,
+      "input": 234,
+      "output": 1204,
+      "cacheCreationInput": 876,
+      "cacheReadInput": 14100,
+      "vendor": "claude",
+      "model": "claude-sonnet-5",
+      "diagnosticStatus": "complete"
+    }
+  ],
+  "toolCalls": [],
+  "parentSessionId": "8d41c0f2-0000-4000-8000-000000000001",
+  "spawnCount": 1,
+  "diagnostics": {
+    "tokenDiagnosticStatus": "complete",
+    "parseMode": "stream-json",
+    "notes": [],
+    "vendor": "claude",
+    "sandbox": "workspace-write",
+    "approvals": "never"
+  }
+}

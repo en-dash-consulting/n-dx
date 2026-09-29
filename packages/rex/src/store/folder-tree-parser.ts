@@ -702,6 +702,9 @@ function buildItem(
   const blockedBy = asStringList(fm["blockedBy"]);
   if (blockedBy !== null) item.blockedBy = blockedBy;
 
+  const ready = asBoolean(fm["ready"]);
+  if (ready !== null) item.ready = ready;
+
   const source = asString(fm["source"]);
   if (source !== null) item.source = source;
 
@@ -740,7 +743,7 @@ function buildItem(
 
   // Preserve unknown fields (forward-compat: round-trip fidelity for future extensions)
   const knownKeys = new Set([
-    "id", "level", "title", "status", "description", "priority", "tags", "blockedBy",
+    "id", "level", "title", "status", "description", "priority", "tags", "blockedBy", "ready",
     "source", "startedAt", "completedAt", "endedAt", "resolutionType",
     "resolutionDetail", "failureReason", "acceptanceCriteria", "loe",
   ]);
@@ -1200,6 +1203,19 @@ function parseScalar(s: string): unknown {
 function asString(v: unknown): string | null {
   if (typeof v === "string") return v;
   if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return null;
+}
+
+/**
+ * Return the value as a boolean, or null if absent/unrecognized.
+ * Accepts a real boolean (the normal case — `parseScalar` already turns an
+ * unquoted `true`/`false` into one) plus the quoted string form, in case a
+ * tree was hand-edited or written before the serializer quoted-boolean fix.
+ */
+function asBoolean(v: unknown): boolean | null {
+  if (typeof v === "boolean") return v;
+  if (v === "true") return true;
+  if (v === "false") return false;
   return null;
 }
 

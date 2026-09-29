@@ -198,6 +198,7 @@ ndx start .                 # register with the hub; dashboard + MCP at /p/<id>/
 ndx start status .          # hub, project and URL
 ndx start stop .            # unregister this worktree
 ndx start --here .          # single-project server that owns the port instead
+ndx start --preview .       # editable UI layout mock-up on :3118, runs alongside the dashboard
 ndx usage .                 # token usage analytics
 ```
 
@@ -230,7 +231,7 @@ ndx config llm.codex.cli_path codex .
 | `ndx add "<desc>" [dir]` | Add PRD items from descriptions, files, or stdin |
 | `ndx work [dir]` | Run next task (`--task=ID`, `--epic=ID`, `--auto`, `--loop`, `--yes`) |
 | `ndx self-heal [N] [dir]` | Iterative improvement loop (analyze + recommend + execute) |
-| `ndx start [dir]` | Start server: dashboard + MCP (`--port=N`, `--background`, `stop`, `status`) |
+| `ndx start [dir]` | Start server: dashboard + MCP (`--port=N`, `--background`, `--preview`, `stop`, `status`) |
 
 ### More
 
@@ -265,6 +266,7 @@ These are delegated to rex; `ndx <command>` and `rex <command>` are equivalent.
 | `ndx next [dir]` | Print the next actionable task |
 | `ndx claim list\|release [dir]` | Inspect and free cross-worktree task claims: `list` shows every live claim with its worktree, holder, state and expiry; `release <taskId>` frees one (`--force` while its holder is alive); `release --all` frees this worktree's held and dead-holder claims (`--format=json` throughout) |
 | `ndx tree [dir]` | Show the full PRD hierarchy with colour-coded status |
+| `ndx tree-diff [dir]` | Compare two PRD trees into added/changed/completed/moved/removed, each with its ancestor chain. Defaults to this checkout against the default branch; `--from=<ref> --to=<ref>` compares commits, `--against=<dir>` compares two checkouts, `--json` for machine output. Read-only — takes no PRD lock |
 | `ndx update <id> [dir]` | Update item status, priority, or title |
 | `ndx remove <id> [dir]` | Remove an item and its children |
 | `ndx move <id> [dir]` | Reparent an item under a new parent |

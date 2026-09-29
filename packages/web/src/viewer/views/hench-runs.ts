@@ -160,6 +160,21 @@ interface RunDiagnosticsData {
   approvals?: string;
 }
 
+/**
+ * The session-cache decision, as `RunSessionRecord` is written by hench.
+ *
+ * `reason` is a bare string on both sides: the rejection codes belong to
+ * hench's cache and change with its identity checks, so a dashboard that
+ * enumerated them would start rendering blanks the moment one was renamed.
+ */
+interface RunSessionData {
+  strategy: "fork" | "batch" | "cold";
+  outcome: "hit" | "miss";
+  reason: string;
+  ageMs?: number;
+  sessionId?: string;
+}
+
 export interface RunDetail extends RunSummary {
   toolCalls?: Array<{ tool: string; input?: unknown; output?: unknown }>;
   turnTokenUsage?: Array<{
@@ -169,6 +184,19 @@ export interface RunDetail extends RunSummary {
     cacheCreationInput?: number;
     cacheReadInput?: number;
   }>;
+  /**
+   * Normalized token totals. `cachedProvenance` is what keeps a missing cache
+   * figure from rendering as a confident zero — see the Token Breakdown block.
+   */
+  tokens?: {
+    input: number;
+    output: number;
+    cached: number;
+    total: number;
+    cachedProvenance?: "measured" | "estimated" | "unavailable";
+  };
+  /** Which session strategy ran, and whether the cache served it. */
+  session?: RunSessionData;
   diagnostics?: RunDiagnosticsData;
   /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
@@ -243,6 +271,73 @@ const TOKEN_DIAG_CONFIG: Record<string, { icon: string; label: string; color: st
 function getTokenDiagConfig(status?: string) {
   if (!status) return null;
   return TOKEN_DIAG_CONFIG[status] ?? null;
+}
+
+/**
+ * Prose for a session-cache reason code, falling through to the code itself.
+ *
+ * Mirrors `REASON_PROSE` in `packages/hench/src/cli/session-report.ts`. The
+ * duplication is deliberate — the viewer must not import from hench, which is
+ * not one of web's gateways — and it is safe because both sides fall back to
+ * printing the raw code, so a reason added on one side degrades to something
+ * readable on the other rather than to a blank.
+ */
+const SESSION_REASON_PROSE: Record<string, string> = {
+  cached: "reused the cached orientation",
+  "chain-continued": "continued the running batch chain",
+  "configured-cold": "cold spawns are configured",
+  "fork-unsupported": "this vendor cannot resume a session by id",
+  "not-consulted": "no cache was consulted",
+  "api-provider": "the API path holds no resumable session",
+  "no-entry": "nothing was cached",
+  "fresh-requested": "a fresh session was requested",
+  "sourcevision-changed": "the analysis changed since it was built",
+  "vendor-changed": "the vendor changed",
+  "model-changed": "the model changed",
+  expired: "it was past its maximum age",
+  malformed: "the cache entry was unreadable",
+  "no-chain": "no chain was running",
+  disabled: "batching is disabled",
+  unversioned: "the chain predates the current cache scheme",
+  "version-changed": "the chain was written by a different cache scheme",
+  "worktree-changed": "the chain belongs to another worktree",
+  "ref-changed": "the chain was opened on another branch",
+  "policy-changed": "the execution policy changed",
+  idle: "the chain sat idle too long",
+  "cap-reached": "the chain had served its full task allowance",
+};
+
+/** `3720000` → `"1h 2m"`. Whole units only — a diagnostic, not a clock. */
+function fmtAge(ms: number): string {
+  const totalMinutes = Math.floor(ms / 60_000);
+  if (totalMinutes < 1) return "under a minute";
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
+/**
+ * How the cached token figure should read.
+ *
+ * `unavailable` is the case this exists for: the vendor reported no cache
+ * accounting, so `0` would be an assertion nobody measured. Absent provenance
+ * is treated the same way — every run record written before the field existed
+ * is in exactly that position.
+ */
+function cachedTokenDisplay(run: RunDetail): { value: string; title?: string } {
+  const provenance = run.tokens?.cachedProvenance;
+  const cached = run.tokens?.cached ?? 0;
+  if (provenance === "unavailable" || provenance === undefined) {
+    return {
+      value: "—",
+      title: "This vendor reported no cache accounting for this run. The figure is unknown, not zero.",
+    };
+  }
+  return {
+    value: fmtTokens(cached),
+    title: provenance === "estimated" ? "Estimated, not reported by the vendor." : undefined,
+  };
 }
 
 function fmtBytes(n: number): string {
@@ -712,8 +807,60 @@ export function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onB
               h("span", { class: "hench-token-label" }, "Cache Read"),
             )
           : null,
+        // Always rendered, unlike the two halves above: the whole point is that
+        // a run with no cache figure has to say so rather than show nothing and
+        // let the reader conclude it cached nothing.
+        (() => {
+          const cached = cachedTokenDisplay(run);
+          return h("div", {
+            class: "hench-token-item",
+            ...(cached.title ? { title: cached.title } : {}),
+          },
+            h("span", { class: "hench-token-val" }, cached.value),
+            h("span", { class: "hench-token-label" }, "Cached Total"),
+          );
+        })(),
       ),
     ),
+
+    // Session strategy — what the cache was asked for, and what it answered.
+    run.session
+      ? h("div", { class: "hench-detail-section" },
+          h("h3", null, "Session"),
+          h("div", { class: "hench-diagnostics-grid" },
+            h("div", { class: "hench-diag-item" },
+              h("span", { class: "hench-diag-label" }, "Strategy"),
+              h("span", { class: "hench-diag-value" }, run.session.strategy),
+            ),
+            h("div", { class: "hench-diag-item" },
+              h("span", { class: "hench-diag-label" }, "Cache"),
+              h("span", {
+                class: `hench-diag-value hench-session-outcome hench-session-outcome-${run.session.outcome}`,
+              }, run.session.outcome === "hit" ? "● Hit" : "○ Miss"),
+            ),
+            h("div", { class: "hench-diag-item" },
+              h("span", { class: "hench-diag-label" }, "Reason"),
+              h("span", { class: "hench-diag-value" },
+                SESSION_REASON_PROSE[run.session.reason] ?? run.session.reason,
+              ),
+            ),
+            run.session.ageMs !== undefined
+              ? h("div", { class: "hench-diag-item" },
+                  h("span", { class: "hench-diag-label" }, "Session Age"),
+                  h("span", { class: "hench-diag-value" }, fmtAge(run.session.ageMs)),
+                )
+              : null,
+            run.session.sessionId
+              ? h("div", { class: "hench-diag-item" },
+                  h("span", { class: "hench-diag-label" }, "Reused"),
+                  h("span", { class: "hench-diag-value hench-diag-mono" },
+                    run.session.sessionId.slice(0, 8),
+                  ),
+                )
+              : null,
+          ),
+        )
+      : null,
 
     // Vendor Diagnostics
     run.diagnostics

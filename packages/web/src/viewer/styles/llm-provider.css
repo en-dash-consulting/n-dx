@@ -627,7 +627,7 @@
 /* Toast */
 .llm-toast {
   position: fixed;
-  bottom: var(--spacing-xl);
+  bottom: calc(var(--spacing-xl) + var(--bottombar-h, 0px));
   right: var(--spacing-xl);
   display: flex;
   align-items: center;

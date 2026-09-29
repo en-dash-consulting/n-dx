@@ -32,8 +32,21 @@ import type {
   BranchWorkRecordItem,
   BranchWorkEpicSummary,
   BranchWorkResult,
+  RexBridge,
 } from "../sourcevision-core.js";
 import { resolveSourcevisionPaths } from "../../paths.js";
+
+/**
+ * Options shared by the two generation entry points.
+ *
+ * `rex` is passed straight through to the collector, which spawns the real rex
+ * CLI when it is absent. Supplying it lets the rendering pipeline be exercised
+ * without a built rex on PATH — see the collector's own docs for why that seam
+ * exists.
+ */
+export interface PrMarkdownOptions {
+  rex?: Partial<RexBridge>;
+}
 
 /** Output filename for generated PR markdown. */
 export const PR_MARKDOWN_FILENAME = "pr-markdown.md";
@@ -111,16 +124,19 @@ export interface PrMarkdownGenerationResult {
  * — this function performs no CLI error checking.
  *
  * Gracefully handles:
- * - Missing `.rex/prd.json` (produces "no completed work" output)
+ * - No readable PRD (produces "no completed work" output plus a warning)
  * - Non-git directories (all completed items treated as branch work)
  * - Missing base branch (all completed items treated as branch work)
- * - Corrupted PRD JSON (produces empty result with warnings)
  */
 export async function generatePrMarkdownFile(
   absDir: string,
   svDir: string,
+  options: PrMarkdownOptions = {},
 ): Promise<PrMarkdownGenerationResult> {
-  const result = await collectBranchWork({ dir: absDir });
+  const result = await collectBranchWork({
+    dir: absDir,
+    ...(options.rex && { rex: options.rex }),
+  });
   const warnings = result.errors ? [...result.errors] : [];
 
   const record = toBranchWorkRecord(result);
@@ -134,23 +150,26 @@ export async function generatePrMarkdownFile(
 /**
  * Generate PR markdown from rex completion data.
  *
- * Collects completed work items from `.rex/prd.json`, converts to a
- * branch work record, and renders structured markdown organized by
- * epics and features.
+ * Collects completed work items from the PRD through rex, converts them to a
+ * branch work record, and renders structured markdown organized by epics and
+ * features.
  *
  * Gracefully handles:
- * - Missing `.rex/prd.json` (produces "no completed work" output)
+ * - No readable PRD (produces "no completed work" output plus a warning)
  * - Non-git directories (all completed items treated as branch work)
  * - Missing base branch (all completed items treated as branch work)
- * - Corrupted PRD JSON (produces empty result with warnings)
  */
-export async function cmdPrMarkdown(targetDir: string): Promise<void> {
+export async function cmdPrMarkdown(
+  targetDir: string,
+  options: PrMarkdownOptions = {},
+): Promise<void> {
   const absDir = resolve(targetDir);
   requireSvDir(absDir);
 
   const { outputPath, warnings } = await generatePrMarkdownFile(
     absDir,
     resolveSourcevisionPaths(absDir).svDir,
+    options,
   );
 
   for (const warning of warnings) {

@@ -1757,6 +1757,12 @@ Hench settings (.hench/config.json):
   hench.parentMaxAgeHours  number    How long a cached orientation session may be forked before it
                                      is rebuilt (default: 24). Re-analyzing the repo invalidates it
                                      sooner; 'ndx work --fresh' forces a new one.
+  hench.batchMaxAgeHours   number    How long a "batch" chain may keep serving tasks, measured from
+                                     the task that opened it (default: 8).
+  hench.batchMaxIdleHours  number    How long a "batch" chain may sit unused before it is retired
+                                     (default: 1). A chain is also retired whenever the worktree,
+                                     branch, analysis fingerprint, permissions, vendor or model
+                                     differ from the ones it was opened under.
   hench.maxSpawnsPerTask   number    Ceiling on vendor spawns for one task (default: 8). Counts
                                      every spawn — the first, failure retries, plan-mode re-spawns,
                                      and fallbacks — so the allowances add up rather than

@@ -96,6 +96,30 @@ describe("findNextTask", () => {
     expect(result!.item.id).toBe("t2");
   });
 
+  it("selects exactly as today on a tree with no ready fields (regression)", () => {
+    // `PRDItem.ready` (written by `rex ready`) must never be read by task
+    // selection — a tree that has never run `rex ready` (the common case,
+    // and every tree before this field existed) selects identically to one
+    // that has. This pins that: priority ordering alone still decides.
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Low", priority: "low" }),
+      makeItem({ id: "t2", title: "Critical", priority: "critical" }),
+      makeItem({ id: "t3", title: "High", priority: "high" }),
+    ];
+    expect(items.every((i) => i.ready === undefined)).toBe(true);
+    const result = findNextTask(items, new Set());
+    expect(result!.item.id).toBe("t2");
+  });
+
+  it("ignores ready when present — priority still decides selection", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Low but ready", priority: "low", ready: true }),
+      makeItem({ id: "t2", title: "Critical, not ready", priority: "critical" }),
+    ];
+    const result = findNextTask(items, new Set());
+    expect(result!.item.id).toBe("t2");
+  });
+
   it("goes depth-first into children", () => {
     const items: PRDItem[] = [
       makeItem({

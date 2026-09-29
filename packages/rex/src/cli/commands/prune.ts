@@ -20,6 +20,7 @@ import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
+import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 
 // ── Parsed flag helpers ──────────────────────────────────────────────
 
@@ -104,6 +105,13 @@ export async function cmdPrune(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  // --dry-run only previews what would be pruned, so it is not a rewrite.
+  const guard = flags["dry-run"] === "true" ? { blocked: false, branch: "" } : checkBranchGuard(dir, flags);
+  if (guard.blocked) {
+    const { message, suggestion } = branchGuardRefusal("prune", guard.branch);
+    throw new CLIError(message, suggestion);
+  }
+
   const smart = flags.smart === "true";
 
   if (smart) {

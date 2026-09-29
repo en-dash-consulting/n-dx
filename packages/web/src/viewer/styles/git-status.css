@@ -7,7 +7,7 @@
 
 .git-status-banner {
   position: fixed;
-  bottom: 8rem;
+  bottom: calc(8rem + var(--bottombar-h, 0px));
   right: 1rem;
   z-index: 997;
   display: flex;

@@ -179,6 +179,17 @@ describe("LLM Utilization view — dashboard spend", () => {
     expect(ask[6]).toBe("13,360");
   });
 
+  it("lays the summary out in two rows: headline figures, then the token classes", () => {
+    const rows = Array.from(root.querySelectorAll(".token-metrics > .token-metrics-row"));
+    const labels = rows.map((row) => Array.from(row.querySelectorAll(".metric-card")).map((c) => c.textContent ?? ""));
+    expect(labels).toHaveLength(2);
+    expect(labels[0]).toHaveLength(3);
+    expect(labels[0].map((t) => ["Total Tokens", "Est. Cost", "API Calls"].find((l) => t.includes(l)))).toEqual(["Total Tokens", "Est. Cost", "API Calls"]);
+    expect(labels[1]).toHaveLength(4);
+    expect(labels[1].map((t) => ["Input Tokens", "Output Tokens", "Cache Write Tokens", "Cache Read Tokens"].find((l) => t.includes(l))))
+      .toEqual(["Input Tokens", "Output Tokens", "Cache Write Tokens", "Cache Read Tokens"]);
+  });
+
   it("gives cache tokens their own headline figures", () => {
     const metrics = Array.from(root.querySelectorAll(".overview-metrics .metric-card"))
       .map((c) => c.textContent ?? "");

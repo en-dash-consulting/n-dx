@@ -61,9 +61,21 @@
   font-size: var(--font-sm);
 }
 
-/* Metrics row (extends overview-metrics) */
+/* Metrics: two fixed rows (extends overview-metrics) — the headline figures
+   (total, cost, calls), then the four token classes behind the total. */
 .token-metrics {
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.token-metrics-row {
+  display: grid;
+  gap: 12px;
+}
+.token-metrics-row--headline { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.token-metrics-row--classes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 640px) {
+  .token-metrics-row--classes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Budget alert banner */

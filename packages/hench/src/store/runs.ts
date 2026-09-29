@@ -32,7 +32,7 @@ export async function saveRun(
   // are still joinable back to their PRD item at rollup time. Mutate the
   // caller's record so in-memory readers see the same value that was
   // written to disk.
-  run.tokens = normalizeRunTokens(run.tokenUsage);
+  run.tokens = normalizeRunTokens(run.tokenUsage, run.turnTokenUsage);
   await writeFile(join(runsDir, `${run.id}.json`), toCanonicalJSON(run), "utf-8");
 }
 
