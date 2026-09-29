@@ -1881,7 +1881,7 @@ refresh(false);
 `;
 
 // packages/sourcevision/src/export/iso-sources.ts
-import { readFileSync as readFileSync3, existsSync as existsSync3, statSync as statSync3 } from "node:fs";
+import { readFileSync as readFileSync3, existsSync as existsSync3 } from "node:fs";
 import { join as join3, basename as basename2, resolve as resolve2 } from "node:path";
 import { execFileSync } from "node:child_process";
 
@@ -2487,6 +2487,18 @@ function scanProject(root) {
 // packages/sourcevision/src/export/iso-declared.ts
 import { readFileSync as readFileSync2, existsSync as existsSync2, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
 import { join as join2, relative as relative2, extname as extname2, sep as sep2 } from "node:path";
+function ndxContainer(root) {
+  const container = join2(root, ".ndx");
+  try {
+    return statSync2(container).isDirectory() ? container : null;
+  } catch {
+    return null;
+  }
+}
+function projectConfigFor(root) {
+  const container = ndxContainer(root);
+  return container ? join2(container, "config.json") : join2(root, ".n-dx.json");
+}
 function readJson(path) {
   try {
     return JSON.parse(readFileSync2(path, "utf-8"));
@@ -2495,7 +2507,7 @@ function readJson(path) {
   }
 }
 function readDeclaredConfig(root) {
-  const config = readJson(join2(root, ".n-dx.json"));
+  const config = readJson(projectConfigFor(root));
   const isoMap = config?.sourcevision?.isoMap;
   if (!isoMap) return { seams: [], infrastructure: [] };
   const seams = (isoMap.injectionSeams ?? []).filter(
@@ -2968,14 +2980,8 @@ function balancedChildren(zone) {
   return kids.map((k) => ({ id: k.id, name: k.name, files: k.files.length }));
 }
 function analysisDirFor(root) {
-  const container = join3(root, ".ndx");
-  let containerIsDir = false;
-  try {
-    containerIsDir = statSync3(container).isDirectory();
-  } catch {
-    containerIsDir = false;
-  }
-  return containerIsDir ? join3(container, "sourcevision") : join3(root, ".sourcevision");
+  const container = ndxContainer(root);
+  return container ? join3(container, "sourcevision") : join3(root, ".sourcevision");
 }
 function hasSourcevision(root) {
   const svDir = analysisDirFor(root);

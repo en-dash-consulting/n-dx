@@ -50,18 +50,23 @@ import type {
   Zone,
   ZoneCrossing,
 } from "../schema/index.js";
+import { resolveLayout } from "@n-dx/llm-client";
 import { resolveSourcevisionPaths } from "../paths.js";
 
 // ── Config loading ──────────────────────────────────────────────────────────
 
-const PROJECT_CONFIG_FILE = ".n-dx.json";
-
 /**
- * Load workspace configuration from .n-dx.json.
+ * Load workspace configuration from the project config file.
+ *
+ * The path comes from the layout resolver rather than a `.n-dx.json` literal:
+ * on a project with `.ndx/` the config lives at `.ndx/config.json`, and a
+ * hard-coded legacy name reads a file that is not there — which returns `null`
+ * and silently drops the workspace members instead of failing.
+ *
  * Returns the workspace config or null if not configured.
  */
 export function loadWorkspaceConfig(rootDir: string): WorkspaceConfig | null {
-  const configPath = join(rootDir, PROJECT_CONFIG_FILE);
+  const configPath = resolveLayout(rootDir).configFile;
 
   let data: Record<string, unknown>;
   try {
@@ -80,14 +85,14 @@ export function loadWorkspaceConfig(rootDir: string): WorkspaceConfig | null {
 }
 
 /**
- * Save workspace configuration to .n-dx.json.
+ * Save workspace configuration to the project config file.
  * Preserves existing config keys, only updates sourcevision.workspace.
  */
 export function saveWorkspaceConfig(
   rootDir: string,
   config: WorkspaceConfig,
 ): void {
-  const configPath = join(rootDir, PROJECT_CONFIG_FILE);
+  const configPath = resolveLayout(rootDir).configFile;
 
   let data: Record<string, unknown> = {};
   try {
