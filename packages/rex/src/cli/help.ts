@@ -578,6 +578,37 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["export", "sync"],
   },
+  "tree-diff": {
+    tool: "rex",
+    command: "tree-diff",
+    summary: "compare two PRD trees",
+    usage: "rex tree-diff [options] [dir]",
+    description:
+      "Diffs two versions of the PRD tree by item id into added, changed,\n" +
+      "completed, moved and removed, each with the item's ancestor chain.\n\n" +
+      "With no flags it compares this checkout's working tree against the\n" +
+      "default branch — 'what has this branch done to the PRD'. Name commits\n" +
+      "with --from/--to, or compare two checkouts on disk with --against.\n\n" +
+      "Read-only: takes no PRD lock and writes nothing, so it is safe to run\n" +
+      "while another command is writing the tree.\n\n" +
+      "Because the diff is by id, an item that was reparented is reported once\n" +
+      "as 'moved' rather than twice as a removal and an addition. Categories\n" +
+      "overlap: a task added and finished on this branch is both added and\n" +
+      "completed.",
+    options: [
+      { flag: "--from=<ref>", description: "Baseline commit (default: the default branch)" },
+      { flag: "--to=<ref>", description: "Target commit (default: the working tree)" },
+      { flag: "--against=<dir>", description: "Compare against another checkout's tree instead of a commit" },
+      { flag: "--json", description: "Machine-readable output (same as --format=json)" },
+    ],
+    examples: [
+      { command: "rex tree-diff", description: "What this branch changed, against the default branch" },
+      { command: "rex tree-diff --from=v0.7.0 --to=HEAD", description: "Compare two commits" },
+      { command: "rex tree-diff --against=../main-checkout", description: "Compare this worktree against its anchor" },
+      { command: "rex tree-diff --json", description: "JSON for a CI summary or the dashboard" },
+    ],
+    related: ["status", "validate", "export"],
+  },
   adapter: {
     tool: "rex",
     command: "adapter",

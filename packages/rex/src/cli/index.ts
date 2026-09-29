@@ -508,6 +508,11 @@ async function dispatchCommand(
       await cmdExport(resolveDir(positional), flags);
       break;
     }
+    case "tree-diff": {
+      const { cmdTreeDiff } = await import("./commands/tree-diff.js");
+      await cmdTreeDiff(resolveDir(positional), flags);
+      break;
+    }
     case "import-bundle": {
       const { cmdImportBundle } = await import("./commands/import-bundle.js");
       await cmdImportBundle(resolveDir(positional), flags);
@@ -602,7 +607,7 @@ async function dispatchCommand(
       }
 
       const REX_COMMANDS = [
-        "init", "status", "tree", "next", "add", "update", "move", "remove", "reshape",
+        "init", "status", "tree", "tree-diff", "next", "add", "update", "move", "remove", "reshape",
         "prune", "restore", "validate", "fix", "sync", "usage", "report", "verify", "log",
         "recommend", "analyze", "import", "export", "import-bundle", "adapter",
         "reorganize", "health", "mcp",
