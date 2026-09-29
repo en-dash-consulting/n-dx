@@ -25,7 +25,7 @@ import {
   type CacheScope,
 } from "../../agent/lifecycle/session-cache.js";
 import { configExists, loadConfig } from "../../store/config.js";
-import { HENCH_DIR } from "./constants.js";
+import { resolveHenchPaths } from "../../store/paths.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 
@@ -103,7 +103,7 @@ async function cmdCacheList(
   scopes: CacheScope[],
   flags: Record<string, string>,
 ): Promise<void> {
-  const henchDir = join(dir, HENCH_DIR);
+  const { henchDir } = resolveHenchPaths(dir);
   const { tasksPerSession, ...bounds } = await freshnessBounds(henchDir);
 
   const inventory = await listCacheEntries(henchDir, bounds);
@@ -173,7 +173,7 @@ async function cmdCacheClear(
   scopes: CacheScope[],
   deadOnly: boolean,
 ): Promise<void> {
-  const henchDir = join(dir, HENCH_DIR);
+  const { henchDir } = resolveHenchPaths(dir);
 
   if (deadOnly) {
     const { tasksPerSession: _cap, ...bounds } = await freshnessBounds(henchDir);
