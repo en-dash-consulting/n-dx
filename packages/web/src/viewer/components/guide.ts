@@ -6,6 +6,32 @@ interface GuideProps {
 }
 
 const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFor: string; actions: string }> = {
+  // ── Shell pages ──
+  home: {
+    title: "Home",
+    description: "The three stages of the loop, side by side: Analysis (what the code looks like), Plan (what to build next) and Work (the agent building it), each with its headline numbers.",
+    lookFor: "A stale analysis, a PRD with nothing pending, or runs that are live or stale.",
+    actions: "Click a column to open that stage. The logo in the top bar always brings you back here.",
+  },
+  analyze: {
+    title: "Analysis",
+    description: "SourceVision's views as sections on one page: repository information, the import map in 2D or 3D, zones, files, findings and token usage.",
+    lookFor: "Low-cohesion, high-coupling zones, circular dependencies, and findings from the enrichment passes.",
+    actions: "Open a section to see it here, or \"Open\" to give it the whole page. The side buttons step on to Plan, or back to Work.",
+  },
+  plan: {
+    title: "Plan",
+    description: "Rex's planning views on one page: add or import items, the task tree, command help, run history and the PRD's structural checks.",
+    lookFor: "Proposals worth accepting, tasks without acceptance criteria, and validation warnings.",
+    actions: "Add items from a description or a file, then open Tasks to arrange them. The side buttons step on to Work, or back to Analysis.",
+  },
+  work: {
+    title: "Work",
+    description: "Hench's views on one page: the next task with its run button, PRD progress, the execution log, templates and usage.",
+    lookFor: "The next task, epics close to done, and what the runs are costing.",
+    actions: "Start the next task or pick a template. The side buttons step on to Analysis, or back to Plan.",
+  },
+
   // ── SourceVision views ──
   overview: {
     title: "Overview",

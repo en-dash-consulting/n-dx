@@ -87,7 +87,10 @@ async function main(): Promise<void> {
     return process.cwd();
   };
 
-  const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template", "review"];
+  // `validate-tokens` and `cache` both dispatch below; omitting either here
+  // makes the command unreachable, since an unlisted name is rejected as
+  // unknown before the switch is ever reached.
+  const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template", "review", "cache", "validate-tokens"];
 
   // Orchestration commands that belong to ndx, not hench directly
   const NDX_ONLY_COMMANDS: Record<string, string> = {
@@ -128,9 +131,17 @@ async function main(): Promise<void> {
     const reviewDir = (): string =>
       positional.length > 2 ? resolve(positional[positional.length - 1]) : process.cwd();
 
+    // `cache <sub> [dir]`: same shape as `usage` — the subcommand is a
+    // positional, so a lone arg is the subcommand and not a path.
+    const cacheDir = usageDir;
+
     // Ensure .hench/ exists for all known commands except init
     if (command !== "init") {
-      const dirFor: Record<string, () => string> = { usage: usageDir, review: reviewDir };
+      const dirFor: Record<string, () => string> = {
+        usage: usageDir,
+        review: reviewDir,
+        cache: cacheDir,
+      };
       requireHenchDir((dirFor[command] ?? resolveDir)());
     }
 
@@ -187,6 +198,11 @@ async function main(): Promise<void> {
       case "template": {
         const { cmdTemplate } = await import("./commands/template.js");
         await cmdTemplate(resolveDir(), positional, flags);
+        break;
+      }
+      case "cache": {
+        const { cmdCache } = await import("./commands/cache.js");
+        await cmdCache(cacheDir(), positional, flags);
         break;
       }
       case "validate-tokens": {

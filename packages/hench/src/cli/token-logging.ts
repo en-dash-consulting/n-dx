@@ -13,7 +13,7 @@
  *   tokens_out: —
  */
 
-import type { TokenUsage } from "../schema/index.js";
+import type { TokenUsage, TokenProvenance } from "../schema/index.js";
 
 /**
  * Minimal token count interface (used for type checking and testing).
@@ -92,14 +92,29 @@ function cacheField(
  * that `tokens_in` and `tokens_out` stay on lines 0 and 1 for anything parsing
  * this block. A run with no cache activity is byte-identical to before.
  *
+ * ## Why an absent cache figure can need its own line
+ *
+ * Omitting the cache lines reads as "this run cached nothing". For a Claude
+ * run that is true. For a Codex run whose counts were scraped out of
+ * `Tokens used: N in, N out` it is not — that vendor reported no cache
+ * accounting at all, and the run may well have read tens of thousands of
+ * cached tokens per turn. So when the caller knows the provenance and it is
+ * `"unavailable"`, the absence is stated rather than left to be inferred.
+ *
  * @param tokens Token usage (input/output counts, or null for unavailable)
+ * @param cachedProvenance Where the cache half came from, when the caller
+ *   knows. Omitted by callers that hold only a {@link TokenCount}, which
+ *   leaves the output exactly as it was.
  * @returns Multi-line formatted string suitable for info() output
  *
  * @example
  * formatTokenReport({ input: 1500, output: 300 })
  * // "tokens_in:       1,500\ntokens_out:        300"
  */
-export function formatTokenReport(tokens: TokenUsage | TokenCount | null): string {
+export function formatTokenReport(
+  tokens: TokenUsage | TokenCount | null,
+  cachedProvenance?: TokenProvenance,
+): string {
   if (!tokens || getTokenAvailability(tokens) === "unavailable") {
     return `tokens_in: ${formatTokenValue(null)}\ntokens_out: ${formatTokenValue(null)}`;
   }
@@ -108,7 +123,11 @@ export function formatTokenReport(tokens: TokenUsage | TokenCount | null): strin
   const cacheRead = cacheField(tokens, "cacheReadInput");
 
   if (cacheWrite === 0 && cacheRead === 0) {
-    return `tokens_in: ${formatTokenValue(tokens.input)}\ntokens_out: ${formatTokenValue(tokens.output)}`;
+    const head =
+      `tokens_in: ${formatTokenValue(tokens.input)}\ntokens_out: ${formatTokenValue(tokens.output)}`;
+    return cachedProvenance === "unavailable"
+      ? `${head}\ncache:      unavailable (this vendor reported no cache accounting)`
+      : head;
   }
 
   // Cache reads run orders of magnitude larger than the uncached counts, so the
@@ -120,12 +139,15 @@ export function formatTokenReport(tokens: TokenUsage | TokenCount | null): strin
     ),
   );
   const label = (text: string) => `${text}:`.padEnd(CACHE_LABEL_WIDTH);
+  // Only an estimate earns a qualifier. "measured" is the assumption a reader
+  // already makes of a printed number, so saying it adds noise to every line.
+  const qualifier = cachedProvenance === "estimated" ? "  (estimated)" : "";
 
   return [
     `${label("tokens_in")} ${formatTokenValue(tokens.input, width)}  (uncached)`,
     `${label("tokens_out")} ${formatTokenValue(tokens.output, width)}`,
-    `${label("cache_write")} ${formatTokenValue(cacheWrite, width)}`,
-    `${label("cache_read")} ${formatTokenValue(cacheRead, width)}`,
+    `${label("cache_write")} ${formatTokenValue(cacheWrite, width)}${qualifier}`,
+    `${label("cache_read")} ${formatTokenValue(cacheRead, width)}${qualifier}`,
   ].join("\n");
 }
 

@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -143,7 +143,32 @@ async function buildLanding() {
   console.log("Built landing: dist/landing/index.html");
 }
 
+/**
+ * Copy the UI layout preview document into dist.
+ *
+ * No bundling: the whole point of that file is that it is hand-edited HTML with
+ * no build step. The copy exists so `ndx start --preview` also works from a
+ * published install, where src/ is not shipped. In a monorepo checkout the
+ * preview server prefers src/preview/index.html so edits are live.
+ */
+function copyPreview() {
+  const previewSrcDir = resolve(__dirname, "src/preview");
+  if (!existsSync(resolve(previewSrcDir, "index.html"))) return;
+  const previewOutDir = resolve(__dirname, "dist/preview");
+  mkdirSync(previewOutDir, { recursive: true });
+  // Every page and data file in the folder ships: index.layout.json carries the
+  // structure the editor renders (without it a published install opens to an
+  // empty shell), and sibling pages such as option1-demo.html are reachable
+  // from the editor's header.
+  for (const file of readdirSync(previewSrcDir)) {
+    if (!/\.(html|json)$/.test(file)) continue;
+    copyFileSync(resolve(previewSrcDir, file), resolve(previewOutDir, file));
+  }
+  console.log("Copied preview: dist/preview/");
+}
+
 async function buildProduction() {
+  copyPreview();
   if (landingOnly) {
     await buildLanding();
   } else if (viewerOnly) {

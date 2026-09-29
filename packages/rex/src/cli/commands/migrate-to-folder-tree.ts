@@ -6,8 +6,8 @@ import { parseDocument } from "../../store/markdown-parser.js";
 import { validateDocument } from "../../schema/validate.js";
 import { SCHEMA_VERSION } from "../../schema/index.js";
 import { walkTree } from "../../core/tree.js";
+import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { CLIError } from "../errors.js";
-
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
 import type { PRDDocument, PRDItem } from "../../schema/index.js";
 import type { PromptFn } from "./validate-interactive.js";
@@ -42,6 +42,12 @@ export async function cmdMigrateToFolderTree(
   flags?: Record<string, string>,
   options?: MigrateOptions,
 ): Promise<void> {
+  const guard = checkBranchGuard(dir, flags ?? {});
+  if (guard.blocked) {
+    const { message, suggestion } = branchGuardRefusal("migrate-to-folder-tree", guard.branch);
+    throw new CLIError(message, suggestion);
+  }
+
   const rexDir = resolveRexPaths(dir).rexDir;
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
 

@@ -19,54 +19,8 @@
   transition: fill var(--transition-normal);
 }
 
-.sidebar-brand:hover .logo-ndx-bg {
+.topnav-brand:hover .logo-ndx-bg {
   fill: var(--logo-bg-hover);
-}
-
-/* Sidebar brand area */
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.sidebar-brand-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.sidebar-logo {
-  border-radius: var(--radius-md);
-  flex-shrink: 0;
-}
-
-/* Small n-dx logo when project name is shown */
-.sidebar-logo-sm {
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-  opacity: 0.6;
-  margin-top: 1px;
-  align-self: flex-start;
-}
-
-/* Project name — primary text in sidebar header */
-.sidebar-project-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Section logos in nav headers */
-.nav-section-logo {
-  opacity: 0.7;
-  transition: opacity var(--transition-normal);
-  flex-shrink: 0;
-}
-
-.nav-section-header:hover .nav-section-logo,
-.nav-section-header[aria-expanded="true"] .nav-section-logo {
-  opacity: 1;
 }
 
 /* Branded page headers for view content areas */

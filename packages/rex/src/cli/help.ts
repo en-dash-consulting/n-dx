@@ -254,6 +254,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--dry-run", description: "Preview proposals without applying" },
       { flag: "--accept", description: "Auto-accept proposals without review" },
       { flag: "--model=<name>", description: "Override LLM model" },
+      { flag: "--allow-on-branch", description: "Allow this whole-tree rewrite off the default branch" },
     ],
     examples: [
       { command: "rex reshape", description: "Interactive review of proposals" },
@@ -277,6 +278,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--accept", description: "Auto-accept all changes without review" },
       { flag: "--yes, -y", description: "Skip confirmation prompt" },
       { flag: "--no-consolidate", description: "Skip the post-prune consolidation pass" },
+      { flag: "--allow-on-branch", description: "Allow this whole-tree rewrite off the default branch" },
     ],
     examples: [
       { command: "rex prune", description: "Interactive prune with confirmation" },
@@ -402,6 +404,28 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex verify --dry-run .", description: "Preview test mapping without execution" },
     ],
     related: ["status"],
+  },
+  ready: {
+    tool: "rex",
+    command: "ready",
+    summary: "mark items ready to work",
+    usage: "rex ready [options] [dir]",
+    description:
+      "Marks an item ready when it has at least one automated or metric\n" +
+      "requirement (own or inherited) and no open blocker. Items already\n" +
+      "completed, deferred, cancelled, or deleted never qualify. Explains\n" +
+      "why items that don't qualify don't. `ready` is never read by task\n" +
+      "selection (`rex next`) — it is purely informational.",
+    options: [
+      { flag: "--item=<id>", description: "Evaluate and mark a single item only" },
+      { flag: "--format=json", description: "Machine-readable output" },
+    ],
+    examples: [
+      { command: "rex ready", description: "Evaluate and mark the whole tree" },
+      { command: "rex ready --item=abc123", description: "Evaluate a single item" },
+      { command: "rex ready --format=json .", description: "Machine-readable output for scripting" },
+    ],
+    related: ["next", "status"],
   },
   recommend: {
     tool: "rex",
@@ -567,6 +591,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--replace", description: "Overwrite the tree with the bundle instead of merging" },
       { flag: "--yes, -y", description: "Skip the --replace confirmation prompt" },
       { flag: "--no-snapshot", description: "Skip the pre-import snapshot ('rex restore' cannot undo the import)" },
+      { flag: "--allow-on-branch", description: "Allow --replace's whole-tree rewrite off the default branch" },
       { flag: "--format=json", description: "Print a JSON summary instead of human output" },
     ],
     examples: [
@@ -574,6 +599,37 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex import-bundle --in=./prd-bundle.json --replace --yes", description: "Replace the local PRD outright" },
     ],
     related: ["export", "sync"],
+  },
+  "tree-diff": {
+    tool: "rex",
+    command: "tree-diff",
+    summary: "compare two PRD trees",
+    usage: "rex tree-diff [options] [dir]",
+    description:
+      "Diffs two versions of the PRD tree by item id into added, changed,\n" +
+      "completed, moved and removed, each with the item's ancestor chain.\n\n" +
+      "With no flags it compares this checkout's working tree against the\n" +
+      "default branch — 'what has this branch done to the PRD'. Name commits\n" +
+      "with --from/--to, or compare two checkouts on disk with --against.\n\n" +
+      "Read-only: takes no PRD lock and writes nothing, so it is safe to run\n" +
+      "while another command is writing the tree.\n\n" +
+      "Because the diff is by id, an item that was reparented is reported once\n" +
+      "as 'moved' rather than twice as a removal and an addition. Categories\n" +
+      "overlap: a task added and finished on this branch is both added and\n" +
+      "completed.",
+    options: [
+      { flag: "--from=<ref>", description: "Baseline commit (default: the default branch)" },
+      { flag: "--to=<ref>", description: "Target commit (default: the working tree)" },
+      { flag: "--against=<dir>", description: "Compare against another checkout's tree instead of a commit" },
+      { flag: "--json", description: "Machine-readable output (same as --format=json)" },
+    ],
+    examples: [
+      { command: "rex tree-diff", description: "What this branch changed, against the default branch" },
+      { command: "rex tree-diff --from=v0.7.0 --to=HEAD", description: "Compare two commits" },
+      { command: "rex tree-diff --against=../main-checkout", description: "Compare this worktree against its anchor" },
+      { command: "rex tree-diff --json", description: "JSON for a CI summary or the dashboard" },
+    ],
+    related: ["status", "validate", "export"],
   },
   adapter: {
     tool: "rex",
@@ -621,6 +677,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--model=<model>", description: "LLM model to use for analysis" },
       { flag: "--include-completed", description: "Include completed items in similarity analysis" },
       { flag: "--format=json", description: "Machine-readable output" },
+      { flag: "--allow-on-branch", description: "Allow this whole-tree rewrite off the default branch" },
     ],
     examples: [
       { command: "rex reorganize", description: "Detect issues and show all proposals" },
@@ -663,6 +720,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "Pass --yes to auto-confirm deletion.\n\n" +
       `Idempotent: re-running on an already-migrated project (where .rex/${PRD_TREE_DIRNAME}/ exists) is a no-op.\n` +
       "Prints a summary of item counts per PRD level and folders/files created.",
+    options: [
+      { flag: "--yes, -y", description: "Auto-confirm deletion of legacy files" },
+      { flag: "--allow-on-branch", description: "Allow this whole-tree rewrite off the default branch" },
+    ],
     examples: [
       { command: "rex migrate-to-folder-tree", description: "Migrate and prompt to delete legacy files" },
       { command: "rex migrate-to-folder-tree --yes", description: "Migrate and auto-delete legacy files" },
@@ -679,6 +740,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "DEPRECATED: This command migrates from .rex/prd.json to a legacy markdown format.\n" +
       "The folder-tree format (.rex/prd_tree/) is now the recommended migration target.\n" +
       "Use 'rex migrate-to-folder-tree' instead for new projects.",
+    options: [
+      { flag: "--allow-on-branch", description: "Allow this whole-tree rewrite off the default branch" },
+    ],
     examples: [
       { command: "rex migrate-to-md", description: "Migrate to markdown in the current project (deprecated)" },
       { command: "rex migrate-to-md ./my-project", description: "Migrate to markdown in a specific project (deprecated)" },
@@ -722,6 +786,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   usage: ["status"],
   report: ["validate"],
   verify: ["status"],
+  ready: ["next", "status"],
   log: ["status"],
   recommend: ["analyze", "status"],
   analyze: ["add", "recommend"],

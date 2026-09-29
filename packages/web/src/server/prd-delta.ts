@@ -22,6 +22,21 @@
  * partition. Id lists are capped at {@link PRD_DELTA_ID_CAP} with
  * `truncated` set; counts are always exact.
  *
+ * ## Where the diff itself lives
+ *
+ * The id-indexing, field comparison and category assignment are rex's
+ * {@link diffTrees} — the same function behind `rex tree-diff`. What stays
+ * here is only this endpoint's projection of it: the anchor/workspace
+ * naming, the id-list cap, and the cache. Two implementations of "how do
+ * these trees differ" would be free to drift, and the dashboard's answer and
+ * the CLI's answer disagreeing about the same pair of trees is exactly the
+ * bug nobody would think to look for.
+ *
+ * rex's `moved` category is deliberately not surfaced here: this payload's
+ * four id lists are a published shape the Workspaces board reads, and a
+ * reparent already registers as nothing at all today. Adding it is a viewer
+ * change, not a diff change.
+ *
  * Results are cached per (anchor, workspace) pair and dropped when either
  * tree's watcher fires — start.ts calls {@link invalidatePrdDelta} from the
  * same debounced callback that refreshes the PRD cache.
@@ -29,8 +44,8 @@
  * @module web/server/prd-delta
  */
 
-import { walkTree } from "./rex-gateway.js";
-import type { PRDDocument, PRDItem } from "./rex-gateway.js";
+import { diffTrees } from "./rex-gateway.js";
+import type { PRDDocument } from "./rex-gateway.js";
 
 /** Longest id list the response carries per category. */
 export const PRD_DELTA_ID_CAP = 500;
@@ -66,23 +81,6 @@ export interface PrdDelta {
   computedAt: string;
 }
 
-/** Flatten a tree into an id → item map. A repeated id keeps its first occurrence. */
-function indexById(doc: PRDDocument | null): Map<string, PRDItem> {
-  const byId = new Map<string, PRDItem>();
-  if (!doc) return byId;
-  for (const { item } of walkTree(doc.items ?? [])) {
-    if (!byId.has(item.id)) byId.set(item.id, item);
-  }
-  return byId;
-}
-
-function fieldsDiffer(a: PRDItem, b: PRDItem): boolean {
-  for (const field of PRD_DELTA_COMPARED_FIELDS) {
-    if ((a[field] ?? null) !== (b[field] ?? null)) return true;
-  }
-  return false;
-}
-
 function cap(ids: string[]): { ids: string[]; cut: boolean } {
   return ids.length > PRD_DELTA_ID_CAP ? { ids: ids.slice(0, PRD_DELTA_ID_CAP), cut: true } : { ids, cut: false };
 }
@@ -97,29 +95,23 @@ export function computePrdDelta(
   keys: { anchor: string; workspace: string },
   now: () => Date = () => new Date(),
 ): PrdDelta {
-  const anchor = indexById(anchorDoc);
-  const here = indexById(workspaceDoc);
+  // The workspace is the "to" side: rex's `added` is what only this
+  // workspace has, `removed` is what only the anchor has.
+  const diff = diffTrees(anchorDoc?.items ?? [], workspaceDoc?.items ?? [], {
+    comparedFields: PRD_DELTA_COMPARED_FIELDS,
+  });
 
-  const onlyHere: string[] = [];
-  const changed: string[] = [];
-  const completedHere: string[] = [];
-  for (const [id, item] of here) {
-    const other = anchor.get(id);
-    if (!other) onlyHere.push(id);
-    else if (fieldsDiffer(item, other)) changed.push(id);
-    if (item.status === "completed" && other?.status !== "completed") completedHere.push(id);
-  }
-  const onlyAnchor: string[] = [];
-  for (const id of anchor.keys()) {
-    if (!here.has(id)) onlyAnchor.push(id);
-  }
-  for (const list of [onlyHere, onlyAnchor, changed, completedHere]) list.sort();
+  const ids = (entries: { id: string }[]): string[] => entries.map((e) => e.id);
+  const onlyHere = ids(diff.added);
+  const onlyAnchor = ids(diff.removed);
+  const changed = ids(diff.changed);
+  const completedHere = ids(diff.completed);
 
   const counts: PrdDeltaCounts = {
-    onlyHere: onlyHere.length,
-    onlyAnchor: onlyAnchor.length,
-    changed: changed.length,
-    completedHere: completedHere.length,
+    onlyHere: diff.counts.added,
+    onlyAnchor: diff.counts.removed,
+    changed: diff.counts.changed,
+    completedHere: diff.counts.completed,
   };
   const capped = {
     onlyHere: cap(onlyHere),
@@ -131,7 +123,7 @@ export function computePrdDelta(
     anchor: keys.anchor,
     workspace: keys.workspace,
     sources: { anchor: anchorDoc !== null, workspace: workspaceDoc !== null },
-    totals: { anchor: anchor.size, workspace: here.size },
+    totals: { anchor: diff.totals.from, workspace: diff.totals.to },
     counts,
     onlyHere: capped.onlyHere.ids,
     onlyAnchor: capped.onlyAnchor.ids,

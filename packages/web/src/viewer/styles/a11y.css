@@ -80,12 +80,9 @@ textarea:focus-visible,
  * and keyboard accessibility. The resets below strip UA button defaults
  * while preserving the visual styles applied by the class itself.
  */
-button.nav-item,
-button.nav-section-header,
 button.collapsible-header,
 button.sidebar-indicator,
-button.faq-section-header,
-button.sidebar-progress {
+button.faq-section-header {
   -webkit-appearance: none;
   appearance: none;
   border: none;
@@ -95,11 +92,3 @@ button.sidebar-progress {
   text-align: left;
 }
 
-button.sidebar-rail-logo {
-  -webkit-appearance: none;
-  appearance: none;
-  border: none;
-  background: none;
-  font: inherit;
-  padding: 0;
-}

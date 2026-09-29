@@ -5,10 +5,13 @@ export type ViewerScope = "sourcevision" | "rex" | "hench";
 
 export type SourcevisionScopeViewId = Extract<
   ViewId,
-  "overview" | "graph" | "iso-map" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "pr-markdown" | "ask"
+  "analyze" | "overview" | "graph" | "iso-map" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "pr-markdown" | "ask"
 >;
 
+// Each stage page belongs to the scope whose views it composes, so a scoped
+// standalone viewer gets its own stage and not the other two.
 export const SOURCEVISION_SCOPE_VIEWS: readonly SourcevisionScopeViewId[] = [
+  "analyze",
   "overview",
   "graph",
   "iso-map",
@@ -23,6 +26,7 @@ export const SOURCEVISION_SCOPE_VIEWS: readonly SourcevisionScopeViewId[] = [
 ];
 
 export const REX_SCOPE_VIEWS: readonly ViewId[] = [
+  "plan",
   "rex-dashboard",
   "prd",
   "analysis",
@@ -35,6 +39,7 @@ export const REX_SCOPE_VIEWS: readonly ViewId[] = [
 ];
 
 export const HENCH_SCOPE_VIEWS: readonly ViewId[] = [
+  "work",
   "hench-runs",
   "hench-audit",
   "hench-config",
@@ -44,6 +49,7 @@ export const HENCH_SCOPE_VIEWS: readonly ViewId[] = [
 ];
 
 export const CROSS_CUTTING_VIEWS: readonly ViewId[] = [
+  "home",
   "workspaces",
   "token-usage",
   "feature-toggles",

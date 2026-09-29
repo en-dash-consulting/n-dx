@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cmdPrMarkdown } from "../../src/cli/commands/pr-markdown.js";
+import { fixtureRex } from "../helpers/index.js";
 
 function git(cwd: string, args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim();
@@ -85,7 +86,7 @@ describe("pr-markdown rex-based output", () => {
     git(tmpDir, ["add", "."]);
     git(tmpDir, ["commit", "-m", "mixed workstream updates"]);
 
-    await cmdPrMarkdown(tmpDir);
+    await cmdPrMarkdown(tmpDir, { rex: fixtureRex(tmpDir) });
 
     const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
 
@@ -142,14 +143,14 @@ describe("pr-markdown rex-based output", () => {
     git(tmpDir, ["add", "."]);
     git(tmpDir, ["commit", "-m", "feature update"]);
 
-    await cmdPrMarkdown(tmpDir);
+    await cmdPrMarkdown(tmpDir, { rex: fixtureRex(tmpDir) });
     const baselineMarkdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
 
     // Configure external diff tools that would break git-diff-based generation
     git(tmpDir, ["config", "diff.external", "/usr/bin/false"]);
 
     // Regenerate — should produce identical output since we use rex data, not git diff
-    await cmdPrMarkdown(tmpDir);
+    await cmdPrMarkdown(tmpDir, { rex: fixtureRex(tmpDir) });
     const deterministicMarkdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
 
     expect(deterministicMarkdown).toBe(baselineMarkdown);

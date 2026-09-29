@@ -69,6 +69,14 @@ export {
 } from "@n-dx/rex";
 export type { TreeEntry, TreeStats } from "@n-dx/rex";
 
+// ---- Rex PRD tree diff ------------------------------------------------------
+// The Workspaces board's PRD delta is a projection of `rex tree-diff`'s
+// engine, not a second implementation of it. `walkTree` is still exported
+// above for other callers; prd-delta.ts reaches the diff itself through here
+// so the dashboard and the CLI cannot disagree about the same two trees.
+export { diffTrees } from "@n-dx/rex";
+export type { TreeDiff } from "@n-dx/rex";
+
 // ---- Rex task selection -----------------------------------------------------
 export { findNextTask, collectCompletedIds } from "@n-dx/rex";
 

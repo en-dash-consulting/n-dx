@@ -4,7 +4,7 @@
  *
  * Covers what a typecheck cannot see: the four display states and the
  * transitions between them, the empty-prompt no-op, the feature gate hiding
- * the tab, and the deep-link path from a URL segment to a rendered panel.
+ * the Analysis page's Ask section, and the deep-link path from a URL segment to a rendered panel.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
@@ -16,7 +16,7 @@ import {
   describeCapture,
   isSubmittablePrompt,
 } from "../../../src/viewer/views/ask.js";
-import { Sidebar } from "../../../src/viewer/components/sidebar.js";
+import { StagePage } from "../../../src/viewer/views/stage-pages.js";
 import { SOURCEVISION_TABS } from "../../../src/viewer/views/index.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -934,11 +934,11 @@ describe("Ask view registration", () => {
   });
 });
 
-describe("Ask tab feature gate", () => {
+describe("Ask section feature gate", () => {
   let root: HTMLDivElement;
 
-  /** Boot the sidebar with `sourcevision.ask` reported at `enabled`. */
-  async function renderSidebarWithGate(enabled: boolean): Promise<HTMLDivElement> {
+  /** Render the Analysis page with `sourcevision.ask` reported at `enabled`. */
+  async function renderAnalysisWithGate(enabled: boolean): Promise<HTMLDivElement> {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === "/api/features") {
@@ -972,14 +972,11 @@ describe("Ask tab feature gate", () => {
     document.body.appendChild(root);
     await act(async () => {
       render(
-        h(Sidebar, {
-          view: "overview" as ViewId,
-          onNavigate: () => {},
-          manifest: null,
-          zones: null,
-          sidebarCollapsed: false,
-          onToggleSidebar: () => {},
-          scope: "sourcevision",
+        h(StagePage, {
+          stage: "analyze",
+          validViews: buildValidViews("sourcevision"),
+          navigateTo: () => {},
+          renderView: () => null,
         }),
         root,
       );
@@ -991,27 +988,15 @@ describe("Ask tab feature gate", () => {
     return root;
   }
 
-  /**
-   * Nav item labels, excluding the icon and enrichment-badge spans.
-   *
-   * `textContent` on a `.nav-item` concatenates the icon glyph onto the label
-   * ("▣Overview"), so an exact-match assertion has to read only the
-   * element's own text nodes.
-   */
-  function navLabels(): string[] {
-    return Array.from(root.querySelectorAll(".nav-item")).map((item) =>
-      Array.from(item.childNodes)
-        .filter((node) => node.nodeType === Node.TEXT_NODE)
-        .map((node) => node.textContent ?? "")
-        .join("")
-        .trim(),
-    );
+  /** Views the Analysis page lists as sections. */
+  function sectionViews(): string[] {
+    return Array.from(root.querySelectorAll<HTMLElement>(".stage-section")).map((el) => el.dataset.view ?? "");
   }
 
   beforeEach(() => {
     clearProjectMetadataCache();
     localStorage.clear();
-    // The tab is `requiresServer`, so a stray deployed-mode flag would hide it
+    // The section is `requiresServer`, so a stray deployed-mode flag would hide it
     // for reasons that have nothing to do with the gate under test.
     delete window.__NDX_DEPLOYED__;
   });
@@ -1023,16 +1008,16 @@ describe("Ask tab feature gate", () => {
     vi.unstubAllGlobals();
   });
 
-  it("hides the Ask tab when the gate is off", async () => {
-    await renderSidebarWithGate(false);
-    expect(navLabels()).not.toContain("Ask");
+  it("leaves Ask off the Analysis page when the gate is off", async () => {
+    await renderAnalysisWithGate(false);
+    expect(sectionViews()).not.toContain("ask");
     // The ungated sibling is still there, so this is the gate and not a
-    // sidebar that failed to render its SourceVision section at all.
-    expect(navLabels()).toContain("Overview");
+    // page that failed to render its sections at all.
+    expect(sectionViews()).toContain("overview");
   });
 
-  it("shows the Ask tab when the gate is on", async () => {
-    await renderSidebarWithGate(true);
-    expect(navLabels()).toContain("Ask");
+  it("lists Ask on the Analysis page when the gate is on", async () => {
+    await renderAnalysisWithGate(true);
+    expect(sectionViews()).toContain("ask");
   });
 });

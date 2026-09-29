@@ -35,7 +35,29 @@ export interface TokenParseResult {
   readonly usage: TokenUsage;
   /** Whether the usage data was fully present, partially present, or absent. */
   readonly diagnosticStatus: TokenDiagnosticStatus;
+  /** Where the cache half of {@link usage} came from. */
+  readonly cacheProvenance: TokenCacheProvenance;
 }
+
+/**
+ * Where a run's cache token counts came from.
+ *
+ * The distinction this exists to draw is between a vendor that accounted for
+ * caching and reported nothing cached, and a vendor that did not account for
+ * it at all. Both leave `cacheReadInput` absent, and reporting either as a
+ * plain `0` says "this run used no cache" — a claim only the first one
+ * supports. A Codex CLI run scraped from `Tokens used: N in, N out` has no
+ * cache accounting whatsoever, and for months read as a run that cached
+ * nothing while its JSONL was reporting 35k cached input tokens a turn.
+ *
+ * - `measured` — the vendor reported cache fields; the counts are its own.
+ * - `estimated` — the counts were derived rather than reported. No parser
+ *   produces this today; it exists so a future estimator cannot be mistaken
+ *   for a measurement.
+ * - `unavailable` — no cache accounting was present. Read the counts as
+ *   unknown, not as zero.
+ */
+export type TokenCacheProvenance = "measured" | "estimated" | "unavailable";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -49,20 +71,90 @@ function classifyPresence(
   return "unavailable";
 }
 
-/** Extract cache fields from a raw object, returning only non-zero values. */
-function extractCacheFields(
-  source: Record<string, unknown>,
-): Pick<TokenUsage, "cacheCreationInput" | "cacheReadInput"> {
-  const result: Pick<TokenUsage, "cacheCreationInput" | "cacheReadInput"> = {};
-  const cacheCreation = source.cache_creation_input_tokens;
-  if (typeof cacheCreation === "number" && cacheCreation > 0) {
-    result.cacheCreationInput = cacheCreation;
-  }
-  const cacheRead = source.cache_read_input_tokens;
-  if (typeof cacheRead === "number" && cacheRead > 0) {
-    result.cacheReadInput = cacheRead;
-  }
+/** Cache accounting read off a vendor payload, normalized to one shape. */
+interface CacheAccounting
+  extends Pick<TokenUsage, "cacheCreationInput" | "cacheReadInput"> {
+  /**
+   * Tokens already counted inside the vendor's input figure that belong to
+   * the cache half. Subtracted from `input` so the two are not counted twice.
+   */
+  readonly inputAdjustment: number;
+  readonly provenance: TokenCacheProvenance;
+}
+
+/** Read a field that must be a finite non-negative number, or undefined. */
+function cacheCount(source: Record<string, unknown>, key: string): number | undefined {
+  const value = source[key];
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return undefined;
+  return value;
+}
+
+/**
+ * Extract cache accounting from a raw usage object, in either vendor's dialect.
+ *
+ * The two dialects disagree about what `input` means, and the disagreement is
+ * the whole reason this is one function rather than two field lookups:
+ *
+ * - **Anthropic** reports `input_tokens` *excluding* both cache halves, with
+ *   `cache_creation_input_tokens` and `cache_read_input_tokens` alongside it.
+ * - **Codex** reports `input_tokens` as the turn's whole input, with
+ *   `cached_input_tokens` naming the portion of it served from cache (the
+ *   `prompt_tokens_details.cached_tokens` convention), plus
+ *   `cache_write_input_tokens` as a separate class the way Anthropic's
+ *   creation counter is.
+ *
+ * So Codex's cached half is subtracted from `input` and Anthropic's is not.
+ * Without that, a Codex turn reporting 45,472 in / 35,072 cached would total
+ * 80,544 — a 77% overcount — which is the trap that keeps the two dialects
+ * from being merged into one key list.
+ *
+ * Zero-valued fields are still *presence*: `"cached_input_tokens": 0` is the
+ * vendor saying nothing was cached, which is a measurement. Only their absence
+ * is `unavailable`. The counts themselves stay omitted when zero, so the
+ * on-disk shape is unchanged for runs that cached nothing.
+ */
+function extractCacheAccounting(source: Record<string, unknown>): CacheAccounting {
+  const anthropicCreation = cacheCount(source, "cache_creation_input_tokens");
+  const anthropicRead = cacheCount(source, "cache_read_input_tokens");
+  const codexWrite = cacheCount(source, "cache_write_input_tokens");
+  const codexRead = cacheCount(source, "cached_input_tokens");
+
+  const creation = anthropicCreation ?? codexWrite;
+  const read = anthropicRead ?? codexRead;
+
+  const measured =
+    anthropicCreation !== undefined ||
+    anthropicRead !== undefined ||
+    codexWrite !== undefined ||
+    codexRead !== undefined;
+
+  const result: CacheAccounting = {
+    // Only Codex's read counter is part of its input figure. `anthropicRead`
+    // takes precedence above, so a payload carrying both keys is read in the
+    // Anthropic dialect and adjusts nothing.
+    inputAdjustment: anthropicRead === undefined && codexRead !== undefined ? codexRead : 0,
+    provenance: measured ? "measured" : "unavailable",
+  };
+  if (creation !== undefined && creation > 0) result.cacheCreationInput = creation;
+  if (read !== undefined && read > 0) result.cacheReadInput = read;
   return result;
+}
+
+/** Build the usage half of a parse result, applying the cache adjustment. */
+function withCacheAccounting(
+  input: number,
+  output: number,
+  cache: CacheAccounting,
+): TokenUsage {
+  const usage: TokenUsage = {
+    // Clamped: a vendor reporting more cached than total input is malformed,
+    // and a negative token count would corrupt every rollup downstream.
+    input: Math.max(0, input - cache.inputAdjustment),
+    output,
+  };
+  if (cache.cacheCreationInput !== undefined) usage.cacheCreationInput = cache.cacheCreationInput;
+  if (cache.cacheReadInput !== undefined) usage.cacheReadInput = cache.cacheReadInput;
+  return usage;
 }
 
 // ── API token parsing ─────────────────────────────────────────────────────
@@ -98,10 +190,12 @@ export function parseApiTokenUsageWithDiagnostic(
 
   const input = hasInput ? (raw.input_tokens as number) : 0;
   const output = hasOutput ? (raw.output_tokens as number) : 0;
+  const cache = extractCacheAccounting(raw);
 
   return {
-    usage: { input, output, ...extractCacheFields(raw) },
+    usage: withCacheAccounting(input, output, cache),
     diagnosticStatus: classifyPresence(hasInput, hasOutput),
+    cacheProvenance: cache.provenance,
   };
 }
 
@@ -137,14 +231,16 @@ export function parseCliTokenUsageWithDiagnostic(
 
   const hasInput = typeof rawInput === "number";
   const hasOutput = typeof rawOutput === "number";
+  const cache = extractCacheAccounting(envelope);
 
   return {
-    usage: {
-      input: hasInput ? (rawInput as number) : 0,
-      output: hasOutput ? (rawOutput as number) : 0,
-      ...extractCacheFields(envelope),
-    },
+    usage: withCacheAccounting(
+      hasInput ? (rawInput as number) : 0,
+      hasOutput ? (rawOutput as number) : 0,
+      cache,
+    ),
     diagnosticStatus: classifyPresence(hasInput, hasOutput),
+    cacheProvenance: cache.provenance,
   };
 }
 
@@ -200,14 +296,16 @@ export function parseStreamTokenUsageWithDiagnostic(
 
   const hasInput = typeof rawInput === "number";
   const hasOutput = typeof rawOutput === "number";
+  const cache = extractCacheAccounting(cacheSource);
 
   return {
-    usage: {
-      input: hasInput ? (rawInput as number) : 0,
-      output: hasOutput ? (rawOutput as number) : 0,
-      ...extractCacheFields(cacheSource),
-    },
+    usage: withCacheAccounting(
+      hasInput ? (rawInput as number) : 0,
+      hasOutput ? (rawOutput as number) : 0,
+      cache,
+    ),
     diagnosticStatus: classifyPresence(hasInput, hasOutput),
+    cacheProvenance: cache.provenance,
   };
 }
 
@@ -243,15 +341,23 @@ export interface CodexTokenMapping {
   usage: TokenUsage;
   total: number;
   diagnosticStatus: TokenDiagnosticStatus;
+  /** Where `usage`'s cache half came from. See {@link TokenCacheProvenance}. */
+  cacheProvenance: TokenCacheProvenance;
 }
 
 /**
  * Map Codex usage payload fields into the shared token usage shape.
  *
  * Explicit field mapping:
- * - input: `input_tokens` | `prompt_tokens`
+ * - input: `input_tokens` | `prompt_tokens`, less the cached portion
  * - output: `output_tokens` | `completion_tokens`
- * - total: `total_tokens` fallback, otherwise `input + output`
+ * - cache: `cached_input_tokens` / `cache_write_input_tokens`, via
+ *   {@link extractCacheAccounting}
+ * - total: `total_tokens` fallback, otherwise the input as reported plus output
+ *
+ * `total` stays the figure the vendor reported, so splitting the cached half
+ * out of `input` does not change what the turn cost — only how it is
+ * attributed.
  *
  * When usage is missing, returns zeros and `diagnosticStatus: "unavailable"`.
  * When all fields are present, returns `diagnosticStatus: "complete"`.
@@ -267,6 +373,7 @@ export function mapCodexUsageToTokenUsage(raw: unknown): CodexTokenMapping {
       usage: { input: 0, output: 0 },
       total: 0,
       diagnosticStatus: "unavailable",
+      cacheProvenance: "unavailable",
     };
   }
 
@@ -275,15 +382,17 @@ export function mapCodexUsageToTokenUsage(raw: unknown): CodexTokenMapping {
   const input = readNumber(source, ["input_tokens", "prompt_tokens", "input"]) ?? 0;
   const output = readNumber(source, ["output_tokens", "completion_tokens", "output"]) ?? 0;
   const total = readNumber(source, ["total_tokens", "total"]) ?? (input + output);
+  const cache = extractCacheAccounting(source);
 
   const hasUsageFields = usage
     ? input > 0 || output > 0 || total > 0
     : readNumber(source, ["input_tokens", "prompt_tokens", "output_tokens", "completion_tokens", "total_tokens"]) !== undefined;
 
   return {
-    usage: { input, output },
+    usage: withCacheAccounting(input, output, cache),
     total,
     diagnosticStatus: hasUsageFields ? "complete" : "unavailable",
+    cacheProvenance: cache.provenance,
   };
 }
 
