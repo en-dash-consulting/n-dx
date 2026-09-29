@@ -56,9 +56,16 @@ import {
   resolveSessionStrategy,
   clearSessionCache,
   readBatchChain,
-  advanceBatchChain,
   clearBatchChain,
+  settleBatchChain,
   isBatchChainUsable,
+  chainRefIdentity,
+  policyFingerprint,
+  sourcevisionFingerprint,
+  evictDeadCacheEntries,
+  unusedCacheScopes,
+  cacheEntryAgeMs,
+  type BatchChainIdentity,
 } from "./session-cache.js";
 import { buildTaskBoundaryDivider } from "./batch-divider.js";
 import {
@@ -87,6 +94,7 @@ import {
   type RuntimeEvent,
   type PromptSection,
   type PromptSectionName,
+  type TokenDiagnosticStatus,
 } from "../../prd/llm-gateway.js";
 import {
   prepareBrief,
@@ -499,7 +507,11 @@ export function rawJsonToTokenUsageEvent(
 
   if (!usage) return null;
 
-  const { usage: parsed } = parseTokenUsageWithDiagnostic(usage);
+  // Carry the parser's verdict on the event. Dropping it here is what forced
+  // the event pipeline to re-infer both values from the parsed numbers, and
+  // that inference cannot tell an explicit zero from an absent field.
+  const { usage: parsed, diagnosticStatus, cacheProvenance } =
+    parseTokenUsageWithDiagnostic(usage);
 
   return {
     type: "token_usage",
@@ -507,6 +519,8 @@ export function rawJsonToTokenUsageEvent(
     turn: turn || 1,
     timestamp: new Date().toISOString(),
     tokenUsage: parsed,
+    tokenDiagnosticStatus: diagnosticStatus,
+    tokenCacheProvenance: cacheProvenance,
   };
 }
 
@@ -541,7 +555,7 @@ function extractTokenUsage(
 
   if (!usage) return;
 
-  const { usage: parsed, diagnosticStatus } = parseTokenUsageWithDiagnostic(usage);
+  const { usage: parsed, diagnosticStatus, cacheProvenance } = parseTokenUsageWithDiagnostic(usage);
 
   result.tokenUsage.input += parsed.input;
   result.tokenUsage.output += parsed.output;
@@ -551,6 +565,10 @@ function extractTokenUsage(
     input: parsed.input,
     output: parsed.output,
     diagnosticStatus,
+    // Recorded even when it is "unavailable" — that is the value the whole
+    // field exists to carry, and omitting it would put the turn back to being
+    // indistinguishable from one that measured zero.
+    cacheProvenance,
     vendor: tokenMetadata.vendor,
     model: tokenMetadata.model,
   };
@@ -964,10 +982,17 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
         // attempt — zeros when no usage data is available — so callers can
         // account for every attempt regardless of stdout output.
         if (adapter.vendor === LLM_VENDOR.CODEX && result.turnTokenUsage.length === 0) {
+          // The mapper's verdict, when this path got one. Same reason as the
+          // event pipeline: a status derived from the payload beats one
+          // inferred from the parsed numbers, which cannot see an explicit
+          // zero. Stays undefined on the text-format branch, which genuinely
+          // has no presence information to offer.
+          let mappedDiagnostic: TokenDiagnosticStatus | undefined;
           if (fullStdout.trim()) {
             try {
               const raw = JSON.parse(fullStdout);
               const codexMapping = mapCodexUsageToTokenUsage(raw);
+              mappedDiagnostic = codexMapping.diagnosticStatus;
               if (codexMapping.diagnosticStatus !== "unavailable") {
                 result.tokenUsage = codexMapping.usage;
               }
@@ -985,9 +1010,11 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
             output: result.tokenUsage.output,
             vendor: tokenMetadata.vendor,
             model: tokenMetadata.model,
-            diagnosticStatus: result.tokenUsage.input === 0 && result.tokenUsage.output === 0
-              ? "unavailable"
-              : undefined,
+            diagnosticStatus:
+              mappedDiagnostic ??
+              (result.tokenUsage.input === 0 && result.tokenUsage.output === 0
+                ? "unavailable"
+                : undefined),
           });
         }
       }
@@ -2020,6 +2047,19 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     provider: config.provider,
     configured: config.sessionStrategy,
   });
+
+  // Sweep the scopes this strategy will not read. The scope it *does* read is
+  // left alone: the strategy's own check is about to reject and clear it with
+  // a named reason, and pre-emptively deleting it here would turn that
+  // diagnostic into a bare "no chain". Best-effort — eviction is tidiness, and
+  // the admission checks are what actually keep a stale entry out of a run.
+  await evictDeadCacheEntries(henchDir, {
+    scopes: unusedCacheScopes(sessionStrategy),
+    parentMaxAgeHours: config.parentMaxAgeHours,
+    batchMaxAgeHours: config.batchMaxAgeHours,
+    batchMaxIdleHours: config.batchMaxIdleHours,
+  }).catch(() => { /* best effort */ });
+
   let warmParentId: string | undefined;
 
   // Batch strategy: resume the *previous task's* session so the transcript
@@ -2031,17 +2071,63 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   let batchTaskNumber = 1;
   let batchPreviousTaskTitle: string | undefined;
   const tasksPerSession = config.tasksPerSession ?? DEFAULT_TASKS_PER_SESSION;
-  if (sessionStrategy === "batch") {
+
+  // What a resumed session must still be true of. Computed once and used for
+  // both the admission check and the advance, so the chain is always stamped
+  // with exactly the identity it was admitted under. The git half comes off
+  // the run record, which `initRunRecord` captured from this checkout under
+  // these exact names. Only the batch strategy resumes anything, so the other
+  // two do not pay for the manifest read.
+  const batchIdentity: BatchChainIdentity | undefined =
+    sessionStrategy === "batch"
+      ? {
+          worktreeRoot: run.worktreeRoot ?? "",
+          ref: chainRefIdentity(run),
+          svFingerprint: await sourcevisionFingerprint(projectDir),
+          policyHash: policyFingerprint(policy),
+          vendor,
+          model: opts.spawnModel ?? "",
+        }
+      : undefined;
+
+  // The decision this run was started under, recorded on the run record so it
+  // outlives the terminal the `detail()` lines below were printed to. Seeded
+  // with the cold answer; the two strategies that consult a cache overwrite it.
+  run.session = {
+    strategy: sessionStrategy,
+    outcome: "miss",
+    reason:
+      sessionStrategy !== "cold"
+        ? "not-consulted"
+        : config.sessionStrategy === "cold"
+          ? "configured-cold"
+          // `resolveSessionStrategy` degrades to cold for any vendor or
+          // provider that cannot resume a session by id. Saying so is the
+          // difference between "forking is off" and "forking was asked for and
+          // this vendor cannot do it".
+          : "fork-unsupported",
+  };
+
+  if (sessionStrategy === "batch" && batchIdentity) {
     const chain = await readBatchChain(henchDir);
     const verdict = isBatchChainUsable(chain, {
-      vendor,
-      model: opts.spawnModel ?? "",
+      identity: batchIdentity,
       tasksPerSession,
+      maxAgeHours: config.batchMaxAgeHours,
+      maxIdleHours: config.batchMaxIdleHours,
     });
+    const chainAgeMs = chain ? cacheEntryAgeMs(chain.createdAt) : undefined;
     if (verdict.usable && chain) {
       batchResumeId = chain.sessionId;
       batchTaskNumber = chain.tasksUsed + 1;
       batchPreviousTaskTitle = chain.lastTaskTitle;
+      run.session = {
+        strategy: "batch",
+        outcome: "hit",
+        reason: "chain-continued",
+        ageMs: chainAgeMs,
+        sessionId: chain.sessionId,
+      };
       detail(
         `Batch session: continuing ${chain.sessionId.slice(0, 8)} ` +
           `(task ${batchTaskNumber} of up to ${tasksPerSession})`,
@@ -2050,12 +2136,14 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       // Any rejection means this task opens a new session. Drop the old chain
       // so a later failure cannot resume a session we have stopped counting.
       if (chain) await clearBatchChain(henchDir);
+      const reason = verdict.usable ? "no-chain" : verdict.reason;
+      run.session = { strategy: "batch", outcome: "miss", reason, ageMs: chainAgeMs };
       detail(`Batch session: starting fresh (${verdict.usable ? "new chain" : verdict.reason})`);
     }
   }
 
   if (sessionStrategy === "fork") {
-    warmParentId = await ensureWarmParent({
+    const decision = await ensureWarmParent({
       adapter,
       vendor,
       cliBinary,
@@ -2076,6 +2164,16 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           tokenMetadata,
         }),
     });
+    warmParentId = decision.parentId;
+    run.session = {
+      strategy: "fork",
+      outcome: decision.outcome,
+      reason: decision.reason,
+      ageMs: decision.ageMs,
+      // On a hit this is the parent that was forked. On a miss followed by a
+      // fresh orientation there is nothing reused to name, so it stays absent.
+      sessionId: decision.outcome === "hit" ? decision.parentId : undefined,
+    };
     if (warmParentId) run.parentSessionId = warmParentId;
   }
 
@@ -2523,16 +2621,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // start the next task inside the failure. The same applies when the vendor
   // reported no session id — there is nothing to hand on.
   if (sessionStrategy === "batch") {
-    if (run.status === "completed" && lastSessionId) {
-      await advanceBatchChain(henchDir, {
-        sessionId: lastSessionId,
-        vendor,
-        model: opts.spawnModel ?? "",
-        lastTaskTitle: brief.task.title,
-      }).catch(() => { /* best effort — the next task just starts fresh */ });
-    } else {
-      await clearBatchChain(henchDir);
-    }
+    await settleBatchChain(henchDir, {
+      completed: run.status === "completed",
+      sessionId: lastSessionId,
+      identity: batchIdentity,
+      lastTaskTitle: brief.task.title,
+    });
   }
 
   return { run };

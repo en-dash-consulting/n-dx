@@ -4,7 +4,8 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { Sidebar } from "../../../src/viewer/components/sidebar.js";
+import { SettingsOverlay } from "../../../src/viewer/components/settings-overlay.js";
+import { buildValidViews } from "../../../src/shared/index.js";
 import { Breadcrumb } from "../../../src/viewer/components/breadcrumb.js";
 import { resolveCliLabel, clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 
@@ -53,16 +54,15 @@ describe("dashboard labels use the project CLI name", () => {
     vi.unstubAllGlobals();
   });
 
-  it("sidebar renders the resolved name, never a bare ndx", async () => {
+  it("settings list renders the resolved name, never a bare ndx", async () => {
     stubProject("myapp");
     act(() => {
-      render(h(Sidebar, {
-        view: "overview" as never,
+      render(h(SettingsOverlay, {
+        view: "llm-provider",
+        validViews: buildValidViews(null),
         onNavigate: () => {},
-        manifest: null,
-        zones: null,
-        sidebarCollapsed: false,
-        onToggleSidebar: () => {},
+        onClose: () => {},
+        children: null,
       }), root);
     });
     await settle();
@@ -86,13 +86,12 @@ describe("dashboard labels use the project CLI name", () => {
   it("falls back to n-dx when the project has no cli.name", async () => {
     stubProject(undefined);
     act(() => {
-      render(h(Sidebar, {
-        view: "overview" as never,
+      render(h(SettingsOverlay, {
+        view: "llm-provider",
+        validViews: buildValidViews(null),
         onNavigate: () => {},
-        manifest: null,
-        zones: null,
-        sidebarCollapsed: false,
-        onToggleSidebar: () => {},
+        onClose: () => {},
+        children: null,
       }), root);
     });
     await settle();

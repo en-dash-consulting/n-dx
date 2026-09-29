@@ -13,8 +13,10 @@ body {
   word-wrap: break-word;
 }
 
+/* Top nav, then the page body, then the bottom bar (see shell.css). */
 #app {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   height: 100dvh;
 }

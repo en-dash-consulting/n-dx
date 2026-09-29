@@ -76,11 +76,17 @@ describe("[a11y] Files: archetype definition", () => {
     expect(description.textContent).toBe(getGlossaryDefinition("archetype"));
     expect(description.classList.contains("sr-only")).toBe(true);
 
-    // The visual copy in the header is hidden from assistive technology, so a
-    // screen reader does not repeat it before every cell in the column.
-    const inHeader = table.querySelector("th p")!;
-    expect(inHeader.textContent).toBe(getGlossaryDefinition("archetype"));
-    expect(inHeader.getAttribute("aria-hidden")).toBe("true");
+    // The header carries it behind an ⓘ: a button named for the term whose
+    // description is that same once-read element, and a bubble that is visual
+    // only — so a screen reader does not repeat it before every cell.
+    expect(table.querySelector("th p")).toBeNull();
+    const tip = table.querySelector("th .info-tip")!;
+    const button = tip.querySelector("button.info-tip-btn")!;
+    expect(button.getAttribute("aria-label")).toBe("About archetype");
+    expect(button.getAttribute("aria-describedby")).toBe(describedBy);
+    const bubble = tip.querySelector(".info-tip-bubble")!;
+    expect(bubble.textContent).toBe(getGlossaryDefinition("archetype"));
+    expect(bubble.getAttribute("aria-hidden")).toBe("true");
 
     const announced = definitionNodes("archetype").filter((n) => n.getAttribute("aria-hidden") !== "true");
     expect(announced).toHaveLength(1);

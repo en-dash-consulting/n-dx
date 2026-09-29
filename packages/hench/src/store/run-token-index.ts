@@ -58,7 +58,7 @@ export function runTokenTupleFromRecord(run: RunRecord): RunTokenTuple {
   return {
     runId: run.id,
     itemId: run.taskId,
-    tokens: run.tokens ?? normalizeRunTokens(run.tokenUsage),
+    tokens: run.tokens ?? normalizeRunTokens(run.tokenUsage, run.turnTokenUsage),
     status: run.status,
     finishedAt: run.finishedAt,
   };

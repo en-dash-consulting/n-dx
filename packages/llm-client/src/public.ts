@@ -64,6 +64,7 @@
  * - `auth.ts` — auth detection and diagnostics
  * - `exec.ts` — process execution utilities (`exec`, `spawnTool`, `ProcessPool`)
  * - `project-dirs.ts` — project directory constants (`PROJECT_DIRS`)
+ * - `layout.ts` — folder-layout resolver (`.ndx/` first, legacy fallback)
  * - `project-config.ts` — `.n-dx.json` override loading and merging
  * - `json.ts` — canonical JSON serialization
  * - `output.ts` — CLI output control (quiet mode)
@@ -208,6 +209,7 @@ export {
 
 export type {
   TokenParseResult,
+  TokenCacheProvenance,
   CodexTokenMapping,
 } from "./token-usage.js";
 
@@ -334,6 +336,14 @@ export type { TerminateTreeOptions } from "./process-tree.js";
 // Project directory constants
 export { PROJECT_DIRS } from "./project-dirs.js";
 export type { ProjectDir } from "./project-dirs.js";
+
+// Folder-layout resolver (.ndx/ container, falling back to the legacy layout)
+export {
+  NDX_CONTAINER_DIRNAME,
+  detectLayoutMode,
+  resolveLayout,
+} from "./layout.js";
+export type { Layout, LayoutMode, ResolveLayoutOptions } from "./layout.js";
 
 // Canonical JSON serialization
 export { toCanonicalJSON } from "./json.js";
