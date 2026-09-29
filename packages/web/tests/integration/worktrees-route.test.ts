@@ -7,7 +7,7 @@
  * only a real layout exercises that join end to end.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -24,14 +24,10 @@ import type { FSWatcher } from "node:fs";
 import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 import { removeTempDir } from "../helpers/temp-dir.js";
 
-// Absolute wait budget for an fs.watch-delivered event: a hang guardrail, not
-// a latency SLA, scaled with the rest of the suite's load-sensitive budgets.
-// See TESTING.md "Flake Resistance" Family 2.
-const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
-const WATCHER_EVENT_TIMEOUT_MS = 4_000 * BUDGET_MULTIPLIER;
-// TESTING.md Family 3: testTimeout must stay above the internal wait budget
-// so a genuine hang surfaces as vi.waitFor's own timeout, not vitest's.
-const TEST_TIMEOUT_BUFFER = 5_000;
+// No wait budget for a watcher event remains in this file: the one test that
+// waited on a real fs.watch delivery now drives the watch-factory seam and
+// advances the debounce with fake timers, so there is no OS-timing window left
+// to size. The constants that scaled that window went with it.
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync(
@@ -120,6 +116,18 @@ beforeEach(() => {
   // Watchers are module-level, one per runs directory: a test must not
   // inherit one registered (with another test's broadcaster) earlier.
   closeWorktreeRunWatchers();
+});
+
+// The watch factory is module-level global state, and the tests that install a
+// fake one must do so BEFORE the try/finally that restores it — the server has
+// to start with the fake already in place. A throw in `startRouteTestServer`
+// (a bind or port failure, say) therefore skips the restore, and every later
+// test in the file silently stops exercising real fs.watch: `beforeEach`
+// closes watchers but says nothing about the factory. Restoring here rather
+// than trusting each test's `finally` makes that unreachable, including for
+// tests added later.
+afterEach(() => {
+  setWorktreeRunWatchFactory(null);
 });
 
 describe("GET /api/worktrees", () => {
@@ -311,33 +319,55 @@ describe("GET /api/worktrees", () => {
     await server.close();
   });
 
-  it(
-    "a run file saved in another worktree pushes hench:run-changed without the Runs view",
-    async () => {
-      // The Sessions tray is open but the Runs view (the only other caller that
-      // watches linked worktrees) was never visited: GET /api/worktrees alone
-      // must register the watcher, or a mid-run claim takeover waits for a poll.
-      const broadcast = vi.fn();
-      const onStatusInvalidate = vi.fn(invalidateWorktreesAnswer);
-      server = await startRouteTestServer((req, res) =>
-        handleWorktreesRoute(req, res, ctxFor(repo), { broadcast, onStatusInvalidate }),
-      );
+  it("a run file saved in another worktree pushes hench:run-changed without the Runs view", async () => {
+    // The Sessions tray is open but the Runs view (the only other caller that
+    // watches linked worktrees) was never visited: GET /api/worktrees alone
+    // must register the watcher, or a mid-run claim takeover waits for a poll.
+    //
+    // Driven through the watch-factory seam rather than a real fs.watch event.
+    // Two claims live here — the route registers a watcher on the linked runs
+    // directory, and a `.json` change on it reaches `broadcast` — and neither
+    // is a statement about how fast the OS delivers a change callback. Waiting
+    // on the real one made this the file's flakiest test: FSEvents on macOS
+    // coalesces and can arrive past any timeout, so CI failed with "Number of
+    // calls: 0" against code that was working. The debounce is advanced with
+    // fake timers for the same reason.
+    const broadcast = vi.fn();
+    const onStatusInvalidate = vi.fn(invalidateWorktreesAnswer);
+    const listeners = new Map<string, (eventType: string, filename: string) => void>();
+    setWorktreeRunWatchFactory((dir, listener) => {
+      listeners.set(dir, listener as (eventType: string, filename: string) => void);
+      return { close: () => {}, on: () => {} } as unknown as FSWatcher;
+    });
+    const linkedRuns = join(linked, ".hench", "runs");
+    server = await startRouteTestServer((req, res) =>
+      handleWorktreesRoute(req, res, ctxFor(repo), { broadcast, onStatusInvalidate }),
+    );
+    try {
+      await fetchWorktrees(server);
+
+      // Registration is the first claim, and the one this route owns.
+      expect([...listeners.keys()]).toContain(linkedRuns);
+
+      // A run file lands in the linked worktree. The watcher debounces before
+      // firing, so the timer is advanced rather than waited out — 2s clears
+      // WORKTREE_WATCH_DEBOUNCE_MS (500) with room, and costs nothing faked.
+      vi.useFakeTimers();
       try {
-        await fetchWorktrees(server);
-
-        writeRun(linked, "run-c", "running");
-
-        await vi.waitFor(() => {
-          expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: "hench:run-changed" }));
-        }, { timeout: WATCHER_EVENT_TIMEOUT_MS, interval: 50 });
-        expect(onStatusInvalidate).toHaveBeenCalled();
+        listeners.get(linkedRuns)!("change", "run-c.json");
+        vi.advanceTimersByTime(2_000);
       } finally {
-        closeWorktreeRunWatchers();
-        await server.close();
+        vi.useRealTimers();
       }
-    },
-    WATCHER_EVENT_TIMEOUT_MS + TEST_TIMEOUT_BUFFER,
-  );
+
+      expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: "hench:run-changed" }));
+      expect(onStatusInvalidate).toHaveBeenCalled();
+    } finally {
+      setWorktreeRunWatchFactory(null);
+      closeWorktreeRunWatchers();
+      await server.close();
+    }
+  });
 
   it("a request scoped to another workspace does not prune that worktree's live watcher", async () => {
     // Regression: the prune keep-set excluded the request's served worktree,

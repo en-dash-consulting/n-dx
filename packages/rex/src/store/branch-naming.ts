@@ -45,7 +45,44 @@ export function resolveGitBranch(cwd: string): string {
 }
 
 /** Well-known default branch names, checked in order. */
-const DEFAULT_BRANCHES = ["main", "master"] as const;
+export const DEFAULT_BRANCHES = ["main", "master"] as const;
+
+const ORIGIN_PREFIX = "refs/remotes/origin/";
+
+/**
+ * The branch `origin/HEAD` points at, or null when the clone has no
+ * `origin/HEAD` (no remote, or one added without `--set-head`).
+ */
+function resolveOriginDefaultBranch(cwd: string): string | null {
+  try {
+    const ref = execFileSync(
+      "git",
+      ["symbolic-ref", "--quiet", `${ORIGIN_PREFIX}HEAD`],
+      { cwd, encoding: "utf-8", ...QUIET_GIT },
+    ).trim();
+    return ref.startsWith(ORIGIN_PREFIX) ? ref.slice(ORIGIN_PREFIX.length) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether `branch` is this clone's default branch.
+ *
+ * Prefers what `origin/HEAD` names, so a repository whose default is neither
+ * `main` nor `master` is read correctly, and falls back to
+ * {@link DEFAULT_BRANCHES} when the clone has no `origin/HEAD`.
+ *
+ * Lives here rather than beside its caller because this module is where rex
+ * talks to git about branches — the allowlist in
+ * `tests/e2e/architecture-policy.test.js` names it for exactly that, and a
+ * second `execFileSync("git", …)` site elsewhere in rex would have to widen
+ * that allowlist to say the same thing twice.
+ */
+export function isDefaultBranch(cwd: string, branch: string): boolean {
+  const origin = resolveOriginDefaultBranch(cwd);
+  return origin ? branch === origin : (DEFAULT_BRANCHES as readonly string[]).includes(branch);
+}
 
 /**
  * Get the YYYY-MM-DD date of the first commit on the current branch.

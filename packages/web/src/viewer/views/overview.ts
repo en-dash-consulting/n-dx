@@ -10,7 +10,7 @@ import {
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
 import { narrationNotice } from "./narration-notice.js";
-import { AnalyzeControls, BrandedHeader } from "../components/index.js";
+import { AnalyzeControls, BrandedHeader, InfoTip } from "../components/index.js";
 
 interface NextStep {
   priority: string;
@@ -361,6 +361,7 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
             value: zones.zones.length,
             label: "Zones",
             color: "var(--accent)",
+            info: h(InfoTip, { term: "zone", label: "zones" }),
           })
         : null,
       imports
@@ -390,17 +391,25 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
           ),
 
           h("div", { class: "health-row" },
-            h(HealthGauge, {
-              value: healthMetrics.avgCohesion,
-              label: "Avg Cohesion",
-              size: 90,
-            }),
-            h(HealthGauge, {
-              value: healthMetrics.avgCoupling,
-              label: "Avg Coupling",
-              size: 90,
-              inverted: true,
-            }),
+            // The ⓘ sits beside each gauge, not inside it: the gauge is a
+            // role="meter", whose children are presentational to assistive tech.
+            h("div", { class: "health-gauge-with-info" },
+              h(HealthGauge, {
+                value: healthMetrics.avgCohesion,
+                label: "Avg Cohesion",
+                size: 90,
+              }),
+              h(InfoTip, { term: "cohesion" }),
+            ),
+            h("div", { class: "health-gauge-with-info" },
+              h(HealthGauge, {
+                value: healthMetrics.avgCoupling,
+                label: "Avg Coupling",
+                size: 90,
+                inverted: true,
+              }),
+              h(InfoTip, { term: "coupling" }),
+            ),
             h("div", { class: "pattern-list" },
               healthMetrics.patterns.map(p =>
                 h(PatternBadge, { key: p, type: "pattern", label: p })

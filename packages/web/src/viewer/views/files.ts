@@ -4,7 +4,7 @@ import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { FileEntry } from "../external.js";
 import { buildFileToZoneMap, getZoneColorByIndex } from "../visualization/index.js";
 import { basename } from "../utils.js";
-import { BrandedHeader, LanguageAnalysisStrip, GlossaryLine } from "../components/index.js";
+import { BrandedHeader, LanguageAnalysisStrip, GlossaryLine, InfoTip } from "../components/index.js";
 
 const FILE_SEARCH_LISTBOX_ID = "file-search-listbox";
 const FILE_SEARCH_MAX_OPTIONS = 10;
@@ -443,8 +443,8 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
     // Table
     // The archetype definition is read once, as the table's description,
     // rather than from inside its <th>, where a screen reader would repeat
-    // it before every cell in the column. The header keeps a visual copy
-    // marked decorative.
+    // it before every cell in the column. The header shows it behind an ⓘ
+    // whose bubble is visual only and whose button points at that description.
     classifications
       ? h(GlossaryLine, { term: "archetype", id: "files-archetype-definition", srOnly: true })
       : null,
@@ -463,7 +463,7 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
           h("th", { onClick: () => toggleSort("role") }, `Role${sortIndicator("role")}`),
           h("th", { onClick: () => toggleSort("category") }, `Category${sortIndicator("category")}`),
           classifications
-            ? h("th", null, "Archetype", h(GlossaryLine, { term: "archetype", decorative: true }))
+            ? h("th", null, "Archetype", h(InfoTip, { term: "archetype", describedBy: "files-archetype-definition" }))
             : null
         )
       ),

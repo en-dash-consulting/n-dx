@@ -7,6 +7,7 @@ import { cmdPrMarkdown, toBranchWorkRecord, generatePrMarkdownFile, PR_MARKDOWN_
 import { CLIError } from "../../../src/cli/errors.js";
 import type { BranchWorkResult } from "../../../src/analyzers/branch-work-collector.js";
 import { existsSync } from "node:fs";
+import { fixtureRex } from "../../helpers/index.js";
 
 function git(cwd: string, args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim();
@@ -20,6 +21,7 @@ function writePRD(dir: string, items: unknown[]): void {
     "utf-8",
   );
 }
+
 
 // ── toBranchWorkRecord (pure conversion) ────────────────────────────────────
 
@@ -282,7 +284,7 @@ describe("cmdPrMarkdown", () => {
     git(tmpDir, ["add", "."]);
     git(tmpDir, ["commit", "-m", "add rex data"]);
 
-    await cmdPrMarkdown(tmpDir);
+    await cmdPrMarkdown(tmpDir, { rex: fixtureRex(tmpDir) });
 
     const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
 
@@ -355,7 +357,7 @@ describe("cmdPrMarkdown", () => {
       },
     ]);
 
-    await cmdPrMarkdown(tmpDir);
+    await cmdPrMarkdown(tmpDir, { rex: fixtureRex(tmpDir) });
 
     const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
     expect(markdown).toContain("## Summary");
@@ -414,7 +416,7 @@ describe("cmdPrMarkdown", () => {
     git(tmpDir, ["add", "."]);
     git(tmpDir, ["commit", "-m", "add prd"]);
 
-    await cmdPrMarkdown(tmpDir);
+    await cmdPrMarkdown(tmpDir, { rex: fixtureRex(tmpDir) });
 
     const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
 
@@ -432,7 +434,7 @@ describe("cmdPrMarkdown", () => {
     expect(alphaIndex).toBeLessThan(zebraIndex);
 
     // Stable: running again produces identical output
-    await cmdPrMarkdown(tmpDir);
+    await cmdPrMarkdown(tmpDir, { rex: fixtureRex(tmpDir) });
     const rerendered = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
     expect(rerendered).toBe(markdown);
   });
@@ -471,7 +473,7 @@ describe("cmdPrMarkdown", () => {
     git(tmpDir, ["add", "."]);
     git(tmpDir, ["commit", "-m", "add prd"]);
 
-    await cmdPrMarkdown(tmpDir);
+    await cmdPrMarkdown(tmpDir, { rex: fixtureRex(tmpDir) });
 
     const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
 
@@ -487,7 +489,7 @@ describe("cmdPrMarkdown", () => {
 
     writeFileSync(join(tmpDir, ".rex", "prd.json"), "", "utf-8");
 
-    await cmdPrMarkdown(tmpDir);
+    await cmdPrMarkdown(tmpDir, { rex: fixtureRex(tmpDir) });
 
     const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
     expect(markdown).toContain("## Summary");
@@ -500,7 +502,7 @@ describe("cmdPrMarkdown", () => {
 
     writeFileSync(join(tmpDir, ".rex", "prd.json"), "{ invalid json", "utf-8");
 
-    await cmdPrMarkdown(tmpDir);
+    await cmdPrMarkdown(tmpDir, { rex: fixtureRex(tmpDir) });
 
     const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
     expect(markdown).toContain("## Summary");
@@ -562,7 +564,9 @@ describe("cmdPrMarkdown", () => {
     git(tmpDir, ["add", "."]);
     git(tmpDir, ["commit", "-m", "complete branch task"]);
 
-    await cmdPrMarkdown(tmpDir);
+    // rex attributes only task-branch to this branch: task-base was already
+    // completed on main, so it is not this branch's work.
+    await cmdPrMarkdown(tmpDir, { rex: fixtureRex(tmpDir, ["task-branch"]) });
 
     const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
 
@@ -610,7 +614,7 @@ describe("generatePrMarkdownFile", () => {
       },
     ]);
 
-    const result = await generatePrMarkdownFile(tmpDir, svDir);
+    const result = await generatePrMarkdownFile(tmpDir, svDir, { rex: fixtureRex(tmpDir) });
 
     expect(result.outputPath).toBe(join(svDir, PR_MARKDOWN_FILENAME));
     expect(result.itemCount).toBe(1);
@@ -672,7 +676,7 @@ describe("generatePrMarkdownFile", () => {
       },
     ]);
 
-    await generatePrMarkdownFile(tmpDir, svDir);
+    await generatePrMarkdownFile(tmpDir, svDir, { rex: fixtureRex(tmpDir) });
 
     const markdown = readFileSync(outputPath, "utf-8");
     expect(markdown).not.toContain("old stale content");

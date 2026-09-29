@@ -6,13 +6,13 @@ import { execFileSync } from "node:child_process";
 
 import {
   collectBranchWork,
-  parsePRDDocument,
-  diffCompletedItems,
+  collectCompletedIds,
   buildBranchWorkItems,
 } from "../../../src/analyzers/branch-work-collector.js";
 import type {
   BranchWorkResult,
   CollectorOptions,
+  RexBridge,
 } from "../../../src/analyzers/branch-work-collector.js";
 
 // ---------------------------------------------------------------------------
@@ -39,33 +39,50 @@ function makeItem(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Initialise a git repo with the given PRD on `main`, then create a feature branch. */
+/**
+ * Initialise a git repo on `baseName` and check out `branchName`.
+ *
+ * No PRD is written: since rex owns both reading the PRD and diffing it, the
+ * collector's own tests supply those through {@link CollectorOptions.rex} and
+ * need git only for the branch detection it still does itself.
+ */
 async function setupGitRepo(
   dir: string,
-  basePRD: Record<string, unknown>,
-  branchPRD?: Record<string, unknown>,
-  branchName = "feature/test-branch",
+  branchName: string | null = "feature/test-branch",
+  baseName = "main",
 ) {
-  const rexDir = join(dir, ".rex");
-  await mkdir(rexDir, { recursive: true });
-
-  // Initialise git repo on main
-  execFileSync("git", ["init", "-b", "main"], { cwd: dir });
+  execFileSync("git", ["init", "-b", baseName], { cwd: dir });
   execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: dir });
   execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
 
-  // Write base PRD and commit on main
-  await writeFile(join(rexDir, "prd.json"), JSON.stringify(basePRD, null, 2));
+  await writeFile(join(dir, "README.md"), "hello");
   execFileSync("git", ["add", "."], { cwd: dir });
-  execFileSync("git", ["commit", "-m", "initial PRD"], { cwd: dir });
+  execFileSync("git", ["commit", "-m", "init"], { cwd: dir });
 
-  // Create feature branch and optionally update PRD
-  execFileSync("git", ["checkout", "-b", branchName], { cwd: dir });
-  if (branchPRD) {
-    await writeFile(join(rexDir, "prd.json"), JSON.stringify(branchPRD, null, 2));
-    execFileSync("git", ["add", "."], { cwd: dir });
-    execFileSync("git", ["commit", "-m", "update PRD on branch"], { cwd: dir });
+  if (branchName) {
+    execFileSync("git", ["checkout", "-b", branchName], { cwd: dir });
   }
+}
+
+/**
+ * A {@link RexBridge} double that records what it was asked.
+ *
+ * `diffCompleted` returning null is rex saying "I could not compare", which is
+ * a different answer from an empty set and the collector treats it as such.
+ */
+function fakeRex(
+  doc: Record<string, unknown> | null,
+  completed: string[] | null,
+): RexBridge & { calls: { dir: string; baseBranch: string }[] } {
+  const calls: { dir: string; baseBranch: string }[] = [];
+  return {
+    calls,
+    readPRD: () => doc as never,
+    diffCompleted: (dir: string, baseBranch: string) => {
+      calls.push({ dir, baseBranch });
+      return completed === null ? null : new Set(completed);
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -83,97 +100,16 @@ describe("branch-work-collector", () => {
     if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
   });
 
-  // ── parsePRDDocument ────────────────────────────────────────────
+  // ── collectCompletedIds ────────────────────────────────────────
+  //
+  // The fallback set, for when there is no baseline to diff against. The diff
+  // itself is rex's — `diffCompletedItems` used to live here and is gone, so
+  // that "what did this branch finish" has exactly one implementation. Its
+  // semantics are covered by rex's own tree-diff tests.
 
-  describe("parsePRDDocument", () => {
-    it("parses a valid PRD JSON string", () => {
-      const doc = parsePRDDocument(JSON.stringify(makePRD([makeItem()])));
-      expect(doc).not.toBeNull();
-      expect(doc!.items).toHaveLength(1);
-      expect(doc!.items[0].id).toBe("item-1");
-    });
-
-    it("returns null for empty string", () => {
-      expect(parsePRDDocument("")).toBeNull();
-    });
-
-    it("returns null for malformed JSON", () => {
-      expect(parsePRDDocument("{not valid json")).toBeNull();
-    });
-
-    it("returns null for JSON without items array", () => {
-      expect(parsePRDDocument(JSON.stringify({ schema: "rex/v1" }))).toBeNull();
-    });
-
-    it("returns null for JSON where items is not an array", () => {
-      expect(parsePRDDocument(JSON.stringify({ schema: "rex/v1", items: "oops" }))).toBeNull();
-    });
-  });
-
-  // ── diffCompletedItems ─────────────────────────────────────────
-
-  describe("diffCompletedItems", () => {
-    it("returns items completed on branch but not on base", () => {
-      const base = makePRD([
-        makeItem({ id: "a", status: "completed" }),
-        makeItem({ id: "b", status: "pending" }),
-        makeItem({ id: "c", status: "pending" }),
-      ]);
-      const current = makePRD([
-        makeItem({ id: "a", status: "completed" }),
-        makeItem({ id: "b", status: "completed" }),
-        makeItem({ id: "c", status: "pending" }),
-      ]);
-
-      const diff = diffCompletedItems(current.items, base.items);
-      expect(diff).toEqual(new Set(["b"]));
-    });
-
-    it("returns all completed IDs when base has no completed items", () => {
-      const base = makePRD([
-        makeItem({ id: "a", status: "pending" }),
-        makeItem({ id: "b", status: "pending" }),
-      ]);
-      const current = makePRD([
-        makeItem({ id: "a", status: "completed" }),
-        makeItem({ id: "b", status: "completed" }),
-      ]);
-
-      const diff = diffCompletedItems(current.items, base.items);
-      expect(diff).toEqual(new Set(["a", "b"]));
-    });
-
-    it("returns empty set when no new completions", () => {
+  describe("collectCompletedIds", () => {
+    it("collects completed ids across the whole hierarchy", () => {
       const items = [
-        makeItem({ id: "a", status: "completed" }),
-        makeItem({ id: "b", status: "pending" }),
-      ];
-
-      const diff = diffCompletedItems(items, items);
-      expect(diff.size).toBe(0);
-    });
-
-    it("handles nested children in hierarchy", () => {
-      const baseItems = [
-        makeItem({
-          id: "epic-1",
-          level: "epic",
-          status: "pending",
-          children: [
-            makeItem({
-              id: "feat-1",
-              level: "feature",
-              status: "pending",
-              children: [
-                makeItem({ id: "task-1", level: "task", status: "pending" }),
-                makeItem({ id: "task-2", level: "task", status: "completed" }),
-              ],
-            }),
-          ],
-        }),
-      ];
-
-      const currentItems = [
         makeItem({
           id: "epic-1",
           level: "epic",
@@ -182,40 +118,21 @@ describe("branch-work-collector", () => {
             makeItem({
               id: "feat-1",
               level: "feature",
-              status: "completed",
+              status: "pending",
               children: [
                 makeItem({ id: "task-1", level: "task", status: "completed" }),
-                makeItem({ id: "task-2", level: "task", status: "completed" }),
+                makeItem({ id: "task-2", level: "task", status: "pending" }),
               ],
             }),
           ],
         }),
       ];
 
-      const diff = diffCompletedItems(currentItems, baseItems);
-      // task-2 was already completed on base, so excluded
-      expect(diff).toEqual(new Set(["epic-1", "feat-1", "task-1"]));
+      expect(collectCompletedIds(items)).toEqual(new Set(["epic-1", "task-1"]));
     });
 
-    it("handles items that exist on current but not on base (new items)", () => {
-      const baseItems = [makeItem({ id: "a", status: "pending" })];
-      const currentItems = [
-        makeItem({ id: "a", status: "pending" }),
-        makeItem({ id: "b", status: "completed" }),
-      ];
-
-      const diff = diffCompletedItems(currentItems, baseItems);
-      expect(diff).toEqual(new Set(["b"]));
-    });
-
-    it("handles empty base (no PRD on base branch)", () => {
-      const currentItems = [
-        makeItem({ id: "a", status: "completed" }),
-        makeItem({ id: "b", status: "pending" }),
-      ];
-
-      const diff = diffCompletedItems(currentItems, []);
-      expect(diff).toEqual(new Set(["a"]));
+    it("returns an empty set when nothing is completed", () => {
+      expect(collectCompletedIds([makeItem({ id: "a", status: "pending" })]).size).toBe(0);
     });
   });
 
@@ -334,258 +251,162 @@ describe("branch-work-collector", () => {
     });
   });
 
-  // ── collectBranchWork (integration) ────────────────────────────
+  // ── collectBranchWork ──────────────────────────────────────────
+  //
+  // rex answers both "what is in the PRD" and "what did this branch complete",
+  // so these supply that pair directly and assert what the collector does with
+  // it: which base branch it asks about, and what it reports when the answer
+  // does not come back. The real spawns are covered by the `sv pr-markdown`
+  // e2e test, which runs against a built rex and a real folder tree.
 
   describe("collectBranchWork", () => {
-    it("identifies completed items on feature branch", async () => {
-      const basePRD = makePRD([
-        makeItem({
-          id: "epic-1",
-          level: "epic",
-          status: "pending",
-          children: [
-            makeItem({ id: "task-1", level: "task", status: "pending" }),
-            makeItem({ id: "task-2", level: "task", status: "completed" }),
-          ],
-        }),
-      ]);
+    const TREE = makePRD([
+      makeItem({
+        id: "epic-1",
+        title: "Auth System",
+        level: "epic",
+        status: "pending",
+        children: [
+          makeItem({
+            id: "task-1",
+            level: "task",
+            status: "completed",
+            completedAt: "2026-02-24T12:00:00Z",
+            description: "Exchange the token",
+            acceptanceCriteria: ["It works"],
+          }),
+          makeItem({ id: "task-2", level: "task", status: "completed" }),
+        ],
+      }),
+    ]);
 
-      const branchPRD = makePRD([
-        makeItem({
-          id: "epic-1",
-          level: "epic",
-          status: "pending",
-          children: [
-            makeItem({ id: "task-1", level: "task", status: "completed", completedAt: "2026-02-24T12:00:00Z" }),
-            makeItem({ id: "task-2", level: "task", status: "completed" }),
-          ],
-        }),
-      ]);
+    it("reports the items rex's diff attributes to this branch", async () => {
+      await setupGitRepo(tmpDir);
 
-      await setupGitRepo(tmpDir, basePRD, branchPRD);
-
-      const result = await collectBranchWork({ dir: tmpDir });
+      const result = await collectBranchWork({
+        dir: tmpDir,
+        rex: fakeRex(TREE, ["task-1"]),
+      });
 
       expect(result.branch).toBe("feature/test-branch");
       expect(result.baseBranch).toBe("main");
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0].id).toBe("task-1");
+      expect(result.items.map((i) => i.id)).toEqual(["task-1"]);
       expect(result.collectedAt).toBeTruthy();
     });
 
-    it("returns all completed items when no PRD exists on base branch", async () => {
-      // Initialise git with an empty commit on main (no rex dir)
-      execFileSync("git", ["init", "-b", "main"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
+    it("enriches items from the PRD, not from the diff", async () => {
+      await setupGitRepo(tmpDir);
 
-      // Create an initial commit with a dummy file
-      await writeFile(join(tmpDir, "README.md"), "hello");
-      execFileSync("git", ["add", "."], { cwd: tmpDir });
-      execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir });
+      const result = await collectBranchWork({
+        dir: tmpDir,
+        rex: fakeRex(TREE, ["task-1"]),
+      });
 
-      // Feature branch with PRD
-      execFileSync("git", ["checkout", "-b", "feature/new"], { cwd: tmpDir });
-      const rexDir = join(tmpDir, ".rex");
-      await mkdir(rexDir, { recursive: true });
-      const prd = makePRD([
-        makeItem({ id: "a", status: "completed" }),
-        makeItem({ id: "b", status: "pending" }),
-      ]);
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
-      execFileSync("git", ["add", "."], { cwd: tmpDir });
-      execFileSync("git", ["commit", "-m", "add PRD"], { cwd: tmpDir });
-
-      const result = await collectBranchWork({ dir: tmpDir });
-
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0].id).toBe("a");
+      // The diff only carries ids; everything a report needs comes from the
+      // tree rex returned. This is the assertion that the two are joined.
+      const item = result.items[0];
+      expect(item.description).toBe("Exchange the token");
+      expect(item.acceptanceCriteria).toEqual(["It works"]);
+      expect(item.completedAt).toBe("2026-02-24T12:00:00Z");
+      expect(item.parentChain.map((p) => p.id)).toEqual(["epic-1"]);
     });
 
-    it("returns empty items when no PRD exists on current branch", async () => {
-      // Initialise git with no rex dir
-      execFileSync("git", ["init", "-b", "main"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
-      await writeFile(join(tmpDir, "README.md"), "hello");
-      execFileSync("git", ["add", "."], { cwd: tmpDir });
-      execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir });
-      execFileSync("git", ["checkout", "-b", "feature/empty"], { cwd: tmpDir });
+    it("asks rex to diff against the detected base branch", async () => {
+      await setupGitRepo(tmpDir);
+      const rex = fakeRex(TREE, []);
 
-      const result = await collectBranchWork({ dir: tmpDir });
+      await collectBranchWork({ dir: tmpDir, rex });
 
-      expect(result.items).toEqual([]);
-      expect(result.branch).toBe("feature/empty");
+      expect(rex.calls).toHaveLength(1);
+      expect(rex.calls[0].baseBranch).toBe("main");
     });
 
-    it("supports custom baseBranch option", async () => {
-      // Create develop as base branch
-      execFileSync("git", ["init", "-b", "develop"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
+    it("auto-detects master when main does not exist", async () => {
+      await setupGitRepo(tmpDir, "feature/from-master", "master");
+      const rex = fakeRex(TREE, []);
 
-      const rexDir = join(tmpDir, ".rex");
-      await mkdir(rexDir, { recursive: true });
-      const basePRD = makePRD([makeItem({ id: "a", status: "pending" })]);
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(basePRD, null, 2));
-      execFileSync("git", ["add", "."], { cwd: tmpDir });
-      execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir });
+      const result = await collectBranchWork({ dir: tmpDir, rex });
 
-      execFileSync("git", ["checkout", "-b", "feature/from-develop"], { cwd: tmpDir });
-      const branchPRD = makePRD([makeItem({ id: "a", status: "completed" })]);
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(branchPRD, null, 2));
-      execFileSync("git", ["add", "."], { cwd: tmpDir });
-      execFileSync("git", ["commit", "-m", "complete task"], { cwd: tmpDir });
+      expect(result.baseBranch).toBe("master");
+      expect(rex.calls[0].baseBranch).toBe("master");
+    });
+
+    it("honours an explicit baseBranch", async () => {
+      await setupGitRepo(tmpDir, "feature/from-develop", "develop");
+      const rex = fakeRex(TREE, ["task-1"]);
 
       const result = await collectBranchWork({
         dir: tmpDir,
         baseBranch: "develop",
+        rex,
       });
 
       expect(result.baseBranch).toBe("develop");
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0].id).toBe("a");
+      expect(rex.calls[0].baseBranch).toBe("develop");
     });
 
-    it("handles corrupted PRD on disk gracefully", async () => {
-      execFileSync("git", ["init", "-b", "main"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
-      await writeFile(join(tmpDir, "README.md"), "hello");
-      execFileSync("git", ["add", "."], { cwd: tmpDir });
-      execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir });
-      execFileSync("git", ["checkout", "-b", "feature/broken"], { cwd: tmpDir });
+    it("returns an empty result with an error when rex has no PRD to read", async () => {
+      await setupGitRepo(tmpDir);
 
-      // Write corrupted PRD
-      const rexDir = join(tmpDir, ".rex");
-      await mkdir(rexDir, { recursive: true });
-      await writeFile(join(rexDir, "prd.json"), "{{{not valid");
-      execFileSync("git", ["add", "."], { cwd: tmpDir });
-      execFileSync("git", ["commit", "-m", "broken PRD"], { cwd: tmpDir });
-
-      const result = await collectBranchWork({ dir: tmpDir });
+      const result = await collectBranchWork({
+        dir: tmpDir,
+        rex: fakeRex(null, ["task-1"]),
+      });
 
       expect(result.items).toEqual([]);
-      expect(result.errors).toBeDefined();
-      expect(result.errors!.length).toBeGreaterThan(0);
+      expect(result.errors?.length).toBeGreaterThan(0);
     });
 
-    it("handles non-git directory gracefully", async () => {
-      // No git init — just a bare directory
-      const rexDir = join(tmpDir, ".rex");
-      await mkdir(rexDir, { recursive: true });
-      const prd = makePRD([makeItem({ id: "a", status: "completed" })]);
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
+    it("falls back to every completed item when the diff fails, and says why", async () => {
+      await setupGitRepo(tmpDir);
 
-      const result = await collectBranchWork({ dir: tmpDir });
+      // null is rex saying "I could not compare" — an unresolvable base ref.
+      const result = await collectBranchWork({
+        dir: tmpDir,
+        rex: fakeRex(TREE, null),
+      });
 
-      // Should still work: returns all completed items with unknown branch
+      expect(result.items.map((i) => i.id).sort()).toEqual(["task-1", "task-2"]);
+      // The full list must not pass for a real answer.
+      expect(result.errors?.join(" ")).toContain("main");
+    });
+
+    it("returns all completed items in a non-git directory, without asking rex to diff", async () => {
+      const rex = fakeRex(TREE, ["task-1"]);
+
+      const result = await collectBranchWork({ dir: tmpDir, rex });
+
       expect(result.branch).toBe("unknown");
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0].id).toBe("a");
+      expect(result.items.map((i) => i.id).sort()).toEqual(["task-1", "task-2"]);
+      // No baseline exists, so there is nothing to ask and nothing to explain.
+      expect(rex.calls).toHaveLength(0);
+      expect(result.errors).toBeUndefined();
     });
 
-    it("auto-detects master as base branch when main does not exist", async () => {
-      execFileSync("git", ["init", "-b", "master"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
+    it("yields nothing when running on the base branch itself", async () => {
+      await setupGitRepo(tmpDir, null);
+      const rex = fakeRex(TREE, ["task-1"]);
 
-      const rexDir = join(tmpDir, ".rex");
-      await mkdir(rexDir, { recursive: true });
-      const basePRD = makePRD([makeItem({ id: "x", status: "pending" })]);
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(basePRD, null, 2));
-      execFileSync("git", ["add", "."], { cwd: tmpDir });
-      execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir });
-
-      execFileSync("git", ["checkout", "-b", "feature/from-master"], { cwd: tmpDir });
-      const branchPRD = makePRD([makeItem({ id: "x", status: "completed" })]);
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(branchPRD, null, 2));
-      execFileSync("git", ["add", "."], { cwd: tmpDir });
-      execFileSync("git", ["commit", "-m", "done"], { cwd: tmpDir });
-
-      const result = await collectBranchWork({ dir: tmpDir });
-
-      expect(result.baseBranch).toBe("master");
-      expect(result.items).toHaveLength(1);
-    });
-
-    it("populates epic summaries for branch work items", async () => {
-      const basePRD = makePRD([
-        makeItem({
-          id: "epic-1",
-          title: "Auth System",
-          level: "epic",
-          status: "pending",
-          children: [
-            makeItem({ id: "t1", level: "task", status: "pending" }),
-            makeItem({ id: "t2", level: "task", status: "pending" }),
-          ],
-        }),
-        makeItem({
-          id: "epic-2",
-          title: "Dashboard",
-          level: "epic",
-          status: "pending",
-          children: [
-            makeItem({ id: "t3", level: "task", status: "pending" }),
-          ],
-        }),
-      ]);
-
-      const branchPRD = makePRD([
-        makeItem({
-          id: "epic-1",
-          title: "Auth System",
-          level: "epic",
-          status: "pending",
-          children: [
-            makeItem({ id: "t1", level: "task", status: "completed" }),
-            makeItem({ id: "t2", level: "task", status: "completed" }),
-          ],
-        }),
-        makeItem({
-          id: "epic-2",
-          title: "Dashboard",
-          level: "epic",
-          status: "pending",
-          children: [
-            makeItem({ id: "t3", level: "task", status: "pending" }),
-          ],
-        }),
-      ]);
-
-      await setupGitRepo(tmpDir, basePRD, branchPRD);
-
-      const result = await collectBranchWork({ dir: tmpDir });
-
-      expect(result.items).toHaveLength(2); // t1, t2
-      expect(result.epicSummaries).toBeDefined();
-      expect(result.epicSummaries).toHaveLength(1); // Only Auth System
-      expect(result.epicSummaries![0].id).toBe("epic-1");
-      expect(result.epicSummaries![0].title).toBe("Auth System");
-      expect(result.epicSummaries![0].completedCount).toBe(2);
-    });
-
-    it("works when running on the base branch itself", async () => {
-      const prd = makePRD([
-        makeItem({ id: "a", status: "completed" }),
-        makeItem({ id: "b", status: "pending" }),
-      ]);
-
-      execFileSync("git", ["init", "-b", "main"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir });
-      execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
-      const rexDir = join(tmpDir, ".rex");
-      await mkdir(rexDir, { recursive: true });
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
-      execFileSync("git", ["add", "."], { cwd: tmpDir });
-      execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir });
-
-      // Running on main — diffing against itself should yield 0 items
-      const result = await collectBranchWork({ dir: tmpDir });
+      const result = await collectBranchWork({ dir: tmpDir, rex });
 
       expect(result.branch).toBe("main");
       expect(result.items).toEqual([]);
+      expect(rex.calls).toHaveLength(0);
+    });
+
+    it("populates epic summaries for branch work items", async () => {
+      await setupGitRepo(tmpDir);
+
+      const result = await collectBranchWork({
+        dir: tmpDir,
+        rex: fakeRex(TREE, ["task-1", "task-2"]),
+      });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.epicSummaries).toHaveLength(1);
+      expect(result.epicSummaries![0].id).toBe("epic-1");
+      expect(result.epicSummaries![0].title).toBe("Auth System");
+      expect(result.epicSummaries![0].completedCount).toBe(2);
     });
   });
 });

@@ -150,6 +150,11 @@ export interface SharedLoopOptions {
   /** Only select tasks with at least one of these tags (e.g. ["self-heal"]). */
   tags?: string[];
   /**
+   * Only select tasks whose `assignee` field matches this identity string
+   * (`ndx work --mine`). Resolved once in `cmdRun` via rex's `resolveActor`.
+   */
+  assignee?: string;
+  /**
    * Cross-worktree claims for this run: selection passes over tasks other
    * worktrees hold and claims the one it picks. The caller (`runOne`)
    * releases them when the run ends. See `process/task-claims.ts`.

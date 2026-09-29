@@ -16,9 +16,12 @@
   -->
   <script>
     (function(){
+      // Theme before first paint. Nothing stored = "system": follow the OS.
       var s = localStorage.getItem("sv-theme");
-      var t = s || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      var pinned = s === "light" || s === "dark";
+      var t = pinned ? s : (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
       document.documentElement.setAttribute("data-theme", t);
+      document.documentElement.setAttribute("data-theme-pref", pinned ? s : "system");
       var d = localStorage.getItem("ndx.ui.density");
       document.documentElement.setAttribute("data-density", (d === "small" || d === "large") ? d : "medium");
     })();

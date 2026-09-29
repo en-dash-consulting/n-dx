@@ -234,4 +234,72 @@ describe("cmdTree", () => {
       vi.restoreAllMocks();
     }
   });
+
+  // ── --format=json ────────────────────────────────────────────────
+  //
+  // The machine-readable rendering exists so a consumer outside rex can read
+  // the PRD without a second parser — sourcevision's PR markdown is the first,
+  // replacing its read of the legacy `.rex/prd.md`. Everything below is that
+  // contract, so a change here is a change to a published surface.
+
+  describe("--format=json", () => {
+    /** Run cmdTree in JSON mode and parse the whole of stdout. */
+    async function runJson(dir: string): Promise<{ items: PRDItem[] }> {
+      const output: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((msg) => {
+        output.push(String(msg));
+      });
+      try {
+        await cmdTree(dir, { format: "json" });
+      } finally {
+        vi.restoreAllMocks();
+      }
+      // Parsing the joined output is the assertion that nothing else reached
+      // stdout: one stray banner line and this throws.
+      return JSON.parse(output.join("\n")) as { items: PRDItem[] };
+    }
+
+    // Sibling order is the folder-tree store's (slug order), not the order
+    // items were written in, and it is the same order the rendered tree uses.
+    // These assertions are on membership and nesting for that reason — pinning
+    // an order here would be re-specifying the store from the wrong place.
+    it("emits the item hierarchy as JSON", async () => {
+      const parsed = await runJson(testDir);
+
+      expect(parsed.items.map((i) => i.id).sort()).toEqual(["e1", "e2"]);
+      const epic = parsed.items.find((i) => i.id === "e1");
+      expect(epic?.title).toBe("Auth System");
+      expect(epic?.children?.map((c) => c.id).sort()).toEqual(["f1", "f2"]);
+
+      const oauth = epic?.children?.find((c) => c.id === "f1");
+      expect(oauth?.children?.map((c) => c.id).sort()).toEqual(["t1", "t2"]);
+    });
+
+    it("carries the fields a report needs, not just the tree shape", async () => {
+      const parsed = await runJson(testDir);
+
+      const token = parsed.items
+        .find((i) => i.id === "e1")
+        ?.children?.find((c) => c.id === "f1")
+        ?.children?.find((c) => c.id === "t1");
+      expect(token?.title).toBe("Token Exchange");
+      expect(token?.status).toBe("completed");
+      expect(token?.priority).toBe("critical");
+      expect(token?.level).toBe("task");
+    });
+
+    it("omits deleted items, matching the rendered tree", async () => {
+      writePRD(testDir, {
+        ...POPULATED_PRD,
+        items: [
+          ...POPULATED_PRD.items,
+          { id: "e3", title: "Deleted Epic", level: "epic", status: "deleted" },
+        ],
+      });
+
+      const parsed = await runJson(testDir);
+
+      expect(parsed.items.map((i) => i.id)).not.toContain("e3");
+    });
+  });
 });

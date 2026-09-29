@@ -823,7 +823,7 @@ export function renderItemIndexMd(
  * `children` is always omitted (handled structurally).
  */
 const ORDERED_FIELDS: ReadonlyArray<string> = [
-  "id", "level", "title", "status", "priority", "tags", "blockedBy", "source",
+  "id", "level", "title", "status", "priority", "tags", "blockedBy", "ready", "source",
   "startedAt", "completedAt", "endedAt",
   "resolutionType", "resolutionDetail", "failureReason",
   "acceptanceCriteria", "loe", "description",
@@ -880,6 +880,12 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
 /**
  * Emit one YAML key-value line (or block) into `lines`.
  *
+ * Booleans are emitted as bare `true`/`false` (not quoted): the parser's
+ * `parseScalar` checks for a leading quote before it checks for `true`/
+ * `false`, so a quoted `"true"` would round-trip back as the *string*
+ * `"true"` rather than the boolean — silently corrupting any boolean field
+ * that took the generic string-encoding path (e.g. `ready`).
+ *
  * @public — used by core/compact-single-children to re-emit prefixed parent
  * fields with the same encoding rules as the rest of the serializer.
  */
@@ -901,6 +907,8 @@ export function emitYamlField(lines: string[], key: string, value: unknown): voi
   } else if (value !== null && typeof value === "object") {
     // Plain objects emit as inline JSON (valid YAML flow mapping).
     lines.push(`${key}: ${JSON.stringify(value)}`);
+  } else if (typeof value === "boolean") {
+    lines.push(`${key}: ${value}`);
   } else {
     lines.push(`${key}: ${JSON.stringify(String(value))}`);
   }

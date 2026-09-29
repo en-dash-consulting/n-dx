@@ -226,6 +226,24 @@ export {
 } from "./core/tree.js";
 export type { TreeEntry } from "./core/tree.js";
 
+// ---- Core: tree diff --------------------------------------------------------
+// One definition of "how do these two PRD trees differ", shared by
+// `rex tree-diff`, the dashboard's Workspaces board, and the pull-request
+// summary. Consumers pass their own comparedFields where they have a
+// published contract of their own.
+
+export { diffTrees, TREE_DIFF_COMPARED_FIELDS } from "./core/tree-diff.js";
+export type {
+  TreeDiff,
+  TreeDiffCounts,
+  TreeDiffOptions,
+  DiffItemRef,
+  DiffEntry,
+  DiffChangedEntry,
+  DiffMovedEntry,
+  DiffFieldChange,
+} from "./core/tree-diff.js";
+
 // ---- Core: stats ------------------------------------------------------------
 
 export { computeStats } from "./core/stats.js";
@@ -268,6 +286,10 @@ export {
   requirementsScore,
 } from "./core/next-task.js";
 export type { SelectionExplanation, SelectionReasonCode, TaskMatch, PrioritizationOptions, RiskTolerance } from "./core/next-task.js";
+
+// ---- Core: identity -----------------------------------------------------------
+
+export { resolveActor } from "./core/identity.js";
 
 // ---- Core: keywords ---------------------------------------------------------
 

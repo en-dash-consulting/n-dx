@@ -1,9 +1,14 @@
 import { h, render, Fragment } from "preact";
 import type { VNode } from "preact";
 import { useState, useEffect, useMemo, useCallback } from "preact/hooks";
-import type {DetailItem} from "./types.js";import { ALL_DATA_FILES } from "./external.js";
+import type { DetailItem, ViewId } from "./types.js";
+import { ALL_DATA_FILES } from "./external.js";
 import {
-  Sidebar,
+  TopNav,
+  StageLinks,
+  BottomBar,
+  SettingsOverlay,
+  CommandsSheet,
   DetailPanel,
   Guide,
   Breadcrumb,
@@ -44,6 +49,7 @@ import { bootstrap } from "./bootstrap.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
 import { installBasePathFetch } from "./base-path.js";
 import { renderActiveView, buildValidViews } from "./views/view-registry.js";
+import { isSettingsView, stageForView } from "./views/stages.js";
 import { initScrollReveal } from "./scroll-reveal.js";
 
 if (isDeployedMode()) {
@@ -64,7 +70,7 @@ initScrollReveal();
 /** What the one boot-time `/api/config` call yields. */
 interface BootConfig {
   scope: string | null;
-  /** Server identity for the sidebar footer; null on a server too old to send it. */
+  /** Server identity for the bottom bar; null on a server too old to send it. */
   server: ServerIdentity | null;
 }
 
@@ -73,8 +79,8 @@ interface BootConfig {
  *
  * Both values it carries are needed before anything paints — the scope
  * decides which views exist, and the identity line says which n-dx this
- * window is — so the footer takes `server` as a prop from here rather than
- * fetching the same endpoint again.
+ * window is — so the bottom bar takes `server` as a prop from here rather
+ * than fetching the same endpoint again.
  */
 async function fetchBootConfig(): Promise<BootConfig> {
   try {
@@ -87,14 +93,12 @@ async function fetchBootConfig(): Promise<BootConfig> {
   }
 }
 
-const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
-
-function getInitialSidebarCollapsed(): boolean {
-  try {
-    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
-  } catch {
-    return false;
-  }
+/**
+ * The page shown under the settings overlay when a settings route is opened
+ * directly: the landing page, or the first view when there is none.
+ */
+function fallbackPage(validViews: Set<ViewId>): ViewId {
+  return validViews.has("home") ? "home" : (validViews.values().next().value as ViewId);
 }
 
 function App({ scope, server = null }: { scope: string | null; server?: ServerIdentity | null }) {
@@ -126,7 +130,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const { status: gitStatus, refetch: refetchGitStatus } = useGitStatus();
   const { worktrees } = useWorktrees();
   const { claims } = useClaims();
-  const [searchOpen, , closeSearch] = useSearchOverlay();
+  const [searchOpen, openSearch, closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const handleTripleClick = useMemo(
     () => createTripleClickDetector({ onTrigger: openNeolithic, requiredClicks: 7 }),
@@ -150,9 +154,28 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
 
   const [detail, setDetail] = useState<DetailItem | null>(null);
   const [degradationDismissed, setDegradationDismissed] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [prdDetailContent, setPrdDetailContent] = useState<VNode<any> | null>(null);
+
+  // Settings routes open as an overlay over the page you were on, which stays
+  // mounted underneath. `pageView` is that page: the current view unless it is
+  // a settings view, else the last non-settings view (or home, on a direct load).
+  const settingsOpen = isSettingsView(view);
+  const [lastPage, setLastPage] = useState<ViewId>(() => (settingsOpen ? fallbackPage(validViews) : view));
+  useEffect(() => {
+    if (!isSettingsView(view)) setLastPage(view);
+  }, [view]);
+  const pageView: ViewId = settingsOpen ? lastPage : view;
+  const stage = stageForView(pageView, validViews);
+
+  // The commands sheet is UI state, not a route. Any navigation lowers it —
+  // including one started from a link inside it.
+  const [commandsOpen, setCommandsOpen] = useState(false);
+  useEffect(() => { setCommandsOpen(false); }, [view]);
+  const toggleCommands = useCallback(() => setCommandsOpen((open) => !open), []);
+  const closeCommands = useCallback(() => setCommandsOpen(false), []);
+  const openSettings = useCallback(() => handleSidebarNav("llm-provider"), [handleSidebarNav]);
+  const closeSettings = useCallback(() => handleSidebarNav(lastPage), [handleSidebarNav, lastPage]);
 
   const handleRestore = () => {
     const state = restoreCrashState();
@@ -170,14 +193,6 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     window.location.reload();
   }, []);
 
-  const handleToggleSidebar = () => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next)); } catch { /* noop */ }
-      return next;
-    });
-  };
-
   // Re-show degradation banner when tier escalates
   useEffect(() => {
     if (isDegraded) setDegradationDismissed(false);
@@ -194,10 +209,11 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     return () => { el.classList.remove("degradation-no-animations"); };
   }, [isFeatureDisabled]);
 
-  // Scroll to top on view change
+  // Scroll to top when the page changes — not when a settings overlay opens
+  // or closes over it, which would lose your place.
   useEffect(() => {
     document.getElementById("main-content")?.scrollTo(0, 0);
-  }, [view]);
+  }, [pageView]);
 
   // document.title is owned by <Breadcrumb>, which has the project name and
   // product context. A second writer here raced it: whichever effect ran last
@@ -205,13 +221,15 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
 
   // Update browser favicon to match the active product section
   useEffect(() => {
-    updateFavicon(view);
-  }, [view]);
+    updateFavicon(pageView);
+  }, [pageView]);
 
   const hasData = data.manifest || data.inventory || data.imports || data.zones;
 
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
+
+  const viewCtx = { data, setDetail, setPrdDetailContent, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews };
 
   return h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
@@ -219,29 +237,49 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
-    h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar, scope, server }),
-    h("main", {
-      id: "main-content",
-      // The Tasks (prd) view manages its own internal scroll region, so the
-      // main column becomes a non-scrolling flex container for it.
-      class: `main${view === "prd" ? " main--fill" : ""}`,
-      role: "main",
-      "aria-label": "Main content",
-      onClick: handleTripleClick,
-    },
-      // Page-context bar: breadcrumb navigation + help buttons
-      h("div", { class: "page-context-bar", role: "group", "aria-label": "Page navigation and help" },
-        h(Breadcrumb, { view, navigateTo, scope }),
-        h("div", { class: "page-context-actions" },
-          h(Guide, { view }),
+    h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, onOpenSearch: openSearch, scope }),
+    h("div", { class: "app-body" },
+      h("main", {
+        id: "main-content",
+        // The Tasks (prd) view manages its own internal scroll region, so the
+        // main column becomes a non-scrolling flex container for it.
+        class: `main${pageView === "prd" ? " main--fill" : ""}${stage && pageView !== "home" ? " main--staged" : ""}`,
+        role: "main",
+        "aria-label": "Main content",
+        onClick: handleTripleClick,
+      },
+        // Page-context bar: breadcrumb navigation + help buttons
+        h("div", { class: "page-context-bar", role: "group", "aria-label": "Page navigation and help" },
+          h(Breadcrumb, { view: pageView, navigateTo, scope }),
+          h("div", { class: "page-context-actions" },
+            h(Guide, { view: pageView }),
+          ),
         ),
+        loading
+          ? h("div", { class: "loading", role: "status", "aria-live": "polite" }, "Loading...")
+          : renderActiveView(pageView, viewCtx),
       ),
-      loading
-        ? h("div", { class: "loading", role: "status", "aria-live": "polite" }, "Loading...")
-        : renderActiveView(view, { data, setDetail, setPrdDetailContent, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed, navigateTo, isFeatureDisabled, askEnabled }),
+      h(StageLinks, { stage, validViews, onNavigate: handleSidebarNav }),
+      !isFeatureDisabled("detailPanel")
+        ? h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent })
+        : null,
     ),
-    !isFeatureDisabled("detailPanel")
-      ? h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent })
+    h(BottomBar, {
+      server,
+      validViews,
+      onNavigate: handleSidebarNav,
+      onOpenSettings: openSettings,
+      settingsOpen,
+      onToggleCommands: toggleCommands,
+      commandsOpen,
+    }),
+    h(CommandsSheet, { open: commandsOpen, onClose: closeCommands },
+      renderActiveView("command-reference", viewCtx),
+    ),
+    settingsOpen
+      ? h(SettingsOverlay, { view, validViews, onNavigate: handleSidebarNav, onClose: closeSettings, server },
+          loading ? null : renderActiveView(view, viewCtx),
+        )
       : null,
     (refreshToast && !isFeatureDisabled("autoRefresh"))
       ? h("div", { class: "refresh-toast", role: "status", "aria-live": "polite" }, "Data updated")

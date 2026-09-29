@@ -23,6 +23,7 @@
  * - Token usage parsing (API and stream token parsing)
  * - Model resolution (resolve model names)
  * - Shared constants (PROJECT_DIRS)
+ * - Folder layout resolution (resolveLayout, detectLayoutMode)
  * - Canonical JSON serialization
  *
  * **Out-of-scope (must NOT be re-exported):**
@@ -53,6 +54,10 @@ export {
   PROJECT_DIRS,
   isLLMVendor,
 } from "@n-dx/llm-client";
+
+// ---- Folder layout ----------------------------------------------------------
+export { detectLayoutMode, resolveLayout } from "@n-dx/llm-client";
+export type { Layout, LayoutMode, ResolveLayoutOptions } from "@n-dx/llm-client";
 
 // ---- Canonical JSON ---------------------------------------------------------
 export { toCanonicalJSON } from "@n-dx/llm-client";

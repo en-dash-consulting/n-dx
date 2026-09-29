@@ -1,7 +1,7 @@
 /**
- * Sidebar status indicators — compact health badges for each product section.
+ * Status indicators — compact health badges, one per stage, in the bottom bar.
  *
- * Pure presentation components that render status data as sidebar badges.
+ * Pure presentation components that render status data as badges.
  * The infrastructure coupling (polling, WebSocket, messaging) lives in the
  * `use-project-status` hook, following the consistent hook abstraction
  * pattern used across all infrastructure services.
@@ -23,6 +23,16 @@ export type {
 
 // Import types for use in component props
 import type { SourceVisionStatus, RexStatus, HenchStatus } from "../hooks/index.js";
+
+/**
+ * The view each indicator opens. A caller that must not offer a view outside
+ * its scope checks against these before rendering the indicator.
+ */
+export const INDICATOR_VIEWS = {
+  sv: "overview",
+  rex: "rex-dashboard",
+  hench: "hench-runs",
+} as const satisfies Record<"sv" | "rex" | "hench", ViewId>;
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -67,7 +77,7 @@ export function SvFreshnessIndicator({ status, onNavigate, tabIndex }: SvIndicat
     type: "button",
     tabIndex,
     "aria-label": `Analysis ${isStale ? "stale" : "fresh"}${timeLabel ? ` — last run ${timeLabel}` : ""} — click to view`,
-    onClick: () => onNavigate("overview"),
+    onClick: () => onNavigate(INDICATOR_VIEWS.sv),
   },
     h("span", {
       class: `indicator-dot ${isStale ? "indicator-dot-stale" : "indicator-dot-fresh"}`,
@@ -123,7 +133,7 @@ export function RexCompletionIndicator({ status, onNavigate, tabIndex }: RexIndi
     type: "button",
     tabIndex,
     "aria-label": `${ariaLabel} — click to view`,
-    onClick: () => onNavigate("rex-dashboard"),
+    onClick: () => onNavigate(INDICATOR_VIEWS.rex),
   },
     // Top row: percentage + task counts
     h("div", { class: "indicator-row" },
@@ -186,7 +196,7 @@ export function HenchActivityIndicator({ status, onNavigate, tabIndex }: HenchIn
     type: "button",
     tabIndex,
     "aria-label": `Hench: ${status.totalRuns} runs${hasStaleRuns ? `, ${status.staleRuns} stuck` : ""} — click to view`,
-    onClick: () => onNavigate("hench-runs"),
+    onClick: () => onNavigate(INDICATOR_VIEWS.hench),
   },
     h("span", {
       class: `indicator-dot ${hasStaleRuns ? "indicator-dot-stale" : "indicator-dot-fresh"}`,

@@ -16,7 +16,7 @@
 
 .active-operations-tray {
   position: fixed;
-  bottom: 4.5rem;
+  bottom: calc(4.5rem + var(--bottombar-h, 0px));
   right: 1rem;
   z-index: 998;
   display: flex;
