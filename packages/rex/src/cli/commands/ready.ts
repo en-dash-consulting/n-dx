@@ -25,6 +25,12 @@ export async function cmdReady(
   flags: Record<string, string>,
 ): Promise<void> {
   const itemId = flags.item;
+  if (itemId === "") {
+    throw new CLIError(
+      "--item needs an item id.",
+      "Pass --item=<id>, or omit --item to evaluate the whole tree.",
+    );
+  }
   const migrationResult = await ensureLegacyPrdMigrated(dir);
   requireRexDir(dir);
   const rexDir = join(dir, REX_DIR);

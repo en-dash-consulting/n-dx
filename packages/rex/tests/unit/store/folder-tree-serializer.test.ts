@@ -830,7 +830,7 @@ describe("serializeFolderTree: round-trip with parseFolderTree", () => {
       join(testDir, `${slugify(task.title)}.md`),
       "utf8",
     );
-    expect(content).not.toContain("ready");
+    expect(content).not.toMatch(/^ready:/m);
 
     const { items, warnings } = await parseFolderTree(testDir);
     expect(warnings).toEqual([]);

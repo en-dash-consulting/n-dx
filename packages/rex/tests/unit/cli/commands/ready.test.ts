@@ -99,4 +99,8 @@ describe("cmdReady", () => {
     await expect(cmdReady(tmp, { item: "nonexistent" })).rejects.toThrow(CLIError);
     await expect(cmdReady(tmp, { item: "nonexistent" })).rejects.toThrow(/not found/);
   });
+
+  it("refuses an empty --item instead of falling through to the whole tree", async () => {
+    await expect(cmdReady(tmp, { item: "" })).rejects.toThrow(/--item needs an item id/);
+  });
 });
