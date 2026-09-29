@@ -25,7 +25,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Add an assignee field and ndx work --mine](./add-an-assignee-field-and-ndx-work-mine.md) | completed |
 | [Add rex ready to mark items ready when they have an automated or metric requirement and no open blocker](./add-rex-ready-to-mark-items-ready-when.md) | completed |
 | [Add rex tree-diff --json to diff two PRD trees](./add-rex-tree-diff-json-to-diff-two-prd.md) | completed |
-| [Address #442 review: --mine scope and messaging, ready's ancestor check](./address-442-review-mine-scope-and.md) | in_progress |
+| [Address #442 review: --mine scope and messaging, ready's ancestor check](./address-442-review-mine-scope-and.md) | completed |
 | [Address #442 review: tree-diff and branch-guard correctness](./address-442-review-tree-diff-and.md) | completed |
 | [Guard whole-tree rewrites reached through the rex MCP reorganize tool and the dashboard's bulk routes](./guard-whole-tree-rewrites-reached.md) | pending |
 | [Point the PRD delta route and SourceVision's PR markdown at rex tree-diff and drop the legacy prd.md read](./point-the-prd-delta-route-and.md) | completed |
