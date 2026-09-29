@@ -24,4 +24,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Back the hench agent model with a real per-vendor override that ndx work honours](./back-the-hench-agent-model-with-a-real.md) | pending |
 | [Serve one per-vendor model catalog and the provider choices each vendor supports from the web server](./serve-one-per-vendor-model-catalog-and.md) | pending |
-| [Validate .n-dx.json hench overrides after the merge, falling back per field with a warning](./validate-n-dx-json-hench-overrides.md) | pending |
+| [Validate .n-dx.json hench overrides after the merge, falling back per field with a warning](./validate-n-dx-json-hench-overrides.md) | in_progress |

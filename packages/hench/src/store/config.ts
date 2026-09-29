@@ -1,8 +1,15 @@
 import { join } from "node:path";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
-import { validateConfig, formatValidationErrors, DEFAULT_HENCH_CONFIG } from "../schema/index.js";
+import {
+  validateConfig,
+  formatValidationErrors,
+  formatFieldIssues,
+  revertInvalidFields,
+  DEFAULT_HENCH_CONFIG,
+} from "../schema/index.js";
 import { toCanonicalJSON } from "../prd/llm-gateway.js";
-import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
+import { deepMerge, loadProjectOverrideSources, mergeWithOverrides } from "./project-config.js";
+import type { ProjectOverrideSource } from "./project-config.js";
 import type { HenchConfig, ProjectLanguage } from "../schema/index.js";
 
 export async function ensureHenchDir(henchDir: string): Promise<void> {
@@ -26,30 +33,35 @@ export interface LoadConfigOptions {
 
 /**
  * Replace every top-level field implicated in a validation failure with its
- * default and re-validate. Returns the salvaged config and the field names
- * that were replaced, or null when the document is beyond this repair (not an
- * object, or the failure isn't attributable to specific fields).
+ * default and re-validate. Thin wrapper over {@link revertInvalidFields} with
+ * the schema defaults as the fallback — this is the `.hench/config.json`
+ * salvage case; {@link loadConfig}'s override-validation step below falls
+ * back to the already-validated base config instead.
  */
 function salvageConfig(
   data: Record<string, unknown>,
   issues: Array<{ path: Array<string | number> }>,
 ): { config: HenchConfig; replacedFields: string[] } | null {
-  const defaults = DEFAULT_HENCH_CONFIG() as unknown as Record<string, unknown>;
-  const badKeys = new Set<string>();
+  return revertInvalidFields(data, issues, DEFAULT_HENCH_CONFIG() as unknown as Record<string, unknown>);
+}
+
+/** The top-level field names a set of validation issues implicates, sorted. */
+function topLevelKeys(issues: Array<{ path: Array<string | number> }>): string[] {
+  const keys = new Set<string>();
   for (const issue of issues) {
     const key = issue.path[0];
-    if (typeof key === "string" && key.length > 0) badKeys.add(key);
+    if (typeof key === "string" && key.length > 0) keys.add(key);
   }
-  if (badKeys.size === 0) return null;
+  return [...keys].sort();
+}
 
-  const candidate: Record<string, unknown> = { ...data };
-  for (const key of badKeys) {
-    if (key in defaults) candidate[key] = defaults[key];
-    else delete candidate[key];
+/** Which override file most recently set `key` — later sources win, matching the merge order. */
+function fileForOverrideKey(sources: ProjectOverrideSource[], key: string): string {
+  let owner = sources[sources.length - 1].file;
+  for (const source of sources) {
+    if (Object.prototype.hasOwnProperty.call(source.data, key)) owner = source.file;
   }
-  const result = validateConfig(candidate);
-  if (!result.ok) return null;
-  return { config: result.data as HenchConfig, replacedFields: [...badKeys].sort() };
+  return owner;
 }
 
 export async function loadConfig(
@@ -78,9 +90,40 @@ export async function loadConfig(
     config = salvaged.config;
   }
 
-  // Merge project-level .n-dx.json overrides (project config takes precedence)
-  const overrides = await loadProjectOverrides(henchDir, "hench");
-  return mergeWithOverrides(config, overrides);
+  // Merge project-level .n-dx.json / .n-dx.local.json overrides (project
+  // config takes precedence). These files skip HenchConfigSchema entirely on
+  // the way in — unlike .hench/config.json above, nothing here validates a
+  // single field as it's written — so the merged result is re-validated. An
+  // invalid override field reverts to its value in `config` (the already-
+  // validated base) or the schema default when the base doesn't carry it,
+  // with a warning naming the field and the file it came from. Unlike an
+  // invalid .hench/config.json, this never throws regardless of
+  // `options.onInvalid`: a stray project override must not stop a run.
+  const overrideSources = await loadProjectOverrideSources(henchDir, "hench");
+  if (overrideSources.length === 0) return config;
+
+  const overrides = overrideSources.reduce(
+    (acc, source) => deepMerge(acc, source.data),
+    {} as Record<string, unknown>,
+  );
+  const merged = mergeWithOverrides(config, overrides);
+  const mergedResult = validateConfig(merged);
+  if (mergedResult.ok) return merged;
+
+  const repaired = revertInvalidFields(
+    merged as unknown as Record<string, unknown>,
+    mergedResult.errors.issues,
+    config as unknown as Record<string, unknown>,
+  );
+  const badKeys = repaired ? repaired.replacedFields : topLevelKeys(mergedResult.errors.issues);
+  for (const key of badKeys) {
+    const file = fileForOverrideKey(overrideSources, key);
+    const detail = formatFieldIssues(mergedResult.errors.issues, key);
+    options.onWarning?.(
+      `Invalid hench.${key} in ${file} — keeping the current config value. (${detail})`,
+    );
+  }
+  return repaired ? repaired.config : config;
 }
 
 export async function saveConfig(

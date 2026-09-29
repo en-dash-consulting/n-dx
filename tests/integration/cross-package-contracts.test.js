@@ -635,7 +635,7 @@ describe("gateway export auto-detection", () => {
 
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
-        "loadProjectOverrides", "mergeWithOverrides", "toCanonicalJSON",
+        "deepMerge", "loadProjectOverrides", "loadProjectOverrideSources", "mergeWithOverrides", "toCanonicalJSON",
         "setQuiet", "isQuiet", "setVerbose", "isVerbose", "setDebug", "isDebug",
         "info", "result", "verbose", "debug", "warn", "suppressKnownDeprecations",
         "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "carolinaBlue", "yellow",
@@ -673,7 +673,8 @@ describe("gateway export auto-detection", () => {
       ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "REVIEW_MODELS", "GOOGLE_MODELS",
         "VENDOR_CONTEXT_CHAR_LIMITS",
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
-        "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS"],
+        "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS",
+        "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));

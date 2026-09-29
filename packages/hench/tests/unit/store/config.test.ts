@@ -107,4 +107,84 @@ describe("loadConfig", () => {
     const reloaded = await loadConfig(henchDir);
     expect(reloaded.maxTurns).toBe(75);
   });
+
+  describe("project-level overrides (.n-dx.json / .n-dx.local.json)", () => {
+    async function writeProjectConfig(data: unknown): Promise<void> {
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify(data), "utf-8");
+    }
+
+    async function writeLocalConfig(data: unknown): Promise<void> {
+      await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify(data), "utf-8");
+    }
+
+    it("applies a valid override, unchanged", async () => {
+      await writeProjectConfig({ hench: { maxTurns: 12 } });
+      const config = await loadConfig(henchDir);
+      expect(config.maxTurns).toBe(12);
+    });
+
+    it("reverts an invalid override to the base value and warns, naming the field and file", async () => {
+      await writeProjectConfig({ hench: { maxTurns: -5 } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("hench.maxTurns");
+      expect(warnings[0]).toContain(".n-dx.json");
+    });
+
+    it("does not throw for an invalid override even without onInvalid: 'use-defaults'", async () => {
+      await writeProjectConfig({ hench: { maxTurns: -5 } });
+      await expect(loadConfig(henchDir)).resolves.toMatchObject({
+        maxTurns: DEFAULT_HENCH_CONFIG().maxTurns,
+      });
+    });
+
+    it("reverts an invalid promptCacheTtl override instead of passing the raw string through", async () => {
+      await writeProjectConfig({ hench: { promptCacheTtl: "1hour" } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.promptCacheTtl).toBeUndefined();
+      expect(warnings[0]).toContain("hench.promptCacheTtl");
+    });
+
+    it("keeps every valid override field when only one is invalid", async () => {
+      await writeProjectConfig({ hench: { maxTurns: -5, model: "opus" } });
+      const config = await loadConfig(henchDir, { onWarning: () => {} });
+      expect(config.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+      expect(config.model).toBe("opus");
+    });
+
+    it("validates .n-dx.local.json overrides the same way, naming that file", async () => {
+      await writeLocalConfig({ hench: { maxTurns: -5 } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+      expect(warnings[0]).toContain(".n-dx.local.json");
+      expect(warnings[0]).not.toContain(".n-dx.json\"");
+    });
+
+    it("blames .n-dx.local.json when both files set the same invalid field (local wins)", async () => {
+      await writeProjectConfig({ hench: { maxTurns: 20 } });
+      await writeLocalConfig({ hench: { maxTurns: -5 } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+      expect(warnings[0]).toContain(".n-dx.local.json");
+    });
+
+    it("does not warn when overrides are absent", async () => {
+      const warnings: string[] = [];
+      await loadConfig(henchDir, { onWarning: (message) => warnings.push(message) });
+      expect(warnings).toHaveLength(0);
+    });
+  });
 });

@@ -361,8 +361,12 @@ export { toCanonicalJSON } from "./json.js";
 export {
   deepMerge,
   loadProjectOverrides,
+  loadProjectOverrideSources,
   mergeWithOverrides,
+  PROJECT_CONFIG_FILE,
+  LOCAL_CONFIG_FILE,
 } from "./project-config.js";
+export type { ProjectOverrideSource } from "./project-config.js";
 
 // CLI output control (quiet/verbose/debug modes)
 export {

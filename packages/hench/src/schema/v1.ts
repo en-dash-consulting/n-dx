@@ -147,9 +147,12 @@ export const DEFAULT_PRUNE_CONFIG: Readonly<Required<PruneConfig>> = {
  *
  * Lives here, with the defaults, because both places that enforce it are
  * downstream of this module: `validate.ts` refuses a smaller value in
- * `.hench/config.json`, and `agent/lifecycle/context-prune.ts` clamps to it at
- * runtime for the `.n-dx.json` overrides that `loadConfig` merges *after*
- * validation. One constant, so the refusal and the clamp cannot disagree.
+ * `.hench/config.json` and in a `.n-dx.json`/`.n-dx.local.json` override
+ * (`loadConfig` re-validates the merged result — see `store/config.ts` —
+ * reverting an invalid override instead of letting it through), and
+ * `agent/lifecycle/context-prune.ts` clamps to it at runtime as a second
+ * line of defense for any `PruneConfig` built outside that path. One
+ * constant, so the refusal and the clamp cannot disagree.
  */
 export const MIN_PRUNE_PAIRS = 2;
 
