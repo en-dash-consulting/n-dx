@@ -81,7 +81,8 @@
     "narration-status.js",
     "commit-trailers.js",
     "install-identity.js",
-    "resolve-existing-dir.js"
+    "resolve-existing-dir.js",
+    "layout.js"
   ],
   "scripts": {
     "build": "echo '@n-dx/core: plain JS, no build needed'"

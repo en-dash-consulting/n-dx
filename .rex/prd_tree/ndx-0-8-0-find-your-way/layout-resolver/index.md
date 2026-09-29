@@ -23,7 +23,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add a layout resolver in core and a paths module per package that read .ndx/ first and fall back to the legacy layout](./add-a-layout-resolver-in-core-and-a.md) | pending |
+| [Add a layout resolver in core and a paths module per package that read .ndx/ first and fall back to the legacy layout](./add-a-layout-resolver-in-core-and-a.md) | completed |
 | [Add an architecture-policy rule that rejects new literal .rex/, .hench/ and .sourcevision/ paths](./add-an-architecture-policy-rule-that.md) | pending |
 | [Add ndx migrate-layout to move an existing project to .ndx/](./add-ndx-migrate-layout-to-move-an.md) | pending |
 | [Make ndx init write the .ndx/ layout for new projects](./make-ndx-init-write-the-ndx-layout-for.md) | pending |
