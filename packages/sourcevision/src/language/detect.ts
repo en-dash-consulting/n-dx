@@ -21,6 +21,7 @@
 
 import { readFile, readdir, access } from "node:fs/promises";
 import { join, extname } from "node:path";
+import { resolveLayout } from "@n-dx/llm-client";
 import type { LanguageConfig } from "./registry.js";
 import { typescriptConfig } from "./typescript.js";
 import { goConfig } from "./go.js";
@@ -105,12 +106,18 @@ async function hasSwiftMarker(rootDir: string): Promise<boolean> {
 }
 
 /**
- * Read the `.n-dx.json` language override, if present.
+ * Read the project config’s `language` override, if present.
+ *
+ * The path comes from the layout resolver, not a `.n-dx.json` literal: on a
+ * project with `.ndx/` the file is `.ndx/config.json`, and reading the legacy
+ * name there just misses — the override is ignored with no error, and the
+ * project is auto-detected as if it had never set one.
+ *
  * Returns the language id string or `undefined` if not set.
  */
 async function readConfigOverride(rootDir: string): Promise<string | undefined> {
   try {
-    const raw = await readFile(join(rootDir, ".n-dx.json"), "utf-8");
+    const raw = await readFile(resolveLayout(rootDir).configFile, "utf-8");
     const config = JSON.parse(raw) as Record<string, unknown>;
     if (typeof config.language === "string" && config.language !== "auto") {
       return config.language;
@@ -138,7 +145,7 @@ export interface InventoryConfigOverride {
  */
 export async function loadInventoryConfig(rootDir: string): Promise<InventoryConfigOverride> {
   try {
-    const raw = await readFile(join(rootDir, ".n-dx.json"), "utf-8");
+    const raw = await readFile(resolveLayout(rootDir).configFile, "utf-8");
     const config = JSON.parse(raw) as Record<string, unknown>;
     const sv = config.sourcevision;
     if (!sv || typeof sv !== "object") return {};

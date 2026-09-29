@@ -23,7 +23,7 @@ import {resolve, join} from "node:path";import {
 import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
-import { DEFAULT_LLM_VENDOR, loadLLMConfig, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, loadLLMConfig, resolveLayout, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter } from "@n-dx/llm-client";
 import type { RiskJustificationEntry, ZoneType } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
@@ -583,9 +583,11 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
       ? JSON.parse(readFileSync(classificationsPath, "utf-8"))
       : null;
 
-    // Load risk justifications and zone types from .n-dx.json
-    const riskJustifications = loadRiskJustifications(ctx.svDir);
-    const zoneTypes = loadZoneTypes(ctx.svDir);
+    // Load risk justifications and zone types from the project config.
+    // Resolved from the project root, not derived from svDir — see the loaders.
+    const configFile = resolveLayout(ctx.absDir).configFile;
+    const riskJustifications = loadRiskJustifications(configFile);
+    const zoneTypes = loadZoneTypes(configFile);
 
     // Compute architectural risk scoring and attach metrics to zones
     if (zonesData.zones.length > 0) {
@@ -666,13 +668,19 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
 }
 
 /**
- * Load risk justifications from .n-dx.json (synchronous).
+ * Load risk justifications from the project config (synchronous).
+ *
+ * Takes the resolved config path rather than deriving one from `svDir`. The
+ * old form was `resolve(svDir, "..")` joined to `.n-dx.json`, which holds only
+ * on the legacy layout: with `.ndx/` in force `svDir` is `.ndx/sourcevision`,
+ * so its parent is `.ndx/` and the guess became `.ndx/.n-dx.json` — a file the
+ * resolver never names. `sourcevision.riskJustifications` was therefore
+ * ignored on every new-layout project, with no error to say so.
+ *
  * Returns the array from `sourcevision.riskJustifications` or undefined.
  */
-function loadRiskJustifications(svDir: string): RiskJustificationEntry[] | undefined {
+export function loadRiskJustifications(configPath: string): RiskJustificationEntry[] | undefined {
   try {
-    const projectDir = resolve(svDir, "..");
-    const configPath = join(projectDir, ".n-dx.json");
     if (!existsSync(configPath)) return undefined;
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
     const justifications = data?.sourcevision?.riskJustifications;
@@ -686,13 +694,15 @@ function loadRiskJustifications(svDir: string): RiskJustificationEntry[] | undef
 }
 
 /**
- * Load zone type annotations from .n-dx.json (synchronous).
+ * Load zone type annotations from the project config (synchronous).
+ *
+ * Takes the resolved config path, for the reason given on
+ * {@link loadRiskJustifications}.
+ *
  * Returns the map from `sourcevision.zones.types` or undefined.
  */
-function loadZoneTypes(svDir: string): Record<string, ZoneType> | undefined {
+export function loadZoneTypes(configPath: string): Record<string, ZoneType> | undefined {
   try {
-    const projectDir = resolve(svDir, "..");
-    const configPath = join(projectDir, ".n-dx.json");
     if (!existsSync(configPath)) return undefined;
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
     const types = data?.sourcevision?.zones?.types;
