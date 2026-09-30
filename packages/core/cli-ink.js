@@ -14,6 +14,7 @@ import { existsSync } from "fs";
 import { basename, join, dirname } from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
+import { relativeToRoot, resolveLayout } from "./layout.js";
 import {
   BRAND_NAME,
   TOOL_NAME,
@@ -142,7 +143,22 @@ function PhaseRow({ name, status, detail }) {
 
 // ── Recap ──────────────────────────────────────────────────────────────
 
+/**
+ * One directory name in the recap's left column, padded so the status column
+ * lines up. Computed rather than hardcoded: `.ndx/sourcevision` is four
+ * characters wider than `.sourcevision`, so a fixed pad that looks right on one
+ * layout is ragged on the other.
+ *
+ * @param {string} name  This row's root-relative directory name.
+ * @param {Record<string, string>} all  Every row's name, for the column width.
+ */
+function padLabel(name, all) {
+  const width = Math.max(...Object.values(all).map((n) => n.length));
+  return `${name}/`.padEnd(width + 1);
+}
+
 function Recap({
+  dirLabel,
   sourcevision,
   rex,
   hench,
@@ -167,9 +183,9 @@ function Recap({
         <${Text} color="green">◆<//><${Text} bold>Project initialized!<//>
       <//>
       <${Text}> <//>
-      <${Text}>  .sourcevision/  ${sourcevision}<//>
-      <${Text}>  .rex/           ${rex}<//>
-      <${Text}>  .hench/         ${hench}<//>
+      <${Text}>  ${padLabel(dirLabel.sourcevision, dirLabel)}  ${sourcevision}<//>
+      <${Text}>  ${padLabel(dirLabel.rex, dirLabel)}  ${rex}<//>
+      <${Text}>  ${padLabel(dirLabel.hench, dirLabel)}  ${hench}<//>
       <${Text}>  LLM configuration<//>
       ${llmSkipped
         ? html`<${Text}>    Provider      skipped<//>`
@@ -233,9 +249,18 @@ function InitApp({
     started.current = true;
 
     (async () => {
-      const svExists = existsSync(join(dir, ".sourcevision"));
-      const rexExists = existsSync(join(dir, ".rex"));
-      const henchExists = existsSync(join(dir, ".hench"));
+      // `handleInit` has already created `.ndx/` if this project is getting
+      // one, so detection here sees the layout the sub-inits are about to
+      // write to — the same one their own resolvers will find.
+      const layout = resolveLayout(dir);
+      const dirLabel = {
+        sourcevision: relativeToRoot(layout, layout.sourcevisionDir),
+        rex: relativeToRoot(layout, layout.rexDir),
+        hench: relativeToRoot(layout, layout.henchDir),
+      };
+      const svExists = existsSync(layout.sourcevisionDir);
+      const rexExists = existsSync(layout.rexDir);
+      const henchExists = existsSync(layout.henchDir);
       // Captured warning from the vendor auth preflight (e.g. Gemini selected
       // before GEMINI_API_KEY is set); surfaced in the recap.
       let llmWarning = null;
@@ -274,21 +299,21 @@ function InitApp({
       // Run the programmatic analysis pipeline (inventory, imports, zones, components)
       const svAnalyze = await runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir], onSvData);
       if (svAnalyze.code !== 0) { setPhase("sourcevision", "failed"); onComplete(1, svAnalyze.stderr || svAnalyze.stdout); return; }
-      setPhase("sourcevision", "done", svExists ? "reused — .sourcevision/ already present" : undefined);
+      setPhase("sourcevision", "done", svExists ? `reused — ${dirLabel.sourcevision}/ already present` : undefined);
 
       // rex
       setPhase("rex", "active");
 
       const rx = await runInitCapture(tools.rex, ["init", ...flags, dir]);
       if (rx.code !== 0) { setPhase("rex", "failed"); onComplete(1, rx.stderr || rx.stdout); return; }
-      setPhase("rex", "done", rexExists ? "reused — .rex/ already present" : undefined);
+      setPhase("rex", "done", rexExists ? `reused — ${dirLabel.rex}/ already present` : undefined);
 
       // hench
       setPhase("hench", "active");
 
       const hx = await runInitCapture(tools.hench, ["init", ...flags, dir]);
       if (hx.code !== 0) { setPhase("hench", "failed"); onComplete(1, hx.stderr || hx.stdout); return; }
-      setPhase("hench", "done", henchExists ? "reused — .hench/ already present" : undefined);
+      setPhase("hench", "done", henchExists ? `reused — ${dirLabel.hench}/ already present` : undefined);
 
       // All remaining work runs as child processes — sync file I/O in
       // the main thread freezes Ink's animation no matter what yielding
@@ -394,6 +419,7 @@ function InitApp({
         : null;
 
       setRecap({
+        dirLabel,
         sourcevision: svExists ? "already exists (reused)" : "created",
         rex: rexExists ? "already exists (reused)" : "created",
         hench: henchExists ? "already exists (reused)" : "created",

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir, homedir } from "node:os";
@@ -54,6 +54,18 @@ function fakeBinaryArgsPath(filePath) {
 }
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
+
+/**
+ * Where `ndx init` puts the project config.
+ *
+ * Every project these tests create is empty before init runs, so init
+ * establishes the `.ndx/` layout and the config lands at `.ndx/config.json`
+ * rather than `.n-dx.json`. Written as a helper rather than inlined so the
+ * reason is stated once.
+ */
+function projectConfigPath(dir) {
+  return join(dir, ".ndx", "config.json");
+}
 
 function run(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, ...args], {
@@ -187,7 +199,7 @@ describe("n-dx init provider selection", () => {
     } finally {
       await rm(binDir, { recursive: true, force: true });
     }
-    const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+    const ndxConfig = JSON.parse(await readFile(projectConfigPath(tmpDir), "utf-8"));
     expect(ndxConfig.llm.vendor).toBe("claude");
   });
 
@@ -294,7 +306,7 @@ describe("n-dx init provider selection", () => {
         expect(result.stderr).toContain("codex logout && codex login");
         expect(result.stderr).toContain("Proceeding anyway");
 
-        const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+        const ndxConfig = JSON.parse(await readFile(projectConfigPath(tmpDir), "utf-8"));
         expect(ndxConfig.llm.vendor).toBe("codex");
       } finally {
         await rm(binDir, { recursive: true, force: true });
@@ -334,7 +346,7 @@ describe("n-dx init provider selection", () => {
         expect(result.stderr).toContain("claude logout && claude login");
         expect(result.stderr).toContain("Proceeding anyway");
 
-        const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+        const ndxConfig = JSON.parse(await readFile(projectConfigPath(tmpDir), "utf-8"));
         expect(ndxConfig.llm.vendor).toBe("claude");
       } finally {
         await rm(binDir, { recursive: true, force: true });
@@ -370,7 +382,7 @@ describe("n-dx init provider selection", () => {
             NDX_TEST_GOOGLE_PREFLIGHT: "ok",
           },
         });
-        const ndxConfig = JSON.parse(await readFile(join(projectDir, ".n-dx.json"), "utf-8"));
+        const ndxConfig = JSON.parse(await readFile(projectConfigPath(projectDir), "utf-8"));
         expect(ndxConfig.llm.vendor).toBe("google");
       } finally {
         await rm(projectDir, { recursive: true, force: true });
@@ -412,7 +424,7 @@ describe("n-dx init provider selection", () => {
       expect(result.stderr).toContain("aistudio.google.com/apikey");
       expect(result.stderr).toContain("Proceeding anyway");
 
-      const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      const ndxConfig = JSON.parse(await readFile(projectConfigPath(tmpDir), "utf-8"));
       expect(ndxConfig.llm.vendor).toBe("google");
     });
 
@@ -435,7 +447,7 @@ describe("n-dx init provider selection", () => {
             NDX_TEST_GOOGLE_PREFLIGHT: "ok",
           },
         });
-        const ndxConfig = JSON.parse(await readFile(join(projectDir, ".n-dx.json"), "utf-8"));
+        const ndxConfig = JSON.parse(await readFile(projectConfigPath(projectDir), "utf-8"));
         expect(ndxConfig.llm.vendor).toBe("google");
       } finally {
         await rm(projectDir, { recursive: true, force: true });
@@ -553,17 +565,20 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
       expect(existsSync(attrPath)).toBe(true);
       const first = await readFile(attrPath, "utf-8");
       for (const pattern of [
-        ".rex/**/*.md", ".hench/**/*.json", ".n-dx.json", "AGENTS.md", "CLAUDE.md",
+        // A fresh project is on the `.ndx/` layout, so the tool-directory pins
+        // name the directories inside the container.
+        ".ndx/rex/**/*.md", ".ndx/hench/**/*.json", ".ndx/config.json",
+        "AGENTS.md", "CLAUDE.md",
         // Assistant + config + text surfaces must be pinned too (parity with
-        // n-dx's own .gitattributes — GITATTRIBUTES_EOL_RULES sync invariant).
-        ".claude/skills/**/*.md", ".codex/config.toml", ".sourcevision/**/*.txt",
+        // n-dx's own .gitattributes — the eol-pattern sync invariant).
+        ".claude/skills/**/*.md", ".codex/config.toml", ".ndx/sourcevision/**/*.txt",
       ]) {
         expect(first).toContain(`${pattern}`);
       }
-      expect(first).toMatch(/\.rex\/\*\*\/\*\.md\s+text eol=lf/);
+      expect(first).toMatch(/\.ndx\/rex\/\*\*\/\*\.md\s+text eol=lf/);
       expect(first).toMatch(/\.claude\/skills\/\*\*\/\*\.md\s+text eol=lf/);
       expect(first).toMatch(/\.codex\/config\.toml\s+text eol=lf/);
-      expect(first).toMatch(/\.sourcevision\/\*\*\/\*\.txt\s+text eol=lf/);
+      expect(first).toMatch(/\.ndx\/sourcevision\/\*\*\/\*\.txt\s+text eol=lf/);
 
       // Re-init must not duplicate rules or the header.
       await initWithFakeCodex(projectDir, binDir);
@@ -585,7 +600,7 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
 
       // The attribute routes PRD tree paths to the driver...
       const attrs = await readFile(join(projectDir, ".gitattributes"), "utf-8");
-      expect(attrs).toMatch(/^\.rex\/prd_tree\/\*\*\s+merge=rex-prd$/m);
+      expect(attrs).toMatch(/^\.ndx\/rex\/prd_tree\/\*\*\s+merge=rex-prd$/m);
       // ...and git config names the driver command.
       const driver = execFileSync("git", ["config", "--get", "merge.rex-prd.driver"], {
         cwd: projectDir,
@@ -636,7 +651,7 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
     const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-attrs-merge-"));
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-attrs-merge-bin-"));
     try {
-      const userContent = "*.png binary\n.rex/**/*.md -text\n";
+      const userContent = "*.png binary\n.ndx/rex/**/*.md -text\n";
       await writeFile(join(projectDir, ".gitattributes"), userContent);
 
       await initWithFakeCodex(projectDir, binDir);
@@ -644,10 +659,10 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
       const merged = await readFile(join(projectDir, ".gitattributes"), "utf-8");
       // User content preserved verbatim, at the top.
       expect(merged.startsWith(userContent)).toBe(true);
-      // The user's overlapping .rex/**/*.md rule wins — not re-added by init.
-      expect(merged.match(/^\.rex\/\*\*\/\*\.md\s/gm)).toHaveLength(1);
+      // The user's overlapping rex-markdown rule wins — not re-added by init.
+      expect(merged.match(/^\.ndx\/rex\/\*\*\/\*\.md\s/gm)).toHaveLength(1);
       // Missing rules are appended.
-      expect(merged).toMatch(/\.hench\/\*\*\/\*\.json\s+text eol=lf/);
+      expect(merged).toMatch(/\.ndx\/hench\/\*\*\/\*\.json\s+text eol=lf/);
       expect(merged).toMatch(/CLAUDE\.md\s+text eol=lf/);
     } finally {
       await rm(binDir, { recursive: true, force: true });
@@ -749,4 +764,93 @@ describe("claude CLI discovery diagnostics", () => {
       await rm(binDir, { recursive: true, force: true });
     }
   });
+});
+
+// ── Folder layout: which one a fresh init writes, and which one it keeps ────
+//
+// `ndx init` is the only command that gets to *choose* a layout — every other
+// command detects one. The two cases below are that choice, and they are e2e
+// rather than unit tests on purpose: the mechanism is that `.ndx/` exists
+// before the sub-CLIs are spawned, and nothing short of actually spawning them
+// proves rex, hench and sourcevision all agree about where to write.
+describe("init establishes the folder layout", () => {
+  /**
+   * Init with the Claude surfaces enabled, because `.mcp.json` is written by
+   * the Claude integration and its staying at the repository root is half of
+   * what these tests are about. `CLAUDE_CLI_PATH` points nowhere so the
+   * `claude mcp add` registration short-circuits — the tracked `.mcp.json` is
+   * written by n-dx itself, not by the vendor CLI, so it still lands.
+   */
+  async function initWithFakeCodex(projectDir, binDir) {
+    await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+    run(["init", "--provider=codex", projectDir], {
+      timeout: 50_000,
+      env: {
+        ...process.env,
+        PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+        CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
+      },
+    });
+  }
+
+  it("puts a new project's state under .ndx/ and leaves no loose n-dx paths", async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-layout-new-"));
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-init-layout-new-bin-"));
+    try {
+      await initWithFakeCodex(projectDir, binDir);
+
+      // All three tools wrote inside the container...
+      for (const entry of ["rex", "hench", "sourcevision", "config.json"]) {
+        expect(
+          existsSync(join(projectDir, ".ndx", entry)),
+          `.ndx/${entry} should exist after a fresh init`,
+        ).toBe(true);
+      }
+
+      // ...and nothing landed at the root under the legacy names. This is the
+      // half that would silently regress: a package that kept a literal writes
+      // its own directory beside the container, and both then exist.
+      for (const legacy of [
+        ".rex", ".hench", ".sourcevision", ".n-dx.json", ".n-dx.local.json",
+      ]) {
+        expect(
+          existsSync(join(projectDir, legacy)),
+          `${legacy} should not be written by a fresh init`,
+        ).toBe(false);
+      }
+
+      // `.mcp.json` is the documented exception — the vendor CLIs read it at
+      // the repository root, so it stays there on both layouts.
+      expect(existsSync(join(projectDir, ".mcp.json"))).toBe(true);
+    } finally {
+      await rm(binDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  it("keeps an existing project on the legacy layout and creates no container", async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-layout-old-"));
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-init-layout-old-bin-"));
+    try {
+      // One legacy directory is enough to make this an initialized project:
+      // re-running init must not turn into a migration nobody asked for.
+      await mkdir(join(projectDir, ".rex"), { recursive: true });
+
+      await initWithFakeCodex(projectDir, binDir);
+
+      expect(
+        existsSync(join(projectDir, ".ndx")),
+        "init must not create .ndx/ for a project that already has state",
+      ).toBe(false);
+      for (const legacy of [".rex", ".hench", ".sourcevision", ".n-dx.json"]) {
+        expect(
+          existsSync(join(projectDir, legacy)),
+          `${legacy} should be written for a project already on the legacy layout`,
+        ).toBe(true);
+      }
+    } finally {
+      await rm(binDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  }, 120_000);
 });

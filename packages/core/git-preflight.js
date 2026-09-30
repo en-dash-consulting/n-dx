@@ -18,6 +18,7 @@ import { dirname, join, resolve } from "path";
 import { execFileSync } from "child_process";
 import { createInterface } from "readline/promises";
 import { buildCommitMessage } from "./commit-trailers.js";
+import { relativeToRoot, resolveLayout } from "./layout.js";
 
 const PREFLIGHT_MESSAGE = [
   "",
@@ -153,17 +154,38 @@ export function formatGitWarningLines(result) {
 }
 
 /**
- * Paths considered "n-dx generated" for the baseline commit.  Only entries
- * that actually exist on disk are passed to `git add`; a missing path would
- * abort the entire stage.  The list intentionally includes the assistant
- * surfaces and the n-dx-modified `.gitignore` so the working tree is clean
- * immediately after `ndx init`.
+ * Paths that are n-dx's own state, wherever this project keeps it.
+ *
+ * On the `.ndx/` layout the container covers all four in one entry; the legacy
+ * layout spreads them across the root. Asking the resolver rather than listing
+ * both is the point — a baseline commit that staged `.rex` on a project whose
+ * PRD lives in `.ndx/rex` would leave the whole tree untracked and the working
+ * directory dirty straight out of `ndx init`.
+ *
+ * @param {string} dir  Project root.
+ * @returns {string[]} Root-relative paths.
+ */
+function stateCommitPaths(dir) {
+  const layout = resolveLayout(dir);
+  if (layout.container) return [relativeToRoot(layout, layout.container)];
+  return [
+    layout.sourcevisionDir,
+    layout.rexDir,
+    layout.henchDir,
+    layout.configFile,
+  ].map((path) => relativeToRoot(layout, path));
+}
+
+/**
+ * Paths considered "n-dx generated" for the baseline commit but not owned by
+ * the layout resolver: assistant surfaces, the n-dx-modified `.gitignore`, and
+ * the README artifacts — all fixed at the project root on either layout, so the
+ * working tree is clean immediately after `ndx init`.
+ *
+ * Only entries that actually exist on disk are passed to `git add`; a missing
+ * path would abort the entire stage.
  */
 const BASELINE_COMMIT_PATHS = [
-  ".sourcevision",
-  ".rex",
-  ".hench",
-  ".n-dx.json",
   ".gitignore",
   ".claude",
   ".codex",
@@ -200,7 +222,8 @@ const BASELINE_COMMIT_PATHS = [
  * @returns {GitInitCommitResult}
  */
 export function commitInitBaseline(dir) {
-  const existing = BASELINE_COMMIT_PATHS.filter((p) => existsSync(join(dir, p)));
+  const candidates = [...stateCommitPaths(dir), ...BASELINE_COMMIT_PATHS];
+  const existing = candidates.filter((p) => existsSync(join(dir, p)));
   if (existing.length === 0) return { status: "nothing-to-commit" };
 
   try {

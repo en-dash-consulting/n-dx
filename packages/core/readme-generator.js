@@ -19,6 +19,7 @@
 
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
 import { basename, join, resolve } from "path";
+import { NDX_CONTAINER_DIRNAME } from "./layout.js";
 
 /**
  * File extensions that identify README variants.  The base name `README`
@@ -34,6 +35,9 @@ const README_EXTENSIONS = new Set([
  */
 const STRUCTURE_SKIP_DIRS = new Set([
   ".git", ".hg", ".svn",
+  // Both layouts: `.ndx/` holds all three on a project that has moved, and the
+  // three root directories are what a project that has not still has.
+  NDX_CONTAINER_DIRNAME,
   ".rex", ".hench", ".sourcevision", ".claude", ".codex", ".agents",
   "node_modules", ".pnpm-store", "bower_components",
   "dist", "build", "out", "target",

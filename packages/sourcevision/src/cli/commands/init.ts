@@ -1,6 +1,6 @@
 import { writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { getCurrentHead, getCurrentBranch } from "@n-dx/llm-client";
+import { getCurrentHead, getCurrentBranch, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
 import { SCHEMA_VERSION } from "../sourcevision-core.js";
 import { TOOL_VERSION } from "./constants.js";
 import { info } from "../output.js";
@@ -19,10 +19,14 @@ export const HINTS_TEMPLATE = `<!-- Sourcevision Hints -->
 
 export function cmdInit(dir: string): void {
   const absDir = resolve(dir);
+  const layout = resolveLayout(absDir);
   const svDir = resolveSourcevisionPaths(absDir).svDir;
+  // What to call the directory in output — `.sourcevision` or
+  // `.ndx/sourcevision`, whichever this project is on.
+  const svDirName = relativeToRoot(layout, svDir);
 
   if (existsSync(join(svDir, "manifest.json"))) {
-    info(`.sourcevision/ already initialized in ${absDir}`);
+    info(`${svDirName}/ already initialized in ${absDir}`);
     info("Run 'sourcevision analyze' to update.");
     return;
   }
@@ -51,11 +55,11 @@ export function cmdInit(dir: string): void {
     writeFileSync(hintsPath, HINTS_TEMPLATE);
   }
 
-  info(`Initialized .sourcevision/ in ${absDir}`);
+  info(`Initialized ${svDirName}/ in ${absDir}`);
   info(`  ${join(svDir, "manifest.json")} created`);
   info(`  ${join(svDir, "hints.md")} created`);
   info("");
-  info("Analysis output saved to .sourcevision/ — this is designed to be committed to your repo.");
+  info(`Analysis output saved to ${svDirName}/ — this is designed to be committed to your repo.`);
   info("The viewer UI is served from the sourcevision package and is not stored in your project.");
   info("");
 

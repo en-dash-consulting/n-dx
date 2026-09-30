@@ -11,7 +11,7 @@ import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { GITATTRIBUTES_EOL_RULES } from "../../packages/core/gitattributes-pins.js";
+import { eolPatternsFor } from "../../packages/core/gitattributes-pins.js";
 
 const REPO_ROOT = process.cwd();
 const PRD_ROOT = join(REPO_ROOT, ".rex", "prd_tree");
@@ -136,7 +136,15 @@ describe("other n-dx-serialized tracked files are pinned to LF", () => {
 // drift apart. The pins originally shipped incomplete precisely because these
 // two sources diverged (one was updated, the other wasn't), so a per-pattern
 // check isn't enough — assert the FULL pattern sets are equal.
-describe("GITATTRIBUTES_EOL_RULES stays in sync with n-dx's own .gitattributes", () => {
+describe("the injected eol=lf pins stay in sync with n-dx's own .gitattributes", () => {
+  /**
+   * The patterns `ndx init` would write into *this* repo. Resolved against the
+   * repo root rather than taken from a constant: the pins name the directories
+   * the layout puts the state in, and n-dx's own checkout is on the legacy
+   * layout, so this is the set its `.gitattributes` must match.
+   */
+  const injectedPatterns = () => eolPatternsFor(REPO_ROOT);
+
   /**
    * Marker that ends the injector-managed region of .gitattributes. Pins below
    * it are specific to this repo's layout (shebang scripts, bin entries) and are
@@ -167,7 +175,7 @@ describe("GITATTRIBUTES_EOL_RULES stays in sync with n-dx's own .gitattributes",
   });
 
   it("the injected rule set equals the repo .gitattributes eol=lf pattern set", () => {
-    const injectorPatterns = GITATTRIBUTES_EOL_RULES.map((r) => r.trim().split(/\s+/)[0]);
+    const injectorPatterns = injectedPatterns();
     const repoBody = readFileSync(join(REPO_ROOT, ".gitattributes"), "utf-8");
     const repoPatterns = eolPatternsFromGitattributes(repoBody);
 
@@ -179,7 +187,7 @@ describe("GITATTRIBUTES_EOL_RULES stays in sync with n-dx's own .gitattributes",
   });
 
   it("neither source has duplicate eol=lf patterns", () => {
-    const injectorPatterns = GITATTRIBUTES_EOL_RULES.map((r) => r.trim().split(/\s+/)[0]);
+    const injectorPatterns = injectedPatterns();
     expect(injectorPatterns.length).toBe(new Set(injectorPatterns).size);
 
     const repoPatterns = eolPatternsFromGitattributes(

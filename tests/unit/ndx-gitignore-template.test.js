@@ -29,7 +29,10 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { HENCH_RUNTIME_GITIGNORE_ENTRIES } from "../../packages/hench/src/store/artifacts.ts";
+import {
+  HENCH_RUNTIME_GITIGNORE_ENTRIES,
+  henchRuntimeGitignoreEntries,
+} from "../../packages/hench/src/store/artifacts.ts";
 
 const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const TEMPLATE = join(ROOT, "packages/core/assistant-assets/ndx.gitignore");
@@ -78,15 +81,32 @@ describe("ndx init ignore template", () => {
   });
 
   it("ignores every path hench declares as its own runtime artifact", () => {
-    // The list hench's gate discounts and the list `hench init` writes are the
-    // same constant; both ignore files must carry it in full. Checked in this
-    // direction only — the files may legitimately ignore more than the gate
+    // What `hench init` would write for a project on the legacy layout — which
+    // both files are, so this is the list they have to carry. Checked in this
+    // direction only: the files may legitimately ignore more than the gate
     // discounts (`.hench/reviews/` does today).
     const template = runtimeEntries(TEMPLATE);
     const repo = runtimeEntries(REPO_IGNORE);
-    for (const entry of HENCH_RUNTIME_GITIGNORE_ENTRIES) {
+    for (const entry of henchRuntimeGitignoreEntries(".hench")) {
+      if (!/^\.(hench|rex)[/-]/.test(entry)) continue;
       expect(template, `${entry} missing from ndx.gitignore`).toContain(entry);
       expect(repo, `${entry} missing from this repo's .gitignore`).toContain(entry);
+    }
+  });
+
+  it("discounts hench's runtime artifacts on both layouts", () => {
+    // The gate's list is a classifier, not a writer: it has to recognise
+    // `.ndx/hench/locks/` as hench's own state on a project that has moved,
+    // and the ignore *files* above deliberately name only the layout they are
+    // written for. Pinning both shapes here is what keeps the gate from
+    // refusing a run over a lock file it created itself.
+    for (const layout of [".hench", ".ndx/hench"]) {
+      for (const entry of henchRuntimeGitignoreEntries(layout)) {
+        expect(
+          HENCH_RUNTIME_GITIGNORE_ENTRIES,
+          `${entry} missing from the gate's discount list`,
+        ).toContain(entry);
+      }
     }
   });
 });
