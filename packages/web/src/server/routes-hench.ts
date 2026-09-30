@@ -44,13 +44,14 @@ import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
 import { totalmem, freemem, loadavg, cpus } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { exec, spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, type ManagedChild } from "@n-dx/llm-client";
+import { exec, spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, resolveLayout, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import {
   CONFIG_FIELD_META,
   validateFieldValue,
   validateConfigKeyValue,
+  validateConfigConstraints,
   validateProviderForVendor,
   completeConfigGroups,
   getConfigValue as getNestedValue,
@@ -187,24 +188,6 @@ export interface RunWorktree {
   branch: string | null;
 }
 
-/** Default config values for detecting non-default settings. */
-const DEFAULT_CONFIG: Record<string, unknown> = {
-  provider: "cli",
-  model: "sonnet",
-  maxTurns: 50,
-  maxTokens: 8192,
-  tokenBudget: 0,
-  loopPauseMs: 2000,
-  maxFailedAttempts: 3,
-  rexDir: ".rex",
-  "retry.maxRetries": 3,
-  "retry.baseDelayMs": 2000,
-  "retry.maxDelayMs": 30000,
-  "guard.commandTimeout": 30000,
-  "guard.maxFileSize": 1048576,
-  apiKeyEnv: "ANTHROPIC_API_KEY",
-};
-
 /** Impact descriptions keyed by field path. */
 function getImpact(path: string, value: unknown): string {
   switch (path) {
@@ -247,10 +230,15 @@ function getImpact(path: string, value: unknown): string {
   }
 }
 
+/** The workspace's hench config file, on whichever layout the project uses (.ndx/hench or .hench). */
+function henchConfigPath(projectDir: string): string {
+  return join(resolveLayout(projectDir).henchDir, "config.json");
+}
+
 /** Read the hench config.json directly from disk. */
 function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
   try {
-    const raw = readFileSync(join(projectDir, ".hench", "config.json"), "utf-8");
+    const raw = readFileSync(henchConfigPath(projectDir), "utf-8");
     return JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return null;
@@ -724,8 +712,11 @@ function routeConfig(rc: RouteContext): boolean | Promise<boolean> | null {
 
     const fields = CONFIG_FIELD_META.map((field) => {
       const value = getNestedValue(config, field.path);
-      const defaultValue = DEFAULT_CONFIG[field.path];
-      const isDefault = JSON.stringify(value) === JSON.stringify(defaultValue);
+      const { defaultValue } = field;
+      // An absent key is the default by definition — hench fills it in on load
+      // — so it is never marked as differing, whatever the default happens to be.
+      const isDefault =
+        value === undefined || JSON.stringify(value) === JSON.stringify(defaultValue);
       return {
         ...field,
         value,
@@ -824,7 +815,7 @@ async function handleConfigUpdate(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  const configPath = join(ctx.projectDir, ".hench", "config.json");
+  const configPath = henchConfigPath(ctx.projectDir);
 
   // Load current config
   const current = loadHenchConfig(ctx.projectDir);
@@ -893,6 +884,15 @@ async function handleConfigUpdate(
   // retry.* edit on a config with no retry block) must not leave a partial
   // group on disk — complete it from the defaults before serializing.
   completeConfigGroups(current);
+
+  // Sibling constraints are only decidable on the finished config, so they run
+  // after completion: a lone `prune.triggerPairs` edit is filled out from the
+  // defaults first, and the pair it produces has to be one hench will load.
+  const constraintError = validateConfigConstraints(current);
+  if (constraintError) {
+    errorResponse(res, 400, `Validation errors: ${constraintError}`);
+    return true;
+  }
 
   // Write back
   try {
@@ -1195,7 +1195,13 @@ function handleTemplateApply(
   // A template overlay carrying part of a nested group (or merging into a
   // config that never had it) must not leave a partial group on disk.
   completeConfigGroups(updated);
-  const configPath = join(ctx.projectDir, ".hench", "config.json");
+
+  const constraintProblem = validateConfigConstraints(updated);
+  if (constraintProblem) {
+    errorResponse(res, 400, `Template "${id}" cannot be applied: ${constraintProblem}`);
+    return true;
+  }
+  const configPath = henchConfigPath(ctx.projectDir);
 
   try {
     writeFileSync(configPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");

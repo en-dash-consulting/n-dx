@@ -24,6 +24,7 @@ import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { safeDecodeSegment } from "../shared/index.js";
 import {
   validateConfigKeyValue,
+  validateConfigConstraints,
   completeConfigGroups,
   getConfigValue as getNestedValue,
   setConfigValue as setNestedValue,
@@ -729,6 +730,13 @@ async function handleApplyAdjustment(
   // Never leave a partial nested group (e.g. retry with one member) on disk.
   completeConfigGroups(config);
 
+  // Sibling constraints are only decidable once the group is complete.
+  const applyConstraintError = validateConfigConstraints(config);
+  if (applyConstraintError) {
+    errorResponse(res, 400, applyConstraintError);
+    return true;
+  }
+
   try {
     writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
   } catch (err) {
@@ -850,6 +858,13 @@ async function handleSetOverride(
     setNestedValue(config, key, value);
     // Never leave a partial nested group (e.g. retry with one member) on disk.
     completeConfigGroups(config);
+
+    // Sibling constraints are only decidable once the group is complete.
+    const constraintError = validateConfigConstraints(config);
+    if (constraintError) {
+      errorResponse(res, 400, constraintError);
+      return true;
+    }
     writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
 
     state.history.push({

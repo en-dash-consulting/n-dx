@@ -6,6 +6,7 @@ import {
   previewChange,
   formatConfigDisplay,
   CONFIG_FIELDS,
+  CATEGORY_ORDER,
 } from "../../../../src/cli/commands/config.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../../src/schema/v1.js";
 import type { HenchConfig } from "../../../../src/schema/v1.js";
@@ -191,10 +192,21 @@ describe("CONFIG_FIELDS", () => {
     }
   });
 
+  // Read from CATEGORY_ORDER rather than a second copy of the list: the display
+  // and the interactive menu both iterate it, so a category that is not in it
+  // is a field no surface ever renders.
   it("has valid categories for all fields", () => {
-    const validCategories = new Set(["execution", "retry", "guard", "task-selection", "general"]);
     for (const field of CONFIG_FIELDS) {
-      expect(validCategories.has(field.category)).toBe(true);
+      expect(CATEGORY_ORDER, `${field.path} category`).toContain(field.category);
+    }
+  });
+
+  it("has at least one field in every category", () => {
+    for (const category of CATEGORY_ORDER) {
+      expect(
+        CONFIG_FIELDS.some((f) => f.category === category),
+        `category "${category}" has no fields`,
+      ).toBe(true);
     }
   });
 

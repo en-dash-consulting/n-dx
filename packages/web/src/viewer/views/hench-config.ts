@@ -44,11 +44,21 @@ interface AppliedChange {
 
 // ── Category metadata ────────────────────────────────────────────────
 
-const CATEGORY_META: Record<string, { label: string; icon: string; description: string }> = {
+/**
+ * Heading, icon and blurb per category. Exported so
+ * `tests/unit/viewer/hench-config.test.ts` can check it against the server's
+ * field list — a category with no entry here renders under its raw id.
+ */
+export const CATEGORY_META: Record<string, { label: string; icon: string; description: string }> = {
   execution: {
     label: "Execution Strategy",
     icon: "\u25B6",
     description: "Controls how the agent runs: model selection, turn limits, and token budgets",
+  },
+  session: {
+    label: "Session Reuse",
+    icon: "\u21BB",
+    description: "How task spawns relate to vendor sessions, and how long a cached one lives",
   },
   "task-selection": {
     label: "Task Selection",
@@ -59,6 +69,21 @@ const CATEGORY_META: Record<string, { label: string; icon: string; description: 
     label: "Retry Policy",
     icon: "\u21BA",
     description: "How transient API errors are handled with exponential backoff",
+  },
+  prune: {
+    label: "Context Prune",
+    icon: "\u2702",
+    description: "When an API run summarizes its older turns, and how much it keeps verbatim",
+  },
+  "test-gate": {
+    label: "Test Gate",
+    icon: "\u2714",
+    description: "The full-suite run that must pass before a commit",
+  },
+  git: {
+    label: "Git Safety",
+    icon: "\u2387",
+    description: "Committing, rollback on failure, and the pre-run working-tree gate",
   },
   guard: {
     label: "Guard Rails",
@@ -72,7 +97,18 @@ const CATEGORY_META: Record<string, { label: string; icon: string; description: 
   },
 };
 
-const CATEGORY_ORDER = ["execution", "task-selection", "retry", "guard", "general"];
+/** Display order. Exported for the same reason as {@link CATEGORY_META}. */
+export const CATEGORY_ORDER = [
+  "execution",
+  "session",
+  "task-selection",
+  "retry",
+  "prune",
+  "test-gate",
+  "git",
+  "guard",
+  "general",
+];
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -660,7 +696,13 @@ export function HenchConfigView() {
       saving,
     }),
 
-    ...CATEGORY_ORDER
+    // Any category the server sends that CATEGORY_ORDER does not name is
+    // appended rather than dropped. Filtering to the known list alone is how a
+    // whole group of settings can disappear from this page while the server
+    // still serves it — which is what happened when the field list grew and
+    // this array did not. CategorySection already falls back to the raw
+    // category name for its heading.
+    ...[...CATEGORY_ORDER, ...[...byCategory.keys()].filter((c) => !CATEGORY_ORDER.includes(c))]
       .filter((cat) => byCategory.has(cat))
       .map((cat) =>
         h(CategorySection, {

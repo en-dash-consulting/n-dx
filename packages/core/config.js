@@ -1697,7 +1697,14 @@ function printSection(label, config, logFn = console.log) {
 
 // ── Help text ────────────────────────────────────────────────────────────────
 
-const HELP_TEXT = `n-dx config — view and edit settings across all packages
+/**
+ * Exported so `tests/e2e/hench-config-gate-contract.test.js` can read the
+ * documented `hench.*` keys without spawning the CLI: the help text is the
+ * documented surface of what `ndx config` accepts, and it has to name every key
+ * `hench config` and the dashboard offer. Export only — nothing imports it at
+ * runtime, so the orchestration tier's spawn-only rule is untouched.
+ */
+export const HELP_TEXT = `n-dx config — view and edit settings across all packages
 
 Usage:
   n-dx config [dir]                    Show all package configurations
@@ -1734,8 +1741,27 @@ Hench settings (.hench/config.json):
   hench.models.<vendor>    string    Agent-only model for claude, codex, google or local
   hench.maxTurns           number    Max conversation turns per run (default: 50)
   hench.maxTokens          number    Max tokens per API request (default: 8192)
+  hench.tokenBudget        number    Total tokens per run, input+cached+output (default: 0 —
+                                     unlimited). A run stops once it crosses this.
   hench.rexDir             string    Path to .rex directory (default: ".rex")
   hench.apiKeyEnv          string    Env variable for API key (default: "ANTHROPIC_API_KEY")
+  hench.claudePath         string    Path to the Claude Code binary. Falls back to "claude" on
+                                     PATH. Prefer claude.cli_path, which is shared across packages.
+  hench.language           string    Project toolchain — "typescript", "javascript", "go" or
+                                     "swift". Selects the hench.guard.* defaults.
+  hench.loopPauseMs        number    Pause between consecutive runs in a loop (default: 2000)
+  hench.maxFailedAttempts  number    Consecutive failures before a task is skipped as stuck
+                                     (default: 3)
+  hench.permissionMode     string    Permission mode the vendor CLI session starts in: "default",
+                                     "acceptEdits", "bypassPermissions" or "plan". Autonomous
+                                     'ndx work' runs default to "acceptEdits" so they do not stall
+                                     in plan mode. The --permission-mode flag overrides this.
+  hench.autonomous         boolean   Run without interactive prompts (default: false). Implies
+                                     "acceptEdits" when hench.permissionMode is unset.
+  hench.useEventPipeline   boolean   Capture the RuntimeEvent stream (default: false). Required by
+                                     'hench show --events'.
+  hench.useRegistryProvider boolean  Resolve the vendor through the provider registry rather than
+                                     the built-in path (default: false)
   hench.rollbackOnFailure  boolean   Revert uncommitted changes when a run fails (default: true)
                                      Set to false to keep changes in place on failure.
                                      The --no-rollback flag always overrides this for one run.
@@ -1793,6 +1819,12 @@ Hench settings (.hench/config.json):
                                      regardless of TTL (see llm-client's config.ts), so enabling
                                      "1h" under-reports estimated spend by that difference.
 
+Hench retry policy (transient API errors):
+  hench.retry.maxRetries   number    Retry attempts for a transient error (default: 3)
+  hench.retry.baseDelayMs  number    Delay before the first retry; doubles each attempt
+                                     (default: 2000)
+  hench.retry.maxDelayMs   number    Cap on the exponential backoff (default: 30000)
+
 Hench context-prune settings (hench.provider=api runs only; the CLI loops let the
 vendor binary manage its own window). Every key trades the same two things: how much
 of the run the agent can still read verbatim, against how often the cached prompt
@@ -1826,6 +1858,8 @@ Hench test-gate settings (mandatory full-suite gate before commit):
                                      is also using the machine, and a timeout aborts a task whose
                                      work is already done. Prefer raising this over skipping the
                                      gate.
+  hench.commitMsgTimeoutMs number    How long the commit-message generation call may run before it
+                                     is killed (default: 300000 — 5 minutes; 0 means no limit)
 
 Hench git-safety settings (pre-run commit gate):
   hench.git.checkpointThreshold  number    Lines-changed threshold at/above which the pre-run
@@ -1846,6 +1880,47 @@ Hench guard settings (security boundaries):
                                            (default: npm, npx, node, git, tsc, vitest)
   hench.guard.commandTimeout     number    Command timeout in ms (default: 30000)
   hench.guard.maxFileSize        number    Max file size in bytes (default: 1048576)
+  hench.guard.spawnTimeout       number    Timeout for a spawned vendor process in ms
+                                           (default: 300000)
+  hench.guard.maxConcurrentProcesses
+                                 number    Simultaneous hench processes allowed (default: 3)
+  hench.guard.allowedGitSubcommands
+                                 string[]  Git subcommands the agent may run (default: status,
+                                           add, commit, diff, log, branch, checkout, stash,
+                                           show, rev-parse)
+  hench.guard.policy.maxCommandsPerMinute
+                                 number    Rate limit on shell commands (default: unlimited)
+  hench.guard.policy.maxWritesPerMinute
+                                 number    Rate limit on file writes (default: unlimited)
+  hench.guard.policy.maxTotalBytesWritten
+                                 number    Bytes the agent may write in one run
+                                           (default: unlimited)
+  hench.guard.policy.maxTotalCommands
+                                 number    Commands the agent may run in one run
+                                           (default: unlimited)
+
+Hench memory settings (back off rather than exhaust the machine):
+  hench.guard.memoryThrottle.enabled
+                                 boolean   Delay or reject runs when system memory is low
+  hench.guard.memoryThrottle.rejectThreshold
+                                 number    System memory usage % at which a run is rejected
+                                           outright, 0-100 (default: 95)
+  hench.guard.memoryThrottle.delayThreshold
+                                 number    System memory usage % at which a run is delayed with
+                                           backoff, 0-100 (default: 80)
+  hench.guard.memoryThrottle.baseDelayMs
+                                 number    Initial backoff before a throttled run retries;
+                                           doubles each attempt
+  hench.guard.memoryThrottle.maxDelayMs
+                                 number    Cap on the throttle backoff
+  hench.guard.memoryThrottle.maxRetries
+                                 number    How many times a throttled run waits before it is
+                                           rejected
+  hench.guard.memoryMonitor.enabled
+                                 boolean   Check system memory before the agent spawns a process
+  hench.guard.memoryMonitor.spawnThreshold
+                                 number    System memory usage % above which a spawn is refused,
+                                           0-100
 
 Sourcevision manifest (.sourcevision/manifest.json):
   sourcevision.*           (read-only, generated by analysis)

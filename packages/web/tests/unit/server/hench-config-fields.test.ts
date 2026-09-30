@@ -121,8 +121,13 @@ describe("validateConfigKeyValue", () => {
   });
 
   describe("key allowlist", () => {
+    // `permissionMode` used to stand in for the unknown key here. It is a real
+    // hench setting now and the list offers it, so the example had to become a
+    // key hench's schema genuinely does not define — zod strips those on load,
+    // which is why a write the gate lets through would silently do nothing.
     it("still rejects an unknown field and a prototype segment", () => {
-      expect(validateConfigKeyValue("permissionMode", "bypassPermissions")).toBeTruthy();
+      expect(validateConfigKeyValue("notAHenchSetting", "anything")).toBeTruthy();
+      expect(validateConfigKeyValue("guard.notAGuardSetting", 1)).toBeTruthy();
       expect(validateConfigKeyValue("__proto__.polluted", 1)).toBeTruthy();
     });
   });
