@@ -7,6 +7,7 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | Command | Description |
 |---------|-------------|
 | `ndx init [dir]` | Initialize a project for n-dx |
+| `ndx migrate-layout [dir]` | Move an existing project's state into `.ndx/` |
 | `ndx config [key] [value]` | View or edit settings |
 
 ## Analyze

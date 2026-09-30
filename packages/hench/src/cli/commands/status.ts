@@ -1,6 +1,6 @@
-import { join } from "node:path";
 import { listRuns } from "../../store/runs.js";
-import { HENCH_DIR, safeParseInt } from "./constants.js";
+import { safeParseInt } from "./constants.js";
+import { resolveHenchPaths } from "../../store/paths.js";
 import { info, result } from "../output.js";
 import { colorStatus } from "../../prd/llm-gateway.js";
 import { batchLookupTasksInRex, formatTaskLine } from "./task-lookup.js";
@@ -9,7 +9,7 @@ export async function cmdStatus(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const henchDir = join(dir, HENCH_DIR);
+  const henchDir = resolveHenchPaths(dir).henchDir;
   const limit = flags.last ? safeParseInt(flags.last, "last") : 10;
   const runs = await listRuns(henchDir, limit);
 

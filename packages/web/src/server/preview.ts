@@ -265,9 +265,40 @@ function readBody(req: IncomingMessage, limit: number): Promise<string> {
  */
 const renameQueues = new Map<string, Promise<void>>();
 
+/**
+ * Errors that mean “something holds this file right now” rather than “this
+ * cannot work”.
+ *
+ * Serialising the queue removes the renames *this server* races against. It
+ * cannot remove the ones it does not own: a browser or editor with the layout
+ * file open, a backup agent, an indexer, a virus scanner. Any of those makes
+ * Windows refuse the rename outright instead of waiting, and the save came back
+ * 400 — which is what a full-suite run caught, one 400 among twenty concurrent
+ * saves that were all valid.
+ */
+const TRANSIENT_RENAME_ERRORS = new Set(["EPERM", "EACCES", "EBUSY"]);
+
+/** Attempts and spacing for {@link retryingRename}. */
+const RENAME_RETRIES = 10;
+const RENAME_RETRY_MS = 50;
+
+/** `rename`, retried while the refusal is transient. See {@link TRANSIENT_RENAME_ERRORS}. */
+async function retryingRename(from: string, to: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code ?? "";
+      if (attempt >= RENAME_RETRIES - 1 || !TRANSIENT_RENAME_ERRORS.has(code)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, RENAME_RETRY_MS));
+    }
+  }
+}
+
 function serializedRename(from: string, to: string): Promise<void> {
   const prev = renameQueues.get(to) ?? Promise.resolve();
-  const next = prev.then(() => rename(from, to));
+  const next = prev.then(() => retryingRename(from, to));
   // The queue must survive a failed rename, or every later save would fail too.
   const tail = next.catch(() => {});
   renameQueues.set(to, tail);
@@ -284,6 +315,10 @@ function serializedRename(from: string, to: string): Promise<void> {
  * would otherwise share one temp file, so one rename could consume the other's
  * file (ENOENT) or publish its contents. With distinct names each save is
  * whole, the renames are serialized per target, and the last one wins.
+ *
+ * Serialising covers the renames this server issues. A handle held by anything
+ * else — an open editor, a backup agent, an indexer — still makes Windows
+ * refuse, so the rename itself retries; see {@link retryingRename}.
  */
 async function writeAtomic(path: string, contents: string): Promise<void> {
   const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;

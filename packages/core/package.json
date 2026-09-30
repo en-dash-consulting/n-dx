@@ -83,8 +83,9 @@
     "install-identity.js",
     "resolve-existing-dir.js",
     "command-effects.js",
-    "run-summary.js",
-    "layout.js"
+    "layout.js",
+    "migrate-layout.js",
+    "run-summary.js"
   ],
   "scripts": {
     "build": "echo '@n-dx/core: plain JS, no build needed'"

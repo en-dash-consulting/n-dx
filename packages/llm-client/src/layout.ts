@@ -44,7 +44,7 @@
 
 import { statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 
 import { PROJECT_DIRS } from "./project-dirs.js";
 
@@ -184,6 +184,22 @@ export function resolveLayout(
     webPortFile: join(root, LEGACY_ENTRIES.WEB_PORT),
     webUsageFile: join(root, LEGACY_ENTRIES.WEB_USAGE),
   };
+}
+
+/**
+ * A resolved path as `.gitignore` and `.gitattributes` need to see it: relative
+ * to the project root, with forward slashes.
+ *
+ * `ndx init` writes both files, and every pattern in them names a directory
+ * this module owns — so on the new layout they have to say `.ndx/rex/…` where
+ * they used to say `.rex/…`. Doing that by hand at each call site is how the
+ * literals this module exists to remove get reintroduced, one gitignore line at
+ * a time. Forward slashes are not cosmetic: git's pattern syntax has no
+ * backslash-separated form, so a Windows `path.relative` result written
+ * verbatim silently matches nothing.
+ */
+export function relativeToRoot(layout: Layout, path: string): string {
+  return relative(layout.root, path).split(sep).join("/");
 }
 
 // ---------------------------------------------------------------------------

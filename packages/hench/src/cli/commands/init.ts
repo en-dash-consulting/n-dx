@@ -1,8 +1,9 @@
 import { join } from "node:path";
 import { access, readFile, readdir, writeFile } from "node:fs/promises";
 import {configExists, initConfig} from "../../store/config.js";
-import { HENCH_RUNTIME_GITIGNORE_ENTRIES } from "../../store/artifacts.js";
-import { HENCH_DIR } from "./constants.js";
+import { henchRuntimeGitignoreEntries } from "../../store/artifacts.js";
+import { resolveHenchPaths } from "../../store/paths.js";
+import { relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
 import { info } from "../output.js";
 import type { ProjectLanguage } from "../../schema/index.js";
 
@@ -51,15 +52,15 @@ async function ensureGitignoreEntries(dir: string, entries: readonly string[]): 
  * Detect the project language for guard configuration.
  *
  * Detection chain (mirrors sourcevision's logic without importing it):
- * 1. Explicit `.n-dx.json` `language` override
+ * 1. Explicit project-config `language` override
  * 2. `go.mod` present → "go"
  * 3. `Package.swift` OR `*.xcodeproj` / `*.xcworkspace` directory → "swift"
  * 4. Otherwise → undefined (JS/TS defaults)
  */
 async function detectProjectLanguage(dir: string): Promise<ProjectLanguage | undefined> {
-  // Step 1: Check .n-dx.json for explicit language override
+  // Step 1: Check the project config for an explicit language override
   try {
-    const raw = await readFile(join(dir, ".n-dx.json"), "utf-8");
+    const raw = await readFile(resolveLayout(dir).configFile, "utf-8");
     const config = JSON.parse(raw) as Record<string, unknown>;
     if (typeof config.language === "string" && config.language !== "auto") {
       const lang = config.language;
@@ -85,34 +86,39 @@ export async function cmdInit(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const henchDir = join(dir, HENCH_DIR);
+  const layout = resolveLayout(dir);
+  const { henchDir } = resolveHenchPaths(dir);
+  // What to call the directory in output and in `.gitignore` — `.hench` or
+  // `.ndx/hench`, whichever this project is on.
+  const henchDirName = relativeToRoot(layout, henchDir);
 
-  // Ensure .gitignore covers hench's own runtime artifacts. `.hench/locks/`
-  // is created the instant a run starts, before any real work happens, so
-  // without these entries it shows up as an untracked path on the very first
-  // `hench run`/`ndx work` — see store/artifacts.ts for the full story.
+  // Ensure .gitignore covers hench's own runtime artifacts. The locks
+  // directory is created the instant a run starts, before any real work
+  // happens, so without these entries it shows up as an untracked path on the
+  // very first `hench run`/`ndx work` — see store/artifacts.ts for the full
+  // story.
   //
   // Deliberately ahead of the already-initialized early return: a project
   // initialized before these entries existed would otherwise never receive
   // them, since init is a no-op on every subsequent invocation. The write is
   // itself a no-op when the entries are already present, so re-running init
   // still leaves .gitignore byte-identical.
-  await ensureGitignoreEntries(dir, HENCH_RUNTIME_GITIGNORE_ENTRIES);
+  await ensureGitignoreEntries(dir, henchRuntimeGitignoreEntries(henchDirName));
 
   if (await configExists(henchDir)) {
-    info(".hench/ already initialized, skipping");
+    info(`${henchDirName}/ already initialized, skipping`);
     return;
   }
 
   const language = await detectProjectLanguage(dir);
-  const config = await initConfig(henchDir, language);
+  const config = await initConfig(henchDir, language, relativeToRoot(layout, layout.rexDir));
 
-  info("Created .hench/config.json");
-  info("Created .hench/runs/");
+  info(`Created ${henchDirName}/config.json`);
+  info(`Created ${henchDirName}/runs/`);
   if (language) {
     info(`Detected language: ${language}`);
   }
-  info(`\nInitialized .hench/ in ${dir}`);
+  info(`\nInitialized ${henchDirName}/ in ${dir}`);
   info(`Model: ${config.model}`);
   info(`Max turns: ${config.maxTurns}`);
   info(`Rex dir: ${config.rexDir}`);

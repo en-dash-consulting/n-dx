@@ -21,7 +21,7 @@
 import { join } from "node:path";
 
 import { loadRun } from "../../store/runs.js";
-import { HENCH_DIR } from "./constants.js";
+import { resolveHenchPaths } from "../../store/paths.js";
 import { CLIError } from "../errors.js";
 import { result } from "../output.js";
 import {
@@ -68,7 +68,7 @@ async function cmdReviewPending(
   runId: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const henchDir = join(dir, HENCH_DIR);
+  const henchDir = resolveHenchPaths(dir).henchDir;
   const run = await loadRun(henchDir, runId);
 
   // Three states that must not be confused, because only one of them means

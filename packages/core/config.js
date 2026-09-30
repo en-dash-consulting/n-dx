@@ -17,21 +17,60 @@ import {
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { execFileSyncCli } from "./win-spawn.js";
+import { relativeToRoot, resolveLayout } from "./layout.js";
 import {
   describeUnrestrictedFile,
   restrictFileToOwner,
 } from "./file-permissions.js";
 export { quoteWindowsToken, buildWindowsCliCommandLine } from "./win-spawn.js";
 
-const PROJECT_CONFIG_FILE = ".n-dx.json";
+/**
+ * The two project config files, as selector tokens.
+ *
+ * These are *which file*, not *where it is*: on the `.ndx/` layout the shared
+ * one is `.ndx/config.json` and the local one `.ndx/config.local.json`. Pass a
+ * token to {@link projectConfigPath} to get the path, or to
+ * {@link projectConfigLabel} to get the name to print. Nothing joins them to a
+ * root directly — that is what made the layout a decision taken here rather
+ * than by the resolver.
+ */
+export const PROJECT_CONFIG_FILE = "shared";
+
 /**
  * The untracked file every API key `ndx config` writes ends up in.
  *
  * Exported because `ndx ci` checks that git is not tracking it: its whole
- * safety rests on being ignored, so the name has to be the same string in
+ * safety rests on being ignored, so the selector has to be the same token in
  * both places rather than two literals that can drift.
  */
-export const LOCAL_CONFIG_FILE = ".n-dx.local.json";
+export const LOCAL_CONFIG_FILE = "local";
+
+/**
+ * Where a project config file lives, for the layout this project is on.
+ *
+ * @param {string} dir  Project root.
+ * @param {string} which  {@link PROJECT_CONFIG_FILE} or {@link LOCAL_CONFIG_FILE}.
+ * @returns {string} Absolute path.
+ */
+export function projectConfigPath(dir, which) {
+  const layout = resolveLayout(dir);
+  return which === LOCAL_CONFIG_FILE ? layout.localConfigFile : layout.configFile;
+}
+
+/**
+ * What to call a project config file in a message the operator reads.
+ *
+ * Root-relative, so it is a path they can act on: a warning that says to move a
+ * key into `.n-dx.local.json` sends them to a file that does not exist on a
+ * project whose config lives in `.ndx/`.
+ *
+ * @param {string} dir  Project root.
+ * @param {string} which  {@link PROJECT_CONFIG_FILE} or {@link LOCAL_CONFIG_FILE}.
+ * @returns {string}
+ */
+export function projectConfigLabel(dir, which) {
+  return relativeToRoot(resolveLayout(dir), projectConfigPath(dir, which));
+}
 
 const LLM_VENDOR = {
   CLAUDE: "claude",
@@ -79,11 +118,29 @@ const LOCAL_ONLY_SETTINGS = {
 /** Setting-path leaf that marks a secret, for the shared-file scan. */
 const SECRET_SETTING_LEAF = "api_key";
 
+/**
+ * The per-package config files, named by the {@link Layout} field that holds
+ * each package's state directory rather than by the directory itself — `.rex`
+ * is one layout's answer, and a config read that assumed it would report a
+ * `.ndx/` project as uninitialized.
+ */
 const PACKAGES = {
-  rex: { dir: ".rex", file: "config.json" },
-  hench: { dir: ".hench", file: "config.json" },
-  sourcevision: { dir: ".sourcevision", file: "manifest.json" },
+  rex: { layoutField: "rexDir", file: "config.json" },
+  hench: { layoutField: "henchDir", file: "config.json" },
+  sourcevision: { layoutField: "sourcevisionDir", file: "manifest.json" },
 };
+
+/**
+ * Path to a package's own config file inside a project.
+ *
+ * @param {string} dir  Project root.
+ * @param {keyof typeof PACKAGES} pkg
+ * @returns {string}
+ */
+function packageConfigPath(dir, pkg) {
+  const meta = PACKAGES[pkg];
+  return join(resolveLayout(dir)[meta.layoutField], meta.file);
+}
 
 /**
  * Sections stored in .n-dx.json rather than package config files.
@@ -195,8 +252,8 @@ function deepMerge(target, source) {
  * Load the project-level .n-dx.json config from the project root.
  * Returns an empty object if the file doesn't exist or is invalid.
  */
-async function loadProjectConfigFile(dir, fileName) {
-  return loadOptionalJSON(join(dir, fileName));
+async function loadProjectConfigFile(dir, which) {
+  return loadOptionalJSON(projectConfigPath(dir, which));
 }
 
 async function loadProjectConfigLayers(dir) {
@@ -266,7 +323,7 @@ function applyNumericRepairs(obj) {
  * means the config was already well-typed (or was missing).
  */
 export async function repairProjectConfig(dir) {
-  const configPath = join(dir, PROJECT_CONFIG_FILE);
+  const configPath = projectConfigPath(dir, PROJECT_CONFIG_FILE);
   const current = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
   if (!current || Object.keys(current).length === 0) {
     return { repairs: [] };
@@ -318,15 +375,19 @@ export async function findSharedSecrets(dir) {
  * Format the stderr warning for keys that `findSharedSecrets` found.
  *
  * @param {string[]} keys
+ * @param {string} dir  Project root — the warning names both files, and which
+ *   paths those are is the layout's answer.
  * @returns {string[]} Lines, empty when there is nothing to warn about.
  */
-export function formatSharedSecretsWarning(keys) {
+export function formatSharedSecretsWarning(keys, dir) {
   if (keys.length === 0) return [];
+  const shared = projectConfigLabel(dir, PROJECT_CONFIG_FILE);
+  const local = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
   return [
-    `Warning: ${PROJECT_CONFIG_FILE} contains ${keys.length === 1 ? "an API key" : "API keys"} (${keys.join(", ")}).`,
-    `  That file is meant to be committed. Keys belong in ${LOCAL_CONFIG_FILE}, which is gitignored.`,
-    `  Fix: re-run \`ndx config <key> <value>\` for each key above — it is written to ${LOCAL_CONFIG_FILE}`,
-    `  and removed from ${PROJECT_CONFIG_FILE}. If ${PROJECT_CONFIG_FILE} was ever committed, rotate the key.`,
+    `Warning: ${shared} contains ${keys.length === 1 ? "an API key" : "API keys"} (${keys.join(", ")}).`,
+    `  That file is meant to be committed. Keys belong in ${local}, which is gitignored.`,
+    `  Fix: re-run \`ndx config <key> <value>\` for each key above — it is written to ${local}`,
+    `  and removed from ${shared}. If ${shared} was ever committed, rotate the key.`,
   ];
 }
 
@@ -336,7 +397,7 @@ export function formatSharedSecretsWarning(keys) {
  * Missing file is a silent no-op.
  */
 async function loadLocalConfig(dir) {
-  const configPath = join(dir, LOCAL_CONFIG_FILE);
+  const configPath = projectConfigPath(dir, LOCAL_CONFIG_FILE);
   if (!(await fileExists(configPath))) return {};
   try {
     return await loadJSON(configPath);
@@ -2218,8 +2279,8 @@ async function loadAllConfigs(dir) {
   const configs = {};
   const rawConfigs = {};
 
-  for (const [pkg, meta] of Object.entries(PACKAGES)) {
-    const configPath = join(dir, meta.dir, meta.file);
+  for (const pkg of Object.keys(PACKAGES)) {
+    const configPath = packageConfigPath(dir, pkg);
     if (await fileExists(configPath)) {
       try {
         const pkgConfig = await loadJSON(configPath);
@@ -2417,7 +2478,7 @@ async function runLLMVendorPreflight(coerced, configs, soft = false) {
  * @returns {Promise<string[]>}
  */
 async function removeFromSharedConfig(dir, entries) {
-  const sharedPath = join(dir, PROJECT_CONFIG_FILE);
+  const sharedPath = projectConfigPath(dir, PROJECT_CONFIG_FILE);
   if (!(await fileExists(sharedPath))) return [];
   const shared = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
   const removed = [];
@@ -2491,7 +2552,7 @@ async function handleSetProjectSection(
   const targetFile = isLocalProjectSetting(pkg, settingPath)
     ? LOCAL_CONFIG_FILE
     : PROJECT_CONFIG_FILE;
-  const configPath = join(dir, targetFile);
+  const configPath = projectConfigPath(dir, targetFile);
   const current = await loadProjectConfigFile(dir, targetFile);
   if (!current[pkg] || typeof current[pkg] !== "object") {
     current[pkg] = {};
@@ -2566,7 +2627,10 @@ async function handleSetProjectSection(
     }
     const removed = await removeFromSharedConfig(dir, sharedPaths);
     if (removed.length > 0) {
-      console.log(`  → moved ${removed.join(", ")} out of ${PROJECT_CONFIG_FILE} into ${LOCAL_CONFIG_FILE}`);
+      console.log(
+        `  → moved ${removed.join(", ")} out of ${projectConfigLabel(dir, PROJECT_CONFIG_FILE)}`
+        + ` into ${projectConfigLabel(dir, LOCAL_CONFIG_FILE)}`,
+      );
     }
   }
 
@@ -2659,8 +2723,7 @@ async function handleSetPackageConfig(
   // Write to raw (un-merged) config so project overrides don't leak
   setByPath(rawConfigs[pkg], settingPath, coerced, pkg);
 
-  const meta = PACKAGES[pkg];
-  const configPath = join(dir, meta.dir, meta.file);
+  const configPath = packageConfigPath(dir, pkg);
   await saveJSON(configPath, rawConfigs[pkg]);
 
   console.log(`${keyArg} = ${formatValue(coerced)}`);
@@ -2800,7 +2863,7 @@ export async function runConfig(args) {
 
   // Every config invocation checks the shared file for keys that predate
   // local-only routing. stderr, so `--json` output stays parseable.
-  for (const line of formatSharedSecretsWarning(await findSharedSecrets(dir))) {
+  for (const line of formatSharedSecretsWarning(await findSharedSecrets(dir), dir)) {
     console.error(line);
   }
 
@@ -2833,7 +2896,7 @@ export async function runConfig(args) {
         );
         process.exit(1);
       }
-      const configPath = join(dir, PROJECT_CONFIG_FILE);
+      const configPath = projectConfigPath(dir, PROJECT_CONFIG_FILE);
       const current = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
       current.language = valueArg;
       await saveProjectJSON(configPath, current);
