@@ -1085,9 +1085,12 @@ describe("n-dx config", () => {
     });
 
     it("prefers the modern cli_path over a legacy one set beside it", async () => {
-      // `claude.cli_path` now writes `llm.claude.cli_path` too (see "claude
-      // config" above), so the legacy location is set directly here to
-      // exercise genuine cross-location precedence.
+      // Both locations are written in ONE file write, on purpose. Setting the
+      // modern key through `ndx config` instead would delete the legacy one:
+      // `cli_path` is local-only, and the local-file migration strips the
+      // matching legacy `claude.*` key out of the shared file as it goes. The
+      // test would then still pass with the per-field fallback removed
+      // entirely, because no legacy value would survive to be preferred over.
       const legacy = await writeFakeBinary(join(tmpDir, "fake-claude-legacy"), {
         stdout: "0.0.1-legacy",
       });
@@ -1097,13 +1100,38 @@ describe("n-dx config", () => {
 
       await writeFile(
         SHARED_CONFIG_PATH(tmpDir),
-        JSON.stringify({ claude: { cli_path: legacy } }, null, 2) + "\n",
+        JSON.stringify(
+          { claude: { cli_path: legacy }, llm: { claude: { cli_path: modern } } },
+          null,
+          2,
+        ) + "\n",
       );
-      run(["llm.claude.cli_path", modern, tmpDir]);
 
       const output = run(["--test-connection", tmpDir]);
       expect(output).toContain("2.0.0-modern");
       expect(output).not.toContain("0.0.1-legacy");
+    });
+
+    it("falls back to the legacy cli_path when the modern block sets only a model", async () => {
+      // The per-field rule: a modern block that sets `model` must not shadow
+      // the legacy `cli_path` beside it. Block-level fallback would return the
+      // modern block whole here and find no cli_path to test at all.
+      const legacy = await writeFakeBinary(join(tmpDir, "fake-claude-legacy-only"), {
+        stdout: "0.0.1-legacy",
+      });
+
+      await writeFile(
+        SHARED_CONFIG_PATH(tmpDir),
+        JSON.stringify(
+          { claude: { cli_path: legacy }, llm: { claude: { model: "claude-sonnet-5" } } },
+          null,
+          2,
+        ) + "\n",
+      );
+
+      const output = run(["--test-connection", tmpDir]);
+      expect(output).toContain("Testing CLI path...");
+      expect(output).toContain("0.0.1-legacy");
     });
   });
 
