@@ -76,7 +76,15 @@ function toPricing(cost: ModelCost): ModelTokenPricing {
 export function resolveModelPricing(modelId?: string): ResolvedModelPricing {
   const raw = modelId?.trim();
   if (raw) {
-    for (const candidate of [raw, resolveModel(raw), normalizeCodexModel(raw), raw.toLowerCase()]) {
+    // A dated snapshot is priced as the model it is a snapshot of. Vendors ship
+    // ids like `claude-haiku-4-5-20251001` while the table is keyed on
+    // `claude-haiku-4-5`, and without this the lookup misses and falls back to
+    // {@link FALLBACK_PRICING_MODEL} — which is a *real* catalogue entry, so the
+    // miss produced plausible dollars at the wrong model’s rates rather than
+    // anything that looked wrong. Pricing only: model *selection* keeps the id
+    // it was given.
+    const undated = raw.replace(/-\d{8}$/, "");
+    for (const candidate of [raw, resolveModel(raw), normalizeCodexModel(raw), undated, raw.toLowerCase()]) {
       const cost = MODEL_COSTS[candidate];
       if (cost) return { modelId: candidate, pricing: toPricing(cost), known: true };
     }

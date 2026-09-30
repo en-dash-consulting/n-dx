@@ -30,6 +30,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { LLM_VENDOR } from "../prd/llm-gateway.js";
+import { resolveHenchPaths } from "../store/paths.js";
 import type { QuotaRemaining } from "./types.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -220,7 +221,7 @@ function loadWeeklyBudgetConfig(projectDir: string): WeeklyBudgetConfig | null {
  * @returns `{ ok: true, quota }` on success or `{ ok: false, reason }` on skip.
  */
 export function fetchClaudeQuota(options: FetchClaudeQuotaOptions): ClaudeQuotaResult {
-  const henchDir = options.henchDir ?? join(options.projectDir, ".hench");
+  const henchDir = options.henchDir ?? resolveHenchPaths(options.projectDir).henchDir;
   const now = options.now ?? new Date();
 
   const budgetConfig = loadWeeklyBudgetConfig(options.projectDir);

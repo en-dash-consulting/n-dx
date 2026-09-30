@@ -32,6 +32,7 @@
 
 import { join } from "node:path";
 import { stat, readdir } from "node:fs/promises";
+import { resolveLayout } from "@n-dx/llm-client";
 import { dashboardUsagePath } from "./dashboard-usage.js";
 
 // ---------------------------------------------------------------------------
@@ -76,9 +77,9 @@ export async function takeFingerprint(
   projectDir: string,
   rexDir: string,
 ): Promise<SourceFingerprint> {
-  const henchRunsDir = join(projectDir, ".hench", "runs");
+  const henchRunsDir = join(resolveLayout(projectDir).henchDir, "runs");
   const rexLogPath = join(rexDir, "execution-log.jsonl");
-  const svManifestPath = join(projectDir, ".sourcevision", "manifest.json");
+  const svManifestPath = join(resolveLayout(projectDir).sourcevisionDir, "manifest.json");
 
   // Run all stat operations in parallel for performance
   const [henchDirResult, henchFilesResult, rexLogResult, svManifestResult, dashboardUsageResult] =

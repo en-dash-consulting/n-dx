@@ -17,6 +17,7 @@ import { join, extname } from "node:path";
 import ts from "typescript";
 import type { AnalyzerOutput, DeadExport, UnusedImport, DuplicateUtility } from "./cleanup-transformations.js";
 import { isTestFilePath } from "./cleanup-transformations.js";
+import { resolveLayout } from "../prd/llm-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Sourcevision Schema Types (subset for reading JSON files)
@@ -188,7 +189,11 @@ export type CleanupCandidate =
 export interface DeadCodeAnalyzerOptions {
   /** Project root directory. */
   projectDir: string;
-  /** Path to .sourcevision directory (default: .sourcevision). */
+  /**
+   * Absolute path to the sourcevision directory. Defaults to the layout
+   * resolver's answer for `projectDir` (`.ndx/sourcevision` or legacy
+   * `.sourcevision`).
+   */
   sourcevisionDir?: string;
   /** Minimum similarity threshold for duplicate detection (0-1, default: 0.8). */
   duplicateSimilarityThreshold?: number;
@@ -227,7 +232,6 @@ export interface DeadCodeAnalysisResult {
 
 const DEFAULT_SIMILARITY_THRESHOLD = 0.8;
 const DEFAULT_MAX_CANDIDATES = 50;
-const SOURCEVISION_DIR = ".sourcevision";
 
 /** Entry point files where unused exports are expected. */
 const ENTRY_POINT_PATTERNS = [
@@ -249,14 +253,15 @@ const JS_TS_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"])
 /**
  * Read and parse a JSON file from the sourcevision directory.
  * Returns null if the file doesn't exist or can't be parsed.
+ *
+ * @param svDir Absolute path to the sourcevision directory.
  */
 async function readSourcevisionFile<T>(
-  projectDir: string,
+  svDir: string,
   filename: string,
-  svDir: string = SOURCEVISION_DIR,
 ): Promise<T | null> {
   try {
-    const filePath = join(projectDir, svDir, filename);
+    const filePath = join(svDir, filename);
     const raw = await readFile(filePath, "utf-8");
     return JSON.parse(raw) as T;
   } catch {
@@ -1008,12 +1013,12 @@ export async function analyzeDeadCode(
   options: DeadCodeAnalyzerOptions,
 ): Promise<DeadCodeAnalysisResult> {
   const startMs = Date.now();
-  const svDir = options.sourcevisionDir ?? SOURCEVISION_DIR;
+  const svDir = options.sourcevisionDir ?? resolveLayout(options.projectDir).sourcevisionDir;
 
   // Load sourcevision data files
-  const imports = await readSourcevisionFile<SVImports>(options.projectDir, "imports.json", svDir);
-  const inventory = await readSourcevisionFile<SVInventory>(options.projectDir, "inventory.json", svDir);
-  const callGraph = await readSourcevisionFile<SVCallGraph>(options.projectDir, "callgraph.json", svDir);
+  const imports = await readSourcevisionFile<SVImports>(svDir, "imports.json");
+  const inventory = await readSourcevisionFile<SVInventory>(svDir, "inventory.json");
+  const callGraph = await readSourcevisionFile<SVCallGraph>(svDir, "callgraph.json");
 
   if (!imports || !inventory) {
     return {

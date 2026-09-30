@@ -23,9 +23,10 @@
  */
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { execStdout } from "../../process/exec.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
+import { resolveHenchPaths } from "../../store/paths.js";
 import {
   excludeHenchRuntimeArtifacts,
   matchesProjectPath,
@@ -407,9 +408,6 @@ export function deletedAmong(projectDir: string, paths: string[]): Set<string> {
  */
 const SHELL_INERT = /^[A-Za-z0-9._/-]+$/;
 
-/** Where the recovery pathspec files live, relative to the project directory. */
-const RECOVERY_DIR = ".hench/recovery";
-
 /**
  * The pathspec files a refusal's recovery commands read, written by
  * {@link prepareRecoveryPathspecs}. Paths are repo-root-relative and
@@ -462,10 +460,17 @@ export async function prepareRecoveryPathspecs(
 ): Promise<RecoveryPathspecs | undefined> {
   if (paths.length === 0 || paths.every((p) => SHELL_INERT.test(p))) return undefined;
 
+  const recoveryDir = resolveHenchPaths(projectDir).recoveryDir;
+
   // The commands are run from the repo root (the listed paths are
-  // repo-root-relative), so the file references must be too.
+  // repo-root-relative), so the file references must be too. `recoveryRel`
+  // is the recovery directory's own location relative to `projectDir` —
+  // `.hench/recovery` on the legacy layout, `.ndx/hench/recovery` on the new
+  // one — so a project nested below the repo root still gets a correct
+  // `sub/.ndx/hench/recovery/…` reference.
   const repoPrefix = await repoRelativePrefix(projectDir);
-  const ref = (name: string): string => `${repoPrefix}${RECOVERY_DIR}/${name}`;
+  const recoveryRel = relative(projectDir, recoveryDir).split(sep).join("/");
+  const ref = (name: string): string => `${repoPrefix}${recoveryRel}/${name}`;
   if (!SHELL_INERT.test(ref("pathspec.txt"))) return undefined;
 
   const existing = paths.filter((p) => !deleted.has(p));
@@ -474,15 +479,15 @@ export async function prepareRecoveryPathspecs(
     list.map(pathspecFileEntry).join("\n") + "\n";
 
   try {
-    mkdirSync(join(projectDir, RECOVERY_DIR), { recursive: true });
+    mkdirSync(recoveryDir, { recursive: true });
     const files: RecoveryPathspecs = { all: ref("pathspec.txt") };
-    writeFileSync(join(projectDir, RECOVERY_DIR, "pathspec.txt"), content(paths), "utf-8");
+    writeFileSync(join(recoveryDir, "pathspec.txt"), content(paths), "utf-8");
     if (gone.length > 0) {
       files.rm = ref("pathspec-rm.txt");
-      writeFileSync(join(projectDir, RECOVERY_DIR, "pathspec-rm.txt"), content(gone), "utf-8");
+      writeFileSync(join(recoveryDir, "pathspec-rm.txt"), content(gone), "utf-8");
       if (existing.length > 0) {
         files.add = ref("pathspec-add.txt");
-        writeFileSync(join(projectDir, RECOVERY_DIR, "pathspec-add.txt"), content(existing), "utf-8");
+        writeFileSync(join(recoveryDir, "pathspec-add.txt"), content(existing), "utf-8");
       }
     }
     return files;

@@ -11,6 +11,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse } from "./response-utils.js";
@@ -256,7 +257,7 @@ function extractRexStatus(ctx: ServerContext): RexStatus {
 const HENCH_STALE_THRESHOLD_MS = 5 * 60 * 1000;
 
 function extractHenchStatus(ctx: ServerContext): HenchStatus {
-  const henchDir = join(ctx.projectDir, ".hench");
+  const henchDir = resolveLayout(ctx.projectDir).henchDir;
   const configPath = join(henchDir, "config.json");
   const runsDir = join(henchDir, "runs");
 

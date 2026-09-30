@@ -22,7 +22,8 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./response-utils.js";
 import { AggregationResultCache } from "./aggregation-cache.js";
@@ -447,7 +448,7 @@ interface HenchRunSummary {
 
 function extractHenchEvents(projectDir: string, since?: string, until?: string): TokenEvent[] {
   const events: TokenEvent[] = [];
-  const runsDir = join(projectDir, ".hench", "runs");
+  const runsDir = join(resolveLayout(projectDir).henchDir, "runs");
   let files: string[];
   try {
     files = readdirSync(runsDir);
@@ -531,7 +532,7 @@ interface SvManifest {
 
 function extractSvEvents(projectDir: string, since?: string, until?: string): TokenEvent[] {
   const events: TokenEvent[] = [];
-  const manifestPath = join(projectDir, ".sourcevision", "manifest.json");
+  const manifestPath = join(resolveLayout(projectDir).sourcevisionDir, "manifest.json");
   try {
     const raw = readFileSync(manifestPath, "utf-8");
     const manifest = JSON.parse(raw) as SvManifest;
@@ -598,13 +599,18 @@ function collectAllEvents(ctx: ServerContext, since?: string, until?: string): T
 
 function resolveSourceMeta(ctx: ServerContext): UtilizationSourceMeta {
   const rexPath = join(ctx.rexDir, "execution-log.jsonl");
-  const henchPath = join(ctx.projectDir, ".hench", "runs");
-  const svPath = join(ctx.projectDir, ".sourcevision", "manifest.json");
+  const henchDir = resolveLayout(ctx.projectDir).henchDir;
+  const henchPath = join(henchDir, "runs");
+  const svDir = resolveLayout(ctx.projectDir).sourcevisionDir;
+  const svPath = join(svDir, "manifest.json");
   const dashboardPath = dashboardUsagePath(ctx.projectDir);
+  const rexLabel = `${relative(ctx.projectDir, ctx.rexDir)}/execution-log.jsonl`;
+  const henchLabel = `${relative(ctx.projectDir, henchDir)}/runs/*.json`;
+  const svLabel = `${relative(ctx.projectDir, svDir)}/manifest.json`;
   return {
-    rex: existsSync(rexPath) ? ".rex/execution-log.jsonl" : "missing (.rex/execution-log.jsonl)",
-    hench: existsSync(henchPath) ? ".hench/runs/*.json" : "missing (.hench/runs/*.json)",
-    sourcevision: existsSync(svPath) ? ".sourcevision/manifest.json" : "missing (.sourcevision/manifest.json)",
+    rex: existsSync(rexPath) ? rexLabel : `missing (${rexLabel})`,
+    hench: existsSync(henchPath) ? henchLabel : `missing (${henchLabel})`,
+    sourcevision: existsSync(svPath) ? svLabel : `missing (${svLabel})`,
     dashboard: existsSync(dashboardPath)
       ? DASHBOARD_USAGE_FILE
       : `missing (${DASHBOARD_USAGE_FILE})`,
