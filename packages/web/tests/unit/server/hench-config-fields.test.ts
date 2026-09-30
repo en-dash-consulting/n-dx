@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   CONFIG_FIELD_META,
   CONFIG_GROUP_DEFAULTS,
+  VENDOR_PROVIDERS,
   completeConfigGroups,
   validateConfigKeyValue,
   validateFieldValue,
+  validateProviderForVendor,
   type ConfigFieldInfo,
 } from "../../../src/server/hench-config-fields.js";
 
@@ -154,6 +156,59 @@ describe("validateConfigKeyValue", () => {
       expect(validateFieldValue(synthetic, "true")).toBeTruthy();
       expect(validateFieldValue(synthetic, true)).toBeNull();
     });
+  });
+});
+
+describe("validateProviderForVendor", () => {
+  it("accepts cli or api for claude", () => {
+    expect(validateProviderForVendor("cli", "claude")).toBeNull();
+    expect(validateProviderForVendor("api", "claude")).toBeNull();
+  });
+
+  it("rejects api for codex, naming the vendor and the allowed providers", () => {
+    const error = validateProviderForVendor("api", "codex");
+    expect(error).toContain("codex");
+    expect(error).toContain("cli");
+  });
+
+  it("accepts cli for codex", () => {
+    expect(validateProviderForVendor("cli", "codex")).toBeNull();
+  });
+
+  it("rejects cli for google and local, accepts api", () => {
+    expect(validateProviderForVendor("cli", "google")).toContain("google");
+    expect(validateProviderForVendor("api", "google")).toBeNull();
+    expect(validateProviderForVendor("cli", "local")).toContain("local");
+    expect(validateProviderForVendor("api", "local")).toBeNull();
+  });
+
+  it("accepts anything when the vendor is unset or unrecognized", () => {
+    expect(validateProviderForVendor("api", null)).toBeNull();
+    expect(validateProviderForVendor("cli", "not-a-vendor")).toBeNull();
+  });
+
+  it("VENDOR_PROVIDERS pins the exact rule set", () => {
+    expect(VENDOR_PROVIDERS).toEqual({
+      claude: ["cli", "api"],
+      codex: ["cli"],
+      google: ["api"],
+      local: ["api"],
+    });
+  });
+});
+
+describe("validateConfigKeyValue with a vendor", () => {
+  it("rejects a provider value the active vendor does not support", () => {
+    expect(validateConfigKeyValue("provider", "api", "codex")).toContain("codex");
+  });
+
+  it("still accepts a provider value the active vendor supports", () => {
+    expect(validateConfigKeyValue("provider", "cli", "codex")).toBeNull();
+  });
+
+  it("skips vendor validation when no vendor is passed", () => {
+    // Unchanged call sites (no third argument) keep accepting any declared member.
+    expect(validateConfigKeyValue("provider", "api")).toBeNull();
   });
 });
 

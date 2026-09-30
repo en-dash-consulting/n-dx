@@ -121,12 +121,12 @@ export interface SerializeOptions {
   /**
    * Load-time identity of the item files the snapshot was parsed from
    * (resolved path → content digest), as returned by `parseFolderTree` or by
-   * the previous `serializeFolderTree` result. Required for the relocation
-   * exemption: a deletion candidate newer than `loadedAt` whose item id IS in
-   * the document being saved is allowed only when its current content still
-   * matches the digest recorded here. Without a matching entry the candidate
-   * is protected by mtime alone — a newer file is someone else's work until
-   * proven otherwise.
+   * the previous `serializeFolderTree` result. This is the relocation
+   * exemption: a deletion candidate newer than `loadedAt` is allowed only when
+   * its current content still matches the digest recorded here, which proves
+   * the snapshot has seen exactly these bytes. Without a matching entry the
+   * candidate is protected by mtime alone — a newer file the snapshot never
+   * read is someone else's work until proven otherwise.
    */
   loadedFiles?: ReadonlyMap<string, string>;
   /**
@@ -176,7 +176,7 @@ export async function serializeFolderTree(
   const staleEntries: StaleEntry[] = [];
   await writeSiblings(items, treeRoot, result, staleEntries);
 
-  await guardStaleEntries(staleEntries, options, collectItemIds(items));
+  await guardStaleEntries(staleEntries, options);
 
   for (const entry of staleEntries) {
     // Enumerated before the rm so a removed directory's contents can still be
@@ -216,49 +216,42 @@ async function collectFilesUnder(path: string): Promise<string[]> {
   return files;
 }
 
-/** Every item id in the tree being saved, at any depth. */
-function collectItemIds(items: PRDItem[], into = new Set<string>()): Set<string> {
-  for (const item of items) {
-    into.add(item.id);
-    if (item.children) collectItemIds(item.children, into);
-  }
-  return into;
-}
-
 /**
  * Refuse deletions a stale snapshot cannot vouch for.
  *
- * With `loadedAt`, a candidate containing a file that is both newer than the
- * load AND carries an item id absent from the document being saved was
- * written by another writer after the snapshot was taken; deleting it would
- * destroy their work. With no options at all the legacy delete-freely
- * behavior is kept.
+ * With `loadedAt`, a candidate containing a file that is newer than the load
+ * AND whose content is not what the snapshot read from that path was written
+ * by another writer after the snapshot was taken; deleting it would destroy
+ * their work. With no options at all the legacy delete-freely behavior is
+ * kept.
  *
- * The id check is what tells a RELOCATION apart from a deletion. Promoting a
- * leaf `<slug>.md` into `<slug>/index.md` (item gains its first child)
- * removes a file the same writer created moments earlier — under Windows
- * timestamp granularity its mtime is indistinguishable from a concurrent
- * writer's, but its item id is present in the document being saved, so
- * nothing is lost. Observed live as the flaky web-route failures ("expected
- * 400 to be 200"): capture handlers add an epic and then its first child in
- * back-to-back transactions, and the guard fired on the promotion's leaf
- * cleanup. An mtime-only comparison cannot be made safe with tolerance —
- * the same-writer gap and a genuine racing write occupy the same range.
+ * The content digest is what tells a RELOCATION apart from a deletion, and it
+ * is the only test here that reads no clock. Promoting a leaf `<slug>.md` into
+ * `<slug>/index.md` (item gains its first child) removes a file the same
+ * writer created moments earlier — under Windows timestamp granularity its
+ * mtime is indistinguishable from a concurrent writer's, but its content is
+ * byte-for-byte what the snapshot loaded, so nothing is lost. Observed live as
+ * the flaky web-route failures ("expected 400 to be 200"): capture handlers
+ * add an epic and then its first child in back-to-back transactions, and the
+ * guard fired on the promotion's leaf cleanup. An mtime-only comparison cannot
+ * be made safe with tolerance — the same-writer gap and a genuine racing write
+ * occupy the same range.
  *
- * The id alone is not enough, though: it says the item survives, not that
- * THIS version of it does. Two writers load X; A edits X and saves; B, still
- * on its old snapshot, moves X under another parent. B's save writes its
- * stale copy at the destination and removes A's newer source file — X is in
- * B's document, so an id-only exemption would wave the deletion through and
- * A's edit would vanish with no error. So a relocation is exempt only when
- * the source file's content still digests to what the snapshot recorded for
- * that path in `loadedFiles`: unchanged since load means the copy being
- * written elsewhere carries everything the source held.
+ * An earlier version exempted a file whose item id was still present in the
+ * document being saved, on the theory that the item living on elsewhere made
+ * this copy a relocation. That was never sufficient on its own: an id says the
+ * item survives, not that THIS version of it does. Two writers load X; A edits
+ * X and saves; B, still on its old snapshot, moves X under another parent. B's
+ * save writes its stale copy at the destination and removes A's newer source
+ * file — X is in B's document, so an id-only exemption waves the deletion
+ * through and A's edit vanishes with no error. The digest catches exactly
+ * that, and catches the promotion case too, so the id check is gone: it had
+ * become unreachable behind the digest, and both of its branches returned the
+ * same answer.
  */
 async function guardStaleEntries(
   staleEntries: StaleEntry[],
   options: SerializeOptions,
-  savedIds: Set<string>,
 ): Promise<void> {
   if (staleEntries.length === 0 || options.allowBulkDelete || options.loadedAt === undefined) return;
 
@@ -270,7 +263,7 @@ async function guardStaleEntries(
 
   const violations: string[] = [];
   for (const entry of staleEntries) {
-    const unseen = await deletesUnseenWork(entry.path, options.loadedAt + MTIME_TOLERANCE_MS, savedIds, options.loadedFiles);
+    const unseen = await deletesUnseenWork(entry.path, options.loadedAt + MTIME_TOLERANCE_MS, options.loadedFiles);
     if (unseen !== null) {
       violations.push(await describeEntry(unseen));
     }
@@ -289,57 +282,57 @@ async function guardStaleEntries(
 
 /**
  * The path of the first file under `path` whose deletion would destroy work
- * the saved document does not carry, or null when there is none. Such a file
- * is newer than the load and either its item id is missing from `savedIds`,
- * or the id is present but the content no longer matches what the snapshot
- * loaded from that path (a concurrent edit the relocation would overwrite
- * with its stale copy). Returning the file rather than a verdict lets the
- * error name the item actually at risk, not the directory that contains it.
+ * the saved document does not carry, or null when there is none.
+ *
+ * The rule is: newer than the load, and its content is not what the snapshot
+ * read from that path. Returning the file rather than a verdict lets the error
+ * name the item actually at risk, not the directory that contains it.
+ *
+ * The item id plays no part. It used to: a file was exempt when its id was
+ * absent from the saved document, on the theory that an id living on elsewhere
+ * in the tree made this copy a relocation. Putting the digest check first made
+ * that unreachable — a file reaching the id check has already failed the
+ * digest, so it differs from what the snapshot read, and the copy being written
+ * elsewhere is missing an edit whether or not its id is in the document. Both
+ * branches returned the same answer, so the check went with them.
  *
  * Directory mtimes are deliberately ignored — a directory's mtime bumps on
  * any child rename and identifies nothing; only files carry items. A newer
- * file with no parseable id and no load-time digest stays protected by mtime
- * alone: unknown content is guarded, not assumed safe.
+ * file the snapshot never read stays protected by mtime alone: unknown
+ * content is guarded, not assumed safe.
  */
 async function deletesUnseenWork(
   path: string,
   newerThan: number,
-  savedIds: Set<string>,
   loadedFiles: ReadonlyMap<string, string> | undefined,
 ): Promise<string | null> {
   try {
     const info = await stat(path);
     if (info.isDirectory()) {
       for (const child of await readdir(path)) {
-        const unseen = await deletesUnseenWork(join(path, child), newerThan, savedIds, loadedFiles);
+        const unseen = await deletesUnseenWork(join(path, child), newerThan, loadedFiles);
         if (unseen !== null) return unseen;
       }
       return null;
     }
     if (info.mtimeMs <= newerThan) return null;
     const raw = await readFile(path, "utf8");
-    // Strongest evidence first, and the only check here that reads no clock:
-    // if the file still digests to exactly what this snapshot loaded from this
-    // path, the snapshot has seen its current contents, so deleting it destroys
-    // nothing unseen — whatever its mtime says, and whether or not its
-    // frontmatter still parses.
+    // The only check here that reads no clock: if the file still digests to
+    // exactly what this snapshot loaded from this path, the snapshot has seen
+    // its current contents, so deleting it destroys nothing unseen — whatever
+    // its mtime says, and whether or not its frontmatter still parses.
     //
-    // It has to precede the id check, not follow it. `mtimeMs` and `Date.now()`
-    // are different clocks: the file clock was measured running up to ~4ms ahead
-    // of Date.now() on Windows, past MTIME_TOLERANCE_MS, so a file written just
-    // *before* a load can read as newer than it. A corrupted or truncated file
-    // has no id to fall back on, so behind the id check it was reported as
-    // another writer's work and the save that would have rewritten it was
-    // refused — the tree stayed corrupt and every later save failed the same
-    // way. The parser records a digest for every `.md` file it reads, before
-    // parsing it, so an unparseable file the snapshot read is covered here.
+    // That last part is why this cannot sit behind an id check. `mtimeMs` and
+    // `Date.now()` are different clocks: the file clock was measured running up
+    // to ~4ms ahead of Date.now() on Windows, past MTIME_TOLERANCE_MS, so a
+    // file written just *before* a load can read as newer than it. A corrupted
+    // or truncated file has no id to fall back on, so behind an id check it was
+    // reported as another writer's work and the save that would have rewritten
+    // it was refused — the tree stayed corrupt and every later save failed the
+    // same way. The parser records a digest for every `.md` file it reads,
+    // before parsing it, so an unparseable file the snapshot read is covered.
     const loadedDigest = loadedFiles?.get(resolve(path));
     if (loadedDigest !== undefined && loadedDigest === digestItemFile(raw)) return null;
-    const id = /^id:\s*"?([^"\n]+?)"?\s*$/m.exec(raw)?.[1];
-    if (!id || !savedIds.has(id)) return path;
-    // Relocation candidate: the item lives on elsewhere in the saved tree, but
-    // the digest check above already established this file is not what the
-    // snapshot read — so the copy being written elsewhere is missing an edit.
     return path;
   } catch {
     // Vanished mid-scan — nothing left to protect.
