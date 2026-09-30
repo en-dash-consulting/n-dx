@@ -10,7 +10,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, chmod } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -135,6 +136,22 @@ async function runJson(dir: string, flags: Record<string, string>): Promise<Reco
   return JSON.parse(lines.join("\n"));
 }
 
+/** Run the command with text output and return everything it printed. */
+async function runText(dir: string, flags: Record<string, string>): Promise<string> {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  const originalError = console.error;
+  console.log = (...args: unknown[]) => void lines.push(args.join(" "));
+  console.error = (...args: unknown[]) => void lines.push(args.join(" "));
+  try {
+    await cmdTreeDiff(dir, flags);
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+  return lines.join("\n");
+}
+
 describe("tree-diff against git refs", () => {
   let dir: string;
   let firstSha: string;
@@ -223,6 +240,11 @@ describe("tree-diff against git refs", () => {
     expect(out.counts.added).toBe(6);
   });
 
+  it("says the baseline has no tree in text output for a ref that predates it", async () => {
+    const output = await runText(dir, { from: firstSha, to: secondSha });
+    expect(output).toContain(`${firstSha}: no PRD tree at this source.`);
+  });
+
   it("leaves the caller's index and working tree untouched", async () => {
     // GIT_INDEX_FILE is what keeps `git checkout -- <path>` from staging the
     // ref's version of every PRD file into the caller's real index. Without
@@ -247,6 +269,23 @@ describe("tree-diff against git refs", () => {
     // Belt and braces: the index must still agree with HEAD, which is the
     // thing `git status` would report as staged if it did not.
     expect(git(dir, "diff", "--cached", "--name-only")).toBe("");
+  });
+
+  it("does not run the repository's post-checkout hook for the scratch extraction", async () => {
+    writePRD(dir, after());
+    const thirdSha = commitAll(dir, "restructure");
+
+    // A hook that fails is the strongest proof it never ran at all — if it
+    // fired, the scratch checkout (and so the whole diff) would fail with it.
+    const hookPath = join(dir, ".git", "hooks", "post-checkout");
+    const marker = join(dir, "hook-ran.marker");
+    await writeFile(hookPath, `#!/bin/sh\ntouch "${marker}"\nexit 1\n`);
+    await chmod(hookPath, 0o755);
+
+    const out = await runJson(dir, { from: secondSha, to: thirdSha });
+
+    expect(out.counts.added).toBe(1);
+    expect(existsSync(marker)).toBe(false);
   });
 
   it("refuses an unknown ref by name instead of diffing against nothing", async () => {
@@ -339,5 +378,36 @@ describe("tree source resolution", () => {
 
   it("returns no anchor ref outside a git repository", async () => {
     expect(await resolveAnchorRef(dir)).toBeNull();
+  });
+
+  it("falls back to a local default branch when origin/HEAD names a pruned ref", async () => {
+    initRepo(dir);
+    writePRD(dir, before());
+    commitAll(dir, "init");
+
+    // Simulate a clone whose upstream default branch was renamed and then
+    // `git remote prune origin`d: origin/HEAD still points at the old name,
+    // but the remote-tracking ref itself is gone.
+    git(dir, "remote", "add", "origin", "https://example.invalid/repo.git");
+    git(dir, "update-ref", "refs/remotes/origin/master", "HEAD");
+    git(dir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master");
+    git(dir, "update-ref", "-d", "refs/remotes/origin/master");
+
+    expect(await resolveAnchorRef(dir)).toBe("main");
+  });
+
+  it("a bare tree-diff falls back to main when origin/HEAD names a pruned ref", async () => {
+    initRepo(dir);
+    writePRD(dir, before());
+    commitAll(dir, "init");
+    writePRD(dir, after());
+
+    git(dir, "remote", "add", "origin", "https://example.invalid/repo.git");
+    git(dir, "update-ref", "refs/remotes/origin/master", "HEAD");
+    git(dir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master");
+    git(dir, "update-ref", "-d", "refs/remotes/origin/master");
+
+    const out = await runJson(dir, {});
+    expect(out.sources.from.label).toBe("main");
   });
 });

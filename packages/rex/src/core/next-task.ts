@@ -313,6 +313,41 @@ export function collectCompletedIds(items: PRDItem[]): Set<string> {
 }
 
 /**
+ * Why an item stops {@link collectActionable}'s descent — it and everything
+ * beneath it is out of contention.
+ */
+export type TraversalBlock =
+  | { cause: "status"; status: string }
+  | { cause: "blockedBy"; openBlockerIds: string[] };
+
+/**
+ * The gate `collectActionable` applies to every item on the way down.
+ *
+ * Returns the reason this item halts the descent, or `null` when it does not.
+ * `completed` and `deferred` are deliberately absent: the walk still recurses
+ * through them, because a child under a finished parent may be `failing` and
+ * need retrying.
+ *
+ * Exported because more than one place has to answer "would selection ever
+ * reach this item?" — notably `core/ready.ts`, which was checking blockers on
+ * the item alone and so marked tasks ready that sat under a blocked epic and
+ * could never be selected. One predicate, one answer.
+ */
+export function traversalBlock(
+  item: PRDItem,
+  completedIds: ReadonlySet<string>,
+): TraversalBlock | null {
+  if (item.status === "blocked" || item.status === "deleted" || item.status === "cancelled") {
+    return { cause: "status", status: item.status };
+  }
+  if (item.blockedBy && item.blockedBy.length > 0) {
+    const open = item.blockedBy.filter((dep) => !completedIds.has(dep));
+    if (open.length > 0) return { cause: "blockedBy", openBlockerIds: open };
+  }
+  return null;
+}
+
+/**
  * Collect actionable candidates from the tree.
  * Returns every leaf task (or parent with all children done) that is
  * pending/in_progress with all dependencies resolved.
@@ -325,13 +360,9 @@ function collectActionable(
 
   function collect(list: PRDItem[], parentChain: PRDItem[]): void {
     for (const item of list) {
-      // Blocked/deleted/cancelled parents are fully inactive — skip them and children.
-      if (item.status === "blocked" || item.status === "deleted" || item.status === "cancelled") continue;
-
-      // Unresolved dependencies — skip item and children.
-      if (item.blockedBy && item.blockedBy.length > 0) {
-        if (!item.blockedBy.every((dep) => completedIds.has(dep))) continue;
-      }
+      // Blocked/deleted/cancelled, or an unresolved dependency: skip the item
+      // and everything under it.
+      if (traversalBlock(item, completedIds)) continue;
 
       // Always recurse into children — even for completed/deferred parents,
       // a child may be failing and need to be retried.
@@ -393,9 +424,34 @@ function filterByTags(entries: TreeEntry[], tags: string[]): TreeEntry[] {
   );
 }
 
-/** Filter entries to those whose `assignee` exactly matches. */
+/**
+ * Does this item belong to `assignee` — by its own field, or by inheritance?
+ *
+ * Assignment is inherited down the tree: assigning a feature or an epic assigns
+ * everything under it. Matching only the candidate's own `assignee` made the
+ * obvious act of handing someone a feature select nothing at all, because the
+ * tasks under it carry no field of their own and nobody expects to have to
+ * stamp every leaf.
+ *
+ * The comparison is exact — no case folding, no substring. An identity is a
+ * key produced by `resolveActor`, not a search term.
+ *
+ * Exported so consumers that scope a *different* operation to `--mine` (hench's
+ * deferred-task reset, its empty-menu counts) apply the same rule as selection
+ * rather than a second, subtly narrower copy of it.
+ */
+export function matchesAssignee(
+  item: PRDItem,
+  parents: readonly PRDItem[],
+  assignee: string,
+): boolean {
+  if (item.assignee === assignee) return true;
+  return parents.some((p) => p.assignee === assignee);
+}
+
+/** Filter entries to those the identity owns, directly or through an ancestor. */
 function filterByAssignee(entries: TreeEntry[], assignee: string): TreeEntry[] {
-  return entries.filter((e) => e.item.assignee === assignee);
+  return entries.filter((e) => matchesAssignee(e.item, e.parents, assignee));
 }
 
 export function findActionableTasks(

@@ -101,6 +101,10 @@ describe("cmdReady", () => {
   });
 
   it("refuses an empty --item instead of falling through to the whole tree", async () => {
-    await expect(cmdReady(tmp, { item: "" })).rejects.toThrow(/--item needs an item id/);
+    await expect(cmdReady(tmp, { item: "" })).rejects.toThrow(/--item needs a value/);
+  });
+
+  it("refuses a bare --item (parsed as \"true\") instead of looking up an item named true", async () => {
+    await expect(cmdReady(tmp, { item: "true" })).rejects.toThrow(/--item needs a value/);
   });
 });
