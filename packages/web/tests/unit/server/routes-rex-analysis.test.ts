@@ -22,11 +22,38 @@ import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
-const { execMock } = vi.hoisted(() => ({ execMock: vi.fn() }));
+const { execMock, spawnManagedMock } = vi.hoisted(() => ({
+  execMock: vi.fn(),
+  spawnManagedMock: vi.fn(),
+}));
 vi.mock("@n-dx/llm-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@n-dx/llm-client")>();
-  return { ...actual, exec: execMock };
+  return { ...actual, exec: execMock, spawnManaged: spawnManagedMock };
 });
+
+interface ManagedResult { exitCode: number | null; stdout: string; stderr: string }
+interface ManagedSpawnOpts { onStdout?: (chunk: string) => void }
+
+/** Finish immediately with `result`. */
+function stubManagedRun(result: Partial<ManagedResult>) {
+  const full: ManagedResult = { exitCode: 0, stdout: "", stderr: "", ...result };
+  spawnManagedMock.mockImplementation((_bin: string, _args: string[], opts: ManagedSpawnOpts) => {
+    if (full.stdout) opts.onStdout?.(full.stdout);
+    return { done: Promise.resolve(full), kill: vi.fn(() => true), pid: 4242 };
+  });
+}
+
+/** A child whose completion the test controls. */
+function stubManagedChild(opts?: { killFinishes?: ManagedResult }) {
+  let finish!: (r: ManagedResult) => void;
+  const done = new Promise<ManagedResult>((resolve) => { finish = resolve; });
+  const kill = vi.fn(() => {
+    if (opts?.killFinishes) finish(opts.killFinishes);
+    return true;
+  });
+  spawnManagedMock.mockImplementation(() => ({ done, kill, pid: 4242 }));
+  return { finish, kill };
+}
 
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
@@ -56,6 +83,7 @@ describe("POST /api/rex/analyze (background job)", () => {
 
   beforeEach(async () => {
     execMock.mockReset();
+    spawnManagedMock.mockReset();
     tmpDir = await mkdtemp(join(tmpdir(), "rex-analyze-"));
     await mkdir(join(tmpDir, ".rex"), { recursive: true });
     ctx = {
@@ -93,10 +121,7 @@ describe("POST /api/rex/analyze (background job)", () => {
   }
 
   it("starts as a 202 background job and exposes the parsed proposals via status", async () => {
-    execMock.mockResolvedValue({
-      stdout: JSON.stringify({ proposals: [{ epic: { title: "Epic A" }, features: [] }] }),
-      stderr: "", error: null,
-    });
+    stubManagedRun({ stdout: JSON.stringify({ proposals: [{ epic: { title: "Epic A" }, features: [] }] }) });
 
     const res = await post("analyze", {});
     expect(res.status).toBe(202);
@@ -112,22 +137,38 @@ describe("POST /api/rex/analyze (background job)", () => {
   });
 
   it("rejects a concurrent run with 409 instead of starting a second subprocess", async () => {
-    let release: (() => void) | undefined;
-    execMock.mockImplementation(() => new Promise((resolve) => {
-      release = () => resolve({ stdout: "{}", stderr: "", error: null });
-    }));
+    const child = stubManagedChild();
     expect((await post("analyze", {})).status).toBe(202);
     expect((await post("analyze", {})).status).toBe(409);
-    release?.();
+    child.finish({ exitCode: 0, stdout: "{}", stderr: "" });
     await waitForStatus();
-    expect(execMock).toHaveBeenCalledTimes(1);
+    expect(spawnManagedMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops the running job through analyze/stop, reporting it as stopped", async () => {
+    // Project Scan is the job tray's "analyze" row; a tray row that offers
+    // Stop needs an endpoint that actually signals the child.
+    const child = stubManagedChild({ killFinishes: { exitCode: null, stdout: "", stderr: "" } });
+    expect((await post("analyze", {})).status).toBe(202);
+
+    const stop = await post("analyze/stop");
+    expect(stop.status).toBe(200);
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+    const status = await waitForStatus();
+    expect(status.stopped).toBe(true);
+    expect(status.error).toBeNull();
+  });
+
+  it("409s when asked to stop with nothing running", async () => {
+    expect((await post("analyze/stop")).status).toBe(409);
   });
 
   it("passes --accept, --no-llm, --lite flags through to the CLI", async () => {
-    execMock.mockResolvedValue({ stdout: JSON.stringify({ proposals: [] }), stderr: "", error: null });
+    stubManagedRun({ stdout: JSON.stringify({ proposals: [] }) });
     await post("analyze", { accept: true, noLlm: true, lite: true });
     await waitForStatus();
-    const args = execMock.mock.calls[0][1] as string[];
+    const args = spawnManagedMock.mock.calls[0][1] as string[];
     expect(args).toContain("analyze");
     expect(args).toContain("--format=json");
     expect(args).toContain("--accept");
@@ -136,7 +177,7 @@ describe("POST /api/rex/analyze (background job)", () => {
   });
 
   it("broadcasts rex:prd-changed only when --accept was requested", async () => {
-    execMock.mockResolvedValue({ stdout: JSON.stringify({ proposals: [] }), stderr: "", error: null });
+    stubManagedRun({ stdout: JSON.stringify({ proposals: [] }) });
     const broadcasts: Array<{ type: string }> = [];
     const ctxWithBroadcast = ctx;
     const started = await new Promise<{ server: Server; port: number }>((resolve) => {
@@ -174,25 +215,25 @@ describe("POST /api/rex/analyze (background job)", () => {
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({ cli: { timeouts: { plan: 42_000 } } }),
     );
-    execMock.mockResolvedValue({ stdout: JSON.stringify({ proposals: [] }), stderr: "", error: null });
+    stubManagedRun({ stdout: JSON.stringify({ proposals: [] }) });
 
     await post("analyze", {});
     await waitForStatus();
 
-    const opts = execMock.mock.calls[0][2] as { timeout: number };
+    const opts = spawnManagedMock.mock.calls[0][2] as { timeout: number };
     expect(opts.timeout).toBe(42_000);
   });
 
   it("falls back to the 30-minute default timeout when unconfigured", async () => {
-    execMock.mockResolvedValue({ stdout: JSON.stringify({ proposals: [] }), stderr: "", error: null });
+    stubManagedRun({ stdout: JSON.stringify({ proposals: [] }) });
     await post("analyze", {});
     await waitForStatus();
-    const opts = execMock.mock.calls[0][2] as { timeout: number };
+    const opts = spawnManagedMock.mock.calls[0][2] as { timeout: number };
     expect(opts.timeout).toBe(1_800_000);
   });
 
   it("reports status.error when the CLI exits non-zero with no parseable output", async () => {
-    execMock.mockResolvedValue({ stdout: "", stderr: "boom", error: new Error("exit 1") });
+    stubManagedRun({ exitCode: 1, stderr: "boom" });
     await post("analyze", {});
     const status = await waitForStatus();
     expect(status.error).toContain("boom");

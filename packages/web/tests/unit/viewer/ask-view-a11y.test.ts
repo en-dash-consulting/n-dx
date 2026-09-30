@@ -38,6 +38,7 @@ import {
   type AskState,
 } from "../../../src/viewer/views/ask.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
+import { emptyJobTray } from "../../helpers/job-tray.js";
 
 // ---------------------------------------------------------------------------
 // Harness
@@ -68,7 +69,7 @@ describe("AskView a11y", () => {
   function mount(): HTMLDivElement {
     root = document.createElement("div");
     document.body.appendChild(root);
-    act(() => { render(h(AskView, null), root); });
+    act(() => { render(h(AskView, { jobs: emptyJobTray() }), root); });
     return root;
   }
 

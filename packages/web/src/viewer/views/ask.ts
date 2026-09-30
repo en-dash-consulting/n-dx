@@ -129,6 +129,7 @@
 import { h } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { AnalyzeControls, BrandedHeader } from "../components/index.js";
+import type { JobTray } from "../hooks/index.js";
 import { useCliName } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import type { AskSeed } from "../types.js";
@@ -403,6 +404,8 @@ export interface AskViewProps {
    * reference to this component.
    */
   seed?: AskSeed | null;
+  /** Shared job tray — the no-analysis affordance starts a run through it. */
+  jobs: JobTray;
 }
 
 /**
@@ -417,7 +420,7 @@ function seedIdentity(seed: AskSeed | null | undefined): string | null {
   return `${seed.kind ?? ""}:${seed.id ?? ""}:${seed.text ?? ""}`;
 }
 
-export function AskView({ seed = null }: AskViewProps = {}) {
+export function AskView({ seed = null, jobs }: AskViewProps) {
   const deployed = isDeployedMode();
   const cliName = useCliName();
 
@@ -970,7 +973,7 @@ export function AskView({ seed = null }: AskViewProps = {}) {
             // not the name of the command that would do it.
             failure.needsAnalysis
               ? h("div", { class: "sv-ask-error-analyze" },
-                  h(AnalyzeControls, null),
+                  h(AnalyzeControls, { jobs }),
                 )
               : null,
           );

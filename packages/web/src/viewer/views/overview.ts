@@ -11,6 +11,7 @@ import {
 import { basename } from "../utils.js";
 import { narrationNotice } from "./narration-notice.js";
 import { AnalyzeControls, BrandedHeader, InfoTip } from "../components/index.js";
+import type { JobTray } from "../hooks/index.js";
 
 interface NextStep {
   priority: string;
@@ -194,6 +195,8 @@ interface OverviewProps {
   data: LoadedData;
   navigateTo?: NavigateTo;
   onSelect?: (detail: DetailItem | null) => void;
+  /** Shared job tray — AnalyzeControls starts and reads the full run there. */
+  jobs: JobTray;
 }
 
 const LANG_COLORS: Record<string, string> = {
@@ -209,7 +212,7 @@ const LANG_COLORS: Record<string, string> = {
   Go: "#00add8",
 };
 
-export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
+export function Overview({ data, navigateTo, onSelect, jobs }: OverviewProps) {
   const { manifest, inventory, imports, zones, components } = data;
 
   if (!manifest && !inventory && !imports && !zones) {
@@ -337,7 +340,7 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
       : null,
 
     // Re-analyze trigger
-    h(AnalyzeControls, null),
+    h(AnalyzeControls, { jobs }),
 
     // Prioritized recommendations (hidden until analysis data exists)
     h(NextStepsPanel, null),

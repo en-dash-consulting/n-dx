@@ -30,15 +30,21 @@ vi.mock("../../../src/viewer/hooks/use-gateway.js", () => ({
   }),
 }));
 
-import { useActiveOperations, type ActiveOperation } from "../../../src/viewer/hooks/use-active-operations.js";
+import {
+  useActiveOperations,
+  type ActiveOperation,
+  type JobTray,
+} from "../../../src/viewer/hooks/use-active-operations.js";
 import { usePolling } from "../../../src/viewer/views/use-polling.js";
 
 // ─── Harness ─────────────────────────────────────────────────────────────────
 
 let hookResult: ActiveOperation[] = [];
+let tray: JobTray | null = null;
 
 function TestHarness() {
-  hookResult = useActiveOperations();
+  tray = useActiveOperations();
+  hookResult = tray.operations;
   return h("div", null, JSON.stringify(hookResult));
 }
 
@@ -81,6 +87,7 @@ describe("useActiveOperations", () => {
     vi.clearAllMocks();
     capturedPoll = null;
     capturedOnMessage = null;
+    tray = null;
 
     globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
       if (String(url) === "/api/hench/execute/status") {
@@ -254,6 +261,167 @@ describe("useActiveOperations", () => {
     await settleInAct();
 
     expect(hookResult.some((op) => op.id === "hench:t3")).toBe(false);
+  });
+
+  it("reports the self-heal loop's current iteration and phase", async () => {
+    // Moved here from self-heal-live.test.ts along with the poll: the tray is
+    // now the only reader of this output, and one reader of a stream owns its
+    // parser. Phases arrive in loop order; the freshest line is the current one.
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      if (String(url) === "/api/hench/execute/status") {
+        return { ok: true, json: async () => ({ executions: [] }) } as Response;
+      }
+      if (String(url) === "/api/commands/self-heal/status") {
+        return {
+          ok: true,
+          json: async () => ({
+            running: true,
+            startedAt: "2026-08-26T10:00:00.000Z",
+            finishedAt: null,
+            iterations: 3,
+            output: "iteration 2/3\nanalyzing zones\nphase: recommend",
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => idleWire() } as Response;
+    }) as typeof fetch;
+
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    await act(async () => { await capturedPoll!(); });
+    act(() => { render(h(TestHarness, null), root); });
+
+    const op = hookResult.find((o) => o.kind === "self-heal")!;
+    expect(op.detail).toBe("iteration 2/3 · phase: recommend");
+  });
+
+  it("carries a stop target and a result link on every operation", async () => {
+    // A tray row's Stop and its result link come off the operation, so a job
+    // whose source table entry lacks either is a row that cannot be stopped
+    // or whose "what did this produce" link goes nowhere.
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      if (String(url) === "/api/hench/execute/status") {
+        return {
+          ok: true,
+          json: async () => ({
+            executions: [{ taskId: "t9", taskTitle: "A task", status: "running", startedAt: "2026-08-26T10:00:00.000Z" }],
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ running: true, startedAt: "2026-08-26T10:00:00.000Z", finishedAt: null }),
+      } as Response;
+    }) as typeof fetch;
+
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    await act(async () => { await capturedPoll!(); });
+    act(() => { render(h(TestHarness, null), root); });
+
+    expect(hookResult.length).toBeGreaterThan(0);
+    for (const op of hookResult) {
+      expect(op.stopUrl).toBeTruthy();
+      expect(op.result.view).toBeTruthy();
+      expect(op.result.label).toBeTruthy();
+    }
+    // Hench is per-run, so its stop must address the specific task.
+    const hench = hookResult.find((o) => o.kind === "hench")!;
+    expect(hench.stopUrl).toBe("/api/hench/execute/t9/terminate");
+  });
+
+  it("tracks the recommend job, counting what it produced", async () => {
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      if (String(url) === "/api/hench/execute/status") {
+        return { ok: true, json: async () => ({ executions: [] }) } as Response;
+      }
+      if (String(url) === "/api/commands/recommend/status") {
+        return {
+          ok: true,
+          json: async () => ({
+            running: false,
+            startedAt: "2026-08-26T10:00:00.000Z",
+            finishedAt: "2026-08-26T10:02:00.000Z",
+            error: null,
+            report: [{ id: "a" }, { id: "b" }],
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => idleWire() } as Response;
+    }) as typeof fetch;
+
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    await act(async () => { await capturedPoll!(); });
+    act(() => { render(h(TestHarness, null), root); });
+
+    const op = hookResult.find((o) => o.kind === "recommend")!;
+    expect(op).toBeDefined();
+    expect(op.status).toBe("done");
+    expect(op.detail).toBe("2 recommendations found");
+    expect(op.result).toEqual({ view: "suggestions", label: "View suggestions" });
+  });
+
+  it("stop POSTs to the operation's stop target and re-reads status", async () => {
+    const calls: Array<{ url: string; method?: string }> = [];
+    globalThis.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), method: init?.method });
+      if (String(url) === "/api/hench/execute/status") {
+        return { ok: true, json: async () => ({ executions: [] }) } as Response;
+      }
+      if (String(url) === "/api/commands/ci/status") {
+        return {
+          ok: true,
+          json: async () => ({ running: true, startedAt: "2026-08-26T10:00:00.000Z", finishedAt: null }),
+        } as Response;
+      }
+      return { ok: true, json: async () => idleWire() } as Response;
+    }) as typeof fetch;
+
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    await act(async () => { await capturedPoll!(); });
+    act(() => { render(h(TestHarness, null), root); });
+
+    const op = hookResult.find((o) => o.kind === "ci")!;
+    calls.length = 0;
+    await act(async () => { await tray!.stop(op); });
+
+    expect(calls[0]).toEqual({ url: "/api/commands/ci/stop", method: "POST" });
+    // The stop endpoint answers before the child has exited, so only a
+    // re-read shows the run as finished.
+    expect(calls.some((c) => c.url === "/api/commands/ci/status")).toBe(true);
+  });
+
+  it("reports a stopped run as stopped rather than as a failure", async () => {
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      if (String(url) === "/api/hench/execute/status") {
+        return { ok: true, json: async () => ({ executions: [] }) } as Response;
+      }
+      if (String(url) === "/api/commands/reshape/status") {
+        return {
+          ok: true,
+          json: async () => ({
+            running: false,
+            startedAt: "2026-08-26T10:00:00.000Z",
+            finishedAt: "2026-08-26T10:01:00.000Z",
+            error: null,
+            stopped: true,
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => idleWire() } as Response;
+    }) as typeof fetch;
+
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    await act(async () => { await capturedPoll!(); });
+    act(() => { render(h(TestHarness, null), root); });
+
+    const op = hookResult.find((o) => o.kind === "reshape")!;
+    expect(op.status).toBe("done");
+    expect(op.stopped).toBe(true);
+    expect(op.detail).toBe("Stopped");
   });
 
   it("handles fetch failure for a singleton source gracefully", async () => {
