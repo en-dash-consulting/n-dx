@@ -37,6 +37,7 @@
 import { createHash } from "node:crypto";
 import { readFile, writeFile, mkdir, rm, open, rename, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
+import { resolveLayout } from "../../prd/llm-gateway.js";
 
 /** File under `.hench/` holding the cached parent session. */
 export const SESSION_CACHE_FILE = "session-cache.json";
@@ -829,7 +830,10 @@ export function isParentUsable(
  */
 export async function sourcevisionFingerprint(projectDir: string): Promise<string> {
   try {
-    const raw = await readFile(join(projectDir, ".sourcevision", "manifest.json"), "utf-8");
+    const raw = await readFile(
+      join(resolveLayout(projectDir).sourcevisionDir, "manifest.json"),
+      "utf-8",
+    );
     const manifest = JSON.parse(raw) as {
       analysisFingerprint?: unknown;
       analyzedAt?: unknown;
