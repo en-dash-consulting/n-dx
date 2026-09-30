@@ -24,6 +24,8 @@ let core;
 let foundation;
 /** @type {Record<string, any>} */
 let isoBundle;
+/** @type {Record<string, any>} */
+let isoDeclared;
 
 /** A project on the legacy layout — three dot-dirs, no container. */
 let legacyRoot;
@@ -51,6 +53,7 @@ beforeAll(async () => {
   core = await import("../../packages/core/layout.js");
   foundation = await import("../../packages/llm-client/dist/public.js");
   isoBundle = await import("../../packages/sourcevision/dist/export/iso-sources.js");
+  isoDeclared = await import("../../packages/sourcevision/dist/export/iso-declared.js");
 
   legacyRoot = mkdtempSync(join(tmpdir(), "ndx-layout-legacy-"));
   mkdirSync(join(legacyRoot, ".rex"), { recursive: true });
@@ -352,8 +355,9 @@ describe("layout resolver: core twin matches the foundation implementation", () 
 describe("layout resolver: iso bundle twin matches the foundation implementation", () => {
   // `packages/sourcevision/src/export/` bundles into the dependency-free
   // standalone skill script, so it may import nothing but `node:` builtins and
-  // cannot reach the resolver. It resolves only the analysis directory, which
-  // is the only path the map reads.
+  // cannot reach the resolver. It resolves the two paths the map reads: the
+  // analysis directory, and the project config that declares seams and
+  // infrastructure the import graph structurally cannot show.
   for (const layout of ["legacy", "ndx"]) {
     it(`resolves the analysis directory identically for a ${layout} project`, () => {
       const root = layout === "ndx" ? ndxRoot : legacyRoot;
@@ -380,8 +384,33 @@ describe("layout resolver: iso bundle twin matches the foundation implementation
       expect(isoBundle.analysisDirFor(root)).toBe(
         foundation.resolveLayout(root).sourcevisionDir,
       );
+      expect(isoDeclared.projectConfigFor(root)).toBe(
+        foundation.resolveLayout(root).configFile,
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  // The map reads declared seams and infrastructure out of the project config.
+  // Guessing `.n-dx.json` on a `.ndx/` project finds nothing and drops them
+  // with no error, so the map silently loses every declaration a human made.
+  for (const layout of ["legacy", "ndx"]) {
+    it(`resolves the project config identically for a ${layout} project`, () => {
+      const root = layout === "ndx" ? ndxRoot : legacyRoot;
+
+      expect(
+        isoDeclared.projectConfigFor(root),
+        "packages/sourcevision/src/export/iso-declared.ts and packages/llm-client/src/layout.ts disagree",
+      ).toBe(foundation.resolveLayout(root).configFile);
+    });
+  }
+
+  it("agrees on the project config for a root that does not exist at all", () => {
+    const missing = join(legacyRoot, "no-such-project");
+
+    expect(isoDeclared.projectConfigFor(missing)).toBe(
+      foundation.resolveLayout(missing).configFile,
+    );
   });
 });

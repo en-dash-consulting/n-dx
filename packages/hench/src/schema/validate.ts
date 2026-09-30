@@ -1,5 +1,6 @@
 import { z, ZodError } from "zod";
-import { DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MIN_PRUNE_PAIRS } from "./v1.js";
+import { DEFAULT_HENCH_CONFIG, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MIN_PRUNE_PAIRS } from "./v1.js";
+import type { HenchConfig } from "./v1.js";
 
 export type ValidationResult<T> =
   | { ok: true; data: T }
@@ -58,9 +59,11 @@ const RetryConfigSchema = z.object({
  * so a single-member group reaches disk and must still load.
  *
  * {@link MIN_PRUNE_PAIRS} is the floor, shared with the pruner rather than
- * restated: this schema refuses a bad value in `.hench/config.json`, but
- * `loadConfig` merges `.n-dx.json` overrides after validation, so the pruner
- * has to clamp to the same floor for values that never reach here.
+ * restated: this schema refuses a bad value in `.hench/config.json`, and
+ * `loadConfig` re-validates a `.n-dx.json`/`.n-dx.local.json` override
+ * against it too (reverting an invalid one — see `store/config.ts`). The
+ * pruner still clamps to the same floor at runtime as a second line of
+ * defense for a `PruneConfig` built outside `loadConfig`.
  */
 const PruneConfigSchema = z
   .object({
@@ -99,7 +102,23 @@ const ProjectLanguageSchema = z.enum(["typescript", "javascript", "go", "swift"]
 export const HenchConfigSchema = z.object({
   schema: z.string(),
   provider: z.enum(["cli", "api"]).default("cli"),
+  // Deprecated and never read — see the field docs on HenchConfig. Kept
+  // required so existing configs keep validating unchanged.
   model: z.string(),
+  // Agent-only per-vendor model override. Keys are spelled out rather than
+  // built from LLM_VENDORS so an unknown vendor key is a validation failure
+  // (which loadConfig reverts with a warning) instead of a silently inert
+  // entry the user would have no way to notice. Non-empty: an empty string
+  // would resolve to "no override" while reading as a deliberate pin.
+  models: z
+    .object({
+      claude: z.string().min(1).optional(),
+      codex: z.string().min(1).optional(),
+      google: z.string().min(1).optional(),
+      local: z.string().min(1).optional(),
+    })
+    .strict()
+    .optional(),
   maxTurns: z.number().positive(),
   maxTokens: z.number().positive(),
   tokenBudget: z.number().int().nonnegative().optional().default(0),
@@ -430,6 +449,90 @@ export function validateConfig(
     return { ok: true, data: result.data };
   }
   return { ok: false, errors: result.error };
+}
+
+export interface FieldRevertResult {
+  /**
+   * The repaired document as {@link HenchConfigSchema} parsed it: schema
+   * defaults materialized, keys the schema does not declare stripped. Right
+   * for a caller whose non-repair path also returns a parsed config (the
+   * `.hench/config.json` salvage in `loadConfig`).
+   */
+  config: HenchConfig;
+  /**
+   * The repaired document as it was built — the input with each implicated
+   * top-level field replaced, and nothing else touched.
+   *
+   * Prefer this over {@link config} when the caller's own success path
+   * returns or persists an *unparsed* object. `HenchConfig` carries fields
+   * `HenchConfigSchema` does not declare (`skipFullTestGate`,
+   * `planOnlyMaxRetries`, `selfHeal`), and a parse silently drops every one
+   * of them — so returning {@link config} would make one bad field discard
+   * unrelated good ones, a difference the caller never warned about.
+   */
+  candidate: Record<string, unknown>;
+  /** Top-level field names that were replaced, sorted for stable messages. */
+  replacedFields: string[];
+}
+
+/**
+ * For each top-level field implicated in a validation failure, replace it
+ * with the corresponding value from `fallback` (or the schema default when
+ * `fallback` doesn't carry it) and re-validate.
+ *
+ * Shared by every place that must not let an unvalidated source — a hand-
+ * edited `.hench/config.json`, a `.n-dx.json`/`.n-dx.local.json` override, a
+ * workflow template overlay — put a value past {@link HenchConfigSchema}: each
+ * calls this with its own idea of "the value to fall back to" (the schema
+ * defaults for a config file salvage, the already-validated base config for
+ * an override or template layered on top of it).
+ *
+ * Returns null when the failure isn't attributable to specific top-level
+ * fields (e.g. the document isn't an object), or the candidate is still
+ * invalid once every implicated field has been replaced.
+ */
+export function revertInvalidFields(
+  data: Record<string, unknown>,
+  issues: Array<{ path: Array<string | number> }>,
+  fallback: Record<string, unknown>,
+): FieldRevertResult | null {
+  const defaults = DEFAULT_HENCH_CONFIG() as unknown as Record<string, unknown>;
+  const badKeys = new Set<string>();
+  for (const issue of issues) {
+    const key = issue.path[0];
+    if (typeof key === "string" && key.length > 0) badKeys.add(key);
+  }
+  if (badKeys.size === 0) return null;
+
+  const candidate: Record<string, unknown> = { ...data };
+  for (const key of badKeys) {
+    if (key in fallback) candidate[key] = fallback[key];
+    else if (key in defaults) candidate[key] = defaults[key];
+    else delete candidate[key];
+  }
+  const result = validateConfig(candidate);
+  if (!result.ok) return null;
+  return {
+    config: result.data as HenchConfig,
+    candidate,
+    replacedFields: [...badKeys].sort(),
+  };
+}
+
+/**
+ * Format the issues implicating a single top-level field, in the same
+ * "path: message" shape as {@link formatValidationErrors}. Used to explain
+ * *why* {@link revertInvalidFields} reverted a specific key, without
+ * repeating every unrelated issue in the same message.
+ */
+export function formatFieldIssues(
+  issues: Array<{ path: Array<string | number>; message: string }>,
+  key: string,
+): string {
+  return issues
+    .filter((issue) => issue.path[0] === key)
+    .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+    .join("; ");
 }
 
 export function validateRunRecord(

@@ -498,6 +498,49 @@ describe("web → sourcevision gateway contract", () => {
 });
 
 // ---------------------------------------------------------------------------
+// hench ↔ web provider-support contract
+// ---------------------------------------------------------------------------
+
+/**
+ * The dashboard's per-vendor model/provider catalog (`GET /api/llm/catalog`
+ * in `packages/web/src/server/routes-llm.ts`) and its hench-config save path
+ * must offer exactly the providers hench itself accepts — claude cli or api,
+ * codex cli only, google api, local api (`cmdRun`'s provider gates in
+ * `packages/hench/src/cli/commands/run.ts`, driven by `VENDOR_PROVIDERS` in
+ * `packages/hench/src/cli/commands/provider-support.ts`).
+ *
+ * Web cannot import hench at runtime — hench is the execution tier, above the
+ * domain packages web depends on — so `packages/web/src/server/hench-config-fields.ts`
+ * keeps a separately maintained literal of the same table. This test is what
+ * catches the two drifting apart, the same one-directional pattern
+ * `tests/e2e/hench-config-gate-contract.test.js` uses for `HenchConfigSchema`.
+ */
+describe("hench ↔ web provider-support contract", () => {
+  it("hench's public API exports VENDOR_PROVIDERS", async () => {
+    const henchPublic = await import("../../packages/hench/dist/public.js");
+    expect(henchPublic.VENDOR_PROVIDERS).toBeDefined();
+    expect(typeof henchPublic.VENDOR_PROVIDERS).toBe("object");
+  });
+
+  it("web's literal matches hench's VENDOR_PROVIDERS exactly", async () => {
+    const henchPublic = await import("../../packages/hench/dist/public.js");
+    const webFields = await import("../../packages/web/dist/server/hench-config-fields.js");
+
+    expect(webFields.VENDOR_PROVIDERS).toEqual(henchPublic.VENDOR_PROVIDERS);
+  });
+
+  it("pins the exact rule set: claude cli/api, codex cli only, google api, local api", async () => {
+    const henchPublic = await import("../../packages/hench/dist/public.js");
+    expect(henchPublic.VENDOR_PROVIDERS).toEqual({
+      claude: ["cli", "api"],
+      codex: ["cli"],
+      google: ["api"],
+      local: ["api"],
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Gateway export auto-detection (finding: cross-package import coverage)
 // ---------------------------------------------------------------------------
 
@@ -636,7 +679,7 @@ describe("gateway export auto-detection", () => {
 
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
-        "loadProjectOverrides", "mergeWithOverrides", "toCanonicalJSON",
+        "deepMerge", "loadProjectOverrides", "loadProjectOverrideSources", "mergeWithOverrides", "toCanonicalJSON",
         "setQuiet", "isQuiet", "setVerbose", "isVerbose", "setDebug", "isDebug",
         "info", "result", "verbose", "debug", "warn", "suppressKnownDeprecations",
         "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "carolinaBlue", "yellow",
@@ -677,7 +720,8 @@ describe("gateway export auto-detection", () => {
       ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "REVIEW_MODELS", "GOOGLE_MODELS",
         "VENDOR_CONTEXT_CHAR_LIMITS",
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
-        "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS"],
+        "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS",
+        "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));

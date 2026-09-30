@@ -57,11 +57,16 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
   },
   {
     path: "model",
-    label: "Model",
-    description: "Claude model to use (e.g. sonnet, opus, haiku)",
+    label: "Model (deprecated)",
+    description:
+      "Deprecated and ignored. Set hench.models.<vendor> in .n-dx.json instead",
     type: "string",
     category: "execution",
-    impact: (v) => `Agent will use model "${v}" for task execution`,
+    // Deliberately states the opposite of what it used to: the field is never
+    // read by the agent loop, and claiming otherwise is how it stayed dead
+    // and unnoticed. See the deprecation note on HenchConfig.model.
+    impact: () =>
+      "Ignored — ndx work resolves its model from --model, then hench.models.<vendor>, then llm.*",
   },
   {
     path: "maxTurns",

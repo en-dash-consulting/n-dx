@@ -13,7 +13,7 @@
  * the standalone skill script.
  */
 
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, basename, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import type {
@@ -25,7 +25,7 @@ import type {
 } from "./iso-model.js";
 import { asKind } from "./iso-model.js";
 import { scanProject } from "./iso-scan.js";
-import { loadDeclaredArchitecture } from "./iso-declared.js";
+import { loadDeclaredArchitecture, ndxContainer } from "./iso-declared.js";
 import type { DeclaredInfra, DeclaredSeam } from "./iso-declared.js";
 import type {
   CallGraph,
@@ -433,14 +433,8 @@ export function balancedChildren(zone: Zone): Array<{ id: string; name: string; 
  * as silently as a second one.
  */
 export function analysisDirFor(root: string): string {
-  const container = join(root, ".ndx");
-  let containerIsDir = false;
-  try {
-    containerIsDir = statSync(container).isDirectory();
-  } catch {
-    containerIsDir = false;
-  }
-  return containerIsDir ? join(container, "sourcevision") : join(root, ".sourcevision");
+  const container = ndxContainer(root);
+  return container ? join(container, "sourcevision") : join(root, ".sourcevision");
 }
 
 /** Whether a directory holds a usable analysis. */

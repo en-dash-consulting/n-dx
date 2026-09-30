@@ -1737,7 +1737,8 @@ Rex LoE settings (level-of-effort estimation and decomposition):
 
 Hench settings (.hench/config.json):
   hench.provider           string    API provider: "cli" or "api" (default: "cli")
-  hench.model              string    Claude model name (default: "sonnet")
+  hench.model              string    Deprecated and ignored (default: "sonnet"); use hench.models.<vendor>
+  hench.models.<vendor>    string    Agent-only model for claude, codex, google or local
   hench.maxTurns           number    Max conversation turns per run (default: 50)
   hench.maxTokens          number    Max tokens per API request (default: 8192)
   hench.tokenBudget        number    Total tokens per run, input+cached+output (default: 0 —
@@ -2229,7 +2230,7 @@ Type coercion:
 Examples:
   n-dx config                                  Show all settings
   n-dx config rex.project                      Get the project name
-  n-dx config hench.model opus                 Set the model to opus
+  n-dx config hench.models.claude opus         Pin the agent's Claude model
   n-dx config hench.maxTurns 100               Set max turns (coerced to number)
   n-dx config hench.guard.allowedCommands \\
     "npm,git,pnpm,tsc"                         Set allowed commands (coerced to array)
