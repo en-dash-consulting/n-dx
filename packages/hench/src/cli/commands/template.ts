@@ -12,7 +12,7 @@
 
 import { join } from "node:path";
 import { loadConfig, saveConfig } from "../../store/config.js";
-import { validateConfig, formatValidationErrors } from "../../schema/index.js";
+import { validateConfig, revertInvalidFields, formatFieldIssues } from "../../schema/index.js";
 import {
   listTemplates,
   getTemplate,
@@ -22,8 +22,9 @@ import {
   isValidTemplateId,
 } from "../../store/templates.js";
 import type { WorkflowTemplate } from "../../schema/templates.js";
+import type { HenchConfig } from "../../schema/index.js";
 import { CLIError } from "../errors.js";
-import { info, result } from "../output.js";
+import { info, result, warn } from "../output.js";
 
 // ── Display helpers ──────────────────────────────────────────────────
 
@@ -166,21 +167,46 @@ async function cmdTemplateApply(
   const config = await loadConfig(henchDir);
   const updated = applyTemplate(config, template.config);
 
-  // Validate before saving
+  // A template overlay skips HenchConfigSchema the same way .n-dx.json
+  // overrides do (see loadConfig) — validate before saving, and fall back
+  // per field to the pre-template config rather than refusing the whole
+  // template. A template with one bad scalar still applies its good fields.
+  let toSave = updated;
+  let revertedKeys: string[] = [];
   const validation = validateConfig(updated);
   if (!validation.ok) {
-    const errors = formatValidationErrors(validation.errors);
-    throw new CLIError(
-      `Template produces invalid config: ${errors.join(", ")}`,
-      "The template may be incompatible with your current configuration.",
+    const repaired = revertInvalidFields(
+      updated as unknown as Record<string, unknown>,
+      validation.errors.issues,
+      config as unknown as Record<string, unknown>,
     );
+    revertedKeys = repaired
+      ? repaired.replacedFields
+      : [...new Set(
+          validation.errors.issues
+            .map((issue) => issue.path[0])
+            .filter((key): key is string => typeof key === "string" && key.length > 0),
+        )].sort();
+    for (const key of revertedKeys) {
+      const detail = formatFieldIssues(validation.errors.issues, key);
+      warn(`Invalid hench.${key} in template "${template.name}" — keeping the current config value. (${detail})`);
+    }
+    // `candidate`, not `config`: this command persists the result, and the
+    // valid-template path above saves the unparsed object. Saving the parsed
+    // one would rewrite .hench/config.json with every schema default
+    // materialized and every undeclared field (skipFullTestGate,
+    // planOnlyMaxRetries) deleted — an on-disk edit the user never asked for,
+    // triggered by one bad field elsewhere in the template.
+    toSave = repaired ? (repaired.candidate as unknown as HenchConfig) : config;
   }
 
-  await saveConfig(henchDir, updated);
+  await saveConfig(henchDir, toSave);
 
   info(`\nApplied template "${template.name}" to .hench/config.json`);
 
-  const entries = flattenConfig(template.config);
+  const entries = flattenConfig(template.config).filter(
+    ([key]) => !revertedKeys.includes(key.split(".")[0]),
+  );
   if (entries.length > 0) {
     info("\n  Changes applied:");
     for (const [key, value] of entries) {

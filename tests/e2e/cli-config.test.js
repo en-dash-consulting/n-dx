@@ -486,7 +486,7 @@ describe("n-dx config", () => {
     it("includes usage examples", () => {
       const output = run(["--help"]);
       expect(output).toContain("Examples:");
-      expect(output).toContain("n-dx config hench.model opus");
+      expect(output).toContain("n-dx config hench.models.claude opus");
       expect(output).toContain("n-dx config hench.maxTurns 100");
       expect(output).toContain("n-dx config --json");
     });

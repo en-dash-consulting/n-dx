@@ -29,6 +29,16 @@
 
 export { HENCH_SCHEMA_VERSION, DEFAULT_HENCH_CONFIG, guardDefaultsForLanguage, normalizeRunTokens } from "./schema/v1.js";
 
+// ---- Provider capability table ---------------------------------------------
+
+/**
+ * Which providers each vendor accepts (cli, api, or both). Consumers that
+ * cannot import hench at runtime (the dashboard) keep their own literal,
+ * pinned against this table by `tests/integration/cross-package-contracts.test.js`.
+ */
+export { VENDOR_PROVIDERS, isProviderSupported } from "./cli/commands/provider-support.js";
+export type { HenchProvider } from "./cli/commands/provider-support.js";
+
 // ---- Schema types (config, run records) ------------------------------------
 
 export type {

@@ -107,4 +107,174 @@ describe("loadConfig", () => {
     const reloaded = await loadConfig(henchDir);
     expect(reloaded.maxTurns).toBe(75);
   });
+
+  describe("project-level overrides (.n-dx.json / .n-dx.local.json)", () => {
+    async function writeProjectConfig(data: unknown): Promise<void> {
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify(data), "utf-8");
+    }
+
+    async function writeLocalConfig(data: unknown): Promise<void> {
+      await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify(data), "utf-8");
+    }
+
+    it("applies a valid override, unchanged", async () => {
+      await writeProjectConfig({ hench: { maxTurns: 12 } });
+      const config = await loadConfig(henchDir);
+      expect(config.maxTurns).toBe(12);
+    });
+
+    it("reverts an invalid override to the base value and warns, naming the field and file", async () => {
+      await writeProjectConfig({ hench: { maxTurns: -5 } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("hench.maxTurns");
+      expect(warnings[0]).toContain(".n-dx.json");
+    });
+
+    it("does not throw for an invalid override even without onInvalid: 'use-defaults'", async () => {
+      await writeProjectConfig({ hench: { maxTurns: -5 } });
+      await expect(loadConfig(henchDir)).resolves.toMatchObject({
+        maxTurns: DEFAULT_HENCH_CONFIG().maxTurns,
+      });
+    });
+
+    it("reverts an invalid promptCacheTtl override instead of passing the raw string through", async () => {
+      await writeProjectConfig({ hench: { promptCacheTtl: "1hour" } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.promptCacheTtl).toBeUndefined();
+      expect(warnings[0]).toContain("hench.promptCacheTtl");
+    });
+
+    it("keeps every valid override field when only one is invalid", async () => {
+      await writeProjectConfig({ hench: { maxTurns: -5, model: "opus" } });
+      const config = await loadConfig(henchDir, { onWarning: () => {} });
+      expect(config.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+      expect(config.model).toBe("opus");
+    });
+
+    // ── hench.models: the agent-only per-vendor model override ──────────────
+
+    it("applies a valid hench.models override", async () => {
+      await writeProjectConfig({ hench: { models: { claude: "opus", codex: "gpt-5.6-terra" } } });
+      const config = await loadConfig(henchDir);
+      expect(config.models).toEqual({ claude: "opus", codex: "gpt-5.6-terra" });
+    });
+
+    it("reverts an unknown vendor key in hench.models and warns", async () => {
+      await writeProjectConfig({ hench: { models: { gemini: "gemini-2.5-pro" } } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      // Reverted wholesale, not partially kept: a map with one bad key is not
+      // evidence the rest was meant.
+      expect(config.models).toBeUndefined();
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("hench.models");
+      expect(warnings[0]).toContain(".n-dx.json");
+    });
+
+    it("reverts an empty model string in hench.models and warns", async () => {
+      await writeProjectConfig({ hench: { models: { claude: "" } } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.models).toBeUndefined();
+      expect(warnings[0]).toContain("hench.models");
+    });
+
+    it("does not stop the load when hench.models is the wrong shape", async () => {
+      await writeProjectConfig({ hench: { models: "opus" } });
+      const warnings: string[] = [];
+      await expect(
+        loadConfig(henchDir, { onWarning: (message) => warnings.push(message) }),
+      ).resolves.toMatchObject({ maxTurns: DEFAULT_HENCH_CONFIG().maxTurns });
+      expect(warnings[0]).toContain("hench.models");
+    });
+
+    it("keeps valid sibling overrides when hench.models is invalid", async () => {
+      await writeProjectConfig({ hench: { models: { claude: "" }, maxTurns: 12 } });
+      const config = await loadConfig(henchDir, { onWarning: () => {} });
+      expect(config.models).toBeUndefined();
+      expect(config.maxTurns).toBe(12);
+    });
+
+    it("validates .n-dx.local.json overrides the same way, naming that file", async () => {
+      await writeLocalConfig({ hench: { maxTurns: -5 } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+      expect(warnings[0]).toContain(".n-dx.local.json");
+      expect(warnings[0]).not.toContain(".n-dx.json\"");
+    });
+
+    it("blames .n-dx.local.json when both files set the same invalid field (local wins)", async () => {
+      await writeProjectConfig({ hench: { maxTurns: 20 } });
+      await writeLocalConfig({ hench: { maxTurns: -5 } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+      expect(warnings[0]).toContain(".n-dx.local.json");
+    });
+
+    // HenchConfig carries fields HenchConfigSchema does not declare
+    // (skipFullTestGate, planOnlyMaxRetries, selfHeal), and a zod parse drops
+    // every one of them. Reverting one invalid field must not take unrelated
+    // valid overrides down with it — the result would otherwise depend on
+    // whether some other field happened to be valid.
+    it("keeps overrides of fields the schema does not declare while reverting an invalid one", async () => {
+      await writeProjectConfig({
+        hench: { skipFullTestGate: true, planOnlyMaxRetries: 0, maxTurns: -5 },
+      });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+      expect(config.skipFullTestGate).toBe(true);
+      expect(config.planOnlyMaxRetries).toBe(0);
+      // Exactly one warning: only maxTurns was reverted. A silently dropped
+      // field with no warning is the defect this guards.
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("hench.maxTurns");
+    });
+
+    it("resolves undeclared-field overrides identically whether or not another field is invalid", async () => {
+      await writeProjectConfig({ hench: { skipFullTestGate: true, maxTurns: 25 } });
+      const valid = await loadConfig(henchDir, { onWarning: () => {} });
+      await writeProjectConfig({ hench: { skipFullTestGate: true, maxTurns: -5 } });
+      const invalid = await loadConfig(henchDir, { onWarning: () => {} });
+      expect(valid.skipFullTestGate).toBe(true);
+      expect(invalid.skipFullTestGate).toBe(valid.skipFullTestGate);
+    });
+
+    it("reverts to an explicitly-set base value, not the schema default", async () => {
+      await writeConfig((c) => { c.promptCacheTtl = "1h"; });
+      await writeProjectConfig({ hench: { promptCacheTtl: "1hour" } });
+      const warnings: string[] = [];
+      const config = await loadConfig(henchDir, {
+        onWarning: (message) => warnings.push(message),
+      });
+      expect(config.promptCacheTtl).toBe("1h");
+      expect(warnings[0]).toContain("hench.promptCacheTtl");
+    });
+
+    it("does not warn when overrides are absent", async () => {
+      const warnings: string[] = [];
+      await loadConfig(henchDir, { onWarning: (message) => warnings.push(message) });
+      expect(warnings).toHaveLength(0);
+    });
+  });
 });

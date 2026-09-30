@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import {
   deepMerge,
   loadProjectOverrides,
+  loadProjectOverrideSources,
   mergeWithOverrides,
 } from "../../src/project-config.js";
 
@@ -123,6 +124,66 @@ describe("loadProjectOverrides", () => {
     await writeFile(join(tmpDir, ".n-dx.local.json"), "not json");
     const result = await loadProjectOverrides(configDir, "rex");
     expect(result).toEqual({ model: "sonnet" });
+  });
+});
+
+describe("loadProjectOverrideSources", () => {
+  let tmpDir: string;
+  let configDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "claude-client-pcs-"));
+    configDir = join(tmpDir, ".rex");
+    await mkdir(configDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns an empty array when neither file exists", async () => {
+    const result = await loadProjectOverrideSources(configDir, "rex");
+    expect(result).toEqual([]);
+  });
+
+  it("returns one entry per file that declares the package section", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ rex: { model: "sonnet" } }),
+    );
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ rex: { model: "opus" } }),
+    );
+    const result = await loadProjectOverrideSources(configDir, "rex");
+    expect(result).toEqual([
+      { file: ".n-dx.json", data: { model: "sonnet" } },
+      { file: ".n-dx.local.json", data: { model: "opus" } },
+    ]);
+  });
+
+  it("omits a file whose package section is absent", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ hench: { maxTurns: 5 } }),
+    );
+    const result = await loadProjectOverrideSources(configDir, "rex");
+    expect(result).toEqual([]);
+  });
+
+  it("keeps sections separate rather than merging them", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ rex: { model: "sonnet", validate: "pnpm test" } }),
+    );
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ rex: { model: "opus" } }),
+    );
+    const result = await loadProjectOverrideSources(configDir, "rex");
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ file: ".n-dx.json", data: { model: "sonnet", validate: "pnpm test" } });
+    expect(result[1]).toEqual({ file: ".n-dx.local.json", data: { model: "opus" } });
   });
 });
 

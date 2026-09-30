@@ -12,6 +12,7 @@
  *
  * GET /api/llm/config   — current LLM provider configuration
  * PUT /api/llm/config   — update LLM provider configuration
+ * GET /api/llm/catalog  — per-vendor model catalog and provider choices hench accepts
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -20,7 +21,9 @@ import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { invalidateAuthCheckCache } from "./routes-commands.js";
-import { LLM_VENDOR, deepMerge } from "@n-dx/llm-client";
+import { LLM_VENDOR, deepMerge, TIER_MODELS, MODEL_COSTS, isModelCompatibleWithVendor } from "@n-dx/llm-client";
+import type { LLMVendor } from "@n-dx/llm-client";
+import { VENDOR_PROVIDERS } from "./hench-config-fields.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -312,6 +315,18 @@ function deleteByPath(obj: Record<string, unknown>, path: string): void {
   }
 }
 
+/**
+ * Read the active `llm.vendor` from `.n-dx.json` merged with the local
+ * overlay (local wins), or null if unset. Shared with `routes-hench.ts` and
+ * `routes-adaptive.ts` so a hench-config `provider` write can be validated
+ * against the vendor actually in effect.
+ */
+export function resolveActiveVendor(projectDir: string): string | null {
+  const config = readEffectiveNdxConfig(projectDir);
+  const llm = (config["llm"] ?? {}) as Record<string, unknown>;
+  return typeof llm["vendor"] === "string" ? llm["vendor"] : null;
+}
+
 function extractLlmConfig(projectDir: string): LlmConfigResponse {
   const config = readEffectiveNdxConfig(projectDir);
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
@@ -546,10 +561,86 @@ function writeProfilesConfig(projectDir: string, profiles: LocalProfile[]): void
 }
 
 // ---------------------------------------------------------------------------
+// Vendor/provider/model catalog
+// ---------------------------------------------------------------------------
+
+/** One cloud vendor's catalog entry: the models to offer and the provider choices hench accepts. */
+export interface VendorCatalogEntry {
+  models: string[];
+  providers: Array<"cli" | "api">;
+}
+
+/**
+ * The local vendor's catalog entry. `models` comes from a live probe of the
+ * configured local server rather than a static catalog, so an unreachable
+ * server answers with an empty list and a `reason` instead of failing the
+ * whole response.
+ */
+export interface LocalCatalogEntry {
+  models: string[];
+  providers: Array<"cli" | "api">;
+  reachable: boolean;
+  reason?: string;
+}
+
+/** Shape returned by GET /api/llm/catalog. */
+export interface LlmCatalogResponse {
+  claude: VendorCatalogEntry;
+  codex: VendorCatalogEntry;
+  google: VendorCatalogEntry;
+  local: LocalCatalogEntry;
+}
+
+/**
+ * Every model id llm-client's catalog knows for `vendor`: the union of its
+ * `TIER_MODELS` (light/standard/heavy) and every `MODEL_COSTS` entry that
+ * belongs to the vendor — the same cost table the dashboard's spend views and
+ * `ndx usage` price a run against. Sorted for a stable response.
+ */
+function cloudVendorModels(vendor: LLMVendor): string[] {
+  const tierModels = Object.values(TIER_MODELS[vendor]).filter((m): m is string => Boolean(m));
+  const catalogModels = Object.keys(MODEL_COSTS).filter((id) => isModelCompatibleWithVendor(vendor, id));
+  return [...new Set([...tierModels, ...catalogModels])].sort();
+}
+
+/**
+ * Build the vendor/model/provider catalog: cloud-vendor models from
+ * llm-client's catalog, local models from a live probe of the configured
+ * local server, and provider choices from {@link VENDOR_PROVIDERS} — the
+ * literal pinned against hench's own table by the cross-package contract
+ * test (see that file's doc comment for why web keeps a copy at all).
+ */
+async function buildLlmCatalog(projectDir: string): Promise<LlmCatalogResponse> {
+  const config = readEffectiveNdxConfig(projectDir);
+  const llm = (config["llm"] ?? {}) as Record<string, unknown>;
+  const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
+  const host = typeof llmLocal["host"] === "string" && llmLocal["host"]
+    ? llmLocal["host"]
+    : DEFAULT_LOCAL_HOST;
+  const port = typeof llmLocal["port"] === "number" && llmLocal["port"] > 0
+    ? llmLocal["port"]
+    : DEFAULT_LOCAL_PORT;
+  const localStatus = await probeLocalServer(host, port);
+
+  return {
+    claude: { models: cloudVendorModels(LLM_VENDOR.CLAUDE), providers: [...VENDOR_PROVIDERS.claude] },
+    codex: { models: cloudVendorModels(LLM_VENDOR.CODEX), providers: [...VENDOR_PROVIDERS.codex] },
+    google: { models: cloudVendorModels(LLM_VENDOR.GOOGLE), providers: [...VENDOR_PROVIDERS.google] },
+    local: {
+      models: localStatus.ok ? localStatus.models : [],
+      providers: [...VENDOR_PROVIDERS.local],
+      reachable: localStatus.ok,
+      ...(localStatus.ok ? {} : { reason: localStatus.error ?? "Local server unreachable" }),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
 const LLM_PREFIX = "/api/llm/config";
+const LLM_CATALOG = "/api/llm/catalog";
 const LLM_LOCAL_STATUS = "/api/llm/local-status";
 const LLM_LOCAL_TEST = "/api/llm/local-test";
 const LLM_LOCAL_PROFILES = "/api/llm/local-profiles";
@@ -664,6 +755,12 @@ export async function handleLlmRoute(
   // GET /api/llm/config
   if (method === "GET" && pathname === LLM_PREFIX) {
     jsonResponse(res, 200, extractLlmConfig(ctx.projectDir));
+    return true;
+  }
+
+  // GET /api/llm/catalog — models to offer and provider choices, per vendor
+  if (method === "GET" && pathname === LLM_CATALOG) {
+    jsonResponse(res, 200, await buildLlmCatalog(ctx.projectDir));
     return true;
   }
 

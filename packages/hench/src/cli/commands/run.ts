@@ -44,7 +44,9 @@ import {
 } from "../../agent/planning/context-caps.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 import type { LLMVendor } from "../../prd/llm-gateway.js";
-import { LLM_VENDOR, printVendorModelHeader, resolveModel, resolveTaskModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, printVendorModelHeader, resolveModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, createSpinner } from "../../prd/llm-gateway.js";
+import { resolveAgentModel } from "./agent-model.js";
+import { isProviderSupported } from "./provider-support.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
 import { formatQueueStatus } from "../../queue/format.js";
 import { resolveSchedulingPriority } from "../../queue/priority-scheduler.js";
@@ -1389,12 +1391,10 @@ export async function cmdRun(
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
 
-  // Resolve model: CLI flag > .n-dx.json config > default.
-  // CLI flag accepts both the vendor-neutral `--model` and the vendor-specific
-  // `--claude-model` / `--codex-model` (the latter pair is also recognized by
-  // `ndx init`; supporting them here means `ndx work --claude-model=…` works
-  // end-to-end). The top-level `llm.model` field is honored ahead of the
-  // vendor-pinned slot inside `resolveVendorModel`.
+  // The CLI flag accepts both the vendor-neutral `--model` and the
+  // vendor-specific `--claude-model` / `--codex-model` (the latter pair is
+  // also recognized by `ndx init`; supporting them here means
+  // `ndx work --claude-model=…` works end-to-end).
   const cliModelOverride =
     flags.model
     ?? (llmVendor === LLM_VENDOR.CLAUDE
@@ -1402,66 +1402,14 @@ export async function cmdRun(
       : llmVendor === LLM_VENDOR.CODEX
         ? flags["codex-model"]
         : flags["google-model"]);
-  // The agent loop is the `agent.execute` task class: standard tier by
-  // default (identical to the previous resolveVendorModel result), but
-  // routable — `llm.routes["agent.execute"] = "heavy"` reaches the heavy
-  // tier with no code change. The resolved tier is recorded on the run.
-  const agentResolution = resolveTaskModel("agent.execute", llmConfig, { vendor: llmVendor });
-  const configuredModel = agentResolution.model;
-  const resolvedModel = cliModelOverride ? resolveModel(cliModelOverride) : configuredModel;
-  const hasConfiguredModel =
-    !!llmConfig?.model
-    || (llmVendor === LLM_VENDOR.CLAUDE
-      ? !!llmConfig?.claude?.model
-      : llmVendor === LLM_VENDOR.CODEX
-        ? !!llmConfig?.codex?.model
-        : !!llmConfig?.google?.model);
-  const modelSource: "cli-override" | "configured" | "default" = cliModelOverride
-    ? "cli-override"
-    : hasConfiguredModel
-      ? "configured"
-      : "default";
-
-  // Validate vendor-model compatibility: error if the model that actually
-  // resolved (either top-level llm.model or vendor-pinned) is incompatible
-  // with the active vendor. Picks the same value resolveVendorModel uses.
-  const activeConfiguredModel = llmConfig?.model
-    ?? (llmVendor === LLM_VENDOR.CLAUDE
-      ? llmConfig?.claude?.model
-      : llmVendor === LLM_VENDOR.CODEX
-        ? llmConfig?.codex?.model
-        : llmVendor === LLM_VENDOR.GOOGLE
-          ? llmConfig?.google?.model
-          : llmConfig?.local?.model);
-  if (!cliModelOverride && activeConfiguredModel) {
-    if (
-      llmVendor === LLM_VENDOR.CLAUDE &&
-      !isModelCompatibleWithVendor(LLM_VENDOR.CLAUDE, activeConfiguredModel)
-    ) {
-      throw new CLIError(
-        `Configured model "${activeConfiguredModel}" is not compatible with vendor="claude".`,
-        `Either use a Claude model (e.g., sonnet, opus) or switch vendor: 'n-dx config llm.vendor codex'`,
-      );
-    }
-    if (
-      llmVendor === LLM_VENDOR.CODEX &&
-      !isModelCompatibleWithVendor(LLM_VENDOR.CODEX, activeConfiguredModel)
-    ) {
-      throw new CLIError(
-        `Configured model "${activeConfiguredModel}" is not compatible with vendor="codex".`,
-        `Either use a Codex/GPT model (e.g., gpt-5.6-terra, gpt-5.6-luna) or switch vendor: 'n-dx config llm.vendor claude'`,
-      );
-    }
-    if (
-      llmVendor === LLM_VENDOR.GOOGLE &&
-      !isModelCompatibleWithVendor(LLM_VENDOR.GOOGLE, activeConfiguredModel)
-    ) {
-      throw new CLIError(
-        `Configured model "${activeConfiguredModel}" is not compatible with vendor="google".`,
-        `Either use a Gemini model (e.g., gemini-2.5-pro, gemini-3.7-flash) or switch vendor: 'n-dx config llm.vendor claude'`,
-      );
-    }
-  }
+  // Resolution chain and the vendor-compatibility check both live in
+  // agent-model.ts: --model > hench.models.<vendor> > llm.* > vendor default.
+  const { model: resolvedModel, source: modelSource } = resolveAgentModel({
+    vendor: llmVendor,
+    cliModelOverride,
+    henchModels: config.models,
+    llmConfig,
+  });
 
   // Surface vendor/model at command start for operator visibility.
   // Reads the most recent run artifact (if any) to detect model changes.
@@ -1581,20 +1529,23 @@ export async function cmdRun(
   }
   const assignee = mine ? await resolveActor(dir) : undefined;
 
-  // Codex only supports CLI mode (no API loop).
-  if (llmVendor === LLM_VENDOR.CODEX && provider === "api" && !dryRun) {
-    throw new CLIError(
-      "Hench API provider is only supported for vendor=claude or vendor=google.",
-      "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
-    );
-  }
-
-  // Google and local only support API mode (no CLI binary exists).
-  // Auto-switch silently — ndx config / ndx init persist hench.provider=api
-  // automatically when local or google is selected as the vendor, so this
-  // branch is a safety net for projects configured outside of those flows.
-  if ((llmVendor === LLM_VENDOR.GOOGLE || llmVendor === LLM_VENDOR.LOCAL) && provider === "cli" && !dryRun) {
-    provider = "api";
+  // VENDOR_PROVIDERS (provider-support.ts) is the single source of truth:
+  // claude accepts cli or api; codex only cli (no API loop); google and local
+  // only api (no CLI binary exists). A vendor that rejects "cli" always
+  // accepts "api" instead, so an unsupported "cli" auto-switches silently —
+  // ndx config / ndx init persist hench.provider=api automatically when
+  // local or google is selected as the vendor, so this branch is a safety
+  // net for projects configured outside of those flows. An unsupported "api"
+  // (codex only) has no such fallback and fails loudly instead.
+  if (!dryRun && !isProviderSupported(llmVendor, provider)) {
+    if (provider === "cli") {
+      provider = "api";
+    } else {
+      throw new CLIError(
+        "Hench API provider is only supported for vendor=claude or vendor=google.",
+        "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
+      );
+    }
   }
 
   // The adversarial review pass spawns a second vendor CLI session, so it

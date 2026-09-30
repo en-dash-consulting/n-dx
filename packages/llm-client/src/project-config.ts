@@ -9,8 +9,8 @@
 import { dirname, join } from "node:path";
 import { readFile, access } from "node:fs/promises";
 
-const PROJECT_CONFIG_FILE = ".n-dx.json";
-const LOCAL_CONFIG_FILE = ".n-dx.local.json";
+export const PROJECT_CONFIG_FILE = ".n-dx.json";
+export const LOCAL_CONFIG_FILE = ".n-dx.local.json";
 
 /**
  * Deep merge source into target. Source values take precedence.
@@ -63,6 +63,44 @@ async function loadJSONFile(
   return null;
 }
 
+/** One file's contribution to a package's project-level overrides. */
+export interface ProjectOverrideSource {
+  /** File the section was read from — {@link PROJECT_CONFIG_FILE} or {@link LOCAL_CONFIG_FILE}. */
+  file: string;
+  /** The package-scoped section (e.g., the "rex" key) as written in that file. */
+  data: Record<string, unknown>;
+}
+
+/**
+ * Load a package's override section from `.n-dx.json` and `.n-dx.local.json`
+ * separately, without merging them — so a caller that needs to blame a
+ * specific file for an invalid value (rather than just apply the merged
+ * result) can tell which file a key came from. Only files that actually
+ * declare a non-empty section for `packageKey` are included, in precedence
+ * order (`.n-dx.json` first, `.n-dx.local.json` last — later entries win, as
+ * in {@link loadProjectOverrides}).
+ *
+ * @param configDir The package config directory (e.g., /project/.rex)
+ * @param packageKey The key to extract (e.g., "rex")
+ */
+export async function loadProjectOverrideSources(
+  configDir: string,
+  packageKey: string,
+): Promise<ProjectOverrideSource[]> {
+  const projectDir = dirname(configDir);
+  const projectData = await loadJSONFile(join(projectDir, PROJECT_CONFIG_FILE));
+  const localData = await loadJSONFile(join(projectDir, LOCAL_CONFIG_FILE));
+
+  const sources: ProjectOverrideSource[] = [];
+  if (projectData && projectData[packageKey]) {
+    sources.push({ file: PROJECT_CONFIG_FILE, data: projectData[packageKey] as Record<string, unknown> });
+  }
+  if (localData && localData[packageKey]) {
+    sources.push({ file: LOCAL_CONFIG_FILE, data: localData[packageKey] as Record<string, unknown> });
+  }
+  return sources;
+}
+
 /**
  * Load project-level overrides for a specific package, merging
  * .n-dx.json with .n-dx.local.json (local wins).
@@ -76,22 +114,11 @@ export async function loadProjectOverrides(
   configDir: string,
   packageKey: string,
 ): Promise<Record<string, unknown>> {
-  const projectDir = dirname(configDir);
-  const projectData = await loadJSONFile(join(projectDir, PROJECT_CONFIG_FILE));
-  const localData = await loadJSONFile(join(projectDir, LOCAL_CONFIG_FILE));
-
-  // Merge project and local configs (local wins)
-  let merged: Record<string, unknown> | null = projectData;
-  if (projectData && localData) {
-    merged = deepMerge(projectData, localData);
-  } else if (localData) {
-    merged = localData;
-  }
-
-  if (merged && merged[packageKey]) {
-    return merged[packageKey] as Record<string, unknown>;
-  }
-  return {};
+  const sources = await loadProjectOverrideSources(configDir, packageKey);
+  return sources.reduce(
+    (merged, source) => deepMerge(merged, source.data),
+    {} as Record<string, unknown>,
+  );
 }
 
 /**
