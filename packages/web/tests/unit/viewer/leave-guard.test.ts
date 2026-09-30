@@ -69,6 +69,7 @@ function Harness({ dirty, setDirty }: { dirty: boolean; setDirty: (d: boolean) =
     h("div", { class: "discard-count" }, String(discards)),
     h("button", { class: "nav-home", onClick: () => navigateTo("home") }, "navigateTo home"),
     h("button", { class: "sidebar-home", onClick: () => handleSidebarNav("home") }, "handleSidebarNav home"),
+    h("button", { class: "sidebar-same", onClick: () => handleSidebarNav("llm-provider") }, "handleSidebarNav self"),
     view === "llm-provider"
       ? h(SettingsFrame, {
           dirty,
@@ -152,6 +153,29 @@ describe("dirty frame: handleSidebarNav prompts (covers switching overlay entrie
   });
 });
 
+describe("dirty frame: a discard that does not leave the page keeps guarding", () => {
+  it("still prompts on the next navigation after discarding onto the same view", async () => {
+    // Clicking the settings entry you are already on is a live button in
+    // SettingsOverlay, and every setter in applyEntry then bails out on an
+    // unchanged value — so the frame never unmounts and the page is still
+    // dirty. The guard has to survive that, or the next ✕ silently drops
+    // the edits it exists to protect.
+    await mountAtSettings(true);
+    act(() => { root.querySelector<HTMLButtonElement>(".sidebar-same")!.click(); });
+    expect(dialog()).not.toBeNull();
+
+    act(() => { discardBtn()!.click(); });
+    expect(currentView()).toBe("llm-provider");
+    expect(root.querySelector(".settings-frame")).not.toBeNull();
+    expect(isLeaveGuarded()).toBe(true);
+
+    // The real consequence: leaving for good must still prompt.
+    act(() => { root.querySelector<HTMLButtonElement>(".sidebar-home")!.click(); });
+    expect(dialog()).not.toBeNull();
+    expect(currentView()).toBe("llm-provider");
+  });
+});
+
 describe("dirty frame: browser back/forward", () => {
   function popStateTo(target: { view: ViewId; url: string }) {
     const state = { view: target.view, file: null, zone: null, runId: null, taskId: null, askSeed: null };
@@ -206,6 +230,31 @@ describe("dirty frame: Escape and backdrop click keep editing, not discard", () 
     act(() => { dialog()!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
     expect(dialog()).toBeNull();
     expect(currentView()).toBe("llm-provider");
+  });
+});
+
+describe("the prompt honours its aria-modal contract", () => {
+  it("traps Tab inside the prompt, so the nav behind it stays unreachable", async () => {
+    await mountAtSettings(true);
+    act(() => { root.querySelector<HTMLButtonElement>(".nav-home")!.click(); });
+    const modal = root.querySelector<HTMLElement>(".leave-guard-modal")!;
+    const focusables = Array.from(modal.querySelectorAll<HTMLButtonElement>("button"));
+    expect(focusables.length).toBe(2);
+    const [first, last] = [focusables[0], focusables[focusables.length - 1]];
+
+    // Tab from the last focusable wraps to the first rather than escaping
+    // to the buttons behind the backdrop.
+    last.focus();
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+    });
+    expect(document.activeElement).toBe(first);
+
+    // Shift+Tab from the first wraps to the last.
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }));
+    });
+    expect(document.activeElement).toBe(last);
   });
 });
 

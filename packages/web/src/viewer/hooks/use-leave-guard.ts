@@ -110,9 +110,14 @@ export function useLeaveGuard(dirty: boolean, onDiscard?: () => void): LeaveGuar
   const discardChanges = useCallback(() => {
     const action = pendingAction;
     pendingAction = null;
-    const discard = activeGuard?.onDiscard;
-    activeGuard = null;
-    discard?.();
+    // Deliberately does not clear `activeGuard`: that mirrors "a mounted
+    // frame is dirty", and the effect above owns it. Clearing it here
+    // disarmed the guard for good whenever the navigation left the frame
+    // mounted — navigating onto the view you are already on bails out of
+    // every setter, so `dirty` never changes and the effect never re-runs.
+    // Unmounting clears it, and `onDiscard` making the page clean clears it
+    // through the effect, which are the two ways it should ever go away.
+    activeGuard?.onDiscard();
     action?.();
     emit();
   }, []);

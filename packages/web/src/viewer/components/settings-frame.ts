@@ -14,7 +14,7 @@
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useCallback, useEffect, useRef } from "preact/hooks";
-import { useLeaveGuard } from "../hooks/index.js";
+import { useFocusTrap, useLeaveGuard } from "../hooks/index.js";
 
 export interface SettingsFrameProps {
   /** True whenever the page's values differ from what was last saved. */
@@ -33,8 +33,14 @@ export interface SettingsFrameProps {
 
 export function SettingsFrame({ dirty, saving, error = null, onSave, onDiscard, children }: SettingsFrameProps) {
   const { promptOpen, keepEditing, discardChanges } = useLeaveGuard(dirty, onDiscard);
-  const modalRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLElement | null>(null);
   const keepRef = useRef<HTMLButtonElement>(null);
+
+  // aria-modal="true" tells assistive tech the rest of the page is inert, so
+  // Tab must not be able to reach it — without this, a keyboard user can tab
+  // out of the prompt onto the settings nav behind it and navigate away from
+  // the very edits the prompt is holding.
+  useFocusTrap(modalRef, promptOpen);
 
   const handleSave = useCallback(() => {
     // onSave rejecting is the page's signal to keep `dirty` true and surface
