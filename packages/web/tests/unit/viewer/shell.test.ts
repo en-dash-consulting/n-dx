@@ -474,6 +474,31 @@ describe("HomeView next-step panel", () => {
     await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
     expect(root.querySelector('[data-slot="preflight"]')).not.toBeNull();
   });
+
+  it("names no command at all when the status is unavailable", async () => {
+    // A 404 is what a static export serves: `ndx export` writes api/config.json
+    // and api/project.json but never api/status.json, so the deployed viewer's
+    // fetch adapter resolves /api/status to a missing file. The same null
+    // status also holds on every cold load before the first poll resolves, and
+    // whenever the server is unreachable.
+    //
+    // In none of those does the viewer know the project's state, so it must not
+    // assert one: telling the reader of a published dashboard to run `init` on
+    // a fully analysed project is wrong, and acting on it would re-run
+    // sourcevision/rex/hench init over a set-up project.
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/project") {
+        return jsonResponse({ name: "demo-project", description: null, version: null, git: null, nameSource: "directory", cliName: "n-dx" });
+      }
+      if (url === "/api/features") return jsonResponse({ toggles: [] });
+      return jsonResponse({}, 404);
+    }));
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    expect(root.querySelector(".next-step-panel")).toBeNull();
+    // Home itself still renders — the cards just carry no numbers.
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
+  });
 });
 
 // ── Bottom bar and settings overlay ────────────────────────────

@@ -246,14 +246,14 @@ function stageFacts(stage: StageId, status: Partial<ProjectStatus> | null): Fact
  * `ndx init` has never touched from one it has; `sv.freshness` separates
  * "touched but not analysed" from "analysed"; `rex.nextTaskTitle` separates
  * "analysed with nothing actionable in the PRD yet" from "a task is next".
- * `status === null` (fetch failed, or the body didn't pass `useProjectStatus`'s
- * shape check) reads the same as a fresh, untouched project — the safest
- * default when the server can't be trusted.
+ *
+ * Every state here is read off a status the viewer actually has. A *missing*
+ * status is not a state — see `NextStepPanel`, which renders nothing for it.
  */
 type NextStepState = "not-initialized" | "not-analyzed" | "no-prd" | "has-task";
 
-function nextStepState(status: ProjectStatus | null): NextStepState {
-  if (!status || !status.initialized) return "not-initialized";
+function nextStepState(status: ProjectStatus): NextStepState {
+  if (!status.initialized) return "not-initialized";
   if (status.sv.freshness === "unavailable") return "not-analyzed";
   if (!status.rex.nextTaskTitle) return "no-prd";
   return "has-task";
@@ -272,13 +272,29 @@ interface NextStepPanelProps {
 
 /** Above the stage cards: names the single next command for the project's current state. */
 function NextStepPanel({ status }: NextStepPanelProps) {
+  // Called before the early return below: the status arrives asynchronously, so
+  // this component renders both with and without one and the hook order must
+  // not depend on which.
   const cliName = useCliName();
+
+  // No status means the viewer does not know the project's state — the fetch
+  // failed, the body failed its shape check, or this is a static export, which
+  // writes api/config.json and api/project.json but never api/status.json, so
+  // deployed mode's fetch adapter resolves /api/status to a missing file. Name
+  // no command rather than guess one. Guessing "not initialised" would tell
+  // every reader of a published dashboard to run `init` on a project that is
+  // already analysed — advice that, if taken, re-runs sourcevision/rex/hench
+  // init over a set-up project — and would flash that same advice on every cold
+  // load, before the first poll resolves. Staying silent matches `stageFacts`,
+  // which drops a card's numbers rather than inventing them.
+  if (!status) return null;
+
   const state = nextStepState(status);
 
   if (state === "has-task") {
     return h("div", { class: "next-step-panel", "data-state": state },
       h("p", { class: "next-step-headline" },
-        "Next up: ", h("strong", null, status!.rex.nextTaskTitle),
+        "Next up: ", h("strong", null, status.rex.nextTaskTitle),
       ),
       h("code", { class: "next-step-command" }, resolveCliLabel("{cli} work", cliName)),
     );

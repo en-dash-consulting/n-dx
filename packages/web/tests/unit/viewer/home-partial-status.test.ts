@@ -75,11 +75,12 @@ describe("Home with a partial /api/status body", () => {
     expect(facts("work")).toBeNull();
   });
 
-  it("names `init` in the next-step panel, same as a fully missing status", async () => {
+  it("names no next command, rather than guessing one from a body it rejected", async () => {
     await mountHome();
-    const panel = root.querySelector(".next-step-panel");
-    expect(panel?.getAttribute("data-state")).toBe("not-initialized");
-    expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx init");
+    // The panel speaks only for a status the viewer actually has. A rejected
+    // body leaves it without one, and "not initialised" is the wrong guess to
+    // make on a project whose real state is unknown.
+    expect(root.querySelector(".next-step-panel")).toBeNull();
   });
 
   it("reports no unhandled render error", async () => {
