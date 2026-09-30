@@ -1,4 +1,6 @@
 /**
+ * REQUIRED TEST — see TESTING.md § Required Tests.
+ *
  * Navigation smoke test — every main dashboard view loads without throwing.
  *
  * Cheap, broad coverage: for each view ID the sidebar can route to, load it
@@ -7,6 +9,10 @@
  * with zero console/page errors. This catches import errors, undefined
  * property access, and broken data-fetch paths across the whole nav
  * surface cheaply, before the deeper per-workflow specs run.
+ *
+ * Also the contract for the 0.8.0 redirect aliases (src/shared/view-routing.ts):
+ * every old path that moved into a stage must still resolve, with the URL
+ * bar landing on its new canonical path.
  */
 
 import { test, expect } from "@playwright/test";
@@ -19,61 +25,42 @@ import {
   type RunningDashboard,
 } from "./helpers/fixture-project.js";
 import { trackConsoleErrors } from "./helpers/console-errors.js";
+import { VIEW_META } from "../../src/viewer/views/view-meta.js";
 
 let fixture: FixtureProject;
 let dashboard: RunningDashboard;
 
+// Every ViewId, read from the navigation model rather than hand-kept here —
+// `VIEW_META` is `as const satisfies Record<ViewId, ViewMeta>`, so the
+// compiler already rejects a missing or misspelt entry there. A hand-kept
+// copy of this list previously drifted silently (it omitted `ask`); this one
+// cannot.
+const VIEWS = Object.keys(VIEW_META);
+
+// Feature-gated views render nothing interesting with their toggle off, so
+// the deep-link loop below turns every gate on before it runs.
+const GATED_FEATURES = {
+  "sourcevision.prMarkdown": true,
+  "sourcevision.ask": true,
+  "rex.notionSync": true,
+  "rex.integrations": true,
+};
+
 test.beforeAll(async () => {
   fixture = await createFixtureProject();
   dashboard = await startDashboard(fixture.dir);
+  const res = await fetch(`${dashboard.baseUrl}/api/features`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ changes: GATED_FEATURES }),
+  });
+  if (!res.ok) throw new Error(`Failed to enable feature toggles for the deep-link suite: ${res.status}`);
 });
 
 test.afterAll(async () => {
   stopDashboard(dashboard.proc);
   await cleanupFixtureProject(fixture.dir);
 });
-
-// Every ViewId from src/shared/view-id.ts. If a view is added or renamed
-// there, update this list — that mismatch is itself worth catching.
-const VIEWS = [
-  "home",
-  "analyze",
-  "plan",
-  "work",
-  "workspaces",
-  "overview",
-  "graph",
-  "iso-map",
-  "zones",
-  "analysis",
-  "files",
-  "routes",
-  "architecture",
-  "problems",
-  "suggestions",
-  "rex-dashboard",
-  "prd",
-  "token-usage",
-  "validation",
-  "requirements",
-  "activity",
-  "notion-config",
-  "integrations",
-  "hench-runs",
-  "hench-audit",
-  "hench-config",
-  "hench-templates",
-  "hench-optimization",
-  "hench-adaptive",
-  "feature-toggles",
-  "cli-timeouts",
-  "commands",
-  "command-reference",
-  "llm-provider",
-  "project-settings",
-  "merge-graph",
-  "pr-markdown",
-];
 
 for (const view of VIEWS) {
   test(`view "${view}" loads without console/page errors`, async ({ page }) => {
@@ -152,3 +139,27 @@ test("the commands sheet lifts over the page and lowers again", async ({ page })
   await expect(page.locator("#commands-sheet")).toBeHidden();
   expect(tracker.errors).toEqual([]);
 });
+
+// Redirect aliases (src/shared/view-routing.ts): old top-level paths merged
+// into a stage in 0.8.0. The full dashboard here has no scope, so both fire.
+const ALIASES: Array<[string, string]> = [
+  ["overview", "analyze"],
+  ["rex-dashboard", "work"],
+];
+
+for (const [oldPath, target] of ALIASES) {
+  test(`/${oldPath} redirects to /${target}`, async ({ page }) => {
+    const tracker = trackConsoleErrors(page);
+    const res = await page.goto(`${dashboard.baseUrl}/${oldPath}`, { waitUntil: "domcontentloaded" });
+    expect(res?.ok(), `HTTP status for /${oldPath}`).toBeTruthy();
+    await expect(page).toHaveURL(new RegExp(`/${target}$`));
+    await expect(page.locator('nav[aria-label="View navigation"]')).toHaveCount(1, { timeout: 10_000 });
+    await page.waitForTimeout(500);
+    expect(tracker.errors, `console/page errors redirecting /${oldPath} -> /${target}`).toEqual([]);
+  });
+}
+
+// The rex-scope exception (no redirect, because a rex-scoped viewer has no
+// Work stage to redirect to) needs a second server bound to that scope —
+// scope is a startup flag, not a per-request one — so it is pinned at the
+// unit level instead: see tests/unit/shared/view-routing.test.ts.

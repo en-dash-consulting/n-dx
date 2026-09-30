@@ -1417,7 +1417,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
     // ── Header ───────────────────────────────────────────────────────────────
     h("div", { class: "mg-header" },
       h("div", { class: "mg-header-left" },
-        h("h2", { class: "mg-title" }, "Context Graph"),
+        h("h2", { class: "mg-title" }, "PRD Graph"),
         graph.stats.merges > 0
           ? h("span", { class: "mg-stats" },
               `${graph.stats.mergesWithPrdLinkage}/${graph.stats.merges} merges linked`,
@@ -1436,7 +1436,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
         h("div", {
           class: "zone-view-toggle",
           role: "group",
-          "aria-label": "Context graph display mode",
+          "aria-label": "PRD graph display mode",
         },
           h("button", {
             type: "button",
@@ -1674,7 +1674,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
             clearSelection();
           }
         },
-        "aria-label": "PRD and merge context graph",
+        "aria-label": "PRD graph of items and merges",
         role: "img",
       },
         // Background rect for click-to-deselect

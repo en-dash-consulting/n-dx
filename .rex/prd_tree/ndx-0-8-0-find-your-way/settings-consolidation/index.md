@@ -30,5 +30,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add the Robot Wrangler settings page for provider and model across every LLM-using command](./add-the-robot-wrangler-settings-page.md) | pending |
 | [Add the Workflow settings page for work settings, templates and timeouts](./add-the-workflow-settings-page-for.md) | pending |
 | [Build the shared settings page frame with explicit Save, a dirty indicator and redirects for the six old settings routes](./build-the-shared-settings-page-frame.md) | pending |
-| [List every key ndx config accepts for hench on the Workflow page and in hench config](./list-every-key-ndx-config-accepts-for.md) | pending |
+| [List every key ndx config accepts for hench on the Workflow page and in hench config](./list-every-key-ndx-config-accepts-for.md) | completed |
 | [Show provider limits per vendor and a per-vendor agent model picker on Robot Wrangler](./show-provider-limits-per-vendor-and-a.md) | pending |

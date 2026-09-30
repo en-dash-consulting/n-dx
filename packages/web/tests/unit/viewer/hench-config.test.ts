@@ -2,8 +2,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { HenchConfigView, formatDisplayValue, coerceFieldValue, validateField, getPreviewImpact } from "../../../src/viewer/views/hench-config.js";
+import { HenchConfigView, formatDisplayValue, coerceFieldValue, validateField, getPreviewImpact, CATEGORY_META, CATEGORY_ORDER } from "../../../src/viewer/views/hench-config.js";
 import type { ConfigField } from "../../../src/viewer/views/hench-config.js";
+// The server's field list is the contract this page renders. Importing it here
+// is a test-only read of the other side of the boundary, not a runtime import:
+// the category coverage check has nothing to compare against otherwise.
+import { CONFIG_FIELD_META } from "../../../src/server/hench-config-fields.js";
 
 /** Mock config response from GET /api/hench/config. */
 function makeConfigResponse() {
@@ -493,5 +497,29 @@ describe("HenchConfigView", () => {
     // Changes panel should be gone
     expect(root.querySelector(".hench-config-changes-panel")).toBeNull();
     expect(root.querySelectorAll(".hench-config-dirty-badge").length).toBe(0);
+  });
+});
+
+/**
+ * The Workflow page renders one section per category and, until this was
+ * checked, iterated a hand-written order that the server's field list had
+ * outgrown — a category missing from that array took every field in it off the
+ * page while `GET /api/hench/config` went on serving them.
+ */
+describe("Workflow page category coverage", () => {
+  it("names every category the server sends", () => {
+    for (const field of CONFIG_FIELD_META) {
+      expect(CATEGORY_ORDER, `${field.path} category "${field.category}"`).toContain(field.category);
+      expect(CATEGORY_META[field.category], `heading for "${field.category}"`).toBeTruthy();
+    }
+  });
+
+  it("has fields for every category it orders", () => {
+    for (const category of CATEGORY_ORDER) {
+      expect(
+        CONFIG_FIELD_META.some((f) => f.category === category),
+        `category "${category}" is ordered but no field uses it`,
+      ).toBe(true);
+    }
   });
 });

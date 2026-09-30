@@ -6,15 +6,22 @@
  * Fetches project metadata from the `/api/project` endpoint and combines
  * it with the current view to build a contextual breadcrumb trail.
  *
- * Also manages `document.title` to reflect the current project and view,
- * formatted as "ProjectName | n-dx" (or "ViewLabel — ProductLabel | ProjectName | n-dx").
+ * Also manages `document.title`, formatted as
+ * "ViewLabel — ProductLabel | ProjectName | n-dx", or "ViewLabel | ProjectName | n-dx"
+ * for a view no single package owns.
+ *
+ * Every name here comes from the navigation model (`views/view-meta.ts`,
+ * reached through `api.ts`). The breadcrumb used to keep its own table of the
+ * lot, which is how it came to call the import map "Map" while the page the
+ * reader had just left called it "Repository map".
  */
 
 import { h } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import { useProjectMetadata, useCliName, resolveCliLabel } from "../hooks/index.js";
-import { STAGES, stageForView, isStageId } from "../api.js";
+import { stageForView, isStageId, stageProduct, viewLabel, VIEW_META, PRODUCT_LABELS } from "../api.js";
+import type { ViewMeta } from "../api.js";
 import { buildValidViews } from "../external.js";
 import { WorkspaceSwitcher } from "./workspace-switcher.js";
 
@@ -28,58 +35,6 @@ export interface BreadcrumbProps {
   /** When set, restricts navigation to a single product scope. */
   scope?: string | null;
 }
-
-// ---------------------------------------------------------------------------
-// View metadata lookup
-// ---------------------------------------------------------------------------
-
-interface ViewMeta {
-  product: "sourcevision" | "rex" | "hench" | "global";
-  label: string;
-  /** Product display name */
-  productLabel: string;
-}
-
-const VIEW_META: Record<ViewId, ViewMeta> = {
-  home:                  { product: "global",       label: "Home",            productLabel: "n-dx" },
-  analyze:               { product: "sourcevision", label: "Analysis",        productLabel: "SourceVision" },
-  plan:                  { product: "rex",          label: "Plan",            productLabel: "Rex" },
-  work:                  { product: "hench",        label: "Work",            productLabel: "Hench" },
-  workspaces:            { product: "global",       label: "Overview",        productLabel: "Workspaces" },
-  overview:              { product: "sourcevision", label: "Overview",        productLabel: "SourceVision" },
-  graph:                 { product: "sourcevision", label: "Map",             productLabel: "SourceVision" },
-  "iso-map":             { product: "sourcevision", label: "Isometric Map",   productLabel: "SourceVision" },
-  zones:                 { product: "sourcevision", label: "Zones",           productLabel: "SourceVision" },
-  files:                 { product: "sourcevision", label: "Files",           productLabel: "SourceVision" },
-  routes:                { product: "sourcevision", label: "Routes",          productLabel: "SourceVision" },
-  architecture:          { product: "sourcevision", label: "Architecture",    productLabel: "SourceVision" },
-  problems:              { product: "sourcevision", label: "Problems",        productLabel: "SourceVision" },
-  suggestions:           { product: "sourcevision", label: "Suggestions",     productLabel: "SourceVision" },
-  "pr-markdown":         { product: "sourcevision", label: "PR Markdown",     productLabel: "SourceVision" },
-  ask:                   { product: "sourcevision", label: "Ask",             productLabel: "SourceVision" },
-  "rex-dashboard":       { product: "rex",          label: "Dashboard",       productLabel: "Rex" },
-  prd:                   { product: "rex",          label: "Tasks",           productLabel: "Rex" },
-  analysis:              { product: "rex",          label: "Analyze & Import", productLabel: "Rex" },
-  "token-usage":         { product: "global",       label: "Token Usage",     productLabel: "Global" },
-  validation:            { product: "rex",          label: "Validation",      productLabel: "Rex" },
-  requirements:          { product: "rex",          label: "Requirements",    productLabel: "Rex" },
-  activity:              { product: "rex",          label: "Activity",        productLabel: "Rex" },
-  "notion-config":       { product: "global",       label: "{cli} sync",           productLabel: "Settings" },
-  integrations:          { product: "rex",          label: "Integrations",       productLabel: "Rex" },
-  "hench-runs":          { product: "hench",        label: "Runs",               productLabel: "Hench" },
-  "hench-audit":         { product: "hench",        label: "Audit",              productLabel: "Hench" },
-  "hench-config":        { product: "global",       label: "{cli} work",           productLabel: "Settings" },
-  "hench-templates":     { product: "hench",        label: "Templates",          productLabel: "Hench" },
-  "hench-optimization":  { product: "hench",        label: "Optimization",       productLabel: "Hench" },
-  "hench-adaptive":      { product: "hench",        label: "Adaptive",           productLabel: "Hench" },
-  "feature-toggles":     { product: "global",       label: "Feature Flags",      productLabel: "Settings" },
-  "cli-timeouts":        { product: "global",       label: "CLI Timeouts",       productLabel: "Settings" },
-  "commands":            { product: "global",       label: "{cli} export / refresh", productLabel: "Settings" },
-  "command-reference":   { product: "global",       label: "All Commands",         productLabel: "Commands" },
-  "llm-provider":        { product: "global",       label: "General",            productLabel: "Settings" },
-  "project-settings":    { product: "global",       label: "{cli} analyze / plan", productLabel: "Settings" },
-  "merge-graph":         { product: "rex",          label: "Context Graph",       productLabel: "Rex" },
-};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -104,18 +59,30 @@ export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
   const project = useProjectMetadata();
   const cliName = useCliName();
 
+  // The current view's name, from the one navigation model — the same string
+  // the top nav, the stage page and the settings overlay show for it.
+  //
+  // Looked up rather than asserted: `view` is not always a live view id. The
+  // crash-recovery banner restores a navigation state read out of
+  // localStorage with an unchecked cast (`getJSON<SavedNavigationState>`) and
+  // hands it straight to `navigateTo`, which does not check it against
+  // `validViews` — so a key saved by an older build, naming a view since
+  // removed, lands here. Indexing it blind would throw during render and take
+  // the whole dashboard down at exactly the moment the user is recovering
+  // from a crash. An unknown view keeps the project segment and drops its
+  // own, which is what this rendered before the model existed.
+  const meta = VIEW_META[view] as ViewMeta | undefined;
+  const label = meta ? resolveCliLabel(meta.label, cliName) : null;
+
   // Keep document.title in sync with project + current view
   useEffect(() => {
-    const meta = VIEW_META[view];
     const parts: string[] = [];
-    if (meta) parts.push(`${resolveCliLabel(meta.label, cliName)} — ${meta.productLabel}`);
+    // A view no single package owns names only itself: "Home | proj | n-dx".
+    if (label && meta) parts.push(meta.product === "global" ? label : `${label} — ${PRODUCT_LABELS[meta.product]}`);
     if (project) parts.push(project.name);
     parts.push("n-dx");
     document.title = parts.join(" | ");
-  }, [project, view, cliName]);
-
-  const rawMeta = VIEW_META[view];
-  const meta = rawMeta ? { ...rawMeta, label: resolveCliLabel(rawMeta.label, cliName) } : rawMeta;
+  }, [project, view, label]);
 
   /** Truncated project name — max 28 chars. */
   const projectName = useMemo(() => {
@@ -157,19 +124,17 @@ export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
       stage
         ? h("li", { class: "breadcrumb-item" },
             h("button", {
-              class: `breadcrumb-link breadcrumb-product breadcrumb-product-${STAGES[stage].product}`,
+              class: `breadcrumb-link breadcrumb-product breadcrumb-product-${stageProduct(stage)}`,
               onClick: () => navigateTo(stage),
               type: "button",
-            }, STAGES[stage].label),
+            }, viewLabel(stage)),
             Separator(),
           )
         : null,
 
       // ── Segment 3: Current view (active, not a link) ──
-      meta
-        ? h("li", { class: "breadcrumb-item breadcrumb-current", "aria-current": "page" },
-            meta.label,
-          )
+      label
+        ? h("li", { class: "breadcrumb-item breadcrumb-current", "aria-current": "page" }, label)
         : null,
     ),
   );

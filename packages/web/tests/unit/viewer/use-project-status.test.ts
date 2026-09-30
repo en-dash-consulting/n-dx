@@ -41,6 +41,7 @@ import { usePolling } from "../../../src/viewer/views/use-polling.js";
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const mockStatus = {
+  initialized: true,
   sv: { freshness: "fresh", analyzedAt: "2026-01-01", minutesAgo: 5, modulesComplete: 4, modulesTotal: 4 },
   rex: { exists: true, percentComplete: 50, stats: null, hasInProgress: true, hasPending: true, nextTaskTitle: "Test task" },
   hench: { configured: true, totalRuns: 3, activeRuns: 0, staleRuns: 0 },
@@ -134,5 +135,22 @@ describe("useProjectStatus", () => {
 
     // Should not throw
     await new Promise((r) => setTimeout(r, 50));
+  });
+
+  it("treats a malformed rex.stats section as an unavailable body", async () => {
+    // rex.stats is either null or a real TreeStats object — `{}` is neither,
+    // and per isValidProjectStatus this invalidates the whole body, not just
+    // the rex section, so a stale cached-good status from an earlier test
+    // must not leak through either.
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ...mockStatus, rex: { ...mockStatus.rex, stats: {} } }),
+    });
+
+    act(() => { render(h(TestHarness, null), root); });
+
+    await vi.waitFor(() => {
+      expect(hookResult).toBeNull();
+    });
   });
 });

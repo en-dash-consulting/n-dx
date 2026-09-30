@@ -19,6 +19,7 @@ import { DATA_FILES } from "../shared/index.js";
 import { computeStats, collectCompletedIds, findNextTask, walkTree } from "./rex-gateway.js";
 import type { PRDDocument, TreeStats } from "./rex-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
+import { isProjectInitialized } from "./routes-static.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,6 +93,20 @@ export interface ProjectStatus {
   hench: HenchStatus;
   /** Server process metadata — see {@link ServerInfo}. */
   server: ServerInfo;
+  /**
+   * Whether this project has ever produced real SourceVision analysis or a
+   * Rex PRD — the same check `routes-static.ts` uses to decide whether `/`
+   * serves the dashboard or the setup-wizard landing page (re-exported here,
+   * not reimplemented).
+   *
+   * The Home next-step panel needs this to tell "not initialised" apart from
+   * "initialised but not analysed": both read as `sv.freshness ===
+   * "unavailable"`, `rex.exists === false` on their own, since those fields
+   * describe *content* (a manifest, a PRD tree) rather than whether the
+   * project has been touched by `ndx init`/`sourcevision init`/`rex init` at
+   * all. This flag is the one field that distinguishes them.
+   */
+  initialized: boolean;
 }
 
 /**
@@ -354,6 +369,7 @@ function buildProjectStatus(ctx: ServerContext): ProjectStatus {
     rex: extractRexStatus(ctx),
     hench: extractHenchStatus(ctx),
     server: buildServerInfo(ctx),
+    initialized: isProjectInitialized(ctx),
   };
 }
 

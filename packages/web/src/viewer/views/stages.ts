@@ -11,22 +11,42 @@
  * stage pages, the side stage links, the breadcrumb and the landing page all
  * read it, so moving a view between stages is an edit here and nowhere else.
  *
+ * It says *where* a view sits; `view-meta.ts` — re-exported below, so callers
+ * need one import — says what it is *called*. A section therefore names only
+ * a view id: its heading and blurb are the view's own, which is why the stage
+ * page and the breadcrumb can no longer disagree about what a view is named.
+ *
  * Pure data and pure functions — no Preact — so both components and views
  * can import it (components through api.ts).
  */
 
 import type { ViewId } from "../types.js";
+import { VIEW_META } from "./view-meta.js";
+
+export * from "./view-meta.js";
 
 export type StageId = "analyze" | "plan" | "work";
 
 export type StageProduct = "sourcevision" | "rex" | "hench";
 
-export interface StageSection {
-  /** View rendered in the section and opened full-page by its "Open" link. */
+export interface StageTab {
+  /** The tab's own label, blurb and glyph come from its `view-meta.ts` entry. */
   view: ViewId;
-  title: string;
-  /** One line under the title saying what the section is for. */
-  blurb: string;
+  /**
+   * Dropped in a static export — the isometric map is built by the server on
+   * demand, same exemption the old 2D/3D toggle carried for its 3D side.
+   */
+  hiddenWhenDeployed?: boolean;
+}
+
+export interface StageSection {
+  /**
+   * View rendered in the section and opened full-page by its "Open" link —
+   * the first tab when `tabs` is set. The section's heading and blurb come
+   * from this view's entry in `view-meta.ts`, unless `group` overrides them;
+   * there is no other per-section override.
+   */
+  view: ViewId;
   /** Expanded when the stage page first opens. */
   open?: boolean;
   /**
@@ -35,10 +55,20 @@ export interface StageSection {
    */
   plain?: boolean;
   /**
-   * A second projection of the same content behind a toggle in the section
-   * header — the 2D import map and the 3D isometric map are one section.
+   * Further views sharing this section as tabs alongside `view` — the
+   * Terrain section's Isometric map and Zones, the Architecture section's
+   * Routes. Generalises the old two-way 2D/3D projection toggle into an
+   * N-way tab strip; each tab is still one view, reused unchanged, and
+   * still keeps its own route and full page.
    */
-  alt?: { view: ViewId; label: string; primaryLabel: string };
+  tabs?: readonly StageTab[];
+  /**
+   * Heading and blurb for a section whose tabs form a named group with no
+   * page of its own — Terrain has no route; only its tabs do. Omitted when
+   * the section's identity is simply `view`'s own (Architecture's merged
+   * section needs no override: it is still named by the `architecture` view).
+   */
+  group?: { heading: string; blurb: string };
   /**
    * A long list (run history, the execution log): the open section is a
    * bounded scroll region, with an Expand control in its header that shows it
@@ -59,11 +89,6 @@ export interface StageSection {
 
 export interface StageDef {
   id: StageId;
-  label: string;
-  glyph: string;
-  product: StageProduct;
-  /** One sentence for the landing page and the stage page header. */
-  blurb: string;
   sections: readonly StageSection[];
 }
 
@@ -73,83 +98,84 @@ export const STAGE_ORDER: readonly StageId[] = ["analyze", "plan", "work"];
 export const STAGES: Readonly<Record<StageId, StageDef>> = {
   analyze: {
     id: "analyze",
-    label: "Analysis",
-    glyph: "▣",
-    product: "sourcevision",
-    blurb: "What the codebase looks like: files, zones, imports and the findings worth acting on.",
     sections: [
-      { view: "overview", title: "General repository information", blurb: "Counts, health and coupling, the largest zones.", plain: true },
+      { view: "overview", plain: true },
       {
         view: "graph",
-        title: "Repository map",
-        blurb: "The import graph, drawn flat or as an isometric block map.",
-        alt: { view: "iso-map", label: "3D", primaryLabel: "2D" },
+        tabs: [
+          { view: "iso-map", hiddenWhenDeployed: true },
+          { view: "zones" },
+        ],
+        group: {
+          heading: "Terrain",
+          blurb: "The import graph — flat, in 3D, or clustered into zones.",
+        },
       },
-      { view: "zones", title: "Zones", blurb: "Clusters of files that import each other more than the rest." },
-      { view: "files", title: "Files", blurb: "The inventory, by role and language.", scroll: true },
-      { view: "problems", title: "Problems", blurb: "Findings from the enrichment passes." },
-      { view: "suggestions", title: "Suggestions", blurb: "Improvements the analysis proposes." },
-      { view: "architecture", title: "Architecture", blurb: "Patterns and layering across zones." },
-      { view: "routes", title: "Routes", blurb: "Pages, API routes and layouts." },
-      { view: "pr-markdown", title: "PR Markdown", blurb: "The analysis as a pull-request summary.", featureGate: "sourcevision.prMarkdown" },
-      { view: "ask", title: "Ask", blurb: "Question the analysis in plain language.", featureGate: "sourcevision.ask", requiresServer: true },
+      { view: "files", scroll: true },
+      { view: "problems" },
+      { view: "suggestions" },
+      { view: "architecture", tabs: [{ view: "routes" }] },
+      { view: "pr-markdown", featureGate: "sourcevision.prMarkdown" },
+      { view: "ask", featureGate: "sourcevision.ask", requiresServer: true },
     ],
   },
   plan: {
     id: "plan",
-    label: "Plan",
-    glyph: "☑",
-    product: "rex",
-    blurb: "What to build next: the PRD, proposals from analysis, and the planning commands.",
     sections: [
-      { view: "analysis", title: "Add items", blurb: "Describe work, import a document, or turn analysis into proposals.", plain: true },
-      { view: "prd", title: "Tasks", blurb: "The full PRD tree — epics, features, tasks.", open: true, fill: true },
-      { view: "command-reference", title: "CLI help", blurb: "Every command, with the ones you can run from here." },
-      { view: "hench-runs", title: "History", blurb: "What the agent has run, most recent first.", scroll: true },
-      { view: "merge-graph", title: "Context graph", blurb: "How the PRD's items connect." },
-      { view: "validation", title: "Validation", blurb: "Structural checks on the PRD." },
-      { view: "requirements", title: "Requirements", blurb: "Acceptance criteria and where they are tested." },
+      { view: "analysis", plain: true },
+      { view: "prd", open: true, fill: true },
+      { view: "command-reference" },
+      { view: "hench-runs", scroll: true },
+      { view: "merge-graph" },
+      { view: "validation" },
+      { view: "requirements" },
     ],
   },
   work: {
     id: "work",
-    label: "Work",
-    glyph: "▶",
-    product: "hench",
-    blurb: "Get it done: hand the next task to the agent, pick a run mode, watch what it costs.",
     sections: [
-      { view: "rex-dashboard", title: "Up next and PRD items", blurb: "The next task with its run button, progress and open epics.", plain: true },
-      { view: "activity", title: "History", blurb: "The execution log — completions as the agent recorded them.", scroll: true },
-      { view: "hench-templates", title: "Templates", blurb: "Run presets: limits, guard rails, provider." },
-      { view: "token-usage", title: "Usage", blurb: "Tokens and estimated cost by period and package." },
-      { view: "hench-audit", title: "Audit", blurb: "Per-task run logs and outcomes." },
-      { view: "hench-optimization", title: "Optimization", blurb: "Where runs spend their turns." },
-      { view: "hench-adaptive", title: "Adaptive", blurb: "Settings the runs have tuned themselves." },
-      { view: "workspaces", title: "Workspaces", blurb: "Every worktree of this repository and what each is running.", requiresServer: true },
+      { view: "rex-dashboard", plain: true },
+      { view: "activity", scroll: true },
+      { view: "hench-templates" },
+      { view: "token-usage" },
+      { view: "hench-audit" },
+      { view: "hench-optimization" },
+      { view: "hench-adaptive" },
+      { view: "workspaces", requiresServer: true },
     ],
   },
 };
 
+/**
+ * The stage's product, narrowed to the three packages.
+ *
+ * `VIEW_META` is declared `as const`, so indexing it by a `StageId` gives the
+ * three literal products and not the wider `ViewProduct` — the stage's colour,
+ * logo and CSS class come from the same table as its name, with no second
+ * declaration to keep in step.
+ */
+export function stageProduct(stage: StageId): StageProduct {
+  return VIEW_META[stage].product;
+}
+
 // ── Settings ───────────────────────────────────────────────────
 
 export interface SettingsEntry {
+  /** Label and glyph come from this view's entry in `view-meta.ts`. */
   view: ViewId;
-  /** May contain the `{cli}` placeholder, resolved by the caller. */
-  label: string;
-  glyph: string;
   featureGate?: string;
 }
 
 /** Workflow order: General → analyze/plan → work → sync → export, then cross-cutting. */
 export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
-  { view: "llm-provider", label: "General", glyph: "\u{1F9E0}" },
-  { view: "project-settings", label: "{cli} analyze / plan", glyph: "▣" },
-  { view: "hench-config", label: "{cli} work", glyph: "▶" },
-  { view: "notion-config", label: "{cli} sync", glyph: "\u{1F50C}", featureGate: "rex.notionSync" },
-  { view: "integrations", label: "Integrations", glyph: "\u{1F517}", featureGate: "rex.integrations" },
-  { view: "commands", label: "{cli} export / refresh", glyph: "\u{1F4E4}" },
-  { view: "feature-toggles", label: "Feature Flags", glyph: "\u{1F4CC}" },
-  { view: "cli-timeouts", label: "CLI Timeouts", glyph: "⏱" },
+  { view: "llm-provider" },
+  { view: "project-settings" },
+  { view: "hench-config" },
+  { view: "notion-config", featureGate: "rex.notionSync" },
+  { view: "integrations", featureGate: "rex.integrations" },
+  { view: "commands" },
+  { view: "feature-toggles" },
+  { view: "cli-timeouts" },
 ];
 
 const SETTINGS_VIEWS: ReadonlySet<ViewId> = new Set(SETTINGS_ENTRIES.map((e) => e.view));
@@ -178,7 +204,7 @@ export function stageForView(view: ViewId, validViews?: ReadonlySet<ViewId>): St
   if (isStageId(view)) return view;
   for (const id of STAGE_ORDER) {
     if (validViews && !validViews.has(id)) continue;
-    if (STAGES[id].sections.some((s) => s.view === view || s.alt?.view === view)) return id;
+    if (STAGES[id].sections.some((s) => s.view === view || s.tabs?.some((t) => t.view === view))) return id;
   }
   return null;
 }
