@@ -302,12 +302,34 @@ describe("hench, the dashboard and ndx config offer the same settings", () => {
    * Setting rows in the help text: two-space indent, then the key. Prose
    * continuation lines are indented further and the `Examples` section starts
    * each line with the command, so neither is picked up.
+   *
+   * A row whose key carries a `<placeholder>` segment documents a *family* of
+   * keys rather than one key, and is dropped. `hench.models.<vendor>` stands
+   * for four vendors and is set in `.n-dx.json` rather than through
+   * `hench config`, so neither list can enumerate it as a path — and matching
+   * it with a character class that stops at `<` yields the truncated stem
+   * `models.`, which is not a path anything defines. Taking the whole token and
+   * then dropping the templated ones says that out loud instead of producing a
+   * near-miss that reads like a missing key.
    */
   const documentedPaths = [
     ...new Set(
-      Array.from(HELP_TEXT.matchAll(/^ {2}hench\.([A-Za-z][A-Za-z0-9.]*)/gm), (m) => m[1]),
+      Array.from(HELP_TEXT.matchAll(/^ {2}hench\.(\S+)/gm), (m) => m[1]).filter(
+        (path) => !path.includes("<"),
+      ),
     ),
   ].sort();
+
+  it("finds the documented rows at all (parser self-test)", () => {
+    // Without this, a help-text reformat that stopped the pattern matching
+    // would make both directions below vacuously green.
+    expect(documentedPaths.length).toBeGreaterThan(20);
+    expect(documentedPaths).toContain("provider");
+    expect(documentedPaths).toContain("maxTurns");
+    // And the templated row is dropped rather than truncated.
+    expect(documentedPaths).not.toContain("models.");
+    expect(documentedPaths).not.toContain("models.<vendor>");
+  });
 
   it("hench config and the dashboard list the same keys", () => {
     expect(webPaths).toEqual(henchPaths);
