@@ -39,6 +39,27 @@ export { HENCH_SCHEMA_VERSION, DEFAULT_HENCH_CONFIG, guardDefaultsForLanguage, n
 export { VENDOR_PROVIDERS, isProviderSupported } from "./cli/commands/provider-support.js";
 export type { HenchProvider } from "./cli/commands/provider-support.js";
 
+// ---- Agent model resolution -------------------------------------------------
+
+/**
+ * The chain `ndx work` resolves its model through: `--model`, then
+ * `hench.models.<vendor>`, then `llm.*`, then the vendor default.
+ *
+ * Exported for the same reason `VENDOR_PROVIDERS` is — not for anyone to call
+ * at runtime, but so the copy the dashboard is forced to keep can be checked
+ * against the original. `GET /api/llm/config` reports what a flagless run
+ * would do, and web cannot import hench to ask; its twin lives in
+ * `packages/web/src/server/effective-agent-config.ts` and is pinned here by
+ * `tests/integration/effective-agent-config-contract.test.js`.
+ */
+export { resolveAgentModel } from "./cli/commands/agent-model.js";
+export type {
+  AgentModelResolution,
+  AgentModelSource,
+  ResolveAgentModelParams,
+} from "./cli/commands/agent-model.js";
+export type { HenchAgentModels } from "./schema/v1.js";
+
 // ---- Schema types (config, run records) ------------------------------------
 
 export type {

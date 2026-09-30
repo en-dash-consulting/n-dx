@@ -31,6 +31,8 @@ import {
 } from "@n-dx/llm-client";
 import type { LLMVendor, ClaudeFieldSource } from "@n-dx/llm-client";
 import { VENDOR_PROVIDERS } from "./hench-config-fields.js";
+import { resolveEffectiveAgentConfig } from "./effective-agent-config.js";
+import type { EffectiveAgentConfig } from "./effective-agent-config.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,6 +94,14 @@ export interface LlmConfigResponse {
   claudeSources: Partial<Record<"model" | "lightModel", ClaudeFieldSource>>;
   /** Enable automatic failover on model/vendor errors. */
   autoFailover?: boolean;
+  /**
+   * What `ndx work` runs with no flags, resolved across `.n-dx.json` and
+   * `.hench/config.json`. Every other field on this response is a configured
+   * key; this one is the answer those keys add up to. See
+   * `effective-agent-config.ts` for the resolution and why web keeps a twin of
+   * it.
+   */
+  effective: EffectiveAgentConfig;
 }
 
 /** Shape expected by PUT /api/llm/config. */
@@ -355,7 +365,12 @@ export function resolveActiveVendor(projectDir: string): string | null {
   return typeof llm["vendor"] === "string" ? llm["vendor"] : null;
 }
 
-function extractLlmConfig(projectDir: string): LlmConfigResponse {
+/**
+ * Async because of `effective`, which resolves through `loadLLMConfig` — the
+ * same async loader hench and the Ask endpoint use, rather than a fourth
+ * hand-rolled read of the same two files.
+ */
+async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> {
   const config = readEffectiveNdxConfig(projectDir);
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmCodex = (llm["codex"] ?? {}) as Record<string, unknown>;
@@ -400,6 +415,7 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
       ...(claude.sources.model ? { model: claude.sources.model } : {}),
       ...(claude.sources.lightModel ? { lightModel: claude.sources.lightModel } : {}),
     },
+    effective: await resolveEffectiveAgentConfig(projectDir),
   };
 
   if (typeof llm["autoFailover"] === "boolean") {
@@ -785,7 +801,7 @@ export async function handleLlmRoute(
 
   // GET /api/llm/config
   if (method === "GET" && pathname === LLM_PREFIX) {
-    jsonResponse(res, 200, extractLlmConfig(ctx.projectDir));
+    jsonResponse(res, 200, await extractLlmConfig(ctx.projectDir));
     return true;
   }
 
@@ -890,7 +906,7 @@ export async function handleLlmRoute(
       // The credential check's answer depends on this config — drop the
       // cached result so the auth chip re-verifies against the new settings.
       invalidateAuthCheckCache();
-      jsonResponse(res, 200, { applied, config: extractLlmConfig(ctx.projectDir) });
+      jsonResponse(res, 200, { applied, config: await extractLlmConfig(ctx.projectDir) });
       return true;
     } catch (err) {
       errorResponse(res, 400, err instanceof Error ? err.message : "Invalid request body");

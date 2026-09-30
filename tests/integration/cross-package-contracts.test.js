@@ -542,6 +542,48 @@ describe("hench ↔ web provider-support contract", () => {
 });
 
 // ---------------------------------------------------------------------------
+// hench ↔ web agent-model contract (symbol pin only)
+// ---------------------------------------------------------------------------
+
+/**
+ * `GET /api/llm/config` reports the model a flagless `ndx work` resolves, and
+ * web cannot import hench to ask — so
+ * `packages/web/src/server/effective-agent-config.ts` twins hench's
+ * `resolveAgentModel`. The behavioural comparison is a fixture matrix and
+ * lives in `tests/integration/effective-agent-config-contract.test.js`; this
+ * file is dist-import-only by design and has no fixture harness.
+ *
+ * What is pinned here is the symbol itself. `resolveAgentModel` is exported
+ * from hench's public API *for* that contract test and nothing else calls it
+ * across a package boundary, so an "unused export" cleanup would look
+ * entirely safe — and would take the matrix's oracle with it, leaving the
+ * twin unchecked while every remaining test still passed.
+ */
+describe("hench ↔ web agent-model contract", () => {
+  it("hench's public API exports resolveAgentModel", async () => {
+    const henchPublic = await import("../../packages/hench/dist/public.js");
+    expect(typeof henchPublic.resolveAgentModel).toBe("function");
+  });
+
+  it("web exposes the twin the matrix compares against", async () => {
+    const webEffective = await import(
+      "../../packages/web/dist/server/effective-agent-config.js"
+    );
+    expect(typeof webEffective.resolveEffectiveAgentConfig).toBe("function");
+    expect(typeof webEffective.resolveEffectiveAgentModel).toBe("function");
+    expect(typeof webEffective.resolveEffectiveProvider).toBe("function");
+  });
+
+  it("resolveAgentModel returns a model and the rung that supplied it", async () => {
+    const henchPublic = await import("../../packages/hench/dist/public.js");
+    const resolved = henchPublic.resolveAgentModel({ vendor: "claude", llmConfig: {} });
+    expect(typeof resolved.model).toBe("string");
+    expect(resolved.model.length).toBeGreaterThan(0);
+    expect(resolved.source).toBe("default");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Gateway export auto-detection (finding: cross-package import coverage)
 // ---------------------------------------------------------------------------
 
