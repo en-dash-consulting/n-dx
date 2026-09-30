@@ -30,7 +30,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
-import { exec as foundationExec, spawnManaged, isVerbose, isDebug } from "@n-dx/llm-client";
+import { exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
 import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
@@ -1637,8 +1637,9 @@ function handleManifest(
   ctx: ServerContext,
 ): boolean {
   const cliName = readCliName(ctx.projectDir);
-  const initialized = [".rex", ".sourcevision", ".hench"]
-    .every((d) => existsSync(join(ctx.projectDir, d)));
+  const layout = resolveLayout(ctx.projectDir);
+  const initialized = [layout.rexDir, layout.sourcevisionDir, layout.henchDir]
+    .every((d) => existsSync(d));
 
   // An LLM vendor is always resolvable: the CLI treats an absent (or empty,
   // or malformed) llm.vendor as "claude" (config.js runAuthCheck, reshape's

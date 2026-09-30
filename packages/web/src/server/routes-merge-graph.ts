@@ -30,7 +30,9 @@ import {
   type MergeGraph,
   type PrdOrigin,
 } from "./merge-history.js";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import { resolveLayout } from "@n-dx/llm-client";
+import { PRD_TREE_DIRNAME } from "./rex-gateway.js";
 
 /**
  * Per-project cache for merge-graph payloads. Keyed on project directory
@@ -176,7 +178,8 @@ export function handleMergeGraphRoute(
       return true;
     }
 
-    const relPath = `.rex/prd_tree/${validation.path}/index.md`;
+    const rexRel = relative(ctx.projectDir, ctx.rexDir);
+    const relPath = join(rexRel, PRD_TREE_DIRNAME, validation.path, "index.md").split("\\").join("/");
     const runner =
       opts.overrideBuildOptions?.gitRunner ?? createGitRunner(ctx.projectDir);
     let origin: PrdOrigin | null;
@@ -197,7 +200,7 @@ export function handleMergeGraphRoute(
   const buildOptions: BuildMergeGraphOptions = {
     projectDir: ctx.projectDir,
     rexDir: ctx.rexDir,
-    henchRunsDir: join(ctx.projectDir, ".hench", "runs"),
+    henchRunsDir: join(resolveLayout(ctx.projectDir).henchDir, "runs"),
     maxMerges,
     ...(opts.overrideBuildOptions ?? {}),
   };
@@ -210,7 +213,7 @@ export function handleMergeGraphRoute(
     const fingerprint = computeFingerprint({
       rexDir: buildOptions.rexDir,
       henchRunsDir:
-        buildOptions.henchRunsDir ?? join(ctx.projectDir, ".hench", "runs"),
+        buildOptions.henchRunsDir ?? join(resolveLayout(ctx.projectDir).henchDir, "runs"),
       gitRunner: runner,
       maxMerges,
     });
