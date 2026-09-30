@@ -29,5 +29,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Make ndx init write the .ndx/ layout for new projects](./make-ndx-init-write-the-ndx-layout-for.md) | pending |
 | [Move the per-user directory to ~/.ndx/ with NDX_HOME, reading ~/.n-dx/ and N_DX_HOME as fallbacks](./move-the-per-user-directory-to-ndx.md) | completed |
 | [Route core and the remaining hench and web file access through the resolver](./route-core-and-the-remaining-hench-and.md) | pending |
-| [Route hench and web file access through their paths modules](./route-hench-and-web-file-access.md) | pending |
+| [Route hench and web file access through their paths modules](./route-hench-and-web-file-access.md) | completed |
 | [Route rex and sourcevision file access through their paths modules](./route-rex-and-sourcevision-file-access.md) | completed |
