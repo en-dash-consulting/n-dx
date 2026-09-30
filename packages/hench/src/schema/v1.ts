@@ -1,4 +1,5 @@
 import { PROJECT_DIRS } from "../prd/llm-gateway.js";
+import type { LLMVendor } from "../prd/llm-gateway.js";
 export type { MemoryThrottleConfig } from "../process/memory-throttle.js";
 export type { MemoryMonitorConfig } from "../process/memory-monitor.js";
 export type { RuntimePoolConfig } from "../process/pool.js";
@@ -147,9 +148,12 @@ export const DEFAULT_PRUNE_CONFIG: Readonly<Required<PruneConfig>> = {
  *
  * Lives here, with the defaults, because both places that enforce it are
  * downstream of this module: `validate.ts` refuses a smaller value in
- * `.hench/config.json`, and `agent/lifecycle/context-prune.ts` clamps to it at
- * runtime for the `.n-dx.json` overrides that `loadConfig` merges *after*
- * validation. One constant, so the refusal and the clamp cannot disagree.
+ * `.hench/config.json` and in a `.n-dx.json`/`.n-dx.local.json` override
+ * (`loadConfig` re-validates the merged result — see `store/config.ts` —
+ * reverting an invalid override instead of letting it through), and
+ * `agent/lifecycle/context-prune.ts` clamps to it at runtime as a second
+ * line of defense for any `PruneConfig` built outside that path. One
+ * constant, so the refusal and the clamp cannot disagree.
  */
 export const MIN_PRUNE_PAIRS = 2;
 
@@ -208,10 +212,33 @@ export function isPermissionMode(value: unknown): value is PermissionMode {
   return typeof value === "string" && (PERMISSION_MODES as readonly string[]).includes(value);
 }
 
+/**
+ * Per-vendor agent model override. Only the entry matching the *active*
+ * vendor is consulted; the rest are inert, so a config can carry a pinned
+ * model for every vendor it switches between.
+ *
+ * Sits between `--model` and all `llm.*` model configuration in `ndx work`'s
+ * resolution order, which is what makes it an agent-only override: `analyze`,
+ * `plan` and Ask keep resolving from `llm.*` alone.
+ */
+export type HenchAgentModels = Partial<Record<LLMVendor, string>>;
+
 export interface HenchConfig {
   schema: string;
   provider: Provider;
+  /**
+   * @deprecated Never read. `ndx work` resolves its model from `--model`, then
+   * `hench.models.<vendor>`, then the `llm.*` fields — this scalar is consulted
+   * at no point, and its "sonnet" default is meaningless on a non-Claude vendor.
+   * Use {@link HenchConfig.models} instead. Retained so existing configs keep
+   * validating; setting it changes nothing.
+   */
   model: string;
+  /**
+   * Agent-only model override, keyed by vendor. See {@link HenchAgentModels}.
+   * Absent means `ndx work` resolves exactly as every other LLM command does.
+   */
+  models?: HenchAgentModels;
   maxTurns: number;
   maxTokens: number;
   /**

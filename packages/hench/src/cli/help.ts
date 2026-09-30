@@ -277,16 +277,25 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "hench config --interactive [dir]",
     ],
     description:
-      "Manages .hench/config.json settings including provider, model, max turns,\n" +
-      "guard rules, retry behavior, and task selection preferences.",
+      "Manages .hench/config.json settings including provider, max turns,\n" +
+      "guard rules, retry behavior, and task selection preferences.\n" +
+      "\n" +
+      "`model` is deprecated and ignored — it has never been read. To run the\n" +
+      "agent on a different model from analyze/plan/Ask, set the per-vendor\n" +
+      "override `hench.models.<vendor>` in .n-dx.json. It applies only to the\n" +
+      "active vendor, and --model still wins over it.",
     options: [
       { flag: "--interactive", description: "Launch interactive configuration menu" },
       { flag: "--format=json", description: "Output current config as JSON" },
     ],
     examples: [
       { command: "hench config", description: "Display all current settings" },
-      { command: "hench config model", description: "Show current model" },
-      { command: "hench config model claude-sonnet-5", description: "Set the model" },
+      { command: "hench config maxTurns", description: "Show the current turn limit" },
+      { command: "hench config maxTurns 80", description: "Raise the turn limit" },
+      {
+        command: "n-dx config hench.models.claude opus",
+        description: "Pin the agent's Claude model (model is deprecated)",
+      },
       { command: "hench config --interactive", description: "Interactive menu for all settings" },
     ],
     related: ["template"],

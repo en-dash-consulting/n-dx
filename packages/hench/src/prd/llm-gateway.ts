@@ -42,9 +42,14 @@ export {
   loadLLMConfig,
   resolveApiKey,
   resolveCliPath,
+  deepMerge,
   loadProjectOverrides,
+  loadProjectOverrideSources,
   mergeWithOverrides,
+  PROJECT_CONFIG_FILE,
+  LOCAL_CONFIG_FILE,
 } from "@n-dx/llm-client";
+export type { ProjectOverrideSource } from "@n-dx/llm-client";
 
 // ---- Shared constants -------------------------------------------------------
 export {
