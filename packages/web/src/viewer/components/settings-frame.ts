@@ -42,10 +42,10 @@ export function SettingsFrame({ dirty, saving, error = null, onSave, onDiscard, 
   // the very edits the prompt is holding.
   useFocusTrap(modalRef, promptOpen);
 
-  const handleSave = useCallback(() => {
-    // onSave rejecting is the page's signal to keep `dirty` true and surface
-    // `error` — the frame just needs to not let the rejection go unhandled.
-    Promise.resolve(onSave()).catch(() => {});
+  const handleSave = useCallback(async () => {
+    // onSave failing — rejecting, or throwing before it returns — is the page's
+    // signal to keep `dirty` true and surface `error`; it must not escape here.
+    try { await onSave(); } catch { /* surfaced by the page through `error` */ }
   }, [onSave]);
 
   useEffect(() => {
@@ -55,7 +55,11 @@ export function SettingsFrame({ dirty, saving, error = null, onSave, onDiscard, 
   useEffect(() => {
     if (!promptOpen) return undefined;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") keepEditing();
+      if (e.key !== "Escape") return;
+      // The overlay closes on Escape from a window listener (settings-overlay.ts);
+      // stop here so dismissing the prompt doesn't also re-attempt the close.
+      e.stopPropagation();
+      keepEditing();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);

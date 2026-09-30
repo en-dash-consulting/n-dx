@@ -224,6 +224,24 @@ describe("dirty frame: Escape and backdrop click keep editing, not discard", () 
     expect(currentView()).toBe("llm-provider");
   });
 
+  it("one Escape closes the prompt even with the overlay's own Escape handler on window", async () => {
+    await mountAtSettings(true);
+    // settings-overlay.ts closes on Escape from a window keydown listener; mirror it.
+    const overlayEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") root.querySelector<HTMLButtonElement>(".sidebar-home")!.click();
+    };
+    window.addEventListener("keydown", overlayEscape);
+    try {
+      act(() => { root.querySelector<HTMLButtonElement>(".nav-home")!.click(); });
+      expect(dialog()).not.toBeNull();
+      act(() => { document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+      expect(dialog()).toBeNull();
+      expect(currentView()).toBe("llm-provider");
+    } finally {
+      window.removeEventListener("keydown", overlayEscape);
+    }
+  });
+
   it("a backdrop click closes the prompt without navigating", async () => {
     await mountAtSettings(true);
     act(() => { root.querySelector<HTMLButtonElement>(".nav-home")!.click(); });
@@ -277,7 +295,6 @@ describe("beforeunload: only while dirty", () => {
 
   it("stops guarding once the frame unmounts", async () => {
     await mountAtSettings(true);
-    act(() => { discardBtn(); }); // no-op, just asserting setup
     act(() => { root.querySelector<HTMLButtonElement>(".sidebar-home")!.click(); });
     act(() => { discardBtn()!.click(); });
     expect(currentView()).toBe("home");

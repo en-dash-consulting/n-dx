@@ -104,6 +104,22 @@ describe("SettingsFrame: Save", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
   });
 
+  it("keeps a synchronous throw from onSave inside the click handler", async () => {
+    const errors: unknown[] = [];
+    const onError = (e: ErrorEvent) => { errors.push(e.error); e.preventDefault(); };
+    window.addEventListener("error", onError);
+    try {
+      const onSave = vi.fn(() => { throw new Error("port must be a number"); });
+      await mount(frame({ dirty: true, onSave }));
+      act(() => { saveBtn().click(); });
+      await act(async () => { await Promise.resolve(); });
+      expect(onSave).toHaveBeenCalledOnce();
+      expect(errors).toEqual([]);
+    } finally {
+      window.removeEventListener("error", onError);
+    }
+  });
+
   it("shows no error message when none is passed", async () => {
     await mount(frame({ dirty: true }));
     expect(root.querySelector(".settings-frame-error")).toBeNull();
