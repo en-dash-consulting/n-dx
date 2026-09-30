@@ -4,7 +4,7 @@
  *
  * `/overview` and `/rex-dashboard` used to be their own top-level pages;
  * both are now the lead section of a stage (`analyze`, `work`) and should
- * 301 there instead of serving the orphaned bare view. The one exception is
+ * 302 there instead of serving the orphaned bare view. The one exception is
  * a rex-scoped viewer, which has no Work stage, so `/rex-dashboard` keeps
  * being served as its own page there.
  */
@@ -44,8 +44,8 @@ describe("redirect aliases: full dashboard (no scope)", () => {
     const { baseUrl, close } = await startFor(baseCtx());
     try {
       const res = await fetch(`${baseUrl}/overview`, { redirect: "manual" });
-      expect(res.status).toBe(301);
-      expect(res.headers.get("location")).toBe("/analyze");
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("analyze");
     } finally {
       await close();
     }
@@ -55,8 +55,8 @@ describe("redirect aliases: full dashboard (no scope)", () => {
     const { baseUrl, close } = await startFor(baseCtx());
     try {
       const res = await fetch(`${baseUrl}/rex-dashboard`, { redirect: "manual" });
-      expect(res.status).toBe(301);
-      expect(res.headers.get("location")).toBe("/work");
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("work");
     } finally {
       await close();
     }
@@ -66,8 +66,20 @@ describe("redirect aliases: full dashboard (no scope)", () => {
     const { baseUrl, close } = await startFor(baseCtx());
     try {
       const res = await fetch(`${baseUrl}/overview/some-zone?ref=email`, { redirect: "manual" });
-      expect(res.status).toBe(301);
-      expect(res.headers.get("location")).toBe("/analyze/some-zone?ref=email");
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("../analyze/some-zone?ref=email");
+    } finally {
+      await close();
+    }
+  });
+
+  it("stays inside a workspace slot and a hub prefix, which this route never sees", async () => {
+    const { baseUrl, close } = await startFor(baseCtx());
+    try {
+      const bare = (await fetch(`${baseUrl}/overview`, { redirect: "manual" })).headers.get("location")!;
+      expect(new URL(bare, "http://h/p/app/w/feature/overview").href).toBe("http://h/p/app/w/feature/analyze");
+      const deep = (await fetch(`${baseUrl}/overview/some-zone?ref=email`, { redirect: "manual" })).headers.get("location")!;
+      expect(new URL(deep, "http://h/w/feature/overview/some-zone?ref=email").href).toBe("http://h/w/feature/analyze/some-zone?ref=email");
     } finally {
       await close();
     }

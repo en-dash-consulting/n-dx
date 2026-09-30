@@ -3,7 +3,7 @@
 ---
 
 Add redirect aliases for the dashboard paths `0.8.0`'s navigation merge
-orphaned: `/overview` now 301s to `/analyze`, and `/rex-dashboard` 301s to
+orphaned: `/overview` now redirects to `/analyze`, and `/rex-dashboard` to
 `/work` in the full dashboard (a rex-scoped standalone viewer, which has no
 Work stage, keeps `/rex-dashboard` as its own page). The alias table lives in
 `packages/web/src/shared/view-routing.ts` and is applied in three places: the

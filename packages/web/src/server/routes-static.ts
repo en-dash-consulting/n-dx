@@ -182,8 +182,15 @@ export function handleStaticRoute(
   const aliasTarget = resolveViewAlias(aliasSegment, buildValidViews(ctx.scope ?? null));
   if (aliasTarget) {
     const rest = pathOnly.slice(1 + aliasSegment.length);
-    const location = `/${aliasTarget}${rest}${queryString ? `?${queryString}` : ""}`;
-    res.writeHead(301, { Location: location });
+    // Relative, not root-relative: start.ts strips a /w/<key>/ workspace slot
+    // from req.url before this runs, and the hub proxy re-prefixes only
+    // /p/<id>/, so "/analyze" would drop the slot and land on the anchor.
+    // One "../" per sub-path segment climbs back to the alias's directory.
+    const up = "../".repeat((rest.match(/\//g) ?? []).length);
+    const location = `${up}${aliasTarget}${rest}${queryString ? `?${queryString}` : ""}`;
+    // 302, not 301: a browser caches a 301 per URL indefinitely, and the same
+    // localhost URL may later be a rex-scoped viewer or a build without the alias.
+    res.writeHead(302, { Location: location });
     res.end();
     return true;
   }
