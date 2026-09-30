@@ -23,8 +23,8 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add a state-aware Home view as the dashboard default](./add-a-state-aware-home-view-as-the.md) | pending |
-| [Add redirect aliases for every moved dashboard path and a navigation contract test](./add-redirect-aliases-for-every-moved.md) | pending |
-| [Merge Map, Isometric Map and Zones into a tabbed Terrain page and Architecture and Routes into a tabbed Architecture page](./merge-map-isometric-map-and-zones-into.md) | pending |
-| [Replace the accordion sidebar with a shared navigation model, always-open groups and a collapsed rail](./replace-the-accordion-sidebar-with-a.md) | pending |
-| [Turn SourceVision Overview and Rex Dashboard into package landing pages, add a Hench landing, and move Rex execution panels to the Flight Deck](./turn-sourcevision-overview-and-rex.md) | pending |
+| [Add a next-step panel with four project states to the Home landing](./add-a-next-step-panel-with-four.md) | completed |
+| [Add redirect aliases for every moved dashboard path and a navigation contract test](./add-redirect-aliases-for-every-moved.md) | completed |
+| [Make stages.ts the single navigation model: one label, glyph, product and blurb per view, read by every navigation surface](./make-stages-ts-the-single-navigation.md) | completed |
+| [Merge the Analysis stage's map, isometric map and zones into one tabbed Terrain section, and Architecture and Routes into one tabbed section](./merge-the-analysis-stage-s-map.md) | completed |
+| [Turn SourceVision Overview and Rex Dashboard into package landing pages, add a Hench landing, and move Rex execution panels to the Flight Deck](./turn-sourcevision-overview-and-rex.md) | cancelled |

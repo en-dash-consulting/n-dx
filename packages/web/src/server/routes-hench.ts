@@ -44,7 +44,7 @@ import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
 import { totalmem, freemem, loadavg, cpus } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { exec, spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, type ManagedChild } from "@n-dx/llm-client";
+import { exec, spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, resolveLayout, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import {
@@ -230,10 +230,15 @@ function getImpact(path: string, value: unknown): string {
   }
 }
 
+/** The workspace's hench config file, on whichever layout the project uses (.ndx/hench or .hench). */
+function henchConfigPath(projectDir: string): string {
+  return join(resolveLayout(projectDir).henchDir, "config.json");
+}
+
 /** Read the hench config.json directly from disk. */
 function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
   try {
-    const raw = readFileSync(join(projectDir, ".hench", "config.json"), "utf-8");
+    const raw = readFileSync(henchConfigPath(projectDir), "utf-8");
     return JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return null;
@@ -810,7 +815,7 @@ async function handleConfigUpdate(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  const configPath = join(ctx.projectDir, ".hench", "config.json");
+  const configPath = henchConfigPath(ctx.projectDir);
 
   // Load current config
   const current = loadHenchConfig(ctx.projectDir);
@@ -1196,7 +1201,7 @@ function handleTemplateApply(
     errorResponse(res, 400, `Template "${id}" cannot be applied: ${constraintProblem}`);
     return true;
   }
-  const configPath = join(ctx.projectDir, ".hench", "config.json");
+  const configPath = henchConfigPath(ctx.projectDir);
 
   try {
     writeFileSync(configPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
@@ -1355,9 +1360,15 @@ async function runTreeMigration(
     bin,
     // rex's branch guard refuses whole-tree rewrites off the default branch
     // unless asked to proceed. The double-confirm above (a 412 naming the
-    // fix, then a second explicit `{ migrateSlugs: true }`) is this route's
-    // own "on purpose" signal, so it is carried through here too.
-    [...prefixArgs, "rex", "migrate-slugs", "--format=json", "--allow-on-branch", ctx.projectDir],
+    // fix, then a second explicit `{ migrateSlugs: true }`) is consent to
+    // *run the migration*, not to run it on a feature branch — those are
+    // different questions, and a migration accepted on a feature branch is
+    // exactly the shape of the 2026-09-17 incident this route exists to
+    // avoid repeating. `--allow-on-branch` is deliberately not passed, so
+    // the guard still applies: on a feature branch the operator sees rex's
+    // refusal (naming the branch) in the 500 response instead of an
+    // unreviewed whole-tree rewrite going through silently.
+    [...prefixArgs, "rex", "migrate-slugs", "--format=json", ctx.projectDir],
     { cwd: ctx.projectDir, timeout: MIGRATION_TIMEOUT_MS },
   );
 

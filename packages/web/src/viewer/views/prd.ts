@@ -331,8 +331,8 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
           ? h("button", {
               class: "prd-search-action",
               onClick: () => navigateTo("merge-graph"),
-              title: "Context Graph \u2014 view PRD/merge linkage",
-              "aria-label": "Open context graph",
+              title: "PRD Graph \u2014 view PRD/merge linkage",
+              "aria-label": "Open PRD graph",
             }, "\u29c9")
           : null,
       ),

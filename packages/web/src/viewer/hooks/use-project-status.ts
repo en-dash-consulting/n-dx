@@ -67,6 +67,13 @@ export interface ProjectStatus {
   sv: SourceVisionStatus;
   rex: RexStatus;
   hench: HenchStatus;
+  /**
+   * Whether this project has ever produced real SourceVision analysis or a
+   * Rex PRD — see the server-side doc comment on `ProjectStatus` in
+   * `routes-status.ts`. Lets the Home next-step panel tell "not initialised"
+   * apart from "initialised but not analysed", which `sv`/`rex` alone cannot.
+   */
+  initialized: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,13 +85,39 @@ const POLL_INTERVAL_MS = 10_000;
 let cachedStatus: ProjectStatus | null = null;
 let fetchPromise: Promise<ProjectStatus | null> | null = null;
 
+/**
+ * Shape check for the `/api/status` body, run once here rather than left to
+ * an unchecked `const data: ProjectStatus = await res.json()` cast.
+ *
+ * A body with a missing section (e.g. only `hench` arrived) or a malformed
+ * one (e.g. `rex.stats = {}` — neither `null` nor a real `TreeStats`) is
+ * treated the same as a failed fetch: the whole body is unavailable, not
+ * partially trusted. That is what lets the Home next-step panel compute one
+ * of its four states from `status` without also having to guard against a
+ * half-populated object — every caller of `useProjectStatus` sees either a
+ * complete `ProjectStatus` or `null`.
+ */
+function isValidProjectStatus(data: unknown): data is ProjectStatus {
+  if (!data || typeof data !== "object") return false;
+  const d = data as Partial<ProjectStatus>;
+  if (!d.sv || typeof d.sv.freshness !== "string") return false;
+  if (!d.rex || typeof d.rex.exists !== "boolean") return false;
+  if (d.rex.stats !== null && d.rex.stats !== undefined) {
+    if (typeof d.rex.stats !== "object" || typeof d.rex.stats.total !== "number") return false;
+  }
+  if (!d.hench || typeof d.hench.configured !== "boolean") return false;
+  if (typeof d.initialized !== "boolean") return false;
+  return true;
+}
+
 async function fetchStatus(): Promise<ProjectStatus | null> {
   if (fetchPromise) return fetchPromise;
   fetchPromise = (async () => {
     try {
       const res = await fetch("/api/status");
       if (!res.ok) return null;
-      const data: ProjectStatus = await res.json();
+      const data: unknown = await res.json();
+      if (!isValidProjectStatus(data)) return null;
       cachedStatus = data;
       return data;
     } catch {

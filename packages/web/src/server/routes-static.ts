@@ -7,7 +7,7 @@ import { readFileSync, existsSync, realpathSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerContext } from "./types.js";
-import { isKnownViewPath } from "../shared/view-routing.js";
+import { isKnownViewPath, resolveViewAlias, buildValidViews } from "../shared/view-routing.js";
 
 const LIVE_RELOAD_SNIPPET = `<script>
 (function(){
@@ -167,6 +167,30 @@ export function handleStaticRoute(
   // Backward compat: /landing → redirect to /
   if (url === "/landing" || url === "/landing/") {
     res.writeHead(301, { Location: "/" });
+    res.end();
+    return true;
+  }
+
+  // Redirect aliases: view paths merged into a stage in 0.8.0 (e.g.
+  // /overview -> /analyze). Must come before the SPA catch-all below, which
+  // would otherwise serve the old path directly — /overview and /rex-dashboard
+  // are still registered ViewIds so a scoped standalone viewer can keep one as
+  // its own page (resolveViewAlias returns null there, and the request falls
+  // through unchanged). Any sub-path and query string survive the redirect.
+  const [pathOnly, queryString] = url.split("?");
+  const aliasSegment = pathOnly.slice(1).split("/")[0];
+  const aliasTarget = resolveViewAlias(aliasSegment, buildValidViews(ctx.scope ?? null));
+  if (aliasTarget) {
+    const rest = pathOnly.slice(1 + aliasSegment.length);
+    // Relative, not root-relative: start.ts strips a /w/<key>/ workspace slot
+    // from req.url before this runs, and the hub proxy re-prefixes only
+    // /p/<id>/, so "/analyze" would drop the slot and land on the anchor.
+    // One "../" per sub-path segment climbs back to the alias's directory.
+    const up = "../".repeat((rest.match(/\//g) ?? []).length);
+    const location = `${up}${aliasTarget}${rest}${queryString ? `?${queryString}` : ""}`;
+    // 302, not 301: a browser caches a 301 per URL indefinitely, and the same
+    // localhost URL may later be a rex-scoped viewer or a build without the alias.
+    res.writeHead(302, { Location: location });
     res.end();
     return true;
   }

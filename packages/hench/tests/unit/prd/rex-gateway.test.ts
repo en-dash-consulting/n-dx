@@ -43,6 +43,7 @@ const EXPECTED_EXPORTS = [
   "findActionableTasks",
   "collectCompletedIds",
   "explainSelection",
+  "matchesAssignee",
   // Cross-worktree task claims
   "openClaimsStore",
   "resolveClaimHolder",

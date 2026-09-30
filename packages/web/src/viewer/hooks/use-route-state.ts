@@ -9,6 +9,7 @@ import { useState, useCallback, useEffect } from "preact/hooks";
 import type { ViewId, NavigateTo, AskSeed } from "../types.js";
 import { parseLegacyHashRoute, resolveLocationRoute } from "../route-state.js";
 import { appUrl, getBasePath } from "../base-path.js";
+import { resolveViewAlias } from "../external.js";
 
 export interface RouteState {
   view: ViewId;
@@ -66,6 +67,10 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
   const [askSeed, setAskSeed] = useState<AskSeed | null>(null);
 
   const navigateTo: NavigateTo = useCallback((targetView, opts) => {
+    // A caller may still pass an old id (the bottom-bar's freshness/completion
+    // indicators do, via INDICATOR_VIEWS) — resolve it to the stage that
+    // absorbed it so the URL and the lit tab both land on the current view.
+    const view = resolveViewAlias(targetView, validViews) ?? targetView;
     const file = opts?.file ?? null;
     const zone = opts?.zone ?? null;
     const runId = opts?.runId ?? null;
@@ -76,21 +81,22 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     setSelectedRunId(runId);
     setSelectedTaskId(taskId);
     setAskSeed(seed);
-    setView(targetView);
+    setView(view);
     const subId = runId ?? taskId;
-    const urlPath = subId ? `/${targetView}/${subId}` : `/${targetView}`;
-    history.pushState({ view: targetView, file, zone, runId, taskId, askSeed: seed }, "", appUrl(urlPath));
-  }, []);
+    const urlPath = subId ? `/${view}/${subId}` : `/${view}`;
+    history.pushState({ view, file, zone, runId, taskId, askSeed: seed }, "", appUrl(urlPath));
+  }, [validViews]);
 
   const handleSidebarNav = useCallback((id: ViewId) => {
+    const view = resolveViewAlias(id, validViews) ?? id;
     setSelectedFile(null);
     setSelectedZone(null);
     setSelectedRunId(null);
     setSelectedTaskId(null);
     setAskSeed(null);
-    setView(id);
-    history.pushState({ view: id, file: null, zone: null, runId: null, taskId: null, askSeed: null }, "", appUrl(`/${id}`));
-  }, []);
+    setView(view);
+    history.pushState({ view, file: null, zone: null, runId: null, taskId: null, askSeed: null }, "", appUrl(`/${view}`));
+  }, [validViews]);
 
   useEffect(() => {
     // Backward compat: migrate old hash URLs to path URLs

@@ -31,6 +31,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readdir, rename, readFile, writeFile, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import {
   offerSlugMigration,
   resolveRexCli,
@@ -40,7 +41,7 @@ import {
 } from "../../src/cli/slug-migration-offer.js";
 import { readTreeConformanceRefusal } from "../../src/cli/commands/run.js";
 import { resolveStore, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../src/prd/rex-gateway.js";
-import { setupProjectDir, cleanupProjectDir } from "../helpers/index.js";
+import { setupProjectDir, cleanupProjectDir, commitGitFixtureBaseline } from "../helpers/index.js";
 
 const DOC = {
   schema: "rex/v1",
@@ -250,6 +251,33 @@ describe("offering the slug migration at the gate", () => {
     // would contradict the advice they are reading.
     expect(result).toEqual({ outcome: "no-offer" });
     expect(prompt).not.toHaveBeenCalled();
+  });
+
+  // #442 finding 7: the offer used to pass rex's own `--allow-on-branch`
+  // unconditionally, so an operator accepting the offer on a feature branch
+  // got a silent whole-tree rewrite instead of rex's branch guard. The offer
+  // no longer passes that flag — an accepted migration on a feature branch
+  // now surfaces the guard's refusal instead of running.
+  it("surfaces rex's branch-guard refusal, naming the branch, on a feature branch", async () => {
+    await reSuffixEpicDir();
+    commitGitFixtureBaseline(projectDir);
+    const branch = "feature/442-branch-guard";
+    execFileSync("git", ["checkout", "-b", branch], { cwd: projectDir, stdio: "ignore" });
+
+    const before = await refusal();
+    const prompt = vi.fn(async () => true);
+
+    await expect(
+      offerSlugMigration(projectDir, before, INTERACTIVE, {
+        isTTY: true,
+        prompt,
+        write: () => {},
+        env: { ...process.env, CI: "" },
+      }),
+    ).rejects.toThrow(new RegExp(`not the default branch.*${branch}|${branch}.*not the default branch`));
+
+    // The branch guard stopped it before the slug rewrite — still refused.
+    expect(await readTreeConformanceRefusal(rexDir)).not.toBeNull();
   });
 });
 

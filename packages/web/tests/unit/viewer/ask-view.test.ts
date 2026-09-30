@@ -17,7 +17,7 @@ import {
   isSubmittablePrompt,
 } from "../../../src/viewer/views/ask.js";
 import { StagePage } from "../../../src/viewer/views/stage-pages.js";
-import { SOURCEVISION_TABS } from "../../../src/viewer/views/index.js";
+import { STAGES } from "../../../src/viewer/views/index.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 import { buildValidViews } from "../../../src/shared/index.js";
@@ -928,9 +928,15 @@ describe("Ask view registration", () => {
     expect(renderActiveView("ask", ctx)).not.toBeNull();
   });
 
-  it("appears in the tab registry after PR Markdown", () => {
-    const ids = SOURCEVISION_TABS.map((t) => t.id);
+  it("is the Analysis section after PR Markdown", () => {
+    const ids = STAGES.analyze.sections.map((s) => s.view);
     expect(ids.indexOf("ask")).toBe(ids.indexOf("pr-markdown") + 1);
+  });
+
+  it("is gated and server-built, as the retired tab table recorded", () => {
+    const ask = STAGES.analyze.sections.find((s) => s.view === "ask")!;
+    expect(ask.featureGate).toBe("sourcevision.ask");
+    expect(ask.requiresServer).toBe(true);
   });
 });
 
