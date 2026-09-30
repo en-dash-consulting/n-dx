@@ -304,7 +304,7 @@ describe("rendered surfaces take their labels from the model", () => {
     expect(wrong).toEqual([]);
   });
 
-  it("every tab in a section is named and described by its own view", async () => {
+  it("every tab in a section is named by its own view", async () => {
     const wrong: string[] = [];
     for (const stage of STAGE_ORDER) {
       act(() => {
@@ -314,16 +314,22 @@ describe("rendered surfaces take their labels from the model", () => {
       });
       await settle();
       for (const section of STAGES[stage].sections.filter((s) => s.tabs?.length)) {
-        act(() => {
-          root.querySelector<HTMLButtonElement>(
-            `.stage-section[data-view="${section.view}"] .stage-section-toggle`,
-          )?.click();
-        });
-        await settle();
+        // Open it only if it is closed: a section remembers its open state in
+        // localStorage, which is not reset between cases, so a blind click
+        // closes an already-open section and leaves nothing to assert on.
+        const toggle = root.querySelector<HTMLButtonElement>(
+          `.stage-section[data-view="${section.view}"] .stage-section-toggle`,
+        );
+        if (toggle?.getAttribute("aria-expanded") !== "true") {
+          act(() => { toggle?.click(); });
+          await settle();
+        }
         const tabButtons = [...root.querySelectorAll<HTMLButtonElement>(
           `.stage-section[data-view="${section.view}"] .stage-section-tab`,
         )];
         const expectedViews = [section.view, ...section.tabs!.map((t) => t.view)];
+        // A closed section renders no tabs, so this comparison also fails
+        // loudly rather than passing having checked nothing.
         if (tabButtons.map((b) => b.textContent).join("|") !== expectedViews.map((v) => viewLabel(v)).join("|")) {
           wrong.push(`${stage}/${section.view}: tabs ${tabButtons.map((b) => b.textContent).join(", ")}`);
         }

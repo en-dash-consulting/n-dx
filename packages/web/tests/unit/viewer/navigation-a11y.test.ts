@@ -134,6 +134,23 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
     await act(async () => {});
   }
 
+  /**
+   * Open a collapsed section — and leave an already-open one alone.
+   *
+   * A section remembers its open state in localStorage, which is not reset
+   * between cases in this file, and each case here runs twice (once per
+   * width). A blind `click()` therefore *closes* the section on the second
+   * run, leaving nothing to assert on: the tab assertions below ran zero
+   * times and still reported green until this read the state first.
+   */
+  function openSection(view: string): void {
+    const toggle = root.querySelector<HTMLButtonElement>(
+      `.stage-section[data-view="${view}"] .stage-section-toggle`,
+    );
+    if (toggle?.getAttribute("aria-expanded") === "true") return;
+    act(() => { toggle?.click(); });
+  }
+
   it("reads at least one hiding rule out of shell.css", () => {
     // Guards the guard: an empty set would make every assertion below vacuous.
     expect(HIDDEN_WHEN_NARROW.size).toBeGreaterThan(0);
@@ -217,14 +234,12 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
             stage, validViews: VALID, navigateTo: () => {}, renderView: () => null,
           }));
           for (const section of STAGES[stage].sections.filter((s) => s.tabs?.length)) {
-            act(() => {
-              root.querySelector<HTMLButtonElement>(
-                `.stage-section[data-view="${section.view}"] .stage-section-toggle`,
-              )?.click();
-            });
-            for (const tab of root.querySelectorAll(
+            openSection(section.view);
+            const tabs = [...root.querySelectorAll(
               `.stage-section[data-view="${section.view}"] [role="tab"]`,
-            )) {
+            )];
+            expect(tabs, `${section.view} rendered no tabs`).toHaveLength(section.tabs!.length + 1);
+            for (const tab of tabs) {
               const view = tab.getAttribute("data-tab")!;
               expect(accessibleName(tab, hidden)).toBe(viewLabel(view as never));
             }

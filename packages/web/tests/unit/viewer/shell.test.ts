@@ -395,6 +395,26 @@ describe("StagePage", () => {
     expect(navigateTo).toHaveBeenCalledWith("validation");
   });
 
+  it("opens the active tab's view, not the section's first, from a tabbed section", async () => {
+    // A tabbed section is a window onto whichever tab is showing, so Open ↗
+    // has to follow the tab. Without this, switching to Zones and pressing
+    // Open silently lands on the Repository Map — the section's own view.
+    const navigateTo = vi.fn();
+    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
+    await mount(page("analyze", ALL, navigateTo));
+    const terrain = root.querySelector('.stage-section[data-view="graph"]')!;
+    const open = terrain.querySelector<HTMLButtonElement>(".stage-section-open")!;
+
+    act(() => { open.click(); });
+    expect(navigateTo).toHaveBeenLastCalledWith("graph");
+
+    const zones = terrain.querySelector<HTMLButtonElement>('[role="tab"][data-tab="zones"]')!;
+    act(() => { zones.click(); });
+    expect(open.getAttribute("aria-label")).toBe("Open Zones on its own page");
+    act(() => { open.click(); });
+    expect(navigateTo).toHaveBeenLastCalledWith("zones");
+  });
+
   it("embeds the Tasks tree, open on arrival, in a bounded-height body it can fill", async () => {
     await mount(page("plan"));
     expect(rendered).toContain("prd");
