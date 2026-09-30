@@ -1,0 +1,25 @@
+---
+id: "94acd4e9-e113-461f-af0e-769c7c357996"
+level: "task"
+title: "Show provider limits per vendor and a per-vendor agent model picker on Robot Wrangler"
+status: "pending"
+priority: "medium"
+tags:
+  - "0.8.0"
+  - "settings-consolidation"
+  - "pr-24"
+blockedBy:
+  - "11e17f5e-2453-4984-bd6e-776dc1dca5f3"
+  - "69848346-1828-42d3-b62d-833648d4274b"
+  - "70ac46e4-b114-48bb-bfcc-d341535309c0"
+source: "2026-09-23 H-lane test session (feat/071-h-glossary-and-plain-language-titles)"
+acceptanceCriteria:
+  - "For each vendor (claude, codex, google, local) Robot Wrangler's provider field offers exactly the providers hench accepts, from the server catalog, and the server rejects any other value."
+  - "The per-vendor agent model picker lists that vendor's models from the server catalog, marks the project default, and saves to hench.models.<vendor>; 'Use project default' removes the override; free entry is still possible."
+  - "Switching the active vendor changes what the page offers without stale options and without a reload."
+  - "MODEL_SUGGESTIONS is removed; no model list in the viewer is hard-coded."
+  - "Unit tests cover the four vendors for both fields."
+description: "Robot Wrangler (11e17f5e) replaces the LLM Provider view and the hench Config view's provider and model fields. On that page, for each vendor offer only the providers hench accepts (claude: cli or api; codex: cli; google and local: api, shown as fixed), taken from the catalog route 69848346 serves. Replace free-text model entry with a per-vendor agent model picker over that vendor's models from the same catalog, marking the project default, with \"Use project default\" (clears hench.models.<vendor>) and free entry; save to the override 70ac46e4 adds. Remove MODEL_SUGGESTIONS so every viewer model list comes from the server catalog. Moved from 0.7.1 PR N, where it targeted the hench Config view (now replaced by the Workflow page and Robot Wrangler); also takes \"surface it on Robot Wrangler\" from 70ac46e4 and the viewer half of 8559090f.\n\nConstraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (hench: src/prd/rex-gateway.ts and src/prd/llm-gateway.ts; web: src/server/rex-gateway.ts and src/server/domain-gateway.ts) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name (@n-dx/hench, @n-dx/rex, @n-dx/web, @n-dx/core, @n-dx/sourcevision, @n-dx/llm-client) with a patch bump; run pnpm preflight before opening the PR."
+lastModified: "2026-09-29T17:29:48.700Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

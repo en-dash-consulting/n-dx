@@ -93,6 +93,41 @@ describe("Model resolution in ndx work", () => {
     expect(line).toContain("(cli-override)");
   });
 
+  // ── hench.models.<vendor> agent-only override ──────────────────────────────
+
+  it("displays the agent-only override with 'hench-override' source", () => {
+    const llmConfig: LLMConfig = {
+      vendor: "claude",
+      claude: { model: "sonnet" },
+    };
+    const options: VendorModelHeaderOptions = {
+      resolvedModel: "claude-opus-4-20250514",
+      modelSource: "hench-override",
+    };
+
+    printVendorModelHeader("claude", llmConfig, options);
+
+    const line = logSpy.mock.calls[0][0] as string;
+    expect(line).toContain("Model: claude-opus-4-20250514");
+    expect(line).toContain("(hench-override)");
+    // The llm.* slot lost, so naming it would misreport what is running.
+    expect(line).not.toContain("llm.claude.model");
+  });
+
+  it("omits the tier label for an agent-only override, as it does for --model", () => {
+    const llmConfig: LLMConfig = { vendor: "claude" };
+
+    printVendorModelHeader("claude", llmConfig, {
+      resolvedModel: "claude-opus-4-20250514",
+      modelSource: "hench-override",
+      tier: "light",
+    });
+
+    const line = logSpy.mock.calls[0][0] as string;
+    expect(line).toContain("(hench-override)");
+    expect(line).not.toContain("tier");
+  });
+
   // ── No configuration falls back to default ─────────────────────────────────
 
   it("displays default model when no config and no CLI override", () => {
