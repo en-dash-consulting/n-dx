@@ -590,13 +590,8 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
     });
 
     it("refuses a valueless --item instead of rendering the whole PRD", () => {
-      // `--item` must be immediately followed by another flag here, not the
-      // trailing directory: `item` is a VALUE_KEY (rex ready --item <id> needs
-      // it), so `--item <bare-token>` now consumes a following non-flag token
-      // as its value — which is the space-separated form working as intended,
-      // not the valueless case this test means to exercise.
       const output = run(
-        ["export", "--format=narrative", "--item", `--out=${narrativePath}`, sourceDir],
+        ["export", "--format=narrative", `--out=${narrativePath}`, "--item", sourceDir],
         true,
       );
       expect(output).toMatch(/--item needs a value/);

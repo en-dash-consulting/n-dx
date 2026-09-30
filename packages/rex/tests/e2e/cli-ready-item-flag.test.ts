@@ -1,9 +1,12 @@
 /**
- * Regression test for #442 finding 11: `item` was missing from `VALUE_KEYS`
- * in the CLI's argument parser, so `--item <id>` (space-separated form) was
- * treated as a bare boolean flag — `<id>` fell through as a stray positional
- * argument instead of being consumed as `--item`'s value, and `rex ready`
- * went looking for an item literally named `"true"`.
+ * Regression test for #442 finding 11: `rex ready --item <id>` (space-separated)
+ * went looking for an item literally named `"true"`, because `item` is not a
+ * VALUE_KEY and the parser turns a bare `--item` into "true".
+ *
+ * `item` stays out of VALUE_KEYS on purpose: adding it made `rex log <event>
+ * --item <dir>` log the directory as the item id and split `rex export` from
+ * `ndx prd export`. So `rex ready` refuses the space form by name, the same
+ * way `rex log` and `rex export` do, and `--item=<id>` is the supported form.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -50,9 +53,16 @@ describe("rex ready --item <id>", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it("parses a space-separated --item value instead of misreading it as a bare flag", () => {
-    const output = run(["ready", "--item", itemId, dir]);
-    expect(output).toContain(itemId);
+  it("refuses a space-separated --item and names the --item=<id> form", () => {
+    let stderr = "";
+    try {
+      run(["ready", "--item", itemId, dir]);
+      expect.fail("rex ready --item <id> should exit non-zero");
+    } catch (err) {
+      stderr = String((err as { stderr?: string }).stderr ?? "");
+    }
+    expect(stderr).toMatch(/--item needs a value/);
+    expect(stderr).toContain("--item=<id>");
   });
 
   it("still accepts the --item=<id> form", () => {
