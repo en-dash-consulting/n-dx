@@ -26,7 +26,7 @@
  * The acceptance criterion this rule serves is absolute — *no* literal outside
  * the resolver and the migration command — and that is not reachable yet: the
  * sweep it depends on (`c64f053e`, routing hench, web and core through their
- * paths modules) has not run, and 193 sites across 78 files are still waiting
+ * paths modules) has not run, and 160 sites across 68 files are still waiting
  * for it. So the rule is a ratchet rather than a wall: every one of those
  * files is named in `tests/layout-literal-inventory.md` with the count it is
  * allowed, a **new** file fails, and an existing file that grows fails. When
