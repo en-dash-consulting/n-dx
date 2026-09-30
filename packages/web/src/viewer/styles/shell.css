@@ -347,6 +347,74 @@
 .settings-overlay-density-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
 .settings-overlay-content { flex: 1; min-width: 0; overflow-y: auto; padding: var(--space-6); }
 
+/* ── Settings frame ─ shared Save/dirty chrome for consolidated settings pages ── */
+
+.settings-frame { display: flex; flex-direction: column; gap: var(--space-5); }
+.settings-frame-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.settings-frame-indicator { font-size: 12px; color: var(--text-muted); }
+.settings-frame-indicator--dirty { color: var(--warn, #e0a030); font-weight: 600; }
+.settings-frame-error { font-size: 12px; color: var(--danger, #e05252); }
+.settings-frame-save {
+  margin-left: auto;
+  padding: 7px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--bg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.settings-frame-save:hover:not(:disabled), .settings-frame-save:focus-visible {
+  filter: brightness(1.08);
+  outline: none;
+}
+.settings-frame-save:disabled { opacity: .5; cursor: default; }
+
+/* Leave-with-unsaved-changes prompt — modelled on .delete-modal-*. */
+.leave-guard-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, .5);
+}
+.leave-guard-modal {
+  width: min(420px, calc(100vw - var(--space-6)));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .4);
+  padding: var(--space-5);
+}
+.leave-guard-header { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.leave-guard-icon { font-size: 16px; }
+.leave-guard-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.leave-guard-message { margin: 0 0 var(--space-4); font-size: 13px; color: var(--text-muted); }
+.leave-guard-actions { display: flex; justify-content: flex-end; gap: var(--space-3); }
+.leave-guard-keep-btn, .leave-guard-discard-btn {
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.leave-guard-keep-btn { border: 1px solid var(--border); background: transparent; color: var(--text); }
+.leave-guard-keep-btn:hover, .leave-guard-keep-btn:focus-visible { background: var(--bg-hover); outline: none; }
+.leave-guard-discard-btn { border: 1px solid transparent; background: var(--danger, #e05252); color: #fff; }
+.leave-guard-discard-btn:hover, .leave-guard-discard-btn:focus-visible { filter: brightness(1.08); outline: none; }
+
 /* ── Stage pages ─────────────────────────────────────────────────────── */
 
 .stage-page-head { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-5); }
