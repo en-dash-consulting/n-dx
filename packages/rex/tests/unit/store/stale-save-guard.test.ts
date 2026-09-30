@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readdir, utimes, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, readdir, utimes, stat, writeFile, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { serializeFolderTree } from "../../../src/store/folder-tree-serializer.js";
@@ -282,11 +282,22 @@ describe("stale-save guard", () => {
     // failed the same way. The snapshot did read the file (the parser digests
     // every `.md` before parsing it), so it is not unseen work.
     await serializeFolderTree([epic("a", "Alpha", [task("x", "Item X")])], treeRoot);
+
+    // Corrupt the file BEFORE the load, so the snapshot's digest is the digest
+    // of the corrupt bytes. That is the real scenario: the tree was already
+    // damaged when this writer read it, and the save that would repair it must
+    // not be refused. Damaging it after the load would instead be another
+    // writer's edit, which the guard is supposed to refuse.
+    const corrupt = join(treeRoot, "alpha", "item-x.md");
+    await writeFile(corrupt, "CORRUPTED", "utf-8");
+
     const { fileDigests: loadedFiles } = await parseFolderTree(treeRoot);
     const loadedAt = Date.now();
 
-    const corrupt = join(treeRoot, "alpha", "item-x.md");
     expect(loadedFiles.has(resolve(corrupt))).toBe(true);
+    // No parseable `id:` line survives — this is the path that used to end the
+    // check early and refuse the repair.
+    expect(await readFile(corrupt, "utf-8")).not.toMatch(/^id:/m);
     const future = new Date(Date.now() + 5_000);
     await utimes(corrupt, future, future);
 

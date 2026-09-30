@@ -63,6 +63,36 @@ function fastestMs(fn: () => unknown, runs = 3): number {
   return best;
 }
 
+/**
+ * The fastest run of each of two functions, measured in alternation.
+ *
+ * Timing one function to completion and then the other leaves each minimum
+ * drawn from a different window, so sustained load arriving during the second
+ * window inflates only that reading — and a ratio between them is then a
+ * measure of when the load happened rather than of the work. Alternating puts
+ * both through the same conditions: a burst long enough to matter is seen by
+ * both, and one short enough to miss a run is excluded from both by the
+ * minimum. Returns the two minima in the order the functions were given.
+ */
+function fastestMsInterleaved(
+  a: () => unknown,
+  b: () => unknown,
+  runs = 5,
+): [number, number] {
+  let bestA = Infinity;
+  let bestB = Infinity;
+  for (let i = 0; i < runs; i++) {
+    const startA = performance.now();
+    a();
+    bestA = Math.min(bestA, performance.now() - startA);
+
+    const startB = performance.now();
+    b();
+    bestB = Math.min(bestB, performance.now() - startB);
+  }
+  return [bestA, bestB];
+}
+
 // ── parseQuery tests ─────────────────────────────────────────────────────────
 
 describe("parseQuery", () => {
@@ -602,8 +632,15 @@ describe("SearchIndex", () => {
     expect(smallIndex.rebuild()).toBe(smallCount);
     expect(largeIndex.rebuild()).toBe(largeCount);
 
-    const smallMs = fastestMs(() => smallIndex.rebuild(), 5);
-    const largeMs = fastestMs(() => largeIndex.rebuild(), 5);
+    // Interleaved, so both minima come from the same stretch of machine time.
+    // Measured sequentially, a load burst landing only on the second window
+    // inflates that reading alone, and the ratio then reports when the load
+    // arrived rather than how the work scales.
+    const [smallMs, largeMs] = fastestMsInterleaved(
+      () => smallIndex.rebuild(),
+      () => largeIndex.rebuild(),
+      5,
+    );
 
     // Linear gives timeRatio ~= sizeRatio (16); measured 13.61x, just under,
     // because per-rebuild file read and parse overhead inflates the small

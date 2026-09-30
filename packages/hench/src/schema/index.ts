@@ -66,9 +66,11 @@ export {
   validateConfig,
   validateRunRecord,
   formatValidationErrors,
+  revertInvalidFields,
+  formatFieldIssues,
 } from "./validate.js";
 
-export type { ValidationResult } from "./validate.js";
+export type { ValidationResult, FieldRevertResult } from "./validate.js";
 
 export { BUILT_IN_TEMPLATES, findBuiltInTemplate } from "./templates.js";
 

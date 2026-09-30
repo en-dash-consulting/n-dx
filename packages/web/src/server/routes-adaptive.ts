@@ -29,6 +29,7 @@ import {
   getConfigValue as getNestedValue,
   setConfigValue as setNestedValue,
 } from "./hench-config-fields.js";
+import { resolveActiveVendor } from "./routes-llm.js";
 
 const ADAPTIVE_PREFIX = "/api/hench/adaptive/";
 
@@ -708,7 +709,7 @@ async function handleApplyAdjustment(
 
   // Only a known config field with a correctly-typed value may be written, and
   // never a prototype-poisoning path. Refuse before touching the config file.
-  const applyError = validateConfigKeyValue(configKey, newValue);
+  const applyError = validateConfigKeyValue(configKey, newValue, resolveActiveVendor(ctx.projectDir));
   if (applyError) {
     errorResponse(res, 400, applyError);
     return true;
@@ -837,7 +838,7 @@ async function handleSetOverride(
 
   // Same gate as apply: an override may only set a known config field to a
   // correctly-typed value, never an invented key or a prototype segment.
-  const overrideError = validateConfigKeyValue(key, value);
+  const overrideError = validateConfigKeyValue(key, value, resolveActiveVendor(ctx.projectDir));
   if (overrideError) {
     errorResponse(res, 400, overrideError);
     return true;

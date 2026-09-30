@@ -341,6 +341,49 @@ describe("Hench Config API routes", () => {
     expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
   });
 
+  // ── PUT /api/hench/config — vendor-aware provider validation ────────
+
+  it("PUT /api/hench/config rejects a provider the active vendor does not support", async () => {
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex" } }));
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes: { provider: "api" } }),
+    });
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    expect(body.error).toContain("codex");
+    expect(body.error).toContain("cli");
+    // Naming both the vendor and its allowed providers, per the acceptance
+    // criterion — and the file must stay untouched, same as every other
+    // rejected write in this suite.
+    expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+  });
+
+  it("PUT /api/hench/config still accepts a provider the active vendor supports", async () => {
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex" } }));
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes: { provider: "cli" } }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("PUT /api/hench/config accepts either provider when no vendor is configured", async () => {
+    // No .n-dx.json at all — matches the pre-existing "returns impact
+    // descriptions" test above, which writes provider=api with no vendor set.
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes: { provider: "api" } }),
+    });
+    expect(res.status).toBe(200);
+  });
+
   it("PUT /api/hench/config leaves the file untouched when one change in a batch is invalid", async () => {
     const before = await readFile(join(henchDir, "config.json"), "utf-8");
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
