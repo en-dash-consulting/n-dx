@@ -18,6 +18,8 @@ Log** (both were "History"); the import map is **Repository Map** everywhere;
 Rex's "Analyze & Import" is **Add Items**; "Rex Dashboard" is **Up Next**; and
 the Workspaces board is **Workspaces** in the breadcrumb rather than "Overview",
 which previously collided with SourceVision's Overview. No route changed.
+Browser tab titles for pages no single package owns (Home, Token Usage,
+Workspaces, settings) name only the page, e.g. `Home | my-project | n-dx`.
 
 Navigation controls also keep an accessible name at narrow widths, where the
 shell hides some of their text.

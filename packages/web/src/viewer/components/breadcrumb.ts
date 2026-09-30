@@ -7,7 +7,8 @@
  * it with the current view to build a contextual breadcrumb trail.
  *
  * Also manages `document.title`, formatted as
- * "ViewLabel — ProductLabel | ProjectName | n-dx".
+ * "ViewLabel — ProductLabel | ProjectName | n-dx", or "ViewLabel | ProjectName | n-dx"
+ * for a view no single package owns.
  *
  * Every name here comes from the navigation model (`views/view-meta.ts`,
  * reached through `api.ts`). The breadcrumb used to keep its own table of the
@@ -76,7 +77,8 @@ export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
   // Keep document.title in sync with project + current view
   useEffect(() => {
     const parts: string[] = [];
-    if (label && meta) parts.push(`${label} — ${PRODUCT_LABELS[meta.product]}`);
+    // A view no single package owns names only itself: "Home | proj | n-dx".
+    if (label && meta) parts.push(meta.product === "global" ? label : `${label} — ${PRODUCT_LABELS[meta.product]}`);
     if (project) parts.push(project.name);
     parts.push("n-dx");
     document.title = parts.join(" | ");

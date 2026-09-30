@@ -206,7 +206,8 @@ describe("rendered surfaces take their labels from the model", () => {
     for (const view of ALL_VIEWS) {
       act(() => { render(h(Breadcrumb, { view, navigateTo: () => {} }), root); });
       await settle();
-      const expected = `${resolveCliLabel(viewLabel(view), "n-dx")} — ${PRODUCT_LABELS[viewProduct(view)]}`;
+      const label = resolveCliLabel(viewLabel(view), "n-dx");
+      const expected = viewProduct(view) === "global" ? `${label} | ` : `${label} — ${PRODUCT_LABELS[viewProduct(view)]}`;
       if (!document.title.startsWith(expected)) {
         wrong.push(`${view}: title "${document.title}" does not start with "${expected}"`);
       }
