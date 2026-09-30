@@ -38,12 +38,11 @@ afterEach(async () => {
 });
 
 /** Write `.sourcevision/manifest.json` with a lastAnalysis block. */
-async function writeManifest(llm) {
+async function writeManifest(llm, { at = new Date().toISOString(), narration } = {}) {
   await mkdir(join(dir, ".sourcevision"), { recursive: true });
-  await writeFile(
-    join(dir, ".sourcevision", "manifest.json"),
-    JSON.stringify({ lastAnalysis: { at: new Date().toISOString(), mode: "cascade", durationMs: 1, phases: {}, llm } }),
-  );
+  const manifest = { lastAnalysis: { at, mode: "cascade", durationMs: 1, phases: {}, llm } };
+  if (narration) manifest.narration = narration;
+  await writeFile(join(dir, ".sourcevision", "manifest.json"), JSON.stringify(manifest));
 }
 
 /** Append one `analyze_token_usage` line to rex's execution log. */
@@ -107,7 +106,7 @@ describe("collectRunSummary — LLM usage", () => {
       costUsd: 0.042,
     });
 
-    const summary = collectRunSummary(dir, EFFECTS, Date.now());
+    const summary = collectRunSummary(dir, EFFECTS, Date.now() - 1000);
     expect(summary.calls).toBe(4);
     expect(summary.inputTokens).toBe(1500);
     expect(summary.outputTokens).toBe(300);
@@ -123,7 +122,7 @@ describe("collectRunSummary — LLM usage", () => {
       },
     });
 
-    const summary = collectRunSummary(dir, EFFECTS, Date.now());
+    const summary = collectRunSummary(dir, EFFECTS, Date.now() - 1000);
     expect(summary.calls).toBe(2);
     expect(summary.costUsd).toBeNull();
   });
@@ -152,6 +151,68 @@ describe("collectRunSummary — LLM usage", () => {
     const summary = collectRunSummary(dir, EFFECTS, Date.now());
     expect(summary.calls).toBe(0);
     expect(summary.costUsd).toBeNull();
+  });
+
+  it("ignores a sourcevision analysis from an earlier run", async () => {
+    // `lastAnalysis` is the last analysis the *project* ran, not the last one
+    // this command ran — and most commands never run sourcevision at all.
+    // Without the cutoff, an interactive `ndx recommend .` after an
+    // `ndx analyze .` billed itself for the analysis.
+    await writeManifest(
+      {
+        byTaskClass: {
+          zones: { calls: 9, inputTokens: 9999, outputTokens: 99, durationMs: 1, vendor: "claude", model: "m" },
+        },
+        costUsd: 1.5,
+      },
+      { at: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString() },
+    );
+
+    const summary = collectRunSummary(dir, EFFECTS, Date.now());
+    expect(summary.calls).toBe(0);
+    expect(summary.costUsd).toBeNull();
+  });
+
+  it("treats an unparseable analysis timestamp as not ours", async () => {
+    await writeManifest(
+      { byTaskClass: { zones: { calls: 4, inputTokens: 40, outputTokens: 4, durationMs: 1, vendor: "claude", model: "m" } } },
+      { at: "not a date" },
+    );
+
+    expect(collectRunSummary(dir, EFFECTS, Date.now() - 1000).calls).toBe(0);
+  });
+
+  it("reports a narrator this run queued and has not finished", async () => {
+    // `analyze` spawns `sv narrate` detached and returns, so the summary prints
+    // before that child records a token. The numbers are right about what has
+    // been recorded and wrong about what the command will cost.
+    await writeManifest(
+      { byTaskClass: { zones: { calls: 1, inputTokens: 10, outputTokens: 1, durationMs: 1, vendor: "claude", model: "m" } } },
+      { narration: { status: "pending", zones: ["z1"], startedAt: new Date().toISOString() } },
+    );
+
+    expect(collectRunSummary(dir, EFFECTS, Date.now() - 1000).narrationPending).toBe(true);
+  });
+
+  it("does not claim a narrator left pending by an earlier analyze", async () => {
+    await writeManifest(
+      { byTaskClass: {} },
+      {
+        at: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString(),
+        narration: { status: "pending", zones: ["z1"], startedAt: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString() },
+      },
+    );
+
+    expect(collectRunSummary(dir, EFFECTS, Date.now()).narrationPending).toBe(false);
+  });
+
+  it("does not report a narrator that finished", async () => {
+    await writeManifest(
+      { byTaskClass: {} },
+      { narration: { status: "done", zones: ["z1"], startedAt: new Date().toISOString(), finishedAt: new Date().toISOString() } },
+    );
+
+    expect(collectRunSummary(dir, EFFECTS, Date.now() - 1000).narrationPending).toBe(false);
   });
 
   it("survives a malformed manifest and a torn log line", async () => {
@@ -201,6 +262,15 @@ describe("formatRunSummary", () => {
     const text = formatRunSummary({ ...base, calls: 0, costUsd: null }).join("\n");
     expect(text).toContain("no model calls");
     expect(text).not.toContain("not recorded");
+  });
+
+  it("says the running narrator is not counted, beside a total and beside none", () => {
+    for (const calls of [0, 4]) {
+      const text = formatRunSummary({ ...base, calls, narrationPending: true }).join("\n");
+      expect(text).toContain("background narration is still running");
+    }
+    // And says nothing when there is no narrator.
+    expect(formatRunSummary({ ...base, narrationPending: false }).join("\n")).not.toContain("narration");
   });
 
   it("emits no ANSI when given no colour functions", () => {

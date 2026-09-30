@@ -38,6 +38,7 @@ import { join } from "node:path";
  * @property {number} inputTokens
  * @property {number} outputTokens
  * @property {number|null} costUsd - `null` when no tool recorded a cost.
+ * @property {boolean} narrationPending - This run queued a detached narrator that has not finished; its spend is not in the numbers above.
  * @property {string} next - The command to run next.
  */
 
@@ -54,11 +55,24 @@ function readJSON(path) {
  * LLM totals from `.sourcevision/manifest.json`, if the last analysis recorded
  * any. Read from `lastAnalysis` rather than the aggregate `tokenUsage` bucket
  * because only `lastAnalysis` is per-task-class, and only it carries the cost.
+ *
+ * `sinceMs` scopes it to this invocation, for the same reason {@link rexUsage}
+ * takes one. `lastAnalysis` is the last analysis *the project* ran, not the
+ * last one this command ran — and most commands never run sourcevision at
+ * all. Without the cutoff, an `ndx recommend .` after an `ndx analyze .`
+ * reported the analysis’s calls, tokens and dollars as if `recommend` had
+ * spent them, and `plan --file` read the same stale figures.
  */
-function sourcevisionUsage(dir) {
-  const manifest = readJSON(join(dir, ".sourcevision", "manifest.json"));
+function sourcevisionUsage(manifest, sinceMs) {
   const run = manifest?.lastAnalysis;
   if (!run?.llm?.byTaskClass) return null;
+
+  // `at` is when the analysis started, which is after the orchestrator noted
+  // `startedAt` and before it reads this back. An unparseable stamp is treated
+  // as not ours: a summary that under-reports is recoverable, one that bills a
+  // command for someone else’s spend is not.
+  const at = Date.parse(run.at);
+  if (!Number.isFinite(at) || at < sinceMs) return null;
 
   let calls = 0, inputTokens = 0, outputTokens = 0;
   for (const bucket of Object.values(run.llm.byTaskClass)) {
@@ -113,6 +127,24 @@ function rexUsage(dir, sinceMs) {
     outputTokens: detail.outputTokens ?? 0,
     costUsd: typeof detail.costUsd === "number" ? detail.costUsd : null,
   };
+}
+
+/**
+ * Whether this run queued a narrator that is still going.
+ *
+ * `analyze` spawns `sv narrate` detached and returns without waiting, so the
+ * summary prints before that child records a single token. The numbers are
+ * therefore right about what has been recorded and wrong about what the
+ * command will end up costing, and only the summary can say which.
+ *
+ * The `startedAt` check is what makes it *this* run’s narrator rather than one
+ * left pending by an earlier analyze.
+ */
+function narrationIsPending(manifest, sinceMs) {
+  const narration = manifest?.narration;
+  if (narration?.status !== "pending") return false;
+  const startedAt = Date.parse(narration.startedAt);
+  return Number.isFinite(startedAt) && startedAt >= sinceMs;
 }
 
 function readDetail(detail) {
@@ -184,8 +216,10 @@ export function collectRunSummary(dir, effects, startedAt) {
 
   // Both are consulted because `ndx plan` drives sourcevision and rex in turn
   // and its summary owes the user the sum, not whichever half it looked at
-  // first. A command that never ran one of them simply finds nothing there.
-  const usages = [sourcevisionUsage(dir), rexUsage(dir, threshold)].filter(Boolean);
+  // first. Both are scoped to `threshold`, so a command that never ran one of
+  // them finds nothing there rather than the last run’s numbers.
+  const manifest = readJSON(join(dir, ".sourcevision", "manifest.json"));
+  const usages = [sourcevisionUsage(manifest, threshold), rexUsage(dir, threshold)].filter(Boolean);
 
   let calls = 0, inputTokens = 0, outputTokens = 0, costUsd = null;
   for (const usage of usages) {
@@ -195,7 +229,15 @@ export function collectRunSummary(dir, effects, startedAt) {
     if (usage.costUsd !== null) costUsd = (costUsd ?? 0) + usage.costUsd;
   }
 
-  return { filesWritten, calls, inputTokens, outputTokens, costUsd, next: effects.next };
+  return {
+    filesWritten,
+    calls,
+    inputTokens,
+    outputTokens,
+    costUsd,
+    narrationPending: narrationIsPending(manifest, threshold),
+    next: effects.next,
+  };
 }
 
 /** `$0.0123` above a tenth of a cent, `<$0.001` below it, so a real spend never prints as `$0.00`. */
@@ -235,6 +277,13 @@ export function formatRunSummary(summary, style = {}) {
       `  ${bold("llm")}      ${summary.calls} call${summary.calls === 1 ? "" : "s"}, ` +
       `${tokens} tokens, ${formatCost(summary.costUsd)}`,
     );
+  }
+
+  if (summary.narrationPending) {
+    // Aligned under the llm line: it qualifies that line, whichever branch above
+    // produced it — "no model calls" is as incomplete as a total, when a
+    // narrator this run started is still spending.
+    lines.push(`           ${dim("background narration is still running — its calls are not counted here")}`);
   }
 
   lines.push(`  ${bold("next")}     ${green(summary.next)}`);

@@ -124,8 +124,25 @@ export function snapshotRunLedger(): AnalysisRun {
  * judgments to Jev and escalations to the text model, so a single-model price
  * is wrong by whatever the split happens to be that day.
  *
- * Returns `undefined` when no call was made, so the manifest carries no field
- * rather than a misleading `0`.
+ * Returns `undefined` whenever the total cannot be known, so the manifest
+ * carries no field rather than a misleading `0`. Three ways that happens:
+ *
+ * - **No call was made.** There is nothing to price.
+ * - **A model is not in the price table.** `resolveModelPricing` answers with
+ *   fallback rates and `known: false` rather than throwing, so pricing off its
+ *   `pricing` field alone turns a guess into dollars. Local and unknown models
+ *   land here.
+ * - **A bucket has calls but no tokens.** {@link recordLLMCall} folds a missing
+ *   `tokenUsage` in as `0`, so a provider that reported no usage is
+ *   indistinguishable from one that spent nothing — and a call that spent
+ *   nothing does not happen.
+ *
+ * One unknowable bucket makes the *run* total unknowable, so any of them ends
+ * the walk. `costUsd` is a single number with no room to say "partly", and a
+ * total quietly missing one class reads as measurement just as much as a
+ * guessed one does. Absence is the whole signal: `formatCost` renders it as
+ * "not recorded", which sends an operator to look where "$0.00" closes the
+ * question.
  *
  * Cache tokens are not broken out per task class in {@link LLMClassUsage}, so
  * they price as zero here; today's sourcevision call sites do not use prompt
@@ -137,7 +154,10 @@ export function priceRunLedger(run: AnalysisRun): number | undefined {
 
   let total = 0;
   for (const bucket of buckets) {
-    const { pricing } = resolveModelPricing(bucket.model);
+    const { pricing, known } = resolveModelPricing(bucket.model);
+    if (!known) return undefined;
+    if (bucket.calls > 0 && bucket.inputTokens + bucket.outputTokens === 0) return undefined;
+
     total += priceTokens(
       {
         inputTokens: bucket.inputTokens,
