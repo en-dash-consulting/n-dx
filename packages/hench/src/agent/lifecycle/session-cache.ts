@@ -34,7 +34,7 @@
  * @module hench/agent/lifecycle/session-cache
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile, writeFile, mkdir, rm, open, rename, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -331,19 +331,68 @@ async function updateCacheFileLocked(
 }
 
 /**
+ * Errors that mean “someone else is touching this file right now” rather than
+ * “this cannot work”.
+ *
+ * Windows refuses a rename onto a target any process holds open, and returns
+ * one of these rather than blocking. It is not hypothetical here:
+ * {@link readSessionCache} deliberately reads *without* the lock — a reader
+ * only ever costs a missed cache hit, so serialising reads behind writes would
+ * buy nothing — which means a concurrent reader’s open handle is exactly the
+ * condition that makes a correctly locked writer fail. Backup, indexing and
+ * antivirus software open files the same way, so the machine does not have to
+ * be running n-dx twice for this to happen.
+ */
+const TRANSIENT_RENAME_ERRORS = new Set(["EPERM", "EACCES", "EBUSY"]);
+
+/** Attempts and spacing for {@link renameWithRetry}; mirrors the `RM_RETRY` the test helpers use. */
+const RENAME_RETRIES = 10;
+const RENAME_RETRY_MS = 50;
+
+/**
+ * `rename`, retried while the failure is one of {@link TRANSIENT_RENAME_ERRORS}.
+ *
+ * The lock serialises n-dx’s own writers; it cannot serialise a reader, a
+ * backup agent or a virus scanner. Those hold the target for milliseconds, so
+ * a short retry turns a thrown run into a slightly later write. A failure that
+ * is not transient, or one that outlasts every attempt, still throws — silence
+ * here would leave the cache stale with nothing to say why.
+ */
+async function renameWithRetry(from: string, to: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code ?? "";
+      if (attempt >= RENAME_RETRIES - 1 || !TRANSIENT_RENAME_ERRORS.has(code)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, RENAME_RETRY_MS));
+    }
+  }
+}
+
+/**
  * Write through a temp file and rename.
  *
  * `rename` is atomic on both platforms we run on, so a reader never observes
  * a half-written file and a process killed mid-write leaves the previous
  * contents rather than a truncated JSON document. A bare `writeFile`
  * truncates first, which is exactly the window a kill lands in.
+ *
+ * The temp name carries a uuid as well as the pid. Two writers in one process
+ * share a pid, so a pid-only name is one temp file between them: the second
+ * write overwrites the first’s scratch file, and the first rename then
+ * publishes contents it never wrote, or fails with ENOENT because the other
+ * rename already consumed it. The lock makes that unreachable today, and the
+ * name should not be the reason — `preview.ts` reached the same conclusion
+ * from the other direction, having no lock at all.
  */
 async function writeCacheFileAtomic(henchDir: string, file: SessionCacheFile): Promise<void> {
   const target = cachePath(henchDir);
-  const tmp = `${target}.${process.pid}.tmp`;
+  const tmp = `${target}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(tmp, `${JSON.stringify(file, null, 2)}\n`, "utf-8");
   try {
-    await rename(tmp, target);
+    await renameWithRetry(tmp, target);
   } catch (err) {
     await unlink(tmp).catch(() => { /* leave no scratch file behind */ });
     throw err;
