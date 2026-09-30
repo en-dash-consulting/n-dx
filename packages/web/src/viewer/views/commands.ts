@@ -3,16 +3,55 @@
  *
  * Provides action panels for: refresh data (live server), export static
  * dashboard, self-heal loop.
+ *
+ * The two long-running panels (self-heal, refresh) do not track their own
+ * runs. They start a job, then read its state from the shared job tray
+ * (`jobs`, passed down from main.ts) — which is what shows progress, elapsed
+ * time and Stop, from any view rather than only this one. Each panel fetches
+ * the status endpoint exactly once, when its run ends, for the full log the
+ * tray row has no room for.
  */
 
 import { h, Fragment } from "preact";
 import { useState, useCallback, useEffect } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
-import { useCliName } from "../hooks/index.js";
+import { useCliName, findOperation } from "../hooks/index.js";
+import type { ActiveOperation, JobTray } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 type OpState = "idle" | "running" | "done" | "error";
+
+/**
+ * Fetch a finished job's full status once, when it finishes.
+ *
+ * Keyed on `finishedAt` so it fires on each completed run and never while one
+ * is in flight — the tray already carries the in-flight detail, and a second
+ * watcher on the same endpoint is the per-view poller this view just lost.
+ * `null` until a run has completed with the panel mounted.
+ */
+function useFinishedStatus<T>(op: ActiveOperation | undefined, url: string): [T | null, () => void] {
+  const [status, setStatus] = useState<T | null>(null);
+  const finishedAt = op?.finishedAt ?? null;
+
+  useEffect(() => {
+    if (!finishedAt) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json() as T;
+        if (!cancelled) setStatus(data);
+      } catch {
+        // The tray row still reports the outcome.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [finishedAt, url]);
+
+  return [status, useCallback(() => setStatus(null), [])];
+}
 
 // ── Sample App Panel ───────────────────────────────────────────────────
 
@@ -375,66 +414,32 @@ interface SelfHealStatusData {
   stopped?: boolean;
 }
 
-/**
- * Pull the newest iteration and phase markers out of the loop's output.
- *
- * `ndx self-heal` prints its progress as it goes; the status endpoint returns
- * the tail of that output, so the freshest matching lines describe where the
- * loop currently is.
- */
-function parseSelfHealProgress(output: string): { iteration: string | null; phase: string | null } {
-  const lines = output.split("\n").map((l) => l.trim()).filter(Boolean);
-  let iteration: string | null = null;
-  let phase: string | null = null;
-  for (const line of lines) {
-    const iter = /iteration\s+(\d+\s*(?:\/|of)\s*\d+)/i.exec(line);
-    if (iter) iteration = `iteration ${iter[1].replace(/\s*of\s*/i, "/")}`;
-    const ph = /\b(analyz\w*|recommend\w*|execut\w*)\b/i.exec(line);
-    if (ph) phase = ph[1].toLowerCase();
-  }
-  return { iteration, phase };
-}
-
-export function SelfHealPanel() {
+export function SelfHealPanel({ jobs }: { jobs: JobTray }) {
   const cliName = useCliName();
-  const [state, setState] = useState<OpState>("idle");
   const [confirmed, setConfirmed] = useState(false);
   const [iterations, setIterations] = useState(3);
-  const [statusData, setStatusData] = useState<SelfHealStatusData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set by Reset, so a finished run's log can be cleared without waiting for
+  // the tray's retention window to drop the row.
+  const [dismissed, setDismissed] = useState(false);
 
-  // Poll self-heal status when running
-  useEffect(() => {
-    if (state !== "running") return;
+  const op = findOperation(jobs.operations, "self-heal");
+  const [statusData, clearStatus] = useFinishedStatus<SelfHealStatusData>(op, "/api/commands/self-heal/status");
 
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/commands/self-heal/status");
-        if (!res.ok) return;
-        const data = await res.json() as SelfHealStatusData;
-        setStatusData(data);
-        if (!data.running && data.finishedAt) {
-          clearInterval(interval);
-          // A stop the operator asked for is a normal outcome, not a failure.
-          if (data.error && !data.stopped) {
-            setError(data.error);
-            setState("error");
-          } else {
-            setState("done");
-          }
-        }
-      } catch {
-        // Ignore transient fetch errors
-      }
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [state]);
+  const state: OpState = error
+    ? "error"
+    : dismissed || !op
+      ? "idle"
+      : op.status === "running"
+        ? "running"
+        : op.status === "failed"
+          ? "error"
+          : "done";
 
   const handleStart = useCallback(async () => {
-    setState("running");
     setError(null);
-    setStatusData(null);
+    setDismissed(false);
+    clearStatus();
 
     try {
       const res = await fetch("/api/commands/self-heal", {
@@ -443,45 +448,29 @@ export function SelfHealPanel() {
         body: JSON.stringify({ iterations }),
       });
 
-      const data = await res.json() as Record<string, unknown>;
-
-      if (res.status === 409) {
-        // Already running — show status
-        setState("running");
-        return;
-      }
-
-      if (!res.ok) {
-        throw new Error((data.error as string) || `HTTP ${res.status}`);
-      }
-
-      // 202 accepted — polling loop handles the rest
-    } catch (err) {
-      setError(String(err));
-      setState("error");
-    }
-  }, [iterations]);
-
-  const handleStop = useCallback(async () => {
-    try {
-      const res = await fetch("/api/commands/self-heal/stop", { method: "POST" });
+      // 409 means it is already running — which is the state the caller
+      // wanted, so the tray simply picks it up like any other run.
       if (!res.ok && res.status !== 409) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error || `HTTP ${res.status}`);
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error || `HTTP ${res.status}`);
       }
-      // The polling loop picks up running=false / stopped=true.
     } catch (err) {
       setError(String(err));
-      setState("error");
     }
-  }, []);
+    // Show the run in the tray now rather than at the next poll tick.
+    await jobs.refresh();
+  }, [iterations, jobs, clearStatus]);
+
+  const handleStop = useCallback(() => {
+    if (op) void jobs.stop(op);
+  }, [op, jobs]);
 
   const handleReset = useCallback(() => {
-    setState("idle");
     setConfirmed(false);
     setError(null);
-    setStatusData(null);
-  }, []);
+    setDismissed(true);
+    clearStatus();
+  }, [clearStatus]);
 
   if (!confirmed) {
     return h("div", { class: "cmd-panel" },
@@ -554,21 +543,14 @@ export function SelfHealPanel() {
             h("div", { class: "cmd-spinner", "aria-hidden": "true" }),
             h("span", null, "Self-heal running\u2026 (", iterations, " iterations)"),
           ),
-          statusData?.startedAt
+          op?.startedAt
             ? h("p", { class: "cmd-panel-hint" },
-                "Started: ", new Date(statusData.startedAt).toLocaleTimeString(),
+                "Started: ", new Date(op.startedAt).toLocaleTimeString(),
               )
             : null,
-          (() => {
-            const progress = statusData ? parseSelfHealProgress(statusData.output) : null;
-            return progress && (progress.iteration || progress.phase)
-              ? h("p", { class: "cmd-phase-item", role: "status", "aria-live": "polite" },
-                  progress.iteration ?? "",
-                  progress.iteration && progress.phase ? " \u00b7 " : "",
-                  progress.phase ? `phase: ${progress.phase}` : "",
-                )
-              : null;
-          })(),
+          op?.detail
+            ? h("p", { class: "cmd-phase-item", role: "status", "aria-live": "polite" }, op.detail)
+            : null,
           h("div", { class: "cmd-panel-actions" },
             h("button", {
               class: "cmd-btn cmd-btn-danger",
@@ -576,15 +558,17 @@ export function SelfHealPanel() {
               title: "Stop the loop after the current step",
             }, "Stop"),
           ),
-          h("p", { class: "cmd-panel-hint" }, "Poll rate: 2 seconds. This may take several minutes."),
+          h("p", { class: "cmd-panel-hint" },
+            "Progress and elapsed time are in the job tray, bottom right \u2014 it keeps reporting while you work in another view.",
+          ),
         )
       : null,
 
     state === "done"
       ? h("div", null,
           h("div", { class: "cmd-result-success", role: "status" },
-            h("span", { class: "cmd-result-icon" }, statusData?.stopped ? "\u25A0" : "\u2713"),
-            h("span", null, statusData?.stopped
+            h("span", { class: "cmd-result-icon" }, op?.stopped ? "\u25A0" : "\u2713"),
+            h("span", null, op?.stopped
               ? "Self-heal stopped by request."
               : "Self-heal complete."),
           ),
@@ -604,7 +588,7 @@ export function SelfHealPanel() {
           h("div", { class: "cmd-result-error", role: "alert" },
             h("strong", null, "Self-heal failed:"),
             " ",
-            error || statusData?.error || "Unknown error",
+            error || op?.error || statusData?.error || "Unknown error",
           ),
           h("button", {
             class: "cmd-btn cmd-btn-secondary",
@@ -628,44 +612,26 @@ interface RefreshStatusData {
   error: string | null;
 }
 
-export function RefreshPanel() {
+export function RefreshPanel({ jobs }: { jobs: JobTray }) {
   const cliName = useCliName();
-  const [state, setState] = useState<OpState>("idle");
   const [fast, setFast] = useState(false);
-  const [statusData, setStatusData] = useState<RefreshStatusData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Poll refresh status while running
-  useEffect(() => {
-    if (state !== "running") return;
+  const op = findOperation(jobs.operations, "refresh");
+  const [statusData] = useFinishedStatus<RefreshStatusData>(op, "/api/commands/refresh/status");
 
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/commands/refresh/status");
-        if (!res.ok) return;
-        const data = await res.json() as RefreshStatusData;
-        setStatusData(data);
-        if (!data.running && data.finishedAt) {
-          clearInterval(interval);
-          if (data.error) {
-            setError(data.error);
-            setState("error");
-          } else {
-            setState("done");
-          }
-        }
-      } catch {
-        // Ignore transient fetch errors
-      }
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [state]);
+  const state: OpState = error
+    ? "error"
+    : !op
+      ? "idle"
+      : op.status === "running"
+        ? "running"
+        : op.status === "failed"
+          ? "error"
+          : "done";
 
   const handleStart = useCallback(async () => {
-    setState("running");
     setError(null);
-    setStatusData(null);
 
     try {
       const res = await fetch("/api/commands/refresh", {
@@ -674,23 +640,20 @@ export function RefreshPanel() {
         body: JSON.stringify({ fast }),
       });
 
-      const data = await res.json() as Record<string, unknown>;
-
-      if (res.status === 409) {
-        // Already running — the polling loop will pick up its status
-        return;
+      // 409 means one is already running — the tray reports that one.
+      if (!res.ok && res.status !== 409) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error || `HTTP ${res.status}`);
       }
-
-      if (!res.ok) {
-        throw new Error((data.error as string) || `HTTP ${res.status}`);
-      }
-
-      // 202 accepted — polling loop handles the rest
     } catch (err) {
       setError(String(err));
-      setState("error");
     }
-  }, [fast]);
+    await jobs.refresh();
+  }, [fast, jobs]);
+
+  const handleStop = useCallback(() => {
+    if (op) void jobs.stop(op);
+  }, [op, jobs]);
 
   return h("div", { class: "cmd-panel" },
     h("div", { class: "cmd-panel-header" },
@@ -722,9 +685,18 @@ export function RefreshPanel() {
     ),
 
     state === "running"
-      ? h("div", { class: "cmd-progress", role: "status", "aria-live": "polite" },
-          h("div", { class: "cmd-spinner", "aria-hidden": "true" }),
-          h("span", null, "Refreshing SourceVision data..."),
+      ? h("div", null,
+          h("div", { class: "cmd-progress", role: "status", "aria-live": "polite" },
+            h("div", { class: "cmd-spinner", "aria-hidden": "true" }),
+            h("span", null, op?.detail || "Refreshing SourceVision data..."),
+          ),
+          h("div", { class: "cmd-panel-actions" },
+            h("button", {
+              class: "cmd-btn cmd-btn-danger",
+              onClick: handleStop,
+              title: "Stop the refresh",
+            }, "Stop"),
+          ),
         )
       : null,
 
@@ -737,19 +709,23 @@ export function RefreshPanel() {
 
     state === "done"
       ? h("div", { class: "cmd-result cmd-result-ok", role: "status" },
-          "Refresh complete — data views will update automatically.",
+          op?.stopped
+            ? "Refresh stopped by request."
+            : "Refresh complete — data views will update automatically.",
         )
       : null,
 
-    state === "error" && error
-      ? h("div", { class: "cmd-result cmd-result-error", role: "alert" }, error)
+    state === "error"
+      ? h("div", { class: "cmd-result cmd-result-error", role: "alert" },
+          error || op?.error || "Refresh failed",
+        )
       : null,
   );
 }
 
 // ── Main view ────────────────────────────────────────────────────────
 
-export function CommandsView() {
+export function CommandsView({ jobs }: { jobs: JobTray }) {
   return h("div", { class: "commands-container" },
     h("div", { class: "view-header" },
       h(BrandedHeader, { product: "rex", title: "Rex", class: "branded-header-rex" }),
@@ -760,10 +736,10 @@ export function CommandsView() {
     ),
 
     h("div", { class: "cmd-panels" },
-      h(RefreshPanel, null),
+      h(RefreshPanel, { jobs }),
       h(InstallSamplePanel, null),
       h(ExportPanel, null),
-      h(SelfHealPanel, null),
+      h(SelfHealPanel, { jobs }),
     ),
   );
 }

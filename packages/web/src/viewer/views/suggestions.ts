@@ -6,6 +6,8 @@ import { FindingsList } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { effectiveEnrichmentPass } from "../enrichment-pass.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
+import { findOperation } from "../hooks/index.js";
+import type { JobTray } from "../hooks/index.js";
 import { findingAskSeed } from "./finding-seed.js";
 
 interface SuggestionsProps {
@@ -13,77 +15,75 @@ interface SuggestionsProps {
   navigateTo?: NavigateTo;
   /** State of the `sourcevision.ask` toggle — see the note in problems.ts. */
   askEnabled?: boolean;
+  /** Shared job tray — `rex recommend` runs through it like any other job. */
+  jobs: JobTray;
 }
 
-function RefreshRecommendationsButton() {
-  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
+/**
+ * Start `rex recommend` and read its state from the job tray.
+ *
+ * The button used to await the route directly, which meant a multi-minute LLM
+ * pass held one browser request open with no elapsed time, no Stop, and
+ * nothing left to receive the result if the page was reloaded. The route is
+ * now an async job; this only starts it and reports what the tray says.
+ */
+function RefreshRecommendationsButton({ jobs }: { jobs: JobTray }) {
   const [error, setError] = useState<string | null>(null);
-  const [count, setCount] = useState<number | null>(null);
+
+  const op = findOperation(jobs.operations, "recommend");
+  const running = op?.status === "running";
 
   const handleClick = useCallback(async () => {
-    setState("running");
     setError(null);
-    setCount(null);
     try {
       const res = await fetch("/api/commands/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      const d = await res.json().catch(() => ({})) as {
-        error?: string;
-        count?: number;
-        recommendations?: unknown[];
-      };
-      if (!res.ok) {
+      // 409 means one is already running — the tray reports that one.
+      if (!res.ok && res.status !== 409) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(d.error || `HTTP ${res.status}`);
       }
-      // Surface the operation's real result rather than discarding it — the
-      // server returns the actionable recommendations produced by rex recommend.
-      const n = typeof d.count === "number"
-        ? d.count
-        : Array.isArray(d.recommendations) ? d.recommendations.length : null;
-      setCount(n);
-      setState("done");
-      setTimeout(() => setState("idle"), 6000);
     } catch (err) {
       setError(String(err));
-      setState("error");
-      setTimeout(() => setState("idle"), 6000);
     }
-  }, []);
-
-  const doneLabel = count === null
-    ? "✓ Done"
-    : count === 0
-      ? "✓ No new recommendations"
-      : `✓ ${count} recommendation${count === 1 ? "" : "s"} found`;
+    await jobs.refresh();
+  }, [jobs]);
 
   return h("div", { class: "overview-reanalyze" },
     h("button", {
       class: "cmd-inline-trigger",
       onClick: handleClick,
-      disabled: state === "running",
-      "aria-busy": state === "running",
+      disabled: running,
+      "aria-busy": running,
       title: "Re-run rex recommend to refresh suggestions",
     },
-      state === "running"
+      running
         ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" })
         : h("span", { "aria-hidden": "true" }, "\u{1F504}"),
-      state === "running" ? "Refreshing..." : "Refresh Recommendations",
+      running ? "Refreshing..." : "Refresh Recommendations",
     ),
+    running
+      ? h("button", {
+          class: "cmd-inline-trigger",
+          onClick: () => { void jobs.stop(op!); },
+          title: "Stop the recommend pass",
+        }, "Stop")
+      : null,
     h("span", { role: "status", "aria-live": "polite" },
-      state === "done"
-        ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, doneLabel)
+      !running && op?.status === "done" && !op.stopped
+        ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, `✓ ${op.detail || "Done"}`)
         : null,
-      state === "error"
-        ? h("span", { class: "cmd-inline-result cmd-inline-result-err" }, error || "Failed")
+      error || op?.status === "failed"
+        ? h("span", { class: "cmd-inline-result cmd-inline-result-err" }, error || op?.error || "Failed")
         : null,
     ),
   );
 }
 
-export function SuggestionsView({ data, navigateTo, askEnabled = false }: SuggestionsProps) {
+export function SuggestionsView({ data, navigateTo, askEnabled = false, jobs }: SuggestionsProps) {
   const { zones, manifest } = data;
   const enrichmentPass = effectiveEnrichmentPass(zones, manifest);
 
@@ -134,7 +134,7 @@ export function SuggestionsView({ data, navigateTo, askEnabled = false }: Sugges
     h("p", { class: "section-sub" },
       `${findings.length} suggestions for improvement`
     ),
-    h(RefreshRecommendationsButton, null),
+    h(RefreshRecommendationsButton, { jobs }),
 
     findings.length > 0
       ? h("div", { class: "stat-grid" },

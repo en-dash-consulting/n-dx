@@ -6,8 +6,9 @@ import type { ServerResponse } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import {
   getCommandJobStatusesForTests,
+  getCommandJobsForTests,
   handleCommandsRoute,
-  newJobStatus,
+  newAsyncJob,
   startAsyncJob,
 } from "../../../src/server/routes-commands.js";
 import { startRouteTestServer, type RouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -54,17 +55,17 @@ describe("routes-commands per-workspace state", () => {
   it("the .sourcevision writer lock is held per workspace", () => {
     // A takes A's lock.
     const r1 = fakeRes();
-    startAsyncJob(r1, newJobStatus(), "CI check", sleepBin, sleepArgs, ctxA, 10_000, undefined, undefined, "CI check");
+    startAsyncJob(r1, newAsyncJob(), "CI check", sleepBin, sleepArgs, ctxA, 10_000, undefined, undefined, "CI check");
     expect(r1.statusCode).toBe(202);
 
     // B is not blocked by A's writer.
     const r2 = fakeRes();
-    startAsyncJob(r2, newJobStatus(), "CI check", sleepBin, sleepArgs, ctxB, 10_000, undefined, undefined, "CI check");
+    startAsyncJob(r2, newAsyncJob(), "CI check", sleepBin, sleepArgs, ctxB, 10_000, undefined, undefined, "CI check");
     expect(r2.statusCode).toBe(202);
 
     // A second writer in A is — and the 409 names A's running job.
     const r3 = fakeRes();
-    startAsyncJob(r3, newJobStatus(), "refresh", sleepBin, sleepArgs, ctxA, 10_000, undefined, undefined, "refresh");
+    startAsyncJob(r3, newAsyncJob(), "refresh", sleepBin, sleepArgs, ctxA, 10_000, undefined, undefined, "refresh");
     expect(r3.statusCode).toBe(409);
     const body = JSON.parse((r3.end as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0] as string);
     expect(body.runningJob).toBe("CI check");
@@ -76,7 +77,7 @@ describe("routes-commands per-workspace state", () => {
     servers.push(serverA, serverB);
 
     // Drive A's own ci tracker — the object the route serializes — with the sleeper.
-    startAsyncJob(fakeRes(), getCommandJobStatusesForTests(ctxA).ci, "CI check", sleepBin, sleepArgs, ctxA, 10_000);
+    startAsyncJob(fakeRes(), getCommandJobsForTests(ctxA).ci, "CI check", sleepBin, sleepArgs, ctxA, 10_000);
 
     const inA = await (await fetch(`${serverA.baseUrl}/api/commands/ci/status`)).json();
     const inB = await (await fetch(`${serverB.baseUrl}/api/commands/ci/status`)).json();

@@ -17,12 +17,15 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import type { FunctionComponent } from "preact";
 import { act } from "preact/test-utils";
 import { FindingsList } from "../../../src/viewer/components/data-display/findings-list.js";
 import { findingAskSeed, EXPLAIN_PROMPT } from "../../../src/viewer/views/finding-seed.js";
 import { ProblemsView } from "../../../src/viewer/views/problems.js";
 import { SuggestionsView } from "../../../src/viewer/views/suggestions.js";
 import { AskView } from "../../../src/viewer/views/ask.js";
+import { emptyJobTray } from "../../helpers/job-tray.js";
+import type { JobTray } from "../../../src/viewer/hooks/use-active-operations.js";
 import type { Finding } from "../../../src/viewer/external.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import type { AskSeed, LoadedData, NavigateTo, ViewId } from "../../../src/viewer/types.js";
@@ -260,7 +263,7 @@ describe("Explain from the Problems and Suggestions views", () => {
 
   it("Suggestions sends the clicked suggestion to the Ask view", async () => {
     const { calls, navigateTo } = captureNavigation();
-    root = mount(h(SuggestionsView, { data: loadedData(FINDINGS), navigateTo, askEnabled: true }));
+    root = mount(h(SuggestionsView, { data: loadedData(FINDINGS), navigateTo, askEnabled: true, jobs: emptyJobTray() }));
 
     const target = explainButtons(root).find(
       (b) => b.getAttribute("aria-label")?.includes("clipboard"),
@@ -284,7 +287,7 @@ describe("Explain from the Problems and Suggestions views", () => {
 
     unmount(root);
 
-    root = mount(h(SuggestionsView, { data: loadedData(FINDINGS), navigateTo, askEnabled: true }));
+    root = mount(h(SuggestionsView, { data: loadedData(FINDINGS), navigateTo, askEnabled: true, jobs: emptyJobTray() }));
     const suggestionRows = root.querySelectorAll("li.finding-card").length;
     expect(suggestionRows).toBe(FINDINGS.filter((f) => f.type === "suggestion").length);
     expect(explainButtons(root)).toHaveLength(suggestionRows);
@@ -311,9 +314,19 @@ describe("Explain respects the sourcevision.ask toggle", () => {
     unmount(root);
   });
 
-  const views = [
-    { name: "Problems", View: ProblemsView, type: "anti-pattern" as const },
-    { name: "Suggestions", View: SuggestionsView, type: "suggestion" as const },
+  // Typed against the superset both views accept, so the loop can hand both
+  // the same props: Suggestions requires `jobs`, Problems has no job to run
+  // and simply ignores it.
+  type GatedView = FunctionComponent<{
+    data: LoadedData;
+    navigateTo?: NavigateTo;
+    askEnabled?: boolean;
+    jobs: JobTray;
+  }>;
+
+  const views: Array<{ name: string; View: GatedView; type: Finding["type"] }> = [
+    { name: "Problems", View: ProblemsView as GatedView, type: "anti-pattern" },
+    { name: "Suggestions", View: SuggestionsView as GatedView, type: "suggestion" },
   ];
 
   for (const { name, View, type } of views) {
@@ -322,6 +335,7 @@ describe("Explain respects the sourcevision.ask toggle", () => {
         data: loadedData(FINDINGS),
         navigateTo: () => { throw new Error("Explain navigated with Ask disabled"); },
         askEnabled: false,
+        jobs: emptyJobTray(),
       }));
 
       expect(root.querySelectorAll("li.finding-card").length)
@@ -331,7 +345,7 @@ describe("Explain respects the sourcevision.ask toggle", () => {
 
     it(`${name} fails closed when the caller omits the toggle entirely`, () => {
       // A new call site that forgets the prop must not re-open the side door.
-      root = mount(h(View, { data: loadedData(FINDINGS), navigateTo: () => {} }));
+      root = mount(h(View, { data: loadedData(FINDINGS), navigateTo: () => {}, jobs: emptyJobTray() }));
       expect(explainButtons(root)).toHaveLength(0);
     });
   }
@@ -355,6 +369,7 @@ describe("Explain respects the sourcevision.ask toggle", () => {
           navigateTo: () => {},
           isFeatureDisabled: () => false,
           askEnabled,
+          jobs: emptyJobTray(),
         };
       }
 
@@ -424,7 +439,7 @@ describe("AskView with a seed", () => {
   }
 
   it("pre-fills a short question rather than a prose prompt carrying the finding", () => {
-    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!) }));
+    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!), jobs: emptyJobTray() }));
 
     const textarea = root.querySelector<HTMLTextAreaElement>("textarea.sv-ask-textarea");
     expect(textarea?.value).toBe(EXPLAIN_PROMPT);
@@ -440,7 +455,7 @@ describe("AskView with a seed", () => {
    * controls.
    */
   it("sends the seed alongside the prompt with zone and files intact", async () => {
-    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!) }));
+    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!), jobs: emptyJobTray() }));
     await submitForm();
 
     const body = askBody();
@@ -456,7 +471,7 @@ describe("AskView with a seed", () => {
     const globalNoSeverity = FINDINGS.find((f) => f.scope === "global" && f.severity === undefined);
     if (!globalNoSeverity) throw new Error("fixture lost its unclassified global finding");
 
-    root = mount(h(AskView, { seed: findingAskSeed(globalNoSeverity) }));
+    root = mount(h(AskView, { seed: findingAskSeed(globalNoSeverity), jobs: emptyJobTray() }));
     await submitForm();
 
     const body = askBody();
@@ -466,7 +481,7 @@ describe("AskView with a seed", () => {
   });
 
   it("shows the seeded finding so the answer's specificity is legible", () => {
-    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!) }));
+    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!), jobs: emptyJobTray() }));
 
     const card = root.querySelector(".sv-ask-seed");
     expect(card).not.toBeNull();
@@ -476,7 +491,7 @@ describe("AskView with a seed", () => {
   });
 
   it("sends no seed once the user detaches it", async () => {
-    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!) }));
+    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!), jobs: emptyJobTray() }));
 
     const detach = root.querySelector<HTMLButtonElement>("button.sv-ask-seed-clear-btn");
     if (!detach) throw new Error("no detach control on the seed card");
@@ -488,7 +503,7 @@ describe("AskView with a seed", () => {
   });
 
   it("keeps the seed attached when the user rewords the question", async () => {
-    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!) }));
+    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!), jobs: emptyJobTray() }));
 
     const textarea = root.querySelector<HTMLTextAreaElement>("textarea.sv-ask-textarea");
     if (!textarea) throw new Error("prompt textarea not rendered");
@@ -504,7 +519,7 @@ describe("AskView with a seed", () => {
   });
 
   it("replaces the exchange when a second finding is explained", async () => {
-    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!) }));
+    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!), jobs: emptyJobTray() }));
     await submitForm();
     expect(root.querySelector(".sv-ask-answer")).not.toBeNull();
 
@@ -512,7 +527,7 @@ describe("AskView with a seed", () => {
     // previous answer is about the previous finding; leaving it on screen
     // under the new one would misattribute it.
     await act(async () => {
-      render(h(AskView, { seed: findingAskSeed(FINDINGS[1]!) }), root);
+      render(h(AskView, { seed: findingAskSeed(FINDINGS[1]!), jobs: emptyJobTray() }), root);
     });
     await settle();
 
@@ -525,7 +540,7 @@ describe("AskView with a seed", () => {
 
   /** AC5 — a seeded answer is an answer, with the same actions on it. */
   it("offers Copy and Capture on a seeded answer", async () => {
-    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!) }));
+    root = mount(h(AskView, { seed: findingAskSeed(FINDINGS[0]!), jobs: emptyJobTray() }));
     await submitForm();
 
     expect(root.querySelector("button.sv-ask-copy-btn")).not.toBeNull();

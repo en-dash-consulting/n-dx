@@ -1,11 +1,11 @@
 /**
- * Unit tests for the /api/commands/recommend route.
+ * Unit tests for the /api/commands/* triggers.
  *
- * Regression: `rex recommend --format=json` emits a JSON *array*. The handler
- * used to do `{ ok: true, ...parsed }`, which spread the array into numeric
- * object keys and dropped the count — so the dashboard's "Refresh
- * Recommendations" button could not read the result. The response must expose
- * the recommendations as a real array with a matching count.
+ * Recommend regression: `rex recommend --format=json` emits a JSON *array*.
+ * The handler used to do `{ ok: true, ...parsed }`, which spread the array
+ * into numeric object keys and dropped the count — so the dashboard's
+ * "Refresh Recommendations" button could not read the result. It is now an
+ * async job and `status.report` must carry the array intact.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -95,6 +95,7 @@ describe("commands route — recommend", () => {
 
   beforeEach(async () => {
     execMock.mockReset();
+    spawnManagedMock.mockReset();
     tmpDir = await mkdtemp(join(tmpdir(), "commands-route-"));
     await mkdir(join(tmpDir, ".rex"), { recursive: true });
     ctx = {
@@ -115,63 +116,85 @@ describe("commands route — recommend", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("returns recommendations as an array with a matching count", async () => {
-    execMock.mockResolvedValue({
-      stdout: JSON.stringify(RECOMMENDATIONS),
-      stderr: "",
-      error: null,
-    });
-
-    const res = await fetch(`http://127.0.0.1:${port}/api/commands/recommend`, {
+  function postRecommend() {
+    return fetch(`http://127.0.0.1:${port}/api/commands/recommend`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
+  }
 
-    expect(res.status).toBe(200);
-    const body = await res.json();
+  async function waitForFinish(): Promise<Record<string, unknown>> {
+    for (let i = 0; i < 50; i++) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/commands/recommend/status`);
+      const body = (await res.json()) as Record<string, unknown>;
+      if (!body.running) return body;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error("recommend did not finish");
+  }
 
-    expect(body.ok).toBe(true);
+  it("runs asynchronously and reports recommendations as an array", async () => {
+    stubManagedRun({ stdout: JSON.stringify(RECOMMENDATIONS) });
+
+    const res = await postRecommend();
+    expect(res.status).toBe(202);
+    expect((await res.json()).ok).toBe(true);
+
+    const status = await waitForFinish();
+    expect(status.error).toBeNull();
     // The array must survive as an array — not be mangled into numeric keys.
-    expect(Array.isArray(body.recommendations)).toBe(true);
-    expect(body.recommendations).toHaveLength(3);
-    expect(body.count).toBe(3);
-    // Numeric-key leakage from an object spread must not be present.
-    expect(body["0"]).toBeUndefined();
+    expect(Array.isArray(status.report)).toBe(true);
+    expect(status.report).toHaveLength(3);
+    expect((status as Record<string, unknown>)["0"]).toBeUndefined();
+
+    const args = spawnManagedMock.mock.calls[0][1] as string[];
+    expect(args).toContain("recommend");
+    expect(args).toContain("--format=json");
+    expect(args).toContain("--actionable-only");
   });
 
-  it("reports count 0 when there are no recommendations", async () => {
-    execMock.mockResolvedValue({ stdout: "[]", stderr: "", error: null });
-
-    const res = await fetch(`http://127.0.0.1:${port}/api/commands/recommend`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-
-    const body = await res.json();
-    expect(body.ok).toBe(true);
-    expect(body.recommendations).toEqual([]);
-    expect(body.count).toBe(0);
+  it("reports an empty array when there are no recommendations", async () => {
+    stubManagedRun({ stdout: "[]" });
+    await postRecommend();
+    const status = await waitForFinish();
+    expect(status.report).toEqual([]);
   });
 
   it("falls back to raw output when stdout is not JSON", async () => {
-    execMock.mockResolvedValue({
-      stdout: "plain text summary, not json",
-      stderr: "",
-      error: null,
-    });
+    stubManagedRun({ stdout: "plain text summary, not json" });
+    await postRecommend();
+    const status = await waitForFinish();
+    expect(status.report).toBeNull();
+    expect(String(status.output)).toContain("plain text summary");
+  });
 
-    const res = await fetch(`http://127.0.0.1:${port}/api/commands/recommend`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
+  it("rejects a concurrent run with 409", async () => {
+    const child = stubManagedChild();
+    expect((await postRecommend()).status).toBe(202);
+    expect((await postRecommend()).status).toBe(409);
+    child.finish({ exitCode: 0, stdout: "[]", stderr: "" });
+    await waitForFinish();
+  });
 
-    const body = await res.json();
-    expect(body.ok).toBe(true);
-    expect(body.output).toContain("plain text summary");
-    expect(body.recommendations).toBeUndefined();
+  it("stops the running pass and records it as stopped, not failed", async () => {
+    const child = stubManagedChild({
+      killFinishes: { exitCode: null, stdout: "", stderr: "" },
+    });
+    expect((await postRecommend()).status).toBe(202);
+
+    const stop = await fetch(`http://127.0.0.1:${port}/api/commands/recommend/stop`, { method: "POST" });
+    expect(stop.status).toBe(200);
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+    const status = await waitForFinish();
+    expect(status.stopped).toBe(true);
+    expect(status.error).toBeNull();
+  });
+
+  it("409s when asked to stop with nothing running", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/recommend/stop`, { method: "POST" });
+    expect(res.status).toBe(409);
   });
 });
 
@@ -360,6 +383,41 @@ describe("commands route — refresh (live-server data refresh)", () => {
     });
     const status = await waitForFinish();
     expect(String(status.error)).toContain("refresh exploded");
+  });
+
+  it("stops the running refresh and releases the .sourcevision writer lock", async () => {
+    const child = stubManagedChild({
+      killFinishes: { exitCode: null, stdout: "", stderr: "" },
+    });
+    await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    const stop = await fetch(`http://127.0.0.1:${port}/api/commands/refresh/stop`, { method: "POST" });
+    expect(stop.status).toBe(200);
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+    const status = await waitForFinish();
+    expect(status.stopped).toBe(true);
+    expect(status.error).toBeNull();
+
+    // A stop that leaked the shared writer lock would refuse every later
+    // .sourcevision writer with a 409 for the life of the server.
+    stubManagedRun({ stdout: "[refresh] ok" });
+    const again = await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(again.status).toBe(202);
+    await waitForFinish();
+  });
+
+  it("409s when asked to stop a refresh that is not running", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/refresh/stop`, { method: "POST" });
+    expect(res.status).toBe(409);
   });
 });
 
@@ -802,6 +860,39 @@ describe("commands route — sv-analyze full flow (async)", () => {
     });
     const status = await waitForFinish();
     expect(String(status.error)).toContain("no LLM credentials");
+  });
+
+  it("stops the running full analysis and releases the writer lock", async () => {
+    const child = stubManagedChild({
+      killFinishes: { exitCode: null, stdout: "", stderr: "" },
+    });
+    await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ full: true }),
+    });
+
+    const stop = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze/stop`, { method: "POST" });
+    expect(stop.status).toBe(200);
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+    const status = await waitForFinish();
+    expect(status.stopped).toBe(true);
+    expect(status.error).toBeNull();
+
+    stubManagedRun({ stdout: "ok" });
+    const again = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ full: true }),
+    });
+    expect(again.status).toBe(202);
+    await waitForFinish();
+  });
+
+  it("409s when asked to stop an analysis that is not running", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze/stop`, { method: "POST" });
+    expect(res.status).toBe(409);
   });
 
   it("forwards deep as --deep on the synchronous quick path", async () => {
@@ -1257,6 +1348,7 @@ describe("commands route — validation actions (fix, ci, reshape)", () => {
 
   beforeEach(async () => {
     execMock.mockReset();
+    spawnManagedMock.mockReset();
     tmpDir = await mkdtemp(join(tmpdir(), "commands-validation-"));
     await mkdir(join(tmpDir, ".rex"), { recursive: true });
     ctx = {
@@ -1331,51 +1423,70 @@ describe("commands route — validation actions (fix, ci, reshape)", () => {
 
   // ── ndx ci ──
   it("ci runs asynchronously and exposes a structured result", async () => {
-    execMock.mockResolvedValue({
-      stdout: JSON.stringify({ health: 82, findings: 4, passed: true }),
-      stderr: "", error: null,
-    });
+    stubManagedRun({ stdout: JSON.stringify({ health: 82, findings: 4, passed: true }) });
     const res = await post("ci");
     expect(res.status).toBe(202);
     const status = await waitFor("ci/status");
     expect(status.error).toBeNull();
     expect((status.report as Record<string, unknown>).health).toBe(82);
-    const args = execMock.mock.calls[0][1] as string[];
+    const args = spawnManagedMock.mock.calls[0][1] as string[];
     expect(args).toContain("ci");
     expect(args).toContain("--format=json");
   });
 
   it("ci rejects a concurrent run with 409", async () => {
-    let release: (() => void) | undefined;
-    execMock.mockImplementation(() => new Promise((resolve) => {
-      release = () => resolve({ stdout: "{}", stderr: "", error: null });
-    }));
+    const child = stubManagedChild();
     expect((await post("ci")).status).toBe(202);
     expect((await post("ci")).status).toBe(409);
-    release?.();
+    child.finish({ exitCode: 0, stdout: "{}", stderr: "" });
+    await waitFor("ci/status");
+  });
+
+  it("ci is stoppable, and a stop is not reported as a failure", async () => {
+    const child = stubManagedChild({
+      killFinishes: { exitCode: null, stdout: "", stderr: "" },
+    });
+    expect((await post("ci")).status).toBe(202);
+
+    const stop = await fetch(`http://127.0.0.1:${port}/api/commands/ci/stop`, { method: "POST" });
+    expect(stop.status).toBe(200);
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+    const status = await waitFor("ci/status");
+    expect(status.stopped).toBe(true);
+    expect(status.error).toBeNull();
+  });
+
+  it("ci status streams output while the run is still going", async () => {
+    const child = stubManagedChild();
+    await post("ci");
+    child.emit("checking zones\n");
+
+    const live = await (await fetch(`http://127.0.0.1:${port}/api/commands/ci/status`)).json();
+    expect(live.running).toBe(true);
+    expect(String(live.output)).toContain("checking zones");
+
+    child.finish({ exitCode: 0, stdout: "{}", stderr: "" });
     await waitFor("ci/status");
   });
 
   // ── rex reshape ──
   it("reshape previews with --dry-run by default", async () => {
-    execMock.mockResolvedValue({
-      stdout: JSON.stringify({ proposals: [{ action: "merge", ids: ["a", "b"] }] }),
-      stderr: "", error: null,
-    });
+    stubManagedRun({ stdout: JSON.stringify({ proposals: [{ action: "merge", ids: ["a", "b"] }] }) });
     expect((await post("reshape", {})).status).toBe(202);
     const status = await waitFor("reshape/status");
     expect((status.report as { proposals: unknown[] }).proposals).toHaveLength(1);
-    const args = execMock.mock.calls[0][1] as string[];
+    const args = spawnManagedMock.mock.calls[0][1] as string[];
     expect(args).toContain("reshape");
     expect(args).toContain("--dry-run");
     expect(args).not.toContain("--accept");
   });
 
   it("reshape applies with --accept when confirmed", async () => {
-    execMock.mockResolvedValue({ stdout: "{}", stderr: "", error: null });
+    stubManagedRun({ stdout: "{}" });
     await post("reshape", { accept: true });
     await waitFor("reshape/status");
-    const args = execMock.mock.calls[0][1] as string[];
+    const args = spawnManagedMock.mock.calls[0][1] as string[];
     expect(args).toContain("--accept");
     expect(args).not.toContain("--dry-run");
   });
@@ -1383,13 +1494,10 @@ describe("commands route — validation actions (fix, ci, reshape)", () => {
   it("reshape spawns with --quiet so stdout is pure JSON", async () => {
     // Without --quiet, reshape interleaves info() progress prose with the
     // --format=json payload and the report parse below can never succeed.
-    execMock.mockResolvedValue({
-      stdout: JSON.stringify({ dryRun: true, proposals: [] }),
-      stderr: "", error: null,
-    });
+    stubManagedRun({ stdout: JSON.stringify({ dryRun: true, proposals: [] }) });
     await post("reshape", {});
     const status = await waitFor("reshape/status");
-    expect(execMock.mock.calls[0][1] as string[]).toContain("--quiet");
+    expect(spawnManagedMock.mock.calls[0][1] as string[]).toContain("--quiet");
     expect((status.report as { proposals: unknown[] }).proposals).toEqual([]);
   });
 
@@ -1397,11 +1505,22 @@ describe("commands route — validation actions (fix, ci, reshape)", () => {
     // Regression shape for the pre---quiet failure mode: prose before the
     // JSON payload must fall back to raw output, never a bogus parse.
     const mixed = `Analyzing PRD structure...\n${JSON.stringify({ proposals: [{ id: "p1" }] })}`;
-    execMock.mockResolvedValue({ stdout: mixed, stderr: "", error: null });
+    stubManagedRun({ stdout: mixed });
     await post("reshape", {});
     const status = await waitFor("reshape/status");
     expect(status.report).toBeNull();
     expect(status.output).toContain("Analyzing PRD structure...");
+  });
+
+  it("reshape is stoppable", async () => {
+    const child = stubManagedChild({
+      killFinishes: { exitCode: null, stdout: "", stderr: "" },
+    });
+    await post("reshape", {});
+    const stop = await fetch(`http://127.0.0.1:${port}/api/commands/reshape/stop`, { method: "POST" });
+    expect(stop.status).toBe(200);
+    const status = await waitFor("reshape/status");
+    expect(status.stopped).toBe(true);
   });
 });
 

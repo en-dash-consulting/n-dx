@@ -126,7 +126,10 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   } = useGracefulDegradation();
   const { state: refreshQueueState } = useRefreshThrottle();
   const { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount } = usePollingSuspension();
-  const activeOperations = useActiveOperations();
+  // One tracker for every async job. Passed down to the views that start
+  // jobs (Commands, Overview, Suggestions) rather than each calling the hook
+  // again — a second caller would mean a second poller and a second socket.
+  const jobs = useActiveOperations();
   const { status: gitStatus, refetch: refetchGitStatus } = useGitStatus();
   const { worktrees } = useWorktrees();
   const { claims } = useClaims();
@@ -229,7 +232,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
-  const viewCtx = { data, setDetail, setPrdDetailContent, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews };
+  const viewCtx = { data, setDetail, setPrdDetailContent, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
   return h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
@@ -286,7 +289,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       : null,
     h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
-    h(ActiveOperationsTray, { operations: activeOperations, navigateTo }),
+    h(ActiveOperationsTray, { operations: jobs.operations, navigateTo, onStop: jobs.stop }),
     h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
     h(SessionsPanel, { worktrees, claims, navigateTo }),
     (showDrop && !hasData)
