@@ -39,7 +39,10 @@ Readers that leaned on that mirror move with it. `ndx config --test-connection`
 resolves both locations per field, so it tests a credential stored under
 `llm.claude.cli_path` / `llm.claude.api_key` instead of reporting "No Claude
 configuration set" for a fully configured project. `ndx auth` already resolved
-both and is unchanged.
+both and is unchanged. `loadClaudeConfig` in `@n-dx/llm-client`, which supplies
+the API key, CLI path and endpoint to `ndx work` on the API provider and to rex's
+LLM commands, resolves both locations the same way, so a key set with
+`ndx config llm.claude.api_key` reaches them.
 
 Not yet moved: `ndx config claude.<field>` as a *read*, the whole-section
 `ndx config claude`, and the `claude` block in `ndx config --json` still answer

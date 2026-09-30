@@ -15,6 +15,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resolveClaudeConfig, loadLLMConfig } from "../../src/llm-config.js";
+import { loadClaudeConfig } from "../../src/config.js";
 
 /** Every field the legacy top-level `claude` block could carry. */
 const FIELDS = ["model", "lightModel", "cli_path", "api_key", "api_endpoint"] as const;
@@ -118,5 +119,40 @@ describe("loadLLMConfig: legacy claude fields survive a partial llm.claude block
     expect(cfg.claude?.model).toBe("modern-model");
     expect(cfg.claude?.cli_path).toBe("/legacy/claude");
     expect(cfg.claude?.api_key).toBe("sk-legacy");
+  });
+});
+
+describe("loadClaudeConfig: reads llm.claude.* as well as legacy claude.*", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "llm-claude-load-"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns credentials set only under llm.claude, where ndx config now writes them", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ llm: { claude: { api_key: MODERN.api_key, cli_path: MODERN.cli_path } } }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadClaudeConfig(tmpDir);
+    expect(cfg.api_key).toBe(MODERN.api_key);
+    expect(cfg.cli_path).toBe(MODERN.cli_path);
+  });
+
+  it("agrees with resolveClaudeConfig field by field", async () => {
+    const modern = { model: MODERN.model, api_key: MODERN.api_key };
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ claude: LEGACY, llm: { claude: modern } }, null, 2),
+      "utf-8",
+    );
+
+    expect(await loadClaudeConfig(tmpDir)).toEqual(resolveClaudeConfig(modern, LEGACY).config);
   });
 });
