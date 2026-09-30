@@ -120,6 +120,12 @@ import {
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
 import { formatNarrationStatus, readNarrationState } from "./narration-status.js";
+import {
+  resolveCommandEffects,
+  shouldShowPreflight,
+  formatPreflightBanner,
+} from "./command-effects.js";
+import { collectRunSummary, formatRunSummary } from "./run-summary.js";
 import { resolveExistingDir } from "./resolve-existing-dir.js";
 import {
   readRexTestCommand,
@@ -1678,19 +1684,90 @@ async function handleMigrateLayout(rest) {
   exitWithCleanup(code);
 }
 
+// ── Preflight banner and run summary ─────────────────────────────────────────
+
+/**
+ * How long the banner pauses before the command starts, so a reader who did
+ * not mean to spend money has time to Ctrl-C. Overridable — an operator who
+ * finds it slow should be able to shorten it without giving up the banner.
+ */
+const PREFLIGHT_PAUSE_MS = (() => {
+  const raw = Number(process.env["NDX_PREFLIGHT_PAUSE_MS"]);
+  return Number.isFinite(raw) && raw >= 0 ? raw : 1500;
+})();
+
+/** The CLI's colour functions, in the shape the formatters expect. */
+const BANNER_STYLE = { bold, dim, cyan, yellow, green };
+
+/**
+ * Orchestrator-only flags, stripped before the argv is forwarded to a child.
+ * `--yes` answers the banner's pause, which happens here; no spawned CLI
+ * declares it, and forwarding a flag nobody reads is how an unrecognized-flag
+ * error gets invented later.
+ */
+const ORCHESTRATOR_ONLY_FLAGS = new Set(["--yes", "-y"]);
+
+/** `flags` minus the ones only this process acts on. */
+function forwardableFlags(flags) {
+  return flags.filter((f) => !ORCHESTRATOR_ONLY_FLAGS.has(f));
+}
+
+/**
+ * Run `command`'s work with its declared effects shown first and its actual
+ * result shown after.
+ *
+ * Both go to **stderr**: stdout belongs to whatever the command produces, and
+ * `--format=json` output must stay byte-identical whether or not the banner
+ * appeared. (It is also suppressed under `--format=json`, so that holds twice
+ * over — see `shouldShowPreflight`.)
+ *
+ * A command with no declaration yet gets neither, silently. The effects map is
+ * partial by design while the remaining commands are being declared.
+ */
+async function withPreflight(command, rest, dir, work) {
+  const flags = extractFlags(rest);
+  const effects = resolveCommandEffects(command, flags);
+  if (!effects) {
+    await work();
+    return;
+  }
+
+  const showing = shouldShowPreflight(flags, { isTTY: process.stdout.isTTY, env: process.env });
+  if (showing) {
+    process.stderr.write(formatPreflightBanner(effects, BANNER_STYLE).join("\n") + "\n");
+    if (PREFLIGHT_PAUSE_MS > 0) {
+      await new Promise((r) => setTimeout(r, PREFLIGHT_PAUSE_MS));
+    }
+  }
+
+  const startedAt = Date.now();
+  await work();
+
+  // Same gate as the banner: a run that was not worth announcing is not worth
+  // summarising either, and a machine reader wants neither.
+  if (showing) {
+    const summary = collectRunSummary(dir, effects, startedAt);
+    process.stderr.write(formatRunSummary(summary, BANNER_STYLE).join("\n") + "\n");
+  }
+}
+
 async function handleAnalyze(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, ["sourcevision"]);
-  const flags = extractFlags(rest);
-  await runOrDie(tools.sourcevision, ["analyze", ...flags, dir]);
+  const flags = forwardableFlags(extractFlags(rest));
+  await withPreflight("analyze", rest, dir, () =>
+    runOrDie(tools.sourcevision, ["analyze", ...flags, dir]),
+  );
   exitWithCleanup(0);
 }
 
 async function handleRecommend(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, ["rex", "sourcevision"]);
-  const flags = extractFlags(rest);
-  await runOrDie(tools.rex, ["recommend", ...flags, dir]);
+  const flags = forwardableFlags(extractFlags(rest));
+  await withPreflight("recommend", rest, dir, () =>
+    runOrDie(tools.rex, ["recommend", ...flags, dir]),
+  );
   exitWithCleanup(0);
 }
 
@@ -1706,23 +1783,25 @@ async function handleAdd(rest) {
 async function handlePlan(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, ["rex"]);
-  const flags = extractFlags(rest);
+  const flags = forwardableFlags(extractFlags(rest));
   const hasFile = flags.some((f) => f.startsWith("--file=") || f === "--file");
 
-  // Skip sourcevision when importing from a specific file
-  if (!hasFile) {
-    // --wait: rex analyze reads zone names and insights, so background
-    // narration must land first or proposals are built from placeholders.
-    await runOrDie(tools.sourcevision, [
-      "analyze",
-      "--wait",
-      ...flags.filter((f) => f === "--quiet" || f === "-q"),
-      ...(flags.includes("--no-llm") ? ["--fast"] : []),
-      dir,
-    ]);
-  }
+  await withPreflight("plan", rest, dir, async () => {
+    // Skip sourcevision when importing from a specific file
+    if (!hasFile) {
+      // --wait: rex analyze reads zone names and insights, so background
+      // narration must land first or proposals are built from placeholders.
+      await runOrDie(tools.sourcevision, [
+        "analyze",
+        "--wait",
+        ...flags.filter((f) => f === "--quiet" || f === "-q"),
+        ...(flags.includes("--no-llm") ? ["--fast"] : []),
+        dir,
+      ]);
+    }
 
-  await runOrDie(tools.rex, ["analyze", ...flags, dir]);
+    await runOrDie(tools.rex, ["analyze", ...flags, dir]);
+  });
   exitWithCleanup(0);
 }
 
@@ -2730,7 +2809,7 @@ async function handleTree(rest) {
 
 async function handleTreeDiff(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["tree-diff", ...flags, dir]);
   exitWithCleanup(0);

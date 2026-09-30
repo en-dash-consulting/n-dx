@@ -32,6 +32,7 @@
 
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { resolveLayout } from "@n-dx/llm-client";
 import type { IncrementalTaskUsageAggregator } from "./incremental-task-usage.js";
 import type { TaskUsageAccumulator, CollectAllIdsFn, LoadPRDFn, OrphanedEntry, CleanupResult, CleanupLogEntry, CleanupConfig } from "../shared-types.js";
 
@@ -251,7 +252,7 @@ export function startUsageCleanupScheduler(
   collectAllIds?: CollectAllIdsFn,
   loadPRD?: LoadPRDFn,
 ): ReturnType<typeof setInterval> {
-  const logPath = join(ctx.projectDir, ".hench", "usage-cleanup.jsonl");
+  const logPath = join(resolveLayout(ctx.projectDir).henchDir, "usage-cleanup.jsonl");
 
   // Determine interval: explicit override > .n-dx.json config > default
   const intervalMs = overrideIntervalMs ?? loadCleanupConfig(ctx.projectDir).intervalMs;

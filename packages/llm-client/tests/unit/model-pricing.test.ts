@@ -81,6 +81,27 @@ describe("resolveModelPricing", () => {
     expect(resolved.pricing).toEqual(resolveModelPricing("gpt-5.6-luna").pricing);
   });
 
+  it("prices a dated model snapshot at its base model", () => {
+    // Vendors ship ids like `claude-haiku-4-5-20251001`; the table is keyed on
+    // `claude-haiku-4-5`. The miss did not look like a miss: the fallback is
+    // `claude-sonnet-5`, a real catalogue entry, so every haiku call was priced
+    // at sonnet's rates and the figure looked measured.
+    const dated = resolveModelPricing("claude-haiku-4-5-20251001");
+
+    expect(dated.known).toBe(true);
+    expect(dated.modelId).toBe("claude-haiku-4-5");
+    expect(dated.pricing).toEqual(resolveModelPricing("claude-haiku-4-5").pricing);
+    // The rates really do differ, which is what made the miss expensive.
+    expect(dated.pricing).not.toEqual(FALLBACK_MODEL_PRICING);
+  });
+
+  it("does not invent a base model from a trailing number that is not a date", () => {
+    // Only an 8-digit suffix is a date. A version like `jev-1.13.0` must stay
+    // unknown rather than be trimmed into something that happens to match.
+    expect(resolveModelPricing("jev-1.13.0").known).toBe(false);
+    expect(resolveModelPricing("model-1234").known).toBe(false);
+  });
+
   it("degrades an unknown id to a labelled fallback rather than throwing", () => {
     const resolved = resolveModelPricing("some-model-that-does-not-exist");
     expect(resolved.known).toBe(false);
