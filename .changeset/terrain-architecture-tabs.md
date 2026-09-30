@@ -19,6 +19,6 @@ per-section `group` override; the merged Architecture section keeps the
 still opens whichever tab is active. The isometric map tab stays hidden in a
 static export, the same exemption the old toggle's 3D side carried.
 
-The PRD graph (Rex's merge/context graph, `merge-graph`) is relabelled **PRD
-Graph** — it was **Context Graph**, a name the Terrain merge made easy to
-confuse with the repository map's own "Graph" tab.
+Rex's merge graph (`merge-graph`) is relabelled **PRD Graph**; it was
+**Context Graph**. Its heading, display-mode control, screen-reader label and
+the link to it from the PRD view all use the new name.

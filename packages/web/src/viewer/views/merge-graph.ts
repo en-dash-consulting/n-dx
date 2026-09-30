@@ -1674,7 +1674,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
             clearSelection();
           }
         },
-        "aria-label": "PRD and merge context graph",
+        "aria-label": "PRD graph of items and merges",
         role: "img",
       },
         // Background rect for click-to-deselect
