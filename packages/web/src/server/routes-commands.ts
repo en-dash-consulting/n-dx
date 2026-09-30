@@ -7,23 +7,34 @@
  * GET  /api/commands/init/status     — check running init status
  * POST /api/commands/sv-analyze      — re-run sourcevision analyze (full: true → async, see status)
  * GET  /api/commands/sv-analyze/status — check running full-analysis status
+ * POST /api/commands/sv-analyze/stop — interrupt the running full analysis
  * POST /api/commands/sync            — rex sync (body: { direction: "push"|"pull"|"sync" })
- * POST /api/commands/recommend       — rex recommend (refresh sourcevision-based recommendations)
+ * POST /api/commands/recommend       — rex recommend (async, see status)
+ * GET  /api/commands/recommend/status — recommend status and recommendation report
+ * POST /api/commands/recommend/stop  — interrupt the running recommend pass
  * POST /api/commands/export          — ndx export static dashboard
  * POST /api/commands/self-heal       — ndx self-heal iterative loop (body: { iterations?: number })
  * GET  /api/commands/self-heal/status — check running self-heal status
  * POST /api/commands/self-heal/stop   — cancel the running self-heal loop
  * POST /api/commands/refresh         — refresh SourceVision data (live server; --data-only --live-server)
  * GET  /api/commands/refresh/status  — check running refresh status
+ * POST /api/commands/refresh/stop    — interrupt the running refresh
  * GET  /api/commands/manifest        — grouped command reference with resolved CLI name and availability
  * POST /api/commands/fix             — rex fix (body: { dryRun?: boolean }); repairs PRD validation issues
  * POST /api/commands/ci              — ndx ci analysis + health validation (async, see status)
  * GET  /api/commands/ci/status       — CI check status and structured report
+ * POST /api/commands/ci/stop         — interrupt the running CI check
  * POST /api/commands/reshape         — rex reshape (body: { accept?: boolean }); previews unless accepted
  * GET  /api/commands/reshape/status  — reshape status and proposal report
+ * POST /api/commands/reshape/stop    — interrupt the running reshape pass
  * GET  /api/commands/auth            — verify LLM provider credentials (read-only)
  * POST /api/commands/validate-tokens — hench vendor token-accuracy check
  * POST /api/commands/export-pdf      — sourcevision PDF report (returns the written path)
+ *
+ * Every async trigger above is a {@link JobSlot}: a pollable status plus the
+ * child handle its `/stop` needs. The dashboard's shared job tray polls those
+ * status endpoints and offers Stop on every row — see
+ * `viewer/hooks/use-active-operations.ts`.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -55,6 +66,57 @@ function serverVerbosityFlag(): "--debug" | "--verbose" | null {
   return null;
 }
 
+// ── Stoppable background jobs ─────────────────────────────────────────
+
+/**
+ * A background command trigger and the handle needed to interrupt it.
+ *
+ * Every async trigger on this surface has the same three parts, so they share
+ * one shape rather than each growing its own: the serialisable `status` the
+ * viewer polls, the process handle — which is *not* serialisable, hence kept
+ * beside the status rather than in it, since the status endpoints spread it
+ * straight onto the wire — and the flag that tells the completion handler an
+ * exit was asked for rather than suffered.
+ *
+ * Every job in the dashboard's shared job tray is stoppable, and this is why:
+ * a tray row offering Stop must have something to signal.
+ */
+interface JobSlot<S extends StoppableStatus> {
+  status: S;
+  child: ManagedChild | null;
+  stopRequested: boolean;
+}
+
+/** The fields {@link stopJob} needs from any job's wire status. */
+interface StoppableStatus {
+  running: boolean;
+  startedAt: string | null;
+}
+
+/**
+ * Interrupt a running job, or answer 409 when there is nothing to interrupt.
+ *
+ * SIGTERM rather than SIGKILL: every one of these children is a CLI that
+ * cleans up after itself, and a half-written `.sourcevision/` is worse than a
+ * few extra seconds of shutdown. The run then reports `stopped: true` with no
+ * error — an operator-requested halt is a normal outcome, not a failure.
+ */
+function stopJob(
+  res: ServerResponse,
+  slot: JobSlot<StoppableStatus>,
+  label: string,
+  message = "Stop requested; the run will halt after the current step.",
+): boolean {
+  if (!slot.status.running || !slot.child) {
+    jsonResponse(res, 409, { error: `${label} is not running` });
+    return true;
+  }
+  slot.stopRequested = true;
+  slot.child.kill("SIGTERM");
+  jsonResponse(res, 200, { ok: true, message });
+  return true;
+}
+
 // ── Self-heal state tracking ──────────────────────────────────────────
 
 interface SelfHealStatus {
@@ -68,21 +130,9 @@ interface SelfHealStatus {
   stopped: boolean;
 }
 
-/**
- * Handle for the in-flight self-heal loop.
- *
- * Kept outside the wire status (a process handle is not serialisable) so the
- * stop endpoint can signal the child without the status carrying it.
- */
-interface SelfHealSlot {
-  status: SelfHealStatus;
-  child: ManagedChild | null;
-  stopRequested: boolean;
-}
-
 // One self-heal at a time per WORKSPACE — worktree A's loop must not block or
 // report in worktree B.
-const selfHealSlots = new WorkspaceScoped<SelfHealSlot>(() => ({
+const selfHealSlots = new WorkspaceScoped<JobSlot<SelfHealStatus>>(() => ({
   status: { running: false, startedAt: null, finishedAt: null, iterations: 0, output: "", error: null, stopped: false },
   child: null,
   stopRequested: false,
@@ -271,15 +321,22 @@ interface SvAnalyzeStatus {
   /** Tail of the analyzer's output — phase and enrichment-pass lines. */
   recentOutput: string;
   error: string | null;
+  /** True when the last run ended because an operator pressed Stop. */
+  stopped: boolean;
 }
 
 // Module-level singleton — one full analysis at a time per server process.
-const svAnalyzeStatuses = new WorkspaceScoped<SvAnalyzeStatus>(() => ({
-  running: false,
-  startedAt: null,
-  finishedAt: null,
-  recentOutput: "",
-  error: null,
+const svAnalyzeSlots = new WorkspaceScoped<JobSlot<SvAnalyzeStatus>>(() => ({
+  status: {
+    running: false,
+    startedAt: null,
+    finishedAt: null,
+    recentOutput: "",
+    error: null,
+    stopped: false,
+  },
+  child: null,
+  stopRequested: false,
 }));
 
 /**
@@ -300,7 +357,8 @@ async function handleSvAnalyze(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const svAnalyzeStatus = svAnalyzeStatuses.get(ctx);
+  const svAnalyzeSlot = svAnalyzeSlots.get(ctx);
+  const svAnalyzeStatus = svAnalyzeSlot.status;
   let lite = false;
   let full = false;
   let deep = false;
@@ -355,6 +413,8 @@ async function handleSvAnalyze(
     svAnalyzeStatus.finishedAt = null;
     svAnalyzeStatus.recentOutput = "";
     svAnalyzeStatus.error = null;
+    svAnalyzeStatus.stopped = false;
+    svAnalyzeSlot.stopRequested = false;
 
     if (broadcast) {
       broadcast({ type: "commands:sv-analyze-started", timestamp: svAnalyzeStatus.startedAt });
@@ -384,11 +444,21 @@ async function handleSvAnalyze(
           (svAnalyzeStatus.recentOutput + chunk).slice(-3000);
       },
     });
-    child.done.then((result) => {
+    svAnalyzeSlot.child = child;
+    const settleSvAnalyze = (error: string | null, stdout: string | null) => {
+      const wasStopped = svAnalyzeSlot.stopRequested;
       svAnalyzeStatus.running = false;
       svAnalyzeStatus.finishedAt = new Date().toISOString();
-      svAnalyzeStatus.recentOutput = (result.stdout || "").trim().slice(-3000);
-      svAnalyzeStatus.error = managedChildError(result, analyzeTimeout);
+      if (stdout !== null) svAnalyzeStatus.recentOutput = stdout.trim().slice(-3000);
+      svAnalyzeStatus.stopped = wasStopped;
+      // A kill the operator asked for is not a failed analysis.
+      svAnalyzeStatus.error = wasStopped ? null : error;
+      svAnalyzeSlot.child = null;
+      svAnalyzeSlot.stopRequested = false;
+      releaseSvWriteLock(ctx);
+    };
+    child.done.then((result) => {
+      settleSvAnalyze(managedChildError(result, analyzeTimeout), result.stdout || "");
 
       if (broadcast) {
         broadcast({
@@ -398,12 +468,8 @@ async function handleSvAnalyze(
           timestamp: svAnalyzeStatus.finishedAt,
         });
       }
-      releaseSvWriteLock(ctx);
     }).catch((err: unknown) => {
-      svAnalyzeStatus.running = false;
-      svAnalyzeStatus.finishedAt = new Date().toISOString();
-      svAnalyzeStatus.error = String(err);
-      releaseSvWriteLock(ctx);
+      settleSvAnalyze(String(err), null);
     });
 
     return true;
@@ -447,7 +513,7 @@ function handleSvAnalyzeStatus(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  jsonResponse(res, 200, { ...svAnalyzeStatuses.get(ctx) });
+  jsonResponse(res, 200, { ...svAnalyzeSlots.get(ctx).status });
   return true;
 }
 
@@ -505,44 +571,29 @@ async function handleSync(
   return true;
 }
 
-/** POST /api/commands/recommend — rex recommend */
-async function handleRecommend(
-  req: IncomingMessage,
+/**
+ * POST /api/commands/recommend — `rex recommend`.
+ *
+ * Async, like every other LLM-backed trigger on this surface: the pass takes
+ * minutes, and a synchronous handler held the browser request open for all of
+ * them with no progress, no Stop, and no presence in the shared job tray.
+ * `report` carries the parsed payload — for `--format=json` that is a JSON
+ * *array* of recommendations, which is why it is stored whole rather than
+ * spread onto the response (spreading an array yields numeric-keyed props and
+ * loses the count).
+ */
+function handleRecommend(
+  _req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
-): Promise<boolean> {
+  broadcast?: WebSocketBroadcaster,
+): boolean {
   const { bin, args: prefixArgs } = resolveRexBin(ctx);
-  const cmdArgs = [...prefixArgs, "recommend", "--format=json", "--actionable-only", ctx.projectDir];
-
-  try {
-    const result = await foundationExec(bin, cmdArgs, {
-      cwd: ctx.projectDir,
-      timeout: 120_000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-
-    if (result.error && !result.stdout) {
-      errorResponse(res, 500, `Recommend failed: ${result.stderr || result.error.message}`);
-      return true;
-    }
-
-    try {
-      const parsed = JSON.parse(result.stdout);
-      // `rex recommend --format=json` emits a JSON array of recommendations.
-      // Spreading an array into an object turns it into numeric-keyed props
-      // and loses the count, so expose it under a named key instead.
-      if (Array.isArray(parsed)) {
-        jsonResponse(res, 200, { ok: true, recommendations: parsed, count: parsed.length });
-      } else {
-        jsonResponse(res, 200, { ok: true, ...(parsed as Record<string, unknown>) });
-      }
-    } catch {
-      jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
-    }
-  } catch (err) {
-    errorResponse(res, 500, String(err));
-  }
-  return true;
+  return startAsyncJob(
+    res, recommendJobs.get(ctx), "Recommend", bin,
+    [...prefixArgs, "recommend", "--format=json", "--actionable-only", ctx.projectDir],
+    ctx, 120_000, broadcast, "commands:recommend-finished",
+  );
 }
 
 /**
@@ -827,16 +878,10 @@ function handleSelfHealStop(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  const slot = selfHealSlots.get(ctx);
-  const selfHealStatus = slot.status;
-  if (!selfHealStatus.running || !slot.child) {
-    jsonResponse(res, 409, { error: "Self-heal is not running" });
-    return true;
-  }
-  slot.stopRequested = true;
-  slot.child.kill("SIGTERM");
-  jsonResponse(res, 200, { ok: true, message: "Stop requested; the loop will halt after the current step." });
-  return true;
+  return stopJob(
+    res, selfHealSlots.get(ctx), "Self-heal",
+    "Stop requested; the loop will halt after the current step.",
+  );
 }
 
 /** GET /api/commands/self-heal/status */
@@ -1017,17 +1062,24 @@ interface RefreshStatus {
   phases: string[];
   output: string;
   error: string | null;
+  /** True when the last run ended because an operator pressed Stop. */
+  stopped: boolean;
 }
 
 // Module-level singleton — one refresh at a time per server process.
-const refreshStatuses = new WorkspaceScoped<RefreshStatus>(() => ({
-  running: false,
-  startedAt: null,
-  finishedAt: null,
-  fast: false,
-  phases: [],
-  output: "",
-  error: null,
+const refreshSlots = new WorkspaceScoped<JobSlot<RefreshStatus>>(() => ({
+  status: {
+    running: false,
+    startedAt: null,
+    finishedAt: null,
+    fast: false,
+    phases: [],
+    output: "",
+    error: null,
+    stopped: false,
+  },
+  child: null,
+  stopRequested: false,
 }));
 
 /** Extract the `[refresh] …` phase lines from CLI output (ANSI stripped). */
@@ -1056,7 +1108,8 @@ async function handleRefresh(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const refreshStatus = refreshStatuses.get(ctx);
+  const refreshSlot = refreshSlots.get(ctx);
+  const refreshStatus = refreshSlot.status;
   if (refreshStatus.running) {
     jsonResponse(res, 409, {
       error: "A refresh is already running",
@@ -1093,6 +1146,8 @@ async function handleRefresh(
   refreshStatus.phases = [];
   refreshStatus.output = "";
   refreshStatus.error = null;
+  refreshStatus.stopped = false;
+  refreshSlot.stopRequested = false;
 
   if (broadcast) {
     broadcast({ type: "commands:refresh-started", timestamp: refreshStatus.startedAt });
@@ -1121,9 +1176,18 @@ async function handleRefresh(
       refreshStatus.phases = parseRefreshPhases(streamed);
     },
   });
-  child.done.then((result) => {
+  refreshSlot.child = child;
+  const settleRefresh = (error: string | null) => {
+    const wasStopped = refreshSlot.stopRequested;
     refreshStatus.running = false;
     refreshStatus.finishedAt = new Date().toISOString();
+    refreshStatus.stopped = wasStopped;
+    refreshStatus.error = wasStopped ? null : error;
+    refreshSlot.child = null;
+    refreshSlot.stopRequested = false;
+    releaseSvWriteLock(ctx);
+  };
+  child.done.then((result) => {
     // --verbose/--debug output writes to stderr — append it for display
     // whenever this server itself is running in that mode (phase parsing
     // above stays stdout-only; that format is structured and would break if
@@ -1133,7 +1197,7 @@ async function handleRefresh(
       : (result.stdout || "");
     refreshStatus.output = combinedOutput.trim().slice(-5000);
     refreshStatus.phases = parseRefreshPhases(result.stdout || "");
-    refreshStatus.error = managedChildError(result, refreshTimeout);
+    settleRefresh(managedChildError(result, refreshTimeout));
 
     if (broadcast) {
       broadcast({
@@ -1143,12 +1207,8 @@ async function handleRefresh(
         timestamp: refreshStatus.finishedAt,
       });
     }
-    releaseSvWriteLock(ctx);
   }).catch((err: unknown) => {
-    refreshStatus.running = false;
-    refreshStatus.finishedAt = new Date().toISOString();
-    refreshStatus.error = String(err);
-    releaseSvWriteLock(ctx);
+    settleRefresh(String(err));
   });
 
   return true;
@@ -1160,7 +1220,7 @@ function handleRefreshStatus(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  jsonResponse(res, 200, { ...refreshStatuses.get(ctx) });
+  jsonResponse(res, 200, { ...refreshSlots.get(ctx).status });
   return true;
 }
 
@@ -1181,22 +1241,38 @@ export interface AsyncJobStatus {
   /** Raw output tail — the fallback when stdout was not JSON. */
   output: string;
   error: string | null;
+  /** True when the last run ended because an operator pressed Stop. */
+  stopped: boolean;
 }
+
+/** A background report-producing job, with the handle its Stop needs. */
+export type AsyncJob = JobSlot<AsyncJobStatus>;
 
 export function newJobStatus(): AsyncJobStatus {
-  return { running: false, startedAt: null, finishedAt: null, report: null, output: "", error: null };
+  return { running: false, startedAt: null, finishedAt: null, report: null, output: "", error: null, stopped: false };
 }
 
-const ciStatuses = new WorkspaceScoped<AsyncJobStatus>(newJobStatus);
-const reshapeStatuses = new WorkspaceScoped<AsyncJobStatus>(newJobStatus);
+export function newAsyncJob(): AsyncJob {
+  return { status: newJobStatus(), child: null, stopRequested: false };
+}
+
+const ciJobs = new WorkspaceScoped<AsyncJob>(newAsyncJob);
+const reshapeJobs = new WorkspaceScoped<AsyncJob>(newAsyncJob);
+const recommendJobs = new WorkspaceScoped<AsyncJob>(newAsyncJob);
 
 /**
- * Start a background CLI job that reports through `status`, or answer 409 when
- * one is already in flight. Returns 202 immediately; the caller polls.
+ * Start a background CLI job that reports through `job.status`, or answer 409
+ * when one is already in flight. Returns 202 immediately; the caller polls.
+ *
+ * Spawned rather than `exec`ed so the job is interruptible: the dashboard's
+ * job tray offers Stop on every row, and a buffered `exec` hands back no
+ * handle to signal. Streaming `onStdout` is the second reason — `output` is
+ * readable while the run is still going, instead of appearing all at once on
+ * exit.
  */
 export function startAsyncJob(
   res: ServerResponse,
-  status: AsyncJobStatus,
+  job: AsyncJob,
   label: string,
   bin: string,
   cmdArgs: string[],
@@ -1207,6 +1283,7 @@ export function startAsyncJob(
   /** Set when the job writes .sourcevision/ — takes the shared writer lock. */
   svWriteLockLabel?: string,
 ): boolean {
+  const status = job.status;
   if (status.running) {
     jsonResponse(res, 409, { error: `${label} is already running`, startedAt: status.startedAt });
     return true;
@@ -1221,6 +1298,8 @@ export function startAsyncJob(
   status.report = null;
   status.output = "";
   status.error = null;
+  status.stopped = false;
+  job.stopRequested = false;
 
   jsonResponse(res, 202, {
     ok: true,
@@ -1228,33 +1307,54 @@ export function startAsyncJob(
     message: `${label} started. Poll the status endpoint for progress.`,
   });
 
-  foundationExec(bin, cmdArgs, {
+  // The whole stream is accumulated, not just the displayed tail: `report`
+  // is JSON.parse'd from it, and a payload larger than the display slice
+  // would otherwise be truncated into a parse failure.
+  let streamed = "";
+  const child = spawnManaged(bin, cmdArgs, {
     cwd: ctx.projectDir,
     timeout,
-    maxBuffer: 20 * 1024 * 1024,
-  }).then((result) => {
+    stdio: "pipe",
+    onStdout: (chunk) => {
+      streamed = (streamed + chunk).slice(-1_000_000);
+      status.output = streamed.trim().slice(-5000);
+    },
+  });
+  job.child = child;
+
+  const settle = (error: string | null) => {
+    const wasStopped = job.stopRequested;
     status.running = false;
     status.finishedAt = new Date().toISOString();
+    status.stopped = wasStopped;
+    status.error = wasStopped ? null : error;
+    job.child = null;
+    job.stopRequested = false;
+    if (svWriteLockLabel) releaseSvWriteLock(ctx);
+  };
+
+  child.done.then((result) => {
     status.output = (result.stdout || "").trim().slice(-5000);
     try {
       status.report = JSON.parse(result.stdout);
     } catch {
       status.report = null; // not JSON — `output` carries the text
     }
-    status.error = result.error ? (result.stderr || result.error.message).slice(-1000) : null;
+    settle(managedChildError(result, timeout));
 
     if (broadcast && broadcastType) {
-      broadcast({ type: broadcastType, ok: !result.error, timestamp: status.finishedAt });
+      broadcast({ type: broadcastType, ok: !status.error, timestamp: status.finishedAt });
     }
-    if (svWriteLockLabel) releaseSvWriteLock(ctx);
   }).catch((err: unknown) => {
-    status.running = false;
-    status.finishedAt = new Date().toISOString();
-    status.error = String(err);
-    if (svWriteLockLabel) releaseSvWriteLock(ctx);
+    settle(String(err));
   });
 
   return true;
+}
+
+/** Interrupt a report-producing job started by {@link startAsyncJob}. */
+export function stopAsyncJob(res: ServerResponse, job: AsyncJob, label: string): boolean {
+  return stopJob(res, job, label);
 }
 
 /**
@@ -1271,12 +1371,29 @@ export function getCommandJobStatusesForTests(ctx: ServerContext): {
   init: InitStatus;
 } {
   return {
-    ci: ciStatuses.get(ctx),
-    reshape: reshapeStatuses.get(ctx),
-    svAnalyze: svAnalyzeStatuses.get(ctx),
-    refresh: refreshStatuses.get(ctx),
+    ci: ciJobs.get(ctx).status,
+    reshape: reshapeJobs.get(ctx).status,
+    svAnalyze: svAnalyzeSlots.get(ctx).status,
+    refresh: refreshSlots.get(ctx).status,
     selfHeal: selfHealSlots.get(ctx).status,
     init: initStatuses.get(ctx),
+  };
+}
+
+/**
+ * The report-producing job slots of one workspace, for tests that need to
+ * drive `startAsyncJob` against the very object a status route serializes.
+ * @internal
+ */
+export function getCommandJobsForTests(ctx: ServerContext): {
+  ci: AsyncJob;
+  reshape: AsyncJob;
+  recommend: AsyncJob;
+} {
+  return {
+    ci: ciJobs.get(ctx),
+    reshape: reshapeJobs.get(ctx),
+    recommend: recommendJobs.get(ctx),
   };
 }
 
@@ -1343,7 +1460,7 @@ function handleCi(
 ): boolean {
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
   return startAsyncJob(
-    res, ciStatuses.get(ctx), "CI check", bin,
+    res, ciJobs.get(ctx), "CI check", bin,
     [...prefixArgs, "ci", "--format=json", ctx.projectDir],
     ctx, 900_000, // 15 minutes — runs the full analysis pipeline
     broadcast, "commands:ci-finished",
@@ -1380,7 +1497,7 @@ async function handleReshape(
   cmdArgs.push(ctx.projectDir);
 
   return startAsyncJob(
-    res, reshapeStatuses.get(ctx), "Reshape", bin, cmdArgs, ctx,
+    res, reshapeJobs.get(ctx), "Reshape", bin, cmdArgs, ctx,
     900_000, // 15 minutes — LLM restructuring pass
     broadcast, accept ? "rex:prd-changed" : undefined,
   );
@@ -1725,11 +1842,21 @@ export function handleCommandsRoute(
   if (path === "sv-analyze/status" && method === "GET") {
     return handleSvAnalyzeStatus(req, res, ctx);
   }
+  if (path === "sv-analyze/stop" && method === "POST") {
+    return stopJob(res, svAnalyzeSlots.get(ctx), "Analysis");
+  }
   if (path === "sync" && method === "POST") {
     return handleSync(req, res, ctx, broadcast);
   }
   if (path === "recommend" && method === "POST") {
-    return handleRecommend(req, res, ctx);
+    return handleRecommend(req, res, ctx, broadcast);
+  }
+  if (path === "recommend/status" && method === "GET") {
+    jsonResponse(res, 200, { ...recommendJobs.get(ctx).status });
+    return true;
+  }
+  if (path === "recommend/stop" && method === "POST") {
+    return stopAsyncJob(res, recommendJobs.get(ctx), "Recommend");
   }
   if (path === "export" && method === "POST") {
     return handleExport(req, res, ctx);
@@ -1758,6 +1885,9 @@ export function handleCommandsRoute(
   if (path === "refresh/status" && method === "GET") {
     return handleRefreshStatus(req, res, ctx);
   }
+  if (path === "refresh/stop" && method === "POST") {
+    return stopJob(res, refreshSlots.get(ctx), "Refresh");
+  }
   if (path === "manifest" && method === "GET") {
     return handleManifest(req, res, ctx);
   }
@@ -1777,15 +1907,21 @@ export function handleCommandsRoute(
     return handleCi(req, res, ctx, broadcast);
   }
   if (path === "ci/status" && method === "GET") {
-    jsonResponse(res, 200, { ...ciStatuses.get(ctx) });
+    jsonResponse(res, 200, { ...ciJobs.get(ctx).status });
     return true;
+  }
+  if (path === "ci/stop" && method === "POST") {
+    return stopAsyncJob(res, ciJobs.get(ctx), "CI check");
   }
   if (path === "reshape" && method === "POST") {
     return handleReshape(req, res, ctx, broadcast);
   }
   if (path === "reshape/status" && method === "GET") {
-    jsonResponse(res, 200, { ...reshapeStatuses.get(ctx) });
+    jsonResponse(res, 200, { ...reshapeJobs.get(ctx).status });
     return true;
+  }
+  if (path === "reshape/stop" && method === "POST") {
+    return stopAsyncJob(res, reshapeJobs.get(ctx), "Reshape");
   }
 
   return false;

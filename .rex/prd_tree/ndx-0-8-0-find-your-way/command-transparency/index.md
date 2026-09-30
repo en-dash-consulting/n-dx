@@ -28,4 +28,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Declare each command's effects in the core command manifest and regenerate cli-ui-gap.md from it](./declare-each-command-s-effects-in-the.md) | pending |
 | [Enforce feature gates server-side on every token-spending dashboard route](./enforce-feature-gates-server-side-on.md) | completed |
 | [Print a preflight banner before interactive analyze, plan and recommend and a run summary after](./print-a-preflight-banner-before.md) | completed |
-| [Run every async dashboard job through one shared job tray with phase, elapsed and Stop](./run-every-async-dashboard-job-through.md) | pending |
+| [Run every async dashboard job through one shared job tray with phase, elapsed and Stop](./run-every-async-dashboard-job-through.md) | completed |

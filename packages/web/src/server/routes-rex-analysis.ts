@@ -18,7 +18,7 @@ import type { WebSocketBroadcaster } from "./websocket.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
-import { startAsyncJob, newJobStatus } from "./routes-commands.js";
+import { startAsyncJob, stopAsyncJob, newAsyncJob } from "./routes-commands.js";
 
 import {
   type PRDItem,
@@ -179,6 +179,11 @@ export function routeProposals(
   // GET /api/rex/analyze/status — poll the running/last analysis job
   if (path === "analyze/status" && method === "GET") {
     return handleAnalyzeStatus(res);
+  }
+
+  // POST /api/rex/analyze/stop — interrupt it (the job tray's Stop)
+  if (path === "analyze/stop" && method === "POST") {
+    return stopAsyncJob(res, analyzeJob, "Analyze");
   }
 
   // GET /api/rex/proposals — get pending proposals
@@ -512,7 +517,7 @@ async function handleCaptureAsk(
  * sees a stuck "Analyzing…" forever and the (costly) LLM work is wasted;
  * (2) zero progress feedback for up to 30 minutes.
  */
-const analyzeStatus = newJobStatus();
+const analyzeJob = newAsyncJob();
 
 /** Handle POST /api/rex/analyze — start analysis as a background job */
 async function handleAnalyze(
@@ -553,14 +558,14 @@ async function handleAnalyze(
   const timeoutMs = resolveEffectiveCliTimeoutMs(ctx.projectDir, "plan");
 
   return startAsyncJob(
-    res, analyzeStatus, "Analyze", binPath, binArgs, ctx,
+    res, analyzeJob, "Analyze", binPath, binArgs, ctx,
     timeoutMs, broadcast, input.accept ? "rex:prd-changed" : undefined,
   );
 }
 
 /** Handle GET /api/rex/analyze/status */
 function handleAnalyzeStatus(res: ServerResponse): boolean {
-  jsonResponse(res, 200, { ...analyzeStatus });
+  jsonResponse(res, 200, { ...analyzeJob.status });
   return true;
 }
 

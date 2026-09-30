@@ -25,6 +25,7 @@ import {
   type RefinementProposal,
 } from "../../../src/viewer/views/ask-refinements.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
+import { emptyJobTray } from "../../helpers/job-tray.js";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -69,7 +70,7 @@ describe("AskView — PRD refinement proposals", () => {
   function mount() {
     root = document.createElement("div");
     document.body.appendChild(root);
-    act(() => { render(h(AskView, null), root); });
+    act(() => { render(h(AskView, { jobs: emptyJobTray() }), root); });
     return root;
   }
 

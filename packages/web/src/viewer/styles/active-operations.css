@@ -179,6 +179,71 @@
   color: var(--red);
 }
 
+/* Stop — one per running row. Sits opposite the label rather than under it
+ * so the rows stay one line tall while a job is in flight; the result card
+ * below only appears once the row is finished and has stopped moving. */
+.active-op-stop {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.active-op-stop:hover,
+.active-op-stop:focus-visible {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.active-op-stop:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.active-op-result {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 6px;
+  background: var(--bg-subtle, var(--bg-surface));
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.active-op-result-text {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.active-op-result-link {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.active-op-result-link:hover,
+.active-op-result-link:focus-visible {
+  color: var(--text);
+}
+
 @keyframes active-operations-fade-in {
   from {
     opacity: 0;

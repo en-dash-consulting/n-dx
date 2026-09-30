@@ -10,6 +10,7 @@ import { h } from "preact";
 import type { ComponentChild, VNode } from "preact";
 import type { ViewId, NavigateTo, DetailItem, LoadedData, AskSeed } from "../types.js";
 import type { DegradableFeature } from "../performance/index.js";
+import type { JobTray } from "../hooks/index.js";
 
 // ── View component imports (via domain barrels) ────────────────
 //
@@ -96,6 +97,12 @@ export interface ViewRenderContext {
    */
   askEnabled: boolean;
   /**
+   * The shared job tray: every async job in flight, plus start-refresh and
+   * stop. Views that trigger a long-running command read their own job from
+   * here instead of polling its status endpoint themselves.
+   */
+  jobs: JobTray;
+  /**
    * The views this viewer has (scope-filtered). The landing and stage pages
    * list only what exists here; absent, every view is assumed to exist.
    */
@@ -131,8 +138,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "workspaces": () =>
     h(WorkspacesView, null),
 
-  "overview": ({ data }) =>
-    h(Overview, { data }),
+  "overview": ({ data, jobs }) =>
+    h(Overview, { data, jobs }),
 
   "graph": ({ data, setDetail, selectedFile, selectedZone, navigateTo }) =>
     h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo }),
@@ -155,14 +162,14 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "problems": ({ data, navigateTo, askEnabled }) =>
     h(ProblemsView, { data, navigateTo, askEnabled }),
 
-  "suggestions": ({ data, navigateTo, askEnabled }) =>
-    h(SuggestionsView, { data, navigateTo, askEnabled }),
+  "suggestions": ({ data, navigateTo, askEnabled, jobs }) =>
+    h(SuggestionsView, { data, navigateTo, askEnabled, jobs }),
 
   "pr-markdown": () =>
     h(PRMarkdownView, null),
 
-  "ask": ({ askSeed }) =>
-    h(AskView, { seed: askSeed }),
+  "ask": ({ askSeed, jobs }) =>
+    h(AskView, { seed: askSeed, jobs }),
 
   "rex-dashboard": ({ navigateTo }) =>
     h(RexDashboard, { navigateTo }),
@@ -218,8 +225,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "cli-timeouts": () =>
     h(CliTimeoutsView, null),
 
-  "commands": () =>
-    h(CommandsView, null),
+  "commands": ({ jobs }) =>
+    h(CommandsView, { jobs }),
 
   "command-reference": () =>
     h(CommandReferenceView, null),
