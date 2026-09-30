@@ -44,7 +44,7 @@ import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
 import { totalmem, freemem, loadavg, cpus } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { exec, spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, type ManagedChild } from "@n-dx/llm-client";
+import { exec, spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, resolveLayout, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import {
@@ -230,10 +230,15 @@ function getImpact(path: string, value: unknown): string {
   }
 }
 
+/** The workspace's hench config file, on whichever layout the project uses (.ndx/hench or .hench). */
+function henchConfigPath(projectDir: string): string {
+  return join(resolveLayout(projectDir).henchDir, "config.json");
+}
+
 /** Read the hench config.json directly from disk. */
 function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
   try {
-    const raw = readFileSync(join(projectDir, ".hench", "config.json"), "utf-8");
+    const raw = readFileSync(henchConfigPath(projectDir), "utf-8");
     return JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return null;
@@ -810,7 +815,7 @@ async function handleConfigUpdate(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  const configPath = join(ctx.projectDir, ".hench", "config.json");
+  const configPath = henchConfigPath(ctx.projectDir);
 
   // Load current config
   const current = loadHenchConfig(ctx.projectDir);
@@ -1196,7 +1201,7 @@ function handleTemplateApply(
     errorResponse(res, 400, `Template "${id}" cannot be applied: ${constraintProblem}`);
     return true;
   }
-  const configPath = join(ctx.projectDir, ".hench", "config.json");
+  const configPath = henchConfigPath(ctx.projectDir);
 
   try {
     writeFileSync(configPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
