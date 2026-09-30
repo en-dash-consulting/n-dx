@@ -345,6 +345,7 @@ export {
   LEGACY_NDX_HOME_ENV,
   detectLayoutMode,
   resolveLayout,
+  relativeToRoot,
   resolveNdxHome,
 } from "./layout.js";
 export type {

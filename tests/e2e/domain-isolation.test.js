@@ -398,10 +398,19 @@ describe("architecture policy: orchestration tier boundary", () => {
       if (!importMatch) continue;
 
       const source = importMatch[1];
-      // win-spawn.js is an intentional same-package helper: it holds the
-      // cmd.exe verbatim spawn recipe shared by config.js and pair-programming.js
-      // within the orchestration tier. It contains no domain-package imports.
-      const allowedLocalHelpers = new Set(["./win-spawn.js"]);
+      // Intentional same-package helpers. Both live in the orchestration tier,
+      // import nothing but node: builtins themselves, and exist precisely so
+      // config.js does not restate a rule that has to agree with other files:
+      //
+      //  - win-spawn.js — the cmd.exe verbatim spawn recipe, shared with
+      //    pair-programming.js.
+      //  - layout.js — where n-dx keeps its files. config.js reads and writes
+      //    `.n-dx.json`, `.n-dx.local.json` and the three package config files,
+      //    so exempting it here would mean config.js deciding the folder layout
+      //    on its own and disagreeing with every package that asks the
+      //    resolver. It is the hand-written twin of the foundation module for
+      //    exactly this reason — see packages/core/layout.js.
+      const allowedLocalHelpers = new Set(["./win-spawn.js", "./layout.js"]);
       if (!source.startsWith("node:") && !allowedLocalHelpers.has(source)) {
         violations.push(`line ${i + 1}: import from "${source}"`);
       }
@@ -411,7 +420,7 @@ describe("architecture policy: orchestration tier boundary", () => {
       expect.fail(
         [
           "config.js is spawn-exempt but must only import from node: builtins",
-          "or permitted same-package helpers (./win-spawn.js).",
+          "or permitted same-package helpers (./win-spawn.js, ./layout.js).",
           "It should not accumulate library imports beyond config I/O.",
           "",
           "Non-node: imports found:",

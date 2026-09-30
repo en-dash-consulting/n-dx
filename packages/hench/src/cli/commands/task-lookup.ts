@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { HENCH_DIR } from "./constants.js";
+import { resolveHenchPaths } from "../../store/paths.js";
 
 /**
  * Try to look up a task's current state in the rex PRD.
@@ -15,7 +15,7 @@ export async function lookupTaskInRex(
     const { findItem } = await import("@n-dx/rex");
     const { loadConfig } = await import("../../store/config.js");
 
-    const henchDir = join(dir, HENCH_DIR);
+    const henchDir = resolveHenchPaths(dir).henchDir;
     const config = await loadConfig(henchDir);
     const rexDir = join(dir, config.rexDir);
     const store = await resolveStore(rexDir);
@@ -46,7 +46,7 @@ export async function batchLookupTasksInRex(
     const { findItem } = await import("@n-dx/rex");
     const { loadConfig } = await import("../../store/config.js");
 
-    const henchDir = join(dir, HENCH_DIR);
+    const henchDir = resolveHenchPaths(dir).henchDir;
     const config = await loadConfig(henchDir);
     const rexDir = join(dir, config.rexDir);
     const store = await resolveStore(rexDir);

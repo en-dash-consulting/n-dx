@@ -22,14 +22,13 @@ import {
   ClaudeClientError,
   type CLIErrorCode,
   LLM_VENDOR,
-  PROJECT_DIRS,
   isExecutableOnPath,
   classifyVendorError,
   failureCategoryLabel,
+  resolveLayout,
 } from "@n-dx/llm-client";
 import type { FailureCategory } from "@n-dx/llm-client";
 
-const HENCH_DIR = PROJECT_DIRS.HENCH;
 type CliLLMVendor = typeof LLM_VENDOR.CLAUDE | typeof LLM_VENDOR.CODEX;
 
 /**
@@ -316,11 +315,11 @@ export function requireLLMCLI(vendor: CliLLMVendor, customPath?: string): void {
 }
 
 /**
- * Check that .hench/ exists in the given directory.
+ * Check that hench's state directory exists in the given directory.
  * Throws a CLIError with an init suggestion if missing.
  */
 export function requireHenchDir(dir: string): void {
-  if (!existsSync(join(dir, HENCH_DIR))) {
+  if (!existsSync(resolveLayout(dir).henchDir)) {
     throw new CLIError(
       `Hench directory not found in ${dir}`,
       "Run 'n-dx init' to set up the project, or 'hench init' if using hench standalone.",

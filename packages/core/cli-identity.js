@@ -11,6 +11,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { resolveLayout } from "./layout.js";
 
 /** Fallback command name when no bin field (or no package.json) exists. */
 export const DEFAULT_CLI_NAME = "n-dx";
@@ -77,7 +78,7 @@ export function detectCliName(dir) {
  * @returns {string} The resolved command name.
  */
 export function getCliName(dir) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = resolveLayout(dir).configFile;
   if (existsSync(configPath)) {
     try {
       const data = JSON.parse(readFileSync(configPath, "utf-8"));
@@ -98,7 +99,7 @@ export function getCliName(dir) {
  * @param {string} dir  Project root directory.
  */
 export function recordCliName(dir) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = resolveLayout(dir).configFile;
   try {
     let data = {};
     if (existsSync(configPath)) {

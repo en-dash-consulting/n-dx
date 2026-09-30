@@ -35,7 +35,7 @@
  */
 
 import { spawn, execFileSync } from "child_process";
-import { existsSync, readFileSync, readdirSync, writeFileSync, rmSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from "fs";
 import { createRequire } from "module";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -103,6 +103,8 @@ import {
 } from "./cli-brand.js";
 import { runExport } from "./export.js";
 import { ensureGitignoreEntry } from "./gitignore.js";
+import { relativeToRoot, resolveLayout } from "./layout.js";
+import { runMigrateLayout } from "./migrate-layout.js";
 import {
   resolveInitLLMSelection,
   promptLLMSelection,
@@ -118,6 +120,12 @@ import {
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
 import { formatNarrationStatus, readNarrationState } from "./narration-status.js";
+import {
+  resolveCommandEffects,
+  shouldShowPreflight,
+  formatPreflightBanner,
+} from "./command-effects.js";
+import { collectRunSummary, formatRunSummary } from "./run-summary.js";
 import { resolveExistingDir } from "./resolve-existing-dir.js";
 import {
   readRexTestCommand,
@@ -686,7 +694,7 @@ function showInitBanner() {
  * Returns undefined when unset or config file is missing/invalid.
  */
 function readLLMVendor(dir) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = resolveLayout(dir).configFile;
   if (!existsSync(configPath)) return undefined;
   try {
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
@@ -703,7 +711,7 @@ function readLLMVendor(dir) {
  */
 function readLLMModel(dir, vendor) {
   if (!vendor) return undefined;
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = resolveLayout(dir).configFile;
   if (!existsSync(configPath)) return undefined;
   try {
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
@@ -719,7 +727,7 @@ function readLLMModel(dir, vendor) {
  * Returns defaults (localhost:1234) when unset or config file is missing/invalid.
  */
 function readLocalConfig(dir) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = resolveLayout(dir).configFile;
   if (!existsSync(configPath)) return { host: "localhost", port: 1234 };
   try {
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
@@ -742,7 +750,7 @@ function readLocalConfig(dir) {
  * @param {string} version  Current @n-dx/core version string.
  */
 function recordInitVersion(dir, version) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = resolveLayout(dir).configFile;
   try {
     let data = {};
     if (existsSync(configPath)) {
@@ -756,11 +764,35 @@ function recordInitVersion(dir, version) {
 }
 
 /**
- * Check that required directories exist before running orchestration commands.
- * Provides a clear, actionable error message suggesting `ndx init`.
+ * The tool directories `requireInit` accepts, and the {@link Layout} field that
+ * holds each one.
+ *
+ * Callers name the *tool*, not the folder: `.rex` is one layout's answer to
+ * "where is rex's state", and a project on the `.ndx/` layout has none. A call
+ * site that kept the literal would report a correctly initialized project as
+ * uninitialized, which is the failure this indirection exists to prevent.
  */
-function requireInit(dir, dirs) {
-  const missing = dirs.filter((d) => !existsSync(join(dir, d)));
+const INIT_REQUIREMENTS = Object.freeze({
+  rex: "rexDir",
+  hench: "henchDir",
+  sourcevision: "sourcevisionDir",
+});
+
+/**
+ * Check that required tool directories exist before running orchestration
+ * commands. Provides a clear, actionable error message suggesting `ndx init`.
+ *
+ * @param {string} dir  Project root.
+ * @param {Array<keyof typeof INIT_REQUIREMENTS>} tools  Tools whose state must be present.
+ */
+function requireInit(dir, tools) {
+  const layout = resolveLayout(dir);
+  const missing = tools
+    .map((tool) => layout[INIT_REQUIREMENTS[tool]])
+    .filter((path) => !existsSync(path))
+    // Named the way the operator would have to type them, so the message points
+    // at `.ndx/rex` on a project that keeps its state there.
+    .map((path) => relativeToRoot(layout, path));
   if (missing.length > 0) {
     console.error(`Error: [${CLI_ERROR_CODES.NOT_INITIALIZED}] Missing ${missing.join(", ")} in ${dir}`);
     console.error(`Hint: Run 'ndx init ${dir === process.cwd() ? "" : dir}' to set up the project.`.trimEnd());
@@ -1431,6 +1463,47 @@ function formatReadmeSummaryLines(result) {
   return [`  ${proposed} written — diff against ${existing} to merge.`];
 }
 
+/**
+ * Decide which layout this `ndx init` writes, creating `.ndx/` when the project
+ * is getting one.
+ *
+ * Three cases, and only one of them creates anything:
+ *
+ * - **Already on `.ndx/`** — nothing to decide, the container is the answer.
+ * - **Has legacy state** — an initialized project keeps the layout it has.
+ *   Re-running init is how people pick up new assistant surfaces and repaired
+ *   config, and it must not turn into a migration nobody asked for; moving a
+ *   project is `ndx migrate-layout`'s job, where it can snapshot first and
+ *   `git mv` so history follows.
+ * - **Neither** — a project with no n-dx state at all is a new project, and new
+ *   projects start on the target layout.
+ *
+ * Creating the container is the *whole* mechanism. Every sub-CLI init spawned
+ * below resolves its own paths from the project root, so `.ndx/` existing is
+ * how rex, hench and sourcevision are told where to write — there is no flag to
+ * thread and no way for one of them to disagree with another.
+ *
+ * @param {string} dir  Project root.
+ * @returns {import("./layout.js").Layout} The layout the rest of init writes to.
+ */
+function establishInitLayout(dir) {
+  const detected = resolveLayout(dir);
+  if (detected.mode === "ndx") return detected;
+
+  const legacyState = [
+    detected.rexDir,
+    detected.henchDir,
+    detected.sourcevisionDir,
+    detected.configFile,
+    detected.localConfigFile,
+  ];
+  if (legacyState.some((path) => existsSync(path))) return detected;
+
+  const target = resolveLayout(dir, { mode: "ndx" });
+  mkdirSync(target.container, { recursive: true });
+  return target;
+}
+
 async function handleInit(rest) {
   const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
 
@@ -1459,15 +1532,21 @@ async function handleInit(rest) {
     exitWithCleanup(1);
   }
 
-  const svExists = existsSync(join(dir, ".sourcevision"));
-  const rexExists = existsSync(join(dir, ".rex"));
-  const henchExists = existsSync(join(dir, ".hench"));
-  ensureGitignoreEntry(dir, ".n-dx.local.json");
+  // Decide the layout before anything is written, and create the container
+  // when this project is getting one: every sub-CLI spawned below resolves its
+  // own paths from the project root, so `.ndx/` existing *is* how they are told
+  // where to write. Nothing else is threaded through.
+  const layout = establishInitLayout(dir);
+
+  const svExists = existsSync(layout.sourcevisionDir);
+  const rexExists = existsSync(layout.rexDir);
+  const henchExists = existsSync(layout.henchDir);
+  ensureGitignoreEntry(dir, relativeToRoot(layout, layout.localConfigFile));
   // `ndx export` writes ./ndx-export inside the project by default; the site
   // it produces carries PRD data and run summaries, so it must not be
   // committable by accident.
   ensureGitignoreEntry(dir, "ndx-export/");
-  ensureGitattributesRules(dir);
+  ensureGitattributesRules(dir, layout);
   ensureMergeDriverRegistered(dir);
 
   // ── Ink animated UI (TTY, non-quiet) vs static fallback ───────────
@@ -1587,19 +1666,108 @@ async function handleInit(rest) {
   exitWithCleanup(0);
 }
 
+/**
+ * `ndx migrate-layout` — move an initialized project onto the `.ndx/` layout.
+ *
+ * No `requireInit`: the migration's own "nothing to migrate" message names the
+ * paths it looked for, and a project on `.ndx/` already must report a no-op
+ * rather than be told it is uninitialized — which is what `requireInit` would
+ * say about a legacy project once the resolver had moved on.
+ *
+ * `runCapture` and `tools` are handed over rather than imported, the same way
+ * `runCI` takes its spawn helpers: the module is orchestration tier and must
+ * reach rex by spawning it.
+ */
+async function handleMigrateLayout(rest) {
+  const dir = resolveDir(rest);
+  const code = await runMigrateLayout(dir, extractFlags(rest), { runCapture, tools });
+  exitWithCleanup(code);
+}
+
+// ── Preflight banner and run summary ─────────────────────────────────────────
+
+/**
+ * How long the banner pauses before the command starts, so a reader who did
+ * not mean to spend money has time to Ctrl-C. Overridable — an operator who
+ * finds it slow should be able to shorten it without giving up the banner.
+ */
+const PREFLIGHT_PAUSE_MS = (() => {
+  const raw = Number(process.env["NDX_PREFLIGHT_PAUSE_MS"]);
+  return Number.isFinite(raw) && raw >= 0 ? raw : 1500;
+})();
+
+/** The CLI's colour functions, in the shape the formatters expect. */
+const BANNER_STYLE = { bold, dim, cyan, yellow, green };
+
+/**
+ * Orchestrator-only flags, stripped before the argv is forwarded to a child.
+ * `--yes` answers the banner's pause, which happens here; no spawned CLI
+ * declares it, and forwarding a flag nobody reads is how an unrecognized-flag
+ * error gets invented later.
+ */
+const ORCHESTRATOR_ONLY_FLAGS = new Set(["--yes", "-y"]);
+
+/** `flags` minus the ones only this process acts on. */
+function forwardableFlags(flags) {
+  return flags.filter((f) => !ORCHESTRATOR_ONLY_FLAGS.has(f));
+}
+
+/**
+ * Run `command`'s work with its declared effects shown first and its actual
+ * result shown after.
+ *
+ * Both go to **stderr**: stdout belongs to whatever the command produces, and
+ * `--format=json` output must stay byte-identical whether or not the banner
+ * appeared. (It is also suppressed under `--format=json`, so that holds twice
+ * over — see `shouldShowPreflight`.)
+ *
+ * A command with no declaration yet gets neither, silently. The effects map is
+ * partial by design while the remaining commands are being declared.
+ */
+async function withPreflight(command, rest, dir, work) {
+  const flags = extractFlags(rest);
+  const effects = resolveCommandEffects(command, flags);
+  if (!effects) {
+    await work();
+    return;
+  }
+
+  const showing = shouldShowPreflight(flags, { isTTY: process.stdout.isTTY, env: process.env });
+  if (showing) {
+    process.stderr.write(formatPreflightBanner(effects, BANNER_STYLE).join("\n") + "\n");
+    if (PREFLIGHT_PAUSE_MS > 0) {
+      await new Promise((r) => setTimeout(r, PREFLIGHT_PAUSE_MS));
+    }
+  }
+
+  const startedAt = Date.now();
+  await work();
+
+  // Same gate as the banner: a run that was not worth announcing is not worth
+  // summarising either, and a machine reader wants neither.
+  if (showing) {
+    const summary = collectRunSummary(dir, effects, startedAt);
+    process.stderr.write(formatRunSummary(summary, BANNER_STYLE).join("\n") + "\n");
+  }
+}
+
 async function handleAnalyze(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".sourcevision"]);
-  const flags = extractFlags(rest);
-  await runOrDie(tools.sourcevision, ["analyze", ...flags, dir]);
+  requireInit(dir, ["sourcevision"]);
+  const flags = forwardableFlags(extractFlags(rest));
+  await withPreflight("analyze", rest, dir, () =>
+    runOrDie(tools.sourcevision, ["analyze", ...flags, dir]),
+  );
   exitWithCleanup(0);
 }
 
 async function handleRecommend(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex", ".sourcevision"]);
-  const flags = extractFlags(rest);
-  await runOrDie(tools.rex, ["recommend", ...flags, dir]);
+  requireInit(dir, ["rex", "sourcevision"]);
+  const flags = forwardableFlags(extractFlags(rest));
+  await withPreflight("recommend", rest, dir, () =>
+    runOrDie(tools.rex, ["recommend", ...flags, dir]),
+  );
   exitWithCleanup(0);
 }
 
@@ -1607,31 +1775,33 @@ async function handleAdd(rest) {
   // Unlike other commands, add's positional args are descriptions, not dirs.
   // Rex's dispatchAdd handles dir resolution internally (resolveSmartAddArgs
   // checks whether the last positional is an existing directory).
-  requireInit(process.cwd(), [".rex"]);
+  requireInit(process.cwd(), ["rex"]);
   await runOrDie(tools.rex, ["add", ...rest]);
   exitWithCleanup(0);
 }
 
 async function handlePlan(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
-  const flags = extractFlags(rest);
+  requireInit(dir, ["rex"]);
+  const flags = forwardableFlags(extractFlags(rest));
   const hasFile = flags.some((f) => f.startsWith("--file=") || f === "--file");
 
-  // Skip sourcevision when importing from a specific file
-  if (!hasFile) {
-    // --wait: rex analyze reads zone names and insights, so background
-    // narration must land first or proposals are built from placeholders.
-    await runOrDie(tools.sourcevision, [
-      "analyze",
-      "--wait",
-      ...flags.filter((f) => f === "--quiet" || f === "-q"),
-      ...(flags.includes("--no-llm") ? ["--fast"] : []),
-      dir,
-    ]);
-  }
+  await withPreflight("plan", rest, dir, async () => {
+    // Skip sourcevision when importing from a specific file
+    if (!hasFile) {
+      // --wait: rex analyze reads zone names and insights, so background
+      // narration must land first or proposals are built from placeholders.
+      await runOrDie(tools.sourcevision, [
+        "analyze",
+        "--wait",
+        ...flags.filter((f) => f === "--quiet" || f === "-q"),
+        ...(flags.includes("--no-llm") ? ["--fast"] : []),
+        dir,
+      ]);
+    }
 
-  await runOrDie(tools.rex, ["analyze", ...flags, dir]);
+    await runOrDie(tools.rex, ["analyze", ...flags, dir]);
+  });
   exitWithCleanup(0);
 }
 
@@ -1724,7 +1894,7 @@ async function handleRefresh(rest) {
   }
 
   if (plan.needsSourcevisionDir) {
-    requireInit(dir, [".sourcevision"]);
+    requireInit(dir, ["sourcevision"]);
   }
 
   const rfTag = cyan("[refresh]");
@@ -1909,7 +2079,7 @@ function installWorkInterruptHandler(dir) {
 
 async function handleWork(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex", ".hench"]);
+  requireInit(dir, ["rex", "hench"]);
   const flags = extractFlags(rest);
 
   // Which n-dx is about to run, against which checkout. A run is the most
@@ -1972,7 +2142,7 @@ function printWorkIdentity(dir) {
 
 async function handleStatus(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["status", ...flags, dir]);
   if (!flags.some((f) => f.startsWith("--format="))) {
@@ -1984,7 +2154,7 @@ async function handleStatus(rest) {
 
 async function handleUsage(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["usage", ...flags, dir]);
   exitWithCleanup(0);
@@ -2012,14 +2182,14 @@ async function handleClaim(rest) {
     positionals[0] === "release" && !releaseAll
       ? positionals.slice(2)
       : positionals.slice(1);
-  requireInit(resolveDir(dirArgs), [".rex"]);
+  requireInit(resolveDir(dirArgs), ["rex"]);
   await runOrDie(tools.rex, ["claim", ...rest]);
   exitWithCleanup(0);
 }
 
 async function handleSync(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["sync", ...flags, dir]);
   exitWithCleanup(0);
@@ -2033,7 +2203,7 @@ async function handleCI(rest) {
   // For JSON mode, let runCI handle missing dirs so it can produce structured output.
   // For text mode, use the standard requireInit guard.
   if (!isJSON) {
-    requireInit(dir, [".rex", ".sourcevision"]);
+    requireInit(dir, ["rex", "sourcevision"]);
   }
 
   try {
@@ -2048,7 +2218,7 @@ async function handleCI(rest) {
 
 async function handleDev(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".sourcevision"]);
+  requireInit(dir, ["sourcevision"]);
   const flags = extractFlags(rest);
   const code = await run(resolvePackageFile("packages/web", "dev.js"), [...flags, dir]);
   exitWithCleanup(code);
@@ -2131,7 +2301,7 @@ function runCapture(script, args) {
  */
 function countPrdTreeItems(dir) {
   try {
-    const treeDir = resolve(dir, ".rex", "prd_tree");
+    const treeDir = resolve(resolveLayout(dir).rexDir, "prd_tree");
     if (!existsSync(treeDir)) return 0;
     let count = 0;
     const walk = (d) => {
@@ -2155,7 +2325,7 @@ function countPrdTreeItems(dir) {
  */
 function readCodeHealthMetrics(dir) {
   try {
-    const svDir = resolve(dir, ".sourcevision");
+    const svDir = resolveLayout(dir).sourcevisionDir;
     let circularDeps = 0;
     let codeFindingCount = 0;
     let unusedExports = 0;
@@ -2192,7 +2362,7 @@ function readCodeHealthMetrics(dir) {
  */
 function readZoneMetrics(dir) {
   try {
-    const zonesPath = resolve(dir, ".sourcevision", "zones.json");
+    const zonesPath = resolve(resolveLayout(dir).sourcevisionDir, "zones.json");
     const data = JSON.parse(readFileSync(zonesPath, "utf-8"));
     const zones = data.zones ?? [];
     if (zones.length === 0) return null;
@@ -2216,7 +2386,7 @@ function readZoneMetrics(dir) {
 
 async function handleSelfHeal(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex", ".hench", ".sourcevision"]);
+  requireInit(dir, ["rex", "hench", "sourcevision"]);
 
   // --capture-only: run analyze + recommend + persist to PRD, then exit without
   // invoking hench. Useful as a pure PRD-population / audit step.
@@ -2461,7 +2631,7 @@ async function handleAuth(rest) {
 
 async function handleValidate(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["validate", ...flags, dir]);
   exitWithCleanup(0);
@@ -2469,7 +2639,7 @@ async function handleValidate(rest) {
 
 async function handleFix(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["fix", ...flags, dir]);
   exitWithCleanup(0);
@@ -2477,7 +2647,7 @@ async function handleFix(rest) {
 
 async function handleHealth(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["health", ...flags, dir]);
   exitWithCleanup(0);
@@ -2485,7 +2655,7 @@ async function handleHealth(rest) {
 
 async function handleReport(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["report", ...flags, dir]);
   exitWithCleanup(0);
@@ -2493,7 +2663,7 @@ async function handleReport(rest) {
 
 async function handleVerify(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["verify", ...flags, dir]);
   exitWithCleanup(0);
@@ -2501,21 +2671,21 @@ async function handleVerify(rest) {
 
 async function handleUpdate(rest) {
   // First positional arg is the item ID, not a dir
-  requireInit(process.cwd(), [".rex"]);
+  requireInit(process.cwd(), ["rex"]);
   await runOrDie(tools.rex, ["update", ...rest]);
   exitWithCleanup(0);
 }
 
 async function handleRemove(rest) {
   // First positional arg is the item ID (or level), not a dir
-  requireInit(process.cwd(), [".rex"]);
+  requireInit(process.cwd(), ["rex"]);
   await runOrDie(tools.rex, ["remove", ...rest]);
   exitWithCleanup(0);
 }
 
 async function handleMove(rest) {
   // First positional arg is the item ID, not a dir
-  requireInit(process.cwd(), [".rex"]);
+  requireInit(process.cwd(), ["rex"]);
   await runOrDie(tools.rex, ["move", ...rest]);
   exitWithCleanup(0);
 }
@@ -2531,14 +2701,14 @@ async function handleMove(rest) {
  * First positional arg is the event name, not a dir — same shape as `move`.
  */
 async function handleLog(rest) {
-  requireInit(process.cwd(), [".rex"]);
+  requireInit(process.cwd(), ["rex"]);
   await runOrDie(tools.rex, ["log", ...rest]);
   exitWithCleanup(0);
 }
 
 async function handleReshape(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["reshape", ...flags, dir]);
   exitWithCleanup(0);
@@ -2546,7 +2716,7 @@ async function handleReshape(rest) {
 
 async function handleReorganize(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["reorganize", ...flags, dir]);
   exitWithCleanup(0);
@@ -2554,7 +2724,7 @@ async function handleReorganize(rest) {
 
 async function handlePrune(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["prune", ...flags, dir]);
   exitWithCleanup(0);
@@ -2562,7 +2732,7 @@ async function handlePrune(rest) {
 
 async function handleNext(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["next", ...flags, dir]);
   exitWithCleanup(0);
@@ -2623,7 +2793,7 @@ async function handlePrd(rest) {
   }
 
   const dir = resolveDir(args);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(args);
   await runOrDie(tools.rex, [rexCommand, ...flags, dir]);
   exitWithCleanup(0);
@@ -2631,7 +2801,7 @@ async function handlePrd(rest) {
 
 async function handleTree(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["tree", ...flags, dir]);
   exitWithCleanup(0);
@@ -2639,7 +2809,7 @@ async function handleTree(rest) {
 
 async function handleTreeDiff(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["tree-diff", ...flags, dir]);
   exitWithCleanup(0);
@@ -2649,7 +2819,7 @@ async function handleTreeDiff(rest) {
 
 async function handleReset(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".sourcevision"]);
+  requireInit(dir, ["sourcevision"]);
   await runOrDie(tools.sourcevision, ["reset", dir]);
   exitWithCleanup(0);
 }
@@ -2665,7 +2835,7 @@ async function handleIso(rest) {
   const dir = resolveDir(rest);
   const flags = rest.filter((a) => a.startsWith("-"));
   const scanning = flags.some((a) => a === "--source=scan");
-  if (!scanning) requireInit(dir, [".sourcevision"]);
+  if (!scanning) requireInit(dir, ["sourcevision"]);
   await runOrDie(tools.sourcevision, ["iso", dir, ...flags]);
   exitWithCleanup(0);
 }
@@ -2674,7 +2844,7 @@ async function handleIso(rest) {
 
 async function handleShow(rest) {
   // First positional arg is the run ID, not a dir
-  requireInit(process.cwd(), [".hench"]);
+  requireInit(process.cwd(), ["hench"]);
   await runOrDie(tools.hench, ["show", ...rest]);
   exitWithCleanup(0);
 }
@@ -2700,7 +2870,7 @@ async function handlePairProgramming(rest) {
   }
 
   const dir = positionals.length >= 2 ? positionals[positionals.length - 1] : process.cwd();
-  requireInit(dir, [".hench"]);
+  requireInit(dir, ["hench"]);
 
   const isDryRun = flags.includes("--dry-run");
   const skipReview = flags.includes("--skip-review");
@@ -2938,6 +3108,7 @@ const COMMAND_DISPATCH = new Map([
   ["which",             handleWhich],
   ["help",              handleHelp],
   ["init",              handleInit],
+  ["migrate-layout",    handleMigrateLayout],
   ["analyze",           handleAnalyze],
   ["recommend",         handleRecommend],
   ["plan",              handlePlan],
