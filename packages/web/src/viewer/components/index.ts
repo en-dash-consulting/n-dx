@@ -109,6 +109,8 @@ export { BottomBar } from "./bottom-bar.js";
 export type { BottomBarProps } from "./bottom-bar.js";
 export { SettingsOverlay } from "./settings-overlay.js";
 export type { SettingsOverlayProps } from "./settings-overlay.js";
+export { SettingsFrame } from "./settings-frame.js";
+export type { SettingsFrameProps } from "./settings-frame.js";
 export { CommandsSheet } from "./commands-sheet.js";
 export type { CommandsSheetProps } from "./commands-sheet.js";
 

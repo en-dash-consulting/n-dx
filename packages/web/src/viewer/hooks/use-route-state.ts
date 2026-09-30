@@ -5,11 +5,12 @@
  * URL history synchronisation, and backward-compat migration of legacy hash URLs.
  */
 
-import { useState, useCallback, useEffect } from "preact/hooks";
+import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { ViewId, NavigateTo, AskSeed } from "../types.js";
 import { parseLegacyHashRoute, resolveLocationRoute } from "../route-state.js";
 import { appUrl, getBasePath } from "../base-path.js";
 import { resolveViewAlias } from "../external.js";
+import { guardedLeave } from "./use-leave-guard.js";
 
 export interface RouteState {
   view: ViewId;
@@ -30,6 +31,21 @@ export interface RouteState {
   askSeed: AskSeed | null;
   navigateTo: NavigateTo;
   handleSidebarNav: (id: ViewId) => void;
+}
+
+/** The full shape carried in a history entry — and the route state it drives. */
+interface HistoryEntry {
+  view: ViewId;
+  file: string | null;
+  zone: string | null;
+  runId: string | null;
+  taskId: string | null;
+  askSeed: AskSeed | null;
+}
+
+function entryUrl(entry: HistoryEntry): string {
+  const subId = entry.runId ?? entry.taskId;
+  return subId ? `/${entry.view}/${subId}` : `/${entry.view}`;
 }
 
 /**
@@ -66,37 +82,50 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [askSeed, setAskSeed] = useState<AskSeed | null>(null);
 
+  // Mirrors the current route outside React state so the popstate handler
+  // (registered once, deps []) can re-push "where we were" when the leave
+  // guard blocks a back/forward navigation. `location` can't tell us that at
+  // that point — the browser has already moved it to the popped entry by the
+  // time the event fires.
+  const currentRef = useRef<HistoryEntry>({
+    view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed,
+  });
+  useEffect(() => {
+    currentRef.current = { view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed };
+  }, [view, selectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed]);
+
+  const applyEntry = useCallback((entry: HistoryEntry, push: boolean) => {
+    setSelectedFile(entry.file);
+    setSelectedZone(entry.zone);
+    setSelectedRunId(entry.runId);
+    setSelectedTaskId(entry.taskId);
+    setAskSeed(entry.askSeed);
+    setView(entry.view);
+    currentRef.current = entry;
+    if (push) history.pushState(entry, "", appUrl(entryUrl(entry)));
+  }, []);
+
   const navigateTo: NavigateTo = useCallback((targetView, opts) => {
     // A caller may still pass an old id (the bottom-bar's freshness/completion
     // indicators do, via INDICATOR_VIEWS) — resolve it to the stage that
     // absorbed it so the URL and the lit tab both land on the current view.
-    const view = resolveViewAlias(targetView, validViews) ?? targetView;
-    const file = opts?.file ?? null;
-    const zone = opts?.zone ?? null;
-    const runId = opts?.runId ?? null;
-    const taskId = opts?.taskId ?? null;
-    const seed = opts?.askSeed ?? null;
-    setSelectedFile(file);
-    setSelectedZone(zone);
-    setSelectedRunId(runId);
-    setSelectedTaskId(taskId);
-    setAskSeed(seed);
-    setView(view);
-    const subId = runId ?? taskId;
-    const urlPath = subId ? `/${view}/${subId}` : `/${view}`;
-    history.pushState({ view, file, zone, runId, taskId, askSeed: seed }, "", appUrl(urlPath));
-  }, [validViews]);
+    const resolved = resolveViewAlias(targetView, validViews) ?? targetView;
+    const entry: HistoryEntry = {
+      view: resolved,
+      file: opts?.file ?? null,
+      zone: opts?.zone ?? null,
+      runId: opts?.runId ?? null,
+      taskId: opts?.taskId ?? null,
+      askSeed: opts?.askSeed ?? null,
+    };
+    guardedLeave(() => applyEntry(entry, true));
+  }, [validViews, applyEntry]);
 
   const handleSidebarNav = useCallback((id: ViewId) => {
-    const view = resolveViewAlias(id, validViews) ?? id;
-    setSelectedFile(null);
-    setSelectedZone(null);
-    setSelectedRunId(null);
-    setSelectedTaskId(null);
-    setAskSeed(null);
-    setView(view);
-    history.pushState({ view, file: null, zone: null, runId: null, taskId: null, askSeed: null }, "", appUrl(`/${view}`));
-  }, [validViews]);
+    const resolved = resolveViewAlias(id, validViews) ?? id;
+    const entry: HistoryEntry = { view: resolved, file: null, zone: null, runId: null, taskId: null, askSeed: null };
+    guardedLeave(() => applyEntry(entry, true));
+  }, [validViews, applyEntry]);
 
   useEffect(() => {
     // Backward compat: migrate old hash URLs to path URLs
@@ -104,63 +133,91 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     if (hashRoute) {
       const isRunView = hashRoute.view === "hench-runs";
       const isTaskView = hashRoute.view === "prd";
-      const runId = isRunView ? hashRoute.subId : null;
-      const taskId = isTaskView ? hashRoute.subId : null;
-      setView(hashRoute.view);
-      setSelectedFile(null);
-      setSelectedZone(null);
-      setSelectedRunId(runId);
-      setSelectedTaskId(taskId);
-      setAskSeed(null);
-      const hashUrl = hashRoute.subId ? `/${hashRoute.view}/${hashRoute.subId}` : `/${hashRoute.view}`;
-      history.replaceState({ view: hashRoute.view, file: null, zone: null, runId, taskId, askSeed: null }, "", appUrl(hashUrl));
+      const entry: HistoryEntry = {
+        view: hashRoute.view,
+        file: null,
+        zone: null,
+        runId: isRunView ? hashRoute.subId : null,
+        taskId: isTaskView ? hashRoute.subId : null,
+        askSeed: null,
+      };
+      setSelectedFile(entry.file);
+      setSelectedZone(entry.zone);
+      setSelectedRunId(entry.runId);
+      setSelectedTaskId(entry.taskId);
+      setAskSeed(entry.askSeed);
+      setView(entry.view);
+      currentRef.current = entry;
+      history.replaceState(entry, "", appUrl(entryUrl(entry)));
     } else {
       // Seed the initial history entry — preserve deep-link path if present
-      const subId = selectedRunId ?? selectedTaskId;
-      const initialUrl = subId ? `/${view}/${subId}` : `/${view}`;
-      history.replaceState({ view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed: null }, "", appUrl(initialUrl));
+      const entry: HistoryEntry = {
+        view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed: null,
+      };
+      currentRef.current = entry;
+      history.replaceState(entry, "", appUrl(entryUrl(entry)));
     }
 
     const handlePopState = (e: PopStateEvent) => {
-      if (e.state) {
-        const s = e.state as {
-          view?: string;
-          file?: string | null;
-          zone?: string | null;
-          runId?: string | null;
-          taskId?: string | null;
-          askSeed?: AskSeed | null;
-        };
-        if (s.view && validViews.has(s.view as ViewId)) {
-          setView(s.view as ViewId);
-          setSelectedFile(s.file ?? null);
-          setSelectedZone(s.zone ?? null);
-          setSelectedRunId(s.runId ?? null);
-          setSelectedTaskId(s.taskId ?? null);
-          setAskSeed(s.askSeed ?? null);
-          return;
+      const target: HistoryEntry = (() => {
+        if (e.state) {
+          const s = e.state as {
+            view?: string;
+            file?: string | null;
+            zone?: string | null;
+            runId?: string | null;
+            taskId?: string | null;
+            askSeed?: AskSeed | null;
+          };
+          if (s.view && validViews.has(s.view as ViewId)) {
+            return {
+              view: s.view as ViewId,
+              file: s.file ?? null,
+              zone: s.zone ?? null,
+              runId: s.runId ?? null,
+              taskId: s.taskId ?? null,
+              askSeed: s.askSeed ?? null,
+            };
+          }
         }
-      }
 
-      const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath())
-        ?? { view: defaultView(validViews), subId: null };
-      setView(parsed.view);
-      setSelectedFile(null);
-      setSelectedZone(null);
-      setAskSeed(null);
-      const isRunView = parsed.view === "hench-runs";
-      const isTaskView = parsed.view === "prd";
-      setSelectedRunId(isRunView ? parsed.subId : null);
-      setSelectedTaskId(isTaskView ? parsed.subId : null);
-      const fallbackUrl = parsed.subId ? `/${parsed.view}/${parsed.subId}` : `/${parsed.view}`;
-      history.replaceState({
-        view: parsed.view,
-        file: null,
-        zone: null,
-        runId: isRunView ? parsed.subId : null,
-        taskId: isTaskView ? parsed.subId : null,
-        askSeed: null,
-      }, "", appUrl(fallbackUrl));
+        const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath())
+          ?? { view: defaultView(validViews), subId: null };
+        const isRunView = parsed.view === "hench-runs";
+        const isTaskView = parsed.view === "prd";
+        return {
+          view: parsed.view,
+          file: null,
+          zone: null,
+          runId: isRunView ? parsed.subId : null,
+          taskId: isTaskView ? parsed.subId : null,
+          askSeed: null,
+        };
+      })();
+
+      const applied = guardedLeave(() => {
+        setSelectedFile(target.file);
+        setSelectedZone(target.zone);
+        setSelectedRunId(target.runId);
+        setSelectedTaskId(target.taskId);
+        setAskSeed(target.askSeed);
+        setView(target.view);
+        currentRef.current = target;
+        // Fixes up the address bar for the deferred (Discard) case, where our
+        // own re-push below already moved it; a no-op when applied immediately,
+        // since the browser already placed `location` at this entry.
+        history.replaceState(target, "", appUrl(entryUrl(target)));
+      });
+
+      if (!applied) {
+        // Blocked: popstate can't be cancelled, and the browser already moved
+        // `location` to the popped entry. Re-push the entry we were just on so
+        // the address bar and back stack look untouched until the user picks
+        // "Keep editing" (stay, do nothing more) or "Discard changes" (the
+        // deferred action above lands the target).
+        const entry = currentRef.current;
+        history.pushState(entry, "", appUrl(entryUrl(entry)));
+      }
     };
 
     window.addEventListener("popstate", handlePopState);
