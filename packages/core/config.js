@@ -2677,14 +2677,12 @@ async function handleSetProjectSection(
     }
   }
 
-  // Compatibility: keep legacy claude.* in sync when setting llm.claude.*
-  if (pkg === "llm" && settingPath.startsWith("claude.")) {
-    if (!current.claude || typeof current.claude !== "object") {
-      current.claude = {};
-    }
-    const legacySetting = settingPath.slice("claude.".length);
-    setByPath(current.claude, legacySetting, coerced);
-  }
+  // Writing `llm.claude.*` used to also mirror the value into the legacy
+  // top-level `claude.*` key. That mirror is gone: every reader now resolves
+  // the two locations per field (`resolveClaudeConfig` in @n-dx/llm-client), so
+  // the legacy copy bought nothing and cost a second place for the same setting
+  // to be wrong. Existing `claude.*` values are deliberately left where they
+  // are — they are still read until 1.0.0.
 
   // Write back to the appropriate file (local or project)
   await saveProjectJSON(configPath, current);
@@ -2693,8 +2691,10 @@ async function handleSetProjectSection(
   // A local-only setting that already exists in the shared file was written
   // before this routing existed. Setting it again is the documented migration:
   // the value now lives in the local file, so the shared copy is stale at best
-  // and a committed secret at worst. Remove it, and the legacy `claude.*`
-  // mirror of an `llm.claude.*` key along with it.
+  // and a committed secret at worst. Remove it, and any legacy `claude.*` copy
+  // of an `llm.claude.*` key along with it — this one still fires, because a
+  // secret mirrored into the shared file by an older version must not be left
+  // committed just because the mirror that put it there is gone.
   if (targetFile === LOCAL_CONFIG_FILE) {
     const sharedPaths = [[pkg, settingPath]];
     if (pkg === "llm" && settingPath.startsWith("claude.")) {

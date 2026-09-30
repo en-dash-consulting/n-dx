@@ -15,7 +15,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
-import { LLM_VENDOR, resolveLayout } from "@n-dx/llm-client";
+import { LLM_VENDOR, resolveLayout, resolveClaudeConfig } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import {jsonResponse} from "./response-utils.js";
@@ -27,7 +27,11 @@ import {jsonResponse} from "./response-utils.js";
 export interface NdxConfigSummary {
   /** Active LLM vendor: "claude", "codex", "local", or null if unset. */
   vendor: string | null;
-  /** Active model for the current vendor (from llm.<vendor>.model or legacy claude.model). */
+  /**
+   * Active model for the current vendor: `llm.<vendor>.model`, else the
+   * per-field resolution of `llm.claude.model` over legacy `claude.model`.
+   * Never `hench.model` — nothing reads that key.
+   */
   model: string | null;
   /** Provider type: "cli" or "api". */
   provider: string | null;
@@ -121,6 +125,12 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
     : null;
   const vendor = llmConfig && typeof llmConfig.vendor === "string" ? llmConfig.vendor : null;
 
+  // Claude's fields resolve per field across the modern `llm.claude` block and
+  // the legacy top-level `claude` block — the same resolution `loadLLMConfig`
+  // and `GET /api/llm/config` use, so the footer cannot disagree with the CLI
+  // about which value is live.
+  const claude = resolveClaudeConfig(llmConfig?.claude, ndxConfig?.claude).config;
+
   // Model: read from active vendor's llm.<vendor>.model field
   let model: string | null = null;
   if (vendor && llmConfig) {
@@ -130,16 +140,12 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
       if (typeof vm === "string" && vm.length > 0) model = vm;
     }
   }
-  // Legacy fallback: claude.model or hench.model (used before llm.* namespace existed)
-  if (!model) {
-    const legacyModel = ndxConfig?.claude &&
-      typeof ndxConfig.claude === "object"
-      ? (ndxConfig.claude as Record<string, unknown>).model
-      : undefined;
-    const henchModel = henchConfig?.model;
-    model = (typeof legacyModel === "string" && legacyModel.length > 0 ? legacyModel : null) ??
-            (typeof henchModel === "string" && henchModel.length > 0 ? henchModel : null);
-  }
+  // Legacy fallback: the resolver already folded `claude.model` in above.
+  //
+  // `hench.model` used to be consulted here as a second fallback. It is not a
+  // model source: `ndx work` has never read it (see the `hench.models.<vendor>`
+  // changeset), so showing it in the footer reported a model nothing would run.
+  if (!model && claude?.model) model = claude.model;
 
   // For local vendor: query LM Studio for the currently loaded model.
   // If the live model differs from the stored config, write it back to .n-dx.json
@@ -198,15 +204,11 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
     ? henchConfig.provider
     : null;
 
-  // Auth method detection
-  const hasApiKey = ndxConfig?.claude &&
-    typeof ndxConfig.claude === "object" &&
-    typeof (ndxConfig.claude as Record<string, unknown>).api_key === "string" &&
-    ((ndxConfig.claude as Record<string, unknown>).api_key as string).length > 0;
-  const hasCliPath = ndxConfig?.claude &&
-    typeof ndxConfig.claude === "object" &&
-    typeof (ndxConfig.claude as Record<string, unknown>).cli_path === "string" &&
-    ((ndxConfig.claude as Record<string, unknown>).cli_path as string).length > 0;
+  // Auth method detection. Reads the resolved view, so a credential set under
+  // the modern `llm.claude.*` keys counts — checking only the legacy block
+  // reported "none" for a perfectly configured project.
+  const hasApiKey = Boolean(claude?.api_key);
+  const hasCliPath = Boolean(claude?.cli_path);
 
   let authMethod: "api-key" | "cli" | "none" = "none";
   if (hasApiKey) {

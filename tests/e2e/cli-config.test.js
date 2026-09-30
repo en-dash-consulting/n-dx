@@ -691,6 +691,35 @@ describe("n-dx config", () => {
       expect(shared.claude.model).toBe("claude-sonnet-5");
     });
 
+    it("writing llm.claude.* no longer mirrors the value into legacy claude.*", async () => {
+      // The mirror existed so block-level legacy fallback could not shadow a
+      // modern write. Readers now resolve the two locations per field
+      // (`resolveClaudeConfig`), so the copy bought nothing and cost a second
+      // place for the same setting to be wrong.
+      run(["llm.claude.model", "claude-sonnet-5", tmpDir]);
+
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.llm.claude.model).toBe("claude-sonnet-5");
+      expect(shared.claude?.model).toBeUndefined();
+    });
+
+    it("leaves an existing legacy claude.* value alone when the modern key is set", async () => {
+      // "Existing claude.* values are left in place" — the legacy key is still
+      // read until 1.0.0, so rewriting or deleting it here would change what a
+      // project resolves without being asked to.
+      await writeFile(
+        SHARED_CONFIG_PATH(tmpDir),
+        JSON.stringify({ claude: { model: "legacy-model", lightModel: "legacy-light" } }, null, 2) + "\n",
+      );
+
+      run(["llm.claude.model", "claude-sonnet-5", tmpDir]);
+
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.llm.claude.model).toBe("claude-sonnet-5");
+      expect(shared.claude.model).toBe("legacy-model");
+      expect(shared.claude.lightModel).toBe("legacy-light");
+    });
+
     it("re-setting an api_key that lives in .n-dx.json moves it to the local file", async () => {
       // A project configured before api keys were local-only has the key in the shared file.
       await writeFile(

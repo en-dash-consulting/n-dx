@@ -2,7 +2,7 @@
 id: "11e17f5e-2453-4984-bd6e-776dc1dca5f3"
 level: "task"
 title: "Add the Robot Wrangler settings page for provider and model across every LLM-using command"
-status: "pending"
+status: "in_progress"
 priority: "medium"
 tags:
   - "0.8.0"
@@ -12,6 +12,7 @@ blockedBy:
   - "2fa5da62-773b-48d9-bcd6-8aaa6011b465"
   - "69848346-1828-42d3-b62d-833648d4274b"
 source: "caos work management: WM-2119 (Add the Robot Wrangler settings page for provider and model across every LLM-using command); 0.8.0 planning, PR 24 · Settings consolidation"
+startedAt: "2026-09-30T21:36:57.841Z"
 acceptanceCriteria:
   - "Robot Wrangler is a new settings view, id robot-wrangler, in packages/web/src/viewer/views/robot-wrangler.ts. It replaces llm-provider.ts, which is deleted, in llm-provider's position (first) in SETTINGS_ENTRIES (viewer/views/stages.ts), in VIEW_META (views/view-meta.ts), in the view registry, in CROSS_CUTTING_VIEWS and in ViewId (shared/view-id.ts). The bottom bar's cog (openSettings in viewer/main.ts) opens it. llm-provider is no longer a ViewId; /llm-provider redirects to /robot-wrangler through VIEW_ALIASES (shared/view-routing.ts), and the pair is added to ALIASES in packages/web/tests/e2e-ui/navigation.spec.ts and as a case in packages/web/tests/unit/server/redirect-aliases.test.ts."
   - "Old keys are the top-level claude.model, claude.lightModel, claude.cli_path, claude.api_key and claude.api_endpoint. New keys are llm.claude.* (and llm.<vendor>.* for other vendors). One exported @n-dx/llm-client function resolves each Claude field as new ?? old, per field, replacing the block-level fallback in llm-config.ts (llmClaude ?? legacyClaude). loadLLMConfig, GET /api/llm/config (server/routes-llm.ts) and GET /api/ndx-config (server/routes-config.ts) all use it, and routes-config no longer falls back to hench.model. A unit test covers old-only, new-only and both-set for each field. The changeset notes the behaviour change: a project with both an llm.claude block and legacy claude.* keys now honours each legacy field the new block leaves unset."
@@ -22,6 +23,6 @@ acceptanceCriteria:
   - "tests/layout-literal-inventory.md is updated in the same commit: the llm-provider.ts row is removed, counts are lowered for files that lose literals, and no file gains a .n-dx*.json literal (new code uses resolveLayout). tests/e2e/layout-literal-policy.test.js and tests/e2e/architecture-policy.test.js pass."
   - "Existing tests that name llm-provider (shell.test.ts, navigation-model.test.ts, leave-guard.test.ts and the other viewer tests) are updated to robot-wrangler. Patch changesets cover @n-dx/web, @n-dx/core, @n-dx/llm-client, and @n-dx/hench if its exports change."
 description: "Robot Wrangler holds provider and model for every LLM-using command. Until 1.0.0 it must read those keys from both their old and new config locations and write only the new ones.\n\nImplementation notes: Replace packages/web/src/viewer/views/llm-provider.ts with the Robot Wrangler page; do the dual-location read and new-key write in packages/core/config.js (the spawn-exempt config module) and the web config routes (server/routes-llm.ts, server/routes-config.ts). Constraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (hench: src/prd/rex-gateway.ts and src/prd/llm-gateway.ts; web: src/server/rex-gateway.ts and src/server/domain-gateway.ts) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name (@n-dx/hench, @n-dx/rex, @n-dx/web, @n-dx/core, @n-dx/sourcevision, @n-dx/llm-client) with a patch bump; run pnpm preflight before opening the PR."
-lastModified: "2026-09-30T21:35:38.267Z"
+lastModified: "2026-09-30T21:42:46.590Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
