@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { PRDItem, Requirement } from "../../../src/schema/v1.js";
 import { evaluateReady, applyReadyMarking } from "../../../src/core/ready.js";
+import { findNextTask, collectCompletedIds } from "../../../src/core/next-task.js";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -224,5 +225,126 @@ describe("applyReadyMarking", () => {
     expect(items[0].ready).toBe(true);
     expect(second.markedReadyCount).toBe(0);
     expect(second.unmarkedCount).toBe(0);
+  });
+});
+
+/**
+ * Readiness inherits blockers the way it already inherits requirements.
+ *
+ * `collectActionable` stops descending at a blocked, cancelled or deleted
+ * ancestor, and at one with an unresolved `blockedBy` — so a task under any of
+ * those can never be selected. Marking it `ready` claimed the opposite, and the
+ * two answers came from two separate pieces of code. They now come from
+ * `traversalBlock`, the predicate selection itself uses.
+ */
+describe("ancestor blockers", () => {
+  function nest(ancestor: Partial<PRDItem>, child: Partial<PRDItem> = {}): PRDItem[] {
+    return [
+      makeItem({
+        id: "epic",
+        title: "The Epic",
+        level: "epic",
+        ...ancestor,
+        children: [
+          makeItem({
+            id: "task",
+            title: "The Task",
+            requirements: [makeReq({ id: "r1", title: "CI check", validationType: "automated" })],
+            ...child,
+          }),
+        ],
+      }),
+    ];
+  }
+
+  it("qualifies when the ancestor chain is clear", () => {
+    const result = evaluateReady(nest({}), "task")!;
+    expect(result.qualifies).toBe(true);
+    expect(result.blockedAncestor).toBeUndefined();
+  });
+
+  for (const status of ["blocked", "cancelled", "deleted"] as const) {
+    it(`does not qualify under a ${status} ancestor, and names it`, () => {
+      const result = evaluateReady(nest({ status }), "task")!;
+      expect(result.qualifies).toBe(false);
+      expect(result.blockedAncestor).toMatchObject({ id: "epic", title: "The Epic", status });
+      expect(result.reason).toContain("The Epic");
+      expect(result.reason).toContain(status);
+    });
+  }
+
+  it("does not qualify under an ancestor with an open blockedBy, and names it", () => {
+    const result = evaluateReady(nest({ blockedBy: ["nope"] }), "task")!;
+    expect(result.qualifies).toBe(false);
+    expect(result.blockedAncestor).toMatchObject({ id: "epic", openBlockerIds: ["nope"] });
+    expect(result.reason).toContain("The Epic");
+    expect(result.reason).toContain("nope");
+  });
+
+  it("qualifies when the ancestor's blockedBy is satisfied", () => {
+    const items = nest({ blockedBy: ["done"] });
+    items.push(makeItem({ id: "done", title: "Done", status: "completed" }));
+    expect(evaluateReady(items, "task")!.qualifies).toBe(true);
+  });
+
+  it("a completed or deferred ancestor does not block — selection still descends", () => {
+    // `traversalBlock` deliberately omits these: a child under a finished
+    // parent may be failing and need retrying.
+    expect(evaluateReady(nest({ status: "completed" }), "task")!.qualifies).toBe(true);
+    expect(evaluateReady(nest({ status: "deferred" }), "task")!.qualifies).toBe(true);
+  });
+
+  it("names the nearest blocked ancestor when more than one blocks", () => {
+    const items: PRDItem[] = [
+      makeItem({
+        id: "epic",
+        title: "Outer",
+        level: "epic",
+        status: "blocked",
+        children: [
+          makeItem({
+            id: "feature",
+            title: "Inner",
+            level: "feature",
+            status: "cancelled",
+            children: [
+              makeItem({
+                id: "task",
+                title: "The Task",
+                requirements: [makeReq({ id: "r1", title: "CI", validationType: "automated" })],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ];
+    expect(evaluateReady(items, "task")!.blockedAncestor).toMatchObject({
+      id: "feature",
+      status: "cancelled",
+    });
+  });
+
+  it("applyReadyMarking does not mark a task under a blocked epic", () => {
+    const items = nest({ status: "blocked" });
+    const outcome = applyReadyMarking(items);
+    expect(items[0].children![0].ready).toBeUndefined();
+    expect(outcome.markedReadyCount).toBe(0);
+    expect(outcome.evaluations.find((e) => e.itemId === "task")?.qualifies).toBe(false);
+  });
+
+  it("applyReadyMarking unmarks a task that a newly-blocked ancestor took out", () => {
+    const items = nest({ status: "blocked" }, { ready: true });
+    const outcome = applyReadyMarking(items);
+    expect(items[0].children![0].ready).toBeUndefined();
+    expect(outcome.unmarkedCount).toBe(1);
+  });
+
+  it("ready never disagrees with selection about the same task", () => {
+    // The point of sharing the predicate: anything marked ready must be a task
+    // findNextTask would actually be willing to hand out.
+    const items = nest({ status: "blocked" });
+    applyReadyMarking(items);
+    expect(findNextTask(items, collectCompletedIds(items))).toBeNull();
+    expect(items[0].children![0].ready).toBeUndefined();
   });
 });

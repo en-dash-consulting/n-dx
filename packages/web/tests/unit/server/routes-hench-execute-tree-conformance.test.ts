@@ -23,6 +23,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
@@ -316,5 +317,29 @@ describe("POST /api/hench/execute — PRD tree conformance gate", () => {
       expect(error).toMatch(/not started/);
       expect(body.runId).toBeUndefined();
     });
+
+    // #442 finding 7: this route used to pass rex's own `--allow-on-branch`
+    // unconditionally, so the dashboard's double-confirm (412 then explicit
+    // `migrateSlugs: true`) silently overrode the branch guard. It no longer
+    // passes that flag — an accepted migration on a feature branch now
+    // surfaces the guard's refusal instead of rewriting the tree.
+    it("surfaces rex's branch-guard refusal on a feature branch instead of migrating", async () => {
+      const foreign = await reSuffixEpicDir();
+      execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
+      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir, stdio: "ignore" });
+      execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir, stdio: "ignore" });
+      execFileSync("git", ["add", "-A"], { cwd: tmpDir, stdio: "ignore" });
+      execFileSync("git", ["commit", "-m", "baseline"], { cwd: tmpDir, stdio: "ignore" });
+      const branch = "feature/442-web-branch-guard";
+      execFileSync("git", ["checkout", "-b", branch], { cwd: tmpDir, stdio: "ignore" });
+
+      const { status, error } = await execute("task-def456", { migrateSlugs: true });
+
+      expect(status).toBe(500);
+      expect(error).toContain(branch);
+      expect(error).toMatch(/not the default branch/);
+      // The branch guard stopped it — the tree is still non-conformant.
+      expect((await readdir(treeRoot)).includes(foreign)).toBe(true);
+    }, 60_000);
   });
 });

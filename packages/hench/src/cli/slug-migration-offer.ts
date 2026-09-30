@@ -333,11 +333,15 @@ export async function runSlugMigration(
   const res = await exec(
     cli.command,
     // rex's branch guard refuses whole-tree rewrites off the default branch
-    // unless asked to proceed. This call only happens after `decideOffer`
-    // has already gated on a human answering yes at an interactive terminal
-    // (never autonomous, CI, or --yes) — that confirmation is the guard's
-    // "on purpose" signal, so it is passed through rather than asked twice.
-    [...cli.args, "migrate-slugs", "--format=json", "--allow-on-branch", dir],
+    // unless asked to proceed. `decideOffer` gating on a human answering yes
+    // at an interactive terminal is consent to *run the migration*, not to
+    // run it on a feature branch — those are different questions, and a
+    // migration accepted on a feature branch is exactly the shape of the
+    // 2026-09-17 incident this offer exists to prevent. `--allow-on-branch`
+    // is deliberately not passed, so the guard still applies: on a feature
+    // branch the operator sees rex's refusal (naming the branch) instead of
+    // an unreviewed whole-tree rewrite going through silently.
+    [...cli.args, "migrate-slugs", "--format=json", dir],
     { cwd: dir, timeout: timeoutMs },
   );
 

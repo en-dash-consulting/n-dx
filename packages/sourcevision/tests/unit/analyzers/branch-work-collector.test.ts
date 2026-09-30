@@ -4,16 +4,22 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 
+vi.mock("../../../src/util/exec-cli.js", () => ({ execFileSyncCli: vi.fn() }));
+
 import {
   collectBranchWork,
   collectCompletedIds,
   buildBranchWorkItems,
+  diffCompletedViaRex,
 } from "../../../src/analyzers/branch-work-collector.js";
 import type {
   BranchWorkResult,
   CollectorOptions,
   RexBridge,
 } from "../../../src/analyzers/branch-work-collector.js";
+import { execFileSyncCli } from "../../../src/util/exec-cli.js";
+
+const mockedExecFileSyncCli = vi.mocked(execFileSyncCli);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -69,18 +75,32 @@ async function setupGitRepo(
  *
  * `diffCompleted` returning null is rex saying "I could not compare", which is
  * a different answer from an empty set and the collector treats it as such.
+ * `reliable: false` (via `overrides`) simulates tree-diff reporting either
+ * side of the comparison as having no PRD tree at all.
+ *
+ * The returned `baseBranch` echoes what was actually asked for (falling back
+ * to "main" when nothing was, simulating tree-diff's own default resolution
+ * landing there) unless `overrides.baseBranch` names something else — the
+ * collector must take its label from this answer, not recompute one locally.
  */
 function fakeRex(
   doc: Record<string, unknown> | null,
   completed: string[] | null,
-): RexBridge & { calls: { dir: string; baseBranch: string }[] } {
-  const calls: { dir: string; baseBranch: string }[] = [];
+  overrides: { baseBranch?: string; reliable?: boolean } = {},
+): RexBridge & { calls: { dir: string; baseBranch: string | undefined }[] } {
+  const calls: { dir: string; baseBranch: string | undefined }[] = [];
   return {
     calls,
     readPRD: () => doc as never,
-    diffCompleted: (dir: string, baseBranch: string) => {
+    diffCompleted: (dir: string, baseBranch?: string) => {
       calls.push({ dir, baseBranch });
-      return completed === null ? null : new Set(completed);
+      if (completed === null) return null;
+      const reliable = overrides.reliable ?? true;
+      return {
+        baseBranch: overrides.baseBranch ?? baseBranch ?? "main",
+        ids: reliable ? new Set(completed) : new Set(),
+        reliable,
+      };
     },
   };
 }
@@ -311,24 +331,33 @@ describe("branch-work-collector", () => {
       expect(item.parentChain.map((p) => p.id)).toEqual(["epic-1"]);
     });
 
-    it("asks rex to diff against the detected base branch", async () => {
+    // #442 finding 6: this call used to pass a locally-detected base branch as
+    // `--from`, overriding tree-diff's own `origin/HEAD`-aware default. It
+    // must leave `--from` out when nothing was given explicitly, so tree-diff
+    // applies its own default instead of a possibly-stale local guess.
+    it("does not force a locally-detected base branch onto rex", async () => {
       await setupGitRepo(tmpDir);
       const rex = fakeRex(TREE, []);
 
       await collectBranchWork({ dir: tmpDir, rex });
 
       expect(rex.calls).toHaveLength(1);
-      expect(rex.calls[0].baseBranch).toBe("main");
+      expect(rex.calls[0].baseBranch).toBeUndefined();
     });
 
-    it("auto-detects master when main does not exist", async () => {
+    it("reports the base branch rex actually diffed against, not a local guess", async () => {
       await setupGitRepo(tmpDir, "feature/from-master", "master");
-      const rex = fakeRex(TREE, []);
+      // "origin/trunk" is deliberately a label `detectBaseBranch` can never
+      // produce — it only ever answers "main" or "master". A label the local
+      // guess could also have produced would let this assertion pass with the
+      // `baseBranch = diffed.baseBranch` assignment deleted, which is exactly
+      // the hole a mutation of that line proved: the whole suite stayed green.
+      const rex = fakeRex(TREE, [], { baseBranch: "origin/trunk" });
 
       const result = await collectBranchWork({ dir: tmpDir, rex });
 
-      expect(result.baseBranch).toBe("master");
-      expect(rex.calls[0].baseBranch).toBe("master");
+      expect(result.baseBranch).toBe("origin/trunk");
+      expect(rex.calls[0].baseBranch).toBeUndefined();
     });
 
     it("honours an explicit baseBranch", async () => {
@@ -371,6 +400,22 @@ describe("branch-work-collector", () => {
       expect(result.errors?.join(" ")).toContain("main");
     });
 
+    // #442 finding 2: a diff that succeeded but reported either side as
+    // having no PRD tree (a legacy prd.md project on the "to" side, or a base
+    // ref predating the PRD on the "from" side) used to be read as a real
+    // answer — tree-diff's `completed` array either way, silently. Neither the
+    // whole-project fallback above (a total diff failure) nor a silently empty
+    // result is correct here: the caller must warn and report no branch work.
+    it("warns and reports no branch work when either side of the diff has no PRD tree", async () => {
+      await setupGitRepo(tmpDir);
+      const rex = fakeRex(TREE, ["task-1", "task-2"], { reliable: false });
+
+      const result = await collectBranchWork({ dir: tmpDir, rex });
+
+      expect(result.items).toEqual([]);
+      expect(result.errors?.length).toBeGreaterThan(0);
+    });
+
     it("returns all completed items in a non-git directory, without asking rex to diff", async () => {
       const rex = fakeRex(TREE, ["task-1"]);
 
@@ -408,5 +453,102 @@ describe("branch-work-collector", () => {
       expect(result.epicSummaries![0].title).toBe("Auth System");
       expect(result.epicSummaries![0].completedCount).toBe(2);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// diffCompletedViaRex — the JSON contract with the real `rex tree-diff --json`
+// ---------------------------------------------------------------------------
+//
+// #442 findings 2 and 6: this is the parsing this module used to get wrong —
+// reading `completed` while ignoring `sources.from.present` / `sources.to
+// .present`, and always sending `--from`. `execFileSyncCli` is mocked here so
+// the JSON shapes tree-diff actually produces (see rex's own
+// `tree-diff-sources.test.ts`) can be fed in directly, without a built rex.
+
+describe("diffCompletedViaRex", () => {
+  beforeEach(() => {
+    mockedExecFileSyncCli.mockReset();
+  });
+
+  function mockTreeDiffOutput(payload: Record<string, unknown>): void {
+    mockedExecFileSyncCli.mockReturnValue(JSON.stringify(payload));
+  }
+
+  it("returns the completed ids and echoes the base label when both sides are present", () => {
+    mockTreeDiffOutput({
+      sources: { from: { label: "main", present: true }, to: { present: true } },
+      completed: [{ id: "task-1" }, { id: "task-2" }],
+    });
+
+    const result = diffCompletedViaRex("/proj", undefined);
+
+    expect(result).toEqual({
+      baseBranch: "main",
+      ids: new Set(["task-1", "task-2"]),
+      reliable: true,
+    });
+  });
+
+  it("omits --from when no baseBranch is given", () => {
+    mockTreeDiffOutput({
+      sources: { from: { label: "main", present: true }, to: { present: true } },
+      completed: [],
+    });
+
+    diffCompletedViaRex("/proj", undefined);
+
+    const args = mockedExecFileSyncCli.mock.calls[0][1];
+    expect(args.some((a) => a.startsWith("--from="))).toBe(false);
+  });
+
+  it("passes --from when a baseBranch is given explicitly", () => {
+    mockTreeDiffOutput({
+      sources: { from: { label: "develop", present: true }, to: { present: true } },
+      completed: [],
+    });
+
+    diffCompletedViaRex("/proj", "develop");
+
+    const args = mockedExecFileSyncCli.mock.calls[0][1];
+    expect(args).toContain("--from=develop");
+  });
+
+  it("reports unreliable with empty ids when the baseline has no PRD tree", () => {
+    mockTreeDiffOutput({
+      sources: { from: { label: "main", present: false }, to: { present: true } },
+      // tree-diff's own completed array would list every current completion
+      // here — the point of `reliable: false` is that this is disregarded.
+      completed: [{ id: "task-1" }, { id: "task-2" }],
+    });
+
+    const result = diffCompletedViaRex("/proj", undefined);
+
+    expect(result).toEqual({ baseBranch: "main", ids: new Set(), reliable: false });
+  });
+
+  it("reports unreliable with empty ids when the working tree has no PRD tree", () => {
+    mockTreeDiffOutput({
+      sources: { from: { label: "main", present: true }, to: { present: false } },
+      completed: [],
+    });
+
+    const result = diffCompletedViaRex("/proj", undefined);
+
+    expect(result).toEqual({ baseBranch: "main", ids: new Set(), reliable: false });
+  });
+
+  it("returns null when the JSON has no completed array", () => {
+    mockTreeDiffOutput({ sources: { from: { label: "main", present: true }, to: { present: true } } });
+
+    expect(diffCompletedViaRex("/proj", undefined)).toBeNull();
+  });
+
+  it("returns null when the spawn throws", () => {
+    mockedExecFileSyncCli.mockImplementation(() => {
+      throw new Error("rex: command not found");
+    });
+
+    expect(diffCompletedViaRex("/proj", undefined)).toBeNull();
   });
 });

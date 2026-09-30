@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
-import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor } from "../../prd/rex-gateway.js";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
@@ -361,18 +361,30 @@ export async function getEpicScopeInfo(
 
 /**
  * Count tasks with a given set of statuses (across the full tree).
- * Walks the PRD tree recursively; counts only leaf-level items.
+ *
+ * `assignee` is the `--mine` identity. When set, only items that identity owns
+ * — by their own `assignee` or an ancestor's, per {@link matchesAssignee} — are
+ * counted. The count is what the reset offer quotes and what it then resets, so
+ * an unscoped count under `--mine` offered to reset the whole PRD.
+ *
+ * Exported for testing: the number shown in that offer is half of what makes it
+ * safe, and it is not otherwise reachable.
  */
-function countTasksByStatus(items: PRDItem[], statuses: string[]): number {
+export function countTasksByStatus(items: PRDItem[], statuses: string[], assignee?: string): number {
   const statusSet = new Set(statuses);
   let count = 0;
-  const walk = (list: PRDItem[]) => {
+  const walk = (list: PRDItem[], parents: PRDItem[]) => {
     for (const item of list) {
-      if (statusSet.has(item.status)) count++;
-      if (item.children) walk(item.children);
+      if (
+        statusSet.has(item.status) &&
+        (!assignee || matchesAssignee(item, parents, assignee))
+      ) {
+        count++;
+      }
+      if (item.children) walk(item.children, [...parents, item]);
     }
   };
-  walk(items);
+  walk(items, []);
   return count;
 }
 
@@ -554,14 +566,25 @@ export interface ResetDeferredOptions {
    * `--dry-run` produced.
    */
   dryRun?: boolean;
+  /**
+   * Restrict the reset to items this identity owns (`--mine`), by their own
+   * `assignee` or an ancestor's.
+   *
+   * Without it, the reset offered when a `--mine` menu comes back empty reset
+   * every deferred and failing task in the PRD — other people's included, and
+   * committed under this operator's name. A filter that narrows what you are
+   * shown must narrow what you act on.
+   */
+  assignee?: string;
 }
 
 /**
- * Reset all deferred and failing tasks to pending so they can be retried.
+ * Reset deferred and failing tasks to pending so they can be retried.
  *
  * Used by --reset-deferred to let the user restart a run where all tasks
  * failed (e.g. after fixing LM Studio context window size). Returns the
  * number of tasks that were reset (or, on a dry run, would be reset).
+ * Scoped to {@link ResetDeferredOptions.assignee} when one is given.
  */
 export async function resetDeferredTasks(
   store: PRDStore,
@@ -569,16 +592,20 @@ export async function resetDeferredTasks(
 ): Promise<number> {
   const doc = await store.loadDocument();
   const toReset: Array<{ id: string; title: string }> = [];
+  const assignee = opts.assignee;
 
-  const walk = (items: PRDItem[]) => {
+  const walk = (items: PRDItem[], parents: PRDItem[]) => {
     for (const item of items) {
-      if (item.status === "deferred" || item.status === "failing") {
+      if (
+        (item.status === "deferred" || item.status === "failing") &&
+        (!assignee || matchesAssignee(item, parents, assignee))
+      ) {
         toReset.push({ id: item.id, title: item.title });
       }
-      if (item.children) walk(item.children);
+      if (item.children) walk(item.children, [...parents, item]);
     }
   };
-  walk(doc.items);
+  walk(doc.items, []);
 
   if (!opts.dryRun) {
     for (const t of toReset) {
@@ -613,6 +640,11 @@ export async function resetDeferredTasks(
  *
  * On a dry run nothing is written and nothing is committed.
  *
+ * {@link ResetDeferredOptions.assignee} is forwarded whole. Rebuilding the
+ * options here as `{ dryRun }` silently unscoped `ndx work --mine
+ * --reset-deferred` back to the entire PRD — the very defect the option was
+ * added to close, reintroduced one call below it. Pass `opts` through.
+ *
  * @returns the number of tasks reset, or that would be reset on a dry run
  */
 export async function resetDeferredAndCommit(
@@ -625,7 +657,7 @@ export async function resetDeferredAndCommit(
   // indistinguishable from anything that was already there.
   const prdDirtyBeforeReset = dryRun ? [] : await listUncommittedPrdPaths(projectDir);
 
-  const resetCount = await resetDeferredTasks(store, { dryRun });
+  const resetCount = await resetDeferredTasks(store, opts);
   if (resetCount === 0) {
     info("\nNo deferred or failing tasks to reset.");
     return 0;
@@ -656,6 +688,83 @@ export async function resetDeferredAndCommit(
     throw commitResult.error;
   }
   return resetCount;
+}
+
+// ---------------------------------------------------------------------------
+// --mine: empty-result reporting
+// ---------------------------------------------------------------------------
+
+/**
+ * How many tasks selection would offer with `--mine` dropped.
+ *
+ * "Nothing assigned to you" and "nothing left to do" are different situations
+ * with the same empty list, and the operator cannot tell them apart. Neither
+ * can they check the filter they never typed: `--mine` resolves an identity
+ * through `resolveActor` (git `user.email`, else the OS username), and a run
+ * that matches nothing is most often an identity that does not match how the
+ * items were actually stamped.
+ */
+async function countActionableIgnoringAssignee(
+  store: PRDStore,
+  epicId?: string,
+): Promise<number> {
+  const doc = await store.loadDocument();
+  const completedIds = collectCompletedIds(doc.items);
+  const entries = findActionable(doc.items, completedIds, Infinity);
+  if (!epicId) return entries.length;
+  const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
+  return entries.filter((e) => epicTaskIds.has(e.item.id)).length;
+}
+
+/**
+ * The lines shown when `--mine` matches nothing. Exported for tests: the
+ * identity and the unfiltered count are the whole content of the message, and
+ * a reworded sentence that drops either one puts the operator back where they
+ * started.
+ *
+ * @param scope trailing scope phrase, e.g. `" in epic"` — `""` for the whole PRD.
+ */
+export function formatNoAssignedTasksLines(
+  assignee: string,
+  unfilteredCount: number,
+  scope = "",
+): string[] {
+  const lines = [`No actionable tasks assigned to ${assignee}${scope}.`];
+  lines.push(
+    unfilteredCount > 0
+      ? `  ${unfilteredCount} actionable task(s) exist without --mine. ` +
+        `Drop --mine to see them, or check that items are assigned to this exact identity.`
+      : `  No actionable tasks exist without --mine either.`,
+  );
+  return lines;
+}
+
+/**
+ * The lines `--loop` prints when it runs out of the identity's tasks.
+ *
+ * Separate from {@link formatNoAssignedTasksLines} because the loop has a
+ * count of its own to report, and exported for the same reason: built inline
+ * at the call site, the one thing this message must never say — "All tasks
+ * complete", which is what it said when `--mine` matched nothing on the first
+ * iteration — was asserted by no test at all, and deleting the branch left the
+ * suite green.
+ *
+ * @param processedCount tasks this loop actually ran before running out.
+ * @param scope trailing scope phrase, e.g. `" in epic"` — `""` for the whole PRD.
+ */
+export function formatMineLoopCompletionLines(
+  assignee: string,
+  processedCount: number,
+  unfilteredCount: number,
+  scope = "",
+): string[] {
+  return [
+    `No tasks assigned to ${assignee}${scope} remain — ` +
+      `loop finished after ${processedCount} task(s).`,
+    unfilteredCount > 0
+      ? `  ${unfilteredCount} actionable task(s) remain without --mine.`
+      : `  No actionable tasks remain without --mine either.`,
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -892,16 +1001,33 @@ async function selectTask(
   }
 
   if (tasks.length === 0) {
-    const scope = epicId ? "within the specified epic" : "in PRD";
-    output(`No actionable tasks found ${scope}.`);
+    if (assignee) {
+      // Name the identity `resolveActor` produced and say what dropping the
+      // filter would find. "No actionable tasks found in PRD" under --mine
+      // described the wrong thing entirely.
+      const scope = epicId ? " in the specified epic" : "";
+      for (const line of formatNoAssignedTasksLines(
+        assignee,
+        await countActionableIgnoringAssignee(store, epicId),
+        scope,
+      )) {
+        output(line);
+      }
+    } else {
+      const scope = epicId ? "within the specified epic" : "in PRD";
+      output(`No actionable tasks found ${scope}.`);
+    }
     // Check for deferred/failing tasks and offer to reset them interactively.
+    // Under --mine both the count and the reset are scoped to the identity —
+    // an offer phrased against the filtered menu must not act outside it.
     const doc = await store.loadDocument();
-    const deferredCount = countTasksByStatus(doc.items, ["deferred", "failing"]);
+    const deferredCount = countTasksByStatus(doc.items, ["deferred", "failing"], assignee);
     if (deferredCount > 0 && process.stdin.isTTY) {
-      output(colorWarn(`  ${deferredCount} task(s) are deferred or failing.`));
+      const whose = assignee ? ` assigned to ${assignee}` : "";
+      output(colorWarn(`  ${deferredCount} task(s)${whose} are deferred or failing.`));
       const answer = await promptUser("  Reset them to pending and continue? [y/N] ");
       if (answer.toLowerCase() === "y" || answer.toLowerCase() === "yes") {
-        await resetDeferredTasks(store);
+        await resetDeferredTasks(store, assignee ? { assignee } : {});
         // Reload tasks after reset
         tasks = await getActionableTasks(store, undefined, claims, assignee);
         if (epicId) {
@@ -917,9 +1043,11 @@ async function selectTask(
         process.exit(0);
       }
     } else if (deferredCount > 0) {
+      const whose = assignee ? ` assigned to ${assignee}` : "";
+      const retryCmd = assignee ? "ndx work --mine --reset-deferred" : "ndx work --reset-deferred";
       output(colorWarn(
-        `  ${deferredCount} task(s) are deferred or failing — ` +
-        `run 'ndx work --reset-deferred' to reset them and retry.`,
+        `  ${deferredCount} task(s)${whose} are deferred or failing — ` +
+        `run '${retryCmd}' to reset them and retry.`,
       ));
       process.exit(0);
     } else {
@@ -1623,12 +1751,17 @@ export async function cmdRun(
   // on which those are.
   await warnOnShadowingMcpRegistration(dir, llmVendor);
 
-  // --reset-deferred: reset all deferred/failing tasks to pending before running.
+  // --reset-deferred: reset deferred/failing tasks to pending before running.
   // This lets the user retry tasks that were deferred by infrastructure failures
   // (e.g. context window overflow) without manually editing each task.
+  //
+  // With --mine the reset is scoped to the resolved identity, for the same
+  // reason the interactive offer is: the run that follows will only work this
+  // operator's items, so resetting everyone else's — and committing that under
+  // this operator's name — is never what the pair of flags asked for.
   if (flags["reset-deferred"] === "true") {
     const store = await resolveStore(rexDir);
-    await resetDeferredAndCommit(store, dir, { dryRun });
+    await resetDeferredAndCommit(store, dir, { dryRun, ...(assignee ? { assignee } : {}) });
   }
 
   // Fail fast if CLI provider selected but vendor CLI binary not available.
@@ -2284,6 +2417,33 @@ async function runLoop(
           const scope = epicId ? " in epic" : "";
           if (tags?.length) {
             printTagFilterCompletionSummary(tags, taggedCompletedItems, completed - 1);
+          } else if (assignee) {
+            // Not "All tasks complete": under --mine the loop ran out of *this
+            // operator's* tasks, which says nothing about the rest of the PRD.
+            // On a first iteration that matched nothing it said the project was
+            // finished.
+            //
+            // The unfiltered count is best-effort: this is the loop's clean
+            // exit, and a store that cannot be read here must not turn a
+            // finished run into a crash. Reporting one number less is strictly
+            // better than losing the completion message entirely.
+            let unfiltered = 0;
+            try {
+              unfiltered = await countActionableIgnoringAssignee(
+                await resolveStore(rexDir),
+                epicId,
+              );
+            } catch {
+              unfiltered = 0;
+            }
+            const lines = formatMineLoopCompletionLines(
+              assignee,
+              completed - 1,
+              unfiltered,
+              scope,
+            );
+            info("");
+            for (const line of lines) info(line);
           } else {
             info(`\nAll tasks${scope} complete — loop finished after ${completed - 1} task(s).`);
           }
@@ -2568,6 +2728,7 @@ async function runEpicByEpic(
               undefined,
               permissionMode,
               skipTestGate,
+              undefined, // assignee — --mine is refused with --epic-by-epic
             );
             status = result.status;
             tasksStarted++;

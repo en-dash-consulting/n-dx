@@ -292,4 +292,94 @@ describe("--reset-deferred vs the pre-run commit gate", () => {
     expect((await gitStatus()).trim()).toBe("");
     expect(await commitCount()).toBe(1);
   });
+
+  /**
+   * `--mine --reset-deferred` must reset only the caller's tasks.
+   *
+   * `resetDeferredAndCommit` rebuilt its options as `{ dryRun }` before calling
+   * `resetDeferredTasks`, dropping the assignee one line below the option that
+   * exists to carry it. The flag pair therefore reset every deferred and
+   * failing task in the PRD — other people's included — and committed that
+   * under the running operator's name, which is exactly what scoping the reset
+   * was meant to prevent.
+   */
+  describe("--mine scoping survives resetDeferredAndCommit", () => {
+    const ALICE = "alice <alice@example.com>";
+    const BOB = "bob <bob@example.com>";
+
+    /** One task per identity, both deferred, plus one owned via its epic. */
+    function buildTwoOwnerStore() {
+      const updated: string[] = [];
+      return {
+        updated,
+        store: {
+          loadDocument: vi.fn(async () => ({
+            items: [
+              {
+                id: "epic-alice",
+                title: "Alice's epic",
+                status: "pending",
+                assignee: ALICE,
+                children: [
+                  { id: "task-inherited", title: "Inherited", status: "deferred", children: [] },
+                ],
+              },
+              { id: "task-bob", title: "Bob's", status: "deferred", assignee: BOB, children: [] },
+              { id: "task-nobody", title: "Nobody's", status: "failing", children: [] },
+            ],
+          })),
+          updateItem: vi.fn(async (id: string) => {
+            updated.push(id);
+          }),
+        },
+      };
+    }
+
+    it("resets only the identity's tasks, not the whole PRD", async () => {
+      const { store, updated } = buildTwoOwnerStore();
+
+      const resetCount = await resetDeferredAndCommit(store as never, projectDir, {
+        assignee: ALICE,
+      });
+
+      expect(resetCount).toBe(1);
+      expect(updated).toEqual(["task-inherited"]);
+      expect(updated).not.toContain("task-bob");
+      expect(updated).not.toContain("task-nobody");
+    });
+
+    it("still resets everything when no identity is given", async () => {
+      const { store, updated } = buildTwoOwnerStore();
+
+      const resetCount = await resetDeferredAndCommit(store as never, projectDir);
+
+      expect(resetCount).toBe(3);
+      expect(updated.sort()).toEqual(["task-bob", "task-inherited", "task-nobody"]);
+    });
+
+    it("a scoped dry run reports the identity's count and writes nothing", async () => {
+      const { store, updated } = buildTwoOwnerStore();
+
+      const resetCount = await resetDeferredAndCommit(store as never, projectDir, {
+        assignee: ALICE,
+        dryRun: true,
+      });
+
+      expect(resetCount).toBe(1);
+      expect(updated).toEqual([]);
+      expect((await gitStatus()).trim()).toBe("");
+    });
+
+    it("reports no work rather than resetting others when the identity owns nothing", async () => {
+      const { store, updated } = buildTwoOwnerStore();
+
+      const resetCount = await resetDeferredAndCommit(store as never, projectDir, {
+        assignee: "ghost <ghost@example.com>",
+      });
+
+      expect(resetCount).toBe(0);
+      expect(updated).toEqual([]);
+      expect(await commitCount()).toBe(1);
+    });
+  });
 });

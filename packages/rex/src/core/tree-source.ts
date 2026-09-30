@@ -37,7 +37,7 @@
  * @module core/tree-source
  */
 
-import { mkdtemp, rm, realpath } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, realpath } from "node:fs/promises";
 import { join, relative, sep, isAbsolute } from "node:path";
 import { tmpdir } from "node:os";
 import { exec, execStdout, PROJECT_DIRS } from "@n-dx/llm-client";
@@ -121,9 +121,25 @@ export async function loadTreeAtRef(
 
   const scratch = await mkdtemp(join(tmpdir(), "rex-tree-diff-"));
   try {
+    // `git checkout` runs the repository's post-checkout hook, same as any
+    // other checkout — this one is a throwaway scratch extraction, not an
+    // operator action, so a repo-configured hook (which may write files,
+    // shell out, or simply be slow) must not fire for it. Pointing
+    // core.hooksPath at a directory with nothing in it is what suppresses
+    // that without touching the repository's real hooks configuration.
+    const hooksDir = join(scratch, "no-hooks");
+    await mkdir(hooksDir);
     const checkout = await exec(
       "git",
-      [`--work-tree=${scratch}`, "checkout", ref, "--", treeRelative],
+      [
+        "-c",
+        `core.hooksPath=${hooksDir}`,
+        `--work-tree=${scratch}`,
+        "checkout",
+        ref,
+        "--",
+        treeRelative,
+      ],
       {
         cwd: repoRoot,
         timeout: GIT_TIMEOUT_MS,
@@ -165,13 +181,21 @@ export async function resolveAnchorRef(projectDir: string): Promise<string | nul
   const repoRoot = await resolveRepoRoot(projectDir).catch(() => null);
   if (repoRoot === null) return null;
 
+  // `git symbolic-ref` only resolves the symref file: it prints the name
+  // `origin/HEAD` points at and exits 0 even when that ref no longer exists —
+  // the state left behind by an upstream default-branch rename followed by
+  // `git remote prune origin`. Verifying the target exists before trusting it
+  // is what keeps a stale origin/HEAD from naming a ref `loadTreeAtRef` then
+  // fails to resolve at all.
   const symbolic = (
     await execStdout("git", ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"], {
       cwd: repoRoot,
       timeout: GIT_TIMEOUT_MS,
     })
   ).trim();
-  if (symbolic.startsWith("refs/remotes/")) return symbolic.slice("refs/remotes/".length);
+  if (symbolic.startsWith("refs/remotes/") && (await refExists(repoRoot, symbolic))) {
+    return symbolic.slice("refs/remotes/".length);
+  }
 
   for (const candidate of ["origin/main", "origin/master", "main", "master"]) {
     if (await refExists(repoRoot, candidate)) return candidate;
