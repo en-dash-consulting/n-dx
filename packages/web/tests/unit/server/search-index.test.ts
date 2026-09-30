@@ -45,52 +45,78 @@ function perfItems(n: number) {
 }
 
 /**
- * Fastest of `runs` timings, in ms.
+ * Index-structure operations performed by one `rebuild()`.
  *
- * Min rather than mean or median: the thing being measured is how long the work
- * takes, and a slower reading only ever means the machine was busy. Taking the
- * minimum treats load as the noise it is, and a transient spike has to land on
- * every single run to skew the result. Same helper, same reasoning, as
- * `packages/rex/tests/unit/store/folder-tree-parser.test.ts`.
+ * Technique 1 from TESTING.md: count work, not time. Every `get`, `set` and
+ * `has` on the three index maps counts once, and every element an iteration
+ * yields counts once — so a pass that re-reads what it has already indexed is
+ * paid for in the number, which is the shape of regression this guards.
+ *
+ * The count is exact and identical on every machine: 31.2 operations per item
+ * at 500, 1000 and 8000 items, repeatable to the operation.
  */
-function fastestMs(fn: () => unknown, runs = 3): number {
-  let best = Infinity;
-  for (let i = 0; i < runs; i++) {
-    const start = performance.now();
-    fn();
-    best = Math.min(best, performance.now() - start);
+class CountingMap<K, V> extends Map<K, V> {
+  constructor(private readonly tally: { ops: number }) {
+    super();
   }
-  return best;
+  override get(key: K): V | undefined {
+    this.tally.ops++;
+    return super.get(key);
+  }
+  override set(key: K, value: V): this {
+    this.tally.ops++;
+    return super.set(key, value);
+  }
+  override has(key: K): boolean {
+    this.tally.ops++;
+    return super.has(key);
+  }
+  override *[Symbol.iterator](): MapIterator<[K, V]> {
+    for (const entry of super[Symbol.iterator]()) {
+      this.tally.ops++;
+      yield entry;
+    }
+  }
+  override *keys(): MapIterator<K> {
+    for (const key of super.keys()) {
+      this.tally.ops++;
+      yield key;
+    }
+  }
+  override *values(): MapIterator<V> {
+    for (const value of super.values()) {
+      this.tally.ops++;
+      yield value;
+    }
+  }
+  override *entries(): MapIterator<[K, V]> {
+    for (const entry of super.entries()) {
+      this.tally.ops++;
+      yield entry;
+    }
+  }
+  override forEach(fn: (v: V, k: K, m: Map<K, V>) => void, thisArg?: unknown): void {
+    super.forEach((v, k, m) => {
+      this.tally.ops++;
+      fn.call(thisArg, v, k, m);
+    });
+  }
 }
 
 /**
- * The fastest run of each of two functions, measured in alternation.
- *
- * Timing one function to completion and then the other leaves each minimum
- * drawn from a different window, so sustained load arriving during the second
- * window inflates only that reading — and a ratio between them is then a
- * measure of when the load happened rather than of the work. Alternating puts
- * both through the same conditions: a burst long enough to matter is seen by
- * both, and one short enough to miss a run is excluded from both by the
- * minimum. Returns the two minima in the order the functions were given.
+ * Swap the index's three maps for counting ones and rebuild, returning the
+ * operation count. The fields are `private` to TypeScript only; nothing at
+ * runtime stops the substitution, and instrumenting the real structures is what
+ * makes the number the production path's own work rather than a model of it.
  */
-function fastestMsInterleaved(
-  a: () => unknown,
-  b: () => unknown,
-  runs = 5,
-): [number, number] {
-  let bestA = Infinity;
-  let bestB = Infinity;
-  for (let i = 0; i < runs; i++) {
-    const startA = performance.now();
-    a();
-    bestA = Math.min(bestA, performance.now() - startA);
-
-    const startB = performance.now();
-    b();
-    bestB = Math.min(bestB, performance.now() - startB);
+function countRebuildOps(index: SearchIndex): number {
+  const tally = { ops: 0 };
+  const target = index as unknown as Record<string, Map<unknown, unknown>>;
+  for (const field of ["invertedIndex", "items", "fieldText"]) {
+    target[field] = new CountingMap(tally);
   }
-  return [bestA, bestB];
+  index.rebuild();
+  return tally.ops;
 }
 
 // ── parseQuery tests ─────────────────────────────────────────────────────────
@@ -583,36 +609,46 @@ describe("SearchIndex", () => {
   /**
    * This replaced `expect(rebuildElapsed).toBeLessThan(5000)` on the 1000-item
    * test above. That budget measured the MACHINE: rebuild of 1000 items reads
-   * 3.98ms on this machine, so the bound carried 1250x headroom and could only
-   * ever fire on a stall. It could not be brought into line by scaling either —
-   * `5000 * 20` exceeds the package's 30s `testTimeout`, so a scaled version
-   * would be unfailable, and TESTING.md forbids a bound whose job is to sit
-   * below another number.
+   * 3.98ms here, so the bound carried 1250x headroom and could only ever fire
+   * on a stall.
    *
-   * What it was guarding is complexity, so assert that directly: two sizes
-   * measured back-to-back in the same process. Ambient load scales both
-   * readings together, so the ratio survives a busy machine.
+   * What it guards is complexity, so assert that directly. It was first written
+   * as a wall-clock growth ratio across a 16x size step, on the reasoning that
+   * ambient load scales both readings together and the ratio therefore survives
+   * a busy machine. **That reasoning was wrong, and CI proved it.** Load scales
+   * both readings together only when the load is CPU contention. Garbage
+   * collection tracks allocation volume, and the two workloads differ in
+   * allocation by exactly the factor being measured — so on a memory-constrained
+   * runner the large reading degrades and the small one does not. The bound was
+   * 32 (`sizeRatio * 2`) against a clean 13.61x here; CI measured 32.57x on code
+   * byte-identical to this branch's, and a run that has to explain itself as
+   * "probably the runner" is the failure mode the register exists to end.
    *
-   * SIZE STEP AND BOUND ARE BOTH MEASURED, not conventional. Clean vs an
-   * injected quadratic rebuild (re-reading every already-indexed item inside
-   * `indexItem`), fastest-of-N on this machine:
+   * So it counts work instead — technique 1, and the one TESTING.md asks for
+   * first. {@link countRebuildOps} tallies every operation `rebuild()` performs
+   * on the three index maps, including each element an iteration yields, which
+   * is how a pass that re-reads what it has already indexed shows up.
    *
-   *     500 -> 4000  (8x)    clean  5.75x   injected 15.25x
-   *     500 -> 8000  (16x)   clean 13.61x   injected 63.26x
-   *     1000 -> 8000 (8x)    clean  7.67x   injected 31.00x
+   * BOTH DIRECTIONS MEASURED, against the same injected regression the wall-clock
+   * version used (re-reading every already-indexed item inside `indexItem`):
    *
-   * 250 -> 1000, the step the task proposed, is unusable: rebuild of 250 items
-   * reads 1.61ms, small enough that one scheduler slice distorts it, and the
-   * injected regression only reached 2.39x there.
+   *                        clean      injected
+   *     ops per item       31.2       281.75 at 500, 4031.70 at 8000
+   *     500 -> 8000 (16x)  15.978x    228.96x
    *
-   * The bound is `sizeRatio * 2`, not the `* 4` that
-   * `folder-tree-parser.test.ts` uses — at 16x that would be 64, and the
-   * injected regression measures 63.26x, i.e. it would pass. The headroom is
-   * smaller here because `rebuild()` re-reads and re-parses the PRD file on
-   * every call, so I/O and `JSON.parse` dominate the linear baseline and
-   * compress the separation between clean and broken.
+   * The clean ratio is 15.978 against a 16x size step — linear to three decimal
+   * places, identical on every machine, and repeatable to the operation. The
+   * bound is `sizeRatio * 1.25`, so 20: a quarter more than linear, and eleven
+   * times below the regression. Less nominal headroom than the 32 it replaces,
+   * and far more real, because the measurement has no variance to absorb.
+   *
+   * LIMIT RECORDED IN PLACE: this counts index-building work. A regression
+   * inside `loadPRD` (reading or parsing the file more than once per rebuild),
+   * or a linear scan of the `TermEntry[]` arrays hanging off the inverted index,
+   * touches no map operation and would pass. The 60s timeout below is the only
+   * guard left on those, and it is a hang guardrail, not a budget.
    */
-  it("rebuild time scales sub-quadratically with PRD size", async () => {
+  it("rebuild work scales linearly with PRD size", async () => {
     const smallCount = 500;
     const largeCount = 8000;
     const sizeRatio = largeCount / smallCount;
@@ -627,36 +663,31 @@ describe("SearchIndex", () => {
     const smallIndex = new SearchIndex(smallDir);
     const largeIndex = new SearchIndex(largeDir);
 
-    // Warm both so the comparison is index-build cost, not cold-read cost,
-    // which would otherwise inflate whichever ran first.
+    // Both index everything first, so a count below cannot be small because the
+    // rebuild silently did nothing.
     expect(smallIndex.rebuild()).toBe(smallCount);
     expect(largeIndex.rebuild()).toBe(largeCount);
 
-    // Interleaved, so both minima come from the same stretch of machine time.
-    // Measured sequentially, a load burst landing only on the second window
-    // inflates that reading alone, and the ratio then reports when the load
-    // arrived rather than how the work scales.
-    const [smallMs, largeMs] = fastestMsInterleaved(
-      () => smallIndex.rebuild(),
-      () => largeIndex.rebuild(),
-      5,
-    );
+    const smallOps = countRebuildOps(smallIndex);
+    const largeOps = countRebuildOps(largeIndex);
 
-    // Linear gives timeRatio ~= sizeRatio (16); measured 13.61x, just under,
-    // because per-rebuild file read and parse overhead inflates the small
-    // reading and so only ever makes this assertion more forgiving.
-    const timeRatio = largeMs / Math.max(smallMs, 0.1);
+    // The counter is instrumenting the real path, not an empty one.
+    expect(smallOps).toBeGreaterThan(smallCount);
+    expect(largeOps).toBeGreaterThan(largeCount);
+
+    const workRatio = largeOps / smallOps;
     expect(
-      timeRatio,
-      `rebuild scaled ${timeRatio.toFixed(1)}x for a ${sizeRatio.toFixed(1)}x size increase ` +
-      `(${smallCount} items: ${smallMs.toFixed(2)}ms, ${largeCount} items: ${largeMs.toFixed(2)}ms). ` +
-      `Linear would be ~${sizeRatio.toFixed(0)}x; this suggests a complexity regression.`,
-    ).toBeLessThan(sizeRatio * 2);
-    // Explicit timeout, for the same reason the assertion is a ratio: this test
-    // builds 8500 items and rebuilds twelve times, ~1s idle, and the suite has
-    // been observed 20x slower under full-suite load — enough to blow the 30s
-    // default and go red for the machine rather than for the code. Extra
-    // wall-clock cannot weaken a ratio, since load scales both readings together.
+      workRatio,
+      `rebuild did ${workRatio.toFixed(3)}x the work for a ${sizeRatio.toFixed(1)}x size increase ` +
+      `(${smallCount} items: ${smallOps} ops, ${largeCount} items: ${largeOps} ops). ` +
+      `Linear is ${sizeRatio.toFixed(0)}x; this is a complexity regression, not a slow machine — ` +
+      `the count is exact and does not vary between runs or machines.`,
+    ).toBeLessThan(sizeRatio * 1.25);
+
+    // Per-item work must not drift either: the ratio alone would accept both
+    // sides growing together.
+    expect(largeOps / largeCount).toBeLessThan((smallOps / smallCount) * 1.25);
+    // The 60s timeout is a hang guardrail — see LIMIT RECORDED IN PLACE above.
   }, 60000);
 
   // ── Edge cases ─────────────────────────────────────────────────────────
