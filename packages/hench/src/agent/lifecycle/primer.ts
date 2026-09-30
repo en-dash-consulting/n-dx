@@ -36,6 +36,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { resolveLayout } from "../../prd/llm-gateway.js";
 
 /** Primer artifact, written by `sourcevision analyze` beside CONTEXT.md. */
 export const PRIMER_FILE = "PRIMER.md";
@@ -88,7 +89,10 @@ export async function readFreshPrimer(
 ): Promise<string | undefined> {
   let raw: string;
   try {
-    raw = await readFile(join(projectDir, ".sourcevision", PRIMER_FILE), "utf-8");
+    raw = await readFile(
+      join(resolveLayout(projectDir).sourcevisionDir, PRIMER_FILE),
+      "utf-8",
+    );
   } catch {
     return undefined;
   }

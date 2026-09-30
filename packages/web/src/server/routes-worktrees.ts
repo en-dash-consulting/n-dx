@@ -28,7 +28,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { exec, getWorktreeRoot, listWorktrees } from "@n-dx/llm-client";
+import { exec, getWorktreeRoot, listWorktrees, resolveLayout } from "@n-dx/llm-client";
 import type { GitWorktree } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
@@ -252,7 +252,7 @@ function latestRank(digest: RunFileDigest): [number, string] {
 
 /** Summarise `<worktree>/.hench/runs/*.json`. Missing directory is zero runs. */
 function summariseRuns(worktreePath: string): WorktreeRunsSummary {
-  const runsDir = join(worktreePath, ".hench", "runs");
+  const runsDir = join(resolveLayout(worktreePath).henchDir, "runs");
   let files: string[];
   try {
     files = readdirSync(runsDir).filter((f) => f.endsWith(".json"));
@@ -369,7 +369,7 @@ function watchOtherWorktreeRuns(entries: WorktreeEntry[], options: WorktreesRout
   if (!options.broadcast) return;
   for (const entry of entries) {
     if (entry.isServed || entry.bare) continue;
-    ensureWorktreeRunWatcher(join(entry.path, ".hench", "runs"), options.broadcast, options.onStatusInvalidate);
+    ensureWorktreeRunWatcher(join(resolveLayout(entry.path).henchDir, "runs"), options.broadcast, options.onStatusInvalidate);
   }
 }
 
@@ -407,7 +407,7 @@ export async function handleWorktreesRoute(
   // Nothing registers a watcher for the request's own root, so keeping it in
   // the set closes nothing it shouldn't.
   pruneWorktreeRunWatchers(
-    new Set(entries.filter((e) => !e.bare).map((e) => join(e.path, ".hench", "runs"))),
+    new Set(entries.filter((e) => !e.bare).map((e) => join(resolveLayout(e.path).henchDir, "runs"))),
   );
   watchOtherWorktreeRuns(entries, options);
   jsonResponse(res, 200, entries);
