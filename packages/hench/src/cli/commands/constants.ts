@@ -1,7 +1,6 @@
-import { PROJECT_DIRS, formatUsage } from "../../prd/llm-gateway.js";
+import { formatUsage } from "../../prd/llm-gateway.js";
 import { CLIError } from "../errors.js";
 
-export const HENCH_DIR = PROJECT_DIRS.HENCH;
 export const TOOL_VERSION = "0.1.0";
 
 export function safeParseInt(value: string, name: string): number {
@@ -34,7 +33,7 @@ export function usage(): void {
       {
         title: "Commands",
         items: [
-          { name: "init [dir]", description: "Create .hench/ with config.json and runs/" },
+          { name: "init [dir]", description: "Create hench's state directory with config.json and runs/" },
           { name: "run [dir]", description: "Execute one task from Rex PRD" },
           { name: "record [dir]", description: "Write an assisted run record (used by the /ndx-work skill)" },
           { name: "config [key] [value]", description: "View or edit workflow configuration" },

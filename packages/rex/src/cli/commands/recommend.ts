@@ -6,7 +6,7 @@ import { resolveStore, resolveRexPaths } from "../../store/index.js";
 
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { parseIntList } from "../parse-utils.js";
-import { info, result } from "../output.js";
+import { info, result, withCommandProgressReporter } from "../output.js";
 import type { ItemLevel } from "../../schema/index.js";
 import {
   computeFindingHash,
@@ -770,6 +770,19 @@ async function acceptRecommendations(
 // ── Main command entry point ────────────────────────────────────────────
 
 export async function cmdRecommend(
+  dir: string,
+  flags: Record<string, string>,
+): Promise<void> {
+  return withCommandProgressReporter(() => runRecommend(dir, flags));
+}
+
+/**
+ * The recommend pipeline, run under the command-scoped progress reporter
+ * registered by {@link cmdRecommend} — the same reporter `rex analyze` uses, so
+ * a spinner or an LLM retry raised anywhere beneath it redraws one line rather
+ * than competing for the terminal.
+ */
+async function runRecommend(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {

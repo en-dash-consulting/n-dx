@@ -41,11 +41,13 @@
 
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { exec } from "../process/exec.js";
 import { resolveLauncherCli } from "../process/agent-mcp-config.js";
+import { PRD_TREE_DIRNAME } from "../prd/rex-gateway.js";
+import { resolveLayout } from "../prd/llm-gateway.js";
 
 /**
  * How long the migration is given before it is treated as hung.
@@ -383,7 +385,7 @@ export async function runSlugMigration(
 export function formatMigrationReport(summary: MigrationSummary, dir: string): string {
   const renamed =
     summary.entriesRenamed === 1 ? "1 entry" : `${summary.entriesRenamed} entries`;
-  const treePath = join(".rex", "prd_tree");
+  const treePath = join(relative(dir, resolveLayout(dir).rexDir), PRD_TREE_DIRNAME);
 
   return (
     `\nMigrated the PRD tree: ${renamed} renamed, ${summary.entriesUnchanged} unchanged, ` +

@@ -17,6 +17,14 @@ import { resolveVendorModel, resolveModel } from "./config.js";
 import { info, warn } from "./output.js";
 import { yellow } from "./help-format.js";
 
+/**
+ * Where the displayed model came from. Ordered most to least specific; the
+ * first three all mean "something was explicitly set", and only `"configured"`
+ * gets a `from llm.<key>` suffix because it is the only one with several
+ * candidate slots to disambiguate.
+ */
+export type ModelSource = "cli-override" | "hench-override" | "configured" | "default";
+
 export interface VendorModelHeaderOptions {
   /**
    * When set to "json", the header is suppressed to avoid polluting
@@ -35,10 +43,17 @@ export interface VendorModelHeaderOptions {
    */
   resolvedModel?: string;
   /**
-   * Source of the resolved model: "cli-override", "configured", or "default".
+   * Source of the resolved model.
+   *
+   * - `"cli-override"` — an explicit `--model` (or `--<vendor>-model`) flag.
+   * - `"hench-override"` — `hench.models.<active vendor>`, the agent-only
+   *   override honoured by `ndx work` and by no other command.
+   * - `"configured"` — one of the `llm.*` fields.
+   * - `"default"` — the newest model for the vendor.
+   *
    * Used to label the model display appropriately.
    */
-  modelSource?: "cli-override" | "configured" | "default";
+  modelSource?: ModelSource;
   /**
    * Task weight tier being used. When provided, includes tier label in output:
    * - "light" → "(light tier)" or "(light tier, configured)"
@@ -93,16 +108,22 @@ export function printVendorModelHeader(
       : undefined;
 
   // Use provided source if available, otherwise determine from config
-  let source: "cli-override" | "configured" | "default" = options?.modelSource || "default";
+  let source: ModelSource = options?.modelSource || "default";
   if (!options?.modelSource && configuredFrom) {
     source = "configured";
   }
 
+  // An explicitly pinned model has no tier semantics to report — it was not
+  // chosen by the tier table. That covers the CLI flag and hench's agent-only
+  // override alike; only the llm.* path can be tier-derived.
+  const explicitlyPinned = source === "cli-override" || source === "hench-override";
+
   // Format label based on tier and source
-  // - When tier is provided and source is not cli-override, show tier-aware label
-  // - When tier is not provided or source is cli-override, use legacy format
+  // - When tier is provided and the model was not explicitly pinned, show the
+  //   tier-aware label
+  // - Otherwise use legacy format
   let label: string;
-  if (options?.tier && source !== "cli-override") {
+  if (options?.tier && !explicitlyPinned) {
     const tierLabel = options.tier === "light" ? "light tier" : "standard tier";
     label = source === "configured" ? `${tierLabel}, configured` : tierLabel;
   } else {

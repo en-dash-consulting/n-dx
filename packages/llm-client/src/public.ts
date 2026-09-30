@@ -345,6 +345,7 @@ export {
   LEGACY_NDX_HOME_ENV,
   detectLayoutMode,
   resolveLayout,
+  relativeToRoot,
   resolveNdxHome,
 } from "./layout.js";
 export type {
@@ -361,8 +362,12 @@ export { toCanonicalJSON } from "./json.js";
 export {
   deepMerge,
   loadProjectOverrides,
+  loadProjectOverrideSources,
   mergeWithOverrides,
+  PROJECT_CONFIG_FILE,
+  LOCAL_CONFIG_FILE,
 } from "./project-config.js";
+export type { ProjectOverrideSource } from "./project-config.js";
 
 // CLI output control (quiet/verbose/debug modes)
 export {
@@ -397,7 +402,7 @@ export type { ProgressReporter } from "./progress-reporter.js";
 export {
   printVendorModelHeader,
 } from "./vendor-header.js";
-export type { VendorModelHeaderOptions } from "./vendor-header.js";
+export type { VendorModelHeaderOptions, ModelSource } from "./vendor-header.js";
 
 // Vendor-change detection and model reset
 export {

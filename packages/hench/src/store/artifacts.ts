@@ -43,24 +43,86 @@
 import { relative as relativePath } from "node:path";
 import { realpath } from "node:fs/promises";
 import { execStdout } from "../process/exec.js";
+import { relativeToRoot, resolveLayout, type LayoutMode } from "../prd/llm-gateway.js";
+import {
+  AGENT_MCP_DIRNAME,
+  LOCKS_DIRNAME,
+  RECOVERY_DIRNAME,
+  REVIEWS_DIRNAME,
+  RUNS_DIRNAME,
+  USAGE_CURSORS_DIRNAME,
+} from "./paths.js";
 
 /**
- * `.gitignore` lines written by `hench init` covering hench's runtime output.
+ * What hench writes inside its own state directory and never wants committed,
+ * relative to that directory.
  *
  * Directory entries carry a trailing slash (git's own convention for
  * "directory only"); {@link isHenchRuntimeArtifact} relies on that shape to
  * tell the two kinds apart.
  */
-export const HENCH_RUNTIME_GITIGNORE_ENTRIES: readonly string[] = [
-  ".hench/runs/",
-  ".hench/locks/",
-  ".hench/usage-cursors/",
-  ".hench/reviews/",
-  ".hench/recovery/",
-  ".hench/mcp/",
-  ".hench/session-cache.json",
-  ".hench-commit-msg.txt",
+const RUNTIME_ENTRIES_IN_HENCH_DIR: readonly string[] = [
+  `${RUNS_DIRNAME}/`,
+  `${LOCKS_DIRNAME}/`,
+  `${USAGE_CURSORS_DIRNAME}/`,
+  `${REVIEWS_DIRNAME}/`,
+  `${RECOVERY_DIRNAME}/`,
+  `${AGENT_MCP_DIRNAME}/`,
+  "session-cache.json",
 ];
+
+/** Runtime output that sits at the project root on either layout. */
+const RUNTIME_ENTRIES_AT_ROOT: readonly string[] = [".hench-commit-msg.txt"];
+
+/**
+ * `.gitignore` lines `hench init` writes for a project, named for the layout it
+ * is on.
+ *
+ * @param henchDirName  Hench's state directory, relative to the project root
+ *                      and with forward slashes — `.hench` or `.ndx/hench`.
+ */
+export function henchRuntimeGitignoreEntries(henchDirName: string): string[] {
+  return [
+    ...RUNTIME_ENTRIES_IN_HENCH_DIR.map((entry) => `${henchDirName}/${entry}`),
+    ...RUNTIME_ENTRIES_AT_ROOT,
+  ];
+}
+
+/**
+ * Every path shape that is hench's runtime output, on *either* layout.
+ *
+ * Deliberately not layout-resolved, unlike everything else that names a
+ * directory. {@link isHenchRuntimeArtifact} is a classifier, not a path
+ * constructor: it answers "did hench write this?" about a path git handed it,
+ * and `.ndx/hench/locks/` is hench's runtime state whoever is asking. No
+ * project has both shapes, and `.ndx/` is n-dx's container by definition — so
+ * accepting both is not a false positive waiting to happen, and it spares the
+ * gate's several callers from threading a project root down to a string match.
+ *
+ * `hench init` must **not** use this list: a writer has to pick one layout, and
+ * writing the other one's ignore lines into `.gitignore` is noise at best.
+ */
+export const HENCH_RUNTIME_GITIGNORE_ENTRIES: readonly string[] = [
+  ...henchRuntimeGitignoreEntries(henchDirNameUnder("legacy")),
+  // Root-relative entries are the same on both layouts, so only the ones
+  // inside the state directory are repeated.
+  ...henchRuntimeGitignoreEntries(henchDirNameUnder("ndx"))
+    .filter((entry) => !RUNTIME_ENTRIES_AT_ROOT.includes(entry)),
+];
+
+/**
+ * Hench's state directory under a named layout, spelled the way a git pattern
+ * has to spell it.
+ *
+ * `"."` as the root is not a lookup — an explicit `mode` skips detection
+ * entirely, so nothing touches the disk and the result is purely the name. The
+ * point is that neither `.hench` nor `.ndx/hench` is written out here: both
+ * come from the resolver, so a rename there reaches these patterns too.
+ */
+function henchDirNameUnder(mode: LayoutMode): string {
+  const layout = resolveLayout(".", { mode });
+  return relativeToRoot(layout, layout.henchDir);
+}
 
 /** Normalize a path for comparison: forward slashes, no leading `./`. */
 function normalize(path: string): string {

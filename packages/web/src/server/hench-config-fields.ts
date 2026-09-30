@@ -61,6 +61,43 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
 export const FORBIDDEN_CONFIG_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
 
 /**
+ * Which providers each vendor accepts. Hench's real source of truth is
+ * `VENDOR_PROVIDERS` in `packages/hench/src/cli/commands/provider-support.ts`
+ * (also re-exported from hench's public API); web cannot import hench at
+ * runtime — hench is the execution tier, above the domain packages web
+ * depends on — so this is a separately maintained literal.
+ * `tests/integration/cross-package-contracts.test.js` pins the two together
+ * against the compiled dist artifacts, the same one-directional pattern
+ * `tests/e2e/hench-config-gate-contract.test.js` already uses for
+ * `HenchConfigSchema`.
+ */
+export const VENDOR_PROVIDERS: Readonly<Record<"claude" | "codex" | "google" | "local", readonly ("cli" | "api")[]>> = {
+  claude: ["cli", "api"],
+  codex: ["cli"],
+  google: ["api"],
+  local: ["api"],
+};
+
+/**
+ * Validate a `provider` value about to be written to `.hench/config.json`
+ * against the vendor active in `.n-dx.json`'s `llm.vendor`. Returns an error
+ * naming the vendor and its allowed providers, or null when acceptable.
+ *
+ * `vendor` may be null (unset) or an unrecognized string — in both cases
+ * every declared provider is accepted, since there is no known vendor to be
+ * wrong about; `hench`'s own default-vendor fallback resolves the rest.
+ */
+export function validateProviderForVendor(provider: string, vendor: string | null): string | null {
+  if (!vendor) return null;
+  const allowed = VENDOR_PROVIDERS[vendor as keyof typeof VENDOR_PROVIDERS];
+  if (!allowed) return null;
+  if (!allowed.includes(provider as "cli" | "api")) {
+    return `Provider "${provider}" is not supported for vendor "${vendor}". Allowed: ${allowed.join(", ")}.`;
+  }
+  return null;
+}
+
+/**
  * Nested config groups the dashboard writes member-by-member but hench reads
  * whole. Writing `retry.maxRetries` into a config with no `retry` used to
  * leave a one-member group on disk, which hench's schema then refused — a 200
@@ -172,8 +209,11 @@ export function validateFieldValue(field: ConfigFieldInfo, value: unknown): stri
  * Validate a `key`/`value` pair for a config write: the key must be an
  * allowlisted field with no prototype-poisoning segment, and the value must
  * match that field's type. Returns an error message, or null when acceptable.
+ *
+ * @param vendor  The active `llm.vendor`, when the caller knows it. Only
+ *   consulted for `key === "provider"` — see {@link validateProviderForVendor}.
  */
-export function validateConfigKeyValue(key: string, value: unknown): string | null {
+export function validateConfigKeyValue(key: string, value: unknown, vendor?: string | null): string | null {
   if (key.split(".").some((seg) => FORBIDDEN_CONFIG_SEGMENTS.has(seg))) {
     return `Key "${key}" contains a forbidden path segment.`;
   }
@@ -181,7 +221,12 @@ export function validateConfigKeyValue(key: string, value: unknown): string | nu
   if (!field) {
     return `Unknown config field: ${key}`;
   }
-  return validateFieldValue(field, value);
+  const typeError = validateFieldValue(field, value);
+  if (typeError) return typeError;
+  if (key === "provider" && typeof value === "string") {
+    return validateProviderForVendor(value, vendor ?? null);
+  }
+  return null;
 }
 
 /**

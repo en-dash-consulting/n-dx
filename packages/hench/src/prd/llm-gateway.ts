@@ -23,7 +23,7 @@
  * - Token usage parsing (API and stream token parsing)
  * - Model resolution (resolve model names)
  * - Shared constants (PROJECT_DIRS)
- * - Folder layout resolution (resolveLayout, detectLayoutMode)
+ * - Folder layout resolution (resolveLayout, detectLayoutMode, relativeToRoot)
  * - Canonical JSON serialization
  *
  * **Out-of-scope (must NOT be re-exported):**
@@ -42,9 +42,14 @@ export {
   loadLLMConfig,
   resolveApiKey,
   resolveCliPath,
+  deepMerge,
   loadProjectOverrides,
+  loadProjectOverrideSources,
   mergeWithOverrides,
+  PROJECT_CONFIG_FILE,
+  LOCAL_CONFIG_FILE,
 } from "@n-dx/llm-client";
+export type { ProjectOverrideSource } from "@n-dx/llm-client";
 
 // ---- Shared constants -------------------------------------------------------
 export {
@@ -56,7 +61,7 @@ export {
 } from "@n-dx/llm-client";
 
 // ---- Folder layout ----------------------------------------------------------
-export { detectLayoutMode, resolveLayout } from "@n-dx/llm-client";
+export { detectLayoutMode, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
 export type { Layout, LayoutMode, ResolveLayoutOptions } from "@n-dx/llm-client";
 
 // ---- Canonical JSON ---------------------------------------------------------

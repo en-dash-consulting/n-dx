@@ -23,7 +23,15 @@ import type { HenchConfig } from "../schema/index.js";
 export type { ClaudeConfig, LLMConfig, LLMVendor } from "../prd/llm-gateway.js";
 
 // Re-export shared project config utilities — previously duplicated here.
-export { loadProjectOverrides, mergeWithOverrides } from "../prd/llm-gateway.js";
+export {
+  deepMerge,
+  loadProjectOverrides,
+  loadProjectOverrideSources,
+  mergeWithOverrides,
+  PROJECT_CONFIG_FILE,
+  LOCAL_CONFIG_FILE,
+} from "../prd/llm-gateway.js";
+export type { ProjectOverrideSource } from "../prd/llm-gateway.js";
 
 /**
  * Load the "claude" section from .n-dx.json.

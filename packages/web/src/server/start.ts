@@ -6,7 +6,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { existsSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type FSWatcher } from "node:fs";
 import { writeFile, unlink } from "node:fs/promises";
 import { resolve, join, dirname, basename } from "node:path";
-import { isVerbose, verbose } from "@n-dx/llm-client";
+import { isVerbose, verbose, resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext, ViewerScope } from "./types.js";
 import { ensureLegacyPrdMigrated } from "./rex-gateway.js";
 import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./routes-static.js";
@@ -39,6 +39,7 @@ import { handleSearchRoute } from "./routes-search.js";
 import { handleNotionRoute } from "./routes-notion.js";
 import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
+import { enforceRouteFeatureGate } from "./route-feature-gates.js";
 import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
@@ -496,7 +497,7 @@ function registerWatchers(
 ): WatcherHandles {
   // Every frame these watchers emit is about this workspace.
   const ws: Broadcasting = { broadcast: tagBroadcaster(wsManager.broadcast, workspaceTagOf(ctx)) };
-  const henchRunsDir = join(ctx.projectDir, ".hench", "runs");
+  const henchRunsDir = join(resolveLayout(ctx.projectDir).henchDir, "runs");
   const watchers: FSWatcher[] = [];
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
   if (sv) watchers.push(sv);
@@ -716,6 +717,11 @@ async function handleApiRoutes(
   /** Tagged for the workspace the request addressed. */
   broadcast: WebSocketBroadcaster,
 ): Promise<boolean> {
+  // Before anything dispatches: a disabled feature refuses for that reason,
+  // rather than for whichever precondition its handler would have checked
+  // first. `ctx` is already the addressed workspace's, so the toggle is read
+  // from the project the request named. See route-feature-gates.ts.
+  if (enforceRouteFeatureGate(req, res, ctx)) return true;
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
   if (await handleWorkspacesRoute(req, res, registry)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;
@@ -959,8 +965,9 @@ export async function startServer(
   opts: ServerOptions = {},
 ): Promise<StartResult> {
   const absDir = resolve(targetDir);
-  const svDir = join(absDir, ".sourcevision");
-  const rexDir = join(absDir, ".rex");
+  const layout = resolveLayout(absDir);
+  const svDir = layout.sourcevisionDir;
+  const rexDir = layout.rexDir;
   const dev = opts.dev ?? false;
   const scope = opts.scope;
 

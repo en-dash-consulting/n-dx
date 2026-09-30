@@ -505,3 +505,39 @@ describe("AggregationResultCache", () => {
     });
   });
 });
+
+describe("takeFingerprint on the .ndx layout", () => {
+  // henchRunsDir and svManifestPath used to be composed as
+  // join(projectDir, ".hench"/".sourcevision", …) inside takeFingerprint
+  // itself, so on a project using the .ndx container the fingerprint would
+  // always read as empty (mtime/size 0) no matter what hench or sourcevision
+  // had written — invalidation would simply never fire.
+  let tmpDir: string;
+  let rexDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "agg-cache-ndx-"));
+    rexDir = join(tmpDir, ".ndx", "rex");
+    await mkdir(rexDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("sees hench runs and the sourcevision manifest under .ndx/", async () => {
+    const henchRunsDir = join(tmpDir, ".ndx", "hench", "runs");
+    const svDir = join(tmpDir, ".ndx", "sourcevision");
+    await mkdir(henchRunsDir, { recursive: true });
+    await mkdir(svDir, { recursive: true });
+    await writeFile(join(henchRunsDir, "run-1.json"), '{"id":"test"}', "utf-8");
+    await writeFile(join(svDir, "manifest.json"), '{"analyzedAt":"2026-01-01"}', "utf-8");
+
+    const fp = await takeFingerprint(tmpDir, rexDir);
+
+    expect(fp.henchFileCount).toBe(1);
+    expect(fp.henchDirMtimeMs).toBeGreaterThan(0);
+    expect(fp.svManifestMtimeMs).toBeGreaterThan(0);
+    expect(fp.svManifestSize).toBeGreaterThan(0);
+  });
+});

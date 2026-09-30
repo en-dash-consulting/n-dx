@@ -23,7 +23,7 @@ import { spawn, spawnSync } from "child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
-import { findSharedSecrets, LOCAL_CONFIG_FILE } from "./config.js";
+import { findSharedSecrets, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel } from "./config.js";
 import { isGitTracked } from "./gitignore.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -1204,34 +1204,41 @@ async function checkConfigSecrets(dir) {
   const secrets = await findSharedSecrets(dir);
   const list = secrets.join(", ");
 
+  // Root-relative names, because they are what `git rm --cached` and the
+  // `.gitignore` line have to say — and on the `.ndx/` layout that is
+  // `.ndx/config.local.json`, not `.n-dx.local.json`. A check that asked git
+  // about the wrong path would report every project clean.
+  const localFile = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
+  const sharedFile = projectConfigLabel(dir, PROJECT_CONFIG_FILE);
+
   // Checked first and reported alone: it is the file the keys are in, so it
   // is the more urgent of the two even when the shared file is also wrong.
-  if (isGitTracked(LOCAL_CONFIG_FILE, dir)) {
+  if (isGitTracked(localFile, dir)) {
     const also = secrets.length > 0
-      ? ` .n-dx.json also contains ${list}.`
+      ? ` ${sharedFile} also contains ${list}.`
       : "";
     return {
       ok: false,
       detail:
-        `${LOCAL_CONFIG_FILE} is tracked by git — it holds every API key \`ndx config\` writes and must stay ignored. ` +
-        `Run \`git rm --cached ${LOCAL_CONFIG_FILE}\`, restore its \`.gitignore\` line, and rotate any key it has held.${also}`,
+        `${localFile} is tracked by git — it holds every API key \`ndx config\` writes and must stay ignored. ` +
+        `Run \`git rm --cached ${localFile}\`, restore its \`.gitignore\` line, and rotate any key it has held.${also}`,
       secrets,
     };
   }
 
   if (secrets.length === 0) {
-    return { ok: true, detail: "no API keys in .n-dx.json", secrets };
+    return { ok: true, detail: `no API keys in ${sharedFile}`, secrets };
   }
-  if (isGitTracked(".n-dx.json", dir)) {
+  if (isGitTracked(sharedFile, dir)) {
     return {
       ok: false,
-      detail: `.n-dx.json is committed to git and contains ${list} — rotate the key, then re-run \`ndx config <key> <value>\` so it is written to ${LOCAL_CONFIG_FILE}`,
+      detail: `${sharedFile} is committed to git and contains ${list} — rotate the key, then re-run \`ndx config <key> <value>\` so it is written to ${localFile}`,
       secrets,
     };
   }
   return {
     ok: true,
-    detail: `.n-dx.json contains ${list} — re-run \`ndx config <key> <value>\` to move it to ${LOCAL_CONFIG_FILE} before committing`,
+    detail: `${sharedFile} contains ${list} — re-run \`ndx config <key> <value>\` to move it to ${localFile} before committing`,
     secrets,
   };
 }

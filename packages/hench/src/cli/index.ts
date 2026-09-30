@@ -25,6 +25,7 @@ import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireHenchDir } from "./errors.js";
 import { setQuiet, setVerbose, setDebug } from "./output.js";
 import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from "../prd/llm-gateway.js";
+import { resolveHenchPaths } from "../store/paths.js";
 
 suppressKnownDeprecations();
 
@@ -207,7 +208,7 @@ async function main(): Promise<void> {
       }
       case "validate-tokens": {
         const { cmdValidateTokens } = await import("./commands/validate-tokens.js");
-        const henchDir = `${resolveDir()}/.hench`;
+        const henchDir = resolveHenchPaths(resolveDir()).henchDir;
         await cmdValidateTokens(henchDir, {
           format: flags.format,
           strict: flags.strict,

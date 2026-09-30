@@ -14,14 +14,13 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import {
   loadUsageCursor,
   resolveTranscriptPath,
   saveUsageMark,
   takeUsageMark,
 } from "../../store/session-usage.js";
-import { HENCH_DIR } from "./constants.js";
+import { resolveHenchPaths } from "../../store/paths.js";
 import { CLIError } from "../errors.js";
 import { result, info, warn } from "../output.js";
 
@@ -47,7 +46,7 @@ async function cmdUsageMark(dir: string, flags: Record<string, string>): Promise
   const task = flags.task;
   if (!task) throw new CLIError("Missing --task.", USAGE_TEXT);
 
-  const henchDir = join(dir, HENCH_DIR);
+  const henchDir = resolveHenchPaths(dir).henchDir;
   const sessionId = flags.session || process.env.CLAUDE_CODE_SESSION_ID || "";
   if (!sessionId) {
     // Nothing to mark against, and nothing to fail: `hench record` will say the
@@ -99,7 +98,7 @@ async function cmdUsageMark(dir: string, flags: Record<string, string>): Promise
 }
 
 async function cmdUsageMarks(dir: string, flags: Record<string, string>): Promise<void> {
-  const henchDir = join(dir, HENCH_DIR);
+  const henchDir = resolveHenchPaths(dir).henchDir;
   const sessionId = flags.session || process.env.CLAUDE_CODE_SESSION_ID || "";
   if (!sessionId) throw new CLIError("No session: pass --session=<id> or run inside Claude Code.", USAGE_TEXT);
 

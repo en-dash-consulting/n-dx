@@ -21,23 +21,47 @@
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
-/** @type {string[]} */
-export const GITATTRIBUTES_EOL_RULES = [
-  ".rex/**/*.md    text eol=lf",
-  ".rex/**/*.json  text eol=lf",
-  ".rex/**/*.jsonl text eol=lf",
-  ".hench/**/*.md   text eol=lf",
-  ".hench/**/*.json text eol=lf",
-  ".sourcevision/**/*.md   text eol=lf",
-  ".sourcevision/**/*.json text eol=lf",
-  ".sourcevision/**/*.txt  text eol=lf",
-  ".n-dx.json text eol=lf",
+import { relativeToRoot, resolveLayout } from "./layout.js";
+
+/**
+ * File-type suffixes to pin under each tool directory, in the order the rules
+ * are written. Which *directory* they hang off is the layout's answer, not
+ * this module's — see {@link gitattributesEolRules}.
+ */
+const EOL_TOOL_SUFFIXES = {
+  rexDir: ["md", "json", "jsonl"],
+  henchDir: ["md", "json"],
+  sourcevisionDir: ["md", "json", "txt"],
+};
+
+/** Pins for files that sit at the project root on either layout. */
+const EOL_FIXED_RULES = [
   "AGENTS.md  text eol=lf",
   "CLAUDE.md  text eol=lf",
   ".agents/**/*.md text eol=lf",
   ".claude/skills/**/*.md text eol=lf",
   ".codex/config.toml text eol=lf",
 ];
+
+/**
+ * The eol=lf pins for a project, named for the layout it is on.
+ *
+ * The patterns have to follow the files: a `.rex/**` pin on a project whose PRD
+ * lives in `.ndx/rex/` matches nothing, which is indistinguishable from having
+ * no pin at all until a Windows checkout rewrites every PRD file's line endings.
+ *
+ * @param {import("./layout.js").Layout} layout
+ * @returns {string[]}
+ */
+export function gitattributesEolRules(layout) {
+  const rules = [];
+  for (const [field, suffixes] of Object.entries(EOL_TOOL_SUFFIXES)) {
+    const dir = relativeToRoot(layout, layout[field]);
+    for (const suffix of suffixes) rules.push(`${dir}/**/*.${suffix} text eol=lf`);
+  }
+  rules.push(`${relativeToRoot(layout, layout.configFile)} text eol=lf`);
+  return [...rules, ...EOL_FIXED_RULES];
+}
 
 export const GITATTRIBUTES_EOL_HEADER =
   "# n-dx tools write these files with LF. Pin them so Windows checkouts\n" +
@@ -51,9 +75,9 @@ export const GITATTRIBUTES_EOL_HEADER =
  *
  * @type {string[]}
  */
-export const GITATTRIBUTES_MERGE_RULES = [
-  ".rex/prd_tree/** merge=rex-prd",
-];
+export function gitattributesMergeRules(layout) {
+  return [`${relativeToRoot(layout, layout.rexDir)}/prd_tree/** merge=rex-prd`];
+}
 
 export const GITATTRIBUTES_MERGE_HEADER =
   "# PRD tree markdown merges through the rex-prd driver (three-way,\n" +
@@ -66,13 +90,18 @@ export const MERGE_DRIVER_CONFIG = {
 };
 
 /**
- * The glob pattern (first token) of each eol=lf rule — the canonical pattern
- * set the repo's own `.gitattributes` must match.
+ * The glob pattern (first token) of each eol=lf rule `ndx init` would write
+ * into `dir` — the canonical pattern set n-dx's own `.gitattributes` must
+ * match, asserted by `tests/e2e/prd-line-endings.test.js`.
  *
- * @returns {Set<string>}
+ * Returns a list rather than a Set so the guard can also catch a duplicate
+ * pattern, which a Set would silently absorb.
+ *
+ * @param {string} dir  Project root whose layout names the patterns.
+ * @returns {string[]}
  */
-export function getEolPatternSet() {
-  return new Set(GITATTRIBUTES_EOL_RULES.map((rule) => rule.trim().split(/\s+/)[0]));
+export function eolPatternsFor(dir) {
+  return gitattributesEolRules(resolveLayout(dir)).map((rule) => rule.trim().split(/\s+/)[0]);
 }
 
 /**
@@ -83,8 +112,13 @@ export function getEolPatternSet() {
  * so user overrides win). Existing content is never modified.
  *
  * @param {string} dir  Project root directory
+ * @param {import("./layout.js").Layout} [layout]  The layout the patterns name.
+ *   Defaults to detecting it. `ndx init` passes the layout it just established,
+ *   because on a brand-new project the container is created and the pins are
+ *   written in the same breath and re-detecting would be asking a question
+ *   already answered.
  */
-export function ensureGitattributesRules(dir) {
+export function ensureGitattributesRules(dir, layout = resolveLayout(dir)) {
   const attrPath = join(dir, ".gitattributes");
   let content = "";
   try {
@@ -95,12 +129,12 @@ export function ensureGitattributesRules(dir) {
 
   const sections = [
     {
-      rules: GITATTRIBUTES_EOL_RULES,
+      rules: gitattributesEolRules(layout),
       header: GITATTRIBUTES_EOL_HEADER,
       headerMarker: "n-dx tools write these files with LF",
     },
     {
-      rules: GITATTRIBUTES_MERGE_RULES,
+      rules: gitattributesMergeRules(layout),
       header: GITATTRIBUTES_MERGE_HEADER,
       headerMarker: "merges through the rex-prd driver",
     },
