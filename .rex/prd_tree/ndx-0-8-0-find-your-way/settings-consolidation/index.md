@@ -29,6 +29,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add the Project settings page and move the export and refresh panels to Commands](./add-the-project-settings-page-and-move.md) | pending |
 | [Add the Robot Wrangler settings page for provider and model across every LLM-using command](./add-the-robot-wrangler-settings-page.md) | pending |
 | [Add the Workflow settings page for work settings, templates and timeouts](./add-the-workflow-settings-page-for.md) | pending |
-| [Build the shared settings page frame with explicit Save, a dirty indicator and redirects for the six old settings routes](./build-the-shared-settings-page-frame.md) | pending |
+| [Build the shared settings frame with explicit Save, a dirty indicator and a leave-with-unsaved-changes prompt](./build-the-shared-settings-frame-with.md) | pending |
 | [List every key ndx config accepts for hench on the Workflow page and in hench config](./list-every-key-ndx-config-accepts-for.md) | completed |
 | [Show provider limits per vendor and a per-vendor agent model picker on Robot Wrangler](./show-provider-limits-per-vendor-and-a.md) | pending |
