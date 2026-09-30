@@ -140,7 +140,7 @@ Files pinned to eliminate phantom cross-zone edges from Louvain misclassificatio
 - `packages/web/src/viewer/external.ts` → `web-viewer` — Intra-package gateway anchor
 - `packages/web/src/viewer/components/{progressive-loader,guide}.ts` → `web-viewer`
 - `packages/web/src/viewer/views/status-filter.ts` → `web-viewer`
-- `packages/web/src/viewer/views/{enrichment-thresholds,graph,sourcevision-tabs,token-usage,prd}.ts` → `web-viewer`
+- `packages/web/src/viewer/views/{enrichment-thresholds,graph,view-meta,token-usage,prd}.ts` → `web-viewer`
 - `packages/web/src/viewer/usage/{constants,index}.ts` → `web-viewer`
 - `packages/web/src/viewer/views/import-graph/{model,layout}.ts` → `web-viewer`
 - `packages/web/src/viewer/components/prd-tree/bulk-actions.ts` → `web-viewer` — viewer-prd-interaction zone containment
@@ -158,7 +158,13 @@ Files pinned to eliminate phantom cross-zone edges from Louvain misclassificatio
 
 **web-sv-view-tests zone** — Tests for viewer tabs rendering sourcevision-derived data. Pinned to prevent `sourcevision-` prefix misclassification:
 - `packages/web/tests/unit/viewer/enrichment-thresholds.test.ts` → `web-sv-view-tests`
-- `packages/web/tests/unit/viewer/sourcevision-tabs.test.ts` → `web-sv-view-tests`
+
+  `sourcevision-tabs.test.ts` was the other member. It went with
+  `SOURCEVISION_TABS` when the navigation model replaced it (0.8.0 PR 23); its
+  assertions live in `navigation-model.test.ts`, pinned to `web-viewer` with
+  the rest of the navigation surface. One file is below the zone-size floor, so
+  expect Louvain to absorb this zone — the pin is retained because the
+  `sourcevision-` prefix misclassification it guards against is still possible.
 
 **web-viewer-search-overlay zone** — Search overlay component and its dedicated test. Pinned to replace the misleading `web-helpers` zone name (which implied a general utility bucket) with a bounded, intent-revealing ID. The component participates in a confirmed zone-level cycle with `web-viewer`; see "Confirmed zone-level cycles" in CLAUDE.md.
 - `packages/web/src/viewer/components/search-overlay.ts` → `web-viewer-search-overlay` — sole production file in the zone; anchor for cycle documentation

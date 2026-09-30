@@ -12,8 +12,28 @@
  */
 
 export { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
-export type { SourceVisionTab, SourceVisionTabId } from "./sourcevision-tabs.js";
-export { SOURCEVISION_TABS, SOURCEVISION_TAB_IDS } from "./sourcevision-tabs.js";
+export type { ViewMeta, ViewProduct } from "./view-meta.js";
+export {
+  VIEW_META,
+  PRODUCT_LABELS,
+  viewMeta,
+  viewLabel,
+  viewBlurb,
+  viewGlyph,
+  viewProduct,
+  viewProductLabel,
+} from "./view-meta.js";
+export type { StageId, StageDef, StageSection, StageTab, StageProduct, SettingsEntry } from "./stages.js";
+export {
+  STAGES,
+  STAGE_ORDER,
+  SETTINGS_ENTRIES,
+  isSettingsView,
+  isStageId,
+  stageForView,
+  stageProduct,
+  visibleStages,
+} from "./stages.js";
 export type { IsoMapControls, IsoMapSource } from "./iso-map-url.js";
 export {
   ISO_MAP_DEFAULTS,

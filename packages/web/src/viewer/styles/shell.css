@@ -377,9 +377,11 @@
 .stage-section-caret { width: 14px; color: var(--text-muted); font-size: 11px; }
 .stage-section-title { font-size: 14px; font-weight: 600; white-space: nowrap; }
 .stage-section-blurb { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stage-section-projection { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
-.stage-section-projection-btn { padding: 4px 11px; border: none; background: transparent; color: var(--text-dim); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
-.stage-section-projection-btn.active { background: var(--accent); color: var(--bg); }
+/* N-way tab strip, generalised from the old 2D/3D toggle: Terrain's Map,
+   Isometric map and Zones; Architecture's Architecture and Routes. */
+.stage-section-tablist { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.stage-section-tab { padding: 4px 11px; border: none; background: transparent; color: var(--text-dim); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.stage-section-tab.active { background: var(--accent); color: var(--bg); }
 /* Long lists (History): a bounded scroll region until Expand. */
 .stage-section-body--scroll {
   max-height: 420px;
@@ -411,6 +413,29 @@
 .home-head { margin-bottom: var(--space-5); }
 .home-head h1 { font-size: 22px; margin: 0; }
 .home-head p { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
+.next-step-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+.next-step-headline { margin: 0; font-size: 14px; color: var(--text); }
+.next-step-headline strong { color: var(--text); }
+.next-step-command {
+  font-size: 13px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--accent);
+}
+.home-preflight-slot:empty { display: none; }
 .home-stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
 .home-stages-2 { grid-template-columns: repeat(2, 1fr); }
 .home-stages-1 { grid-template-columns: minmax(0, 420px); }

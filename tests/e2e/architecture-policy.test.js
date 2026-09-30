@@ -1042,8 +1042,8 @@ describe("architecture policy: zone cohesion gate", () => {
 const BOUNDARY_FILES = [
   {
     file: "packages/web/src/viewer/external.ts",
-    maxExports: 33,
-    description: "viewer outbound gateway (schema types, shared utilities, messaging). Raised from 32 to 33 for frameIsForWorkspace: the workspace-tag filter lives in the messaging pipeline and raw socket consumers need the same predicate, which they may reach only through this gateway. Raised from 30 to 32 for detectViewerBasePath and workspaceKeyFromBasePath — the /w/<key>/ workspace slot (0.8.0 PR 12) is part of the viewer's base path and must be read through the same shared helper the server strips it with. Raised from 26 to 30 for the four base-path helpers (detectBasePath, withBasePath, stripBasePath, webSocketUrl) the viewer needs to run under the hub's /p/<id>/ prefix (0.7.0 PR 8): they live in src/shared so the hub strips exactly what the viewer prefixes, and the viewer may reach shared/ only through this gateway.",
+    maxExports: 34,
+    description: "viewer outbound gateway (schema types, shared utilities, messaging). Raised from 33 to 34 for resolveViewAlias (0.8.0 PR 23, redirect aliases): the bottom-bar's freshness/completion indicators still navigate to the pre-merge view ids (INDICATOR_VIEWS in status-indicators.ts), and route-state.ts's pathname parser has to resolve the same old-path-to-stage table the server's SPA catch-all redirects with — one alias table in shared/view-routing.ts, reached here rather than duplicated. Raised from 32 to 33 for frameIsForWorkspace: the workspace-tag filter lives in the messaging pipeline and raw socket consumers need the same predicate, which they may reach only through this gateway. Raised from 30 to 32 for detectViewerBasePath and workspaceKeyFromBasePath — the /w/<key>/ workspace slot (0.8.0 PR 12) is part of the viewer's base path and must be read through the same shared helper the server strips it with. Raised from 26 to 30 for the four base-path helpers (detectBasePath, withBasePath, stripBasePath, webSocketUrl) the viewer needs to run under the hub's /p/<id>/ prefix (0.7.0 PR 8): they live in src/shared so the hub strips exactly what the viewer prefixes, and the viewer may reach shared/ only through this gateway.",
   },
   {
     file: "packages/web/src/server/rex-gateway.ts",
@@ -1487,6 +1487,7 @@ describe("architecture policy: required test annotations", () => {
     const REQUIRED_TEST_FILES = [
       "tests/e2e/cli-dev.test.js",
       "tests/integration/scheduler-startup.test.js",
+      "packages/web/tests/e2e-ui/navigation.spec.ts",
     ];
 
     const violations = [];

@@ -32,4 +32,5 @@ export {
   VIEWS_BY_SCOPE,
   buildValidViews,
   isKnownViewPath,
+  resolveViewAlias,
 } from "./view-routing.js";

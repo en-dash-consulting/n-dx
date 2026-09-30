@@ -26,4 +26,4 @@ export { MergeGraphView } from "./merge-graph.js";
 // PRD-refinement half of that feature already writes through
 // rex-gateway's resolveStore under withTransaction, so a Rex-side panel should
 // reuse that apply path rather than growing a second PRD write surface.
-// Not in the PRD yet by choice; see sourcevision-tabs.ts for the origin marker.
+// Not in the PRD yet by choice; see view-meta.ts's `ask` entry for the origin marker.

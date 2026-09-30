@@ -1,5 +1,5 @@
 import type { ViewId } from "./types.js";
-import { stripBasePath } from "./external.js";
+import { stripBasePath, resolveViewAlias } from "./external.js";
 
 export interface ParsedRoute {
   view: ViewId;
@@ -57,6 +57,15 @@ export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>, ba
 
   const legacyAlias = resolveLegacyViewAlias(base, sub || null);
   if (legacyAlias && validViews.has(legacyAlias)) return { view: legacyAlias, subId: null };
+
+  // A path merged into a stage in 0.8.0 (e.g. `overview` -> `analyze`) takes
+  // priority over the literal check below, which would otherwise still match
+  // it — `overview`/`rex-dashboard` remain registered ViewIds for the scoped
+  // viewers that keep them as their own page. Any trailing sub-path rides
+  // along unexamined, same as an unrecognised sub-path does today, so it is
+  // preserved in the address bar rather than dropped.
+  const movedAlias = resolveViewAlias(base, validViews);
+  if (movedAlias) return { view: movedAlias, subId: sub || null };
 
   if (validViews.has(raw as ViewId)) return { view: raw as ViewId, subId: null };
 

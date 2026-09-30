@@ -84,3 +84,29 @@ export function buildValidViews(scope: string | null): Set<ViewId> {
 export function isKnownViewPath(segment: string): boolean {
   return ALL_VIEWS.has(segment as ViewId);
 }
+
+/**
+ * Old view paths merged into a stage in 0.8.0, mapped to the stage that
+ * absorbed them. `overview` and `rex-dashboard` remain registered `ViewId`s
+ * (a scoped standalone viewer still renders them as their own page — see
+ * `resolveViewAlias`), so this table is what turns a stale top-level path
+ * into a redirect instead of the orphaned bare view it used to be.
+ */
+const VIEW_ALIASES: Readonly<Record<string, ViewId>> = {
+  overview: "analyze",
+  "rex-dashboard": "work",
+};
+
+/**
+ * Resolve an old view path segment to the stage it now redirects to, or
+ * `null` when no alias applies.
+ *
+ * The alias only fires when its target is itself a valid view for this
+ * viewer — the one exception this covers today is a rex-scoped viewer,
+ * which has no `work` stage, so `rex-dashboard` keeps being its own page
+ * there rather than redirecting nowhere.
+ */
+export function resolveViewAlias(segment: string, validViews: ReadonlySet<ViewId>): ViewId | null {
+  const target = VIEW_ALIASES[segment];
+  return target && validViews.has(target) ? target : null;
+}
