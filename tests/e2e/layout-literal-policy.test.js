@@ -26,7 +26,7 @@
  * The acceptance criterion this rule serves is absolute — *no* literal outside
  * the resolver and the migration command — and that is not reachable yet: the
  * sweep it depends on (`c64f053e`, routing hench, web and core through their
- * paths modules) has not run, and 257 sites across 81 files are still waiting
+ * paths modules) has not run, and 193 sites across 78 files are still waiting
  * for it. So the rule is a ratchet rather than a wall: every one of those
  * files is named in `tests/layout-literal-inventory.md` with the count it is
  * allowed, a **new** file fails, and an existing file that grows fails. When
@@ -210,18 +210,24 @@ function readInventory() {
 describe("layout-literal policy", () => {
   it("still finds the literals it is meant to find (detector self-test)", () => {
     const found = findLayoutLiterals();
+    const sites = [...found.values()].flat();
 
     // A detector that silently matches nothing turns every check below
     // vacuously green — which has happened on this lane before, to a scan
     // whose filter read `\+` as a quantifier and dropped every line.
-    expect(found.size).toBeGreaterThan(0);
-    expect(found.has("packages/core/cli.js")).toBe(true);
-    expect(found.get("packages/core/cli.js").length).toBeGreaterThan(10);
+    //
+    // Deliberately not anchored to a named file. The first version asserted
+    // that `packages/core/cli.js` held more than ten literals; A6 then routed
+    // it through the resolver and took it from 50 to 1, so the self-test
+    // failed on the sweep *working*. A floor on the whole scan says the same
+    // thing about the detector without betting on which file is still dirty,
+    // and it relaxes on its own as the debt falls — the inventory's own total
+    // is the number that has to come down, and the rows below check that.
+    expect(found.size).toBeGreaterThan(20);
+    expect(sites.length).toBeGreaterThan(50);
 
     // Every site carries a line number, so a failure can point at one.
-    for (const site of found.get("packages/core/cli.js")) {
-      expect(site.line).toBeGreaterThan(0);
-    }
+    for (const site of sites) expect(site.line).toBeGreaterThan(0);
   });
 
   it("does not flag the resolver, the paths modules or the iso twins", () => {
