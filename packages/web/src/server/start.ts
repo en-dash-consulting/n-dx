@@ -39,6 +39,7 @@ import { handleSearchRoute } from "./routes-search.js";
 import { handleNotionRoute } from "./routes-notion.js";
 import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
+import { enforceRouteFeatureGate } from "./route-feature-gates.js";
 import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
@@ -716,6 +717,11 @@ async function handleApiRoutes(
   /** Tagged for the workspace the request addressed. */
   broadcast: WebSocketBroadcaster,
 ): Promise<boolean> {
+  // Before anything dispatches: a disabled feature refuses for that reason,
+  // rather than for whichever precondition its handler would have checked
+  // first. `ctx` is already the addressed workspace's, so the toggle is read
+  // from the project the request named. See route-feature-gates.ts.
+  if (enforceRouteFeatureGate(req, res, ctx)) return true;
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
   if (await handleWorkspacesRoute(req, res, registry)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;
