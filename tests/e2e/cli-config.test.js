@@ -1027,6 +1027,37 @@ describe("n-dx config", () => {
       expect(stderr).toContain("Testing CLI path...");
       expect(stderr).toContain("✗");
     });
+
+    it("tests a cli_path stored under the modern llm.claude key", async () => {
+      // This read used to work only because `ndx config llm.claude.cli_path`
+      // mirrored its value into the legacy `claude.cli_path`. With the mirror
+      // gone, a reader that does not resolve both locations reports a fully
+      // configured project as having no Claude configuration at all.
+      const fakeClaude = await writeFakeBinary(join(tmpDir, "fake-claude-llm"), {
+        stdout: "1.0.0-test",
+      });
+
+      run(["llm.claude.cli_path", fakeClaude, tmpDir]);
+      const output = run(["--test-connection", tmpDir]);
+      expect(output).toContain("Testing CLI path...");
+      expect(output).toContain("✓");
+    });
+
+    it("prefers the modern cli_path over a legacy one set beside it", async () => {
+      const legacy = await writeFakeBinary(join(tmpDir, "fake-claude-legacy"), {
+        stdout: "0.0.1-legacy",
+      });
+      const modern = await writeFakeBinary(join(tmpDir, "fake-claude-modern"), {
+        stdout: "2.0.0-modern",
+      });
+
+      run(["claude.cli_path", legacy, tmpDir]);
+      run(["llm.claude.cli_path", modern, tmpDir]);
+
+      const output = run(["--test-connection", tmpDir]);
+      expect(output).toContain("2.0.0-modern");
+      expect(output).not.toContain("0.0.1-legacy");
+    });
   });
 
   // ── API endpoint and model configuration ────────────────────────────────

@@ -140,12 +140,19 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
       if (typeof vm === "string" && vm.length > 0) model = vm;
     }
   }
-  // Legacy fallback: the resolver already folded `claude.model` in above.
+  // Claude fallback: the resolver already folded `llm.claude.model` and the
+  // legacy `claude.model` together above.
+  //
+  // Gated on the active vendor, because these are Claude's keys: reporting
+  // `llm.claude.model` as the live model while `llm.vendor` is codex names a
+  // model that vendor will never run. An unset vendor still falls back — it
+  // defaults to claude everywhere else.
   //
   // `hench.model` used to be consulted here as a second fallback. It is not a
   // model source: `ndx work` has never read it (see the `hench.models.<vendor>`
   // changeset), so showing it in the footer reported a model nothing would run.
-  if (!model && claude?.model) model = claude.model;
+  const vendorIsClaude = vendor === null || vendor === LLM_VENDOR.CLAUDE;
+  if (!model && vendorIsClaude && claude?.model) model = claude.model;
 
   // For local vendor: query LM Studio for the currently loaded model.
   // If the live model differs from the stored config, write it back to .n-dx.json

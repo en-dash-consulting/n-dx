@@ -2385,9 +2385,43 @@ async function loadAllConfigs(dir) {
 
 // ── Test connection handler ──────────────────────────────────────────────────
 
+/** The Claude fields both config locations may carry. */
+const CLAUDE_RESOLVED_FIELDS = ["cli_path", "api_key", "api_endpoint", "model", "lightModel"];
+
+/**
+ * The Claude settings in force, resolving `llm.claude.<field>` over the legacy
+ * top-level `claude.<field>` one field at a time. Returns undefined when
+ * neither location sets anything.
+ *
+ * A hand-written twin of `resolveClaudeConfig` in @n-dx/llm-client, which this
+ * file may not import: config.js is the spawn-exempt orchestration script and
+ * is restricted to `node:` builtins (`domain-isolation.test.js`).
+ * `getVendorAuthPreflightCommand` already applies the same rule inline.
+ *
+ * Reading only `configs.claude` worked while `ndx config llm.claude.<field>`
+ * mirrored its value into the legacy key. That mirror is gone, so a reader
+ * that does not resolve both locations now reports a project configured under
+ * `llm.claude.*` as having no Claude configuration at all.
+ */
+function resolveClaudeSettings(configs) {
+  const modern = configs?.llm?.claude;
+  const legacy = configs?.claude;
+  const pick = (block, field) => {
+    const value = block && typeof block === "object" ? block[field] : undefined;
+    return typeof value === "string" && value ? value : undefined;
+  };
+
+  const resolved = {};
+  for (const field of CLAUDE_RESOLVED_FIELDS) {
+    const value = pick(modern, field) ?? pick(legacy, field);
+    if (value !== undefined) resolved[field] = value;
+  }
+  return Object.keys(resolved).length > 0 ? resolved : undefined;
+}
+
 /** Handle --test-connection mode. */
 async function handleTestConnection(configs) {
-  const claudeConfig = configs.claude;
+  const claudeConfig = resolveClaudeSettings(configs);
   if (!claudeConfig) {
     console.error(
       "No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.",

@@ -35,6 +35,18 @@ Two further consequences of reading the resolved view:
   migration still clears a legacy *secret* from the shared file, because a key
   mirrored there by an older version must not stay committed.
 
+Readers that leaned on that mirror move with it. `ndx config --test-connection`
+resolves both locations per field, so it tests a credential stored under
+`llm.claude.cli_path` / `llm.claude.api_key` instead of reporting "No Claude
+configuration set" for a fully configured project. `ndx auth` already resolved
+both and is unchanged.
+
+Not yet moved: `ndx config claude.<field>` as a *read*, the whole-section
+`ndx config claude`, and the `claude` block in `ndx config --json` still answer
+from the legacy key alone, so they no longer surface a value set under
+`llm.claude.*`. Read it under its own name (`ndx config llm.claude.<field>`)
+until that migration lands.
+
 Writes go to the modern keys only. `PUT /api/llm/config` refuses `claude.model`
 and `claude.lightModel` with a 400 naming the `llm.claude.*` replacement, rather
 than the generic unknown-path error those keys would otherwise get.

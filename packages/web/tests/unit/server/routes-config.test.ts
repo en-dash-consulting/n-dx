@@ -107,6 +107,36 @@ describe("Config API routes", () => {
       expect(data.authMethod).toBe("api-key");
     });
 
+    it("does not report a Claude model as the live model for a non-Claude vendor", async () => {
+      // llm.claude.* are Claude's keys. Folding them into the model shown for
+      // a codex project names a model that vendor will never run.
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "codex", claude: { model: "claude-opus-5" } } }),
+      );
+
+      clearConfigCaches();
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
+      const data = await res.json();
+
+      expect(data.vendor).toBe("codex");
+      expect(data.model).toBeNull();
+    });
+
+    it("still uses the Claude model when the vendor is claude or unset", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ claude: { model: "legacy-model" } }),
+      );
+
+      clearConfigCaches();
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
+      const data = await res.json();
+
+      expect(data.vendor).toBeNull();
+      expect(data.model).toBe("legacy-model");
+    });
+
     it("counts a credential set under the modern llm.claude keys", async () => {
       await writeFile(
         join(tmpDir, ".n-dx.json"),
