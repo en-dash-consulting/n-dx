@@ -639,13 +639,17 @@ describe("n-dx config", () => {
 
   describe("claude config", () => {
     it("sets claude.cli_path in .n-dx.local.json", async () => {
+      // The write redirects to the modern key — see "writes llm.claude.* ..."
+      // below — but the legacy key is still the one printed, so the
+      // deprecation note (stderr) names what was actually written.
       const output = run(["claude.cli_path", "/usr/local/bin/claude", "--force", tmpDir]);
       expect(output).toContain("claude.cli_path = /usr/local/bin/claude");
 
       const ndxConfig = JSON.parse(
         await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
-      expect(ndxConfig.claude.cli_path).toBe("/usr/local/bin/claude");
+      expect(ndxConfig.llm.claude.cli_path).toBe("/usr/local/bin/claude");
+      expect(ndxConfig.claude).toBeUndefined();
     });
 
     it("sets claude.api_key in .n-dx.local.json, never in .n-dx.json", async () => {
@@ -655,7 +659,7 @@ describe("n-dx config", () => {
       const localConfig = JSON.parse(
         await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
-      expect(localConfig.claude.api_key).toBe("sk-ant-test-key");
+      expect(localConfig.llm.claude.api_key).toBe("sk-ant-test-key");
 
       // The shared file is the one teammates commit — a key must never land there.
       let shared = {};
@@ -663,6 +667,41 @@ describe("n-dx config", () => {
         shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
       } catch { /* not created — fine */ }
       expect(shared.claude?.api_key).toBeUndefined();
+      expect(shared.llm?.claude?.api_key).toBeUndefined();
+    });
+
+    it("writes claude.<field> to llm.claude.<field> and notes the redirect on stderr", () => {
+      const result = spawnSync("node", [CLI_PATH, "config", "claude.model", "claude-sonnet-5", tmpDir], {
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("claude.model = claude-sonnet-5");
+      expect(result.stderr).toContain("claude.model");
+      expect(result.stderr).toContain("llm.claude.model");
+      expect(result.stderr).toContain("deprecated");
+    });
+
+    it("reads a legacy-only project correctly (no llm.claude section at all)", async () => {
+      await writeFile(
+        SHARED_CONFIG_PATH(tmpDir),
+        JSON.stringify(
+          { claude: { model: "legacy-model", api_endpoint: "https://legacy.example.com" } },
+          null,
+          2,
+        ) + "\n",
+      );
+
+      expect(run(["claude.model", tmpDir]).trim()).toBe("legacy-model");
+      expect(run(["claude.api_endpoint", tmpDir]).trim()).toBe("https://legacy.example.com");
+
+      const section = JSON.parse(run(["claude", "--json", tmpDir]));
+      expect(section.model).toBe("legacy-model");
+      expect(section.api_endpoint).toBe("https://legacy.example.com");
+
+      const whole = JSON.parse(run(["--json", tmpDir]));
+      expect(whole.claude.model).toBe("legacy-model");
+      expect(whole.claude.api_endpoint).toBe("https://legacy.example.com");
     });
 
     it("routes every vendor api_key to .n-dx.local.json", async () => {
@@ -688,7 +727,8 @@ describe("n-dx config", () => {
       run(["claude.model", "claude-sonnet-5", tmpDir]);
 
       const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
-      expect(shared.claude.model).toBe("claude-sonnet-5");
+      expect(shared.llm.claude.model).toBe("claude-sonnet-5");
+      expect(shared.claude).toBeUndefined();
     });
 
     it("writing llm.claude.* no longer mirrors the value into legacy claude.*", async () => {
@@ -733,7 +773,7 @@ describe("n-dx config", () => {
       expect(shared.claude.api_key).toBeUndefined();
       expect(shared.claude.model).toBe("claude-sonnet-5");
       const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
-      expect(local.claude.api_key).toBe("sk-ant-new");
+      expect(local.llm.claude.api_key).toBe("sk-ant-new");
     });
 
     it("warns on stderr when .n-dx.json still holds an api_key", async () => {
@@ -807,7 +847,7 @@ describe("n-dx config", () => {
       const localConfig = JSON.parse(
         await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
-      expect(localConfig.claude.cli_path).toBe("/usr/local/bin/claude");
+      expect(localConfig.llm.claude.cli_path).toBe("/usr/local/bin/claude");
     });
 
     it("preserves existing .n-dx.json content when setting claude values", async () => {
@@ -824,8 +864,9 @@ describe("n-dx config", () => {
       expect(ndxConfig.hench.model).toBe("opus");
       // The key itself is local-only; the shared file is left otherwise intact.
       expect(ndxConfig.claude).toBeUndefined();
+      expect(ndxConfig.llm).toBeUndefined();
       const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
-      expect(local.claude.api_key).toBe("sk-ant-test");
+      expect(local.llm.claude.api_key).toBe("sk-ant-test");
     });
 
     it("does not write to package config files", async () => {
@@ -859,7 +900,7 @@ describe("n-dx config", () => {
       const ndxConfig = JSON.parse(
         await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
-      expect(ndxConfig.claude.cli_path).toBe("/new/path");
+      expect(ndxConfig.llm.claude.cli_path).toBe("/new/path");
     });
   });
 
@@ -1044,6 +1085,9 @@ describe("n-dx config", () => {
     });
 
     it("prefers the modern cli_path over a legacy one set beside it", async () => {
+      // `claude.cli_path` now writes `llm.claude.cli_path` too (see "claude
+      // config" above), so the legacy location is set directly here to
+      // exercise genuine cross-location precedence.
       const legacy = await writeFakeBinary(join(tmpDir, "fake-claude-legacy"), {
         stdout: "0.0.1-legacy",
       });
@@ -1051,7 +1095,10 @@ describe("n-dx config", () => {
         stdout: "2.0.0-modern",
       });
 
-      run(["claude.cli_path", legacy, tmpDir]);
+      await writeFile(
+        SHARED_CONFIG_PATH(tmpDir),
+        JSON.stringify({ claude: { cli_path: legacy } }, null, 2) + "\n",
+      );
       run(["llm.claude.cli_path", modern, tmpDir]);
 
       const output = run(["--test-connection", tmpDir]);
@@ -1070,7 +1117,7 @@ describe("n-dx config", () => {
       const ndxConfig = JSON.parse(
         await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
       );
-      expect(ndxConfig.claude.api_endpoint).toBe("https://proxy.example.com");
+      expect(ndxConfig.llm.claude.api_endpoint).toBe("https://proxy.example.com");
     });
 
     it("gets claude.api_endpoint after setting it", () => {
@@ -1118,7 +1165,7 @@ describe("n-dx config", () => {
       const ndxConfig = JSON.parse(
         await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
       );
-      expect(ndxConfig.claude.model).toBe("claude-opus-4-20250514");
+      expect(ndxConfig.llm.claude.model).toBe("claude-opus-4-20250514");
     });
 
     it("gets claude.model after setting it", () => {
