@@ -148,6 +148,7 @@ would create silent coverage gaps.
 |-----------|--------|-------------|
 | `tests/e2e/cli-dev.test.js` | `ndx dev` command startup | Single point of failure for dev-mode coverage |
 | `tests/integration/scheduler-startup.test.js` | Usage cleanup scheduler boot | Single point of failure for server scheduler wiring |
+| `packages/web/tests/e2e-ui/navigation.spec.ts` | Every dashboard view deep-links, and every 0.8.0 redirect alias resolves to its target | Single point of failure for the whole nav surface — a broken view or a dangling old path fails silently otherwise |
 
 These tests must remain in the test suite. If refactoring changes their targets,
 update the tests — do not delete them.
