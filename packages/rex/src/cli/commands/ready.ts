@@ -24,10 +24,14 @@ export async function cmdReady(
   flags: Record<string, string>,
 ): Promise<void> {
   const itemId = flags.item;
-  if (itemId === "") {
+  // `item` is deliberately not a VALUE_KEY (see commands/log.ts#readItemId),
+  // so a bare `--item`, including the space-separated `--item <id>`, arrives
+  // as "true". Refuse it rather than look up an item named "true" or fall
+  // through to the whole tree.
+  if (itemId === "" || itemId === "true") {
     throw new CLIError(
-      "--item needs an item id.",
-      "Pass --item=<id>, or omit --item to evaluate the whole tree.",
+      "--item needs a value.",
+      "Write it as --item=<id>, or omit --item to evaluate the whole tree; the space-separated form is not supported.",
     );
   }
   const migrationResult = await ensureLegacyPrdMigrated(dir);

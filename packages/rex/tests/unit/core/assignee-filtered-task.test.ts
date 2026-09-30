@@ -78,6 +78,105 @@ describe("findNextTask with assignee filter", () => {
   });
 });
 
+/**
+ * Assignment is inherited: assigning a feature or an epic assigns the work
+ * under it. Matching only the candidate's own field made the natural act of
+ * handing someone a feature select nothing, because the leaves carry no
+ * `assignee` of their own.
+ */
+describe("assignee inheritance from ancestors", () => {
+  const ALICE = "alice <alice@example.com>";
+
+  /**
+   *   epic-1  (assignee: alice)
+   *     feat-1
+   *       task-deep   — no own assignee, inherits alice through epic-1
+   *   epic-2
+   *     feat-2  (assignee: alice)
+   *       task-under-feat — inherits alice through feat-2
+   *     feat-3
+   *       task-other — nobody's
+   */
+  function makeNestedTree(): PRDItem[] {
+    return [
+      makeItem({
+        id: "epic-1",
+        title: "Epic 1",
+        level: "epic",
+        assignee: ALICE,
+        children: [
+          makeItem({
+            id: "feat-1",
+            title: "Feature 1",
+            level: "feature",
+            children: [makeItem({ id: "task-deep", title: "Deep Task" })],
+          }),
+        ],
+      }),
+      makeItem({
+        id: "epic-2",
+        title: "Epic 2",
+        level: "epic",
+        children: [
+          makeItem({
+            id: "feat-2",
+            title: "Feature 2",
+            level: "feature",
+            assignee: ALICE,
+            children: [makeItem({ id: "task-under-feat", title: "Task Under Feature" })],
+          }),
+          makeItem({
+            id: "feat-3",
+            title: "Feature 3",
+            level: "feature",
+            children: [makeItem({ id: "task-other", title: "Someone Else's Task" })],
+          }),
+        ],
+      }),
+    ];
+  }
+
+  it("matches a task whose epic carries the identity", () => {
+    const results = findActionableTasks(makeNestedTree(), new Set(), 20, { assignee: ALICE });
+    expect(results.map((r) => r.item.id)).toContain("task-deep");
+  });
+
+  it("matches a task whose feature carries the identity", () => {
+    const results = findActionableTasks(makeNestedTree(), new Set(), 20, { assignee: ALICE });
+    expect(results.map((r) => r.item.id)).toContain("task-under-feat");
+  });
+
+  it("does not match a task with no assigned ancestor", () => {
+    const results = findActionableTasks(makeNestedTree(), new Set(), 20, { assignee: ALICE });
+    expect(results.map((r) => r.item.id)).not.toContain("task-other");
+  });
+
+  it("an item's own assignee still matches when no ancestor carries one", () => {
+    const results = findActionableTasks(makeTree(), new Set(), 20, { assignee: ALICE });
+    expect(results.map((r) => r.item.id)).toEqual(["task-mine"]);
+  });
+
+  it("a descendant's own assignee does not leak upward to siblings", () => {
+    // The relation is ancestor → descendant only. `epic-2` is not alice's just
+    // because something beneath it is.
+    const items = makeNestedTree();
+    const results = findActionableTasks(items, new Set(), 20, { assignee: ALICE });
+    expect(results.map((r) => r.item.id).sort()).toEqual(["task-deep", "task-under-feat"]);
+  });
+
+  it("findNextTask honours inheritance too", () => {
+    const next = findNextTask(makeNestedTree(), new Set(), { assignee: ALICE });
+    expect(["task-deep", "task-under-feat"]).toContain(next!.item.id);
+  });
+
+  it("an unrelated identity matches nothing in the nested tree", () => {
+    const results = findActionableTasks(makeNestedTree(), new Set(), 20, {
+      assignee: "bob <bob@example.com>",
+    });
+    expect(results).toHaveLength(0);
+  });
+});
+
 describe("findActionableTasks with assignee filter", () => {
   it("returns only the task assigned to the given identity", () => {
     const items = makeTree();

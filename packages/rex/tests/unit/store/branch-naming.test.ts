@@ -9,6 +9,7 @@ import {
   getFirstCommitDate,
   generatePRDFilename,
   resolvePRDFilename,
+  isDefaultBranch,
 } from "../../../src/store/branch-naming.js";
 
 // ---------------------------------------------------------------------------
@@ -127,6 +128,54 @@ describe("resolveGitBranch", () => {
     } finally {
       await rm(nonGit, { recursive: true, force: true });
     }
+  });
+});
+
+describe("isDefaultBranch", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-default-branch-"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("falls back to main/master when there is no origin/HEAD", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    expect(isDefaultBranch(tmpDir, "main")).toBe(true);
+    expect(isDefaultBranch(tmpDir, "feature/x")).toBe(false);
+  });
+
+  it("prefers what origin/HEAD names when its target actually exists", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    git(tmpDir, "remote", "add", "origin", "https://example.invalid/repo.git");
+    // Simulates a fetch that registered a remote-tracking branch named "trunk".
+    git(tmpDir, "update-ref", "refs/remotes/origin/trunk", "HEAD");
+    git(tmpDir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk");
+
+    expect(isDefaultBranch(tmpDir, "trunk")).toBe(true);
+    expect(isDefaultBranch(tmpDir, "main")).toBe(false);
+  });
+
+  it("falls back to main/master when origin/HEAD names a pruned ref", () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    git(tmpDir, "remote", "add", "origin", "https://example.invalid/repo.git");
+    git(tmpDir, "update-ref", "refs/remotes/origin/master", "HEAD");
+    git(tmpDir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master");
+    // The upstream default branch was renamed and the stale ref pruned, but
+    // `symbolic-ref` never repoints itself — `origin/HEAD` still names it.
+    git(tmpDir, "update-ref", "-d", "refs/remotes/origin/master");
+
+    // Falls back to the well-known-name list — "master" is trivially true
+    // there too, so a feature branch is what actually proves the fallback
+    // engaged rather than the (now-unverified) origin/HEAD name being trusted.
+    expect(isDefaultBranch(tmpDir, "main")).toBe(true);
+    expect(isDefaultBranch(tmpDir, "feature/x")).toBe(false);
   });
 });
 

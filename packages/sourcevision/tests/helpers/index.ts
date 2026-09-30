@@ -253,7 +253,10 @@ export function completedIn(items: { status?: string; id?: string; children?: un
 export function fixtureRex(
   dir: string,
   completed?: string[],
-): { readPRD: () => never; diffCompleted: () => Set<string> } {
+): {
+  readPRD: () => never;
+  diffCompleted: (dir: string, baseBranch?: string) => { baseBranch: string; ids: Set<string>; reliable: true };
+} {
   const load = (): { items: unknown[] } | null => {
     const path = joinPath(dir, ".rex", "prd.json");
     if (!existsSyncFn(path)) return null;
@@ -271,7 +274,13 @@ export function fixtureRex(
 
   return {
     readPRD: () => load() as never,
-    diffCompleted: () =>
-      new Set(completed ?? completedIn((load()?.items ?? []) as Parameters<typeof completedIn>[0])),
+    // Echoes the requested base branch, same as real tree-diff, defaulting to
+    // "main" to match this suite's fixture repos (all initialised with `git
+    // init -b main`) when the caller left it to rex's own default resolution.
+    diffCompleted: (_dir, baseBranch) => ({
+      baseBranch: baseBranch ?? "main",
+      ids: new Set(completed ?? completedIn((load()?.items ?? []) as Parameters<typeof completedIn>[0])),
+      reliable: true,
+    }),
   };
 }

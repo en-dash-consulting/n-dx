@@ -2,13 +2,18 @@
 id: "24a5afeb-a680-479e-936f-0906060da713"
 level: "task"
 title: "Address #442 review: --mine scope and messaging, ready's ancestor check"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "0.8.0"
   - "prd-storage-additive"
   - "pr-18"
 source: "adversarial review of PR #442 (endash-shal, 2026-09-29), 0.8.0 PR B2"
+startedAt: "2026-09-29T20:38:53.283Z"
+completedAt: "2026-09-29T21:18:41.580Z"
+endedAt: "2026-09-29T21:18:41.580Z"
+resolutionType: "code-change"
+resolutionDetail: "Fixed #442 review findings 1, 4, 5, 10, 13. --mine now matches via ancestor assignee (rex matchesAssignee, shared through hench's gateway); the deferred/failing reset offer and --reset-deferred are scoped to the identity instead of resetting the whole PRD; empty --mine results name the resolved identity and the unfiltered actionable count, and --loop no longer reports \"All tasks complete\"; rex ready checks the ancestor chain with collectActionable's own traversalBlock predicate and names the blocking ancestor; added an AST-based plumbing test that fails if assignee is dropped at selectTask/runLoop/runIterations/runOne — it caught a live drop at the epic-by-epic runOne call site."
 acceptanceCriteria:
   - "Under --mine, the deferred-task reset offer counts and resets only tasks matching the assignee filter (test)."
   - "When --mine matches nothing, the message names the resolved identity and how many actionable tasks exist without the filter; --loop does not report 'All tasks complete' (tests)."
@@ -16,6 +21,6 @@ acceptanceCriteria:
   - "rex ready does not mark an item whose ancestor is blocked, cancelled, deleted or has an open blockedBy, and names that ancestor in its reason, using the same predicate collectActionable uses (test)."
   - "A test fails if assignee is dropped at any of runOne, runLoop or selectTask."
 description: "Fixes from the #442 review (findings 1, 4, 5, 10, 13).\n\n- #1 (must-fix): when --mine leaves the interactive menu empty, packages/hench/src/cli/commands/run.ts counts deferred/failing tasks across the whole PRD and offers resetDeferredTasks(store), which resets everyone's tasks. Scope both the count and the reset to the assignee filter.\n- #5: when --mine matches nothing, --loop prints 'All tasks complete' and the menu says 'No actionable tasks found in PRD', never naming the identity resolveActor produced. Name the identity and say how many actionable tasks exist without the filter.\n- #10 (decision: ancestor matching): filterByAssignee (packages/rex/src/core/next-task.ts) matches only the candidate's own assignee. Match when the item or any ancestor in entry.parents carries the identity, so assigning a feature or epic assigns its tasks.\n- #4: rex ready (packages/rex/src/core/ready.ts) inherits requirements from ancestors but checks blockers only on the item itself, so a task under a blocked or cancelled epic is marked ready although collectActionable never selects it. Check the ancestor chain with the same predicate collectActionable uses.\n- #13: no hench test proves assignee reaches runOne, runLoop and selectTask."
-lastModified: "2026-09-29T17:44:04.876Z"
+lastModified: "2026-09-29T21:18:41.958Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
