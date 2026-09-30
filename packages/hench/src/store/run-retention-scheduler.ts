@@ -34,6 +34,7 @@
 
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
+import { resolveHenchPaths } from "./paths.js";
 import {
   enforceRetentionPolicy,
   loadRetentionConfig,
@@ -121,7 +122,7 @@ export async function runRetentionCycle(
 
   try {
     const config = await loadRetentionConfig(projectDir);
-    const logPath = join(projectDir, ".hench", "retention-stats.jsonl");
+    const logPath = join(resolveHenchPaths(projectDir).henchDir, "retention-stats.jsonl");
 
     const result = await enforceRetentionPolicy(
       runsDir,

@@ -32,6 +32,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { resolveLayout } from "@n-dx/llm-client";
 import { loadPRDSync, prdMaxMtimeMs } from "./prd-io.js";
 import type { PRDDocument, PRDItem } from "./rex-gateway.js";
 
@@ -898,7 +899,7 @@ export function buildMergeGraph(opts: BuildMergeGraphOptions): MergeGraph {
   const maxMerges = opts.maxMerges ?? DEFAULT_MAX_MERGES;
   const windowMs = opts.henchRunWindowMs ?? DEFAULT_HENCH_RUN_WINDOW_MS;
   const henchRunsDir =
-    opts.henchRunsDir ?? join(opts.projectDir, ".hench", "runs");
+    opts.henchRunsDir ?? join(resolveLayout(opts.projectDir).henchDir, "runs");
   const runner = opts.gitRunner ?? createGitRunner(opts.projectDir);
 
   // ── 1. PRD index ────────────────────────────────────────────────
@@ -1049,7 +1050,7 @@ export class MergeGraphCache {
   get(opts: BuildMergeGraphOptions): MergeGraph {
     const maxMerges = opts.maxMerges ?? DEFAULT_MAX_MERGES;
     const henchRunsDir =
-      opts.henchRunsDir ?? join(opts.projectDir, ".hench", "runs");
+      opts.henchRunsDir ?? join(resolveLayout(opts.projectDir).henchDir, "runs");
     const runner = opts.gitRunner ?? createGitRunner(opts.projectDir);
 
     const fp = computeFingerprint({
