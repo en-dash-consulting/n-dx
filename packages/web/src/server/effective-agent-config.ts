@@ -162,15 +162,42 @@ function readHenchAgentSettings(projectDir: string): {
 
   const provider = raw["provider"] === "api" || raw["provider"] === "cli" ? raw["provider"] : "cli";
 
-  const models: Partial<Record<LLMVendor, string>> = {};
-  const rawModels = raw["models"];
-  if (rawModels && typeof rawModels === "object") {
-    for (const [vendor, value] of Object.entries(rawModels as Record<string, unknown>)) {
-      if (isLLMVendor(vendor) && typeof value === "string") models[vendor] = value;
-    }
-  }
+  return { provider, models: readAgentModels(raw["models"]) };
+}
 
-  return { provider, models };
+/**
+ * The `models` map, or `{}` when hench would refuse it.
+ *
+ * **Any invalid entry discards the whole map**, which looks over-strict until
+ * you follow what hench does with the same file. `HenchConfigSchema`'s
+ * `models` is `.strict()` with `z.string().min(1)` values, so one unknown
+ * vendor key fails validation for the field — and `loadConfig`'s
+ * `onInvalid: "use-defaults"` salvage replaces *each invalid top-level field*
+ * with its default, dropping optional ones the defaults do not carry.
+ * `models` is exactly such a field, so hench ends up with no override at all,
+ * not with the valid entries kept.
+ *
+ * Filtering the bad key and keeping the rest — the obvious reading — makes
+ * this route disagree with the run on a plausible typo: `ndx config
+ * hench.models.gemini …` (the vendor is `google`; its models are Gemini) is
+ * accepted by the CLI, and the dashboard would then report that model as the
+ * agent's while `ndx work` warns and runs the `llm.*` one instead.
+ *
+ * Whitespace-only is deliberately *not* rejected here: `.min(1)` accepts it,
+ * so hench validates it and then `resolveAgentModel`'s own `trim()` reads it
+ * as unset — which is what {@link resolveEffectiveAgentModel} also does.
+ */
+function readAgentModels(rawModels: unknown): Partial<Record<LLMVendor, string>> {
+  if (rawModels === undefined) return {};
+  if (!rawModels || typeof rawModels !== "object" || Array.isArray(rawModels)) return {};
+
+  const models: Partial<Record<LLMVendor, string>> = {};
+  for (const [vendor, value] of Object.entries(rawModels as Record<string, unknown>)) {
+    if (!isLLMVendor(vendor)) return {};
+    if (typeof value !== "string" || value.length < 1) return {};
+    models[vendor] = value;
+  }
+  return models;
 }
 
 /**

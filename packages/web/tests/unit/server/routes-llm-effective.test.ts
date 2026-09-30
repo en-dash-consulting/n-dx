@@ -140,6 +140,51 @@ describe("GET /api/llm/config — effective block", () => {
     expect(await effective()).toMatchObject({ modelSource: "default" });
   });
 
+  describe("hench.models entries hench's schema would reject", () => {
+    // HenchConfigSchema's `models` is .strict() with z.string().min(1) values,
+    // and loadConfig's "use-defaults" salvage drops a whole invalid optional
+    // top-level field. So one bad entry costs hench the entire map — keeping
+    // the good entries here would report an override the run does not apply.
+    it("drops the whole map when a vendor key is unknown", async () => {
+      // `gemini` for `google` is the plausible typo: the vendor is named
+      // google, its models are named Gemini, and `ndx config
+      // hench.models.gemini …` does not refuse it.
+      await writeNdxConfig({ llm: { vendor: "claude" } });
+      await writeHenchConfig({ models: { claude: "haiku", gemini: "gemini-2.5-pro" } });
+
+      expect(await effective()).toMatchObject({
+        model: resolveModel(TIER_MODELS.claude.standard),
+        modelSource: "default",
+      });
+    });
+
+    it("drops the whole map when a value is not a string", async () => {
+      await writeNdxConfig({ llm: { vendor: "claude" } });
+      await writeHenchConfig({ models: { claude: "haiku", codex: 123 } });
+
+      expect(await effective()).toMatchObject({ modelSource: "default" });
+    });
+
+    it("drops the whole map when a value is the empty string", async () => {
+      // `.min(1)` rejects "" outright — unlike "   ", which validates and is
+      // then read as unset by the trim in the resolution chain.
+      await writeNdxConfig({ llm: { vendor: "claude" } });
+      await writeHenchConfig({ models: { claude: "haiku", google: "" } });
+
+      expect(await effective()).toMatchObject({ modelSource: "default" });
+    });
+
+    it("still honours a map in which every entry is valid", async () => {
+      await writeNdxConfig({ llm: { vendor: "claude" } });
+      await writeHenchConfig({ models: { claude: "haiku", codex: "gpt-5.6-luna" } });
+
+      expect(await effective()).toMatchObject({
+        model: resolveModel("haiku"),
+        modelSource: "hench-override",
+      });
+    });
+  });
+
   it("honours an llm.routes override for the agent.execute class", async () => {
     // The agent loop is routable — this is the rung that makes `effective`
     // more than a re-read of llm.claude.model.

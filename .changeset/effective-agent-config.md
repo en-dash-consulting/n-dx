@@ -32,6 +32,13 @@ hench exports `resolveAgentModel` (plus its parameter and result types, and
 `VENDOR_PROVIDERS` is already exported: not to be called at runtime, but so the
 copy web is forced to keep can be checked against the original.
 
+A `hench.models` map with any entry hench's schema rejects — an unknown
+vendor key, a non-string, an empty string — is discarded whole rather than
+filtered, because that is what hench's own config salvage does with an
+invalid optional field. Keeping the good entries would report an override
+`ndx work` does not apply, which `ndx config hench.models.gemini …` (the
+vendor is `google`) makes easy to hit.
+
 Two configurations resolve but would refuse to run — `vendor=codex` with
 `provider=api`, and a model pinned for a vendor that cannot run it. The route
 reports the resolution rather than throwing, because a settings page that 500s

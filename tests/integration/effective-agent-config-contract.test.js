@@ -44,6 +44,12 @@ import { tmpdir } from "node:os";
 import { resolveAgentModel, isProviderSupported } from "../../packages/hench/dist/public.js";
 import { resolveEffectiveAgentConfig } from "../../packages/web/dist/server/effective-agent-config.js";
 import { loadLLMConfig, DEFAULT_LLM_VENDOR } from "../../packages/llm-client/dist/public.js";
+// Not on hench's public API — reached through the documented `./dist/*`
+// subpath, as `tests/e2e/hench-config-gate-contract.test.js` already does for
+// the same schema. The matrix above hands `resolveAgentModel` a `models`
+// literal, which is what hench's chain sees but *not* what its config loader
+// would have produced; this is the oracle for the step in between.
+import { HenchConfigSchema } from "../../packages/hench/dist/schema/validate.js";
 
 const VENDORS = ["claude", "codex", "google", "local"];
 
@@ -221,6 +227,59 @@ describe("web's effective-agent-config twin agrees with hench", () => {
       }
     }
     expect([...seen].sort()).toEqual(["configured", "default", "hench-override"]);
+  });
+});
+
+describe("web's hench.models reader agrees with hench's schema", () => {
+  /**
+   * The matrix above compares the resolution *chain*, but it hands hench a
+   * `models` literal — so it cannot see the step where hench's config loader
+   * decides whether that map survives at all. `HenchConfigSchema.models` is
+   * `.strict()` with `z.string().min(1)` values, and `loadConfig`'s
+   * `onInvalid: "use-defaults"` salvage drops each invalid *top-level* field,
+   * `models` being an optional one the defaults do not carry. So one bad
+   * entry costs hench the whole map, and web must discard it identically or
+   * it reports an override the run will not apply.
+   */
+  const CASES = [
+    { name: "all entries valid", models: { claude: "haiku", codex: "gpt-5.6-luna" } },
+    { name: "unknown vendor key", models: { claude: "haiku", gemini: "gemini-2.5-pro" } },
+    { name: "unknown key only", models: { nope: "x" } },
+    { name: "non-string value", models: { claude: "haiku", codex: 123 } },
+    { name: "empty-string value", models: { claude: "haiku", google: "" } },
+    { name: "whitespace-only value", models: { claude: "   " } },
+    { name: "empty map", models: {} },
+  ];
+
+  for (const { name, models } of CASES) {
+    it(`${name}: web keeps the map only when hench's schema accepts it`, async () => {
+      await seed({ llm: { vendor: "claude", claude: { model: "claude-opus-5" } } }, { models });
+
+      // Does hench's own schema accept this `models` field?
+      const schemaAccepts = HenchConfigSchema.shape.models.safeParse(models).success;
+
+      const { model, modelSource } = await resolveEffectiveAgentConfig(projectDir);
+
+      // A map hench rejects leaves no override, so the answer must fall
+      // through to the configured llm.claude.model.
+      const usedOverride = modelSource === "hench-override";
+      const claudeEntry = typeof models.claude === "string" ? models.claude.trim() : "";
+      expect(usedOverride).toBe(schemaAccepts && claudeEntry.length > 0);
+
+      if (!usedOverride) {
+        expect(model).toBe("claude-opus-5");
+        expect(modelSource).toBe("configured");
+      }
+    });
+  }
+
+  it("exercises both an accepted and a rejected map", async () => {
+    // Vacuity guard: the cases above must actually straddle the schema.
+    const verdicts = CASES.map(
+      (c) => HenchConfigSchema.shape.models.safeParse(c.models).success,
+    );
+    expect(verdicts).toContain(true);
+    expect(verdicts).toContain(false);
   });
 });
 
