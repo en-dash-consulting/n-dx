@@ -29,11 +29,22 @@ export type StageId = "analyze" | "plan" | "work";
 
 export type StageProduct = "sourcevision" | "rex" | "hench";
 
+export interface StageTab {
+  /** The tab's own label, blurb and glyph come from its `view-meta.ts` entry. */
+  view: ViewId;
+  /**
+   * Dropped in a static export — the isometric map is built by the server on
+   * demand, same exemption the old 2D/3D toggle carried for its 3D side.
+   */
+  hiddenWhenDeployed?: boolean;
+}
+
 export interface StageSection {
   /**
-   * View rendered in the section and opened full-page by its "Open" link.
-   * The section's heading and blurb come from this view's entry in
-   * `view-meta.ts`; there is no per-section override.
+   * View rendered in the section and opened full-page by its "Open" link —
+   * the first tab when `tabs` is set. The section's heading and blurb come
+   * from this view's entry in `view-meta.ts`, unless `group` overrides them;
+   * there is no other per-section override.
    */
   view: ViewId;
   /** Expanded when the stage page first opens. */
@@ -44,10 +55,20 @@ export interface StageSection {
    */
   plain?: boolean;
   /**
-   * A second projection of the same content behind a toggle in the section
-   * header — the 2D import map and the 3D isometric map are one section.
+   * Further views sharing this section as tabs alongside `view` — the
+   * Terrain section's Isometric map and Zones, the Architecture section's
+   * Routes. Generalises the old two-way 2D/3D projection toggle into an
+   * N-way tab strip; each tab is still one view, reused unchanged, and
+   * still keeps its own route and full page.
    */
-  alt?: { view: ViewId; label: string; primaryLabel: string };
+  tabs?: readonly StageTab[];
+  /**
+   * Heading and blurb for a section whose tabs form a named group with no
+   * page of its own — Terrain has no route; only its tabs do. Omitted when
+   * the section's identity is simply `view`'s own (Architecture's merged
+   * section needs no override: it is still named by the `architecture` view).
+   */
+  group?: { heading: string; blurb: string };
   /**
    * A long list (run history, the execution log): the open section is a
    * bounded scroll region, with an Expand control in its header that shows it
@@ -79,13 +100,21 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     id: "analyze",
     sections: [
       { view: "overview", plain: true },
-      { view: "graph", alt: { view: "iso-map", label: "3D", primaryLabel: "2D" } },
-      { view: "zones" },
+      {
+        view: "graph",
+        tabs: [
+          { view: "iso-map", hiddenWhenDeployed: true },
+          { view: "zones" },
+        ],
+        group: {
+          heading: "Terrain",
+          blurb: "The import graph — flat, in 3D, or clustered into zones.",
+        },
+      },
       { view: "files", scroll: true },
       { view: "problems" },
       { view: "suggestions" },
-      { view: "architecture" },
-      { view: "routes" },
+      { view: "architecture", tabs: [{ view: "routes" }] },
       { view: "pr-markdown", featureGate: "sourcevision.prMarkdown" },
       { view: "ask", featureGate: "sourcevision.ask", requiresServer: true },
     ],
@@ -175,7 +204,7 @@ export function stageForView(view: ViewId, validViews?: ReadonlySet<ViewId>): St
   if (isStageId(view)) return view;
   for (const id of STAGE_ORDER) {
     if (validViews && !validViews.has(id)) continue;
-    if (STAGES[id].sections.some((s) => s.view === view || s.alt?.view === view)) return id;
+    if (STAGES[id].sections.some((s) => s.view === view || s.tabs?.some((t) => t.view === view))) return id;
   }
   return null;
 }

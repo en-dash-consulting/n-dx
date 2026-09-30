@@ -60,7 +60,7 @@ export {
   stageProduct,
   visibleStages,
 } from "./views/stages.js";
-export type { StageId, StageDef, StageSection, StageProduct, SettingsEntry } from "./views/stages.js";
+export type { StageId, StageDef, StageSection, StageTab, StageProduct, SettingsEntry } from "./views/stages.js";
 
 // --- Navigation model: the one name, glyph, product and blurb per view ---
 export {

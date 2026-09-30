@@ -365,13 +365,13 @@ describe("iso-map view registration", () => {
   });
 
   // Moved off the retired SOURCEVISION_TABS table. The isometric map is no
-  // longer a sibling tab of the 2D map: it is the same section's second
-  // projection, which is a stronger form of "next to" than adjacency was.
-  it("is the second projection of the repository map section", () => {
-    const graph = STAGES.analyze.sections.find((s) => s.view === "graph")!;
-    expect(graph.alt?.view).toBe("iso-map");
-    expect(graph.alt?.primaryLabel).toBe("2D");
-    expect(graph.alt?.label).toBe("3D");
+  // longer a sibling tab of the 2D map alone: it shares the Terrain section
+  // with Zones too, and is dropped in a static export, same as before.
+  it("is a tab of the Terrain section, dropped in a static export", () => {
+    const terrain = STAGES.analyze.sections.find((s) => s.view === "graph")!;
+    const isoTab = terrain.tabs?.find((t) => t.view === "iso-map");
+    expect(isoTab).toBeDefined();
+    expect(isoTab?.hiddenWhenDeployed).toBe(true);
   });
 
   it("is named by the navigation model", () => {

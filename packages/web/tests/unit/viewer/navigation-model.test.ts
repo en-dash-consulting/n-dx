@@ -90,7 +90,7 @@ function placementsOf(view: ViewId): string[] {
   for (const stage of STAGE_ORDER) {
     for (const section of STAGES[stage].sections) {
       if (section.view === view) places.push(`section:${stage}`);
-      if (section.alt?.view === view) places.push(`alt:${stage}`);
+      if (section.tabs?.some((t) => t.view === view)) places.push(`tab:${stage}`);
     }
   }
   if (SETTINGS_ENTRIES.some((e) => e.view === view)) places.push("settings");
@@ -281,7 +281,7 @@ describe("rendered surfaces take their labels from the model", () => {
     }
   });
 
-  it("each stage section is headed by its view's label and blurb", async () => {
+  it("each stage section is headed by its view's label and blurb, or its group's", async () => {
     const wrong: string[] = [];
     for (const stage of STAGE_ORDER) {
       act(() => {
@@ -292,10 +292,41 @@ describe("rendered surfaces take their labels from the model", () => {
       await settle();
       for (const el of root.querySelectorAll(".stage-section[data-view]:not(.stage-section--plain)")) {
         const view = el.getAttribute("data-view") as ViewId;
+        const section = STAGES[stage].sections.find((s) => s.view === view)!;
+        const expectedTitle = section.group?.heading ?? viewLabel(view);
+        const expectedBlurb = section.group?.blurb ?? viewBlurb(view);
         const title = el.querySelector(".stage-section-title")?.textContent;
         const blurb = el.querySelector(".stage-section-blurb")?.textContent;
-        if (title !== viewLabel(view)) wrong.push(`${stage}/${view}: titled "${title}"`);
-        if (blurb !== viewBlurb(view)) wrong.push(`${stage}/${view}: blurb "${blurb}"`);
+        if (title !== expectedTitle) wrong.push(`${stage}/${view}: titled "${title}"`);
+        if (blurb !== expectedBlurb) wrong.push(`${stage}/${view}: blurb "${blurb}"`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  it("every tab in a section is named and described by its own view", async () => {
+    const wrong: string[] = [];
+    for (const stage of STAGE_ORDER) {
+      act(() => {
+        render(h(StagePage, {
+          stage, validViews: buildValidViews(null), navigateTo: () => {}, renderView: () => null,
+        }), root);
+      });
+      await settle();
+      for (const section of STAGES[stage].sections.filter((s) => s.tabs?.length)) {
+        act(() => {
+          root.querySelector<HTMLButtonElement>(
+            `.stage-section[data-view="${section.view}"] .stage-section-toggle`,
+          )?.click();
+        });
+        await settle();
+        const tabButtons = [...root.querySelectorAll<HTMLButtonElement>(
+          `.stage-section[data-view="${section.view}"] .stage-section-tab`,
+        )];
+        const expectedViews = [section.view, ...section.tabs!.map((t) => t.view)];
+        if (tabButtons.map((b) => b.textContent).join("|") !== expectedViews.map((v) => viewLabel(v)).join("|")) {
+          wrong.push(`${stage}/${section.view}: tabs ${tabButtons.map((b) => b.textContent).join(", ")}`);
+        }
       }
     }
     expect(wrong).toEqual([]);
@@ -359,24 +390,48 @@ describe("rendered surfaces take their labels from the model", () => {
 describe("the Analysis stage carries what SOURCEVISION_TABS used to", () => {
   const sectionViews = STAGES.analyze.sections.map((s) => s.view);
   const section = (view: ViewId) => STAGES.analyze.sections.find((s) => s.view === view)!;
+  // Every view the stage shows, sections and their tabs flattened — the
+  // successor to the old flat `sectionViews` list now that Zones, Routes and
+  // the isometric map are tabs rather than sections of their own.
+  const allViews = STAGES.analyze.sections.flatMap((s) => [s.view, ...(s.tabs ?? []).map((t) => t.view)]);
 
-  it("lists every SourceVision view", () => {
-    // `iso-map` is the repository map's second projection rather than a
-    // section of its own; the rest are sections, in tab order.
+  it("lists every SourceVision view, sections and tabs", () => {
     expect(sectionViews).toEqual([
-      "overview", "graph", "zones", "files", "problems",
+      "overview", "graph", "files", "problems",
+      "suggestions", "architecture", "pr-markdown", "ask",
+    ]);
+    expect(allViews).toEqual([
+      "overview", "graph", "iso-map", "zones", "files", "problems",
       "suggestions", "architecture", "routes", "pr-markdown", "ask",
     ]);
-    expect(section("graph").alt?.view).toBe("iso-map");
   });
 
-  it("names the repository map once, not twice", () => {
+  it("folds the repository map, isometric map and zones into one Terrain section", () => {
+    const terrain = section("graph");
+    expect(terrain.tabs?.map((t) => t.view)).toEqual(["iso-map", "zones"]);
+    expect(terrain.group?.heading).toBe("Terrain");
+    expect(terrain.tabs?.find((t) => t.view === "iso-map")?.hiddenWhenDeployed).toBe(true);
+  });
+
+  it("folds architecture and routes into one section named by Architecture", () => {
+    const arch = section("architecture");
+    expect(arch.tabs?.map((t) => t.view)).toEqual(["routes"]);
+    // No group override: the merged section keeps the `architecture` view's
+    // own identity, unlike Terrain, which names no view of its own.
+    expect(arch.group).toBeUndefined();
+  });
+
+  it("names the repository map and isometric map as the navigation model has them", () => {
     expect(viewLabel("graph")).toBe("Repository Map");
     expect(viewLabel("iso-map")).toBe("Isometric Map");
   });
 
   it("section views are unique", () => {
     expect(new Set(sectionViews).size).toBe(sectionViews.length);
+  });
+
+  it("every view in the stage appears exactly once, sections and tabs together", () => {
+    expect(new Set(allViews).size).toBe(allViews.length);
   });
 
   it("keeps thresholds for the enrichment-gated views", () => {

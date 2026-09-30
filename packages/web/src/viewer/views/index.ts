@@ -23,7 +23,7 @@ export {
   viewProduct,
   viewProductLabel,
 } from "./view-meta.js";
-export type { StageId, StageDef, StageSection, StageProduct, SettingsEntry } from "./stages.js";
+export type { StageId, StageDef, StageSection, StageTab, StageProduct, SettingsEntry } from "./stages.js";
 export {
   STAGES,
   STAGE_ORDER,

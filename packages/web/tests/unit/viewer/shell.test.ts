@@ -101,7 +101,7 @@ describe("stages.ts", () => {
     const ctx = { navigateTo: () => {}, data: {} as LoadedData } as unknown as ViewRenderContext;
     for (const id of STAGE_ORDER) {
       for (const s of STAGES[id].sections) {
-        for (const view of [s.view, s.alt?.view].filter(Boolean) as ViewId[]) {
+        for (const view of [s.view, ...(s.tabs ?? []).map((t) => t.view)]) {
           expect(isKnownViewPath(view), `${id} lists unknown view ${view}`).toBe(true);
           expect(renderActiveView(view, ctx), `no renderer for ${view}`).not.toBeNull();
         }
@@ -152,7 +152,7 @@ describe("stages.ts", () => {
     const owner = new Map<ViewId, string>();
     for (const id of STAGE_ORDER) {
       for (const s of STAGES[id].sections) {
-        for (const view of [s.view, s.alt?.view].filter(Boolean) as ViewId[]) {
+        for (const view of [s.view, ...(s.tabs ?? []).map((t) => t.view)]) {
           expect(owner.get(view), `${view} is on both ${owner.get(view)} and ${id}`).toBeUndefined();
           owner.set(view, id);
         }
@@ -326,17 +326,66 @@ describe("StagePage", () => {
     expect(root.querySelector('.stage-section[data-view="hench-templates"] .stage-section-expand')).toBeNull();
   });
 
-  it("flips the map section between the 2D and 3D projections", async () => {
+  it("shows the Terrain section with Map, Isometric map and Zones tabs, switching bodies with the active tab", async () => {
     localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
     await mount(page("analyze"));
-    const map = root.querySelector('.stage-section[data-view="graph"]')!;
-    expect(map.querySelector('[data-rendered="graph"]')).not.toBeNull();
-    const [flat, iso] = Array.from(map.querySelectorAll<HTMLButtonElement>(".stage-section-projection-btn"));
-    expect([flat.textContent, iso.textContent]).toEqual(["2D", "3D"]);
-    act(() => { iso.click(); });
-    expect(map.querySelector('[data-rendered="iso-map"]')).not.toBeNull();
-    expect(map.querySelector('[data-rendered="graph"]')).toBeNull();
-    expect(iso.getAttribute("aria-pressed")).toBe("true");
+    const terrain = root.querySelector('.stage-section[data-view="graph"]')!;
+    expect(terrain.querySelector(".stage-section-title")?.textContent).toBe("Terrain");
+    expect(terrain.querySelector('[data-rendered="graph"]')).not.toBeNull();
+
+    const tablist = terrain.querySelector('[role="tablist"]')!;
+    expect(tablist.getAttribute("aria-label")).toBe("Terrain views");
+    const tabs = Array.from(tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    expect(tabs.map((t) => t.textContent)).toEqual(["Repository Map", "Isometric Map", "Zones"]);
+    expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
+    expect(tabs.map((t) => t.getAttribute("tabindex"))).toEqual(["0", "-1", "-1"]);
+    const panel = document.getElementById(tabs[0]!.getAttribute("aria-controls")!)!;
+    expect(panel.getAttribute("role")).toBe("tabpanel");
+    expect(panel.getAttribute("aria-labelledby")).toBe(tabs[0]!.id);
+
+    act(() => { tabs[1]!.click(); });
+    expect(terrain.querySelector('[data-rendered="iso-map"]')).not.toBeNull();
+    expect(terrain.querySelector('[data-rendered="graph"]')).toBeNull();
+    expect(tabs[1]!.getAttribute("aria-selected")).toBe("true");
+    expect(panel.getAttribute("aria-labelledby")).toBe(tabs[1]!.id);
+
+    act(() => { tabs[2]!.click(); });
+    expect(terrain.querySelector('[data-rendered="zones"]')).not.toBeNull();
+  });
+
+  it("moves the active Terrain tab with the arrow keys, wrapping at the ends", async () => {
+    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
+    await mount(page("analyze"));
+    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.stage-section[data-view="graph"] [role="tab"]'));
+
+    act(() => { tabs[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true })); });
+    expect(tabs[2]!.getAttribute("aria-selected")).toBe("true");
+
+    act(() => { tabs[2]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true })); });
+    expect(tabs[0]!.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("drops the Isometric map tab in deployed mode, keeping Map and Zones", async () => {
+    window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "" };
+    try {
+      localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
+      await mount(page("analyze"));
+      const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.stage-section[data-view="graph"] [role="tab"]'));
+      expect(tabs.map((t) => t.textContent)).toEqual(["Repository Map", "Zones"]);
+    } finally {
+      delete window.__NDX_DEPLOYED__;
+    }
+  });
+
+  it("shows the Architecture section with Architecture and Routes tabs, named by the architecture view itself", async () => {
+    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:architecture": true }));
+    await mount(page("analyze"));
+    const arch = root.querySelector('.stage-section[data-view="architecture"]')!;
+    expect(arch.querySelector(".stage-section-title")?.textContent).toBe("Architecture");
+    const tabs = Array.from(arch.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    expect(tabs.map((t) => t.textContent)).toEqual(["Architecture", "Routes"]);
+    act(() => { tabs[1]!.click(); });
+    expect(arch.querySelector('[data-rendered="routes"]')).not.toBeNull();
   });
 
   it("opens a section's view on its own page", async () => {

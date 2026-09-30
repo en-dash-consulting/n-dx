@@ -23,6 +23,7 @@ import {
   viewGlyph,
   type StageId,
   type StageSection,
+  type StageTab,
 } from "./stages.js";
 import { ProductLogoPng, useProjectStatus, type ProjectStatus } from "../components/index.js";
 import { useFeatureToggle, useCliName, resolveCliLabel } from "../hooks/index.js";
@@ -54,7 +55,8 @@ function writeOpenState(key: string, open: boolean): void {
 interface SectionProps {
   stage: StageId;
   section: StageSection;
-  showAlt: boolean;
+  validViews: ReadonlySet<ViewId>;
+  deployed: boolean;
   navigateTo: NavigateTo;
   renderView: RenderView;
 }
@@ -66,19 +68,47 @@ function PlainSection({ section, renderView }: Pick<SectionProps, "section" | "r
   );
 }
 
-function Section({ stage, section, showAlt, navigateTo, renderView }: SectionProps) {
+/** Move the active tab with the arrow keys — the roving-tabindex tablist pattern. */
+function tabListKeyDown(e: KeyboardEvent, tabs: readonly StageTab[], activeIndex: number, activate: (view: ViewId) => void): void {
+  let next: number | null = null;
+  if (e.key === "ArrowRight") next = (activeIndex + 1) % tabs.length;
+  else if (e.key === "ArrowLeft") next = (activeIndex - 1 + tabs.length) % tabs.length;
+  else if (e.key === "Home") next = 0;
+  else if (e.key === "End") next = tabs.length - 1;
+  if (next === null || next === activeIndex) return;
+  e.preventDefault();
+  const view = tabs[next]!.view;
+  activate(view);
+  const list = (e.currentTarget as HTMLElement).closest(".stage-section-tablist");
+  list?.querySelector<HTMLButtonElement>(`[data-tab="${view}"]`)?.focus();
+}
+
+function Section({ stage, section, validViews, deployed, navigateTo, renderView }: SectionProps) {
   const key = `${stage}:${section.view}`;
   const [open, setOpen] = useState<boolean>(() => readOpenState()[key] ?? !!section.open);
-  const [useAlt, setUseAlt] = useState(false);
   // Scroll sections: bounded by default, full length on Expand. Stored beside
   // the open state under "<stage>:<view>:full".
   const fullKey = `${key}:full`;
   const [full, setFull] = useState<boolean>(() => readOpenState()[fullKey] ?? false);
-  const shown: ViewId = useAlt && section.alt ? section.alt.view : section.view;
+
+  // `view` is always the section's first tab; `tabs` adds the rest. Folds
+  // what used to be separate sections (Zones; Architecture and Routes) into
+  // one, and generalises the old 2D/3D toggle the same way (its `iso-map`
+  // side is the one tab still dropped in a static export).
+  const allTabs: StageTab[] = [{ view: section.view }, ...(section.tabs ?? [])];
+  const tabs = allTabs.filter((t) => validViews.has(t.view) && !(deployed && t.hiddenWhenDeployed));
+  const hasTabs = tabs.length > 1;
+  // Not persisted across reloads, same as the toggle it replaces: a section
+  // always opens back on its first tab.
+  const [activeTab, setActiveTab] = useState<ViewId>(section.view);
+  const shown: ViewId = tabs.some((t) => t.view === activeTab) ? activeTab : section.view;
+
   const bodyId = `stage-section-${stage}-${section.view}`;
-  // The section is a window onto a view, so it is named by that view — the
+  // A section named by a group (Terrain) takes its heading from the group,
+  // since no one view is its identity; otherwise it is named by its view, the
   // same string the breadcrumb shows once the "Open" link has been followed.
-  const title = viewLabel(section.view);
+  const title = section.group?.heading ?? viewLabel(section.view);
+  const blurb = section.group?.blurb ?? viewBlurb(section.view);
 
   const toggle = () => {
     const next = !open;
@@ -108,22 +138,26 @@ function Section({ stage, section, showAlt, navigateTo, renderView }: SectionPro
       },
         h("span", { class: "stage-section-caret", "aria-hidden": "true" }, open ? "▾" : "▸"),
         h("span", { class: "stage-section-title" }, title),
-        h("span", { class: "stage-section-blurb" }, viewBlurb(section.view)),
+        h("span", { class: "stage-section-blurb" }, blurb),
       ),
-      section.alt && showAlt && open
-        ? h("div", { class: "stage-section-projection", role: "group", "aria-label": "Projection" },
-            h("button", {
-              type: "button",
-              class: `stage-section-projection-btn${useAlt ? "" : " active"}`,
-              "aria-pressed": String(!useAlt),
-              onClick: () => setUseAlt(false),
-            }, section.alt.primaryLabel),
-            h("button", {
-              type: "button",
-              class: `stage-section-projection-btn${useAlt ? " active" : ""}`,
-              "aria-pressed": String(useAlt),
-              onClick: () => setUseAlt(true),
-            }, section.alt.label),
+      hasTabs && open
+        ? h("div", { class: "stage-section-tablist", role: "tablist", "aria-label": `${title} views` },
+            tabs.map((t, i) => {
+              const selected = t.view === shown;
+              return h("button", {
+                key: t.view,
+                type: "button",
+                role: "tab",
+                id: `${bodyId}-tab-${t.view}`,
+                "data-tab": t.view,
+                class: `stage-section-tab${selected ? " active" : ""}`,
+                "aria-selected": String(selected),
+                "aria-controls": bodyId,
+                tabIndex: selected ? 0 : -1,
+                onClick: () => setActiveTab(t.view),
+                onKeyDown: (e: KeyboardEvent) => tabListKeyDown(e, tabs, i, setActiveTab),
+              }, viewLabel(t.view));
+            }),
           )
         : null,
       section.scroll && open
@@ -151,6 +185,8 @@ function Section({ stage, section, showAlt, navigateTo, renderView }: SectionPro
       ? h("div", {
           class: bodyClass,
           id: bodyId,
+          role: hasTabs ? "tabpanel" : undefined,
+          "aria-labelledby": hasTabs ? `${bodyId}-tab-${shown}` : undefined,
           // A bounded scroll region must be reachable by keyboard.
           tabIndex: section.scroll && !full ? 0 : undefined,
         },
@@ -193,10 +229,8 @@ export function StagePage({ stage, validViews, navigateTo, renderView }: StagePa
       ),
     ),
     sections.map((s) => {
-      // The second projection is a server-built view too (the isometric map).
       if (s.plain) return h(PlainSection, { key: s.view, section: s, renderView });
-      const showAlt = !!s.alt && validViews.has(s.alt.view) && !deployed;
-      return h(Section, { key: s.view, stage, section: s, showAlt, navigateTo, renderView });
+      return h(Section, { key: s.view, stage, section: s, validViews, deployed, navigateTo, renderView });
     }),
   );
 }

@@ -168,7 +168,7 @@ export const VIEW_META = {
     blurb: "The next task with its run button, progress and open epics.",
   },
   "merge-graph": {
-    label: "Context Graph",
+    label: "PRD Graph",
     glyph: "◈",
     product: "rex",
     blurb: "How the PRD's items connect.",

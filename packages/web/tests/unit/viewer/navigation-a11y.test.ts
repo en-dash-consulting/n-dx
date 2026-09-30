@@ -21,7 +21,7 @@ import { TopNav } from "../../../src/viewer/components/top-nav.js";
 import { StageLinks } from "../../../src/viewer/components/stage-links.js";
 import { SettingsOverlay } from "../../../src/viewer/components/settings-overlay.js";
 import { StagePage } from "../../../src/viewer/views/stage-pages.js";
-import { STAGE_ORDER, viewLabel, SETTINGS_ENTRIES } from "../../../src/viewer/views/index.js";
+import { STAGE_ORDER, STAGES, viewLabel, SETTINGS_ENTRIES } from "../../../src/viewer/views/index.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache, resolveCliLabel } from "../../../src/viewer/hooks/use-project-metadata.js";
 
@@ -203,8 +203,31 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
           }));
           for (const toggle of root.querySelectorAll(".stage-section-toggle")) {
             const view = toggle.closest("[data-view]")!.getAttribute("data-view")!;
-            // The blurb is hidden when narrow; the title must carry the name alone.
-            expect(accessibleName(toggle, hidden)).toContain(viewLabel(view as never));
+            const section = STAGES[stage].sections.find((s) => s.view === view)!;
+            // A grouped section (Terrain) is named by its group, not its first
+            // tab's own label; the blurb is hidden when narrow, so the title
+            // must carry the name alone either way.
+            const expected = section.group?.heading ?? viewLabel(view as never);
+            expect(accessibleName(toggle, hidden)).toContain(expected);
+          }
+        });
+
+        it(`every ${viewLabel(stage)} section's tabs are named by their own view`, async () => {
+          await mount(h(StagePage, {
+            stage, validViews: VALID, navigateTo: () => {}, renderView: () => null,
+          }));
+          for (const section of STAGES[stage].sections.filter((s) => s.tabs?.length)) {
+            act(() => {
+              root.querySelector<HTMLButtonElement>(
+                `.stage-section[data-view="${section.view}"] .stage-section-toggle`,
+              )?.click();
+            });
+            for (const tab of root.querySelectorAll(
+              `.stage-section[data-view="${section.view}"] [role="tab"]`,
+            )) {
+              const view = tab.getAttribute("data-tab")!;
+              expect(accessibleName(tab, hidden)).toBe(viewLabel(view as never));
+            }
           }
         });
       }
