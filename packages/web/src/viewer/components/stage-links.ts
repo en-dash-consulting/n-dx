@@ -7,7 +7,7 @@
 
 import { h } from "preact";
 import type { ViewId, StageId } from "../api.js";
-import { STAGES, visibleStages } from "../api.js";
+import { visibleStages, viewLabel } from "../api.js";
 
 export interface StageLinksProps {
   stage: StageId | null;
@@ -24,20 +24,22 @@ export function StageLinks({ stage, validViews, onNavigate }: StageLinksProps) {
   const prev = stages[(i + stages.length - 1) % stages.length];
   const next = stages[(i + 1) % stages.length];
 
-  const link = (dir: "prev" | "next", target: StageId) =>
-    h("button", {
+  const link = (dir: "prev" | "next", target: StageId) => {
+    const name = `${dir === "prev" ? "Previous" : "Next"} stage: ${viewLabel(target)}`;
+    return h("button", {
       type: "button",
       class: `stage-link stage-link-${dir}`,
       "data-stage": target,
       onClick: () => onNavigate(target),
-      title: `${dir === "prev" ? "Previous" : "Next"} stage: ${STAGES[target].label}`,
-      "aria-label": `${dir === "prev" ? "Previous" : "Next"} stage: ${STAGES[target].label}`,
+      title: name,
+      "aria-label": name,
     },
       dir === "prev" ? h("span", { class: "stage-link-arrow", "aria-hidden": "true" }, "←") : null,
       h("span", { class: "stage-link-dir", "aria-hidden": "true" }, dir),
-      h("span", { class: "stage-link-name", "aria-hidden": "true" }, STAGES[target].label),
+      h("span", { class: "stage-link-name", "aria-hidden": "true" }, viewLabel(target)),
       dir === "next" ? h("span", { class: "stage-link-arrow", "aria-hidden": "true" }, "→") : null,
     );
+  };
 
   return h("div", { class: "stage-links", role: "group", "aria-label": "Stage navigation" },
     link("prev", prev),

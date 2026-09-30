@@ -108,7 +108,7 @@ describe("token usage route regression", { timeout: 120_000 }, () => {
     expect(document.querySelector(".breadcrumb-product-rex")).toBeNull();
     expect(document.querySelector(".breadcrumb-product")).toBeNull();
     expect(document.title).toContain("Token Usage");
-    expect(document.title).toContain("Global");
+    expect(document.title).not.toContain("Global");
   });
 
   it("redirects legacy Rex token links to canonical global /token-usage", async () => {

@@ -9,7 +9,7 @@
 
 import { h } from "preact";
 import type { ViewId } from "../api.js";
-import { STAGES, stageForView, visibleStages, useProjectMetadata } from "../api.js";
+import { stageForView, visibleStages, stageProduct, viewLabel, viewGlyph, useProjectMetadata } from "../api.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 
 export interface TopNavProps {
@@ -47,19 +47,25 @@ export function TopNav({ view, validViews, onNavigate, onOpenSearch, scope = nul
 
     h("nav", { class: "topnav-tabs", "aria-label": "View navigation" },
       stages.map((id) => {
-        const stage = STAGES[id];
+        const product = stageProduct(id);
+        const label = viewLabel(id);
         const isActive = active === id;
         return h("button", {
           key: id,
           type: "button",
-          class: `topnav-tab topnav-tab-${stage.product}${isActive ? " active" : ""}`,
+          class: `topnav-tab topnav-tab-${product}${isActive ? " active" : ""}`,
           "data-stage": id,
           onClick: () => onNavigate(id),
           "aria-current": isActive ? (view === id ? "page" : "true") : undefined,
+          // Stated rather than left to the text nodes: the product hint is
+          // already hidden below 960px and the label is a candidate for the
+          // same treatment, at which point a tab named only by its glyph
+          // would read as "▣" to a screen reader.
+          "aria-label": label,
         },
-          h("span", { class: "topnav-tab-glyph", "aria-hidden": "true" }, stage.glyph),
-          h("span", { class: "topnav-tab-label" }, stage.label),
-          h("span", { class: "topnav-tab-hint" }, stage.product),
+          h("span", { class: "topnav-tab-glyph", "aria-hidden": "true" }, viewGlyph(id)),
+          h("span", { class: "topnav-tab-label" }, label),
+          h("span", { class: "topnav-tab-hint" }, product),
         );
       }),
     ),

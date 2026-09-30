@@ -18,4 +18,4 @@ export { AdaptiveOptimizationView } from "./adaptive-optimization.js";
 // SourceVision one (PRD feature d339458a) is generalised. Its domain context is
 // run history rather than analysis data ("why did this run fail", "what did
 // this run spend"), so it needs its own context assembly, not just a new tab.
-// Not in the PRD yet by choice; see sourcevision-tabs.ts for the origin marker.
+// Not in the PRD yet by choice; see view-meta.ts's `ask` entry for the origin marker.

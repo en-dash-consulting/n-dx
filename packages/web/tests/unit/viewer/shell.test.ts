@@ -23,6 +23,7 @@ import {
   SETTINGS_ENTRIES,
   isSettingsView,
   stageForView,
+  viewLabel,
   visibleStages,
 } from "../../../src/viewer/views/stages.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
@@ -35,12 +36,13 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 const STATUS = {
+  initialized: true,
   sv: { freshness: "fresh", analyzedAt: null, minutesAgo: 5, modulesComplete: 6, modulesTotal: 6 },
   rex: { exists: true, percentComplete: 96.4, stats: { total: 1548, completed: 1493, inProgress: 1, pending: 54, deferred: 0, blocked: 0 }, hasInProgress: true, hasPending: true, nextTaskTitle: "Next" },
   hench: { configured: true, totalRuns: 1146, activeRuns: 1, staleRuns: 0 },
 };
 
-function stubApi(enabledToggles: string[] = []) {
+function stubApi(enabledToggles: string[] = [], status: unknown = STATUS) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url === "/api/features") {
@@ -53,7 +55,7 @@ function stubApi(enabledToggles: string[] = []) {
     if (url === "/api/project") {
       return jsonResponse({ name: "demo-project", description: null, version: null, git: null, nameSource: "directory", cliName: "n-dx" });
     }
-    if (url === "/api/status") return jsonResponse(STATUS);
+    if (url === "/api/status") return jsonResponse(status);
     return jsonResponse({}, 404);
   }));
 }
@@ -92,14 +94,14 @@ const ALL = buildValidViews(null);
 
 describe("stages.ts", () => {
   it("orders the loop Analysis → Plan → Work", () => {
-    expect(STAGE_ORDER.map((id) => STAGES[id].label)).toEqual(["Analysis", "Plan", "Work"]);
+    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work"]);
   });
 
   it("lists only real views, each with a registry renderer", () => {
     const ctx = { navigateTo: () => {}, data: {} as LoadedData } as unknown as ViewRenderContext;
     for (const id of STAGE_ORDER) {
       for (const s of STAGES[id].sections) {
-        for (const view of [s.view, s.alt?.view].filter(Boolean) as ViewId[]) {
+        for (const view of [s.view, ...(s.tabs ?? []).map((t) => t.view)]) {
           expect(isKnownViewPath(view), `${id} lists unknown view ${view}`).toBe(true);
           expect(renderActiveView(view, ctx), `no renderer for ${view}`).not.toBeNull();
         }
@@ -150,7 +152,7 @@ describe("stages.ts", () => {
     const owner = new Map<ViewId, string>();
     for (const id of STAGE_ORDER) {
       for (const s of STAGES[id].sections) {
-        for (const view of [s.view, s.alt?.view].filter(Boolean) as ViewId[]) {
+        for (const view of [s.view, ...(s.tabs ?? []).map((t) => t.view)]) {
           expect(owner.get(view), `${view} is on both ${owner.get(view)} and ${id}`).toBeUndefined();
           owner.set(view, id);
         }
@@ -324,17 +326,66 @@ describe("StagePage", () => {
     expect(root.querySelector('.stage-section[data-view="hench-templates"] .stage-section-expand')).toBeNull();
   });
 
-  it("flips the map section between the 2D and 3D projections", async () => {
+  it("shows the Terrain section with Map, Isometric map and Zones tabs, switching bodies with the active tab", async () => {
     localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
     await mount(page("analyze"));
-    const map = root.querySelector('.stage-section[data-view="graph"]')!;
-    expect(map.querySelector('[data-rendered="graph"]')).not.toBeNull();
-    const [flat, iso] = Array.from(map.querySelectorAll<HTMLButtonElement>(".stage-section-projection-btn"));
-    expect([flat.textContent, iso.textContent]).toEqual(["2D", "3D"]);
-    act(() => { iso.click(); });
-    expect(map.querySelector('[data-rendered="iso-map"]')).not.toBeNull();
-    expect(map.querySelector('[data-rendered="graph"]')).toBeNull();
-    expect(iso.getAttribute("aria-pressed")).toBe("true");
+    const terrain = root.querySelector('.stage-section[data-view="graph"]')!;
+    expect(terrain.querySelector(".stage-section-title")?.textContent).toBe("Terrain");
+    expect(terrain.querySelector('[data-rendered="graph"]')).not.toBeNull();
+
+    const tablist = terrain.querySelector('[role="tablist"]')!;
+    expect(tablist.getAttribute("aria-label")).toBe("Terrain views");
+    const tabs = Array.from(tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    expect(tabs.map((t) => t.textContent)).toEqual(["Repository Map", "Isometric Map", "Zones"]);
+    expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
+    expect(tabs.map((t) => t.getAttribute("tabindex"))).toEqual(["0", "-1", "-1"]);
+    const panel = document.getElementById(tabs[0]!.getAttribute("aria-controls")!)!;
+    expect(panel.getAttribute("role")).toBe("tabpanel");
+    expect(panel.getAttribute("aria-labelledby")).toBe(tabs[0]!.id);
+
+    act(() => { tabs[1]!.click(); });
+    expect(terrain.querySelector('[data-rendered="iso-map"]')).not.toBeNull();
+    expect(terrain.querySelector('[data-rendered="graph"]')).toBeNull();
+    expect(tabs[1]!.getAttribute("aria-selected")).toBe("true");
+    expect(panel.getAttribute("aria-labelledby")).toBe(tabs[1]!.id);
+
+    act(() => { tabs[2]!.click(); });
+    expect(terrain.querySelector('[data-rendered="zones"]')).not.toBeNull();
+  });
+
+  it("moves the active Terrain tab with the arrow keys, wrapping at the ends", async () => {
+    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
+    await mount(page("analyze"));
+    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.stage-section[data-view="graph"] [role="tab"]'));
+
+    act(() => { tabs[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true })); });
+    expect(tabs[2]!.getAttribute("aria-selected")).toBe("true");
+
+    act(() => { tabs[2]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true })); });
+    expect(tabs[0]!.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("drops the Isometric map tab in deployed mode, keeping Map and Zones", async () => {
+    window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "" };
+    try {
+      localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
+      await mount(page("analyze"));
+      const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.stage-section[data-view="graph"] [role="tab"]'));
+      expect(tabs.map((t) => t.textContent)).toEqual(["Repository Map", "Zones"]);
+    } finally {
+      delete window.__NDX_DEPLOYED__;
+    }
+  });
+
+  it("shows the Architecture section with Architecture and Routes tabs, named by the architecture view itself", async () => {
+    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:architecture": true }));
+    await mount(page("analyze"));
+    const arch = root.querySelector('.stage-section[data-view="architecture"]')!;
+    expect(arch.querySelector(".stage-section-title")?.textContent).toBe("Architecture");
+    const tabs = Array.from(arch.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    expect(tabs.map((t) => t.textContent)).toEqual(["Architecture", "Routes"]);
+    act(() => { tabs[1]!.click(); });
+    expect(arch.querySelector('[data-rendered="routes"]')).not.toBeNull();
   });
 
   it("opens a section's view on its own page", async () => {
@@ -342,6 +393,26 @@ describe("StagePage", () => {
     await mount(page("plan", ALL, navigateTo));
     act(() => { root.querySelector<HTMLButtonElement>('.stage-section[data-view="validation"] .stage-section-open')!.click(); });
     expect(navigateTo).toHaveBeenCalledWith("validation");
+  });
+
+  it("opens the active tab's view, not the section's first, from a tabbed section", async () => {
+    // A tabbed section is a window onto whichever tab is showing, so Open ↗
+    // has to follow the tab. Without this, switching to Zones and pressing
+    // Open silently lands on the Repository Map — the section's own view.
+    const navigateTo = vi.fn();
+    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
+    await mount(page("analyze", ALL, navigateTo));
+    const terrain = root.querySelector('.stage-section[data-view="graph"]')!;
+    const open = terrain.querySelector<HTMLButtonElement>(".stage-section-open")!;
+
+    act(() => { open.click(); });
+    expect(navigateTo).toHaveBeenLastCalledWith("graph");
+
+    const zones = terrain.querySelector<HTMLButtonElement>('[role="tab"][data-tab="zones"]')!;
+    act(() => { zones.click(); });
+    expect(open.getAttribute("aria-label")).toBe("Open Zones on its own page");
+    act(() => { open.click(); });
+    expect(navigateTo).toHaveBeenLastCalledWith("zones");
   });
 
   it("embeds the Tasks tree, open on arrival, in a bounded-height body it can fill", async () => {
@@ -395,6 +466,107 @@ describe("HomeView", () => {
     expect(cards[1].textContent).toContain("1,548");
     expect(cards[1].textContent).toContain("96%");
     expect(cards[2].textContent).toContain("1,146");
+  });
+});
+
+describe("HomeView next-step panel", () => {
+  const NOT_INITIALIZED = {
+    initialized: false,
+    sv: { freshness: "unavailable", analyzedAt: null, minutesAgo: null, modulesComplete: 0, modulesTotal: 6 },
+    rex: { exists: false, percentComplete: 0, stats: null, hasInProgress: false, hasPending: false, nextTaskTitle: null },
+    hench: { configured: false, totalRuns: 0, activeRuns: 0, staleRuns: 0 },
+  };
+  const NOT_ANALYZED = {
+    ...NOT_INITIALIZED,
+    initialized: true,
+    hench: { ...NOT_INITIALIZED.hench, configured: true },
+  };
+  const NO_PRD = {
+    ...STATUS,
+    rex: { ...STATUS.rex, exists: true, stats: { ...STATUS.rex.stats, total: 0 }, nextTaskTitle: null },
+  };
+
+  it("names `init` on a never-touched project, above the three stage cards", async () => {
+    stubApi([], NOT_INITIALIZED);
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    const panel = root.querySelector(".next-step-panel");
+    expect(panel?.getAttribute("data-state")).toBe("not-initialized");
+    expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx init");
+    // The panel replaces no stage content — all three cards are still there.
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
+    const panelIndex = Array.from(root.querySelector(".home")!.children).indexOf(panel!);
+    const stagesIndex = Array.from(root.querySelector(".home")!.children).findIndex((el) => el.classList.contains("home-stages"));
+    expect(panelIndex).toBeLessThan(stagesIndex);
+  });
+
+  it("names `analyze` once initialised but never analysed", async () => {
+    stubApi([], NOT_ANALYZED);
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    const panel = root.querySelector(".next-step-panel");
+    expect(panel?.getAttribute("data-state")).toBe("not-analyzed");
+    expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx analyze");
+  });
+
+  it("names `plan` once analysed with no PRD", async () => {
+    stubApi([], NO_PRD);
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    const panel = root.querySelector(".next-step-panel");
+    expect(panel?.getAttribute("data-state")).toBe("no-prd");
+    expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx plan");
+  });
+
+  it("names the next task's title and `work` once a PRD is present", async () => {
+    stubApi([], STATUS);
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    const panel = root.querySelector(".next-step-panel");
+    expect(panel?.getAttribute("data-state")).toBe("has-task");
+    expect(panel?.querySelector(".next-step-headline")?.textContent).toContain("Next");
+    expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx work");
+  });
+
+  it("resolves the command through the project's configured CLI name", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/project") {
+        return jsonResponse({ name: "demo-project", description: null, version: null, git: null, nameSource: "directory", cliName: "custom-cli" });
+      }
+      if (url === "/api/status") return jsonResponse(NOT_INITIALIZED);
+      if (url === "/api/features") return jsonResponse({ toggles: [] });
+      return jsonResponse({}, 404);
+    }));
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    expect(root.querySelector(".next-step-command")?.textContent).toBe("custom-cli init");
+  });
+
+  it("leaves an empty slot below the panel for the preflight card", async () => {
+    stubApi([], STATUS);
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    expect(root.querySelector('[data-slot="preflight"]')).not.toBeNull();
+  });
+
+  it("names no command at all when the status is unavailable", async () => {
+    // A 404 is what a static export serves: `ndx export` writes api/config.json
+    // and api/project.json but never api/status.json, so the deployed viewer's
+    // fetch adapter resolves /api/status to a missing file. The same null
+    // status also holds on every cold load before the first poll resolves, and
+    // whenever the server is unreachable.
+    //
+    // In none of those does the viewer know the project's state, so it must not
+    // assert one: telling the reader of a published dashboard to run `init` on
+    // a fully analysed project is wrong, and acting on it would re-run
+    // sourcevision/rex/hench init over a set-up project.
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/project") {
+        return jsonResponse({ name: "demo-project", description: null, version: null, git: null, nameSource: "directory", cliName: "n-dx" });
+      }
+      if (url === "/api/features") return jsonResponse({ toggles: [] });
+      return jsonResponse({}, 404);
+    }));
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    expect(root.querySelector(".next-step-panel")).toBeNull();
+    // Home itself still renders — the cards just carry no numbers.
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
   });
 });
 
