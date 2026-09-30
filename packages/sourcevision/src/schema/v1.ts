@@ -45,6 +45,18 @@ export interface AnalysisRun {
   llm: {
     byTaskClass: Record<string, LLMClassUsage>;
     judgmentCache?: { hits: number; misses: number };
+    /**
+     * What this run's LLM calls cost, in USD, priced per task class at the
+     * model that actually answered it.
+     *
+     * Recorded here — by the tool that spent it — rather than recomputed by a
+     * reader, because the rate table lives in `@n-dx/llm-client` and every
+     * copy of it drifts. `ndx`'s run summary is an orchestration-tier script
+     * that cannot import that table at all, so a cost it does not find here it
+     * reports as unrecorded instead of guessing. Absent when no call was made,
+     * and on manifests written before the field existed.
+     */
+    costUsd?: number;
   };
   /** This run's partition review, when a previous partition existed; `reused` says whether its zones were kept verbatim. */
   partition?: PartitionReview & { reused: boolean };

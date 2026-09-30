@@ -1132,6 +1132,23 @@ describe("commands route — manifest (command reference)", () => {
     const all = body.groups.flatMap((g: { commands: Array<Record<string, unknown>> }) => g.commands);
     expect(all.find((c: Record<string, unknown>) => c.name === "plan").status).toBe("available");
   });
+
+  it("recognizes an initialized project on the .ndx layout", async () => {
+    // The "initialized" check used to compose join(projectDir, ".rex"/
+    // ".sourcevision"/".hench") itself, so a project on the .ndx layout —
+    // where those three live under .ndx/ instead — would report every
+    // init-requiring command as needs-init forever, with no error. This pins
+    // the fix: the layout resolver, not a hardcoded literal, decides where to
+    // look.
+    const { mkdir: md } = await import("node:fs/promises");
+    for (const d of [join(".ndx", "rex"), join(".ndx", "sourcevision"), join(".ndx", "hench")]) {
+      await md(join(tmpDir, d), { recursive: true });
+    }
+    const body = await getManifest();
+    const all = body.groups.flatMap((g: { commands: Array<Record<string, unknown>> }) => g.commands);
+    expect(all.find((c: Record<string, unknown>) => c.name === "work").status).toBe("available");
+    expect(all.find((c: Record<string, unknown>) => c.name === "status").status).toBe("available");
+  });
 });
 
 describe("commands route — self-heal stop", () => {

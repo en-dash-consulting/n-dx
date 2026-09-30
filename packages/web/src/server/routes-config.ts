@@ -15,7 +15,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
-import { LLM_VENDOR } from "@n-dx/llm-client";
+import { LLM_VENDOR, resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import {jsonResponse} from "./response-utils.js";
@@ -102,7 +102,7 @@ function mergeConfigLayers(
 
 /** Extract configuration summary from project files. */
 async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
-  const henchConfigPath = join(ctx.projectDir, ".hench", "config.json");
+  const henchConfigPath = join(resolveLayout(ctx.projectDir).henchDir, "config.json");
   const ndxConfigPath = join(ctx.projectDir, ".n-dx.json");
   const ndxLocalConfigPath = join(ctx.projectDir, ".n-dx.local.json");
   const pkgPath = join(ctx.projectDir, "package.json");

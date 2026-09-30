@@ -82,6 +82,8 @@
     "commit-trailers.js",
     "install-identity.js",
     "resolve-existing-dir.js",
+    "command-effects.js",
+    "run-summary.js",
     "layout.js"
   ],
   "scripts": {

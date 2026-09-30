@@ -12,7 +12,7 @@ import { stampModified } from "../../core/sync.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { parseIntSafe } from "../validate-input.js";
-import { info, warn, result, startSpinner } from "../output.js";
+import { info, warn, result, startSpinner, withCommandProgressReporter } from "../output.js";
 import {
   preflightBudgetCheck,
   formatBudgetWarnings,
@@ -44,7 +44,7 @@ import type { ScanResult, Proposal } from "../../analyze/index.js";
 import type {PRDItem, AnalyzeTokenUsage, LoEConfig} from "../../schema/index.js";import { LOE_DEFAULTS } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "../../analyze/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
-import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor, printVendorModelHeader, resolveVendorModel, cyan, yellow, dim } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor, printVendorModelHeader, priceTokens, resolveModelPricing, resolveVendorModel, cyan, yellow, dim } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 import { resolveVendorCompatibleRexModel } from "../model-resolution.js";
 
@@ -60,6 +60,56 @@ const UNKNOWN_PROVIDER_METADATA = "unknown";
 function normalizeProviderMetadata(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+/**
+ * What one analyze run's tokens cost in USD, at the model that answered — or
+ * `undefined` when that cannot be known.
+ *
+ * Written into the `analyze_token_usage` log entry by the command that spent
+ * it. `ndx`'s run summary sits at the orchestration tier and cannot import the
+ * price table from `@n-dx/llm-client` at all, and a second copy of that table
+ * would drift from the first — so the spender records the figure and readers
+ * only read it.
+ *
+ * ## Why unknown is returned rather than priced
+ *
+ * Two inputs can be missing, and neither announces itself:
+ *
+ * - **The model is not in the price table.** `resolveModelPricing` answers with
+ *   fallback rates and `known: false` rather than throwing, so pricing against
+ *   its `pricing` field alone turns a guess into a dollar figure.
+ * - **The provider omitted usage.** A run can report calls with every token
+ *   count at zero, which prices to exactly `0`.
+ *
+ * Both used to reach the log as a number, and the run summary presents whatever
+ * number it finds as actual spend — so a guess and a gap both read as
+ * measurement. `undefined` is dropped by `JSON.stringify`, leaving the key off
+ * the entry, and `formatCost` renders a missing cost as "not recorded". An
+ * operator reading "not recorded" knows to go and look; one reading "$0.00"
+ * does not.
+ *
+ * A genuinely free run is not a case this has to separate out: the only caller
+ * logs at all when `calls > 0`, and a call that spent nothing does not happen.
+ */
+export function priceAnalyzeTokenUsage(
+  usage: AnalyzeTokenUsage,
+  model: string,
+): number | undefined {
+  const { pricing, known } = resolveModelPricing(model);
+  if (!known) return undefined;
+
+  const tokens = {
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    cacheCreationTokens: usage.cacheCreationInputTokens ?? 0,
+    cacheReadTokens: usage.cacheReadInputTokens ?? 0,
+  };
+  const billed =
+    tokens.inputTokens + tokens.outputTokens + tokens.cacheCreationTokens + tokens.cacheReadTokens;
+  if (billed === 0) return undefined;
+
+  return priceTokens(tokens, pricing).totalRaw;
 }
 
 function resolveAnalyzeTokenEventMetadata(
@@ -423,6 +473,19 @@ export async function cmdAnalyze(
   flags: Record<string, string>,
   multiFlags: Record<string, string[]> = {},
 ): Promise<void> {
+  return withCommandProgressReporter(() => runAnalyze(dir, flags, multiFlags));
+}
+
+/**
+ * The analyze pipeline itself, run under the command-scoped progress reporter
+ * registered by {@link cmdAnalyze}. Every spinner below reports through it, so
+ * their per-phase counters read as one monotonic total.
+ */
+async function runAnalyze(
+  dir: string,
+  flags: Record<string, string>,
+  multiFlags: Record<string, string[]>,
+): Promise<void> {
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading/writing PRD
   await ensureLegacyPrdMigrated(dir);
 
@@ -779,10 +842,14 @@ async function logUsageAndCache(
       await store.appendLog({
         timestamp: new Date().toISOString(),
         event: "analyze_token_usage",
+        // costUsd is undefined when the model is unpriced or the provider
+        // reported no tokens; JSON.stringify drops the key, which the run
+        // summary reads as "not recorded" rather than as zero spend.
         detail: JSON.stringify({
           ...tokenUsage,
           vendor: metadata.vendor,
           model: metadata.model,
+          costUsd: priceAnalyzeTokenUsage(tokenUsage, metadata.model),
         }),
       });
     }
