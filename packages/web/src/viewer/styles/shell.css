@@ -411,6 +411,29 @@
 .home-head { margin-bottom: var(--space-5); }
 .home-head h1 { font-size: 22px; margin: 0; }
 .home-head p { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
+.next-step-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+.next-step-headline { margin: 0; font-size: 14px; color: var(--text); }
+.next-step-headline strong { color: var(--text); }
+.next-step-command {
+  font-size: 13px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--accent);
+}
+.home-preflight-slot:empty { display: none; }
 .home-stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
 .home-stages-2 { grid-template-columns: repeat(2, 1fr); }
 .home-stages-1 { grid-template-columns: minmax(0, 420px); }

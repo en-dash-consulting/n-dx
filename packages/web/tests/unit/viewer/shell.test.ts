@@ -36,12 +36,13 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 const STATUS = {
+  initialized: true,
   sv: { freshness: "fresh", analyzedAt: null, minutesAgo: 5, modulesComplete: 6, modulesTotal: 6 },
   rex: { exists: true, percentComplete: 96.4, stats: { total: 1548, completed: 1493, inProgress: 1, pending: 54, deferred: 0, blocked: 0 }, hasInProgress: true, hasPending: true, nextTaskTitle: "Next" },
   hench: { configured: true, totalRuns: 1146, activeRuns: 1, staleRuns: 0 },
 };
 
-function stubApi(enabledToggles: string[] = []) {
+function stubApi(enabledToggles: string[] = [], status: unknown = STATUS) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url === "/api/features") {
@@ -54,7 +55,7 @@ function stubApi(enabledToggles: string[] = []) {
     if (url === "/api/project") {
       return jsonResponse({ name: "demo-project", description: null, version: null, git: null, nameSource: "directory", cliName: "n-dx" });
     }
-    if (url === "/api/status") return jsonResponse(STATUS);
+    if (url === "/api/status") return jsonResponse(status);
     return jsonResponse({}, 404);
   }));
 }
@@ -396,6 +397,82 @@ describe("HomeView", () => {
     expect(cards[1].textContent).toContain("1,548");
     expect(cards[1].textContent).toContain("96%");
     expect(cards[2].textContent).toContain("1,146");
+  });
+});
+
+describe("HomeView next-step panel", () => {
+  const NOT_INITIALIZED = {
+    initialized: false,
+    sv: { freshness: "unavailable", analyzedAt: null, minutesAgo: null, modulesComplete: 0, modulesTotal: 6 },
+    rex: { exists: false, percentComplete: 0, stats: null, hasInProgress: false, hasPending: false, nextTaskTitle: null },
+    hench: { configured: false, totalRuns: 0, activeRuns: 0, staleRuns: 0 },
+  };
+  const NOT_ANALYZED = {
+    ...NOT_INITIALIZED,
+    initialized: true,
+    hench: { ...NOT_INITIALIZED.hench, configured: true },
+  };
+  const NO_PRD = {
+    ...STATUS,
+    rex: { ...STATUS.rex, exists: true, stats: { ...STATUS.rex.stats, total: 0 }, nextTaskTitle: null },
+  };
+
+  it("names `init` on a never-touched project, above the three stage cards", async () => {
+    stubApi([], NOT_INITIALIZED);
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    const panel = root.querySelector(".next-step-panel");
+    expect(panel?.getAttribute("data-state")).toBe("not-initialized");
+    expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx init");
+    // The panel replaces no stage content — all three cards are still there.
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
+    const panelIndex = Array.from(root.querySelector(".home")!.children).indexOf(panel!);
+    const stagesIndex = Array.from(root.querySelector(".home")!.children).findIndex((el) => el.classList.contains("home-stages"));
+    expect(panelIndex).toBeLessThan(stagesIndex);
+  });
+
+  it("names `analyze` once initialised but never analysed", async () => {
+    stubApi([], NOT_ANALYZED);
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    const panel = root.querySelector(".next-step-panel");
+    expect(panel?.getAttribute("data-state")).toBe("not-analyzed");
+    expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx analyze");
+  });
+
+  it("names `plan` once analysed with no PRD", async () => {
+    stubApi([], NO_PRD);
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    const panel = root.querySelector(".next-step-panel");
+    expect(panel?.getAttribute("data-state")).toBe("no-prd");
+    expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx plan");
+  });
+
+  it("names the next task's title and `work` once a PRD is present", async () => {
+    stubApi([], STATUS);
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    const panel = root.querySelector(".next-step-panel");
+    expect(panel?.getAttribute("data-state")).toBe("has-task");
+    expect(panel?.querySelector(".next-step-headline")?.textContent).toContain("Next");
+    expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx work");
+  });
+
+  it("resolves the command through the project's configured CLI name", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/project") {
+        return jsonResponse({ name: "demo-project", description: null, version: null, git: null, nameSource: "directory", cliName: "custom-cli" });
+      }
+      if (url === "/api/status") return jsonResponse(NOT_INITIALIZED);
+      if (url === "/api/features") return jsonResponse({ toggles: [] });
+      return jsonResponse({}, 404);
+    }));
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    expect(root.querySelector(".next-step-command")?.textContent).toBe("custom-cli init");
+  });
+
+  it("leaves an empty slot below the panel for the preflight card", async () => {
+    stubApi([], STATUS);
+    await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
+    expect(root.querySelector('[data-slot="preflight"]')).not.toBeNull();
   });
 });
 

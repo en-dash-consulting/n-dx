@@ -25,7 +25,7 @@ import {
   type StageSection,
 } from "./stages.js";
 import { ProductLogoPng, useProjectStatus, type ProjectStatus } from "../components/index.js";
-import { useFeatureToggle } from "../hooks/index.js";
+import { useFeatureToggle, useCliName, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 
 export type RenderView = (view: ViewId) => ComponentChild;
@@ -237,6 +237,62 @@ function stageFacts(stage: StageId, status: Partial<ProjectStatus> | null): Fact
   return [[hench.totalRuns.toLocaleString(), "runs"], [String(hench.activeRuns), "live"], [String(hench.staleRuns), "stale"]];
 }
 
+// ── Next-step panel ────────────────────────────────────────────
+
+/**
+ * Which of the four states the Home next-step panel is in.
+ *
+ * Read in order: `initialized` (see routes-status.ts) separates a project
+ * `ndx init` has never touched from one it has; `sv.freshness` separates
+ * "touched but not analysed" from "analysed"; `rex.nextTaskTitle` separates
+ * "analysed with nothing actionable in the PRD yet" from "a task is next".
+ * `status === null` (fetch failed, or the body didn't pass `useProjectStatus`'s
+ * shape check) reads the same as a fresh, untouched project — the safest
+ * default when the server can't be trusted.
+ */
+type NextStepState = "not-initialized" | "not-analyzed" | "no-prd" | "has-task";
+
+function nextStepState(status: ProjectStatus | null): NextStepState {
+  if (!status || !status.initialized) return "not-initialized";
+  if (status.sv.freshness === "unavailable") return "not-analyzed";
+  if (!status.rex.nextTaskTitle) return "no-prd";
+  return "has-task";
+}
+
+/** Headline + `{cli}`-templated command for the three states with a fixed message. */
+const NEXT_STEP_COPY: Record<Exclude<NextStepState, "has-task">, { headline: string; command: string }> = {
+  "not-initialized": { headline: "Set up n-dx for this project.", command: "{cli} init" },
+  "not-analyzed": { headline: "Scan the codebase to see its structure.", command: "{cli} analyze" },
+  "no-prd": { headline: "Turn the analysis into a plan.", command: "{cli} plan" },
+};
+
+interface NextStepPanelProps {
+  status: ProjectStatus | null;
+}
+
+/** Above the stage cards: names the single next command for the project's current state. */
+function NextStepPanel({ status }: NextStepPanelProps) {
+  const cliName = useCliName();
+  const state = nextStepState(status);
+
+  if (state === "has-task") {
+    return h("div", { class: "next-step-panel", "data-state": state },
+      h("p", { class: "next-step-headline" },
+        "Next up: ", h("strong", null, status!.rex.nextTaskTitle),
+      ),
+      h("code", { class: "next-step-command" }, resolveCliLabel("{cli} work", cliName)),
+    );
+  }
+
+  const { headline, command } = NEXT_STEP_COPY[state];
+  return h("div", { class: "next-step-panel", "data-state": state },
+    h("p", { class: "next-step-headline" }, headline),
+    h("code", { class: "next-step-command" }, resolveCliLabel(command, cliName)),
+  );
+}
+
+// ── Landing ────────────────────────────────────────────────────
+
 export interface HomeViewProps {
   validViews: ReadonlySet<ViewId>;
   navigateTo: NavigateTo;
@@ -251,6 +307,9 @@ export function HomeView({ validViews, navigateTo }: HomeViewProps) {
       h("h1", null, "n-dx"),
       h("p", null, "Three stages in a loop — understand the code, decide what to build, let the agent build it."),
     ),
+    h(NextStepPanel, { status }),
+    // Reserved for A8's preflight card — intentionally empty until then.
+    h("div", { class: "home-preflight-slot", "data-slot": "preflight" }),
     h("div", { class: `home-stages home-stages-${stages.length}` },
       stages.map((id) => {
         const product = stageProduct(id);

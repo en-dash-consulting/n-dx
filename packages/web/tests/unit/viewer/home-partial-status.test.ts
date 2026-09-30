@@ -2,12 +2,15 @@
 /**
  * Home survives a truncated `/api/status` body.
  *
- * `useProjectStatus` parses the response with `const data: ProjectStatus =
- * await res.json()` — an unchecked cast — so a 200 whose body is missing a
- * section reaches the Home cards typed as though it were complete. Before this
- * was guarded, reading `status.sv.minutesAgo` threw during render and took the
- * whole landing page down: the default view, blank, on a response the server
- * had called a success.
+ * `useProjectStatus` shape-checks the response once in `fetchStatus`
+ * (`isValidProjectStatus`) rather than trusting an unchecked `const data:
+ * ProjectStatus = await res.json()` cast. A 200 whose body is missing a
+ * section, or carries a malformed one (`rex.stats = {}`, neither `null` nor a
+ * real `TreeStats`), is treated the same as a failed fetch: the whole body is
+ * discarded and every Home consumer sees `null`, not a half-populated object.
+ * Before this existed, reading `status.sv.minutesAgo` on a half-populated
+ * object threw during render and took the whole landing page down: the
+ * default view, blank, on a response the server had called a success.
  *
  * This lives in its own file on purpose. `useProjectStatus` caches the first
  * body it fetches in a module-level variable, so a test that needs a *different*
@@ -59,18 +62,24 @@ describe("Home with a partial /api/status body", () => {
     expect(names).toEqual(STAGE_ORDER.map((id) => viewLabel(id)));
   });
 
-  it("omits the numbers for the sections that did not arrive", async () => {
+  it("omits every card's numbers — a partial body is discarded wholesale, not rendered piecemeal", async () => {
     await mountHome();
     const facts = (stage: string) =>
       root.querySelector(`.stage-card[data-stage="${stage}"] .stage-card-facts`);
 
-    // No `sv` — the Analysis card keeps its name and blurb, drops its numbers.
+    // The body fails `isValidProjectStatus` (no `sv`, no `rex`), so
+    // `useProjectStatus` reports `null` — even the `hench` section that *did*
+    // arrive is not trusted, matching how a fully-missing status renders.
     expect(facts("analyze")).toBeNull();
-    // No `rex` — the Plan card reads as "no PRD yet", which is what a viewer
-    // with no PRD already sees, rather than inventing a count.
-    expect(facts("plan")?.textContent).toContain("no PRD yet");
-    // `hench` did arrive, so the Work card is unaffected.
-    expect(facts("work")?.textContent).toContain("runs");
+    expect(facts("plan")).toBeNull();
+    expect(facts("work")).toBeNull();
+  });
+
+  it("names `init` in the next-step panel, same as a fully missing status", async () => {
+    await mountHome();
+    const panel = root.querySelector(".next-step-panel");
+    expect(panel?.getAttribute("data-state")).toBe("not-initialized");
+    expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx init");
   });
 
   it("reports no unhandled render error", async () => {

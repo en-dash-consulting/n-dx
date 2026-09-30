@@ -153,6 +153,31 @@ describe("Status API routes", () => {
     });
   });
 
+  describe("initialized flag", () => {
+    it("reports false when no sv manifest or rex PRD exists", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+      const data = await res.json();
+      expect(data.initialized).toBe(false);
+    });
+
+    it("reports true once a sv manifest exists, even with no PRD", async () => {
+      await writeFile(join(ctx.svDir, "manifest.json"), JSON.stringify({ modules: {} }));
+      clearStatusCache();
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+      const data = await res.json();
+      expect(data.initialized).toBe(true);
+    });
+
+    it("reports true once a rex PRD tree exists, even with no sv manifest", async () => {
+      await mkdir(join(ctx.rexDir, "prd_tree"), { recursive: true });
+      clearStatusCache();
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+      const data = await res.json();
+      expect(data.sv.freshness).toBe("unavailable");
+      expect(data.initialized).toBe(true);
+    });
+  });
+
   it("returns 404 for non-status routes", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/other`);
     expect(res.status).toBe(404);

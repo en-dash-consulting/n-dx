@@ -23,7 +23,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add a next-step panel with four project states to the Home landing](./add-a-next-step-panel-with-four.md) | pending |
+| [Add a next-step panel with four project states to the Home landing](./add-a-next-step-panel-with-four.md) | in_progress |
 | [Add redirect aliases for every moved dashboard path and a navigation contract test](./add-redirect-aliases-for-every-moved.md) | completed |
 | [Make stages.ts the single navigation model: one label, glyph, product and blurb per view, read by every navigation surface](./make-stages-ts-the-single-navigation.md) | completed |
 | [Merge the Analysis stage's map, isometric map and zones into one tabbed Terrain section, and Architecture and Routes into one tabbed section](./merge-the-analysis-stage-s-map.md) | pending |
