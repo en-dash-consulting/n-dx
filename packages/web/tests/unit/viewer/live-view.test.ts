@@ -129,9 +129,15 @@ describe("the rendered page", () => {
     vi.unstubAllGlobals();
   });
 
+  // The fetch mock resolves on the microtask queue, so draining it is enough —
+  // no timer is the barrier.
+  async function flush() {
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+  }
+
   async function mount(navigateTo = vi.fn()) {
     act(() => { render(h(LiveView, { navigateTo, analyzedAt: null, jobs }), root); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    await act(async () => { await flush(); });
     return navigateTo;
   }
 
@@ -147,7 +153,7 @@ describe("the rendered page", () => {
   it("starts the next task through the execute route", async () => {
     await mount();
     const start = [...root.querySelectorAll("button")].find((b) => b.textContent === "Start working")!;
-    await act(async () => { start.click(); await new Promise((r) => setTimeout(r, 10)); });
+    await act(async () => { start.click(); await flush(); });
     const post = calls.find((c) => c.url.includes("/api/hench/execute"));
     expect(post?.init?.method).toBe("POST");
     expect(JSON.parse(String(post?.init?.body))).toMatchObject({ taskId: "n1" });
@@ -157,7 +163,7 @@ describe("the rendered page", () => {
     await mount();
     const press = async (label: string) => {
       const b = [...root.querySelectorAll("button")].find((x) => x.textContent === label)!;
-      await act(async () => { b.click(); await new Promise((r) => setTimeout(r, 10)); });
+      await act(async () => { b.click(); await flush(); });
     };
     await press("Run analysis (fast)");
     await press("Run analysis (deep)");
@@ -176,7 +182,7 @@ describe("the rendered page", () => {
     expect(root.querySelector(".live-idle")).toBeNull();
 
     const mark = [...attention.querySelectorAll("button")].find((b) => b.textContent === "Mark stuck")!;
-    await act(async () => { mark.click(); await new Promise((r) => setTimeout(r, 10)); });
+    await act(async () => { mark.click(); await flush(); });
     const post = calls.find((c) => c.url.includes("/mark-stuck"));
     expect(post?.url).toBe("/api/hench/runs/r2/mark-stuck");
     expect(post?.init?.method).toBe("POST");
@@ -210,7 +216,7 @@ describe("the rendered page", () => {
     body = snapshot({ runs: [run()] });
     await mount();
     // The pause control appears once the throttle state has been read.
-    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    await act(async () => { await flush(); });
     expect(root.textContent).toContain("3 more idle");
     expect(root.textContent).toContain("Next up");
     expect(root.textContent).toContain("Pause loop after current");
