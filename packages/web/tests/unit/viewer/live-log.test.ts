@@ -257,6 +257,58 @@ describe("the Log tab", () => {
     expect(await blobs[0]!.text()).toBe(SAMPLE);
   });
 
+  it("reads one chunk at a time on a running run, so a slow read never doubles a line", async () => {
+    vi.useFakeTimers();
+    try {
+      const held: Array<() => void> = [];
+      const froms: number[] = [];
+      vi.stubGlobal("fetch", vi.fn((url: unknown) => {
+        const from = Number(new URL(String(url), "http://x").searchParams.get("from") ?? 0);
+        froms.push(from);
+        // The answer is cut when the request is made and arrives when released.
+        const content = logText.slice(from);
+        const next = logText.length;
+        return new Promise((resolve) => {
+          held.push(() => resolve({ ok: true, status: 200, json: async () => ({ content, next, reset: false, more: false }) }));
+        });
+      }));
+      const release = async () => { await act(async () => { held.shift()!(); await Promise.resolve(); await Promise.resolve(); }); };
+
+      await mount(run({ status: "running", finishedAt: null }));
+      // Three poll ticks (1.5s) pass while the first read is still out.
+      await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+      expect(froms).toEqual([0]);
+
+      await release();
+      // The ticks that landed mid-read ask for one follow-up, not three.
+      expect(froms).toEqual([0, logText.length]);
+      await release();
+
+      expect(texts()).toHaveLength(11);
+      const blobs: Blob[] = [];
+      URL.createObjectURL = vi.fn((b: Blob | MediaSource) => { blobs.push(b as Blob); return "blob:x"; });
+      URL.revokeObjectURL = vi.fn();
+      vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+      const button = [...root.querySelectorAll("button")].find((b) => b.textContent === "Download .log")!;
+      await act(async () => { button.click(); });
+      expect(await blobs[0]!.text()).toBe(SAMPLE);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops paging when the server reports more but the log ends inside a character", async () => {
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      calls++;
+      // A runaway loop ends the test with a count, not a hang.
+      const more = calls < 50;
+      return { ok: true, status: 200, json: async () => ({ content: "", next: 0, reset: false, more }) };
+    }));
+    await mount();
+    expect(calls).toBe(1);
+  });
+
   it("says so when the run has no log", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })));
     await mount();

@@ -62,10 +62,17 @@ function useRunLog(run: LiveTaskRun, buffer: LogBuffer): { version: number; miss
   // this runs once more and picks up whatever was written last.
   useEffect(() => {
     let cancelled = false;
+    // One read at a time: two reads from the same cursor would append the same
+    // chunk twice. A tick that lands mid-read asks for one follow-up instead.
+    let inFlight = false;
+    let again = false;
     const read = async () => {
+      if (inFlight) { again = true; return; }
+      inFlight = true;
       try {
         for (;;) {
-          const res = await fetch(`/api/hench/runs/${encodeURIComponent(run.runId)}/log?from=${cursorRef.current}`);
+          const from = cursorRef.current;
+          const res = await fetch(`/api/hench/runs/${encodeURIComponent(run.runId)}/log?from=${from}`);
           if (cancelled) return;
           if (!res.ok) { setMissing(true); return; }
           const body = await res.json() as LogChunkBody;
@@ -74,10 +81,15 @@ function useRunLog(run: LiveTaskRun, buffer: LogBuffer): { version: number; miss
           if (body.reset) buffer.reset();
           buffer.append(body.content);
           if (body.content || body.reset) setVersion(buffer.version);
-          if (!body.more) return;
+          // The server reports `more` while bytes remain, but a log that ends
+          // inside a multi-byte character yields nothing until the rest is written.
+          if (!body.more || (!body.reset && body.next === from)) return;
         }
       } catch {
         // The next tick reads from the same cursor.
+      } finally {
+        inFlight = false;
+        if (again && !cancelled) { again = false; void read(); }
       }
     };
     void read();
