@@ -13,8 +13,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { LLM_VENDOR, deepMerge, exec, listVendorModels, loadLLMConfig } from "@n-dx/llm-client";
+import { LLM_VENDOR, deepMerge, exec, listVendorModels, loadLLMConfig, resolveLayout } from "@n-dx/llm-client";
 import type { LLMConfig, ListableVendor } from "@n-dx/llm-client";
 
 /** How long a live list and CLI probe are served before they are fetched again. */
@@ -64,9 +63,10 @@ function readJson(path: string): Record<string, unknown> {
   }
 }
 
-/** `.n-dx.json` merged with the gitignored `.n-dx.local.json` (local wins), as runs read it. */
+/** The project config merged with its gitignored local overlay (local wins), as runs read it. */
 function readProjectConfig(projectDir: string): Record<string, unknown> {
-  return deepMerge(readJson(join(projectDir, ".n-dx.json")), readJson(join(projectDir, ".n-dx.local.json")));
+  const { configFile, localConfigFile } = resolveLayout(projectDir);
+  return deepMerge(readJson(configFile), readJson(localConfigFile));
 }
 
 function stringAt(obj: unknown, ...keys: string[]): string | undefined {
