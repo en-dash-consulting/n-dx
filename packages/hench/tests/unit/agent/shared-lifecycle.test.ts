@@ -1057,7 +1057,7 @@ describe("shared lifecycle", () => {
       stream("Agent", "did the work");
       await finalizeRun({ run, henchDir, projectDir, memoryCtx });
 
-      const files = await readdir(join(projectDir, ".run-logs"));
+      const files = (await readdir(join(projectDir, ".run-logs"))).filter((name) => name.endsWith(".log"));
       expect(files).toHaveLength(1);
       expect(await readFile(join(projectDir, ".run-logs", files[0]!), "utf-8"))
         .toContain("did the work");

@@ -2,9 +2,10 @@
  * Persistent run log — writes captured output lines to a timestamped file
  * under .run-logs/ at the project root.
  *
- * The directory is created automatically on first use. The project's
- * .gitignore is updated to exclude .run-logs/ if the entry is missing — at the
- * end of a run, never while one is in flight. See {@link ensureRunLogsIgnored}.
+ * The directory is created automatically on first use, with a `.gitignore` of
+ * `*` inside it so git never sees a log (see `prepareLogDir`). The project's
+ * .gitignore is also updated to exclude .run-logs/ if the entry is missing — at
+ * the end of a run, never while one is in flight. See {@link ensureRunLogsIgnored}.
  *
  * Log file naming convention: {ISO-timestamp-safe}-{runId}.log
  * Example: 2026-04-08T23-21-17-abc123ef-….log
@@ -45,9 +46,28 @@ export function runLogPath(projectDir: string, runId: string, startedAt: string)
   return resolve(projectDir, LOG_DIR_NAME, `${safeTimestamp}-${runId}.log`);
 }
 
-/** Create .run-logs/ if it is not already there. */
+/**
+ * Create .run-logs/ if it is not already there, with a `.gitignore` of `*`
+ * inside it.
+ *
+ * The directory ignores itself so git never sees a run log, from the moment
+ * the directory exists. The project `.gitignore` line is only added at the
+ * end of a run ({@link ensureRunLogsIgnored}), but the live log grows from the
+ * start: without this file, a project's first run showed its own log to the
+ * review pass's dirty-state snapshots and to an agent's `git add -A`. Writing
+ * inside the untracked directory edits no tracked file mid-run.
+ *
+ * An existing ignore file is left as it is (`wx`): the operator may have
+ * chosen different rules.
+ */
 async function prepareLogDir(projectDir: string): Promise<void> {
-  await mkdir(join(projectDir, LOG_DIR_NAME), { recursive: true });
+  const dir = join(projectDir, LOG_DIR_NAME);
+  await mkdir(dir, { recursive: true });
+  try {
+    await writeFile(join(dir, ".gitignore"), "*\n", { encoding: "utf-8", flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  }
 }
 
 /**

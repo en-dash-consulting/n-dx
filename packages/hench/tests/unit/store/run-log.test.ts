@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { basename, isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
+import { initGitFixtureRepoSync } from "../../helpers/index.js";
 import {
   ensureRunLogsIgnored,
   openRunLog,
@@ -55,7 +57,7 @@ describe("persistRunLog", () => {
 
     const logDir = join(projectDir, ".run-logs");
     const { readdir } = await import("node:fs/promises");
-    const files = await readdir(logDir);
+    const files = (await readdir(logDir)).filter((name) => name.endsWith(".log"));
     expect(files).toHaveLength(1);
 
     const content = await readFile(join(logDir, files[0]!), "utf-8");
@@ -111,7 +113,7 @@ describe("persistRunLog", () => {
     await persistRunLog(projectDir, "run-b", "2026-04-08T10:00:01Z", ["b"]);
 
     const { readdir } = await import("node:fs/promises");
-    const files = await readdir(join(projectDir, ".run-logs"));
+    const files = (await readdir(join(projectDir, ".run-logs"))).filter((name) => name.endsWith(".log"));
     expect(files).toHaveLength(2);
   });
 
@@ -299,5 +301,72 @@ describe("openRunLog", () => {
         await rm(wholeDir, { recursive: true, force: true });
       }
     }
+  });
+});
+
+/**
+ * The log directory ignores itself.
+ *
+ * The live log exists from the start of the run, but the project `.gitignore`
+ * line is added only at the end (`ensureRunLogsIgnored`). On a project's first
+ * run that left the growing log visible to git: a review pass listed it as a
+ * repair and committed it, and an agent's `git add -A` swept it into the task
+ * commit. A `*` ignore file inside the directory hides it from the moment the
+ * directory exists, without editing a tracked file mid-run.
+ */
+describe("run log directory ignore file", () => {
+  let projectDir: string;
+
+  const git = (...args: string[]): string =>
+    execFileSync("git", args, { cwd: projectDir, encoding: "utf-8" });
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-runlog-ignore-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it("is written with '*' when the live log creates the directory", async () => {
+    const writer = await openRunLog(projectDir, "run-ign-1", "2026-04-08T10:00:00Z");
+    await writer.close();
+
+    expect(await readFile(join(projectDir, ".run-logs", ".gitignore"), "utf-8")).toBe("*\n");
+  });
+
+  it("is written when the end-of-run writer creates the directory", async () => {
+    await persistRunLog(projectDir, "run-ign-2", "2026-04-08T10:00:00Z", ["x"]);
+
+    expect(await readFile(join(projectDir, ".run-logs", ".gitignore"), "utf-8")).toBe("*\n");
+  });
+
+  it("leaves an existing ignore file in the directory alone", async () => {
+    await mkdir(join(projectDir, ".run-logs"));
+    await writeFile(join(projectDir, ".run-logs", ".gitignore"), "*.log\n");
+
+    const writer = await openRunLog(projectDir, "run-ign-3", "2026-04-08T10:00:00Z");
+    await writer.close();
+
+    expect(await readFile(join(projectDir, ".run-logs", ".gitignore"), "utf-8")).toBe("*.log\n");
+  });
+
+  it("hides a growing first-run log from git status and git add -A", async () => {
+    initGitFixtureRepoSync(projectDir);
+    await writeFile(join(projectDir, "README.md"), "fixture\n");
+    git("add", "-A");
+    git("commit", "-m", "baseline");
+
+    // No `.run-logs/` line in the project's .gitignore.
+    const writer = await openRunLog(projectDir, "run-ign-4", "2026-04-08T10:00:00Z");
+    writer.appendLine("[Agent]   working");
+    await readUntil(writer.path, (content) => content.includes("working"));
+
+    expect(git("status", "--porcelain", "--untracked-files=all")).toBe("");
+    git("add", "-A");
+    expect(git("diff", "--cached", "--name-only")).toBe("");
+
+    await writer.close();
+    expect(git("status", "--porcelain", "--untracked-files=all")).toBe("");
   });
 });
