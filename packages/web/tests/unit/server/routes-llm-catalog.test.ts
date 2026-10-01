@@ -11,19 +11,43 @@
  * pinned by `tests/integration/cross-package-contracts.test.js`.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import { TIER_MODELS } from "@n-dx/llm-client";
 import { handleLlmRoute } from "../../../src/server/routes-llm.js";
+import { CATALOG_CACHE_TTL_MS } from "../../../src/server/llm-catalog.js";
+
+// The CLI probe spawns `<binary> --version`; stub it so no test depends on a
+// CLI being installed.
+const execMock = vi.hoisted(() => vi.fn());
+vi.mock("@n-dx/llm-client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@n-dx/llm-client")>()),
+  exec: execMock,
+}));
+
+const realFetch = globalThis.fetch;
+/** Stands in for the Anthropic and OpenAI APIs; every other request (the test's own servers) goes through. */
+const vendorFetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>();
 
 let projectDir: string;
 let server: Server;
 let baseUrl: string;
 
+const MISSING_CLI = { stdout: "", stderr: "", exitCode: 1, error: new Error("ENOENT"), launched: false };
+
 beforeEach(async () => {
+  vi.stubEnv("ANTHROPIC_API_KEY", "");
+  vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("CLAUDE_CLI_PATH", "");
+  execMock.mockReset().mockResolvedValue(MISSING_CLI);
+  vendorFetch.mockReset().mockRejectedValue(new Error("unexpected vendor fetch"));
+  vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    return /^https:\/\/api\.(anthropic|openai)\.com\//.test(url) ? vendorFetch(url, init) : realFetch(input, init);
+  });
   projectDir = await mkdtemp(join(tmpdir(), "ndx-llm-catalog-"));
   server = createServer((req, res) => {
     void handleLlmRoute(req, res, { projectDir } as never).then((handled) => {
@@ -40,6 +64,9 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   await new Promise<void>((resolve) => server.close(() => resolve()));
   await rm(projectDir, { recursive: true, force: true });
 });
@@ -125,5 +152,192 @@ describe("GET /api/llm/catalog", () => {
     } finally {
       await new Promise<void>((resolve) => fake.close(() => resolve()));
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Live model list, installed CLI, default model
+// ---------------------------------------------------------------------------
+
+const SECRET = "sk-test-secret-key-0123456789";
+
+function jsonOk(body: unknown): Response {
+  return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+async function getCatalog(query = ""): Promise<Record<string, any>> {
+  const res = await fetch(`${baseUrl}/api/llm/catalog${query}`);
+  expect(res.status).toBe(200);
+  return res.json();
+}
+
+const vendorCalls = (host: string): number =>
+  vendorFetch.mock.calls.filter(([url]) => url.includes(host)).length;
+
+describe("GET /api/llm/catalog — live model list", () => {
+  it("lists claude from the Anthropic Models API when a key resolves", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    vendorFetch.mockResolvedValue(
+      jsonOk({ data: [{ id: "claude-live-model-9" }, { id: "claude-sonnet-4-5" }, { id: "text-embedding-3-small" }] }),
+    );
+
+    const body = await getCatalog();
+
+    expect(body.claude.source).toBe("live");
+    expect(body.claude.models).toEqual(["claude-live-model-9", "claude-sonnet-4-5"]);
+    expect(Number.isNaN(Date.parse(body.claude.checkedAt))).toBe(false);
+    expect(body.claude.reason).toBeUndefined();
+    const [url, init] = vendorFetch.mock.calls[0];
+    expect(url).toContain("api.anthropic.com");
+    expect((init?.headers as Record<string, string>)["x-api-key"]).toBe(SECRET);
+  });
+
+  it("lists codex from OpenAI /v1/models and drops non-chat models", async () => {
+    await writeConfig({ llm: { codex: { api_key: SECRET } } });
+    vendorFetch.mockResolvedValue(
+      jsonOk({ data: [{ id: "gpt-live-5" }, { id: "text-embedding-3-small" }, { id: "whisper-1" }, { id: "claude-x" }] }),
+    );
+
+    const body = await getCatalog();
+
+    expect(body.codex.source).toBe("live");
+    expect(body.codex.models).toEqual(["gpt-live-5"]);
+    expect(vendorFetch.mock.calls[0][0]).toContain("api.openai.com/v1/models");
+  });
+
+  it("falls back to the built-in list with a reason when no key resolves", async () => {
+    const body = await getCatalog();
+
+    for (const vendor of ["claude", "codex"]) {
+      expect(body[vendor].source, vendor).toBe("built-in");
+      expect(body[vendor].checkedAt, vendor).toBeNull();
+      expect(body[vendor].reason, vendor).toMatch(/API key/);
+    }
+    expect(body.claude.models).toEqual(expect.arrayContaining(Object.values(TIER_MODELS.claude)));
+    expect(vendorFetch).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the built-in list when the live call fails, without failing the route or leaking the key", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    vendorFetch.mockRejectedValue(new Error(`connect failed for key ${SECRET}`));
+
+    const res = await fetch(`${baseUrl}/api/llm/catalog`);
+    const text = await res.text();
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(text);
+    expect(body.claude.source).toBe("built-in");
+    expect(body.claude.reason).toMatch(/failed/);
+    expect(text).not.toContain(SECRET);
+  });
+
+  it("keeps google on the built-in list", async () => {
+    const body = await getCatalog();
+    expect(body.google.source).toBe("built-in");
+    expect(body.google.checkedAt).toBeNull();
+    expect(body.google.reason).toEqual(expect.any(String));
+  });
+
+  it("serves a cache hit within 10 minutes, then refetches after it expires", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    vendorFetch.mockImplementation(async () => jsonOk({ data: [{ id: "claude-live-model-9" }] }));
+
+    await getCatalog();
+    vi.advanceTimersByTime(CATALOG_CACHE_TTL_MS - 1000);
+    await getCatalog();
+    expect(vendorCalls("anthropic")).toBe(1);
+    expect(execMock).toHaveBeenCalledTimes(2); // one claude + one codex probe, not repeated
+
+    vi.advanceTimersByTime(2000);
+    await getCatalog();
+    expect(vendorCalls("anthropic")).toBe(2);
+  });
+
+  it("?refresh=true bypasses the cache and refills it", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    vendorFetch
+      .mockResolvedValueOnce(jsonOk({ data: [{ id: "claude-live-model-1" }] }))
+      .mockResolvedValueOnce(jsonOk({ data: [{ id: "claude-live-model-2" }] }));
+
+    expect((await getCatalog()).claude.models).toEqual(["claude-live-model-1"]);
+    expect((await getCatalog("?refresh=true")).claude.models).toEqual(["claude-live-model-2"]);
+    // The refresh refilled the cache: a plain read now serves it.
+    expect((await getCatalog()).claude.models).toEqual(["claude-live-model-2"]);
+    expect(vendorCalls("anthropic")).toBe(2);
+  });
+
+  it("a successful PUT /api/llm/config clears the cache", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    vendorFetch.mockImplementation(async () => jsonOk({ data: [{ id: "claude-live-model-9" }] }));
+
+    await getCatalog();
+    const put = await fetch(`${baseUrl}/api/llm/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes: { "llm.claude.model": "claude-live-model-9" } }),
+    });
+    expect(put.status).toBe(200);
+    await getCatalog();
+
+    expect(vendorCalls("anthropic")).toBe(2);
+  });
+});
+
+describe("GET /api/llm/catalog — installed CLI", () => {
+  it("reports the version and path of a CLI that runs", async () => {
+    execMock.mockImplementation(async (cmd: string) => ({
+      stdout: cmd === "claude" ? "2.1.7 (Claude Code)\n" : "codex-cli 0.46.0\n",
+      stderr: "",
+      exitCode: 0,
+      error: null,
+      launched: true,
+    }));
+
+    const body = await getCatalog();
+
+    expect(body.claude.cli).toEqual({ found: true, version: "2.1.7", path: "claude" });
+    expect(body.codex.cli).toEqual({ found: true, version: "0.46.0", path: "codex" });
+    expect(execMock).toHaveBeenCalledWith("claude", ["--version"], expect.objectContaining({ timeout: 5000 }));
+  });
+
+  it("reports a missing CLI as not found", async () => {
+    const body = await getCatalog();
+    expect(body.claude.cli).toEqual({ found: false, version: null, path: null });
+    expect(body.codex.cli).toEqual({ found: false, version: null, path: null });
+  });
+
+  it("resolves the binary the way runs do: env, then .n-dx.local.json over .n-dx.json", async () => {
+    await writeConfig({ cli: { claudePath: "/shared/claude" }, llm: { codex: { cli_path: "/shared/codex" } } });
+    await writeFile(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ llm: { codex: { cli_path: "/local/codex" } } }),
+      "utf-8",
+    );
+    execMock.mockResolvedValue({ stdout: "1.0.0", stderr: "", exitCode: 0, error: null, launched: true });
+
+    const body = await getCatalog();
+    expect(body.claude.cli.path).toBe("/shared/claude");
+    expect(body.codex.cli.path).toBe("/local/codex");
+
+    vi.stubEnv("CLAUDE_CLI_PATH", "/env/claude");
+    expect((await getCatalog("?refresh=true")).claude.cli.path).toBe("/env/claude");
+  });
+});
+
+describe("GET /api/llm/catalog — defaultModel", () => {
+  it("is the vendor default with nothing configured", async () => {
+    const body = await getCatalog();
+    expect(body.claude.defaultModel).toEqual(expect.any(String));
+    expect(body.claude.defaultModel).not.toBe("");
+    expect(body.codex.defaultModel).not.toBe("");
+    expect(body.codex.defaultModel).not.toBe(body.claude.defaultModel);
+  });
+
+  it("follows llm.<vendor>.model, and legacy claude.model for Claude", async () => {
+    await writeConfig({ llm: { codex: { model: "gpt-pinned" } }, claude: { model: "claude-legacy-pinned" } });
+    const body = await getCatalog();
+    expect(body.codex.defaultModel).toBe("gpt-pinned");
+    expect(body.claude.defaultModel).toBe("claude-legacy-pinned");
   });
 });

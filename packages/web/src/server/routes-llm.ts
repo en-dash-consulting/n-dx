@@ -28,10 +28,13 @@ import {
   MODEL_COSTS,
   isModelCompatibleWithVendor,
   resolveClaudeConfig,
+  loadLLMConfig,
 } from "@n-dx/llm-client";
-import type { LLMVendor, ClaudeFieldSource } from "@n-dx/llm-client";
+import type { LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
 import { VENDOR_PROVIDERS, validateProviderForVendor } from "./hench-config-fields.js";
-import { resolveEffectiveAgentConfig } from "./effective-agent-config.js";
+import { resolveEffectiveAgentConfig, resolveEffectiveAgentModel } from "./effective-agent-config.js";
+import { getLiveVendorProbe, clearLlmCatalogCache } from "./llm-catalog.js";
+import type { CliInfo, LiveVendorProbe } from "./llm-catalog.js";
 import type { EffectiveAgentConfig } from "./effective-agent-config.js";
 
 // ---------------------------------------------------------------------------
@@ -651,6 +654,23 @@ function writeProfilesConfig(projectDir: string, profiles: LocalProfile[]): void
 export interface VendorCatalogEntry {
   models: string[];
   providers: Array<"cli" | "api">;
+  /**
+   * The model `ndx work` runs for this vendor with no `hench.models.<vendor>`
+   * set: `llm.<vendor>.model` (legacy `claude.model` for Claude), else the
+   * vendor default.
+   */
+  defaultModel: string;
+  /** `"live"` when `models` came from the vendor's Models API, else the built-in list. */
+  source: "live" | "built-in";
+  /** ISO time of the live fetch; null when `source` is `"built-in"`. */
+  checkedAt: string | null;
+  /** Why the built-in list is shown. Present only when `source` is `"built-in"`. */
+  reason?: string;
+}
+
+/** A vendor entry whose CLI is installed locally, with what `<binary> --version` reported. */
+export interface CliVendorCatalogEntry extends VendorCatalogEntry {
+  cli: CliInfo;
 }
 
 /**
@@ -662,14 +682,15 @@ export interface VendorCatalogEntry {
 export interface LocalCatalogEntry {
   models: string[];
   providers: Array<"cli" | "api">;
+  defaultModel: string;
   reachable: boolean;
   reason?: string;
 }
 
 /** Shape returned by GET /api/llm/catalog. */
 export interface LlmCatalogResponse {
-  claude: VendorCatalogEntry;
-  codex: VendorCatalogEntry;
+  claude: CliVendorCatalogEntry;
+  codex: CliVendorCatalogEntry;
   google: VendorCatalogEntry;
   local: LocalCatalogEntry;
 }
@@ -693,8 +714,30 @@ function cloudVendorModels(vendor: LLMVendor): string[] {
  * literal pinned against hench's own table by the cross-package contract
  * test (see that file's doc comment for why web keeps a copy at all).
  */
-async function buildLlmCatalog(projectDir: string): Promise<LlmCatalogResponse> {
+async function buildLlmCatalog(projectDir: string, refresh: boolean): Promise<LlmCatalogResponse> {
   const config = readEffectiveNdxConfig(projectDir);
+  const llmConfig = await loadLLMConfig(projectDir);
+  // The model `ndx work` would run with no `hench.models.<vendor>` — resolved
+  // through the same chain as `effective`, minus the hench override rung.
+  const defaultModel = (vendor: LLMVendor): string =>
+    resolveEffectiveAgentModel(vendor, undefined, llmConfig).model;
+  const [claudeProbe, codexProbe] = await Promise.all([
+    getLiveVendorProbe(LLM_VENDOR.CLAUDE, projectDir, { refresh }),
+    getLiveVendorProbe(LLM_VENDOR.CODEX, projectDir, { refresh }),
+  ]);
+  const cliEntry = (vendor: ListableVendor, probe: LiveVendorProbe): CliVendorCatalogEntry => {
+    const builtIn = cloudVendorModels(vendor);
+    const live = probe.listing.ok;
+    return {
+      models: probe.listing.ok ? probe.listing.models : builtIn,
+      providers: [...VENDOR_PROVIDERS[vendor]],
+      defaultModel: defaultModel(vendor),
+      source: live ? "live" : "built-in",
+      checkedAt: live ? probe.checkedAt : null,
+      ...(probe.listing.ok ? {} : { reason: probe.listing.reason }),
+      cli: probe.cli,
+    };
+  };
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
   const host = typeof llmLocal["host"] === "string" && llmLocal["host"]
@@ -706,12 +749,20 @@ async function buildLlmCatalog(projectDir: string): Promise<LlmCatalogResponse> 
   const localStatus = await probeLocalServer(host, port);
 
   return {
-    claude: { models: cloudVendorModels(LLM_VENDOR.CLAUDE), providers: [...VENDOR_PROVIDERS.claude] },
-    codex: { models: cloudVendorModels(LLM_VENDOR.CODEX), providers: [...VENDOR_PROVIDERS.codex] },
-    google: { models: cloudVendorModels(LLM_VENDOR.GOOGLE), providers: [...VENDOR_PROVIDERS.google] },
+    claude: cliEntry(LLM_VENDOR.CLAUDE, claudeProbe),
+    codex: cliEntry(LLM_VENDOR.CODEX, codexProbe),
+    google: {
+      models: cloudVendorModels(LLM_VENDOR.GOOGLE),
+      providers: [...VENDOR_PROVIDERS.google],
+      defaultModel: defaultModel(LLM_VENDOR.GOOGLE),
+      source: "built-in",
+      checkedAt: null,
+      reason: "No live model list for google",
+    },
     local: {
       models: localStatus.ok ? localStatus.models : [],
       providers: [...VENDOR_PROVIDERS.local],
+      defaultModel: defaultModel(LLM_VENDOR.LOCAL),
       reachable: localStatus.ok,
       ...(localStatus.ok ? {} : { reason: localStatus.error ?? "Local server unreachable" }),
     },
@@ -843,7 +894,8 @@ export async function handleLlmRoute(
 
   // GET /api/llm/catalog — models to offer and provider choices, per vendor
   if (method === "GET" && pathname === LLM_CATALOG) {
-    jsonResponse(res, 200, await buildLlmCatalog(ctx.projectDir));
+    const refresh = new URL(url, "http://localhost").searchParams.get("refresh") === "true";
+    jsonResponse(res, 200, await buildLlmCatalog(ctx.projectDir, refresh));
     return true;
   }
 
@@ -942,6 +994,8 @@ export async function handleLlmRoute(
       // The credential check's answer depends on this config — drop the
       // cached result so the auth chip re-verifies against the new settings.
       invalidateAuthCheckCache();
+      // A new key, binary path or model changes what the live probe would see.
+      clearLlmCatalogCache(ctx.projectDir);
       jsonResponse(res, 200, { applied, config: await extractLlmConfig(ctx.projectDir) });
       return true;
     } catch (err) {
