@@ -49,4 +49,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Pre-run commit gate: verify uncommitted changes before starting a work loop](./pre-run-commit-gate-verify-uncommitted.md) | completed |
 | [RunRecord fields testGate, dependencyAudit and cleanupTransformations are stripped by the run-record schema on load](./runrecord-fields-testgate.md) | completed |
 | [Skill runs attribute tokens from a code-written usage mark taken when the task starts, not from a model-typed --startedAt window](./skill-runs-attribute-tokens-from-a.md) | completed |
-| [Tell the agent to run git bare from the project root, never behind cd or git -C](./tell-the-agent-to-run-git-bare-from.md) | pending |
+| [Tell the agent to run git bare from the project root, never behind cd or git -C](./tell-the-agent-to-run-git-bare-from.md) | in_progress |
