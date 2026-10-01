@@ -409,6 +409,8 @@ Remove `.sourcevision/` if you want to commit the analysis baseline so teammates
 
 n-dx runs an autonomous agent (hench) that reads, writes, and executes commands on your behalf. The security model is designed to keep all operations scoped to the project directory with no ambient access to the rest of your system.
 
+Found a vulnerability? Please report it privately, not in a public issue. [SECURITY.md](SECURITY.md) has the reporting routes, what we treat as in scope, and how fixes are handled and disclosed.
+
 ### Filesystem boundary
 
 Every file operation passes through a guard that validates the resolved path stays within the project directory. Directory traversal (`..`), null-byte injection, and symlink escapes are rejected before any I/O occurs. Additionally, `.hench/`, `.rex/`, `.git/`, and `node_modules/` are blocked by default — the agent cannot modify its own configuration or PRD state through file tools.
