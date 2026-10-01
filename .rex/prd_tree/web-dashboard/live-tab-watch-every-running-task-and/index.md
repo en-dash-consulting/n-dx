@@ -36,7 +36,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Every useLive instance shares the poller key "live", so the first unmount stops polling for the Live tab, badge and pill](./every-uselive-instance-shares-the.md) | completed |
 | ["Finished in the last hour" links on /live open another worktree's run in the current workspace, which answers not found](./finished-in-the-last-hour-links-on.md) | pending |
 | [Log tab tail reads overlap and append the same chunk twice when a read takes longer than the 500 ms poll](./log-tab-tail-reads-overlap-and-append.md) | completed |
-| [Mark stuck on the task page has no confirmation and shows on healthy runs, so one click marks a working run failed](./mark-stuck-on-the-task-page-has-no.md) | pending |
+| [Mark stuck on the task page has no confirmation and shows on healthy runs, so one click marks a working run failed](./mark-stuck-on-the-task-page-has-no.md) | completed |
 | [Point the Home worktrees pill and the bottom-bar analysis and stuck-run badges at Live](./point-the-home-worktrees-pill-and-the.md) | completed |
 | ["Stop all" on /live is enabled by the repository-wide count but stops only the served worktree's runs](./stop-all-on-live-is-enabled-by-the.md) | pending |
 | [Stop on the task page reports "Stopped" when the server only marked the record and sent no signal](./stop-on-the-task-page-reports-stopped.md) | pending |
