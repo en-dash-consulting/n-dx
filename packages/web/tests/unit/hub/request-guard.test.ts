@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { classifyOrigin, guardHubRequest, upgradeAllowed } from "../../../src/hub/request-guard.js";
+import { classifyOrigin, guardHubRequest, upgradeRefusal } from "../../../src/hub/request-guard.js";
 
 const HUB_PORT = 3117;
 
@@ -214,27 +214,42 @@ describe("guardHubRequest — per-user token", () => {
     expect(foreignOrigin.statusCode).toBe(403);
   });
 
-  it("requires the token on a WebSocket handshake too", () => {
-    expect(upgradeAllowed(req("GET", { origin: "http://localhost:3117" }), HUB_PORT, TOKEN)).toBe(false);
-    expect(upgradeAllowed(req("GET", { origin: "http://localhost:3117", cookie: `ndx_token=${TOKEN}` }), HUB_PORT, TOKEN)).toBe(true);
-    expect(upgradeAllowed(req("GET", { "x-ndx-token": TOKEN }), HUB_PORT, TOKEN)).toBe(true);
-    expect(upgradeAllowed(req("GET", { origin: "http://localhost:3117" }), HUB_PORT, null)).toBe(true);
+  it("requires the token on a WebSocket handshake too, and says 401", () => {
+    expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117" }), HUB_PORT, TOKEN)).toBe("401 Unauthorized");
+    expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117", cookie: `ndx_token=${TOKEN}` }), HUB_PORT, TOKEN)).toBeNull();
+    expect(upgradeRefusal(req("GET", { "x-ndx-token": TOKEN }), HUB_PORT, TOKEN)).toBeNull();
+    expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117" }), HUB_PORT, null)).toBeNull();
+  });
+
+  it("puts the Host rule ahead of the token rule", () => {
+    // Both are broken here; the answer is 421, matching the HTTP gate's order.
+    expect(
+      upgradeRefusal(req("GET", { host: "attacker.example:3117" }), HUB_PORT, TOKEN),
+    ).toBe("421 Misdirected Request");
   });
 });
 
-describe("upgradeAllowed", () => {
+describe("upgradeRefusal", () => {
   it("refuses a WebSocket handshake from another origin, and allows the dashboard's", () => {
     // A handshake carries no preflight, so this is the only check there is:
     // otherwise any open page could read every frame a project broadcasts.
-    expect(upgradeAllowed(req("GET", { origin: "http://evil.test" }), HUB_PORT)).toBe(false);
-    expect(upgradeAllowed(req("GET", { origin: "http://localhost:3117" }), HUB_PORT)).toBe(true);
-    expect(upgradeAllowed(req("GET"), HUB_PORT)).toBe(true);
+    expect(upgradeRefusal(req("GET", { origin: "http://evil.test" }), HUB_PORT)).toBe("403 Forbidden");
+    expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117" }), HUB_PORT)).toBeNull();
+    expect(upgradeRefusal(req("GET"), HUB_PORT)).toBeNull();
   });
 
   it("refuses a handshake whose Host is not the hub, whatever its Origin", () => {
-    expect(upgradeAllowed(req("GET", { host: "attacker.example:3117" }), HUB_PORT)).toBe(false);
+    // 421, not 403: the caller writes this status line verbatim, and the HTTP
+    // path and the project server's own upgrade path both answer 421 for a
+    // foreign Host. A boolean verdict made every rejection a 403.
+    expect(upgradeRefusal(req("GET", { host: "attacker.example:3117" }), HUB_PORT)).toBe("421 Misdirected Request");
     expect(
-      upgradeAllowed(req("GET", { host: "attacker.example:3117", origin: "http://localhost:3117" }), HUB_PORT),
-    ).toBe(false);
+      upgradeRefusal(req("GET", { host: "attacker.example:3117", origin: "http://localhost:3117" }), HUB_PORT),
+    ).toBe("421 Misdirected Request");
+    // The Host rule wins over the origin rule, so a handshake that breaks both
+    // is still reported as misdirected rather than forbidden.
+    expect(
+      upgradeRefusal(req("GET", { host: "attacker.example:3117", origin: "http://evil.test" }), HUB_PORT),
+    ).toBe("421 Misdirected Request");
   });
 });

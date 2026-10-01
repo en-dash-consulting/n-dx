@@ -451,6 +451,9 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       });
   });
   server.on("upgrade", (req, socket, head) => {
+    // Each refusal keeps its own status line, as on the HTTP path and on the
+    // project server's own upgrade path: a `Host` that does not name this hub
+    // is 421 Misdirected Request, a missing token 401, a foreign `Origin` 403.
     const refusal = upgradeRefusal(req, hub.listeningPort, hub.token);
     if (refusal !== null) {
       socket.write(`HTTP/1.1 ${refusal}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);

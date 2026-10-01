@@ -2,10 +2,10 @@
  * Hook to subscribe to a specific feature toggle value from the API.
  *
  * Fetches the toggle state once on mount and re-fetches whenever the
- * feature-toggles view saves a change (listens for the custom
+ * Project page saves a change (listens for the custom
  * `feature-toggle-changed` event on `window`).
  *
- * @see ../views/feature-toggles.ts — emits `feature-toggle-changed`
+ * @see ../views/feature-toggles.ts — emits `feature-toggle-changed` after a save
  * @see ../../server/routes-features.ts — GET /api/features
  */
 
@@ -48,7 +48,7 @@ export function useFeatureToggle(key: string, defaultValue: boolean): boolean {
     };
   }, [fetchToggle]);
 
-  // Re-fetch on toggle change events from the feature-toggles UI
+  // Re-fetch on toggle change events from the Project page
   useEffect(() => {
     const handler = () => {
       fetchToggle();

@@ -164,27 +164,19 @@ export function guardHubRequest(
 }
 
 /**
- * Whether a WebSocket upgrade may be forwarded.
+ * Why a WebSocket handshake is refused, as the status line to answer with, or
+ * null when it may proceed.
  *
  * A handshake carries no preflight, so this is the only check there is: a
  * page that opened `ws://localhost:3117/p/<id>/` would otherwise read every
  * frame the project broadcasts — PRD changes, agent stdout, run state.
  *
- * The `Host` rule is applied here as well, so the HTTP and upgrade paths cannot
- * disagree about what "this server" means.
- */
-export function upgradeAllowed(
-  req: Pick<IncomingMessage, "headers">,
-  hubPort: number | undefined,
-  token: string | null = null,
-): boolean {
-  return upgradeRefusal(req, hubPort, token) === null;
-}
-
-/**
- * Why a handshake is refused, as the status line to answer with, or null
- * when it may proceed. The rules apply in the same order as the HTTP gate:
- * Host (421), then the per-user token (401), then Origin (403).
+ * The rules apply in the same order as the HTTP gate, and each is reported
+ * distinctly rather than collapsed into one refusal: Host (421 Misdirected
+ * Request), then the per-user token (401 Unauthorized), then Origin (403
+ * Forbidden). A boolean here would have answered 403 for a foreign `Host`,
+ * which contradicts both the HTTP path above and the project server's own
+ * upgrade handler (`server/websocket.ts`).
  */
 export function upgradeRefusal(
   req: Pick<IncomingMessage, "headers">,

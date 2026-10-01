@@ -1,4 +1,4 @@
-/* Integration Config view — generic dynamic configuration */
+/* Integrations section (on the Project page) — generic dynamic configuration */
 
 .intg-container {
   max-width: 900px;
@@ -10,10 +10,29 @@
   margin-bottom: var(--space-4);
 }
 
+.intg-detail-title {
+  margin: 0;
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
 .intg-subtitle {
   font-size: var(--font-md);
   color: var(--text-dim);
   margin: 4px 0 0;
+}
+
+.intg-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.intg-blocked-hint {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
 }
 
 .intg-back-btn {
@@ -21,7 +40,6 @@
   align-items: center;
   gap: 4px;
   padding: 6px 12px;
-  margin-bottom: var(--space-3);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -31,9 +49,14 @@
   transition: all 0.15s;
 }
 
-.intg-back-btn:hover {
+.intg-back-btn:hover:not(:disabled) {
   color: var(--text);
   border-color: var(--accent);
+}
+
+.intg-back-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ── Integration list ─────────────────────────────────────────────── */
@@ -326,32 +349,6 @@
   margin-bottom: var(--space-6);
 }
 
-.intg-actions-primary {
-  display: flex;
-  gap: 8px;
-}
-
-.intg-save-btn {
-  padding: 10px 24px;
-  background: var(--accent);
-  color: var(--bg);
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: var(--font-base);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.intg-save-btn:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
-
-.intg-save-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .intg-actions-danger {
   display: flex;
   align-items: center;
@@ -369,9 +366,14 @@
   transition: all 0.15s;
 }
 
-.intg-remove-btn:hover {
+.intg-remove-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--red) 8%, transparent);
   border-color: var(--red);
+}
+
+.intg-remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .intg-confirm-text {
@@ -403,7 +405,7 @@
   cursor: pointer;
 }
 
-/* ── Error & toast ────────────────────────────────────────────────── */
+/* ── Error ────────────────────────────────────────────────────────── */
 
 .intg-error-banner {
   padding: 10px 14px;
@@ -413,29 +415,6 @@
   color: var(--red);
   font-size: var(--font-sm);
   margin-bottom: var(--space-3);
-}
-
-.intg-toast {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  background: color-mix(in srgb, var(--green) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--green) 25%, transparent);
-  border-radius: var(--radius-md);
-  color: var(--green);
-  font-size: var(--font-sm);
-  margin-bottom: var(--space-3);
-  animation: intg-fadeIn 0.2s ease-out;
-}
-
-.intg-toast-icon {
-  font-size: 16px;
-}
-
-@keyframes intg-fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Environment variable hints ───────────────────────────────────── */

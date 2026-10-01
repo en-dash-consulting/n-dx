@@ -177,7 +177,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   useEffect(() => { setCommandsOpen(false); }, [view]);
   const toggleCommands = useCallback(() => setCommandsOpen((open) => !open), []);
   const closeCommands = useCallback(() => setCommandsOpen(false), []);
-  const openSettings = useCallback(() => handleSidebarNav("llm-provider"), [handleSidebarNav]);
+  const openSettings = useCallback(() => handleSidebarNav("robot-wrangler"), [handleSidebarNav]);
   const closeSettings = useCallback(() => handleSidebarNav(lastPage), [handleSidebarNav, lastPage]);
 
   const handleRestore = () => {
