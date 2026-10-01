@@ -46,8 +46,11 @@ import { join } from "node:path";
 import {
   DEFAULT_LLM_VENDOR,
   LLM_VENDOR,
+  deepMerge,
   isLLMVendor,
   loadLLMConfig,
+  loadProjectOverrideSources,
+  mergeWithOverrides,
   resolveLayout,
   resolveModel,
   resolveTaskModel,
@@ -140,33 +143,67 @@ export function resolveEffectiveAgentModel(
 }
 
 /**
- * `provider` and `models` from `.hench/config.json`, with hench's own defaults
- * applied to anything absent or malformed.
+ * `provider` and `models`: `.hench/config.json` merged with the `hench`
+ * sections of `.n-dx.json` and `.n-dx.local.json` (local wins) — the same
+ * two override files hench's own `loadConfig` merges in
+ * (`packages/hench/src/store/config.ts`, from line 93).
  *
- * A file that is missing, unparseable, or holds a `provider` outside
- * `cli`/`api` yields hench's `DEFAULT_HENCH_CONFIG` value of `"cli"` — hench
- * loads its config with `onInvalid: "use-defaults"`, so a bad field degrades
- * to the default there too rather than refusing the run.
+ * Reading `.hench/config.json` alone — all this used to do — silently missed
+ * every override saved the documented way: hench's own help tells users to
+ * set `hench.models.<vendor>` in `.n-dx.json`
+ * (`packages/hench/src/cli/commands/config.ts`, `packages/hench/src/cli/help.ts`),
+ * and the dashboard's Robot Wrangler page saves there too.
+ *
+ * Invalid is per field and reverts to the `.hench/config.json` value, not to
+ * a hard default — hench's own merge falls back to "the already-validated
+ * base config" when an override is bad, never to `DEFAULT_HENCH_CONFIG()`
+ * directly, and a difference here would only surface on a malformed
+ * override, which is exactly the case nobody checks by hand.
  */
-function readHenchAgentSettings(projectDir: string): {
+async function readHenchAgentSettings(projectDir: string): Promise<{
   provider: HenchProvider;
   models: Partial<Record<LLMVendor, string>>;
-} {
-  let raw: Record<string, unknown>;
+}> {
+  const henchDir = resolveLayout(projectDir).henchDir;
+
+  let raw: Record<string, unknown> = {};
   try {
-    const path = join(resolveLayout(projectDir).henchDir, "config.json");
-    raw = JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
+    raw = JSON.parse(readFileSync(join(henchDir, "config.json"), "utf-8")) as Record<string, unknown>;
   } catch {
-    return { provider: "cli", models: {} };
+    // Missing or unparseable: carry on with `{}` as the base. hench's own
+    // `loadConfig` has no such fallback (a missing file throws there), but
+    // every real project has one — `ndx init` writes it — so this only
+    // matters for a project this route is asked about before init, and an
+    // override should still be reported rather than silently ignored.
   }
 
-  const provider = raw["provider"] === "api" || raw["provider"] === "cli" ? raw["provider"] : "cli";
+  const baseProvider = parseProvider(raw["provider"]) ?? "cli";
+  const baseModels = parseAgentModels(raw["models"]) ?? {};
 
-  return { provider, models: readAgentModels(raw["models"]) };
+  const overrideSources = await loadProjectOverrideSources(henchDir, "hench");
+  if (overrideSources.length === 0) {
+    return { provider: baseProvider, models: baseModels };
+  }
+
+  const overrides = overrideSources.reduce(
+    (acc, source) => deepMerge(acc, source.data),
+    {} as Record<string, unknown>,
+  );
+  const merged = mergeWithOverrides(raw, overrides);
+
+  return {
+    provider: parseProvider(merged["provider"]) ?? baseProvider,
+    models: parseAgentModels(merged["models"]) ?? baseModels,
+  };
+}
+
+/** `"cli"` or `"api"`, or `undefined` when the field is absent or malformed. */
+function parseProvider(value: unknown): HenchProvider | undefined {
+  return value === "api" || value === "cli" ? value : undefined;
 }
 
 /**
- * The `models` map, or `{}` when hench would refuse it.
+ * The `models` map, or `undefined` when hench's schema would refuse it.
  *
  * **Any invalid entry discards the whole map**, which looks over-strict until
  * you follow what hench does with the same file. `HenchConfigSchema`'s
@@ -186,15 +223,20 @@ function readHenchAgentSettings(projectDir: string): {
  * Whitespace-only is deliberately *not* rejected here: `.min(1)` accepts it,
  * so hench validates it and then `resolveAgentModel`'s own `trim()` reads it
  * as unset — which is what {@link resolveEffectiveAgentModel} also does.
+ *
+ * `undefined` (not `{}`) marks "this field was bad", distinct from "this
+ * field was validly empty" — {@link readHenchAgentSettings} needs that
+ * distinction to decide whether to keep a merged value or revert to the
+ * base one; collapsing both into `{}` would lose which case it was.
  */
-function readAgentModels(rawModels: unknown): Partial<Record<LLMVendor, string>> {
+function parseAgentModels(rawModels: unknown): Partial<Record<LLMVendor, string>> | undefined {
   if (rawModels === undefined) return {};
-  if (!rawModels || typeof rawModels !== "object" || Array.isArray(rawModels)) return {};
+  if (!rawModels || typeof rawModels !== "object" || Array.isArray(rawModels)) return undefined;
 
   const models: Partial<Record<LLMVendor, string>> = {};
   for (const [vendor, value] of Object.entries(rawModels as Record<string, unknown>)) {
-    if (!isLLMVendor(vendor)) return {};
-    if (typeof value !== "string" || value.length < 1) return {};
+    if (!isLLMVendor(vendor)) return undefined;
+    if (typeof value !== "string" || value.length < 1) return undefined;
     models[vendor] = value;
   }
   return models;
@@ -210,7 +252,7 @@ export async function resolveEffectiveAgentConfig(
 ): Promise<EffectiveAgentConfig> {
   const llmConfig = await loadLLMConfig(projectDir);
   const vendor = llmConfig.vendor ?? DEFAULT_LLM_VENDOR;
-  const hench = readHenchAgentSettings(projectDir);
+  const hench = await readHenchAgentSettings(projectDir);
   const { model, source } = resolveEffectiveAgentModel(vendor, hench.models, llmConfig);
 
   return {

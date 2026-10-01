@@ -41,15 +41,20 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { resolveAgentModel, isProviderSupported } from "../../packages/hench/dist/public.js";
+import {
+  resolveAgentModel,
+  isProviderSupported,
+  DEFAULT_HENCH_CONFIG,
+} from "../../packages/hench/dist/public.js";
 import { resolveEffectiveAgentConfig } from "../../packages/web/dist/server/effective-agent-config.js";
 import { loadLLMConfig, DEFAULT_LLM_VENDOR } from "../../packages/llm-client/dist/public.js";
 // Not on hench's public API — reached through the documented `./dist/*`
 // subpath, as `tests/e2e/hench-config-gate-contract.test.js` already does for
-// the same schema. The matrix above hands `resolveAgentModel` a `models`
-// literal, which is what hench's chain sees but *not* what its config loader
-// would have produced; this is the oracle for the step in between.
+// the same schema. `loadConfig` is this test's oracle for what hench's own
+// config loader resolves `provider`/`models` to — the step the matrix used to
+// skip by handing `resolveAgentModel` a `models` literal instead.
 import { HenchConfigSchema } from "../../packages/hench/dist/schema/validate.js";
+import { loadConfig } from "../../packages/hench/dist/store/config.js";
 
 const VENDORS = ["claude", "codex", "google", "local"];
 
@@ -87,9 +92,19 @@ afterEach(async () => {
   await rm(projectDir, { recursive: true, force: true });
 });
 
-/** Write `.n-dx.json` and, when `henchConfig` is given, `.hench/config.json`. */
-async function seed(ndxConfig, henchConfig) {
+/**
+ * Write `.n-dx.json`, optionally `.n-dx.local.json`, and, when `henchConfig`
+ * is given, `.hench/config.json`.
+ */
+async function seed(ndxConfig, henchConfig, localNdxConfig) {
   await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify(ndxConfig, null, 2), "utf-8");
+  if (localNdxConfig) {
+    await writeFile(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify(localNdxConfig, null, 2),
+      "utf-8",
+    );
+  }
   if (henchConfig) {
     await mkdir(join(projectDir, ".hench"), { recursive: true });
     await writeFile(
@@ -97,6 +112,28 @@ async function seed(ndxConfig, henchConfig) {
       JSON.stringify(henchConfig, null, 2),
       "utf-8",
     );
+  }
+}
+
+/**
+ * hench's own config, the way `cmdRun` gets it: `loadConfig` reads
+ * `.hench/config.json` and merges in the `hench` sections of `.n-dx.json`
+ * and `.n-dx.local.json` itself — nothing about that merge is re-done here.
+ *
+ * `loadConfig` throws when `.hench/config.json` doesn't exist at all (every
+ * real project has one; `ndx init` writes it), which several shapes below
+ * deliberately don't seed. Falling back to `DEFAULT_HENCH_CONFIG()` for that
+ * case matches what a freshly initialized project's file would contain —
+ * plain defaults, no override of its own — since none of those shapes also
+ * puts an override in `.n-dx.json` (the ones that do seed an empty
+ * `.hench/config.json` instead, so `loadConfig` actually runs its merge).
+ */
+async function henchConfigFor(dir) {
+  const henchDir = join(dir, ".hench");
+  try {
+    return await loadConfig(henchDir, { onInvalid: "use-defaults" });
+  } catch {
+    return DEFAULT_HENCH_CONFIG();
   }
 }
 
@@ -152,6 +189,35 @@ function shapesFor(vendor) {
       ndx: { llm: { vendor, routes: { "agent.execute": "heavy" } } },
       hench: undefined,
     },
+    {
+      // `.hench/config.json` exists (as it always does — `ndx init` writes
+      // it) but sets neither field itself, so the override is the only
+      // source. An empty object still needs writing: `loadConfig` throws on
+      // a missing file, which is not what "only in .n-dx.json" means.
+      name: "hench.models.<vendor> set only in .n-dx.json",
+      ndx: { llm: { vendor }, hench: { models: { [vendor]: override } } },
+      hench: {},
+    },
+    {
+      name: "hench.models.<vendor> set only in .n-dx.local.json",
+      ndx: { llm: { vendor } },
+      hench: {},
+      localNdx: { hench: { models: { [vendor]: override } } },
+    },
+    {
+      name: "hench.models.<vendor> set in both .hench/config.json and .n-dx.json — override wins",
+      ndx: { llm: { vendor }, hench: { models: { [vendor]: override } } },
+      hench: { models: { [vendor]: pinned } },
+    },
+    {
+      // The override's `models` is invalid as a whole (an empty-string entry
+      // fails hench's `.min(1)`), so both sides must revert the *entire*
+      // field to the `.hench/config.json` value rather than keep the base
+      // entry merged with a blanked-out override.
+      name: "invalid .n-dx.json models override reverts to .hench/config.json value",
+      ndx: { llm: { vendor }, hench: { models: { [vendor]: "" } } },
+      hench: { models: { [vendor]: pinned } },
+    },
   ];
 
   if (vendor === "claude") {
@@ -176,16 +242,18 @@ describe("web's effective-agent-config twin agrees with hench", () => {
   for (const vendor of VENDORS) {
     for (const shape of shapesFor(vendor)) {
       it(`${vendor}: ${shape.name}`, async () => {
-        await seed(shape.ndx, shape.hench);
+        await seed(shape.ndx, shape.hench, shape.localNdx);
 
         const web = await resolveEffectiveAgentConfig(projectDir);
 
-        // hench reads the same two files: `.n-dx.json` (+ local overlay)
-        // through this same loader, and `models` out of `.hench/config.json`.
+        // hench reads `.n-dx.json` (+ local overlay) through `loadLLMConfig`,
+        // and `provider`/`models` through its own config loader — which
+        // merges in the `hench` sections of both override files itself.
         const llmConfig = await loadLLMConfig(projectDir);
+        const henchConfig = await henchConfigFor(projectDir);
         const hench = resolveAgentModel({
           vendor,
-          henchModels: shape.hench?.models,
+          henchModels: henchConfig.models,
           llmConfig,
         });
 
@@ -222,7 +290,7 @@ describe("web's effective-agent-config twin agrees with hench", () => {
     const seen = new Set();
     for (const vendor of VENDORS) {
       for (const shape of shapesFor(vendor)) {
-        await seed(shape.ndx, shape.hench);
+        await seed(shape.ndx, shape.hench, shape.localNdx);
         seen.add((await resolveEffectiveAgentConfig(projectDir)).modelSource);
       }
     }
@@ -232,14 +300,16 @@ describe("web's effective-agent-config twin agrees with hench", () => {
 
 describe("web's hench.models reader agrees with hench's schema", () => {
   /**
-   * The matrix above compares the resolution *chain*, but it hands hench a
-   * `models` literal — so it cannot see the step where hench's config loader
-   * decides whether that map survives at all. `HenchConfigSchema.models` is
-   * `.strict()` with `z.string().min(1)` values, and `loadConfig`'s
-   * `onInvalid: "use-defaults"` salvage drops each invalid *top-level* field,
-   * `models` being an optional one the defaults do not carry. So one bad
-   * entry costs hench the whole map, and web must discard it identically or
-   * it reports an override the run will not apply.
+   * The matrix above now runs both sides through hench's own config loader,
+   * but only for `.hench/config.json` plus an optional `.n-dx.json`/
+   * `.n-dx.local.json` override. This block isolates the base-file step on
+   * its own: does web's reading of a bare `.hench/config.json` `models` field
+   * agree with what `HenchConfigSchema` would accept? `.strict()` with
+   * `z.string().min(1)` values, and `loadConfig`'s `onInvalid: "use-defaults"`
+   * salvage drops each invalid *top-level* field, `models` being an optional
+   * one the defaults do not carry. So one bad entry costs hench the whole
+   * map, and web must discard it identically or it reports an override the
+   * run will not apply.
    */
   const CASES = [
     { name: "all entries valid", models: { claude: "haiku", codex: "gpt-5.6-luna" } },
@@ -304,6 +374,29 @@ describe("web's provider switch agrees with hench's isProviderSupported", () => 
           // Unsupported "api" — codex only. hench refuses the run outright
           // rather than switching, so there is nothing to switch to and the
           // configured value is reported unchanged.
+          expect(provider).toBe(configured);
+          expect(isProviderSupported(vendor, provider)).toBe(false);
+        }
+      });
+    }
+  }
+
+  for (const vendor of VENDORS) {
+    for (const configured of ["cli", "api"]) {
+      it(`${vendor} + hench.provider=${configured} set only in .n-dx.json`, async () => {
+        // `.hench/config.json` exists (every real project has one) but sets
+        // no provider of its own, so `.n-dx.json`'s `hench.provider` is the
+        // only source — the documented override path, same as `models`.
+        await seed({ llm: { vendor }, hench: { provider: configured } }, {});
+
+        const { provider } = await resolveEffectiveAgentConfig(projectDir);
+
+        if (isProviderSupported(vendor, configured)) {
+          expect(provider).toBe(configured);
+        } else if (configured === "cli") {
+          expect(provider).toBe("api");
+          expect(isProviderSupported(vendor, provider)).toBe(true);
+        } else {
           expect(provider).toBe(configured);
           expect(isProviderSupported(vendor, provider)).toBe(false);
         }
