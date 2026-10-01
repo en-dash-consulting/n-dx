@@ -30,6 +30,7 @@ import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
 import { watchAnalyzeProgress } from "./analyze-progress-watcher.js";
+import { stopRunTailWatches } from "./run-tail.js";
 import { handleWorkspacesRoute } from "./routes-workspaces.js";
 import { invalidatePrdDelta } from "./prd-delta.js";
 import { WorkspaceRegistry } from "./workspaces.js";
@@ -140,6 +141,8 @@ export function registerShutdownHandlers(
     registry?.closeAll();
     // Lazily registered per-worktree runs watchers (GET /api/hench/runs?scope=repo).
     closeWorktreeRunWatchers();
+    // Leases taken by GET /api/hench/runs/:id/log|events.
+    stopRunTailWatches();
 
     // Step 1 — terminate hench child processes (highest priority: avoids orphaned agents)
     // Covers both hench-route executions and the rex epic-by-epic execution engine.

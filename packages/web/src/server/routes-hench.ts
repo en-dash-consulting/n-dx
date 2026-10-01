@@ -10,6 +10,8 @@
  *                                            searches every worktree)
  * GET    /api/hench/runs/health           — staleness health check for running runs
  * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
+ * GET    /api/hench/runs/:id/log          — run log from a byte cursor (?from=N); any worktree
+ * GET    /api/hench/runs/:id/events       — progress events after a seq cursor (?after=N); any worktree
  * GET    /api/hench/task-usage            — incremental per-task token usage aggregation
  * GET    /api/hench/audit                 — audit info for active tasks (PIDs, resource usage)
  * GET    /api/hench/metrics              — concurrent execution metrics and resource utilization
@@ -37,7 +39,7 @@
  * POST   /api/hench/throttle/emergency-stop — terminate all running executions immediately
  */
 
-import { readFileSync, readdirSync, writeFileSync, existsSync, watch } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync, existsSync, realpathSync, watch } from "node:fs";
 import type { FSWatcher } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join, basename } from "node:path";
@@ -81,6 +83,15 @@ import { readCliName } from "./cli-name.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { ProcessMemoryTracker } from "./process-memory-tracker.js";
 import { ConcurrentExecutionMetrics } from "./concurrent-execution-metrics.js";
+import {
+  isValidRunId,
+  readEventsAfter,
+  readLogChunk,
+  resolveRunEventsFile,
+  resolveRunLogFile,
+  watchRunTail,
+  type LocatedRun,
+} from "./run-tail.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -468,6 +479,128 @@ async function handleRunDetailRepoScope(rc: RouteContext, runId: string): Promis
   return true;
 }
 
+// ── Run tail (log + events) ─────────────────────────────────────────────────
+// `GET /api/hench/runs/:id/log?from=` and `/events?after=`. The run may live in
+// any worktree of the served repository; see run-tail.ts for confinement,
+// cursors and the watch lease behind `hench:run-appended` frames.
+
+/** `git worktree list` per served directory, briefly cached: clients tail about once a second. */
+const tailSourcesCache = new Map<string, { at: number; sources: Promise<WorktreeRunsSource[]> }>();
+const TAIL_SOURCES_TTL_MS = 5_000;
+
+function tailRunSources(ctx: ServerContext): Promise<WorktreeRunsSource[]> {
+  const cached = tailSourcesCache.get(ctx.projectDir);
+  if (cached && Date.now() - cached.at < TAIL_SOURCES_TTL_MS) return cached.sources;
+  const sources = resolveRunSources(ctx);
+  tailSourcesCache.set(ctx.projectDir, { at: Date.now(), sources });
+  return sources;
+}
+
+function samePath(a: string, b: string): boolean {
+  try {
+    return realpathSync.native(a) === realpathSync.native(b);
+  } catch {
+    return a === b;
+  }
+}
+
+/**
+ * Find a run for tailing: the served directory first, then every worktree.
+ * Returns the registered worktree roots alongside, since confinement needs
+ * them. Null when the run is unknown or belongs to no registered worktree.
+ */
+async function locateRunForTail(
+  rc: RouteContext,
+  runId: string,
+): Promise<{ located: LocatedRun; roots: string[] } | null> {
+  if (!isValidRunId(runId)) return null;
+  const sources = await tailRunSources(rc.ctx);
+  const roots = sources.length > 0 ? sources.map((s) => s.worktree.path) : [rc.ctx.projectDir];
+  const candidates = [
+    { runsDir: rc.runsDir, root: rc.ctx.projectDir },
+    ...sources.map((s) => ({ runsDir: s.runsDir, root: s.worktree.path })),
+  ];
+  for (const { runsDir, root } of candidates) {
+    const run = loadRunFile(runsDir, runId);
+    if (!run) continue;
+    const claimed = typeof run.worktreeRoot === "string" ? [run.worktreeRoot, root] : [root];
+    const worktreeRoot = claimed.map((c) => roots.find((r) => samePath(r, c))).find((r) => r !== undefined);
+    if (!worktreeRoot) return null;
+    return { located: { run, runsDir, worktreeRoot }, roots };
+  }
+  return null;
+}
+
+/** Non-negative integer query parameter, or 0. */
+function cursorParam(rc: RouteContext, name: string): number {
+  if (rc.qIdx === -1) return 0;
+  const raw = new URLSearchParams(rc.fullPath.slice(rc.qIdx)).get(name);
+  const value = raw === null ? 0 : Number.parseInt(raw, 10);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/** Take or renew the watch lease on a running run, so appends are announced. */
+function watchIfRunning(rc: RouteContext, runId: string, located: LocatedRun, roots: string[]): void {
+  if (!rc.broadcast || located.run.status !== "running") return;
+  const events = resolveRunEventsFile(located, roots);
+  watchRunTail({
+    key: `${rc.ctx.workspace ?? ""}\u0000${located.runsDir}\u0000${runId}`,
+    runId,
+    logPath: resolveRunLogFile(located, roots)?.path,
+    eventsPath: events.kind === "file" ? events.path : null,
+    broadcast: rc.broadcast,
+  });
+}
+
+/** GET /api/hench/runs/:id/log?from=<byte offset> */
+async function handleRunLogTail(rc: RouteContext, runId: string): Promise<boolean> {
+  const found = await locateRunForTail(rc, runId);
+  const file = found ? resolveRunLogFile(found.located, found.roots) : null;
+  if (!found || !file) {
+    errorResponse(rc.res, 404, `Log for run "${runId}" not found`);
+    return true;
+  }
+  const chunk = readLogChunk(file.path, cursorParam(rc, "from"));
+  const status = found.located.run.status;
+  watchIfRunning(rc, runId, found.located, found.roots);
+  jsonResponse(rc.res, 200, {
+    runId,
+    status,
+    running: status === "running",
+    source: file.source,
+    ...chunk,
+    more: chunk.next < chunk.size,
+  });
+  return true;
+}
+
+/** GET /api/hench/runs/:id/events?after=<seq> */
+async function handleRunEventsTail(rc: RouteContext, runId: string): Promise<boolean> {
+  const found = await locateRunForTail(rc, runId);
+  const file = found ? resolveRunEventsFile(found.located, found.roots) : null;
+  if (!found || !file || file.kind === "refused") {
+    errorResponse(rc.res, 404, `Events for run "${runId}" not found`);
+    return true;
+  }
+  const after = cursorParam(rc, "after");
+  const status = found.located.run.status;
+  const base = { runId, status, running: status === "running", after };
+  watchIfRunning(rc, runId, found.located, found.roots);
+  if (file.kind === "absent") {
+    jsonResponse(rc.res, 200, { ...base, available: false, events: [], next: after, more: false });
+    return true;
+  }
+  const chunk = readEventsAfter(file.path, after);
+  jsonResponse(rc.res, 200, {
+    ...base,
+    available: true,
+    events: chunk.events,
+    next: chunk.next,
+    more: chunk.next < chunk.total,
+  });
+  return true;
+}
+
 // ── Sub-routers ─────────────────────────────────────────────────────────────
 // Each sub-router handles a resource group under /api/hench/.
 // Returns false if the path doesn't belong to its group.
@@ -619,6 +752,12 @@ function routeRuns(rc: RouteContext): boolean | Promise<boolean> | null {
   const markStuckMatch = rc.path.match(/^runs\/([^/?]+)\/mark-stuck$/);
   if (markStuckMatch && rc.method === "POST") {
     return handleMarkStuck(markStuckMatch[1], rc.res, rc.runsDir, rc.onStatusInvalidate);
+  }
+  const tailMatch = rc.path.match(/^runs\/([^/?]+)\/(log|events)$/);
+  if (tailMatch && rc.method === "GET") {
+    return tailMatch[2] === "log"
+      ? handleRunLogTail(rc, tailMatch[1]!)
+      : handleRunEventsTail(rc, tailMatch[1]!);
   }
 
   // GET /api/hench/runs — list runs with summary (?limit=N&offset=N&taskId=&scope=repo)
