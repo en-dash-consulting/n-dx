@@ -24,10 +24,23 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A run log ending in an incomplete UTF-8 sequence makes the Log tab refetch the same cursor forever](./a-run-log-ending-in-an-incomplete-utf.md) | pending |
+| [A stale analyze progress file whose pid was reused shows a phantom running analysis, and Stop signals the unrelated process](./a-stale-analyze-progress-file-whose.md) | pending |
 | [Add loop position and hub-queued execute requests to GET /api/live](./add-loop-position-and-hub-queued.md) | pending |
 | [Add one live endpoint listing every running run and job across the repository's worktrees](./add-one-live-endpoint-listing-every.md) | completed |
 | [Add tail routes and WebSocket frames for a running hench run's log and events](./add-tail-routes-and-websocket-frames.md) | completed |
+| [An analyze that fails after its phases is recorded as failed with no reason](./an-analyze-that-fails-after-its-phases.md) | pending |
+| [/api/live re-parses the PRD index on a 10-second timer instead of when the file changes](./api-live-re-parses-the-prd-index-on-a.md) | pending |
+| [/api/live shows a run whose process died as healthy for up to 5 minutes although pidAlive is known](./api-live-shows-a-run-whose-process.md) | pending |
+| [During a --deep analyze, sub-package phases are compared with the root's previous times and cost resets per package](./during-a-deep-analyze-sub-package.md) | pending |
 | [Expose structured sourcevision analyze progress: phase, enrichment pass, batch and model calls](./expose-structured-sourcevision-analyze.md) | completed |
+| [Live test gaps: clock-dependent analyze route fixture, untested stop handlers and log-stream fallback, unregistered LiveSources seam](./live-test-gaps-clock-dependent-analyze.md) | pending |
+| [On a project's first run the live .run-logs file is not git-ignored, so --review commits it as a review repair](./on-a-project-s-first-run-the-live-run.md) | pending |
 | [Record a structured progress event stream for every hench run, not only in verbose mode](./record-a-structured-progress-event.md) | completed |
 | [Record the agent process pid on the run record for every run](./record-the-agent-process-pid-on-the.md) | completed |
+| [Tail path confinement trusts .run-logs or .hench/runs when the directory itself is a symlink](./tail-path-confinement-trusts-run-logs.md) | pending |
+| [The live analysis page's last-run times and estimate filter on exact mode, so cascade runs get none in phases 1-3 or an old run's](./the-live-analysis-page-s-last-run.md) | pending |
+| [The live analysis page shows an older dashboard run's output and error against a newer terminal-started run](./the-live-analysis-page-shows-an-older.md) | pending |
+| [The Live machine strip's vendor and model ignore the default vendor and hench model overrides, disagreeing with the effective config](./the-live-machine-strip-s-vendor-and.md) | pending |
+| [vendorPid is not recorded while the review pass and the warm-parent orientation spawn are running](./vendorpid-is-not-recorded-while-the.md) | pending |
 | [Write the hench run log incrementally while the run is in progress](./write-the-hench-run-log-incrementally.md) | completed |
