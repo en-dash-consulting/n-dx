@@ -24,7 +24,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A run log ending in an incomplete UTF-8 sequence makes the Log tab refetch the same cursor forever](./a-run-log-ending-in-an-incomplete-utf.md) | pending |
+| [A run log ending in an incomplete UTF-8 sequence makes the Log tab refetch the same cursor forever](./a-run-log-ending-in-an-incomplete-utf.md) | in_progress |
 | [A stale analyze progress file whose pid was reused shows a phantom running analysis, and Stop signals the unrelated process](./a-stale-analyze-progress-file-whose.md) | pending |
 | [Add loop position and hub-queued execute requests to GET /api/live](./add-loop-position-and-hub-queued.md) | pending |
 | [Add one live endpoint listing every running run and job across the repository's worktrees](./add-one-live-endpoint-listing-every.md) | completed |

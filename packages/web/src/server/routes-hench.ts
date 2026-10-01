@@ -562,8 +562,8 @@ async function handleRunLogTail(rc: RouteContext, runId: string): Promise<boolea
     errorResponse(rc.res, 404, `Log for run "${runId}" not found`);
     return true;
   }
-  const chunk = readLogChunk(file.path, cursorParam(rc, "from"));
   const status = found.located.run.status;
+  const chunk = readLogChunk(file.path, cursorParam(rc, "from"), undefined, { final: status !== "running" });
   watchIfRunning(rc, runId, found.located, found.roots);
   jsonResponse(rc.res, 200, {
     runId,

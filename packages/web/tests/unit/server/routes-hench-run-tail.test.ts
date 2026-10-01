@@ -171,6 +171,17 @@ describe("hench run tail routes", () => {
       expect(second.body.content).toBe("é!");
     });
 
+    it("ends a finished run's log that stops inside a character with U+FFFD and more: false", async () => {
+      const path = logFile(repo, "2026-09-30T10-00-00-run-cut.log", "");
+      writeFileSync(path, Buffer.from([0x41, 0xe9]));
+      writeRun(repo, "run-cut", { logPath: path, status: "failed" });
+      server = await serve(repo);
+      const { body } = await get("/api/hench/runs/run-cut/log");
+      expect(body.content).toBe("A�");
+      expect(body.next).toBe(2);
+      expect(body.more).toBe(false);
+    });
+
     it("restarts from 0 when the cursor is past the end of the file", async () => {
       server = await serve(repo);
       const { body } = await get("/api/hench/runs/run-live/log?from=999999");

@@ -29,6 +29,15 @@ describe("utf8CompletePrefixLength", () => {
   it("handles an empty buffer", () => {
     expect(utf8CompletePrefixLength(Buffer.alloc(0))).toBe(0);
   });
+
+  it.each([
+    ["0xF8", [0x41, 0xf8]],
+    ["0xFF", [0x41, 0xff]],
+    ["0xF5", [0x41, 0xf5, 0x80]],
+    ["overlong 0xC0", [0x41, 0xc0]],
+  ])("does not hold back a lead byte that can never complete (%s)", (_name, bytes) => {
+    expect(utf8CompletePrefixLength(Buffer.from(bytes))).toBe(bytes.length);
+  });
 });
 
 describe("readers", () => {
@@ -52,6 +61,31 @@ describe("readers", () => {
       cursor = chunk.next;
     }
     expect(out).toBe(text);
+  });
+
+  it("holds an unfinished trailing character while the log can still grow", () => {
+    const path = join(dir, "partial.log");
+    writeFileSync(path, Buffer.from([0x41, 0xe9]));
+    const chunk = readLogChunk(path, 0);
+    expect(chunk.content).toBe("A");
+    expect(chunk.next).toBe(1);
+  });
+
+  it("emits an unfinished trailing character as U+FFFD once the log is final", () => {
+    const path = join(dir, "partial.log");
+    writeFileSync(path, Buffer.from([0x41, 0xe9]));
+    const chunk = readLogChunk(path, 0, undefined, { final: true });
+    expect(chunk.content).toBe("A�");
+    expect(chunk.next).toBe(2);
+    expect(chunk.size).toBe(2);
+  });
+
+  it("still holds a split character mid-file when final, if the page ends before EOF", () => {
+    const path = join(dir, "split.log");
+    writeFileSync(path, "aé!");
+    const chunk = readLogChunk(path, 0, 2, { final: true });
+    expect(chunk.content).toBe("a");
+    expect(chunk.next).toBe(1);
   });
 
   it("spends a seq on a malformed event line without returning it", () => {

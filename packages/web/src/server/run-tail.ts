@@ -186,13 +186,15 @@ export function resolveRunEventsFile(located: LocatedRun, worktreeRoots: readonl
 /**
  * Length of the longest prefix of `buf` that does not end inside a UTF-8
  * multi-byte sequence. Only the last three bytes can belong to an unfinished
- * sequence, so only they are inspected.
+ * sequence, so only they are inspected. A byte that is never a valid lead
+ * (0xC0, 0xC1, 0xF5 and up) is not held back: no later byte can complete it.
  */
 export function utf8CompletePrefixLength(buf: Buffer): number {
   const len = buf.length;
   for (let back = 1; back <= Math.min(3, len); back++) {
     const byte = buf[len - back]!;
     if ((byte & 0xc0) === 0x80) continue; // continuation byte — keep looking for the lead
+    if (byte === 0xc0 || byte === 0xc1 || byte >= 0xf5) return len;
     const need = byte >= 0xf0 ? 4 : byte >= 0xe0 ? 3 : byte >= 0xc0 ? 2 : 1;
     return need > back ? len - back : len;
   }
@@ -211,8 +213,23 @@ export interface LogChunk {
   reset: boolean;
 }
 
+export interface ReadLogChunkOptions {
+  /**
+   * The log will not grow (the run has finished). A trailing unfinished
+   * character at EOF is then returned, decoding to U+FFFD, rather than held
+   * back for bytes that will never arrive — otherwise `next` never reaches
+   * the size and a reader asks for the same cursor forever.
+   */
+  final?: boolean;
+}
+
 /** Read up to `maxBytes` of the log starting at byte `from`. */
-export function readLogChunk(path: string, from: number, maxBytes = MAX_LOG_CHUNK_BYTES): LogChunk {
+export function readLogChunk(
+  path: string,
+  from: number,
+  maxBytes = MAX_LOG_CHUNK_BYTES,
+  { final = false }: ReadLogChunkOptions = {},
+): LogChunk {
   const fd = openSync(path, "r");
   try {
     const size = statSync(path).size;
@@ -221,7 +238,8 @@ export function readLogChunk(path: string, from: number, maxBytes = MAX_LOG_CHUN
     const length = Math.min(maxBytes, size - start);
     const buf = Buffer.alloc(length);
     const read = length > 0 ? readSync(fd, buf, 0, length, start) : 0;
-    const complete = utf8CompletePrefixLength(buf.subarray(0, read));
+    const atEof = start + read === size;
+    const complete = final && atEof ? read : utf8CompletePrefixLength(buf.subarray(0, read));
     return {
       content: buf.subarray(0, complete).toString("utf-8"),
       from: start,
