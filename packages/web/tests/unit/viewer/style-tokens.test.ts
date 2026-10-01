@@ -20,7 +20,7 @@ const STYLES_DIR = join(import.meta.dirname, "../../../src/viewer/styles");
 /**
  * Undefined properties that predate this test.
  *
- * Every one is a real defect — `llm-provider.css` in particular is written
+ * Every one is a real defect — `robot-wrangler.css` in particular is written
  * against a `--color-*` / `--spacing-*` scheme the project never adopted, so
  * most of its declarations do nothing. They are listed rather than fixed
  * because repairing them means choosing replacement values, which is a

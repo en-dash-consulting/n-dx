@@ -70,13 +70,13 @@ describe("the live-task renderer", () => {
 /** Wires the route and the settings page memory the way main.ts does. */
 function Harness() {
   const { view, selectedTaskId, navigateTo, handleSidebarNav } = useRouteState(ALL);
-  const settingsOpen = view === "llm-provider";
+  const settingsOpen = view === "robot-wrangler";
   const { page, lastEntry } = usePageEntry(
     { view, file: null, zone: null, runId: null, taskId: selectedTaskId }, settingsOpen, "home",
   );
   return h(Fragment, null,
     h("div", { class: "page" }, `${page.view}|${page.taskId ?? ""}`),
-    h("button", { class: "open", onClick: () => handleSidebarNav("llm-provider") }, "open"),
+    h("button", { class: "open", onClick: () => handleSidebarNav("robot-wrangler") }, "open"),
     h("button", { class: "close", onClick: () => navigateTo(lastEntry.view, { taskId: lastEntry.taskId ?? undefined }) }, "close"),
     h("button", { class: "bare", onClick: () => handleSidebarNav("live-task") }, "bare"),
   );
@@ -107,7 +107,7 @@ describe("route handling", () => {
     expect(pageText()).toBe("live-task|X");
 
     click("open");
-    expect(location.pathname).toBe("/llm-provider");
+    expect(location.pathname).toBe("/robot-wrangler");
     expect(pageText()).toBe("live-task|X"); // the page stays rendered underneath
 
     click("close");

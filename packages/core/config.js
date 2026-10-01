@@ -2005,8 +2005,9 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     (default: 300000 = 5 min; 0 = no timeout)
                                     Raise this when the model is slow to generate or load,
                                     e.g. 7200000 for 2 hours. This is separate from
-                                    cli.timeoutMs / the "CLI Timeouts" settings page, which
-                                    bound the whole command rather than one HTTP request.
+                                    cli.timeoutMs / the CLI timeouts on the Workflow settings
+                                    page, which bound the whole command rather than one
+                                    HTTP request.
   llm.local.verifier.host  string    Hostname of a second local server used to review the
                                     primary model's output before finalizing a run (optional)
   llm.local.verifier.port  number    Port of the verifier server (optional)

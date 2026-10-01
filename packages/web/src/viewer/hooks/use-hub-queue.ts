@@ -19,12 +19,18 @@
  *
  * ## Where the request goes
  *
- * `/api/hub/queue`, which `installBasePathFetch` rewrites to
- * `/p/<id>/api/hub/queue` when the viewer is served under a project prefix.
- * The hub answers that itself rather than proxying it, and scopes `entries`
- * to the project that asked. Without a hub — the single-project server, or a
+ * `/api/hub/queue`, which `installBasePathFetch` rewrites to sit under this
+ * viewer's whole base path — `/p/<id>/api/hub/queue`, and on a worktree page
+ * `/p/<id>/w/<key>/api/hub/queue`. The hub answers all of those itself rather
+ * than proxying them, scoping `entries` to the project the prefix named and
+ * ignoring the worktree slot. Without a hub — the single-project server, or a
  * static export — nothing answers and the hook stays null, which is how
  * every consumer renders nothing.
+ *
+ * That last behaviour is why the slot has to be handled on the hub's side:
+ * a 404 here is indistinguishable from "there is no hub", so a path the hub
+ * declines to answer does not surface as an error, it surfaces as a strip
+ * that is permanently empty.
  *
  * @module web/viewer/hooks/use-hub-queue
  */

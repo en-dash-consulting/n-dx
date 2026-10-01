@@ -1,37 +1,4 @@
-/* Feature Toggles view — manage feature flags across packages */
-
-.ft-container {
-  max-width: 900px;
-}
-
-/* ── Header ──────────────────────────────────────────────────────────── */
-
-.ft-header {
-  margin-bottom: var(--space-5);
-}
-
-.ft-header-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-.ft-header-logo {
-  flex-shrink: 0;
-}
-
-.ft-header-title {
-  font-size: var(--font-xl);
-  font-weight: var(--weight-semibold);
-}
-
-.ft-header-subtitle {
-  font-size: var(--font-base);
-  color: var(--text-dim);
-  margin: 0;
-  line-height: var(--leading-relaxed);
-}
+/* Feature flags section (on the Project page) — flags grouped by package */
 
 /* ── Error states ────────────────────────────────────────────────────── */
 
@@ -294,6 +261,12 @@
   background: color-mix(in srgb, var(--brand-teal) 12%, transparent);
 }
 
+/* Flipped, not yet saved. */
+.ft-badge-unsaved {
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+
 /* ── Legend ───────────────────────────────────────────────────────────── */
 
 .ft-legend {
@@ -318,41 +291,6 @@
 .ft-legend-sep {
   color: var(--text-muted);
   font-size: var(--font-xs);
-}
-
-/* ── Toast notification ──────────────────────────────────────────────── */
-
-.ft-toast {
-  position: fixed;
-  bottom: calc(20px + var(--bottombar-h, 0px));
-  right: 20px;
-  background: var(--green);
-  color: var(--bg);
-  padding: 10px 18px;
-  border-radius: var(--radius-lg);
-  font-size: var(--font-base);
-  font-weight: var(--weight-semibold);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  animation: ft-toast-in 0.2s ease-out;
-  z-index: 1000;
-}
-
-.ft-toast-icon {
-  font-size: var(--font-lg);
-}
-
-@keyframes ft-toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────── */

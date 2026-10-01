@@ -11,10 +11,12 @@ export type { ViewId } from "./view-id.js";
 export type { FeatureToggle, FeaturesResponse } from "./features.js";
 export type { ViewerScope, SourcevisionScopeViewId } from "./view-routing.js";
 export {
+  HUB_PATH,
   PROJECT_PATH_PREFIX,
   WORKSPACE_PATH_PREFIX,
   detectBasePath,
   detectViewerBasePath,
+  isHubChooserPath,
   projectIdFromBasePath,
   safeDecodeSegment,
   workspaceKeyFromBasePath,

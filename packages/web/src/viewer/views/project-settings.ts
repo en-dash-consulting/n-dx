@@ -1,5 +1,6 @@
 /**
- * Project Settings view — configure project-level n-dx settings.
+ * Project settings section — the project-level n-dx settings the Project page
+ * renders: language, zone analysis (`analyze` / `plan`) and the dashboard port.
  *
  * Surfaces the following fields from `.n-dx.json`:
  * - web.port           — dashboard server port (numeric, 1–65535)
@@ -8,12 +9,13 @@
  * - sourcevision.zones.pins           — file → zone override map (key-value)
  *
  * Data comes from GET /api/project-settings (read) and
- * PUT /api/project-settings (update).
+ * PUT /api/project-settings (update). The page owns the frame and the Save
+ * button; this module owns the form state (`useProjectSettingsForm`) and the
+ * fields (`ProjectSettingsSection`).
  */
 
 import { h } from "preact";
-import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { NdxLogoPng } from "../components/index.js";
+import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { useCliName } from "../hooks/index.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -23,6 +25,13 @@ interface ProjectSettingsResponse {
   language: string | null;
   sourcevisionMergeThreshold: number | null;
   sourcevisionPins: Record<string, string>;
+}
+
+/** One editable row of the zone-pins table. `id` is a stable render key. */
+interface PinRow {
+  id: number;
+  filePath: string;
+  zoneId: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -36,97 +45,217 @@ const LANGUAGE_OPTIONS = [
 
 const DEFAULT_PORT = 3117;
 
-// ── Toast ─────────────────────────────────────────────────────────────
+function validatePort(raw: string): string | null {
+  if (raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 65535) return "Must be an integer between 1 and 65535";
+  return null;
+}
 
-function SaveToast({ message }: { message: string | null }) {
-  if (!message) return null;
-  return h("div", { class: "ps-toast", role: "status", "aria-live": "polite" },
-    h("span", { class: "ps-toast-icon" }, "\u2714"),
-    h("span", null, message),
+function validateMerge(raw: string): string | null {
+  if (raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) return "Must be a non-negative integer (zone size in files)";
+  return null;
+}
+
+const asText = (n: number | null): string => (n != null ? String(n) : "");
+
+function rowsFrom(pins: Record<string, string>): PinRow[] {
+  return Object.entries(pins).map(([filePath, zoneId], i) => ({ id: i, filePath, zoneId }));
+}
+
+/**
+ * The PUT body for a pins table: a removed or renamed path maps to null, a new
+ * or changed pin to its zone. A row with no path is not a pin yet and is ignored.
+ */
+export function diffPins(
+  saved: Record<string, string>,
+  rows: readonly PinRow[],
+): Record<string, string | null> {
+  const wanted = new Map<string, string>();
+  for (const row of rows) {
+    if (row.filePath) wanted.set(row.filePath, row.zoneId);
+  }
+  const updates: Record<string, string | null> = {};
+  for (const path of Object.keys(saved)) {
+    if (!wanted.has(path)) updates[path] = null;
+  }
+  for (const [path, zoneId] of wanted) {
+    if (saved[path] !== zoneId) updates[path] = zoneId || null;
+  }
+  return updates;
+}
+
+// ── Form state ────────────────────────────────────────────────────────
+
+/** State and actions of the project-settings form. The Project page owns it. */
+export interface ProjectSettingsForm {
+  data: ProjectSettingsResponse | null;
+  loading: boolean;
+  /** Why the settings could not be loaded. */
+  loadError: string | null;
+  /** Why the last save failed. Cleared by the next save or a discard. */
+  saveError: string | null;
+  portRaw: string;
+  language: string;
+  mergeThreshold: string;
+  pinRows: PinRow[];
+  portError: string | null;
+  mergeError: string | null;
+  portDirty: boolean;
+  langDirty: boolean;
+  mergeDirty: boolean;
+  pinsDirty: boolean;
+  /** True while any field differs from its saved value. */
+  dirty: boolean;
+  setPortRaw: (raw: string) => void;
+  setLanguage: (value: string) => void;
+  setMergeThreshold: (raw: string) => void;
+  addPin: () => void;
+  updatePin: (id: number, field: "filePath" | "zoneId", value: string) => void;
+  removePin: (id: number) => void;
+  /**
+   * PUT the changed fields to /api/project-settings. Resolves true once saved
+   * (or when nothing is dirty); false leaves the edits in place with
+   * `saveError` set.
+   */
+  save: () => Promise<boolean>;
+  /** Restore every field to its saved value. */
+  discard: () => void;
+}
+
+export function useProjectSettingsForm(): ProjectSettingsForm {
+  const [data, setData] = useState<ProjectSettingsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const [portRaw, setPortRaw] = useState("");
+  const [language, setLanguage] = useState("auto");
+  const [mergeThreshold, setMergeThreshold] = useState("");
+  const [pinRows, setPinRows] = useState<PinRow[]>([]);
+  const [nextPinId, setNextPinId] = useState(0);
+
+  /** Make `s` the saved state and every field show it. */
+  const adopt = useCallback((s: ProjectSettingsResponse) => {
+    setData(s);
+    setPortRaw(asText(s.port));
+    setLanguage(s.language ?? "auto");
+    setMergeThreshold(asText(s.sourcevisionMergeThreshold));
+    const rows = rowsFrom(s.sourcevisionPins);
+    setPinRows(rows);
+    setNextPinId(rows.length);
+  }, []);
+
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/project-settings");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Failed to load" }));
+        setLoadError((body as { error?: string }).error ?? "Failed to load project settings");
+        return;
+      }
+      adopt(await res.json() as ProjectSettingsResponse);
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load project settings");
+    } finally {
+      setLoading(false);
+    }
+  }, [adopt]);
+
+  useEffect(() => { void fetchSettings(); }, [fetchSettings]);
+
+  const portError = validatePort(portRaw);
+  const mergeError = validateMerge(mergeThreshold);
+
+  const savedPins = data?.sourcevisionPins;
+  const pinUpdates = useMemo(
+    () => (savedPins ? diffPins(savedPins, pinRows) : {}),
+    [savedPins, pinRows],
   );
+
+  const portDirty = data != null && portRaw !== asText(data.port);
+  const langDirty = data != null && language !== (data.language ?? "auto");
+  const mergeDirty = data != null && mergeThreshold !== asText(data.sourcevisionMergeThreshold);
+  const pinsDirty = Object.keys(pinUpdates).length > 0;
+  const dirty = portDirty || langDirty || mergeDirty || pinsDirty;
+  const hasErrors = portError != null || mergeError != null;
+
+  const addPin = useCallback(() => {
+    setPinRows((prev) => [...prev, { id: nextPinId, filePath: "", zoneId: "" }]);
+    setNextPinId((n) => n + 1);
+  }, [nextPinId]);
+
+  const updatePin = useCallback((id: number, field: "filePath" | "zoneId", value: string) => {
+    setPinRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  }, []);
+
+  const removePin = useCallback((id: number) => {
+    setPinRows((prev) => prev.filter((r) => r.id !== id));
+  }, []);
+
+  const save = useCallback(async (): Promise<boolean> => {
+    if (!dirty) return true;
+    setSaveError(null);
+    if (hasErrors) {
+      setSaveError("Fix the invalid project settings before saving");
+      return false;
+    }
+    const body: Record<string, unknown> = {};
+    if (portDirty) body["port"] = portRaw === "" ? null : parseInt(portRaw, 10);
+    if (langDirty) body["language"] = language === "auto" ? null : language;
+    if (mergeDirty) {
+      body["sourcevisionMergeThreshold"] =
+        mergeThreshold === "" ? null : parseInt(mergeThreshold, 10);
+    }
+    if (pinsDirty) body["sourcevisionPins"] = pinUpdates;
+
+    try {
+      const res = await fetch("/api/project-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: "Save failed" }));
+        setSaveError((errBody as { error?: string }).error ?? "Failed to save");
+        return false;
+      }
+      adopt((await res.json() as { settings: ProjectSettingsResponse }).settings);
+      return true;
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save");
+      return false;
+    }
+  }, [
+    dirty, hasErrors, portDirty, portRaw, langDirty, language,
+    mergeDirty, mergeThreshold, pinsDirty, pinUpdates, adopt,
+  ]);
+
+  const discard = useCallback(() => {
+    if (data) adopt(data);
+    setSaveError(null);
+  }, [data, adopt]);
+
+  return {
+    data, loading, loadError, saveError,
+    portRaw, language, mergeThreshold, pinRows,
+    portError, mergeError,
+    portDirty, langDirty, mergeDirty, pinsDirty, dirty,
+    setPortRaw, setLanguage, setMergeThreshold,
+    addPin, updatePin, removePin,
+    save, discard,
+  };
 }
 
 // ── Zone pins editor ──────────────────────────────────────────────────
 
-interface PinRow {
-  id: string;
-  filePath: string;
-  zoneId: string;
-  saved: boolean;
-}
-
-function PinEditor({
-  pins,
-  onChange,
-}: {
-  pins: Record<string, string>;
-  onChange: (updates: Record<string, string | null>) => void;
-}) {
-  const [rows, setRows] = useState<PinRow[]>(() =>
-    Object.entries(pins).map(([filePath, zoneId], i) => ({
-      id: String(i),
-      filePath,
-      zoneId,
-      saved: true,
-    })),
-  );
-
-  // Sync when props change (after save)
-  const propsRef = useRef(pins);
-  useEffect(() => {
-    if (pins === propsRef.current) return;
-    propsRef.current = pins;
-    setRows(
-      Object.entries(pins).map(([filePath, zoneId], i) => ({
-        id: String(i),
-        filePath,
-        zoneId,
-        saved: true,
-      })),
-    );
-  }, [pins]);
-
-  const addRow = useCallback(() => {
-    setRows((prev) => [
-      ...prev,
-      { id: String(Date.now()), filePath: "", zoneId: "", saved: false },
-    ]);
-  }, []);
-
-  const updateRow = useCallback((id: string, field: "filePath" | "zoneId", value: string) => {
-    setRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, [field]: value, saved: false } : r)),
-    );
-  }, []);
-
-  const removeRow = useCallback((id: string) => {
-    setRows((prev) => {
-      const removed = prev.find((r) => r.id === id);
-      const next = prev.filter((r) => r.id !== id);
-      // Signal removal of saved key
-      if (removed?.saved && removed.filePath) {
-        onChange({ [removed.filePath]: null });
-      }
-      return next;
-    });
-  }, [onChange]);
-
-  // Emit changes whenever rows mutate
-  const rowsRef = useRef(rows);
-  useEffect(() => {
-    if (rows === rowsRef.current) return;
-    rowsRef.current = rows;
-    const updates: Record<string, string | null> = {};
-    for (const row of rows) {
-      if (!row.saved && row.filePath) {
-        updates[row.filePath] = row.zoneId || null;
-      }
-    }
-    if (Object.keys(updates).length > 0) onChange(updates);
-  }, [rows, onChange]);
-
+function PinEditor({ form }: { form: ProjectSettingsForm }) {
+  const { pinRows } = form;
   return h("div", { class: "ps-pin-editor" },
-    rows.length === 0
+    pinRows.length === 0
       ? h("p", { class: "ps-pin-empty" }, "No zone pins configured. Add a pin to override zone detection for a specific file.")
       : h("table", { class: "ps-pin-table" },
           h("thead", null,
@@ -137,7 +266,7 @@ function PinEditor({
             ),
           ),
           h("tbody", null,
-            rows.map((row) =>
+            pinRows.map((row) =>
               h("tr", { key: row.id },
                 h("td", null,
                   h("input", {
@@ -145,8 +274,9 @@ function PinEditor({
                     class: "ps-pin-input",
                     value: row.filePath,
                     placeholder: "src/server/index.ts",
+                    "aria-label": "Pinned file path",
                     onInput: (e: Event) =>
-                      updateRow(row.id, "filePath", (e.target as HTMLInputElement).value),
+                      form.updatePin(row.id, "filePath", (e.target as HTMLInputElement).value),
                   }),
                 ),
                 h("td", null,
@@ -155,251 +285,63 @@ function PinEditor({
                     class: "ps-pin-input",
                     value: row.zoneId,
                     placeholder: "web-server",
+                    "aria-label": "Pinned zone ID",
                     onInput: (e: Event) =>
-                      updateRow(row.id, "zoneId", (e.target as HTMLInputElement).value),
+                      form.updatePin(row.id, "zoneId", (e.target as HTMLInputElement).value),
                   }),
                 ),
                 h("td", null,
                   h("button", {
+                    type: "button",
                     class: "ps-pin-remove",
-                    onClick: () => removeRow(row.id),
+                    onClick: () => form.removePin(row.id),
                     "aria-label": "Remove pin",
                     title: "Remove",
-                  }, "\u2715"),
+                  }, "✕"),
                 ),
               ),
             ),
           ),
         ),
-    h("button", { class: "ps-pin-add", onClick: addRow },
+    h("button", { type: "button", class: "ps-pin-add", onClick: form.addPin },
       h("span", { "aria-hidden": "true" }, "+"),
       " Add pin",
     ),
   );
 }
 
-// ── Main view ─────────────────────────────────────────────────────────
+// ── Section ───────────────────────────────────────────────────────────
 
-export function ProjectSettingsView() {
+/** A fresh vnode per use: one vnode object must not be mounted in two places. */
+const dirtyMark = () => h("span", { class: "ps-dirty-indicator" }, " •");
+
+export function ProjectSettingsSection({ form }: { form: ProjectSettingsForm }) {
   const cliName = useCliName();
-  const [data, setData] = useState<ProjectSettingsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const toastRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Editable state (strings for controlled inputs)
-  const [portRaw, setPortRaw] = useState<string>("");
-  const [language, setLanguage] = useState<string>("auto");
-  const [mergeThreshold, setMergeThreshold] = useState<string>("");
-  // Pending pin updates: filePath → zoneId | null (null = remove)
-  const [pinUpdates, setPinUpdates] = useState<Record<string, string | null>>({});
-
-  const [portError, setPortError] = useState<string | null>(null);
-  const [mergeError, setMergeError] = useState<string | null>(null);
-
-  const fetchSettings = useCallback(async () => {
-    try {
-      const res = await fetch("/api/project-settings");
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setError((body as { error?: string }).error ?? "Failed to load project settings");
-        return;
-      }
-      const json = await res.json() as ProjectSettingsResponse;
-      setData(json);
-      setPortRaw(json.port != null ? String(json.port) : "");
-      setLanguage(json.language ?? "auto");
-      setMergeThreshold(
-        json.sourcevisionMergeThreshold != null
-          ? String(json.sourcevisionMergeThreshold)
-          : "",
-      );
-      setPinUpdates({});
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load project settings");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchSettings(); }, [fetchSettings]);
-
-  useEffect(() => {
-    return () => {
-      if (toastRef.current) clearTimeout(toastRef.current);
-    };
-  }, []);
-
-  // Validation helpers
-  const validatePort = useCallback((raw: string): string | null => {
-    if (raw === "") return null;
-    const n = Number(raw);
-    if (!Number.isInteger(n) || n < 1 || n > 65535) return "Must be an integer between 1 and 65535";
-    return null;
-  }, []);
-
-  const validateMerge = useCallback((raw: string): string | null => {
-    if (raw === "") return null;
-    const n = Number(raw);
-    if (!Number.isInteger(n) || n < 0) return "Must be a non-negative integer (zone size in files)";
-    return null;
-  }, []);
-
-  const handlePortChange = useCallback((raw: string) => {
-    setPortRaw(raw);
-    setPortError(validatePort(raw));
-  }, [validatePort]);
-
-  const handleMergeChange = useCallback((raw: string) => {
-    setMergeThreshold(raw);
-    setMergeError(validateMerge(raw));
-  }, [validateMerge]);
-
-  const handlePinUpdates = useCallback((updates: Record<string, string | null>) => {
-    setPinUpdates((prev) => ({ ...prev, ...updates }));
-  }, []);
-
-  // Dirty detection
-  const portDirty = data != null && portRaw !== (data.port != null ? String(data.port) : "");
-  const langDirty = data != null && language !== (data.language ?? "auto");
-  const mergeDirty =
-    data != null &&
-    mergeThreshold !==
-      (data.sourcevisionMergeThreshold != null ? String(data.sourcevisionMergeThreshold) : "");
-  const pinsDirty = Object.keys(pinUpdates).length > 0;
-  const hasPendingChanges = portDirty || langDirty || mergeDirty || pinsDirty;
-  const hasErrors = portError != null || mergeError != null;
-
-  const handleSave = useCallback(async () => {
-    if (hasErrors) return;
-    setSaving(true);
-    setError(null);
-
-    try {
-      const body: Record<string, unknown> = {};
-
-      if (portDirty) {
-        body["port"] = portRaw === "" ? null : parseInt(portRaw, 10);
-      }
-      if (langDirty) {
-        body["language"] = language === "auto" ? null : language;
-      }
-      if (mergeDirty) {
-        body["sourcevisionMergeThreshold"] =
-          mergeThreshold === "" ? null : parseInt(mergeThreshold, 10);
-      }
-      if (pinsDirty) {
-        body["sourcevisionPins"] = pinUpdates;
-      }
-
-      const res = await fetch("/api/project-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Save failed" }));
-        setError((errBody as { error?: string }).error ?? "Failed to save");
-        return;
-      }
-
-      const json = await res.json() as { settings: ProjectSettingsResponse };
-      const s = json.settings;
-      setData(s);
-      setPortRaw(s.port != null ? String(s.port) : "");
-      setLanguage(s.language ?? "auto");
-      setMergeThreshold(
-        s.sourcevisionMergeThreshold != null ? String(s.sourcevisionMergeThreshold) : "",
-      );
-      setPinUpdates({});
-
-      setToast("Project settings saved");
-      if (toastRef.current) clearTimeout(toastRef.current);
-      toastRef.current = setTimeout(() => setToast(null), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
-    } finally {
-      setSaving(false);
-    }
-  }, [
-    hasErrors,
-    portDirty,
-    portRaw,
-    langDirty,
-    language,
-    mergeDirty,
-    mergeThreshold,
-    pinsDirty,
-    pinUpdates,
-  ]);
-
-  const handleDiscard = useCallback(() => {
-    if (!data) return;
-    setPortRaw(data.port != null ? String(data.port) : "");
-    setLanguage(data.language ?? "auto");
-    setMergeThreshold(
-      data.sourcevisionMergeThreshold != null ? String(data.sourcevisionMergeThreshold) : "",
-    );
-    setPinUpdates({});
-    setPortError(null);
-    setMergeError(null);
-    setError(null);
-  }, [data]);
-
-  if (loading) {
-    return h("div", { class: "ps-container" },
-      h("div", { class: "loading" }, "Loading project settings\u2026"),
-    );
+  if (form.loading) {
+    return h("div", { class: "loading" }, "Loading project settings…");
   }
 
-  if (error && !data) {
-    return h("div", { class: "ps-container" },
-      h("div", { class: "ps-header" },
-        h("div", { class: "ps-header-brand" },
-          h(NdxLogoPng, { size: 16, class: "ps-header-logo" }),
-          h("span", { class: "ps-header-title" }, "Project Settings"),
-        ),
-      ),
-      h("div", { class: "ps-error-state" }, h("p", null, error)),
-    );
+  if (form.loadError && !form.data) {
+    return h("div", { class: "ps-error-state" }, h("p", null, form.loadError));
   }
 
-  return h("div", { class: "ps-container" },
-    // ── Header
-    h("div", { class: "ps-header" },
-      h("div", { class: "ps-header-brand" },
-        h(NdxLogoPng, { size: 16, class: "ps-header-logo" }),
-        h("span", { class: "ps-header-title" }, "Project Settings"),
-      ),
-      h("p", { class: "ps-header-subtitle" },
-        "Project-level configuration stored in ",
-        h("code", null, ".n-dx.json"),
-        ". Controls language detection (all commands), zone analysis (",
-        h("code", null, `${cliName} analyze / plan`),
-        "), and dashboard port (",
-        h("code", null, `${cliName} start`),
-        ").",
-      ),
-    ),
+  const { portRaw, mergeThreshold, portError, mergeError } = form;
 
-    // ── Error banner
-    error ? h("div", { class: "ps-error-banner" }, error) : null,
+  return h("div", { class: "ps-sections" },
+    form.saveError ? h("div", { class: "ps-error-banner", role: "alert" }, form.saveError) : null,
 
-    // ── General section (affects all commands)
+    // ── General (affects all commands)
     h("section", { class: "ps-section" },
       h("h3", { class: "ps-section-title" },
-        h("span", { class: "ps-section-icon" }, "\u2699"),
+        h("span", { class: "ps-section-icon" }, "⚙"),
         "General",
         h("span", { class: "ps-section-cmd" }, "all commands"),
       ),
       h("div", { class: "ps-field" },
         h("label", { class: "ps-field-label", htmlFor: "ps-language" },
           "Project language",
-          langDirty ? h("span", { class: "ps-dirty-indicator" }, " \u2022") : null,
+          form.langDirty ? dirtyMark() : null,
         ),
         h("p", { class: "ps-field-desc" },
           "Override the auto-detected project language. Used by sourcevision analysis, ",
@@ -408,8 +350,8 @@ export function ProjectSettingsView() {
         h("select", {
           id: "ps-language",
           class: "ps-select",
-          value: language,
-          onChange: (e: Event) => setLanguage((e.target as HTMLSelectElement).value),
+          value: form.language,
+          onChange: (e: Event) => form.setLanguage((e.target as HTMLSelectElement).value),
         },
           LANGUAGE_OPTIONS.map((opt) =>
             h("option", { key: opt.value, value: opt.value }, opt.label),
@@ -418,10 +360,10 @@ export function ProjectSettingsView() {
       ),
     ),
 
-    // ── ndx analyze / plan section
+    // ── ndx analyze / plan
     h("section", { class: "ps-section" },
       h("h3", { class: "ps-section-title" },
-        h("span", { class: "ps-section-icon" }, "\u25A3"),
+        h("span", { class: "ps-section-icon" }, "▣"),
         `${cliName} analyze / plan`,
       ),
       h("p", { class: "ps-section-desc" },
@@ -434,7 +376,7 @@ export function ProjectSettingsView() {
       h("div", { class: "ps-field" },
         h("label", { class: "ps-field-label", htmlFor: "ps-merge-threshold" },
           "Merge threshold",
-          mergeDirty ? h("span", { class: "ps-dirty-indicator" }, " \u2022") : null,
+          form.mergeDirty ? dirtyMark() : null,
         ),
         h("p", { class: "ps-field-desc" },
           "Minimum zone size in files: zones with fewer files are merged into ",
@@ -450,40 +392,37 @@ export function ProjectSettingsView() {
             min: 0,
             step: 1,
             placeholder: "3",
-            onInput: (e: Event) => handleMergeChange((e.target as HTMLInputElement).value),
+            onInput: (e: Event) => form.setMergeThreshold((e.target as HTMLInputElement).value),
           }),
-          mergeThreshold === "" && !mergeDirty
+          mergeThreshold === "" && !form.mergeDirty
             ? h("span", { class: "ps-field-default" }, "Using default (3)")
             : null,
         ),
         mergeError ? h("p", { class: "ps-field-error" }, mergeError) : null,
       ),
       h("div", { class: "ps-field" },
-        h("label", { class: "ps-field-label" },
+        h("span", { class: "ps-field-label" },
           "Zone pins",
-          pinsDirty ? h("span", { class: "ps-dirty-indicator" }, " \u2022") : null,
+          form.pinsDirty ? dirtyMark() : null,
         ),
         h("p", { class: "ps-field-desc" },
           "Pin specific files to named zones, overriding Louvain community detection. ",
           "Useful when a file is repeatedly misclassified.",
         ),
-        h(PinEditor, {
-          pins: data?.sourcevisionPins ?? {},
-          onChange: handlePinUpdates,
-        }),
+        h(PinEditor, { form }),
       ),
     ),
 
-    // ── ndx start section
+    // ── ndx start
     h("section", { class: "ps-section" },
       h("h3", { class: "ps-section-title" },
-        h("span", { class: "ps-section-icon" }, "\uD83C\uDF10"),
+        h("span", { class: "ps-section-icon" }, "🌐"),
         `${cliName} start`,
       ),
       h("div", { class: "ps-field" },
         h("label", { class: "ps-field-label", htmlFor: "ps-port" },
           "Dashboard port",
-          portDirty ? h("span", { class: "ps-dirty-indicator" }, " \u2022") : null,
+          form.portDirty ? dirtyMark() : null,
         ),
         h("p", { class: "ps-field-desc" },
           `Port the web dashboard listens on. Default: ${DEFAULT_PORT}. `,
@@ -500,37 +439,14 @@ export function ProjectSettingsView() {
             min: 1,
             max: 65535,
             placeholder: String(DEFAULT_PORT),
-            onInput: (e: Event) => handlePortChange((e.target as HTMLInputElement).value),
+            onInput: (e: Event) => form.setPortRaw((e.target as HTMLInputElement).value),
           }),
-          portRaw === "" && !portDirty
+          portRaw === "" && !form.portDirty
             ? h("span", { class: "ps-field-default" }, `Using default (${DEFAULT_PORT})`)
             : null,
         ),
-        portError
-          ? h("p", { class: "ps-field-error" }, portError)
-          : null,
+        portError ? h("p", { class: "ps-field-error" }, portError) : null,
       ),
     ),
-
-    // ── Save / Discard bar
-    hasPendingChanges
-      ? h("div", { class: "ps-save-bar" },
-          h("span", { class: "ps-save-bar-hint" },
-            hasErrors ? "Fix errors before saving" : "You have unsaved changes",
-          ),
-          h("button", {
-            class: "cmd-btn cmd-btn-secondary",
-            onClick: handleDiscard,
-            disabled: saving,
-          }, "Discard"),
-          h("button", {
-            class: "cmd-btn cmd-btn-primary",
-            onClick: handleSave,
-            disabled: saving || hasErrors,
-          }, saving ? "Saving\u2026" : "Save changes"),
-        )
-      : null,
-
-    h(SaveToast, { message: toast }),
   );
 }

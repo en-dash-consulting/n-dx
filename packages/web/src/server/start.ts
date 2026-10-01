@@ -39,6 +39,7 @@ import { invalidatePrdDelta } from "./prd-delta.js";
 import { WorkspaceRegistry } from "./workspaces.js";
 import type { WatcherHandles, WorkspaceHooks, WorkspaceResources } from "./workspaces.js";
 import { handleStatusRoute, clearStatusCache, buildServerInfo } from "./routes-status.js";
+import { handleHubAbsentRoute } from "./routes-hub-absent.js";
 import { handleConfigRoute } from "./routes-config.js";
 import { handleSearchRoute } from "./routes-search.js";
 import { handleNotionRoute } from "./routes-notion.js";
@@ -749,6 +750,7 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "hench") && handleLiveTaskRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && (await handleLiveAnalyzeRoute(req, res, ctx, liveSourcesOf(registry)))) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
+  if (handleHubAbsentRoute(req, res)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleIntegrationRoute(req, res, ctx))) return true;

@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { ActivityView } from "../../../src/viewer/views/activity.js";
-import { AuthStatusChip } from "../../../src/viewer/views/llm-provider.js";
+import { AuthStatusChip } from "../../../src/viewer/views/robot-wrangler.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 
 const LOG = {

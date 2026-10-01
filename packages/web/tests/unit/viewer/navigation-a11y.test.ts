@@ -198,7 +198,7 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
 
       it("every settings entry is named by the navigation model", async () => {
         await mount(h(SettingsOverlay, {
-          view: "llm-provider", validViews: VALID, onNavigate: () => {}, onClose: () => {}, children: null,
+          view: "robot-wrangler", validViews: VALID, onNavigate: () => {}, onClose: () => {}, children: null,
         }));
         const items = [...root.querySelectorAll(".settings-overlay-item")];
         // Two entries are behind default-off feature toggles.

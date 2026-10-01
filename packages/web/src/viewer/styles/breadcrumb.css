@@ -253,6 +253,69 @@
   text-decoration: underline;
 }
 
+/* ── Hub link and project switcher ── */
+
+.breadcrumb-hub {
+  text-decoration: none;
+}
+
+.breadcrumb-hub:focus-visible,
+.breadcrumb-project-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.breadcrumb-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.breadcrumb-project-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.breadcrumb-project-trigger:hover,
+.breadcrumb-project-trigger[aria-expanded="true"] {
+  border-color: var(--border);
+}
+
+.breadcrumb-project-option-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.breadcrumb-workspace-option.is-current .breadcrumb-project-option-name {
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+}
+
+/* Status dot — same states and colours as the hub's chooser cards. */
+.breadcrumb-project-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.breadcrumb-project-dot-healthy { background: var(--green); }
+.breadcrumb-project-dot-starting { background: var(--orange); }
+.breadcrumb-project-dot-unreachable,
+.breadcrumb-project-dot-stopped { background: var(--red); }
+
 /* ── Zone drill-down breadcrumb ── */
 
 .zone-breadcrumb {

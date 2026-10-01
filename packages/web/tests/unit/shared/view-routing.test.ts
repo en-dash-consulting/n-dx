@@ -56,6 +56,23 @@ describe("redirect aliases (0.8.0 navigation merge)", () => {
     expect(resolveViewAlias("rex-dashboard", rexViews)).toBeNull();
   });
 
+  it("the four merged settings pages redirect to project in every scope, rex included", () => {
+    for (const old of ["project-settings", "feature-toggles", "notion-config", "integrations"]) {
+      for (const scope of [null, "sourcevision", "rex", "hench"]) {
+        expect(resolveViewAlias(old, buildValidViews(scope)), `${old} in ${scope ?? "all"}`).toBe("project");
+      }
+    }
+  });
+
+  it("project is valid in every scope, and the merged ids are no longer views", () => {
+    for (const scope of [null, "sourcevision", "rex", "hench"]) {
+      expect(buildValidViews(scope).has("project")).toBe(true);
+    }
+    for (const old of ["project-settings", "feature-toggles", "notion-config", "integrations"]) {
+      expect(isKnownViewPath(old)).toBe(false);
+    }
+  });
+
   it("live full-page views (#425) are not aliased", () => {
     const validViews = buildValidViews(null);
     for (const view of ["graph", "iso-map", "zones", "architecture", "routes"]) {

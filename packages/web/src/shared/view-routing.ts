@@ -34,16 +34,12 @@ export const REX_SCOPE_VIEWS: readonly ViewId[] = [
   "validation",
   "requirements",
   "activity",
-  "notion-config",
-  "integrations",
 ];
 
 export const HENCH_SCOPE_VIEWS: readonly ViewId[] = [
   "work",
   "hench-runs",
   "hench-audit",
-  "hench-config",
-  "hench-templates",
   "hench-optimization",
   "hench-adaptive",
 ];
@@ -55,12 +51,11 @@ export const CROSS_CUTTING_VIEWS: readonly ViewId[] = [
   "live-analyze",
   "workspaces",
   "token-usage",
-  "feature-toggles",
-  "cli-timeouts",
+  "workflow",
   "command-reference",
   "commands",
-  "llm-provider",
-  "project-settings",
+  "robot-wrangler",
+  "project",
 ];
 
 export const VIEWS_BY_SCOPE: Readonly<Record<ViewerScope, readonly ViewId[]>> = {
@@ -89,7 +84,7 @@ export function isKnownViewPath(segment: string): boolean {
 }
 
 /**
- * Old view paths merged into a stage in 0.8.0, mapped to the stage that
+ * Old view paths renamed or merged in 0.8.0, mapped to the view that
  * absorbed them. `overview` and `rex-dashboard` remain registered `ViewId`s
  * (a scoped standalone viewer still renders them as their own page — see
  * `resolveViewAlias`), so this table is what turns a stale top-level path
@@ -98,6 +93,17 @@ export function isKnownViewPath(segment: string): boolean {
 const VIEW_ALIASES: Readonly<Record<string, ViewId>> = {
   overview: "analyze",
   "rex-dashboard": "work",
+  // 0.8.0 renamed the LLM Provider page to Robot Wrangler.
+  "llm-provider": "robot-wrangler",
+  // 0.8.0 merged work settings, CLI timeouts and templates into Workflow (#457).
+  "hench-config": "workflow",
+  "cli-timeouts": "workflow",
+  "hench-templates": "workflow",
+  // 0.8.0 merged analyze/plan settings, feature flags, Notion and integrations into Project.
+  "project-settings": "project",
+  "feature-toggles": "project",
+  "notion-config": "project",
+  integrations: "project",
 };
 
 /**
