@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add Live as a fourth top-nav tab outside the stage loop, with a status dot, count and hover peek](./add-live-as-a-fourth-top-nav-tab.md) | completed |
 | [Add the Log tab to the running-task page: the raw terminal stream with follow, filter and search](./add-the-log-tab-to-the-running-task.md) | pending |
 | [Add the Review tab to the running-task page for runs started with --review](./add-the-review-tab-to-the-running-task.md) | pending |
-| [Build the Live overview page with machine strip, running cards, worktrees, queue and an idle state](./build-the-live-overview-page-with.md) | pending |
+| [Build the Live overview page with machine strip, running cards, worktrees, queue and an idle state](./build-the-live-overview-page-with.md) | completed |
 | [Build the live sourcevision analysis page: phases, enrichment passes, estimate, output and model spend](./build-the-live-sourcevision-analysis.md) | pending |
 | [Build the running-task page with the Work tab: step stream, criteria, runs, location and spend](./build-the-running-task-page-with-the.md) | pending |
 | [Point the Home worktrees pill and the bottom-bar analysis and stuck-run badges at Live](./point-the-home-worktrees-pill-and-the.md) | pending |
