@@ -21,7 +21,8 @@
  * GET    /api/hench/memory/history/:taskId — memory history for a specific task
  * GET    /api/hench/memory/leaks          — leak detection summary for all active processes
  * GET    /api/hench/concurrency           — concurrent execution count, limits, and queue status
- * POST   /api/hench/execute/:taskId/terminate — terminate a running task
+ * POST   /api/hench/execute/:taskId/terminate — terminate a running task (a terminal-started
+ *                                            run is stopped by its recorded pid)
  * GET    /api/hench/config                — current workflow configuration with field metadata
  * PUT    /api/hench/config                — update workflow configuration (partial or full)
  * GET    /api/hench/templates             — list all workflow templates (built-in + user)
@@ -44,7 +45,7 @@ import type { FSWatcher } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
-import { totalmem, freemem, loadavg, cpus } from "node:os";
+import { totalmem, freemem, loadavg, cpus, hostname } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { exec, spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, resolveLayout, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
@@ -248,7 +249,7 @@ function henchConfigPath(projectDir: string): string {
 }
 
 /** Read the hench config.json directly from disk. */
-function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
+export function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
   try {
     const raw = readFileSync(henchConfigPath(projectDir), "utf-8");
     return JSON.parse(raw) as Record<string, unknown>;
@@ -2959,6 +2960,56 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
   return true;
 }
 
+/** How long a terminal-started run gets to exit on SIGTERM before SIGKILL. */
+const RECORDED_PID_GRACE_MS = 5_000;
+const RECORDED_PID_POLL_MS = 100;
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // EPERM: alive, owned by someone else — and so not ours to signal either.
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+function signalPid(pid: unknown, signal: NodeJS.Signals): boolean {
+  if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, signal);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Stop the hench process of a run the dashboard did not start, by the pid on
+ * its record. A pid is acted on only when the record says it is this host's
+ * and the heartbeat — which re-writes the pid — is fresh: a stale record's pid
+ * may since have been reused by an unrelated process. SIGTERM first, so hench
+ * can stop its vendor child and write its record; SIGKILL to both if it has
+ * not exited after {@link RECORDED_PID_GRACE_MS}. Returns whether a signal
+ * was sent.
+ */
+async function stopRecordedRunProcess(run: Record<string, unknown>): Promise<boolean> {
+  const pid = run.pid;
+  if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  if (typeof run.host === "string" && run.host !== hostname()) return false;
+  if (isRunStale(run.lastActivityAt, Date.now()) || !pidAlive(pid)) return false;
+  if (!signalPid(pid, "SIGTERM")) return false;
+  const deadline = Date.now() + RECORDED_PID_GRACE_MS;
+  while (Date.now() < deadline && pidAlive(pid)) {
+    await new Promise((resolve) => setTimeout(resolve, RECORDED_PID_POLL_MS));
+  }
+  if (pidAlive(pid)) {
+    signalPid(pid, "SIGKILL");
+    signalPid(run.vendorPid, "SIGKILL");
+  }
+  return true;
+}
+
 /** POST /api/hench/execute/:taskId/terminate — terminate a running task. */
 async function handleTerminate(
   taskId: string,
@@ -2983,26 +3034,33 @@ async function handleTerminate(
     for (const file of files) {
       if (!file.endsWith(".json")) continue;
       const id = file.replace(/\.json$/, "");
-      const run = loadRunFile(runsDir, id);
-      if (run && run.status === "running" && run.taskId === taskId) {
-        // Mark as terminated on disk
-        run.status = "failed";
-        run.error = "Terminated via audit interface";
-        run.finishedAt = new Date().toISOString();
-        const runPath = join(runsDir, `${id}.json`);
-        try {
-          writeFileSync(runPath, JSON.stringify(run, null, 2) + "\n", "utf-8");
-        } catch (err) {
-          errorResponse(res, 500, `Failed to update run: ${err instanceof Error ? err.message : String(err)}`);
-          return true;
+      const found = loadRunFile(runsDir, id);
+      if (found && found.status === "running" && found.taskId === taskId) {
+        // Started from a terminal: stop the hench process by its recorded pid
+        // when that pid is trustworthy, then mark the record — re-read, since
+        // hench may have written its own final status while exiting.
+        const signalled = await stopRecordedRunProcess(found);
+        const run = loadRunFile(runsDir, id) ?? found;
+        if (run.status === "running") {
+          run.status = "failed";
+          run.error = "Terminated via audit interface";
+          run.finishedAt = new Date().toISOString();
+          const runPath = join(runsDir, `${id}.json`);
+          try {
+            writeFileSync(runPath, JSON.stringify(run, null, 2) + "\n", "utf-8");
+          } catch (err) {
+            errorResponse(res, 500, `Failed to update run: ${err instanceof Error ? err.message : String(err)}`);
+            return true;
+          }
         }
         onStatusInvalidate?.();
         jsonResponse(res, 200, {
           taskId,
           runId: id,
           terminated: true,
-          method: "disk-mark",
-          message: "Run marked as terminated (process not managed by dashboard)",
+          ...(signalled
+            ? { pid: found.pid, signalSent: true, method: "pid-signal", message: "Process terminated by its recorded pid" }
+            : { method: "disk-mark", message: "Run marked as terminated (process not managed by dashboard)" }),
         });
         return true;
       }

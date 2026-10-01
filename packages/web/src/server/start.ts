@@ -30,6 +30,7 @@ import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
 import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
+import { handleLiveTaskRoute } from "./routes-live-task.js";
 import { watchAnalyzeProgress } from "./analyze-progress-watcher.js";
 import { stopRunTailWatches } from "./run-tail.js";
 import { handleWorkspacesRoute } from "./routes-workspaces.js";
@@ -744,6 +745,7 @@ async function handleApiRoutes(
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx, { broadcast, onStatusInvalidate: invalidateRunCaches }))) return true;
   if (handleLiveRoute(req, res, ctx, liveSourcesOf(registry))) return true;
+  if (isInScope(ctx.scope, "hench") && handleLiveTaskRoute(req, res, ctx)) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;

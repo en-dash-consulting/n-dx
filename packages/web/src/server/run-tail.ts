@@ -307,6 +307,39 @@ export function readLastEvent(path: string): Record<string, unknown> | null {
   }
 }
 
+/** How much of a log's end {@link readLogTailLines} reads. */
+const LOG_TAIL_WINDOW_BYTES = 16 * 1024;
+
+/** CSI and OSC escape sequences — colour codes and hyperlinks a terminal would interpret. */
+const ANSI_PATTERN = /\u001b(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007\u001b]*(?:\u0007|\u001b\\))/g;
+
+/**
+ * The last `count` non-blank lines of a log, colour codes removed. Reads only
+ * the file's last {@link LOG_TAIL_WINDOW_BYTES}, so the Work tab's five-line
+ * tail costs the same at minute one and hour three. A line still being written
+ * (no trailing newline yet) is included: the tail shows what the terminal shows.
+ */
+export function readLogTailLines(path: string, count: number): string[] {
+  let fd: number;
+  try {
+    fd = openSync(path, "r");
+  } catch {
+    return [];
+  }
+  try {
+    const size = statSync(path).size;
+    const length = Math.min(size, LOG_TAIL_WINDOW_BYTES);
+    const buf = Buffer.alloc(length);
+    const read = length > 0 ? readSync(fd, buf, 0, length, size - length) : 0;
+    const lines = buf.subarray(0, read).toString("utf-8").replace(ANSI_PATTERN, "").split(/\r?\n|\r/);
+    // The window's first line may start mid-line; drop it unless the window is the whole file.
+    if (length < size) lines.shift();
+    return lines.map((l) => l.trimEnd()).filter((l) => l.trim().length > 0).slice(-count);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 // ── Watching ────────────────────────────────────────────────────────────────
 
 /** Frame announcing that a watched run's log or event stream grew. */
