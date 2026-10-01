@@ -26,10 +26,13 @@ const command = args[0];
 let port = command === "preview" ? DEFAULT_PREVIEW_PORT : DEFAULT_HUB_PORT;
 let scope: ViewerScope | undefined;
 let previewFile: string | undefined;
+let tokenFile: string | undefined;
 
 for (const a of args.slice(1)) {
   if (a.startsWith("--file=")) {
     previewFile = a.slice("--file=".length);
+  } else if (a.startsWith("--token-file=")) {
+    tokenFile = a.slice("--token-file=".length);
   } else if (a.startsWith("--port=")) {
     port = parseInt(a.split("=")[1], 10);
   } else if (a.startsWith("--scope=")) {
@@ -62,13 +65,13 @@ if (command === "serve") {
 
   const dir = resolve(targetArg || ".");
   const dev = args.includes("--dev");
-  await startServer(dir, port, { dev, scope });
+  await startServer(dir, port, { dev, scope, tokenFile });
 } else if (command === "hub") {
   // Same reasoning as "serve": the hub is long-running and spawns a server
   // per project, all of which would otherwise inherit NDX_DEBUG.
   delete process.env.NDX_DEBUG;
 
-  const hub = await startHub({ port, log: (message) => console.log(message) });
+  const hub = await startHub({ port, tokenFile, log: (message) => console.log(message) });
   console.log(`n-dx hub listening on http://127.0.0.1:${hub.port} (registry: ${hub.registryPath})`);
 
   let shuttingDown = false;
@@ -89,7 +92,7 @@ if (command === "serve") {
   // its own port file.
   const dir = resolve(targetArg || ".");
   try {
-    await startPreviewServer(dir, port, { file: previewFile });
+    await startPreviewServer(dir, port, { file: previewFile, tokenFile });
   } catch (err) {
     console.error((err as Error).message);
     process.exit(1);

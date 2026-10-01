@@ -188,7 +188,7 @@ describe("ndx mcp (bridging to a live hub)", { timeout: 300_000 }, () => {
 
   function runStart(args) {
     try {
-      const stdout = execFileSync("node", [CLI_PATH, "start", ...args], {
+      const stdout = execFileSync("node", [CLI_PATH, "start", "--no-auth", ...args], {
         encoding: "utf-8",
         timeout: 120_000,
         stdio: "pipe",

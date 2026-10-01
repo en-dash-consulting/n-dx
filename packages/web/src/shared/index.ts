@@ -27,6 +27,19 @@ export {
 } from "./base-path.js";
 export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
 export {
+  AUTH_COOKIE_NAME,
+  AUTH_HEADER_NAME,
+  AUTH_QUERY_PARAM,
+  tokensEqual,
+  parseCookieValue,
+  presentedToken,
+  isAuthenticated,
+  splitTokenQuery,
+  authCookie,
+  urlWithToken,
+} from "./auth.js";
+export type { AuthHeaders } from "./auth.js";
+export {
   SOURCEVISION_SCOPE_VIEWS,
   REX_SCOPE_VIEWS,
   HENCH_SCOPE_VIEWS,

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { MAX_REQUEST_BODY_BYTES } from "./response-utils.js";
-import { isLoopbackHostOnPort, isLoopbackOriginOnPort } from "../shared/index.js";
+import { isLoopbackHostOnPort, isLoopbackOriginOnPort, isAuthenticated, splitTokenQuery, tokensEqual, authCookie } from "../shared/index.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -48,6 +48,61 @@ function rejectMisdirected(res: ServerResponse): true {
   return true;
 }
 
+/** Per-request options for {@link handleRequestSecurity}. */
+export interface RequestSecurityOptions {
+  /**
+   * The per-user token every request must present (bearer header,
+   * `X-Ndx-Token`, or the `ndx_token` cookie). `null`/absent means the server
+   * runs without one — a bare `web serve`, or a test harness.
+   */
+  token?: string | null;
+}
+
+/** Whether the request presents the token in a header or the cookie. Used by the upgrade path too. */
+export function isAuthenticatedRequest(req: Pick<IncomingMessage, "headers">, token: string): boolean {
+  return isAuthenticated(req.headers, token);
+}
+
+function rejectUnauthenticated(res: ServerResponse): true {
+  res.writeHead(401, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+    "WWW-Authenticate": 'Bearer realm="n-dx"',
+  });
+  res.end(JSON.stringify({
+    error: "Authentication required",
+    hint: "Open the URL printed by `ndx start`, or send the token from <ndx home>/auth.token as `Authorization: Bearer <token>` or `X-Ndx-Token`.",
+  }));
+  return true;
+}
+
+/**
+ * Apply the token rule. Returns true when the request was answered.
+ *
+ * A navigation carrying `?ndx_token=<token>` is how the URL `ndx start`
+ * prints opens the dashboard: the cookie is set and the browser is sent to
+ * the same URL without the parameter, so the token stays out of the address
+ * bar and history. Only safe methods get that treatment; a POST with the
+ * token in its query is answered 401 like any other unauthenticated request.
+ */
+export function enforceToken(req: IncomingMessage, res: ServerResponse, token: string): boolean {
+  if (isAuthenticatedRequest(req, token)) return false;
+  const method = (req.method || "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD") {
+    const { token: fromQuery, location } = splitTokenQuery(req.url ?? "/");
+    if (fromQuery !== null && tokensEqual(fromQuery, token)) {
+      res.writeHead(302, {
+        Location: location,
+        "Set-Cookie": authCookie(token),
+        "Cache-Control": "no-store",
+      });
+      res.end();
+      return true;
+    }
+  }
+  return rejectUnauthenticated(res);
+}
+
 function setCorsHeaders(res: ServerResponse, origin: string): void {
   // Reflect only a validated origin. A wildcard would let any website read API
   // responses and would approve preflights for the mutating route surface.
@@ -71,7 +126,9 @@ function rejectCrossOrigin(res: ServerResponse): true {
  * Apply browser-origin and CORS protection before route dispatch.
  *
  * Every request, safe methods included, must carry a `Host` naming loopback on
- * this socket's port, or it is answered 421.
+ * this socket's port, or it is answered 421. When the server runs with a
+ * per-user token, the request must then present it or it is answered 401
+ * (a navigation carrying `?ndx_token=` sets the cookie and redirects instead).
  * Requests without browser origin metadata remain supported for CLI and MCP
  * clients. Origin-bearing mutations must come from this loopback server, while
  * Fetch Metadata rejects cross-site mutations if a browser omits Origin.
@@ -80,8 +137,10 @@ function rejectCrossOrigin(res: ServerResponse): true {
 export function handleRequestSecurity(
   req: IncomingMessage,
   res: ServerResponse,
+  options: RequestSecurityOptions = {},
 ): boolean {
   if (!isTrustedHost(req)) return rejectMisdirected(res);
+  if (options.token && enforceToken(req, res, options.token)) return true;
 
   const method = (req.method || "GET").toUpperCase();
 

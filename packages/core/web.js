@@ -50,10 +50,10 @@
 import { spawn, execFileSync } from "child_process";
 import { get as httpGet, request as httpRequest } from "http";
 import { createConnection } from "net";
-import { createHash } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { readFile, writeFile, unlink, access } from "fs/promises";
-import { realpathSync } from "fs";
-import { basename, join, resolve } from "path";
+import { realpathSync, readFileSync, mkdirSync, writeFileSync, chmodSync } from "fs";
+import { basename, dirname, join, resolve } from "path";
 import { NDX_HOME_ENV, resolveNdxHome } from "./layout.js";
 import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
@@ -756,6 +756,78 @@ export function hubHome() {
   return resolveNdxHome();
 }
 
+// ── Per-user dashboard token ────────────────────────────────────────────────
+// Loopback is shared by every account on a host, so the hub and the project
+// servers require a token that lives in the user's ndx home with owner-only
+// modes. This file manages it the same way the web package does
+// (`@n-dx/llm-client`'s auth-token.ts) — the orchestration tier spawns rather
+// than imports, so the few lines are repeated here, as layout.js repeats the
+// home resolver. `ndx start` creates it, passes `--token-file` to whatever it
+// spawns, sends it on its own probes, and prints a URL that carries it once.
+// `--no-auth`, or `web.auth: false` in .n-dx.json, turns it off.
+
+export const AUTH_TOKEN_FILENAME = "auth.token";
+
+/** Where this user's token lives, whether or not it exists yet. */
+export function authTokenPath(home = hubHome()) {
+  return join(home, AUTH_TOKEN_FILENAME);
+}
+
+/** The token in `path`, or null when the file is missing or empty. */
+export function readAuthTokenFile(path = authTokenPath()) {
+  try {
+    const value = readFileSync(path, "utf-8").trim();
+    return value.length > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Read the token, creating it (dir 0700, file 0600) when absent. */
+export function ensureAuthTokenFile(path = authTokenPath()) {
+  const existing = readAuthTokenFile(path);
+  if (existing) return existing;
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const token = randomBytes(32).toString("base64url");
+  writeFileSync(path, `${token}\n`, { encoding: "utf-8", mode: 0o600 });
+  try { chmodSync(path, 0o600); } catch { /* modes are advisory on some filesystems */ }
+  return token;
+}
+
+/**
+ * Create-or-read the token, or explain why the server starts without one.
+ * A home directory that cannot be written (a read-only profile, a sandbox)
+ * must not stop the dashboard from starting; it did not need the token
+ * before, and the warning says what was skipped and how to turn it off.
+ */
+function resolveStartToken(enabled, home) {
+  if (!enabled) return { tokenFile: null, token: null };
+  const tokenFile = authTokenPath(home);
+  try {
+    return { tokenFile, token: ensureAuthTokenFile(tokenFile) };
+  } catch (err) {
+    console.error(`Warning: could not create the dashboard token at ${tokenFile} (${err.code ?? err.message}); starting without it. Pass --no-auth or set web.auth=false to silence this.`);
+    return { tokenFile: null, token: null };
+  }
+}
+
+/** A dashboard URL that sets the browser's cookie on first open. */
+export function urlWithAuthToken(base, token) {
+  if (!token) return base;
+  return `${base}${base.includes("?") ? "&" : "?"}ndx_token=${encodeURIComponent(token)}`;
+}
+
+/** `web.auth` from the project's .n-dx.json; anything but `false` means on. */
+async function loadAuthEnabled(dir) {
+  const configPath = join(dir, ".n-dx.json");
+  if (!(await fileExists(configPath))) return true;
+  try {
+    return JSON.parse(await readFile(configPath, "utf-8"))?.web?.auth !== false;
+  } catch {
+    return true;
+  }
+}
+
 /** Hub port: `<hub home>/config.json` → `{ "hub": { "port": N } }`, default 3117. */
 export async function loadHubPort(home = hubHome()) {
   try {
@@ -895,7 +967,12 @@ export function hubRequest(port, method, path, body, timeoutMs = PROBE_TIMEOUT_M
         port,
         method,
         path,
-        headers: payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {},
+        headers: {
+          ...(payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {}),
+          // The hub may be running with the per-user token; sending it when
+          // the file exists costs nothing against a hub that is not.
+          ...(() => { const t = readAuthTokenFile(); return t ? { "X-Ndx-Token": t } : {}; })(),
+        },
       },
       (response) => {
         let text = "";
@@ -925,12 +1002,14 @@ async function hubIsHealthy(port) {
  * Make sure a hub is answering on `port`, spawning one detached if not.
  * Same CLAUDECODE-stripping, detached, unref'd pattern as background mode.
  */
-async function ensureHub(port, { tools, __dir, home }) {
+async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
   if (await hubIsHealthy(port)) return { spawned: false, pid: null };
 
   const script = resolve(__dir, tools.web);
   const { CLAUDECODE: _cc, ...env } = process.env;
-  const child = spawn(process.execPath, [script, "hub", `--port=${port}`], {
+  const hubArgs = [script, "hub", `--port=${port}`];
+  if (tokenFile) hubArgs.push(`--token-file=${tokenFile}`);
+  const child = spawn(process.execPath, hubArgs, {
     stdio: "ignore",
     detached: true,
     windowsHide: true,
@@ -1262,8 +1341,12 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   });
 
   let hub;
+  // The token is created before the hub so this process and the hub agree on
+  // it from the first probe; an existing file is reused, never rotated.
+  const authEnabled = !flags["no-auth"] && (await loadAuthEnabled(absDir));
+  const { tokenFile, token } = resolveStartToken(authEnabled, home);
   try {
-    hub = await ensureHub(hubPort, { tools, __dir, home });
+    hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile });
   } catch (err) {
     console.error(err.message);
     return 1;
@@ -1300,13 +1383,17 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   const base = `http://localhost:${hubPort}/p/${encodeURIComponent(id)}`;
   log(`${label}: project "${id}" registered with the hub${status === 200 ? " (already known)" : ""}.`);
   log(`  Repository: ${repo.repoRoot}${repo.worktree !== repo.repoRoot ? `\n  Worktree:   ${repo.worktree}` : ""}${repo.branch ? ` (${repo.branch})` : ""}`);
-  log(`  URL: ${base}/`);
+  log(`  URL: ${urlWithAuthToken(`${base}/`, token)}`);
   log(`  MCP (rex):          ${base}/mcp/rex`);
   log(`  MCP (sourcevision): ${base}/mcp/sourcevision`);
   log("");
   log("MCP setup:");
-  log(`  Claude:  claude mcp add --transport http rex ${base}/mcp/rex`);
-  log(`           claude mcp add --transport http sourcevision ${base}/mcp/sourcevision`);
+  const headerFlag = token ? ` --header "X-Ndx-Token: $(cat ${tokenFile})"` : "";
+  log(`  Claude:  claude mcp add --transport http rex ${base}/mcp/rex${headerFlag}`);
+  log(`           claude mcp add --transport http sourcevision ${base}/mcp/sourcevision${headerFlag}`);
+  if (token) {
+    log(`  Token:   ${tokenFile} (the dashboard URL above sets it as a cookie once; disable with --no-auth or web.auth=false)`);
+  }
   log("  Codex:   configured automatically via .codex/config.toml (stdio)");
   log("");
   log(`Stop: ${stopCmd} .   (or 'ndx hub stop' for every project)`);
@@ -1517,6 +1604,11 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   // process, and then dropped on the floor.
   const serveArgs = [isPreview ? "preview" : "serve", `--port=${port}`, absDir];
   if (isPreview && typeof flags.file === "string") serveArgs.push(`--file=${flags.file}`);
+  // Single-project and preview servers take the same per-user token the hub
+  // would. Created here so a background start can print a URL that carries it.
+  const hereAuthEnabled = !flags["no-auth"] && (await loadAuthEnabled(absDir));
+  const { tokenFile: hereTokenFile, token: hereToken } = resolveStartToken(hereAuthEnabled, hubHome());
+  if (hereTokenFile) serveArgs.push(`--token-file=${hereTokenFile}`);
   if (flags.debug) serveArgs.push("--debug");
   else if (flags.verbose) serveArgs.push("--verbose");
 
@@ -1551,7 +1643,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       // Process is alive but port file not written yet — use requested port as fallback
       await writePidFile(absDir, child.pid, port, files);
       log(`${label} started in background (PID ${child.pid}).`);
-      log(`  URL: http://localhost:${port}`);
+      log(`  URL: ${urlWithAuthToken(`http://localhost:${port}/`, hereToken)}`);
       log(`Use '${stopCmd}' to stop it.`);
       return 0;
     }
@@ -1564,7 +1656,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     }
 
     log(`${label} started in background (PID ${child.pid}).`);
-    log(`  URL: http://localhost:${actualPort}`);
+    log(`  URL: ${urlWithAuthToken(`http://localhost:${actualPort}/`, hereToken)}`);
 
     // The preview serves one HTML document — no MCP endpoints to advertise.
     if (isPreview) {
@@ -1576,9 +1668,11 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     log(`  MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
     log("");
     log("MCP setup:");
-    log(`  Claude:  claude mcp add --transport http rex http://localhost:${actualPort}/mcp/rex`);
-    log(`           claude mcp add --transport http sourcevision http://localhost:${actualPort}/mcp/sourcevision`);
+    const hereHeaderFlag = hereToken ? ` --header "X-Ndx-Token: $(cat ${hereTokenFile})"` : "";
+    log(`  Claude:  claude mcp add --transport http rex http://localhost:${actualPort}/mcp/rex${hereHeaderFlag}`);
+    log(`           claude mcp add --transport http sourcevision http://localhost:${actualPort}/mcp/sourcevision${hereHeaderFlag}`);
     log("  Codex:   configured automatically via .codex/config.toml (stdio)");
+    if (hereToken) log(`  Token:   ${hereTokenFile} (disable with --no-auth or web.auth=false)`);
     log("");
     log(`Use '${stopCmd}' to stop it.`);
     return 0;

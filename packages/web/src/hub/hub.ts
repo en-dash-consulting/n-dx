@@ -41,7 +41,8 @@ import {
 import type { HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute } from "./routes.js";
 import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
-import { guardHubRequest, upgradeAllowed } from "./request-guard.js";
+import { guardHubRequest, upgradeRefusal } from "./request-guard.js";
+import { ensureAuthToken } from "@n-dx/llm-client";
 
 export const DEFAULT_HUB_PORT = 3117;
 const LOOPBACK_HOST = "127.0.0.1";
@@ -49,6 +50,12 @@ const LOOPBACK_HOST = "127.0.0.1";
 export interface HubOptions {
   /** Port to listen on. 0 asks the OS for a free one (tests). Default 3117. */
   port?: number;
+  /**
+   * Per-user token file (`<ndx home>/auth.token`). When set, the token is
+   * created if absent, every hub request must present it, and the project
+   * servers the hub spawns are started with the same file.
+   */
+  tokenFile?: string;
   /** Directory holding hub.json and hub.pid. Defaults to {@link resolveHubHome}. */
   homeDir?: string;
   /** How often each project server is health-checked. Default 15 s. */
@@ -151,6 +158,8 @@ export class Hub {
   readonly admission: AdmissionGate;
   /** Keys the per-user `config.json` got wrong, for {@link startHub} to report once. */
   readonly configProblems: HubConfigProblem[];
+  /** The per-user token every request must present, or null when running without one. */
+  readonly token: string | null;
   private readonly registry: HubRegistry;
   private readonly supervisors = new Map<string, ProjectSupervisor>();
   private readonly supervisorOptions: SupervisorOptions;
@@ -167,7 +176,8 @@ export class Hub {
     const { config, problems } = readHubConfig(hubConfigPath(this.hubHome));
     this.configProblems = problems;
     this.keepAlive = options.keepAlive ?? config.keepAlive;
-    this.supervisorOptions = { log: this.log, ...options.supervisor };
+    this.token = options.tokenFile ? ensureAuthToken(options.tokenFile) : null;
+    this.supervisorOptions = { log: this.log, tokenFile: options.tokenFile, token: this.token, ...options.supervisor };
     this.registry = loadRegistry(this.registryPath);
     for (const record of Object.values(this.registry.projects)) {
       this.supervisors.set(record.id, new ProjectSupervisor(record, this.supervisorOptions));
@@ -423,7 +433,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     // The origin gate is the hub's outer boundary and runs before any routing:
     // registration spawns a process, and the project servers behind the proxy
     // see a rewritten Origin, so this is where a browser request is judged.
-    if (guardHubRequest(req, res, hub.listeningPort)) return;
+    if (guardHubRequest(req, res, hub.listeningPort, hub.token)) return;
     void handleHubRoute(req, res, hub)
       .then((handled) => {
         // Everything that is not the hub's own API belongs to a project server:
@@ -441,8 +451,9 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       });
   });
   server.on("upgrade", (req, socket, head) => {
-    if (!upgradeAllowed(req, hub.listeningPort)) {
-      socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    const refusal = upgradeRefusal(req, hub.listeningPort, hub.token);
+    if (refusal !== null) {
+      socket.write(`HTTP/1.1 ${refusal}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
       socket.destroy();
       return;
     }

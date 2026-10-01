@@ -40,8 +40,9 @@ function res(): FakeRes {
     res: null as unknown as ServerResponse,
   };
   state.res = {
-    writeHead(status: number) {
+    writeHead(status: number, headers?: Record<string, string>) {
       state.statusCode = status;
+      for (const [name, value] of Object.entries(headers ?? {})) state.headers[name.toLowerCase()] = value;
       return this;
     },
     setHeader(name: string, value: string) {
@@ -167,6 +168,57 @@ describe("guardHubRequest — Host validation", () => {
     const out = res();
     expect(guardHubRequest(req("GET"), out.res, undefined)).toBe(true);
     expect(out.statusCode).toBe(421);
+  });
+});
+
+describe("guardHubRequest — per-user token", () => {
+  const TOKEN = "hubtok_0123456789abcdefghijklmnopqrstuv";
+
+  it("is inert without a token and refuses with 401 when one is configured", () => {
+    const a = res();
+    expect(guardHubRequest(req("GET"), a.res, HUB_PORT)).toBe(false);
+    const b = res();
+    expect(guardHubRequest(req("GET"), b.res, HUB_PORT, TOKEN)).toBe(true);
+    expect(b.statusCode).toBe(401);
+    expect(b.headers["www-authenticate"]).toContain("Bearer");
+  });
+
+  it("accepts the token as bearer, header or cookie, including on the spawn route", () => {
+    const carriers: Array<Record<string, string>> = [
+      { authorization: `Bearer ${TOKEN}` },
+      { "x-ndx-token": TOKEN },
+      { cookie: `ndx_token=${TOKEN}` },
+    ];
+    for (const headers of carriers) {
+      const out = res();
+      expect(guardHubRequest(req("POST", { ...headers, origin: "http://localhost:3117" }), out.res, HUB_PORT, TOKEN), JSON.stringify(headers)).toBe(false);
+    }
+  });
+
+  it("sets the cookie and redirects for a navigation that carries the token once", () => {
+    const r = req("GET", {}) as IncomingMessage & { url: string };
+    r.url = `/p/alpha/?ndx_token=${TOKEN}`;
+    const out = res();
+    expect(guardHubRequest(r, out.res, HUB_PORT, TOKEN)).toBe(true);
+    expect(out.statusCode).toBe(302);
+    expect(out.headers["set-cookie"]).toContain(`ndx_token=${TOKEN}`);
+    expect(out.headers["location"]).toBe("/p/alpha/");
+  });
+
+  it("still applies the Host and Origin rules to an authenticated request", () => {
+    const foreignHost = res();
+    expect(guardHubRequest(req("GET", { host: "attacker.example:3117", "x-ndx-token": TOKEN }), foreignHost.res, HUB_PORT, TOKEN)).toBe(true);
+    expect(foreignHost.statusCode).toBe(421);
+    const foreignOrigin = res();
+    expect(guardHubRequest(req("POST", { origin: "http://evil.test", "x-ndx-token": TOKEN }), foreignOrigin.res, HUB_PORT, TOKEN)).toBe(true);
+    expect(foreignOrigin.statusCode).toBe(403);
+  });
+
+  it("requires the token on a WebSocket handshake too", () => {
+    expect(upgradeAllowed(req("GET", { origin: "http://localhost:3117" }), HUB_PORT, TOKEN)).toBe(false);
+    expect(upgradeAllowed(req("GET", { origin: "http://localhost:3117", cookie: `ndx_token=${TOKEN}` }), HUB_PORT, TOKEN)).toBe(true);
+    expect(upgradeAllowed(req("GET", { "x-ndx-token": TOKEN }), HUB_PORT, TOKEN)).toBe(true);
+    expect(upgradeAllowed(req("GET", { origin: "http://localhost:3117" }), HUB_PORT, null)).toBe(true);
   });
 });
 
