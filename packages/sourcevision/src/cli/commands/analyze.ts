@@ -425,6 +425,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   const ownsProgressFile = startAnalyzeProgress(svDir, ["sv analyze", ...extraArgs].join(" "));
   const removeStopHandlers = ownsProgressFile ? installStopHandlers(absDir) : null;
   let completed = false;
+  let phasesDone = false;
 
   try {
     // Stop a narrator still working on the previous analysis before this one
@@ -440,6 +441,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     info("");
 
     await executePhases(ctx, filter, extraArgs);
+    phasesDone = true;
 
     // A --fast run makes no LLM calls, so it leaves the carried work recorded
     // (as a retryable failure) for the next full run instead of spawning for it.
@@ -498,6 +500,14 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     info("");
     info(green("Done."));
     completed = true;
+  } catch (err) {
+    // Phase failures were noted where they happened; this covers everything
+    // after the last phase (outputs, PR markdown, narration scheduling), which
+    // would otherwise leave the progress file failed with no reason.
+    if (phasesDone) {
+      noteAnalyzeError(`Analysis failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    throw err;
   } finally {
     if (ownsProgressReporter) setActiveProgressReporter(null);
     removeStopHandlers?.();
