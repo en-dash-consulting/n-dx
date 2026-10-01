@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  HUB_PATH,
   detectBasePath,
   detectViewerBasePath,
+  isHubChooserPath,
   projectIdFromBasePath,
   stripBasePath,
   stripWorkspaceSlot,
@@ -149,5 +151,24 @@ describe("loopback origin trust", () => {
   it("defaults the port when the origin omits one", () => {
     expect(isLoopbackOriginOnPort("http://localhost", 80)).toBe(true);
     expect(isLoopbackOriginOnPort("http://localhost", 3117)).toBe(false);
+  });
+
+  it("recognises the hub chooser path with or without its trailing slash", () => {
+    expect(HUB_PATH).toBe("/hub");
+    expect(isHubChooserPath("/hub")).toBe(true);
+    expect(isHubChooserPath("/hub/")).toBe(true);
+    // Anything deeper is not the chooser — it belongs to whoever serves it.
+    expect(isHubChooserPath("/hub/extra")).toBe(false);
+    expect(isHubChooserPath("/hubs")).toBe(false);
+    expect(isHubChooserPath("/")).toBe(false);
+    // A project's own /hub path is the project's, reached through the prefix.
+    expect(isHubChooserPath("/p/alpha/hub")).toBe(false);
+  });
+
+  it("leaves the hub chooser path outside any base path", () => {
+    // withBasePath would answer `/p/alpha/hub`, which is a project path. The
+    // chooser lives above every project, so it is never prefixed.
+    expect(detectBasePath(HUB_PATH)).toBe("");
+    expect(detectViewerBasePath(HUB_PATH)).toBe("");
   });
 });

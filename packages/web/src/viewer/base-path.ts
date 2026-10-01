@@ -18,11 +18,14 @@
  * - {@link appUrl} for the few places that build a URL by hand: history
  *   entries, the shareable-link button, the logo image.
  *
+ * {@link hubUrl} is the one address that is deliberately *not* prefixed — the
+ * hub's chooser sits above every project rather than inside one.
+ *
  * The pure helpers live in src/shared/base-path.ts (via external.ts); this
  * module adds the browser-bound state.
  */
 
-import { detectViewerBasePath, frameIsForWorkspace, webSocketUrl, withBasePath, workspaceKeyFromBasePath } from "./external.js";
+import { HUB_PATH, detectViewerBasePath, frameIsForWorkspace, webSocketUrl, withBasePath, workspaceKeyFromBasePath } from "./external.js";
 
 let cachedBasePath: string | null = null;
 
@@ -59,6 +62,23 @@ export function setBasePathForTests(basePath: string | null): void {
 /** A root-relative app path (`/api/x`, `/prd/123`) as it must be requested from here. */
 export function appUrl(path: string): string {
   return withBasePath(getBasePath(), path);
+}
+
+/**
+ * The hub's project chooser, for a link out of this dashboard.
+ *
+ * Deliberately not `appUrl(HUB_PATH)`, which the shape of every neighbouring
+ * call invites: `appUrl` is for paths this viewer's own server answers, and
+ * would produce `/p/<id>/w/<key>/hub` — a project path, proxied to a project
+ * server that has no such route. The chooser sits above every project, so its
+ * address is the same from anywhere and carries no base path at all.
+ *
+ * Standalone (`web serve`, a static export) nothing answers it; the caller
+ * decides whether to offer the link, and today only a hub-served dashboard
+ * does — `getBasePath()` is non-empty exactly then.
+ */
+export function hubUrl(): string {
+  return HUB_PATH;
 }
 
 /** The WebSocket endpoint for live updates from this viewer's server. */
