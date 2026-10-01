@@ -138,7 +138,7 @@ export function featureDisabledBody(feature: string, pathname: string): FeatureD
     feature,
     kind: "feature_disabled",
     suggestion:
-      `Enable ${feature} in the Feature Toggles view, or set features.${feature} to true in .n-dx.json.`,
+      `Enable ${feature} in the feature flags on the Project settings page, or set features.${feature} to true in .n-dx.json.`,
   };
 }
 

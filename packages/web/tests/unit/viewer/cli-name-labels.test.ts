@@ -8,6 +8,7 @@ import { SettingsOverlay } from "../../../src/viewer/components/settings-overlay
 import { buildValidViews } from "../../../src/shared/index.js";
 import { Breadcrumb } from "../../../src/viewer/components/breadcrumb.js";
 import { WorkflowView } from "../../../src/viewer/views/workflow.js";
+import { ProjectView } from "../../../src/viewer/views/project.js";
 import { resolveCliLabel, clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 
 /**
@@ -61,7 +62,7 @@ describe("dashboard labels use the project CLI name", () => {
     vi.unstubAllGlobals();
   });
 
-  it("settings list renders the resolved name, never a bare ndx", async () => {
+  it("settings list never shows an unresolved placeholder or a bare ndx", async () => {
     stubProject("myapp");
     act(() => {
       render(h(SettingsOverlay, {
@@ -74,18 +75,29 @@ describe("dashboard labels use the project CLI name", () => {
     });
     await settle();
 
-    expect(root.textContent).toContain("myapp analyze / plan");
     expect(root.textContent).not.toContain("{cli}");
     expect(root.textContent).not.toMatch(/\bndx\b/);
   });
 
-  it("breadcrumb renders the resolved name for a settings view", async () => {
+  it("breadcrumb for a settings view never shows an unresolved placeholder or a bare ndx", async () => {
     stubProject("myapp");
     act(() => {
-      render(h(Breadcrumb, { view: "project-settings", navigateTo: () => {} }), root);
+      render(h(Breadcrumb, { view: "project", navigateTo: () => {} }), root);
     });
     await settle();
-    expect(root.textContent).toContain("myapp analyze / plan");
+    expect(root.textContent).toContain("Project");
+    expect(root.textContent).not.toContain("{cli}");
+    expect(root.textContent).not.toMatch(/\bndx\b/);
+  });
+
+  it("Project page names the analyze and plan commands with the resolved name", async () => {
+    stubProject("myapp", { otherApisFail: true });
+    act(() => {
+      render(h(ProjectView, null), root);
+    });
+    await settle();
+    expect(root.querySelector(".project-header-subtitle")!.textContent).toContain("myapp analyze");
+    expect(root.querySelector(".project-header-subtitle")!.textContent).toContain("myapp plan");
     expect(root.textContent).not.toMatch(/\bndx\b/);
   });
 
@@ -111,7 +123,6 @@ describe("dashboard labels use the project CLI name", () => {
       }), root);
     });
     await settle();
-    expect(root.textContent).toContain("n-dx analyze / plan");
     expect(root.textContent).not.toContain("{cli}");
   });
 });

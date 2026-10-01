@@ -116,7 +116,7 @@ describe("stages.ts", () => {
     }
     expect(isKnownViewPath("home")).toBe(true);
     expect(SETTINGS_ENTRIES.map((e) => e.view)).toEqual([
-      "robot-wrangler", "project-settings", "workflow", "notion-config", "integrations", "commands", "feature-toggles",
+      "robot-wrangler", "project", "workflow", "commands",
     ]);
   });
 
@@ -630,21 +630,20 @@ describe("SettingsOverlay", () => {
   const items = () => Array.from(root.querySelectorAll(".settings-overlay-item")).map((el) =>
     Array.from(el.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent ?? "").join("").trim());
 
-  it("is a modal dialog listing the settings pages, gated ones hidden while off", async () => {
+  it("is a modal dialog listing the settings pages", async () => {
     await mount(overlay("robot-wrangler"));
     const dialog = root.querySelector(".settings-overlay")!;
     expect(dialog.getAttribute("role")).toBe("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(items()).toEqual(["Robot Wrangler", "n-dx analyze / plan", "Workflow", "n-dx export / refresh", "Feature Flags"]);
+    expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Commands"]);
     expect(root.querySelector(".fake-settings")).not.toBeNull();
     expect(root.querySelector(".settings-overlay-crumbs")?.textContent).toContain("Robot Wrangler");
   });
 
-  it("shows the gated pages when their toggles are on", async () => {
+  it("lists the same pages whatever the feature toggles are — Notion and Integrations live on Project", async () => {
     stubApi(["rex.notionSync", "rex.integrations"]);
     await mount(overlay("robot-wrangler"));
-    expect(items()).toContain("n-dx sync");
-    expect(items()).toContain("Integrations");
+    expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Commands"]);
   });
 
   it("switches pages and closes with the ✕ or Escape", async () => {

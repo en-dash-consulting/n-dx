@@ -8,7 +8,9 @@
  * a rex-scoped viewer, which has no Work stage, so `/rex-dashboard` keeps
  * being served as its own page there. `/llm-provider` was renamed to
  * `/robot-wrangler`, and `/hench-config`, `/cli-timeouts` and
- * `/hench-templates` merged into `/workflow`; all redirect the same way.
+ * `/hench-templates` merged into `/workflow`, and `/project-settings`,
+ * `/feature-toggles`, `/notion-config` and `/integrations` merged into
+ * `/project`; all redirect the same way.
  */
 
 import { describe, it, expect } from "vitest";
@@ -88,6 +90,19 @@ describe("redirect aliases: full dashboard (no scope)", () => {
     });
   }
 
+  for (const old of ["project-settings", "feature-toggles", "notion-config", "integrations"]) {
+    it(`redirects the merged /${old} to /project`, async () => {
+      const { baseUrl, close } = await startFor(baseCtx());
+      try {
+        const res = await fetch(`${baseUrl}/${old}`, { redirect: "manual" });
+        expect(res.status).toBe(302);
+        expect(res.headers.get("location")).toBe("project");
+      } finally {
+        await close();
+      }
+    });
+  }
+
   it("keeps a sub-path and query string across the redirect", async () => {
     const { baseUrl, close } = await startFor(baseCtx());
     try {
@@ -132,6 +147,33 @@ describe("redirect aliases: scoped viewers", () => {
         const res = await fetch(`${baseUrl}/hench-config`, { redirect: "manual" });
         expect(res.status).toBe(302);
         expect(res.headers.get("location")).toBe("workflow");
+      } finally {
+        await close();
+      }
+    });
+  }
+
+  // Project is cross-cutting too. /notion-config and /integrations were
+  // rex-scope views, so a rex-scoped viewer is where a stale bookmark to them
+  // would otherwise have been served as an unknown path.
+  it("redirects /notion-config to /project in a rex-scoped viewer", async () => {
+    const { baseUrl, close } = await startFor(baseCtx("rex"));
+    try {
+      const res = await fetch(`${baseUrl}/notion-config`, { redirect: "manual" });
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("project");
+    } finally {
+      await close();
+    }
+  });
+
+  for (const scope of ["sourcevision", "hench"] as const) {
+    it(`redirects /project-settings to /project in a ${scope}-scoped viewer`, async () => {
+      const { baseUrl, close } = await startFor(baseCtx(scope));
+      try {
+        const res = await fetch(`${baseUrl}/project-settings`, { redirect: "manual" });
+        expect(res.status).toBe(302);
+        expect(res.headers.get("location")).toBe("project");
       } finally {
         await close();
       }

@@ -53,7 +53,7 @@ packages/web/tests/unit/viewer/axe-audit.test.ts
 | Workflow settings (`workflow`) | WorkflowView loading state (work settings, CLI timeouts and templates) |
 | PR Tab (`pr-markdown`) | PRMarkdownView loading state |
 | Ask (`ask`) | AskView idle state, plus the deployed-mode unavailable state |
-| Settings (`project-settings`) | ProjectSettingsView loading state |
+| Project settings (`project`) | ProjectView loading state (analyze and plan settings, feature flags, Notion and integrations) |
 
 Each route is tested in **both light and dark themes** to catch theme-specific structural regressions (missing ARIA labels that only appear in one theme, dynamic class applications, etc.).
 
@@ -134,7 +134,7 @@ Run this procedure before any release that touches dashboard UI components.
 1. Enable VoiceOver (`⌘ F5`). Open the dashboard.
 2. Use `VO + Right` to navigate through the sidebar — each item should be announced.
 3. Navigate to **PRD view** — use VoiceOver rotor (`VO + U`) → Tables to jump to the PRD tree.
-4. Use VoiceOver's Form Controls rotor to navigate all form elements in **Hench Config** and **Project Settings** — each must have a label.
+4. Use VoiceOver's Form Controls rotor to navigate all form elements in **Workflow** and **Project** — each must have a label.
 5. Open the **Guide modal** on any view — VoiceOver should announce `dialog` and move focus inside. Escape should close and restore focus.
 6. Navigate to **Zones view** — use VoiceOver's Links/Headings rotor to confirm section structure is logical.
 

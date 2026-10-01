@@ -5,14 +5,13 @@
  * behind a single import boundary. This establishes a natural decomposition
  * point within the web-viewer zone.
  *
- * Domain scope: Notion config, external integrations, and feature toggles.
+ * Domain scope: the settings pages (Robot Wrangler, Project, Workflow) and the
+ * Commands page. Project's sections — project settings, feature flags, Notion
+ * and integrations — are components of `project.ts`, not views of their own.
  */
 
-export { NotionConfigView } from "./notion-config.js";
-export { IntegrationConfigView } from "./integration-config.js";
-export { FeatureTogglesView } from "./feature-toggles.js";
 export { WorkflowView } from "./workflow.js";
 export { CommandsView } from "./commands.js";
 export { CommandReferenceView } from "./command-reference.js";
 export { RobotWranglerView } from "./robot-wrangler.js";
-export { ProjectSettingsView } from "./project-settings.js";
+export { ProjectView } from "./project.js";

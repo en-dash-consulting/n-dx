@@ -162,18 +162,14 @@ export function stageProduct(stage: StageId): StageProduct {
 export interface SettingsEntry {
   /** Label and glyph come from this view's entry in `view-meta.ts`. */
   view: ViewId;
-  featureGate?: string;
 }
 
-/** Loop order: Robot Wrangler → analyze/plan → Workflow → sync → export, then cross-cutting. */
+/** Robot Wrangler → Project → Workflow, then Commands (which moves to the Commands sheet in #464). */
 export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   { view: "robot-wrangler" },
-  { view: "project-settings" },
+  { view: "project" },
   { view: "workflow" },
-  { view: "notion-config", featureGate: "rex.notionSync" },
-  { view: "integrations", featureGate: "rex.integrations" },
   { view: "commands" },
-  { view: "feature-toggles" },
 ];
 
 const SETTINGS_VIEWS: ReadonlySet<ViewId> = new Set(SETTINGS_ENTRIES.map((e) => e.view));

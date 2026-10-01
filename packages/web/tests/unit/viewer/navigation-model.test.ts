@@ -136,9 +136,10 @@ describe("navigation model: labels", () => {
     expect(viewLabel("activity")).toBe("Execution Log");
   });
 
+  // No label carries the placeholder today (the settings pages that did were
+  // merged into Project), so this holds vacuously until one does again.
   it("resolves the {cli} placeholder in every label that carries one", () => {
     const templated = ALL_VIEWS.filter((v) => viewLabel(v).includes("{cli}"));
-    expect(templated.length).toBeGreaterThan(0);
     for (const view of templated) {
       expect(resolveCliLabel(viewLabel(view), "myapp")).not.toContain("{cli}");
     }

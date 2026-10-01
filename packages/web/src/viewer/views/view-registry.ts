@@ -59,14 +59,11 @@ import type { StageId } from "./stages.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 
 import {
-  NotionConfigView,
-  IntegrationConfigView,
-  FeatureTogglesView,
   WorkflowView,
   CommandsView,
   CommandReferenceView,
   RobotWranglerView,
-  ProjectSettingsView,
+  ProjectView,
 } from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
@@ -193,12 +190,6 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "activity": () =>
     h(ActivityView, null),
 
-  "notion-config": () =>
-    h(NotionConfigView, null),
-
-  "integrations": () =>
-    h(IntegrationConfigView, null),
-
   "hench-runs": ({ navigateTo, selectedRunId }) =>
     h(HenchRunsView, { navigateTo, initialRunId: selectedRunId }),
 
@@ -210,9 +201,6 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "hench-adaptive": () =>
     h(AdaptiveOptimizationView, null),
-
-  "feature-toggles": () =>
-    h(FeatureTogglesView, null),
 
   "workflow": ({ navigateTo }) =>
     h(WorkflowView, { navigateTo }),
@@ -226,8 +214,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "robot-wrangler": () =>
     h(RobotWranglerView, null),
 
-  "project-settings": () =>
-    h(ProjectSettingsView, null),
+  "project": () =>
+    h(ProjectView, null),
 };
 
 /** Render the view identified by `view` using props from `ctx`. */

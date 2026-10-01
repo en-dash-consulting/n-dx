@@ -193,7 +193,7 @@ const PRESENTATION: Record<AskFailureKind, KindPresentation> = {
     // the fix is a setting rather than anything about the question. Reaching
     // this card at all means a stale tab or a direct request — both entry
     // points into the panel are hidden while the toggle is off.
-    steps: ["Enable the Ask Panel toggle in the Feature Toggles view, then reload this page."],
+    steps: ["Enable the Ask Panel toggle in the feature flags on the Project settings page, then reload this page."],
     canRetry: false,
     needsAnalysis: false,
   },

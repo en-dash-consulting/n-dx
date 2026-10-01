@@ -34,8 +34,6 @@ export const REX_SCOPE_VIEWS: readonly ViewId[] = [
   "validation",
   "requirements",
   "activity",
-  "notion-config",
-  "integrations",
 ];
 
 export const HENCH_SCOPE_VIEWS: readonly ViewId[] = [
@@ -50,12 +48,11 @@ export const CROSS_CUTTING_VIEWS: readonly ViewId[] = [
   "home",
   "workspaces",
   "token-usage",
-  "feature-toggles",
   "workflow",
   "command-reference",
   "commands",
   "robot-wrangler",
-  "project-settings",
+  "project",
 ];
 
 export const VIEWS_BY_SCOPE: Readonly<Record<ViewerScope, readonly ViewId[]>> = {
@@ -99,6 +96,11 @@ const VIEW_ALIASES: Readonly<Record<string, ViewId>> = {
   "hench-config": "workflow",
   "cli-timeouts": "workflow",
   "hench-templates": "workflow",
+  // 0.8.0 merged analyze/plan settings, feature flags, Notion and integrations into Project.
+  "project-settings": "project",
+  "feature-toggles": "project",
+  "notion-config": "project",
+  integrations: "project",
 };
 
 /**

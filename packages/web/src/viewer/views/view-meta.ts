@@ -245,11 +245,11 @@ export const VIEW_META = {
     product: "global",
     blurb: "Which model answers, and the credentials it answers with.",
   },
-  "project-settings": {
-    label: "{cli} analyze / plan",
+  project: {
+    label: "Project",
     glyph: "▣",
     product: "global",
-    blurb: "Defaults for the analysis and planning commands.",
+    blurb: "Analyze and plan settings, feature flags, and the services the PRD syncs with.",
   },
   workflow: {
     label: "Workflow",
@@ -257,29 +257,11 @@ export const VIEW_META = {
     product: "global",
     blurb: "How agent runs behave: limits, guard rails, templates and command timeouts.",
   },
-  "notion-config": {
-    label: "{cli} sync",
-    glyph: "\u{1F50C}",
-    product: "global",
-    blurb: "Push and pull the PRD through a Notion database.",
-  },
-  integrations: {
-    label: "Integrations",
-    glyph: "\u{1F517}",
-    product: "rex",
-    blurb: "Other trackers this PRD can sync with.",
-  },
   commands: {
-    label: "{cli} export / refresh",
+    label: "Commands",
     glyph: "\u{1F4E4}",
     product: "global",
-    blurb: "Defaults for the export and refresh commands.",
-  },
-  "feature-toggles": {
-    label: "Feature Flags",
-    glyph: "\u{1F4CC}",
-    product: "global",
-    blurb: "Turn optional surfaces on and off.",
+    blurb: "Run refresh, export, the sample app and self-heal from the dashboard.",
   },
 } as const satisfies Record<ViewId, ViewMeta>;
 

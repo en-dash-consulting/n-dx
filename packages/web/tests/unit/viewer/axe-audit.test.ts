@@ -783,9 +783,9 @@ describe.skipIf(!axeRun)("[a11y] AskView — axe audit", () => {
   });
 });
 
-// ── [a11y] ProjectSettings (loading state) ───────────────────────────────────
+// ── [a11y] Project settings page (loading state) ─────────────────────────────
 
-describe.skipIf(!axeRun)("[a11y] ProjectSettings — axe audit", () => {
+describe.skipIf(!axeRun)("[a11y] Project — axe audit", () => {
   let root: HTMLElement;
   let cleanup: () => void;
   let originalFetch: typeof globalThis.fetch;
@@ -806,8 +806,8 @@ describe.skipIf(!axeRun)("[a11y] ProjectSettings — axe audit", () => {
 
   it("has zero critical/serious violations (light theme, loading state)", async () => {
     cleanup = setTheme("light");
-    const { ProjectSettingsView } = await import("../../../src/viewer/views/project-settings.js");
-    root = renderToDiv(h(ProjectSettingsView, {}));
+    const { ProjectView } = await import("../../../src/viewer/views/project.js");
+    root = renderToDiv(h(ProjectView, {}));
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
@@ -815,8 +815,8 @@ describe.skipIf(!axeRun)("[a11y] ProjectSettings — axe audit", () => {
 
   it("has zero critical/serious violations (dark theme, loading state)", async () => {
     cleanup = setTheme("dark");
-    const { ProjectSettingsView } = await import("../../../src/viewer/views/project-settings.js");
-    root = renderToDiv(h(ProjectSettingsView, {}));
+    const { ProjectView } = await import("../../../src/viewer/views/project.js");
+    root = renderToDiv(h(ProjectView, {}));
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);

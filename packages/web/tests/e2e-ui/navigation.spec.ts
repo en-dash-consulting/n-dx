@@ -149,6 +149,10 @@ const ALIASES: Array<[string, string]> = [
   ["hench-config", "workflow"],
   ["cli-timeouts", "workflow"],
   ["hench-templates", "workflow"],
+  ["project-settings", "project"],
+  ["feature-toggles", "project"],
+  ["notion-config", "project"],
+  ["integrations", "project"],
 ];
 
 for (const [oldPath, target] of ALIASES) {

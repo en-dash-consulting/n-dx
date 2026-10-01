@@ -3,7 +3,7 @@
 Every production source file that still spells out where n-dx keeps its files,
 instead of asking the resolver.
 
-**158 literals across 67 files.** That number is the debt, and it may only go
+**157 literals across 66 files.** That number is the debt, and it may only go
 down.
 
 ## Why this file exists
@@ -91,13 +91,13 @@ hench and web are not finished either. What is left:
 | Package | Literals |
 |---|---|
 | core | 60 |
-| web | 53 |
+| web | 52 |
 | hench | 25 |
 | rex | 12 |
 | llm-client | 6 |
 | sourcevision | 2 |
 
-So 138 of the remaining 158 sit in the three packages that sweep was meant to
+So 137 of the remaining 157 sit in the three packages that sweep was meant to
 clear. That is the number this file exists to keep honest: without it the task
 reads as done because a PR with its name on it merged.
 
@@ -207,7 +207,6 @@ more.
 | `packages/web/src/viewer/views/hench-templates.ts` | 1 | .hench |
 | `packages/web/src/viewer/views/iso-map.ts` | 1 | .sourcevision |
 | `packages/web/src/viewer/views/notion-config.ts` | 1 | .rex |
-| `packages/web/src/viewer/views/project-settings.ts` | 1 | .n-dx* |
 | `packages/web/src/viewer/views/workflow-optimization.ts` | 1 | .hench |
 
 ### Registered ahead of merge
