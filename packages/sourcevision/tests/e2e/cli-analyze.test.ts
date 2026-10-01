@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { execFileSync, spawn } from "node:child_process";
 import { mkdtemp, cp, rm } from "node:fs/promises";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -102,11 +102,10 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
     });
     try {
       // The handlers are installed right after the progress file is created.
-      const deadline = Date.now() + 20_000;
-      while (readAnalyzeProgress(svDir)?.status !== "running" && Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 5));
-      }
-      expect(readAnalyzeProgress(svDir)?.status).toBe("running");
+      await vi.waitFor(() => expect(readAnalyzeProgress(svDir)?.status).toBe("running"), {
+        timeout: 20_000,
+        interval: 5,
+      });
       child.kill("SIGTERM");
     } catch (error) {
       child.kill("SIGKILL");

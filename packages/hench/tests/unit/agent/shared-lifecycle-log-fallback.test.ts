@@ -6,10 +6,19 @@ import { tmpdir } from "node:os";
 import { initConfig } from "../../../src/store/config.js";
 import { RM_RETRY } from "../../helpers/index.js";
 
-const { mockResolveActor, mockResolveHost } = vi.hoisted(() => ({
-  mockResolveActor: vi.fn(async () => "Test Actor <test@example.com>"),
-  mockResolveHost: vi.fn(() => "test-host"),
-}));
+const { mockResolveActor, mockResolveHost, streamFailed, markStreamFailed } = vi.hoisted(() => {
+  let resolveFailed!: () => void;
+  /** Resolves once the run log stream has emitted its 'error' event. */
+  const streamFailed = new Promise<void>((resolve) => {
+    resolveFailed = resolve;
+  });
+  return {
+    mockResolveActor: vi.fn(async () => "Test Actor <test@example.com>"),
+    mockResolveHost: vi.fn(() => "test-host"),
+    streamFailed,
+    markStreamFailed: () => resolveFailed(),
+  };
+});
 
 vi.mock("../../../src/process/actor-identity.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../src/process/actor-identity.js")>();
@@ -28,12 +37,15 @@ vi.mock("node:fs/promises", async (importOriginal) => {
     open: (async (...args: Parameters<typeof actual.open>) => {
       const handle = await actual.open(...args);
       if (!String(args[0]).includes(".run-logs") || !String(args[0]).endsWith(".log")) return handle;
-      handle.createWriteStream = (() =>
-        new Writable({
+      handle.createWriteStream = (() => {
+        const broken = new Writable({
           write(_chunk, _encoding, callback) {
             callback(Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" }));
           },
-        })) as unknown as typeof handle.createWriteStream;
+        });
+        broken.once("error", markStreamFailed);
+        return broken;
+      }) as unknown as typeof handle.createWriteStream;
       return handle;
     }) as typeof actual.open,
   };
@@ -93,8 +105,8 @@ describe("run log end-of-run fallback", () => {
 
     stream("Agent", "first line");
     stream("Agent", "second line");
-    // Let the stream's failed write surface as an 'error' event.
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Wait for the stream's failed write to surface as an 'error' event.
+    await streamFailed;
 
     // The live file is empty: nothing could be written to it.
     expect(await readFile(run.logPath!, "utf-8")).toBe("");
