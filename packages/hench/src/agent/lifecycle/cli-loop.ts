@@ -669,6 +669,12 @@ export interface SpawnWithAdapterOptions {
 export interface LiveSpawnProgress {
   turns: number;
   tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
+  /**
+   * Pid of the vendor CLI while a spawn is live; cleared when it closes. Not
+   * touched by {@link resetLiveSpawnProgress} — that runs between spawns, and
+   * the pid belongs to the process, not to the counters it produced.
+   */
+  vendorPid?: number;
 }
 
 export function createLiveSpawnProgress(): LiveSpawnProgress {
@@ -735,6 +741,10 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
       env: cliEnv ?? process.env,
     });
 
+    // proc.pid is undefined when the spawn failed outright (ENOENT); the
+    // `error` handler below clears it either way.
+    if (liveProgress) liveProgress.vendorPid = proc.pid;
+
     // Write stdin content if the adapter requires it (Claude: pipe-based prompt)
     if (spawnConfig.stdinContent !== null && proc.stdin) {
       proc.stdin.write(spawnConfig.stdinContent, "utf-8");
@@ -787,6 +797,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     });
 
     proc.on("error", (err) => {
+      if (liveProgress) liveProgress.vendorPid = undefined;
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         // Keep the vendor-specific prefix (matched by formatCLIError) and
         // append the cross-platform diagnoseCliInvocation detail, which
@@ -810,6 +821,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     });
 
     proc.on("close", (code) => {
+      if (liveProgress) liveProgress.vendorPid = undefined;
       // Flush remaining buffered output
       if (lineBuffer.trim()) {
         processLine(lineBuffer);
@@ -2049,6 +2061,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const heartbeat = startHeartbeat(henchDir, run, undefined, () => {
     run.turns = accumulated.turns + liveProgress.turns;
     run.tokenUsage = addTokenUsage(accumulated.tokenUsage, liveProgress.tokenUsage);
+    // Absent between spawns: a stale vendor pid would read as a live child.
+    if (liveProgress.vendorPid !== undefined) run.vendorPid = liveProgress.vendorPid;
+    else delete run.vendorPid;
   });
 
   // Start the commit-message watcher. If the agent writes `.hench-commit-msg.txt`

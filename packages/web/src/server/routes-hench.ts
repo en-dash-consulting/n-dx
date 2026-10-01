@@ -1880,7 +1880,12 @@ function computeHeartbeatStatus(
   return { status, missedHeartbeats };
 }
 
-/** GET /api/hench/runs/health — detect stale "running" runs. */
+/**
+ * GET /api/hench/runs/health — detect stale "running" runs.
+ *
+ * Reports the recorded pid's liveness next to the heartbeat age so a viewer can
+ * tell a slow run (old heartbeat, pid alive) from a dead one (pid gone).
+ */
 function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
   let files: string[];
   try {
@@ -1899,6 +1904,12 @@ function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
     lastActivityAt?: string;
     stale: boolean;
     staleSinceMs?: number;
+    /** Recorded hench pid; absent on records written before the field existed. */
+    pid?: number;
+    /** Recorded vendor CLI pid; absent between spawns and on the API provider. */
+    vendorPid?: number;
+    /** Whether `pid` is still alive. `null` = no pid recorded, i.e. unknown — not dead. */
+    pidAlive: boolean | null;
   }> = [];
 
   for (const file of files) {
@@ -1912,6 +1923,7 @@ function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
     const stale = lastActivityMs != null
       ? (now - lastActivityMs) > STALE_THRESHOLD_MS
       : true; // No lastActivityAt = legacy run, treat as stale if still "running"
+    const pid = typeof run.pid === "number" ? run.pid : undefined;
 
     runningRuns.push({
       id: run.id as string,
@@ -1921,6 +1933,9 @@ function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
       lastActivityAt: lastActivity,
       stale,
       staleSinceMs: lastActivityMs != null ? Math.max(0, now - lastActivityMs) : undefined,
+      pid,
+      vendorPid: typeof run.vendorPid === "number" ? run.vendorPid : undefined,
+      pidAlive: pid != null ? isPidAlive(pid) : null,
     });
   }
 

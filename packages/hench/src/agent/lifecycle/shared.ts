@@ -605,6 +605,7 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     session: opts.session,
     actor: await resolveActor(opts.projectDir ?? "."),
     host: resolveHost(),
+    pid: process.pid,
     ndxVersion: resolveNdxVersion(),
     cliPath: resolveCliPath(),
     ...gitOrigin,
@@ -3040,6 +3041,8 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   const { run, henchDir, projectDir, config, testCommand, heartbeat, memoryCtx, selfHeal, yes, autonomous, skipFullTestGate } = opts;
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
+  // Every spawn has closed; a leftover heartbeat-written pid would name a process that is gone.
+  delete run.vendorPid;
 
   // Every agent session is over by now, so whatever completion it asked for
   // is on the claim. Nothing is applied until the gates below have passed.

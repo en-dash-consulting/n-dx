@@ -1487,6 +1487,28 @@ export interface RunRecord {
    */
   eventsPath?: string;
   /**
+   * Pid of the hench process driving this run (`process.pid`).
+   *
+   * Written when the run starts and re-written by every heartbeat, so a viewer
+   * can tell a slow run (pid alive, heartbeat old) from a dead one (pid gone)
+   * and can stop a run that was started from a terminal. Meaningful only while
+   * `status` is `"running"`, and only on the host named by {@link host}.
+   *
+   * v1 additive field — old records without it load normally and mean
+   * "pid unknown".
+   */
+  pid?: number;
+  /**
+   * Pid of the vendor CLI subprocess currently spawned for this run.
+   *
+   * Set from the heartbeat while a spawn is live and absent between spawns
+   * (retries, the plan-mode prompt) and on the API provider, which spawns
+   * nothing.
+   *
+   * v1 additive field — old records without it load normally.
+   */
+  vendorPid?: number;
+  /**
    * Commits this run produced — the task's own work commit, the
    * review-repair commit, and the completion-metadata ("record") commit,
    * whichever landed — in the order git created them.

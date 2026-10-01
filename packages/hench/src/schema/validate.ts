@@ -403,6 +403,8 @@ export const RunRecordSchema = z.object({
   host: z.string().optional(),
   logPath: z.string().optional(),
   eventsPath: z.string().optional(),
+  pid: z.number().int().positive().optional(),
+  vendorPid: z.number().int().positive().optional(),
   commits: z.array(RunCommitRecordSchema).optional(),
   // Boolean is the legacy shape (records written before the paths existed);
   // new records carry the paths the record commit tried to stage.

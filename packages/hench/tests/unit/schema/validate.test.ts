@@ -540,6 +540,24 @@ describe("validateRunRecord", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("accepts pid and vendorPid, and records without them (pid unknown)", () => {
+    const withPids = validateRunRecord({ ...validRun, pid: 23110, vendorPid: 23125 });
+    expect(withPids.ok).toBe(true);
+    if (withPids.ok) {
+      expect(withPids.data.pid).toBe(23110);
+      expect(withPids.data.vendorPid).toBe(23125);
+    }
+
+    const without = validateRunRecord(validRun);
+    expect(without.ok).toBe(true);
+    if (without.ok) expect(without.data.pid).toBeUndefined();
+  });
+
+  it("rejects a non-positive or fractional pid", () => {
+    expect(validateRunRecord({ ...validRun, pid: 0 }).ok).toBe(false);
+    expect(validateRunRecord({ ...validRun, vendorPid: 1.5 }).ok).toBe(false);
+  });
+
   it("accepts run with tool calls", () => {
     const run = {
       ...validRun,

@@ -168,4 +168,16 @@ describe("livelock intercept in spawnWithAdapter", () => {
     expect(result.error).toBeUndefined();
     expect(result.toolCalls.length).toBeGreaterThan(0);
   }, 20_000);
+
+  it("exposes the child's pid while it runs and clears it once it closes", async () => {
+    // What the heartbeat reads to write `vendorPid` onto the run record.
+    const progress = createLiveSpawnProgress();
+    const spawned = spawn("varied", 0, progress);
+
+    await waitFor(() => progress.turns > 0);
+    expect(progress.vendorPid).toBe(Number(await readFile(pidFile, "utf-8")));
+
+    await spawned;
+    expect(progress.vendorPid).toBeUndefined();
+  }, 20_000);
 });
