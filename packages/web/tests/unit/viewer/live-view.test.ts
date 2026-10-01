@@ -198,6 +198,21 @@ describe("the rendered page", () => {
     expect(hrefs.some((x) => x?.endsWith("/live/analyze"))).toBe(true);
   });
 
+  it("links a finished run to its own worktree's run detail", async () => {
+    body = snapshot({
+      runs: [run()],
+      recent: [
+        run({ runId: "served", status: "completed", finishedAt: "2026-10-01T10:30:00.000Z" }),
+        run({ runId: "other", status: "completed", worktree: OTHER, finishedAt: "2026-10-01T10:31:00.000Z" }),
+      ],
+    });
+    await mount();
+    const hrefs = [...root.querySelectorAll<HTMLAnchorElement>(".live-recent a")].map((a) => a.getAttribute("href"));
+    expect(hrefs).toHaveLength(2);
+    expect(hrefs.find((x) => x?.endsWith("/hench-runs/served"))).not.toContain("/w/");
+    expect(hrefs.find((x) => x?.endsWith("/hench-runs/other"))).toContain("/w/feat/hench-runs/other");
+  });
+
   it("shows a six-segment bar for a sourcevision analysis and the last output line for other jobs", async () => {
     body = snapshot({
       jobs: [

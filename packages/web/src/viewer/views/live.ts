@@ -32,7 +32,7 @@ import {
   type LiveSnapshot,
 } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
-import { PeekLink, StartTaskButton, jobTarget, runTarget } from "../components/index.js";
+import { PeekLink, StartTaskButton, isCurrentWorktree, jobTarget, liveHref, runTarget } from "../components/index.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import {
   chainLabel,
@@ -329,10 +329,16 @@ function Recent({ snapshot, navigateTo }: { snapshot: LiveSnapshot; navigateTo: 
     snapshot.recent.length === 0
       ? h("p", { class: "live-muted" }, "None.")
       : h("ul", { class: "live-recent" }, snapshot.recent.map((run) => h("li", { key: run.runId },
+        // The list covers every worktree and a run record lives only in its own,
+        // so another worktree's run opens under that worktree's /w/<key>/ slot.
         h("a", {
           class: "live-queue-item",
-          href: "#",
-          onClick: (e: MouseEvent) => { e.preventDefault(); navigateTo("hench-runs", { runId: run.runId }); },
+          href: liveHref(run.worktree, "hench-runs", run.runId),
+          onClick: (e: MouseEvent) => {
+            if (!isCurrentWorktree(run.worktree)) return;
+            e.preventDefault();
+            navigateTo("hench-runs", { runId: run.runId });
+          },
         },
           h("span", { class: "live-card-title" }, run.taskTitle ?? run.runId),
           h("span", { class: "live-card-chain" }, [run.status, formatSince(run.finishedAt)].filter(Boolean).join(" · ")),
