@@ -1,0 +1,25 @@
+---
+id: "a7f79d0d-4d63-42db-8e5e-e77c979990b8"
+level: "task"
+title: "Report a no-edit forked attempt as a read-only refusal and retry it with a cold spawn"
+status: "pending"
+priority: "high"
+tags:
+  - "hench"
+  - "session-fork"
+  - "retry"
+blockedBy:
+  - "54bbe6b8-9d8a-4539-b185-3d30b352c921"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "A forked attempt with no diff and zero file-edit tool calls triggers exactly one cold re-spawn in the same run, without using retry budget"
+  - "A forked attempt with no diff but at least one file-edit tool call keeps the existing completion_rejected behaviour"
+  - "A cold (non-forked) attempt with no diff keeps the existing completion_rejected behaviour"
+  - "The run record names the read-only refusal and the spawn reason for the cold retry"
+  - "The session cache entry is not cleared by a read-only refusal"
+  - "If the cold retry also makes no changes the run fails with the standard no-changes reason"
+  - "A @n-dx/hench patch changeset is included"
+description: "Today `processSuccessfulResult` in packages/hench/src/agent/lifecycle/cli-loop.ts records a no-change result as `completion_rejected` (\"No changes detected in git diff\") and stops the run. The next run then forks the same cached parent.\n\nDetection is structural, as decided in the hotfix session. An attempt counts as a read-only refusal when all three hold:\n- it forked the warm parent (`forkSession` was set for this attempt);\n- `validateCompletion` rejected it for no changes;\n- the attempt made zero file-modifying tool calls (Edit, Write, MultiEdit, NotebookEdit, or the vendor equivalents the run already tracks).\n\nPhrase matching (\"read-only\", \"not to edit\", \"instructions say\") can only make the reported message more specific. It must not decide whether the retry happens.\n\nOn a detected refusal:\n- record a distinct reason on the run, e.g. \"Agent treated the forked session as read-only (no edits made)\";\n- re-spawn the task once in the same run with a cold spawn (warmParentId cleared for the rest of the run, no fork, retry notice as for a cold retry), using the same shape as the existing fork-fallback block: `nextSpawnReason`, no retry-budget charge, at most once per run;\n- keep the session cache: the parent is not broken (run 07eb4cad forked the same kind of parent and edited fine), so other tasks and later runs can still fork it.\n\nIf the cold retry also makes no changes, it fails with the normal completion_rejected path and message. The run record must show that a read-only-refusal retry happened, so `hench show` and the dashboard can tell it apart from fork-fallback and from ordinary retries."
+lastModified: "2026-10-01T21:04:12.568Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
