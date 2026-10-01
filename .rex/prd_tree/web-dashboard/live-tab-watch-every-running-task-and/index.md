@@ -34,7 +34,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Build the running-task page with the Work tab: step stream, criteria, runs, location and spend](./build-the-running-task-page-with-the.md) | completed |
 | [Escape does not close the Live tab peek when it was opened by hover](./escape-does-not-close-the-live-tab.md) | pending |
 | [Every useLive instance shares the poller key "live", so the first unmount stops polling for the Live tab, badge and pill](./every-uselive-instance-shares-the.md) | completed |
-| ["Finished in the last hour" links on /live open another worktree's run in the current workspace, which answers not found](./finished-in-the-last-hour-links-on.md) | pending |
+| ["Finished in the last hour" links on /live open another worktree's run in the current workspace, which answers not found](./finished-in-the-last-hour-links-on.md) | completed |
 | [Log tab tail reads overlap and append the same chunk twice when a read takes longer than the 500 ms poll](./log-tab-tail-reads-overlap-and-append.md) | completed |
 | [Mark stuck on the task page has no confirmation and shows on healthy runs, so one click marks a working run failed](./mark-stuck-on-the-task-page-has-no.md) | completed |
 | [Point the Home worktrees pill and the bottom-bar analysis and stuck-run badges at Live](./point-the-home-worktrees-pill-and-the.md) | completed |
