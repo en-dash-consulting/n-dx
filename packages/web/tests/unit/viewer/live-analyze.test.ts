@@ -161,6 +161,17 @@ describe("reading the header", () => {
     expect(finished.some((c) => c.key === "estimate")).toBe(false);
   });
 
+  it("inside a --deep sub-package shows no previous times or estimate and labels cost per package", () => {
+    const scoped = snapshot({ progress: progress({ scope: "packages/a" }) });
+    const chips = headerChips(scoped);
+    expect(chips.some((c) => c.key === "estimate")).toBe(false);
+    expect(chips.find((c) => c.key === "cost")?.label).toBe("$0.41 this package");
+    expect(phaseRows(scoped, NOW).every((r) => r.previousMs === null)).toBe(true);
+    // The root run keeps both.
+    expect(phaseRows(snapshot(), NOW).some((r) => r.previousMs !== null)).toBe(true);
+    expect(headerChips(snapshot()).find((c) => c.key === "cost")?.label).toBe("$0.41 so far");
+  });
+
   it("omits the model and cost for a fast run", () => {
     const keys = headerChips(snapshot({ progress: progress({ mode: "fast" }) })).map((c) => c.key);
     expect(keys).not.toContain("model");

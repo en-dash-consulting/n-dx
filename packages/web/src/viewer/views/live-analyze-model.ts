@@ -66,11 +66,26 @@ export function formatMs(ms: number): string {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
+/**
+ * A --deep run analyses each sub-package in turn. The previous-run lookup
+ * reads the root's ledger and the cost counter restarts per package, so while
+ * a package is in scope neither previous times nor an estimate mean anything.
+ */
+export function isPackageScoped(progress: AnalyzeProgressFile | null): boolean {
+  return Boolean(progress?.scope);
+}
+
+/** "so far", or "this package" when the counter covers only the package in scope. */
+export function costScopeLabel(progress: AnalyzeProgressFile | null): string {
+  return isPackageScoped(progress) ? "this package" : "so far";
+}
+
 export function phaseRows(snapshot: LiveAnalyzeSnapshot, now: number): PhaseRow[] {
   const progress = snapshot.progress;
+  const scoped = isPackageScoped(progress);
   return ANALYZE_PHASES.map((spec): PhaseRow => {
     const entry = progress?.phases.find((p) => p.name === spec.name);
-    const previousMs = progress?.previous?.phases[spec.name] ?? null;
+    const previousMs = scoped ? null : progress?.previous?.phases[spec.name] ?? null;
     const result = snapshot.results[spec.name] ?? null;
     if (!progress || !entry) {
       // No entry: not reached yet while the run goes, otherwise not run at all.
@@ -173,7 +188,7 @@ export interface Chip {
 export function headerChips(snapshot: LiveAnalyzeSnapshot): Chip[] {
   const progress = snapshot.progress;
   const chips: Chip[] = [];
-  if (progress?.running && progress.previous && progress.previous.durationMs > 0) {
+  if (progress?.running && !isPackageScoped(progress) && progress.previous && progress.previous.durationMs > 0) {
     chips.push({ key: "estimate", label: `estimate ${formatMs(progress.previous.durationMs)} (last ${progress.mode === "fast" ? "fast" : "deep"} run)` });
   }
   chips.push({ key: "worktree", label: snapshot.worktree.branch ?? snapshot.worktree.name });
@@ -182,7 +197,7 @@ export function headerChips(snapshot: LiveAnalyzeSnapshot): Chip[] {
     const { vendor, model } = snapshot.llm;
     const named = [vendor, model].filter(Boolean).join(" · ");
     if (named) chips.push({ key: "model", label: named });
-    if (progress.llm.calls > 0) chips.push({ key: "cost", label: `${formatUsd(snapshot.costUsd)} so far` });
+    if (progress.llm.calls > 0) chips.push({ key: "cost", label: `${formatUsd(snapshot.costUsd)} ${costScopeLabel(progress)}` });
   }
   if (progress?.scope) chips.push({ key: "scope", label: `in ${progress.scope}` });
   return chips;

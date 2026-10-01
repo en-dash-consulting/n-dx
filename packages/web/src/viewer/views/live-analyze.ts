@@ -37,6 +37,7 @@ import {
   headerChips,
   historyLine,
   narrationLine,
+  costScopeLabel,
   passRows,
   phaseRows,
   phaseTimeLabel,
@@ -249,7 +250,7 @@ function CallsSection({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
           h("tbody", null, classes.map((c) => h("tr", { key: c.name, title: c.model },
             h("th", { scope: "row" }, c.name), h("td", null, c.calls), h("td", null, c.tokens), h("td", null, formatMs(c.durationMs)))))),
     cache ? h("p", { class: "live-step-detail" }, `Judgment cache: ${cache.label}`) : null,
-    progress && progress.llm.calls > 0 ? h("p", { class: "live-step-detail" }, `${formatUsd(snapshot.costUsd)} so far (input and output tokens)`) : null,
+    progress && progress.llm.calls > 0 ? h("p", { class: "live-step-detail" }, `${formatUsd(snapshot.costUsd)} ${costScopeLabel(progress)} (input and output tokens)`) : null,
   );
 }
 
