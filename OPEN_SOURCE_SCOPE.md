@@ -153,6 +153,8 @@ product, without permission.
 
 - **Bugs and feature requests** — open an issue at
   <https://github.com/en-dash-consulting/n-dx/issues>.
+- **Security vulnerabilities** — report privately, never in a public issue.
+  See [SECURITY.md](SECURITY.md) for the advisory link and email route.
 - **Licensing, commercial, or hosted-service questions** — email the maintainers
   at <nick@endash.us>.
 
