@@ -39,6 +39,8 @@ import { handleSearchRoute } from "./routes-search.js";
 import { handleNotionRoute } from "./routes-notion.js";
 import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
+import { handleTrustRoute } from "./routes-trust.js";
+import { evaluateRepoTrust, formatRepoTrustReport } from "@n-dx/llm-client";
 import { enforceRouteFeatureGate } from "./route-feature-gates.js";
 import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
@@ -730,6 +732,7 @@ async function handleApiRoutes(
   if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx, { broadcast, onStatusInvalidate: invalidateRunCaches }))) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
+  if (await handleTrustRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleIntegrationRoute(req, res, ctx))) return true;
   if (await handleFeaturesRoute(req, res, ctx)) return true;
@@ -902,6 +905,18 @@ function logStartup(
   }
   if (isInScope(ctx.scope, "hench") && existsSync(henchRunsDir)) {
     console.log(`Hench runs from: ${henchRunsDir}`);
+  }
+  // Repository trust, same evaluation hench applies at run start and the
+  // dashboard shows as a strip. Silent when the checkout matches the defaults
+  // or the user has trusted it; loud otherwise, because `ndx start` is often
+  // the first thing run on a fresh clone.
+  try {
+    const trust = evaluateRepoTrust(ctx.projectDir);
+    if (trust.restricted) {
+      for (const line of formatRepoTrustReport(trust, { acceptCommand: "ndx trust accept ." })) console.log(line);
+    }
+  } catch {
+    // Never block startup on the trust store.
   }
   console.log(`MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
   console.log(`MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);

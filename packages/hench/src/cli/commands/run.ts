@@ -37,6 +37,8 @@ import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failur
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { offerSlugMigration } from "../slug-migration-offer.js";
 import { info, result as output, setQuiet, warn } from "../output.js";
+import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
+import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
 import { section, detail } from "../../types/output.js";
 import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
 import {
@@ -1284,12 +1286,19 @@ async function runOne(
   const store = await resolveStore(rexDir);
   await assertSchemaCompatibility(store);
 
+  // Repository trust. While this checkout's execution config is not trusted
+  // by the user, the guard it declares is clamped to the baseline and
+  // bypassPermissions is lowered (store/trust.ts). cmdRun printed the warning
+  // once; here the clamp is applied per task so a loop cannot outrun it.
+  const trusted = applyRepoTrust(config, dir, permissionMode);
+  permissionMode = trusted.permissionMode;
+
   // Load run history for prior attempt display if not provided
   const runs = runHistory ?? await listRuns(henchDir);
 
   // Apply CLI overrides (--token-budget, --skip-test-gate) to config
   const effectiveConfig = {
-    ...config,
+    ...trusted.config,
     provider,
     ...(tokenBudget != null ? { tokenBudget } : {}),
     ...(skipTestGate ? { skipFullTestGate: true } : {}),
@@ -2007,6 +2016,14 @@ export async function cmdRun(
     // governs task autoselect above — both are facets of "running unattended".
     const autonomous = auto || loop || epicByEpic;
 
+    // Repository trust, reported once per invocation. The per-task clamp in
+    // runOne is what enforces it; this is the operator-facing warning, so an
+    // unattended loop on an untrusted clone says so at the top of its output.
+    const repoTrust = evaluateRepoTrust(dir);
+    if (repoTrust.restricted) {
+      for (const line of formatTrustWarningForRun(repoTrust, config.provider)) warn(line);
+    }
+
     // Resolve the effective permission mode for the spawned Claude session.
     // Precedence: --permission-mode flag > config.permissionMode > autonomous
     // default ("acceptEdits") > undefined (Claude CLI's built-in default).
@@ -2015,6 +2032,10 @@ export async function cmdRun(
       (permissionModeFlag as PermissionMode | undefined) ??
       config.permissionMode ??
       (autonomous ? "acceptEdits" : undefined);
+    if (repoTrust.restricted && effectivePermissionMode === "bypassPermissions") {
+      warn("Lowering --permission-mode bypassPermissions to acceptEdits: this repository's execution config is not trusted.");
+      effectivePermissionMode = "acceptEdits";
+    }
     if (effectivePermissionMode && llmVendor !== LLM_VENDOR.CLAUDE) {
       info(
         `⚠ --permission-mode is a Claude CLI feature; ignoring "${effectivePermissionMode}" for vendor=${llmVendor}.`,

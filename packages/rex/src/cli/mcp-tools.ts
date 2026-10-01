@@ -7,6 +7,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { evaluateRepoTrust } from "@n-dx/llm-client";
 import { SCHEMA_VERSION } from "../schema/index.js";
 import { findItem, resolveItem } from "../core/tree.js";
 import { computeStats } from "../core/stats.js";
@@ -699,14 +700,28 @@ export async function handleVerifyCriteria(
   try {
     const doc = await store.loadDocument();
     const config = await store.loadConfig();
+    // The test command comes from the repository's own `.rex/config.json`, so
+    // running it on a checkout the user has not trusted would execute whatever
+    // that checkout chose. Default off; and even when asked for, tests run
+    // only once the repository's execution config is trusted (`ndx trust`).
+    const requested = args.runTests === true;
+    const trust = requested ? evaluateRepoTrust(dir) : null;
+    const runTests = requested && trust !== null && !trust.restricted;
     const result = await verify({
       projectDir: dir,
       items: doc.items,
       taskId: args.taskId,
       testCommand: config.test,
-      runTests: args.runTests ?? true,
+      runTests,
     });
-    return textResult(JSON.stringify(result, null, 2));
+    const payload = requested && !runTests
+      ? {
+          ...result,
+          testsSkipped: "The repository's execution config is not trusted, so its test command was not run. Review with `ndx trust .` and accept with `ndx trust accept .`.",
+          trust: { state: trust?.state, findings: trust?.findings.filter((f) => f.severity === "warning").map((f) => f.message) ?? [] },
+        }
+      : result;
+    return textResult(JSON.stringify(payload, null, 2));
   } catch (err) {
     return textResult(`Error: ${(err as Error).message}`, true);
   }

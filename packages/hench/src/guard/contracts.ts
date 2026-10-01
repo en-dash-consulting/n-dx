@@ -17,9 +17,26 @@ export interface PolicyLimitsConfig {
   maxTotalCommands?: number;
 }
 
+/**
+ * Which environment variables reach processes the agent starts.
+ *
+ * Names are matched case-insensitively as globs (`*` matches any run of
+ * characters). The defaults strip anything that looks like a credential —
+ * see `DEFAULT_ENV_DENY` in `guard/env.ts` — and `allow` punches holes in that
+ * list for variables a project's tests genuinely need.
+ */
+export interface EnvPolicyConfig {
+  /** Additional variable-name globs to strip. */
+  deny?: string[];
+  /** Variable-name globs to pass through even when a deny glob matches. */
+  allow?: string[];
+}
+
 export interface GuardConfig {
   blockedPaths: string[];
   allowedCommands: string[];
+  /** Environment filtering for child processes; defaults strip credential-shaped names. */
+  env?: EnvPolicyConfig;
   commandTimeout: number;
   maxFileSize: number;
   /** Timeout in ms for spawn-based execution (spawnTool/spawnManaged). 0 = no timeout. */

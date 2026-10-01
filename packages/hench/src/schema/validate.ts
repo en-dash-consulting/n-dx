@@ -41,6 +41,10 @@ const GuardConfigSchema = z.object({
   policy: PolicyLimitsConfigSchema,
   memoryThrottle: MemoryThrottleConfigSchema,
   memoryMonitor: MemoryMonitorConfigSchema,
+  env: z.object({
+    deny: z.array(z.string()).optional(),
+    allow: z.array(z.string()).optional(),
+  }).optional(),
 });
 
 // Per-field defaults so a partial retry group loads: the dashboard's config
@@ -384,6 +388,12 @@ export const RunRecordSchema = z.object({
   turnTokenUsage: z.array(TurnTokenUsageSchema).optional(),
   toolCalls: z.array(ToolCallRecordSchema),
   model: z.string(),
+  trust: z.object({
+    state: z.enum(["baseline", "trusted", "untrusted", "changed"]),
+    digest: z.string(),
+    restricted: z.boolean(),
+    findings: z.array(z.string()),
+  }).optional(),
   worktreeRoot: z.string().optional(),
   branch: z.string().optional(),
   startHead: z.string().optional(),

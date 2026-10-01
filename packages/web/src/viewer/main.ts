@@ -29,6 +29,7 @@ import {
   createTripleClickDetector,
   initTheme,
   initDensity,
+  RepoTrustStrip,
 } from "./components/index.js";
 import {
   useRouteState,
@@ -241,6 +242,9 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
     h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, onOpenSearch: openSearch, scope }),
+    // Repository trust: shown while the checkout's execution config is not
+    // trusted. Server-backed; renders nothing in a standalone viewer.
+    h(RepoTrustStrip, null),
     h("div", { class: "app-body" },
       h("main", {
         id: "main-content",

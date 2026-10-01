@@ -38,6 +38,7 @@ export type {
   PersistedRuntimeEvent,
   RunReviewRecord,
   RunRecord,
+  RunTrustRecord,
   RunCommitRecord,
   RunCompletionHold,
   RunSessionRecord,
