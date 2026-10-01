@@ -401,6 +401,7 @@ export const RunRecordSchema = z.object({
   review: RunReviewRecordSchema.optional(),
   actor: z.string().optional(),
   host: z.string().optional(),
+  logPath: z.string().optional(),
   commits: z.array(RunCommitRecordSchema).optional(),
   // Boolean is the legacy shape (records written before the paths existed);
   // new records carry the paths the record commit tried to stage.

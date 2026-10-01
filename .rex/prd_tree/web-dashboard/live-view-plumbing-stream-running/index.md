@@ -29,4 +29,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Expose structured sourcevision analyze progress: phase, enrichment pass, batch and model calls](./expose-structured-sourcevision-analyze.md) | pending |
 | [Record a structured progress event stream for every hench run, not only in verbose mode](./record-a-structured-progress-event.md) | pending |
 | [Record the agent process pid on the run record for every run](./record-the-agent-process-pid-on-the.md) | pending |
-| [Write the hench run log incrementally while the run is in progress](./write-the-hench-run-log-incrementally.md) | pending |
+| [Write the hench run log incrementally while the run is in progress](./write-the-hench-run-log-incrementally.md) | in_progress |

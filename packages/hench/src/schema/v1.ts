@@ -1455,6 +1455,19 @@ export interface RunRecord {
    */
   host?: string;
   /**
+   * Absolute path of this run's log file under `.run-logs/`.
+   *
+   * Written before the agent produces anything, because the file is written
+   * incrementally and the point of recording it is to be tailed while the run
+   * is still going — a reader that has to reconstruct the timestamped
+   * filename has already lost the race. Absent when the run was started
+   * without a project directory, or when the log file could not be opened
+   * (the run proceeds either way; the log is not load-bearing).
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  logPath?: string;
+  /**
    * Commits this run produced — the task's own work commit, the
    * review-repair commit, and the completion-metadata ("record") commit,
    * whichever landed — in the order git created them.

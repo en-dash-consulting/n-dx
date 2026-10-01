@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initConfig } from "../../../src/store/config.js";
@@ -928,6 +928,159 @@ describe("shared lifecycle", () => {
       const { run } = await initRunRecord({ taskId: "task-1", taskTitle: "Test task", model: "sonnet", henchDir, vendor: "claude" });
       expect(() => recordClaimLoss(undefined, run, henchDir)).not.toThrow();
       expect(run.claimLost).toBeUndefined();
+    });
+  });
+
+  /**
+   * The run log is written while the run is in progress, not assembled at the
+   * end. Both loops go through `initRunRecord` and `finalizeRun`, so what is
+   * asserted here holds for CLI-loop and API-loop runs alike.
+   *
+   * Byte-equality between the incremental writer and the end-of-run writer is
+   * pinned in `tests/unit/store/run-log.test.ts`; these tests cover the
+   * plumbing — that a run opens one, records its path, and streams into it.
+   */
+  describe("incremental run log", () => {
+    /** Read `path` until `predicate` holds, or give up after `timeoutMs`. */
+    async function readUntil(
+      path: string,
+      predicate: (content: string) => boolean,
+      timeoutMs = 1000,
+    ): Promise<string> {
+      const deadline = Date.now() + timeoutMs;
+      for (;;) {
+        const content = await readFile(path, "utf-8");
+        if (predicate(content) || Date.now() >= deadline) return content;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
+
+    let consoleLog: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(async () => {
+      const { resetCapturedLines } = await import("../../../src/types/output.js");
+      resetCapturedLines();
+      // stream()/detail() print as they capture; the capture is what is under
+      // test, the printing is noise.
+      consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleLog.mockRestore();
+    });
+
+    it("opens the log at run start and records its path on the run", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+      const { loadRun } = await import("../../../src/store/runs.js");
+
+      const { run } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        projectDir,
+        vendor: "claude",
+      });
+
+      expect(run.logPath).toBeDefined();
+      expect(run.logPath).toContain(run.id);
+      // Readable before the agent has produced a single line — the whole point
+      // of recording the path rather than letting readers guess the filename.
+      expect(await readFile(run.logPath!, "utf-8")).toBe("");
+
+      // And the path is on the persisted record, not only the in-memory one.
+      expect((await loadRun(henchDir, run.id))?.logPath).toBe(run.logPath);
+    });
+
+    it("grows line by line while the run is in progress", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+      const { stream, detail, getCapturedLines } = await import("../../../src/types/output.js");
+
+      const { run } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        projectDir,
+        vendor: "claude",
+      });
+
+      stream("Agent", "reading the brief");
+      detail("1.2s");
+
+      const live = await readUntil(run.logPath!, (c) => c.includes("1.2s"));
+      expect(live).toBe(getCapturedLines().join("\n") + "\n");
+      expect(live).toContain("reading the brief");
+    });
+
+    it("leaves every captured line in the file when the run finalizes", async () => {
+      const { initRunRecord, finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");
+      const { stream } = await import("../../../src/types/output.js");
+
+      const { run, memoryCtx } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        projectDir,
+        vendor: "claude",
+      });
+
+      stream("Agent", "did the work");
+      const midRun = await readUntil(run.logPath!, (c) => c.includes("did the work"));
+
+      await finalizeRun({ run, henchDir, projectDir, memoryCtx });
+
+      const finished = await readFile(run.logPath!, "utf-8");
+      // Appended to, never rewritten: whatever a tail had already read is
+      // still the start of the finished file, byte for byte.
+      expect(finished.startsWith(midRun)).toBe(true);
+      expect(finished.endsWith("\n")).toBe(true);
+    });
+
+    it("still writes the log at run end when no project directory was given", async () => {
+      const { initRunRecord, finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");
+      const { stream } = await import("../../../src/types/output.js");
+      const { readdir } = await import("node:fs/promises");
+
+      // No projectDir on init: there is no project root to put .run-logs/ in,
+      // so no live log is opened and finalizeRun writes the whole file.
+      const { run, memoryCtx } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        vendor: "claude",
+      });
+      expect(run.logPath).toBeUndefined();
+
+      stream("Agent", "did the work");
+      await finalizeRun({ run, henchDir, projectDir, memoryCtx });
+
+      const files = await readdir(join(projectDir, ".run-logs"));
+      expect(files).toHaveLength(1);
+      expect(await readFile(join(projectDir, ".run-logs", files[0]!), "utf-8"))
+        .toContain("did the work");
+    });
+
+    it("loads a run record written before logPath existed", async () => {
+      const { RunRecordSchema } = await import("../../../src/schema/validate.js");
+
+      const legacy = {
+        id: "run-legacy",
+        taskId: "task-1",
+        taskTitle: "old task",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        status: "completed",
+        turns: 1,
+        tokenUsage: { input: 10, output: 5 },
+        toolCalls: [],
+        model: "sonnet",
+      };
+
+      const parsed = RunRecordSchema.safeParse(legacy);
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data.logPath).toBeUndefined();
     });
   });
 });

@@ -36,7 +36,7 @@ import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
 import type { PromptEnvelope } from "../../prd/llm-gateway.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { saveRun } from "../../store/runs.js";
-import { persistRunLog } from "../../store/run-log.js";
+import { ensureRunLogsIgnored, openRunLog, persistRunLog, type RunLogWriter } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { formatBudgetExceeded, type TokenBudgetResult } from "./token-budget.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
@@ -50,7 +50,7 @@ import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } fro
 import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS, OUTPUT_TAIL_LINES } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
-import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines } from "../../types/output.js";
+import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
 import { displayTaskInfo } from "./task-display.js";
 import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
@@ -445,6 +445,87 @@ export interface MemoryContext {
   systemTotalBytes: number;
 }
 
+// ---------------------------------------------------------------------------
+// Incremental run log
+// ---------------------------------------------------------------------------
+
+/**
+ * The log file the run currently in this process is streaming into.
+ *
+ * Module state for the same reason the capture buffer behind
+ * `getCapturedLines()` is: output is a process-wide singleton, so at most one
+ * run can be narrating at a time. `--loop` runs tasks one after another, each
+ * opening its own file in {@link beginRunLog} and closing it in
+ * {@link endRunLog}.
+ */
+let _activeRunLog: RunLogWriter | null = null;
+
+/**
+ * Open this run's log and route captured output into it.
+ *
+ * Best-effort by design: a run that cannot open its log still runs, and
+ * {@link endRunLog} writes the whole file at the end instead.
+ *
+ * @returns The writer, or null when no live log could be started.
+ */
+async function beginRunLog(projectDir: string, run: RunRecord): Promise<RunLogWriter | null> {
+  // A previous run that threw before finalizing would otherwise leak its fd
+  // and keep a stale sink installed. Closed and dropped, not rewritten: its
+  // lines belong to that run's file, and this run's buffer is not them.
+  const stale = _activeRunLog;
+  _activeRunLog = null;
+  setCapturedLineSink(null);
+  if (stale) await stale.close();
+
+  try {
+    // Lines already captured before the record existed (the task banner, the
+    // brief) belong to this run's log — passing them as the prefix is what
+    // makes the finished file equal to the whole-buffer write.
+    const writer = await openRunLog(projectDir, run.id, run.startedAt, getCapturedLines());
+    _activeRunLog = writer;
+    setCapturedLineSink(writer.appendLine);
+    return writer;
+  } catch {
+    // Nowhere to write, or no permission to. Not worth failing a run over;
+    // the end-of-run fallback will try once more.
+    return null;
+  }
+}
+
+/**
+ * Close the live log and return the path of the finished file.
+ *
+ * Falls back to a whole-buffer write when there was no live log, or when the
+ * stream broke part-way through — in both cases the operator still ends up
+ * with the complete file the run would have produced before this was
+ * incremental.
+ *
+ * @returns The log path, or undefined when no log could be written at all.
+ */
+async function endRunLog(projectDir: string, run: RunRecord): Promise<string | undefined> {
+  const writer = _activeRunLog;
+  _activeRunLog = null;
+  setCapturedLineSink(null);
+
+  if (writer) {
+    const failure = await writer.close();
+    // Only now, with the run over and its gates behind it: .gitignore is a
+    // tracked file, and editing it mid-run would read as operator work to
+    // this run's own completion gate.
+    await ensureRunLogsIgnored(projectDir);
+    if (!failure) return writer.path;
+    // The stream died mid-run, so the file on disk is short. Fall through and
+    // rewrite it from the capture buffer, which is still complete in memory.
+  }
+
+  try {
+    return await persistRunLog(projectDir, run.id, run.startedAt, getCapturedLines());
+  } catch {
+    // Log persistence is optional; the run result stands.
+    return undefined;
+  }
+}
+
 /**
  * Create a new RunRecord in "running" status and persist it.
  * Also captures a system memory snapshot for later use in finalization.
@@ -498,6 +579,16 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
       sandbox: opts.sandbox,
       approvals: opts.approvals,
     };
+  }
+
+  // Open the run log before the first save, so the record carries its path
+  // from the moment it is readable. Only when the caller named a project
+  // directory: `.run-logs/` belongs at a project root, and defaulting to the
+  // process cwd would scatter logs (and .gitignore edits) wherever hench
+  // happened to be invoked from.
+  if (opts.projectDir) {
+    const writer = await beginRunLog(opts.projectDir, run);
+    if (writer) run.logPath = writer.path;
   }
 
   run.lastActivityAt = new Date().toISOString();
@@ -3434,15 +3525,10 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   run.lastActivityAt = run.finishedAt;
   await saveRun(henchDir, run);
 
-  // Persist full run output to .run-logs/ at the project root.
-  // Best-effort: a log write failure must not crash the run.
-  const logLines = getCapturedLines();
-  try {
-    const logPath = await persistRunLog(projectDir, run.id, run.startedAt, logLines);
-    info(`\nRun log: ${logPath}`);
-  } catch {
-    // Swallow — log persistence is optional; the run result stands.
-  }
+  // Close the run log under .run-logs/ at the project root. The file has been
+  // growing line by line since initRunRecord; this flushes the tail of it.
+  const logPath = await endRunLog(projectDir, run);
+  if (logPath) info(`\nRun log: ${logPath}`);
   resetCapturedLines();
 }
 
