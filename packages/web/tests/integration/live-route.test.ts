@@ -89,7 +89,7 @@ function writePrd(worktree: string, taskIds: string[]): void {
       children: [{
         id: "feature-1", title: "Feature one", level: "feature", status: "in_progress",
         children: [
-          ...taskIds.map((id) => ({ id, title: `task ${id}`, level: "task", status: "in_progress" })),
+          ...taskIds.map((id) => ({ id, title: `task ${id}`, level: "task", status: "in_progress", acceptanceCriteria: ["one", "two"] })),
           { id: "next-1", title: "Next task", level: "task", status: "pending", priority: "high" },
         ],
       }],
@@ -192,6 +192,7 @@ describe("GET /api/live", () => {
         { id: "feature-1", title: "Feature one", level: "feature" },
       ],
       branch: "side",
+      criteriaTotal: 2,
       turns: 3,
       model: "claude-sonnet-4-5",
       startedFrom: "terminal",

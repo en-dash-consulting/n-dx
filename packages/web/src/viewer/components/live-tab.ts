@@ -23,6 +23,7 @@ import { appUrl, getWorkspaceKey } from "../base-path.js";
 import { viewPathname } from "../route-state.js";
 import {
   analyzeFraction,
+  isAnalysisJob,
   liveRunningCount,
   liveStuckCount,
   liveTabLabel,
@@ -45,7 +46,7 @@ function elapsedFormatter(startedAt: string): string {
 // ── Links ────────────────────────────────────────────────────────────
 
 /** Whether `worktree` is the one this viewer addresses (null = the project anchor). */
-function isCurrentWorktree(worktree: LiveWorktreeRef | null): boolean {
+export function isCurrentWorktree(worktree: LiveWorktreeRef | null): boolean {
   if (!worktree) return true;
   const current = getWorkspaceKey();
   return current === null ? worktree.isAnchor : worktree.key === current;
@@ -56,37 +57,37 @@ function isCurrentWorktree(worktree: LiveWorktreeRef | null): boolean {
  * the current worktree, else the same page under that worktree's `/w/<key>/`
  * slot — a full navigation, since a viewer is mounted on one workspace.
  */
-function liveHref(worktree: LiveWorktreeRef | null, view: ViewId, subId: string | null): string {
+export function liveHref(worktree: LiveWorktreeRef | null, view: ViewId, subId: string | null): string {
   const path = viewPathname(view, subId);
   if (isCurrentWorktree(worktree) || !worktree) return appUrl(path);
   const slot = worktree.isAnchor ? "" : `/w/${encodeURIComponent(worktree.key)}`;
   return `${detectBasePath(location.pathname)}${slot}${path}`;
 }
 
-interface PeekTarget {
+export interface PeekTarget {
   view: ViewId;
   subId: string | null;
   worktree: LiveWorktreeRef | null;
 }
 
-function runTarget(run: LiveRunSummary): PeekTarget {
+export function runTarget(run: LiveRunSummary): PeekTarget {
   return run.taskId
     ? { view: "live-task", subId: run.taskId, worktree: run.worktree }
     : { view: "live", subId: null, worktree: run.worktree };
 }
 
-function jobTarget(job: LiveJobSummary): PeekTarget {
-  return job.kind === "analyze"
+export function jobTarget(job: LiveJobSummary): PeekTarget {
+  return isAnalysisJob(job)
     ? { view: "live-analyze", subId: null, worktree: job.worktree }
     : { view: "live", subId: null, worktree: job.worktree };
 }
 
 // ── Peek ─────────────────────────────────────────────────────────────
 
-interface PeekLinkProps {
+export interface PeekLinkProps {
   target: PeekTarget;
   navigateTo?: NavigateTo;
-  onNavigated: () => void;
+  onNavigated?: () => void;
   class: string;
   children?: ComponentChildren;
 }
@@ -95,14 +96,14 @@ interface PeekLinkProps {
  * A row that is a real link — middle-click and "copy link" work — and, for a
  * page in this worktree, navigates in place rather than reloading the app.
  */
-function PeekLink({ target, navigateTo, onNavigated, class: className, children }: PeekLinkProps) {
+export function PeekLink({ target, navigateTo, onNavigated, class: className, children }: PeekLinkProps) {
   const href = liveHref(target.worktree, target.view, target.subId);
   const onClick = (e: MouseEvent) => {
     if (!navigateTo || !isCurrentWorktree(target.worktree)) return;
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     navigateTo(target.view, target.view === "live-task" && target.subId ? { taskId: target.subId } : undefined);
-    onNavigated();
+    onNavigated?.();
   };
   return h("a", { class: className, href, onClick }, children);
 }
@@ -126,7 +127,7 @@ function RunRow({ run, navigateTo, onNavigated }: { run: LiveRunSummary; navigat
 }
 
 function JobRow({ job, navigateTo, onNavigated }: { job: LiveJobSummary; navigateTo?: NavigateTo; onNavigated: () => void }) {
-  const fraction = job.kind === "analyze" ? analyzeFraction(job.progress) : null;
+  const fraction = isAnalysisJob(job) ? analyzeFraction(job.progress) : null;
   const phase = job.progress?.phase;
   const step = phase ? `${phase.name} (${phase.index}/${phase.total})` : job.detail;
   return h("li", null,

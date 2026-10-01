@@ -114,6 +114,12 @@ export interface LiveRun {
   heartbeatAgeMs: number | null;
   /** Running with no heartbeat for the stuck-run threshold (`isRunStale`). Always false once finished. */
   stale: boolean;
+  /**
+   * How many acceptance criteria the task lists in its worktree's PRD, or null
+   * when it lists none or the PRD does not know it. How many are met is not
+   * recorded while the run is going, so it is not reported.
+   */
+  criteriaTotal: number | null;
   /** Newest progress event summary, else the dashboard's last stdout line. */
   lastProgress: string | null;
 }
@@ -218,6 +224,8 @@ export interface LiveSources {
 interface PrdIndex {
   at: number;
   chains: Map<string, LiveChainLink[]>;
+  /** Acceptance criteria per item, for items that list any. */
+  criteria: Map<string, number>;
   doc: PRDDocument | null;
   completedIds: Set<string>;
 }
@@ -262,10 +270,12 @@ function prdIndexFor(rexDir: string, now: number): PrdIndex {
   const cached = prdIndexes.get(rexDir);
   if (cached && now - cached.at < PRD_CACHE_TTL_MS) return cached;
   const doc = loadPRDSync(rexDir);
-  const index: PrdIndex = { at: now, chains: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set() };
+  const index: PrdIndex = { at: now, chains: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set() };
   if (doc) {
     for (const { item, parents } of walkTree(doc.items)) {
       index.chains.set(item.id, parents.map((p) => ({ id: p.id, title: p.title, level: p.level })));
+      const criteria = item.acceptanceCriteria?.length ?? 0;
+      if (criteria > 0) index.criteria.set(item.id, criteria);
     }
   }
   prdIndexes.set(rexDir, index);
@@ -446,6 +456,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
         lastActivityAt: digest.lastActivityAt,
         heartbeatAgeMs: running ? heartbeatAgeMs(digest.lastActivityAt, now) : null,
         stale,
+        criteriaTotal: digest.taskId ? prdIndexFor(layout.rexDir, now).criteria.get(digest.taskId) ?? null : null,
         lastProgress: running ? lastProgressOf(digest, ws.path, roots, execution) : null,
       };
       if (running) {

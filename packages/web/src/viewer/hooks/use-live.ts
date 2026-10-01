@@ -63,6 +63,77 @@ export interface LiveSummary {
   counts: { running: number; stale: number; jobs: number };
 }
 
+/** Mirrors LiveWorktree in server/routes-live.ts. */
+export interface LiveWorktreeFull extends LiveWorktreeRef {
+  name: string;
+  path: string;
+  branch: string | null;
+  isServed: boolean;
+}
+
+export interface LiveChainLink {
+  id: string;
+  title: string;
+  level: string;
+}
+
+/** Mirrors LiveRun in server/routes-live.ts. */
+export interface LiveRunFull extends LiveRunSummary {
+  epicChain: LiveChainLink[];
+  status: string;
+  worktree: LiveWorktreeFull;
+  finishedAt: string | null;
+  turns: number | null;
+  tokens: { input: number; output: number; cacheCreationInput: number; cacheReadInput: number; total: number };
+  model: string | null;
+  vendor: string | null;
+  criteriaTotal: number | null;
+  /** Milliseconds since the last heartbeat, or null when none was recorded. */
+  heartbeatAgeMs: number | null;
+}
+
+/** The slice of the server's AnalyzeProgressReport the Live overview reads. */
+export interface LiveAnalyzeProgressFull extends LiveAnalyzeProgress {
+  pass: { number: number; label: string } | null;
+}
+
+/** Mirrors LiveJob in server/routes-live.ts. */
+export interface LiveJobFull extends LiveJobSummary {
+  worktree: LiveWorktreeFull | null;
+  progress: LiveAnalyzeProgressFull | null;
+}
+
+export interface LiveNextTask {
+  id: string;
+  title: string;
+  priority: string | null;
+  epicChain: LiveChainLink[];
+}
+
+/** Mirrors LiveSnapshot in server/routes-live.ts — what `GET /api/live` answers. */
+export interface LiveSnapshot extends LiveSummary {
+  generatedAt: string;
+  runs: LiveRunFull[];
+  jobs: LiveJobFull[];
+  queue: {
+    next: LiveNextTask[];
+    starting: Array<{ taskId: string; taskTitle: string; startedAt: string; worktree: LiveWorktreeFull }>;
+  };
+  machine: {
+    slots: { inUse: number; max: number; available: number };
+    memory: { freeBytes: number; totalBytes: number; floorBytes: number | null; belowFloor: boolean };
+    llm: { vendor: string | null; model: string | null };
+    worktrees: { total: number; withLiveRun: number };
+    spend: { todayUsd: number; todayTokens: number; inFlightUsd: number; inFlightTokens: number };
+  };
+  recent: LiveRunFull[];
+}
+
+/** A sourcevision analysis, by either of the two kinds that run one. */
+export function isAnalysisJob(job: Pick<LiveJobSummary, "kind">): boolean {
+  return job.kind === "analyze" || job.kind === "sv-analyze";
+}
+
 // ---------------------------------------------------------------------------
 // Reading the answer
 // ---------------------------------------------------------------------------
@@ -123,13 +194,37 @@ function isLiveSummary(data: unknown): data is LiveSummary {
     && typeof d.counts.stale === "number" && typeof d.counts.jobs === "number";
 }
 
+/** The answer as the full snapshot, or null when it lacks the overview's fields. */
+export function asLiveSnapshot(live: LiveSummary | null): LiveSnapshot | null {
+  const d = live as Partial<LiveSnapshot> | null;
+  if (!d || typeof d.generatedAt !== "string" || !d.machine || !d.queue || !Array.isArray(d.recent)) return null;
+  return live as LiveSnapshot;
+}
+
+/** How the feed is staying current: over the socket, over the poll alone, or not at all. */
+export type LiveConnection = "live" | "polling" | "offline";
+
+export interface LiveFeed {
+  live: LiveSummary | null;
+  connection: LiveConnection;
+  /** Fetch now, ahead of the socket and the poll — after an action that changes what is running. */
+  refresh: () => Promise<void>;
+}
+
 /**
  * The live snapshot, or null until the first answer (and after a failed one —
  * a tab that cannot reach the endpoint reads as idle rather than stale).
  * `enabled: false` makes no request at all, for a static export with no server.
  */
 export function useLive(enabled = true): LiveSummary | null {
+  return useLiveFeed(enabled).live;
+}
+
+/** {@link useLive} plus how the answer is being kept current. */
+export function useLiveFeed(enabled = true): LiveFeed {
   const [live, setLive] = useState<LiveSummary | null>(null);
+  const [reachable, setReachable] = useState(true);
+  const [socketOpen, setSocketOpen] = useState(false);
   const lastFetchRef = useRef(0);
   const mountedRef = useRef(true);
 
@@ -138,14 +233,14 @@ export function useLive(enabled = true): LiveSummary | null {
     try {
       const res = await fetch("/api/live");
       if (!res.ok) {
-        if (mountedRef.current) setLive(null);
+        if (mountedRef.current) { setLive(null); setReachable(false); }
         return;
       }
       const json: unknown = await res.json();
-      if (mountedRef.current) setLive(isLiveSummary(json) ? json : null);
+      if (mountedRef.current) { setLive(isLiveSummary(json) ? json : null); setReachable(true); }
     } catch {
       // Unreachable server: the tab falls back to idle until the next tick.
-      if (mountedRef.current) setLive(null);
+      if (mountedRef.current) { setLive(null); setReachable(false); }
     }
   }, []);
 
@@ -166,6 +261,8 @@ export function useLive(enabled = true): LiveSummary | null {
     });
     try {
       ws = new WebSocket(getWebSocketUrl());
+      ws.onopen = () => { if (mountedRef.current) setSocketOpen(true); };
+      ws.onclose = () => { if (mountedRef.current) setSocketOpen(false); };
       ws.onmessage = (event) => {
         try {
           pipeline.push(JSON.parse(event.data));
@@ -186,5 +283,5 @@ export function useLive(enabled = true): LiveSummary | null {
 
   usePolling("live", fetchLive, POLL_INTERVAL_MS, enabled);
 
-  return live;
+  return { live, connection: !reachable ? "offline" : socketOpen ? "live" : "polling", refresh: fetchLive };
 }

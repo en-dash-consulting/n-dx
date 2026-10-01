@@ -55,6 +55,7 @@ import {
 } from "./domain-hench.js";
 
 import { WorkspacesView } from "./domain-workspaces.js";
+import { LiveView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import type { StageId } from "./stages.js";
@@ -137,6 +138,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "workspaces": () =>
     h(WorkspacesView, null),
+
+  "live": ({ data, navigateTo, jobs }) =>
+    h(LiveView, { navigateTo, analyzedAt: data.manifest?.analyzedAt ?? null, jobs }),
 
   "overview": ({ data, jobs }) =>
     h(Overview, { data, jobs }),

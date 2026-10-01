@@ -1,0 +1,241 @@
+/* Live overview — machine strip, running cards, side column, idle state.
+   Tokens only, so both themes come from tokens.css. Every flex/grid child
+   that holds user text sets min-width: 0 so a long title wraps or truncates
+   instead of widening the page: the layout holds at 375 px with no
+   horizontal scroll. */
+
+.live-container {
+  max-width: 1200px;
+  min-width: 0;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+
+.live-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.live-title-row,
+.live-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.live-title {
+  margin: 0;
+  font-size: var(--font-3xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+}
+
+.live-connection {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.live-connection-live { color: var(--accent); border-color: var(--accent); }
+.live-connection-offline { color: var(--orange); border-color: var(--orange); }
+
+.live-updated,
+.live-notice,
+.live-muted {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+.live-muted { margin: 0; font-size: var(--font-base); color: var(--text-dim); }
+
+.live-error {
+  display: block;
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-sm);
+  color: var(--orange);
+}
+
+/* ── Machine strip ──────────────────────────────────────────────────── */
+
+.live-machine {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.live-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-2-5) var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.live-tile-warn { border-color: var(--orange); }
+.live-tile-label { font-size: var(--font-sm); color: var(--text-muted); }
+.live-tile-value {
+  font-size: var(--font-lg);
+  font-weight: var(--weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-tile-detail { font-size: var(--font-sm); color: var(--text-dim); }
+
+/* ── Body ───────────────────────────────────────────────────────────── */
+
+.live-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .live-body { grid-template-columns: minmax(0, 1fr); }
+}
+
+.live-main,
+.live-side { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+
+.live-section-title,
+.live-side-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+}
+
+/* ── Needs attention ────────────────────────────────────────────────── */
+
+.live-attention { border: 1px solid var(--orange); border-radius: var(--radius-lg); padding: var(--space-3); }
+.live-attention-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.live-attention-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.live-attention-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 200px; }
+.live-attention-actions { display: flex; gap: var(--space-2); }
+
+/* ── Cards ──────────────────────────────────────────────────────────── */
+
+.live-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+
+.live-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.live-card:hover { background: var(--bg-hover); }
+
+.live-card-link {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+.live-card-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.live-tile-kind {
+  flex: none;
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.live-card-body { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; flex: 1; }
+.live-card-title { font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
+.live-card-chain,
+.live-card-step { font-size: var(--font-sm); color: var(--text-dim); overflow-wrap: anywhere; }
+.live-card-step { font-family: var(--font-mono); }
+.live-elapsed { flex: none; font-size: var(--font-sm); color: var(--text-muted); }
+
+.live-card-meta { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.live-chip {
+  font-size: var(--font-xs);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-active);
+  color: var(--text-dim);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-chip-branch { font-family: var(--font-mono); }
+
+/* Six-segment sourcevision phase bar */
+.live-phasebar { display: flex; gap: 3px; margin: var(--space-1) 0; }
+.live-phase { flex: 1; height: 6px; border-radius: 3px; background: var(--bg-active); }
+.live-phase-done { background: var(--accent-dim); }
+.live-phase-active { background: var(--accent); }
+
+/* ── Side column ────────────────────────────────────────────────────── */
+
+.live-side-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+.live-side-title { margin: 0; }
+
+.live-queue,
+.live-recent,
+.live-worktrees { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.live-queue { counter-reset: live-queue; }
+
+.live-queue-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+.live-queue-item:hover .live-card-title { text-decoration: underline; }
+.live-worktree { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
+.live-more { font-size: var(--font-sm); color: var(--accent); }
+
+/* ── Idle ───────────────────────────────────────────────────────────── */
+
+.live-idle-lede { margin: 0 0 var(--space-3); font-size: var(--font-lg); color: var(--text-dim); }
+.live-idle-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-3); }
+.live-idle-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+}
+.live-idle-card h3 { margin: 0; font-size: var(--font-md); }
+.live-idle-card p { margin: 0; }
+.live-idle-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
