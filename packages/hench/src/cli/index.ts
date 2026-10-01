@@ -91,7 +91,7 @@ async function main(): Promise<void> {
   // `validate-tokens` and `cache` both dispatch below; omitting either here
   // makes the command unreachable, since an unlisted name is rejected as
   // unknown before the switch is ever reached.
-  const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template", "review", "cache", "validate-tokens"];
+  const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template", "review", "cache", "validate-tokens", "check-runs"];
 
   // Orchestration commands that belong to ndx, not hench directly
   const NDX_ONLY_COMMANDS: Record<string, string> = {
@@ -214,6 +214,16 @@ async function main(): Promise<void> {
           strict: flags.strict,
           limit: flags.limit,
           "codex-only": flags["codex-only"],
+        });
+        break;
+      }
+      case "check-runs": {
+        const { cmdCheckRuns } = await import("./commands/check-runs.js");
+        await cmdCheckRuns(resolveDir(), {
+          fix: flags.fix,
+          "include-unknown": flags["include-unknown"],
+          strict: flags.strict,
+          format: flags.format,
         });
         break;
       }

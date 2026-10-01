@@ -39,6 +39,7 @@ export function usage(): void {
           { name: "config [key] [value]", description: "View or edit workflow configuration" },
           { name: "template [subcommand]", description: "Manage workflow templates (list, show, apply, save, delete)" },
           { name: "status [dir]", description: "Show recent run history" },
+          { name: "check-runs [dir]", description: "Audit which runs recorded as running actually are" },
           { name: "show <run-id> [dir]", description: "Show full details of a specific run" },
           { name: "review pending <run-id>", description: "List findings an autonomous review deferred for capture" },
           { name: "cache [subcommand]", description: "Inspect or clear the session cache (list, clear)" },

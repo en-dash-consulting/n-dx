@@ -401,6 +401,37 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["status", "show"],
   },
+  "check-runs": {
+    tool: "hench",
+    command: "check-runs",
+    summary: "audit which runs recorded as running are actually running",
+    usage: "hench check-runs [options] [dir]",
+    description:
+      "A run file stays \"running\" until its process writes a terminal status, so a\n" +
+      "crash, a Ctrl-C or a reboot strands it there and every active-work count\n" +
+      "keeps reporting runs nothing is executing. Elapsed time cannot tell those\n" +
+      "apart from a genuinely long run, so this checks the PID locks in\n" +
+      ".hench/locks/ instead and reports one of:\n" +
+      "  - running           a live hench process holds this task's lock\n" +
+      "  - not running       no process on this host could be running it\n" +
+      "  - unconfirmed       live processes exist but none can be attributed\n" +
+      "  - another machine   recorded elsewhere; local PIDs say nothing about it\n" +
+      "\n" +
+      "--fix ends only the runs proved dead; it signals no process.",
+    options: [
+      { flag: "--fix", description: "End the runs no process is executing" },
+      { flag: "--include-unknown", description: "With --fix, also end unconfirmed runs" },
+      { flag: "--strict", description: "Exit 1 if any run is not confirmed running" },
+      { flag: "--format=json", description: "Output as JSON for scripting" },
+    ],
+    examples: [
+      { command: "hench check-runs", description: "Audit without changing anything" },
+      { command: "hench check-runs --fix", description: "Close out the runs nothing is executing" },
+      { command: "hench check-runs --format=json", description: "Machine-readable audit" },
+      { command: "hench check-runs --strict", description: "Fail a CI job on a dirty runs directory" },
+    ],
+    related: ["status", "show", "run"],
+  },
 };
 
 /** Related commands for each hench command (shown as "See also"). */
@@ -409,12 +440,13 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   run: ["status", "show"],
   record: ["usage", "status", "show"],
   usage: ["record"],
-  status: ["show", "run", "validate-tokens"],
+  status: ["show", "run", "check-runs", "validate-tokens"],
   show: ["status"],
   config: ["template"],
   template: ["config"],
   cache: ["run", "config"],
   "validate-tokens": ["status", "show"],
+  "check-runs": ["status", "show", "run"],
 };
 
 /**

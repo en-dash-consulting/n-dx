@@ -1,19 +1,18 @@
 /**
- * Liveness verification for hench runs recorded as `status: "running"`.
+ * Liveness verification for runs recorded as `status: "running"`.
  *
  * A run file stays `"running"` until the process that owns it writes a terminal
  * status. A crash, a Ctrl-C, a machine restart or a `kill -9` never gets that
- * far, so the file says "running" forever and the dashboard's active-task list
- * fills up with runs nothing is executing. Elapsed time cannot separate the two
- * cases — a genuinely long run and an abandoned one both look like "started
- * hours ago" — which is why the pre-existing `stale` flag only ever expressed a
- * suspicion.
+ * far, so the file says "running" forever and every surface that counts active
+ * work — `hench status`, the dashboard's active-task list — counts runs nothing
+ * is executing. Elapsed time cannot separate the two cases: a genuinely long
+ * run and an abandoned one both look like "started hours ago".
  *
  * This module answers the question from evidence instead of from a timer:
  *
  * | Verdict    | Evidence                                                            |
  * |------------|---------------------------------------------------------------------|
- * | `live`     | the dashboard owns the child, or a live PID lock names this task     |
+ * | `live`     | a live PID lock names this task (or the caller owns the child)        |
  * | `foreign`  | recorded on another host — PIDs on this machine say nothing about it |
  * | `unknown`  | live hench processes exist but none can be attributed to this run    |
  * | `orphaned` | no process on this host could be running it                          |
@@ -22,25 +21,23 @@
  * a live process behind it or cannot be disproved from this machine.
  *
  * The evidence comes from `.hench/locks/<pid>.lock`, which `hench run` acquires
- * before starting work and releases on exit (see `hench/src/process/limiter.ts`).
+ * before starting work and releases on exit — see {@link ../process/limiter}.
  *
- * **This module mirrors `hench/src/process/run-liveness.ts`,** which is the
- * canonical copy — hench owns the lock files and the runs directory. It is
- * duplicated rather than imported because the web package deliberately takes no
- * runtime dependency on hench, the same reason `concurrent-execution-metrics.ts`
- * and the lock-file shape in `routes-hench.ts` are duplicated. The two are
- * pinned to identical verdicts by `tests/e2e/run-liveness-parity.test.js`;
- * change both, or that test fails.
+ * **This module is mirrored in `@n-dx/web` as `web/src/server/run-liveness.ts`,**
+ * because the web package deliberately takes no runtime dependency on hench.
+ * The two are pinned to identical verdicts by
+ * `tests/e2e/run-liveness-parity.test.js`; change both, or that test fails.
  *
- * @module web/server/run-liveness
+ * @module hench/process/run-liveness
  */
 
 import { readdirSync, readFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { resolveLayout } from "@n-dx/llm-client";
 
-// ── Constants ────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 /**
  * How far apart a lock's `startedAt` and a run's `startedAt` may be before the
@@ -48,15 +45,17 @@ import { resolveLayout } from "@n-dx/llm-client";
  *
  * `hench run` acquires its lock immediately before recording the run, so the
  * two timestamps are seconds apart in practice. Locks are only *optionally*
- * tagged with a task id (`limiter.acquire(flags.task)` passes `undefined` when
- * the task was auto-selected), so an untagged live lock has to be matched by
+ * tagged with a task id — `limiter.acquire(flags.task)` passes `undefined` when
+ * the task was auto-selected — so an untagged live lock has to be matched by
  * start time or not at all. Without this window a single live hench process
  * would make every abandoned run on disk unattributable, which is exactly the
  * state this module exists to resolve.
  */
 export const LOCK_ATTRIBUTION_WINDOW_MS = 5 * 60 * 1000;
 
-// ── Types ────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 /** Verdict on whether a run recorded as "running" is actually executing. */
 export type RunLiveness = "live" | "foreign" | "unknown" | "orphaned";
@@ -64,7 +63,7 @@ export type RunLiveness = "live" | "foreign" | "unknown" | "orphaned";
 /**
  * A `.hench/locks/<pid>.lock` entry held by a process that is still alive.
  *
- * Mirrors `LockFileData` in `hench/src/process/limiter.ts`.
+ * Mirrors `LockFileData` in {@link ../process/limiter}.
  */
 export interface LiveLock {
   pid: number;
@@ -86,7 +85,7 @@ export interface RunLivenessInput {
 export interface LivenessContext {
   /** Locks whose PID is still alive, from {@link collectLiveLocks}. */
   liveLocks: readonly LiveLock[];
-  /** Task ids whose child process this server spawned and still holds. */
+  /** Task ids whose child process the caller spawned and still holds. */
   managedTaskIds: ReadonlySet<string>;
   /** This machine's hostname. Defaults to `os.hostname()`. */
   host?: string;
@@ -97,7 +96,7 @@ export interface LivenessContext {
 /** The judgment on one run. */
 export interface LivenessVerdict {
   liveness: RunLiveness;
-  /** Human-readable justification, shown verbatim in the dashboard and the API. */
+  /** Human-readable justification, shown verbatim by the CLI and the dashboard. */
   reason: string;
   /** The PID executing this run, when one could be identified. */
   pid: number | null;
@@ -114,7 +113,9 @@ export interface LivenessSummary {
   orphaned: number;
 }
 
-// ── PID liveness ─────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// PID liveness
+// ---------------------------------------------------------------------------
 
 /**
  * Check whether a process with the given PID exists.
@@ -161,19 +162,14 @@ export function collectLiveLocks(locksDir: string): LiveLock[] {
   return live;
 }
 
-/**
- * The locks directory for a project root.
- *
- * Asks {@link resolveLayout} rather than spelling the path out: a project on
- * the `.ndx/` layout keeps hench state at `.ndx/hench`, and a hardcoded
- * `.hench` would find no locks there — which does not fail loudly, it silently
- * condemns every live run as orphaned.
- */
-export function locksDirFor(projectDir: string): string {
-  return join(resolveLayout(projectDir).henchDir, "locks");
+/** `<henchDir>/locks` — the directory {@link ../process/limiter} writes to. */
+export function locksDirOf(henchDir: string): string {
+  return join(henchDir, "locks");
 }
 
-// ── Classification ───────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Classification
+// ---------------------------------------------------------------------------
 
 /** Parse an ISO timestamp, returning null for missing or unparseable input. */
 function epochOf(iso: string | undefined): number | null {
@@ -196,7 +192,7 @@ function describeAge(ms: number): string {
 /**
  * Judge whether one run recorded as "running" is actually executing.
  *
- * Checks run in order of evidence strength: a process this server owns, then a
+ * Checks run in order of evidence strength: a process the caller owns, then a
  * lock naming the task, then the host check (which can only ever withhold a
  * verdict), then start-time attribution against untagged locks.
  */
@@ -207,7 +203,7 @@ export function classifyRunLiveness(
   const now = ctx.now ?? Date.now();
   const host = ctx.host ?? hostname();
 
-  // 1. This server spawned it and still holds the handle — definitive.
+  // 1. The caller spawned it and still holds the handle — definitive.
   if (run.taskId && ctx.managedTaskIds.has(run.taskId)) {
     return {
       liveness: "live",

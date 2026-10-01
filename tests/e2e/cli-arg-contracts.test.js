@@ -129,6 +129,7 @@ const HENCH_COMMANDS = [
   "template",
   "status",
   "show",
+  "check-runs",
   "review",
   "cache",
   "validate-tokens",
