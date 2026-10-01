@@ -111,6 +111,12 @@ beforeAll(() => {
   // A path in another directory of a registered worktree (not .run-logs/ or .hench/runs/).
   writeFileSync(join(repo, "README.md"), "readme\n");
   writeRun(repo, "run-wrongdir", { logPath: join(repo, "README.md") });
+  // A registered worktree whose .run-logs/ is itself a symlink out of the tree,
+  // as a cloned repository can commit it.
+  const trapped = join(tmpRoot, "trapped");
+  git(repo, "worktree", "add", "--quiet", "-b", "trap", trapped);
+  symlinkSync(outside, join(trapped, ".run-logs"));
+  writeRun(trapped, "run-dirlink", { logPath: join(trapped, ".run-logs", "secret.txt") });
 });
 
 afterAll(() => {
@@ -205,7 +211,7 @@ describe("hench run tail routes", () => {
       expect(body.running).toBe(false);
     });
 
-    it.each(["run-escape", "run-dotdot", "run-symlink", "run-wrongdir"])(
+    it.each(["run-escape", "run-dotdot", "run-symlink", "run-wrongdir", "run-dirlink"])(
       "refuses a recorded path outside .run-logs/ and .hench/runs/ (%s)",
       async (id) => {
         server = await serve(repo);

@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, realpathSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
+  confineTailPath,
   utf8CompletePrefixLength,
   readEventsAfter,
   readLogChunk,
@@ -104,6 +105,49 @@ describe("readers", () => {
     expect(first.events.map((e) => e.seq)).toEqual([1, 2]);
     const second = readEventsAfter(path, first.next, 10);
     expect(second.events.map((e) => e.seq)).toEqual([3, 4, 5]);
+  });
+});
+
+describe("confineTailPath", () => {
+  let dir: string;
+  let root: string;
+  let secretDir: string;
+  beforeEach(() => {
+    dir = realpathSync.native(mkdtempSync(join(tmpdir(), "ndx-run-tail-confine-")));
+    root = join(dir, "repo");
+    secretDir = join(dir, "secret");
+    mkdirSync(root);
+    mkdirSync(secretDir);
+    writeFileSync(join(secretDir, "id_rsa"), "do not serve\n");
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("serves a file inside a real .run-logs/", () => {
+    mkdirSync(join(root, ".run-logs"));
+    const path = join(root, ".run-logs", "a.log");
+    writeFileSync(path, "x");
+    expect(confineTailPath(path, [root])).toBe(path);
+  });
+
+  it("refuses a file reached through a symlinked .run-logs/", () => {
+    symlinkSync(secretDir, join(root, ".run-logs"));
+    expect(confineTailPath(join(root, ".run-logs", "id_rsa"), [root])).toBeNull();
+  });
+
+  it("refuses a file reached through a symlinked .hench/", () => {
+    mkdirSync(join(secretDir, "runs"));
+    writeFileSync(join(secretDir, "runs", "r.events.jsonl"), "{}\n");
+    symlinkSync(secretDir, join(root, ".hench"));
+    expect(confineTailPath(join(root, ".hench", "runs", "r.events.jsonl"), [root])).toBeNull();
+  });
+
+  it("accepts a worktree root that is itself reached through a symlink", () => {
+    const alias = join(dir, "alias");
+    symlinkSync(root, alias);
+    mkdirSync(join(root, ".run-logs"));
+    const path = join(root, ".run-logs", "a.log");
+    writeFileSync(path, "x");
+    expect(confineTailPath(join(alias, ".run-logs", "a.log"), [alias])).toBe(path);
   });
 });
 

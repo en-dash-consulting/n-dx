@@ -12,7 +12,9 @@
  * The paths come from a JSON file on disk, so they are input, not trust. A
  * file is served only if — after resolving symlinks — it lies inside
  * `.run-logs/` or `<hench dir>/runs/` of a worktree `git worktree list`
- * reports for the served repository. Anything else is answered exactly like a
+ * reports for the served repository. The allowed directories themselves must
+ * not be reached through a symlink below the worktree root — a repository can
+ * commit `.run-logs` as a link to anywhere. Anything else is answered exactly like a
  * missing file, so the response does not reveal whether a path exists.
  *
  * ## Cursors
@@ -102,9 +104,12 @@ export function confineTailPath(path: unknown, worktreeRoots: readonly string[])
     return null;
   }
   for (const root of worktreeRoots) {
-    for (const dir of allowedTailDirs(root)) {
-      const realDir = realpathOrNull(dir);
-      if (realDir && isInside(realDir, real)) return real;
+    const realRoot = realpathOrNull(root);
+    if (!realRoot) continue;
+    for (const dir of allowedTailDirs(realRoot)) {
+      // A symlink anywhere below the root (`.run-logs -> ~/.ssh`, committed by
+      // a cloned repository) would move the allowed area out of the worktree.
+      if (realpathOrNull(dir) === dir && isInside(dir, real)) return real;
     }
   }
   return null;
