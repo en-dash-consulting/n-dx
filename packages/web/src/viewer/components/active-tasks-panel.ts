@@ -2,15 +2,22 @@
  * Active Tasks Panel — shows currently executing tasks prominently at the
  * top of the Hench UI.
  *
- * Combines data from two sources:
+ * Combines data from three sources:
  * 1. Hench runs with status "running" (from /api/hench/runs)
  * 2. Active task executions triggered via the dashboard (from /api/hench/execute/status)
+ * 3. Liveness verdicts for those runs (from /api/hench/audit)
  *
  * Updates in real-time via WebSocket ("hench:task-execution-progress" events)
  * and periodic polling as a fallback.
  *
- * Displays task title, start time, elapsed duration (live-ticking), and
- * health status (stale detection).
+ * A run file says "running" until its process writes a terminal status, so a
+ * crash or a reboot strands it there permanently and the list fills with tasks
+ * nothing is executing. Source 3 says which of them a process is actually
+ * running — see `server/run-liveness.ts` for how the verdict is reached — and
+ * this panel surfaces that per card plus a one-click sweep for the dead ones.
+ *
+ * Displays task title, start time, elapsed duration (live-ticking), the
+ * liveness verdict, and controls to end a run.
  */
 
 import { appUrl, getWebSocketUrl, acceptsFrame } from "../base-path.js";
@@ -47,10 +54,30 @@ interface ExecutionState {
   error?: string;
 }
 
+/** Evidence-based verdict from the server — mirrors `RunLiveness`. */
+type RunLiveness = "live" | "foreign" | "unknown" | "orphaned";
+
+/** One entry of `GET /api/hench/audit`, narrowed to what this panel reads. */
+interface AuditEntry {
+  runId: string;
+  taskId: string;
+  liveness?: RunLiveness;
+  livenessReason?: string;
+  canEnd?: boolean;
+}
+
+/** What the audit says about one run, keyed by run id. */
+type LivenessMap = Map<string, { liveness: RunLiveness; reason: string; canEnd: boolean }>;
+
 export interface ActiveTasksPanelProps {
   /** Running runs from the parent (from /api/hench/runs with status=running). */
   runs: ActiveRun[];
   navigateTo?: NavigateTo;
+  /**
+   * Called after a run is ended here, so the parent can re-fetch. Without it
+   * an ended run lingers in `runs` until the parent's own poll comes round.
+   */
+  onRunsChanged?: () => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -61,6 +88,13 @@ function isStale(run: ActiveRun): boolean {
   if (!run.lastActivityAt) return true; // Legacy run
   return Date.now() - new Date(run.lastActivityAt).getTime() > STALE_THRESHOLD_MS;
 }
+
+/** Badge label and modifier class for a liveness verdict. */
+const LIVENESS_BADGE: Record<Exclude<RunLiveness, "live">, { label: string; mod: string }> = {
+  orphaned: { label: "Not running", mod: "orphaned" },
+  unknown: { label: "Unverified", mod: "unknown" },
+  foreign: { label: "Other machine", mod: "foreign" },
+};
 
 function formatElapsed(startedAt: string): string {
   const ms = Date.now() - new Date(startedAt).getTime();
@@ -85,15 +119,33 @@ function formatStartTime(iso: string): string {
 
 // ── Active task card ─────────────────────────────────────────────────
 
-function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: NavigateTo }) {
+interface ActiveTaskCardProps {
+  run: ActiveRun;
+  navigateTo?: NavigateTo;
+  /** Audit verdict for this run, absent until the first audit fetch resolves. */
+  verdict?: { liveness: RunLiveness; reason: string; canEnd: boolean };
+  /** Ends this run. Resolves once the server has answered. */
+  onEnd: (run: ActiveRun, verdict?: { liveness: RunLiveness }) => void | Promise<void>;
+  /** True while this card's end request is in flight. */
+  ending: boolean;
+}
+
+function ActiveTaskCard({ run, navigateTo, verdict, onEnd, ending }: ActiveTaskCardProps) {
+  // Before the audit resolves, fall back to the time-based suspicion so the
+  // card never silently downgrades from "possibly stuck" to "fine".
   const stale = isStale(run);
+  const dead = verdict?.liveness === "orphaned";
+  const badge = verdict && verdict.liveness !== "live" ? LIVENESS_BADGE[verdict.liveness] : null;
 
   return h("div", {
-    class: `active-task-card${stale ? " active-task-card-stale" : ""}`,
+    class: `active-task-card${dead ? " active-task-card-dead" : stale ? " active-task-card-stale" : ""}`,
   },
-    // Pulsing status indicator
+    // Pulsing status indicator — a dead run gets a static dot, not a pulse:
+    // animating it would keep asserting activity the audit has disproved.
     h("div", { class: "active-task-pulse-wrapper", "aria-hidden": "true" },
-      h("span", { class: `active-task-pulse${stale ? " active-task-pulse-stale" : ""}` }),
+      h("span", {
+        class: `active-task-pulse${dead ? " active-task-pulse-dead" : stale ? " active-task-pulse-stale" : ""}`,
+      }),
     ),
 
     // Main content
@@ -113,9 +165,23 @@ function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: Navi
               class: "active-task-link",
             })
           : h("span", { class: "active-task-title" }, run.taskTitle),
-        stale
-          ? h("span", { class: "active-task-stale-badge" }, "Possibly stuck")
-          : null,
+        badge
+          ? h("span", {
+              class: `active-task-liveness-badge active-task-liveness-${badge.mod}`,
+              title: verdict!.reason,
+            }, badge.label)
+          : !verdict && stale
+            ? h("span", { class: "active-task-stale-badge" }, "Possibly stuck")
+            : null,
+        h("button", {
+          class: `active-task-end-btn${dead ? " active-task-end-btn-dead" : ""}`,
+          disabled: ending,
+          title: dead
+            ? "Close out this run — no process is executing it"
+            : "Stop this run and mark it failed",
+          "aria-label": `End run: ${run.taskTitle}`,
+          onClick: () => { void onEnd(run, verdict); },
+        }, ending ? "Ending…" : "End"),
       ),
 
       // Metadata row — elapsed time is isolated in its own component to
@@ -137,13 +203,26 @@ function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: Navi
           : null,
         h("span", { class: `active-task-model active-task-model-${run.model}` }, run.model),
       ),
+
+      // The audit's justification, so the verdict is auditable rather than
+      // something the user has to take on trust before ending a run.
+      verdict && verdict.liveness !== "live"
+        ? h("div", { class: "active-task-liveness-reason" }, verdict.reason)
+        : null,
     ),
   );
 }
 
 // ── Execution state card (for dashboard-triggered executions) ────────
 
-function ExecutionCard({ exec }: { exec: ExecutionState }) {
+interface ExecutionCardProps {
+  exec: ExecutionState;
+  /** Stops the managed child process behind this execution. */
+  onEnd: (exec: ExecutionState) => void | Promise<void>;
+  ending: boolean;
+}
+
+function ExecutionCard({ exec, onEnd, ending }: ExecutionCardProps) {
   const isStarting = exec.status === "starting";
   // Show last non-blank line from stdout as a live status hint
   const lastLine = exec.lastOutput
@@ -164,6 +243,15 @@ function ExecutionCard({ exec }: { exec: ExecutionState }) {
         isStarting
           ? h("span", { class: "active-task-starting-badge" }, "Starting…")
           : null,
+        // Always a live child process — no liveness check needed, and no
+        // ambiguity about what ending it does.
+        h("button", {
+          class: "active-task-end-btn",
+          disabled: ending,
+          title: "Stop this run",
+          "aria-label": `End run: ${exec.taskTitle}`,
+          onClick: () => { void onEnd(exec); },
+        }, ending ? "Ending…" : "End"),
       ),
       h("div", { class: "active-task-meta" },
         h("span", { class: "active-task-elapsed", title: "Elapsed time" },
@@ -215,8 +303,12 @@ function fireNotification(title: string, body: string) {
 
 // ── Main panel ───────────────────────────────────────────────────────
 
-export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
+export function ActiveTasksPanel({ runs, navigateTo, onRunsChanged }: ActiveTasksPanelProps) {
   const [executions, setExecutions] = useState<ExecutionState[]>([]);
+  const [liveness, setLiveness] = useState<LivenessMap>(() => new Map());
+  const [ending, setEnding] = useState<Set<string>>(() => new Set());
+  const [sweeping, setSweeping] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   // Tracks task IDs that have ever been seen as active (running/starting), so that
   // a "completed" WS event can fire a notification even if it races ahead of the
@@ -256,10 +348,32 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
     }
   }, []);
 
+  // Fetch liveness verdicts for the runs on screen.
+  const fetchLiveness = useCallback(async () => {
+    try {
+      const res = await fetch("/api/hench/audit");
+      if (!res.ok) return;
+      const data = await res.json();
+      const next: LivenessMap = new Map();
+      for (const e of (data.entries ?? []) as AuditEntry[]) {
+        if (!e.runId || !e.liveness) continue;
+        next.set(e.runId, {
+          liveness: e.liveness,
+          reason: e.livenessReason ?? "",
+          canEnd: e.canEnd === true,
+        });
+      }
+      setLiveness(next);
+    } catch {
+      // Audit unavailable — cards fall back to the time-based stale badge.
+    }
+  }, []);
+
   // WebSocket + polling with exponential-backoff reconnect
   useEffect(() => {
     let mounted = true;
     fetchExecutions();
+    fetchLiveness();
 
     const wsUrl = getWebSocketUrl();
 
@@ -344,10 +458,14 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
 
     // Poll as fallback every 5 seconds (covers WS gaps during reconnect)
     const interval = setInterval(fetchExecutions, 5000);
+    // Liveness changes only when a process starts or dies, and each sweep
+    // stats every lock file, so it polls far less often than the WS fallback.
+    const livenessInterval = setInterval(fetchLiveness, 30_000);
 
     return () => {
       mounted = false;
       clearInterval(interval);
+      clearInterval(livenessInterval);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       const ws = wsRef.current;
       if (ws) {
@@ -355,7 +473,95 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
       }
       wsRef.current = null;
     };
-  }, [fetchExecutions]);
+  }, [fetchExecutions, fetchLiveness]);
+
+  // ── End controls ───────────────────────────────────────────────────
+
+  /**
+   * End one run.
+   *
+   * `POST /api/hench/execute/:taskId/terminate` kills the child when this
+   * dashboard owns it and otherwise marks the run file failed, which covers
+   * both kinds of card here. Anything the audit has not proved dead asks first,
+   * because for those a real process may still be mid-edit.
+   */
+  const terminate = useCallback(async (
+    taskId: string,
+    taskTitle: string,
+    /** Key tracking the in-flight state — a run id or an execution's run id. */
+    busyKey: string,
+  ) => {
+    setActionError(null);
+    setEnding((prev) => new Set(prev).add(busyKey));
+    try {
+      const res = await fetch(
+        `/api/hench/execute/${encodeURIComponent(taskId)}/terminate`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setActionError(body.error ?? `Could not end "${taskTitle}" (HTTP ${res.status}).`);
+        return;
+      }
+      await Promise.all([fetchLiveness(), fetchExecutions()]);
+      onRunsChanged?.();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not reach the server.");
+    } finally {
+      setEnding((prev) => {
+        const next = new Set(prev);
+        next.delete(busyKey);
+        return next;
+      });
+    }
+  }, [fetchLiveness, fetchExecutions, onRunsChanged]);
+
+  const endRun = useCallback(async (
+    run: ActiveRun,
+    verdict?: { liveness: RunLiveness },
+  ) => {
+    if (verdict?.liveness !== "orphaned") {
+      const detail = verdict?.liveness === "live"
+        ? "A process is still running this task; it will be killed."
+        : "This run has not been confirmed dead; a process may still be working.";
+      if (!confirm(`End "${run.taskTitle}"?\n\n${detail}`)) return;
+    }
+    await terminate(run.taskId, run.taskTitle, run.id);
+  }, [terminate]);
+
+  const endExecution = useCallback(async (exec: ExecutionState) => {
+    if (!confirm(`End "${exec.taskTitle}"?\n\nThe running process will be killed.`)) return;
+    await terminate(exec.taskId, exec.taskTitle, exec.runId);
+  }, [terminate]);
+
+  /** End every run the audit proved no process is executing. */
+  const sweepOrphaned = useCallback(async (count: number) => {
+    if (!confirm(
+      `End ${count} run${count === 1 ? "" : "s"} that no process is executing?\n\n` +
+      "Each is marked failed in its run file. No running process is signalled.",
+    )) return;
+
+    setActionError(null);
+    setSweeping(true);
+    try {
+      const res = await fetch("/api/hench/runs/reconcile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setActionError(body.error ?? `Reconcile failed (HTTP ${res.status}).`);
+        return;
+      }
+      await fetchLiveness();
+      onRunsChanged?.();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not reach the server.");
+    } finally {
+      setSweeping(false);
+    }
+  }, [fetchLiveness, onRunsChanged]);
 
   // Merge: running hench runs + dashboard-triggered executions.
   // Deduplicate by taskId (hench runs take priority since they have more data).
@@ -363,6 +569,10 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
   const uniqueExecutions = executions.filter((e) => !runTaskIds.has(e.taskId));
 
   const totalActive = runs.length + uniqueExecutions.length;
+
+  // Runs the audit proved nothing is executing — the ones that make this count
+  // misleading, and the only ones the bulk sweep touches.
+  const orphanedCount = runs.filter((r) => liveness.get(r.id)?.liveness === "orphaned").length;
 
   // Nothing active → don't render
   if (totalActive === 0) return null;
@@ -389,14 +599,53 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
         : null,
     ),
 
+    // Audit banner — the count above is only trustworthy once these are gone.
+    orphanedCount > 0
+      ? h("div", { class: "active-tasks-audit-banner", role: "status" },
+          h("span", { class: "active-tasks-audit-icon", "aria-hidden": "true" }, "⚠"),
+          h("span", { class: "active-tasks-audit-text" },
+            `${orphanedCount} of these ${orphanedCount === 1 ? "is" : "are"} not running — ` +
+            `no hench process holds ${orphanedCount === 1 ? "it" : "them"}.`,
+          ),
+          h("button", {
+            class: "active-tasks-audit-sweep",
+            disabled: sweeping,
+            onClick: () => { void sweepOrphaned(orphanedCount); },
+          }, sweeping ? "Ending…" : `End ${orphanedCount}`),
+        )
+      : null,
+
+    actionError
+      ? h("div", { class: "active-tasks-audit-error", role: "alert" },
+          h("span", null, actionError),
+          h("button", {
+            class: "active-tasks-audit-error-dismiss",
+            onClick: () => setActionError(null),
+            "aria-label": "Dismiss",
+          }, "×"),
+        )
+      : null,
+
     h("div", { class: "active-tasks-list" },
       // Hench runs first
       ...runs.map((run) =>
-        h(ActiveTaskCard, { key: run.id, run, navigateTo }),
+        h(ActiveTaskCard, {
+          key: run.id,
+          run,
+          navigateTo,
+          verdict: liveness.get(run.id),
+          onEnd: endRun,
+          ending: ending.has(run.id),
+        }),
       ),
       // Then dashboard-triggered executions that aren't already in runs
       ...uniqueExecutions.map((exec) =>
-        h(ExecutionCard, { key: exec.runId, exec }),
+        h(ExecutionCard, {
+          key: exec.runId,
+          exec,
+          onEnd: endExecution,
+          ending: ending.has(exec.runId),
+        }),
       ),
     ),
   );

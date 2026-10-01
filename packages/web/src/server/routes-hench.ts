@@ -8,7 +8,8 @@
  *                                            annotated with its worktree)
  * GET    /api/hench/runs/:id              — full run detail with transcript (?scope=repo
  *                                            searches every worktree)
- * GET    /api/hench/runs/health           — staleness health check for running runs
+ * GET    /api/hench/runs/health           — staleness + liveness check for running runs
+ * POST   /api/hench/runs/reconcile        — end runs no process is executing (?dryRun)
  * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
  * GET    /api/hench/task-usage            — incremental per-task token usage aggregation
  * GET    /api/hench/audit                 — audit info for active tasks (PIDs, resource usage)
@@ -81,6 +82,15 @@ import { readCliName } from "./cli-name.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { ProcessMemoryTracker } from "./process-memory-tracker.js";
 import { ConcurrentExecutionMetrics } from "./concurrent-execution-metrics.js";
+import {
+  isPidAlive,
+  collectLiveLocks,
+  locksDirFor,
+  classifyRunLiveness,
+  summarizeLiveness,
+  type RunLiveness,
+  type LivenessSummary,
+} from "./run-liveness.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -529,7 +539,7 @@ function routeUsage(rc: RouteContext): boolean | Promise<boolean> | null {
 
   // GET /api/hench/audit — task execution audit info
   if (rc.path === "audit" && rc.method === "GET") {
-    return handleAudit(rc.res, rc.runsDir);
+    return handleAudit(rc.res, rc.runsDir, locksDirFor(rc.ctx.projectDir));
   }
 
   return null;
@@ -614,7 +624,16 @@ function routeRuns(rc: RouteContext): boolean | Promise<boolean> | null {
   if (!rc.path.startsWith("runs")) return null;
 
   if (rc.path === "runs/health" && rc.method === "GET") {
-    return handleRunsHealth(rc.res, rc.runsDir);
+    return handleRunsHealth(rc.res, rc.runsDir, locksDirFor(rc.ctx.projectDir));
+  }
+  if (rc.path === "runs/reconcile" && rc.method === "POST") {
+    return handleReconcile(
+      rc.req,
+      rc.res,
+      rc.runsDir,
+      locksDirFor(rc.ctx.projectDir),
+      rc.onStatusInvalidate,
+    );
   }
   const markStuckMatch = rc.path.match(/^runs\/([^/?]+)\/mark-stuck$/);
   if (markStuckMatch && rc.method === "POST") {
@@ -1880,17 +1899,33 @@ function computeHeartbeatStatus(
   return { status, missedHeartbeats };
 }
 
-/** GET /api/hench/runs/health — detect stale "running" runs. */
-function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
+/**
+ * GET /api/hench/runs/health — detect stale "running" runs.
+ *
+ * `stale` is the original time-since-activity heuristic; `liveness` is the
+ * evidence-based verdict from `run-liveness.ts`. They disagree in both
+ * directions — a healthy run that simply hasn't logged for five minutes is
+ * `stale` but `live`, and a run abandoned seconds ago is `orphaned` but not yet
+ * `stale` — so both are reported rather than one replacing the other.
+ */
+function handleRunsHealth(res: ServerResponse, runsDir: string, locksDir: string): boolean {
   let files: string[];
   try {
     files = readdirSync(runsDir);
   } catch {
-    jsonResponse(res, 200, { activeRuns: 0, staleRuns: 0, runs: [] });
+    jsonResponse(res, 200, {
+      activeRuns: 0,
+      staleRuns: 0,
+      orphanedRuns: 0,
+      liveness: summarizeLiveness([]),
+      runs: [],
+    });
     return true;
   }
 
   const now = Date.now();
+  const liveLocks = collectLiveLocks(locksDir);
+  const managedTaskIds = new Set(stateFor(runsDir).activeExecutions.keys());
   const runningRuns: Array<{
     id: string;
     taskId: string;
@@ -1899,6 +1934,9 @@ function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
     lastActivityAt?: string;
     stale: boolean;
     staleSinceMs?: number;
+    liveness: RunLiveness;
+    livenessReason: string;
+    canEnd: boolean;
   }> = [];
 
   for (const file of files) {
@@ -1913,6 +1951,16 @@ function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
       ? (now - lastActivityMs) > STALE_THRESHOLD_MS
       : true; // No lastActivityAt = legacy run, treat as stale if still "running"
 
+    const verdict = classifyRunLiveness(
+      {
+        taskId: run.taskId as string | undefined,
+        startedAt: run.startedAt as string | undefined,
+        lastActivityAt: lastActivity,
+        host: run.host as string | undefined,
+      },
+      { liveLocks, managedTaskIds, now },
+    );
+
     runningRuns.push({
       id: run.id as string,
       taskId: run.taskId as string,
@@ -1921,12 +1969,18 @@ function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
       lastActivityAt: lastActivity,
       stale,
       staleSinceMs: lastActivityMs != null ? Math.max(0, now - lastActivityMs) : undefined,
+      liveness: verdict.liveness,
+      livenessReason: verdict.reason,
+      canEnd: verdict.canEnd,
     });
   }
 
+  const liveness: LivenessSummary = summarizeLiveness(runningRuns);
   jsonResponse(res, 200, {
     activeRuns: runningRuns.length,
     staleRuns: runningRuns.filter((r) => r.stale).length,
+    orphanedRuns: liveness.orphaned,
+    liveness,
     runs: runningRuns,
   });
   return true;
@@ -2433,16 +2487,6 @@ interface ConcurrencyLockFile {
 /** Default max concurrent processes (matches hench DEFAULT_HENCH_CONFIG). */
 const DEFAULT_MAX_CONCURRENT_PROCESSES = 3;
 
-/** Check whether a process with the given PID is still alive. */
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Concurrency utilization level for UI indicators. */
 type ConcurrencyLevel = "low" | "moderate" | "high" | "at_limit";
 
@@ -2682,13 +2726,25 @@ interface AuditEntry {
   heartbeatStatus: HeartbeatStatus;
   /** Number of missed heartbeat intervals since last activity. */
   missedHeartbeats: number;
+  /**
+   * Evidence-based verdict on whether a process is actually executing this run.
+   *
+   * `stale` above is a timer; this is the answer. See `run-liveness.ts`.
+   */
+  liveness: RunLiveness;
+  /** Why {@link liveness} came out the way it did, shown verbatim in the UI. */
+  livenessReason: string;
+  /** Whether `POST .../reconcile` will end this run without extra confirmation. */
+  canEnd: boolean;
 }
 
 /** GET /api/hench/audit — aggregate audit info for all active tasks. */
-function handleAudit(res: ServerResponse, runsDir: string): boolean {
+function handleAudit(res: ServerResponse, runsDir: string, locksDir: string): boolean {
   const { activeExecutions } = stateFor(runsDir);
   const now = Date.now();
   const entries: AuditEntry[] = [];
+  const liveLocks = collectLiveLocks(locksDir);
+  const managedTaskIds = new Set(activeExecutions.keys());
 
   // 1. Dashboard-triggered executions (have PID from the managed child handle)
   for (const [taskId, entry] of activeExecutions.entries()) {
@@ -2706,11 +2762,14 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
       lastOutput: entry.state.lastOutput,
       heartbeatStatus: "healthy", // dashboard executions are tracked in real-time
       missedHeartbeats: 0,
+      liveness: "live",
+      livenessReason: "This dashboard owns the running process.",
+      canEnd: false,
     });
   }
 
   // 2. Disk-based running runs (from .hench/runs/*.json)
-  const dashboardTaskIds = new Set(activeExecutions.keys());
+  const dashboardTaskIds = managedTaskIds;
   let files: string[];
   try {
     files = readdirSync(runsDir);
@@ -2735,12 +2794,23 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
       : true;
     const startMs = new Date(run.startedAt as string).getTime();
     const hb = computeHeartbeatStatus(lastActivityMs, now);
+    // Run files carry no PID, so liveness is proved (or disproved) from the
+    // `.hench/locks/` entries the hench CLI holds while it runs.
+    const verdict = classifyRunLiveness(
+      {
+        taskId: runTaskId,
+        startedAt: run.startedAt as string | undefined,
+        lastActivityAt: lastActivity,
+        host: run.host as string | undefined,
+      },
+      { liveLocks, managedTaskIds, now },
+    );
 
     entries.push({
       taskId: runTaskId,
       taskTitle: run.taskTitle as string,
       runId: run.id as string,
-      pid: null, // PIDs are not tracked in run files
+      pid: verdict.pid,
       status: "running",
       startedAt: run.startedAt as string,
       lastActivityAt: lastActivity,
@@ -2752,6 +2822,9 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
       tokenUsage: run.tokenUsage as { input: number; output: number } | undefined,
       heartbeatStatus: hb.status,
       missedHeartbeats: hb.missedHeartbeats,
+      liveness: verdict.liveness,
+      livenessReason: verdict.reason,
+      canEnd: verdict.canEnd,
     });
   }
 
@@ -2769,7 +2842,165 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
     activeExecutions: activeExecutions.size,
   };
 
-  jsonResponse(res, 200, { entries, systemInfo, timestamp: new Date().toISOString() });
+  jsonResponse(res, 200, {
+    entries,
+    liveness: summarizeLiveness(entries),
+    systemInfo,
+    timestamp: new Date().toISOString(),
+  });
+  return true;
+}
+
+// ── Reconciliation ────────────────────────────────────────────────────
+
+/** One run considered by `POST /api/hench/runs/reconcile`. */
+interface ReconcileOutcome {
+  runId: string;
+  taskId: string;
+  taskTitle: string;
+  liveness: RunLiveness;
+  reason: string;
+  /** Whether this run qualified to be ended. */
+  eligible: boolean;
+  /** Whether this run's file was rewritten (always false for a dry run). */
+  ended: boolean;
+}
+
+/** Error recorded on a run file ended by reconciliation. */
+const RECONCILE_ERROR_PREFIX = "Ended by audit reconciliation";
+
+/**
+ * POST /api/hench/runs/reconcile — close out runs that no process is executing.
+ *
+ * This is the bulk counterpart to `POST /api/hench/execute/:taskId/terminate`:
+ * terminate kills one managed child, whereas reconcile never signals anything.
+ * It only rewrites run files whose owning process is already gone, which is the
+ * situation that fills the active-task list after a crash or a reboot.
+ *
+ * Body (all optional):
+ * - `dryRun`         — report what would be ended, write nothing.
+ * - `includeUnknown` — also end runs whose liveness could not be determined.
+ *                      Never includes `live` or `foreign` runs.
+ * - `runIds`         — restrict to these run ids instead of every eligible run.
+ */
+async function handleReconcile(
+  req: IncomingMessage,
+  res: ServerResponse,
+  runsDir: string,
+  locksDir: string,
+  onStatusInvalidate?: () => void,
+): Promise<boolean> {
+  let body: Record<string, unknown> = {};
+  try {
+    const raw = await readBody(req);
+    if (raw) body = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    errorResponse(res, 400, "Request body must be JSON");
+    return true;
+  }
+
+  const dryRun = body.dryRun === true;
+  const includeUnknown = body.includeUnknown === true;
+  const runIdFilter = Array.isArray(body.runIds)
+    ? new Set((body.runIds as unknown[]).map(String))
+    : null;
+
+  const { activeExecutions } = stateFor(runsDir);
+  const liveLocks = collectLiveLocks(locksDir);
+  const managedTaskIds = new Set(activeExecutions.keys());
+  const now = Date.now();
+
+  let files: string[];
+  try {
+    files = readdirSync(runsDir);
+  } catch {
+    jsonResponse(res, 200, {
+      dryRun,
+      ended: 0,
+      outcomes: [],
+      liveness: summarizeLiveness([]),
+    });
+    return true;
+  }
+
+  const outcomes: ReconcileOutcome[] = [];
+  const verdicts: Array<{ liveness: RunLiveness }> = [];
+  let failed: string | null = null;
+
+  for (const file of files) {
+    if (!file.endsWith(".json")) continue;
+    const id = file.replace(/\.json$/, "");
+    if (runIdFilter && !runIdFilter.has(id)) continue;
+
+    const run = loadRunFile(runsDir, id);
+    if (!run || run.status !== "running") continue;
+
+    const verdict = classifyRunLiveness(
+      {
+        taskId: run.taskId as string | undefined,
+        startedAt: run.startedAt as string | undefined,
+        lastActivityAt: run.lastActivityAt as string | undefined,
+        host: run.host as string | undefined,
+      },
+      { liveLocks, managedTaskIds, now },
+    );
+    verdicts.push(verdict);
+
+    const eligible =
+      verdict.canEnd || (includeUnknown && verdict.liveness === "unknown");
+    if (!eligible) {
+      outcomes.push({
+        runId: id,
+        taskId: (run.taskId as string) ?? "",
+        taskTitle: (run.taskTitle as string) ?? "",
+        liveness: verdict.liveness,
+        reason: verdict.reason,
+        eligible: false,
+        ended: false,
+      });
+      continue;
+    }
+
+    if (!dryRun) {
+      run.status = "failed";
+      run.error = `${RECONCILE_ERROR_PREFIX}: ${verdict.reason}`;
+      run.finishedAt = new Date(now).toISOString();
+      try {
+        writeFileSync(join(runsDir, file), JSON.stringify(run, null, 2) + "\n", "utf-8");
+      } catch (err) {
+        failed = err instanceof Error ? err.message : String(err);
+        break;
+      }
+    }
+
+    outcomes.push({
+      runId: id,
+      taskId: (run.taskId as string) ?? "",
+      taskTitle: (run.taskTitle as string) ?? "",
+      liveness: verdict.liveness,
+      reason: verdict.reason,
+      eligible: true,
+      ended: !dryRun,
+    });
+  }
+
+  if (failed) {
+    errorResponse(res, 500, `Failed to update run files: ${failed}`);
+    return true;
+  }
+
+  const ended = outcomes.filter((o) => o.ended).length;
+  if (ended > 0) onStatusInvalidate?.();
+
+  jsonResponse(res, 200, {
+    dryRun,
+    includeUnknown,
+    ended,
+    eligible: outcomes.filter((o) => o.eligible).length,
+    outcomes,
+    liveness: summarizeLiveness(verdicts),
+    timestamp: new Date(now).toISOString(),
+  });
   return true;
 }
 

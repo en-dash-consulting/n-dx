@@ -1469,7 +1469,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
       : null,
 
     // Active tasks panel — shown at top when there are running tasks
-    h(ActiveTasksPanel, { runs: activeRuns, navigateTo }),
+    h(ActiveTasksPanel, { runs: activeRuns, navigateTo, onRunsChanged: fetchRuns }),
 
     // Aggregate metrics
     h(RunMetrics, { runs }),
