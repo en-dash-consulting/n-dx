@@ -29,6 +29,7 @@ import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
+import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
 import { watchAnalyzeProgress } from "./analyze-progress-watcher.js";
 import { stopRunTailWatches } from "./run-tail.js";
 import { handleWorkspacesRoute } from "./routes-workspaces.js";
@@ -713,6 +714,11 @@ async function handleScopedRoute(
   return await run();
 }
 
+/** The Live overview reads the registry's worktree list rather than asking git per request. */
+function liveSourcesOf(registry: WorkspaceRegistry): LiveSources {
+  return { listWorkspaces: () => registry.list() };
+}
+
 async function handleApiRoutes(
   req: IncomingMessage,
   res: ServerResponse,
@@ -737,6 +743,7 @@ async function handleApiRoutes(
   if (await handleProjectRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx, { broadcast, onStatusInvalidate: invalidateRunCaches }))) return true;
+  if (handleLiveRoute(req, res, ctx, liveSourcesOf(registry))) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
@@ -1095,6 +1102,9 @@ export async function startServer(
     log: isVerbose() ? verbose : () => {},
   });
   registry.start();
+
+  // Live overview frames: repository-wide, so every workspace's viewer gets them.
+  watcherHandles.monitorIntervals.push(startLiveMonitor(registry.anchor.ctx, liveSourcesOf(registry), everyWorkspaceBroadcast));
 
   const server = createHttpServer(registry, ws, assets, wsHealthTracker);
 

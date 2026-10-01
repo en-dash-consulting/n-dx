@@ -327,6 +327,18 @@ export function resolveActiveVendor(projectDir: string): string | null {
   return typeof llm["vendor"] === "string" ? llm["vendor"] : null;
 }
 
+/**
+ * The configured vendor and that vendor's `llm.<vendor>.model`, each null
+ * when unset (the vendor's own default applies).
+ */
+export function resolveActiveModel(projectDir: string): { vendor: string | null; model: string | null } {
+  const config = readEffectiveNdxConfig(projectDir);
+  const llm = (config["llm"] ?? {}) as Record<string, unknown>;
+  const vendor = typeof llm["vendor"] === "string" ? llm["vendor"] : null;
+  const vendorConfig = (vendor ? llm[vendor] ?? {} : {}) as Record<string, unknown>;
+  return { vendor, model: getString(vendorConfig, "model") };
+}
+
 function extractLlmConfig(projectDir: string): LlmConfigResponse {
   const config = readEffectiveNdxConfig(projectDir);
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;

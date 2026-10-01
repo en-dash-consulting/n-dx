@@ -92,6 +92,7 @@ import {
   watchRunTail,
   type LocatedRun,
 } from "./run-tail.js";
+import { isRunStale } from "./run-staleness.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -144,7 +145,7 @@ function stateFor(runsDir: string): HenchWorkspaceState {
   return state;
 }
 
-function runsDirOf(ctx: ServerContext): string {
+function runsDirOf(ctx: Pick<ServerContext, "projectDir">): string {
   return join(ctx.projectDir, ".hench", "runs");
 }
 
@@ -1957,6 +1958,16 @@ async function handleExecute(
   return true;
 }
 
+/**
+ * Dashboard-started executions of the workspace served from `projectDir`,
+ * as `GET /api/hench/execute/status` reports them. Never creates state for a
+ * workspace that has none.
+ */
+export function dashboardExecutionsFor(projectDir: string): TaskExecutionStatus[] {
+  const state = workspaceStates.get(runsDirOf({ projectDir }));
+  return state ? Array.from(state.activeExecutions.values(), (entry) => ({ ...entry.state })) : [];
+}
+
 /** GET /api/hench/execute/status — return status of all active executions. */
 function handleExecuteStatus(res: ServerResponse, runsDir: string): boolean {
   const executions: TaskExecutionStatus[] = [];
@@ -1979,9 +1990,6 @@ function handleExecuteStatusForTask(taskId: string, res: ServerResponse, runsDir
 }
 
 // ── Health monitoring ─────────────────────────────────────────────────
-
-/** Default staleness threshold: 5 minutes in milliseconds. */
-const STALE_THRESHOLD_MS = 5 * 60 * 1000;
 
 /**
  * Heartbeat interval expected from the agent (matches hench heartbeat writer).
@@ -2059,9 +2067,7 @@ function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
 
     const lastActivity = run.lastActivityAt as string | undefined;
     const lastActivityMs = lastActivity ? new Date(lastActivity).getTime() : null;
-    const stale = lastActivityMs != null
-      ? (now - lastActivityMs) > STALE_THRESHOLD_MS
-      : true; // No lastActivityAt = legacy run, treat as stale if still "running"
+    const stale = isRunStale(lastActivity, now);
     const pid = typeof run.pid === "number" ? run.pid : undefined;
 
     runningRuns.push({
@@ -2319,7 +2325,7 @@ export function startConcurrencyMonitor(
 // ── Memory / resource monitoring ──────────────────────────────────────
 
 /** Memory health level for UI indicators. */
-type MemoryHealthLevel = "healthy" | "warning" | "critical";
+export type MemoryHealthLevel ="healthy" | "warning" | "critical";
 
 /** Per-process memory snapshot. */
 interface ProcessMemoryEntry {
@@ -2331,7 +2337,7 @@ interface ProcessMemoryEntry {
 }
 
 /** Full memory status response shape. */
-interface MemoryStatus {
+export interface MemoryStatus {
   system: {
     totalBytes: number;
     freeBytes: number;
@@ -2402,12 +2408,22 @@ function getProcessRss(pid: number): number | null {
 /** Which workspace's tracker each sampled dashboard process belongs to (taskId → runsDir). */
 const processOwners = new Map<string, string>();
 
-function collectMemoryStatus(): MemoryStatus {
-  processOwners.clear();
+/**
+ * The machine's memory and its health level — the `system` and `health`
+ * parts of `GET /api/hench/memory`, without the per-process `ps` probes,
+ * for readers that must answer quickly (the Live overview).
+ */
+export function readSystemMemory(): MemoryStatus["system"] & { health: MemoryHealthLevel } {
   const totalBytes = totalmem();
   const freeBytes = freemem();
   const usedBytes = totalBytes - freeBytes;
   const usedPercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
+  return { totalBytes, freeBytes, usedBytes, usedPercent, health: computeMemoryHealth(usedPercent) };
+}
+
+function collectMemoryStatus(): MemoryStatus {
+  processOwners.clear();
+  const { totalBytes, freeBytes, usedBytes, usedPercent, health } = readSystemMemory();
 
   const mem = process.memoryUsage();
   const load = loadavg() as [number, number, number];
@@ -2444,7 +2460,7 @@ function collectMemoryStatus(): MemoryStatus {
       externalBytes: mem.external,
     },
     processes,
-    health: computeMemoryHealth(usedPercent),
+    health,
     loadAvg: load,
     cpuCount,
     timestamp: new Date().toISOString(),
@@ -2598,7 +2614,7 @@ function isPidAlive(pid: number): boolean {
 }
 
 /** Concurrency utilization level for UI indicators. */
-type ConcurrencyLevel = "low" | "moderate" | "high" | "at_limit";
+export type ConcurrencyLevel ="low" | "moderate" | "high" | "at_limit";
 
 // ── Throttle state ────────────────────────────────────────────────────
 
@@ -2678,22 +2694,49 @@ function getEffectiveMaxConcurrent(projectDir: string): number {
  * a utilization level for visual indicators.
  */
 function handleConcurrency(res: ServerResponse, ctx: ServerContext): boolean {
-  const { activeExecutions } = stateForCtx(ctx);
-  const henchDir = join(ctx.projectDir, ".hench");
-  const locksDir = join(henchDir, "locks");
-  const runsDir = join(henchDir, "runs");
+  jsonResponse(res, 200, collectConcurrencyStatus(ctx));
+  return true;
+}
 
-  // 1. Read max concurrent (respects runtime override from throttle controls)
+/** What `GET /api/hench/concurrency` answers. */
+export interface ConcurrencyStatus {
+  processCount: number;
+  maxConcurrent: number;
+  slotsAvailable: number;
+  level: ConcurrencyLevel;
+  utilization: number;
+  totalRunning: number;
+  dashboardActive: number;
+  diskRunning: number;
+  pendingTasks: number;
+  locks: Array<{ pid: number; startedAt: string; taskId?: string }>;
+  timestamp: string;
+}
+
+/** Agent slots of one workspace: live lock holders against the effective limit. */
+export interface ConcurrencySlots {
+  processCount: number;
+  maxConcurrent: number;
+  slotsAvailable: number;
+  level: ConcurrencyLevel;
+  utilization: number;
+  locks: ConcurrencyStatus["locks"];
+}
+
+/**
+ * Slots in use, from the PID lock files hench's limiter holds in
+ * `.hench/locks/` — the authoritative cross-process count — against the
+ * limit (including a throttle override). Reads no run files, so the Live
+ * overview can ask it on every request.
+ */
+export function readConcurrencySlots(ctx: ServerContext): ConcurrencySlots {
+  const locksDir = join(ctx.projectDir, ".hench", "locks");
+
+  // Read max concurrent (respects runtime override from throttle controls)
   const maxConcurrent = getEffectiveMaxConcurrent(ctx.projectDir);
 
-  // 2. Read lock files and check PID liveness
-  const activeLocks: Array<{
-    pid: number;
-    startedAt: string;
-    taskId?: string;
-    alive: boolean;
-  }> = [];
-
+  // Read lock files; keep those whose PID is alive
+  const locks: ConcurrencyStatus["locks"] = [];
   try {
     const files = readdirSync(locksDir);
     for (const file of files) {
@@ -2701,13 +2744,7 @@ function handleConcurrency(res: ServerResponse, ctx: ServerContext): boolean {
       try {
         const raw = readFileSync(join(locksDir, file), "utf-8");
         const lock = JSON.parse(raw) as ConcurrencyLockFile;
-        const alive = isPidAlive(lock.pid);
-        activeLocks.push({
-          pid: lock.pid,
-          startedAt: lock.startedAt,
-          taskId: lock.taskId,
-          alive,
-        });
+        if (isPidAlive(lock.pid)) locks.push({ pid: lock.pid, startedAt: lock.startedAt, taskId: lock.taskId });
       } catch {
         // Corrupted lock file — skip
       }
@@ -2716,9 +2753,39 @@ function handleConcurrency(res: ServerResponse, ctx: ServerContext): boolean {
     // Locks dir doesn't exist yet — no active locks
   }
 
-  const aliveLocks = activeLocks.filter((l) => l.alive);
+  // The "active process count" is the number of live lock-holding processes,
+  // which is the authoritative cross-process count.
+  const processCount = locks.length;
+  const utilization = maxConcurrent > 0 ? processCount / maxConcurrent : 0;
+  let level: ConcurrencyLevel;
+  if (processCount >= maxConcurrent) {
+    level = "at_limit";
+  } else if (utilization >= 0.67) {
+    level = "high";
+  } else if (utilization > 0) {
+    level = "moderate";
+  } else {
+    level = "low";
+  }
 
-  // 3. Count dashboard-triggered executions
+  return {
+    processCount,
+    maxConcurrent,
+    // Slots remaining before limit is reached
+    slotsAvailable: Math.max(0, maxConcurrent - processCount),
+    level,
+    utilization: Math.min(1, utilization),
+    locks,
+  };
+}
+
+/** The concurrency status of one workspace, as `GET /api/hench/concurrency` answers it. */
+export function collectConcurrencyStatus(ctx: ServerContext): ConcurrencyStatus {
+  const { activeExecutions } = stateForCtx(ctx);
+  const runsDir = join(ctx.projectDir, ".hench", "runs");
+  const slots = readConcurrencySlots(ctx);
+
+  // Count dashboard-triggered executions
   const dashboardActive = activeExecutions.size;
   const dashboardRunning = Array.from(activeExecutions.values()).filter(
     (e) => e.state.status === "running" || e.state.status === "starting",
@@ -2752,48 +2819,15 @@ function handleConcurrency(res: ServerResponse, ctx: ServerContext): boolean {
     // PRD not available
   }
 
-  // 6. Compute aggregate counts
-  // The "active process count" is the number of live lock-holding processes,
-  // which is the authoritative cross-process count.
-  const processCount = aliveLocks.length;
-
-  // Total running tasks combines dashboard + disk sources (deduplicated)
-  const totalRunning = dashboardRunning + diskRunningCount;
-
-  // Compute utilization level
-  const utilization = maxConcurrent > 0 ? processCount / maxConcurrent : 0;
-  let level: ConcurrencyLevel;
-  if (processCount >= maxConcurrent) {
-    level = "at_limit";
-  } else if (utilization >= 0.67) {
-    level = "high";
-  } else if (utilization > 0) {
-    level = "moderate";
-  } else {
-    level = "low";
-  }
-
-  // Slots remaining before limit is reached
-  const slotsAvailable = Math.max(0, maxConcurrent - processCount);
-
-  jsonResponse(res, 200, {
-    processCount,
-    maxConcurrent,
-    slotsAvailable,
-    level,
-    utilization: Math.min(1, utilization),
-    totalRunning,
+  return {
+    ...slots,
+    // Total running tasks combines dashboard + disk sources (deduplicated)
+    totalRunning: dashboardRunning + diskRunningCount,
     dashboardActive,
     diskRunning: diskRunningCount,
     pendingTasks: pendingTaskCount,
-    locks: aliveLocks.map((l) => ({
-      pid: l.pid,
-      startedAt: l.startedAt,
-      taskId: l.taskId,
-    })),
     timestamp: new Date().toISOString(),
-  });
-  return true;
+  };
 }
 
 /** Recursively count pending/blocked tasks (leaf tasks only). */
@@ -2884,9 +2918,7 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
 
     const lastActivity = run.lastActivityAt as string | undefined;
     const lastActivityMs = lastActivity ? new Date(lastActivity).getTime() : null;
-    const stale = lastActivityMs != null
-      ? (now - lastActivityMs) > STALE_THRESHOLD_MS
-      : true;
+    const stale = isRunStale(lastActivity, now);
     const startMs = new Date(run.startedAt as string).getTime();
     const hb = computeHeartbeatStatus(lastActivityMs, now);
 

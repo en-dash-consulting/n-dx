@@ -267,6 +267,46 @@ export function readEventsAfter(path: string, after: number, max = MAX_EVENTS_PE
   return { events, next, total: lines.length };
 }
 
+/** How much of an events file's end {@link readLastEvent} reads. */
+const LAST_EVENT_WINDOW_BYTES = 16 * 1024;
+
+/**
+ * The last complete, parseable event in the file, or null. Reads only the
+ * file's last {@link LAST_EVENT_WINDOW_BYTES}, so its cost does not grow
+ * with the run — the Live overview asks this of every running run.
+ */
+export function readLastEvent(path: string): Record<string, unknown> | null {
+  let fd: number;
+  try {
+    fd = openSync(path, "r");
+  } catch {
+    return null;
+  }
+  try {
+    const size = statSync(path).size;
+    const length = Math.min(size, LAST_EVENT_WINDOW_BYTES);
+    const buf = Buffer.alloc(length);
+    const read = length > 0 ? readSync(fd, buf, 0, length, size - length) : 0;
+    const text = buf.subarray(0, read).toString("utf-8");
+    // Only newline-terminated lines are events; the first line of the window
+    // may be a fragment and fails to parse, which is fine — it is the oldest.
+    const lines = text.slice(0, text.lastIndexOf("\n") + 1).split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i]!.trim();
+      if (!line) continue;
+      try {
+        const parsed: unknown = JSON.parse(line);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+      } catch {
+        // A torn or malformed line: keep looking further back.
+      }
+    }
+    return null;
+  } finally {
+    closeSync(fd);
+  }
+}
+
 // ── Watching ────────────────────────────────────────────────────────────────
 
 /** Frame announcing that a watched run's log or event stream grew. */

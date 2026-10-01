@@ -1367,6 +1367,54 @@ export function stopAsyncJob(res: ServerResponse, job: AsyncJob, label: string):
   return stopJob(res, job, label);
 }
 
+/** The dashboard-started background jobs the job tray and the Live overview list. */
+export type CommandJobKind = "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "recommend";
+
+/** One job's status, reduced to what every kind shares. */
+export interface CommandJobSnapshot {
+  kind: CommandJobKind;
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  error: string | null;
+  stopped: boolean;
+  /** Last output line — for refresh, its latest phase — or null. */
+  detail: string | null;
+}
+
+function lastOutputLine(text: string | undefined): string | null {
+  const lines = (text ?? "").trim().split("\n").map((l) => l.trim()).filter(Boolean);
+  return lines.at(-1) ?? null;
+}
+
+/**
+ * Every job one workspace has started, by its key (`workspaceKeyOf`). A
+ * workspace that never started a job has no slots and lists nothing; reading
+ * creates none.
+ */
+export function commandJobsOf(workspaceKey: string): CommandJobSnapshot[] {
+  return [
+    snapshotJob("sv-analyze", svAnalyzeSlots.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.recentOutput)),
+    snapshotJob("self-heal", selfHealSlots.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+    snapshotJob("ci", ciJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+    snapshotJob("reshape", reshapeJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+    snapshotJob("refresh", refreshSlots.peekByKey(workspaceKey)?.status, (s) => s.phases.at(-1) ?? lastOutputLine(s.output)),
+    snapshotJob("recommend", recommendJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+  ].filter((job): job is CommandJobSnapshot => job !== null);
+}
+
+type JobStatusBase = Pick<CommandJobSnapshot, "running" | "startedAt" | "finishedAt" | "error" | "stopped">;
+
+function snapshotJob<S extends JobStatusBase>(
+  kind: CommandJobKind,
+  status: S | undefined,
+  detail: (status: S) => string | null,
+): CommandJobSnapshot | null {
+  if (!status) return null;
+  const { running, startedAt, finishedAt, error, stopped } = status;
+  return { kind, running, startedAt, finishedAt, error, stopped, detail: detail(status) };
+}
+
 /**
  * The job trackers of one workspace, for tests that need to observe or drive
  * them without spawning the real CLIs. Mirrors `resetHenchRouteStateForTests`.

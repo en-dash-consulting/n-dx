@@ -130,28 +130,69 @@ interface WorktreesCache {
 
 let worktreesCache: WorktreesCache | null = null;
 
+/** Token counts as a run record carries them (`tokenUsage`); absent classes are 0. */
+export interface RunDigestTokens {
+  input: number;
+  output: number;
+  cacheCreationInput: number;
+  cacheReadInput: number;
+}
+
 /**
- * Per-run-file cache keyed by path. Run files are append-heavy (transcripts,
- * tool calls) and only their `status` / `finishedAt` matter here, so a file
- * whose mtime and size have not moved is not parsed again.
+ * The small, fixed slice of a run file that the worktree summary and the Live
+ * overview read (`GET /api/worktrees`, `GET /api/live`). Both count running
+ * runs from this one digest, so their counts agree.
  */
-interface RunFileDigest {
-  mtimeMs: number;
-  size: number;
+export interface RunDigest {
   id: string | null;
   status: string | null;
+  taskId: string | null;
   taskTitle: string | null;
   startedAt: string | null;
   finishedAt: string | null;
+  lastActivityAt: string | null;
   claimLostTo: string | null;
+  turns: number | null;
+  model: string | null;
+  vendor: string | null;
+  tokens: RunDigestTokens;
+  /** Hench process pid, while running. */
+  pid: number | null;
+  branch: string | null;
+  worktreeRoot: string | null;
+  /** Recorded path of the structured progress events file, unconfined. */
+  eventsPath: string | null;
+}
+
+/**
+ * Per-run-file cache keyed by path. Run files are append-heavy (transcripts,
+ * tool calls) and only a few fields matter here, so a file whose mtime and
+ * size have not moved is not parsed again.
+ */
+interface RunFileDigest extends RunDigest {
+  mtimeMs: number;
+  size: number;
 }
 
 const runDigestCache = new Map<string, RunFileDigest>();
+
+/** Run files read and parsed since the last {@link clearWorktreesCache}. */
+let runFileParses = 0;
 
 /** Clear caches (exposed for testing). */
 export function clearWorktreesCache(): void {
   worktreesCache = null;
   runDigestCache.clear();
+  runFileParses = 0;
+}
+
+/**
+ * How many run files the digest cache has had to read — what a warm reader
+ * should keep at zero. Lets tests count work instead of timing it.
+ * @internal
+ */
+export function runFileParseCountForTests(): number {
+  return runFileParses;
 }
 
 /**
@@ -185,7 +226,6 @@ async function countDirtyFiles(worktree: GitWorktree): Promise<number | null> {
   return result.stdout.split("\n").filter((line) => line.length > 0).length;
 }
 
-/** Read just the two fields this route needs from one run file, via the digest cache. */
 /**
  * The worktree named by a run record's `claimLost`, or null.
  *
@@ -199,6 +239,41 @@ function claimLostHolder(value: unknown): string | null {
   return typeof holder === "string" && holder.length > 0 ? holder : null;
 }
 
+/**
+ * The digest fields of one parsed run record. Tolerant of every field being
+ * missing or mistyped: records come from other worktrees and hench versions.
+ */
+function digestRun(run: Record<string, unknown>): RunDigest {
+  const str = (value: unknown): string | null => (typeof value === "string" ? value : null);
+  const num = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
+  const usage = (run.tokenUsage && typeof run.tokenUsage === "object" ? run.tokenUsage : {}) as Record<string, unknown>;
+  const diagnostics = (run.diagnostics && typeof run.diagnostics === "object" ? run.diagnostics : {}) as Record<string, unknown>;
+  return {
+    id: str(run.id),
+    status: str(run.status),
+    taskId: str(run.taskId),
+    taskTitle: str(run.taskTitle),
+    startedAt: str(run.startedAt),
+    finishedAt: str(run.finishedAt),
+    lastActivityAt: str(run.lastActivityAt),
+    claimLostTo: claimLostHolder(run.claimLost),
+    turns: num(run.turns),
+    model: str(run.model),
+    vendor: str(run.vendor) ?? str(diagnostics.vendor),
+    tokens: {
+      input: num(usage.input) ?? 0,
+      output: num(usage.output) ?? 0,
+      cacheCreationInput: num(usage.cacheCreationInput) ?? 0,
+      cacheReadInput: num(usage.cacheReadInput) ?? 0,
+    },
+    pid: num(run.pid),
+    branch: str(run.branch),
+    worktreeRoot: str(run.worktreeRoot),
+    eventsPath: str(run.eventsPath),
+  };
+}
+
+/** One run file's digest, read through the mtime/size cache. */
 function digestRunFile(path: string): RunFileDigest | null {
   let mtimeMs: number;
   let size: number;
@@ -213,25 +288,15 @@ function digestRunFile(path: string): RunFileDigest | null {
   const cached = runDigestCache.get(path);
   if (cached && cached.mtimeMs === mtimeMs && cached.size === size) return cached;
 
-  const str = (value: unknown): string | null => (typeof value === "string" ? value : null);
-
+  runFileParses++;
   let digest: RunFileDigest;
   try {
     const run = JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
-    digest = {
-      mtimeMs,
-      size,
-      id: str(run.id),
-      status: str(run.status),
-      taskTitle: str(run.taskTitle),
-      startedAt: str(run.startedAt),
-      finishedAt: str(run.finishedAt),
-      claimLostTo: claimLostHolder(run.claimLost),
-    };
+    digest = { mtimeMs, size, ...digestRun(run) };
   } catch {
     // Unparseable (mid-write, corrupt): remember that so it is not re-read on
     // every poll, but count it as no run.
-    digest = { mtimeMs, size, id: null, status: null, taskTitle: null, startedAt: null, finishedAt: null, claimLostTo: null };
+    digest = { mtimeMs, size, ...digestRun({}) };
   }
   runDigestCache.set(path, digest);
   return digest;
@@ -245,28 +310,38 @@ function digestRunFile(path: string): RunFileDigest | null {
  * the most recent wins. ISO-8601 UTC timestamps compare correctly as strings,
  * which is how `lastFinishedAt` has always been computed here.
  */
-function latestRank(digest: RunFileDigest): [number, string] {
+function latestRank(digest: RunDigest): [number, string] {
   const running = digest.status === "running";
   return [running ? 1 : 0, (running ? digest.startedAt : digest.finishedAt) ?? digest.startedAt ?? ""];
 }
 
-/** Summarise `<worktree>/.hench/runs/*.json`. Missing directory is zero runs. */
-function summariseRuns(worktreePath: string): WorktreeRunsSummary {
+/**
+ * Digests of every parseable run file in `<worktree>/<hench dir>/runs/`.
+ * Missing directory is no runs; unparseable files are skipped.
+ */
+export function readRunDigests(worktreePath: string): RunDigest[] {
   const runsDir = join(resolveLayout(worktreePath).henchDir, "runs");
   let files: string[];
   try {
     files = readdirSync(runsDir).filter((f) => f.endsWith(".json"));
   } catch {
-    return { total: 0, running: 0, lastFinishedAt: null, latest: null };
+    return [];
   }
+  const digests: RunDigest[] = [];
+  for (const file of files) {
+    const digest = digestRunFile(join(runsDir, file));
+    if (digest && digest.status !== null) digests.push(digest);
+  }
+  return digests;
+}
 
+/** Summarise a worktree's runs. Missing directory is zero runs. */
+function summariseRuns(worktreePath: string): WorktreeRunsSummary {
   let total = 0;
   let running = 0;
   let lastFinishedAt: string | null = null;
-  let best: RunFileDigest | null = null;
-  for (const file of files) {
-    const digest = digestRunFile(join(runsDir, file));
-    if (!digest || digest.status === null) continue;
+  let best: RunDigest | null = null;
+  for (const digest of readRunDigests(worktreePath)) {
     total++;
     if (digest.status === "running") running++;
     if (digest.finishedAt && (lastFinishedAt === null || digest.finishedAt > lastFinishedAt)) {
