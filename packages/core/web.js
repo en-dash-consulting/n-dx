@@ -819,13 +819,7 @@ export function urlWithAuthToken(base, token) {
 
 /** `web.auth` from the project's .n-dx.json; anything but `false` means on. */
 async function loadAuthEnabled(dir) {
-  const configPath = join(dir, ".n-dx.json");
-  if (!(await fileExists(configPath))) return true;
-  try {
-    return JSON.parse(await readFile(configPath, "utf-8"))?.web?.auth !== false;
-  } catch {
-    return true;
-  }
+  return (await loadWebConfig(dir)).auth !== false;
 }
 
 /** Hub port: `<hub home>/config.json` → `{ "hub": { "port": N } }`, default 3117. */
@@ -850,16 +844,22 @@ export async function readHubRegistry(home = hubHome()) {
   }
 }
 
+/** The project's `web` config block from .n-dx.json, or `{}` when absent or unreadable. */
+async function loadWebConfig(dir) {
+  const configPath = join(dir, ".n-dx.json");
+  if (!(await fileExists(configPath))) return {};
+  try {
+    const web = JSON.parse(await readFile(configPath, "utf-8"))?.web;
+    return web && typeof web === "object" ? web : {};
+  } catch {
+    return {};
+  }
+}
+
 /** `web.mode` from the project's .n-dx.json: "hub" or "here"; undefined when unset. */
 async function loadConfigMode(dir) {
-  const configPath = join(dir, ".n-dx.json");
-  if (!(await fileExists(configPath))) return undefined;
-  try {
-    const mode = JSON.parse(await readFile(configPath, "utf-8"))?.web?.mode;
-    return mode === "hub" || mode === "here" ? mode : undefined;
-  } catch {
-    return undefined;
-  }
+  const mode = (await loadWebConfig(dir)).mode;
+  return mode === "hub" || mode === "here" ? mode : undefined;
 }
 
 /**
