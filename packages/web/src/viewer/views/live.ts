@@ -41,6 +41,8 @@ import {
   machineTiles,
   phaseSegments,
   runningItems,
+  stopAllPrompt,
+  stoppableRuns,
   stuckRuns,
   updatedLabel,
   worktreeRows,
@@ -93,8 +95,10 @@ function Header({ snapshot, connection, refresh }: HeaderProps) {
     setNotice("Checked just now");
   }, [refresh]);
 
+  const stoppable = snapshot ? stoppableRuns(snapshot).length : 0;
+
   const stopAll = useCallback(async () => {
-    if (!window.confirm("Stop every task started from this dashboard in this worktree? New tasks stay paused until resumed.")) return;
+    if (!window.confirm(stopAllPrompt(stoppable))) return;
     setStopping(true);
     setNotice(null);
     try {
@@ -110,9 +114,8 @@ function Header({ snapshot, connection, refresh }: HeaderProps) {
     } finally {
       setStopping(false);
     }
-  }, [refresh]);
+  }, [refresh, stoppable]);
 
-  const running = snapshot ? snapshot.runs.length + snapshot.jobs.length : 0;
   return h("header", { class: "live-header" },
     h("div", { class: "live-title-row" },
       h("h2", { class: "live-title" }, "Live"),
@@ -125,7 +128,8 @@ function Header({ snapshot, connection, refresh }: HeaderProps) {
         type: "button",
         class: "cmd-btn cmd-btn-secondary live-stop-all",
         onClick: stopAll,
-        disabled: stopping || running === 0,
+        disabled: stopping || stoppable === 0,
+        title: stoppable === 0 ? "No run is live in this worktree" : undefined,
       }, stopping ? "Stopping…" : "Stop all"),
       notice ? h("span", { class: "live-notice", role: "status" }, notice) : null,
     ),

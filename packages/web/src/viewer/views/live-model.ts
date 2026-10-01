@@ -28,6 +28,21 @@ export function runningRuns(snapshot: LiveSnapshot): LiveRunFull[] {
   return snapshot.runs.filter((r) => !r.stale);
 }
 
+/**
+ * Runs "Stop all" can end: emergency-stop terminates the executions of the
+ * served worktree only, so runs in other worktrees and analysis jobs are not
+ * counted — they would enable a button that stops nothing.
+ */
+export function stoppableRuns(snapshot: LiveSnapshot): LiveRunFull[] {
+  return snapshot.runs.filter((r) => r.worktree.isServed);
+}
+
+/** The confirm text for "Stop all", naming how many runs it ends. */
+export function stopAllPrompt(count: number): string {
+  const runs = count === 1 ? "1 run" : `${count} runs`;
+  return `Stop ${runs} in this worktree? Runs in other worktrees are not affected. New tasks stay paused until resumed.`;
+}
+
 export type RunningItem =
   | { kind: "run"; key: string; startedAt: string | null; run: LiveRunFull }
   | { kind: "job"; key: string; startedAt: string | null; job: LiveJobFull };

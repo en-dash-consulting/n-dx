@@ -15,6 +15,8 @@ import {
   machineTiles,
   phaseSegments,
   runningItems,
+  stopAllPrompt,
+  stoppableRuns,
   stuckRuns,
   updatedLabel,
   worktreeRows,
@@ -96,6 +98,15 @@ describe("reading the snapshot", () => {
     expect(idle).toBe(3);
   });
 
+  it("counts only the served worktree's runs as stoppable", () => {
+    const s = snapshot({ runs: [run(), run({ runId: "r2", worktree: OTHER })], jobs: [job()] });
+    expect(stoppableRuns(s).map((r) => r.runId)).toEqual(["r1"]);
+    expect(stoppableRuns(snapshot({ runs: [run({ worktree: OTHER })], jobs: [job()] }))).toEqual([]);
+    expect(stopAllPrompt(1)).toContain("Stop 1 run in this worktree");
+    expect(stopAllPrompt(3)).toContain("Stop 3 runs in this worktree");
+    expect(stopAllPrompt(3)).toContain("other worktrees are not affected");
+  });
+
   it("formats bytes and the age of the answer", () => {
     expect(formatBytes(8 * 1024 ** 3)).toBe("8.0 GB");
     expect(formatBytes(512 * 1024 ** 2)).toBe("512 MB");
@@ -148,6 +159,22 @@ describe("the rendered page", () => {
     expect(root.textContent).toContain("Run analysis (fast)");
     expect(root.textContent).toContain("Run analysis (deep)");
     expect(root.querySelector(".live-cards")).toBeNull();
+  });
+
+  it("disables Stop all when every live run is in another worktree, and names the count otherwise", async () => {
+    const stopAll = () => root.querySelector<HTMLButtonElement>(".live-stop-all")!;
+    body = snapshot({ runs: [run({ worktree: OTHER })], jobs: [job()] });
+    await mount();
+    expect(stopAll().disabled).toBe(true);
+
+    render(null, root);
+    body = snapshot({ runs: [run(), run({ runId: "r2", worktree: OTHER })] });
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    await mount();
+    expect(stopAll().disabled).toBe(false);
+    await act(async () => { stopAll().click(); await flush(); });
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Stop 1 run in this worktree"));
   });
 
   it("starts the next task through the execute route", async () => {
