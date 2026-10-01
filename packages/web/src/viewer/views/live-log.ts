@@ -12,7 +12,7 @@ import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useMemo, useCallback } from "preact/hooks";
 import type { LiveTaskRun } from "../hooks/index.js";
-import { useCliName } from "../hooks/use-project-metadata.js";
+import { useCliName } from "../hooks/index.js";
 import {
   LOG_FILTERS,
   LOG_LEGEND,
