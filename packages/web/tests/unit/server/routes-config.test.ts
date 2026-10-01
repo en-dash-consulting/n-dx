@@ -67,7 +67,9 @@ describe("Config API routes", () => {
       expect(data.projectDir).toBe(tmpDir);
     });
 
-    it("reads model from hench config", async () => {
+    it("reads provider, turns and budget from hench config but never its dead model key", async () => {
+      // `hench.model` is not a model source — `ndx work` has never read it, so
+      // reporting it here named a model nothing would actually run.
       const henchDir = join(tmpDir, ".hench");
       await mkdir(henchDir, { recursive: true });
       await writeFile(
@@ -79,11 +81,73 @@ describe("Config API routes", () => {
       const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
       const data = await res.json();
 
-      expect(data.model).toBe("sonnet");
+      expect(data.model).toBeNull();
       expect(data.provider).toBe("cli");
       expect(data.authMethod).toBe("cli");
       expect(data.maxTurns).toBe(50);
       expect(data.tokenBudget).toBe(500000);
+    });
+
+    it("resolves each legacy claude.* field the llm.claude block leaves unset", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({
+          claude: { model: "legacy-model", api_key: "sk-legacy" },
+          llm: { vendor: "claude", claude: { model: "modern-model" } },
+        }),
+      );
+
+      clearConfigCaches();
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
+      const data = await res.json();
+
+      // The modern block wins for `model`; `api_key` still comes from the
+      // legacy key beside it rather than being shadowed by the whole block.
+      expect(data.model).toBe("modern-model");
+      expect(data.authMethod).toBe("api-key");
+    });
+
+    it("does not report a Claude model as the live model for a non-Claude vendor", async () => {
+      // llm.claude.* are Claude's keys. Folding them into the model shown for
+      // a codex project names a model that vendor will never run.
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "codex", claude: { model: "claude-opus-5" } } }),
+      );
+
+      clearConfigCaches();
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
+      const data = await res.json();
+
+      expect(data.vendor).toBe("codex");
+      expect(data.model).toBeNull();
+    });
+
+    it("still uses the Claude model when the vendor is claude or unset", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ claude: { model: "legacy-model" } }),
+      );
+
+      clearConfigCaches();
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
+      const data = await res.json();
+
+      expect(data.vendor).toBeNull();
+      expect(data.model).toBe("legacy-model");
+    });
+
+    it("counts a credential set under the modern llm.claude keys", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "claude", claude: { api_key: "sk-modern" } } }),
+      );
+
+      clearConfigCaches();
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
+      const data = await res.json();
+
+      expect(data.authMethod).toBe("api-key");
     });
 
     it("prefers .n-dx.json claude.model over hench model", async () => {

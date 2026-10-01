@@ -21,9 +21,18 @@ import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { invalidateAuthCheckCache } from "./routes-commands.js";
-import { LLM_VENDOR, deepMerge, TIER_MODELS, MODEL_COSTS, isModelCompatibleWithVendor } from "@n-dx/llm-client";
-import type { LLMVendor } from "@n-dx/llm-client";
+import {
+  LLM_VENDOR,
+  deepMerge,
+  TIER_MODELS,
+  MODEL_COSTS,
+  isModelCompatibleWithVendor,
+  resolveClaudeConfig,
+} from "@n-dx/llm-client";
+import type { LLMVendor, ClaudeFieldSource } from "@n-dx/llm-client";
 import { VENDOR_PROVIDERS } from "./hench-config-fields.js";
+import { resolveEffectiveAgentConfig } from "./effective-agent-config.js";
+import type { EffectiveAgentConfig } from "./effective-agent-config.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,7 +73,11 @@ export interface LocalVendorConfig {
 export interface LlmConfigResponse {
   /** Active LLM vendor: "claude", "codex", "google", "local", or null if unset. */
   vendor: string | null;
-  /** Claude-specific settings from llm.claude.* */
+  /**
+   * Claude settings, resolved **per field** across `llm.claude.*` and the
+   * legacy top-level `claude.*` — see `claudeSources` for which location each
+   * value came from.
+   */
   claude: VendorConfig;
   /** Codex-specific settings from llm.codex.* */
   codex: VendorConfig;
@@ -73,12 +86,22 @@ export interface LlmConfigResponse {
   /** Local server settings from llm.local.* */
   local: LocalVendorConfig;
   /**
-   * Legacy claude.* settings for display when llm.claude.* are absent.
-   * These are read-only — writes go to the modern llm.claude.* namespace.
+   * Where each resolved Claude field came from, so the dashboard can mark a
+   * value as still living under a deprecated key. Only fields that resolved to
+   * a value appear. Writes always go to the modern `llm.claude.*` namespace —
+   * a `"legacy"` source is a display fact, never a write target.
    */
-  legacyClaude: VendorConfig;
+  claudeSources: Partial<Record<"model" | "lightModel", ClaudeFieldSource>>;
   /** Enable automatic failover on model/vendor errors. */
   autoFailover?: boolean;
+  /**
+   * What `ndx work` runs with no flags, resolved across `.n-dx.json` and
+   * `.hench/config.json`. Every other field on this response is a configured
+   * key; this one is the answer those keys add up to. See
+   * `effective-agent-config.ts` for the resolution and why web keeps a twin of
+   * it.
+   */
+  effective: EffectiveAgentConfig;
 }
 
 /** Shape expected by PUT /api/llm/config. */
@@ -99,6 +122,20 @@ const VALID_VENDORS: ReadonlySet<string> = new Set([
   LLM_VENDOR.GOOGLE,
   LLM_VENDOR.LOCAL,
 ]);
+
+/**
+ * Legacy top-level `claude.*` write paths, mapped to the key that replaces
+ * them.
+ *
+ * Reads still fold these in per field (see `resolveClaudeConfig`), so an
+ * existing project keeps working untouched; writes go to `llm.claude.*` only.
+ * Only the two fields the dashboard can set are listed — the auth fields are
+ * not writable through this route at all, under either name.
+ */
+const DEPRECATED_WRITE_PATHS: Readonly<Record<string, string>> = {
+  "claude.model": "llm.claude.model",
+  "claude.lightModel": "llm.claude.lightModel",
+};
 
 /** Writable paths. Auth fields (api_key, api_endpoint, cli_path) are excluded. */
 const VALID_PATHS = new Set([
@@ -126,8 +163,9 @@ const VALID_PATHS = new Set([
   "llm.autoFailover",
   "llm.escalation.enabled",
   "llm.escalation.maxSteps",
-  "claude.model",
-  "claude.lightModel",
+  // `claude.model` / `claude.lightModel` used to be listed here. They are read
+  // (per field, beside their `llm.claude.*` twins) but no longer written — see
+  // DEPRECATED_WRITE_PATHS above, which refuses them by name.
 ]);
 
 /** Routing tiers a `llm.routes.<class>` value may name. */
@@ -328,32 +366,45 @@ export function resolveActiveVendor(projectDir: string): string | null {
 }
 
 /**
- * The configured vendor and that vendor's `llm.<vendor>.model`, each null
- * when unset (the vendor's own default applies).
+/**
+ * The configured vendor and that vendor's model, each null when unset (the
+ * vendor's own default applies). Claude's model resolves per field across
+ * `llm.claude.*` and legacy `claude.*`, the same as `extractLlmConfig` below.
  */
 export function resolveActiveModel(projectDir: string): { vendor: string | null; model: string | null } {
   const config = readEffectiveNdxConfig(projectDir);
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const vendor = typeof llm["vendor"] === "string" ? llm["vendor"] : null;
+  if (vendor === "claude") {
+    return { vendor, model: resolveClaudeConfig(llm["claude"], config["claude"]).config?.model ?? null };
+  }
   const vendorConfig = (vendor ? llm[vendor] ?? {} : {}) as Record<string, unknown>;
   return { vendor, model: getString(vendorConfig, "model") };
 }
 
-function extractLlmConfig(projectDir: string): LlmConfigResponse {
+/**
+ * Async because of `effective`, which resolves through `loadLLMConfig` — the
+ * same async loader hench and the Ask endpoint use, rather than a fourth
+ * hand-rolled read of the same two files.
+ */
+async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> {
   const config = readEffectiveNdxConfig(projectDir);
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
-  const llmClaude = (llm["claude"] ?? {}) as Record<string, unknown>;
   const llmCodex = (llm["codex"] ?? {}) as Record<string, unknown>;
   const llmGoogle = (llm["google"] ?? {}) as Record<string, unknown>;
   const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
   const llmLocalVerifier = (llmLocal["verifier"] ?? {}) as Record<string, unknown>;
-  const legacyClaude = (config["claude"] ?? {}) as Record<string, unknown>;
+
+  // Claude resolves per field across `llm.claude.*` and legacy `claude.*` —
+  // the same resolution `loadLLMConfig` and `GET /api/ndx-config` use, so the
+  // dashboard shows the value the next run will actually use.
+  const claude = resolveClaudeConfig(llm["claude"], config["claude"]);
 
   const result: LlmConfigResponse = {
     vendor: typeof llm["vendor"] === "string" ? llm["vendor"] : null,
     claude: {
-      model: getString(llmClaude, "model"),
-      lightModel: getString(llmClaude, "lightModel"),
+      model: claude.config?.model ?? null,
+      lightModel: claude.config?.lightModel ?? null,
     },
     codex: {
       model: getString(llmCodex, "model"),
@@ -377,10 +428,11 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
         maxCycles: getNumber(llmLocalVerifier, "maxCycles"),
       },
     },
-    legacyClaude: {
-      model: getString(legacyClaude, "model"),
-      lightModel: getString(legacyClaude, "lightModel"),
+    claudeSources: {
+      ...(claude.sources.model ? { model: claude.sources.model } : {}),
+      ...(claude.sources.lightModel ? { lightModel: claude.sources.lightModel } : {}),
     },
+    effective: await resolveEffectiveAgentConfig(projectDir),
   };
 
   if (typeof llm["autoFailover"] === "boolean") {
@@ -766,7 +818,7 @@ export async function handleLlmRoute(
 
   // GET /api/llm/config
   if (method === "GET" && pathname === LLM_PREFIX) {
-    jsonResponse(res, 200, extractLlmConfig(ctx.projectDir));
+    jsonResponse(res, 200, await extractLlmConfig(ctx.projectDir));
     return true;
   }
 
@@ -788,6 +840,20 @@ export async function handleLlmRoute(
       }
 
       for (const [path, value] of Object.entries(parsed.changes)) {
+        // Legacy keys are read until 1.0.0 but never written. Refusing with the
+        // replacement named beats the generic "unknown path" below, which would
+        // leave a caller guessing that the key it can still *read* is not one
+        // it may set.
+        const replacement = DEPRECATED_WRITE_PATHS[path];
+        if (replacement) {
+          errorResponse(
+            res,
+            400,
+            `"${path}" is a deprecated key and is no longer written. Set "${replacement}" instead — ` +
+            `the legacy value is still read until 1.0.0 and is left untouched.`,
+          );
+          return true;
+        }
         if (!isWritablePath(path)) {
           errorResponse(res, 400, `Unknown LLM config path: "${path}". Valid paths: ${[...VALID_PATHS].join(", ")}, or llm.tiers.<vendor>.<tier> / llm.routes.<class> / llm.effort.<class>`);
           return true;
@@ -857,7 +923,7 @@ export async function handleLlmRoute(
       // The credential check's answer depends on this config — drop the
       // cached result so the auth chip re-verifies against the new settings.
       invalidateAuthCheckCache();
-      jsonResponse(res, 200, { applied, config: extractLlmConfig(ctx.projectDir) });
+      jsonResponse(res, 200, { applied, config: await extractLlmConfig(ctx.projectDir) });
       return true;
     } catch (err) {
       errorResponse(res, 400, err instanceof Error ? err.message : "Invalid request body");
