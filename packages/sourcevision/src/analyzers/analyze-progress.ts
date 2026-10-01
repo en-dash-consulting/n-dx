@@ -483,12 +483,25 @@ function defaultIsPidAlive(pid: number): boolean {
 }
 
 /**
- * The latest `analyses.jsonl` entry of `mode` that started before
- * `startedAt`. Comparing start times rather than skipping the last line keeps
- * a finished run from being its own "previous".
+ * Runs that are comparable: fast (no LLM), deep (generative or cascade), or
+ * neither (narration passes, which have their own phases). The ledger starts
+ * as `generative` and only becomes `cascade` mid-run, so exact-mode matching
+ * would compare a cascade run against the wrong history until then.
+ */
+function modeFamily(mode: AnalysisRun["mode"] | undefined): "fast" | "deep" | null {
+  if (mode === "fast") return "fast";
+  return mode === "generative" || mode === "cascade" ? "deep" : null;
+}
+
+/**
+ * The latest `analyses.jsonl` entry in the same mode family as `mode` that
+ * started before `startedAt`. Comparing start times rather than skipping the
+ * last line keeps a finished run from being its own "previous".
  */
 function previousRun(svDir: string, mode: AnalysisRun["mode"], startedAt: string): PreviousAnalyzeRun | null {
   const before = Date.parse(startedAt);
+  const family = modeFamily(mode);
+  if (!family) return null;
   let lines: string[];
   try {
     lines = readFileSync(join(svDir, ".cache", "analyses.jsonl"), "utf-8").split("\n");
@@ -503,7 +516,7 @@ function previousRun(svDir: string, mode: AnalysisRun["mode"], startedAt: string
     } catch {
       continue;
     }
-    if (run.mode !== mode || typeof run.at !== "string" || !(Date.parse(run.at) < before)) continue;
+    if (modeFamily(run.mode) !== family || typeof run.at !== "string" || !(Date.parse(run.at) < before)) continue;
     return { at: run.at, durationMs: run.durationMs ?? 0, phases: { ...(run.phases ?? {}) } };
   }
   return null;

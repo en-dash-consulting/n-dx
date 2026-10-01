@@ -292,6 +292,29 @@ describe("readAnalyzeProgress", () => {
     });
   });
 
+  it("compares a run still labelled generative (phases 1-3 of a cascade run) with the latest earlier cascade run", () => {
+    writeHistory([
+      { at: "2026-09-01T10:00:00.000Z", mode: "generative", durationMs: 100, phases: { zones: 90 }, llm: { byTaskClass: {} } },
+      { at: "2026-09-29T10:00:00.000Z", mode: "cascade", durationMs: 50, phases: { inventory: 5, zones: 40 }, llm: { byTaskClass: {} } },
+      { at: "2026-09-29T11:00:00.000Z", mode: "fast", durationMs: 9, phases: { inventory: 1 }, llm: { byTaskClass: {} } },
+    ]);
+    writeProgress({ mode: "generative", status: "running" });
+    expect(readAnalyzeProgress(svDir, { isPidAlive: () => true, processCommandLine: analyzeCommand })!.previous).toEqual({
+      at: "2026-09-29T10:00:00.000Z", durationMs: 50, phases: { inventory: 5, zones: 40 },
+    });
+  });
+
+  it("compares a fast run only with earlier fast runs", () => {
+    writeHistory([
+      { at: "2026-09-29T10:00:00.000Z", mode: "fast", durationMs: 9, phases: { inventory: 1 }, llm: { byTaskClass: {} } },
+      { at: "2026-09-29T11:00:00.000Z", mode: "cascade", durationMs: 50, phases: { zones: 40 }, llm: { byTaskClass: {} } },
+    ]);
+    writeProgress({ mode: "fast", status: "running" });
+    expect(readAnalyzeProgress(svDir, { isPidAlive: () => true, processCommandLine: analyzeCommand })!.previous).toMatchObject({
+      at: "2026-09-29T10:00:00.000Z",
+    });
+  });
+
   it("has no previous run when the history holds none of this mode, or is unreadable", () => {
     writeProgress({ mode: "fast" });
     expect(readAnalyzeProgress(svDir, { isPidAlive: () => true, processCommandLine: analyzeCommand })!.previous).toBeNull();
