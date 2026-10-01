@@ -19,6 +19,7 @@ import {
   ROW_HEIGHT,
   filterIndices,
   positionOfTurn,
+  reviewLogStart,
   scrollTopFor,
   searchMatches,
   splitMatches,
@@ -109,7 +110,11 @@ function Row({ line, query, current, showTime }: { line: LogLine; query: string;
   );
 }
 
-export function LogTab({ run, taskId }: { run: LiveTaskRun; taskId: string }) {
+/**
+ * @param part "review" shows only the review part of the log: from the line
+ *   where the adversarial review began to the end.
+ */
+export function LogTab({ run, taskId, part }: { run: LiveTaskRun; taskId: string; part?: "review" }) {
   const buffer = useMemo(() => new LogBuffer(), []);
   const { version, missing } = useRunLog(run, buffer);
 
@@ -121,7 +126,11 @@ export function LogTab({ run, taskId }: { run: LiveTaskRun; taskId: string }) {
   const [scrollTop, setScrollTop] = useState(0);
   const viewport = useRef<HTMLDivElement>(null);
 
-  const visible = useMemo(() => filterIndices(buffer.lines, filter), [buffer, version, filter]);
+  const from = part === "review" ? reviewLogStart(buffer.lines) : 0;
+  const visible = useMemo(
+    () => filterIndices(buffer.lines, filter).filter((i) => from >= 0 && i >= from),
+    [buffer, version, filter, from],
+  );
   const matches = useMemo(() => searchMatches(buffer.lines, visible, query), [buffer, version, visible, query]);
   const currentMatch = matches.length > 0 ? matches[Math.min(matchAt, matches.length - 1)]! : -1;
 
@@ -154,6 +163,9 @@ export function LogTab({ run, taskId }: { run: LiveTaskRun; taskId: string }) {
   };
 
   if (missing) return h("p", { class: "live-muted" }, "No log was recorded for this run.");
+  if (part === "review" && from < 0) {
+    return h("p", { class: "live-muted", role: "status" }, "The review has not written to the log yet.");
+  }
 
   const turns = Array.from({ length: buffer.turns }, (_, i) => i + 1);
   const rows: ComponentChildren[] = [];

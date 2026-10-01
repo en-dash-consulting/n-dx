@@ -41,8 +41,42 @@ export interface LiveTaskItem {
 
 export interface LiveTaskReview {
   failed: string | null;
+  detail: string | null;
   findings: number | null;
   unresolved: number | null;
+}
+
+export interface LiveTaskReviewPlan {
+  model: string | null;
+  modelSource: string | null;
+  optional: boolean;
+}
+
+export interface LiveTaskReviewSpend {
+  turns: number;
+  tokens: number;
+  costUsd: number;
+}
+
+/** Severity, verdict, action and disposition are plain text: values this build does not know arrive as written. */
+export interface LiveReviewFinding {
+  title: string | null;
+  location: string | null;
+  severity: string | null;
+  verdict: string | null;
+  scenario: string | null;
+  action: string | null;
+  itemId: string | null;
+  note: string | null;
+  disposition: string | null;
+  reason: string | null;
+}
+
+export interface LiveReviewReport {
+  taskId: string | null;
+  findings: LiveReviewFinding[];
+  fixesApplied: boolean | null;
+  summary: string | null;
 }
 
 export interface LiveTaskRun {
@@ -67,6 +101,9 @@ export interface LiveTaskRun {
   startedFrom: "dashboard" | "terminal" | null;
   outcome: string | null;
   review: LiveTaskReview | null;
+  reviewPlan: LiveTaskReviewPlan | null;
+  reviewSpend: LiveTaskReviewSpend | null;
+  reviewReport: LiveReviewReport | null;
   logTail: string[];
 }
 

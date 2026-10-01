@@ -31,7 +31,7 @@ function run(over: Partial<LiveTaskRun> = {}): LiveTaskRun {
     tokens: { input: 10_000, output: 2_000, cacheCreationInput: 0, cacheReadInput: 50_000, total: 62_000 },
     costUsd: 0.42, tokensPerSecond: null, model: "claude-sonnet-4-5", vendor: "claude", weight: "standard",
     worktreeRoot: "/repo-feat", branch: "feat/x", startHead: "abcdef0123456789", pid: 4242, startedFrom: "terminal",
-    outcome: null, review: null, logTail: ["line a", "line b"], ...over,
+    outcome: null, review: null, reviewPlan: null, reviewSpend: null, reviewReport: null, logTail: ["line a", "line b"], ...over,
   };
 }
 
@@ -106,7 +106,7 @@ describe("reading the task page", () => {
   it("lists the gates, and the review only when the run has one", () => {
     expect(afterRunItems(run(), []).map((i) => i.key)).toEqual(["gates"]);
     expect(hasReview(run(), [ev(1, "review_started", "Review started")])).toBe(true);
-    const reviewed = run({ review: { failed: null, findings: 3, unresolved: 1 } });
+    const reviewed = run({ review: { failed: null, detail: null, findings: 3, unresolved: 1 } });
     expect(afterRunItems(reviewed, [ev(1, "gate", "Test gate passed", { ok: true })])).toEqual([
       { key: "gates", label: "Tests and completion gates", state: "ok", detail: "Test gate passed" },
       { key: "review", label: "Adversarial review", state: "ok", detail: "3 findings, 1 unresolved" },
@@ -241,9 +241,61 @@ describe("the rendered page", () => {
     const tabs = () => [...root.querySelectorAll("[role=tab]")].map((t) => t.textContent);
     expect(tabs()).toEqual(["Work", "Log"]);
     render(null, root);
-    body = snapshot({ runs: [run({ review: { failed: null, findings: 2, unresolved: 0 } })] });
+    body = snapshot({ runs: [run({ review: { failed: null, detail: null, findings: 2, unresolved: 0 } })] });
     await mount();
     expect(tabs()).toEqual(["Work", "Log", "Review"]);
+  });
+
+  it("shows the Review tab from the start for a run launched with --review, marked waiting", async () => {
+    body = snapshot({ runs: [run({ reviewPlan: { model: "claude-opus-5", modelSource: "vendor-default", optional: false } })] });
+    await mount();
+    const tabs = [...root.querySelectorAll("[role=tab]")].map((t) => t.textContent);
+    expect(tabs).toEqual(["Work", "Log", "Review · waiting"]);
+    expect(root.querySelector(".live-stages")?.textContent).toContain("Review");
+    expect(root.textContent).toContain("Review is a gate");
+  });
+
+  it("lists the findings once the report exists, with a PRD link for a captured one", async () => {
+    body = snapshot({
+      runs: [run({
+        reviewPlan: { model: "claude-opus-5", modelSource: "flag", optional: false },
+        reviewReport: {
+          taskId: "t1", fixesApplied: true, summary: "Attacked the diff.",
+          findings: [
+            { title: "Race on save", location: "a.ts:3", severity: "high", verdict: "must-fix", scenario: "two writers", action: "fixed", itemId: null, note: null, disposition: "fixed", reason: null },
+            { title: "Missing log", location: null, severity: "low", verdict: "should-fix", scenario: null, action: "captured", itemId: "item-9", note: null, disposition: "offered", reason: null },
+            { title: "Style", location: null, severity: "low", verdict: "not-worth-fixing", scenario: null, action: "dropped", itemId: null, note: null, disposition: "dropped", reason: null },
+          ],
+        },
+      })],
+    });
+    eventsBody = { available: true, events: [ev(1, "review_started", "Adversarial review started on claude-opus-5", { detail: "fresh session" })], next: 1, more: false };
+    const navigateTo = await mount();
+    await act(async () => { [...root.querySelectorAll<HTMLButtonElement>("[role=tab]")].find((t) => t.textContent?.startsWith("Review"))!.click(); await flush(); });
+    expect(root.querySelectorAll(".live-finding")).toHaveLength(3);
+    expect(root.querySelector(".live-findings-dropped")?.textContent).toContain("1 dropped finding");
+    expect(root.querySelector(".live-sev-high")?.textContent).toBe("high");
+    expect(root.textContent).toContain("must fix");
+    expect(root.textContent).toContain("captured to the PRD");
+    const link = [...root.querySelectorAll<HTMLAnchorElement>(".live-finding-item a")][0]!;
+    await act(async () => { link.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("prd", { taskId: "item-9" });
+    expect(root.textContent).toContain("fresh session");
+    expect(root.textContent).toContain("--review-model");
+  });
+
+  it("says why when the review never ran, instead of an empty list", async () => {
+    body = snapshot({
+      runs: [run({
+        status: "failed", finishedAt: "2026-10-01T10:05:00.000Z", pid: null, startedFrom: null,
+        reviewPlan: { model: "claude-opus-5", modelSource: "vendor-default", optional: false },
+        review: { failed: "spawn-failed", detail: "claude: command not found", findings: null, unresolved: null },
+      })],
+    });
+    await mount();
+    await act(async () => { [...root.querySelectorAll<HTMLButtonElement>("[role=tab]")].find((t) => t.textContent?.startsWith("Review"))!.click(); await flush(); });
+    expect(root.querySelector(".live-review-reason")?.textContent).toContain("spawn-failed: claude: command not found");
+    expect(root.querySelector(".live-finding")).toBeNull();
   });
 
   it("opens the full log from the tail's link", async () => {

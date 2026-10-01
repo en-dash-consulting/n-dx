@@ -399,6 +399,12 @@ export const RunRecordSchema = z.object({
   diagnostics: RunDiagnosticsSchema.optional(),
   events: z.array(PersistedRuntimeEventSchema).optional(),
   review: RunReviewRecordSchema.optional(),
+  // Passthrough and all-optional for the same reason as `review` above.
+  reviewPlan: z
+    .object({ model: z.string().optional(), modelSource: z.string().optional(), optional: z.boolean().optional() })
+    .passthrough()
+    .optional(),
+  reviewSpend: z.object({}).passthrough().optional(),
   actor: z.string().optional(),
   host: z.string().optional(),
   logPath: z.string().optional(),

@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "nod
 import { join } from "node:path";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -436,6 +436,8 @@ export interface InitRunOptions {
    */
   criteriaCount?: number;
   permissionMode?: string;
+  /** The review pass the run was launched with (`--review`), recorded on the run from its first save. */
+  reviewPlan?: RunReviewPlan;
 }
 
 /**
@@ -603,6 +605,7 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     vendor: opts.vendor,
     weight: opts.weight ?? "standard",
     session: opts.session,
+    ...(opts.reviewPlan ? { reviewPlan: opts.reviewPlan } : {}),
     actor: await resolveActor(opts.projectDir ?? "."),
     host: resolveHost(),
     pid: process.pid,

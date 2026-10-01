@@ -111,6 +111,35 @@ describe("buildLiveTaskSnapshot", () => {
     expect(failed).toMatchObject({ status: "failed", pid: null, startedFrom: null, outcome: "Tests failed", logTail: [] });
   });
 
+  it("carries the review a run was launched with, its spend and — once written — its report", () => {
+    writePrd();
+    writeRun("r1", {
+      startedAt: "2026-10-01T10:00:00.000Z",
+      reviewPlan: { model: "claude-opus-5", modelSource: "flag", optional: true },
+      reviewSpend: { turns: 4, input: 1_000, output: 500, cacheCreationInput: 0, cacheReadInput: 2_000 },
+    });
+    writeRun("r2", { taskId: "t1", startedAt: "2026-10-01T09:00:00.000Z" });
+    const first = buildLiveTaskSnapshot(ctx(), "t1").runs.find((r) => r.runId === "r1")!;
+    // Launched with --review, nothing written yet: a plan and spend, no report.
+    expect(first.reviewPlan).toEqual({ model: "claude-opus-5", modelSource: "flag", optional: true });
+    expect(first.reviewSpend).toMatchObject({ turns: 4, tokens: 3_500 });
+    expect(first.reviewSpend!.costUsd).toBeGreaterThan(0);
+    expect(first.reviewReport).toBeNull();
+
+    mkdirSync(join(dir, ".hench", "reviews"), { recursive: true });
+    writeFileSync(join(dir, ".hench", "reviews", "r1.json"), JSON.stringify({
+      taskId: "t1", fixesApplied: false, summary: "s",
+      findings: [{ title: "T", severity: "catastrophic", verdict: "must-fix", action: "captured", itemId: "i1" }],
+    }));
+    const runs = buildLiveTaskSnapshot(ctx(), "t1").runs;
+    expect(runs.find((r) => r.runId === "r1")!.reviewReport?.findings).toMatchObject([
+      { title: "T", severity: "catastrophic", action: "captured", itemId: "i1", scenario: null },
+    ]);
+    // A run without --review has none of it, and no tab to show it in.
+    const plain = runs.find((r) => r.runId === "r2")!;
+    expect(plain).toMatchObject({ review: null, reviewPlan: null, reviewSpend: null, reviewReport: null });
+  });
+
   it("answers an empty run list and a null task for a task this worktree does not know", () => {
     const snap = buildLiveTaskSnapshot(ctx(), "missing");
     expect(snap).toMatchObject({ taskId: "missing", task: null, runs: [] });

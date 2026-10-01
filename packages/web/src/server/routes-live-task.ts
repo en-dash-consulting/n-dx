@@ -29,6 +29,7 @@ import { heartbeatAgeMs, isRunStale } from "./run-staleness.js";
 import { isValidRunId, readLogTailLines, resolveRunLogFile } from "./run-tail.js";
 import { estimateCostFromTotals, walkTree } from "./rex-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
+import { readLiveReviewReport, type LiveReviewReport } from "./live-review-report.js";
 
 /** Lines of log the Work tab shows under the step stream. */
 export const LIVE_TASK_LOG_TAIL_LINES = 5;
@@ -54,8 +55,26 @@ export interface LiveTaskItem {
 export interface LiveTaskReview {
   /** Why the review could not run, when it could not. */
   failed: string | null;
+  /** The detail the run recorded with {@link failed}. */
+  detail: string | null;
   findings: number | null;
   unresolved: number | null;
+}
+
+/** The review the run was launched with (`--review`), as hench recorded it at launch. */
+export interface LiveTaskReviewPlan {
+  model: string | null;
+  /** `flag`, `vendor-config`, `shared-config` or `vendor-default`; other text passes through. */
+  modelSource: string | null;
+  /** `--review-optional`. */
+  optional: boolean;
+}
+
+/** What the reviewer spent, apart from the work. */
+export interface LiveTaskReviewSpend {
+  turns: number;
+  tokens: number;
+  costUsd: number;
 }
 
 export interface LiveTaskRun {
@@ -85,6 +104,11 @@ export interface LiveTaskRun {
   /** The run's final summary or its error, once it has one. */
   outcome: string | null;
   review: LiveTaskReview | null;
+  /** Null when the run was not started with `--review` (or predates the record of it). */
+  reviewPlan: LiveTaskReviewPlan | null;
+  reviewSpend: LiveTaskReviewSpend | null;
+  /** The reviewer's report, once it has written one; null before that and when the review failed. */
+  reviewReport: LiveReviewReport | null;
   /** Last non-blank lines of the run's log, colour codes removed. */
   logTail: string[];
 }
@@ -151,8 +175,37 @@ function reviewOf(record: Record<string, unknown>): LiveTaskReview | null {
   const r = review as Record<string, unknown>;
   return {
     failed: str(r.failed),
+    detail: str(r.detail),
     findings: typeof r.findingCount === "number" ? r.findingCount : null,
     unresolved: typeof r.unresolvedCount === "number" ? r.unresolvedCount : null,
+  };
+}
+
+function reviewPlanOf(record: Record<string, unknown>): LiveTaskReviewPlan | null {
+  const plan = record.reviewPlan;
+  if (!plan || typeof plan !== "object") return null;
+  const p = plan as Record<string, unknown>;
+  return { model: str(p.model), modelSource: str(p.modelSource), optional: p.optional === true };
+}
+
+function num(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function reviewSpendOf(record: Record<string, unknown>, model: string | null): LiveTaskReviewSpend | null {
+  const spend = record.reviewSpend;
+  if (!spend || typeof spend !== "object") return null;
+  const s = spend as Record<string, unknown>;
+  const tokens: RunDigestTokens = {
+    input: num(s.input),
+    output: num(s.output),
+    cacheCreationInput: num(s.cacheCreationInput),
+    cacheReadInput: num(s.cacheReadInput),
+  };
+  return {
+    turns: num(s.turns),
+    tokens: tokens.input + tokens.output + tokens.cacheCreationInput + tokens.cacheReadInput,
+    costUsd: priceTokens(tokens, model),
   };
 }
 
@@ -163,7 +216,8 @@ function maxTurnsOf(projectDir: string): number | null {
 
 /** Build the answer for one task in the served worktree. Exported for tests. */
 export function buildLiveTaskSnapshot(ctx: ServerContext, taskId: string, now = Date.now()): LiveTaskSnapshot {
-  const runsDir = join(resolveLayout(ctx.projectDir).henchDir, "runs");
+  const henchDir = resolveLayout(ctx.projectDir).henchDir;
+  const runsDir = join(henchDir, "runs");
   const execution = dashboardExecutionsFor(ctx.projectDir)
     .find((e) => e.taskId === taskId && (e.status === "starting" || e.status === "running"));
 
@@ -177,6 +231,9 @@ export function buildLiveTaskSnapshot(ctx: ServerContext, taskId: string, now = 
     const ownExecution = running ? execution : undefined;
     const log = resolveRunLogFile({ run: { ...record, id: digest.id }, runsDir, worktreeRoot: ctx.projectDir }, [ctx.projectDir]);
     const tokens = { ...digest.tokens, total: digest.tokens.input + digest.tokens.output + digest.tokens.cacheCreationInput + digest.tokens.cacheReadInput };
+    const review = reviewOf(record);
+    const reviewPlan = reviewPlanOf(record);
+    const reviewerModel = reviewPlan?.model ?? str((record.review as { model?: unknown } | undefined)?.model) ?? digest.model;
     runs.push({
       runId: digest.id,
       status: digest.status,
@@ -198,7 +255,10 @@ export function buildLiveTaskSnapshot(ctx: ServerContext, taskId: string, now = 
       pid: running ? digest.pid : null,
       startedFrom: running ? (ownExecution ? "dashboard" : "terminal") : null,
       outcome: running ? null : str(record.error) ?? str(record.summary),
-      review: reviewOf(record),
+      review,
+      reviewPlan,
+      reviewSpend: reviewSpendOf(record, reviewerModel),
+      reviewReport: review || reviewPlan ? readLiveReviewReport(henchDir, digest.id) : null,
       logTail: log ? readLogTailLines(log.path, LIVE_TASK_LOG_TAIL_LINES) : [],
     });
   }

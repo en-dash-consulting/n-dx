@@ -153,6 +153,14 @@ export class LogBuffer {
   }
 }
 
+/**
+ * Index of the line where the run log's review part begins — hench prints a
+ * `── Adversarial review ──` rule when the pass starts — or -1 before then.
+ */
+export function reviewLogStart(lines: readonly LogLine[]): number {
+  return lines.findIndex((line) => line.text.includes("── Adversarial review"));
+}
+
 /** Whether `line` survives `filter`. */
 export function matchesFilter(line: LogLine, filter: LogFilter): boolean {
   switch (filter) {

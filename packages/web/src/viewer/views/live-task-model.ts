@@ -173,9 +173,13 @@ export interface AfterRunItem {
   detail: string | null;
 }
 
-/** Whether the run has an adversarial review (started with `--review`) that has begun or been recorded. */
+/**
+ * Whether the run has an adversarial review: it was started with `--review`
+ * (the run record says so from launch), or the review has begun or been
+ * recorded — which is how a run recorded before that field is recognised.
+ */
 export function hasReview(run: LiveTaskRun, events: readonly RunEventLine[]): boolean {
-  return run.review !== null || events.some((e) => e.kind === "review_started" || e.kind === "review_report");
+  return run.reviewPlan !== null || run.review !== null || events.some((e) => e.kind === "review_started" || e.kind === "review_report");
 }
 
 function lastOf(events: readonly RunEventLine[], kinds: readonly string[]): RunEventLine | null {
@@ -196,12 +200,13 @@ export function afterRunItems(run: LiveTaskRun, events: readonly RunEventLine[])
     const report = lastOf(events, ["review_report"]);
     const failed = run.review?.failed ?? null;
     const findings = run.review?.findings ?? null;
+    const started = run.review !== null || events.some((e) => e.kind === "review_started" || e.kind === "review_report");
     items.push({
       key: "review",
       label: "Adversarial review",
-      state: failed ? "fail" : run.review || report ? "ok" : "running",
+      state: failed ? "fail" : run.review || report ? "ok" : started ? "running" : "pending",
       detail: failed
-        ?? (findings !== null ? `${findings} finding${findings === 1 ? "" : "s"}${run.review?.unresolved ? `, ${run.review.unresolved} unresolved` : ""}` : report?.summary ?? "In progress"),
+        ?? (findings !== null ? `${findings} finding${findings === 1 ? "" : "s"}${run.review?.unresolved ? `, ${run.review.unresolved} unresolved` : ""}` : report?.summary ?? (started ? "In progress" : "Runs after validation")),
     });
   }
   return items;

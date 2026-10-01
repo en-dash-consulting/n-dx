@@ -31,6 +31,8 @@ import { WorkspaceWriteStrip } from "../components/index.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
 import { LogTab } from "./live-log.js";
+import { ReviewSection, ReviewTab, StageStrip } from "./live-review.js";
+import { reviewStages, reviewTabMarker } from "./live-review-model.js";
 import {
   afterRunItems,
   criteriaRows,
@@ -247,17 +249,6 @@ function WorkTab({ run, events, eventsAvailable, onOpenLog }: {
   );
 }
 
-// ── Log and Review tabs ──────────────────────────────────────────────
-
-function ReviewTab({ run, events }: { run: LiveTaskRun; events: RunEventLine[] }) {
-  const item = afterRunItems(run, events).find((i) => i.key === "review");
-  const lines = events.filter((e) => e.kind === "review_started" || e.kind === "review_report");
-  return h("div", { class: "live-work" },
-    item ? h("p", null, h("strong", null, item.label), ` — ${item.detail ?? item.state}`) : null,
-    lines.length > 0 ? h(StepList, { rows: stepRows(lines, run.status === "running") }) : null,
-  );
-}
-
 // ── Side column ──────────────────────────────────────────────────────
 
 function Section({ id, title, children }: { id: string; title: string; children?: ComponentChildren }) {
@@ -367,10 +358,14 @@ export function LiveTaskView({ taskId, navigateTo }: LiveTaskViewProps) {
 
   const review = run ? hasReview(run, events) : false;
   const activeTab: TabId = tab === "review" && !review ? "work" : tab;
-  const tabs: Array<{ id: TabId; label: string }> = [
-    { id: "work", label: "Work" },
-    { id: "log", label: "Log" },
-    ...(review ? [{ id: "review" as const, label: "Review" }] : []),
+  // With a review, the tabs say where the run is: Work done once it has
+  // moved on, Review waiting until the reviewer starts.
+  const workDone = run !== null && review && run.status === "running" && reviewStages(run, events)[0].state === "done";
+  const reviewMarker = run !== null && review ? reviewTabMarker(run, events) : null;
+  const tabs: Array<{ id: TabId; label: string; marker: string | null }> = [
+    { id: "work", label: "Work", marker: workDone ? "done" : null },
+    { id: "log", label: "Log", marker: null },
+    ...(review ? [{ id: "review" as const, label: "Review", marker: reviewMarker }] : []),
   ];
 
   return h("div", { class: "live-container live-task" },
@@ -391,6 +386,7 @@ export function LiveTaskView({ taskId, navigateTo }: LiveTaskViewProps) {
           ? h("p", { key: "none", class: "live-muted" }, "This task has no runs in this worktree.")
           : h("div", { key: "body", class: "live-body" },
             h("section", { class: "live-main live-task-card", "aria-label": "Run" },
+              review ? h(StageStrip, { run, events }) : null,
               h("div", { class: "live-tabs", role: "tablist" }, tabs.map((t) => h("button", {
                 key: t.id,
                 type: "button",
@@ -400,13 +396,13 @@ export function LiveTaskView({ taskId, navigateTo }: LiveTaskViewProps) {
                 "aria-controls": "live-task-panel",
                 class: `live-tab${activeTab === t.id ? " live-tab-active" : ""}`,
                 onClick: () => setTab(t.id),
-              }, t.label))),
+              }, t.label, t.marker ? h("span", { class: "live-tab-marker" }, ` · ${t.marker}`) : null))),
               h("div", { id: "live-task-panel", role: "tabpanel", "aria-labelledby": `live-task-tab-${activeTab}`, class: "live-task-panel" },
                 activeTab === "work"
                   ? h(WorkTab, { run, events, eventsAvailable, onOpenLog: () => setTab("log") })
                   : activeTab === "log"
                     ? h(LogTab, { run, taskId })
-                    : h(ReviewTab, { run, events }),
+                    : h(ReviewTab, { run, events, taskId, navigateTo }),
               ),
             ),
             h("aside", { class: "live-side", "aria-label": "Task and run" },
@@ -414,6 +410,7 @@ export function LiveTaskView({ taskId, navigateTo }: LiveTaskViewProps) {
               h(RunsSection, { snapshot, run, onPick }),
               h(WhereSection, { run, events }),
               h(SpendSection, { run }),
+              review ? h(ReviewSection, { run, events }) : null,
               h(AfterSection, { run, events }),
             ),
           ),

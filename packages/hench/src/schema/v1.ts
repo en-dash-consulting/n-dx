@@ -1252,6 +1252,28 @@ export type RunReviewRecord =
       backgroundResumed?: boolean;
     };
 
+/** Which setting chose the reviewer's model. */
+export type ReviewModelSource = "flag" | "vendor-config" | "shared-config" | "vendor-default";
+
+/** The review pass a run was launched with. See {@link RunRecord.reviewPlan}. */
+export interface RunReviewPlan {
+  /** Resolved reviewer model. Empty for the local vendor. */
+  model: string;
+  /** `--review-model`, `llm.<vendor>.reviewModel`, `llm.reviewModel` or the vendor default. */
+  modelSource: ReviewModelSource;
+  /** `--review-optional`: a reviewer that cannot start warns instead of refusing completion. */
+  optional: boolean;
+}
+
+/** Reviewer spend. See {@link RunRecord.reviewSpend}. */
+export interface RunReviewSpend {
+  turns: number;
+  input: number;
+  output: number;
+  cacheCreationInput: number;
+  cacheReadInput: number;
+}
+
 /**
  * A completion whose PRD "record" commit did not land — the work itself is
  * committed and the task stays completed; only the bookkeeping is pending.
@@ -1405,6 +1427,23 @@ export interface RunRecord {
    * v1 additive field — records without it load normally.
    */
   review?: RunReviewRecord;
+  /**
+   * The review pass this run was started with (`--review`), written with the
+   * record at launch. Unlike {@link review}, it exists before the reviewer
+   * does, so a reader can tell "review pending" from "no review requested".
+   * Absent when `--review` was not passed.
+   *
+   * v1 additive field — records without it load normally.
+   */
+  reviewPlan?: RunReviewPlan;
+  /**
+   * What the reviewer spent, accumulated as its spawns finish. Already
+   * included in {@link tokenUsage}; kept apart so the review's share can be
+   * shown. Absent until a reviewer has run.
+   *
+   * v1 additive field — records without it load normally.
+   */
+  reviewSpend?: RunReviewSpend;
   /**
    * Full RuntimeEvent stream captured during the run.
    *

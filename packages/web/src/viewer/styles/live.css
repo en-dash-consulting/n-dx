@@ -419,6 +419,38 @@
 .live-criterion-mark { flex: none; color: var(--text-muted); }
 .live-criterion-met .live-criterion-mark { color: var(--green); }
 
+/* Review tab. Severity and action are always spelled out; colour only reinforces. */
+.live-stages { display: flex; flex-wrap: wrap; gap: var(--space-1); list-style: none; margin: 0; padding: var(--space-2) var(--space-3) 0; font-size: var(--font-sm); }
+.live-stage { padding: 2px var(--space-2); border-radius: var(--radius-sm); color: var(--text-muted); }
+.live-stage:not(:last-child)::after { content: " →"; color: var(--text-muted); }
+.live-stage-done { color: var(--green); }
+.live-stage-current { color: var(--accent); background: var(--accent-subtle); font-weight: var(--weight-semibold); }
+.live-stage-stopped { color: var(--orange); }
+.live-tab-marker { font-size: var(--font-sm); color: var(--text-muted); }
+
+.live-review-toggle { display: flex; gap: var(--space-2); }
+.live-review-findings { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.live-review-activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.live-review-activity li { display: flex; gap: var(--space-2); align-items: baseline; }
+.live-review-summary { margin: 0; overflow-wrap: anywhere; }
+.live-review-reason, .live-review-step { margin: 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow-wrap: anywhere; }
+.live-review-reason { border-color: var(--orange); }
+
+.live-findings { display: flex; flex-direction: column; gap: var(--space-2); }
+.live-findings-dropped > summary { cursor: pointer; color: var(--text-dim); margin-bottom: var(--space-2); }
+.live-finding { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-2) var(--space-3); display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.live-finding-head { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+.live-finding-title { margin: 0; font-size: var(--font-base); overflow-wrap: anywhere; }
+.live-finding-location, .live-finding-scenario, .live-finding-note, .live-finding-item { margin: 0; font-size: var(--font-sm); overflow-wrap: anywhere; }
+.live-finding-item a { color: var(--accent); }
+.live-sev { padding: 0 var(--space-2); border-radius: var(--radius-sm); border: 1px solid currentColor; font-size: var(--font-sm); font-weight: var(--weight-semibold); text-transform: uppercase; }
+.live-sev-critical { color: var(--red); }
+.live-sev-high { color: var(--orange); }
+.live-sev-medium { color: var(--text); }
+.live-sev-low, .live-sev-other { color: var(--text-dim); }
+.live-finding-action-failed { color: var(--red); }
+.live-finding-action-fixed { color: var(--green); }
+
 .live-task-run { display: flex; flex-direction: column; gap: 2px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); min-width: 0; }
 .live-task-run-current { background: var(--accent-subtle); }
 .live-task-outcome { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

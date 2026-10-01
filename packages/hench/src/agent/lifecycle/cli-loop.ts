@@ -44,6 +44,7 @@ import {
   parkDeferredFindings,
   deferredFindings,
   mergeDispositionsIntoRaw,
+  reviewModelSource,
 } from "../analysis/adversarial-review.js";
 import type {
   ReviewPassOutcome,
@@ -1336,6 +1337,16 @@ export function chargeReviewToRun(
 ): void {
   run.tokenUsage = addTokenUsage(run.tokenUsage ?? { input: 0, output: 0 }, result.tokenUsage);
 
+  // The review's own share, kept apart for the Live page's Review tab.
+  const spend = run.reviewSpend ?? { turns: 0, input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0 };
+  run.reviewSpend = {
+    turns: spend.turns + result.turnTokenUsage.length,
+    input: spend.input + (result.tokenUsage.input ?? 0),
+    output: spend.output + (result.tokenUsage.output ?? 0),
+    cacheCreationInput: spend.cacheCreationInput + (result.tokenUsage.cacheCreationInput ?? 0),
+    cacheReadInput: spend.cacheReadInput + (result.tokenUsage.cacheReadInput ?? 0),
+  };
+
   if (result.turnTokenUsage.length === 0) return;
 
   const executorTurns = run.turnTokenUsage ?? [];
@@ -1954,8 +1965,20 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     allowedGitSubcommands: config.guard.allowedGitSubcommands,
   };
 
+  // The review the run is launched with, resolved up front so the record
+  // carries it from its first save (the Live page shows a Review tab from the
+  // start, and says which setting chose the model).
+  const reviewModel = opts.reviewPass ? resolveReviewModel(vendor, llmConfig, opts.reviewModel) : undefined;
+
   // Shared: initialize run record + capture start memory snapshot
   const { run, memoryCtx } = await initRunRecord({
+    reviewPlan: reviewModel === undefined
+      ? undefined
+      : {
+        model: reviewModel,
+        modelSource: reviewModelSource(vendor, llmConfig, opts.reviewModel),
+        optional: opts.reviewOptional === true,
+      },
     taskId,
     taskTitle: brief.task.title,
     model,
@@ -2003,7 +2026,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Assemble the review-pass context once, if `--review` is on. Building it
   // here rather than at the call site keeps the per-attempt success path free
   // of config resolution, and makes "review is off" a single undefined value.
-  const reviewPassContext: ReviewPassContext | undefined = opts.reviewPass
+  const reviewPassContext: ReviewPassContext | undefined = reviewModel !== undefined
     ? {
         adapter,
         vendor,
@@ -2011,7 +2034,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         cliEnv,
         policy,
         henchDir,
-        reviewModel: resolveReviewModel(vendor, llmConfig, opts.reviewModel),
+        reviewModel,
         // The reviewer has to be able to apply must-fixes and run the
         // project's checks. `plan` would leave it able to do neither, so the
         // review pass always runs with edit permission regardless of the
