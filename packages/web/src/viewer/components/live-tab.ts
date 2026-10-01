@@ -182,7 +182,11 @@ export interface LiveTabProps {
 
 export function LiveTab({ view, active, onNavigate, navigateTo, enabled = true }: LiveTabProps) {
   const live = useLive(enabled);
-  const [open, setOpen] = useState(false);
+  // Hover and focus each hold the peek open on their own: a pointer leaving
+  // must not close a peek that focus opened, nor focus leaving one the pointer holds.
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const open = hovered || focused;
   const rootRef = useRef<HTMLDivElement>(null);
   const restoringFocusRef = useRef(false);
 
@@ -190,54 +194,60 @@ export function LiveTab({ view, active, onNavigate, navigateTo, enabled = true }
   const running = liveRunningCount(live);
   const stuck = liveStuckCount(live);
 
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => { setHovered(false); setFocused(false); }, []);
 
-  // Leaving by mouse closes the peek; leaving by Tab does too, but focus
-  // moving between the button and the peek's links must not.
+  // Leaving by Tab closes the focus hold; focus moving between the button and
+  // the peek's links must not.
   const onFocusOut = useCallback((e: FocusEvent) => {
     const next = e.relatedTarget as Node | null;
-    if (!next || !rootRef.current?.contains(next)) setOpen(false);
+    if (!next || !rootRef.current?.contains(next)) setFocused(false);
   }, []);
-
-  const onKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key !== "Escape" || !open) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setOpen(false);
-    // Focus inside the peek would otherwise be lost with it. Moving it to the
-    // button fires focusin, which must not reopen what Escape just closed.
-    const button = rootRef.current?.querySelector<HTMLButtonElement>(".topnav-tab-live");
-    if (button && rootRef.current?.contains(document.activeElement)) {
-      restoringFocusRef.current = true;
-      button.focus();
-      restoringFocusRef.current = false;
-    }
-  }, [open]);
 
   const onFocusIn = useCallback(() => {
-    if (!restoringFocusRef.current) setOpen(true);
+    if (!restoringFocusRef.current) setFocused(true);
   }, []);
+
+  // Escape dismisses the peek wherever focus is (WCAG 2.1 SC 1.4.13): hover
+  // can open it with focus elsewhere. The listener exists only while it is open.
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+      // Focus inside the peek would otherwise be lost with it. Moving it to the
+      // button fires focusin, which must not reopen what Escape just closed.
+      const button = rootRef.current?.querySelector<HTMLButtonElement>(".topnav-tab-live");
+      if (button && rootRef.current?.contains(document.activeElement)) {
+        restoringFocusRef.current = true;
+        button.focus();
+        restoringFocusRef.current = false;
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, close]);
 
   // The peek is anchored to the tab, so a route change that leaves the
   // pointer resting over it should not leave it open over the new page.
-  useEffect(() => { setOpen(false); }, [view]);
+  useEffect(() => { close(); }, [view, close]);
 
   if (!enabled) return null;
 
   return h("div", {
     ref: rootRef,
     class: "topnav-live",
-    onMouseEnter: () => setOpen(true),
-    onMouseLeave: close,
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
     onFocusIn,
     onFocusOut,
-    onKeyDown,
   },
     h("button", {
       type: "button",
       class: `topnav-tab topnav-tab-live live-state-${state}${active ? " active" : ""}`,
       "data-live-state": state,
-      onClick: () => { setOpen(false); onNavigate("live"); },
+      onClick: () => { close(); onNavigate("live"); },
       "aria-label": liveTabLabel(live),
       "aria-current": active ? (view === "live" ? "page" : "true") : undefined,
       "aria-expanded": open,

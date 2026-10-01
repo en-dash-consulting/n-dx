@@ -200,6 +200,27 @@ describe("the rendered tab", () => {
       expect(document.activeElement).toBe(tab());
     });
 
+    it("Escape closes a peek opened by hover while focus is elsewhere", async () => {
+      withItems();
+      await mount();
+      act(() => { root.querySelector(".topnav-live")!.dispatchEvent(new MouseEvent("mouseenter")); });
+      expect(root.querySelector(".live-peek")).not.toBeNull();
+      act(() => { document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+      expect(root.querySelector(".live-peek")).toBeNull();
+    });
+
+    it("a peek opened by focus stays open when the pointer leaves", async () => {
+      withItems();
+      await mount();
+      const live = root.querySelector(".topnav-live")!;
+      act(() => { tab().focus(); });
+      act(() => { live.dispatchEvent(new MouseEvent("mouseenter")); });
+      act(() => { live.dispatchEvent(new MouseEvent("mouseleave")); });
+      expect(root.querySelector(".live-peek")).not.toBeNull();
+      act(() => { tab().blur(); });
+      expect(root.querySelector(".live-peek")).toBeNull();
+    });
+
     it("a row navigates in place to that item's page", async () => {
       withItems();
       const { navigateTo } = await mount();
