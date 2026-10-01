@@ -25,7 +25,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 |-------|--------|
 | [Add a next-step panel with four project states to the Home landing](./add-a-next-step-panel-with-four.md) | completed |
 | [Add redirect aliases for every moved dashboard path and a navigation contract test](./add-redirect-aliases-for-every-moved.md) | completed |
-| [Dashboard breadcrumb links back to the hub and switches between registered projects](./dashboard-breadcrumb-links-back-to-the.md) | pending |
+| [Dashboard breadcrumb links back to the hub and switches between registered projects](./dashboard-breadcrumb-links-back-to-the.md) | in_progress |
 | [Hub serves its project chooser at a fixed /hub path and answers /api/hub/* under a worktree slot](./hub-serves-its-project-chooser-at-a.md) | completed |
 | [Make stages.ts the single navigation model: one label, glyph, product and blurb per view, read by every navigation surface](./make-stages-ts-the-single-navigation.md) | completed |
 | [Merge the Analysis stage's map, isometric map and zones into one tabbed Terrain section, and Architecture and Routes into one tabbed section](./merge-the-analysis-stage-s-map.md) | completed |

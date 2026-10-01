@@ -74,8 +74,9 @@ export function appUrl(path: string): string {
  * address is the same from anywhere and carries no base path at all.
  *
  * Standalone (`web serve`, a static export) nothing answers it; the caller
- * decides whether to offer the link, and today only a hub-served dashboard
- * does — `getBasePath()` is non-empty exactly then.
+ * decides whether to offer the link. The breadcrumb asks the hub
+ * (`useHubProjects` in components/project-switcher.ts) rather than reading
+ * `getBasePath()`, which is empty under the hub's single-project root alias.
  */
 export function hubUrl(): string {
   return HUB_PATH;
