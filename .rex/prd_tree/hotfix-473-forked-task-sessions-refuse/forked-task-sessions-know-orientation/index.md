@@ -22,5 +22,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Lift orientation's read-only instruction in the first turn of every forked task spawn](./lift-orientation-s-read-only.md) | completed |
-| [Report a no-edit forked attempt as a read-only refusal and retry it with a cold spawn](./report-a-no-edit-forked-attempt-as-a.md) | pending |
+| [Report a no-edit forked attempt as a read-only refusal and retry it with a cold spawn](./report-a-no-edit-forked-attempt-as-a.md) | completed |
 | [Test forked spawns against the real orientation prompt for the lift and the cold retry](./test-forked-spawns-against-the-real.md) | pending |
