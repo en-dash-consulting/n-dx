@@ -16,6 +16,8 @@
  *   sum over the same digests.
  * - **Staleness** — `isRunStale`, the rule `GET /api/status` counts stuck
  *   runs with.
+ * - **Liveness** — `judgeRunLiveness` (hench's rules, mirrored in
+ *   `run-liveness.ts`) against each worktree's own lock files.
  * - **Jobs** — the dashboard job slots (`commandJobsOf`, `rexAnalyzeJobStatus`)
  *   plus each worktree's `analyze-progress.json`, which is how an analysis
  *   started from a terminal shows up at all.
@@ -44,6 +46,16 @@ import type { WebSocketBroadcaster } from "./websocket.js";
 import { workspaceKeyOf } from "./workspace-scoped.js";
 import { readRunDigests, type RunDigest, type RunDigestTokens } from "./routes-worktrees.js";
 import { heartbeatAgeMs, isPidAlive, isRunStale } from "./run-staleness.js";
+import {
+  collectLiveLocks,
+  judgeRunLiveness,
+  livenessInputOf,
+  locksDirOf,
+  summarizeLiveness,
+  type LiveLock,
+  type LivenessSummary,
+  type RunLiveness,
+} from "./run-liveness.js";
 import {
   dashboardExecutionsFor,
   readConcurrencySlots,
@@ -120,6 +132,12 @@ export interface LiveRun {
   heartbeatAgeMs: number | null;
   /** Running with no heartbeat for the stuck-run threshold (`isRunStale`). Always false once finished. */
   stale: boolean;
+  /** Whether the run is actually executing (`run-liveness.ts`); null once finished. */
+  liveness: RunLiveness | null;
+  /** Why, in words; null once finished. */
+  livenessReason: string | null;
+  /** Whether ending it is safe without asking (only `orphaned`); null once finished. */
+  canEnd: boolean | null;
   /**
    * How many acceptance criteria the task lists in its worktree's PRD, or null
    * when it lists none or the PRD does not know it. How many are met is not
@@ -201,6 +219,8 @@ export interface LiveSnapshot {
     servedStale: number;
     /** Running jobs. */
     jobs: number;
+    /** Liveness verdicts among `runs`. */
+    liveness: LivenessSummary;
   };
 }
 
@@ -434,6 +454,14 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
       taskId ? prdIndexFor(layout.rexDir).chains.get(taskId) ?? [] : [];
     const runningTasksHere = new Set<string>();
     let liveHere = false;
+    // Read only when a running run here has no pid of its own to judge by.
+    let liveLocks: LiveLock[] | null = null;
+    const livenessCtx = {
+      get liveLocks(): LiveLock[] {
+        return (liveLocks ??= collectLiveLocks(locksDirOf(layout.henchDir)));
+      },
+      now,
+    };
 
     for (const digest of readRunDigests(ws.path)) {
       const running = digest.status === "running";
@@ -456,6 +484,9 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
       if (!running && !isRecent) continue;
 
       const execution = digest.taskId ? executions.get(digest.taskId) : undefined;
+      const verdict = running
+        ? judgeRunLiveness(livenessInputOf(digest), livenessCtx, execution ? [execution] : [])
+        : null;
       const entry: LiveRun = {
         runId: digest.id,
         taskId: digest.taskId,
@@ -476,6 +507,9 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
         lastActivityAt: digest.lastActivityAt,
         heartbeatAgeMs: running ? heartbeatAgeMs(digest.lastActivityAt, now) : null,
         stale,
+        liveness: verdict?.liveness ?? null,
+        livenessReason: verdict?.reason ?? null,
+        canEnd: verdict?.canEnd ?? null,
         criteriaTotal: digest.taskId ? prdIndexFor(layout.rexDir).criteria.get(digest.taskId) ?? null : null,
         lastProgress: running ? lastProgressOf(digest, ws.path, roots, execution) : null,
       };
@@ -586,6 +620,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
       servedRunning,
       servedStale,
       jobs: jobs.length,
+      liveness: summarizeLiveness(runs.flatMap((r) => (r.liveness ? [{ liveness: r.liveness }] : []))),
     },
   };
 }

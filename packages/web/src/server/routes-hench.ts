@@ -8,7 +8,7 @@
  *                                            annotated with its worktree)
  * GET    /api/hench/runs/:id              — full run detail with transcript (?scope=repo
  *                                            searches every worktree)
- * GET    /api/hench/runs/health           — staleness health check for running runs
+ * GET    /api/hench/runs/health           — staleness and liveness of running runs, every worktree
  * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
  * GET    /api/hench/runs/:id/log          — run log from a byte cursor (?from=N); any worktree
  * GET    /api/hench/runs/:id/events       — progress events after a seq cursor (?after=N); any worktree
@@ -93,7 +93,15 @@ import {
   watchRunTail,
   type LocatedRun,
 } from "./run-tail.js";
-import { isRunStale } from "./run-staleness.js";
+import { isPidAlive, isRunStale } from "./run-staleness.js";
+import {
+  collectLiveLocks,
+  judgeRunLiveness,
+  livenessInputOf,
+  locksDirOf,
+  summarizeLiveness,
+  type RunLiveness,
+} from "./run-liveness.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -318,7 +326,7 @@ async function resolveRunSources(ctx: ServerContext): Promise<WorktreeRunsSource
   return worktrees
     .filter((wt) => !wt.bare)
     .map((wt) => ({
-      runsDir: join(wt.path, ".hench", "runs"),
+      runsDir: join(resolveLayout(wt.path).henchDir, "runs"),
       worktree: { name: basename(wt.path), path: wt.path, branch: wt.branch },
       served: servedRoot !== null && wt.path === servedRoot,
     }));
@@ -749,7 +757,7 @@ function routeRuns(rc: RouteContext): boolean | Promise<boolean> | null {
   if (!rc.path.startsWith("runs")) return null;
 
   if (rc.path === "runs/health" && rc.method === "GET") {
-    return handleRunsHealth(rc.res, rc.runsDir);
+    return handleRunsHealth(rc);
   }
   const markStuckMatch = rc.path.match(/^runs\/([^/?]+)\/mark-stuck$/);
   if (markStuckMatch && rc.method === "POST") {
@@ -2035,17 +2043,17 @@ function computeHeartbeatStatus(
 /**
  * GET /api/hench/runs/health — detect stale "running" runs.
  *
- * Reports the recorded pid's liveness next to the heartbeat age so a viewer can
- * tell a slow run (old heartbeat, pid alive) from a dead one (pid gone).
+ * Covers every worktree of the repository (the served directory alone outside
+ * one). Reports the recorded pid's liveness next to the heartbeat age so a
+ * viewer can tell a slow run (old heartbeat, pid alive) from a dead one (pid
+ * gone), and the liveness verdict hench would reach (`run-liveness.ts`),
+ * judged against that worktree's own lock files.
  */
-function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
-  let files: string[];
-  try {
-    files = readdirSync(runsDir);
-  } catch {
-    jsonResponse(res, 200, { activeRuns: 0, staleRuns: 0, runs: [] });
-    return true;
-  }
+async function handleRunsHealth(rc: RouteContext): Promise<boolean> {
+  const sources = await resolveRunSources(rc.ctx);
+  const targets: Array<{ root: string; runsDir: string; worktree?: RunWorktree }> = sources.length > 0
+    ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree }))
+    : [{ root: rc.ctx.projectDir, runsDir: rc.runsDir }];
 
   const now = Date.now();
   const runningRuns: Array<{
@@ -2062,36 +2070,58 @@ function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
     vendorPid?: number;
     /** Whether `pid` is still alive. `null` = no pid recorded, i.e. unknown — not dead. */
     pidAlive: boolean | null;
+    liveness: RunLiveness;
+    livenessReason: string;
+    canEnd: boolean;
+    /** The worktree the run file was read from; absent outside a git repository. */
+    worktree?: RunWorktree;
   }> = [];
 
-  for (const file of files) {
-    if (!file.endsWith(".json")) continue;
-    const id = file.replace(/\.json$/, "");
-    const run = loadRunFile(runsDir, id);
-    if (!run || run.status !== "running") continue;
+  for (const target of targets) {
+    let files: string[];
+    try {
+      files = readdirSync(target.runsDir);
+    } catch {
+      continue;
+    }
+    const executions = dashboardExecutionsFor(target.root);
+    const liveLocks = collectLiveLocks(locksDirOf(resolveLayout(target.root).henchDir));
 
-    const lastActivity = run.lastActivityAt as string | undefined;
-    const lastActivityMs = lastActivity ? new Date(lastActivity).getTime() : null;
-    const stale = isRunStale(lastActivity, now);
-    const pid = typeof run.pid === "number" ? run.pid : undefined;
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const id = file.replace(/\.json$/, "");
+      const run = loadRunFile(target.runsDir, id);
+      if (!run || run.status !== "running") continue;
 
-    runningRuns.push({
-      id: run.id as string,
-      taskId: run.taskId as string,
-      taskTitle: run.taskTitle as string,
-      startedAt: run.startedAt as string,
-      lastActivityAt: lastActivity,
-      stale,
-      staleSinceMs: lastActivityMs != null ? Math.max(0, now - lastActivityMs) : undefined,
-      pid,
-      vendorPid: typeof run.vendorPid === "number" ? run.vendorPid : undefined,
-      pidAlive: pid != null ? isPidAlive(pid) : null,
-    });
+      const lastActivity = run.lastActivityAt as string | undefined;
+      const lastActivityMs = lastActivity ? new Date(lastActivity).getTime() : null;
+      const stale = isRunStale(lastActivity, now);
+      const pid = typeof run.pid === "number" ? run.pid : undefined;
+      const verdict = judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, executions);
+
+      runningRuns.push({
+        id: run.id as string,
+        taskId: run.taskId as string,
+        taskTitle: run.taskTitle as string,
+        startedAt: run.startedAt as string,
+        lastActivityAt: lastActivity,
+        stale,
+        staleSinceMs: lastActivityMs != null ? Math.max(0, now - lastActivityMs) : undefined,
+        pid,
+        vendorPid: typeof run.vendorPid === "number" ? run.vendorPid : undefined,
+        pidAlive: pid != null ? isPidAlive(pid) : null,
+        liveness: verdict.liveness,
+        livenessReason: verdict.reason,
+        canEnd: verdict.canEnd,
+        ...(target.worktree ? { worktree: target.worktree } : {}),
+      });
+    }
   }
 
-  jsonResponse(res, 200, {
+  jsonResponse(rc.res, 200, {
     activeRuns: runningRuns.length,
     staleRuns: runningRuns.filter((r) => r.stale).length,
+    liveness: summarizeLiveness(runningRuns),
     runs: runningRuns,
   });
   return true;
@@ -2608,16 +2638,6 @@ interface ConcurrencyLockFile {
 /** Default max concurrent processes (matches hench DEFAULT_HENCH_CONFIG). */
 const DEFAULT_MAX_CONCURRENT_PROCESSES = 3;
 
-/** Check whether a process with the given PID is still alive. */
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Concurrency utilization level for UI indicators. */
 export type ConcurrencyLevel ="low" | "moderate" | "high" | "at_limit";
 
@@ -2735,28 +2755,12 @@ export interface ConcurrencySlots {
  * overview can ask it on every request.
  */
 export function readConcurrencySlots(ctx: ServerContext): ConcurrencySlots {
-  const locksDir = join(ctx.projectDir, ".hench", "locks");
-
   // Read max concurrent (respects runtime override from throttle controls)
   const maxConcurrent = getEffectiveMaxConcurrent(ctx.projectDir);
 
-  // Read lock files; keep those whose PID is alive
-  const locks: ConcurrencyStatus["locks"] = [];
-  try {
-    const files = readdirSync(locksDir);
-    for (const file of files) {
-      if (!file.endsWith(".lock")) continue;
-      try {
-        const raw = readFileSync(join(locksDir, file), "utf-8");
-        const lock = JSON.parse(raw) as ConcurrencyLockFile;
-        if (isPidAlive(lock.pid)) locks.push({ pid: lock.pid, startedAt: lock.startedAt, taskId: lock.taskId });
-      } catch {
-        // Corrupted lock file — skip
-      }
-    }
-  } catch {
-    // Locks dir doesn't exist yet — no active locks
-  }
+  // Lock files whose PID is alive
+  const locks: ConcurrencyStatus["locks"] = collectLiveLocks(locksDirOf(resolveLayout(ctx.projectDir).henchDir))
+    .map((lock) => ({ pid: lock.pid, startedAt: lock.startedAt, taskId: lock.taskId }));
 
   // The "active process count" is the number of live lock-holding processes,
   // which is the authoritative cross-process count.

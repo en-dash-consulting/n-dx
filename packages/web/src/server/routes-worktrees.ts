@@ -158,6 +158,8 @@ export interface RunDigest {
   tokens: RunDigestTokens;
   /** Hench process pid, while running. */
   pid: number | null;
+  /** Hostname of the machine that started the run. */
+  host: string | null;
   branch: string | null;
   worktreeRoot: string | null;
   /** Recorded path of the structured progress events file, unconfined. */
@@ -267,6 +269,7 @@ function digestRun(run: Record<string, unknown>): RunDigest {
       cacheReadInput: num(usage.cacheReadInput) ?? 0,
     },
     pid: num(run.pid),
+    host: str(run.host),
     branch: str(run.branch),
     worktreeRoot: str(run.worktreeRoot),
     eventsPath: str(run.eventsPath),
