@@ -10,6 +10,8 @@
  *                                            searches every worktree)
  * GET    /api/hench/runs/health           — staleness and liveness of running runs, every worktree
  * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
+ * POST   /api/hench/runs/reconcile        — end orphaned runs in every worktree
+ *                                            ({ dryRun, includeUnknown, runIds })
  * GET    /api/hench/runs/:id/log          — run log from a byte cursor (?from=N); any worktree
  * GET    /api/hench/runs/:id/events       — progress events after a seq cursor (?after=N); any worktree
  * GET    /api/hench/task-usage            — incremental per-task token usage aggregation
@@ -102,6 +104,7 @@ import {
   summarizeLiveness,
   type RunLiveness,
 } from "./run-liveness.js";
+import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -752,12 +755,15 @@ function routeExecute(rc: RouteContext): boolean | Promise<boolean> | null {
   return null;
 }
 
-/** Routes: runs, runs/:id, runs/health, runs/:id/mark-stuck */
+/** Routes: runs, runs/:id, runs/health, runs/reconcile, runs/:id/mark-stuck */
 function routeRuns(rc: RouteContext): boolean | Promise<boolean> | null {
   if (!rc.path.startsWith("runs")) return null;
 
   if (rc.path === "runs/health" && rc.method === "GET") {
     return handleRunsHealth(rc);
+  }
+  if (rc.path === "runs/reconcile" && rc.method === "POST") {
+    return handleReconcile(rc);
   }
   const markStuckMatch = rc.path.match(/^runs\/([^/?]+)\/mark-stuck$/);
   if (markStuckMatch && rc.method === "POST") {
@@ -2040,6 +2046,28 @@ function computeHeartbeatStatus(
   return { status, missedHeartbeats };
 }
 
+/** One worktree's runs, for the routes that sweep every worktree. */
+interface RunTarget {
+  root: string;
+  runsDir: string;
+  /** Absent outside a git repository, where the served directory is the only target. */
+  worktree?: RunWorktree;
+}
+
+/** Every worktree of the repository, or the served directory alone outside one. */
+async function resolveRunTargets(rc: RouteContext): Promise<RunTarget[]> {
+  const sources = await resolveRunSources(rc.ctx);
+  return sources.length > 0
+    ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree }))
+    : [{ root: rc.ctx.projectDir, runsDir: rc.runsDir }];
+}
+
+/** Judge a run against its worktree's lock files and this dashboard's children, read now. */
+function judgeRunInTarget(target: RunTarget, run: Record<string, unknown>, now: number) {
+  const liveLocks = collectLiveLocks(locksDirOf(resolveLayout(target.root).henchDir));
+  return judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, dashboardExecutionsFor(target.root));
+}
+
 /**
  * GET /api/hench/runs/health — detect stale "running" runs.
  *
@@ -2050,10 +2078,7 @@ function computeHeartbeatStatus(
  * judged against that worktree's own lock files.
  */
 async function handleRunsHealth(rc: RouteContext): Promise<boolean> {
-  const sources = await resolveRunSources(rc.ctx);
-  const targets: Array<{ root: string; runsDir: string; worktree?: RunWorktree }> = sources.length > 0
-    ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree }))
-    : [{ root: rc.ctx.projectDir, runsDir: rc.runsDir }];
+  const targets = await resolveRunTargets(rc);
 
   const now = Date.now();
   const runningRuns: Array<{
@@ -2134,8 +2159,7 @@ function handleMarkStuck(
   runsDir: string,
   onStatusInvalidate?: () => void,
 ): boolean {
-  const runPath = join(runsDir, `${runId}.json`);
-  const run = loadRunFile(runsDir, runId);
+  const run = isValidRunId(runId) ? loadRunFile(runsDir, runId) : null;
   if (!run) {
     errorResponse(res, 404, `Run "${runId}" not found`);
     return true;
@@ -2146,13 +2170,9 @@ function handleMarkStuck(
     return true;
   }
 
-  // Patch the run file on disk
-  run.status = "failed";
-  run.error = "Manually marked as stuck (no recent activity)";
-  run.finishedAt = new Date().toISOString();
-
+  const ended = endedRunRecord(run, MARK_STUCK_REASON);
   try {
-    writeFileSync(runPath, JSON.stringify(run, null, 2) + "\n", "utf-8");
+    writeRunFileAtomic(runsDir, runId, ended);
   } catch (err) {
     errorResponse(res, 500, `Failed to update run: ${err instanceof Error ? err.message : String(err)}`);
     return true;
@@ -2161,8 +2181,173 @@ function handleMarkStuck(
   // Invalidate status cache so sidebar shows updated active/stale counts
   onStatusInvalidate?.();
 
-  jsonResponse(res, 200, { id: runId, status: "failed", markedStuckAt: run.finishedAt });
+  jsonResponse(res, 200, { id: runId, status: "failed", markedStuckAt: ended.finishedAt });
   return true;
+}
+
+// ── Reconciliation ────────────────────────────────────────────────────
+
+/** One running run considered by `POST /api/hench/runs/reconcile`. */
+interface ReconcileOutcome {
+  runId: string;
+  taskId: string;
+  taskTitle: string;
+  /** The verdict the decision rests on — re-judged just before writing, when it got that far. */
+  liveness: RunLiveness;
+  reason: string;
+  /** Whether the run qualified to be ended. */
+  eligible: boolean;
+  /** Whether the run file was rewritten (always false for a dry run). */
+  ended: boolean;
+  /** Why an eligible run was left alone at write time: it finished, or its verdict changed. */
+  skipped?: string;
+  /** The write failed; the run file is unchanged. */
+  error?: string;
+}
+
+/** One worktree's share of a reconcile response. */
+interface ReconcileWorktreeResult {
+  /** Absent outside a git repository. */
+  worktree?: RunWorktree;
+  runsDir: string;
+  outcomes: ReconcileOutcome[];
+}
+
+/**
+ * POST /api/hench/runs/reconcile — end running runs no process is executing,
+ * in every worktree of the repository.
+ *
+ * Ends runs whose verdict is `orphaned`; `unknown` only with `includeUnknown`;
+ * never `live` or `foreign`. Never signals a process — it only rewrites run
+ * records whose owner is already gone, each in its own worktree's
+ * `.hench/runs/`, atomically, in the shape {@link endedRunRecord} defines.
+ * Never touches a PRD.
+ *
+ * Each run is re-read and re-judged immediately before its write, so a run
+ * that came back to life after the sweep (or after a dry run) is left alone.
+ *
+ * Body (all optional):
+ * - `dryRun`         — report what would end; write nothing.
+ * - `includeUnknown` — also end runs whose liveness could not be determined.
+ * - `runIds`         — only consider these run ids.
+ */
+async function handleReconcile(rc: RouteContext): Promise<boolean> {
+  let body: unknown = {};
+  try {
+    const raw = await readBody(rc.req, rc.res);
+    if (raw.trim()) body = JSON.parse(raw);
+  } catch {
+    if (!rc.res.headersSent) errorResponse(rc.res, 400, "Request body must be JSON");
+    return true;
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    errorResponse(rc.res, 400, "Request body must be a JSON object");
+    return true;
+  }
+  const opts = body as Record<string, unknown>;
+  if (opts.runIds !== undefined && !(Array.isArray(opts.runIds) && opts.runIds.every((id) => typeof id === "string"))) {
+    errorResponse(rc.res, 400, "runIds must be an array of run id strings");
+    return true;
+  }
+
+  const dryRun = opts.dryRun === true;
+  const includeUnknown = opts.includeUnknown === true;
+  const runIdFilter = Array.isArray(opts.runIds) ? new Set(opts.runIds as string[]) : null;
+  const endable = (liveness: RunLiveness): boolean =>
+    liveness === "orphaned" || (includeUnknown && liveness === "unknown");
+
+  const now = Date.now();
+  const groups: ReconcileWorktreeResult[] = [];
+  const verdicts: Array<{ liveness: RunLiveness }> = [];
+
+  for (const target of await resolveRunTargets(rc)) {
+    const group: ReconcileWorktreeResult = {
+      ...(target.worktree ? { worktree: target.worktree } : {}),
+      runsDir: target.runsDir,
+      outcomes: [],
+    };
+    groups.push(group);
+
+    let files: string[];
+    try {
+      files = readdirSync(target.runsDir);
+    } catch {
+      continue;
+    }
+    const liveLocks = collectLiveLocks(locksDirOf(resolveLayout(target.root).henchDir));
+    const executions = dashboardExecutionsFor(target.root);
+
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const id = file.slice(0, -".json".length);
+      if (runIdFilter && !runIdFilter.has(id)) continue;
+      const run = loadRunFile(target.runsDir, id);
+      if (!run || run.status !== "running") continue;
+
+      const verdict = judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, executions);
+      verdicts.push(verdict);
+      const outcome: ReconcileOutcome = {
+        runId: id,
+        taskId: typeof run.taskId === "string" ? run.taskId : "",
+        taskTitle: typeof run.taskTitle === "string" ? run.taskTitle : "",
+        liveness: verdict.liveness,
+        reason: verdict.reason,
+        eligible: endable(verdict.liveness),
+        ended: false,
+      };
+      group.outcomes.push(outcome);
+      if (outcome.eligible && !dryRun) endIfStillEndable(target, id, outcome, endable);
+    }
+  }
+
+  const all = groups.flatMap((g) => g.outcomes);
+  const ended = all.filter((o) => o.ended).length;
+  if (ended > 0) rc.onStatusInvalidate?.();
+
+  jsonResponse(rc.res, 200, {
+    dryRun,
+    includeUnknown,
+    ended,
+    eligible: all.filter((o) => o.eligible).length,
+    failed: all.filter((o) => o.error !== undefined).length,
+    worktrees: groups,
+    liveness: summarizeLiveness(verdicts),
+    timestamp: new Date(now).toISOString(),
+  });
+  return true;
+}
+
+/**
+ * Re-read the run and re-judge it with fresh lock files and dashboard
+ * children; end it only if it is still running and still endable. Updates
+ * `outcome` in place with what happened.
+ */
+function endIfStillEndable(
+  target: RunTarget,
+  id: string,
+  outcome: ReconcileOutcome,
+  endable: (liveness: RunLiveness) => boolean,
+): void {
+  const fresh = loadRunFile(target.runsDir, id);
+  if (!fresh || fresh.status !== "running") {
+    outcome.skipped = `Run is no longer running (status "${String(fresh?.status ?? "missing")}").`;
+    return;
+  }
+  const now = Date.now();
+  const verdict = judgeRunInTarget(target, fresh, now);
+  outcome.liveness = verdict.liveness;
+  outcome.reason = verdict.reason;
+  if (!endable(verdict.liveness)) {
+    outcome.eligible = false;
+    outcome.skipped = `Verdict changed to "${verdict.liveness}" before the write.`;
+    return;
+  }
+  try {
+    writeRunFileAtomic(target.runsDir, id, endedRunRecord(fresh, verdict.reason, now));
+    outcome.ended = true;
+  } catch (err) {
+    outcome.error = err instanceof Error ? err.message : String(err);
+  }
 }
 
 // ── Heartbeat monitor ─────────────────────────────────────────────────
