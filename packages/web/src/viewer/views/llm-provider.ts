@@ -43,7 +43,12 @@ interface LlmConfigResponse {
   codex: VendorConfig;
   google: VendorConfig;
   local: LocalVendorConfig;
-  legacyClaude: VendorConfig;
+  /**
+   * Where each resolved Claude field came from. `claude` above already holds
+   * the resolved value; this only says whether it is still living under the
+   * deprecated top-level `claude.*` key.
+   */
+  claudeSources: Partial<Record<"model" | "lightModel", "llm" | "legacy">>;
   autoFailover?: boolean;
 }
 
@@ -1021,8 +1026,12 @@ export function LlmProviderView() {
     );
   }
 
-  const legacy = data?.legacyClaude;
-  const showLegacy = legacy && (legacy.model || legacy.lightModel) && !data?.claude.model && !data?.claude.lightModel;
+  // A field is "legacy" when its resolved value came from the deprecated
+  // top-level `claude.*` key. The value itself is already shown in the field
+  // above — this notice only explains where it is still stored.
+  const legacyFields = (["model", "lightModel"] as const)
+    .filter((f) => data?.claudeSources?.[f] === "legacy");
+  const showLegacy = legacyFields.length > 0;
 
   return h("div", { class: "llm-container" },
 
@@ -1106,17 +1115,14 @@ export function LlmProviderView() {
       ? h("div", { class: "llm-legacy" },
           h("span", null, "ℹ"),
           h("div", null,
-            h("strong", null, "Legacy claude.* fields detected"),
+            h("strong", null, "Still set under a deprecated key"),
             h("p", null,
-              "Your ",
-              h("code", null, ".n-dx.json"),
-              " has legacy ",
-              h("code", null, "claude.model"),
-              legacy!.model ? ` (${legacy!.model})` : "",
-              legacy!.lightModel ? ` / claude.lightModel (${legacy!.lightModel})` : "",
-              ". Set the modern ",
+              legacyFields.map((f) => `claude.${f}`).join(" and "),
+              legacyFields.length === 1 ? " is " : " are ",
+              "read from the legacy top-level key. The value shown above is the one that will run. ",
+              "Saving writes the modern ",
               h("code", null, "llm.claude.*"),
-              " fields above to override.",
+              " field and leaves the old key where it is.",
             ),
           ),
         )

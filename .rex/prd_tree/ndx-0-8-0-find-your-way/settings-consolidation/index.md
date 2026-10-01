@@ -27,8 +27,12 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add the Project settings page and move the export and refresh panels to Commands](./add-the-project-settings-page-and-move.md) | pending |
-| [Add the Robot Wrangler settings page for provider and model across every LLM-using command](./add-the-robot-wrangler-settings-page.md) | pending |
+| [Add the Robot Wrangler settings page for provider and model across every LLM-using command](./add-the-robot-wrangler-settings-page.md) | completed |
 | [Add the Workflow settings page for work settings, templates and timeouts](./add-the-workflow-settings-page-for.md) | pending |
 | [Build the shared settings frame with explicit Save, a dirty indicator and a leave-with-unsaved-changes prompt](./build-the-shared-settings-frame-with.md) | completed |
 | [List every key ndx config accepts for hench on the Workflow page and in hench config](./list-every-key-ndx-config-accepts-for.md) | completed |
+| [Migrate the CLI's legacy claude.* section to llm.claude.* on both read and write](./migrate-the-cli-s-legacy-claude.md) | completed |
+| [Read hench overrides from .n-dx.json in the effective block, and check the contract through hench's own config loader](./read-hench-overrides-from-n-dx-json-in.md) | completed |
+| [Replace the LLM Provider view with the Robot Wrangler settings page on the shared settings frame](./replace-the-llm-provider-view-with-the.md) | pending |
+| [Serve the effective vendor, provider and model ndx work will use from GET /api/llm/config](./serve-the-effective-vendor-provider.md) | completed |
 | [Show provider limits per vendor and a per-vendor agent model picker on Robot Wrangler](./show-provider-limits-per-vendor-and-a.md) | pending |
