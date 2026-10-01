@@ -24,7 +24,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add a running-now bar to every Live page so concurrent runs can be switched without going back](./add-a-running-now-bar-to-every-live.md) | pending |
-| [Add Live as a fourth top-nav tab outside the stage loop, with a status dot, count and hover peek](./add-live-as-a-fourth-top-nav-tab.md) | pending |
+| [Add Live as a fourth top-nav tab outside the stage loop, with a status dot, count and hover peek](./add-live-as-a-fourth-top-nav-tab.md) | completed |
 | [Add the Log tab to the running-task page: the raw terminal stream with follow, filter and search](./add-the-log-tab-to-the-running-task.md) | pending |
 | [Add the Review tab to the running-task page for runs started with --review](./add-the-review-tab-to-the-running-task.md) | pending |
 | [Build the Live overview page with machine strip, running cards, worktrees, queue and an idle state](./build-the-live-overview-page-with.md) | pending |
