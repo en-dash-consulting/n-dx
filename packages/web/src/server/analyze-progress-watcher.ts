@@ -23,7 +23,7 @@
 
 import { statSync } from "node:fs";
 import { readAnalyzeProgress, analyzeProgressPath } from "./domain-gateway.js";
-import type { AnalyzeProgressReport } from "./domain-gateway.js";
+import type { AnalyzeProgressReport, ProcessCommandLine } from "./domain-gateway.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 
 export const ANALYZE_PROGRESS_POLL_MS = 1000;
@@ -31,6 +31,8 @@ export const ANALYZE_PROGRESS_POLL_MS = 1000;
 export interface AnalyzeProgressWatchOptions {
   /** Liveness check for the recorded pid; injectable for tests. */
   isPidAlive?: (pid: number) => boolean;
+  /** The recorded pid's command line; injectable for tests. */
+  processCommandLine?: ProcessCommandLine;
 }
 
 /** Frame broadcast on every change. */
@@ -51,7 +53,7 @@ export function watchAnalyzeProgress(
   options: AnalyzeProgressWatchOptions = {},
 ): ReturnType<typeof setInterval> {
   const path = analyzeProgressPath(svDir);
-  const read = () => readAnalyzeProgress(svDir, { isPidAlive: options.isPidAlive });
+  const read = () => readAnalyzeProgress(svDir, { isPidAlive: options.isPidAlive, processCommandLine: options.processCommandLine });
 
   let fileKey = statKey(path);
   let last = read();

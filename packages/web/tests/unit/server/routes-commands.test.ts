@@ -8,7 +8,8 @@
  * async job and `status.report` must carry the array intact.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi, onTestFinished } from "vitest";
+import { spawn } from "node:child_process";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -827,9 +828,12 @@ describe("commands route — sv-analyze full flow (async)", () => {
   });
 
   it("status reports a terminal-started analysis's structured progress though no dashboard job is running", async () => {
+    // A live process whose command line reads as an analyze: the reader checks both.
+    const analyzer = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)", "sv", "analyze"], { stdio: "ignore" });
+    onTestFinished(() => { analyzer.kill("SIGKILL"); });
     await mkdir(join(tmpDir, ".sourcevision", ".cache"), { recursive: true });
     await writeFile(join(tmpDir, ".sourcevision", ".cache", "analyze-progress.json"), JSON.stringify({
-      version: 1, pid: process.pid, status: "running", mode: "generative", scope: null,
+      version: 1, pid: analyzer.pid, status: "running", mode: "generative", scope: null,
       startedAt: "2026-09-30T12:00:00.000Z", updatedAt: "2026-09-30T12:01:00.000Z",
       phase: { index: 4, name: "zones", total: 6 },
       phases: [{ index: 4, name: "zones", startedAt: "2026-09-30T12:00:30.000Z" }],

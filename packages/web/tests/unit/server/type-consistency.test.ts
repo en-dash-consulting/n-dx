@@ -233,7 +233,12 @@ describe("Viewer type mirrors match canonical definitions", () => {
 // web package. A silent rename or removal in sourcevision's public API would
 // break MCP route handling at runtime. These tests catch such breakage at CI.
 
-import { createSourcevisionMcpServer, readAnalyzeProgress, analyzeProgressPath } from "../../../src/server/domain-gateway.js";
+import {
+  createSourcevisionMcpServer,
+  readAnalyzeProgress,
+  analyzeProgressPath,
+  confirmAnalyzeProcess,
+} from "../../../src/server/domain-gateway.js";
 
 describe("domain-gateway contract", () => {
   it("re-exports createSourcevisionMcpServer as a function", () => {
@@ -243,6 +248,14 @@ describe("domain-gateway contract", () => {
   it("re-exports the live analyze progress reader the status route and socket poller use", () => {
     expect(typeof readAnalyzeProgress).toBe("function");
     expect(analyzeProgressPath("/p/.sourcevision").replace(/\\/g, "/")).toBe("/p/.sourcevision/.cache/analyze-progress.json");
+  });
+
+  it("re-exports the command-line check the analyze Stop route applies before signalling", () => {
+    expect(confirmAnalyzeProcess(1, () => "node /x/sourcevision/dist/cli/index.js analyze .")).toEqual({
+      analyze: true, command: "node /x/sourcevision/dist/cli/index.js analyze .",
+    });
+    expect(confirmAnalyzeProcess(1, () => "/usr/bin/vim").analyze).toBe(false);
+    expect(confirmAnalyzeProcess(1, () => null).analyze).toBeNull();
   });
 
   it("re-exports match canonical sourcevision exports", async () => {

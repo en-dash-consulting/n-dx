@@ -122,6 +122,8 @@ beforeAll(() => {
       { key: "linked", path: linked, branch: "side", isAnchor: false },
     ],
     memoryFloorBytes: () => 1,
+    // The progress files below record this test process's pid; stand it in for an analyze.
+    processCommandLine: () => "node /repo/packages/sourcevision/dist/cli/index.js analyze .",
   };
 });
 

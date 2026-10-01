@@ -7,6 +7,7 @@ import { analyzeProgressPath } from "../../../src/server/domain-gateway.js";
 
 let svDir: string;
 let timer: ReturnType<typeof setInterval> | undefined;
+const analyzeCommand = () => "node /repo/packages/sourcevision/dist/cli/index.js analyze .";
 
 function writeProgress(fields: Record<string, unknown>): void {
   mkdirSync(join(svDir, ".cache"), { recursive: true });
@@ -47,7 +48,7 @@ describe("watchAnalyzeProgress", () => {
 
   it("pushes the report when a run appears, and again on each change", () => {
     const broadcast = vi.fn();
-    timer = watchAnalyzeProgress(svDir, broadcast, { isPidAlive: () => true });
+    timer = watchAnalyzeProgress(svDir, broadcast, { isPidAlive: () => true, processCommandLine: analyzeCommand });
 
     // No .cache/ yet — the first analysis creates it while we watch.
     writeProgress({ updatedAt: "2026-09-30T12:00:01.000Z" });
@@ -72,7 +73,7 @@ describe("watchAnalyzeProgress", () => {
     let alive = true;
     writeProgress({});
     const broadcast = vi.fn();
-    timer = watchAnalyzeProgress(svDir, broadcast, { isPidAlive: () => alive });
+    timer = watchAnalyzeProgress(svDir, broadcast, { isPidAlive: () => alive, processCommandLine: analyzeCommand });
     vi.advanceTimersByTime(ANALYZE_PROGRESS_POLL_MS);
     expect(broadcast).not.toHaveBeenCalled();
 
@@ -80,6 +81,20 @@ describe("watchAnalyzeProgress", () => {
     vi.advanceTimersByTime(ANALYZE_PROGRESS_POLL_MS);
     expect(broadcast).toHaveBeenCalledTimes(1);
     expect(broadcast.mock.calls[0][0].progress).toMatchObject({ status: "interrupted", running: false, stale: true });
+  });
+
+  it("pushes 'interrupted' when the recorded pid passes to another program", () => {
+    let command = analyzeCommand();
+    writeProgress({});
+    const broadcast = vi.fn();
+    timer = watchAnalyzeProgress(svDir, broadcast, { isPidAlive: () => true, processCommandLine: () => command });
+    vi.advanceTimersByTime(ANALYZE_PROGRESS_POLL_MS);
+    expect(broadcast).not.toHaveBeenCalled();
+
+    command = "/usr/bin/vim notes.txt";
+    vi.advanceTimersByTime(ANALYZE_PROGRESS_POLL_MS);
+    expect(broadcast).toHaveBeenCalledTimes(1);
+    expect(broadcast.mock.calls[0][0].progress).toMatchObject({ status: "interrupted", running: false, pidReusedBy: command });
   });
 
   it("returns an unref'd interval so it never holds the server open", () => {

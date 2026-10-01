@@ -27,7 +27,12 @@ import { basename, join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { errorResponse, jsonResponse } from "./response-utils.js";
 import { workspaceKeyOf } from "./workspace-scoped.js";
-import { readAnalyzeProgress, type AnalyzeProgressReport } from "./domain-gateway.js";
+import {
+  confirmAnalyzeProcess,
+  readAnalyzeProgress,
+  type AnalyzeProgressReport,
+  type ProcessCommandLine,
+} from "./domain-gateway.js";
 import { svAnalyzeRunOf } from "./routes-commands.js";
 import { resolveActiveModel } from "./routes-llm.js";
 import { estimateCostFromTotals } from "./rex-gateway.js";
@@ -331,7 +336,7 @@ function worktreeOf(ctx: ServerContext, sources: LiveSources): LiveWorktree {
 /** Build the answer for the served worktree. Exported for tests. */
 export function buildLiveAnalyzeSnapshot(ctx: ServerContext, sources: LiveSources, now = Date.now()): LiveAnalyzeSnapshot {
   const worktree = worktreeOf(ctx, sources);
-  const progress = readAnalyzeProgress(ctx.svDir);
+  const progress = readAnalyzeProgress(ctx.svDir, { processCommandLine: sources.processCommandLine });
   const slot = svAnalyzeRunOf(workspaceKeyOf(ctx));
   const running = progress?.running === true;
   // The slot says the dashboard spawned a run; the progress file says it is a live one.
@@ -363,14 +368,33 @@ export function buildLiveAnalyzeSnapshot(ctx: ServerContext, sources: LiveSource
 const ANALYZE_PATH = "/api/live/analyze";
 const STOP_PATH = "/api/live/analyze/stop";
 
+function pidReusedMessage(pid: number, command: string): string {
+  return `Process ${pid} is no longer the analysis (it is now "${command}"); not signalling it`;
+}
+
 /**
  * Signal the process a progress file names. Returns the HTTP outcome rather
  * than throwing: a process that is already gone, or one this server may not
  * signal, is an answer for the page, not a server error.
+ *
+ * The pid comes from a file, and after a hard kill the OS may have given it
+ * to another program, so its command line must be an analyze's. Where `ps`
+ * cannot say (it failed, or the process just exited) the signal is refused;
+ * only on Windows, which has no command-line reader, does the pid alone do.
  */
-function signalRecordedPid(pid: number): { ok: true } | { ok: false; status: number; error: string } {
+function signalRecordedPid(
+  pid: number,
+  commandLine: ProcessCommandLine | undefined,
+): { ok: true } | { ok: false; status: number; error: string } {
   if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) {
     return { ok: false, status: 409, error: "The analysis has no process to stop" };
+  }
+  const check = confirmAnalyzeProcess(pid, commandLine);
+  if (check.analyze === false) {
+    return { ok: false, status: 409, error: pidReusedMessage(pid, check.command ?? "") };
+  }
+  if (check.analyze === null && process.platform !== "win32") {
+    return { ok: false, status: 409, error: `Could not confirm process ${pid} is the analysis; not signalling it` };
   }
   try {
     process.kill(pid, "SIGTERM");
@@ -400,16 +424,18 @@ export function handleLiveAnalyzeRoute(
   }
   if (url !== STOP_PATH || method !== "POST") return false;
 
-  const progress = readAnalyzeProgress(ctx.svDir);
+  const commandLine = sources.processCommandLine;
+  const progress = readAnalyzeProgress(ctx.svDir, { processCommandLine: commandLine });
   if (!progress?.running) {
-    errorResponse(res, 409, "No analysis is running in this worktree");
+    const why = progress?.pidReusedBy ? pidReusedMessage(progress.pid, progress.pidReusedBy) : "No analysis is running in this worktree";
+    errorResponse(res, 409, why);
     return true;
   }
   if (svAnalyzeRunOf(workspaceKeyOf(ctx))?.running) {
     errorResponse(res, 409, "This analysis was started from the dashboard; stop it with POST /api/commands/sv-analyze/stop");
     return true;
   }
-  const outcome = signalRecordedPid(progress.pid);
+  const outcome = signalRecordedPid(progress.pid, commandLine);
   if (!outcome.ok) {
     errorResponse(res, outcome.status, outcome.error);
     return true;

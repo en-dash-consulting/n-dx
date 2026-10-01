@@ -15,6 +15,8 @@ import {
   noteAnalyzeError,
   openRootPhase,
   readAnalyzeProgress,
+  readProcessCommandLine,
+  isAnalyzeCommandLine,
   ANALYZE_PROGRESS_WRITE_INTERVAL_MS,
 } from "../../../src/analyzers/analyze-progress.js";
 import type { AnalyzeProgress } from "../../../src/analyzers/analyze-progress.js";
@@ -244,10 +246,24 @@ describe("readAnalyzeProgress", () => {
     expect(readAnalyzeProgress(svDir)).toBeNull();
   });
 
-  it("reports a running file whose pid is alive as running", () => {
+  const analyzeCommand = () => "node /repo/packages/sourcevision/dist/cli/index.js analyze --deep .";
+
+  it("reports a running file whose pid is alive and is an analyze as running", () => {
     writeProgress({});
-    const r = readAnalyzeProgress(svDir, { isPidAlive: () => true })!;
-    expect(r).toMatchObject({ status: "running", running: true, stale: false });
+    const r = readAnalyzeProgress(svDir, { isPidAlive: () => true, processCommandLine: analyzeCommand })!;
+    expect(r).toMatchObject({ status: "running", running: true, stale: false, pidReusedBy: null });
+  });
+
+  it("reports a running file whose pid now belongs to another program as interrupted", () => {
+    writeProgress({});
+    const r = readAnalyzeProgress(svDir, { isPidAlive: () => true, processCommandLine: () => "/usr/bin/vim notes.txt" })!;
+    expect(r).toMatchObject({ status: "interrupted", running: false, stale: true, pidReusedBy: "/usr/bin/vim notes.txt" });
+  });
+
+  it("trusts liveness alone when the command line cannot be read", () => {
+    writeProgress({});
+    const r = readAnalyzeProgress(svDir, { isPidAlive: () => true, processCommandLine: () => null })!;
+    expect(r).toMatchObject({ status: "running", running: true, pidReusedBy: null });
   });
 
   it("never reports a dead pid's file as running", () => {
@@ -278,8 +294,41 @@ describe("readAnalyzeProgress", () => {
 
   it("has no previous run when the history holds none of this mode, or is unreadable", () => {
     writeProgress({ mode: "fast" });
-    expect(readAnalyzeProgress(svDir, { isPidAlive: () => true })!.previous).toBeNull();
+    expect(readAnalyzeProgress(svDir, { isPidAlive: () => true, processCommandLine: analyzeCommand })!.previous).toBeNull();
     writeFileSync(join(svDir, ".cache", "analyses.jsonl"), "not json\n");
-    expect(readAnalyzeProgress(svDir, { isPidAlive: () => true })!.previous).toBeNull();
+    expect(readAnalyzeProgress(svDir, { isPidAlive: () => true, processCommandLine: analyzeCommand })!.previous).toBeNull();
+  });
+});
+
+describe("isAnalyzeCommandLine", () => {
+  it.each([
+    "node /repo/packages/sourcevision/dist/cli/index.js analyze --deep /repo",
+    "/usr/local/bin/node /opt/lib/node_modules/@n-dx/core/node_modules/@n-dx/sourcevision/dist/cli/index.js analyze .",
+    "node /usr/local/bin/sv analyze --full",
+    "node /repo/packages/core/bin/sourcevision.js analyze .",
+    "sourcevision analyze",
+    "node C:\\repo\\packages\\sourcevision\\dist\\cli\\index.js analyze .",
+  ])("accepts %s", (command) => {
+    expect(isAnalyzeCommandLine(command)).toBe(true);
+  });
+
+  it.each([
+    "/usr/bin/vim notes.txt",
+    "node /repo/packages/sourcevision/dist/cli/index.js serve .",
+    "python analyze.py",
+    "node /repo/tools/analyze",
+  ])("rejects %s", (command) => {
+    expect(isAnalyzeCommandLine(command)).toBe(false);
+  });
+});
+
+describe.skipIf(process.platform === "win32")("readProcessCommandLine", () => {
+  it("reads a live process's command line", () => {
+    expect(readProcessCommandLine(process.pid)).toContain("node");
+  });
+
+  it("cannot tell for a pid with no process", () => {
+    expect(readProcessCommandLine(2_147_483_000)).toBeNull();
+    expect(readProcessCommandLine(0)).toBeNull();
   });
 });

@@ -55,7 +55,7 @@ import {
 import { commandJobsOf, type CommandJobKind } from "./routes-commands.js";
 import { rexAnalyzeJobStatus } from "./routes-rex-analysis.js";
 import { resolveActiveModel } from "./routes-llm.js";
-import { analyzeProgressPath, readAnalyzeProgress, type AnalyzeProgressReport } from "./domain-gateway.js";
+import { analyzeProgressPath, readAnalyzeProgress, type AnalyzeProgressReport, type ProcessCommandLine } from "./domain-gateway.js";
 import { collectCompletedIds, estimateCostFromTotals, findNextTask, walkTree } from "./rex-gateway.js";
 import type { PRDDocument } from "./rex-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
@@ -219,6 +219,8 @@ export interface LiveSources {
   listWorkspaces: () => ReadonlyArray<{ key: string; path: string; branch: string | null; isAnchor: boolean }>;
   /** The hub's memory floor in bytes, or null when unknown. Defaults to the per-user hub config. */
   memoryFloorBytes?: () => number | null;
+  /** A pid's command line, or null when unknown — tells a reused pid from a live analysis. Defaults to sourcevision's `ps` reader. */
+  processCommandLine?: ProcessCommandLine;
 }
 
 interface PrdIndex {
@@ -310,7 +312,7 @@ function nextTasks(index: PrdIndex, excluded: ReadonlySet<string>): LiveNextTask
  * while it claims to be running — its liveness depends on the pid, not on
  * the file. A finished report never changes until the file does.
  */
-function analyzeProgressFor(svDir: string): AnalyzeProgressReport | null {
+function analyzeProgressFor(svDir: string, processCommandLine?: ProcessCommandLine): AnalyzeProgressReport | null {
   const cached = analyzeProgressCache.get(svDir);
   let mtimeMs: number;
   try {
@@ -320,7 +322,7 @@ function analyzeProgressFor(svDir: string): AnalyzeProgressReport | null {
     return null;
   }
   if (cached && cached.mtimeMs === mtimeMs && cached.report?.running !== true) return cached.report;
-  const report = readAnalyzeProgress(svDir);
+  const report = readAnalyzeProgress(svDir, { processCommandLine });
   analyzeProgressCache.set(svDir, { mtimeMs, report });
   return report;
 }
@@ -481,7 +483,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
 
     // Jobs: the dashboard's slots for this workspace, and an analysis seen
     // only through its progress file (started from a terminal).
-    const progress = analyzeProgressFor(layout.sourcevisionDir);
+    const progress = analyzeProgressFor(layout.sourcevisionDir, sources.processCommandLine);
     let analysisListed = false;
     for (const job of commandJobsOf(ws.key)) {
       if (!job.running) continue;

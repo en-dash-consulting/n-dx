@@ -27,7 +27,10 @@
  * (SIGKILL, a crash in native code) cannot write anything, so
  * {@link readAnalyzeProgress} checks the recorded pid and reports a `running`
  * file whose process is gone as `interrupted`: a file never reads as running
- * after its process exits.
+ * after its process exits. A pid the OS has since given to another program,
+ * or one written inside a container and read on the host, is alive but not
+ * the analysis, so where the platform shows command lines the reader checks
+ * that one too ({@link readProcessCommandLine}).
  *
  * Module-level state, one run per process, owned by the outermost `analyze`
  * call — the recursive `--deep` sub-analyses report into the same file under
@@ -38,8 +41,9 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import type { AnalysisRun, LLMClassUsage } from "../schema/index.js";
+import { execFileSyncCli } from "../util/exec-cli.js";
 import { describePass } from "./enrich-config.js";
 import { setRunLedgerListener, snapshotRunLedger } from "./run-ledger.js";
 
@@ -116,6 +120,11 @@ export interface AnalyzeProgressReport extends AnalyzeProgress {
   running: boolean;
   /** The file says running but its process is gone; `status` is then `interrupted`. */
   stale: boolean;
+  /**
+   * When the file is stale because its pid now belongs to another program,
+   * that program's command line; otherwise null. Never signal it.
+   */
+  pidReusedBy: string | null;
   /** The latest run of the same mode that started before this one, or null. */
   previous: PreviousAnalyzeRun | null;
 }
@@ -368,6 +377,58 @@ function sum(buckets: LLMClassUsage[], key: "calls" | "inputTokens" | "outputTok
 export interface ReadAnalyzeProgressOptions {
   /** Liveness check for the recorded pid; injectable for tests. */
   isPidAlive?: (pid: number) => boolean;
+  /** The recorded pid's command line; injectable for tests. Defaults to {@link readProcessCommandLine}. */
+  processCommandLine?: ProcessCommandLine;
+}
+
+/** A process's command line, or null when it cannot be told. */
+export type ProcessCommandLine = (pid: number) => string | null;
+
+/**
+ * `ps -ww -o command= -p <pid>` on POSIX. Null on Windows, when `ps` is
+ * missing or fails, and when no such process exists: null means "cannot
+ * tell", never "not an analysis".
+ */
+export function readProcessCommandLine(pid: number): string | null {
+  if (process.platform === "win32" || !Number.isInteger(pid) || pid <= 0) return null;
+  let out: string;
+  try {
+    out = String(execFileSyncCli("ps", ["-ww", "-o", "command=", "-p", String(pid)], {
+      encoding: "utf-8",
+      timeout: 2_000,
+      stdio: ["ignore", "pipe", "ignore"],
+    }));
+  } catch {
+    // ps exits 1 for a pid with no process; missing ps or a timeout lands here too.
+    return null;
+  }
+  return out.trim() || null;
+}
+
+/** Program names `sv analyze` runs as: the `sv` / `sourcevision` bins and their shims. */
+const ANALYZER_PROGRAM = /^(sv|sourcevision)(\.c?js|\.cmd)?$/;
+
+/**
+ * Whether a command line is a sourcevision analyze: an `analyze` argument,
+ * run by a program named `sv` / `sourcevision` or from a path inside a
+ * `sourcevision` package (`node …/sourcevision/dist/cli/index.js analyze`).
+ */
+export function isAnalyzeCommandLine(command: string): boolean {
+  const tokens = command.trim().split(/\s+/);
+  if (!tokens.includes("analyze")) return false;
+  return tokens.some((t) => ANALYZER_PROGRAM.test(basename(t)) || /[\\/]sourcevision[\\/]/.test(t));
+}
+
+/** Whether a pid is running an analyze: `analyze` is null when its command line cannot be read. */
+export interface AnalyzeProcessCheck {
+  analyze: boolean | null;
+  command: string | null;
+}
+
+/** Read `pid`'s command line and judge it with {@link isAnalyzeCommandLine}. */
+export function confirmAnalyzeProcess(pid: number, commandLine: ProcessCommandLine = readProcessCommandLine): AnalyzeProcessCheck {
+  const command = commandLine(pid);
+  return { analyze: command === null ? null : isAnalyzeCommandLine(command), command };
 }
 
 /**
@@ -388,13 +449,24 @@ export function readAnalyzeProgress(svDir: string, options: ReadAnalyzeProgressO
 
   const alive = options.isPidAlive ?? defaultIsPidAlive;
   const claimsRunning = progress.status === "running";
-  const running = claimsRunning && alive(progress.pid);
+  let running = claimsRunning && alive(progress.pid);
+  let pidReusedBy: string | null = null;
+  if (running) {
+    // Alive is not enough: after a hard kill the OS may have given the pid
+    // to another program. Unknown (Windows, no `ps`) keeps the liveness answer.
+    const check = confirmAnalyzeProcess(progress.pid, options.processCommandLine);
+    if (check.analyze === false) {
+      pidReusedBy = check.command;
+      running = false;
+    }
+  }
   const stale = claimsRunning && !running;
   return {
     ...progress,
     status: stale ? "interrupted" : progress.status,
     running,
     stale,
+    pidReusedBy,
     previous: previousRun(svDir, progress.mode, progress.startedAt),
   };
 }

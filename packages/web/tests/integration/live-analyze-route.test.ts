@@ -26,6 +26,7 @@ import { removeTempDir } from "../helpers/temp-dir.js";
 
 // Early enough that files the test writes "now" count as written by this run.
 const STARTED = "2026-10-01T00:00:00.000Z";
+const ANALYZE_COMMAND = "node /repo/packages/sourcevision/dist/cli/index.js analyze --full .";
 
 let root: string;
 let svDir: string;
@@ -67,7 +68,12 @@ beforeEach(() => {
   svDir = join(root, ".sourcevision");
   mkdirSync(svDir, { recursive: true });
   ctx = { projectDir: root, svDir, rexDir: join(root, ".rex"), dev: false, workspace: "main" };
-  sources = { listWorkspaces: () => [{ key: "main", path: root, branch: "feat/x", isAnchor: true }], memoryFloorBytes: () => 1 };
+  sources = {
+    listWorkspaces: () => [{ key: "main", path: root, branch: "feat/x", isAnchor: true }],
+    memoryFloorBytes: () => 1,
+    // Progress files here record this test process's pid; stand it in for an analyze.
+    processCommandLine: () => ANALYZE_COMMAND,
+  };
   clearLiveAnalyzeCaches();
 });
 
@@ -183,13 +189,49 @@ describe("POST /api/live/analyze/stop", () => {
     expect((await post()).status).toBe(409);
   });
 
-  it("signals the process the progress file names", async () => {
-    child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
+  it("signals the process the progress file names when its command line is an analyze", async () => {
+    // Real command-line reader: the child's argv carries `sv analyze`, as the analyzer's does.
+    delete sources.processCommandLine;
+    child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)", "sv", "analyze"], { stdio: "ignore" });
     const exited = new Promise<NodeJS.Signals | null>((resolve) => child!.once("exit", (_code, signal) => resolve(signal)));
     writeProgress({ pid: child.pid });
     const res = await post();
     expect(res.status).toBe(200);
     expect(await exited).toBe("SIGTERM");
+  });
+
+  it("refuses to signal a pid another program now holds, and says so", async () => {
+    child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
+    writeProgress({ pid: child.pid });
+    sources.processCommandLine = () => "/usr/bin/vim notes.txt";
+    expect(readAnalyzeProgress(svDir, { processCommandLine: sources.processCommandLine })).toMatchObject({
+      status: "interrupted", running: false, pidReusedBy: "/usr/bin/vim notes.txt",
+    });
+    const res = await post();
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe(
+      `Process ${child.pid} is no longer the analysis (it is now "/usr/bin/vim notes.txt"); not signalling it`,
+    );
+    expect(child.signalCode).toBeNull();
+  });
+
+  it("does not show a reused pid as a running analysis", () => {
+    writeProgress();
+    sources.processCommandLine = () => "/usr/bin/vim notes.txt";
+    const snapshot = buildLiveAnalyzeSnapshot(ctx, sources);
+    expect(snapshot.progress).toMatchObject({ status: "interrupted", running: false, stale: true });
+    expect(snapshot.startedFrom).toBeNull();
+  });
+
+  it.skipIf(process.platform === "win32")("refuses to signal when the command line cannot be read", async () => {
+    child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
+    writeProgress({ pid: child.pid });
+    // The reader trusts liveness when it cannot tell; Stop does not.
+    let calls = 0;
+    sources.processCommandLine = () => (calls++ === 0 ? ANALYZE_COMMAND : null);
+    const res = await post();
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe(`Could not confirm process ${child.pid} is the analysis; not signalling it`);
   });
 
   it("never signals the server's own process", async () => {

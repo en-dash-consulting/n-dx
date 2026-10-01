@@ -74,11 +74,20 @@ export type {
 // A running `sv analyze` publishes its phase, enrichment pass, batch and LLM
 // use to `.sourcevision/.cache/analyze-progress.json`. The dashboard watches
 // that path and reads it through this reader, which owns the format: it
-// reports a file whose process has died as interrupted rather than running,
-// and attaches the previous same-mode run's per-phase timings.
+// reports a file whose process has died, or whose pid another program now
+// holds, as interrupted rather than running, and attaches the previous
+// same-mode run's per-phase timings.
 
-export { readAnalyzeProgress, analyzeProgressPath } from "./analyzers/analyze-progress.js";
+export {
+  readAnalyzeProgress,
+  analyzeProgressPath,
+  readProcessCommandLine,
+  isAnalyzeCommandLine,
+  confirmAnalyzeProcess,
+} from "./analyzers/analyze-progress.js";
 export type {
+  ProcessCommandLine,
+  AnalyzeProcessCheck,
   AnalyzeProgress,
   AnalyzeProgressReport,
   AnalyzePhaseProgress,
