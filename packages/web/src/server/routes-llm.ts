@@ -366,7 +366,6 @@ export function resolveActiveVendor(projectDir: string): string | null {
 }
 
 /**
-/**
  * The configured vendor and that vendor's model, each null when unset (the
  * vendor's own default applies). Claude's model resolves per field across
  * `llm.claude.*` and legacy `claude.*`, the same as `extractLlmConfig` below.
