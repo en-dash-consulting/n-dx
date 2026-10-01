@@ -2,13 +2,12 @@
 id: "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7"
 level: "epic"
 title: "Web Dashboard"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-24T05:27:03.754Z"
-completedAt: "2026-09-10T17:46:28.941Z"
 endedAt: "2026-09-10T17:46:28.941Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
-lastModified: "2026-09-10T17:46:28.947Z"
-lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+lastModified: "2026-10-01T21:41:25.141Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -44,6 +43,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-http.md) | completed |
 | [Match settings-page text boxes to the Analyze & Import input style and fix dark-mode native form chrome](./match-settings-page-text-boxes-to-the.md) | completed |
 | [Overview Next Steps panel: consistent formatting, copyable items, and capture-to-PRD action](./overview-next-steps-panel-consistent.md) | completed |
+| [PRD timeline view: time-ordered default with a tree toggle and recency desaturation](./prd-timeline-view-time-ordered-default.md) | pending |
 | [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-before.md) | completed |
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-contract-in.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-hench.md) | completed |
