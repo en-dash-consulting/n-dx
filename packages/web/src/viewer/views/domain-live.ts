@@ -6,4 +6,5 @@
  */
 
 export { LiveView } from "./live.js";
+export { LiveBar } from "./live-bar.js";
 export type { LiveViewProps } from "./live.js";

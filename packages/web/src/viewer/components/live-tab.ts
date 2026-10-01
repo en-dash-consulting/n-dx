@@ -89,6 +89,8 @@ export interface PeekLinkProps {
   navigateTo?: NavigateTo;
   onNavigated?: () => void;
   class: string;
+  /** This link is the page being viewed: `aria-current="page"`. */
+  current?: boolean;
   children?: ComponentChildren;
 }
 
@@ -96,7 +98,7 @@ export interface PeekLinkProps {
  * A row that is a real link — middle-click and "copy link" work — and, for a
  * page in this worktree, navigates in place rather than reloading the app.
  */
-export function PeekLink({ target, navigateTo, onNavigated, class: className, children }: PeekLinkProps) {
+export function PeekLink({ target, navigateTo, onNavigated, class: className, current, children }: PeekLinkProps) {
   const href = liveHref(target.worktree, target.view, target.subId);
   const onClick = (e: MouseEvent) => {
     if (!navigateTo || !isCurrentWorktree(target.worktree)) return;
@@ -105,7 +107,7 @@ export function PeekLink({ target, navigateTo, onNavigated, class: className, ch
     navigateTo(target.view, target.view === "live-task" && target.subId ? { taskId: target.subId } : undefined);
     onNavigated?.();
   };
-  return h("a", { class: className, href, onClick }, children);
+  return h("a", { class: className, href, onClick, "aria-current": current ? "page" : undefined }, children);
 }
 
 function Elapsed({ startedAt }: { startedAt: string }) {

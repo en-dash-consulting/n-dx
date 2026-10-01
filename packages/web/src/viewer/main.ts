@@ -49,7 +49,8 @@ import { bootstrap } from "./bootstrap.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
 import { installBasePathFetch } from "./base-path.js";
 import { renderActiveView, buildValidViews } from "./views/view-registry.js";
-import { isSettingsView, stageForView } from "./views/stages.js";
+import { isLiveView, isSettingsView, stageForView } from "./views/stages.js";
+import { LiveBar } from "./views/domain-live.js";
 import { initScrollReveal } from "./scroll-reveal.js";
 
 if (isDeployedMode()) {
@@ -241,6 +242,9 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
     h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, navigateTo, onOpenSearch: openSearch, scope }),
+    isLiveView(pageView) && validViews.has("live") && !isDeployedMode()
+      ? h(LiveBar, { view: pageView, taskId: selectedTaskId, navigateTo })
+      : null,
     h("div", { class: "app-body" },
       h("main", {
         id: "main-content",
