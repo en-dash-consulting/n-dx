@@ -79,7 +79,7 @@ export async function listVendorModels(
     return { ok: false, reason: `No API key (llm.${vendor}.api_key or ${envName})` };
   }
 
-  const request =
+  const request: { url: string; headers: Record<string, string> } =
     vendor === LLM_VENDOR.CLAUDE
       ? { url: ANTHROPIC_MODELS_URL, headers: { "x-api-key": key, "anthropic-version": ANTHROPIC_VERSION } }
       : { url: OPENAI_MODELS_URL, headers: { Authorization: `Bearer ${key}` } };
