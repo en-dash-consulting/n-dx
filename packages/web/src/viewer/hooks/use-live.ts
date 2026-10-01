@@ -131,7 +131,8 @@ export interface LiveSnapshot extends LiveSummary {
     starting: Array<{ taskId: string; taskTitle: string; startedAt: string; worktree: LiveWorktreeFull }>;
   };
   machine: {
-    slots: { inUse: number; max: number; available: number };
+    /** `machine`: the hub's admission gate; `repository`: live runs in every worktree. */
+    slots: { scope: "machine" | "repository"; inUse: number; max: number; available: number; queued: number };
     memory: { freeBytes: number; totalBytes: number; floorBytes: number | null; belowFloor: boolean };
     llm: { vendor: string | null; model: string | null };
     worktrees: { total: number; withLiveRun: number };

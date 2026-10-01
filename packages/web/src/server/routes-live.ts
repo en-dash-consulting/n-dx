@@ -21,7 +21,8 @@
  * - **Jobs** — the dashboard job slots (`commandJobsOf`, `rexAnalyzeJobStatus`)
  *   plus each worktree's `analyze-progress.json`, which is how an analysis
  *   started from a terminal shows up at all.
- * - **Machine** — `readConcurrencySlots` (lock files) and `readSystemMemory`;
+ * - **Machine** — agent slots (runs judged `live` across every worktree, or
+ *   the hub's admission state when proxied through it) and `readSystemMemory`;
  *   the memory floor is the hub's admission floor from the per-user config.
  *
  * The whole answer is cached for {@link LIVE_CACHE_TTL_MS} per served
@@ -29,9 +30,9 @@
  * `live:changed` frame when a run or job starts, finishes, or goes stale; the
  * frame announces, the client refetches.
  *
- * Not here yet: hench records no loop position for `--loop` runs, and
- * execute requests queued by the hub's admission gate live in the hub
- * process, which this server cannot read (the viewer polls `/api/hub/queue`).
+ * Not here yet: hench records no loop position for `--loop` runs, and the
+ * execute requests queued by the hub's admission gate are only counted
+ * (`machine.slots.queued`), not listed (the viewer polls `/api/hub/queue`).
  *
  * @module web/server/routes-live
  */
@@ -57,8 +58,9 @@ import {
   type RunLiveness,
 } from "./run-liveness.js";
 import {
+  concurrencyLevelOf,
   dashboardExecutionsFor,
-  readConcurrencySlots,
+  getEffectiveMaxConcurrent,
   readSystemMemory,
   type ConcurrencyLevel,
   type MemoryHealthLevel,
@@ -73,6 +75,7 @@ import type { PRDDocument } from "./rex-gateway.js";
 import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
 import { readLastEvent, resolveRunEventsFile } from "./run-tail.js";
 import { hubConfigPath, readHubConfig, resolveHubHome } from "../hub/index.js";
+import { HUB_ADMISSION_HEADER, parseHubAdmissionHeader, type HubAdmissionHeader } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Response shape
@@ -179,6 +182,33 @@ export interface LiveStartingExecution {
   worktree: LiveWorktree;
 }
 
+/**
+ * Agent slots in use against a cap, and what the count covers.
+ *
+ * - `machine` — served through the hub: its admission gate's dashboard
+ *   sessions across every registered project, against `maxSessions`.
+ * - `repository` — standalone: runs judged `live` in any worktree of the
+ *   repository, however they were started, against hench's configured limit.
+ */
+export interface LiveSlots {
+  scope: "machine" | "repository";
+  inUse: number;
+  max: number;
+  available: number;
+  level: ConcurrencyLevel;
+  /** Execute requests the hub has queued; always 0 standalone. */
+  queued: number;
+}
+
+function liveSlots(scope: LiveSlots["scope"], inUse: number, max: number, queued = 0): LiveSlots {
+  return { scope, inUse, max, available: Math.max(0, max - inUse), level: concurrencyLevelOf(inUse, max), queued };
+}
+
+/** The slots tile as the hub's admission gate reports it. */
+function hubSlots(admission: HubAdmissionHeader): LiveSlots {
+  return liveSlots("machine", admission.running, admission.maxSessions, admission.queued);
+}
+
 export interface LiveSnapshot {
   generatedAt: string;
   runs: LiveRun[];
@@ -190,8 +220,8 @@ export interface LiveSnapshot {
     starting: LiveStartingExecution[];
   };
   machine: {
-    /** The served worktree's agent slots (`GET /api/hench/concurrency`). */
-    slots: { inUse: number; max: number; available: number; level: ConcurrencyLevel };
+    /** Agent slots, over the scope the run list beside it covers or wider. */
+    slots: LiveSlots;
     memory: {
       freeBytes: number;
       totalBytes: number;
@@ -444,6 +474,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
   let servedRunning = 0;
   let servedStale = 0;
   let withLiveRun = 0;
+  let liveRuns = 0;
 
   for (const ws of workspaces) {
     const isServed = canonical(ws.path) === servedPath;
@@ -474,6 +505,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
         // An abandoned record (`orphaned`) or another machine's run (`foreign`)
         // is not executing here; `unknown` might still be.
         if (verdict?.liveness === "live" || verdict?.liveness === "unknown") liveHere = true;
+        if (verdict?.liveness === "live") liveRuns++;
       }
       if (digest.startedAt && Date.parse(digest.startedAt) >= dayStart) todayDigests.push(digest);
       // A run with no id cannot be linked to, so it is counted but not listed.
@@ -583,7 +615,6 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
 
   const next = nextTasks(prdIndexFor(ctx.rexDir), runningTaskIds);
 
-  const slots = readConcurrencySlots(ctx);
   const memory = readSystemMemory();
   const floorBytes = (sources.memoryFloorBytes ?? defaultMemoryFloor)();
 
@@ -597,7 +628,8 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
     jobs,
     queue: { next, starting },
     machine: {
-      slots: { inUse: slots.processCount, max: slots.maxConcurrent, available: slots.slotsAvailable, level: slots.level },
+      // Standalone; handleLiveRoute replaces it with the hub's when served through one.
+      slots: liveSlots("repository", liveRuns, getEffectiveMaxConcurrent(ctx.projectDir)),
       memory: {
         freeBytes: memory.freeBytes,
         totalBytes: memory.totalBytes,
@@ -648,7 +680,9 @@ const LIVE_PATH = "/api/live";
  *
  * The agent's vendor and model are resolved per request and laid over the
  * cached snapshot, so a config change shows on the next read rather than
- * after the cache turns over.
+ * after the cache turns over. So are the agent slots when the request came
+ * through the hub, whose proxy states its admission gate's numbers in
+ * {@link HUB_ADMISSION_HEADER}: one snapshot can be read both ways.
  */
 export async function handleLiveRoute(
   req: IncomingMessage,
@@ -660,7 +694,9 @@ export async function handleLiveRoute(
   if (url !== LIVE_PATH || (req.method || "GET") !== "GET") return false;
   const llm = await resolveActiveAgentModel(ctx.projectDir);
   const snapshot = getLiveSnapshot(ctx, sources);
-  jsonResponse(res, 200, { ...snapshot, machine: { ...snapshot.machine, llm } });
+  const admission = parseHubAdmissionHeader(req.headers[HUB_ADMISSION_HEADER]);
+  const slots = admission ? hubSlots(admission) : snapshot.machine.slots;
+  jsonResponse(res, 200, { ...snapshot, machine: { ...snapshot.machine, llm, slots } });
   return true;
 }
 

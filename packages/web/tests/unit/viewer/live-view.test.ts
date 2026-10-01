@@ -48,7 +48,7 @@ function snapshot(over: Record<string, unknown> = {}): LiveSnapshot {
     runs: [], jobs: [],
     queue: { next: [{ id: "n1", title: "Next up", priority: "high", epicChain: [] }], starting: [] },
     machine: {
-      slots: { inUse: 1, max: 3, available: 2 },
+      slots: { scope: "repository", inUse: 1, max: 3, available: 2, queued: 0 },
       memory: { freeBytes: 8 * 1024 ** 3, totalBytes: 16 * 1024 ** 3, floorBytes: 2 * 1024 ** 3, belowFloor: false },
       llm: { vendor: "claude", model: "sonnet" },
       worktrees: { total: 4, withLiveRun: 1 },
@@ -118,6 +118,15 @@ describe("reading the snapshot", () => {
     expect(machineTiles(m, 0, 0).some((t) => t.warn)).toBe(false);
     const tight = { ...m, slots: { ...m.slots, available: 0 }, memory: { ...m.memory, belowFloor: true } };
     expect(machineTiles(tight, 0, 0).filter((t) => t.warn).map((t) => t.key)).toEqual(["slots", "memory"]);
+  });
+
+  it("labels the slots tile with its scope, and names the hub's queue when it holds anything", () => {
+    const m = snapshot().machine;
+    expect(machineTiles(m, 0, 2)[0]).toMatchObject({ label: "Agent slots · this repository", value: "1 of 3", detail: "2 starting" });
+    const hub = { ...m, slots: { scope: "machine" as const, inUse: 2, max: 4, available: 2, queued: 0 } };
+    expect(machineTiles(hub, 0, 0)[0]).toMatchObject({ label: "Agent slots · this machine", value: "2 of 4", detail: "0 starting" });
+    const queued = { ...hub, slots: { ...hub.slots, queued: 3 } };
+    expect(machineTiles(queued, 0, 0)[0]?.detail).toBe("0 starting · 3 queued");
   });
 
   it("lists worktrees with something live and counts the idle rest", () => {

@@ -188,9 +188,10 @@ export function machineTiles(machine: LiveSnapshot["machine"], runningJobs: numb
   return [
     {
       key: "slots",
-      label: "Agent slots",
+      // The scope is in the label so the number cannot pass for the run list's count.
+      label: slots.scope === "machine" ? "Agent slots · this machine" : "Agent slots · this repository",
       value: `${slots.inUse} of ${slots.max}`,
-      detail: `${starting} starting`,
+      detail: slots.queued > 0 ? `${starting} starting · ${slots.queued} queued` : `${starting} starting`,
       warn: slots.available <= 0,
     },
     { key: "jobs", label: "Running jobs", value: String(runningJobs), detail: null, warn: false },

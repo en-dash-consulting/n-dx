@@ -28,6 +28,7 @@ import { clearWorktreesCache, collectWorktrees, runFileParseCountForTests } from
 import { clearStatusCache, handleStatusRoute, type ProjectStatus } from "../../src/server/routes-status.js";
 import { analyzeProgressPath } from "../../src/server/domain-gateway.js";
 import { handleLlmRoute } from "../../src/server/routes-llm.js";
+import { HUB_ADMISSION_HEADER, formatHubAdmissionHeader } from "../../src/shared/index.js";
 import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 import { removeTempDir } from "../helpers/temp-dir.js";
 
@@ -246,7 +247,8 @@ describe("GET /api/live", () => {
     expect(live.machine.worktrees).toEqual({ total: 2, withLiveRun: 1 });
     expect(live.machine.memory.floorBytes).toBe(1);
     expect(live.machine.memory.belowFloor).toBe(false);
-    expect(live.machine.slots.inUse).toBe(0);
+    // Only "fresh" is judged live; the stuck, ghost and abandoned records hold no slot.
+    expect(live.machine.slots).toMatchObject({ scope: "repository", inUse: 1, queued: 0 });
     expect(live.machine.spend.inFlightTokens).toBe(4800);
     expect(live.machine.spend.inFlightUsd).toBeGreaterThan(0);
   });
@@ -313,6 +315,56 @@ describe("GET /api/live machine.llm", () => {
     const live = await liveLlm();
     expect(live).toEqual({ vendor: "claude", model: "claude-opus-4-6" });
     expect(live).toEqual(await effectiveAgent());
+  });
+});
+
+describe("GET /api/live machine.slots", () => {
+  let root: string;
+  let served: string;
+  let other: string;
+  let server: RouteTestServer;
+
+  beforeAll(async () => {
+    root = realpathSync.native(mkdtempSync(join(tmpdir(), "ndx-live-slots-")));
+    served = join(root, "served");
+    other = join(root, "other");
+    mkdirSync(served);
+    mkdirSync(other);
+    writeFileSync(join(served, ".n-dx.json"), "{}");
+    // A terminal-started run, executing (this process holds its pid), in a worktree the server does not serve.
+    writeRun(other, { id: "terminal", status: "running", startedAt: Date.now() - MINUTE, lastActivityAt: Date.now() - 5_000, pid: process.pid });
+    const slotSources: LiveSources = {
+      listWorkspaces: () => [
+        { key: "served", path: served, branch: "main", isAnchor: true },
+        { key: "other", path: other, branch: "side", isAnchor: false },
+      ],
+      memoryFloorBytes: () => null,
+    };
+    server = await startRouteTestServer((req, res) => handleLiveRoute(req, res, ctxFor(served, "served"), slotSources));
+  });
+
+  afterAll(async () => {
+    await server?.close();
+    if (root) await removeTempDir(root);
+  });
+
+  async function slots(headers: Record<string, string> = {}): Promise<LiveSnapshot["machine"]["slots"]> {
+    return ((await (await fetch(`${server.baseUrl}/api/live`, { headers })).json()) as LiveSnapshot).machine.slots;
+  }
+
+  it("standalone, counts a live terminal-started run in another worktree against this repository's limit", async () => {
+    expect(await slots()).toMatchObject({ scope: "repository", inUse: 1, max: 3, available: 2, queued: 0 });
+  });
+
+  it("behind the hub, reports the admission gate's sessions, cap and queue instead", async () => {
+    const header = formatHubAdmissionHeader({ running: 4, maxSessions: 4, queued: 2 });
+    expect(await slots({ [HUB_ADMISSION_HEADER]: header })).toEqual({
+      scope: "machine", inUse: 4, max: 4, available: 0, level: "at_limit", queued: 2,
+    });
+  });
+
+  it("ignores a malformed admission header", async () => {
+    expect((await slots({ [HUB_ADMISSION_HEADER]: "{\"running\":-1}" })).scope).toBe("repository");
   });
 });
 

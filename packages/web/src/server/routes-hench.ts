@@ -2512,16 +2512,7 @@ export function startConcurrencyMonitor(
 
     const totalRunning = dashboardRunning + diskRunning;
     const utilization = maxConcurrent > 0 ? processCount / maxConcurrent : 0;
-    let level: ConcurrencyLevel;
-    if (processCount >= maxConcurrent) {
-      level = "at_limit";
-    } else if (utilization >= 0.67) {
-      level = "high";
-    } else if (utilization > 0) {
-      level = "moderate";
-    } else {
-      level = "low";
-    }
+    const level = concurrencyLevelOf(processCount, maxConcurrent);
 
     broadcast({
       type: "hench:concurrency-status",
@@ -2881,7 +2872,7 @@ export function resetHenchRouteStateForTests(): void {
  * Get the effective max concurrent processes, respecting the runtime
  * override when set.
  */
-function getEffectiveMaxConcurrent(projectDir: string): number {
+export function getEffectiveMaxConcurrent(projectDir: string): number {
   if (throttleState.concurrencyOverride !== null) {
     return throttleState.concurrencyOverride;
   }
@@ -2951,26 +2942,25 @@ export function readConcurrencySlots(ctx: ServerContext): ConcurrencySlots {
   // which is the authoritative cross-process count.
   const processCount = locks.length;
   const utilization = maxConcurrent > 0 ? processCount / maxConcurrent : 0;
-  let level: ConcurrencyLevel;
-  if (processCount >= maxConcurrent) {
-    level = "at_limit";
-  } else if (utilization >= 0.67) {
-    level = "high";
-  } else if (utilization > 0) {
-    level = "moderate";
-  } else {
-    level = "low";
-  }
 
   return {
     processCount,
     maxConcurrent,
     // Slots remaining before limit is reached
     slotsAvailable: Math.max(0, maxConcurrent - processCount),
-    level,
+    level: concurrencyLevelOf(processCount, maxConcurrent),
     utilization: Math.min(1, utilization),
     locks,
   };
+}
+
+/** How full `inUse` of `max` slots is. */
+export function concurrencyLevelOf(inUse: number, max: number): ConcurrencyLevel {
+  const utilization = max > 0 ? inUse / max : 0;
+  if (inUse >= max) return "at_limit";
+  if (utilization >= 0.67) return "high";
+  if (utilization > 0) return "moderate";
+  return "low";
 }
 
 /** The concurrency status of one workspace, as `GET /api/hench/concurrency` answers it. */
