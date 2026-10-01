@@ -125,31 +125,51 @@ export class LogBuffer {
     return stripAnsi(this.pending);
   }
 
+  /**
+   * The unfinished last line as a provisional row, or null when the log ends
+   * in a newline. Not part of `lines`: it may still grow, so only a finished
+   * run's reader should show it. Changes no state.
+   */
+  tail(): LogLine | null {
+    return this.pending ? this.parse(this.pending, false) : null;
+  }
+
   private push(raw: string): void {
+    this.lines.push(this.parse(raw, true));
+  }
+
+  /** Reads one line; `commit` carries its label, turn and timestamp into the lines after it. */
+  private parse(raw: string, commit: boolean): LogLine {
     const clean = stripAnsi(raw.endsWith("\r") ? raw.slice(0, -1) : raw);
     const stamp = TIMESTAMP.exec(clean);
-    if (stamp) this.timestamps = true;
+    if (stamp && commit) this.timestamps = true;
     const text = stamp ? clean.slice(stamp[0].length) : clean;
     const labelled = LABELLED.exec(text);
+    let { label, cls, turn } = this;
     let turnStart = false;
     if (labelled) {
-      const previous = this.label;
-      this.label = labelled[1]!;
-      this.cls = LABEL_CLASS[this.label] ?? "plain";
-      if (this.label === "Agent" && previous !== "Agent") {
-        this.turn++;
+      const previous = label;
+      label = labelled[1]!;
+      cls = LABEL_CLASS[label] ?? "plain";
+      if (label === "Agent" && previous !== "Agent") {
+        turn++;
         turnStart = true;
       }
     }
-    this.lines.push({
+    if (commit) {
+      this.label = label;
+      this.cls = cls;
+      this.turn = turn;
+    }
+    return {
       n: this.lines.length + 1,
       text,
-      cls: this.cls,
-      label: this.label,
-      turn: this.turn,
+      cls,
+      label,
+      turn,
       turnStart,
       at: stamp ? stamp[1]! : null,
-    });
+    };
   }
 }
 

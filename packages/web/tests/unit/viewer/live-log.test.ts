@@ -72,6 +72,16 @@ describe("reading a log", () => {
     expect(b.raw()).toBe("  [Tool]     read\n  [Result]   ok\n");
   });
 
+  it("offers the unfinished line as a tail without changing the log", () => {
+    const b = new LogBuffer();
+    b.append("  [Agent]    hi\n  [Agent]    par");
+    expect(b.tail()).toMatchObject({ n: 2, text: "  [Agent]    par", cls: "turn", turn: 1, turnStart: false });
+    expect(b.lines).toHaveLength(1);
+    b.append("t\n");
+    expect(b.lines[1]!.text).toBe("  [Agent]    part");
+    expect(b.tail()).toBeNull();
+  });
+
   it("strips terminal colour codes and a leading timestamp", () => {
     expect(stripAnsi(`${ESC}[2m  [Tool]${ESC}[22m x`)).toBe("  [Tool] x");
     const b = buffer("2026-10-01T10:00:00.000Z   [Tool]    x\n");
@@ -307,6 +317,26 @@ describe("the Log tab", () => {
     }));
     await mount();
     expect(calls).toBe(1);
+  });
+
+  it("shows a finished run's unterminated last line, counts it and finds it in search", async () => {
+    logText = "  [Tool]     read\n  [Error]    crashed mid-li";
+    await mount();
+    expect(texts()).toEqual(["  [Tool]     read", "  [Error]    crashed mid-li"]);
+    expect(root.querySelector(".live-log-source")?.textContent).toContain("2 lines");
+    await act(async () => { change(root.querySelector("input[type=search]")!, "mid-li"); });
+    expect(root.querySelector(".live-log-matches")?.textContent).toBe("1 of 1");
+  });
+
+  it("keeps a running run's unterminated line out until it is finished", async () => {
+    vi.useFakeTimers();
+    try {
+      logText = "  [Tool]     read\n  [Error]    crashed mid-li";
+      await mount(run({ status: "running", finishedAt: null }));
+      expect(texts()).toEqual(["  [Tool]     read"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("says so when the run has no log", async () => {

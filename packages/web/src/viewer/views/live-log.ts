@@ -138,12 +138,19 @@ export function LogTab({ run, taskId, part }: { run: LiveTaskRun; taskId: string
   const [scrollTop, setScrollTop] = useState(0);
   const viewport = useRef<HTMLDivElement>(null);
 
-  const from = part === "review" ? reviewLogStart(buffer.lines) : 0;
+  // A finished run writes no more, so its unterminated last line is complete;
+  // a running one may still be mid-line.
+  const finished = run.status !== "running";
+  const lines = useMemo(() => {
+    const tail = finished ? buffer.tail() : null;
+    return tail ? [...buffer.lines, tail] : buffer.lines;
+  }, [buffer, version, finished]);
+  const from = part === "review" ? reviewLogStart(lines) : 0;
   const visible = useMemo(
-    () => filterIndices(buffer.lines, filter).filter((i) => from >= 0 && i >= from),
-    [buffer, version, filter, from],
+    () => filterIndices(lines, filter).filter((i) => from >= 0 && i >= from),
+    [lines, version, filter, from],
   );
-  const matches = useMemo(() => searchMatches(buffer.lines, visible, query), [buffer, version, visible, query]);
+  const matches = useMemo(() => searchMatches(lines, visible, query), [lines, version, visible, query]);
   const currentMatch = matches.length > 0 ? matches[Math.min(matchAt, matches.length - 1)]! : -1;
 
   const viewH = viewport.current?.clientHeight || FALLBACK_VIEWPORT_PX;
@@ -179,13 +186,13 @@ export function LogTab({ run, taskId, part }: { run: LiveTaskRun; taskId: string
     return h("p", { class: "live-muted", role: "status" }, "The review has not written to the log yet.");
   }
 
-  const turns = Array.from({ length: buffer.turns }, (_, i) => i + 1);
+  const turns = Array.from({ length: lines[lines.length - 1]?.turn ?? 0 }, (_, i) => i + 1);
   const rows: ComponentChildren[] = [];
   for (let at = start; at < end; at++) {
-    const line = buffer.lines[visible[at]!]!;
+    const line = lines[visible[at]!]!;
     rows.push(h(Row, { key: line.n, line, query, current: at === currentMatch, showTime }));
   }
-  const count = buffer.lines.length;
+  const count = lines.length;
 
   return h("div", { class: "live-log" },
     h("p", { class: "live-log-source" },
@@ -225,7 +232,7 @@ export function LogTab({ run, taskId, part }: { run: LiveTaskRun; taskId: string
             const select = e.target as HTMLSelectElement;
             const turn = Number(select.value);
             select.value = "";
-            if (turn > 0) scrollToPosition(positionOfTurn(buffer.lines, visible, turn));
+            if (turn > 0) scrollToPosition(positionOfTurn(lines, visible, turn));
           },
         }, h("option", { value: "" }, "Jump to…"), turns.map((t) => h("option", { key: t, value: t }, `Turn ${t}`)))),
       h("label", { class: "live-log-field", title: buffer.timestamps ? undefined : "This log has no timestamps" },
