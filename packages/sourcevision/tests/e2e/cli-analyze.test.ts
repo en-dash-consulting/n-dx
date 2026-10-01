@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtemp, cp, rm } from "node:fs/promises";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -89,6 +89,41 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
     expect(Object.keys(second.previous!.phases)).toEqual(
       expect.arrayContaining(["inventory", "imports", "classifications", "zones", "components"]),
     );
+  });
+
+  it("records a SIGTERM as a stop: progress failed, manifest phase in error, exit 143", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
+    await cp(FIXTURE_DIR, tmpDir, { recursive: true });
+    const svDir = join(tmpDir, ".sourcevision");
+
+    const child = spawn(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], { stdio: "ignore" });
+    const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit) => {
+      child.once("exit", (code, signal) => resolveExit({ code, signal }));
+    });
+    try {
+      // The handlers are installed right after the progress file is created.
+      const deadline = Date.now() + 20_000;
+      while (readAnalyzeProgress(svDir)?.status !== "running" && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      expect(readAnalyzeProgress(svDir)?.status).toBe("running");
+      child.kill("SIGTERM");
+    } catch (error) {
+      child.kill("SIGKILL");
+      throw error;
+    }
+
+    // 128 + SIGTERM(15); a run that finished before the signal would exit 0.
+    expect(await exited).toEqual({ code: 143, signal: null });
+
+    const progress = readAnalyzeProgress(svDir)!;
+    expect(progress).toMatchObject({ status: "failed", running: false });
+    expect(progress.error).toBe("Stopped (SIGTERM)");
+
+    const manifest = JSON.parse(readFileSync(join(svDir, "manifest.json"), "utf-8"));
+    const stopped = Object.values<{ status?: string; error?: string }>(manifest.modules ?? {})
+      .filter((m) => m.status === "error");
+    expect(stopped.map((m) => m.error)).toContain("Stopped (SIGTERM)");
   });
 
   it("produces deterministic output", async () => {

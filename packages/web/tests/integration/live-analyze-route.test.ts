@@ -25,8 +25,11 @@ import type { LiveSources } from "../../src/server/routes-live.js";
 import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 import { removeTempDir } from "../helpers/temp-dir.js";
 
-// Early enough that files the test writes "now" count as written by this run.
-const STARTED = "2026-10-01T00:00:00.000Z";
+// Early enough that files the test writes "now" count as written by this run,
+// whatever the clock says: derived from it, not a fixed date.
+const START_MS = Date.now() - 600_000;
+const at = (offsetMs: number): string => new Date(START_MS + offsetMs).toISOString();
+const STARTED = at(0);
 const ANALYZE_COMMAND = "node /repo/packages/sourcevision/dist/cli/index.js analyze --full .";
 
 let root: string;
@@ -53,8 +56,8 @@ function writeProgress(over: Record<string, unknown> = {}): void {
     command: "sv analyze --full",
     phase: { index: 2, name: "imports", total: 6 },
     phases: [
-      { index: 1, name: "inventory", startedAt: STARTED, endedAt: "2026-10-01T00:00:20.000Z", durationMs: 20_000, outcome: "ok" },
-      { index: 2, name: "imports", startedAt: "2026-10-01T00:00:20.000Z" },
+      { index: 1, name: "inventory", startedAt: STARTED, endedAt: at(20_000), durationMs: 20_000, outcome: "ok" },
+      { index: 2, name: "imports", startedAt: at(20_000) },
     ],
     pass: null,
     batch: null,
@@ -121,10 +124,10 @@ describe("GET /api/live/analyze", () => {
 
   it("shows the dashboard run's own output, finished or running", () => {
     expect(slotOutputIsCurrent({ running: true, finishedAt: null }, { startedAt: STARTED })).toBe(true);
-    expect(slotOutputIsCurrent({ running: false, finishedAt: "2026-10-01T00:05:00.000Z" }, { startedAt: STARTED })).toBe(true);
+    expect(slotOutputIsCurrent({ running: false, finishedAt: at(300_000) }, { startedAt: STARTED })).toBe(true);
     // Died before writing progress: the file is an older run's, the slot is the latest.
-    expect(slotOutputIsCurrent({ running: false, finishedAt: "2026-10-01T00:05:00.000Z" }, { startedAt: "2026-09-01T00:00:00.000Z" })).toBe(true);
-    expect(slotOutputIsCurrent({ running: false, finishedAt: "2026-10-01T00:05:00.000Z" }, null)).toBe(true);
+    expect(slotOutputIsCurrent({ running: false, finishedAt: at(300_000) }, { startedAt: "2026-09-01T00:00:00.000Z" })).toBe(true);
+    expect(slotOutputIsCurrent({ running: false, finishedAt: at(300_000) }, null)).toBe(true);
   });
 
   it("describes a phase from the file this run wrote, and not from the previous run's", () => {
@@ -142,7 +145,7 @@ describe("GET /api/live/analyze", () => {
   it("carries the enrichment pass zones.json records once the zones phase has ended", () => {
     writeProgress({
       phase: null,
-      phases: [{ index: 4, name: "zones", startedAt: STARTED, endedAt: "2026-10-01T00:01:00.000Z", durationMs: 60_000, outcome: "ok" }],
+      phases: [{ index: 4, name: "zones", startedAt: STARTED, endedAt: at(60_000), durationMs: 60_000, outcome: "ok" }],
     });
     writeJson(join(svDir, "zones.json"), { zones: [{ id: "a" }, { id: "b" }], enrichmentPass: 3 });
     const snapshot = buildLiveAnalyzeSnapshot(ctx, sources);
@@ -152,12 +155,12 @@ describe("GET /api/live/analyze", () => {
 
   it("lists manifest modules and background narration", () => {
     writeJson(join(svDir, "manifest.json"), {
-      modules: { inventory: { status: "complete", completedAt: "2026-10-01T00:00:20.000Z" }, zones: { status: "error", error: "boom" } },
+      modules: { inventory: { status: "complete", completedAt: at(20_000) }, zones: { status: "error", error: "boom" } },
       narration: { status: "pending", zones: ["a", "b"], names: ["c"] },
     });
     const snapshot = buildLiveAnalyzeSnapshot(ctx, sources);
     expect(snapshot.modules).toEqual([
-      { name: "inventory", status: "complete", startedAt: null, completedAt: "2026-10-01T00:00:20.000Z", error: null },
+      { name: "inventory", status: "complete", startedAt: null, completedAt: at(20_000), error: null },
       { name: "zones", status: "error", startedAt: null, completedAt: null, error: "boom" },
     ]);
     expect(snapshot.narration).toEqual({ status: "pending", zones: 3, reason: null });
