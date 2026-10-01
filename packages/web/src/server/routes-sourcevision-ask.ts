@@ -484,7 +484,7 @@ const KIND_FALLBACK_WORDING: Record<Exclude<AskErrorKind, "auth">, { error: stri
   },
   disabled: {
     error: "The SourceVision Ask panel is turned off for this project.",
-    suggestion: "Enable sourcevision.ask in the Feature Toggles view, or set features.sourcevision.ask to true in .n-dx.json.",
+    suggestion: "Enable sourcevision.ask in the feature flags on the Project settings page, or set features.sourcevision.ask to true in .n-dx.json.",
   },
   no_analysis: {
     error: "No analysis data to answer from.",

@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { FilesView } from "../../../src/viewer/views/files.js";
-import { HenchConfigView } from "../../../src/viewer/views/hench-config.js";
+import { WorkflowView } from "../../../src/viewer/views/workflow.js";
 import { ZoneSlideout } from "../../../src/viewer/components/zone-slideout.js";
 import { getGlossaryDefinition } from "../../../src/viewer/components/glossary-terms.js";
 import type { LoadedData } from "../../../src/viewer/types.js";
@@ -100,7 +100,7 @@ describe("[a11y] Files: archetype definition", () => {
   });
 });
 
-describe("hench Config: guard rail definition", () => {
+describe("Workflow work settings: guard rail definition", () => {
   function field(path: string, category: string) {
     return {
       path, label: path, description: "", type: "number", category,
@@ -109,14 +109,18 @@ describe("hench Config: guard rail definition", () => {
   }
 
   async function renderConfig() {
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        config: { schema: "hench/v1", maxTurns: 1, guard: { commandTimeout: 1 } },
-        fields: [field("maxTurns", "execution"), field("guard.commandTimeout", "guard")],
-      }),
-    })));
-    await act(async () => { render(h(HenchConfigView, null), root); });
+    // The page also loads CLI timeouts and templates; only the hench config
+    // matters here, so the other two fail and render their error states.
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => url === "/api/hench/config"
+      ? {
+          ok: true,
+          json: async () => ({
+            config: { schema: "hench/v1", maxTurns: 1, guard: { commandTimeout: 1 } },
+            fields: [field("maxTurns", "execution"), field("guard.commandTimeout", "guard")],
+          }),
+        }
+      : { ok: false, status: 404, json: async () => ({}) }));
+    await act(async () => { render(h(WorkflowView, { navigateTo: () => {} }), root); });
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     await act(async () => {});
   }

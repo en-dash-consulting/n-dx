@@ -1,0 +1,54 @@
+/* ── Workflow settings page ──────────────────────────────────────────
+ * The page shell only. Each section keeps its own stylesheet
+ * (hench-config.css, cli-timeout.css, hench-templates.css).
+ */
+
+.workflow-container {
+  padding: var(--space-6);
+}
+
+.workflow-header {
+  margin-bottom: var(--space-6);
+}
+
+.workflow-header-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.workflow-header-logo { flex-shrink: 0; }
+
+.workflow-header-title {
+  margin: 0;
+  font-size: var(--font-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.workflow-header-subtitle {
+  margin: var(--space-1) 0 0;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  line-height: var(--leading-normal);
+}
+
+.workflow-section {
+  margin-bottom: var(--space-8);
+}
+
+.workflow-section-title {
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+/* Provider and model live on Robot Wrangler; this line sits in their place. */
+.workflow-wrangler-link {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+}

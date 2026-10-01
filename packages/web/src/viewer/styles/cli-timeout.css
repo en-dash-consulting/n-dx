@@ -1,35 +1,15 @@
-/* CLI Timeout configuration view */
+/* CLI timeouts — the timeout section of the Workflow page */
 
 .ct-container {
   max-width: 900px;
 }
 
-/* ── Header ───────────────────────────────────────────────────────────── */
-
-.ct-header {
-  margin-bottom: var(--space-5);
-}
-
-.ct-header-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-.ct-header-logo {
-  flex-shrink: 0;
-}
-
-.ct-header-title {
-  font-size: var(--font-xl);
-  font-weight: var(--weight-semibold);
-}
+/* ── Intro ────────────────────────────────────────────────────────────── */
 
 .ct-header-subtitle {
   font-size: var(--font-base);
   color: var(--text-dim);
-  margin: 0;
+  margin: 0 0 var(--space-4);
   line-height: var(--leading-relaxed);
 }
 
@@ -274,97 +254,6 @@
   margin-top: var(--space-1);
 }
 
-/* ── Changes panel ────────────────────────────────────────────────────── */
-
-.ct-changes-panel {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-  border-radius: var(--radius-lg);
-  padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.ct-changes-header {
-  font-weight: var(--weight-semibold);
-  font-size: var(--font-base);
-  margin-bottom: var(--space-2);
-}
-
-.ct-changes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: var(--space-3);
-}
-
-.ct-change-item {
-  font-size: var(--font-sm);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.ct-change-label {
-  font-weight: var(--weight-medium);
-  min-width: 140px;
-}
-
-.ct-change-old {
-  color: var(--text-muted);
-  text-decoration: line-through;
-}
-
-.ct-change-arrow {
-  color: var(--text-dim);
-}
-
-.ct-change-new {
-  color: var(--accent);
-  font-weight: var(--weight-medium);
-}
-
-.ct-changes-actions {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.ct-save-btn {
-  padding: 6px 16px;
-  font-size: var(--font-base);
-  font-weight: var(--weight-semibold);
-  background: var(--accent);
-  color: var(--bg);
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: opacity var(--transition-fast);
-}
-
-.ct-save-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ct-discard-btn {
-  padding: 6px 16px;
-  font-size: var(--font-base);
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-}
-
-.ct-discard-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.ct-discard-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 /* ── Info box ─────────────────────────────────────────────────────────── */
 
 .ct-info-box {
@@ -396,41 +285,6 @@
   margin: 0;
 }
 
-/* ── Toast ────────────────────────────────────────────────────────────── */
-
-.ct-toast {
-  position: fixed;
-  bottom: calc(20px + var(--bottombar-h, 0px));
-  right: 20px;
-  background: var(--green);
-  color: var(--bg);
-  padding: 10px 18px;
-  border-radius: var(--radius-lg);
-  font-size: var(--font-base);
-  font-weight: var(--weight-semibold);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  animation: ct-toast-in 0.2s ease-out;
-  z-index: 1000;
-}
-
-.ct-toast-icon {
-  font-size: var(--font-lg);
-}
-
-@keyframes ct-toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* ── Responsive ───────────────────────────────────────────────────────── */
 
 @media (max-width: 700px) {
@@ -442,9 +296,5 @@
   .ct-field-header {
     flex-direction: column;
     gap: var(--space-2);
-  }
-
-  .ct-changes-actions {
-    flex-direction: column;
   }
 }

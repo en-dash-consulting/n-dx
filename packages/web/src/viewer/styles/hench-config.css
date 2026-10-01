@@ -1,20 +1,11 @@
-/* Hench Config view — workflow configuration form editor */
+/* Work settings — the hench config section of the Workflow page */
 
 .hench-config-container {
   max-width: 900px;
 }
 
-/* Header */
-.hench-config-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-
 .hench-config-modified-count {
+  margin: 0 0 var(--space-4);
   font-size: 12px;
   color: var(--brand-teal);
 }
@@ -49,130 +40,6 @@
   border-radius: 8px;
   font-size: 13px;
   margin-bottom: var(--space-4);
-}
-
-/* ── Changes summary panel ─────────────────────────────────────────── */
-
-.hench-config-changes-panel {
-  background: var(--bg-surface);
-  border: 1px solid var(--accent);
-  border-radius: 8px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
-  position: sticky;
-  top: 8px;
-  z-index: 10;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-.hench-config-changes-header {
-  margin-bottom: 10px;
-}
-
-.hench-config-changes-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.hench-config-changes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.hench-config-change-item {
-  padding: 6px 10px;
-  background: var(--bg-hover);
-  border-radius: 6px;
-  font-size: 12px;
-}
-
-.hench-config-change-label {
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 2px;
-}
-
-.hench-config-change-diff {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.hench-config-change-old {
-  color: var(--text-dim);
-  text-decoration: line-through;
-  font-family: monospace;
-  font-size: 11px;
-}
-
-.hench-config-change-arrow {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.hench-config-change-new {
-  color: var(--accent);
-  font-family: monospace;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.hench-config-change-impact {
-  color: var(--text-dim);
-  font-size: 11px;
-  margin-top: 2px;
-}
-
-.hench-config-changes-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.hench-config-discard-btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  padding: 6px 14px;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-
-.hench-config-discard-btn:hover {
-  border-color: var(--text-dim);
-  color: var(--text);
-}
-
-.hench-config-discard-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.hench-config-save-all-btn {
-  background: var(--accent);
-  border: none;
-  color: var(--bg);
-  padding: 6px 16px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.hench-config-save-all-btn:hover {
-  opacity: 0.9;
-}
-
-.hench-config-save-all-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* ── Category sections ─────────────────────────────────────────────── */
@@ -531,41 +398,6 @@
   margin-top: 6px;
 }
 
-/* ── Save toast ────────────────────────────────────────────────────── */
-
-.hench-config-toast {
-  position: fixed;
-  bottom: calc(20px + var(--bottombar-h, 0px));
-  right: 20px;
-  background: var(--green);
-  color: var(--bg);
-  padding: 10px 18px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  animation: toast-in 0.2s ease-out;
-  z-index: 1000;
-}
-
-.hench-config-toast-icon {
-  font-size: 16px;
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* ── Responsive ────────────────────────────────────────────────────── */
 
 @media (max-width: 700px) {
@@ -581,9 +413,5 @@
   .hench-config-field-header {
     flex-direction: column;
     gap: 2px;
-  }
-
-  .hench-config-changes-panel {
-    position: static;
   }
 }
