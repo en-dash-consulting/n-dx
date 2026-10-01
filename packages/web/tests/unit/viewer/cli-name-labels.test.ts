@@ -58,7 +58,7 @@ describe("dashboard labels use the project CLI name", () => {
     stubProject("myapp");
     act(() => {
       render(h(SettingsOverlay, {
-        view: "llm-provider",
+        view: "robot-wrangler",
         validViews: buildValidViews(null),
         onNavigate: () => {},
         onClose: () => {},
@@ -87,7 +87,7 @@ describe("dashboard labels use the project CLI name", () => {
     stubProject(undefined);
     act(() => {
       render(h(SettingsOverlay, {
-        view: "llm-provider",
+        view: "robot-wrangler",
         validViews: buildValidViews(null),
         onNavigate: () => {},
         onClose: () => {},

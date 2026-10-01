@@ -38,7 +38,7 @@
 @import "./feature-toggles.css";
 @import "./cli-timeout.css";
 @import "./commands.css";
-@import "./llm-provider.css";
+@import "./robot-wrangler.css";
 @import "./project-settings.css";
 @import "./pr-markdown.css";
 @import "./ask.css";

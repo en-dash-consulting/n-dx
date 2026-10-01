@@ -6,7 +6,8 @@
  * both are now the lead section of a stage (`analyze`, `work`) and should
  * 302 there instead of serving the orphaned bare view. The one exception is
  * a rex-scoped viewer, which has no Work stage, so `/rex-dashboard` keeps
- * being served as its own page there.
+ * being served as its own page there. `/llm-provider` was renamed to
+ * `/robot-wrangler` and redirects the same way.
  */
 
 import { describe, it, expect } from "vitest";
@@ -57,6 +58,17 @@ describe("redirect aliases: full dashboard (no scope)", () => {
       const res = await fetch(`${baseUrl}/rex-dashboard`, { redirect: "manual" });
       expect(res.status).toBe(302);
       expect(res.headers.get("location")).toBe("work");
+    } finally {
+      await close();
+    }
+  });
+
+  it("redirects the renamed /llm-provider to /robot-wrangler", async () => {
+    const { baseUrl, close } = await startFor(baseCtx());
+    try {
+      const res = await fetch(`${baseUrl}/llm-provider`, { redirect: "manual" });
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("robot-wrangler");
     } finally {
       await close();
     }

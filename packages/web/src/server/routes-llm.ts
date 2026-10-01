@@ -30,7 +30,7 @@ import {
   resolveClaudeConfig,
 } from "@n-dx/llm-client";
 import type { LLMVendor, ClaudeFieldSource } from "@n-dx/llm-client";
-import { VENDOR_PROVIDERS } from "./hench-config-fields.js";
+import { VENDOR_PROVIDERS, validateProviderForVendor } from "./hench-config-fields.js";
 import { resolveEffectiveAgentConfig } from "./effective-agent-config.js";
 import type { EffectiveAgentConfig } from "./effective-agent-config.js";
 
@@ -102,6 +102,18 @@ export interface LlmConfigResponse {
    * it.
    */
   effective: EffectiveAgentConfig;
+  /**
+   * Why `ndx work` would refuse to run {@link LlmConfigResponse.effective};
+   * empty when it would run. The viewer renders these and runs no check of its
+   * own, so the rules live only here, beside the validators they come from.
+   */
+  effectiveProblems: EffectiveProblem[];
+}
+
+/** One reason the resolved agent config would be refused. */
+export interface EffectiveProblem {
+  field: "provider" | "model";
+  message: string;
 }
 
 /** Shape expected by PUT /api/llm/config. */
@@ -366,6 +378,27 @@ export function resolveActiveVendor(projectDir: string): string | null {
 }
 
 /**
+ * Refusals `ndx work` would raise for the resolved config. The provider check
+ * is the one the dashboard already applies on write; the model check is
+ * llm-client's, skipped for `local` where any loaded model id is valid.
+ */
+function findEffectiveProblems(effective: EffectiveAgentConfig): EffectiveProblem[] {
+  const problems: EffectiveProblem[] = [];
+  const providerError = validateProviderForVendor(effective.provider, effective.vendor);
+  if (providerError) problems.push({ field: "provider", message: providerError });
+  if (
+    effective.vendor !== LLM_VENDOR.LOCAL &&
+    !isModelCompatibleWithVendor(effective.vendor, effective.model)
+  ) {
+    problems.push({
+      field: "model",
+      message: `Model "${effective.model}" is not a ${effective.vendor} model.`,
+    });
+  }
+  return problems;
+}
+
+/**
  * Async because of `effective`, which resolves through `loadLLMConfig` — the
  * same async loader hench and the Ask endpoint use, rather than a fourth
  * hand-rolled read of the same two files.
@@ -382,6 +415,8 @@ async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> 
   // the same resolution `loadLLMConfig` and `GET /api/ndx-config` use, so the
   // dashboard shows the value the next run will actually use.
   const claude = resolveClaudeConfig(llm["claude"], config["claude"]);
+
+  const effective = await resolveEffectiveAgentConfig(projectDir);
 
   const result: LlmConfigResponse = {
     vendor: typeof llm["vendor"] === "string" ? llm["vendor"] : null,
@@ -415,7 +450,8 @@ async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> 
       ...(claude.sources.model ? { model: claude.sources.model } : {}),
       ...(claude.sources.lightModel ? { lightModel: claude.sources.lightModel } : {}),
     },
-    effective: await resolveEffectiveAgentConfig(projectDir),
+    effective,
+    effectiveProblems: findEffectiveProblems(effective),
   };
 
   if (typeof llm["autoFailover"] === "boolean") {

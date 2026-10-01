@@ -138,7 +138,7 @@ const PRESENTATION: Record<AskFailureKind, KindPresentation> = {
     message: "The configured LLM vendor refused the request before it produced an answer.",
     // Deliberately navigation, not credential advice: the fix wording is
     // canonical and arrives from the endpoint as `remediation`.
-    steps: ["Open the LLM Provider view to see which vendor and model this project is configured for."],
+    steps: ["Open the Robot Wrangler view to see which vendor and model this project is configured for."],
     canRetry: false,
     needsAnalysis: false,
   },
@@ -175,7 +175,7 @@ const PRESENTATION: Record<AskFailureKind, KindPresentation> = {
     // and an automatic retry would spend the same tokens on the same fault. The
     // prompt survives, so asking again stays one keypress away when the user
     // judges it worth it.
-    steps: ["Rephrase the question and ask again, or check the LLM Provider view for the model in use."],
+    steps: ["Rephrase the question and ask again, or check the Robot Wrangler view for the model in use."],
     canRetry: false,
     needsAnalysis: false,
   },

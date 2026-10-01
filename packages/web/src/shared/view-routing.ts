@@ -56,7 +56,7 @@ export const CROSS_CUTTING_VIEWS: readonly ViewId[] = [
   "cli-timeouts",
   "command-reference",
   "commands",
-  "llm-provider",
+  "robot-wrangler",
   "project-settings",
 ];
 
@@ -95,6 +95,8 @@ export function isKnownViewPath(segment: string): boolean {
 const VIEW_ALIASES: Readonly<Record<string, ViewId>> = {
   overview: "analyze",
   "rex-dashboard": "work",
+  // 0.8.0 renamed the LLM Provider page to Robot Wrangler.
+  "llm-provider": "robot-wrangler",
 };
 
 /**

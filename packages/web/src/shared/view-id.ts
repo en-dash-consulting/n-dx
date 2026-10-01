@@ -43,7 +43,7 @@ export type ViewId =
   | "cli-timeouts"
   | "commands"
   | "command-reference"
-  | "llm-provider"
+  | "robot-wrangler"
   | "project-settings"
   | "merge-graph"
   | "workspaces";

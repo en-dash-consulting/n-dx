@@ -1,15 +1,18 @@
 /**
- * LLM Provider view — configure active vendor and per-vendor model selection.
+ * Robot Wrangler — configure the active vendor and per-vendor model selection.
  *
  * Surfaces llm.vendor (claude/codex/google/local), per-vendor model fields, and
- * local server connection settings from `.n-dx.json`.
+ * local server connection settings from the project config, and shows what
+ * `ndx work` will actually run with (the route's `effective` block, plus any
+ * `effectiveProblems` it would refuse on). Renders on the shared SettingsFrame,
+ * which owns Save, the dirty indicator and the leave-with-unsaved-changes prompt.
  *
  * Data: GET /api/llm/config (read) · PUT /api/llm/config (update)
  */
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { NdxLogoPng } from "../components/index.js";
+import { NdxLogoPng, SettingsFrame } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -50,6 +53,22 @@ interface LlmConfigResponse {
    */
   claudeSources: Partial<Record<"model" | "lightModel", "llm" | "legacy">>;
   autoFailover?: boolean;
+  /** What `ndx work` runs with no flags, resolved server-side. */
+  effective: EffectiveConfig;
+  /** Why `ndx work` would refuse `effective`; empty when it would run. */
+  effectiveProblems: EffectiveProblem[];
+}
+
+interface EffectiveConfig {
+  vendor: string;
+  provider: string;
+  model: string;
+  modelSource: "hench-override" | "configured" | "default";
+}
+
+interface EffectiveProblem {
+  field: "provider" | "model";
+  message: string;
 }
 
 interface LocalStatusResponse {
@@ -171,6 +190,7 @@ function ModelField({
   onChange,
   dirty,
   placeholder,
+  legacyKey,
 }: {
   fieldKey: string;
   label: string;
@@ -180,12 +200,18 @@ function ModelField({
   onChange: (key: string, v: string) => void;
   dirty: boolean;
   placeholder?: string;
+  /** Deprecated key this value is still read from, when it is not `llm.*`. */
+  legacyKey?: string;
 }) {
   const listId = suggestions.length > 0 ? `llm-dl-${fieldKey}` : undefined;
   return h("div", { class: `llm-field${dirty ? " llm-field-dirty" : ""}` },
     h("label", { class: "llm-field-label", htmlFor: fieldKey },
       label,
       dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+      legacyKey
+        ? h("span", { class: "llm-field-source", title: "Read from the deprecated key; saving writes the llm.* key" },
+            ` from legacy ${legacyKey}`)
+        : null,
     ),
     h("p", { class: "llm-field-desc" }, description),
     h("input", {
@@ -292,12 +318,15 @@ function VendorSection({
   editValues,
   onChange,
   dirtyKeys,
+  legacyFields,
 }: {
   vendorId: CloudViewerVendor;
   config: VendorConfig;
   editValues: Record<string, string>;
   onChange: (key: string, v: string) => void;
   dirtyKeys: Set<string>;
+  /** Fields still read from the deprecated top-level key (Claude only). */
+  legacyFields: ReadonlyArray<"model" | "lightModel">;
 }) {
   const cliName = useCliName();
   const suggestions = MODEL_SUGGESTIONS[vendorId] ?? [];
@@ -313,6 +342,7 @@ function VendorSection({
       suggestions,
       onChange,
       dirty: dirtyKeys.has(modelKey),
+      legacyKey: legacyFields.includes("model") ? "claude.model" : undefined,
     }),
     h(ModelField, {
       fieldKey: lightKey,
@@ -322,7 +352,45 @@ function VendorSection({
       suggestions,
       onChange,
       dirty: dirtyKeys.has(lightKey),
+      legacyKey: legacyFields.includes("lightModel") ? "claude.lightModel" : undefined,
     }),
+  );
+}
+
+// ── Effective block ───────────────────────────────────────────────────
+
+const MODEL_SOURCE_LABEL: Record<EffectiveConfig["modelSource"], string> = {
+  "hench-override": "agent model override",
+  configured: "configured",
+  default: "vendor default",
+};
+
+/**
+ * What `ndx work` will run with no flags. The route resolves it and, when it
+ * would refuse the result, lists why in `problems` — this component only
+ * renders; it applies no rules of its own.
+ */
+function EffectiveBlock({ effective, problems }: { effective: EffectiveConfig; problems: EffectiveProblem[] }) {
+  const cliName = useCliName();
+  const refused = problems.length > 0;
+  return h("section", {
+    class: `llm-effective${refused ? " llm-effective-refused" : ""}`,
+    "aria-label": `What ${cliName} work will run`,
+  },
+    h("p", { class: "llm-section-sub" }, `${cliName} work will run with`),
+    h("dl", { class: "llm-effective-list" },
+      h("dt", null, "Vendor"), h("dd", null, effective.vendor),
+      h("dt", null, "Provider"), h("dd", null, effective.provider),
+      h("dt", null, "Model"),
+      h("dd", null, effective.model,
+        h("span", { class: "llm-effective-source" }, ` (${MODEL_SOURCE_LABEL[effective.modelSource]})`)),
+    ),
+    refused
+      ? h("div", { class: "llm-effective-problems", role: "alert" },
+          h("strong", null, `${cliName} work would refuse this configuration`),
+          h("ul", null, problems.map((p) => h("li", { key: p.field }, p.message))),
+        )
+      : null,
   );
 }
 
@@ -806,7 +874,7 @@ function LocalSection({
   );
 }
 
-// ── Toast ─────────────────────────────────────────────────────────────
+// ── Credential status ─────────────────────────────────────────────────
 
 /**
  * Credential status for the configured provider.
@@ -860,24 +928,14 @@ export function AuthStatusChip() {
   );
 }
 
-function SaveToast({ message }: { message: string | null }) {
-  if (!message) return null;
-  return h("div", { class: "llm-toast", role: "status", "aria-live": "polite" },
-    h("span", { class: "llm-toast-check" }, "✓"),
-    h("span", null, message),
-  );
-}
-
 // ── Main view ─────────────────────────────────────────────────────────
 
-export function LlmProviderView() {
+export function RobotWranglerView() {
   const cliName = useCliName();
   const [data, setData] = useState<LlmConfigResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const toastRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [editValues,  setEditValues]  = useState<Record<string, string>>({});
   const [editToggles, setEditToggles] = useState<Record<string, boolean>>({});
@@ -905,7 +963,6 @@ export function LlmProviderView() {
   }, []);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
-  useEffect(() => () => { if (toastRef.current) clearTimeout(toastRef.current); }, []);
 
   const handleVendorChange = useCallback((v: string | null) => setPendingVendor(v), []);
   const handleField  = useCallback((key: string, val: string)  => setEditValues((p)  => ({ ...p, [key]: val })), []);
@@ -966,7 +1023,6 @@ export function LlmProviderView() {
   }
 
   const hasChanges = dirtyKeys.size > 0 || vendorDirty || dirtyToggles.size > 0;
-  const changeCount = dirtyKeys.size + dirtyToggles.size + (vendorDirty ? 1 : 0);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -989,6 +1045,8 @@ export function LlmProviderView() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: "Save failed" }));
+        // Edits stay in place and `dirty` stays true, so the frame keeps Save
+        // enabled and the leave prompt armed.
         setError((body as { error?: string }).error ?? "Failed to save");
         return;
       }
@@ -997,9 +1055,6 @@ export function LlmProviderView() {
       setEditValues({});
       setEditToggles({});
       setPendingVendor(undefined);
-      setToast("Saved");
-      if (toastRef.current) clearTimeout(toastRef.current);
-      toastRef.current = setTimeout(() => setToast(null), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -1033,34 +1088,37 @@ export function LlmProviderView() {
     .filter((f) => data?.claudeSources?.[f] === "legacy");
   const showLegacy = legacyFields.length > 0;
 
-  return h("div", { class: "llm-container" },
+  return h(SettingsFrame, {
+    dirty: hasChanges,
+    saving,
+    error,
+    onSave: handleSave,
+    onDiscard: handleDiscard,
+  },
+   h("div", { class: "llm-container" },
 
     h("div", { class: "llm-header" },
       h("div", { class: "llm-header-brand" },
         h(NdxLogoPng, { size: 16, class: "llm-header-logo" }),
-        h("span", { class: "llm-header-title" }, "LLM Provider"),
+        h("span", { class: "llm-header-title" }, "Robot Wrangler"),
       ),
       h("p", { class: "llm-header-subtitle" },
-        "General settings used by all LLM commands (",
+        "Provider and model for all LLM commands (",
         h("code", null, `${cliName} work`),
         ", ",
         h("code", null, `${cliName} plan`),
         ", ",
         h("code", null, `${cliName} recommend`),
         "). Select the active vendor and configure model IDs. ",
-        "Changes are saved to ",
-        h("code", null, ".n-dx.json"),
-        " and take effect on the next run.",
+        "Changes are saved to the project config and take effect on the next run.",
       ),
     ),
 
     // ── Credential status for the configured provider
     h(AuthStatusChip, null),
 
-    // ── Error banner
-    error
-      ? h("div", { class: "llm-error-banner" }, error)
-      : null,
+    // What `ndx work` will run, per the route (saved config, not pending edits)
+    data ? h(EffectiveBlock, { effective: data.effective, problems: data.effectiveProblems }) : null,
 
     h(VendorSelector, {
       vendor: effectiveVendor,
@@ -1077,6 +1135,7 @@ export function LlmProviderView() {
           editValues,
           onChange: handleField,
           dirtyKeys,
+          legacyFields: effectiveVendor === VIEWER_LLM_VENDOR.CLAUDE ? legacyFields : [],
         })
       : null,
     showLocal
@@ -1127,26 +1186,6 @@ export function LlmProviderView() {
           ),
         )
       : null,
-
-    // Save / discard bar
-    hasChanges
-      ? h("div", { class: "llm-save-bar" },
-          h("span", { class: "llm-save-hint" },
-            `${changeCount} unsaved change${changeCount === 1 ? "" : "s"}`,
-          ),
-          h("button", {
-            class: "cmd-btn cmd-btn-secondary",
-            onClick: handleDiscard,
-            disabled: saving,
-          }, "Discard"),
-          h("button", {
-            class: "cmd-btn cmd-btn-primary",
-            onClick: handleSave,
-            disabled: saving,
-          }, saving ? "Saving…" : "Save"),
-        )
-      : null,
-
-    h(SaveToast, { message: toast }),
+   ),
   );
 }

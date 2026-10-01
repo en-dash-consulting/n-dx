@@ -1,4 +1,4 @@
-/* ── LLM Provider settings view ─────────────────────────────────── */
+/* ── Robot Wrangler settings view ─────────────────────────────────── */
 
 .llm-container {
   padding: var(--spacing-lg);
@@ -674,3 +674,24 @@
 .llm-verifier-details[open] .llm-verifier-summary {
   margin-bottom: var(--spacing-xs, 4px);
 }
+
+/* ── Effective block: what `work` will run, and why it might refuse ── */
+.llm-effective {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.llm-effective-refused { border-color: var(--red); }
+.llm-effective-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.llm-effective-list dt { color: var(--text-muted); }
+.llm-effective-list dd { margin: 0; }
+.llm-effective-source { color: var(--text-muted); }
+.llm-effective-problems { margin-top: var(--space-2); color: var(--red); }
+.llm-effective-problems ul { margin: var(--space-1) 0 0; padding-left: var(--space-4); }
+.llm-field-source { font-weight: normal; color: var(--text-muted); }

@@ -116,7 +116,7 @@ describe("stages.ts", () => {
     }
     expect(isKnownViewPath("home")).toBe(true);
     expect(SETTINGS_ENTRIES.map((e) => e.view)).toEqual([
-      "llm-provider", "project-settings", "hench-config", "notion-config", "integrations", "commands", "feature-toggles", "cli-timeouts",
+      "robot-wrangler", "project-settings", "hench-config", "notion-config", "integrations", "commands", "feature-toggles", "cli-timeouts",
     ]);
   });
 
@@ -139,7 +139,7 @@ describe("stages.ts", () => {
     expect(stageForView("rex-dashboard")).toBe("work");
     expect(stageForView("work")).toBe("work");
     expect(stageForView("home")).toBeNull();
-    expect(stageForView("llm-provider")).toBeNull();
+    expect(stageForView("robot-wrangler")).toBeNull();
     // Token Usage is on Work only; a Rex-only viewer has no Work stage.
     expect(stageForView("token-usage")).toBe("work");
     expect(stageForView("token-usage", buildValidViews("rex"))).toBeNull();
@@ -632,18 +632,18 @@ describe("SettingsOverlay", () => {
     Array.from(el.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent ?? "").join("").trim());
 
   it("is a modal dialog listing the settings pages, gated ones hidden while off", async () => {
-    await mount(overlay("llm-provider"));
+    await mount(overlay("robot-wrangler"));
     const dialog = root.querySelector(".settings-overlay")!;
     expect(dialog.getAttribute("role")).toBe("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(items()).toEqual(["General", "n-dx analyze / plan", "n-dx work", "n-dx export / refresh", "Feature Flags", "CLI Timeouts"]);
+    expect(items()).toEqual(["Robot Wrangler", "n-dx analyze / plan", "n-dx work", "n-dx export / refresh", "Feature Flags", "CLI Timeouts"]);
     expect(root.querySelector(".fake-settings")).not.toBeNull();
-    expect(root.querySelector(".settings-overlay-crumbs")?.textContent).toContain("General");
+    expect(root.querySelector(".settings-overlay-crumbs")?.textContent).toContain("Robot Wrangler");
   });
 
   it("shows the gated pages when their toggles are on", async () => {
     stubApi(["rex.notionSync", "rex.integrations"]);
-    await mount(overlay("llm-provider"));
+    await mount(overlay("robot-wrangler"));
     expect(items()).toContain("n-dx sync");
     expect(items()).toContain("Integrations");
   });
@@ -654,7 +654,7 @@ describe("SettingsOverlay", () => {
     await mount(overlay("hench-config", onNavigate, onClose));
     expect(root.querySelector(".settings-overlay-item.active")?.textContent).toContain("work");
     act(() => { (root.querySelectorAll<HTMLButtonElement>(".settings-overlay-item")[0]).click(); });
-    expect(onNavigate).toHaveBeenCalledWith("llm-provider");
+    expect(onNavigate).toHaveBeenCalledWith("robot-wrangler");
     act(() => { root.querySelector<HTMLButtonElement>(".settings-overlay-close")!.click(); });
     act(() => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
     expect(onClose).toHaveBeenCalledTimes(2);

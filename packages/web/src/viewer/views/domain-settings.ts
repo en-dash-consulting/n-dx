@@ -14,5 +14,5 @@ export { FeatureTogglesView } from "./feature-toggles.js";
 export { CliTimeoutsView } from "./cli-timeout.js";
 export { CommandsView } from "./commands.js";
 export { CommandReferenceView } from "./command-reference.js";
-export { LlmProviderView } from "./llm-provider.js";
+export { RobotWranglerView } from "./robot-wrangler.js";
 export { ProjectSettingsView } from "./project-settings.js";

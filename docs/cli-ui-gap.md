@@ -57,10 +57,10 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `ndx start` / `ndx dev` | n/a | — | These commands launch the dashboard |
 | `ndx version` / `ndx help` | n/a | — | Footer version + Guide/FAQ views cover this |
 
-### `ndx config` — LLM Provider view detail
+### `ndx config` — Robot Wrangler view detail
 
-- **Local vendor (full):** the LLM Provider view (`packages/web/src/viewer/views/llm-provider.ts`) adds a "local" vendor alongside Claude/Codex — host/port/model fields, a live status probe, a connection smoke test (latency + tokens/sec), and saved server profiles. Backed by GET/PUT `/api/llm/config` plus GET `/api/llm/local-status`, POST `/api/llm/local-test`, and GET/POST/DELETE `/api/llm/local-profiles` (`packages/web/src/server/routes-llm.ts`).
-- **Google/Gemini vendor (none, impact: medium):** the CLI's `google` vendor (`packages/core/config.js`) has no dashboard representation — `VENDORS` in `llm-provider.ts` and `VALID_VENDORS` in `routes-llm.ts` cover only claude/codex/local; no tab, no field in the `GET`/`PUT /api/llm/config` contract.
+- **Local vendor (full):** the Robot Wrangler view (`packages/web/src/viewer/views/robot-wrangler.ts`) adds a "local" vendor alongside Claude/Codex — host/port/model fields, a live status probe, a connection smoke test (latency + tokens/sec), and saved server profiles. Backed by GET/PUT `/api/llm/config` plus GET `/api/llm/local-status`, POST `/api/llm/local-test`, and GET/POST/DELETE `/api/llm/local-profiles` (`packages/web/src/server/routes-llm.ts`).
+- **Google/Gemini vendor (none, impact: medium):** the CLI's `google` vendor (`packages/core/config.js`) has no dashboard representation — `VENDORS` in `robot-wrangler.ts` and `VALID_VENDORS` in `routes-llm.ts` cover only claude/codex/local; no tab, no field in the `GET`/`PUT /api/llm/config` contract.
 
 ## rex package CLI
 

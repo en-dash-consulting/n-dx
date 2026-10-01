@@ -168,7 +168,7 @@ export interface SettingsEntry {
 
 /** Workflow order: General → analyze/plan → work → sync → export, then cross-cutting. */
 export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
-  { view: "llm-provider" },
+  { view: "robot-wrangler" },
   { view: "project-settings" },
   { view: "hench-config" },
   { view: "notion-config", featureGate: "rex.notionSync" },

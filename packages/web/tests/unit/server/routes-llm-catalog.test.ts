@@ -3,7 +3,7 @@
  * provider choices hench accepts.
  *
  * Replaces the viewer's hard-coded `MODEL_SUGGESTIONS` list
- * (`packages/web/src/viewer/views/llm-provider.ts`) as the source of truth for
+ * (`packages/web/src/viewer/views/robot-wrangler.ts`) as the source of truth for
  * which models to offer: cloud-vendor models come from llm-client's catalog
  * (`TIER_MODELS` / `MODEL_COSTS`), local models come from a live probe of the
  * configured local server, and provider choices come from the same table

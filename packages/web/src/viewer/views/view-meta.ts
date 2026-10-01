@@ -245,8 +245,8 @@ export const VIEW_META = {
   },
 
   // ── Settings ─────────────────────────────────────────────────
-  "llm-provider": {
-    label: "General",
+  "robot-wrangler": {
+    label: "Robot Wrangler",
     glyph: "\u{1F9E0}",
     product: "global",
     blurb: "Which model answers, and the credentials it answers with.",

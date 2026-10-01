@@ -114,7 +114,7 @@ test("settings open over the page from the cog and close back to it", async ({ p
   await expect(page.locator(".bottombar-settings")).toBeVisible({ timeout: 10_000 });
 
   await page.locator(".bottombar-settings").click();
-  await expect(page).toHaveURL(/\/llm-provider$/);
+  await expect(page).toHaveURL(/\/robot-wrangler$/);
   await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
   await expect(page.locator('main .stage-page[data-stage="work"]')).toHaveCount(1); // still mounted underneath
 
@@ -145,6 +145,7 @@ test("the commands sheet lifts over the page and lowers again", async ({ page })
 const ALIASES: Array<[string, string]> = [
   ["overview", "analyze"],
   ["rex-dashboard", "work"],
+  ["llm-provider", "robot-wrangler"],
 ];
 
 for (const [oldPath, target] of ALIASES) {

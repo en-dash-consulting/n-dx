@@ -341,7 +341,7 @@ describe("rendered surfaces take their labels from the model", () => {
   it("the settings overlay names each entry with the model's label", async () => {
     act(() => {
       render(h(SettingsOverlay, {
-        view: "llm-provider", validViews: buildValidViews(null),
+        view: "robot-wrangler", validViews: buildValidViews(null),
         onNavigate: () => {}, onClose: () => {}, children: null,
       }), root);
     });
