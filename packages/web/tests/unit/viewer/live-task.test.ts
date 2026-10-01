@@ -227,6 +227,39 @@ describe("the rendered page", () => {
     expect(post?.init?.method).toBe("POST");
   });
 
+  async function stopWith(terminateBody: Record<string, unknown>, runOverrides: Partial<LiveTaskRun> = {}) {
+    body = snapshot({ runs: [run(runOverrides)] });
+    const base = globalThis.fetch as unknown as (u: string, i?: RequestInit) => Promise<unknown>;
+    vi.stubGlobal("fetch", vi.fn(async (u: string, i?: RequestInit) =>
+      String(u).includes("/terminate")
+        ? { ok: true, status: 200, json: async () => terminateBody }
+        : base(u, i)));
+    await mount();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirm.mockClear();
+    const stop = [...root.querySelectorAll("button")].find((b) => b.textContent === "Stop")!;
+    await act(async () => { stop.click(); await flush(); });
+    return { notice: root.querySelector(".live-notice")?.textContent, question: confirm.mock.calls[0][0] };
+  }
+
+  it("says the process was not signalled when the server only marked the record", async () => {
+    const { notice } = await stopWith({ terminated: true, method: "disk-mark" });
+    expect(notice).toBe("Marked terminated; the process was not signalled (pid 4242)");
+  });
+
+  it("reports Stopped when a signal was sent", async () => {
+    const { notice } = await stopWith({ terminated: true, signalSent: true, method: "pid-signal" });
+    expect(notice).toBe("Stopped");
+  });
+
+  it("promises a stop signal only when the run has a recorded pid", async () => {
+    const withPid = await stopWith({ signalSent: true });
+    expect(withPid.question).toContain("is sent a stop signal");
+    render(null, root);
+    const noPid = await stopWith({ method: "disk-mark" }, { pid: null });
+    expect(noPid.question).toContain("no stop signal can be sent");
+  });
+
   it("offers Mark stuck only for a stale run", async () => {
     await mount();
     const mark = () => [...root.querySelectorAll("button")].find((b) => b.textContent === "Mark stuck");

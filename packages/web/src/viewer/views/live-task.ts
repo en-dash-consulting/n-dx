@@ -101,7 +101,9 @@ function Header({ taskId, snapshot, run, onPick, navigateTo, refresh }: HeaderPr
     if (!run) return;
     const question = kind === "stop"
       ? run.startedFrom === "terminal"
-        ? `Stop this run? It was started from a terminal; its process (pid ${run.pid ?? "unknown"}) is sent a stop signal.`
+        ? run.pid != null
+          ? `Stop this run? It was started from a terminal; its process (pid ${run.pid}) is sent a stop signal if the recorded pid still belongs to it. Otherwise only the record is marked failed.`
+          : "Stop this run? It was started from a terminal and no pid is recorded, so no stop signal can be sent. The record is marked failed but the process may keep running."
         : "Stop this run? The agent process is terminated and the run is marked failed."
       : "Mark this run stuck? Its record is set to failed, but the agent process is not stopped and may keep working.";
     if (!window.confirm(question)) return;
@@ -112,7 +114,17 @@ function Header({ taskId, snapshot, run, onPick, navigateTo, refresh }: HeaderPr
         ? `/api/hench/execute/${encodeURIComponent(taskId)}/terminate`
         : `/api/hench/runs/${encodeURIComponent(run.runId)}/mark-stuck`;
       const res = await fetch(url, { method: "POST" });
-      setNotice(res.ok ? (kind === "stop" ? "Stopped" : "Marked stuck") : await errorOf(res, kind === "stop" ? "Could not stop" : "Could not mark stuck"));
+      if (!res.ok) {
+        setNotice(await errorOf(res, kind === "stop" ? "Could not stop" : "Could not mark stuck"));
+      } else if (kind === "stuck") {
+        setNotice("Marked stuck");
+      } else {
+        const body = await res.json().catch(() => null) as { signalSent?: boolean; pid?: number } | null;
+        // The disk-mark path omits signalSent: only an explicit true means a signal went out.
+        setNotice(body?.signalSent === true
+          ? "Stopped"
+          : `Marked terminated; the process was not signalled${run.pid != null ? ` (pid ${run.pid})` : ""}`);
+      }
       await refresh();
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Request failed");
