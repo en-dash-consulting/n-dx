@@ -69,8 +69,8 @@ function Harness({ dirty, setDirty }: { dirty: boolean; setDirty: (d: boolean) =
     h("div", { class: "discard-count" }, String(discards)),
     h("button", { class: "nav-home", onClick: () => navigateTo("home") }, "navigateTo home"),
     h("button", { class: "sidebar-home", onClick: () => handleSidebarNav("home") }, "handleSidebarNav home"),
-    h("button", { class: "sidebar-same", onClick: () => handleSidebarNav("llm-provider") }, "handleSidebarNav self"),
-    view === "llm-provider"
+    h("button", { class: "sidebar-same", onClick: () => handleSidebarNav("robot-wrangler") }, "handleSidebarNav self"),
+    view === "robot-wrangler"
       ? h(SettingsFrame, {
           dirty,
           saving: false,
@@ -90,9 +90,9 @@ function HarnessHost({ initialDirty }: { initialDirty: boolean }) {
 }
 
 async function mountAtSettings(initialDirty: boolean): Promise<HTMLDivElement> {
-  window.history.pushState(null, "", "/llm-provider");
+  window.history.pushState(null, "", "/robot-wrangler");
   const el = await mount(h(HarnessHost, { initialDirty }));
-  expect(el.querySelector(".current-view")?.textContent).toBe("llm-provider");
+  expect(el.querySelector(".current-view")?.textContent).toBe("robot-wrangler");
   return el;
 }
 
@@ -116,13 +116,13 @@ describe("dirty frame: navigateTo prompts", () => {
     await mountAtSettings(true);
     act(() => { root.querySelector<HTMLButtonElement>(".nav-home")!.click(); });
     expect(dialog()).not.toBeNull();
-    expect(currentView()).toBe("llm-provider");
-    expect(location.pathname).toBe("/llm-provider");
+    expect(currentView()).toBe("robot-wrangler");
+    expect(location.pathname).toBe("/robot-wrangler");
 
     act(() => { keepBtn()!.click(); });
     expect(dialog()).toBeNull();
-    expect(currentView()).toBe("llm-provider");
-    expect(location.pathname).toBe("/llm-provider");
+    expect(currentView()).toBe("robot-wrangler");
+    expect(location.pathname).toBe("/robot-wrangler");
     expect(discardCount()).toBe("0");
   });
 
@@ -145,7 +145,7 @@ describe("dirty frame: handleSidebarNav prompts (covers switching overlay entrie
     expect(dialog()).not.toBeNull();
 
     act(() => { keepBtn()!.click(); });
-    expect(currentView()).toBe("llm-provider");
+    expect(currentView()).toBe("robot-wrangler");
 
     act(() => { root.querySelector<HTMLButtonElement>(".sidebar-home")!.click(); });
     act(() => { discardBtn()!.click(); });
@@ -165,14 +165,14 @@ describe("dirty frame: a discard that does not leave the page keeps guarding", (
     expect(dialog()).not.toBeNull();
 
     act(() => { discardBtn()!.click(); });
-    expect(currentView()).toBe("llm-provider");
+    expect(currentView()).toBe("robot-wrangler");
     expect(root.querySelector(".settings-frame")).not.toBeNull();
     expect(isLeaveGuarded()).toBe(true);
 
     // The real consequence: leaving for good must still prompt.
     act(() => { root.querySelector<HTMLButtonElement>(".sidebar-home")!.click(); });
     expect(dialog()).not.toBeNull();
-    expect(currentView()).toBe("llm-provider");
+    expect(currentView()).toBe("robot-wrangler");
   });
 });
 
@@ -192,13 +192,13 @@ describe("dirty frame: browser back/forward", () => {
     expect(dialog()).not.toBeNull();
     // popstate can't be cancelled — the guard re-pushes over the browser's
     // own navigation so the address bar (and view) land back on settings.
-    expect(location.pathname).toBe("/llm-provider");
-    expect(currentView()).toBe("llm-provider");
+    expect(location.pathname).toBe("/robot-wrangler");
+    expect(currentView()).toBe("robot-wrangler");
 
     act(() => { keepBtn()!.click(); });
     expect(dialog()).toBeNull();
-    expect(location.pathname).toBe("/llm-provider");
-    expect(currentView()).toBe("llm-provider");
+    expect(location.pathname).toBe("/robot-wrangler");
+    expect(currentView()).toBe("robot-wrangler");
   });
 
   it("Discard changes completes the popped-to navigation", async () => {
@@ -221,7 +221,7 @@ describe("dirty frame: Escape and backdrop click keep editing, not discard", () 
     expect(dialog()).not.toBeNull();
     act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
     expect(dialog()).toBeNull();
-    expect(currentView()).toBe("llm-provider");
+    expect(currentView()).toBe("robot-wrangler");
   });
 
   it("one Escape closes the prompt even with the overlay's own Escape handler on window", async () => {
@@ -236,7 +236,7 @@ describe("dirty frame: Escape and backdrop click keep editing, not discard", () 
       expect(dialog()).not.toBeNull();
       act(() => { document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
       expect(dialog()).toBeNull();
-      expect(currentView()).toBe("llm-provider");
+      expect(currentView()).toBe("robot-wrangler");
     } finally {
       window.removeEventListener("keydown", overlayEscape);
     }
@@ -247,7 +247,7 @@ describe("dirty frame: Escape and backdrop click keep editing, not discard", () 
     act(() => { root.querySelector<HTMLButtonElement>(".nav-home")!.click(); });
     act(() => { dialog()!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
     expect(dialog()).toBeNull();
-    expect(currentView()).toBe("llm-provider");
+    expect(currentView()).toBe("robot-wrangler");
   });
 });
 

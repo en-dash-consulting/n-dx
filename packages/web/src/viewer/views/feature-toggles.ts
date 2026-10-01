@@ -1,17 +1,18 @@
 /**
- * Feature Toggles view — manage experimental and stable feature flags.
+ * Feature flags section — experimental and stable feature flags, organised by
+ * package (sourcevision, rex, hench), as the Project page renders them.
  *
- * Displays feature flags organized by package (sourcevision, rex, hench)
- * with toggle controls. Changes are saved immediately on toggle and
- * reflected without server restart.
+ * A toggle is an edit, not an action: flipping one changes the form, and Save
+ * writes every changed flag in one request. Only after that request succeeds
+ * is `feature-toggle-changed` dispatched for each changed key, so the rest of
+ * the dashboard (which gates surfaces on these flags) never sees a flag that
+ * was not persisted.
  *
- * Data comes from GET /api/features (read) and
- * PUT /api/features (update).
+ * Data comes from GET /api/features (read) and PUT /api/features (update).
  */
 
 import { h } from "preact";
-import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { NdxLogoPng } from "../components/index.js";
+import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { useCliName, resolveCliLabel } from "../hooks/index.js";
 
 // ── Types (canonical definitions in src/shared/features.ts) ──────────
@@ -22,17 +23,17 @@ import type { FeatureToggle, FeaturesResponse } from "../external.js";
 const PACKAGE_META: Record<string, { label: string; icon: string; description: string }> = {
   sourcevision: {
     label: "{cli} analyze / plan",
-    icon: "\u25A3",
+    icon: "▣",
     description: "Static analysis, file inventory, import graph, and zone detection",
   },
   rex: {
     label: "{cli} work / {cli} sync",
-    icon: "\u25A8",
+    icon: "▨",
     description: "PRD management, task tracking, analysis proposals, and Notion sync",
   },
   hench: {
     label: "{cli} work",
-    icon: "\u25B6",
+    icon: "▶",
     description: "Autonomous agent execution, retry policies, and guard rails",
   },
 };
@@ -45,14 +46,121 @@ const STABILITY_META: Record<string, { label: string; class: string }> = {
   deprecated:   { label: "Deprecated",   class: "ft-badge-deprecated" },
 };
 
+// ── Form state ───────────────────────────────────────────────────────
+
+/** State and actions of the feature-flags form. The Project page owns it. */
+export interface FeatureTogglesForm {
+  /** Every flag with `enabled` showing the edited value, or empty before the first load. */
+  toggles: FeatureToggle[];
+  loading: boolean;
+  /** Why the flags could not be loaded. */
+  loadError: string | null;
+  /** Why the last save failed. Cleared by the next save or a discard. */
+  saveError: string | null;
+  /** Keys of the flags whose edited value differs from the saved one. */
+  unsaved: ReadonlySet<string>;
+  /** True while any flag differs from its saved value. */
+  dirty: boolean;
+  /** Flip one flag in the form; flipping it back leaves the form clean. */
+  toggle: (key: string, enabled: boolean) => void;
+  /**
+   * PUT the changed flags to /api/features, then announce each one. Resolves
+   * true once saved (or when nothing is dirty); false leaves the edits in
+   * place with `saveError` set and announces nothing.
+   */
+  save: () => Promise<boolean>;
+  /** Drop every edit. */
+  discard: () => void;
+}
+
+export function useFeatureTogglesForm(): FeatureTogglesForm {
+  const [saved, setSaved] = useState<FeatureToggle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  /** key → edited value, only for flags that differ from `saved`. */
+  const [edits, setEdits] = useState<Record<string, boolean>>({});
+
+  const fetchFeatures = useCallback(async () => {
+    try {
+      const res = await fetch("/api/features");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Failed to load" }));
+        setLoadError((body as { error?: string }).error ?? "Failed to load feature toggles");
+        return;
+      }
+      setSaved((await res.json() as FeaturesResponse).toggles);
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load feature toggles");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void fetchFeatures(); }, [fetchFeatures]);
+
+  const toggle = useCallback((key: string, enabled: boolean) => {
+    const was = saved.find((t) => t.key === key)?.enabled;
+    setEdits((prev) => {
+      const next = { ...prev };
+      if (enabled === was) delete next[key];
+      else next[key] = enabled;
+      return next;
+    });
+  }, [saved]);
+
+  const toggles = useMemo(
+    () => saved.map((t) => (t.key in edits ? { ...t, enabled: edits[t.key]! } : t)),
+    [saved, edits],
+  );
+
+  const unsaved = useMemo(() => new Set(Object.keys(edits)), [edits]);
+  const dirty = unsaved.size > 0;
+
+  const save = useCallback(async (): Promise<boolean> => {
+    if (!dirty) return true;
+    setSaveError(null);
+    const changes = edits;
+    try {
+      const res = await fetch("/api/features", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ changes }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Save failed" }));
+        setSaveError((body as { error?: string }).error ?? "Failed to save");
+        return false;
+      }
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save");
+      return false;
+    }
+    setSaved((prev) => prev.map((t) => (t.key in changes ? { ...t, enabled: changes[t.key]! } : t)));
+    setEdits({});
+    for (const [key, enabled] of Object.entries(changes)) {
+      window.dispatchEvent(new CustomEvent("feature-toggle-changed", { detail: { key, enabled } }));
+    }
+    return true;
+  }, [dirty, edits]);
+
+  const discard = useCallback(() => {
+    setEdits({});
+    setSaveError(null);
+  }, []);
+
+  return { toggles, loading, loadError, saveError, unsaved, dirty, toggle, save, discard };
+}
+
 // ── Toggle item component ────────────────────────────────────────────
 
-function ToggleItem({ toggle, onToggle, saving }: {
+function ToggleItem({ toggle, isUnsaved, onToggle }: {
   toggle: FeatureToggle;
+  /** True when the flag was flipped and not yet saved. */
+  isUnsaved: boolean;
   onToggle: (key: string, enabled: boolean) => void;
-  saving: string | null;
 }) {
-  const isSaving = saving === toggle.key;
   const isNonDefault = toggle.enabled !== toggle.defaultValue;
   const stability = STABILITY_META[toggle.stability] ?? STABILITY_META.stable;
 
@@ -68,24 +176,24 @@ function ToggleItem({ toggle, onToggle, saving }: {
         isNonDefault
           ? h("span", { class: "ft-badge ft-badge-modified" }, "modified")
           : null,
+        isUnsaved
+          ? h("span", { class: "ft-badge ft-badge-unsaved" }, "unsaved")
+          : null,
       ),
       h("label", { class: "ft-toggle-switch" },
         h("input", {
           type: "checkbox",
           checked: toggle.enabled,
           onChange: handleChange,
-          disabled: isSaving,
           "aria-label": `Toggle ${toggle.label}`,
         }),
         h("span", { class: "ft-toggle-slider" }),
-        h("span", { class: "ft-toggle-status" },
-          isSaving ? "Saving..." : (toggle.enabled ? "Enabled" : "Disabled"),
-        ),
+        h("span", { class: "ft-toggle-status" }, toggle.enabled ? "Enabled" : "Disabled"),
       ),
     ),
     h("p", { class: "ft-toggle-desc" }, toggle.description),
     h("div", { class: "ft-toggle-impact" },
-      h("span", { class: "ft-toggle-impact-icon", "aria-hidden": "true" }, "\u26A0"),
+      h("span", { class: "ft-toggle-impact-icon", "aria-hidden": "true" }, "⚠"),
       h("span", null, toggle.impact),
     ),
   );
@@ -93,14 +201,14 @@ function ToggleItem({ toggle, onToggle, saving }: {
 
 // ── Package section component ────────────────────────────────────────
 
-function PackageSection({ pkg, toggles, onToggle, saving }: {
+function PackageSection({ pkg, toggles, unsaved, onToggle }: {
   pkg: string;
   toggles: FeatureToggle[];
+  unsaved: ReadonlySet<string>;
   onToggle: (key: string, enabled: boolean) => void;
-  saving: string | null;
 }) {
   const cliName = useCliName();
-  const rawMeta = PACKAGE_META[pkg] ?? { label: pkg, icon: "\u2022", description: "" };
+  const rawMeta = PACKAGE_META[pkg] ?? { label: pkg, icon: "•", description: "" };
   const meta = { ...rawMeta, label: resolveCliLabel(rawMeta.label, cliName) };
 
   return h("div", { class: "ft-package-section" },
@@ -116,22 +224,11 @@ function PackageSection({ pkg, toggles, onToggle, saving }: {
         h(ToggleItem, {
           key: toggle.key,
           toggle,
+          isUnsaved: unsaved.has(toggle.key),
           onToggle,
-          saving,
         }),
       ),
     ),
-  );
-}
-
-// ── Toast notification ───────────────────────────────────────────────
-
-function SaveToast({ message }: { message: string | null }) {
-  if (!message) return null;
-
-  return h("div", { class: "ft-toast", role: "status", "aria-live": "polite" },
-    h("span", { class: "ft-toast-icon" }, "\u2714"),
-    h("span", null, message),
   );
 }
 
@@ -159,141 +256,36 @@ function StatsBar({ toggles }: { toggles: FeatureToggle[] }) {
   );
 }
 
-// ── Main view ────────────────────────────────────────────────────────
+// ── Section ──────────────────────────────────────────────────────────
 
-export function FeatureTogglesView() {
+export function FeatureTogglesSection({ form }: { form: FeatureTogglesForm }) {
   const cliName = useCliName();
-  const [toggles, setToggles] = useState<FeatureToggle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { toggles } = form;
 
-  const fetchFeatures = useCallback(async () => {
-    try {
-      const res = await fetch("/api/features");
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setError((body as { error?: string }).error ?? "Failed to load feature toggles");
-        return;
-      }
-      const json = await res.json() as FeaturesResponse;
-      setToggles(json.toggles);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load feature toggles");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchFeatures();
-  }, [fetchFeatures]);
-
-  // Clean up toast timer on unmount
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
-
-  const handleToggle = useCallback(async (key: string, enabled: boolean) => {
-    setSaving(key);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/features", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ changes: { [key]: enabled } }),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Save failed" }));
-        setError((body as { error?: string }).error ?? "Failed to save");
-        return;
-      }
-
-      // Update local state immediately
-      setToggles((prev) =>
-        prev.map((t) => t.key === key ? { ...t, enabled } : t),
-      );
-
-      // Notify other components that a toggle changed
-      window.dispatchEvent(new CustomEvent("feature-toggle-changed", { detail: { key, enabled } }));
-
-      // Find the toggle label for the toast
-      const toggle = toggles.find((t) => t.key === key);
-      const label = toggle?.label ?? key;
-      const action = enabled ? "enabled" : "disabled";
-      setToast(`${label} ${action}`);
-
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setToast(null), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
-    } finally {
-      setSaving(null);
-    }
-  }, [toggles]);
-
-  if (loading) {
-    return h("div", { class: "ft-container" },
-      h("div", { class: "loading" }, "Loading feature toggles..."),
-    );
+  if (form.loading) {
+    return h("div", { class: "loading" }, "Loading feature toggles...");
   }
 
-  if (error && toggles.length === 0) {
-    return h("div", { class: "ft-container" },
-      h("div", { class: "ft-header" },
-        h("div", { class: "ft-header-brand" },
-          h(NdxLogoPng, { size: 16, class: "ft-header-logo" }),
-          h("span", { class: "ft-header-title" }, "Feature Flags"),
-        ),
-      ),
-      h("div", { class: "ft-error-state" },
-        h("p", null, error),
-        h("p", { class: "ft-error-hint" },
-          "Make sure the n-dx server is running. Run ",
-          h("code", null, `${cliName} start .`),
-          " to start it.",
-        ),
+  if (form.loadError && toggles.length === 0) {
+    return h("div", { class: "ft-error-state" },
+      h("p", null, form.loadError),
+      h("p", { class: "ft-error-hint" },
+        "Make sure the n-dx server is running. Run ",
+        h("code", null, `${cliName} start .`),
+        " to start it.",
       ),
     );
   }
 
-  // Group toggles by package
   const byPackage = new Map<string, FeatureToggle[]>();
   for (const toggle of toggles) {
-    if (!byPackage.has(toggle.package)) {
-      byPackage.set(toggle.package, []);
-    }
+    if (!byPackage.has(toggle.package)) byPackage.set(toggle.package, []);
     byPackage.get(toggle.package)!.push(toggle);
   }
 
-  return h("div", { class: "ft-container" },
-    h("div", { class: "ft-header" },
-      h("div", { class: "ft-header-brand" },
-        h(NdxLogoPng, { size: 16, class: "ft-header-logo" }),
-        h("span", { class: "ft-header-title" }, "Feature Flags"),
-      ),
-      h("p", { class: "ft-header-subtitle" },
-        "Manage experimental and stable features across all n-dx packages. ",
-        "Changes apply immediately without restart.",
-      ),
-    ),
-
-    // Error banner
-    error
-      ? h("div", { class: "ft-error-banner" }, error)
-      : null,
-
-    // Stats bar
+  return h("div", { class: "ft-sections" },
+    form.saveError ? h("div", { class: "ft-error-banner", role: "alert" }, form.saveError) : null,
     h(StatsBar, { toggles }),
-
-    // Package sections
     ...PACKAGE_ORDER
       .filter((pkg) => byPackage.has(pkg))
       .map((pkg) =>
@@ -301,22 +293,18 @@ export function FeatureTogglesView() {
           key: pkg,
           pkg,
           toggles: byPackage.get(pkg)!,
-          onToggle: handleToggle,
-          saving,
+          unsaved: form.unsaved,
+          onToggle: form.toggle,
         }),
       ),
-
-    // Legend
     h("div", { class: "ft-legend" },
       h("span", { class: "ft-legend-title" }, "Stability Levels:"),
       h("span", { class: "ft-badge ft-badge-stable" }, "Stable"),
-      h("span", { class: "ft-legend-sep" }, "\u2014 Production-ready features"),
+      h("span", { class: "ft-legend-sep" }, "— Production-ready features"),
       h("span", { class: "ft-badge ft-badge-experimental" }, "Experimental"),
-      h("span", { class: "ft-legend-sep" }, "\u2014 May change or have rough edges"),
+      h("span", { class: "ft-legend-sep" }, "— May change or have rough edges"),
       h("span", { class: "ft-badge ft-badge-deprecated" }, "Deprecated"),
-      h("span", { class: "ft-legend-sep" }, "\u2014 Will be removed in a future version"),
+      h("span", { class: "ft-legend-sep" }, "— Will be removed in a future version"),
     ),
-
-    h(SaveToast, { message: toast }),
   );
 }
