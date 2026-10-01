@@ -180,4 +180,38 @@ describe("livelock intercept in spawnWithAdapter", () => {
     await spawned;
     expect(progress.vendorPid).toBeUndefined();
   }, 20_000);
+
+  it("records the pid in a pid-only holder without touching run counters (review, orientation)", async () => {
+    // Review and orientation spawns are charged to the run another way, so they
+    // pass a holder that must see the pid but never the turns or tokens.
+    const holder: { vendorPid?: number } = {};
+    const spawned = spawnWithAdapter({
+      adapter: claudeCliAdapter,
+      spawnConfig: {
+        binary: process.execPath,
+        args: [script, "varied"],
+        env: { ...process.env, HENCH_TEST_CHILD_PID: pidFile },
+        stdinContent: null,
+        cwd: dir,
+      },
+      cliBinary: process.execPath,
+      cliEnv: { ...process.env, HENCH_TEST_CHILD_PID: pidFile },
+      cwd: dir,
+      tokenMetadata: { vendor: "claude", model: "sonnet" },
+      pidHolder: holder,
+    });
+
+    await waitFor(() => holder.vendorPid !== undefined);
+    const livePid = holder.vendorPid;
+    // The child writes its own pid on startup; wait for that before comparing.
+    let childPid = "";
+    for (let i = 0; i < 200 && childPid === ""; i++) {
+      childPid = await readFile(pidFile, "utf-8").catch(() => "");
+      if (childPid === "") await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    expect(livePid).toBe(Number(childPid));
+
+    await spawned;
+    expect(holder.vendorPid).toBeUndefined();
+  }, 20_000);
 });

@@ -664,6 +664,12 @@ export interface SpawnWithAdapterOptions {
    * carries until the process closes (GH #362).
    */
   liveProgress?: LiveSpawnProgress;
+  /**
+   * Receives only the vendor pid, for spawns whose turns and tokens are charged
+   * to the run another way (review, orientation) and so must not feed the
+   * heartbeat's counters. Ignored when {@link liveProgress} is set.
+   */
+  pidHolder?: Pick<LiveSpawnProgress, "vendorPid">;
 }
 
 /** Mid-spawn counters. Mutated in place; read by the heartbeat. */
@@ -731,6 +737,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
     useEventPipeline, accumulator, livelock, liveProgress,
   } = opts;
+  const pidHolder = liveProgress ?? opts.pidHolder;
 
   return new Promise((resolve, reject) => {
     const stdinMode = spawnConfig.stdinContent !== null ? "pipe" : "ignore";
@@ -744,7 +751,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
 
     // proc.pid is undefined when the spawn failed outright (ENOENT); the
     // `error` handler below clears it either way.
-    if (liveProgress) liveProgress.vendorPid = proc.pid;
+    if (pidHolder) pidHolder.vendorPid = proc.pid;
 
     // Write stdin content if the adapter requires it (Claude: pipe-based prompt)
     if (spawnConfig.stdinContent !== null && proc.stdin) {
@@ -798,7 +805,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     });
 
     proc.on("error", (err) => {
-      if (liveProgress) liveProgress.vendorPid = undefined;
+      if (pidHolder) pidHolder.vendorPid = undefined;
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         // Keep the vendor-specific prefix (matched by formatCLIError) and
         // append the cross-platform diagnoseCliInvocation detail, which
@@ -822,7 +829,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     });
 
     proc.on("close", (code) => {
-      if (liveProgress) liveProgress.vendorPid = undefined;
+      if (pidHolder) pidHolder.vendorPid = undefined;
       // Flush remaining buffered output
       if (lineBuffer.trim()) {
         processLine(lineBuffer);
@@ -1309,6 +1316,8 @@ export interface ReviewPassContext {
    * servers and must be pinned to the same worktree.
    */
   mcpConfigPath?: string;
+  /** Run's heartbeat-visible pid holder, so the record shows the reviewer's pid. */
+  pidHolder?: Pick<LiveSpawnProgress, "vendorPid">;
 }
 
 /**
@@ -1473,6 +1482,7 @@ async function runAdversarialReviewPass(
           cliEnv: ctx.cliEnv,
           cwd: inv.projectDir,
           tokenMetadata: { vendor: ctx.vendor, model: ctx.reviewModel },
+          pidHolder: ctx.pidHolder,
         }),
       );
     } catch (err) {
@@ -2026,6 +2036,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Assemble the review-pass context once, if `--review` is on. Building it
   // here rather than at the call site keeps the per-attempt success path free
   // of config resolution, and makes "review is off" a single undefined value.
+  const liveProgress = createLiveSpawnProgress();
   const reviewPassContext: ReviewPassContext | undefined = reviewModel !== undefined
     ? {
         adapter,
@@ -2044,6 +2055,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         autonomous: autonomous || opts.yes === true || process.stdin.isTTY !== true,
         taskTitle: brief.task.title,
         mcpConfigPath,
+        pidHolder: liveProgress,
       }
     : undefined;
 
@@ -2073,8 +2085,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // repetition. The detector clears itself whenever the agent writes a file.
   const livelock = createLivelockDetector({ threshold: config.livelockThreshold });
 
-  // Counters for the in-flight spawn, folded onto the record by the heartbeat.
-  const liveProgress = createLiveSpawnProgress();
+  // Counters for the in-flight spawn (`liveProgress`, created above), folded
+  // onto the record by the heartbeat.
 
   // Start heartbeat — writes lastActivityAt to disk periodically so the CLI
   // subprocess doesn't appear stale to the web dashboard during long tool calls,
@@ -2238,6 +2250,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           cliEnv,
           cwd: projectDir,
           tokenMetadata,
+          pidHolder: liveProgress,
         }),
     });
     warmParentId = decision.parentId;
