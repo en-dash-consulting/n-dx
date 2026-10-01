@@ -573,6 +573,34 @@ function stripInitModelFlag(args) {
   return args.filter((a) => !a.startsWith("--model="));
 }
 
+/**
+ * Read the git-repository consent flags accepted by `ndx init`.
+ *
+ * `--git` / `--no-git` answer the git preflight prompt up front, which is the
+ * only way a run without a TTY can create a repository: the prompt never fires
+ * when stdio is piped, so the dashboard's setup wizard (which asks the question
+ * in the browser) and scripted inits would otherwise always land on the
+ * "not a git repository" warning.
+ *
+ * @param {string[]} args
+ * @returns {boolean|undefined} true for --git, false for --no-git, undefined when neither is present.
+ */
+function extractInitGitConsent(args) {
+  const wantsGit = args.includes("--git");
+  const refusesGit = args.includes("--no-git");
+  if (wantsGit && refusesGit) {
+    console.error("Error: --git and --no-git cannot be combined.");
+    exitWithCleanup(1);
+  }
+  if (wantsGit) return true;
+  if (refusesGit) return false;
+  return undefined;
+}
+
+function stripInitGitFlags(args) {
+  return args.filter((a) => a !== "--git" && a !== "--no-git");
+}
+
 function extractInitClaudeModel(args) {
   const flag = args.find((a) => a.startsWith("--claude-model="));
   if (!flag) return undefined;
@@ -1192,7 +1220,9 @@ function parseInitFlagSet(rest) {
  * @returns {string[]}
  */
 function buildInitArgs(rest) {
-  return stripAssistantFlags(stripInitVendorModelFlags(stripInitModelFlag(stripInitProviderFlag(rest))));
+  return stripInitGitFlags(
+    stripAssistantFlags(stripInitVendorModelFlags(stripInitModelFlag(stripInitProviderFlag(rest)))),
+  );
 }
 
 /**
@@ -1507,6 +1537,7 @@ function establishInitLayout(dir) {
 async function handleInit(rest) {
   const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
 
+  const gitConsent = extractInitGitConsent(rest);
   const initArgs = buildInitArgs(rest);
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
@@ -1516,8 +1547,9 @@ async function handleInit(rest) {
 
   // Git preflight runs before any tool-directory setup so a declined prompt
   // does not leave the project half-initialized. The check is a pure
-  // filesystem walk for `.git`; the prompt only surfaces when interactive.
-  const gitResult = await runGitPreflight(dir, { quiet });
+  // filesystem walk for `.git`; the prompt only surfaces when interactive and
+  // neither --git nor --no-git already answered it.
+  const gitResult = await runGitPreflight(dir, { quiet, consent: gitConsent });
 
   const assistantEnabled = resolveInitAssistants(rest, dir);
   const llmResult = await selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, {

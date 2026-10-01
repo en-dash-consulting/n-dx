@@ -81,6 +81,133 @@ function stubManagedRun(result: Partial<ManagedResult>) {
   );
 }
 
+describe("commands route — init (setup wizard)", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    execMock.mockReset();
+    spawnManagedMock.mockReset();
+    // `git --version` — the preflight's availability probe.
+    execMock.mockResolvedValue({ stdout: "git version 2.45.0", stderr: "", exitCode: 0, error: null, launched: true });
+    tmpDir = await mkdtemp(join(tmpdir(), "commands-init-"));
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    const started = await startRouteTestServer((req, res) =>
+      handleCommandsRoute(req, res, ctx),
+    );
+    server = started.server;
+    port = started.port;
+  });
+
+  afterEach(async () => {
+    await closeRouteTestServer(server);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  function postInit(body: Record<string, unknown>) {
+    return fetch(`http://127.0.0.1:${port}/api/commands/init`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function waitForInit(): Promise<Record<string, unknown>> {
+    for (let i = 0; i < 50; i++) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/commands/init/status`);
+      const body = (await res.json()) as Record<string, unknown>;
+      if (!body.running && body.finishedAt) return body;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error("init did not finish");
+  }
+
+  function initArgs(): string[] {
+    return spawnManagedMock.mock.calls[0][1] as string[];
+  }
+
+  it("forwards --git when the wizard asked for a repository", async () => {
+    stubManagedRun({ stdout: "n-dx initialized" });
+    expect((await postInit({ provider: "claude", git: true })).status).toBe(202);
+    await waitForInit();
+
+    expect(initArgs()).toContain("--git");
+    expect(initArgs()).not.toContain("--no-git");
+  });
+
+  it("forwards --no-git when the wizard declined", async () => {
+    stubManagedRun({ stdout: "n-dx initialized" });
+    await postInit({ provider: "claude", git: false });
+    await waitForInit();
+
+    expect(initArgs()).toContain("--no-git");
+    expect(initArgs()).not.toContain("--git");
+  });
+
+  it("sends no git flag when the wizard never asked the question", async () => {
+    stubManagedRun({ stdout: "n-dx initialized" });
+    await postInit({ provider: "claude" });
+    await waitForInit();
+
+    expect(initArgs()).not.toContain("--git");
+    expect(initArgs()).not.toContain("--no-git");
+  });
+
+  it("confirms the repository on disk rather than from the exit code", async () => {
+    // `ndx init` exits 0 with a warning when `git init` fails, so a status of
+    // "created" taken from the exit code would be a lie.
+    stubManagedRun({ stdout: "n-dx initialized" });
+    await postInit({ provider: "claude", git: true });
+    const failed = await waitForInit();
+    expect(failed.gitRequested).toBe(true);
+    expect(failed.gitInitialized).toBe(false);
+
+    await mkdir(join(tmpDir, ".git"), { recursive: true });
+    spawnManagedMock.mockClear();
+    stubManagedRun({ stdout: "n-dx initialized" });
+    await postInit({ provider: "claude", git: true });
+    const created = await waitForInit();
+    expect(created.gitInitialized).toBe(true);
+  });
+
+  it("leaves gitInitialized null when no repository was requested", async () => {
+    stubManagedRun({ stdout: "n-dx initialized" });
+    await postInit({ provider: "claude", git: false });
+    const status = await waitForInit();
+    expect(status.gitRequested).toBe(false);
+    expect(status.gitInitialized).toBeNull();
+  });
+
+  it("preflight reports a plain folder as not a repository, with git available", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/init/preflight`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.isRepo).toBe(false);
+    expect(body.gitAvailable).toBe(true);
+  });
+
+  it("preflight reports a folder inside a repository as isRepo", async () => {
+    await mkdir(join(tmpDir, ".git"), { recursive: true });
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/init/preflight`);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.isRepo).toBe(true);
+  });
+
+  it("preflight reports git unavailable when the binary never launched", async () => {
+    execMock.mockResolvedValue({ stdout: "", stderr: "", exitCode: 1, error: new Error("ENOENT"), launched: false });
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/init/preflight`);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.gitAvailable).toBe(false);
+  });
+});
+
 const RECOMMENDATIONS = [
   { id: "a", title: "Rec A", level: "feature", priority: "high", source: "sourcevision" },
   { id: "b", title: "Rec B", level: "task", priority: "medium", source: "sourcevision" },

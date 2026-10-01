@@ -840,7 +840,7 @@ const ORCHESTRATOR_HELP_DEFS = {
   },
   init: {
     summary: "initialize all tools",
-    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude, codex, google, or local) unless --provider is given.\nProvisions assistant surfaces for both Claude and Codex unless limited\nby --no-claude, --no-codex, --claude-only, --codex-only, or --assistants=.\n\nThe init summary reports each assistant surface separately, listing the\nspecific artifacts (instruction files, skills, permissions, MCP servers)\nthat were provisioned for the repo.",
+    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude, codex, google, or local) unless --provider is given.\nProvisions assistant surfaces for both Claude and Codex unless limited\nby --no-claude, --no-codex, --claude-only, --codex-only, or --assistants=.\n\nWhen the target directory is not inside a git repository, init offers to\ncreate one. That prompt only appears on a TTY — pass --git (or --no-git) to\nanswer it ahead of time, which is what scripted and dashboard-driven runs\nmust do.\n\nThe init summary reports each assistant surface separately, listing the\nspecific artifacts (instruction files, skills, permissions, MCP servers)\nthat were provisioned for the repo.",
     usage: "ndx init [options] [dir]",
     options: [
       { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
@@ -849,6 +849,8 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--claude-model=<id>", description: "Claude model ID (implies --provider=claude)" },
       { flag: "--codex-model=<id>", description: "Codex model ID (implies --provider=codex)" },
       { flag: "--analyze", description: "Also run SourceVision analysis after init" },
+      { flag: "--git", description: "Create a git repository when the target directory is not in one (answers the preflight prompt; required for non-interactive runs)" },
+      { flag: "--no-git", description: "Never create a git repository — skip the preflight prompt and leave auto-commit features off" },
       { flag: "--no-claude", description: "Skip Claude Code integration (no CLAUDE.md, .claude/ modifications)" },
       { flag: "--no-codex", description: "Skip Codex integration (no AGENTS.md, .agents/, .codex/ modifications)" },
       { flag: "--claude-only", description: "Provision only Claude Code surfaces (equivalent to --no-codex)" },
@@ -865,6 +867,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx init --codex-model=gpt-5.6-terra .", description: "Set Codex model (implies --provider=codex)" },
       { command: "ndx init --claude-model=claude-sonnet-5 --codex-model=gpt-5.6-terra .", description: "Configure both vendors at once" },
       { command: "ndx init --analyze .", description: "Initialize and analyze codebase" },
+      { command: "ndx init --git .", description: "Initialize a blank folder and create a git repository in it" },
       { command: "ndx init --claude-only .", description: "Initialize with Claude surfaces only" },
       { command: "ndx init --codex-only .", description: "Initialize with Codex surfaces only" },
       { command: "ndx init --no-codex .", description: "Initialize without Codex integration" },
