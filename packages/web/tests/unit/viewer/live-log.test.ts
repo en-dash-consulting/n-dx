@@ -153,7 +153,7 @@ function run(over: Partial<LiveTaskRun> = {}): LiveTaskRun {
     tokens: { input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0, total: 0 },
     costUsd: 0, tokensPerSecond: null, model: null, vendor: null, weight: null,
     worktreeRoot: null, branch: null, startHead: null, pid: null, startedFrom: "dashboard",
-    outcome: null, review: null, logTail: [], ...over,
+    outcome: null, review: null, reviewPlan: null, reviewSpend: null, reviewReport: null, logTail: [], ...over,
   };
 }
 
