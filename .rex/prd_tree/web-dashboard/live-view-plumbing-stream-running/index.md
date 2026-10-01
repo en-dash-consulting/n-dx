@@ -25,7 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A run log ending in an incomplete UTF-8 sequence makes the Log tab refetch the same cursor forever](./a-run-log-ending-in-an-incomplete-utf.md) | completed |
-| [A stale analyze progress file still reads as running on Windows and when ps is unavailable](./a-stale-analyze-progress-file-still.md) | pending |
+| [A stale analyze progress file still reads as running on Windows and when ps is unavailable](./a-stale-analyze-progress-file-still.md) | completed |
 | [A stale analyze progress file whose pid was reused shows a phantom running analysis, and Stop signals the unrelated process](./a-stale-analyze-progress-file-whose.md) | completed |
 | [Add hench check-runs to audit and end dead runs from the CLI, across every worktree of the repository](./add-hench-check-runs-to-audit-and-end.md) | completed |
 | [Add loop position and hub-queued execute requests to GET /api/live](./add-loop-position-and-hub-queued.md) | pending |
