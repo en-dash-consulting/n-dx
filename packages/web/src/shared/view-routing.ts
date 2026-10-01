@@ -42,8 +42,6 @@ export const HENCH_SCOPE_VIEWS: readonly ViewId[] = [
   "work",
   "hench-runs",
   "hench-audit",
-  "hench-config",
-  "hench-templates",
   "hench-optimization",
   "hench-adaptive",
 ];
@@ -53,7 +51,7 @@ export const CROSS_CUTTING_VIEWS: readonly ViewId[] = [
   "workspaces",
   "token-usage",
   "feature-toggles",
-  "cli-timeouts",
+  "workflow",
   "command-reference",
   "commands",
   "robot-wrangler",
@@ -86,7 +84,7 @@ export function isKnownViewPath(segment: string): boolean {
 }
 
 /**
- * Old view paths merged into a stage in 0.8.0, mapped to the stage that
+ * Old view paths renamed or merged in 0.8.0, mapped to the view that
  * absorbed them. `overview` and `rex-dashboard` remain registered `ViewId`s
  * (a scoped standalone viewer still renders them as their own page — see
  * `resolveViewAlias`), so this table is what turns a stale top-level path
@@ -97,6 +95,10 @@ const VIEW_ALIASES: Readonly<Record<string, ViewId>> = {
   "rex-dashboard": "work",
   // 0.8.0 renamed the LLM Provider page to Robot Wrangler.
   "llm-provider": "robot-wrangler",
+  // 0.8.0 merged work settings, CLI timeouts and templates into Workflow (#457).
+  "hench-config": "workflow",
+  "cli-timeouts": "workflow",
+  "hench-templates": "workflow",
 };
 
 /**

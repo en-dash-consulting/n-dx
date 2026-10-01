@@ -1,7 +1,7 @@
 /**
  * Settings as a full overlay over the page, opened from the bottom bar's cog.
  *
- * Every settings page keeps its own route (`/robot-wrangler`, `/hench-config`, …);
+ * Every settings page keeps its own route (`/robot-wrangler`, `/workflow`, …);
  * the overlay is what those routes look like. The page underneath stays
  * mounted, so closing returns to exactly where you were. The configuration
  * summary that used to sit in the sidebar footer heads the settings list.

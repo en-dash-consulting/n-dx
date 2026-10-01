@@ -39,6 +39,7 @@
 @import "./cli-timeout.css";
 @import "./commands.css";
 @import "./robot-wrangler.css";
+@import "./workflow.css";
 @import "./project-settings.css";
 @import "./pr-markdown.css";
 @import "./ask.css";

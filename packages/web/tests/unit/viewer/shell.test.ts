@@ -116,14 +116,13 @@ describe("stages.ts", () => {
     }
     expect(isKnownViewPath("home")).toBe(true);
     expect(SETTINGS_ENTRIES.map((e) => e.view)).toEqual([
-      "robot-wrangler", "project-settings", "hench-config", "notion-config", "integrations", "commands", "feature-toggles", "cli-timeouts",
+      "robot-wrangler", "project-settings", "workflow", "notion-config", "integrations", "commands", "feature-toggles",
     ]);
   });
 
-  it("puts PRD items and the execution log on Work, above Templates", () => {
+  it("puts PRD items and the execution log at the top of Work", () => {
     const work = STAGES.work.sections.map((s) => s.view);
-    expect(work.indexOf("rex-dashboard")).toBeLessThan(work.indexOf("activity"));
-    expect(work.indexOf("activity")).toBeLessThan(work.indexOf("hench-templates"));
+    expect(work.slice(0, 2)).toEqual(["rex-dashboard", "activity"]);
     expect(STAGES.analyze.sections.map((s) => s.view)).not.toContain("rex-dashboard");
   });
 
@@ -191,7 +190,7 @@ describe("TopNav", () => {
     expect(root.querySelector(".topnav-tab.active")?.getAttribute("aria-current")).toBe("page");
     await act(async () => { render(nav("zones"), root); });
     expect(activeTab()).toBe("Analysis");
-    await act(async () => { render(nav("hench-templates"), root); });
+    await act(async () => { render(nav("hench-audit"), root); });
     expect(activeTab()).toBe("Work");
   });
 
@@ -319,11 +318,11 @@ describe("StagePage", () => {
     expect(JSON.parse(localStorage.getItem("ndx.stage-sections")!)).toMatchObject({ "work:activity:full": true });
 
     // Sections without the option get no Expand control.
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:hench-templates": true }));
+    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:hench-audit": true }));
     render(null, root);
     root.remove();
     await mount(page("work"));
-    expect(root.querySelector('.stage-section[data-view="hench-templates"] .stage-section-expand')).toBeNull();
+    expect(root.querySelector('.stage-section[data-view="hench-audit"] .stage-section-expand')).toBeNull();
   });
 
   it("shows the Terrain section with Map, Isometric map and Zones tabs, switching bodies with the active tab", async () => {
@@ -442,7 +441,7 @@ describe("StagePage", () => {
     await mount(page("work", buildValidViews("hench")));
     // Up next is Rex's dashboard: not in a Hench-only viewer.
     expect(sectionViews()).not.toContain("rex-dashboard");
-    expect(sectionViews()).toContain("hench-templates");
+    expect(sectionViews()).toContain("hench-audit");
   });
 });
 
@@ -636,7 +635,7 @@ describe("SettingsOverlay", () => {
     const dialog = root.querySelector(".settings-overlay")!;
     expect(dialog.getAttribute("role")).toBe("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(items()).toEqual(["Robot Wrangler", "n-dx analyze / plan", "n-dx work", "n-dx export / refresh", "Feature Flags", "CLI Timeouts"]);
+    expect(items()).toEqual(["Robot Wrangler", "n-dx analyze / plan", "Workflow", "n-dx export / refresh", "Feature Flags"]);
     expect(root.querySelector(".fake-settings")).not.toBeNull();
     expect(root.querySelector(".settings-overlay-crumbs")?.textContent).toContain("Robot Wrangler");
   });
@@ -651,8 +650,8 @@ describe("SettingsOverlay", () => {
   it("switches pages and closes with the ✕ or Escape", async () => {
     const onNavigate = vi.fn();
     const onClose = vi.fn();
-    await mount(overlay("hench-config", onNavigate, onClose));
-    expect(root.querySelector(".settings-overlay-item.active")?.textContent).toContain("work");
+    await mount(overlay("workflow", onNavigate, onClose));
+    expect(root.querySelector(".settings-overlay-item.active")?.textContent).toContain("Workflow");
     act(() => { (root.querySelectorAll<HTMLButtonElement>(".settings-overlay-item")[0]).click(); });
     expect(onNavigate).toHaveBeenCalledWith("robot-wrangler");
     act(() => { root.querySelector<HTMLButtonElement>(".settings-overlay-close")!.click(); });

@@ -49,8 +49,6 @@ import {
 
 import {
   HenchRunsView,
-  HenchConfigView,
-  HenchTemplatesView,
   AdaptiveOptimizationView,
 } from "./domain-hench.js";
 
@@ -64,7 +62,7 @@ import {
   NotionConfigView,
   IntegrationConfigView,
   FeatureTogglesView,
-  CliTimeoutsView,
+  WorkflowView,
   CommandsView,
   CommandReferenceView,
   RobotWranglerView,
@@ -207,12 +205,6 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "hench-audit": ({ navigateTo }) =>
     h(TaskAuditView, { navigateTo }),
 
-  "hench-config": () =>
-    h(HenchConfigView, null),
-
-  "hench-templates": () =>
-    h(HenchTemplatesView, null),
-
   "hench-optimization": () =>
     h(WorkflowOptimizationView, null),
 
@@ -222,8 +214,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "feature-toggles": () =>
     h(FeatureTogglesView, null),
 
-  "cli-timeouts": () =>
-    h(CliTimeoutsView, null),
+  "workflow": ({ navigateTo }) =>
+    h(WorkflowView, { navigateTo }),
 
   "commands": ({ jobs }) =>
     h(CommandsView, { jobs }),

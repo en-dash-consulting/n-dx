@@ -50,7 +50,7 @@ packages/web/tests/unit/viewer/axe-audit.test.ts
 | Zones (`zones`, `architecture`) | ZonesView with two-zone mock |
 | Overview | OverviewView with full LoadedData fixture |
 | Hench Monitor (`hench-runs`) | HenchRunsView loading state |
-| Hench Config (`hench-config`) | HenchConfigView loading state |
+| Workflow settings (`workflow`) | WorkflowView loading state (work settings, CLI timeouts and templates) |
 | PR Tab (`pr-markdown`) | PRMarkdownView loading state |
 | Ask (`ask`) | AskView idle state, plus the deployed-mode unavailable state |
 | Settings (`project-settings`) | ProjectSettingsView loading state |

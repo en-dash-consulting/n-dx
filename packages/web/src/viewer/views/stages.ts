@@ -136,7 +136,6 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     sections: [
       { view: "rex-dashboard", plain: true },
       { view: "activity", scroll: true },
-      { view: "hench-templates" },
       { view: "token-usage" },
       { view: "hench-audit" },
       { view: "hench-optimization" },
@@ -166,16 +165,15 @@ export interface SettingsEntry {
   featureGate?: string;
 }
 
-/** Workflow order: General → analyze/plan → work → sync → export, then cross-cutting. */
+/** Loop order: Robot Wrangler → analyze/plan → Workflow → sync → export, then cross-cutting. */
 export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   { view: "robot-wrangler" },
   { view: "project-settings" },
-  { view: "hench-config" },
+  { view: "workflow" },
   { view: "notion-config", featureGate: "rex.notionSync" },
   { view: "integrations", featureGate: "rex.integrations" },
   { view: "commands" },
   { view: "feature-toggles" },
-  { view: "cli-timeouts" },
 ];
 
 const SETTINGS_VIEWS: ReadonlySet<ViewId> = new Set(SETTINGS_ENTRIES.map((e) => e.view));

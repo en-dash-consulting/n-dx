@@ -205,12 +205,6 @@ export const VIEW_META = {
     product: "hench",
     blurb: "Per-task run logs and outcomes.",
   },
-  "hench-templates": {
-    label: "Templates",
-    glyph: "▭",
-    product: "hench",
-    blurb: "Run presets: limits, guard rails, provider.",
-  },
   "hench-optimization": {
     label: "Optimization",
     glyph: "↗",
@@ -257,11 +251,11 @@ export const VIEW_META = {
     product: "global",
     blurb: "Defaults for the analysis and planning commands.",
   },
-  "hench-config": {
-    label: "{cli} work",
+  workflow: {
+    label: "Workflow",
     glyph: "▶",
     product: "global",
-    blurb: "Defaults for agent runs: limits, guard rails, provider.",
+    blurb: "How agent runs behave: limits, guard rails, templates and command timeouts.",
   },
   "notion-config": {
     label: "{cli} sync",
@@ -286,12 +280,6 @@ export const VIEW_META = {
     glyph: "\u{1F4CC}",
     product: "global",
     blurb: "Turn optional surfaces on and off.",
-  },
-  "cli-timeouts": {
-    label: "CLI Timeouts",
-    glyph: "⏱",
-    product: "global",
-    blurb: "How long each command may run before it is stopped.",
   },
 } as const satisfies Record<ViewId, ViewMeta>;
 

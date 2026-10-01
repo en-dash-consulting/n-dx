@@ -581,9 +581,9 @@ describe.skipIf(!axeRun)("[a11y] HenchRunsView — axe audit", () => {
   });
 });
 
-// ── [a11y] HenchConfigView (loading state) ───────────────────────────────────
+// ── [a11y] WorkflowView (loading state) ──────────────────────────────────────
 
-describe.skipIf(!axeRun)("[a11y] HenchConfigView — axe audit", () => {
+describe.skipIf(!axeRun)("[a11y] WorkflowView — axe audit", () => {
   let root: HTMLElement;
   let cleanup: () => void;
   let originalFetch: typeof globalThis.fetch;
@@ -604,8 +604,8 @@ describe.skipIf(!axeRun)("[a11y] HenchConfigView — axe audit", () => {
 
   it("has zero critical/serious violations (light theme, loading state)", async () => {
     cleanup = setTheme("light");
-    const { HenchConfigView } = await import("../../../src/viewer/views/hench-config.js");
-    root = renderToDiv(h(HenchConfigView, {}));
+    const { WorkflowView } = await import("../../../src/viewer/views/workflow.js");
+    root = renderToDiv(h(WorkflowView, { navigateTo: () => {} }));
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
@@ -613,8 +613,8 @@ describe.skipIf(!axeRun)("[a11y] HenchConfigView — axe audit", () => {
 
   it("has zero critical/serious violations (dark theme, loading state)", async () => {
     cleanup = setTheme("dark");
-    const { HenchConfigView } = await import("../../../src/viewer/views/hench-config.js");
-    root = renderToDiv(h(HenchConfigView, {}));
+    const { WorkflowView } = await import("../../../src/viewer/views/workflow.js");
+    root = renderToDiv(h(WorkflowView, { navigateTo: () => {} }));
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);

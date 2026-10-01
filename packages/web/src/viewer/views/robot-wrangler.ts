@@ -793,7 +793,7 @@ function LocalSection({
         dirtyKeys.has("local.timeoutMs") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
       ),
       h("p", { class: "llm-field-desc" },
-        "How long to wait for a single response from the local server. Enter 0 for no limit, or e.g. 7200000 for 2 hours. Leave blank for the 5-minute default. This is per request — the CLI Timeouts page bounds the whole command instead, so setting that to unlimited does not extend this.",
+        "How long to wait for a single response from the local server. Enter 0 for no limit, or e.g. 7200000 for 2 hours. Leave blank for the 5-minute default. This is per request — the CLI timeouts on the Workflow page bound the whole command instead, so setting those to unlimited does not extend this.",
       ),
       h("input", {
         id: "local.timeoutMs",

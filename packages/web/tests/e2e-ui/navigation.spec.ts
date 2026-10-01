@@ -146,6 +146,9 @@ const ALIASES: Array<[string, string]> = [
   ["overview", "analyze"],
   ["rex-dashboard", "work"],
   ["llm-provider", "robot-wrangler"],
+  ["hench-config", "workflow"],
+  ["cli-timeouts", "workflow"],
+  ["hench-templates", "workflow"],
 ];
 
 for (const [oldPath, target] of ALIASES) {

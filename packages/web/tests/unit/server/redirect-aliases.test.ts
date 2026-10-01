@@ -7,7 +7,8 @@
  * 302 there instead of serving the orphaned bare view. The one exception is
  * a rex-scoped viewer, which has no Work stage, so `/rex-dashboard` keeps
  * being served as its own page there. `/llm-provider` was renamed to
- * `/robot-wrangler` and redirects the same way.
+ * `/robot-wrangler`, and `/hench-config`, `/cli-timeouts` and
+ * `/hench-templates` merged into `/workflow`; all redirect the same way.
  */
 
 import { describe, it, expect } from "vitest";
@@ -74,6 +75,19 @@ describe("redirect aliases: full dashboard (no scope)", () => {
     }
   });
 
+  for (const old of ["hench-config", "cli-timeouts", "hench-templates"]) {
+    it(`redirects the merged /${old} to /workflow`, async () => {
+      const { baseUrl, close } = await startFor(baseCtx());
+      try {
+        const res = await fetch(`${baseUrl}/${old}`, { redirect: "manual" });
+        expect(res.status).toBe(302);
+        expect(res.headers.get("location")).toBe("workflow");
+      } finally {
+        await close();
+      }
+    });
+  }
+
   it("keeps a sub-path and query string across the redirect", async () => {
     const { baseUrl, close } = await startFor(baseCtx());
     try {
@@ -106,6 +120,23 @@ describe("redirect aliases: full dashboard (no scope)", () => {
       await close();
     }
   });
+});
+
+describe("redirect aliases: scoped viewers", () => {
+  // Workflow is cross-cutting, so every scope that had hench-config or
+  // cli-timeouts has it — the old paths redirect rather than 404.
+  for (const scope of ["sourcevision", "rex", "hench"] as const) {
+    it(`redirects /hench-config to /workflow in a ${scope}-scoped viewer`, async () => {
+      const { baseUrl, close } = await startFor(baseCtx(scope));
+      try {
+        const res = await fetch(`${baseUrl}/hench-config`, { redirect: "manual" });
+        expect(res.status).toBe(302);
+        expect(res.headers.get("location")).toBe("workflow");
+      } finally {
+        await close();
+      }
+    });
+  }
 });
 
 describe("redirect aliases: rex-scoped viewer (no Work stage)", () => {

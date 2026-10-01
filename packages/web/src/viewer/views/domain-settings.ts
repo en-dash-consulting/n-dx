@@ -11,7 +11,7 @@
 export { NotionConfigView } from "./notion-config.js";
 export { IntegrationConfigView } from "./integration-config.js";
 export { FeatureTogglesView } from "./feature-toggles.js";
-export { CliTimeoutsView } from "./cli-timeout.js";
+export { WorkflowView } from "./workflow.js";
 export { CommandsView } from "./commands.js";
 export { CommandReferenceView } from "./command-reference.js";
 export { RobotWranglerView } from "./robot-wrangler.js";
