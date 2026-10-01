@@ -51,7 +51,11 @@ interface RunFixture {
   model?: string;
   tokens?: { input: number; output: number };
   events?: string[];
+  pid?: number;
 }
+
+/** A pid no process can hold: above every platform's pid limit, so `kill(pid, 0)` is ESRCH. */
+const DEAD_PID = 2 ** 31 - 2;
 
 function writeRun(worktree: string, run: RunFixture): void {
   const runsDir = join(worktree, ".hench", "runs");
@@ -73,7 +77,7 @@ function writeRun(worktree: string, run: RunFixture): void {
     model: run.model ?? "claude-sonnet-4-5",
     tokenUsage: run.tokens ?? { input: 1000, output: 200 },
     branch: "side",
-    pid: 4242,
+    pid: run.pid ?? 4242,
     ...(eventsPath ? { eventsPath } : {}),
   }));
 }
@@ -146,6 +150,8 @@ describe("GET /api/live", () => {
     // Served worktree: one fresh run, one stale, one finished recently, one long ago.
     writeRun(repo, { id: "fresh", status: "running", taskId: "task-a", startedAt: now - 2 * MINUTE, lastActivityAt: now - 10_000, events: ["Brief loaded", "Ran 12 tests"] });
     writeRun(repo, { id: "stuck", status: "running", startedAt: now - 30 * MINUTE, lastActivityAt: now - 10 * MINUTE });
+    // Killed hard: the record still says running with a fresh heartbeat.
+    writeRun(repo, { id: "ghost", status: "running", startedAt: now - 3 * MINUTE, lastActivityAt: now - 5_000, pid: DEAD_PID });
     writeRun(repo, { id: "done", status: "completed", startedAt: now - 20 * MINUTE, finishedAt: now - 10 * MINUTE });
     writeRun(repo, { id: "old", status: "completed", startedAt: now - 3 * 60 * MINUTE, finishedAt: now - 2 * 60 * MINUTE });
     writePrd(repo, ["task-a"]);
@@ -180,7 +186,7 @@ describe("GET /api/live", () => {
 
   it("lists running runs from every worktree, not only the served one", async () => {
     const live = await fetchLive();
-    expect(live.runs.map((r) => r.runId).sort()).toEqual(["elsewhere", "fresh", "stuck"]);
+    expect(live.runs.map((r) => r.runId).sort()).toEqual(["elsewhere", "fresh", "ghost", "stuck"]);
     expect(live.runs.find((r) => r.runId === "elsewhere")?.worktree).toMatchObject({ key: "linked", isServed: false, branch: "side" });
   });
 
@@ -206,6 +212,13 @@ describe("GET /api/live", () => {
     });
     expect(fresh.heartbeatAgeMs).not.toBeNull();
     expect(live.runs.find((r) => r.runId === "stuck")?.stale).toBe(true);
+  });
+
+  it("reports a running record whose pid is dead as pidAlive false, without making it stale", async () => {
+    const live = await fetchLive();
+    expect(live.runs.find((r) => r.runId === "ghost")).toMatchObject({ pid: DEAD_PID, pidAlive: false, stale: false });
+    expect(live.counts.stale).toBe(1);
+    expect(live.recent.find((r) => r.runId === "done")?.pidAlive).toBeNull();
   });
 
   it("lists runs finished in the last hour and drops older ones", async () => {
@@ -234,7 +247,7 @@ describe("GET /api/live", () => {
     expect(live.machine.memory.floorBytes).toBe(1);
     expect(live.machine.memory.belowFloor).toBe(false);
     expect(live.machine.slots.inUse).toBe(0);
-    expect(live.machine.spend.inFlightTokens).toBe(3600);
+    expect(live.machine.spend.inFlightTokens).toBe(4800);
     expect(live.machine.spend.inFlightUsd).toBeGreaterThan(0);
   });
 
@@ -245,7 +258,7 @@ describe("GET /api/live", () => {
     const status = (await (await fetch(`${server.baseUrl}/api/status`)).json()) as ProjectStatus;
 
     expect(live.counts.running).toBe(pillRunning);
-    expect(live.counts.running).toBe(3);
+    expect(live.counts.running).toBe(4);
     expect(live.counts.servedStale).toBe(status.hench.staleRuns);
     expect(live.counts.servedRunning).toBe(status.hench.activeRuns);
     expect(live.counts.stale).toBe(1);

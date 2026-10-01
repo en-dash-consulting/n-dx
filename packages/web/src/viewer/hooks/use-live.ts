@@ -38,6 +38,8 @@ export interface LiveRunSummary {
   worktree: LiveWorktreeRef;
   startedAt: string | null;
   stale: boolean;
+  /** False when the recorded pid no longer exists; null/absent when unknown. Does not affect `stale`. */
+  pidAlive?: boolean | null;
   lastProgress: string | null;
 }
 

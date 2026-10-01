@@ -154,6 +154,7 @@ function WorktreeChip({ run }: { run: Pick<LiveRunFull, "worktree" | "branch"> }
 
 function RunMeta({ run }: { run: LiveRunFull }) {
   const bits: ComponentChildren[] = [];
+  if (run.pidAlive === false) bits.push(h("span", { key: "gone", class: "live-chip live-chip-warn" }, "process not found"));
   if (run.model) bits.push(h("span", { key: "model", class: "live-chip" }, run.model));
   if (run.turns !== null) bits.push(h("span", { key: "turn", class: "live-chip" }, `turn ${run.turns}`));
   if (run.tokens.total > 0) bits.push(h("span", { key: "tokens", class: "live-chip" }, `${formatTokenCount(run.tokens.total)} tokens`));
@@ -238,7 +239,8 @@ function StuckRow({ run, navigateTo, refresh }: { run: LiveRunFull; navigateTo: 
     }
   }, [run, refresh]);
 
-  const quiet = run.heartbeatAgeMs === null ? "no heartbeat" : `no heartbeat for ${Math.round(run.heartbeatAgeMs / 60_000)} min`;
+  const quiet = (run.heartbeatAgeMs === null ? "no heartbeat" : `no heartbeat for ${Math.round(run.heartbeatAgeMs / 60_000)} min`)
+    + (run.pidAlive === false ? " · process not found" : "");
   return h("li", { class: "live-attention-row" },
     h("span", { class: "live-attention-text" },
       h("span", { class: "live-card-title" }, run.taskTitle ?? run.runId),

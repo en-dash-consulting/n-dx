@@ -43,7 +43,7 @@ import { jsonResponse } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { workspaceKeyOf } from "./workspace-scoped.js";
 import { readRunDigests, type RunDigest, type RunDigestTokens } from "./routes-worktrees.js";
-import { heartbeatAgeMs, isRunStale } from "./run-staleness.js";
+import { heartbeatAgeMs, isPidAlive, isRunStale } from "./run-staleness.js";
 import {
   dashboardExecutionsFor,
   readConcurrencySlots,
@@ -109,6 +109,12 @@ export interface LiveRun {
   startedFrom: "dashboard" | "terminal" | null;
   /** Hench process pid; meaningful only while running. */
   pid: number | null;
+  /**
+   * Whether `pid` still exists on this machine. Null when not running or no pid
+   * was recorded (unknown, not dead). Informational: `stale` stays on the
+   * shared heartbeat threshold so counts agree with the bottom bar.
+   */
+  pidAlive: boolean | null;
   lastActivityAt: string | null;
   /** Milliseconds since the last heartbeat, or null when none was recorded. */
   heartbeatAgeMs: number | null;
@@ -466,6 +472,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
         vendor: digest.vendor,
         startedFrom: running ? (execution ? "dashboard" : "terminal") : null,
         pid: running ? digest.pid : null,
+        pidAlive: running && digest.pid !== null ? isPidAlive(digest.pid) : null,
         lastActivityAt: digest.lastActivityAt,
         heartbeatAgeMs: running ? heartbeatAgeMs(digest.lastActivityAt, now) : null,
         stale,

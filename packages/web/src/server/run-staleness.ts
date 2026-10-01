@@ -12,6 +12,19 @@
 /** A running run whose last heartbeat is older than this is stale. */
 export const RUN_STALE_THRESHOLD_MS = 5 * 60 * 1000;
 
+/**
+ * Whether a process with this pid exists. EPERM means it exists but belongs
+ * to someone else, so it counts as alive.
+ */
+export function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 /** Milliseconds since `lastActivityAt`, or null when the run recorded none. */
 export function heartbeatAgeMs(lastActivityAt: unknown, now: number): number | null {
   if (typeof lastActivityAt !== "string" || lastActivityAt.length === 0) return null;
