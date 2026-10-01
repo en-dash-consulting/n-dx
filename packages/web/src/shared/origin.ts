@@ -13,11 +13,15 @@
  * knows the port it bound. Comparing against the port rather than the `Host`
  * header is what stops a DNS-rebinding origin presenting a matching host.
  *
+ * Both servers also require every request's `Host` to name loopback on their
+ * own port ({@link isLoopbackHostOnPort}); a request addressed to any other
+ * name is answered 421 Misdirected Request before routing.
+ *
  * Framework-agnostic and pure, so the hub can apply the rule without importing
  * from `src/server/` (which its zone boundary forbids).
  */
 
-const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 function effectivePort(url: URL): number {
   if (url.port) return Number(url.port);
@@ -36,6 +40,30 @@ export function isLoopbackOriginOnPort(origin: string, port: number | undefined)
   try {
     const url = new URL(origin);
     return url.protocol === "http:"
+      && LOOPBACK_HOSTNAMES.has(url.hostname)
+      && effectivePort(url) === port;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True when a request's `Host` header names loopback on `port`.
+ *
+ * The value is parsed as the authority of an `http:` URL and must
+ * round-trip unchanged (case aside), so `user@localhost:3117`,
+ * `localhost:3117/x`, `127.1:3117` and other spellings the URL parser would
+ * quietly normalise are refused rather than interpreted. A missing `Host`, an
+ * undefined port, and a non-loopback or wrong-port host are all refused.
+ *
+ * The caller passes `undefined` for a duplicated header (an array): a request
+ * carrying two `Host` values is not one a browser or a sane client sends.
+ */
+export function isLoopbackHostOnPort(host: string | undefined, port: number | undefined): boolean {
+  if (port === undefined || host === undefined || host === "") return false;
+  try {
+    const url = new URL(`http://${host}/`);
+    return url.host === host.toLowerCase()
       && LOOPBACK_HOSTNAMES.has(url.hostname)
       && effectivePort(url) === port;
   } catch {
