@@ -143,8 +143,10 @@ const REGISTRY: Record<string, ViewRenderer> = {
     h(LiveView, { navigateTo, analyzedAt: data.manifest?.analyzedAt ?? null, jobs }),
 
   // Keyed by task: switching tasks in place starts a fresh page, not the last one's run choice.
-  "live-task": ({ selectedTaskId, navigateTo }) =>
-    selectedTaskId ? h(LiveTaskView, { key: selectedTaskId, taskId: selectedTaskId, navigateTo }) : null,
+  "live-task": (ctx) =>
+    ctx.selectedTaskId
+      ? h(LiveTaskView, { key: ctx.selectedTaskId, taskId: ctx.selectedTaskId, navigateTo: ctx.navigateTo })
+      : REGISTRY["live"](ctx),
 
   "live-analyze": ({ navigateTo }) =>
     h(LiveAnalyzeView, { navigateTo }),

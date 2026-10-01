@@ -19,6 +19,7 @@ import { liveRunningCount, liveStuckCount, useLive } from "../hooks/index.js";
 import {
   barEntries,
   currentEntryKey,
+  isModalOpen,
   isTypingTarget,
   stepTarget,
   withFinished,
@@ -90,7 +91,7 @@ export function LiveBar({ view, taskId, navigateTo }: LiveBarProps) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.key !== "[" && e.key !== "]") || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
-      if (isTypingTarget(e.target)) return;
+      if (isTypingTarget(e.target) || isModalOpen(document)) return;
       const { entries: current, pageKey: key, navigateTo: go } = stateRef.current;
       const target = stepTarget(current, key, e.key === "]" ? 1 : -1);
       if (!target) return;

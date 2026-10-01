@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parsePathnameRoute, viewPathname, isTaskRouteView } from "../../../src/viewer/route-state.js";
+import { parsePathnameRoute, viewPathname, isTaskRouteView, normalizeLiveView } from "../../../src/viewer/route-state.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { STAGE_ORDER, STAGES, isLiveView, isStageId, stageForView, LIVE_VIEWS } from "../../../src/viewer/views/stages.js";
 
@@ -17,6 +17,13 @@ describe("Live routes", () => {
   it("does not parse a task page without a task id", () => {
     expect(parsePathnameRoute("/live/task", valid)).toBeNull();
     expect(parsePathnameRoute("/live/nonsense", valid)).toBeNull();
+  });
+
+  it("reads /live-task with no task id as the Live overview", () => {
+    expect(parsePathnameRoute("/live-task", valid)).toEqual({ view: "live", subId: null });
+    expect(normalizeLiveView("live-task", null)).toBe("live");
+    expect(normalizeLiveView("live-task", "t1")).toBe("live-task");
+    expect(normalizeLiveView("prd", null)).toBe("prd");
   });
 
   it("round-trips every Live view through viewPathname", () => {

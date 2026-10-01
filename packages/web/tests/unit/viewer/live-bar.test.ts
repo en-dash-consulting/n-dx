@@ -11,6 +11,7 @@ import { LiveBar } from "../../../src/viewer/views/live-bar.js";
 import {
   barEntries,
   currentEntryKey,
+  isModalOpen,
   isTypingTarget,
   stepTarget,
   withFinished,
@@ -71,6 +72,13 @@ describe("bar model", () => {
     // Still kept on the next read, though `previous` no longer has it live.
     expect(withFinished(after, after, "run:r1", kept).entries[0].finished).toBe(true);
     expect(withFinished(after, before, null, null).entries).toHaveLength(1);
+  });
+
+  it("sees an open modal dialog anywhere in the document", () => {
+    const root = document.createElement("div");
+    expect(isModalOpen(root)).toBe(false);
+    root.innerHTML = '<div role="dialog" aria-modal="true"></div>';
+    expect(isModalOpen(root)).toBe(true);
   });
 
   it("recognises text fields", () => {
@@ -141,6 +149,19 @@ describe("the rendered bar", () => {
     press("[");
     expect(navigateTo).toHaveBeenCalledWith("live-analyze", undefined);
     input.remove();
+  });
+
+  it("[ and ] do nothing while a modal dialog is open", async () => {
+    await mount("live-task", "t1");
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    document.body.appendChild(dialog);
+    press("[");
+    expect(navigateTo).not.toHaveBeenCalled();
+    dialog.remove();
+    press("[");
+    expect(navigateTo).toHaveBeenCalledWith("live-analyze", undefined);
   });
 
   it("keeps an item that finishes while open, marked finished", async () => {

@@ -26,6 +26,14 @@ function parseLivePath(base: string, sub: string): ParsedRoute | null {
   return task ? { view: "live-task", subId: task[1] } : null;
 }
 
+/**
+ * `live-task` is a page about one task, so without a task id there is nothing
+ * to show; it means the Live overview. Every route entry passes through here.
+ */
+export function normalizeLiveView(view: ViewId, subId: string | null): ViewId {
+  return view === "live-task" && !subId ? "live" : view;
+}
+
 /** The path a view and its sub-id are addressed at — the inverse of {@link parsePathnameRoute}. */
 export function viewPathname(view: ViewId, subId: string | null): string {
   if (view === "live-task") return subId ? `/live/task/${subId}` : "/live";
@@ -95,7 +103,10 @@ export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>, ba
   const live = parseLivePath(base, sub);
   if (live && validViews.has(live.view)) return live;
 
-  if (validViews.has(raw as ViewId)) return { view: raw as ViewId, subId: null };
+  if (validViews.has(raw as ViewId)) {
+    const view = normalizeLiveView(raw as ViewId, null);
+    return { view: validViews.has(view) ? view : (raw as ViewId), subId: null };
+  }
 
   if (slashIdx > 0) {
     const view = base as ViewId;

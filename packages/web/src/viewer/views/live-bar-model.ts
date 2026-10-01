@@ -107,6 +107,11 @@ export function stepTarget(entries: readonly BarEntry[], currentKey: string | nu
   return next.key === currentKey ? null : next;
 }
 
+/** A modal dialog (settings, search, guide, ...) makes the page behind it inert, bar shortcuts included. */
+export function isModalOpen(root: Pick<ParentNode, "querySelector">): boolean {
+  return root.querySelector('[aria-modal="true"]') !== null;
+}
+
 /** Keys typed into a field must reach the field, not the bar. */
 export function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as Partial<HTMLElement> | null;

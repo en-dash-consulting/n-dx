@@ -32,6 +32,7 @@ import {
 } from "./components/index.js";
 import {
   useRouteState,
+  usePageEntry,
   useAppData,
   useMemoryMonitor,
   useCrashRecovery,
@@ -170,11 +171,12 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // mounted underneath. `pageView` is that page: the current view unless it is
   // a settings view, else the last non-settings view (or home, on a direct load).
   const settingsOpen = isSettingsView(view);
-  const [lastPage, setLastPage] = useState<ViewId>(() => (settingsOpen ? fallbackPage(validViews) : view));
-  useEffect(() => {
-    if (!isSettingsView(view)) setLastPage(view);
-  }, [view]);
-  const pageView: ViewId = settingsOpen ? lastPage : view;
+  const { page, lastEntry } = usePageEntry(
+    { view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId },
+    settingsOpen,
+    fallbackPage(validViews),
+  );
+  const pageView: ViewId = page.view;
   const stage = stageForView(pageView, validViews);
 
   // The commands sheet is UI state, not a route. Any navigation lowers it —
@@ -184,7 +186,15 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const toggleCommands = useCallback(() => setCommandsOpen((open) => !open), []);
   const closeCommands = useCallback(() => setCommandsOpen(false), []);
   const openSettings = useCallback(() => handleSidebarNav("llm-provider"), [handleSidebarNav]);
-  const closeSettings = useCallback(() => handleSidebarNav(lastPage), [handleSidebarNav, lastPage]);
+  const closeSettings = useCallback(
+    () => navigateTo(lastEntry.view, {
+      file: lastEntry.file ?? undefined,
+      zone: lastEntry.zone ?? undefined,
+      runId: lastEntry.runId ?? undefined,
+      taskId: lastEntry.taskId ?? undefined,
+    }),
+    [navigateTo, lastEntry],
+  );
 
   const handleRestore = () => {
     const state = restoreCrashState();
@@ -238,7 +248,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
-  const viewCtx = { data, setDetail, setPrdDetailContent, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
+  const viewCtx = { data, setDetail, setPrdDetailContent, selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
   return h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
@@ -248,7 +258,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
     h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, navigateTo, onOpenSearch: openSearch, scope }),
     isLiveView(pageView) && validViews.has("live") && !isDeployedMode()
-      ? h(LiveBar, { view: pageView, taskId: selectedTaskId, navigateTo })
+      ? h(LiveBar, { view: pageView, taskId: page.taskId, navigateTo })
       : null,
     h("div", { class: "app-body" },
       h("main", {
