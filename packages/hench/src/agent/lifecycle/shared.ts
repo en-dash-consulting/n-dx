@@ -37,6 +37,13 @@ import type { PromptEnvelope } from "../../prd/llm-gateway.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { saveRun } from "../../store/runs.js";
 import { ensureRunLogsIgnored, openRunLog, persistRunLog, type RunLogWriter } from "../../store/run-log.js";
+import {
+  closeActiveRunEvents,
+  emitRunEvent,
+  openRunEvents,
+  setActiveRunEvents,
+  type RunEventWriter,
+} from "../../store/run-events.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { formatBudgetExceeded, type TokenBudgetResult } from "./token-budget.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
@@ -419,6 +426,16 @@ export interface InitRunOptions {
    * in between claim a decision nobody made.
    */
   session?: RunSessionRecord;
+  /**
+   * Number of acceptance criteria on the brief, and the permission mode the
+   * agent will spawn under.
+   *
+   * Only used for the `brief_loaded` progress event. Both loops already hold
+   * these when they call this function, and passing them is what keeps the
+   * event emitted in one place rather than duplicated at each call site.
+   */
+  criteriaCount?: number;
+  permissionMode?: string;
 }
 
 /**
@@ -526,6 +543,39 @@ async function endRunLog(projectDir: string, run: RunRecord): Promise<string | u
   }
 }
 
+// ---------------------------------------------------------------------------
+// Structured progress events
+// ---------------------------------------------------------------------------
+
+/**
+ * Open this run's structured event stream and route {@link emitRunEvent} into
+ * it.
+ *
+ * Best-effort, like the run log: a run that cannot open its events file still
+ * runs, with every emit becoming a no-op. There is no end-of-run fallback —
+ * unlike the log, an event stream assembled after the fact would be exactly the
+ * thing this replaces.
+ *
+ * The writer itself is owned by `store/run-events.ts`, which is why this hands
+ * it straight over rather than keeping a copy: two references to one file
+ * handle is how one of them ends up writing to a closed stream.
+ *
+ * @returns The writer, or null when no stream could be started.
+ */
+async function beginRunEvents(henchDir: string, run: RunRecord): Promise<RunEventWriter | null> {
+  // A previous run that threw before finalizing would otherwise leak its fd and
+  // keep a stale writer installed.
+  await closeActiveRunEvents();
+
+  try {
+    const writer = await openRunEvents(henchDir, run.id);
+    setActiveRunEvents(writer);
+    return writer;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Create a new RunRecord in "running" status and persist it.
  * Also captures a system memory snapshot for later use in finalization.
@@ -590,6 +640,27 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     const writer = await beginRunLog(opts.projectDir, run);
     if (writer) run.logPath = writer.path;
   }
+
+  // The structured event stream. Unconditional, unlike the log: it lives under
+  // `.hench/runs/` next to the record, which every run has by definition, so
+  // there is no project directory to be missing and no `.gitignore` to edit.
+  const eventWriter = await beginRunEvents(opts.henchDir, run);
+  if (eventWriter) run.eventsPath = eventWriter.path;
+
+  emitRunEvent(
+    "brief_loaded",
+    `Brief loaded for "${run.taskTitle}"`,
+    {
+      detail: [
+        `model ${run.model}`,
+        opts.vendor ? `vendor ${opts.vendor}` : undefined,
+        opts.permissionMode ? `permission mode ${opts.permissionMode}` : undefined,
+      ]
+        .filter(Boolean)
+        .join(", "),
+      ...(opts.criteriaCount !== undefined ? { counts: { criteria: opts.criteriaCount } } : {}),
+    },
+  );
 
   run.lastActivityAt = new Date().toISOString();
   await saveRun(opts.henchDir, run);
@@ -860,8 +931,20 @@ export async function runPostTaskTestsIfNeeded(
     if (!testResult.passed && testResult.output) {
       info(testResult.output.slice(-500));
     }
+    emitRunEvent("tests_run", `Post-task tests ${status.toLowerCase()}${scope}`, {
+      ok: testResult.passed,
+      detail: testCommand,
+      counts: {
+        targetedFiles: testResult.targetedFiles.length,
+        ...(testResult.durationMs != null ? { durationMs: testResult.durationMs } : {}),
+      },
+    });
   } else if (testResult.error) {
     detail(testResult.error);
+    emitRunEvent("tests_run", "Post-task tests did not run", {
+      ok: false,
+      detail: testResult.error,
+    });
   }
 }
 
@@ -3149,6 +3232,18 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
           if (testGate.totalDurationMs != null) {
             detail(`Elapsed: ${formatDurationMs(testGate.totalDurationMs)}`);
           }
+          emitRunEvent("gate", `Test gate passed — ${packageCount} package(s)`, {
+            ok: true,
+            detail: testGate.command,
+            counts: {
+              packages: packageCount,
+              passed: passCount,
+              failed: 0,
+              ...(testGate.totalDurationMs != null
+                ? { durationMs: testGate.totalDurationMs }
+                : {}),
+            },
+          });
           gateComplete = true;
         } else {
           // Gate failed — prompt for action
@@ -3158,6 +3253,23 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             noPackagesParsed
               ? "✗ Test gate failed — no per-package results were parsed"
               : `✗ ${packageCount - passCount}/${packageCount} package(s) failed`,
+          );
+
+          emitRunEvent(
+            "gate",
+            noPackagesParsed
+              ? "Test gate failed — no per-package results were parsed"
+              : `Test gate failed — ${packageCount - passCount}/${packageCount} package(s)`,
+            {
+              ok: false,
+              detail: failedPackages.join(", ") || testGate.error,
+              counts: {
+                packages: packageCount,
+                passed: passCount,
+                failed: packageCount - passCount,
+                attempt: testGateAttempt,
+              },
+            },
           );
 
           // Show failure details from first failed package
@@ -3172,6 +3284,10 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
           if (action === "rerun") {
             // Loop will retry
             detail("Retrying test gate...");
+            emitRunEvent("retry", "Re-running the test gate", {
+              detail: "operator chose rerun",
+              counts: { attempt: testGateAttempt },
+            });
           } else if (action === "skip") {
             // User chose to skip gate and continue to commit
             testGateSkipped = true;
@@ -3511,6 +3627,22 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // takes, minus hench's own runtime artifacts.
   run.uncommittedPaths = (await findUncommittedWork({ projectDir })).paths;
 
+  // The commit gate's verdict, emitted from the one place that sees every
+  // commit regardless of which path made it. "Passed" means the run left
+  // nothing behind: work that is committed is work the next run can build on,
+  // and a dirty tree is the failure this gate exists to surface.
+  emitRunEvent(
+    "gate",
+    run.uncommittedPaths.length === 0
+      ? `Commit gate passed — ${run.commits.length} commit(s)`
+      : `Commit gate: ${run.uncommittedPaths.length} path(s) left uncommitted`,
+    {
+      ok: run.uncommittedPaths.length === 0,
+      detail: run.commits.map((c) => c.sha.slice(0, 8)).join(", ") || undefined,
+      counts: { commits: run.commits.length, uncommitted: run.uncommittedPaths.length },
+    },
+  );
+
   // A held completion is applied only by a run that ends completed. Applied
   // and then withdrawn (a later commit step failed) counts as not applied.
   if (completionHold) {
@@ -3524,6 +3656,19 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   run.finishedAt = new Date().toISOString();
   run.lastActivityAt = run.finishedAt;
   await saveRun(henchDir, run);
+
+  // The last event, before the stream is closed below. A reader tailing the
+  // file learns the run is over from this line rather than from the file
+  // simply stopping — which is indistinguishable from a crash.
+  emitRunEvent("run_finished", `Run ${run.status}`, {
+    ok: run.status === "completed",
+    detail: run.error,
+    counts: {
+      turns: run.turns,
+      durationMs: new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime(),
+    },
+  });
+  await closeActiveRunEvents();
 
   // Close the run log under .run-logs/ at the project root. The file has been
   // growing line by line since initRunRecord; this flushes the tail of it.

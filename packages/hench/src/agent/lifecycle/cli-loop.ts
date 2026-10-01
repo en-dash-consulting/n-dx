@@ -28,6 +28,7 @@ import { toolRexAppendLog } from "../../tools/rex.js";
 import {checkTokenBudget, formatBudgetExceeded} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
+import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
 import { isSpinningRun } from "../analysis/spin.js";
 import { createLivelockDetector } from "../analysis/livelock.js";
@@ -1069,6 +1070,14 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
       // Step 1: Parse the line through the adapter for event classification
       const event = adapter.parseEvent(line, turnCounter.value + 1, {});
 
+      // Narrate file work onto the run's structured event stream. Placed here,
+      // above the pipeline branches, so it happens once for both of them —
+      // and reuses the tool call the adapter has already parsed rather than
+      // adding a second pass over the output.
+      if (event?.type === "tool_use" && event.toolCall) {
+        recordFileWork(event.toolCall.tool, event.toolCall.input, event.turn);
+      }
+
       // Plan-mode intercept: when the agent calls ExitPlanMode, capture the
       // plan text and terminate the spawn so the outer loop can prompt the
       // user (or auto-accept) and re-run with permissionMode "acceptEdits".
@@ -1410,6 +1419,12 @@ async function runAdversarialReviewPass(
       `${ctx.reviewModel || "the loaded model"}...`,
   );
 
+  emitRunEvent(
+    "review_started",
+    `Adversarial review started on ${ctx.reviewModel || "the loaded model"}`,
+    { detail: resumeSessionId ? "resuming the work session" : "fresh session" },
+  );
+
   // Bracket the reviewer spawn with working-tree snapshots so its repairs can
   // be identified — and committed — without sweeping pre-existing dirt. A
   // failed snapshot degrades to "repairs unknown", never to a failed review.
@@ -1542,6 +1557,17 @@ async function runAdversarialReviewPass(
     backgroundResumed: backgroundResumed || undefined,
   };
 
+  emitRunEvent("review_report", `Review report written — ${report.findings.length} finding(s)`, {
+    ok: unresolved.unrepairedMustFix.length === 0,
+    detail: reportPath,
+    counts: {
+      findings: report.findings.length,
+      unresolved: unresolved.all.length,
+      unrepairedMustFix: unresolved.unrepairedMustFix.length,
+      deferred: deferred.length,
+    },
+  });
+
   return { ok: true, report };
 }
 
@@ -1614,6 +1640,12 @@ function reportReviewFailure(run: RunRecord, outcome: ReviewPassOutcome & { ok: 
   info(`⚠ Adversarial review did not complete (${outcome.reason}): ${outcome.detail}`);
   info("  The task's own validation still passed — continuing without review findings.");
   run.review = { failed: outcome.reason, detail: outcome.detail };
+  // A review that silently did not happen is indistinguishable on the Work tab
+  // from one that found nothing, so the stream says which.
+  emitRunEvent("review_report", `Adversarial review did not complete (${outcome.reason})`, {
+    ok: false,
+    detail: outcome.detail,
+  });
 }
 
 // ── Successful result processing ──────────────────────────────────────────
@@ -1827,6 +1859,10 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
   if (attempt < retryConfig.maxRetries) {
     const delay = computeDelay(attempt, retryConfig.baseDelayMs, retryConfig.maxDelayMs);
     info(`retry ${attempt + 1}/${retryConfig.maxRetries}: transient error, waiting ${delay}ms`);
+    emitRunEvent("retry", `Retrying after a transient error (${attempt + 1}/${retryConfig.maxRetries})`, {
+      detail: result.error,
+      counts: { attempt: attempt + 1, maxAttempts: retryConfig.maxRetries, delayMs: delay },
+    });
     await sleep(delay);
     return "retry";
   }
@@ -1921,6 +1957,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     // The routed tier for the agent loop — "standard" unless llm.routes
     // reroutes agent.execute — so `ndx usage` can report spend per tier.
     weight: resolveTaskModel("agent.execute", llmConfig, { vendor }).tier,
+    criteriaCount: brief.task.acceptanceCriteria?.length,
+    permissionMode: opts.permissionMode,
   });
 
   // CLI-specific: load config for CLI path and env resolution

@@ -1468,6 +1468,25 @@ export interface RunRecord {
    */
   logPath?: string;
   /**
+   * Absolute path of this run's structured progress event stream, a JSON Lines
+   * file under `.hench/runs/`.
+   *
+   * Distinct from {@link logPath}, which is the run's terminal output, and from
+   * {@link events}, which is the raw `RuntimeEvent` stream kept only in
+   * verbose mode and only at the end of the run. This file carries a small
+   * typed vocabulary — brief loaded, files read, file edited, tests run,
+   * retry, gate, review, finished — written as each happens, so a viewer can
+   * render a run's progress without parsing log text.
+   *
+   * Written before the agent produces anything, for the same reason
+   * {@link logPath} is: the point of recording it is to be tailed while the
+   * run is still going. Absent when the events file could not be opened; the
+   * run proceeds either way, since this is narration rather than state.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  eventsPath?: string;
+  /**
    * Commits this run produced — the task's own work commit, the
    * review-repair commit, and the completion-metadata ("record") commit,
    * whichever landed — in the order git created them.
