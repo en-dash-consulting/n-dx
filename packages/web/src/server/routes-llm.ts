@@ -28,10 +28,13 @@ import {
   MODEL_COSTS,
   isModelCompatibleWithVendor,
   resolveClaudeConfig,
+  loadLLMConfig,
 } from "@n-dx/llm-client";
-import type { LLMVendor, ClaudeFieldSource } from "@n-dx/llm-client";
-import { VENDOR_PROVIDERS } from "./hench-config-fields.js";
-import { resolveEffectiveAgentConfig } from "./effective-agent-config.js";
+import type { LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
+import { VENDOR_PROVIDERS, validateProviderForVendor } from "./hench-config-fields.js";
+import { resolveEffectiveAgentConfig, resolveEffectiveAgentModel } from "./effective-agent-config.js";
+import { getLiveVendorProbe, clearLlmCatalogCache } from "./llm-catalog.js";
+import type { CliInfo, LiveVendorProbe } from "./llm-catalog.js";
 import type { EffectiveAgentConfig } from "./effective-agent-config.js";
 
 // ---------------------------------------------------------------------------
@@ -95,6 +98,13 @@ export interface LlmConfigResponse {
   /** Enable automatic failover on model/vendor errors. */
   autoFailover?: boolean;
   /**
+   * The per-vendor agent model override, `hench.models.<vendor>` in the project
+   * config (`.n-dx.json` merged with the local overlay). A vendor with no
+   * override is absent. This is the key the picker writes — not the merged
+   * view `effective` reports, which also folds in `.hench/config.json`.
+   */
+  agentModels: Partial<Record<LLMVendor, string>>;
+  /**
    * What `ndx work` runs with no flags, resolved across `.n-dx.json` and
    * `.hench/config.json`. Every other field on this response is a configured
    * key; this one is the answer those keys add up to. See
@@ -102,6 +112,18 @@ export interface LlmConfigResponse {
    * it.
    */
   effective: EffectiveAgentConfig;
+  /**
+   * Why `ndx work` would refuse to run {@link LlmConfigResponse.effective};
+   * empty when it would run. The viewer renders these and runs no check of its
+   * own, so the rules live only here, beside the validators they come from.
+   */
+  effectiveProblems: EffectiveProblem[];
+}
+
+/** One reason the resolved agent config would be refused. */
+export interface EffectiveProblem {
+  field: "provider" | "model";
+  message: string;
 }
 
 /** Shape expected by PUT /api/llm/config. */
@@ -191,8 +213,37 @@ const PARAMETERIZED_PREFIXES = ["llm.tiers.", "llm.routes.", "llm.effort."] as c
  */
 const FLAT_MAP_PREFIXES = ["llm.routes.", "llm.effort."] as const;
 
+/** `hench.models.<vendor>` — the agent model override `ndx work` honours after `--model`. */
+const AGENT_MODEL_PATH = /^hench\.models\.(claude|codex|google|local)$/;
+
+/**
+ * The vendor a model-valued path is scoped to, or null for any other path:
+ * `llm.<vendor>.model`, `llm.<vendor>.lightModel` and `hench.models.<vendor>`.
+ */
+function modelPathVendor(path: string): LLMVendor | null {
+  const agent = AGENT_MODEL_PATH.exec(path);
+  if (agent) return agent[1] as LLMVendor;
+  const llm = /^llm\.(claude|codex|google|local)\.(model|lightModel)$/.exec(path);
+  return llm ? (llm[1] as LLMVendor) : null;
+}
+
+/**
+ * Refuse a model id the vendor cannot run — the check `ndx work` applies, made
+ * at write time so the next run does not fail on it. `local` runs whatever the
+ * server has loaded, so any id is accepted there. Returns an error message, or
+ * null when the change is acceptable (including a delete).
+ */
+function validateModelForVendor(path: string, value: unknown): string | null {
+  const vendor = modelPathVendor(path);
+  if (!vendor || vendor === LLM_VENDOR.LOCAL) return null;
+  if (typeof value !== "string" || value === "") return null;
+  if (isModelCompatibleWithVendor(vendor, value)) return null;
+  return `Model "${value}" is not a ${vendor} model; "${path}" was not changed.`;
+}
+
 function isWritablePath(path: string): boolean {
   if (VALID_PATHS.has(path)) return true;
+  if (AGENT_MODEL_PATH.test(path)) return true;
   return PARAMETERIZED_PREFIXES.some(
     (prefix) => path.startsWith(prefix) && path.length > prefix.length,
   );
@@ -354,6 +405,22 @@ function deleteByPath(obj: Record<string, unknown>, path: string): void {
 }
 
 /**
+ * Drop `hench.models` once its last vendor is cleared, and `hench` once that
+ * leaves it empty, so "Use project default" leaves no residue in `.n-dx.json`.
+ * Only ever removes objects this route emptied itself.
+ */
+function pruneEmptyAgentModels(config: Record<string, unknown>): void {
+  const hench = config["hench"];
+  if (!hench || typeof hench !== "object") return;
+  const henchObj = hench as Record<string, unknown>;
+  const models = henchObj["models"];
+  if (models && typeof models === "object" && Object.keys(models).length === 0) {
+    delete henchObj["models"];
+  }
+  if (Object.keys(henchObj).length === 0) delete config["hench"];
+}
+
+/**
  * Read the active `llm.vendor` from `.n-dx.json` merged with the local
  * overlay (local wins), or null if unset. Shared with `routes-hench.ts` and
  * `routes-adaptive.ts` so a hench-config `provider` write can be validated
@@ -363,6 +430,39 @@ export function resolveActiveVendor(projectDir: string): string | null {
   const config = readEffectiveNdxConfig(projectDir);
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   return typeof llm["vendor"] === "string" ? llm["vendor"] : null;
+}
+
+/**
+ * Refusals `ndx work` would raise for the resolved config. The provider check
+ * is the one the dashboard already applies on write; the model check is
+ * llm-client's, skipped for `local` where any loaded model id is valid.
+ */
+function findEffectiveProblems(effective: EffectiveAgentConfig): EffectiveProblem[] {
+  const problems: EffectiveProblem[] = [];
+  const providerError = validateProviderForVendor(effective.provider, effective.vendor);
+  if (providerError) problems.push({ field: "provider", message: providerError });
+  if (
+    effective.vendor !== LLM_VENDOR.LOCAL &&
+    !isModelCompatibleWithVendor(effective.vendor, effective.model)
+  ) {
+    problems.push({
+      field: "model",
+      message: `Model "${effective.model}" is not a ${effective.vendor} model.`,
+    });
+  }
+  return problems;
+}
+
+/** `hench.models.<vendor>` entries from a parsed project config; non-string and unknown-vendor keys are skipped. */
+function readAgentModels(config: Record<string, unknown>): Partial<Record<LLMVendor, string>> {
+  const hench = (config["hench"] ?? {}) as Record<string, unknown>;
+  const raw = (hench["models"] ?? {}) as Record<string, unknown>;
+  const models: Partial<Record<LLMVendor, string>> = {};
+  for (const vendor of VALID_VENDORS) {
+    const value = getString(raw, vendor);
+    if (value) models[vendor as LLMVendor] = value;
+  }
+  return models;
 }
 
 /**
@@ -382,6 +482,8 @@ async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> 
   // the same resolution `loadLLMConfig` and `GET /api/ndx-config` use, so the
   // dashboard shows the value the next run will actually use.
   const claude = resolveClaudeConfig(llm["claude"], config["claude"]);
+
+  const effective = await resolveEffectiveAgentConfig(projectDir);
 
   const result: LlmConfigResponse = {
     vendor: typeof llm["vendor"] === "string" ? llm["vendor"] : null,
@@ -415,7 +517,9 @@ async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> 
       ...(claude.sources.model ? { model: claude.sources.model } : {}),
       ...(claude.sources.lightModel ? { lightModel: claude.sources.lightModel } : {}),
     },
-    effective: await resolveEffectiveAgentConfig(projectDir),
+    agentModels: readAgentModels(config),
+    effective,
+    effectiveProblems: findEffectiveProblems(effective),
   };
 
   if (typeof llm["autoFailover"] === "boolean") {
@@ -615,6 +719,23 @@ function writeProfilesConfig(projectDir: string, profiles: LocalProfile[]): void
 export interface VendorCatalogEntry {
   models: string[];
   providers: Array<"cli" | "api">;
+  /**
+   * The model `ndx work` runs for this vendor with no `hench.models.<vendor>`
+   * set: `llm.<vendor>.model` (legacy `claude.model` for Claude), else the
+   * vendor default.
+   */
+  defaultModel: string;
+  /** `"live"` when `models` came from the vendor's Models API, else the built-in list. */
+  source: "live" | "built-in";
+  /** ISO time of the live fetch; null when `source` is `"built-in"`. */
+  checkedAt: string | null;
+  /** Why the built-in list is shown. Present only when `source` is `"built-in"`. */
+  reason?: string;
+}
+
+/** A vendor entry whose CLI is installed locally, with what `<binary> --version` reported. */
+export interface CliVendorCatalogEntry extends VendorCatalogEntry {
+  cli: CliInfo;
 }
 
 /**
@@ -626,14 +747,15 @@ export interface VendorCatalogEntry {
 export interface LocalCatalogEntry {
   models: string[];
   providers: Array<"cli" | "api">;
+  defaultModel: string;
   reachable: boolean;
   reason?: string;
 }
 
 /** Shape returned by GET /api/llm/catalog. */
 export interface LlmCatalogResponse {
-  claude: VendorCatalogEntry;
-  codex: VendorCatalogEntry;
+  claude: CliVendorCatalogEntry;
+  codex: CliVendorCatalogEntry;
   google: VendorCatalogEntry;
   local: LocalCatalogEntry;
 }
@@ -657,8 +779,30 @@ function cloudVendorModels(vendor: LLMVendor): string[] {
  * literal pinned against hench's own table by the cross-package contract
  * test (see that file's doc comment for why web keeps a copy at all).
  */
-async function buildLlmCatalog(projectDir: string): Promise<LlmCatalogResponse> {
+async function buildLlmCatalog(projectDir: string, refresh: boolean): Promise<LlmCatalogResponse> {
   const config = readEffectiveNdxConfig(projectDir);
+  const llmConfig = await loadLLMConfig(projectDir);
+  // The model `ndx work` would run with no `hench.models.<vendor>` — resolved
+  // through the same chain as `effective`, minus the hench override rung.
+  const defaultModel = (vendor: LLMVendor): string =>
+    resolveEffectiveAgentModel(vendor, undefined, llmConfig).model;
+  const [claudeProbe, codexProbe] = await Promise.all([
+    getLiveVendorProbe(LLM_VENDOR.CLAUDE, projectDir, { refresh }),
+    getLiveVendorProbe(LLM_VENDOR.CODEX, projectDir, { refresh }),
+  ]);
+  const cliEntry = (vendor: ListableVendor, probe: LiveVendorProbe): CliVendorCatalogEntry => {
+    const builtIn = cloudVendorModels(vendor);
+    const live = probe.listing.ok;
+    return {
+      models: probe.listing.ok ? probe.listing.models : builtIn,
+      providers: [...VENDOR_PROVIDERS[vendor]],
+      defaultModel: defaultModel(vendor),
+      source: live ? "live" : "built-in",
+      checkedAt: live ? probe.checkedAt : null,
+      ...(probe.listing.ok ? {} : { reason: probe.listing.reason }),
+      cli: probe.cli,
+    };
+  };
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
   const host = typeof llmLocal["host"] === "string" && llmLocal["host"]
@@ -670,12 +814,20 @@ async function buildLlmCatalog(projectDir: string): Promise<LlmCatalogResponse> 
   const localStatus = await probeLocalServer(host, port);
 
   return {
-    claude: { models: cloudVendorModels(LLM_VENDOR.CLAUDE), providers: [...VENDOR_PROVIDERS.claude] },
-    codex: { models: cloudVendorModels(LLM_VENDOR.CODEX), providers: [...VENDOR_PROVIDERS.codex] },
-    google: { models: cloudVendorModels(LLM_VENDOR.GOOGLE), providers: [...VENDOR_PROVIDERS.google] },
+    claude: cliEntry(LLM_VENDOR.CLAUDE, claudeProbe),
+    codex: cliEntry(LLM_VENDOR.CODEX, codexProbe),
+    google: {
+      models: cloudVendorModels(LLM_VENDOR.GOOGLE),
+      providers: [...VENDOR_PROVIDERS.google],
+      defaultModel: defaultModel(LLM_VENDOR.GOOGLE),
+      source: "built-in",
+      checkedAt: null,
+      reason: "No live model list for google",
+    },
     local: {
       models: localStatus.ok ? localStatus.models : [],
       providers: [...VENDOR_PROVIDERS.local],
+      defaultModel: defaultModel(LLM_VENDOR.LOCAL),
       reachable: localStatus.ok,
       ...(localStatus.ok ? {} : { reason: localStatus.error ?? "Local server unreachable" }),
     },
@@ -807,7 +959,8 @@ export async function handleLlmRoute(
 
   // GET /api/llm/catalog — models to offer and provider choices, per vendor
   if (method === "GET" && pathname === LLM_CATALOG) {
-    jsonResponse(res, 200, await buildLlmCatalog(ctx.projectDir));
+    const refresh = new URL(url, "http://localhost").searchParams.get("refresh") === "true";
+    jsonResponse(res, 200, await buildLlmCatalog(ctx.projectDir, refresh));
     return true;
   }
 
@@ -885,6 +1038,11 @@ export async function handleLlmRoute(
             return true;
           }
         }
+        const modelError = validateModelForVendor(path, value);
+        if (modelError) {
+          errorResponse(res, 400, modelError);
+          return true;
+        }
       }
 
       const config = readNdxConfig(ctx.projectDir);
@@ -893,6 +1051,7 @@ export async function handleLlmRoute(
       for (const [path, value] of Object.entries(parsed.changes)) {
         if (value === null || value === "") {
           deleteByPath(config, path);
+          if (AGENT_MODEL_PATH.test(path)) pruneEmptyAgentModels(config);
         } else if (NUMERIC_PATHS.has(path)) {
           // Coerce string port values to numbers before persisting
           setByPath(config, path, Number(value));
@@ -906,6 +1065,8 @@ export async function handleLlmRoute(
       // The credential check's answer depends on this config — drop the
       // cached result so the auth chip re-verifies against the new settings.
       invalidateAuthCheckCache();
+      // A new key, binary path or model changes what the live probe would see.
+      clearLlmCatalogCache(ctx.projectDir);
       jsonResponse(res, 200, { applied, config: await extractLlmConfig(ctx.projectDir) });
       return true;
     } catch (err) {

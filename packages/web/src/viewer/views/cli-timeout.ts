@@ -1,17 +1,18 @@
 /**
- * CLI Timeouts view — timeout configuration panel for the n-dx CLI.
+ * CLI timeouts — the timeout section of the Workflow page.
  *
  * Surfaces the global CLI timeout and per-command overrides from `.n-dx.json`
- * in an editable form. Changes are validated client-side (non-numeric and
- * negative values rejected inline) before being saved via the config API.
+ * in an editable form. `useCliTimeoutsForm` owns the state; values are
+ * validated client-side (non-numeric and negative values rejected inline)
+ * before `save` writes them. `views/workflow.ts` composes the section onto
+ * the shared SettingsFrame, which owns Save and the unsaved-changes prompt.
  *
  * Data comes from GET /api/cli/timeouts (read) and
  * PUT /api/cli/timeouts (write).
  */
 
 import { h } from "preact";
-import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
-import { NdxLogoPng } from "../components/index.js";
+import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -278,56 +279,42 @@ function GlobalTimeoutField({ savedMs, defaultMs, editValue, error, onchange, on
   );
 }
 
-// ── Changes panel ─────────────────────────────────────────────────────
+// ── Form state ────────────────────────────────────────────────────────
 
-function ChangesSummary({ count, onSave, onDiscard, saving }: {
-  count: number;
-  onSave: () => void;
-  onDiscard: () => void;
-  saving: boolean;
-}) {
-  if (count === 0) return null;
-
-  return h("div", { class: "ct-changes-panel" },
-    h("div", { class: "ct-changes-header" },
-      `${count} unsaved change${count > 1 ? "s" : ""}`,
-    ),
-    h("div", { class: "ct-changes-actions" },
-      h("button", {
-        type: "button",
-        class: "ct-discard-btn",
-        onClick: onDiscard,
-        disabled: saving,
-      }, "Discard All"),
-      h("button", {
-        type: "button",
-        class: "ct-save-btn",
-        onClick: onSave,
-        disabled: saving,
-      }, saving ? "Saving..." : "Save All Changes"),
-    ),
-  );
+/** State and actions of the CLI-timeouts form. The Workflow page owns it. */
+export interface CliTimeoutsForm {
+  /** Loaded timeouts, or null before the first successful load. */
+  data: CliTimeoutsResponse | null;
+  loading: boolean;
+  /** Why the timeouts could not be loaded. */
+  loadError: string | null;
+  /** Why the last save failed. Cleared by the next save or a discard. */
+  saveError: string | null;
+  /** Raw global edit, or null when untouched. */
+  globalEdit: string | null;
+  perCmdEdit: Record<string, string>;
+  globalError: string | null;
+  perCmdErrors: Record<string, string | null>;
+  /** True while any value differs from its saved value, or holds invalid input. */
+  dirty: boolean;
+  onGlobalChange: (raw: string) => void;
+  onGlobalReset: () => void;
+  onPerCmdChange: (key: string, raw: string) => void;
+  onPerCmdReset: (key: string) => void;
+  /**
+   * PUT the changed values to /api/cli/timeouts. Resolves true once saved (or
+   * when nothing is dirty); false leaves the edits in place with `saveError` set.
+   */
+  save: () => Promise<boolean>;
+  /** Drop every edit. */
+  discard: () => void;
 }
 
-// ── Toast ─────────────────────────────────────────────────────────────
-
-function SaveToast({ visible }: { visible: boolean }) {
-  if (!visible) return null;
-  return h("div", { class: "ct-toast" },
-    h("span", { class: "ct-toast-icon" }, "\u2714"),
-    h("span", null, "Saved"),
-  );
-}
-
-// ── Main view ─────────────────────────────────────────────────────────
-
-export function CliTimeoutsView() {
+export function useCliTimeoutsForm(): CliTimeoutsForm {
   const [data, setData] = useState<CliTimeoutsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [showToast, setShowToast] = useState(false);
 
   // Edit state: maps field key → raw string input value
   const [globalEdit, setGlobalEdit] = useState<string | null>(null);
@@ -337,8 +324,6 @@ export function CliTimeoutsView() {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [perCmdErrors, setPerCmdErrors] = useState<Record<string, string | null>>({});
 
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const fetchConfig = useCallback(async () => {
     try {
       const res = await fetch("/api/cli/timeouts");
@@ -347,10 +332,8 @@ export function CliTimeoutsView() {
         setLoadError((body as { error?: string }).error ?? "Failed to load timeout configuration");
         return;
       }
-      const json = await res.json() as CliTimeoutsResponse;
-      setData(json);
+      setData(await res.json() as CliTimeoutsResponse);
       setLoadError(null);
-      // Reset edit state on load
       setGlobalEdit(null);
       setPerCmdEdit({});
       setGlobalError(null);
@@ -362,32 +345,24 @@ export function CliTimeoutsView() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchConfig();
-  }, [fetchConfig]);
+  useEffect(() => { void fetchConfig(); }, [fetchConfig]);
 
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
-
-  const handleGlobalChange = useCallback((raw: string) => {
+  const onGlobalChange = useCallback((raw: string) => {
     setGlobalEdit(raw);
     setGlobalError(validateTimeoutInput(raw, "Global timeout"));
   }, []);
 
-  const handleGlobalReset = useCallback(() => {
+  const onGlobalReset = useCallback(() => {
     setGlobalEdit(null);
     setGlobalError(null);
   }, []);
 
-  const handlePerCmdChange = useCallback((key: string, raw: string) => {
+  const onPerCmdChange = useCallback((key: string, raw: string) => {
     setPerCmdEdit((prev) => ({ ...prev, [key]: raw }));
     setPerCmdErrors((prev) => ({ ...prev, [key]: validateTimeoutInput(raw, KNOWN_COMMANDS[key]?.label ?? key) }));
   }, []);
 
-  const handlePerCmdReset = useCallback((key: string) => {
+  const onPerCmdReset = useCallback((key: string) => {
     setPerCmdEdit((prev) => {
       const next = { ...prev };
       delete next[key];
@@ -400,77 +375,56 @@ export function CliTimeoutsView() {
     });
   }, []);
 
-  // Count pending changes
-  const pendingCount = useMemo(() => {
-    if (!data) return 0;
-    let count = 0;
-    if (globalEdit !== null && isDirty(data.timeoutMs, globalEdit, data.defaultTimeoutMs)) count++;
-    for (const [key, raw] of Object.entries(perCmdEdit)) {
-      const saved = data.timeouts[key] ?? null;
-      if (isDirty(saved, raw, data.defaultTimeoutMs)) count++;
+  /** The request body for the values that differ from what is saved. */
+  const pendingBody = useMemo(() => {
+    const body: { timeoutMs?: number | null; timeouts?: Record<string, number | null> } = {};
+    if (!data) return body;
+    if (globalEdit !== null && isDirty(data.timeoutMs, globalEdit, data.defaultTimeoutMs)) {
+      body.timeoutMs = parseMs(globalEdit);
     }
-    return count;
+    const perCmdChanges: Record<string, number | null> = {};
+    for (const [key, raw] of Object.entries(perCmdEdit)) {
+      if (isDirty(data.timeouts[key] ?? null, raw, data.defaultTimeoutMs)) perCmdChanges[key] = parseMs(raw);
+    }
+    if (Object.keys(perCmdChanges).length > 0) body.timeouts = perCmdChanges;
+    return body;
   }, [data, globalEdit, perCmdEdit]);
 
-  const hasErrors = useMemo(() => {
-    if (globalError) return true;
-    return Object.values(perCmdErrors).some((e) => e !== null && e !== undefined);
-  }, [globalError, perCmdErrors]);
+  const hasErrors = globalError !== null || Object.values(perCmdErrors).some((e) => e !== null && e !== undefined);
 
-  const handleSave = useCallback(async () => {
-    if (!data || pendingCount === 0 || hasErrors || saving) return;
+  // `isDirty` treats unparseable input as clean (there is no value to save),
+  // but the page must still count it as an unsaved edit — otherwise typing
+  // "abc" leaves Save disabled and the leave prompt unarmed, and the edit is
+  // lost silently on navigation.
+  const dirty = Object.keys(pendingBody).length > 0 || hasErrors;
 
-    setSaving(true);
+  const save = useCallback(async (): Promise<boolean> => {
+    if (!dirty) return true;
     setSaveError(null);
-
+    if (hasErrors) {
+      setSaveError("Fix the invalid timeouts before saving");
+      return false;
+    }
     try {
-      const body: { timeoutMs?: number | null; timeouts?: Record<string, number | null> } = {};
-
-      // Global timeout
-      if (globalEdit !== null && isDirty(data.timeoutMs, globalEdit, data.defaultTimeoutMs)) {
-        const n = parseMs(globalEdit);
-        body.timeoutMs = n ?? null;
-      }
-
-      // Per-command overrides
-      const perCmdChanges: Record<string, number | null> = {};
-      for (const [key, raw] of Object.entries(perCmdEdit)) {
-        const saved = data.timeouts[key] ?? null;
-        if (isDirty(saved, raw, data.defaultTimeoutMs)) {
-          perCmdChanges[key] = parseMs(raw);
-        }
-      }
-      if (Object.keys(perCmdChanges).length > 0) {
-        body.timeouts = perCmdChanges;
-      }
-
       const res = await fetch("/api/cli/timeouts", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(pendingBody),
       });
-
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({ error: "Save failed" }));
         setSaveError((errBody as { error?: string }).error ?? "Save failed");
-        return;
+        return false;
       }
-
-      // Show toast
-      setShowToast(true);
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setShowToast(false), 3000);
-
-      // Refresh from server
-      await fetchConfig();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSaving(false);
+      return false;
     }
-  }, [data, pendingCount, hasErrors, saving, globalEdit, perCmdEdit, fetchConfig]);
+    await fetchConfig();
+    return true;
+  }, [dirty, hasErrors, pendingBody, fetchConfig]);
 
-  const handleDiscard = useCallback(() => {
+  const discard = useCallback(() => {
     setGlobalEdit(null);
     setPerCmdEdit({});
     setGlobalError(null);
@@ -478,32 +432,47 @@ export function CliTimeoutsView() {
     setSaveError(null);
   }, []);
 
-  if (loading) {
+  return {
+    data,
+    loading,
+    loadError,
+    saveError,
+    globalEdit,
+    perCmdEdit,
+    globalError,
+    perCmdErrors,
+    dirty,
+    onGlobalChange,
+    onGlobalReset,
+    onPerCmdChange,
+    onPerCmdReset,
+    save,
+    discard,
+  };
+}
+
+// ── Section ───────────────────────────────────────────────────────────
+
+export function CliTimeoutsSection({ form }: { form: CliTimeoutsForm }) {
+  const { data } = form;
+
+  if (form.loading) {
     return h("div", { class: "ct-container" },
       h("div", { class: "loading" }, "Loading timeout configuration..."),
     );
   }
 
-  if (loadError && !data) {
+  if (!data) {
     return h("div", { class: "ct-container" },
-      h("div", { class: "ct-header" },
-        h("div", { class: "ct-header-brand" },
-          h(NdxLogoPng, { size: 28, class: "ct-header-logo" }),
-          h("span", { class: "ct-header-title" }, "CLI Timeouts"),
-        ),
-      ),
-      h("div", { class: "ct-error-state" }, loadError),
+      h("div", { class: "ct-error-state" }, form.loadError ?? "Failed to load timeout configuration"),
     );
   }
-
-  if (!data) return null;
 
   // Group known commands by category
   const byCategory = new Map<string, string[]>();
   for (const [cmd, meta] of Object.entries(KNOWN_COMMANDS)) {
-    const cat = meta.category;
-    if (!byCategory.has(cat)) byCategory.set(cat, []);
-    byCategory.get(cat)!.push(cmd);
+    if (!byCategory.has(meta.category)) byCategory.set(meta.category, []);
+    byCategory.get(meta.category)!.push(cmd);
   }
 
   // Collect any per-command overrides that are set in config but not in KNOWN_COMMANDS
@@ -512,21 +481,14 @@ export function CliTimeoutsView() {
   const overrideCount = Object.keys(data.timeouts).length;
   const effectiveGlobal = data.timeoutMs ?? data.defaultTimeoutMs;
 
-  const globalEditValue = globalEdit ?? (data.timeoutMs !== null ? String(data.timeoutMs) : "");
+  const globalEditValue = form.globalEdit ?? (data.timeoutMs !== null ? String(data.timeoutMs) : "");
 
   return h("div", { class: "ct-container" },
-    // Header
-    h("div", { class: "ct-header" },
-      h("div", { class: "ct-header-brand" },
-        h(NdxLogoPng, { size: 28, class: "ct-header-logo" }),
-        h("span", { class: "ct-header-title" }, "CLI Timeouts"),
-      ),
-      h("p", { class: "ct-header-subtitle" },
-        "Configure how long each CLI command may run before being cancelled. " +
-        "Settings are persisted to ",
-        h("code", null, ".n-dx.json"),
-        ".",
-      ),
+    h("p", { class: "ct-header-subtitle" },
+      "How long each CLI command may run before being cancelled. " +
+      "Settings are persisted to ",
+      h("code", null, ".n-dx.json"),
+      ".",
     ),
 
     // Stats bar
@@ -541,16 +503,7 @@ export function CliTimeoutsView() {
       ),
     ),
 
-    // Save error
-    saveError ? h("div", { class: "ct-error-banner" }, saveError) : null,
-
-    // Changes summary
-    h(ChangesSummary, {
-      count: pendingCount,
-      onSave: handleSave,
-      onDiscard: handleDiscard,
-      saving,
-    }),
+    form.saveError ? h("div", { class: "ct-error-banner" }, form.saveError) : null,
 
     // Info box
     h("div", { class: "ct-info-box" },
@@ -572,7 +525,7 @@ export function CliTimeoutsView() {
     // Global timeout section
     h("div", { class: "ct-section" },
       h("div", { class: "ct-section-header" },
-        h("span", { class: "ct-section-icon" }, "\u2699"),
+        h("span", { class: "ct-section-icon" }, "⚙"),
         h("div", null,
           h("h3", { class: "ct-section-title" }, "Global Default"),
           h("p", { class: "ct-section-desc" }, "Applied to all bounded commands unless a per-command override is set"),
@@ -583,9 +536,9 @@ export function CliTimeoutsView() {
           savedMs: data.timeoutMs,
           defaultMs: data.defaultTimeoutMs,
           editValue: globalEditValue,
-          error: globalError,
-          onchange: handleGlobalChange,
-          onReset: handleGlobalReset,
+          error: form.globalError,
+          onchange: form.onGlobalChange,
+          onReset: form.onGlobalReset,
         }),
       ),
     ),
@@ -608,7 +561,7 @@ export function CliTimeoutsView() {
             ...cmds.map((cmd) => {
               const meta = KNOWN_COMMANDS[cmd];
               const savedMs = data.timeouts[cmd] ?? null;
-              const rawEdit = perCmdEdit[cmd] ?? (savedMs !== null ? String(savedMs) : "");
+              const rawEdit = form.perCmdEdit[cmd] ?? (savedMs !== null ? String(savedMs) : "");
               const noDefaultTimeout = data.noDefaultTimeoutCommands.includes(cmd);
               return h(TimeoutField, {
                 key: cmd,
@@ -618,10 +571,10 @@ export function CliTimeoutsView() {
                 savedMs,
                 defaultMs: noDefaultTimeout ? 0 : (data.timeoutMs ?? data.defaultTimeoutMs),
                 editValue: rawEdit,
-                error: perCmdErrors[cmd] ?? null,
+                error: form.perCmdErrors[cmd] ?? null,
                 noDefaultTimeout,
-                onchange: handlePerCmdChange,
-                onReset: handlePerCmdReset,
+                onchange: form.onPerCmdChange,
+                onReset: form.onPerCmdReset,
               });
             }),
           ),
@@ -632,7 +585,7 @@ export function CliTimeoutsView() {
     customOverrides.length > 0
       ? h("div", { class: "ct-section" },
           h("div", { class: "ct-section-header" },
-            h("span", { class: "ct-section-icon" }, "\u25A6"),
+            h("span", { class: "ct-section-icon" }, "▦"),
             h("div", null,
               h("h3", { class: "ct-section-title" }, "Custom Overrides"),
               h("p", { class: "ct-section-desc" }, "Per-command overrides set manually in .n-dx.json"),
@@ -641,7 +594,7 @@ export function CliTimeoutsView() {
           h("div", { class: "ct-field-list" },
             ...customOverrides.map((cmd) => {
               const savedMs = data.timeouts[cmd] ?? null;
-              const rawEdit = perCmdEdit[cmd] ?? (savedMs !== null ? String(savedMs) : "");
+              const rawEdit = form.perCmdEdit[cmd] ?? (savedMs !== null ? String(savedMs) : "");
               return h(TimeoutField, {
                 key: cmd,
                 fieldKey: cmd,
@@ -650,16 +603,15 @@ export function CliTimeoutsView() {
                 savedMs,
                 defaultMs: data.timeoutMs ?? data.defaultTimeoutMs,
                 editValue: rawEdit,
-                error: perCmdErrors[cmd] ?? null,
+                error: form.perCmdErrors[cmd] ?? null,
                 noDefaultTimeout: false,
-                onchange: handlePerCmdChange,
-                onReset: handlePerCmdReset,
+                onchange: form.onPerCmdChange,
+                onReset: form.onPerCmdReset,
               });
             }),
           ),
         )
       : null,
-
-    h(SaveToast, { visible: showToast }),
   );
 }
+
