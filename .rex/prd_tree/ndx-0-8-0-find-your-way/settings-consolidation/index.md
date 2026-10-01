@@ -26,7 +26,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add the Project settings page and relabel the Commands settings entry](./add-the-project-settings-page-and.md) | pending |
+| [Add the Project settings page and relabel the Commands settings entry](./add-the-project-settings-page-and.md) | completed |
 | [Add the Robot Wrangler settings page for provider and model across every LLM-using command](./add-the-robot-wrangler-settings-page.md) | completed |
 | [Add the Workflow settings page for work settings, templates and timeouts](./add-the-workflow-settings-page-for.md) | completed |
 | [Build the shared settings frame with explicit Save, a dirty indicator and a leave-with-unsaved-changes prompt](./build-the-shared-settings-frame-with.md) | completed |
