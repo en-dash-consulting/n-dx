@@ -79,6 +79,10 @@ export interface AnalyzeProgress {
   startedAt: string;
   updatedAt: string;
   endedAt?: string;
+  /** The command line the run was started with (`sv analyze --deep`), for the page that names it. */
+  command?: string;
+  /** Why the run failed or was stopped: the last error line the analyzer reported. Absent on success. */
+  error?: string;
   /** The phase in progress, or null between phases and after the run. */
   phase: { index: number; name: string; total: number } | null;
   /** Every phase started in the current scope, in order. */
@@ -126,6 +130,8 @@ interface ActiveRun {
   path: string;
   startedAt: string;
   scope: string | null;
+  command: string | undefined;
+  error: string | undefined;
   phase: AnalyzeProgress["phase"];
   phases: AnalyzePhaseProgress[];
   pass: AnalyzeProgress["pass"];
@@ -148,9 +154,9 @@ export function isAnalyzeProgressActive(): boolean {
  *
  * Returns false, and changes nothing, when a run already owns the file — the
  * nested `cmdAnalyze` of a `--deep` sub-package. Only the call that got true
- * may finish it.
+ * may finish it. `command` is recorded for readers that show what was run.
  */
-export function startAnalyzeProgress(svDir: string): boolean {
+export function startAnalyzeProgress(svDir: string, command?: string): boolean {
   if (_active) return false;
   const run: ActiveRun = {
     path: analyzeProgressPath(svDir),
@@ -159,6 +165,8 @@ export function startAnalyzeProgress(svDir: string): boolean {
     // runs apart by starting strictly before this.
     startedAt: snapshotRunLedger().at,
     scope: null,
+    command,
+    error: undefined,
     phase: null,
     phases: [],
     pass: null,
@@ -178,6 +186,26 @@ export function startAnalyzeProgress(svDir: string): boolean {
 /** Mark the run finished, close any open phase, and stop publishing. */
 export function finishAnalyzeProgress(outcome: "complete" | "failed"): void {
   finish(outcome);
+}
+
+/**
+ * Record why the run is failing; written with the next progress write, and
+ * kept by the final `failed` one. The latest message wins.
+ */
+export function noteAnalyzeError(message: string): void {
+  const run = _active;
+  if (!run) return;
+  run.error = message;
+  write();
+}
+
+/**
+ * The phase in progress at the root scope, or null between phases and inside
+ * a `--deep` sub-package (whose phases are not the root manifest's).
+ */
+export function openRootPhase(): string | null {
+  const run = _active;
+  return run && run.scope === null ? run.phase?.name ?? null : null;
 }
 
 /** The phase runner is starting phase `index` (1–6). Clears pass and batch. */
@@ -300,6 +328,8 @@ function write(end?: { status: "complete" | "failed"; endedAt: string }): void {
     startedAt: run.startedAt,
     updatedAt: new Date().toISOString(),
     ...(end ? { endedAt: end.endedAt } : {}),
+    ...(run.command !== undefined ? { command: run.command } : {}),
+    ...(run.error !== undefined ? { error: run.error } : {}),
     phase: run.phase,
     phases: run.phases,
     pass: run.pass,

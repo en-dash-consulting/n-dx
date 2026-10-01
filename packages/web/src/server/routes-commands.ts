@@ -1403,6 +1403,24 @@ export function commandJobsOf(workspaceKey: string): CommandJobSnapshot[] {
   ].filter((job): job is CommandJobSnapshot => job !== null);
 }
 
+/** What the Live analysis page reads of the dashboard's own analyze slot. */
+export interface SvAnalyzeRunSnapshot {
+  running: boolean;
+  startedAt: string | null;
+  /** Tail of the analyzer's stdout (about the last 3000 characters). */
+  output: string;
+}
+
+/**
+ * The dashboard's analyze slot for one workspace, or null when that
+ * workspace never started one. Output exists only for runs the dashboard
+ * spawned: a terminal run's stdout belongs to its terminal.
+ */
+export function svAnalyzeRunOf(workspaceKey: string): SvAnalyzeRunSnapshot | null {
+  const status = svAnalyzeSlots.peekByKey(workspaceKey)?.status;
+  return status ? { running: status.running, startedAt: status.startedAt, output: status.recentOutput } : null;
+}
+
 type JobStatusBase = Pick<CommandJobSnapshot, "running" | "startedAt" | "finishedAt" | "error" | "stopped">;
 
 function snapshotJob<S extends JobStatusBase>(

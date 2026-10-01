@@ -12,6 +12,8 @@ import {
   markPass,
   markBatch,
   markScope,
+  noteAnalyzeError,
+  openRootPhase,
   readAnalyzeProgress,
   ANALYZE_PROGRESS_WRITE_INTERVAL_MS,
 } from "../../../src/analyzers/analyze-progress.js";
@@ -170,6 +172,47 @@ describe("analyze progress file", () => {
     markPass(2);
     markBatch("classify", 0, 2);
     expect(existsSync(analyzeProgressPath(svDir))).toBe(false);
+  });
+});
+
+describe("analyze progress: command and error", () => {
+  it("records the command the run was started with", () => {
+    startAnalyzeProgress(svDir, "sv analyze --deep");
+    expect(onDisk().command).toBe("sv analyze --deep");
+  });
+
+  it("omits command and error when none were given", () => {
+    startAnalyzeProgress(svDir);
+    const p = onDisk();
+    expect(p).not.toHaveProperty("command");
+    expect(p).not.toHaveProperty("error");
+  });
+
+  it("keeps the error line and the failed phase in the final write", () => {
+    startAnalyzeProgress(svDir);
+    markPhaseStarted(4, "zones");
+    noteAnalyzeError("Phase 4 failed: rate limited");
+    finishAnalyzeProgress("failed");
+    const p = onDisk();
+    expect(p).toMatchObject({ status: "failed", error: "Phase 4 failed: rate limited" });
+    expect(p.phases[0]).toMatchObject({ name: "zones", outcome: "failed" });
+  });
+
+  it("names the open root phase, and none inside a --deep sub-package or between phases", () => {
+    startAnalyzeProgress(svDir);
+    expect(openRootPhase()).toBeNull();
+    markPhaseStarted(2, "imports");
+    expect(openRootPhase()).toBe("imports");
+    markPhaseEnded("imports", "ok");
+    expect(openRootPhase()).toBeNull();
+    markScope("packages/a");
+    markPhaseStarted(1, "inventory");
+    expect(openRootPhase()).toBeNull();
+  });
+
+  it("ignores an error noted while no run owns the file", () => {
+    expect(() => noteAnalyzeError("nobody is listening")).not.toThrow();
+    expect(openRootPhase()).toBeNull();
   });
 });
 

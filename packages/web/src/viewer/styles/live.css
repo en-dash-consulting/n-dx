@@ -455,3 +455,61 @@
 .live-task-run-current { background: var(--accent-subtle); }
 .live-task-outcome { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .live-after-item { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+
+/* ── Analysis page ──────────────────────────────────────────────────── */
+
+.live-analyze-command {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-active);
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  overflow-wrap: anywhere;
+}
+.live-analyze-error { font-family: var(--font-mono); overflow-wrap: anywhere; }
+
+.live-analyze-card { padding: var(--space-3); gap: var(--space-3); }
+
+.live-analyze-bar { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
+.live-analyze-seg { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.live-analyze-seg .live-phase { height: 8px; }
+.live-analyze-seg .live-phase-failed { background: var(--orange); }
+.live-analyze-seg-label { font-size: var(--font-xs); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.live-analyze-phases,
+.live-analyze-passes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.live-analyze-passes { gap: var(--space-2); margin-top: var(--space-2); padding-left: var(--space-3); border-left: 2px solid var(--border); }
+
+.live-analyze-phase { display: flex; gap: var(--space-2); min-width: 0; }
+.live-analyze-mark { flex: none; width: 1.2em; text-align: center; color: var(--text-muted); }
+.live-analyze-mark-done { color: var(--green); }
+.live-analyze-mark-active { color: var(--accent); }
+.live-analyze-mark-failed { color: var(--orange); }
+.live-analyze-phase-body { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; flex: 1; }
+.live-analyze-phase-head { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+.live-analyze-time { margin-left: auto; font-size: var(--font-sm); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.live-analyze-phase-pending .live-card-title,
+.live-analyze-phase-skipped .live-card-title { color: var(--text-muted); }
+
+.live-analyze-pass { display: flex; gap: var(--space-2); min-width: 0; font-size: var(--font-sm); }
+.live-analyze-pass-pending { color: var(--text-muted); }
+.live-analyze-pass-active .live-criterion-mark { color: var(--accent); }
+.live-analyze-pass-done .live-criterion-mark { color: var(--green); }
+
+.live-analyze-output { max-height: 280px; overflow: auto; }
+
+.live-analyze-table { width: 100%; border-collapse: collapse; font-size: var(--font-sm); }
+.live-analyze-table th,
+.live-analyze-table td { padding: 2px var(--space-1); text-align: right; font-variant-numeric: tabular-nums; }
+.live-analyze-table th[scope="col"] { color: var(--text-muted); font-weight: var(--weight-regular, normal); }
+.live-analyze-table th:first-child,
+.live-analyze-table td:first-child { text-align: left; }
+.live-analyze-table th[scope="row"] { font-weight: normal; overflow-wrap: anywhere; }
+
+.live-analyze-file { display: flex; justify-content: space-between; gap: var(--space-2); font-size: var(--font-sm); }
+.live-analyze-file-state { color: var(--text-muted); text-align: right; }
+.live-analyze-file-written { color: var(--green); }
+.live-analyze-file-error { color: var(--orange); }
+
+.live-analyze-notes { margin: 0; padding-left: var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--font-sm); color: var(--text-dim); }

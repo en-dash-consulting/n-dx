@@ -1,10 +1,12 @@
 import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { constants as osConstants } from "node:os";
 import {resolve, join} from "node:path";import {
   DATA_FILES,
   SUPPLEMENTARY_FILES,
   readManifest,
   writeManifest,
+  updateManifestError,
   generateLlmsTxt,
   generateContext,
   emitZoneOutputs,
@@ -49,6 +51,8 @@ import {
   markPhaseStarted,
   markPhaseEnded,
   markScope,
+  noteAnalyzeError,
+  openRootPhase,
 } from "../../analyzers/analyze-progress.js";
 import { carryNarration, cmdNarrate, narrationLogPath, takeOverNarration } from "./narrate.js";
 import type { NarrateDeps } from "./narrate.js";
@@ -199,6 +203,7 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
       succeeded = true;
     } catch (err) {
       if (err instanceof PhasePrerequsiteError) {
+        noteAnalyzeError(`Phase ${err.phase} requires ${err.requirement}.`);
         console.error(`  Phase ${err.phase} requires ${err.requirement}.`);
         if (filter.type === "all") process.exit(1);
       } else if (err instanceof PhaseError) {
@@ -209,6 +214,8 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
           vendor,
           `run phase ${err.phase} (${err.module})`,
         );
+        const reason = classified.category !== "unknown" ? classified.message : err.reason;
+        noteAnalyzeError(`Phase ${err.phase} failed: ${reason}`);
         if (classified.category !== "unknown") {
           console.error(`  Phase ${err.phase} failed: ${classified.message}`);
           warn(`  Hint: ${classified.suggestion}`);
@@ -222,6 +229,7 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
         const errObj = err instanceof Error ? err : new Error(String(err));
         const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
         const classified = classifyLLMError(errObj, vendor);
+        noteAnalyzeError(`Phase ${phase} failed: ${classified.category !== "unknown" ? classified.message : errObj.message}`);
         if (classified.category !== "unknown") {
           console.error(`  Phase ${phase} failed: ${classified.message}`);
           warn(`  Hint: ${classified.suggestion}`);
@@ -345,6 +353,33 @@ export function appendAnalysisHistory(svDir: string, line: string): void {
   }
 }
 
+const STOP_SIGNALS = ["SIGTERM", "SIGINT"] as const;
+
+/**
+ * Turn a stop signal into an orderly failure. Without this the process dies
+ * with the manifest's open phase still `running` and the progress file still
+ * `running`; with it, the phase is recorded as an error the next analyze
+ * overwrites, the progress file says `failed` (its exit listener) and names
+ * the signal, and the exit code is the conventional 128 + signal. Returns the
+ * function that removes the handlers.
+ */
+function installStopHandlers(absDir: string): () => void {
+  const installed = STOP_SIGNALS.map((signal) => {
+    const handler = (): void => {
+      const message = `Stopped (${signal})`;
+      noteAnalyzeError(message);
+      const open = openRootPhase();
+      if (open) updateManifestError(absDir, open, message);
+      process.exit(128 + osConstants.signals[signal]);
+    };
+    process.once(signal, handler);
+    return { signal, handler };
+  });
+  return () => {
+    for (const { signal, handler } of installed) process.off(signal, handler);
+  };
+}
+
 export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promise<void> {
   const absDir = resolve(targetDir);
   if (!existsSync(absDir)) {
@@ -387,7 +422,8 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   // the dashboard. Same ownership rule as the reporter above: a --deep
   // sub-analysis reports into the outermost run's file (under markScope) and
   // leaves finishing it to that run.
-  const ownsProgressFile = startAnalyzeProgress(svDir);
+  const ownsProgressFile = startAnalyzeProgress(svDir, ["sv analyze", ...extraArgs].join(" "));
+  const removeStopHandlers = ownsProgressFile ? installStopHandlers(absDir) : null;
   let completed = false;
 
   try {
@@ -464,6 +500,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     completed = true;
   } finally {
     if (ownsProgressReporter) setActiveProgressReporter(null);
+    removeStopHandlers?.();
     if (ownsProgressFile) finishAnalyzeProgress(completed ? "complete" : "failed");
   }
 }

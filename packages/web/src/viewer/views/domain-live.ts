@@ -8,5 +8,7 @@
 export { LiveView } from "./live.js";
 export { LiveBar } from "./live-bar.js";
 export { LiveTaskView } from "./live-task.js";
+export { LiveAnalyzeView } from "./live-analyze.js";
 export type { LiveViewProps } from "./live.js";
+export type { LiveAnalyzeViewProps } from "./live-analyze.js";
 export type { LiveTaskViewProps } from "./live-task.js";
