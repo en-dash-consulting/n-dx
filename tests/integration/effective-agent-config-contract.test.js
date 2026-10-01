@@ -369,12 +369,27 @@ describe("web's hench.models reader agrees with hench's schema", () => {
 });
 
 describe("web's provider switch agrees with hench's isProviderSupported", () => {
+  /**
+   * The provider hench runs: `provider` as hench's own `loadConfig` resolves it
+   * (base file plus .n-dx.json / .n-dx.local.json overrides), then cmdRun's
+   * switch — an unsupported "cli" becomes "api"; an unsupported "api" (codex)
+   * is refused, so it is reported unchanged. The switch is inline in cmdRun and
+   * not exported, so it is the one rule restated here; the loader is not.
+   */
+  async function henchProvider(vendor) {
+    const configured = (await henchConfigFor(projectDir)).provider;
+    return isProviderSupported(vendor, configured) || configured !== "cli" ? configured : "api";
+  }
+
   for (const vendor of VENDORS) {
     for (const configured of ["cli", "api"]) {
       it(`${vendor} + provider=${configured}`, async () => {
         await seed({ llm: { vendor } }, { provider: configured });
+        // Vacuity guard: the oracle must have read the seeded value.
+        expect((await henchConfigFor(projectDir)).provider).toBe(configured);
 
         const { provider } = await resolveEffectiveAgentConfig(projectDir);
+        expect(provider).toBe(await henchProvider(vendor));
 
         if (isProviderSupported(vendor, configured)) {
           // Supported: reported untouched.
@@ -403,8 +418,10 @@ describe("web's provider switch agrees with hench's isProviderSupported", () => 
         // no provider of its own, so `.n-dx.json`'s `hench.provider` is the
         // only source — the documented override path, same as `models`.
         await seed({ llm: { vendor }, hench: { provider: configured } }, {});
+        expect((await henchConfigFor(projectDir)).provider).toBe(configured);
 
         const { provider } = await resolveEffectiveAgentConfig(projectDir);
+        expect(provider).toBe(await henchProvider(vendor));
 
         if (isProviderSupported(vendor, configured)) {
           expect(provider).toBe(configured);
@@ -418,6 +435,27 @@ describe("web's provider switch agrees with hench's isProviderSupported", () => 
       });
     }
   }
+
+  for (const vendor of VENDORS) {
+    for (const configured of ["cli", "api"]) {
+      it(`${vendor} + hench.provider=${configured} set only in .n-dx.local.json`, async () => {
+        await seed({ llm: { vendor } }, {});
+        await writeFile(
+          join(projectDir, ".n-dx.local.json"),
+          JSON.stringify({ hench: { provider: configured } }, null, 2),
+          "utf-8",
+        );
+        expect((await henchConfigFor(projectDir)).provider).toBe(configured);
+        expect((await resolveEffectiveAgentConfig(projectDir)).provider).toBe(await henchProvider(vendor));
+      });
+    }
+  }
+
+  it("an invalid hench.provider override reverts to the .hench/config.json value on both sides", async () => {
+    await seed({ llm: { vendor: "claude" }, hench: { provider: "bogus" } }, { provider: "api" });
+    expect((await henchConfigFor(projectDir)).provider).toBe("api");
+    expect((await resolveEffectiveAgentConfig(projectDir)).provider).toBe("api");
+  });
 
   it("defaults to hench's own default provider when .hench/config.json is absent", async () => {
     await seed({ llm: { vendor: "claude" } });
