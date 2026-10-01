@@ -21,6 +21,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add a shared available-memory reading to llm-client that counts macOS reclaimable pages and kernel pressure](./add-a-shared-available-memory-reading.md) | in_progress |
+| [Add a shared available-memory reading to llm-client that counts macOS reclaimable pages and kernel pressure](./add-a-shared-available-memory-reading.md) | completed |
 | [Route hench's memory throttle and pre-spawn check through the shared reading and never act on an unknown reading](./route-hench-s-memory-throttle-and-pre.md) | pending |
 | [Use the shared reading for the dashboard memory status and hub admission floor, labelled Available memory](./use-the-shared-reading-for-the.md) | pending |
