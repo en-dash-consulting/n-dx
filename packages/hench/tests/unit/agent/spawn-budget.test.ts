@@ -33,14 +33,16 @@ describe("spawn ledger", () => {
     recordSpawn(ledger, "plan-respawn");
     recordSpawn(ledger, "fork-fallback");
     recordSpawn(ledger, "background-resume");
+    recordSpawn(ledger, "read-only-retry");
 
-    expect(ledger.total).toBe(5);
+    expect(ledger.total).toBe(6);
     expect(ledger.byReason).toEqual({
       initial: 1,
       retry: 1,
       "plan-respawn": 1,
       "fork-fallback": 1,
       "background-resume": 1,
+      "read-only-retry": 1,
     });
   });
 

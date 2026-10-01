@@ -55,6 +55,11 @@ import { snapshotDirtyState, diffDirtyState } from "../analysis/review-repairs.j
 import type { DirtySnapshot } from "../analysis/review-repairs.js";
 import { ensureWarmParent, ORIENTATION_LIFT_NOTICE } from "./orientation.js";
 import {
+  buildReadOnlyRetryNotice,
+  describeReadOnlyRefusal,
+  isReadOnlyRefusal,
+} from "./read-only-refusal.js";
+import {
   resolveSessionStrategy,
   clearSessionCache,
   readBatchChain,
@@ -1684,8 +1689,12 @@ function reportReviewFailure(run: RunRecord, outcome: ReviewPassOutcome & { ok: 
 
 // ── Successful result processing ──────────────────────────────────────────
 
-/** Return value from processSuccessfulResult indicating whether the loop should break. */
-type SuccessAction = "break" | "continue";
+/**
+ * Return value from processSuccessfulResult indicating whether the loop should
+ * break. `read-only-retry` means the attempt was a read-only refusal and the
+ * task should be re-spawned cold without charging the retry budget.
+ */
+type SuccessAction = "break" | "continue" | "read-only-retry";
 
 interface SuccessContext {
   run: RunRecord;
@@ -1719,6 +1728,11 @@ interface SuccessContext {
   attemptAccumulator?: EventAccumulator;
   /** Cross-retry EventAccumulator (event pipeline path). */
   runAccumulator?: EventAccumulator;
+  /**
+   * True when this attempt forked the warm parent and the run has not yet
+   * used its one read-only-refusal retry.
+   */
+  readOnlyRetryAvailable?: boolean;
 }
 
 /**
@@ -1810,6 +1824,23 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     run.summary = result.summary;
     // Note: PRD status update deferred to performCommitPromptIfNeeded
     // so it's staged alongside code changes in the same commit.
+  } else if (
+    isReadOnlyRefusal({
+      forked: ctx.readOnlyRetryAvailable === true,
+      noChanges: !validation.hasChanges,
+      toolNames: result.toolCalls.map((c) => c.tool),
+    })
+  ) {
+    // A fork that never tried to edit: the inherited orientation turn won.
+    // Not a task failure — the caller re-spawns cold once.
+    const reason = describeReadOnlyRefusal(result.summary);
+    run.readOnlyRefusal = { reason };
+    info(`\n⚠ ${reason}. Retrying this task once with a cold spawn.`);
+    await toolRexAppendLog(store, taskId, {
+      event: "read_only_refusal_retried",
+      detail: `${reason}. Re-spawned cold once.`,
+    });
+    return "read-only-retry";
   } else {
     // Completion rejected — no meaningful changes
     run.status = "failed";
@@ -2274,6 +2305,16 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // cold without consuming retry budget (the same shape as a plan re-spawn).
   let forkFallbackUsed = false;
 
+  // A fork that ends with no diff and no edit calls treated the inherited
+  // orientation as still in force (#473). The parent is not broken, so the
+  // cache stays; this run stops forking and re-spawns cold once, again
+  // without charging retry budget.
+  let readOnlyRetryUsed = false;
+  /** True for the one cold spawn that follows a read-only refusal. */
+  let readOnlyRetryPending = false;
+  /** Whether the most recent spawn forked the warm parent. */
+  let lastSpawnForked = false;
+
   // Plan-mode bookkeeping: when the spawned Claude session emits an
   // ExitPlanMode tool_use we kill the spawn, prompt the user (or auto-accept
   // when no TTY is attached), and re-spawn with permissionMode=acceptEdits
@@ -2373,6 +2414,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           (needsRetryNotice
             ? boundedBriefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns)
             : boundedBriefText) +
+          (readOnlyRetryPending ? buildReadOnlyRetryNotice() : "") +
           (planModeAppendix ? `\n\n${planModeAppendix}` : "");
 
         // Build the per-attempt PromptEnvelope. On the first attempt with
@@ -2385,7 +2427,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
               { name: "system" as PromptSectionName, content: systemPrompt } as PromptSection,
               { name: "brief" as PromptSectionName, content: WORK_SESSION_RESUME_MESSAGE } as PromptSection,
             ])
-          : attempt === 0 && !planModeAppendix && !forkingWarmParent
+          : attempt === 0 && !planModeAppendix && !forkingWarmParent && !readOnlyRetryPending
           ? baseEnvelope
           : createPromptEnvelope([
               { name: "system" as PromptSectionName, content: systemPrompt } as PromptSection,
@@ -2423,6 +2465,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
         if (backgroundResumeSessionId) {
           subsection("Resuming the session: it ended waiting on a background command");
+        } else if (readOnlyRetryPending) {
+          subsection("Re-spawn cold after a read-only refusal");
         } else if (attempt > 0 && planRespawns === 0) {
           subsection(`Retry ${attempt}/${retryConfig.maxRetries}`);
         } else if (planRespawns > 0) {
@@ -2476,6 +2520,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         resetLiveSpawnProgress(liveProgress);
         const wasBackgroundResume = backgroundResumeSessionId !== undefined;
         backgroundResumeSessionId = undefined;
+        lastSpawnForked = forkingWarmParent;
+        readOnlyRetryPending = false;
 
         // Merge per-attempt events into the cross-retry accumulator. Includes
         // events from spawns terminated by plan-mode interception so token
@@ -2611,7 +2657,21 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           baselineUntracked,
           attemptAccumulator,
           runAccumulator,
+          readOnlyRetryAvailable: lastSpawnForked && !readOnlyRetryUsed,
         });
+        if (action === "read-only-retry") {
+          // Stop forking for the rest of the run but keep the cache entry:
+          // the parent is fine, and other tasks and runs can still fork it.
+          readOnlyRetryUsed = true;
+          readOnlyRetryPending = true;
+          warmParentId = undefined;
+          retryResumeSessionId = undefined;
+          nextSpawnReason = "read-only-retry";
+          // Undo the loop increment: like a fork fallback, the cold re-spawn
+          // does not consume retry budget.
+          attempt--;
+          continue;
+        }
         if (action === "break") break;
       } else {
         const action = await processErrorResult({
