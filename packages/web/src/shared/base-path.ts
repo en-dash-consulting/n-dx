@@ -17,6 +17,21 @@ export const PROJECT_PATH_PREFIX = "/p/";
 /** Path slot under which a project server exposes one worktree ("workspace"). */
 export const WORKSPACE_PATH_PREFIX = "/w/";
 
+/**
+ * Fixed path at which the hub serves its project chooser.
+ *
+ * `/` cannot be that address: with exactly one project registered it is the
+ * compatibility alias for that project's dashboard, so a dashboard linking
+ * "back to the hub" at `/` would link to itself. This path answers with the
+ * chooser whatever is registered, which is what makes it linkable at all.
+ *
+ * It lives above every project, so unlike every other root-relative URL the
+ * viewer builds it is NOT prefixed with a base path — see `hubUrl()` in
+ * viewer/base-path.ts. Defined here so the hub's routing and the viewer's link
+ * cannot drift apart.
+ */
+export const HUB_PATH = "/hub";
+
 const PROJECT_BASE_PATTERN = /^\/p\/([^/?#]+)/;
 const WORKSPACE_SLOT_PATTERN = /^\/w\/([^/?#]+)/;
 
@@ -37,6 +52,16 @@ export function safeDecodeSegment(segment: string): string {
   } catch {
     return segment;
   }
+}
+
+/**
+ * Whether a pathname addresses the hub's chooser, with or without a trailing
+ * slash. Only the exact path: anything deeper (`/hub/x`, and `/p/<id>/hub`,
+ * which reaches this with its prefix already stripped) belongs to whichever
+ * project server serves it.
+ */
+export function isHubChooserPath(pathname: string): boolean {
+  return pathname === HUB_PATH || pathname === `${HUB_PATH}/`;
 }
 
 /**

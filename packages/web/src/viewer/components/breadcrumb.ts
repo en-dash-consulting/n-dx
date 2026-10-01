@@ -3,6 +3,8 @@
  *
  * Displays a "project > stage > view" hierarchy in the page header area —
  * the stage being the Analysis / Plan / Work page that lists the view.
+ * Behind the hub it starts with a "Hub" link, and the project name becomes a
+ * menu of the registered projects (`project-switcher.ts`).
  * Fetches project metadata from the `/api/project` endpoint and combines
  * it with the current view to build a contextual breadcrumb trail.
  *
@@ -24,6 +26,7 @@ import { stageForView, isStageId, stageProduct, viewLabel, VIEW_META, PRODUCT_LA
 import type { ViewMeta } from "../api.js";
 import { buildValidViews } from "../external.js";
 import { WorkspaceSwitcher } from "./workspace-switcher.js";
+import { HubLink, ProjectSwitcher, useHubProjects } from "./project-switcher.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,6 +37,8 @@ export interface BreadcrumbProps {
   navigateTo: NavigateTo;
   /** When set, restricts navigation to a single product scope. */
   scope?: string | null;
+  /** Injected for tests; defaults to `fetch`. Used for the hub's project list. */
+  hubFetcher?: typeof fetch;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,9 +60,10 @@ function Separator() {
   }, h("path", { d: "M4.5 2.5l3 3.5-3 3.5" }));
 }
 
-export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
+export function Breadcrumb({ view, navigateTo, scope, hubFetcher }: BreadcrumbProps) {
   const project = useProjectMetadata();
   const cliName = useCliName();
+  const hub = useHubProjects(hubFetcher);
 
   // The current view's name, from the one navigation model — the same string
   // the top nav, the stage page and the settings overlay show for it.
@@ -104,15 +110,20 @@ export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
     "aria-label": "Breadcrumb",
   },
     h("ol", { class: "breadcrumb-list" },
-      // ── Segment 1: Project name ──
+      // ── Segment 0: Hub — only when a hub answered ──
+      hub.hub
+        ? h("li", { class: "breadcrumb-item" }, h(HubLink, null), Separator())
+        : null,
+
+      // ── Segment 1: Project name — a project menu behind a hub with several ──
       project && projectName
         ? h("li", { class: "breadcrumb-item" },
-            h("span", {
-              class: "breadcrumb-project",
+            h(ProjectSwitcher, {
+              label: projectName,
               title: project.name.length > 28 ? project.name : undefined,
-            },
-              projectName,
-            ),
+              view,
+              hub,
+            }),
             // The branch chip is the workspace switcher: "<worktree> · <branch>",
             // a menu of every worktree when there is more than one.
             h(WorkspaceSwitcher, { view, branch: gitBranch }),

@@ -17,6 +17,11 @@
  *   a request that could mean two different repositories must not be
  *   guessed at.
  *
+ * `/hub` is the exception to both: it is the hub's own, and it serves the
+ * chooser whatever is registered. That matters because `/` is overloaded —
+ * the sole project's dashboard with one registered, the chooser with several
+ * — which leaves a dashboard no stable address to link back to.
+ *
  * Plain `node:http` and `node:net`: HTTP bodies stream in both directions;
  * a WebSocket upgrade is forwarded by writing the client's request head to
  * the upstream socket and piping the two sockets together.
@@ -30,7 +35,7 @@ import { connect } from "node:net";
 import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { Duplex } from "node:stream";
-import { detectBasePath, loopbackOrigin, projectIdFromBasePath, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
+import { HUB_PATH, detectBasePath, isHubChooserPath, loopbackOrigin, projectIdFromBasePath, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 import { buildHubOverview } from "./overview.js";
 import { renderHomePage } from "./home.js";
@@ -81,6 +86,18 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
       return { kind: "json", status: 503, body: { error: `Project "${id}" has no running server`, status: project.status } };
     }
     return { kind: "proxy", project, path: stripBasePath(prefix, pathname) + query, prefix };
+  }
+
+  // The chooser's fixed address, checked before the project rules so it
+  // answers the same way at every project count. `/` cannot serve this
+  // purpose: with one project registered it is that project's dashboard, so
+  // the page has no stable address to link back to. Checked after the prefix
+  // block above, so `/p/<id>/hub` remains that project's own path.
+  if (isHubChooserPath(pathname)) {
+    // Nothing to upgrade on a page the hub renders itself. Falling through
+    // would hand the socket to the sole project, which never served it.
+    if (upgrade) return { kind: "json", status: 404, body: { error: `No WebSocket endpoint at ${HUB_PATH}` } };
+    return { kind: "home" };
   }
 
   const projects = hub.listProjects();

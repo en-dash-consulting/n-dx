@@ -117,6 +117,38 @@ describe("hub reverse proxy", () => {
     expect(await wsHandshake("/")).toMatch(/^HTTP\/1\.1 101/);
   });
 
+  it("serves the chooser at /hub while / still opens the sole project", async () => {
+    // With one project `/` is that project's dashboard, so it is not a link
+    // back to the hub. `/hub` is, and it answers the same at every count.
+    for (const path of ["/hub", "/hub/"]) {
+      const chooser = await fetch(`http://127.0.0.1:${hub.port}${path}`);
+      expect(chooser.status).toBe(200);
+      expect(chooser.headers.get("content-type")).toContain("text/html");
+      expect(await chooser.text()).toContain("/p/alpha/");
+    }
+    // Unchanged: the root still reaches alpha's own server.
+    expect((await (await fetch(`http://127.0.0.1:${hub.port}/api/status`)).json()).projectDir).toBe(repoA);
+  });
+
+  it("answers the hub API under a worktree slot instead of proxying it", async () => {
+    // The viewer's base path carries /w/<key> on a worktree page, and
+    // installBasePathFetch puts the whole thing on every root-relative fetch.
+    // Proxied, these reach a project server that has never heard of them and
+    // 404 — which the run-queue strip renders as "no hub", silently.
+    for (const path of ["/w/feature/api/hub/queue", "/p/alpha/w/feature/api/hub/queue"]) {
+      const res = await fetch(`http://127.0.0.1:${hub.port}${path}`);
+      expect(res.status, path).toBe(200);
+      const body = await res.json();
+      expect(Array.isArray(body.entries), path).toBe(true);
+      expect(typeof body.running, path).toBe("number");
+      expect(body.limits, path).toBeTruthy();
+    }
+    // The slot does not invent a project: an unknown id under it still 404s.
+    expect((await fetch(`http://127.0.0.1:${hub.port}/p/nope/w/feature/api/hub/queue`)).status).toBe(404);
+    // And the hub's own liveness answers through the slot the same way.
+    expect((await fetch(`http://127.0.0.1:${hub.port}/w/feature/api/hub/health`)).status).toBe(200);
+  });
+
   it("with two projects: / lists them, root API calls are 409 with the ids, /p/ still works", async () => {
     await register("beta", repoB);
 
@@ -130,6 +162,13 @@ describe("hub reverse proxy", () => {
     expect(conflict.status).toBe(409);
     expect((await conflict.json()).projects).toEqual(["alpha", "beta"]);
     expect(await wsHandshake("/")).toMatch(/^HTTP\/1\.1 409/);
+
+    // /hub is the same page here as it was with one project registered.
+    const chooser = await fetch(`http://127.0.0.1:${hub.port}/hub`);
+    expect(chooser.status).toBe(200);
+    const chooserHtml = await chooser.text();
+    expect(chooserHtml).toContain("/p/alpha/");
+    expect(chooserHtml).toContain("/p/beta/");
 
     expect((await (await fetch(`http://127.0.0.1:${hub.port}/p/beta/api/status`)).json()).projectDir).toBe(repoB);
     expect((await (await fetch(`http://127.0.0.1:${hub.port}/p/alpha/api/status`)).json()).projectDir).toBe(repoA);
