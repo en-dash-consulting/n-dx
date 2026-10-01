@@ -16,7 +16,13 @@ import { classifyOrigin, guardHubRequest, upgradeAllowed } from "../../../src/hu
 const HUB_PORT = 3117;
 
 function req(method: string, headers: Record<string, string | string[]> = {}): IncomingMessage {
-  return { method, headers, url: "/api/hub/projects" } as unknown as IncomingMessage;
+  // Every real client sends Host. Default it to the hub so the origin tests
+  // exercise the origin rule, not the Host rule; the Host tests override it.
+  return {
+    method,
+    headers: { host: `localhost:${HUB_PORT}`, ...headers },
+    url: "/api/hub/projects",
+  } as unknown as IncomingMessage;
 }
 
 interface FakeRes {
@@ -117,6 +123,53 @@ describe("guardHubRequest", () => {
   });
 });
 
+describe("guardHubRequest — Host validation", () => {
+  it("answers 421 to a safe-method read whose Host is not the hub", () => {
+    const out = res();
+    expect(
+      guardHubRequest(req("GET", { host: "attacker.example:3117", "sec-fetch-site": "same-origin" }), out.res, HUB_PORT),
+    ).toBe(true);
+    expect(out.statusCode).toBe(421);
+    expect(out.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(JSON.parse(out.body)).toEqual({ error: "Request Host does not name this server" });
+  });
+
+  it("answers 421 to a mutation whose Host is not the hub, even with a trusted Origin", () => {
+    const out = res();
+    expect(
+      guardHubRequest(req("POST", { host: "attacker.example:3117", origin: "http://localhost:3117" }), out.res, HUB_PORT),
+    ).toBe(true);
+    expect(out.statusCode).toBe(421);
+  });
+
+  it("answers 421 when Host names the right machine on the wrong port, or is missing", () => {
+    for (const headers of [{ host: "localhost:3118" }, { host: "localhost" }, { host: "" }]) {
+      const out = res();
+      expect(guardHubRequest(req("GET", headers), out.res, HUB_PORT), JSON.stringify(headers)).toBe(true);
+      expect(out.statusCode, JSON.stringify(headers)).toBe(421);
+    }
+    const noHost = req("GET");
+    delete (noHost.headers as Record<string, unknown>).host;
+    const out = res();
+    expect(guardHubRequest(noHost, out.res, HUB_PORT)).toBe(true);
+    expect(out.statusCode).toBe(421);
+  });
+
+  it("lets every loopback spelling of the hub's own port through", () => {
+    for (const host of ["localhost:3117", "127.0.0.1:3117", "[::1]:3117", "LOCALHOST:3117"]) {
+      const out = res();
+      expect(guardHubRequest(req("GET", { host }), out.res, HUB_PORT), host).toBe(false);
+      expect(out.statusCode, host).toBeNull();
+    }
+  });
+
+  it("refuses everything while the hub has not yet bound a port", () => {
+    const out = res();
+    expect(guardHubRequest(req("GET"), out.res, undefined)).toBe(true);
+    expect(out.statusCode).toBe(421);
+  });
+});
+
 describe("upgradeAllowed", () => {
   it("refuses a WebSocket handshake from another origin, and allows the dashboard's", () => {
     // A handshake carries no preflight, so this is the only check there is:
@@ -124,5 +177,12 @@ describe("upgradeAllowed", () => {
     expect(upgradeAllowed(req("GET", { origin: "http://evil.test" }), HUB_PORT)).toBe(false);
     expect(upgradeAllowed(req("GET", { origin: "http://localhost:3117" }), HUB_PORT)).toBe(true);
     expect(upgradeAllowed(req("GET"), HUB_PORT)).toBe(true);
+  });
+
+  it("refuses a handshake whose Host is not the hub, whatever its Origin", () => {
+    expect(upgradeAllowed(req("GET", { host: "attacker.example:3117" }), HUB_PORT)).toBe(false);
+    expect(
+      upgradeAllowed(req("GET", { host: "attacker.example:3117", origin: "http://localhost:3117" }), HUB_PORT),
+    ).toBe(false);
   });
 });

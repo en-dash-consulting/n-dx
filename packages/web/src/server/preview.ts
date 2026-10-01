@@ -24,6 +24,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { writeFile, rename, unlink } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { handleRequestSecurity } from "./request-security.js";
 
 /** Default port for the preview server — one above the dashboard's 3117. */
 export const DEFAULT_PREVIEW_PORT = 3118;
@@ -369,6 +370,12 @@ export async function startPreviewServer(
   const layoutPath = layoutPathFor(docPath);
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+    // Same gate as the dashboard: loopback Host on this port for every request,
+    // and a browser origin on mutations. The layout endpoint below writes a
+    // file from the request body, so it needs the same protection as the
+    // dashboard's write routes.
+    if (handleRequestSecurity(req, res)) return;
+
     const urlPath = (req.url ?? "/").split("?")[0];
 
     if (urlPath === STATE_ROUTE) {

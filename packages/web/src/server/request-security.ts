@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { MAX_REQUEST_BODY_BYTES } from "./response-utils.js";
-import { isLoopbackOriginOnPort } from "../shared/index.js";
+import { isLoopbackHostOnPort, isLoopbackOriginOnPort } from "../shared/index.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -12,6 +12,7 @@ function singleHeader(value: string | string[] | undefined): string | undefined 
  * Only the dashboard itself may make browser CORS requests. Comparing against
  * the socket's local port, rather than the attacker-controlled Host header,
  * also prevents a DNS-rebinding origin from presenting a matching Host value.
+ * {@link isTrustedHost} is checked first on every request, independently.
  *
  * Exported so the WebSocket upgrade path can apply the same check — browsers do
  * not send a CORS preflight for a WebSocket handshake, so without this any page
@@ -20,6 +21,31 @@ function singleHeader(value: string | string[] | undefined): string | undefined 
  */
 export function isTrustedBrowserOrigin(origin: string, req: IncomingMessage): boolean {
   return isLoopbackOriginOnPort(origin, req.socket.localPort);
+}
+
+/**
+ * Whether the request's `Host` names loopback on the socket it arrived on.
+ *
+ * Behind the hub this always holds: the proxy rewrites `Host` to
+ * `127.0.0.1:<child port>` (`hub/proxy.ts`), and the hub has already judged
+ * the browser's original `Host` itself. So this check only ever refuses a
+ * request made directly to a project server by a name that is not loopback.
+ *
+ * Exported for the WebSocket upgrade path, which has no `handleRequestSecurity`.
+ */
+export function isTrustedHost(req: IncomingMessage): boolean {
+  return isLoopbackHostOnPort(singleHeader(req.headers.host), req.socket.localPort);
+}
+
+function rejectMisdirected(res: ServerResponse): true {
+  // 421 Misdirected Request: the request was not meant for the server it
+  // reached. No CORS headers are set.
+  res.writeHead(421, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+  });
+  res.end(JSON.stringify({ error: "Request Host does not name this server" }));
+  return true;
 }
 
 function setCorsHeaders(res: ServerResponse, origin: string): void {
@@ -44,6 +70,8 @@ function rejectCrossOrigin(res: ServerResponse): true {
 /**
  * Apply browser-origin and CORS protection before route dispatch.
  *
+ * Every request, safe methods included, must carry a `Host` naming loopback on
+ * this socket's port, or it is answered 421.
  * Requests without browser origin metadata remain supported for CLI and MCP
  * clients. Origin-bearing mutations must come from this loopback server, while
  * Fetch Metadata rejects cross-site mutations if a browser omits Origin.
@@ -53,6 +81,8 @@ export function handleRequestSecurity(
   req: IncomingMessage,
   res: ServerResponse,
 ): boolean {
+  if (!isTrustedHost(req)) return rejectMisdirected(res);
+
   const method = (req.method || "GET").toUpperCase();
 
   // Refuse an over-large body before any route buffers it. A declared

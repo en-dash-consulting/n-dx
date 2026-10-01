@@ -150,13 +150,49 @@ describe("preview server", () => {
  * it.
  */
 describe("preview layout endpoint", () => {
-  async function serveDoc(): Promise<{ base: string; doc: string }> {
+  async function serveDoc(): Promise<{ base: string; doc: string; port: number }> {
     const dir = await scratch();
     const doc = join(dir, "mock.html");
     await writeFile(doc, "<html><body>doc</body></html>", "utf-8");
     handle = await startPreviewServer(dir, 0, { file: doc });
-    return { base: `http://127.0.0.1:${handle.port}`, doc };
+    return { base: `http://127.0.0.1:${handle.port}`, doc, port: handle.port };
   }
+
+  it("refuses a cross-origin save", async () => {
+    const { base, doc } = await serveDoc();
+
+    const res = await fetch(base + "/__preview/layout", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain", Origin: "http://attacker.example" },
+      body: JSON.stringify({ nav: [] }),
+    });
+    expect(res.status).toBe(403);
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+    await expect(readFile(layoutPathFor(doc), "utf-8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("answers 421 to a request whose Host is not loopback on its port", async () => {
+    const { base, port } = await serveDoc();
+    const { request } = await import("node:http");
+    const status = await new Promise<number>((resolvePromise, reject) => {
+      const r = request(
+        {
+          host: "127.0.0.1",
+          port,
+          method: "GET",
+          path: "/",
+          headers: { Host: `attacker.example:${port}` },
+          setHost: false,
+        },
+        (res) => { res.resume(); res.on("end", () => resolvePromise(res.statusCode ?? 0)); },
+      );
+      r.on("error", reject);
+      r.end();
+    });
+    expect(status).toBe(421);
+    // The server is still up for its own name.
+    expect((await fetch(base + "/")).status).toBe(200);
+  });
 
   it("round-trips a layout through disk", async () => {
     const { base, doc } = await serveDoc();

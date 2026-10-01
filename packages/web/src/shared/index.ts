@@ -25,7 +25,7 @@ export {
   stripBasePath,
   webSocketUrl,
 } from "./base-path.js";
-export { isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
+export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
 export {
   SOURCEVISION_SCOPE_VIEWS,
   REX_SCOPE_VIEWS,

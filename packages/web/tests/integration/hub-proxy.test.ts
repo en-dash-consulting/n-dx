@@ -241,6 +241,40 @@ describe("hub origin handling", () => {
     expect((await (await fetch(`http://127.0.0.1:${hub.port}/api/hub/projects/gamma`)).json()).project.id).toBe("gamma");
   }, 60_000);
 
+  it("answers 421 to a read whose Host is not the hub, and never proxies it", async () => {
+    await ensureGamma();
+    // fetch() will not send a foreign Host, so build the request by hand.
+    const { request } = await import("node:http");
+    const send = (host: string, path: string) =>
+      new Promise<{ status: number; body: string }>((resolvePromise, reject) => {
+        const r = request(
+          { host: "127.0.0.1", port: hub.port, method: "GET", path, headers: { Host: host }, setHost: false },
+          (res) => {
+            let body = "";
+            res.on("data", (c: Buffer) => { body += c.toString(); });
+            res.on("end", () => resolvePromise({ status: res.statusCode ?? 0, body }));
+          },
+        );
+        r.on("error", reject);
+        r.end();
+      });
+
+    for (const path of ["/api/hub/overview", "/p/gamma/api/status", "/hub", "/"]) {
+      const foreign = await send(`attacker.example:${hub.port}`, path);
+      expect(foreign.status, path).toBe(421);
+      expect(JSON.parse(foreign.body), path).toEqual({ error: "Request Host does not name this server" });
+    }
+
+    // The same requests with the hub's own name still work — including the
+    // proxied one, where the proxy rewrites Host for the child.
+    for (const host of [`localhost:${hub.port}`, `127.0.0.1:${hub.port}`]) {
+      expect((await send(host, "/api/hub/overview")).status, host).toBe(200);
+      const proxied = await send(host, "/p/gamma/api/status");
+      expect(proxied.status, host).toBe(200);
+      expect(JSON.parse(proxied.body).projectDir, host).toBe(repoA);
+    }
+  }, 60_000);
+
   it("lets the dashboard's own origin mutate through the proxy", async () => {
     await ensureGamma();
     // The child's 404 ("Not found", plain text) is the proof that the request

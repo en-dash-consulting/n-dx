@@ -15,7 +15,7 @@
 import { createHash } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import { isTrustedBrowserOrigin } from "./request-security.js";
+import { isTrustedBrowserOrigin, isTrustedHost } from "./request-security.js";
 
 // ── Health tracking types ──────────────────────────────────────────────────
 
@@ -520,7 +520,14 @@ export function createWebSocketManager(opts?: WebSocketManagerOptions): {
     // broadcast (PRD changes, agent stdout, execution state). A present `Origin`
     // must be this loopback server's own; a missing one is a non-browser client
     // (CLI/MCP), which stays allowed to match the HTTP guard's contract. A
-    // duplicate/array Origin header is treated as untrusted.
+    // duplicate/array Origin header is treated as untrusted. The Host rule is
+    // applied first, as on the HTTP path, so the two cannot disagree about
+    // what "this server" means.
+    if (!isTrustedHost(req)) {
+      socket.write("HTTP/1.1 421 Misdirected Request\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
     const originHeader = req.headers.origin;
     if (originHeader !== undefined) {
       const origin = typeof originHeader === "string" ? originHeader : null;
