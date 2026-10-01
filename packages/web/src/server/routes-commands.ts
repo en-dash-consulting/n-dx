@@ -41,7 +41,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
-import { exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
+import { redactSecrets, exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
 import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
@@ -440,8 +440,9 @@ async function handleSvAnalyze(
       timeout: analyzeTimeout,
       stdio: "pipe",
       onStdout: (chunk) => {
+        // Live output goes to the dashboard; scrub it like a run record.
         svAnalyzeStatus.recentOutput =
-          (svAnalyzeStatus.recentOutput + chunk).slice(-3000);
+          redactSecrets((svAnalyzeStatus.recentOutput + chunk).slice(-3000));
       },
     });
     svAnalyzeSlot.child = child;

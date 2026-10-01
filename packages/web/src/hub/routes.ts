@@ -110,6 +110,22 @@ function isDirectory(path: string): boolean {
 }
 
 /** Validate a registration body. Returns the input or the first problem. */
+/**
+ * Whether `ndxBin` is something the hub should spawn.
+ *
+ * Registration already needs the dashboard's Origin and the per-user token,
+ * so only this user's own processes reach it; this is the belt to those
+ * braces. The hub exists to run `web serve`, so it accepts the one script
+ * that is — `@n-dx/web`'s `dist/cli/index.js`, from a checkout or an
+ * install — or an `ndx` / `n-dx` launcher, and refuses any other executable.
+ */
+export function isAcceptableNdxBin(path: string): boolean {
+  const normalized = path.replace(/\\/g, "/");
+  if (/\/web\/dist\/cli\/index\.(m|c)?js$/.test(normalized)) return true;
+  const base = normalized.slice(normalized.lastIndexOf("/") + 1).toLowerCase();
+  return /^(ndx|n-dx)(\.(cmd|exe|ps1))?$/.test(base);
+}
+
 export function parseRegisterInput(body: unknown): { input: RegisterProjectInput } | { problem: string } {
   if (!body || typeof body !== "object") return { problem: "body must be a JSON object" };
   const b = body as Record<string, unknown>;
@@ -125,6 +141,9 @@ export function parseRegisterInput(body: unknown): { input: RegisterProjectInput
     return { problem: "ndxBin must be an absolute path" };
   }
   if (!existsSync(b.ndxBin)) return { problem: `ndxBin does not exist: ${b.ndxBin}` };
+  if (!isAcceptableNdxBin(b.ndxBin)) {
+    return { problem: "ndxBin must be @n-dx/web's CLI entry point (…/web/dist/cli/index.js) or an ndx launcher" };
+  }
   if (b.worktree !== undefined) {
     if (typeof b.worktree !== "string" || !isAbsolute(b.worktree)) {
       return { problem: "worktree must be an absolute path" };

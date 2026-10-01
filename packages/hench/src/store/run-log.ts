@@ -13,6 +13,7 @@
 
 import { join } from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { redactSecrets } from "../prd/llm-gateway.js";
 
 const LOG_DIR_NAME = ".run-logs";
 const GITIGNORE_ENTRY = ".run-logs/";
@@ -50,7 +51,8 @@ export async function persistRunLog(
   const filename = `${safeTimestamp}-${runId}.log`;
   const logPath = join(logDir, filename);
 
-  const content = lines.length > 0 ? lines.join("\n") + "\n" : "";
+  // Same scrub as the run record: the log is the agent's terminal, verbatim.
+  const content = lines.length > 0 ? lines.map((line) => redactSecrets(line)).join("\n") + "\n" : "";
   await writeFile(logPath, content, "utf-8");
 
   return logPath;
