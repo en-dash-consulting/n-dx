@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add one live endpoint listing every running run and job across the repository's worktrees](./add-one-live-endpoint-listing-every.md) | completed |
 | [Add tail routes and WebSocket frames for a running hench run's log and events](./add-tail-routes-and-websocket-frames.md) | completed |
 | [An analyze that fails after its phases is recorded as failed with no reason](./an-analyze-that-fails-after-its-phases.md) | completed |
-| [/api/live re-parses the PRD index on a 10-second timer instead of when the file changes](./api-live-re-parses-the-prd-index-on-a.md) | pending |
+| [/api/live re-parses the PRD index on a 10-second timer instead of when the file changes](./api-live-re-parses-the-prd-index-on-a.md) | completed |
 | [/api/live shows a run whose process died as healthy for up to 5 minutes although pidAlive is known](./api-live-shows-a-run-whose-process.md) | pending |
 | [During a --deep analyze, sub-package phases are compared with the root's previous times and cost resets per package](./during-a-deep-analyze-sub-package.md) | completed |
 | [Expose structured sourcevision analyze progress: phase, enrichment pass, batch and model calls](./expose-structured-sourcevision-analyze.md) | completed |
