@@ -28,7 +28,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add the Project settings page and relabel the Commands settings entry](./add-the-project-settings-page-and.md) | pending |
 | [Add the Robot Wrangler settings page for provider and model across every LLM-using command](./add-the-robot-wrangler-settings-page.md) | completed |
-| [Add the Workflow settings page for work settings, templates and timeouts](./add-the-workflow-settings-page-for.md) | in_progress |
+| [Add the Workflow settings page for work settings, templates and timeouts](./add-the-workflow-settings-page-for.md) | completed |
 | [Build the shared settings frame with explicit Save, a dirty indicator and a leave-with-unsaved-changes prompt](./build-the-shared-settings-frame-with.md) | completed |
 | [List every key ndx config accepts for hench on the Workflow page and in hench config](./list-every-key-ndx-config-accepts-for.md) | completed |
 | [Migrate the CLI's legacy claude.* section to llm.claude.* on both read and write](./migrate-the-cli-s-legacy-claude.md) | completed |
