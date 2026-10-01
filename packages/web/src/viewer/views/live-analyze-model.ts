@@ -256,10 +256,10 @@ export function fileRows(snapshot: LiveAnalyzeSnapshot): FileRow[] {
 }
 
 /** Notes shown while a run is going. */
-export function runningNotes(snapshot: LiveAnalyzeSnapshot): string[] {
+export function runningNotes(snapshot: LiveAnalyzeSnapshot, cliName: string): string[] {
   const notes = [
     "The analysis pages show the previous run until this one finishes.",
-    "Hold ndx ci and ndx refresh: they also write .sourcevision/.",
+    `Hold ${cliName} ci and ${cliName} refresh: they also write .sourcevision/.`,
   ];
   if (snapshot.progress && snapshot.progress.mode !== "fast") {
     notes.push("Zones the judgments cannot settle are narrated in the background after the run; names and insights land in zones.json when that ends.");

@@ -24,7 +24,8 @@ import type { LiveSources } from "../../src/server/routes-live.js";
 import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 import { removeTempDir } from "../helpers/temp-dir.js";
 
-const STARTED = "2026-10-01T10:00:00.000Z";
+// Early enough that files the test writes "now" count as written by this run.
+const STARTED = "2026-10-01T00:00:00.000Z";
 
 let root: string;
 let svDir: string;
@@ -50,8 +51,8 @@ function writeProgress(over: Record<string, unknown> = {}): void {
     command: "sv analyze --full",
     phase: { index: 2, name: "imports", total: 6 },
     phases: [
-      { index: 1, name: "inventory", startedAt: STARTED, endedAt: "2026-10-01T10:00:20.000Z", durationMs: 20_000, outcome: "ok" },
-      { index: 2, name: "imports", startedAt: "2026-10-01T10:00:20.000Z" },
+      { index: 1, name: "inventory", startedAt: STARTED, endedAt: "2026-10-01T00:00:20.000Z", durationMs: 20_000, outcome: "ok" },
+      { index: 2, name: "imports", startedAt: "2026-10-01T00:00:20.000Z" },
     ],
     pass: null,
     batch: null,
@@ -121,7 +122,7 @@ describe("GET /api/live/analyze", () => {
   it("carries the enrichment pass zones.json records once the zones phase has ended", () => {
     writeProgress({
       phase: null,
-      phases: [{ index: 4, name: "zones", startedAt: STARTED, endedAt: "2026-10-01T10:01:00.000Z", durationMs: 60_000, outcome: "ok" }],
+      phases: [{ index: 4, name: "zones", startedAt: STARTED, endedAt: "2026-10-01T00:01:00.000Z", durationMs: 60_000, outcome: "ok" }],
     });
     writeJson(join(svDir, "zones.json"), { zones: [{ id: "a" }, { id: "b" }], enrichmentPass: 3 });
     const snapshot = buildLiveAnalyzeSnapshot(ctx, sources);
@@ -131,12 +132,12 @@ describe("GET /api/live/analyze", () => {
 
   it("lists manifest modules and background narration", () => {
     writeJson(join(svDir, "manifest.json"), {
-      modules: { inventory: { status: "complete", completedAt: "2026-10-01T10:00:20.000Z" }, zones: { status: "error", error: "boom" } },
+      modules: { inventory: { status: "complete", completedAt: "2026-10-01T00:00:20.000Z" }, zones: { status: "error", error: "boom" } },
       narration: { status: "pending", zones: ["a", "b"], names: ["c"] },
     });
     const snapshot = buildLiveAnalyzeSnapshot(ctx, sources);
     expect(snapshot.modules).toEqual([
-      { name: "inventory", status: "complete", startedAt: null, completedAt: "2026-10-01T10:00:20.000Z", error: null },
+      { name: "inventory", status: "complete", startedAt: null, completedAt: "2026-10-01T00:00:20.000Z", error: null },
       { name: "zones", status: "error", startedAt: null, completedAt: null, error: "boom" },
     ]);
     expect(snapshot.narration).toEqual({ status: "pending", zones: 3, reason: null });

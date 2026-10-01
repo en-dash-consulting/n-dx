@@ -22,7 +22,7 @@ import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { NavigateTo } from "../types.js";
-import { useLiveAnalyze, useTick, type LiveAnalyzeSnapshot } from "../hooks/index.js";
+import { useLiveAnalyze, useTick, useCliName, type LiveAnalyzeSnapshot } from "../hooks/index.js";
 import { fmtDuration, formatSince } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
 import {
@@ -265,9 +265,10 @@ function FilesSection({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
 }
 
 function NotesSection({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
+  const cliName = useCliName();
   const narration = narrationLine(snapshot.narration);
   const running = runState(snapshot.progress) === "running";
-  const notes = [...(running ? runningNotes(snapshot) : []), ...(narration ? [narration] : [])];
+  const notes = [...(running ? runningNotes(snapshot, cliName) : []), ...(narration ? [narration] : [])];
   if (notes.length === 0) return null;
   return h(Section, { id: "la-notes-h", title: "Notes" },
     h("ul", { class: "live-analyze-notes" }, notes.map((note, i) => h("li", { key: i }, note))));
@@ -287,6 +288,7 @@ function RecentSection({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
 // ── View ─────────────────────────────────────────────────────────────
 
 export function LiveAnalyzeView({ navigateTo }: LiveAnalyzeViewProps) {
+  const cliName = useCliName();
   const { snapshot, error, refresh } = useLiveAnalyze();
   const [now, setNow] = useState(() => Date.now());
   const running = snapshot?.progress?.running === true;
@@ -323,7 +325,7 @@ export function LiveAnalyzeView({ navigateTo }: LiveAnalyzeViewProps) {
         h("a", { href: "#", onClick: (e: MouseEvent) => { e.preventDefault(); navigateTo("analyze"); } }, "Open the Analysis stage"))
       : null,
     progress === null
-      ? h("p", { key: "none", class: "live-muted" }, "No analysis has run in this worktree yet. Run ndx analyze, or start one from the Analysis stage.")
+      ? h("p", { key: "none", class: "live-muted" }, `No analysis has run in this worktree yet. Run ${cliName} analyze, or start one from the Analysis stage.`)
       : h("div", { key: "body", class: "live-body" },
         h("section", { class: "live-main live-task-card live-analyze-card", "aria-label": "Analysis" },
           h(OverallBar, { rows }),

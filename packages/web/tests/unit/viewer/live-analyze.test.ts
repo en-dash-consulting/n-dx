@@ -218,10 +218,11 @@ describe("reading the side column", () => {
   });
 
   it("carries the notes while running, narration included except for a fast run", () => {
-    expect(runningNotes(snapshot()).join(" ")).toContain("previous run");
-    expect(runningNotes(snapshot()).join(" ")).toContain("ndx ci");
-    expect(runningNotes(snapshot()).join(" ")).toContain("narrated in the background");
-    expect(runningNotes(snapshot({ progress: progress({ mode: "fast" }) })).join(" ")).not.toContain("narrated");
+    expect(runningNotes(snapshot(), "ndx").join(" ")).toContain("previous run");
+    expect(runningNotes(snapshot(), "ndx").join(" ")).toContain("ndx ci");
+    expect(runningNotes(snapshot(), "acme").join(" ")).toContain("acme refresh");
+    expect(runningNotes(snapshot(), "ndx").join(" ")).toContain("narrated in the background");
+    expect(runningNotes(snapshot({ progress: progress({ mode: "fast" }) }), "ndx").join(" ")).not.toContain("narrated");
     expect(narrationLine({ status: "pending", zones: 3, reason: null })).toBe("Narrating 3 zones in the background.");
     expect(narrationLine(null)).toBeNull();
   });
