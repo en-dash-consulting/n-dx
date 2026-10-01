@@ -33,7 +33,7 @@ import {
   type AnalyzeProgressReport,
   type ProcessCommandLine,
 } from "./domain-gateway.js";
-import { svAnalyzeRunOf } from "./routes-commands.js";
+import { svAnalyzeRunOf, type SvAnalyzeRunSnapshot } from "./routes-commands.js";
 import { lastActiveAgentModel, resolveActiveAgentModel } from "./routes-llm.js";
 import { estimateCostFromTotals } from "./rex-gateway.js";
 import type { LiveSources, LiveWorktree } from "./routes-live.js";
@@ -333,6 +333,21 @@ function worktreeOf(ctx: ServerContext, sources: LiveSources): LiveWorktree {
     : { key: workspaceKeyOf(ctx), name: basename(ctx.projectDir), path: ctx.projectDir, branch: null, isAnchor: true, isServed: true };
 }
 
+/**
+ * Whether the dashboard slot's stdout belongs to the run the progress file
+ * describes. A slot that finished before that run began is an earlier run's —
+ * a terminal analyze since then must not inherit its output or error line. A
+ * slot that began after the file's run is newer than it (it died before
+ * writing progress), so its output is the latest there is.
+ */
+export function slotOutputIsCurrent(
+  slot: Pick<SvAnalyzeRunSnapshot, "running" | "finishedAt">,
+  progress: Pick<AnalyzeProgressReport, "startedAt"> | null,
+): boolean {
+  if (slot.running || !progress || !slot.finishedAt) return true;
+  return Date.parse(slot.finishedAt) >= Date.parse(progress.startedAt);
+}
+
 /** Build the answer for the served worktree. Exported for tests. */
 export function buildLiveAnalyzeSnapshot(ctx: ServerContext, sources: LiveSources, now = Date.now()): LiveAnalyzeSnapshot {
   const worktree = worktreeOf(ctx, sources);
@@ -342,7 +357,7 @@ export function buildLiveAnalyzeSnapshot(ctx: ServerContext, sources: LiveSource
   // The slot says the dashboard spawned a run; the progress file says it is a live one.
   const dashboardRun = slot?.running === true;
   const manifest = readJsonObject(join(ctx.svDir, "manifest.json"));
-  const outputAvailable = slot !== null && (dashboardRun || !running);
+  const outputAvailable = slot !== null && (dashboardRun || !running) && slotOutputIsCurrent(slot, progress);
   return {
     generatedAt: new Date(now).toISOString(),
     worktree,

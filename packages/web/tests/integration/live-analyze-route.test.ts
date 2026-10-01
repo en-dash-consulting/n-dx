@@ -17,6 +17,7 @@ import {
   clearLiveAnalyzeCaches,
   handleLiveAnalyzeRoute,
   priceAnalyzeUsage,
+  slotOutputIsCurrent,
   type LiveAnalyzeSnapshot,
 } from "../../src/server/routes-live-analyze.js";
 import { readAnalyzeProgress, analyzeProgressPath } from "../../src/server/domain-gateway.js";
@@ -111,6 +112,19 @@ describe("GET /api/live/analyze", () => {
     // A terminal run's stdout is not ours to show.
     expect(snapshot.output.available).toBe(false);
     expect(snapshot.recent.map((r) => [r.mode, r.calls, r.costUsd])).toEqual([["generative", 4, 0.5], ["fast", 0, null]]);
+  });
+
+  it("does not show an earlier dashboard run's output for a terminal run started after it", () => {
+    const earlier = { running: false, startedAt: "2026-09-30T09:00:00.000Z", finishedAt: "2026-09-30T09:05:00.000Z" };
+    expect(slotOutputIsCurrent(earlier, { startedAt: STARTED })).toBe(false);
+  });
+
+  it("shows the dashboard run's own output, finished or running", () => {
+    expect(slotOutputIsCurrent({ running: true, finishedAt: null }, { startedAt: STARTED })).toBe(true);
+    expect(slotOutputIsCurrent({ running: false, finishedAt: "2026-10-01T00:05:00.000Z" }, { startedAt: STARTED })).toBe(true);
+    // Died before writing progress: the file is an older run's, the slot is the latest.
+    expect(slotOutputIsCurrent({ running: false, finishedAt: "2026-10-01T00:05:00.000Z" }, { startedAt: "2026-09-01T00:00:00.000Z" })).toBe(true);
+    expect(slotOutputIsCurrent({ running: false, finishedAt: "2026-10-01T00:05:00.000Z" }, null)).toBe(true);
   });
 
   it("describes a phase from the file this run wrote, and not from the previous run's", () => {

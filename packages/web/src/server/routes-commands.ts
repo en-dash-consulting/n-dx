@@ -1407,6 +1407,8 @@ export function commandJobsOf(workspaceKey: string): CommandJobSnapshot[] {
 export interface SvAnalyzeRunSnapshot {
   running: boolean;
   startedAt: string | null;
+  /** When the dashboard's run ended; null while running or never run. */
+  finishedAt: string | null;
   /** Tail of the analyzer's stdout (about the last 3000 characters). */
   output: string;
 }
@@ -1418,7 +1420,7 @@ export interface SvAnalyzeRunSnapshot {
  */
 export function svAnalyzeRunOf(workspaceKey: string): SvAnalyzeRunSnapshot | null {
   const status = svAnalyzeSlots.peekByKey(workspaceKey)?.status;
-  return status ? { running: status.running, startedAt: status.startedAt, output: status.recentOutput } : null;
+  return status ? { running: status.running, startedAt: status.startedAt, finishedAt: status.finishedAt, output: status.recentOutput } : null;
 }
 
 type JobStatusBase = Pick<CommandJobSnapshot, "running" | "startedAt" | "finishedAt" | "error" | "stopped">;
