@@ -221,6 +221,30 @@ describe("recordFileRead / flushFileReads", () => {
     expect(event.detail).toContain("+4 more");
   });
 
+  it("closes the pending batch before any other kind, so the stream stays chronological", async () => {
+    // Reads are emitted at flush time, not read time. The agent's final turn
+    // reads a file and the spawn ends; nothing advances the turn, so the batch
+    // is still open when the gates and run_finished are emitted. Without the
+    // flush in emitRunEvent those land first and the file says the run read a
+    // file after it finished.
+    recordFileRead("src/last.ts", 7);
+
+    emitRunEvent("gate", "Test gate passed", { ok: true });
+    emitRunEvent("run_finished", "Run completed", { ok: true });
+    await closeActiveRunEvents();
+
+    const events = await eventsIn(writer.path);
+    expect(events.map((e) => e.kind)).toEqual(["files_read", "gate", "run_finished"]);
+  });
+
+  it("leaves run_finished last when the final turn read nothing", async () => {
+    emitRunEvent("run_finished", "Run completed", { ok: true });
+    await closeActiveRunEvents();
+
+    const events = await eventsIn(writer.path);
+    expect(events.map((e) => e.kind)).toEqual(["run_finished"]);
+  });
+
   it("drops a pending batch when the active writer is replaced", async () => {
     recordFileRead("src/a.ts", 1);
 

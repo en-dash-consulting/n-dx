@@ -287,12 +287,23 @@ export async function closeActiveRunEvents(): Promise<void> {
  * A no-op when no run is active, which is the normal state in tests, in the
  * dry-run path, and for a run whose events file could not be opened. Callers
  * therefore never guard this.
+ *
+ * Any kind other than `files_read` closes the pending read batch first.
+ * Batched reads are emitted at flush time, not at read time, and the only
+ * thing that flushed them was the next turn starting — so a turn's reads sat
+ * open across everything that came after the spawn, and a `gate`,
+ * `review_report` or `run_finished` overtook reads that happened before it.
+ * A viewer rendering the file in order then showed the run reading files
+ * after it had finished. Flushing here keeps the stream chronological for
+ * every kind, rather than leaving each emit site to remember.
  */
 export function emitRunEvent(
   kind: RunEventKind,
   summary: string,
   extra?: Omit<RunEvent, "kind" | "at" | "summary">,
 ): void {
+  // Exempt, and the reason there is no recursion: flushing is what emits it.
+  if (kind !== "files_read") flushFileReads();
   _active?.append({ kind, at: new Date().toISOString(), summary, ...extra });
 }
 
@@ -465,9 +476,8 @@ export function recordFileWork(
 
   const edit = summariseFileEdit(input ?? {});
   if (!edit) return;
-  // An edit closes the turn's read batch, so the Work tab reads in the order
-  // the work happened: the reads that informed an edit come above it.
-  flushFileReads();
+  // The pending read batch is closed by emitRunEvent itself, so the reads that
+  // informed this edit appear above it without a second mechanism here.
   emitRunEvent("file_edited", edit.summary, {
     turn,
     detail: edit.path,
