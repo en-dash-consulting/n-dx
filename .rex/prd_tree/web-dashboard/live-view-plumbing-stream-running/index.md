@@ -42,6 +42,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Tail path confinement trusts .run-logs or .hench/runs when the directory itself is a symlink](./tail-path-confinement-trusts-run-logs.md) | completed |
 | [The live analysis page's last-run times and estimate filter on exact mode, so cascade runs get none in phases 1-3 or an old run's](./the-live-analysis-page-s-last-run.md) | pending |
 | [The live analysis page shows an older dashboard run's output and error against a newer terminal-started run](./the-live-analysis-page-shows-an-older.md) | pending |
-| [The Live machine strip's vendor and model ignore the default vendor and hench model overrides, disagreeing with the effective config](./the-live-machine-strip-s-vendor-and.md) | pending |
+| [The Live machine strip's vendor and model ignore the default vendor and hench model overrides, disagreeing with the effective config](./the-live-machine-strip-s-vendor-and.md) | completed |
 | [vendorPid is not recorded while the review pass and the warm-parent orientation spawn are running](./vendorpid-is-not-recorded-while-the.md) | pending |
 | [Write the hench run log incrementally while the run is in progress](./write-the-hench-run-log-incrementally.md) | completed |
