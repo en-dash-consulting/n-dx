@@ -1,0 +1,23 @@
+---
+id: "1ca50f92-4fae-4c59-abef-dcd62b3a97f9"
+level: "task"
+title: "Serve installed CLI versions and a live, cached model list from GET /api/llm/catalog"
+status: "pending"
+priority: "medium"
+tags:
+  - "0.8.0"
+  - "settings-consolidation"
+  - "pr-24"
+source: "B6b step 0 (2026-09-30): replace hard-coded model choices with a live vendor listing where a key exists"
+acceptanceCriteria:
+  - "Each cloud vendor entry in GET /api/llm/catalog gains `source: \"live\" | \"built-in\"`, `checkedAt` (ISO time of the live fetch, null when built-in) and, when built-in, `reason`. claude lists from Anthropic's Models API when a key resolves (llm.claude.api_key, legacy claude.api_key, then ANTHROPIC_API_KEY, the order llm-client already uses). codex lists from OpenAI's GET /v1/models when llm.codex.api_key or OPENAI_API_KEY resolves. google keeps the built-in list. With no key, or when the live call fails or exceeds 5s, the entry is today's cloudVendorModels list unchanged, with source \"built-in\" and a reason; the route never fails because of it."
+  - "Live ids are filtered with isModelCompatibleWithVendor plus a rule dropping non-chat models (embedding, audio, image, moderation, realtime, transcription). The rule lives in @n-dx/llm-client beside isModelCompatibleWithVendor and has unit tests over a recorded OpenAI-style list."
+  - "The listing is one exported @n-dx/llm-client function (for example listVendorModels) that routes-llm.ts calls. No API key appears in a response, log line or error message (test)."
+  - "Results are cached in the server process per vendor for 10 minutes. GET /api/llm/catalog?refresh=true bypasses and refills the cache, and a successful PUT /api/llm/config clears it."
+  - "The claude and codex entries gain `cli: { found: boolean; version: string | null; path: string | null }` from `<binary> --version` (5s timeout), resolving the binary as runs do: CLAUDE_CLI_PATH or cli.claudePath for Claude, llm.codex.cli_path for Codex, reading .n-dx.local.json as well as .n-dx.json (see #468), else PATH. The result is cached with the model list."
+  - "Each entry gains `defaultModel`: the model ndx work would run for that vendor with no hench.models.<vendor> set (llm.<vendor>.model, legacy claude.model for Claude, else the vendor default), resolved through llm-client the way effective-agent-config.ts resolves it."
+  - "Route tests in packages/web/tests/unit/server/routes-llm-catalog.test.ts, with fetch and spawn stubbed, cover: live list, no key, live error, a cache hit within 10 minutes, the refresh bypass, the cache cleared by a config save, and CLI found and missing. Changesets bump @n-dx/llm-client and @n-dx/web as patch."
+description: "Today cloudVendorModels (packages/web/src/server/routes-llm.ts) offers a static list built from llm-client's TIER_MODELS and MODEL_COSTS, and n-dx never reads the installed CLI's version. Neither the claude nor the codex CLI can list models, so a live list comes from the vendor API and needs an API key. With no key, the catalog falls back to today's built-in list. Pricing, context windows and tier defaults stay in llm-client (no API serves them). Robot Wrangler (94acd4e9) consumes this. Reporting the latest available version and updating the CLI are GitHub issue #470. Not verified: whether hub-spawned servers inherit ANTHROPIC_API_KEY / OPENAI_API_KEY from the shell that ran ndx start; the built-in fallback covers the case where they don't.\n\nConstraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (web: src/server/rex-gateway.ts and src/server/domain-gateway.ts; foundation-tier imports from @n-dx/llm-client are allowed directly in web) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name with a patch bump; run pnpm preflight before opening the PR."
+lastModified: "2026-10-01T01:42:22.437Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
