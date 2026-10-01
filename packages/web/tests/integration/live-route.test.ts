@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ServerContext } from "../../src/server/types.js";
@@ -322,6 +322,63 @@ describe("25 worktrees", () => {
     const warm = buildLiveSnapshot(ctx, scaleSources, now);
     expect(warm.counts).toEqual(cold.counts);
     expect(runFileParseCountForTests()).toBe(500);
+  });
+});
+
+describe("PRD index cache", () => {
+  let root: string;
+  afterEach(async () => {
+    if (root) await removeTempDir(root);
+  });
+
+  function epicTitle(snapshot: LiveSnapshot): string | undefined {
+    return snapshot.runs[0]?.epicChain[0]?.title;
+  }
+
+  it("re-parses only when prd.json's mtime or size changes, not on a timer", () => {
+    root = realpathSync.native(mkdtempSync(join(tmpdir(), "ndx-live-prd-")));
+    const now = Date.now();
+    writeRun(root, { id: "r1", status: "running", taskId: "task-a", startedAt: now - MINUTE, lastActivityAt: now - 1_000 });
+    writePrd(root, ["task-a"]);
+    const prdPath = join(root, ".rex", ".cache", "prd.json");
+    const original = readFileSync(prdPath, "utf-8");
+    // Pin a whole-millisecond mtime so restoring it later reproduces it exactly.
+    const mtime = new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000);
+    utimesSync(prdPath, mtime, mtime);
+    const src: LiveSources = { listWorkspaces: () => [{ key: "solo", path: root, branch: "main", isAnchor: true }], memoryFloorBytes: () => null };
+    const ctx = ctxFor(root, "solo");
+
+    expect(epicTitle(buildLiveSnapshot(ctx, src, now))).toBe("Epic one");
+
+    // Same size, same mtime, hours later: the old parse stands.
+    writeFileSync(prdPath, original.replace("Epic one", "Epic two"));
+    utimesSync(prdPath, mtime, mtime);
+    expect(epicTitle(buildLiveSnapshot(ctx, src, now + 3 * 60 * MINUTE))).toBe("Epic one");
+
+    // A changed mtime is re-read.
+    const later = new Date(mtime.getTime() + 5_000);
+    utimesSync(prdPath, later, later);
+    expect(epicTitle(buildLiveSnapshot(ctx, src, now + 3 * 60 * MINUTE))).toBe("Epic two");
+
+    // So is a changed size.
+    writeFileSync(prdPath, original.replace("Epic one", "Epic three"));
+    utimesSync(prdPath, later, later);
+    expect(epicTitle(buildLiveSnapshot(ctx, src, now + 3 * 60 * MINUTE))).toBe("Epic three");
+  });
+
+  it("reports no chain for a worktree without a cached prd.json, even when a legacy prd.json exists", () => {
+    root = realpathSync.native(mkdtempSync(join(tmpdir(), "ndx-live-prd-none-")));
+    const now = Date.now();
+    writeRun(root, { id: "r1", status: "running", taskId: "task-a", startedAt: now - MINUTE, lastActivityAt: now - 1_000 });
+    mkdirSync(join(root, ".rex"), { recursive: true });
+    writeFileSync(join(root, ".rex", "prd.json"), JSON.stringify({
+      schema: "rex/v1", title: "stale",
+      items: [{ id: "task-a", title: "old", level: "task", status: "pending" }],
+    }));
+    const src: LiveSources = { listWorkspaces: () => [{ key: "solo", path: root, branch: "main", isAnchor: true }], memoryFloorBytes: () => null };
+    const snapshot = buildLiveSnapshot(ctxFor(root, "solo"), src, now);
+    expect(snapshot.runs[0]?.epicChain).toEqual([]);
+    expect(snapshot.queue.next).toEqual([]);
   });
 });
 

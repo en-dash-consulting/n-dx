@@ -58,7 +58,7 @@ import { lastActiveAgentModel, resolveActiveAgentModel } from "./routes-llm.js";
 import { analyzeProgressPath, readAnalyzeProgress, type AnalyzeProgressReport, type ProcessCommandLine } from "./domain-gateway.js";
 import { collectCompletedIds, estimateCostFromTotals, findNextTask, walkTree } from "./rex-gateway.js";
 import type { PRDDocument } from "./rex-gateway.js";
-import { loadPRDSync } from "./prd-io.js";
+import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
 import { readLastEvent, resolveRunEventsFile } from "./run-tail.js";
 import { hubConfigPath, readHubConfig, resolveHubHome } from "../hub/index.js";
 
@@ -208,8 +208,6 @@ export const LIVE_CACHE_TTL_MS = 1_000;
 export const RECENT_WINDOW_MS = 60 * 60 * 1000;
 /** How many next tasks `queue.next` lists. */
 const NEXT_TASK_LIMIT = 5;
-/** PRD documents are read for titles and chains only; a few seconds old is fine. */
-const PRD_CACHE_TTL_MS = 10_000;
 /** How often {@link startLiveMonitor} looks for changes. */
 export const LIVE_MONITOR_INTERVAL_MS = 2_000;
 
@@ -224,7 +222,8 @@ export interface LiveSources {
 }
 
 interface PrdIndex {
-  at: number;
+  /** The cache file's `mtimeMs:size` when parsed; "absent" when there was none. */
+  signature: string;
   chains: Map<string, LiveChainLink[]>;
   /** Acceptance criteria per item, for items that list any. */
   criteria: Map<string, number>;
@@ -264,15 +263,27 @@ function defaultMemoryFloor(): number | null {
 }
 
 /**
- * One worktree's PRD and its task chains, cached briefly. A worktree whose
- * PRD cannot be read has no chains and no next tasks; titles still come from
- * the run records.
+ * One worktree's PRD and its task chains. Parsed again only when
+ * `.rex/.cache/prd.json` changes mtime or size, never on a timer.
+ *
+ * That cache file is the only source read, deliberately: it is what the
+ * workspace's watcher keeps in step with `prd_tree/`, and `loadPRDSync` would
+ * otherwise fall back to a legacy `prd.md`/`prd.json` that may be long stale.
+ * A worktree with no cache file (no live workspace context) has no chains and
+ * no next tasks; titles still come from the run records.
  */
-function prdIndexFor(rexDir: string, now: number): PrdIndex {
+function prdIndexFor(rexDir: string): PrdIndex {
+  let signature = "absent";
+  try {
+    const st = statSync(join(rexDir, PRD_CACHE_DIR, PRD_CACHE_JSON));
+    signature = `${st.mtimeMs}:${st.size}`;
+  } catch {
+    // No cache file — empty index below.
+  }
   const cached = prdIndexes.get(rexDir);
-  if (cached && now - cached.at < PRD_CACHE_TTL_MS) return cached;
-  const doc = loadPRDSync(rexDir);
-  const index: PrdIndex = { at: now, chains: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set() };
+  if (cached && cached.signature === signature) return cached;
+  const doc = signature === "absent" ? null : loadPRDSync(rexDir);
+  const index: PrdIndex = { signature, chains: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set() };
   if (doc) {
     for (const { item, parents } of walkTree(doc.items)) {
       index.chains.set(item.id, parents.map((p) => ({ id: p.id, title: p.title, level: p.level })));
@@ -414,7 +425,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
     const executions = new Map(dashboardExecutionsFor(ws.path).map((e) => [e.taskId, e]));
     const layout = resolveLayout(ws.path);
     const chains = (taskId: string | null): LiveChainLink[] =>
-      taskId ? prdIndexFor(layout.rexDir, now).chains.get(taskId) ?? [] : [];
+      taskId ? prdIndexFor(layout.rexDir).chains.get(taskId) ?? [] : [];
     const runningTasksHere = new Set<string>();
     let liveHere = false;
 
@@ -458,7 +469,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
         lastActivityAt: digest.lastActivityAt,
         heartbeatAgeMs: running ? heartbeatAgeMs(digest.lastActivityAt, now) : null,
         stale,
-        criteriaTotal: digest.taskId ? prdIndexFor(layout.rexDir, now).criteria.get(digest.taskId) ?? null : null,
+        criteriaTotal: digest.taskId ? prdIndexFor(layout.rexDir).criteria.get(digest.taskId) ?? null : null,
         lastProgress: running ? lastProgressOf(digest, ws.path, roots, execution) : null,
       };
       if (running) {
@@ -527,7 +538,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
     });
   }
 
-  const next = nextTasks(prdIndexFor(ctx.rexDir, now), runningTaskIds);
+  const next = nextTasks(prdIndexFor(ctx.rexDir), runningTaskIds);
 
   const slots = readConcurrencySlots(ctx);
   const memory = readSystemMemory();
