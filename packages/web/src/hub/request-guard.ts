@@ -22,6 +22,12 @@
  *   allowed, except when `Sec-Fetch-Site: cross-site` says a browser sent it
  *   without one.
  *
+ * Before any of that, every request — safe methods included — must carry a
+ * `Host` naming loopback on the hub's own port, or it is answered 421. The
+ * check sits here rather than only in the project servers because the proxy
+ * rewrites `Host` for the child (`proxy.ts`), so a server behind the hub never
+ * sees the original.
+ *
  * It guards proxied traffic too, not just `/api/hub/*`: the hub is the outer
  * boundary, and it rewrites the forwarded `Origin` for the child behind it
  * (see `proxy.ts`), so the child can no longer tell a browser origin apart.
@@ -30,7 +36,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { isLoopbackOriginOnPort } from "../shared/index.js";
+import { isLoopbackHostOnPort, isLoopbackOriginOnPort } from "../shared/index.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -61,11 +67,26 @@ function reject(res: ServerResponse): true {
   return true;
 }
 
+function rejectHost(res: ServerResponse): true {
+  // 421 Misdirected Request: the request was not meant for the server it
+  // reached. No CORS headers are set.
+  res.writeHead(421, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+  res.end(JSON.stringify({ error: "Request Host does not name this server" }));
+  return true;
+}
+
+/** Whether the request's `Host` names loopback on the hub's own port. */
+export function hostAllowed(req: Pick<IncomingMessage, "headers">, hubPort: number | undefined): boolean {
+  return isLoopbackHostOnPort(singleHeader(req.headers.host), hubPort);
+}
+
 /**
  * Apply the gate. Returns true when the request has been answered (rejected,
  * or a preflight) and must not be routed further.
  */
 export function guardHubRequest(req: IncomingMessage, res: ServerResponse, hubPort: number | undefined): boolean {
+  if (!hostAllowed(req, hubPort)) return rejectHost(res);
+
   const method = (req.method || "GET").toUpperCase();
   const mutating = method === "OPTIONS" || !SAFE_METHODS.has(method);
   const verdict = classifyOrigin(req, hubPort);
@@ -97,13 +118,26 @@ export function guardHubRequest(req: IncomingMessage, res: ServerResponse, hubPo
   return false;
 }
 
+/** What the hub makes of a WebSocket handshake. */
+export type UpgradeVerdict = "allowed" | "misdirected" | "forbidden";
+
 /**
- * Whether a WebSocket upgrade may be forwarded.
+ * Judge a WebSocket upgrade.
  *
  * A handshake carries no preflight, so this is the only check there is: a
  * page that opened `ws://localhost:3117/p/<id>/` would otherwise read every
  * frame the project broadcasts — PRD changes, agent stdout, run state.
+ *
+ * The `Host` rule is applied here as well, so the HTTP and upgrade paths cannot
+ * disagree about what "this server" means — and it is reported separately from
+ * the origin rule so the caller can answer 421 where the HTTP path answers 421
+ * and 403 where it answers 403. A single boolean collapsed both into 403, which
+ * also disagreed with the project server's own upgrade path (`server/websocket.ts`).
  */
-export function upgradeAllowed(req: Pick<IncomingMessage, "headers">, hubPort: number | undefined): boolean {
-  return classifyOrigin(req, hubPort) !== "untrusted";
+export function upgradeVerdict(
+  req: Pick<IncomingMessage, "headers">,
+  hubPort: number | undefined,
+): UpgradeVerdict {
+  if (!hostAllowed(req, hubPort)) return "misdirected";
+  return classifyOrigin(req, hubPort) === "untrusted" ? "forbidden" : "allowed";
 }
