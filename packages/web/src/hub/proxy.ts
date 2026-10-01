@@ -38,7 +38,9 @@ import type { Duplex } from "node:stream";
 import { HUB_PATH, detectBasePath, isHubChooserPath, loopbackOrigin, projectIdFromBasePath, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 import { buildHubOverview } from "./overview.js";
+import { homedir } from "node:os";
 import { renderHomePage } from "./home.js";
+import { defaultParentDir } from "./new-project.js";
 
 const UPSTREAM_HOST = "127.0.0.1";
 /** `ndx refresh --live-server` posts here; with several projects the body's `dir` picks one. */
@@ -369,8 +371,11 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       writeJson(res, decision.status, decision.body);
       return;
     case "home": {
-      const overview = await buildHubOverview(hub.listProjects());
-      const html = renderHomePage(overview);
+      const projects = hub.listProjects();
+      const overview = await buildHubOverview(projects);
+      // Where the "New project" form offers to create: wherever most of the
+      // registered projects already live, else the user's home.
+      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()));
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
       res.end(html);
       return;

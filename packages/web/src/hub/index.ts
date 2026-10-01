@@ -31,6 +31,14 @@ export {
 export type { HubRegistry, ProjectRecord, HubPidFile, HubConfig, HubConfigResult, HubConfigProblem } from "./registry.js";
 export { parseRegisterInput, handleHubRoute } from "./routes.js";
 export {
+  planNewProject,
+  validateProjectName,
+  slugifyProjectId,
+  deriveProjectId,
+  defaultParentDir,
+} from "./new-project.js";
+export type { NewProjectInput, NewProjectPlan } from "./new-project.js";
+export {
   AdmissionGate,
   AdmissionQueue,
   decideAdmission,

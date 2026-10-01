@@ -202,6 +202,8 @@ ndx start --preview .       # editable UI layout mock-up on :3118, runs alongsid
 ndx usage .                 # token usage analytics
 ```
 
+The hub's chooser at `http://localhost:3117/hub` lists every registered project — and starts new ones: **New project** asks for a folder name and the directory to put it in, shows the exact absolute path it will create (checked against the filesystem as you type), creates and registers it, then opens its setup page. That page is the same setup wizard an empty folder gets, so the new project picks its assistants, its LLM vendor and whether to create a git repository there, and lands on its dashboard.
+
 ## LLM Configuration
 
 **Claude (recommended):**

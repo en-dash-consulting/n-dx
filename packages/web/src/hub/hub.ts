@@ -21,8 +21,8 @@
 
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
-import { mkdirSync } from "node:fs";
-import { basename } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
+import { basename, isAbsolute } from "node:path";
 import { ProjectSupervisor } from "./children.js";
 import type { ChildStatus, SupervisorOptions } from "./children.js";
 import { AdmissionGate, countProjectExecutions } from "./admission.js";
@@ -76,6 +76,16 @@ export interface HubOptions {
    * response has flushed before pulling the server out from under it.
    */
   onEmpty?: () => void;
+  /**
+   * The n-dx binary a project created *from the hub* is registered with.
+   *
+   * Every other project names its own (`ndxBin` on the registration, so each
+   * repository can run its own n-dx version), but a folder the hub creates has
+   * nobody to name one — so it inherits the hub's own. Defaults to the script
+   * this process was started from, which is `@n-dx/web`'s CLI, the same entry
+   * `buildServeCommand` expects.
+   */
+  selfBin?: string;
   log?: (message: string) => void;
 }
 
@@ -141,6 +151,27 @@ export function normalizeWorktree(path: string): string {
  * Hub state and operations, independent of HTTP so the routes stay thin and
  * the lifecycle is testable without a socket.
  */
+/**
+ * The binary to register hub-created projects with.
+ *
+ * `process.argv[1]` is this process's entry — `@n-dx/web`'s `dist/cli/index.js`,
+ * which answers `serve` as well as `hub`, so it is exactly what a project
+ * server is spawned from. A registered project's own `ndxBin` is the fallback
+ * for the case the entry cannot be read back (a bundled or renamed launcher):
+ * those paths were good enough to spawn the servers already running.
+ */
+export function resolveSelfBin(explicit: string | undefined, registry: HubRegistry): string {
+  const candidates = [
+    explicit,
+    process.argv[1],
+    ...Object.values(registry.projects).map((p) => p.ndxBin),
+  ];
+  for (const candidate of candidates) {
+    if (candidate && isAbsolute(candidate) && existsSync(candidate)) return candidate;
+  }
+  return "";
+}
+
 export class Hub {
   readonly hubHome: string;
   readonly registryPath: string;
@@ -151,6 +182,8 @@ export class Hub {
   readonly admission: AdmissionGate;
   /** Keys the per-user `config.json` got wrong, for {@link startHub} to report once. */
   readonly configProblems: HubConfigProblem[];
+  /** The n-dx binary projects created from the hub are registered with. */
+  readonly selfBin: string;
   private readonly registry: HubRegistry;
   private readonly supervisors = new Map<string, ProjectSupervisor>();
   private readonly supervisorOptions: SupervisorOptions;
@@ -169,6 +202,7 @@ export class Hub {
     this.keepAlive = options.keepAlive ?? config.keepAlive;
     this.supervisorOptions = { log: this.log, ...options.supervisor };
     this.registry = loadRegistry(this.registryPath);
+    this.selfBin = resolveSelfBin(options.selfBin, this.registry);
     for (const record of Object.values(this.registry.projects)) {
       this.supervisors.set(record.id, new ProjectSupervisor(record, this.supervisorOptions));
     }
