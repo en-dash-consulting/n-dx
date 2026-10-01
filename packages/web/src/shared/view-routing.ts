@@ -50,6 +50,9 @@ export const HENCH_SCOPE_VIEWS: readonly ViewId[] = [
 
 export const CROSS_CUTTING_VIEWS: readonly ViewId[] = [
   "home",
+  "live",
+  "live-task",
+  "live-analyze",
   "workspaces",
   "token-usage",
   "feature-toggles",

@@ -174,7 +174,8 @@ describe("TopNav", () => {
   function nav(view: ViewId, extra: Partial<Parameters<typeof TopNav>[0]> = {}) {
     return h(TopNav, { view, validViews: ALL, onNavigate: vi.fn(), onOpenSearch: vi.fn(), ...extra });
   }
-  const tabLabels = () => Array.from(root.querySelectorAll(".topnav-tab .topnav-tab-label")).map((el) => el.textContent);
+  // The stage tabs only: Live is a tab too, but outside the loop (live-tab.test.ts).
+  const tabLabels = () => Array.from(root.querySelectorAll(".topnav-tab[data-stage] .topnav-tab-label")).map((el) => el.textContent);
   const activeTab = () => root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent ?? null;
 
   it("shows exactly the three stages, under the View navigation landmark", async () => {

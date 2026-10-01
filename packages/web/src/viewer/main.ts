@@ -240,7 +240,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
-    h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, onOpenSearch: openSearch, scope }),
+    h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, navigateTo, onOpenSearch: openSearch, scope }),
     h("div", { class: "app-body" },
       h("main", {
         id: "main-content",

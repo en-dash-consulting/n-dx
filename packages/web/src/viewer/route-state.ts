@@ -8,6 +8,31 @@ export interface ParsedRoute {
 
 const DEEP_LINK_VIEWS = new Set<ViewId>(["prd", "hench-runs"]);
 
+/** Views whose `subId` is a task id (the rest of `/<view>/<subId>` is a run id or unused). */
+export function isTaskRouteView(view: ViewId): boolean {
+  return view === "prd" || view === "live-task";
+}
+
+/**
+ * Live's pages live under one `/live` prefix — `/live`, `/live/analyze`,
+ * `/live/task/<taskId>` — while their ids are separate views, so the generic
+ * `/<view>/<subId>` form does not apply to them.
+ */
+function parseLivePath(base: string, sub: string): ParsedRoute | null {
+  if (base !== "live") return null;
+  if (!sub) return { view: "live", subId: null };
+  if (sub === "analyze") return { view: "live-analyze", subId: null };
+  const task = /^task\/(.+)$/.exec(sub);
+  return task ? { view: "live-task", subId: task[1] } : null;
+}
+
+/** The path a view and its sub-id are addressed at — the inverse of {@link parsePathnameRoute}. */
+export function viewPathname(view: ViewId, subId: string | null): string {
+  if (view === "live-task") return subId ? `/live/task/${subId}` : "/live";
+  if (view === "live-analyze") return "/live/analyze";
+  return subId ? `/${view}/${subId}` : `/${view}`;
+}
+
 function resolveLegacyViewAlias(base: string, sub: string | null): ViewId | null {
   const normalizedBase = base.trim().toLowerCase();
   const normalizedSub = (sub ?? "").trim().toLowerCase();
@@ -66,6 +91,9 @@ export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>, ba
   // preserved in the address bar rather than dropped.
   const movedAlias = resolveViewAlias(base, validViews);
   if (movedAlias) return { view: movedAlias, subId: sub || null };
+
+  const live = parseLivePath(base, sub);
+  if (live && validViews.has(live.view)) return live;
 
   if (validViews.has(raw as ViewId)) return { view: raw as ViewId, subId: null };
 

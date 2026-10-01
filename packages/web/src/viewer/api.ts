@@ -56,6 +56,8 @@ export {
   SETTINGS_ENTRIES,
   isSettingsView,
   isStageId,
+  isLiveView,
+  LIVE_VIEWS,
   stageForView,
   stageProduct,
   visibleStages,

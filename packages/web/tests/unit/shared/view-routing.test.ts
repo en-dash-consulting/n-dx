@@ -22,6 +22,16 @@ describe("view routing contract", () => {
     expect(views.has("prd")).toBe(false);
   });
 
+  it("lists the three Live views as cross-cutting, so every scope has them", () => {
+    const live = ["live", "live-task", "live-analyze"] as const;
+    for (const view of live) {
+      expect(CROSS_CUTTING_VIEWS).toContain(view);
+      for (const scope of [null, "sourcevision", "rex", "hench"]) {
+        expect(buildValidViews(scope).has(view), `${view} in ${scope}`).toBe(true);
+      }
+    }
+  });
+
   it("treats known SPA paths as shared routing state", () => {
     expect(isKnownViewPath("overview")).toBe(true);
     expect(isKnownViewPath("hench-runs")).toBe(true);

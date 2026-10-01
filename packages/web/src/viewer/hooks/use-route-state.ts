@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { ViewId, NavigateTo, AskSeed } from "../types.js";
-import { parseLegacyHashRoute, resolveLocationRoute } from "../route-state.js";
+import { isTaskRouteView, parseLegacyHashRoute, resolveLocationRoute, viewPathname } from "../route-state.js";
 import { appUrl, getBasePath } from "../base-path.js";
 import { resolveViewAlias } from "../external.js";
 import { guardedLeave } from "./use-leave-guard.js";
@@ -45,7 +45,7 @@ interface HistoryEntry {
 
 function entryUrl(entry: HistoryEntry): string {
   const subId = entry.runId ?? entry.taskId;
-  return subId ? `/${entry.view}/${subId}` : `/${entry.view}`;
+  return viewPathname(entry.view, subId);
 }
 
 /**
@@ -70,7 +70,7 @@ function getInitialRunId(validViews: Set<ViewId>): string | null {
 
 function getInitialTaskId(validViews: Set<ViewId>): string | null {
   const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath());
-  if (!parsed || parsed.view !== "prd") return null;
+  if (!parsed || !isTaskRouteView(parsed.view)) return null;
   return parsed.subId;
 }
 
@@ -132,7 +132,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     const hashRoute = parseLegacyHashRoute(location.hash, validViews);
     if (hashRoute) {
       const isRunView = hashRoute.view === "hench-runs";
-      const isTaskView = hashRoute.view === "prd";
+      const isTaskView = isTaskRouteView(hashRoute.view);
       const entry: HistoryEntry = {
         view: hashRoute.view,
         file: null,
@@ -184,7 +184,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
         const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath())
           ?? { view: defaultView(validViews), subId: null };
         const isRunView = parsed.view === "hench-runs";
-        const isTaskView = parsed.view === "prd";
+        const isTaskView = isTaskRouteView(parsed.view);
         return {
           view: parsed.view,
           file: null,
