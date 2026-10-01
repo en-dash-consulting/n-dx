@@ -23,6 +23,8 @@ import {
   windowRange,
 } from "../../../src/viewer/views/live-log-model.js";
 
+vi.mock("../../../src/viewer/hooks/use-project-metadata.js", () => ({ useCliName: () => "acme" }));
+
 const ESC = String.fromCharCode(27);
 
 const SAMPLE = [
@@ -148,9 +150,19 @@ describe("windowing", () => {
 
 describe("the header line", () => {
   it("names the command only when it is known", () => {
-    expect(startedLine("t1", "dashboard")).toContain("n-dx work --task=t1 --auto");
-    expect(startedLine("t1", "terminal")).toBe("Started from a terminal");
-    expect(startedLine("t1", null)).toContain("no longer recorded");
+    expect(startedLine("t1", "dashboard", "n-dx")).toBe("Started from the dashboard: n-dx work --task=t1 --auto");
+    expect(startedLine("t1", "terminal", "n-dx")).toBe("Started from a terminal");
+    expect(startedLine("t1", null, "n-dx")).toContain("no longer recorded");
+  });
+
+  it("uses the project's CLI name", () => {
+    expect(startedLine("t1", "dashboard", "acme")).toContain("acme work --task=t1");
+  });
+
+  it("includes --reset-deferred for a deferred task's start", () => {
+    expect(startedLine("t1", "dashboard", "n-dx", true)).toBe(
+      "Started from the dashboard: n-dx work --task=t1 --auto --reset-deferred",
+    );
   });
 });
 
@@ -162,7 +174,7 @@ function run(over: Partial<LiveTaskRun> = {}): LiveTaskRun {
     lastActivityAt: null, heartbeatAgeMs: null, stale: false, turns: 2,
     tokens: { input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0, total: 0 },
     costUsd: 0, tokensPerSecond: null, model: null, vendor: null, weight: null,
-    worktreeRoot: null, branch: null, startHead: null, pid: null, startedFrom: "dashboard",
+    worktreeRoot: null, branch: null, startHead: null, pid: null, startedFrom: "dashboard", resetDeferred: false,
     outcome: null, review: null, reviewPlan: null, reviewSpend: null, reviewReport: null, logTail: [], ...over,
   };
 }
@@ -205,7 +217,7 @@ describe("the Log tab", () => {
 
   it("shows the origin, the line count, the lines and a legend", async () => {
     await mount();
-    expect(root.querySelector(".live-log-source")?.textContent).toContain("n-dx work --task=t1 --auto · 11 lines");
+    expect(root.querySelector(".live-log-source")?.textContent).toContain("acme work --task=t1 --auto · 11 lines");
     expect(texts()).toHaveLength(11);
     expect(root.querySelectorAll(".live-log-legend li")).toHaveLength(5);
     expect([...root.querySelectorAll(".live-logrow-turnstart .live-logrow-tag")].map((n) => n.textContent)).toEqual(["Turn 1", "Turn 2"]);

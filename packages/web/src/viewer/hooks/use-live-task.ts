@@ -99,6 +99,7 @@ export interface LiveTaskRun {
   startHead: string | null;
   pid: number | null;
   startedFrom: "dashboard" | "terminal" | null;
+  resetDeferred: boolean;
   outcome: string | null;
   review: LiveTaskReview | null;
   reviewPlan: LiveTaskReviewPlan | null;

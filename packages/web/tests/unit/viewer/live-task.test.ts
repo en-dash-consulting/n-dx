@@ -30,7 +30,7 @@ function run(over: Partial<LiveTaskRun> = {}): LiveTaskRun {
     lastActivityAt: "2026-10-01T10:09:50.000Z", heartbeatAgeMs: 10_000, stale: false, turns: 4,
     tokens: { input: 10_000, output: 2_000, cacheCreationInput: 0, cacheReadInput: 50_000, total: 62_000 },
     costUsd: 0.42, tokensPerSecond: null, model: "claude-sonnet-4-5", vendor: "claude", weight: "standard",
-    worktreeRoot: "/repo-feat", branch: "feat/x", startHead: "abcdef0123456789", pid: 4242, startedFrom: "terminal",
+    worktreeRoot: "/repo-feat", branch: "feat/x", startHead: "abcdef0123456789", pid: 4242, startedFrom: "terminal", resetDeferred: false,
     outcome: null, review: null, reviewPlan: null, reviewSpend: null, reviewReport: null, logTail: ["line a", "line b"], ...over,
   };
 }

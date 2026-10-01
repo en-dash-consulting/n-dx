@@ -255,8 +255,15 @@ export function scrollTopFor(position: number, viewportHeight: number): number {
 // ── Header line ──────────────────────────────────────────────────────
 
 /** What started the run, as far as the run record knows. */
-export function startedLine(taskId: string, startedFrom: "dashboard" | "terminal" | null): string {
-  if (startedFrom === "dashboard") return `Started from the dashboard: n-dx work --task=${taskId} --auto`;
+export function startedLine(
+  taskId: string,
+  startedFrom: "dashboard" | "terminal" | null,
+  cliName: string,
+  resetDeferred = false,
+): string {
+  if (startedFrom === "dashboard") {
+    return `Started from the dashboard: ${cliName} work --task=${taskId} --auto${resetDeferred ? " --reset-deferred" : ""}`;
+  }
   if (startedFrom === "terminal") return "Started from a terminal";
   return "How this run was started is no longer recorded";
 }

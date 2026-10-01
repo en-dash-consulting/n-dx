@@ -101,6 +101,8 @@ export interface LiveTaskRun {
   pid: number | null;
   /** Null once finished: the dashboard forgets its executions when they end. */
   startedFrom: "dashboard" | "terminal" | null;
+  /** A dashboard start passed `--reset-deferred`; false for terminal starts and finished runs. */
+  resetDeferred: boolean;
   /** The run's final summary or its error, once it has one. */
   outcome: string | null;
   review: LiveTaskReview | null;
@@ -254,6 +256,7 @@ export function buildLiveTaskSnapshot(ctx: ServerContext, taskId: string, now = 
       startHead: str(record.startHead),
       pid: running ? digest.pid : null,
       startedFrom: running ? (ownExecution ? "dashboard" : "terminal") : null,
+      resetDeferred: ownExecution?.resetDeferred === true,
       outcome: running ? null : str(record.error) ?? str(record.summary),
       review,
       reviewPlan,

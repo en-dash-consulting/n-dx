@@ -1408,6 +1408,8 @@ export interface TaskExecutionStatus {
   tokensPerSecond?: number;
   error?: string;
   exitCode?: number | null;
+  /** The run was started with `--reset-deferred` (the task was deferred). */
+  resetDeferred?: boolean;
 }
 
 /** Regex (global) to find all tok/s metrics in a chunk via matchAll. */
@@ -1806,7 +1808,8 @@ async function handleExecute(
   // immediately with MODULE_NOT_FOUND.
   const { bin: binPath, args: prefixArgs } = resolveNdxBin(ctx);
   // Pass --reset-deferred when executing a deferred task so hench resets it to pending before running
-  const workArgs = status === "deferred"
+  const resetDeferred = status === "deferred";
+  const workArgs = resetDeferred
     ? ["work", `--task=${taskId}`, "--auto", "--reset-deferred", ctx.projectDir]
     : ["work", `--task=${taskId}`, "--auto", ctx.projectDir];
   const binArgs = [...prefixArgs, ...workArgs];
@@ -1823,6 +1826,7 @@ async function handleExecute(
     runId,
     status: "starting",
     startedAt: new Date().toISOString(),
+    resetDeferred,
   };
 
   // Spawn hench process with streaming stdout so the UI can show live output.

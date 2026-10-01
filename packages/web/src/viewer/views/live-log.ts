@@ -12,6 +12,7 @@ import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useMemo, useCallback } from "preact/hooks";
 import type { LiveTaskRun } from "../hooks/index.js";
+import { useCliName } from "../hooks/use-project-metadata.js";
 import {
   LOG_FILTERS,
   LOG_LEGEND,
@@ -127,6 +128,7 @@ function Row({ line, query, current, showTime }: { line: LogLine; query: string;
  *   where the adversarial review began to the end.
  */
 export function LogTab({ run, taskId, part }: { run: LiveTaskRun; taskId: string; part?: "review" }) {
+  const cliName = useCliName();
   const buffer = useMemo(() => new LogBuffer(), []);
   const { version, missing } = useRunLog(run, buffer);
 
@@ -196,7 +198,7 @@ export function LogTab({ run, taskId, part }: { run: LiveTaskRun; taskId: string
 
   return h("div", { class: "live-log" },
     h("p", { class: "live-log-source" },
-      startedLine(taskId, run.startedFrom),
+      startedLine(taskId, run.startedFrom, cliName, run.resetDeferred),
       ` · ${count.toLocaleString()} ${count === 1 ? "line" : "lines"}`,
       filter !== "all" ? ` · ${visible.length.toLocaleString()} shown` : null,
     ),
