@@ -29,6 +29,7 @@ import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
+import { watchAnalyzeProgress } from "./analyze-progress-watcher.js";
 import { handleWorkspacesRoute } from "./routes-workspaces.js";
 import { invalidatePrdDelta } from "./prd-delta.js";
 import { WorkspaceRegistry } from "./workspaces.js";
@@ -511,7 +512,12 @@ function registerWatchers(
   const prdCacheDir = isInScope(ctx.scope, "rex") && existsSync(ctx.rexDir)
     ? join(ctx.rexDir, PRD_CACHE_DIR)
     : undefined;
-  return { watchers, henchRunsDir, monitorIntervals: [], prdCacheDir };
+  // Polls rather than watches, so it is registered even before
+  // .sourcevision/ exists and needs no re-registration after init.
+  const monitorIntervals = isInScope(ctx.scope, "sourcevision")
+    ? [watchAnalyzeProgress(ctx.svDir, ws.broadcast)]
+    : [];
+  return { watchers, henchRunsDir, monitorIntervals, prdCacheDir };
 }
 
 /**

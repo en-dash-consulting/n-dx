@@ -48,6 +48,7 @@ import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { readCliName } from "./cli-name.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
+import { readAnalyzeProgress } from "./domain-gateway.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 
 const CMD_PREFIX = "/api/commands/";
@@ -507,13 +508,22 @@ async function handleSvAnalyze(
   return true;
 }
 
-/** GET /api/commands/sv-analyze/status */
+/**
+ * GET /api/commands/sv-analyze/status
+ *
+ * The dashboard job's slot (`running`, `recentOutput`, …) as before, plus
+ * `progress`: the structured progress the analyzing process itself publishes
+ * (phase, pass, batch, LLM use, the previous same-mode run's phase timings).
+ * The slot only knows runs this server started; `progress` covers a run
+ * started from a terminal too, so it can say running while `running` is false.
+ * Null until any analysis has run under the progress writer.
+ */
 function handleSvAnalyzeStatus(
   _req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  jsonResponse(res, 200, { ...svAnalyzeSlots.get(ctx).status });
+  jsonResponse(res, 200, { ...svAnalyzeSlots.get(ctx).status, progress: readAnalyzeProgress(ctx.svDir) });
   return true;
 }
 

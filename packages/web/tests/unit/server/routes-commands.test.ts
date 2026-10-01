@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
@@ -816,6 +816,42 @@ describe("commands route — sv-analyze full flow (async)", () => {
     });
     const status = await waitForFinish();
     expect(status.recentOutput).toContain("Enrichment pass 4 complete");
+  });
+
+  it("status carries null progress, beside every existing field, before any analysis has published one", async () => {
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze/status`)).json();
+    expect(Object.keys(body).sort()).toEqual(
+      ["error", "finishedAt", "progress", "recentOutput", "running", "startedAt", "stopped"],
+    );
+    expect(body.progress).toBeNull();
+  });
+
+  it("status reports a terminal-started analysis's structured progress though no dashboard job is running", async () => {
+    await mkdir(join(tmpDir, ".sourcevision", ".cache"), { recursive: true });
+    await writeFile(join(tmpDir, ".sourcevision", ".cache", "analyze-progress.json"), JSON.stringify({
+      version: 1, pid: process.pid, status: "running", mode: "generative", scope: null,
+      startedAt: "2026-09-30T12:00:00.000Z", updatedAt: "2026-09-30T12:01:00.000Z",
+      phase: { index: 4, name: "zones", total: 6 },
+      phases: [{ index: 4, name: "zones", startedAt: "2026-09-30T12:00:30.000Z" }],
+      pass: { number: 2, label: "LLM cross-zone relationships" },
+      batch: { label: "zone enrichment", done: 1, total: 2 },
+      judgmentCache: { hits: 2, misses: 1 },
+      llm: { calls: 3, inputTokens: 900, outputTokens: 120, durationMs: 4000, byTaskClass: {} },
+    }));
+    await writeFile(join(tmpDir, ".sourcevision", ".cache", "analyses.jsonl"),
+      JSON.stringify({ at: "2026-09-29T09:00:00.000Z", mode: "generative", durationMs: 60000, phases: { zones: 50000 }, llm: { byTaskClass: {} } }) + "\n");
+
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze/status`)).json();
+    expect(body.running).toBe(false);
+    expect(body.recentOutput).toBe("");
+    expect(body.progress).toMatchObject({
+      running: true,
+      status: "running",
+      phase: { index: 4, name: "zones" },
+      pass: { number: 2 },
+      batch: { done: 1, total: 2 },
+      previous: { at: "2026-09-29T09:00:00.000Z", phases: { zones: 50000 } },
+    });
   });
 
   it("targetPass runs async and spawns --target-pass=N without --full", async () => {

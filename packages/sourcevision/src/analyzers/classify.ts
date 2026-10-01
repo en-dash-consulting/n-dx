@@ -33,6 +33,7 @@ import { startSpinner } from "../cli/output.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
 import { section, svPromptEnvelope, svPrompt } from "./prompt-envelope.js";
 import { collectFileHeaders } from "./file-headers.js";
+import { markBatch } from "./analyze-progress.js";
 
 /** Minimum accumulated score for a primary classification. */
 const PRIMARY_THRESHOLD = 0.4;
@@ -377,6 +378,7 @@ export async function enrichClassificationsWithLLM(
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
     const batchLabel = batches.length > 1 ? ` batch ${batchIdx + 1}/${batches.length}` : "";
+    markBatch("classification", batchIdx, batches.length);
 
     if (judgmentRoute !== "typesafe") {
       const result = await classifyBatchWithLLM(batch, archetypeCatalog, validIds, batchLabel, tokenUsage);
@@ -401,6 +403,7 @@ export async function enrichClassificationsWithLLM(
       if (result) updatedFiles.push(...result);
     }
   }
+  markBatch("classification", batches.length, batches.length);
 
   return { updatedFiles, tokenUsage };
 }

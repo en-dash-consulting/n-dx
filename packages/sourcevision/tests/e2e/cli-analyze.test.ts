@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { validate, InventorySchema, ImportsSchema, ClassificationsSchema, ZonesSchema, ComponentsSchema } from "../../src/schema/validate.js";
+import { readAnalyzeProgress } from "../../src/analyzers/analyze-progress.js";
 
 const validateInventory = (data: unknown) => validate(InventorySchema, data);
 const validateImports = (data: unknown) => validate(ImportsSchema, data);
@@ -60,6 +61,34 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
 
     const components = JSON.parse(readFileSync(join(svDir, "components.json"), "utf-8"));
     expect(validateComponents(components).ok).toBe(true);
+  });
+
+  it("publishes progress while it runs and leaves it finished, with the previous same-mode run attached", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
+    await cp(FIXTURE_DIR, tmpDir, { recursive: true });
+    const svDir = join(tmpDir, ".sourcevision");
+    const run = () => execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], { encoding: "utf-8", timeout: 30000 });
+
+    run();
+    const first = readAnalyzeProgress(svDir)!;
+    expect(first).toMatchObject({ status: "complete", running: false, stale: false, mode: "fast", phase: null, pass: null, batch: null });
+    expect(first.pid).not.toBe(process.pid);
+    expect(first.endedAt).toBeDefined();
+    expect(first.phases.map((p) => [p.index, p.name])).toEqual([
+      [1, "inventory"], [2, "imports"], [3, "classifications"], [4, "zones"], [5, "components"], [6, "callgraph"],
+    ]);
+    for (const p of first.phases.slice(0, 5)) expect(p).toMatchObject({ outcome: "ok" });
+    expect(first.previous).toBeNull();
+
+    run();
+    const second = readAnalyzeProgress(svDir)!;
+    expect(second.startedAt > first.startedAt).toBe(true);
+    // The first run's own history line, not the second's.
+    expect(second.previous?.at).toBeDefined();
+    expect(Date.parse(second.previous!.at)).toBeLessThan(Date.parse(second.startedAt));
+    expect(Object.keys(second.previous!.phases)).toEqual(
+      expect.arrayContaining(["inventory", "imports", "classifications", "zones", "components"]),
+    );
   });
 
   it("produces deterministic output", async () => {

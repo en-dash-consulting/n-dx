@@ -1052,8 +1052,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/web/src/server/domain-gateway.ts",
-    maxExports: 16,
-    description: "web→sourcevision gateway (MCP server factory, domain types, iso-map builder, analysis-output schema types). Raised from 15 to carry the five artifact schema types (Manifest, Inventory, Imports, Zones, Components) that the Ask endpoint's context assembler parses .sourcevision/*.json against — sourcevision exposes no loader, so the types are the only thing keeping those disk reads honest about the schema, and importing them from @n-dx/sourcevision at the read site would bypass the gateway.",
+    maxExports: 19,
+    description: "web→sourcevision gateway (MCP server factory, domain types, iso-map builder, analysis-output schema types, live analyze progress reader). Raised from 16 to 19 for readAnalyzeProgress, analyzeProgressPath and the AnalyzeProgressReport type: the dashboard reports a running analysis whether it was started from a terminal or from the dashboard, which means reading the progress file the analyzing process writes — and whether that file's 'running' is still true depends on its pid, and its 'last time' timings come from analyses.jsonl. Those rules are the writer's; a server-side parser would be a second definition of when an analysis counts as running, free to drift from the one that writes it. Raised from 15 to carry the five artifact schema types (Manifest, Inventory, Imports, Zones, Components) that the Ask endpoint's context assembler parses .sourcevision/*.json against — sourcevision exposes no loader, so the types are the only thing keeping those disk reads honest about the schema, and importing them from @n-dx/sourcevision at the read site would bypass the gateway.",
   },
   {
     file: "packages/hench/src/prd/rex-gateway.ts",

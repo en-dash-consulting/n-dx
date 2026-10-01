@@ -43,6 +43,13 @@ import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../a
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger } from "../../analyzers/run-ledger.js";
 import { configureJudgmentCache } from "../../analyzers/judgment-cache.js";
+import {
+  startAnalyzeProgress,
+  finishAnalyzeProgress,
+  markPhaseStarted,
+  markPhaseEnded,
+  markScope,
+} from "../../analyzers/analyze-progress.js";
 import { carryNarration, cmdNarrate, narrationLogPath, takeOverNarration } from "./narrate.js";
 import type { NarrateDeps } from "./narrate.js";
 import type { Manifest } from "../sourcevision-core.js";
@@ -160,9 +167,11 @@ async function runDeepSubAnalyses(absDir: string, extraArgs: string[]): Promise<
   for (const sub of subAnalyses) {
     const subDir = join(absDir, sub.prefix);
     info(`\n${dim("[deep]")} Analyzing ${sub.prefix}...`);
+    markScope(sub.prefix);
     await cmdAnalyze(subDir, childArgs);
     info("");
   }
+  markScope(null);
   info(`${dim("[deep]")} Sub-package analysis complete, proceeding with root.\n`);
 }
 
@@ -183,8 +192,11 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
     if (!shouldRunPhase(filter, phase, module)) continue;
 
     const phaseStartedAt = Date.now();
+    let succeeded = false;
+    markPhaseStarted(phase, module);
     try {
       await run();
+      succeeded = true;
     } catch (err) {
       if (err instanceof PhasePrerequsiteError) {
         console.error(`  Phase ${err.phase} requires ${err.requirement}.`);
@@ -221,6 +233,7 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
       }
     } finally {
       recordPhaseDuration(module, Date.now() - phaseStartedAt);
+      markPhaseEnded(module, succeeded ? "ok" : "failed");
     }
   }
 }
@@ -370,6 +383,13 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   const ownsProgressReporter = getActiveProgressReporter() === null;
   if (ownsProgressReporter) setActiveProgressReporter(createProgressReporter());
 
+  // Publish live progress to .sourcevision/.cache/analyze-progress.json for
+  // the dashboard. Same ownership rule as the reporter above: a --deep
+  // sub-analysis reports into the outermost run's file (under markScope) and
+  // leaves finishing it to that run.
+  const ownsProgressFile = startAnalyzeProgress(svDir);
+  let completed = false;
+
   try {
     // Stop a narrator still working on the previous analysis before this one
     // rewrites zones.json; whatever it had not finished is queued again below.
@@ -441,8 +461,10 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
 
     info("");
     info(green("Done."));
+    completed = true;
   } finally {
     if (ownsProgressReporter) setActiveProgressReporter(null);
+    if (ownsProgressFile) finishAnalyzeProgress(completed ? "complete" : "failed");
   }
 }
 

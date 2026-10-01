@@ -69,6 +69,22 @@ export type {
   IsoKind,
 } from "./export/iso-model.js";
 
+// ---- Live analyze progress ----------------------------------------------------
+//
+// A running `sv analyze` publishes its phase, enrichment pass, batch and LLM
+// use to `.sourcevision/.cache/analyze-progress.json`. The dashboard watches
+// that path and reads it through this reader, which owns the format: it
+// reports a file whose process has died as interrupted rather than running,
+// and attaches the previous same-mode run's per-phase timings.
+
+export { readAnalyzeProgress, analyzeProgressPath } from "./analyzers/analyze-progress.js";
+export type {
+  AnalyzeProgress,
+  AnalyzeProgressReport,
+  AnalyzePhaseProgress,
+  PreviousAnalyzeRun,
+} from "./analyzers/analyze-progress.js";
+
 // ---- Schema constants -------------------------------------------------------
 
 export { SCHEMA_VERSION as SV_SCHEMA_VERSION } from "./schema/v1.js";
