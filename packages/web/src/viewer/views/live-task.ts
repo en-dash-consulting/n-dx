@@ -99,11 +99,12 @@ function Header({ taskId, snapshot, run, onPick, navigateTo, refresh }: HeaderPr
 
   const act = useCallback(async (kind: "stop" | "stuck") => {
     if (!run) return;
-    if (kind === "stop" && !window.confirm(
-      run.startedFrom === "terminal"
+    const question = kind === "stop"
+      ? run.startedFrom === "terminal"
         ? `Stop this run? It was started from a terminal; its process (pid ${run.pid ?? "unknown"}) is sent a stop signal.`
-        : "Stop this run? The agent process is terminated and the run is marked failed.",
-    )) return;
+        : "Stop this run? The agent process is terminated and the run is marked failed."
+      : "Mark this run stuck? Its record is set to failed, but the agent process is not stopped and may keep working.";
+    if (!window.confirm(question)) return;
     setBusy(kind);
     setNotice(null);
     try {
@@ -144,7 +145,7 @@ function Header({ taskId, snapshot, run, onPick, navigateTo, refresh }: HeaderPr
       h("h2", { class: "live-task-title" }, title),
       h("div", { class: "live-actions" },
         h("button", { type: "button", class: "cmd-btn cmd-btn-secondary", onClick: copyLink }, "Copy link"),
-        running ? h("button", {
+        running && run?.stale ? h("button", {
           type: "button", class: "cmd-btn cmd-btn-secondary", disabled: busy !== null, onClick: () => { void act("stuck"); },
         }, busy === "stuck" ? "Marking…" : "Mark stuck") : null,
         running ? h("button", {

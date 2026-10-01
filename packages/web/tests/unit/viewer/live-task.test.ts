@@ -227,10 +227,25 @@ describe("the rendered page", () => {
     expect(post?.init?.method).toBe("POST");
   });
 
-  it("marks stuck through the existing route", async () => {
+  it("offers Mark stuck only for a stale run", async () => {
     await mount();
-    const mark = [...root.querySelectorAll("button")].find((b) => b.textContent === "Mark stuck")!;
-    await act(async () => { mark.click(); await flush(); });
+    const mark = () => [...root.querySelectorAll("button")].find((b) => b.textContent === "Mark stuck");
+    expect(mark()).toBeUndefined();
+    render(null, root);
+    body = snapshot({ runs: [run({ stale: true, heartbeatAgeMs: 600_000 })] });
+    await mount();
+    expect(mark()).toBeDefined();
+  });
+
+  it("asks before marking stuck, then uses the existing route", async () => {
+    body = snapshot({ runs: [run({ stale: true, heartbeatAgeMs: 600_000 })] });
+    await mount();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const mark = () => [...root.querySelectorAll("button")].find((b) => b.textContent === "Mark stuck")!;
+    await act(async () => { mark().click(); await flush(); });
+    expect(calls.some((c) => c.url.includes("/mark-stuck"))).toBe(false);
+    await act(async () => { mark().click(); await flush(); });
+    expect(confirm).toHaveBeenCalledTimes(2);
     const post = calls.find((c) => c.url.includes("/mark-stuck"));
     expect(post?.url).toBe("/api/hench/runs/r2/mark-stuck");
     expect(post?.init?.method).toBe("POST");
