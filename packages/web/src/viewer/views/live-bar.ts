@@ -57,7 +57,7 @@ function EntryLink({ entry, current, navigateTo }: { entry: BarEntry; current: b
     h("span", { class: "live-bar-title" }, entry.title),
     h("span", { class: "live-bar-meta" },
       entry.finished ? "finished" : [entry.branch, entry.step].filter(Boolean).join(" · ")),
-    entry.stuck ? h("span", { class: "live-bar-flag" }, "stuck") : null,
+    entry.stuck ? h("span", { class: "live-bar-flag" }, entry.flag ?? "stuck") : null,
   );
 }
 

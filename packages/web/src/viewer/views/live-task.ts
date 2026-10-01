@@ -21,6 +21,7 @@ import type { ComponentChildren } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { NavigateTo } from "../types.js";
 import {
+  useLive,
   useLiveTask,
   useTick,
   type LiveTaskRun,
@@ -41,6 +42,7 @@ import {
   headerChips,
   readRunParam,
   runPosition,
+  runStatus,
   selectRun,
   stepRows,
   withRunParam,
@@ -172,9 +174,16 @@ function Header({ taskId, snapshot, run, onPick, navigateTo, refresh }: HeaderPr
 
 function Chips({ run, snapshot }: { run: LiveTaskRun; snapshot: LiveTaskSnapshot }) {
   const running = run.status === "running";
+  // The task snapshot knows this worktree's record; whether anything is
+  // executing it is the repository-wide feed's verdict.
+  const verdict = useLive()?.runs.find((r) => r.runId === run.runId) ?? null;
+  const status = runStatus(run, verdict);
   return h("div", { class: "live-card-meta live-task-chips" },
-    h("span", { class: `live-chip live-task-status live-task-status-${running ? (run.stale ? "stuck" : "running") : run.status}` },
-      running ? (run.stale ? "stuck" : "running") : run.status,
+    h("span", {
+      class: `live-chip live-task-status live-task-status-${status.mod}`,
+      title: verdict?.livenessReason ?? undefined,
+    },
+      status.label,
       run.startedAt ? [" · ", running ? h(Elapsed, { key: "e", startedAt: run.startedAt }) : fmtDuration(run.startedAt, run.finishedAt ?? undefined)] : null),
     headerChips(run, snapshot.task, snapshot.maxTurns, Date.now()).map((chip) =>
       h("span", { key: chip.key, class: `live-chip${chip.warn ? " live-chip-warn" : ""}` }, chip.label)),

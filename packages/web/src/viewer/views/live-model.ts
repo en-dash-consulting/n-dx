@@ -7,6 +7,7 @@
  * @module web/viewer/views/live-model
  */
 
+import { isDeadRun, livenessBadge, needsAttention } from "../hooks/index.js";
 import type {
   LiveAnalyzeProgress,
   LiveChainLink,
@@ -18,14 +19,62 @@ import type {
 
 // ── What is running ──────────────────────────────────────────────────
 
-/** Stuck runs are a section of their own: they are not progressing, so "Running now" would lie. */
-export function stuckRuns(snapshot: LiveSnapshot): LiveRunFull[] {
-  return snapshot.runs.filter((r) => r.stale);
+/**
+ * Runs that need a look: stuck, no process behind them, or impossible to verify.
+ * They are a section of their own — "Running now" would lie about them.
+ */
+export function attentionRuns(snapshot: LiveSnapshot): LiveRunFull[] {
+  return snapshot.runs.filter(needsAttention);
 }
 
 /** Runs that are moving, newest first (the server's order). */
 export function runningRuns(snapshot: LiveSnapshot): LiveRunFull[] {
-  return snapshot.runs.filter((r) => !r.stale);
+  return snapshot.runs.filter((r) => !needsAttention(r));
+}
+
+/** Dead runs "End N dead runs" closes: orphaned, and the server agrees they can be ended. */
+export function endableDeadRuns(snapshot: LiveSnapshot): LiveRunFull[] {
+  return snapshot.runs.filter((r) => isDeadRun(r) && r.canEnd !== false);
+}
+
+/**
+ * Whether a row offers a single-run End. Orphaned and unknown runs can be ended;
+ * a foreign run belongs to another machine and never can, and a merely stale
+ * one still has a process (use Mark stuck for that).
+ */
+export function canEndRun(run: LiveRunFull): boolean {
+  return (run.liveness === "orphaned" || run.liveness === "unknown") && run.canEnd !== false;
+}
+
+/** The confirm text for "End N dead runs". */
+export function endDeadPrompt(runs: readonly LiveRunFull[]): string {
+  const dead = runs.length === 1 ? "1 dead run" : `${runs.length} dead runs`;
+  return `End ${dead}? No process is executing ${runs.length === 1 ? "it" : "them"}; each is recorded as failed. Nothing is signalled.`;
+}
+
+/** The confirm text for ending one run whose liveness could not be verified — it names the reason. */
+export function endUnknownPrompt(run: LiveRunFull): string {
+  return `The server could not tell whether "${run.taskTitle ?? run.runId}" is still running: ${run.livenessReason ?? "no evidence either way"}\n\n`
+    + "End it anyway? It is recorded as failed. If a process is still working on it, that process is not stopped.";
+}
+
+/** What a reconcile answer says happened, for the notice beside the button. */
+export function reconcileNotice(
+  result: { ended?: number; failed?: number; worktrees?: Array<{ outcomes?: Array<{ skipped?: string }> }> },
+): string {
+  const ended = result.ended ?? 0;
+  const failed = result.failed ?? 0;
+  const skipped = (result.worktrees ?? []).flatMap((w) => w.outcomes ?? []).filter((o) => o.skipped).length;
+  const parts = [`Ended ${ended} ${ended === 1 ? "run" : "runs"}`];
+  if (skipped > 0) parts.push(`${skipped} changed and were left alone`);
+  if (failed > 0) parts.push(`${failed} could not be written`);
+  return parts.join(" · ");
+}
+
+/** Why a row is listed: the server's reason when it has a verdict, else the heartbeat. */
+export function attentionReason(run: LiveRunFull): string {
+  if (run.livenessReason && livenessBadge(run.liveness)) return run.livenessReason;
+  return run.heartbeatAgeMs === null ? "no heartbeat" : `no heartbeat for ${Math.round(run.heartbeatAgeMs / 60_000)} min`;
 }
 
 /**
@@ -199,7 +248,7 @@ export function worktreeRows(snapshot: LiveSnapshot): { rows: WorktreeRow[]; idl
   for (const run of snapshot.runs) {
     const r = row(run.worktree);
     r.runs++;
-    if (run.stale) r.stuck++;
+    if (needsAttention(run)) r.stuck++;
   }
   for (const start of snapshot.queue.starting) row(start.worktree).runs++;
   for (const job of snapshot.jobs) if (job.worktree) row(job.worktree).jobs++;

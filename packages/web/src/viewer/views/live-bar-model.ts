@@ -8,7 +8,7 @@
 
 import type { ViewId } from "../types.js";
 import { jobTarget, runTarget } from "../components/index.js";
-import { isAnalysisJob, type LiveSummary, type LiveWorktreeRef } from "../hooks/index.js";
+import { attentionFlag, isAnalysisJob, needsAttention, type LiveSummary, type LiveWorktreeRef } from "../hooks/index.js";
 import { jobLabel } from "./live-model.js";
 
 /** One item in the bar: a run or a job, reduced to what the bar shows and links to. */
@@ -24,6 +24,8 @@ export interface BarEntry {
   /** Current step or phase. */
   step: string | null;
   stuck: boolean;
+  /** What the flag beside a stuck entry says: "stuck", or the liveness verdict ("not running"). */
+  flag: string | null;
   /** The item ended while its page was open; kept until the operator leaves it. */
   finished: boolean;
 }
@@ -34,14 +36,14 @@ export function barEntries(live: LiveSummary): BarEntry[] {
     const { view, subId, worktree } = runTarget(run);
     return {
       key: `run:${run.runId}`, kind: "Task", view, subId, worktree,
-      title: run.taskTitle ?? run.runId, branch: run.branch, step: run.lastProgress, stuck: run.stale, finished: false,
+      title: run.taskTitle ?? run.runId, branch: run.branch, step: run.lastProgress, stuck: needsAttention(run), flag: attentionFlag(run), finished: false,
     };
   });
   const jobs = live.jobs.map((job): BarEntry => {
     const { view, subId, worktree } = jobTarget(job);
     return {
       key: `job:${job.id}`, kind: isAnalysisJob(job) ? "Analyze" : "Job", view, subId, worktree,
-      title: jobLabel(job), branch: null, step: job.progress?.phase?.name ?? job.detail, stuck: false, finished: false,
+      title: jobLabel(job), branch: null, step: job.progress?.phase?.name ?? job.detail, stuck: false, flag: null, finished: false,
     };
   });
   return [...runs, ...jobs];

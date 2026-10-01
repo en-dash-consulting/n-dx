@@ -295,6 +295,12 @@
 .live-task-status-failed { color: var(--orange); }
 .live-task-status-completed { color: var(--green); }
 .live-chip-warn { color: var(--orange); }
+/* Liveness verdicts: no process behind the run, or no way to tell. */
+.live-task-status-orphaned,
+.live-task-status-unknown,
+.live-verdict-orphaned,
+.live-verdict-unknown { color: var(--orange); }
+.live-verdict-foreign { color: var(--text-muted); }
 .live-stop { color: var(--orange); }
 
 .live-task-finished {

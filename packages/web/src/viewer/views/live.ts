@@ -23,6 +23,7 @@ import {
   analyzeFraction,
   asLiveSnapshot,
   isAnalysisJob,
+  livenessBadge,
   useLiveFeed,
   useTick,
   type LiveConnection,
@@ -35,15 +36,21 @@ import type { JobTray } from "../hooks/index.js";
 import { PeekLink, StartTaskButton, isCurrentWorktree, jobTarget, liveHref, runTarget } from "../components/index.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import {
+  attentionReason,
+  attentionRuns,
+  canEndRun,
   chainLabel,
+  endableDeadRuns,
+  endDeadPrompt,
+  endUnknownPrompt,
   isIdle,
   jobLabel,
   machineTiles,
   phaseSegments,
+  reconcileNotice,
   runningItems,
   stopAllPrompt,
   stoppableRuns,
-  stuckRuns,
   updatedLabel,
   worktreeRows,
 } from "./live-model.js";
@@ -222,40 +229,107 @@ function JobCard({ job, navigateTo }: { job: LiveJobFull; navigateTo: NavigateTo
 
 // ── Needs attention ──────────────────────────────────────────────────
 
-function StuckRow({ run, navigateTo, refresh }: { run: LiveRunFull; navigateTo: NavigateTo; refresh: () => Promise<void> }) {
+/** Ends runs through the reconcile route; one place for the request and its notice. */
+async function reconcile(body: { runIds: string[]; includeUnknown?: boolean }): Promise<string> {
+  const res = await fetch("/api/hench/runs/reconcile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await errorOf(res, "Could not end runs"));
+  return reconcileNotice(await res.json());
+}
+
+function VerdictBadge({ run }: { run: LiveRunFull }) {
+  const badge = livenessBadge(run.liveness);
+  return badge
+    ? h("span", { class: `live-chip live-verdict live-verdict-${badge.mod}`, title: run.livenessReason ?? undefined }, badge.label)
+    : null;
+}
+
+function AttentionRow({ run, navigateTo, refresh }: { run: LiveRunFull; navigateTo: NavigateTo; refresh: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const markStuck = useCallback(async () => {
+  const act = useCallback(async (work: () => Promise<unknown>, fallback: string) => {
     setBusy(true);
     setError(null);
     try {
-      // The run record lives in its own worktree; the header addresses it.
-      const headers: Record<string, string> = {};
-      if (!run.worktree.isServed) headers["X-Ndx-Workspace"] = run.worktree.key;
-      const res = await fetch(`/api/hench/runs/${encodeURIComponent(run.runId)}/mark-stuck`, { method: "POST", headers });
-      if (!res.ok) setError(await errorOf(res, "Could not mark stuck"));
+      await work();
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not mark stuck");
+      setError(err instanceof Error ? err.message : fallback);
     } finally {
       setBusy(false);
     }
-  }, [run, refresh]);
+  }, [refresh]);
 
-  const quiet = (run.heartbeatAgeMs === null ? "no heartbeat" : `no heartbeat for ${Math.round(run.heartbeatAgeMs / 60_000)} min`)
-    + (run.pidAlive === false ? " · process not found" : "");
+  const markStuck = () => act(async () => {
+    // The run record lives in its own worktree; the header addresses it.
+    const headers: Record<string, string> = {};
+    if (!run.worktree.isServed) headers["X-Ndx-Workspace"] = run.worktree.key;
+    const res = await fetch(`/api/hench/runs/${encodeURIComponent(run.runId)}/mark-stuck`, { method: "POST", headers });
+    if (!res.ok) throw new Error(await errorOf(res, "Could not mark stuck"));
+  }, "Could not mark stuck");
+
+  const end = () => {
+    const unknown = run.liveness === "unknown";
+    // A dead run needs no second look: the section's bulk action asks, this is the same decision.
+    if (unknown && !window.confirm(endUnknownPrompt(run))) return Promise.resolve();
+    return act(() => reconcile({ runIds: [run.runId], includeUnknown: unknown }), "Could not end the run");
+  };
+
+  const endable = canEndRun(run);
+  // Mark stuck is the stale-but-alive path; a foreign run is another machine's to manage.
+  const markable = !endable && run.stale && run.liveness !== "foreign";
   return h("li", { class: "live-attention-row" },
     h("span", { class: "live-attention-text" },
       h("span", { class: "live-card-title" }, run.taskTitle ?? run.runId),
-      h("span", { class: "live-card-chain" }, `${quiet} · `, h(WorktreeChip, { run })),
+      h("span", { class: "live-card-chain" },
+        h(VerdictBadge, { run }), ` ${attentionReason(run)} · `, h(WorktreeChip, { run })),
       error ? h("span", { class: "live-error", role: "alert" }, error) : null,
     ),
     h("span", { class: "live-attention-actions" },
       h(PeekLink, { target: runTarget(run), navigateTo, class: "cmd-btn cmd-btn-secondary" }, "Open"),
-      h("button", { type: "button", class: "cmd-btn cmd-btn-secondary", onClick: markStuck, disabled: busy },
-        busy ? "Marking…" : "Mark stuck"),
+      endable ? h("button", { type: "button", class: "cmd-btn cmd-btn-secondary", onClick: end, disabled: busy },
+        busy ? "Ending…" : "End run") : null,
+      markable ? h("button", { type: "button", class: "cmd-btn cmd-btn-secondary", onClick: markStuck, disabled: busy },
+        busy ? "Marking…" : "Mark stuck") : null,
     ),
+  );
+}
+
+function AttentionSection({ snapshot, navigateTo, refresh }: { snapshot: LiveSnapshot; navigateTo: NavigateTo; refresh: () => Promise<void> }) {
+  const runs = attentionRuns(snapshot);
+  const dead = endableDeadRuns(snapshot);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const endDead = useCallback(async () => {
+    if (!window.confirm(endDeadPrompt(dead))) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      setNotice(await reconcile({ runIds: dead.map((r) => r.runId) }));
+      await refresh();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Could not end runs");
+    } finally {
+      setBusy(false);
+    }
+  }, [dead, refresh]);
+
+  return h("section", { class: "live-attention", "aria-labelledby": "live-attention-h" },
+    h("div", { class: "live-title-row" },
+      h("h3", { id: "live-attention-h", class: "live-section-title" }, "Needs attention"),
+      dead.length > 0
+        ? h("button", { type: "button", class: "cmd-btn cmd-btn-secondary live-end-dead", onClick: endDead, disabled: busy },
+          busy ? "Ending…" : `End ${dead.length} dead ${dead.length === 1 ? "run" : "runs"}`)
+        : null,
+      notice ? h("span", { class: "live-notice", role: "status" }, notice) : null,
+    ),
+    h("ul", { class: "live-attention-list" }, runs.map((run) =>
+      h(AttentionRow, { key: run.runId, run, navigateTo, refresh }))),
   );
 }
 
@@ -421,7 +495,7 @@ function IdleState({ snapshot, analyzedAt, jobs, refresh }: {
 export function LiveView({ navigateTo, analyzedAt, jobs }: LiveViewProps) {
   const { live, connection, refresh } = useLiveFeed();
   const snapshot = asLiveSnapshot(live);
-  const stuck = snapshot ? stuckRuns(snapshot) : [];
+  const needsLook = snapshot !== null && attentionRuns(snapshot).length > 0;
   const items = snapshot ? runningItems(snapshot) : [];
 
   return h("div", { class: "live-container" },
@@ -433,12 +507,7 @@ export function LiveView({ navigateTo, analyzedAt, jobs }: LiveViewProps) {
         h(MachineStrip, { key: "machine", snapshot }),
         h("div", { key: "body", class: "live-body" },
           h("div", { class: "live-main" },
-            stuck.length > 0
-              ? h("section", { class: "live-attention", "aria-labelledby": "live-attention-h" },
-                h("h3", { id: "live-attention-h", class: "live-section-title" }, "Needs attention"),
-                h("ul", { class: "live-attention-list" }, stuck.map((run) =>
-                  h(StuckRow, { key: run.runId, run, navigateTo, refresh }))))
-              : null,
+            needsLook ? h(AttentionSection, { snapshot, navigateTo, refresh }) : null,
             isIdle(snapshot)
               ? h(IdleState, { snapshot, analyzedAt, jobs, refresh })
               : items.length > 0

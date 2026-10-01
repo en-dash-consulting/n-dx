@@ -9,8 +9,10 @@
  * Updates in real-time via WebSocket ("hench:task-execution-progress" events)
  * and periodic polling as a fallback.
  *
- * Displays task title, start time, elapsed duration (live-ticking), and
- * health status (stale detection).
+ * Displays task title, start time, elapsed duration (live-ticking), health
+ * status (stale detection) and the Live feed's liveness verdict. It has no
+ * controls that end a run: Live is the one place that does, and each card
+ * links there.
  */
 
 import { appUrl, getWebSocketUrl, acceptsFrame } from "../base-path.js";
@@ -18,6 +20,8 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { RexTaskLink } from "./rex-task-link.js";
 import { ElapsedTime } from "./elapsed-time.js";
+import { PeekLink } from "./live-tab.js";
+import { livenessBadge, useLive, type LiveRunSummary } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -85,8 +89,14 @@ function formatStartTime(iso: string): string {
 
 // ── Active task card ─────────────────────────────────────────────────
 
-function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: NavigateTo }) {
+function ActiveTaskCard({ run, navigateTo, verdict }: {
+  run: ActiveRun;
+  navigateTo?: NavigateTo;
+  /** The Live feed's verdict for this run, absent until the feed answers. */
+  verdict?: LiveRunSummary;
+}) {
   const stale = isStale(run);
+  const badge = livenessBadge(verdict?.liveness);
 
   return h("div", {
     class: `active-task-card${stale ? " active-task-card-stale" : ""}`,
@@ -113,9 +123,19 @@ function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: Navi
               class: "active-task-link",
             })
           : h("span", { class: "active-task-title" }, run.taskTitle),
-        stale
-          ? h("span", { class: "active-task-stale-badge" }, "Possibly stuck")
-          : null,
+        badge
+          ? h("span", { class: `live-chip live-verdict live-verdict-${badge.mod}`, title: verdict?.livenessReason ?? undefined }, badge.label)
+          : stale
+            ? h("span", { class: "active-task-stale-badge" }, "Possibly stuck")
+            : null,
+        // Runs are ended in Live, so there is one place that does it.
+        h(PeekLink, {
+          target: run.taskId
+            ? { view: "live-task", subId: run.taskId, worktree: null }
+            : { view: "live", subId: null, worktree: null },
+          navigateTo,
+          class: "active-task-live-link",
+        }, "Manage in Live"),
       ),
 
       // Metadata row — elapsed time is isolated in its own component to
@@ -217,6 +237,7 @@ function fireNotification(title: string, body: string) {
 
 export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
   const [executions, setExecutions] = useState<ExecutionState[]>([]);
+  const verdicts = new Map((useLive()?.runs ?? []).map((r) => [r.runId, r]));
   const wsRef = useRef<WebSocket | null>(null);
   // Tracks task IDs that have ever been seen as active (running/starting), so that
   // a "completed" WS event can fire a notification even if it races ahead of the
@@ -392,7 +413,7 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
     h("div", { class: "active-tasks-list" },
       // Hench runs first
       ...runs.map((run) =>
-        h(ActiveTaskCard, { key: run.id, run, navigateTo }),
+        h(ActiveTaskCard, { key: run.id, run, navigateTo, verdict: verdicts.get(run.id) }),
       ),
       // Then dashboard-triggered executions that aren't already in runs
       ...uniqueExecutions.map((exec) =>

@@ -7,7 +7,8 @@
  * @module web/viewer/views/live-task-model
  */
 
-import type { LiveTaskItem, LiveTaskRun, RunEventLine } from "../hooks/index.js";
+import { livenessBadge } from "../hooks/index.js";
+import type { LiveRunSummary, LiveTaskItem, LiveTaskRun, RunEventLine } from "../hooks/index.js";
 import { formatTokenCount } from "../utils/format.js";
 
 // ── Which run ────────────────────────────────────────────────────────
@@ -116,6 +117,24 @@ export function ageLabel(ms: number): string {
   if (s < 60) return `${s} s ago`;
   const m = Math.round(s / 60);
   return m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
+}
+
+export interface RunStatus {
+  label: string;
+  /** Modifier for `live-task-status-<mod>`. */
+  mod: string;
+}
+
+/**
+ * The status chip: a finished run's status, else what the liveness verdict says.
+ * A run no process is executing reads "Not running", never "running" or "stuck" —
+ * its heartbeat age says how long it has been quiet, not that something is working.
+ */
+export function runStatus(run: Pick<LiveTaskRun, "status" | "stale">, verdict: Pick<LiveRunSummary, "liveness"> | null): RunStatus {
+  if (run.status !== "running") return { label: run.status, mod: run.status };
+  const badge = livenessBadge(verdict?.liveness);
+  if (badge && badge.mod !== "foreign") return { label: badge.label, mod: badge.mod };
+  return run.stale ? { label: "stuck", mod: "stuck" } : { label: "running", mod: "running" };
 }
 
 export interface HeaderChip {

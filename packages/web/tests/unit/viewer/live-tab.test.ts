@@ -10,6 +10,7 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import {
   analyzeFraction,
+  attentionFlag,
   liveTabLabel,
   liveTabState,
   type LiveSummary,
@@ -51,6 +52,26 @@ describe("reading /api/live", () => {
     const live = snapshot({ counts: { running: 3, stale: 1, jobs: 0 } });
     expect(liveTabState(live)).toBe("attention");
     expect(liveTabLabel(live)).toBe("Live, 3 running, 1 stuck");
+  });
+
+  it("does not count a run no process is executing as running, and flags it for attention", () => {
+    const live = snapshot({
+      runs: [run(), run({ runId: "r2", liveness: "orphaned" }), run({ runId: "r3", stale: true, liveness: "orphaned" })] as never,
+      counts: { running: 3, stale: 1, jobs: 0 },
+    });
+    expect(liveTabLabel(live)).toBe("Live, 1 running, 2 stuck");
+    expect(liveTabState(live)).toBe("attention");
+    // Dead but not yet quiet: attention with no stale count behind it.
+    const fresh = snapshot({ runs: [run({ liveness: "orphaned" })] as never, counts: { running: 1, stale: 0, jobs: 0 } });
+    expect(liveTabState(fresh)).toBe("attention");
+    expect(liveTabLabel(fresh)).toBe("Live, 0 running, 1 stuck");
+  });
+
+  it("names the verdict instead of 'stuck' for the flag", () => {
+    expect(attentionFlag({ stale: true, liveness: "orphaned" })).toBe("not running");
+    expect(attentionFlag({ stale: false, liveness: "unknown" })).toBe("unverified");
+    expect(attentionFlag({ stale: true, liveness: "live" })).toBe("stuck");
+    expect(attentionFlag({ stale: false, liveness: "foreign" })).toBeNull();
   });
 
   it("fills the analysis bar by phase, then by batch within the phase", () => {

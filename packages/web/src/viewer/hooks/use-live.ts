@@ -29,6 +29,9 @@ export interface LiveWorktreeRef {
   isAnchor: boolean;
 }
 
+/** Whether a run's process is actually executing — mirrors RunLiveness in server/run-liveness.ts. */
+export type RunLiveness = "live" | "foreign" | "unknown" | "orphaned";
+
 /** Mirrors the fields of LiveRun in server/routes-live.ts that the peek shows. */
 export interface LiveRunSummary {
   runId: string;
@@ -41,6 +44,12 @@ export interface LiveRunSummary {
   /** False when the recorded pid no longer exists; null/absent when unknown. Does not affect `stale`. */
   pidAlive?: boolean | null;
   lastProgress: string | null;
+  /** The server's verdict on whether a process is running it; absent from older servers, null once finished. */
+  liveness?: RunLiveness | null;
+  /** Why the verdict is what it is — shown next to the badge. */
+  livenessReason?: string | null;
+  /** Whether the run may be ended from the dashboard (never true for a foreign run). */
+  canEnd?: boolean | null;
 }
 
 /** The slice of the server's AnalyzeProgressReport the progress bar needs. */
@@ -142,13 +151,46 @@ export function isAnalysisJob(job: Pick<LiveJobSummary, "kind">): boolean {
 
 export type LiveTabState = "idle" | "running" | "attention";
 
-/** Runs and jobs both count: the tab's number is everything in flight. */
-export function liveRunningCount(live: LiveSummary | null): number {
-  return live ? live.counts.running + live.counts.jobs : 0;
+/** No process is executing the run, though its record still says running. */
+export function isDeadRun(run: Pick<LiveRunSummary, "liveness">): boolean {
+  return run.liveness === "orphaned";
 }
 
+/** Stuck, dead, or impossible to verify: something an operator should look at. */
+export function needsAttention(run: Pick<LiveRunSummary, "stale" | "liveness">): boolean {
+  return run.stale || run.liveness === "orphaned" || run.liveness === "unknown";
+}
+
+/** The verdict as a badge, or null for a run that is simply live (or has no verdict). */
+export function livenessBadge(liveness: RunLiveness | null | undefined): { label: string; mod: RunLiveness } | null {
+  switch (liveness) {
+    case "orphaned": return { label: "Not running", mod: "orphaned" };
+    case "unknown": return { label: "Unverified", mod: "unknown" };
+    case "foreign": return { label: "Other machine", mod: "foreign" };
+    default: return null;
+  }
+}
+
+/** The short flag for a run needing attention: the verdict when there is one, else "stuck". */
+export function attentionFlag(run: Pick<LiveRunSummary, "stale" | "liveness">): string | null {
+  if (run.liveness === "orphaned") return "not running";
+  if (run.liveness === "unknown") return "unverified";
+  return run.stale ? "stuck" : null;
+}
+
+/**
+ * Runs and jobs both count: the tab's number is everything in flight. A run no
+ * process is executing is not in flight, whatever its record says.
+ */
+export function liveRunningCount(live: LiveSummary | null): number {
+  if (!live) return 0;
+  return Math.max(0, live.counts.running + live.counts.jobs - live.runs.filter(isDeadRun).length);
+}
+
+/** Stuck runs, plus dead or unverifiable ones the stale count does not already include. */
 export function liveStuckCount(live: LiveSummary | null): number {
-  return live?.counts.stale ?? 0;
+  if (!live) return 0;
+  return live.counts.stale + live.runs.filter((r) => !r.stale && needsAttention(r)).length;
 }
 
 /** Stuck beats running beats idle. */

@@ -17,7 +17,10 @@ import {
   runningItems,
   stopAllPrompt,
   stoppableRuns,
-  stuckRuns,
+  attentionRuns,
+  canEndRun,
+  endableDeadRuns,
+  reconcileNotice,
   updatedLabel,
   worktreeRows,
 } from "../../../src/viewer/views/live-model.js";
@@ -60,8 +63,35 @@ function snapshot(over: Record<string, unknown> = {}): LiveSnapshot {
 describe("reading the snapshot", () => {
   it("separates stuck runs from running ones", () => {
     const s = snapshot({ runs: [run(), run({ runId: "r2", stale: true })] });
-    expect(stuckRuns(s).map((r) => r.runId)).toEqual(["r2"]);
+    expect(attentionRuns(s).map((r) => r.runId)).toEqual(["r2"]);
     expect(runningItems(s).map((i) => i.key)).toEqual(["run:r1"]);
+  });
+
+  it("lists orphaned and unknown runs from every worktree as needing attention, with their reasons", () => {
+    const s = snapshot({
+      runs: [
+        run({ liveness: "live" }),
+        run({ runId: "r2", worktree: OTHER, liveness: "orphaned", livenessReason: "pid 9 is gone", canEnd: true }),
+        run({ runId: "r3", liveness: "unknown", livenessReason: "no pid recorded", canEnd: true }),
+        run({ runId: "r4", worktree: OTHER, liveness: "foreign", livenessReason: "other host", canEnd: false }),
+      ],
+    });
+    expect(attentionRuns(s).map((r) => r.runId)).toEqual(["r2", "r3"]);
+    expect(runningItems(s).map((i) => i.key).sort()).toEqual(["run:r1", "run:r4"]);
+    expect(endableDeadRuns(s).map((r) => r.runId)).toEqual(["r2"]);
+  });
+
+  it("offers a single End for orphaned and unknown runs only — never foreign", () => {
+    expect(canEndRun(run({ liveness: "orphaned", canEnd: true }) as never)).toBe(true);
+    expect(canEndRun(run({ liveness: "unknown", canEnd: true }) as never)).toBe(true);
+    expect(canEndRun(run({ liveness: "foreign", canEnd: false }) as never)).toBe(false);
+    expect(canEndRun(run({ liveness: "live", canEnd: false }) as never)).toBe(false);
+  });
+
+  it("summarises a reconcile answer", () => {
+    expect(reconcileNotice({ ended: 2, failed: 0, worktrees: [] })).toBe("Ended 2 runs");
+    expect(reconcileNotice({ ended: 1, failed: 1, worktrees: [{ outcomes: [{ skipped: "x" }] }] }))
+      .toBe("Ended 1 run · 1 changed and were left alone · 1 could not be written");
   });
 
   it("interleaves runs and jobs, newest first", () => {
@@ -215,6 +245,76 @@ describe("the rendered page", () => {
     expect(post?.init?.method).toBe("POST");
     // Another worktree's run is addressed by header, not by the URL.
     expect((post?.init?.headers as Record<string, string>)["X-Ndx-Workspace"]).toBe("feat");
+  });
+
+  describe("dead runs", () => {
+    const dead = (id: string, over: Record<string, unknown> = {}) =>
+      run({ runId: id, taskTitle: `Dead ${id}`, liveness: "orphaned", livenessReason: `pid of ${id} is gone`, canEnd: true, ...over });
+    const reconcileCalls = () => calls.filter((c) => c.url.includes("/api/hench/runs/reconcile"));
+    const button = (label: string) => [...root.querySelectorAll("button")].find((b) => b.textContent === label);
+
+    it("shows each verdict badge and reason under Needs attention, from every worktree", async () => {
+      body = snapshot({ runs: [run(), dead("d1"), dead("d2", { worktree: OTHER }), run({ runId: "u1", taskTitle: "Unsure", liveness: "unknown", livenessReason: "no lock file", canEnd: true })] });
+      await mount();
+      const attention = root.querySelector(".live-attention")!;
+      expect(attention.textContent).toContain("Dead d1");
+      expect(attention.textContent).toContain("Dead d2");
+      expect(attention.textContent).toContain("pid of d2 is gone");
+      expect(attention.textContent).toContain("Not running");
+      expect(attention.textContent).toContain("Unverified");
+      expect(attention.textContent).toContain("no lock file");
+      expect(root.querySelector("#live-running-h")!.parentElement!.textContent).not.toContain("Dead d1");
+    });
+
+    it("End N dead runs confirms, then ends only the orphaned runs through the reconcile route", async () => {
+      body = snapshot({ runs: [dead("d1"), dead("d2", { worktree: OTHER }), run({ runId: "u1", liveness: "unknown", canEnd: true })] });
+      const confirm = vi.fn(() => true);
+      vi.stubGlobal("confirm", confirm);
+      await mount();
+      expect(button("End 2 dead runs")).toBeDefined();
+      await act(async () => { button("End 2 dead runs")!.click(); await flush(); });
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining("End 2 dead runs"));
+      expect(reconcileCalls()).toHaveLength(1);
+      expect(JSON.parse(String(reconcileCalls()[0].init?.body))).toEqual({ runIds: ["d1", "d2"] });
+    });
+
+    it("ends nothing when the confirm is declined", async () => {
+      body = snapshot({ runs: [dead("d1")] });
+      vi.stubGlobal("confirm", vi.fn(() => false));
+      await mount();
+      await act(async () => { button("End 1 dead run")!.click(); await flush(); });
+      expect(reconcileCalls()).toHaveLength(0);
+    });
+
+    it("ends an unknown run one at a time, after a confirm that shows the reason", async () => {
+      body = snapshot({ runs: [run({ runId: "u1", taskTitle: "Unsure", liveness: "unknown", livenessReason: "no lock file", canEnd: true })] });
+      const confirm = vi.fn(() => true);
+      vi.stubGlobal("confirm", confirm);
+      await mount();
+      expect(root.querySelector(".live-end-dead")).toBeNull();
+      await act(async () => { button("End run")!.click(); await flush(); });
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining("no lock file"));
+      expect(JSON.parse(String(reconcileCalls()[0].init?.body))).toEqual({ runIds: ["u1"], includeUnknown: true });
+    });
+
+    it("an unknown run is not ended when its confirm is declined", async () => {
+      body = snapshot({ runs: [run({ runId: "u1", liveness: "unknown", livenessReason: "no lock file", canEnd: true })] });
+      vi.stubGlobal("confirm", vi.fn(() => false));
+      await mount();
+      await act(async () => { button("End run")!.click(); await flush(); });
+      expect(reconcileCalls()).toHaveLength(0);
+    });
+
+    it("shows a foreign run with its reason but no end action", async () => {
+      body = snapshot({ runs: [run({ runId: "f1", taskTitle: "Elsewhere", stale: true, liveness: "foreign", livenessReason: "started on host-b", canEnd: false })] });
+      await mount();
+      const attention = root.querySelector(".live-attention")!;
+      expect(attention.textContent).toContain("Other machine");
+      expect(attention.textContent).toContain("started on host-b");
+      expect(button("End run")).toBeUndefined();
+      expect(button("Mark stuck")).toBeUndefined();
+      expect(attention.querySelector(".live-end-dead")).toBeNull();
+    });
   });
 
   it("links each card to its item's Live page", async () => {

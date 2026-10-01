@@ -23,6 +23,7 @@ import { appUrl, getWorkspaceKey } from "../base-path.js";
 import { viewPathname } from "../route-state.js";
 import {
   analyzeFraction,
+  attentionFlag,
   isAnalysisJob,
   liveRunningCount,
   liveStuckCount,
@@ -118,7 +119,7 @@ function RunRow({ run, navigateTo, onNavigated }: { run: LiveRunSummary; navigat
   return h("li", null,
     h(PeekLink, { target: runTarget(run), navigateTo, onNavigated, class: "live-peek-row" },
       h("span", { class: "live-peek-title" }, run.taskTitle ?? run.runId,
-        run.stale ? h("span", { class: "live-peek-stuck" }, "stuck") : null,
+        attentionFlag(run) ? h("span", { class: "live-peek-stuck" }, attentionFlag(run)) : null,
         run.pidAlive === false ? h("span", { class: "live-peek-stuck" }, "process not found") : null),
       h("span", { class: "live-peek-meta" },
         run.branch ? h("span", { class: "live-peek-branch" }, run.branch) : null,
