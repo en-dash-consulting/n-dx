@@ -51,15 +51,20 @@ All packages (`@n-dx/core`, `@n-dx/web`, `@n-dx/rex`, `@n-dx/sourcevision`,
 n-dx's security model has a few load-bearing assumptions. Anything that breaks
 one of them is a vulnerability we want to hear about.
 
-**The dashboard and hub are reachable only from the operator's own browser.**
+**The dashboard and hub are reachable only from the operator, in their own browser or CLI.**
 `ndx start` binds the per-user hub (port 3117) and every project server to
-`127.0.0.1` with no authentication. Browser-origin checks are the access
-control. Any way for a web page the operator merely visits to **read** dashboard
-data (PRD, analysis, agent run records, configuration) or to **trigger** an
-action (start or stop an agent, edit the PRD, change settings, spawn a process)
-is in scope, regardless of the HTTP method or transport (fetch, WebSocket,
-MCP over HTTP, DNS rebinding, and so on). Safe methods are not exempt: a `GET`
-that leaks data or has a side effect counts.
+`127.0.0.1`. Two things stand between them and anyone else: the Host and
+Origin rules, which tell a web page apart from the dashboard, and the
+per-user token in `~/.ndx/auth.token` (mode 0600), which tells this user's
+browser and CLI apart from another account on the same machine — loopback is
+shared by every account on a host. Any way for a web page the operator merely
+visits, or for another local account, to **read** dashboard data (PRD,
+analysis, agent run records, configuration) or to **trigger** an action
+(start or stop an agent, edit the PRD, change settings, spawn a process) is in
+scope, regardless of the HTTP method or transport (fetch, WebSocket, MCP over
+HTTP, DNS rebinding, and so on). Safe methods are not exempt: a `GET` that
+leaks data or has a side effect counts. So is any way to obtain or bypass the
+token, or to make the hub spawn something other than its own project server.
 
 **The agent stays inside the project directory.** Hench's guard rejects path
 traversal, null bytes and symlink escapes, blocks `.hench/`, `.rex/`, `.git/`
@@ -69,6 +74,19 @@ the project, modify its own guard configuration or PRD state through its
 tools, or run a command the allowlist should have refused is in scope. This
 includes prompt-injection paths (a crafted file, PRD item, or tool result)
 when they cross a guard boundary.
+
+**Repository configuration is reviewed before it is obeyed.** The files that
+decide what n-dx may execute — the hench guard in `.hench/config.json`, the
+test command in `.rex/config.json`, the servers in `.mcp.json` — are tracked
+in the repository, so a clone or a pull request can widen them. Until the user
+accepts a checkout's configuration (`ndx trust`), hench runs under the default
+guard, `bypassPermissions` is lowered, and `verify_criteria` does not run the
+repository's test command; the record of that acceptance lives in the user's
+ndx home, not the repository. A way for repository content to widen execution
+without that review, or to forge the review, is in scope. So is a secret
+reaching `.hench/runs/` or the dashboard unredacted: run records and logs are
+scrubbed of credential-shaped text, and the scrubbing is best-effort by
+nature, so a reproducible miss is a welcome report.
 
 **Secrets never leave their files.** API keys, CLI paths and other credentials
 live in `.n-dx.local.json` (git-ignored) and in `.hench/config.json`. Dashboard
@@ -92,6 +110,9 @@ in scope.
   commands on purpose. Loosening `guard` in `.hench/config.json` is an operator
   decision; a report that the loosened configuration permits what it permits is
   not a vulnerability.
+- **Running with `--no-auth` or `web.auth: false`.** Turning the per-user
+  token off is an operator decision; what another local account can then do
+  is the documented consequence, not a vulnerability.
 - **Exposing a server beyond loopback.** Running the dashboard, hub or MCP
   endpoints behind a tunnel, a port-forward or on a non-loopback interface is
   unsupported. There is no authentication layer to defeat.
