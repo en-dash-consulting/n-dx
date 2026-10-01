@@ -26,6 +26,7 @@ import type { WorktreeEntry, WorktreeLatestRun, ClaimEntry } from "../hooks/inde
 import { useTick, claimsForWorktree } from "../hooks/index.js";
 import { fmtDuration, formatSince } from "../utils/format.js";
 import type { NavigateTo } from "../types.js";
+import { PeekLink } from "./live-tab.js";
 
 export interface SessionsPanelProps {
   /** null until the first fetch resolves. */
@@ -33,6 +34,10 @@ export interface SessionsPanelProps {
   /** Live cross-worktree task claims; each row lists the tasks its worktree holds. */
   claims?: ClaimEntry[] | null;
   navigateTo?: NavigateTo;
+  /** Sourcevision analyses running now (from the Live feed). */
+  analyses?: number;
+  /** Offer the link to the Live overview; false when Live is out of scope or exported. */
+  liveAvailable?: boolean;
 }
 
 // ── Pure helpers (unit-tested) ───────────────────────────────────────
@@ -47,11 +52,16 @@ export function worktreeName(path: string): string {
   return cut === -1 ? trimmed : trimmed.slice(cut + 1);
 }
 
-/** The pill's text. The running count is omitted when nothing is running. */
-export function sessionsPillLabel(worktrees: readonly WorktreeEntry[]): string {
+/**
+ * The pill's text. The running and analysis counts are each omitted when zero:
+ * "3 worktrees", "3 worktrees · 1 running", "3 worktrees · 1 running · 1 analysis".
+ */
+export function sessionsPillLabel(worktrees: readonly WorktreeEntry[], analyses = 0): string {
   const running = worktrees.reduce((n, wt) => n + wt.runs.running, 0);
-  const trees = `${worktrees.length} worktree${worktrees.length === 1 ? "" : "s"}`;
-  return running > 0 ? `${trees} · ${running} running` : trees;
+  const parts = [`${worktrees.length} worktree${worktrees.length === 1 ? "" : "s"}`];
+  if (running > 0) parts.push(`${running} running`);
+  if (analyses > 0) parts.push(`${analyses} analysis`);
+  return parts.join(" · ");
 }
 
 /** The tray is for *other* checkouts; one worktree means there are none. */
@@ -189,13 +199,13 @@ function WorktreeRow({ entry, claims, navigateTo }: { entry: WorktreeEntry; clai
   );
 }
 
-export function SessionsPanel({ worktrees, claims = null, navigateTo }: SessionsPanelProps) {
+export function SessionsPanel({ worktrees, claims = null, navigateTo, analyses = 0, liveAvailable = false }: SessionsPanelProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (!shouldShowSessions(worktrees)) return null;
 
-  const label = sessionsPillLabel(worktrees);
-  const running = worktrees.some((wt) => wt.runs.running > 0);
+  const label = sessionsPillLabel(worktrees, analyses);
+  const running = analyses > 0 || worktrees.some((wt) => wt.runs.running > 0);
 
   return h("div", { class: "sessions-panel", role: "status" },
     h("button", {
@@ -211,6 +221,13 @@ export function SessionsPanel({ worktrees, claims = null, navigateTo }: Sessions
       }, running ? "●" : "⌥"),
       h("span", { class: "sessions-summary" }, label),
     ),
+    liveAvailable
+      ? h(PeekLink, {
+          target: { view: "live", subId: null, worktree: null },
+          navigateTo,
+          class: "sessions-live-link",
+        }, "Live →")
+      : null,
     expanded
       ? h("ul", { class: "sessions-list", "aria-label": "Worktree sessions" },
           worktrees.map((entry) => h(WorktreeRow, {

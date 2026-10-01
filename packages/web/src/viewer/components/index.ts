@@ -68,6 +68,7 @@ export {
   RexCompletionIndicator,
   HenchActivityIndicator,
   INDICATOR_VIEWS,
+  LIVE_INDICATOR_VIEWS,
   type ProjectStatus,
   type SourceVisionStatus,
   type RexStatus,

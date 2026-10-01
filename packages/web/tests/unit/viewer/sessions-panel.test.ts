@@ -193,6 +193,25 @@ describe("SessionsPanel", () => {
     }
   });
 
+  it("adds the analysis count to the pill when an analysis is running", () => {
+    render(h(SessionsPanel, { worktrees: [makeWorktree(), LINKED], analyses: 1 }), root);
+    expect(root.querySelector(".sessions-toggle")!.textContent).toContain("2 worktrees · 1 running · 1 analysis");
+  });
+
+  it("links to the Live overview, navigating in place, when Live is available", () => {
+    const navigateTo = vi.fn();
+    render(h(SessionsPanel, { worktrees: [makeWorktree(), LINKED], navigateTo, liveAvailable: true }), root);
+    const link = root.querySelector<HTMLAnchorElement>(".sessions-live-link")!;
+    expect(link.getAttribute("href")).toMatch(/\/live$/);
+    act(() => { link.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("live", undefined);
+  });
+
+  it("offers no Live link when Live is unavailable", () => {
+    render(h(SessionsPanel, { worktrees: [makeWorktree(), LINKED] }), root);
+    expect(root.querySelector(".sessions-live-link")).toBeNull();
+  });
+
   it("renders a collapsed pill naming the worktree and running counts", () => {
     render(h(SessionsPanel, { worktrees: [makeWorktree(), LINKED] }), root);
 

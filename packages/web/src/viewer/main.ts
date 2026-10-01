@@ -41,6 +41,8 @@ import {
   useGitStatus,
   useWorktrees,
   useClaims,
+  useLive,
+  isAnalysisJob,
   useFeatureToggle,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
@@ -134,6 +136,9 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const { status: gitStatus, refetch: refetchGitStatus } = useGitStatus();
   const { worktrees } = useWorktrees();
   const { claims } = useClaims();
+  const liveAvailable = validViews.has("live") && !isDeployedMode();
+  const live = useLive(liveAvailable);
+  const analyses = live?.jobs.filter(isAnalysisJob).length ?? 0;
   const [searchOpen, openSearch, closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const handleTripleClick = useMemo(
@@ -295,7 +300,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
     h(ActiveOperationsTray, { operations: jobs.operations, navigateTo, onStop: jobs.stop }),
     h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
-    h(SessionsPanel, { worktrees, claims, navigateTo }),
+    h(SessionsPanel, { worktrees, claims, navigateTo, analyses, liveAvailable }),
     (showDrop && !hasData)
       ? h("div", { class: "drop-overlay", role: "dialog", "aria-label": "File drop zone" },
           h("div", { class: "drop-box" },
