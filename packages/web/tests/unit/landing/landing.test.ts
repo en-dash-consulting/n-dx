@@ -191,11 +191,13 @@ function setupWizardDOM(): void {
 function stubPreflight(preflight: { isRepo: boolean; gitAvailable: boolean } | "error") {
   const initBodies: Record<string, unknown>[] = [];
   const fetchMock = vi.fn(async (url: string, opts?: { method?: string; body?: string }) => {
-    if (url === "/api/commands/init/preflight") {
+    // Served at "/" standalone and "/p/<id>/" behind the hub — match on the
+    // route, not the prefix, so one stub covers both.
+    if (url.endsWith("/api/commands/init/preflight")) {
       if (preflight === "error") throw new Error("offline");
       return { ok: true, json: async () => preflight } as Response;
     }
-    if (url === "/api/commands/init" && opts?.method === "POST") {
+    if (url.endsWith("/api/commands/init") && opts?.method === "POST") {
       initBodies.push(JSON.parse(opts.body ?? "{}") as Record<string, unknown>);
       return { ok: true, status: 202, json: async () => ({ ok: true }) } as Response;
     }
@@ -214,6 +216,7 @@ describe("landing.ts setup wizard — git question", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllGlobals();
+    window.history.replaceState({}, "", "/");
     setupWizardDOM();
     installBrowserStubs();
   });
@@ -261,6 +264,29 @@ describe("landing.ts setup wizard — git question", () => {
     expect(initBodies).toHaveLength(1);
     expect(initBodies[0].git).toBe(false);
     expect(initBodies[0].provider).toBe("claude");
+  });
+
+  // Plain `ndx start` registers with the per-user hub, which serves each
+  // project at /p/<id>/. A root-relative call from there reaches the hub, not
+  // this project — and with two projects registered the hub answers 409.
+  it("addresses the project through its hub prefix", async () => {
+    const { initBodies } = stubPreflight({ isRepo: false, gitAvailable: true });
+    window.history.replaceState({}, "", "/p/demo-project/");
+    await import("../../../src/landing/landing.js");
+    await flush();
+
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const urls = fetchMock.mock.calls.map((c) => c[0] as string);
+    expect(urls).toContain("/p/demo-project/api/commands/init/preflight");
+
+    (document.getElementById("setup-wizard") as HTMLFormElement).dispatchEvent(
+      new Event("submit", { cancelable: true }),
+    );
+    await flush();
+
+    expect(initBodies).toHaveLength(1);
+    const posted = fetchMock.mock.calls.map((c) => c[0] as string);
+    expect(posted).toContain("/p/demo-project/api/commands/init");
   });
 
   it("omits the git answer entirely when the preflight could not be read", async () => {

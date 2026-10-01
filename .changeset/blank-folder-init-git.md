@@ -25,3 +25,8 @@ and travels to `POST /api/commands/init` as `git: boolean`. The init status
 endpoint reports `gitRequested` / `gitInitialized`, confirmed from disk rather
 than from the exit code — `ndx init` treats a failed `git init` as a warning
 and still exits 0.
+
+The wizard also addresses the project through its hub prefix now. Plain `ndx
+start` registers with the per-user hub, which serves each project at
+`/p/<id>/`; the page's root-relative `fetch("/api/...")` calls reached the hub
+instead, which answers 409 once a second project is registered.

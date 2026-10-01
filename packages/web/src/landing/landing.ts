@@ -75,6 +75,26 @@ function initCopyButtons(): void {
 
 // ── Setup wizard (bootstraps this project without a terminal) ──
 
+/**
+ * Where this page is mounted. Standalone (`ndx start --here`) it is served at
+ * `/`; behind the per-user hub — which is what plain `ndx start` registers
+ * with — it is served at `/p/<id>/`, and a worktree other than the anchor sits
+ * under `/w/<key>/`. A root-relative `fetch("/api/…")` from there reaches the
+ * hub rather than this project: with one project registered the hub aliases it
+ * back, but with two it answers 409 and the wizard would initialize nothing.
+ *
+ * Deliberately a local copy of `detectViewerBasePath` (src/shared/base-path.ts)
+ * rather than an import: the landing page is a self-contained zone with no
+ * imports into the dashboard viewer (see build.js), so the prefix shapes are
+ * duplicated here on purpose. Keep the two in step.
+ */
+function apiUrl(path: string): string {
+  const pathname = typeof location === "undefined" ? "" : location.pathname;
+  const project = /^\/p\/[^/?#]+/.exec(pathname)?.[0] ?? "";
+  const workspace = /^\/w\/[^/?#]+/.exec(pathname.slice(project.length))?.[0] ?? "";
+  return `${project}${workspace}${path}`;
+}
+
 interface InitStatusResponse {
   running: boolean;
   startedAt: string | null;
@@ -137,7 +157,7 @@ function initSetupWizard(): void {
    */
   async function loadPreflight(): Promise<void> {
     try {
-      const res = await fetch("/api/commands/init/preflight");
+      const res = await fetch(apiUrl("/api/commands/init/preflight"));
       if (!res.ok) return;
       const data = (await res.json()) as InitPreflightResponse;
       if (data.isRepo || !gitFieldset) return;
@@ -195,7 +215,7 @@ function initSetupWizard(): void {
 
   async function pollStatus(): Promise<void> {
     try {
-      const res = await fetch("/api/commands/init/status");
+      const res = await fetch(apiUrl("/api/commands/init/status"));
       if (!res.ok) return;
       const data = (await res.json()) as InitStatusResponse;
       if (data.running || !data.finishedAt) return;
@@ -220,7 +240,9 @@ function initSetupWizard(): void {
       // The server now sees .rex/.sourcevision/.hench on disk, so the next
       // request to "/" serves the real dashboard instead of this page.
       setTimeout(() => {
-        location.href = "/";
+        // Same prefix as the API calls — "/" would land on the hub's chooser
+        // (or another project) instead of the dashboard just initialized.
+        location.href = apiUrl("/");
       }, 900);
     } catch {
       // Transient network hiccup — keep polling, the interval will retry.
@@ -265,7 +287,7 @@ function initSetupWizard(): void {
 
     void (async () => {
       try {
-        const res = await fetch("/api/commands/init", {
+        const res = await fetch(apiUrl("/api/commands/init"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
