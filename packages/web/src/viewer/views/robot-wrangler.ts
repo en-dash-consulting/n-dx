@@ -53,6 +53,8 @@ interface LlmConfigResponse {
    */
   claudeSources: Partial<Record<"model" | "lightModel", "llm" | "legacy">>;
   autoFailover?: boolean;
+  /** `hench.models.<vendor>` overrides in the project config; a vendor with none is absent. */
+  agentModels: Partial<Record<string, string>>;
   /** What `ndx work` runs with no flags, resolved server-side. */
   effective: EffectiveConfig;
   /** Why `ndx work` would refuse `effective`; empty when it would run. */
@@ -70,6 +72,30 @@ interface EffectiveProblem {
   field: "provider" | "model";
   message: string;
 }
+
+type HenchProvider = "cli" | "api";
+
+/** Installed CLI, from `<binary> --version` on the server. */
+interface CliInfo {
+  found: boolean;
+  version: string | null;
+  path: string | null;
+}
+
+/** One vendor's entry in GET /api/llm/catalog. */
+interface CatalogEntry {
+  models: string[];
+  providers: HenchProvider[];
+  defaultModel: string;
+  /** Cloud vendors: where `models` came from. Local reports `reachable` instead. */
+  source?: "live" | "built-in";
+  checkedAt?: string | null;
+  reachable?: boolean;
+  reason?: string;
+  cli?: CliInfo;
+}
+
+type LlmCatalog = Record<ViewerLLMVendor, CatalogEntry>;
 
 interface LocalStatusResponse {
   ok: boolean;
@@ -124,16 +150,39 @@ const VENDORS = [
   { id: VIEWER_LLM_VENDOR.LOCAL, label: "Local", subtitle: "LM Studio / Ollama" },
 ] satisfies ReadonlyArray<{ id: ViewerLLMVendor; label: string; subtitle: string }>;
 
-// Keep in sync with packages/core/llm-model-catalog.js (the `ndx init`
-// selector). These are display-only suggestions; any model ID the vendor
-// accepts can still be typed in.
-//
-const MODEL_SUGGESTIONS: Record<ViewerLLMVendor, string[]> = {
-  [VIEWER_LLM_VENDOR.CLAUDE]: ["claude-sonnet-5", "claude-opus-5", "claude-fable-5", "claude-haiku-4-5"],
-  [VIEWER_LLM_VENDOR.CODEX]: ["gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.5"],
-  [VIEWER_LLM_VENDOR.GOOGLE]: ["gemini-2.5-pro", "gemini-3.7-flash", "gemini-3.5-flash-lite"],
-  [VIEWER_LLM_VENDOR.LOCAL]: [],
-};
+/** `<option>` value for the free-entry choice; never a model id. */
+const OTHER_MODEL = "__other__";
+
+/** editValues key for the agent model override of one vendor (saved as `hench.models.<vendor>`). */
+const AGENT_KEY_PREFIX = "agent.";
+const agentKey = (vendor: string): string => `${AGENT_KEY_PREFIX}${vendor}`;
+
+/** editValues key for the hench provider (saved through PUT /api/hench/config, not the llm route). */
+const PROVIDER_KEY = "provider";
+
+/**
+ * The provider to show for the active vendor, and whether saving it is needed.
+ *
+ * A pending edit is honoured only while the vendor still offers it — switching
+ * vendor drops an edit the new vendor refuses. When the saved provider is not
+ * on offer (codex saved as `api`) the first choice is shown and counts as a
+ * change, since `ndx work` would refuse the saved value. Api-only vendors are
+ * the exception: hench forces `api` for them whatever is saved, so there is
+ * nothing to write until the user picks something. `saved` is null when hench
+ * is not initialised; the field is then read-only and never dirty.
+ */
+function resolveProviderField(
+  choices: HenchProvider[],
+  saved: HenchProvider | null,
+  edit: string | undefined,
+): { value: HenchProvider; dirty: boolean } {
+  const first = choices[0] ?? saved ?? "api";
+  if (saved === null || choices.length === 0) return { value: saved ?? first, dirty: false };
+  const picked = edit !== undefined && (choices as string[]).includes(edit) ? (edit as HenchProvider) : undefined;
+  const value = picked ?? (choices.includes(saved) ? saved : first);
+  const forcedApi = choices.length === 1 && choices[0] === "api";
+  return { value, dirty: value !== saved && !(forcedApi && picked === undefined) };
+}
 
 // ── Vendor selector (segmented control) ───────────────────────────────
 
@@ -179,31 +228,84 @@ function VendorSelector({
   );
 }
 
-// ── Free-text model field (with optional datalist suggestions) ─────────
+// ── Free-text model field ──────────────────────────────────────────────
 
 function ModelField({
   fieldKey,
   label,
   description,
   value,
-  suggestions,
   onChange,
   dirty,
   placeholder,
+}: {
+  fieldKey: string;
+  label: string;
+  description: string;
+  value: string;
+  onChange: (key: string, v: string) => void;
+  dirty: boolean;
+  placeholder?: string;
+}) {
+  return h("div", { class: `llm-field${dirty ? " llm-field-dirty" : ""}` },
+    h("label", { class: "llm-field-label", htmlFor: fieldKey },
+      label,
+      dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+    ),
+    h("p", { class: "llm-field-desc" }, description),
+    h("input", {
+      id: fieldKey,
+      type: "text",
+      class: "llm-text-input",
+      value,
+      placeholder: placeholder ?? "",
+      onInput: (e: Event) => onChange(fieldKey, (e.target as HTMLInputElement).value),
+    }),
+  );
+}
+
+// ── Catalog-backed model picker ────────────────────────────────────────
+
+/**
+ * A dropdown over the server's model catalog for one vendor.
+ *
+ * `value` is the stored model, `""` when unset. The first option clears it
+ * (`unsetLabel`); the last, "Other model…", reveals a text input for an id the
+ * catalog does not list. A stored value the list lacks is kept as its own
+ * option so it is never silently dropped from view. `defaultModel`, when
+ * given, is marked in the list as the project default.
+ */
+function CatalogModelPicker({
+  fieldKey,
+  label,
+  description,
+  value,
+  models,
+  unsetLabel,
+  defaultModel,
+  onChange,
+  dirty,
   legacyKey,
 }: {
   fieldKey: string;
   label: string;
   description: string;
   value: string;
-  suggestions: string[];
+  models: string[];
+  unsetLabel: string;
+  defaultModel?: string;
   onChange: (key: string, v: string) => void;
   dirty: boolean;
-  placeholder?: string;
   /** Deprecated key this value is still read from, when it is not `llm.*`. */
   legacyKey?: string;
 }) {
-  const listId = suggestions.length > 0 ? `llm-dl-${fieldKey}` : undefined;
+  // Sticky: once the user picks "Other model…" the input stays up while they
+  // type, even though the half-typed id is (rightly) not in the list.
+  const [custom, setCustom] = useState(false);
+  const listed = value === "" || models.includes(value);
+  const options = listed || custom ? models : [value, ...models];
+  const selected = custom ? OTHER_MODEL : value;
+
   return h("div", { class: `llm-field${dirty ? " llm-field-dirty" : ""}` },
     h("label", { class: "llm-field-label", htmlFor: fieldKey },
       label,
@@ -214,18 +316,116 @@ function ModelField({
         : null,
     ),
     h("p", { class: "llm-field-desc" }, description),
-    h("input", {
+    h("select", {
       id: fieldKey,
-      type: "text",
-      class: "llm-text-input",
-      value,
-      list: listId,
-      placeholder: placeholder ?? (suggestions[0] ? `e.g. ${suggestions[0]}` : ""),
-      onInput: (e: Event) => onChange(fieldKey, (e.target as HTMLInputElement).value),
-    }),
-    listId
-      ? h("datalist", { id: listId },
-          suggestions.map((s) => h("option", { key: s, value: s })),
+      class: "llm-select-input",
+      value: selected,
+      onChange: (e: Event) => {
+        const next = (e.target as HTMLSelectElement).value;
+        if (next === OTHER_MODEL) {
+          setCustom(true);
+          return;
+        }
+        setCustom(false);
+        onChange(fieldKey, next);
+      },
+    },
+      h("option", { value: "" }, unsetLabel),
+      options.map((m) =>
+        h("option", { key: m, value: m },
+          m === defaultModel ? `${m} (project default)` : m,
+        ),
+      ),
+      h("option", { value: OTHER_MODEL }, "Other model…"),
+    ),
+    custom
+      ? h("input", {
+          id: `${fieldKey}-other`,
+          type: "text",
+          class: "llm-text-input",
+          value,
+          placeholder: "model-id",
+          "aria-label": `${label} — model id`,
+          onInput: (e: Event) => onChange(fieldKey, (e.target as HTMLInputElement).value),
+        })
+      : null,
+  );
+}
+
+// ── Provider field ─────────────────────────────────────────────────────
+
+/** The providers hench accepts for the vendor; one choice is shown as fixed. */
+function ProviderField({
+  choices,
+  value,
+  onChange,
+  dirty,
+}: {
+  choices: HenchProvider[];
+  value: HenchProvider;
+  onChange: (key: string, v: string) => void;
+  dirty: boolean;
+}) {
+  const cliName = useCliName();
+  return h("div", { class: `llm-field${dirty ? " llm-field-dirty" : ""}` },
+    h("label", { class: "llm-field-label", htmlFor: "provider" },
+      "Provider",
+      dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+    ),
+    h("p", { class: "llm-field-desc" },
+      choices.length === 1
+        ? `${cliName} work always uses ${choices[0]} for this vendor.`
+        : `How ${cliName} work drives this vendor: through its CLI, or the API directly.`,
+    ),
+    choices.length === 1
+      ? h("span", { id: "provider", class: "llm-provider-fixed" }, choices[0])
+      : h("select", {
+          id: "provider",
+          class: "llm-select-input",
+          value,
+          onChange: (e: Event) => onChange("provider", (e.target as HTMLSelectElement).value),
+        },
+          choices.map((p) => h("option", { key: p, value: p }, p)),
+        ),
+  );
+}
+
+// ── Catalog provenance + CLI status ────────────────────────────────────
+
+/**
+ * Where the model list came from, with a Refresh that bypasses the server's
+ * cache. For Claude and Codex it also reports the installed CLI — and only
+ * reports it: updating or installing a CLI is not something this page does.
+ */
+function CatalogStatus({
+  vendor,
+  entry,
+  refreshing,
+  onRefresh,
+}: {
+  vendor: ViewerLLMVendor;
+  entry: CatalogEntry;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const origin = vendor === VIEWER_LLM_VENDOR.LOCAL
+    ? (entry.reachable ? "Live list from the local server" : `Local server unreachable${entry.reason ? ` — ${entry.reason}` : ""}`)
+    : entry.source === "live"
+      ? `Live list, checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}`
+      : `Built-in list${entry.reason ? ` — ${entry.reason}` : ""}`;
+  const cli = entry.cli;
+  return h("div", { class: "llm-catalog-status" },
+    h("span", { class: "llm-catalog-origin" }, origin),
+    h("button", {
+      class: "llm-btn llm-btn-secondary",
+      onClick: onRefresh,
+      disabled: refreshing,
+    }, refreshing ? "Refreshing…" : "Refresh models"),
+    cli
+      ? h("span", { class: "llm-catalog-cli" },
+          cli.found
+            ? `CLI ${cli.version ?? "installed"}`
+            : "CLI not found",
         )
       : null,
   );
@@ -315,6 +515,7 @@ function ToggleSwitch({
 function VendorSection({
   vendorId,
   config,
+  catalog,
   editValues,
   onChange,
   dirtyKeys,
@@ -322,6 +523,8 @@ function VendorSection({
 }: {
   vendorId: CloudViewerVendor;
   config: VendorConfig;
+  /** This vendor's catalog entry; null until the catalog loads or when it failed. */
+  catalog: CatalogEntry | null;
   editValues: Record<string, string>;
   onChange: (key: string, v: string) => void;
   dirtyKeys: Set<string>;
@@ -329,27 +532,29 @@ function VendorSection({
   legacyFields: ReadonlyArray<"model" | "lightModel">;
 }) {
   const cliName = useCliName();
-  const suggestions = MODEL_SUGGESTIONS[vendorId] ?? [];
   const modelKey = `${vendorId}.model`;
   const lightKey = `${vendorId}.lightModel`;
+  const models = catalog?.models ?? [];
 
   return h("div", { class: "llm-vendor-section" },
-    h(ModelField, {
+    h(CatalogModelPicker, {
       fieldKey: modelKey,
-      label: "Primary model",
-      description: `Used for agentic tasks (${cliName} work, ${cliName} plan). Leave blank for the CLI default.`,
+      label: "Project model",
+      description: `Used by every ${cliName} command that has no agent model of its own. Leave on the vendor default for the CLI's choice.`,
       value: editValues[modelKey] ?? config.model ?? "",
-      suggestions,
+      models,
+      unsetLabel: "Vendor default",
       onChange,
       dirty: dirtyKeys.has(modelKey),
       legacyKey: legacyFields.includes("model") ? "claude.model" : undefined,
     }),
-    h(ModelField, {
+    h(CatalogModelPicker, {
       fieldKey: lightKey,
       label: "Light model",
-      description: "Cheaper model for recommendations and summaries. Falls back to primary if blank.",
+      description: "Cheaper model for recommendations and summaries. Falls back to the project model if unset.",
       value: editValues[lightKey] ?? config.lightModel ?? "",
-      suggestions,
+      models,
+      unsetLabel: "Same as project model",
       onChange,
       dirty: dirtyKeys.has(lightKey),
       legacyKey: legacyFields.includes("lightModel") ? "claude.lightModel" : undefined,
@@ -672,7 +877,6 @@ function LocalSection({
         label: "Primary model",
         description: "Leave blank to use whichever model is currently loaded.",
         value: model,
-        suggestions: [],
         onChange,
         dirty: dirtyKeys.has("local.model"),
         placeholder: "model-id",
@@ -693,7 +897,6 @@ function LocalSection({
         label: "Light model",
         description: "Falls back to primary if blank.",
         value: light,
-        suggestions: [],
         onChange,
         dirty: dirtyKeys.has("local.lightModel"),
         placeholder: "model-id",
@@ -843,7 +1046,6 @@ function LocalSection({
         label: "Model",
         description: "Leave blank to use whichever model is currently loaded on the verifier endpoint.",
         value: verifierModel,
-        suggestions: [],
         onChange,
         dirty: dirtyKeys.has("local.verifier.model"),
         placeholder: "model-id",
@@ -964,6 +1166,45 @@ export function RobotWranglerView() {
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
 
+  // The catalog holds every vendor, so switching vendor reads another entry
+  // rather than refetching — nothing from the previous vendor can linger.
+  const [catalog, setCatalog] = useState<LlmCatalog | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadCatalog = useCallback(async (refresh: boolean) => {
+    setRefreshing(refresh);
+    try {
+      const res = await fetch(refresh ? "/api/llm/catalog?refresh=true" : "/api/llm/catalog");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setCatalogError((body as { error?: string }).error ?? `Model catalog unavailable (HTTP ${res.status})`);
+        return;
+      }
+      setCatalog(await res.json() as LlmCatalog);
+      setCatalogError(null);
+    } catch (err) {
+      setCatalogError(err instanceof Error ? err.message : "Model catalog unavailable");
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadCatalog(false); }, [loadCatalog]);
+
+  // The saved hench provider. Null when hench is not initialised, in which case
+  // the page reports the effective provider and offers no edit.
+  const [henchProvider, setHenchProvider] = useState<HenchProvider | null>(null);
+  useEffect(() => {
+    fetch("/api/hench/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { config?: { provider?: string } } | null) => {
+        const p = body?.config?.provider;
+        if (p === "cli" || p === "api") setHenchProvider(p);
+      })
+      .catch(() => { /* hench not initialised; provider stays read-only */ });
+  }, []);
+
   const handleVendorChange = useCallback((v: string | null) => setPendingVendor(v), []);
   const handleField  = useCallback((key: string, val: string)  => setEditValues((p)  => ({ ...p, [key]: val })), []);
   const handleToggle = useCallback((key: string, val: boolean) => setEditToggles((p) => ({ ...p, [key]: val })), []);
@@ -979,11 +1220,16 @@ export function RobotWranglerView() {
   // silently included in an unrelated save.
   const dirtyKeys = new Set<string>();
   if (data) {
-    for (const vid of [VIEWER_LLM_VENDOR.CLAUDE, VIEWER_LLM_VENDOR.CODEX] as const) {
+    if (effectiveVendor && CLOUD_VENDORS.has(effectiveVendor)) {
+      const vid = effectiveVendor as CloudViewerVendor;
       for (const f of ["model", "lightModel"] as const) {
         const k = `${vid}.${f}`;
         if (k in editValues && editValues[k] !== (data[vid][f] ?? "")) dirtyKeys.add(k);
       }
+    }
+    if (effectiveVendor) {
+      const k = agentKey(effectiveVendor);
+      if (k in editValues && editValues[k] !== (data.agentModels?.[effectiveVendor] ?? "")) dirtyKeys.add(k);
     }
     if (effectiveVendor === VIEWER_LLM_VENDOR.LOCAL) {
       for (const f of ["model", "lightModel", "host"] as const) {
@@ -1022,8 +1268,18 @@ export function RobotWranglerView() {
     dirtyToggles.add("autoFailover");
   }
 
-  const hasChanges = dirtyKeys.size > 0 || vendorDirty || dirtyToggles.size > 0;
+  // The provider belongs to the active vendor's catalog entry, so it follows
+  // the vendor selection (saved or pending) and never offers a stale choice.
+  const vendorCatalog: CatalogEntry | null = effectiveVendor
+    ? catalog?.[effectiveVendor as ViewerLLMVendor] ?? null
+    : null;
+  const providerChoices = vendorCatalog?.providers ?? [];
+  const provider = resolveProviderField(providerChoices, henchProvider, editValues[PROVIDER_KEY]);
 
+  const hasChanges = dirtyKeys.size > 0 || vendorDirty || dirtyToggles.size > 0 || provider.dirty;
+
+  // Two writes, in this order: the hench route validates `provider` against the
+  // *saved* vendor, so the llm write (which may change the vendor) goes first.
   const handleSave = useCallback(async () => {
     setSaving(true);
     setError(null);
@@ -1032,35 +1288,64 @@ export function RobotWranglerView() {
       if (vendorDirty) changes["llm.vendor"] = pendingVendor;
       for (const key of dirtyKeys) {
         const raw = editValues[key] ?? "";
-        // key is e.g. "claude.model" → api path is "llm.claude.model"
-        changes[`llm.${key}`] = raw.trim() || null;
+        const value = raw.trim() || null;
+        // "agent.claude" → hench.models.claude; "claude.model" → llm.claude.model
+        if (key.startsWith(AGENT_KEY_PREFIX)) changes[`hench.models.${key.slice(AGENT_KEY_PREFIX.length)}`] = value;
+        else changes[`llm.${key}`] = value;
       }
       for (const key of dirtyToggles) {
         if (key === "autoFailover") changes["llm.autoFailover"] = editToggles.autoFailover;
       }
-      const res = await fetch("/api/llm/config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ changes }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Save failed" }));
-        // Edits stay in place and `dirty` stays true, so the frame keeps Save
-        // enabled and the leave prompt armed.
-        setError((body as { error?: string }).error ?? "Failed to save");
-        return;
+
+      if (Object.keys(changes).length > 0) {
+        const res = await fetch("/api/llm/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ changes }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ error: "Save failed" }));
+          // Edits stay in place and `dirty` stays true, so the frame keeps Save
+          // enabled and the leave prompt armed.
+          setError((body as { error?: string }).error ?? "Failed to save");
+          return;
+        }
+        const json = await res.json() as { config: LlmConfigResponse };
+        setData(json.config);
+        // The llm part is saved: clear it, but keep a pending provider edit so
+        // a failed second write leaves exactly that field dirty.
+        setEditValues((prev) => {
+          const pending: Record<string, string> = {};
+          if (PROVIDER_KEY in prev) pending[PROVIDER_KEY] = prev[PROVIDER_KEY];
+          return pending;
+        });
+        setEditToggles({});
+        setPendingVendor(undefined);
       }
-      const json = await res.json() as { config: LlmConfigResponse };
-      setData(json.config);
-      setEditValues({});
-      setEditToggles({});
-      setPendingVendor(undefined);
+
+      if (provider.dirty) {
+        const res = await fetch("/api/hench/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ changes: { provider: provider.value } }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ error: "Save failed" }));
+          setError((body as { error?: string }).error ?? "Failed to save the provider");
+          return;
+        }
+        setHenchProvider(provider.value);
+        setEditValues((prev) => {
+          const { [PROVIDER_KEY]: _saved, ...rest } = prev;
+          return rest;
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSaving(false);
     }
-  }, [vendorDirty, pendingVendor, dirtyKeys, dirtyToggles, editValues, editToggles]);
+  }, [vendorDirty, pendingVendor, dirtyKeys, dirtyToggles, editValues, editToggles, provider.dirty, provider.value]);
 
   const handleDiscard = useCallback(() => {
     setEditValues({});
@@ -1126,12 +1411,50 @@ export function RobotWranglerView() {
       localStatus: showLocal ? localStatus : null,
     }),
 
+    // Provider and agent model for the active vendor, from the server catalog
+    catalogError
+      ? h("p", { class: "llm-catalog-error", role: "alert" },
+          `${catalogError}. Model lists are empty; use "Other model…" to enter an id.`)
+      : null,
+    (effectiveVendor && data)
+      ? h("div", { key: `agent-${effectiveVendor}`, class: "llm-vendor-section llm-agent-section" },
+          h(ProviderField, {
+            choices: providerChoices.length > 0 ? providerChoices : [provider.value],
+            value: provider.value,
+            onChange: handleField,
+            dirty: provider.dirty,
+          }),
+          vendorCatalog
+            ? h(CatalogStatus, {
+                vendor: effectiveVendor as ViewerLLMVendor,
+                entry: vendorCatalog,
+                refreshing,
+                onRefresh: () => { void loadCatalog(true); },
+              })
+            : null,
+          h(CatalogModelPicker, {
+            fieldKey: agentKey(effectiveVendor),
+            label: "Agent model",
+            description: `Model ${cliName} work runs for ${effectiveVendor}. Overrides the project model; --model on the command line still wins.`,
+            value: editValues[agentKey(effectiveVendor)] ?? data.agentModels?.[effectiveVendor] ?? "",
+            models: vendorCatalog?.models ?? [],
+            defaultModel: vendorCatalog?.defaultModel,
+            unsetLabel: vendorCatalog
+              ? `Use project default (${vendorCatalog.defaultModel})`
+              : "Use project default",
+            onChange: handleField,
+            dirty: dirtyKeys.has(agentKey(effectiveVendor)),
+          }),
+        )
+      : null,
+
     // Active vendor settings
     (effectiveVendor && CLOUD_VENDORS.has(effectiveVendor))
       ? h(VendorSection, {
           key: effectiveVendor,
           vendorId: effectiveVendor as CloudViewerVendor,
           config: data![effectiveVendor as CloudViewerVendor] ?? { model: null, lightModel: null },
+          catalog: vendorCatalog,
           editValues,
           onChange: handleField,
           dirtyKeys,

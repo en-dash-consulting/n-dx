@@ -98,6 +98,13 @@ export interface LlmConfigResponse {
   /** Enable automatic failover on model/vendor errors. */
   autoFailover?: boolean;
   /**
+   * The per-vendor agent model override, `hench.models.<vendor>` in the project
+   * config (`.n-dx.json` merged with the local overlay). A vendor with no
+   * override is absent. This is the key the picker writes — not the merged
+   * view `effective` reports, which also folds in `.hench/config.json`.
+   */
+  agentModels: Partial<Record<LLMVendor, string>>;
+  /**
    * What `ndx work` runs with no flags, resolved across `.n-dx.json` and
    * `.hench/config.json`. Every other field on this response is a configured
    * key; this one is the answer those keys add up to. See
@@ -206,8 +213,37 @@ const PARAMETERIZED_PREFIXES = ["llm.tiers.", "llm.routes.", "llm.effort."] as c
  */
 const FLAT_MAP_PREFIXES = ["llm.routes.", "llm.effort."] as const;
 
+/** `hench.models.<vendor>` — the agent model override `ndx work` honours after `--model`. */
+const AGENT_MODEL_PATH = /^hench\.models\.(claude|codex|google|local)$/;
+
+/**
+ * The vendor a model-valued path is scoped to, or null for any other path:
+ * `llm.<vendor>.model`, `llm.<vendor>.lightModel` and `hench.models.<vendor>`.
+ */
+function modelPathVendor(path: string): LLMVendor | null {
+  const agent = AGENT_MODEL_PATH.exec(path);
+  if (agent) return agent[1] as LLMVendor;
+  const llm = /^llm\.(claude|codex|google|local)\.(model|lightModel)$/.exec(path);
+  return llm ? (llm[1] as LLMVendor) : null;
+}
+
+/**
+ * Refuse a model id the vendor cannot run — the check `ndx work` applies, made
+ * at write time so the next run does not fail on it. `local` runs whatever the
+ * server has loaded, so any id is accepted there. Returns an error message, or
+ * null when the change is acceptable (including a delete).
+ */
+function validateModelForVendor(path: string, value: unknown): string | null {
+  const vendor = modelPathVendor(path);
+  if (!vendor || vendor === LLM_VENDOR.LOCAL) return null;
+  if (typeof value !== "string" || value === "") return null;
+  if (isModelCompatibleWithVendor(vendor, value)) return null;
+  return `Model "${value}" is not a ${vendor} model; "${path}" was not changed.`;
+}
+
 function isWritablePath(path: string): boolean {
   if (VALID_PATHS.has(path)) return true;
+  if (AGENT_MODEL_PATH.test(path)) return true;
   return PARAMETERIZED_PREFIXES.some(
     (prefix) => path.startsWith(prefix) && path.length > prefix.length,
   );
@@ -369,6 +405,22 @@ function deleteByPath(obj: Record<string, unknown>, path: string): void {
 }
 
 /**
+ * Drop `hench.models` once its last vendor is cleared, and `hench` once that
+ * leaves it empty, so "Use project default" leaves no residue in `.n-dx.json`.
+ * Only ever removes objects this route emptied itself.
+ */
+function pruneEmptyAgentModels(config: Record<string, unknown>): void {
+  const hench = config["hench"];
+  if (!hench || typeof hench !== "object") return;
+  const henchObj = hench as Record<string, unknown>;
+  const models = henchObj["models"];
+  if (models && typeof models === "object" && Object.keys(models).length === 0) {
+    delete henchObj["models"];
+  }
+  if (Object.keys(henchObj).length === 0) delete config["hench"];
+}
+
+/**
  * Read the active `llm.vendor` from `.n-dx.json` merged with the local
  * overlay (local wins), or null if unset. Shared with `routes-hench.ts` and
  * `routes-adaptive.ts` so a hench-config `provider` write can be validated
@@ -399,6 +451,18 @@ function findEffectiveProblems(effective: EffectiveAgentConfig): EffectiveProble
     });
   }
   return problems;
+}
+
+/** `hench.models.<vendor>` entries from a parsed project config; non-string and unknown-vendor keys are skipped. */
+function readAgentModels(config: Record<string, unknown>): Partial<Record<LLMVendor, string>> {
+  const hench = (config["hench"] ?? {}) as Record<string, unknown>;
+  const raw = (hench["models"] ?? {}) as Record<string, unknown>;
+  const models: Partial<Record<LLMVendor, string>> = {};
+  for (const vendor of VALID_VENDORS) {
+    const value = getString(raw, vendor);
+    if (value) models[vendor as LLMVendor] = value;
+  }
+  return models;
 }
 
 /**
@@ -453,6 +517,7 @@ async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> 
       ...(claude.sources.model ? { model: claude.sources.model } : {}),
       ...(claude.sources.lightModel ? { lightModel: claude.sources.lightModel } : {}),
     },
+    agentModels: readAgentModels(config),
     effective,
     effectiveProblems: findEffectiveProblems(effective),
   };
@@ -973,6 +1038,11 @@ export async function handleLlmRoute(
             return true;
           }
         }
+        const modelError = validateModelForVendor(path, value);
+        if (modelError) {
+          errorResponse(res, 400, modelError);
+          return true;
+        }
       }
 
       const config = readNdxConfig(ctx.projectDir);
@@ -981,6 +1051,7 @@ export async function handleLlmRoute(
       for (const [path, value] of Object.entries(parsed.changes)) {
         if (value === null || value === "") {
           deleteByPath(config, path);
+          if (AGENT_MODEL_PATH.test(path)) pruneEmptyAgentModels(config);
         } else if (NUMERIC_PATHS.has(path)) {
           // Coerce string port values to numbers before persisting
           setByPath(config, path, Number(value));

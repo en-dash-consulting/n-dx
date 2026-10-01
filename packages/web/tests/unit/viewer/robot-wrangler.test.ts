@@ -29,10 +29,20 @@ function config(overrides: Json = {}): Json {
   };
 }
 
-/** Serves GET /api/llm/config and records PUT bodies; everything else is empty. */
+const CATALOG: Json = {
+  claude: { models: ["claude-haiku-4-5", "claude-opus-5", "claude-sonnet-5"], providers: ["cli", "api"], defaultModel: "claude-sonnet-5", source: "built-in", checkedAt: null, cli: { found: true, version: "2.0.0", path: "/bin/claude" } },
+  codex: { models: ["gpt-5.5"], providers: ["cli"], defaultModel: "gpt-5.5", source: "built-in", checkedAt: null, cli: { found: false, version: null, path: null } },
+  google: { models: ["gemini-2.5-pro"], providers: ["api"], defaultModel: "gemini-2.5-pro", source: "built-in", checkedAt: null },
+  local: { models: [], providers: ["api"], defaultModel: "", reachable: false },
+};
+
+/** Serves GET /api/llm/config and the catalog, and records PUT bodies; everything else is empty. */
 function stubApi(initial: Json) {
   const puts: Json[] = [];
   const mock = vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
+    if (String(url).includes("/api/llm/catalog")) {
+      return { ok: true, status: 200, json: async () => CATALOG };
+    }
     if (String(url).includes("/api/llm/config")) {
       if (init?.method === "PUT") {
         const body = JSON.parse(init.body ?? "{}") as Json;
@@ -127,8 +137,8 @@ describe("RobotWranglerView", () => {
     }));
     await mount();
 
-    const model = root.querySelector<HTMLInputElement>('input[id="claude.model"]')!;
-    const light = root.querySelector<HTMLInputElement>('input[id="claude.lightModel"]')!;
+    const model = root.querySelector<HTMLSelectElement>('select[id="claude.model"]')!;
+    const light = root.querySelector<HTMLSelectElement>('select[id="claude.lightModel"]')!;
     expect(model.value).toBe("claude-opus-5");
     expect(light.value).toBe("claude-haiku-4-5");
     const sources = Array.from(root.querySelectorAll(".llm-field-source")).map((el) => el.textContent?.trim());
@@ -136,7 +146,7 @@ describe("RobotWranglerView", () => {
 
     await act(async () => {
       model.value = "claude-sonnet-5";
-      model.dispatchEvent(new Event("input", { bubbles: true }));
+      model.dispatchEvent(new Event("change", { bubbles: true }));
     });
     expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("Unsaved changes");
 

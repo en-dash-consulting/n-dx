@@ -49,8 +49,8 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `ndx self-heal` | **full** | medium | Trigger, status poll, iteration/phase display, and a Stop control that cancels the running loop |
 | `ndx export` | partial | medium | Export trigger exists; deploy flow not exposed |
 | `ndx ci` | **full** | medium | Run-CI-check action in the Validation view with structured results from `--format=json` |
-| `ndx config` | full | medium | Settings section: General (LLM provider), project settings, hench config, Notion, feature flags, CLI timeouts — grouped by CLI command |
-| `ndx auth` | **full** | low | Credential status chip in Settings → General (GET `/api/commands/auth`), with re-check |
+| `ndx config` | full | medium | Three settings pages: Robot Wrangler (vendor, provider and model), Workflow (work settings, templates, CLI timeouts) and Project (analyze/plan settings, feature flags, Notion, integrations) |
+| `ndx auth` | **full** | low | Credential status chip on Robot Wrangler (GET `/api/commands/auth`), with re-check |
 | `ndx install-sample` / `ndx destroy-sample` | **full** | low | Sample App panel in Commands view (`packages/web/src/viewer/views/commands.ts`) — Install/Destroy buttons, live status polling via GET `/api/commands/sample-status`, POST `/api/commands/install-sample` and `/api/commands/destroy-sample` |
 | `ndx pair-programming` / `bicker` | none | low | Experimental; not yet a dashboard workflow |
 | `ndx init` | n/a | — | One-time setup; dashboard requires init to exist |
@@ -60,7 +60,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 ### `ndx config` — Robot Wrangler view detail
 
 - **Local vendor (full):** the Robot Wrangler view (`packages/web/src/viewer/views/robot-wrangler.ts`) adds a "local" vendor alongside Claude/Codex — host/port/model fields, a live status probe, a connection smoke test (latency + tokens/sec), and saved server profiles. Backed by GET/PUT `/api/llm/config` plus GET `/api/llm/local-status`, POST `/api/llm/local-test`, and GET/POST/DELETE `/api/llm/local-profiles` (`packages/web/src/server/routes-llm.ts`).
-- **Google/Gemini vendor (none, impact: medium):** the CLI's `google` vendor (`packages/core/config.js`) has no dashboard representation — `VENDORS` in `robot-wrangler.ts` and `VALID_VENDORS` in `routes-llm.ts` cover only claude/codex/local; no tab, no field in the `GET`/`PUT /api/llm/config` contract.
+- **Providers and models (full):** each vendor offers only the providers hench accepts and a model dropdown over the server's catalog (GET `/api/llm/catalog`, `?refresh=true` to re-fetch). The agent model saves as `hench.models.<vendor>` through PUT `/api/llm/config`; the provider saves through PUT `/api/hench/config`. The page shows the installed CLI version for Claude and Codex but offers no update or install action.
 
 ## rex package CLI
 
@@ -81,7 +81,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `rex analyze` / `import` | partial | medium | Same orphaned-panel regression as `ndx plan` |
 | `rex usage` | full | medium | Same coverage as `ndx usage` |
 | `rex sync` | full | medium | Via sync triggers |
-| `rex adapter` | partial | low | Integrations view provides schema-driven config for registered adapters; no add/remove |
+| `rex adapter` | partial | low | The Project settings page provides schema-driven config for registered adapters; no add/remove |
 | `rex report` | none | low | JSON for CI; health view covers interactive use |
 | `rex facets` (MCP `facets`) | partial | low | **Deferred by decision (2026-08-14).** Facet filters exist in the PRD tree. A distribution view was scoped and skipped: `facets` is MCP-only (no CLI command), no facets are configured in this project, and the panel would render an empty state for most users. Revisit if facet configuration becomes common. |
 | `rex migrate-to-md` / `migrate-folder-tree-filenames` / `backfill-commit-attribution` | n/a | — | One-time migrations; terminal-only by design |
@@ -107,7 +107,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 |---------|----------|--------|-------|
 | `hench run` | full | high | Execute buttons + epic-by-epic panel (see `ndx work`) |
 | `hench status` / `show` | full | medium | Runs view: history, transcript, token breakdown, files changed |
-| `hench config` | full | medium | ndx work settings view (GET/PUT `/api/hench/config`) |
+| `hench config` | full | medium | Workflow settings page (GET/PUT `/api/hench/config`); provider and model live on Robot Wrangler |
 | `hench template` | full | medium | Templates view: gallery, apply, save, delete |
 | `hench validate-tokens` | **full** | low | "Validate token reporting" trigger in the Runs view, beside the per-run token diagnostics |
 | `hench record` | n/a | — | Plumbing for the assisted-run skills (`/ndx-work`, `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-config`); reads its token usage from the Claude Code session transcript |
