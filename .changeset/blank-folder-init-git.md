@@ -30,3 +30,10 @@ The wizard also addresses the project through its hub prefix now. Plain `ndx
 start` registers with the per-user hub, which serves each project at
 `/p/<id>/`; the page's root-relative `fetch("/api/...")` calls reached the hub
 instead, which answers 409 once a second project is registered.
+
+Initializing from the dashboard also moves the running server onto the layout
+init wrote. A server started in an empty folder resolves its paths before
+anything exists, so it holds the legacy roots (`.rex`, `.sourcevision`,
+`.hench`) while `ndx init` gives a new project the `.ndx/` container — the
+dashboard went on serving the setup page, and every data route read an empty
+project, until the server was restarted by hand.

@@ -534,6 +534,32 @@ function registerWatchers(
  * the only way to double up — which the setup wizard's own pre-init-only
  * gating (see `isProjectInitialized`) rules out in practice.
  */
+/**
+ * Re-resolve the project's layout after a successful `ndx init`.
+ *
+ * `ctx.svDir` / `ctx.rexDir` and the hench runs directory are resolved once in
+ * {@link startServer}. On a blank folder there is no state to detect, so they
+ * resolve to the legacy root paths (`.sourcevision`, `.rex`, `.hench`) — but
+ * `ndx init` gives a *new* project the `.ndx/` container instead. Without this
+ * the server kept pointing at directories init never created: the landing page
+ * was served forever (`isProjectInitialized` reads those paths), every data
+ * route read an empty project, and the only cure was restarting the server —
+ * which is exactly what initializing from the dashboard is meant to avoid.
+ *
+ * Mutates `ctx` rather than rebuilding it: the anchor's context is a single
+ * long-lived object that every request and every already-registered watcher
+ * reads, so replacing it would leave them on the stale copy.
+ *
+ * Exported for the regression test that pins the `.ndx/` case, the same way
+ * {@link refreshPRDCache} is.
+ */
+export function refreshProjectLayout(ctx: ServerContext, handles: WatcherHandles): void {
+  const layout = resolveLayout(ctx.projectDir);
+  ctx.svDir = layout.sourcevisionDir;
+  ctx.rexDir = layout.rexDir;
+  handles.henchRunsDir = join(layout.henchDir, "runs");
+}
+
 function reregisterProjectWatchers(
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,
@@ -739,7 +765,14 @@ async function handleApiRoutes(
   if (await handleScopedRoute(true, () => handleCommandsRoute(req, res, ctx, broadcast, {
     onProjectInitialized: () => {
       clearStatusCache();
+      // Layout first: the watchers below are registered against ctx's
+      // directories, which init may have just moved under `.ndx/`.
+      refreshProjectLayout(ctx, watcherHandles);
       reregisterProjectWatchers(ctx, watcher, { broadcast }, watcherHandles);
+      if (isInScope(ctx.scope, "rex") && existsSync(ctx.rexDir)) {
+        watcherHandles.prdCacheDir = join(ctx.rexDir, PRD_CACHE_DIR);
+        void refreshPRDCache(ctx.rexDir);
+      }
     },
   }))) return true;
   // Ask must be dispatched before the general sourcevision route so
