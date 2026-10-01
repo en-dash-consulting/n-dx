@@ -42,5 +42,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | ["Stop all" on /live is enabled by the repository-wide count but stops only the served worktree's runs](./stop-all-on-live-is-enabled-by-the.md) | pending |
 | [Stop on the task page reports "Stopped" when the server only marked the record and sent no signal](./stop-on-the-task-page-reports-stopped.md) | completed |
 | [The live-task view with no task id renders a blank page, reachable by closing Settings or deep-linking /live-task](./the-live-task-view-with-no-task-id.md) | completed |
-| [The Log tab never shows a log's last line when it has no trailing newline](./the-log-tab-never-shows-a-log-s-last.md) | pending |
+| [The Log tab never shows a log's last line when it has no trailing newline](./the-log-tab-never-shows-a-log-s-last.md) | completed |
 | [The Log tab's started line hardcodes "n-dx work --task=… --auto" instead of the project's CLI name and real command](./the-log-tab-s-started-line-hardcodes-n.md) | pending |
