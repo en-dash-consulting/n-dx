@@ -39,7 +39,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [On a project's first run the live .run-logs file is not git-ignored, so --review commits it as a review repair](./on-a-project-s-first-run-the-live-run.md) | completed |
 | [Record a structured progress event stream for every hench run, not only in verbose mode](./record-a-structured-progress-event.md) | completed |
 | [Record the agent process pid on the run record for every run](./record-the-agent-process-pid-on-the.md) | completed |
-| [Tail path confinement trusts .run-logs or .hench/runs when the directory itself is a symlink](./tail-path-confinement-trusts-run-logs.md) | pending |
+| [Tail path confinement trusts .run-logs or .hench/runs when the directory itself is a symlink](./tail-path-confinement-trusts-run-logs.md) | completed |
 | [The live analysis page's last-run times and estimate filter on exact mode, so cascade runs get none in phases 1-3 or an old run's](./the-live-analysis-page-s-last-run.md) | pending |
 | [The live analysis page shows an older dashboard run's output and error against a newer terminal-started run](./the-live-analysis-page-shows-an-older.md) | pending |
 | [The Live machine strip's vendor and model ignore the default vendor and hench model overrides, disagreeing with the effective config](./the-live-machine-strip-s-vendor-and.md) | pending |
