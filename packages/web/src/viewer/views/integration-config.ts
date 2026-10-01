@@ -1,23 +1,23 @@
 /**
- * Generic Integration Configuration view — dynamic form generation
- * based on integration schemas.
+ * Integrations section — the other trackers this PRD can sync with, as the
+ * Project page renders them (only while `rex.integrations` is on). Forms are
+ * generated from each integration's schema.
  *
- * This view lists all available integrations and generates configuration
- * forms dynamically from their schema definitions. It replaces the need
- * for per-integration hardcoded configuration views (though existing
- * views like NotionConfigView continue to work for backward compatibility).
+ * One integration is open at a time, and its form is what `useIntegrationsForm`
+ * tracks: the page's Save writes it. Going back to the list and Remove
+ * Configuration are held back while the open form has unsaved edits, so
+ * neither can discard them silently; Remove itself is an immediate action and
+ * never changes whether the form is dirty.
  *
  * Data comes from:
  *   GET    /api/integrations                — list available integrations
- *   GET    /api/integrations/:id/schema     — get schema for one integration
  *   GET    /api/integrations/:id/config     — current config (masked)
  *   PUT    /api/integrations/:id/config     — save credentials
  *   DELETE /api/integrations/:id/config     — remove config
  */
 
 import { h, Fragment } from "preact";
-import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
-import { BrandedHeader } from "../components/index.js";
+import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 
 // ── Types (duplicated from rex for browser context) ──────────────────
 
@@ -86,11 +86,14 @@ interface IntegrationConfig {
 
 // ── Client-side validation ───────────────────────────────────────────
 
+const asText = (value: unknown): string =>
+  value === undefined || value === null ? "" : String(value);
+
 function validateFieldValue(
   value: unknown,
   schema: IntegrationFieldSchema,
 ): string | null {
-  const strValue = value === undefined || value === null ? "" : String(value);
+  const strValue = asText(value);
 
   // Required check
   if (schema.required && strValue.trim().length === 0) {
@@ -157,9 +160,6 @@ function groupFields(schema: IntegrationSchema): GroupedFields[] {
     fields.sort((a, b) => (a.schema.order ?? 999) - (b.schema.order ?? 999));
   }
 
-  // Build result sorted by group order
-  const result: GroupedFields[] = [];
-
   // Get sorted group keys
   const groupKeys = Array.from(grouped.keys()).sort((a, b) => {
     if (a === null) return 1; // ungrouped fields go last
@@ -169,15 +169,252 @@ function groupFields(schema: IntegrationSchema): GroupedFields[] {
     return (ga?.order ?? 999) - (gb?.order ?? 999);
   });
 
-  for (const groupKey of groupKeys) {
-    result.push({
-      groupKey,
-      group: groupKey ? (schema.groups?.[groupKey] ?? null) : null,
-      fields: grouped.get(groupKey) ?? [],
-    });
-  }
+  return groupKeys.map((groupKey) => ({
+    groupKey,
+    group: groupKey ? (schema.groups?.[groupKey] ?? null) : null,
+    fields: grouped.get(groupKey) ?? [],
+  }));
+}
 
-  return result;
+// ── Form state ───────────────────────────────────────────────────────
+
+/** State and actions of the integrations form. The Project page owns it. */
+export interface IntegrationsForm {
+  schemas: IntegrationSchema[];
+  configuredIds: ReadonlySet<string>;
+  /** True until the integration list (or the open integration's config) has loaded. */
+  loading: boolean;
+  /** Why the list could not be loaded. */
+  loadError: string | null;
+  /** The open integration, or null while the list shows. */
+  selected: IntegrationSchema | null;
+  /** The open integration's saved config. */
+  config: IntegrationConfig | null;
+  formValues: Record<string, unknown>;
+  fieldErrors: Record<string, string>;
+  /** Why the last save failed. Cleared by the next save or a discard. */
+  saveError: string | null;
+  /** Why the last immediate action (remove) failed. */
+  actionError: string | null;
+  confirmRemove: boolean;
+  removing: boolean;
+  /** True while the open form holds a value that differs from what is saved. */
+  dirty: boolean;
+  /** Open an integration. */
+  open: (id: string) => void;
+  /** Return to the list. Ignored while the open form is dirty. */
+  back: () => void;
+  onFieldInput: (key: string, value: unknown) => void;
+  setConfirmRemove: (confirm: boolean) => void;
+  /** DELETE the open integration's config and reset its form. Not an edit. */
+  remove: () => Promise<void>;
+  /**
+   * PUT the open form to /api/integrations/:id/config. Resolves true once
+   * saved (or when nothing is dirty); false leaves the edits in place with an
+   * error set.
+   */
+  save: () => Promise<boolean>;
+  /** Restore the open form to what is saved. */
+  discard: () => void;
+}
+
+/**
+ * @param enabled False while `rex.integrations` is off: nothing is fetched and
+ *   the form stays clean, so a hidden section can never hold the page dirty.
+ */
+export function useIntegrationsForm(enabled: boolean): IntegrationsForm {
+  const [loading, setLoading] = useState(true);
+  const [schemas, setSchemas] = useState<IntegrationSchema[]>([]);
+  const [configuredIds, setConfiguredIds] = useState<ReadonlySet<string>>(new Set());
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [config, setConfig] = useState<IntegrationConfig | null>(null);
+  const [configLoading, setConfigLoading] = useState(false);
+  const [formValues, setFormValues] = useState<Record<string, unknown>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const selected = useMemo(
+    () => schemas.find((s) => s.id === selectedId) ?? null,
+    [schemas, selectedId],
+  );
+
+  const fetchList = useCallback(async () => {
+    try {
+      const res = await fetch("/api/integrations");
+      if (!res.ok) {
+        setLoadError("Failed to load integrations");
+        return;
+      }
+      const data = await res.json() as { integrations: IntegrationSchema[] };
+      setSchemas(data.integrations);
+      setLoadError(null);
+
+      const configured = new Set<string>();
+      for (const s of data.integrations) {
+        try {
+          const cfgRes = await fetch(`/api/integrations/${s.id}/config`);
+          if (cfgRes.ok && (await cfgRes.json() as { configured: boolean }).configured) {
+            configured.add(s.id);
+          }
+        } catch {
+          // A card whose status cannot be read simply shows as not configured.
+        }
+      }
+      setConfiguredIds(configured);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load integrations");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (enabled) void fetchList();
+  }, [enabled, fetchList]);
+
+  const fetchConfig = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/integrations/${id}/config`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Failed to load" }));
+        setActionError((body as { error?: string }).error ?? "Failed to load configuration");
+        return;
+      }
+      const data = await res.json() as IntegrationConfig;
+      setConfig(data);
+      // Sensitive values are never returned; the form starts from what is stored.
+      setFormValues(data.configured ? { ...data.values } : {});
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to load configuration");
+    } finally {
+      setConfigLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (enabled && selectedId) void fetchConfig(selectedId);
+  }, [enabled, selectedId, fetchConfig]);
+
+  const savedValues = config?.configured ? config.values : {};
+  const dirty = enabled && selected != null && Object.entries(formValues).some(([key, value]) => {
+    const text = asText(value);
+    return text.trim().length > 0 && text !== asText(savedValues[key]);
+  });
+
+  const open = useCallback((id: string) => {
+    setConfig(null);
+    setFormValues({});
+    setFieldErrors({});
+    setSaveError(null);
+    setActionError(null);
+    setConfirmRemove(false);
+    setConfigLoading(true);
+    setSelectedId(id);
+  }, []);
+
+  const back = useCallback(() => {
+    if (dirty) return;
+    setSelectedId(null);
+    setConfig(null);
+    void fetchList();
+  }, [dirty, fetchList]);
+
+  const onFieldInput = useCallback((key: string, value: unknown) => {
+    setFormValues((prev) => ({ ...prev, [key]: value }));
+    const fieldSchema = selected?.fields[key];
+    const err = fieldSchema && asText(value).trim().length > 0
+      ? validateFieldValue(value, fieldSchema)
+      : null;
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (err) next[key] = err;
+      else delete next[key];
+      return next;
+    });
+  }, [selected]);
+
+  const save = useCallback(async (): Promise<boolean> => {
+    if (!dirty || !selected) return true;
+    setSaveError(null);
+
+    const errors: Record<string, string> = {};
+    const payload: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(formValues)) {
+      const fieldSchema = selected.fields[key];
+      if (asText(value).trim().length === 0 || !fieldSchema) continue;
+      const err = validateFieldValue(value, fieldSchema);
+      if (err) errors[key] = err;
+      else payload[key] = value;
+    }
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setSaveError(`Fix the highlighted ${selected.name} fields before saving`);
+      return false;
+    }
+
+    try {
+      const res = await fetch(`/api/integrations/${selected.id}/config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Save failed" })) as
+          { error?: string; errors?: Record<string, string> };
+        if (body.errors) setFieldErrors(body.errors);
+        setSaveError(body.error ?? `${selected.name} configuration was not saved`);
+        return false;
+      }
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Save failed");
+      return false;
+    }
+
+    setFieldErrors({});
+    await fetchConfig(selected.id);
+    return true;
+  }, [dirty, selected, formValues, fetchConfig]);
+
+  const discard = useCallback(() => {
+    setFormValues(config?.configured ? { ...config.values } : {});
+    setFieldErrors({});
+    setSaveError(null);
+  }, [config]);
+
+  const remove = useCallback(async () => {
+    if (!selected) return;
+    setRemoving(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/integrations/${selected.id}/config`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Remove failed" }));
+        setActionError((body as { error?: string }).error ?? "Remove failed");
+        return;
+      }
+      setConfirmRemove(false);
+      await fetchConfig(selected.id);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Remove failed");
+    } finally {
+      setRemoving(false);
+    }
+  }, [selected, fetchConfig]);
+
+  return {
+    schemas, configuredIds,
+    loading: loading || (selectedId !== null && configLoading),
+    loadError, selected, config,
+    formValues, fieldErrors, saveError, actionError,
+    confirmRemove, removing, dirty,
+    open, back, onFieldInput, setConfirmRemove, remove,
+    save, discard,
+  };
 }
 
 // ── Dynamic form field component ─────────────────────────────────────
@@ -201,8 +438,9 @@ function DynamicField({
 }) {
   const [visible, setVisible] = useState(false);
   const inputType = schema.inputType ?? "text";
-  const strValue = value === undefined || value === null ? "" : String(value);
+  const strValue = asText(value);
   const hasError = !!error;
+  const inputId = `intg-${fieldKey}`;
 
   const handleInput = useCallback((e: Event) => {
     const target = e.target as HTMLInputElement;
@@ -217,11 +455,12 @@ function DynamicField({
     onInput(fieldKey, (e.target as HTMLSelectElement).value);
   }, [fieldKey, onInput]);
 
+  const placeholder = configured && masked ? `Current: ${masked}` : (schema.placeholder ?? "");
+
   return h("div", {
     class: `intg-field${hasError ? " intg-field-error" : ""}`,
   },
-    // Label
-    h("label", { class: "intg-field-label" },
+    h("label", { class: "intg-field-label", htmlFor: inputId },
       schema.label ?? fieldKey,
       configured && (schema.sensitive ? masked : undefined)
         ? h("span", { class: "intg-field-badge" }, "configured")
@@ -231,7 +470,6 @@ function DynamicField({
         : null,
     ),
 
-    // Help text
     schema.helpText
       ? h("p", { class: "intg-field-help" },
           schema.helpText,
@@ -249,10 +487,10 @@ function DynamicField({
         )
       : null,
 
-    // Input element
     inputType === "checkbox"
       ? h("label", { class: "intg-checkbox-wrapper" },
           h("input", {
+            id: inputId,
             type: "checkbox",
             checked: value === true || value === "true",
             onChange: handleInput,
@@ -261,6 +499,7 @@ function DynamicField({
         )
       : inputType === "select"
         ? h("select", {
+            id: inputId,
             class: "intg-input intg-select",
             value: strValue || (schema.defaultValue !== undefined ? String(schema.defaultValue) : ""),
             onChange: handleSelect,
@@ -272,23 +511,21 @@ function DynamicField({
           )
         : inputType === "textarea"
           ? h("textarea", {
+              id: inputId,
               class: "intg-input intg-textarea",
               value: strValue,
-              placeholder: configured && masked
-                ? `Current: ${masked}`
-                : (schema.placeholder ?? ""),
+              placeholder,
               onInput: handleInput,
               rows: 4,
             })
           : inputType === "password"
             ? h("div", { class: "intg-input-row" },
                 h("input", {
+                  id: inputId,
                   type: visible ? "text" : "password",
                   class: "intg-input",
                   value: strValue,
-                  placeholder: configured && masked
-                    ? `Current: ${masked}`
-                    : (schema.placeholder ?? ""),
+                  placeholder,
                   onInput: handleInput,
                   autocomplete: "off",
                   spellcheck: false,
@@ -299,21 +536,19 @@ function DynamicField({
                   onClick: () => setVisible(!visible),
                   title: visible ? "Hide" : "Show",
                   "aria-label": visible ? "Hide value" : "Show value",
-                }, visible ? "\u{1F441}" : "\u{1F441}\u200D\u{1F5E8}"),
+                }, visible ? "\u{1F441}" : "\u{1F441}‍\u{1F5E8}"),
               )
             : h("input", {
+                id: inputId,
                 type: inputType,
                 class: "intg-input",
                 value: strValue,
-                placeholder: configured && masked
-                  ? `Current: ${masked}`
-                  : (schema.placeholder ?? ""),
+                placeholder,
                 onInput: handleInput,
                 autocomplete: "off",
                 spellcheck: false,
               }),
 
-    // Error message
     hasError
       ? h("div", { class: "intg-field-error-text" }, error)
       : null,
@@ -322,224 +557,42 @@ function DynamicField({
 
 // ── Integration detail view (config form) ────────────────────────────
 
-function IntegrationDetail({
-  schema,
-  onBack,
-}: {
-  schema: IntegrationSchema;
-  onBack: () => void;
-}) {
-  const [loading, setLoading] = useState(true);
-  const [config, setConfig] = useState<IntegrationConfig | null>(null);
-  const [formValues, setFormValues] = useState<Record<string, unknown>>({});
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+/** Why Back and Remove are unavailable, shown beside them. */
+export const INTEGRATION_BLOCKED_HINT = "Save or discard your edits first.";
 
+function IntegrationDetail({ form, schema }: { form: IntegrationsForm; schema: IntegrationSchema }) {
   const groupedFields = useMemo(() => groupFields(schema), [schema]);
-
-  // ── Fetch current config ────────────────────────────────────────────
-
-  const fetchConfig = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/integrations/${schema.id}/config`);
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setError((body as { error?: string }).error ?? "Failed to load configuration");
-        return;
-      }
-      const data = await res.json() as IntegrationConfig;
-      setConfig(data);
-      setError(null);
-
-      // Initialize form with existing non-sensitive values
-      if (data.configured) {
-        setFormValues({ ...data.values });
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load configuration");
-    } finally {
-      setLoading(false);
-    }
-  }, [schema.id]);
-
-  useEffect(() => {
-    fetchConfig();
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, [fetchConfig]);
-
-  // ── Field change handler ────────────────────────────────────────────
-
-  const handleFieldInput = useCallback((key: string, value: unknown) => {
-    setFormValues((prev) => ({ ...prev, [key]: value }));
-    const fieldSchema = schema.fields[key];
-    if (fieldSchema) {
-      const strVal = value === undefined || value === null ? "" : String(value);
-      if (strVal.trim().length > 0) {
-        const err = validateFieldValue(value, fieldSchema);
-        setFieldErrors((prev) => {
-          const next = { ...prev };
-          if (err) next[key] = err;
-          else delete next[key];
-          return next;
-        });
-      } else {
-        setFieldErrors((prev) => {
-          const next = { ...prev };
-          delete next[key];
-          return next;
-        });
-      }
-    }
-  }, [schema.fields]);
-
-  // ── Save handler ────────────────────────────────────────────────────
-
-  const handleSave = useCallback(async () => {
-    // Validate all non-empty fields
-    const errors: Record<string, string> = {};
-    const payload: Record<string, unknown> = {};
-
-    for (const [key, val] of Object.entries(formValues)) {
-      const strVal = val === undefined || val === null ? "" : String(val);
-      if (strVal.trim().length > 0) {
-        const fieldSchema = schema.fields[key];
-        if (fieldSchema) {
-          const err = validateFieldValue(val, fieldSchema);
-          if (err) errors[key] = err;
-          else payload[key] = val;
-        }
-      }
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      return;
-    }
-
-    if (Object.keys(payload).length === 0) {
-      setError("Enter at least one field to save");
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
-    setSaveSuccess(false);
-
-    try {
-      const res = await fetch(`/api/integrations/${schema.id}/config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Save failed" }));
-        if ((body as { errors?: Record<string, string> }).errors) {
-          setFieldErrors((body as { errors: Record<string, string> }).errors);
-        } else {
-          setError((body as { error?: string }).error ?? "Save failed");
-        }
-        return;
-      }
-
-      setSaveSuccess(true);
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => setSaveSuccess(false), 3000);
-
-      // Clear sensitive fields from form
-      setFormValues((prev) => {
-        const next = { ...prev };
-        for (const [key, fieldSchema] of Object.entries(schema.fields)) {
-          if (fieldSchema.sensitive) delete next[key];
-        }
-        return next;
-      });
-
-      await fetchConfig();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
-  }, [formValues, schema, fetchConfig]);
-
-  // ── Remove handler ──────────────────────────────────────────────────
-
-  const handleRemove = useCallback(async () => {
-    setRemoving(true);
-    try {
-      const res = await fetch(`/api/integrations/${schema.id}/config`, { method: "DELETE" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Remove failed" }));
-        setError((body as { error?: string }).error ?? "Remove failed");
-        return;
-      }
-      setFormValues({});
-      setConfirmRemove(false);
-      await fetchConfig();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Remove failed");
-    } finally {
-      setRemoving(false);
-    }
-  }, [schema.id, fetchConfig]);
-
-  // ── Check if form has values ────────────────────────────────────────
-
-  const hasValues = Object.entries(formValues).some(([, v]) => {
-    const s = v === undefined || v === null ? "" : String(v);
-    return s.trim().length > 0;
-  });
-
+  const { config } = form;
   const isConfigured = config?.configured ?? false;
-
-  // ── Render ──────────────────────────────────────────────────────────
-
-  if (loading) {
-    return h("div", { class: "intg-container" },
-      h("div", { class: "loading" }, `Loading ${schema.name} configuration...`),
-    );
-  }
+  const error = form.saveError ?? form.actionError;
 
   return h("div", { class: "intg-container" },
-    // ── Back button ──────────────────────────────────────────────────
-    h("button", {
-      type: "button",
-      class: "intg-back-btn",
-      onClick: onBack,
-    }, "\u2190 All Integrations"),
+    h("div", { class: "intg-nav" },
+      h("button", {
+        type: "button",
+        class: "intg-back-btn",
+        onClick: form.back,
+        disabled: form.dirty,
+        title: form.dirty ? INTEGRATION_BLOCKED_HINT : undefined,
+      }, "← All Integrations"),
+      form.dirty
+        ? h("span", { class: "intg-blocked-hint" }, INTEGRATION_BLOCKED_HINT)
+        : null,
+    ),
 
-    // ── Header ──────────────────────────────────────────────────────
     h("div", { class: "intg-header" },
-      h(BrandedHeader, { product: "rex", title: `${schema.name} Integration` }),
+      h("h3", { class: "intg-detail-title" }, `${schema.name} Integration`),
       h("p", { class: "intg-subtitle" }, schema.description),
     ),
 
-    // ── Error banner ─────────────────────────────────────────────────
     error
-      ? h("div", { class: "intg-error-banner" }, error)
+      ? h("div", { class: "intg-error-banner", role: "alert" }, error)
       : null,
 
-    // ── Save success toast ───────────────────────────────────────────
-    saveSuccess
-      ? h("div", { class: "intg-toast" },
-          h("span", { class: "intg-toast-icon" }, "\u2714"),
-          "Configuration saved",
-        )
-      : null,
-
-    // ── Form fields grouped ──────────────────────────────────────────
     groupedFields.map(({ groupKey, group, fields }) =>
       h("div", { key: groupKey ?? "__ungrouped", class: "intg-section" },
         group
-          ? h("h3", { class: "intg-section-title" },
+          ? h("h4", { class: "intg-section-title" },
               group.icon ? h("span", { class: "intg-section-icon" }, group.icon) : null,
               group.label,
             )
@@ -552,53 +605,45 @@ function IntegrationDetail({
             key,
             fieldKey: key,
             schema: fieldSchema,
-            value: formValues[key],
-            error: fieldErrors[key],
+            value: form.formValues[key],
+            error: form.fieldErrors[key],
             configured: isConfigured,
             masked: config?.masked[key],
-            onInput: handleFieldInput,
+            onInput: form.onFieldInput,
           }),
         ),
       ),
     ),
 
-    // ── Actions ──────────────────────────────────────────────────────
-    h("div", { class: "intg-actions" },
-      h("div", { class: "intg-actions-primary" },
-        h("button", {
-          type: "button",
-          class: "intg-save-btn",
-          onClick: handleSave,
-          disabled: saving || !hasValues,
-        }, saving ? "Saving..." : "Save Configuration"),
-      ),
-      isConfigured
-        ? h("div", { class: "intg-actions-danger" },
-            confirmRemove
+    isConfigured
+      ? h("div", { class: "intg-actions" },
+          h("div", { class: "intg-actions-danger" },
+            form.confirmRemove
               ? h(Fragment, null,
                   h("span", { class: "intg-confirm-text" }, `Remove ${schema.name} config?`),
                   h("button", {
                     type: "button",
                     class: "intg-confirm-yes",
-                    onClick: handleRemove,
-                    disabled: removing,
-                  }, removing ? "Removing..." : "Yes, Remove"),
+                    onClick: () => void form.remove(),
+                    disabled: form.removing,
+                  }, form.removing ? "Removing..." : "Yes, Remove"),
                   h("button", {
                     type: "button",
                     class: "intg-confirm-no",
-                    onClick: () => setConfirmRemove(false),
+                    onClick: () => form.setConfirmRemove(false),
                   }, "Cancel"),
                 )
               : h("button", {
                   type: "button",
                   class: "intg-remove-btn",
-                  onClick: () => setConfirmRemove(true),
+                  onClick: () => form.setConfirmRemove(true),
+                  disabled: form.dirty,
+                  title: form.dirty ? INTEGRATION_BLOCKED_HINT : undefined,
                 }, "Remove Configuration"),
-          )
-        : null,
-    ),
+          ),
+        )
+      : null,
 
-    // ── Environment variable hints ───────────────────────────────────
     isConfigured && Object.keys(config?.envVars ?? {}).length > 0
       ? h("div", { class: "intg-section" },
           h("div", { class: "intg-env-hint" },
@@ -618,11 +663,10 @@ function IntegrationDetail({
         )
       : null,
 
-    // ── Setup guide ──────────────────────────────────────────────────
     schema.setupGuide && schema.setupGuide.length > 0
       ? h("div", { class: "intg-section intg-help" },
-          h("h3", { class: "intg-section-title" },
-            h("span", { class: "intg-section-icon" }, "\u2139"),
+          h("h4", { class: "intg-section-title" },
+            h("span", { class: "intg-section-icon" }, "ℹ"),
             "Setup Guide",
           ),
           h("ol", { class: "intg-steps" },
@@ -636,7 +680,7 @@ function IntegrationDetail({
                   href: schema.docsUrl,
                   target: "_blank",
                   rel: "noopener noreferrer",
-                }, `${schema.name} documentation \u2192`),
+                }, `${schema.name} documentation →`),
               )
             : null,
         )
@@ -672,7 +716,7 @@ function IntegrationCard({
       h("div", { class: "intg-card-header" },
         h("h3", { class: "intg-card-name" }, schema.name),
         configured
-          ? h("span", { class: "intg-card-badge" }, "\u2714 Configured")
+          ? h("span", { class: "intg-card-badge" }, "✔ Configured")
           : null,
         schema.builtIn
           ? h("span", { class: "intg-card-builtin" }, "Built-in")
@@ -682,109 +726,46 @@ function IntegrationCard({
       h("div", { class: "intg-card-meta" },
         h("span", null, `${Object.keys(schema.fields).length} fields`),
         schema.supportsConnectionTest
-          ? h("span", null, "\u2022 Connection test")
+          ? h("span", null, "• Connection test")
           : null,
       ),
     ),
-    h("span", { class: "intg-card-arrow" }, "\u203A"),
+    h("span", { class: "intg-card-arrow" }, "›"),
   );
 }
 
-// ── Main view ────────────────────────────────────────────────────────
+// ── Section ──────────────────────────────────────────────────────────
 
-export function IntegrationConfigView() {
-  const [loading, setLoading] = useState(true);
-  const [schemas, setSchemas] = useState<IntegrationSchema[]>([]);
-  const [configuredIds, setConfiguredIds] = useState<Set<string>>(new Set());
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // ── Fetch integration list ──────────────────────────────────────────
-
-  const fetchIntegrations = useCallback(async () => {
-    try {
-      const res = await fetch("/api/integrations");
-      if (!res.ok) {
-        setError("Failed to load integrations");
-        return;
-      }
-      const data = await res.json() as { integrations: IntegrationSchema[] };
-      setSchemas(data.integrations);
-
-      // Check which are configured
-      const configured = new Set<string>();
-      for (const s of data.integrations) {
-        try {
-          const cfgRes = await fetch(`/api/integrations/${s.id}/config`);
-          if (cfgRes.ok) {
-            const cfg = await cfgRes.json() as { configured: boolean };
-            if (cfg.configured) configured.add(s.id);
-          }
-        } catch {
-          // ignore
-        }
-      }
-      setConfiguredIds(configured);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load integrations");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchIntegrations();
-  }, [fetchIntegrations]);
-
-  // ── Selected schema ─────────────────────────────────────────────────
-
-  const selectedSchema = useMemo(() => {
-    return schemas.find((s) => s.id === selectedId) ?? null;
-  }, [schemas, selectedId]);
-
-  // ── Render ──────────────────────────────────────────────────────────
-
-  if (selectedSchema) {
-    return h(IntegrationDetail, {
-      schema: selectedSchema,
-      onBack: () => {
-        setSelectedId(null);
-        // Refresh config status
-        fetchIntegrations();
-      },
-    });
+export function IntegrationsSection({ form }: { form: IntegrationsForm }) {
+  if (form.loading) {
+    return h("div", { class: "loading" }, "Loading integrations...");
   }
 
-  if (loading) {
-    return h("div", { class: "intg-container" },
-      h("div", { class: "loading" }, "Loading integrations..."),
-    );
+  if (form.selected) {
+    return h(IntegrationDetail, { form, schema: form.selected });
   }
 
   return h("div", { class: "intg-container" },
-    h("div", { class: "intg-header" },
-      h(BrandedHeader, { product: "rex", title: "Integrations" }),
-      h("p", { class: "intg-subtitle" },
-        "Connect external services to sync PRD data bidirectionally.",
-      ),
+    h("p", { class: "intg-subtitle" },
+      "Connect external services to sync PRD data bidirectionally.",
     ),
 
-    error
-      ? h("div", { class: "intg-error-banner" }, error)
+    form.loadError
+      ? h("div", { class: "intg-error-banner", role: "alert" }, form.loadError)
       : null,
 
     h("div", { class: "intg-list" },
-      schemas.map((s) =>
+      form.schemas.map((s) =>
         h(IntegrationCard, {
           key: s.id,
           schema: s,
-          configured: configuredIds.has(s.id),
-          onClick: () => setSelectedId(s.id),
+          configured: form.configuredIds.has(s.id),
+          onClick: () => form.open(s.id),
         }),
       ),
     ),
 
-    schemas.length === 0
+    form.schemas.length === 0 && !form.loadError
       ? h("div", { class: "intg-empty" },
           h("p", null, "No integrations available."),
           h("p", { class: "intg-empty-hint" },

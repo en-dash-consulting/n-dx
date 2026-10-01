@@ -1032,7 +1032,7 @@ async function handleInit(
 
     // Post-init: persist the vendor details the wizard collected that
     // `ndx init` itself never asks for — it doesn't collect API keys or a
-    // local server's host/port (see the LLM Provider settings page, which
+    // local server's host/port (see the Robot Wrangler settings page, which
     // covers these same fields post-init). Set here via the same `ndx
     // config` CLI path that page documents; failures here are non-fatal —
     // init itself already succeeded, and these can be set from Settings.
