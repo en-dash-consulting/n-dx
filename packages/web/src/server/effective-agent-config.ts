@@ -189,7 +189,21 @@ async function readHenchAgentSettings(projectDir: string): Promise<{
     (acc, source) => deepMerge(acc, source.data),
     {} as Record<string, unknown>,
   );
-  const merged = mergeWithOverrides(raw, overrides);
+  // Merge onto the *salvaged* base, not the raw file. hench validates
+  // `.hench/config.json` and drops its invalid fields before merging the
+  // overrides on top, so a bad entry there is already gone when the override
+  // lands. Merging `raw` would keep it, and `deepMerge` unions the two
+  // `models` maps rather than replacing one with the other — so a single
+  // stale key in the file (`hench.models.gemini`, the typo this module
+  // already warns about) would void an otherwise-valid `.n-dx.json`
+  // override. hench honours the override; this route would report the
+  // `llm.*` model instead, which is the exact drift the twin exists to
+  // prevent. hench leaves a dropped field absent where this leaves `{}`,
+  // which `deepMerge` treats identically.
+  const merged = mergeWithOverrides(
+    { ...raw, provider: baseProvider, models: baseModels },
+    overrides,
+  );
 
   return {
     provider: parseProvider(merged["provider"]) ?? baseProvider,

@@ -218,6 +218,21 @@ function shapesFor(vendor) {
       ndx: { llm: { vendor }, hench: { models: { [vendor]: "" } } },
       hench: { models: { [vendor]: pinned } },
     },
+    {
+      // The mirror of the row above, and the one that actually bites: the
+      // *base file* is the invalid one. hench drops `models` when it
+      // validates `.hench/config.json`, so the override lands on a clean
+      // slate and wins. A reader that merges the raw file instead keeps the
+      // stale `gemini` key (never a vendor — the vendor is `google`), unions
+      // it into the override's map, and voids the whole thing — reporting
+      // the `llm.<vendor>.model` below while `ndx work` runs the override.
+      name: "invalid .hench/config.json models does not void a valid .n-dx.json override",
+      ndx: {
+        llm: { vendor, [vendor]: { model: pinned } },
+        hench: { models: { [vendor]: override } },
+      },
+      hench: { models: { gemini: "gemini-2.5-pro" } },
+    },
   ];
 
   if (vendor === "claude") {
