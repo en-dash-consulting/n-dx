@@ -53,7 +53,7 @@ import type {
 } from "../analysis/adversarial-review.js";
 import { snapshotDirtyState, diffDirtyState } from "../analysis/review-repairs.js";
 import type { DirtySnapshot } from "../analysis/review-repairs.js";
-import { ensureWarmParent } from "./orientation.js";
+import { ensureWarmParent, ORIENTATION_LIFT_NOTICE } from "./orientation.js";
 import {
   resolveSessionStrategy,
   clearSessionCache,
@@ -2362,7 +2362,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // attempt, so the notice would restate what it just did and grow the
         // prompt on every retry.
         const needsRetryNotice = shouldSendRetryNotice(attempt, retryResumeSessionId);
+        // A fork inherits the orientation transcript, which declares itself
+        // read-only. Lift that before the brief; a resume continues a session
+        // that already left orientation, so it never gets the sentence.
+        const forkingWarmParent =
+          !backgroundResumeSessionId && !retryResumeSessionId && !!warmParentId;
         const briefContent =
+          (forkingWarmParent ? `${ORIENTATION_LIFT_NOTICE}\n\n` : "") +
           boundaryDivider +
           (needsRetryNotice
             ? boundedBriefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns)
@@ -2379,7 +2385,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
               { name: "system" as PromptSectionName, content: systemPrompt } as PromptSection,
               { name: "brief" as PromptSectionName, content: WORK_SESSION_RESUME_MESSAGE } as PromptSection,
             ])
-          : attempt === 0 && !planModeAppendix
+          : attempt === 0 && !planModeAppendix && !forkingWarmParent
           ? baseEnvelope
           : createPromptEnvelope([
               { name: "system" as PromptSectionName, content: systemPrompt } as PromptSection,
@@ -2404,8 +2410,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           // wins over everything and never forks.
           resumeSessionId:
             backgroundResumeSessionId ?? retryResumeSessionId ?? warmParentId ?? batchResumeId,
-          forkSession:
-            !backgroundResumeSessionId && !retryResumeSessionId && warmParentId ? true : undefined,
+          forkSession: forkingWarmParent ? true : undefined,
           mcpConfigPath,
         });
 
