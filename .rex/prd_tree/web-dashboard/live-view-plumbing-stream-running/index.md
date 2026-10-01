@@ -34,11 +34,13 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [An analyze that fails after its phases is recorded as failed with no reason](./an-analyze-that-fails-after-its-phases.md) | completed |
 | [/api/live re-parses the PRD index on a 10-second timer instead of when the file changes](./api-live-re-parses-the-prd-index-on-a.md) | completed |
 | [/api/live shows a run whose process died as healthy for up to 5 minutes although pidAlive is known](./api-live-shows-a-run-whose-process.md) | completed |
+| [Count worktrees with a live run, and the Home pill's running count, by liveness verdict instead of run status](./count-worktrees-with-a-live-run-and.md) | pending |
 | [Decide whether a running hench run is actually running from its recorded pid, host and heartbeat, with lock files as the fallback](./decide-whether-a-running-hench-run-is.md) | completed |
 | [During a --deep analyze, sub-package phases are compared with the root's previous times and cost resets per package](./during-a-deep-analyze-sub-package.md) | completed |
 | [End dead runs across every worktree from one reconcile route, with one terminal status shared with Mark stuck](./end-dead-runs-across-every-worktree.md) | completed |
 | [Expose structured sourcevision analyze progress: phase, enrichment pass, batch and model calls](./expose-structured-sourcevision-analyze.md) | completed |
 | [Live test gaps: clock-dependent analyze route fixture, untested stop handlers and log-stream fallback, unregistered LiveSources seam](./live-test-gaps-clock-dependent-analyze.md) | completed |
+| [Make the Live strip's agent slots match the repository-wide run list, using the hub's admission capacity when served through the hub](./make-the-live-strip-s-agent-slots.md) | pending |
 | [On a project's first run the live .run-logs file is not git-ignored, so --review commits it as a review repair](./on-a-project-s-first-run-the-live-run.md) | completed |
 | [Record a structured progress event stream for every hench run, not only in verbose mode](./record-a-structured-progress-event.md) | completed |
 | [Record the agent process pid on the run record for every run](./record-the-agent-process-pid-on-the.md) | completed |
