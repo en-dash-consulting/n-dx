@@ -148,14 +148,14 @@ describe("GET /api/live", () => {
 
   beforeAll(async () => {
     // Served worktree: one fresh run, one stale, one finished recently, one long ago.
-    writeRun(repo, { id: "fresh", status: "running", taskId: "task-a", startedAt: now - 2 * MINUTE, lastActivityAt: now - 10_000, events: ["Brief loaded", "Ran 12 tests"] });
+    writeRun(repo, { id: "fresh", status: "running", taskId: "task-a", startedAt: now - 2 * MINUTE, lastActivityAt: now - 10_000, events: ["Brief loaded", "Ran 12 tests"], pid: process.pid });
     writeRun(repo, { id: "stuck", status: "running", startedAt: now - 30 * MINUTE, lastActivityAt: now - 10 * MINUTE });
     // Killed hard: the record still says running with a fresh heartbeat.
     writeRun(repo, { id: "ghost", status: "running", startedAt: now - 3 * MINUTE, lastActivityAt: now - 5_000, pid: DEAD_PID });
     writeRun(repo, { id: "done", status: "completed", startedAt: now - 20 * MINUTE, finishedAt: now - 10 * MINUTE });
     writeRun(repo, { id: "old", status: "completed", startedAt: now - 3 * 60 * MINUTE, finishedAt: now - 2 * 60 * MINUTE });
     writePrd(repo, ["task-a"]);
-    // Another worktree: one running run, and an analysis started from a terminal.
+    // Another worktree: one abandoned record (its pid is gone), and an analysis started from a terminal.
     writeRun(linked, { id: "elsewhere", status: "running", startedAt: now - MINUTE, lastActivityAt: now - 5_000 });
     const progressFile = analyzeProgressPath(join(linked, ".sourcevision"));
     mkdirSync(dirname(progressFile), { recursive: true });
@@ -205,7 +205,7 @@ describe("GET /api/live", () => {
       turns: 3,
       model: "claude-sonnet-4-5",
       startedFrom: "terminal",
-      pid: 4242,
+      pid: process.pid,
       stale: false,
       lastProgress: "Ran 12 tests",
       tokens: { input: 1000, output: 200, total: 1200 },
@@ -243,12 +243,23 @@ describe("GET /api/live", () => {
     const live = await fetchLive();
     expect(live.queue.next.map((t) => t.id)).toEqual(["next-1"]);
     expect(live.queue.next[0]?.epicChain.map((l) => l.id)).toEqual(["epic-1", "feature-1"]);
-    expect(live.machine.worktrees).toEqual({ total: 2, withLiveRun: 2 });
+    expect(live.machine.worktrees).toEqual({ total: 2, withLiveRun: 1 });
     expect(live.machine.memory.floorBytes).toBe(1);
     expect(live.machine.memory.belowFloor).toBe(false);
     expect(live.machine.slots.inUse).toBe(0);
     expect(live.machine.spend.inFlightTokens).toBe(4800);
     expect(live.machine.spend.inFlightUsd).toBeGreaterThan(0);
+  });
+
+  it("counts a worktree as having a live run by verdict, not by the record's status", async () => {
+    const live = await fetchLive();
+    // One executing run in main; linked holds only an abandoned record. Both say "running".
+    expect(live.runs.find((r) => r.runId === "fresh")?.liveness).toBe("live");
+    expect(live.runs.find((r) => r.runId === "elsewhere")?.liveness).toBe("orphaned");
+    expect(live.machine.worktrees.withLiveRun).toBe(1);
+    // The raw status count behind GET /api/worktrees is unchanged.
+    const worktrees = await collectWorktrees(repo);
+    expect(worktrees.find((wt) => wt.path === linked)?.runs.running).toBe(1);
   });
 
   it("agrees with the worktrees pill and the bottom bar's stuck-run number", async () => {

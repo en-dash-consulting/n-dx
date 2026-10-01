@@ -36,6 +36,11 @@ export interface SessionsPanelProps {
   navigateTo?: NavigateTo;
   /** Sourcevision analyses running now (from the Live feed). */
   analyses?: number;
+  /**
+   * Hench runs executing now, from the Live feed (by liveness verdict). null when
+   * there is no feed; the pill then falls back to each worktree's recorded status.
+   */
+  liveRuns?: number | null;
   /** Offer the link to the Live overview; false when Live is out of scope or exported. */
   liveAvailable?: boolean;
 }
@@ -53,11 +58,20 @@ export function worktreeName(path: string): string {
 }
 
 /**
+ * Runs the pill calls running. The Live feed's count goes by each run's liveness
+ * verdict, so an abandoned record is not counted; `worktrees[].runs.running`
+ * goes by the record's status and is only the fallback when there is no feed.
+ */
+function pillRunning(worktrees: readonly WorktreeEntry[], liveRuns: number | null): number {
+  return liveRuns ?? worktrees.reduce((n, wt) => n + wt.runs.running, 0);
+}
+
+/**
  * The pill's text. The running and analysis counts are each omitted when zero:
  * "3 worktrees", "3 worktrees · 1 running", "3 worktrees · 1 running · 1 analysis".
  */
-export function sessionsPillLabel(worktrees: readonly WorktreeEntry[], analyses = 0): string {
-  const running = worktrees.reduce((n, wt) => n + wt.runs.running, 0);
+export function sessionsPillLabel(worktrees: readonly WorktreeEntry[], analyses = 0, liveRuns: number | null = null): string {
+  const running = pillRunning(worktrees, liveRuns);
   const parts = [`${worktrees.length} worktree${worktrees.length === 1 ? "" : "s"}`];
   if (running > 0) parts.push(`${running} running`);
   if (analyses > 0) parts.push(`${analyses} analysis`);
@@ -199,13 +213,13 @@ function WorktreeRow({ entry, claims, navigateTo }: { entry: WorktreeEntry; clai
   );
 }
 
-export function SessionsPanel({ worktrees, claims = null, navigateTo, analyses = 0, liveAvailable = false }: SessionsPanelProps) {
+export function SessionsPanel({ worktrees, claims = null, navigateTo, analyses = 0, liveRuns = null, liveAvailable = false }: SessionsPanelProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (!shouldShowSessions(worktrees)) return null;
 
-  const label = sessionsPillLabel(worktrees, analyses);
-  const running = analyses > 0 || worktrees.some((wt) => wt.runs.running > 0);
+  const label = sessionsPillLabel(worktrees, analyses, liveRuns);
+  const running = analyses > 0 || pillRunning(worktrees, liveRuns) > 0;
 
   return h("div", { class: "sessions-panel", role: "status" },
     h("button", {

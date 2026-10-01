@@ -44,6 +44,7 @@ import {
   useClaims,
   useLive,
   isAnalysisJob,
+  liveRunCount,
   useFeatureToggle,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
@@ -140,6 +141,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const liveAvailable = validViews.has("live") && !isDeployedMode();
   const live = useLive(liveAvailable);
   const analyses = live?.jobs.filter(isAnalysisJob).length ?? 0;
+  const liveRuns = live ? liveRunCount(live) : null;
   const [searchOpen, openSearch, closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const handleTripleClick = useMemo(
@@ -310,7 +312,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
     h(ActiveOperationsTray, { operations: jobs.operations, navigateTo, onStop: jobs.stop }),
     h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
-    h(SessionsPanel, { worktrees, claims, navigateTo, analyses, liveAvailable }),
+    h(SessionsPanel, { worktrees, claims, navigateTo, analyses, liveRuns, liveAvailable }),
     (showDrop && !hasData)
       ? h("div", { class: "drop-overlay", role: "dialog", "aria-label": "File drop zone" },
           h("div", { class: "drop-box" },

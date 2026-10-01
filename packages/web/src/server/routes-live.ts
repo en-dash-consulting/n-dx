@@ -465,9 +465,15 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
 
     for (const digest of readRunDigests(ws.path)) {
       const running = digest.status === "running";
+      const execution = digest.taskId ? executions.get(digest.taskId) : undefined;
+      const verdict = running
+        ? judgeRunLiveness(livenessInputOf(digest), livenessCtx, execution ? [execution] : [])
+        : null;
       if (running) {
         runningCount++;
-        liveHere = true;
+        // An abandoned record (`orphaned`) or another machine's run (`foreign`)
+        // is not executing here; `unknown` might still be.
+        if (verdict?.liveness === "live" || verdict?.liveness === "unknown") liveHere = true;
       }
       if (digest.startedAt && Date.parse(digest.startedAt) >= dayStart) todayDigests.push(digest);
       // A run with no id cannot be linked to, so it is counted but not listed.
@@ -483,10 +489,6 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
       const isRecent = !running && Number.isFinite(finishedMs) && now - finishedMs <= RECENT_WINDOW_MS;
       if (!running && !isRecent) continue;
 
-      const execution = digest.taskId ? executions.get(digest.taskId) : undefined;
-      const verdict = running
-        ? judgeRunLiveness(livenessInputOf(digest), livenessCtx, execution ? [execution] : [])
-        : null;
       const entry: LiveRun = {
         runId: digest.id,
         taskId: digest.taskId,

@@ -156,6 +156,20 @@ export function isDeadRun(run: Pick<LiveRunSummary, "liveness">): boolean {
   return run.liveness === "orphaned";
 }
 
+/**
+ * Whether a run counts as executing: not abandoned (`orphaned`) and not another
+ * machine's (`foreign`). `unknown` counts — the process may still be running.
+ * Mirrors the server's `withLiveRun` rule so the two never disagree.
+ */
+export function countsAsLive(run: Pick<LiveRunSummary, "liveness">): boolean {
+  return run.liveness !== "orphaned" && run.liveness !== "foreign";
+}
+
+/** Runs executing now (no analyses), by verdict rather than by the record's status. */
+export function liveRunCount(live: LiveSummary | null): number {
+  return live ? live.runs.filter(countsAsLive).length : 0;
+}
+
 /** Stuck, dead, or impossible to verify: something an operator should look at. */
 export function needsAttention(run: Pick<LiveRunSummary, "stale" | "liveness">): boolean {
   return run.stale || run.liveness === "orphaned" || run.liveness === "unknown";
