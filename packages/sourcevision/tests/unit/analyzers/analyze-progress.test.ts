@@ -18,6 +18,8 @@ import {
   readProcessCommandLine,
   isAnalyzeCommandLine,
   ANALYZE_PROGRESS_WRITE_INTERVAL_MS,
+  ANALYZE_PROGRESS_HEARTBEAT_MS,
+  ANALYZE_PROGRESS_STALE_MS,
 } from "../../../src/analyzers/analyze-progress.js";
 import type { AnalyzeProgress } from "../../../src/analyzers/analyze-progress.js";
 import { startRunLedger, recordLLMCall, recordJudgmentCache, setRunMode, snapshotRunLedger } from "../../../src/analyzers/run-ledger.js";
@@ -140,6 +142,25 @@ describe("analyze progress file", () => {
     expect(onDisk().llm.calls).toBe(3);
   });
 
+  it("rewrites updatedAt every heartbeat while nothing else writes, and stops on finish", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-30T12:00:00.000Z"));
+    startAnalyzeProgress(svDir);
+    const first = Date.parse(onDisk().updatedAt);
+    vi.advanceTimersByTime(ANALYZE_PROGRESS_HEARTBEAT_MS);
+    expect(Date.parse(onDisk().updatedAt)).toBe(first + ANALYZE_PROGRESS_HEARTBEAT_MS);
+    finishAnalyzeProgress("complete");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not keep the process alive for its heartbeat", () => {
+    vi.useFakeTimers();
+    const spy = vi.spyOn(globalThis, "setInterval");
+    startAnalyzeProgress(svDir);
+    const handle = spy.mock.results[0].value as { hasRef: () => boolean };
+    expect(handle.hasRef()).toBe(false);
+  });
+
   it("is marked finished with an end time, closing any open phase", () => {
     startAnalyzeProgress(svDir);
     markPhaseStarted(2, "imports");
@@ -223,7 +244,7 @@ describe("readAnalyzeProgress", () => {
     mkdirSync(join(svDir, ".cache"), { recursive: true });
     const base: AnalyzeProgress = {
       version: 1, pid: 4242, status: "running", mode: "generative", scope: null,
-      startedAt: "2026-09-30T12:00:00.000Z", updatedAt: "2026-09-30T12:00:05.000Z",
+      startedAt: "2026-09-30T12:00:00.000Z", updatedAt: new Date().toISOString(),
       phase: { index: 4, name: "zones", total: 6 }, phases: [], pass: null, batch: null,
       judgmentCache: { hits: 0, misses: 0 },
       llm: { calls: 0, inputTokens: 0, outputTokens: 0, durationMs: 0, byTaskClass: {} },
@@ -258,6 +279,16 @@ describe("readAnalyzeProgress", () => {
     writeProgress({});
     const r = readAnalyzeProgress(svDir, { isPidAlive: () => true, processCommandLine: () => "/usr/bin/vim notes.txt" })!;
     expect(r).toMatchObject({ status: "interrupted", running: false, stale: true, pidReusedBy: "/usr/bin/vim notes.txt" });
+  });
+
+  it("reports a running file past the staleness window as interrupted though the pid is alive and unreadable", () => {
+    writeProgress({ updatedAt: "2026-09-30T12:00:00.000Z" });
+    const at = (ms: number) => () => Date.parse("2026-09-30T12:00:00.000Z") + ms;
+    const opts = { isPidAlive: () => true, processCommandLine: () => null };
+    expect(readAnalyzeProgress(svDir, { ...opts, now: at(ANALYZE_PROGRESS_STALE_MS) })).toMatchObject({ running: true, stale: false });
+    expect(readAnalyzeProgress(svDir, { ...opts, now: at(ANALYZE_PROGRESS_STALE_MS + 1) })).toMatchObject({
+      status: "interrupted", running: false, stale: true, pidReusedBy: null,
+    });
   });
 
   it("trusts liveness alone when the command line cannot be read", () => {

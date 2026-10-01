@@ -23,6 +23,8 @@ function writeProgress(fields: Record<string, unknown>): void {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // Just after the fixtures' updatedAt, so none is past the heartbeat window.
+  vi.setSystemTime(new Date("2026-09-30T12:00:05.000Z"));
   svDir = mkdtempSync(join(tmpdir(), "web-sv-progress-"));
 });
 

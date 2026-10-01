@@ -30,7 +30,10 @@
  * after its process exits. A pid the OS has since given to another program,
  * or one written inside a container and read on the host, is alive but not
  * the analysis, so where the platform shows command lines the reader checks
- * that one too ({@link readProcessCommandLine}).
+ * that one too ({@link readProcessCommandLine}). Where it cannot, a heartbeat
+ * ({@link ANALYZE_PROGRESS_HEARTBEAT_MS}) keeps `updatedAt` fresh and a
+ * `running` file older than {@link ANALYZE_PROGRESS_STALE_MS} reads as
+ * interrupted.
  *
  * Module-level state, one run per process, owned by the outermost `analyze`
  * call — the recursive `--deep` sub-analyses report into the same file under
@@ -52,6 +55,16 @@ export const ANALYZE_PROGRESS_FILE = "analyze-progress.json";
 
 /** Minimum gap between two ledger-driven writes. */
 export const ANALYZE_PROGRESS_WRITE_INTERVAL_MS = 250;
+
+/** A running analysis rewrites the file this often even when nothing changed. */
+export const ANALYZE_PROGRESS_HEARTBEAT_MS = 15_000;
+
+/**
+ * A `running` file not rewritten for this long is reported `interrupted`
+ * whatever its pid says — the check that works where the pid's command line
+ * cannot be read (Windows, no `ps`) and the pid has been reused.
+ */
+export const ANALYZE_PROGRESS_STALE_MS = 120_000;
 
 /** Phases `sv analyze` runs, in order (`executePhases` in cli/commands/analyze.ts). */
 const PHASE_COUNT = 6;
@@ -147,6 +160,7 @@ interface ActiveRun {
   batch: AnalyzeProgress["batch"];
   lastWriteAt: number;
   pending: ReturnType<typeof setTimeout> | null;
+  heartbeat: ReturnType<typeof setInterval>;
   /** A write failed and was reported; later failures stay quiet. */
   writeFailed: boolean;
   onExit: (code: number) => void;
@@ -182,9 +196,16 @@ export function startAnalyzeProgress(svDir: string, command?: string): boolean {
     batch: null,
     lastWriteAt: 0,
     pending: null,
+    // Refreshes `updatedAt` while nothing else writes, so a reader can tell a
+    // live run from a dead one without trusting its pid. Unref'd: it must
+    // never keep a finished analysis alive.
+    heartbeat: setInterval(() => {
+      if (_active === run) write();
+    }, ANALYZE_PROGRESS_HEARTBEAT_MS),
     writeFailed: false,
     onExit: () => finish("failed"),
   };
+  run.heartbeat.unref?.();
   _active = run;
   process.on("exit", run.onExit);
   setRunLedgerListener(onLedgerChange);
@@ -300,6 +321,7 @@ function finish(outcome: "complete" | "failed"): void {
   run.batch = null;
   write({ status: outcome, endedAt: new Date().toISOString() });
   if (run.pending) clearTimeout(run.pending);
+  clearInterval(run.heartbeat);
   process.off("exit", run.onExit);
   setRunLedgerListener(null);
   _active = null;
@@ -379,6 +401,8 @@ export interface ReadAnalyzeProgressOptions {
   isPidAlive?: (pid: number) => boolean;
   /** The recorded pid's command line; injectable for tests. Defaults to {@link readProcessCommandLine}. */
   processCommandLine?: ProcessCommandLine;
+  /** Clock in epoch ms; injectable for tests. */
+  now?: () => number;
 }
 
 /** A process's command line, or null when it cannot be told. */
@@ -451,6 +475,12 @@ export function readAnalyzeProgress(svDir: string, options: ReadAnalyzeProgressO
   const claimsRunning = progress.status === "running";
   let running = claimsRunning && alive(progress.pid);
   let pidReusedBy: string | null = null;
+  if (running) {
+    // No heartbeat for a whole window: the writer is gone or wedged, however
+    // the pid answers. An unparseable `updatedAt` is not evidence either way.
+    const age = (options.now ?? Date.now)() - Date.parse(progress.updatedAt);
+    if (age > ANALYZE_PROGRESS_STALE_MS) running = false;
+  }
   if (running) {
     // Alive is not enough: after a hard kill the OS may have given the pid
     // to another program. Unknown (Windows, no `ps`) keeps the liveness answer.

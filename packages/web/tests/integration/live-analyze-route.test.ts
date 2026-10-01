@@ -52,7 +52,7 @@ function writeProgress(over: Record<string, unknown> = {}): void {
     mode: "generative",
     scope: null,
     startedAt: STARTED,
-    updatedAt: STARTED,
+    updatedAt: new Date().toISOString(),
     command: "sv analyze --full",
     phase: { index: 2, name: "imports", total: 6 },
     phases: [
@@ -204,6 +204,17 @@ describe("POST /api/live/analyze/stop", () => {
     writeProgress({ pid: 2_147_483_000 });
     expect(readAnalyzeProgress(svDir)?.status).toBe("interrupted");
     expect((await post()).status).toBe(409);
+  });
+
+  it("refuses a heartbeat-expired file whose pid is alive and whose command line is unknown", async () => {
+    child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
+    sources.processCommandLine = () => null;
+    writeProgress({ pid: child.pid, updatedAt: new Date(Date.now() - 10 * 60_000).toISOString() });
+    expect(readAnalyzeProgress(svDir, { processCommandLine: sources.processCommandLine })).toMatchObject({
+      status: "interrupted", running: false, stale: true,
+    });
+    expect((await post()).status).toBe(409);
+    expect(child.signalCode).toBeNull();
   });
 
   it("signals the process the progress file names when its command line is an analyze", async () => {

@@ -834,7 +834,7 @@ describe("commands route — sv-analyze full flow (async)", () => {
     await mkdir(join(tmpDir, ".sourcevision", ".cache"), { recursive: true });
     await writeFile(join(tmpDir, ".sourcevision", ".cache", "analyze-progress.json"), JSON.stringify({
       version: 1, pid: analyzer.pid, status: "running", mode: "generative", scope: null,
-      startedAt: "2026-09-30T12:00:00.000Z", updatedAt: "2026-09-30T12:01:00.000Z",
+      startedAt: "2026-09-30T12:00:00.000Z", updatedAt: new Date().toISOString(),
       phase: { index: 4, name: "zones", total: 6 },
       phases: [{ index: 4, name: "zones", startedAt: "2026-09-30T12:00:30.000Z" }],
       pass: { number: 2, label: "LLM cross-zone relationships" },
