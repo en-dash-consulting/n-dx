@@ -54,7 +54,7 @@ import {
 } from "./routes-hench.js";
 import { commandJobsOf, type CommandJobKind } from "./routes-commands.js";
 import { rexAnalyzeJobStatus } from "./routes-rex-analysis.js";
-import { resolveActiveModel } from "./routes-llm.js";
+import { lastActiveAgentModel, resolveActiveAgentModel } from "./routes-llm.js";
 import { analyzeProgressPath, readAnalyzeProgress, type AnalyzeProgressReport, type ProcessCommandLine } from "./domain-gateway.js";
 import { collectCompletedIds, estimateCostFromTotals, findNextTask, walkTree } from "./rex-gateway.js";
 import type { PRDDocument } from "./rex-gateway.js";
@@ -552,7 +552,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
         floorBytes,
         belowFloor: floorBytes !== null && memory.freeBytes <= floorBytes,
       },
-      llm: resolveActiveModel(ctx.projectDir),
+      llm: lastActiveAgentModel(ctx.projectDir),
       worktrees: { total: workspaces.length, withLiveRun },
       spend: {
         todayUsd: priceRuns(todayDigests),
@@ -588,16 +588,24 @@ export function getLiveSnapshot(ctx: ServerContext, sources: LiveSources, now = 
 
 const LIVE_PATH = "/api/live";
 
-/** Handle GET /api/live. Returns true if the request was handled. */
-export function handleLiveRoute(
+/**
+ * Handle GET /api/live. Resolves true if the request was handled.
+ *
+ * The agent's vendor and model are resolved per request and laid over the
+ * cached snapshot, so a config change shows on the next read rather than
+ * after the cache turns over.
+ */
+export async function handleLiveRoute(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
   sources: LiveSources,
-): boolean {
+): Promise<boolean> {
   const url = (req.url || "/").split("?")[0];
   if (url !== LIVE_PATH || (req.method || "GET") !== "GET") return false;
-  jsonResponse(res, 200, getLiveSnapshot(ctx, sources));
+  const llm = await resolveActiveAgentModel(ctx.projectDir);
+  const snapshot = getLiveSnapshot(ctx, sources);
+  jsonResponse(res, 200, { ...snapshot, machine: { ...snapshot.machine, llm } });
   return true;
 }
 

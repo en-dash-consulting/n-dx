@@ -27,6 +27,7 @@ import {
 import { clearWorktreesCache, collectWorktrees, runFileParseCountForTests } from "../../src/server/routes-worktrees.js";
 import { clearStatusCache, handleStatusRoute, type ProjectStatus } from "../../src/server/routes-status.js";
 import { analyzeProgressPath } from "../../src/server/domain-gateway.js";
+import { handleLlmRoute } from "../../src/server/routes-llm.js";
 import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 import { removeTempDir } from "../helpers/temp-dir.js";
 
@@ -162,7 +163,7 @@ describe("GET /api/live", () => {
     }));
 
     server = await startRouteTestServer(async (req, res) => {
-      if (handleLiveRoute(req, res, ctxFor(repo, "main"), sources)) return true;
+      if (await handleLiveRoute(req, res, ctxFor(repo, "main"), sources)) return true;
       return handleStatusRoute(req, res, ctxFor(repo, "main"));
     });
   });
@@ -248,6 +249,46 @@ describe("GET /api/live", () => {
     expect(live.counts.servedStale).toBe(status.hench.staleRuns);
     expect(live.counts.servedRunning).toBe(status.hench.activeRuns);
     expect(live.counts.stale).toBe(1);
+  });
+});
+
+describe("GET /api/live machine.llm", () => {
+  let project: string;
+  let server: RouteTestServer;
+
+  beforeEach(async () => {
+    project = realpathSync.native(mkdtempSync(join(tmpdir(), "ndx-live-llm-")));
+    const solo: LiveSources = { listWorkspaces: () => [{ key: "solo", path: project, branch: "main", isAnchor: true }], memoryFloorBytes: () => null };
+    server = await startRouteTestServer(async (req, res) => {
+      if (await handleLiveRoute(req, res, ctxFor(project, "solo"), solo)) return true;
+      return handleLlmRoute(req, res, ctxFor(project, "solo"));
+    });
+  });
+
+  afterEach(async () => {
+    await server?.close();
+    await removeTempDir(project);
+  });
+
+  async function liveLlm(): Promise<LiveSnapshot["machine"]["llm"]> {
+    return ((await (await fetch(`${server.baseUrl}/api/live`)).json()) as LiveSnapshot).machine.llm;
+  }
+
+  async function effectiveAgent(): Promise<{ vendor: string; model: string }> {
+    const { effective } = (await (await fetch(`${server.baseUrl}/api/llm/config`)).json()) as { effective: { vendor: string; model: string } };
+    return { vendor: effective.vendor, model: effective.model };
+  }
+
+  it("reports the default vendor and the configured claude model when llm.vendor is unset", async () => {
+    writeFileSync(join(project, ".n-dx.json"), JSON.stringify({ llm: { claude: { model: "claude-opus-4-6" } } }));
+    expect(await liveLlm()).toEqual({ vendor: "claude", model: "claude-opus-4-6" });
+  });
+
+  it("reports a hench.models override, matching the effective block of GET /api/llm/config", async () => {
+    writeFileSync(join(project, ".n-dx.json"), JSON.stringify({ llm: { claude: { model: "claude-sonnet-4-5" } }, hench: { models: { claude: "claude-opus-4-6" } } }));
+    const live = await liveLlm();
+    expect(live).toEqual({ vendor: "claude", model: "claude-opus-4-6" });
+    expect(live).toEqual(await effectiveAgent());
   });
 });
 

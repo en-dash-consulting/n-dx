@@ -34,7 +34,7 @@ import {
   type ProcessCommandLine,
 } from "./domain-gateway.js";
 import { svAnalyzeRunOf } from "./routes-commands.js";
-import { resolveActiveModel } from "./routes-llm.js";
+import { lastActiveAgentModel, resolveActiveAgentModel } from "./routes-llm.js";
 import { estimateCostFromTotals } from "./rex-gateway.js";
 import type { LiveSources, LiveWorktree } from "./routes-live.js";
 
@@ -352,7 +352,7 @@ export function buildLiveAnalyzeSnapshot(ctx: ServerContext, sources: LiveSource
       available: outputAvailable,
       lines: outputAvailable && slot ? slot.output.split("\n").map((l) => l.trimEnd()).filter(Boolean).slice(-LIVE_ANALYZE_OUTPUT_LINES) : [],
     },
-    llm: resolveActiveModel(ctx.projectDir),
+    llm: lastActiveAgentModel(ctx.projectDir),
     costUsd: priceAnalyzeUsage(progress),
     modules: modulesOf(manifest),
     ...phaseResults(ctx.svDir, progress),
@@ -407,18 +407,20 @@ function signalRecordedPid(
 }
 
 /**
- * Handle GET /api/live/analyze and POST /api/live/analyze/stop. Returns true
+ * Handle GET /api/live/analyze and POST /api/live/analyze/stop. Resolves true
  * if the request was handled.
  */
-export function handleLiveAnalyzeRoute(
+export async function handleLiveAnalyzeRoute(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
   sources: LiveSources,
-): boolean {
+): Promise<boolean> {
   const url = (req.url || "/").split("?")[0];
   const method = req.method || "GET";
   if (url === ANALYZE_PATH && method === "GET") {
+    // The build reads this back through lastActiveAgentModel.
+    await resolveActiveAgentModel(ctx.projectDir);
     jsonResponse(res, 200, buildLiveAnalyzeSnapshot(ctx, sources));
     return true;
   }

@@ -365,20 +365,39 @@ export function resolveActiveVendor(projectDir: string): string | null {
   return typeof llm["vendor"] === "string" ? llm["vendor"] : null;
 }
 
+/** The agent's vendor and model as the Live views show them; both null when the config cannot be resolved. */
+export interface ActiveAgentModel {
+  vendor: string | null;
+  model: string | null;
+}
+
+const activeAgentModels = new Map<string, ActiveAgentModel>();
+
 /**
- * The configured vendor and that vendor's model, each null when unset (the
- * vendor's own default applies). Claude's model resolves per field across
- * `llm.claude.*` and legacy `claude.*`, the same as `extractLlmConfig` below.
+ * The vendor and model `ndx work` runs — the `effective` block of
+ * `GET /api/llm/config`, so the Live strip and Robot Wrangler name the same
+ * robot. Remembered per project for {@link lastActiveAgentModel}.
+ *
+ * A config that fails to resolve (malformed `.n-dx.json`) yields nulls and a
+ * log line rather than a throw: the Live views must keep answering, and the
+ * LLM settings page is where that error is reported.
  */
-export function resolveActiveModel(projectDir: string): { vendor: string | null; model: string | null } {
-  const config = readEffectiveNdxConfig(projectDir);
-  const llm = (config["llm"] ?? {}) as Record<string, unknown>;
-  const vendor = typeof llm["vendor"] === "string" ? llm["vendor"] : null;
-  if (vendor === "claude") {
-    return { vendor, model: resolveClaudeConfig(llm["claude"], config["claude"]).config?.model ?? null };
+export async function resolveActiveAgentModel(projectDir: string): Promise<ActiveAgentModel> {
+  let resolved: ActiveAgentModel;
+  try {
+    const { vendor, model } = await resolveEffectiveAgentConfig(projectDir);
+    resolved = { vendor, model };
+  } catch (err) {
+    console.error(`[llm] effective agent config unresolved for ${projectDir}: ${(err as Error).message}`);
+    resolved = { vendor: null, model: null };
   }
-  const vendorConfig = (vendor ? llm[vendor] ?? {} : {}) as Record<string, unknown>;
-  return { vendor, model: getString(vendorConfig, "model") };
+  activeAgentModels.set(projectDir, resolved);
+  return resolved;
+}
+
+/** The last {@link resolveActiveAgentModel} answer for the project, for synchronous snapshot builders. */
+export function lastActiveAgentModel(projectDir: string): ActiveAgentModel {
+  return activeAgentModels.get(projectDir) ?? { vendor: null, model: null };
 }
 
 /**

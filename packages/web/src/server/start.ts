@@ -745,9 +745,9 @@ async function handleApiRoutes(
   if (await handleProjectRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx, { broadcast, onStatusInvalidate: invalidateRunCaches }))) return true;
-  if (handleLiveRoute(req, res, ctx, liveSourcesOf(registry))) return true;
+  if (await handleLiveRoute(req, res, ctx, liveSourcesOf(registry))) return true;
   if (isInScope(ctx.scope, "hench") && handleLiveTaskRoute(req, res, ctx)) return true;
-  if (isInScope(ctx.scope, "sourcevision") && handleLiveAnalyzeRoute(req, res, ctx, liveSourcesOf(registry))) return true;
+  if (isInScope(ctx.scope, "sourcevision") && (await handleLiveAnalyzeRoute(req, res, ctx, liveSourcesOf(registry)))) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
