@@ -64,6 +64,7 @@ import {
   findUncommittedWork,
   formatOperatorPrdLeftovers,
   formatRecordCommitPending,
+  formatReviewRepairsUncommittedRefusal,
   formatUncommittedWorkRefusal,
   listDirtyPaths,
   listOperatorOwnedPrdDirt,
@@ -1528,12 +1529,20 @@ async function commitPreRunChanges(projectDir: string, message: string): Promise
 
 /**
  * Commit the files the adversarial review pass changed, when there are any.
- * Called on the autoCommit path only: the interactive commit prompt already
- * sweeps repairs into the task's commit, but on autoCommit the executor
- * committed its own work before the review ran, so the repairs have no other
- * owner. A failed repair commit is propagated to finalization so it can
- * withdraw the completion claim rather than leave the repair for a later
- * task to absorb.
+ *
+ * Two callers, both cases where the repairs would otherwise have no owner:
+ *
+ * - The autoCommit path, where the executor committed its own work before the
+ *   review ran and the reviewer is barred from committing.
+ * - {@link commitOrphanedReviewRepairs} on the commit-prompt path, when the
+ *   executor committed for itself and left no message file, so the prompt that
+ *   normally sweeps the repairs in never runs (GitHub #483).
+ *
+ * The ordinary commit-prompt path does not call this: `stageReviewRepairs`
+ * stages the repairs and `git commit -F` lands them with the executor's work.
+ *
+ * A failed repair commit is propagated to the caller so it can withdraw the
+ * completion claim rather than leave the repair for a later task to absorb.
  */
 export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRecord): Promise<void> {
   const review = run.review;
@@ -1564,6 +1573,65 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
         `They remain in the working tree: ${review.repairedFiles.join(", ")}`,
     );
     throw error;
+  }
+}
+
+/**
+ * Commit review repairs the commit prompt was supposed to take but never will
+ * (GitHub #483, caos run 4b733f14).
+ *
+ * With `hench.autoCommit` false the repairs ride along in the prompt's
+ * `git commit -F .hench-commit-msg.txt`. When the executor commits its own work
+ * with a plain `git commit` and writes no message file, that prompt returns
+ * early, nothing commits the repairs, and the uncommitted-work gate correctly
+ * refuses them — so a run whose work *and* repairs were both right ended failed
+ * and its task was reset to pending.
+ *
+ * Both conditions below must hold before this commits anything, and each
+ * guards against a distinct way of making things worse:
+ *
+ * (a) **HEAD moved past `run.startHead`.** Something committed during this run
+ *     — the executor itself, or the commit-message watcher. Without this, the
+ *     "repairs" may be the entire uncommitted feature (the review pass reports
+ *     every path it touched, including files the agent created and the reviewer
+ *     then edited — caos run 2fb96507), and landing that under a
+ *     `fix(review):` subject would mislabel a whole feature. A run record with
+ *     no `startHead` predates the field; it cannot answer the question, so it
+ *     does not get the benefit of the doubt.
+ *
+ * (b) **Nothing else is loose.** The repairs plus the PRD paths are the only
+ *     dirt. If anything else is uncommitted, the existing refusal is the right
+ *     answer and committing a slice of a leaking tree would only obscure it.
+ *
+ * @returns The error from a refused or failed commit, for the caller to render
+ *   as {@link formatReviewRepairsUncommittedRefusal}; undefined when the commit
+ *   landed, or when the conditions above said not to try.
+ */
+async function commitOrphanedReviewRepairs(
+  projectDir: string,
+  run: RunRecord,
+  repairs: readonly string[],
+): Promise<Error | undefined> {
+  if (repairs.length === 0) return undefined;
+
+  // (a) The executor (or the watcher) committed during this run.
+  if (!run.startHead) return undefined;
+  const head = getCurrentHead(projectDir);
+  if (!head || head === run.startHead) return undefined;
+
+  // (b) The repairs are all that is left, once hench's own PRD writes are
+  // discounted — the same discount the gate itself applies a moment later.
+  const remaining = await findUncommittedWork({
+    projectDir,
+    discountPaths: [...PRD_COMMIT_PATHS, ...repairs],
+  });
+  if (!remaining.clean) return undefined;
+
+  try {
+    await commitReviewRepairsIfNeeded(projectDir, run);
+    return undefined;
+  } catch (err) {
+    return err as Error;
   }
 }
 
@@ -3197,6 +3265,9 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   //   changed (diffDirtyState in cli-loop.ts), so it covers files the agent
   //   created and the reviewer then edited. In that run the repairs were the
   //   whole feature, and the refusal named only the manifests.
+  //   When no commit follows at all, commitOrphanedReviewRepairs gets one
+  //   bounded chance to land them itself first (#483) — an executor that
+  //   committed for itself leaves correct work that nothing else will claim.
   // - The staged index, only when the commit prompt will really run — which
   //   takes a non-empty .hench-commit-msg.txt, not just `!autoCommit`. Staged
   //   work with no message file is the #363 leak wearing an `A ` prefix.
@@ -3209,6 +3280,17 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     const review = run.review;
     const repairs = review && review.failed === undefined ? review.repairedFiles ?? [] : [];
     const pendingRepairs = autoCommit || commitPromptFollows ? repairs : [];
+
+    // Neither path above owns the repairs: autoCommit is off, so
+    // commitReviewRepairsIfNeeded is not called downstream, and no message file
+    // means no commit prompt to sweep them in. Commit them here when it is safe
+    // to — otherwise this is a no-op and the gate below refuses as it always
+    // did (GitHub #483).
+    const repairCommitError =
+      !autoCommit && !commitPromptFollows
+        ? await commitOrphanedReviewRepairs(projectDir, run, repairs)
+        : undefined;
+
     const leaked = await findUncommittedWork({
       projectDir,
       stagedCommitFollows: commitPromptFollows,
@@ -3218,11 +3300,16 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       uncommittedWorkRefused = true;
       run.status = "failed";
       const leakedDeleted = deletedAmong(projectDir, leaked.paths);
-      run.error = formatUncommittedWorkRefusal(
-        leaked.paths,
-        leakedDeleted,
-        await prepareRecoveryPathspecs(projectDir, leaked.paths, leakedDeleted),
-      );
+      const pathspecs = await prepareRecoveryPathspecs(projectDir, leaked.paths, leakedDeleted);
+      run.error = repairCommitError
+        ? formatReviewRepairsUncommittedRefusal(
+            leaked.paths,
+            repairCommitError.message,
+            run.taskId,
+            leakedDeleted,
+            pathspecs,
+          )
+        : formatUncommittedWorkRefusal(leaked.paths, leakedDeleted, pathspecs);
       info(`\n${run.error}`);
       if (opts.store) {
         await withdrawCompletionClaim(opts.store, run, run.error);

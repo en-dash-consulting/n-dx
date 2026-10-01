@@ -42,7 +42,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Strict Self-Heal Tag Scoping Enforcement](./strict-self-heal-tag-scoping-enforcement/index.md) | completed |
 | [Task Repetition Detection and Completion Enforcement in Hench Run Loop](./task-repetition-detection-and/index.md) | completed |
 | [Web UI: Reorganize around SourceVision / Rex / Hench sections](./web-ui-reorganize-around-sourcevision/index.md) | completed |
-| [Commit review repairs when the executor committed for itself and left no commit message](./commit-review-repairs-when-the.md) | pending |
+| [Commit review repairs when the executor committed for itself and left no commit message](./commit-review-repairs-when-the.md) | in_progress |
 | [Fix hench parent auto-completion cascade silently skipped + add reconciliation sweep (#293)](./fix-hench-parent-auto-completion.md) | completed |
 | [Fix hench task-completion commit gap + fullTestCommand schema drop (#302)](./fix-hench-task-completion-commit-gap.md) | completed |
 | [Hench task display branches on rex prose, so a reworded selection summary silently blanks the finalize label](./hench-task-display-branches-on-rex.md) | completed |
