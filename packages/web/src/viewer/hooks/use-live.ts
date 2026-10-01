@@ -14,9 +14,9 @@
  * testable without a DOM.
  */
 
-import { useState, useCallback, useEffect, useRef } from "preact/hooks";
+import { useState, useEffect } from "preact/hooks";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
-import { usePolling } from "../views/use-polling.js";
+import { registerPoller } from "../polling/index.js";
 import { createWSPipeline } from "./use-gateway.js";
 
 // ---------------------------------------------------------------------------
@@ -211,6 +211,151 @@ export interface LiveFeed {
   refresh: () => Promise<void>;
 }
 
+// ---------------------------------------------------------------------------
+// The shared feed
+//
+// The tab, the bottom bar, the running-now bar and the overview all read the
+// same answer, often at once. One module-level feed serves them all: the first
+// subscriber opens one socket, one poller and makes the first fetch; the last
+// one to leave closes them. Per-component feeds shared the poller key "live",
+// so the first to unmount stopped the poll for the rest.
+// ---------------------------------------------------------------------------
+
+/** The socket's reconnect delay doubles from the first to the cap, and resets once it opens. */
+const RECONNECT_FIRST_MS = 1_000;
+const RECONNECT_MAX_MS = 30_000;
+
+interface FeedState {
+  live: LiveSummary | null;
+  reachable: boolean;
+  socketOpen: boolean;
+}
+
+const IDLE_FEED: FeedState = { live: null, reachable: true, socketOpen: false };
+
+let feed: FeedState = IDLE_FEED;
+const subscribers = new Set<(state: FeedState) => void>();
+let stopFeed: (() => void) | null = null;
+let lastFetchAt = 0;
+/** Bumped on every stop, so an answer that lands after the last subscriber left is dropped. */
+let feedGeneration = 0;
+
+function setFeed(next: Partial<FeedState>): void {
+  feed = { ...feed, ...next };
+  for (const notify of subscribers) notify(feed);
+}
+
+/** Fetch now. Does nothing while no component reads the feed. */
+async function fetchLive(): Promise<void> {
+  if (!stopFeed) return;
+  const generation = feedGeneration;
+  lastFetchAt = Date.now();
+  let next: Partial<FeedState>;
+  try {
+    const res = await fetch("/api/live");
+    if (res.ok) {
+      const json: unknown = await res.json();
+      next = { live: isLiveSummary(json) ? json : null, reachable: true };
+    } else {
+      next = { live: null, reachable: false };
+    }
+  } catch {
+    // Unreachable server: the tab reads as idle until the next tick.
+    next = { live: null, reachable: false };
+  }
+  if (generation === feedGeneration) setFeed(next);
+}
+
+/** Open the socket, the pipeline and the poll; returns what closes them. */
+function startFeed(): () => void {
+  let stopped = false;
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectDelay = RECONNECT_FIRST_MS;
+
+  const pipeline = createWSPipeline({
+    workspace: getWorkspaceKey(),
+    onFlush: (batch) => {
+      if (stopped || !batch.types.has("live:changed")) return;
+      if (Date.now() - lastFetchAt < MIN_REFETCH_INTERVAL_MS) return;
+      void fetchLive();
+    },
+    defaultDelayMs: 250,
+  });
+
+  const connect = (isReconnect: boolean): void => {
+    if (typeof WebSocket === "undefined") return; // no socket at all: the poll carries it
+    try {
+      ws = new WebSocket(getWebSocketUrl());
+    } catch {
+      scheduleReconnect();
+      return;
+    }
+    ws.onopen = () => {
+      reconnectDelay = RECONNECT_FIRST_MS;
+      setFeed({ socketOpen: true });
+      // Frames sent while the socket was down are gone: catch up now.
+      if (isReconnect) void fetchLive();
+    };
+    ws.onclose = () => {
+      ws = null;
+      if (stopped) return;
+      setFeed({ socketOpen: false });
+      scheduleReconnect();
+    };
+    ws.onmessage = (event) => {
+      try {
+        pipeline.push(JSON.parse(event.data));
+      } catch {
+        // Malformed frame — the poll still catches up.
+      }
+    };
+  };
+
+  const scheduleReconnect = (): void => {
+    if (stopped || reconnectTimer !== null) return;
+    const delay = reconnectDelay;
+    reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect(true);
+    }, delay);
+  };
+
+  connect(false);
+  const unregisterPoll = registerPoller("live", () => { void fetchLive(); }, POLL_INTERVAL_MS);
+
+  return () => {
+    stopped = true;
+    unregisterPoll();
+    pipeline.dispose();
+    if (reconnectTimer !== null) clearTimeout(reconnectTimer);
+    if (ws) {
+      ws.onclose = null;
+      ws.close();
+      ws = null;
+    }
+  };
+}
+
+function subscribe(notify: (state: FeedState) => void): () => void {
+  subscribers.add(notify);
+  if (!stopFeed) {
+    stopFeed = startFeed();
+    void fetchLive();
+  }
+  notify(feed);
+  return () => {
+    subscribers.delete(notify);
+    if (subscribers.size > 0 || !stopFeed) return;
+    const stop = stopFeed;
+    stopFeed = null;
+    feedGeneration++;
+    feed = IDLE_FEED;
+    stop();
+  };
+}
+
 /**
  * The live snapshot, or null until the first answer (and after a failed one —
  * a tab that cannot reach the endpoint reads as idle rather than stale).
@@ -222,66 +367,16 @@ export function useLive(enabled = true): LiveSummary | null {
 
 /** {@link useLive} plus how the answer is being kept current. */
 export function useLiveFeed(enabled = true): LiveFeed {
-  const [live, setLive] = useState<LiveSummary | null>(null);
-  const [reachable, setReachable] = useState(true);
-  const [socketOpen, setSocketOpen] = useState(false);
-  const lastFetchRef = useRef(0);
-  const mountedRef = useRef(true);
-
-  const fetchLive = useCallback(async () => {
-    lastFetchRef.current = Date.now();
-    try {
-      const res = await fetch("/api/live");
-      if (!res.ok) {
-        if (mountedRef.current) { setLive(null); setReachable(false); }
-        return;
-      }
-      const json: unknown = await res.json();
-      if (mountedRef.current) { setLive(isLiveSummary(json) ? json : null); setReachable(true); }
-    } catch {
-      // Unreachable server: the tab falls back to idle until the next tick.
-      if (mountedRef.current) { setLive(null); setReachable(false); }
-    }
-  }, []);
+  const [state, setState] = useState<FeedState>(() => (enabled ? feed : IDLE_FEED));
 
   useEffect(() => {
-    mountedRef.current = true;
-    if (!enabled) return () => { mountedRef.current = false; };
-    void fetchLive();
-
-    let ws: WebSocket | null = null;
-    const pipeline = createWSPipeline({
-      workspace: getWorkspaceKey(),
-      onFlush: (batch) => {
-        if (!mountedRef.current || !batch.types.has("live:changed")) return;
-        if (Date.now() - lastFetchRef.current < MIN_REFETCH_INTERVAL_MS) return;
-        void fetchLive();
-      },
-      defaultDelayMs: 250,
-    });
-    try {
-      ws = new WebSocket(getWebSocketUrl());
-      ws.onopen = () => { if (mountedRef.current) setSocketOpen(true); };
-      ws.onclose = () => { if (mountedRef.current) setSocketOpen(false); };
-      ws.onmessage = (event) => {
-        try {
-          pipeline.push(JSON.parse(event.data));
-        } catch {
-          // Malformed frame — the poll still catches up.
-        }
-      };
-    } catch {
-      // No WebSocket — polling still works.
+    if (!enabled) {
+      setState(IDLE_FEED);
+      return;
     }
+    return subscribe(setState);
+  }, [enabled]);
 
-    return () => {
-      mountedRef.current = false;
-      pipeline.dispose();
-      ws?.close();
-    };
-  }, [enabled, fetchLive]);
-
-  usePolling("live", fetchLive, POLL_INTERVAL_MS, enabled);
-
-  return { live, connection: !reachable ? "offline" : socketOpen ? "live" : "polling", refresh: fetchLive };
+  const connection: LiveConnection = !state.reachable ? "offline" : state.socketOpen ? "live" : "polling";
+  return { live: state.live, connection, refresh: fetchLive };
 }
