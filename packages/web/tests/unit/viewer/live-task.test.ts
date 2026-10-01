@@ -251,6 +251,7 @@ describe("the rendered page", () => {
     const link = [...root.querySelectorAll("a")].find((a) => a.textContent === "Open the log")!;
     await act(async () => { link.click(); await flush(); });
     await act(async () => { await flush(); });
-    expect(root.querySelector(".live-log-full")?.textContent).toBe("full log\n");
+    expect([...root.querySelectorAll(".live-logrow-text")].map((r) => r.textContent)).toEqual(["full log"]);
+    expect(root.querySelector(".live-log-source")?.textContent).toContain("1 line");
   });
 });

@@ -359,8 +359,7 @@
 
 .live-log-tail { border-top: 1px solid var(--border); padding-top: var(--space-2); min-width: 0; }
 .live-log-tail-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
-.live-log-lines,
-.live-log-full {
+.live-log-lines {
   margin: var(--space-1) 0 0;
   font-family: var(--font-mono);
   font-size: var(--font-sm);
@@ -368,7 +367,44 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.live-log-full { max-height: 70vh; overflow-y: auto; }
+
+/* Log tab. Colour classes use the theme's contrast-checked tokens (>= 4.5:1 on
+   --bg-surface and --bg-active in both themes); the [Label] in each line keeps
+   the class readable without colour. */
+.live-log { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.live-log-source { margin: 0; font-size: var(--font-sm); color: var(--text-dim); overflow-wrap: anywhere; }
+.live-log-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--font-sm); }
+.live-log-field { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-dim); }
+.live-log-matches { color: var(--text-dim); }
+.live-log-legend { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: 0; padding: 0; list-style: none; font-size: var(--font-sm); }
+.live-log-legend li { display: inline-flex; align-items: center; gap: var(--space-1); }
+.live-log-swatch { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.live-log-viewport {
+  position: relative;
+  height: 60vh;
+  min-height: 240px;
+  overflow: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
+}
+.live-log-empty { padding: var(--space-2); }
+.live-log-space { position: relative; min-width: 100%; width: max-content; }
+.live-log-window { position: absolute; left: 0; min-width: 100%; width: max-content; }
+.live-logrow { display: flex; gap: var(--space-2); height: 20px; line-height: 20px; box-sizing: border-box; white-space: pre; padding: 0 var(--space-2); }
+.live-logrow-n { flex: none; min-width: 5ch; text-align: right; color: var(--text-muted); user-select: none; }
+.live-logrow-time { flex: none; color: var(--text-muted); }
+.live-logrow-tag { flex: none; font-weight: 600; }
+.live-logrow-turnstart { border-top: 1px solid var(--border-strong); }
+.live-logrow-current { background: var(--bg-active); }
+.live-logrow mark { background: var(--bg-active); color: var(--text); outline: 1px solid var(--accent); border-radius: 2px; }
+.live-logrow-plain, .live-logrow-tool { color: var(--text-dim); }
+.live-logrow-turn { color: var(--accent); }
+.live-logrow-test { color: var(--green); }
+.live-logrow-error { color: var(--red); }
+.live-logrow-gate { color: var(--orange); }
 
 .live-task-legacy { display: flex; flex-direction: column; gap: var(--space-2); }
 .live-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-1) var(--space-3); margin: 0; font-size: var(--font-sm); }

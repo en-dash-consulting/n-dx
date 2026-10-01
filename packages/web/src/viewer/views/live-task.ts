@@ -30,6 +30,7 @@ import {
 import { WorkspaceWriteStrip } from "../components/index.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
+import { LogTab } from "./live-log.js";
 import {
   afterRunItems,
   criteriaRows,
@@ -248,48 +249,6 @@ function WorkTab({ run, events, eventsAvailable, onOpenLog }: {
 
 // ── Log and Review tabs ──────────────────────────────────────────────
 
-/** Most log text kept on the page; older output is still in the file. */
-const LOG_KEEP_CHARS = 200_000;
-const LOG_POLL_MS = 1_000;
-
-function LogTab({ run }: { run: LiveTaskRun }) {
-  const [text, setText] = useState("");
-  const [missing, setMissing] = useState(false);
-  const cursorRef = useRef(0);
-  const running = run.status === "running";
-
-  useEffect(() => {
-    let cancelled = false;
-    cursorRef.current = 0;
-    setText("");
-    setMissing(false);
-    const read = async () => {
-      try {
-        for (let page = 0; page < 10; page++) {
-          const res = await fetch(`/api/hench/runs/${encodeURIComponent(run.runId)}/log?from=${cursorRef.current}`);
-          if (cancelled) return;
-          if (!res.ok) { setMissing(true); return; }
-          const body = await res.json() as { content: string; next: number; reset: boolean; more: boolean };
-          if (cancelled) return;
-          cursorRef.current = body.next;
-          if (body.content || body.reset) {
-            setText((prev) => ((body.reset ? "" : prev) + body.content).slice(-LOG_KEEP_CHARS));
-          }
-          if (!body.more) break;
-        }
-      } catch {
-        // The next tick reads from the same cursor.
-      }
-    };
-    void read();
-    const id = running ? setInterval(() => { void read(); }, LOG_POLL_MS) : null;
-    return () => { cancelled = true; if (id) clearInterval(id); };
-  }, [run.runId, running]);
-
-  if (missing) return h("p", { class: "live-muted" }, "No log was recorded for this run.");
-  return h("pre", { class: "live-log-full" }, text || "…");
-}
-
 function ReviewTab({ run, events }: { run: LiveTaskRun; events: RunEventLine[] }) {
   const item = afterRunItems(run, events).find((i) => i.key === "review");
   const lines = events.filter((e) => e.kind === "review_started" || e.kind === "review_report");
@@ -446,7 +405,7 @@ export function LiveTaskView({ taskId, navigateTo }: LiveTaskViewProps) {
                 activeTab === "work"
                   ? h(WorkTab, { run, events, eventsAvailable, onOpenLog: () => setTab("log") })
                   : activeTab === "log"
-                    ? h(LogTab, { run })
+                    ? h(LogTab, { run, taskId })
                     : h(ReviewTab, { run, events }),
               ),
             ),
