@@ -95,6 +95,62 @@ function extractClaudeConfig(value: unknown): ClaudeConfig | undefined {
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
+/** Which of the two config locations a resolved Claude field came from. */
+export type ClaudeFieldSource = "llm" | "legacy";
+
+/** The outcome of {@link resolveClaudeConfig}: merged values plus their origins. */
+export interface ResolvedClaudeConfig {
+  /** Merged config, or undefined when neither location set any field. */
+  config: ClaudeConfig | undefined;
+  /** Origin of each field that resolved to a value. Absent fields are omitted. */
+  sources: Partial<Record<keyof ClaudeConfig, ClaudeFieldSource>>;
+}
+
+/** The fields a Claude config carries, and which both locations may set. */
+const CLAUDE_FIELDS = ["cli_path", "api_key", "api_endpoint", "model", "lightModel"] as const;
+
+/**
+ * Resolve the modern `llm.claude` block against the legacy top-level `claude`
+ * block, **per field**: each field is `new ?? old` on its own.
+ *
+ * Until 1.0.0 both locations are read. This used to be a block-level choice
+ * (`llmClaude ?? legacyClaude`), which meant a modern block setting a single
+ * field shadowed every legacy field beside it — a project that set
+ * `claude.api_key` once and later pinned `llm.claude.model` silently lost the
+ * key, with nothing to say so. Resolving field by field is what
+ * `loadLLMConfig`, `GET /api/llm/config` and `GET /api/ndx-config` all share,
+ * so the CLI and the dashboard cannot disagree about which value wins.
+ *
+ * `sources` is what lets the dashboard mark a value as still coming from a
+ * deprecated key; writes always go to `llm.claude.*`.
+ *
+ * Both arguments are raw `.n-dx.json` fragments — anything non-object, and any
+ * field that is not a non-empty string, is ignored rather than thrown on.
+ */
+export function resolveClaudeConfig(modern: unknown, legacy: unknown): ResolvedClaudeConfig {
+  const llmBlock = extractClaudeConfig(modern);
+  const legacyBlock = extractClaudeConfig(legacy);
+
+  const config: ClaudeConfig = {};
+  const sources: Partial<Record<keyof ClaudeConfig, ClaudeFieldSource>> = {};
+
+  for (const field of CLAUDE_FIELDS) {
+    const fromLlm = llmBlock?.[field];
+    if (fromLlm !== undefined) {
+      config[field] = fromLlm;
+      sources[field] = "llm";
+      continue;
+    }
+    const fromLegacy = legacyBlock?.[field];
+    if (fromLegacy !== undefined) {
+      config[field] = fromLegacy;
+      sources[field] = "legacy";
+    }
+  }
+
+  return Object.keys(config).length > 0 ? { config, sources } : { config: undefined, sources: {} };
+}
+
 function extractCodexConfig(value: unknown): CodexConfig | undefined {
   const v = asRecord(value);
   if (!v) return undefined;
@@ -169,11 +225,10 @@ async function loadJSONFile(filePath: string): Promise<Record<string, unknown> |
 function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
   const llm = asRecord(root.llm);
   const llmVendor = extractVendor(llm?.vendor);
-  const llmClaude = extractClaudeConfig(llm?.claude);
+  const claude = resolveClaudeConfig(llm?.claude, root.claude).config;
   const llmCodex = extractCodexConfig(llm?.codex);
   const llmGoogle = extractGoogleConfig(llm?.google);
   const llmLocal = extractLocalConfig(llm?.local);
-  const legacyClaude = extractClaudeConfig(root.claude);
   const autoFailover =
     typeof llm?.autoFailover === "boolean" ? llm.autoFailover : undefined;
   const rawTopLevelModel =
@@ -188,7 +243,7 @@ function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
     config.model =
       llmVendor === LLM_VENDOR.CODEX ? normalizeCodexModel(rawTopLevelModel) : rawTopLevelModel;
   }
-  if (llmClaude || legacyClaude) config.claude = llmClaude ?? legacyClaude;
+  if (claude) config.claude = claude;
   if (llmCodex) config.codex = llmCodex;
   if (llmGoogle) config.google = llmGoogle;
   if (llmLocal) config.local = llmLocal;
@@ -215,7 +270,8 @@ function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
  * Merge behavior:
  * - Reads `llm.vendor` if present.
  * - Reads `llm.claude`/`llm.codex` blocks when present.
- * - Falls back to legacy top-level `claude` block for compatibility.
+ * - Falls back to the legacy top-level `claude` block **per field** — see
+ *   {@link resolveClaudeConfig}.
  */
 export async function loadLLMConfig(dir: string): Promise<LLMConfig> {
   const projectData = await loadJSONFile(join(dir, PROJECT_CONFIG_FILE));

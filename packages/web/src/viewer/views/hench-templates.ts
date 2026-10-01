@@ -1,9 +1,14 @@
 /**
- * Hench Templates view — browse, apply, and manage workflow templates.
+ * Templates — the template section of the Workflow page.
  *
  * Displays a gallery of built-in and user-defined templates with metadata,
  * use cases, and config overrides. Users can apply templates to their
  * current configuration or save their current config as a new template.
+ *
+ * These are immediate actions, outside the page's Save: each writes the saved
+ * config, so while the page has unsaved edits (`blocked`) Apply and Save as
+ * template are disabled — applying would overwrite the edits' base, and saving
+ * would capture the saved config rather than what is on screen.
  *
  * Data comes from:
  *   GET  /api/hench/templates          (list)
@@ -15,7 +20,6 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
-import { BrandedHeader } from "../components/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -58,11 +62,13 @@ function formatConfigValue(value: unknown): string {
 
 // ── Template card component ──────────────────────────────────────────
 
-function TemplateCard({ template, onApply, onDelete, applying }: {
+function TemplateCard({ template, onApply, onDelete, applying, blocked }: {
   template: WorkflowTemplate;
   onApply: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   applying: string | null;
+  /** The page has unsaved edits — Apply would write underneath them. */
+  blocked: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const configEntries = flattenConfig(template.config);
@@ -132,7 +138,7 @@ function TemplateCard({ template, onApply, onDelete, applying }: {
       h("button", {
         class: "hench-template-apply-btn",
         onClick: () => onApply(template.id),
-        disabled: isApplying,
+        disabled: isApplying || blocked,
       }, isApplying ? "Applying..." : "Apply"),
       !template.builtIn
         ? h("button", {
@@ -146,9 +152,11 @@ function TemplateCard({ template, onApply, onDelete, applying }: {
 
 // ── Save template form ───────────────────────────────────────────────
 
-function SaveTemplateForm({ onSave, saving }: {
+function SaveTemplateForm({ onSave, saving, blocked }: {
   onSave: (data: { id: string; name: string; description: string; tags: string }) => Promise<void>;
   saving: boolean;
+  /** The page has unsaved edits — the template would capture the saved config, not them. */
+  blocked: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [id, setId] = useState("");
@@ -179,6 +187,7 @@ function SaveTemplateForm({ onSave, saving }: {
     return h("button", {
       class: "hench-template-save-current-btn",
       onClick: () => setOpen(true),
+      disabled: blocked,
     }, "Save Current Config as Template");
   }
 
@@ -225,7 +234,7 @@ function SaveTemplateForm({ onSave, saving }: {
       h("button", {
         class: "hench-template-apply-btn",
         onClick: handleSave,
-        disabled: saving || !id,
+        disabled: saving || !id || blocked,
       }, saving ? "Saving..." : "Save Template"),
       h("button", {
         class: "hench-template-cancel-btn",
@@ -245,9 +254,17 @@ function Toast({ message }: { message: string | null }) {
   );
 }
 
-// ── Main view ────────────────────────────────────────────────────────
+// ── Section ──────────────────────────────────────────────────────────
 
-export function HenchTemplatesView() {
+/** The hint shown while `blocked` keeps Apply and Save as template disabled. */
+export const TEMPLATES_BLOCKED_HINT = "Save or discard your changes before applying or saving a template.";
+
+export function HenchTemplatesSection({ blocked, onApplied }: {
+  /** The page has unsaved edits — Apply and Save as template are disabled. */
+  blocked: boolean;
+  /** Called after a template is applied, so the work-settings form can reload. */
+  onApplied: () => Promise<void> | void;
+}) {
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -292,12 +309,13 @@ export function HenchTemplatesView() {
       }
       const result = await res.json() as { templateName: string };
       showToast(`Applied template "${result.templateName}"`);
+      await onApplied();
     } catch (err) {
       showToast(`Error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setApplying(null);
     }
-  }, [showToast]);
+  }, [showToast, onApplied]);
 
   const handleDelete = useCallback(async (id: string) => {
     try {
@@ -356,7 +374,6 @@ export function HenchTemplatesView() {
 
   if (error) {
     return h("div", { class: "hench-templates-container" },
-      h(BrandedHeader, { product: "hench", title: "Workflow Templates" }),
       h("div", { class: "hench-templates-error" },
         h("p", null, error),
         h("p", { class: "hench-templates-error-hint" },
@@ -375,17 +392,18 @@ export function HenchTemplatesView() {
 
   return h("div", { class: "hench-templates-container" },
     h("div", { class: "hench-templates-header" },
-      h(BrandedHeader, { product: "hench", title: "Workflow Templates" }),
       h("p", { class: "hench-templates-subtitle" },
-        "Pre-configured workflow setups for common development patterns. Apply a template to quickly configure your agent.",
+        "Pre-configured workflow setups for common development patterns. Applying a template writes its settings immediately.",
       ),
     ),
 
-    h(SaveTemplateForm, { onSave: handleSaveTemplate, saving }),
+    blocked ? h("p", { class: "hench-templates-blocked-hint", role: "note" }, TEMPLATES_BLOCKED_HINT) : null,
+
+    h(SaveTemplateForm, { onSave: handleSaveTemplate, saving, blocked }),
 
     builtIn.length > 0
       ? h("div", { class: "hench-templates-section" },
-          h("h2", { class: "hench-templates-section-title" }, "Built-in Templates"),
+          h("h3", { class: "hench-templates-section-title" }, "Built-in Templates"),
           h("div", { class: "hench-templates-grid" },
             ...builtIn.map((t) =>
               h(TemplateCard, {
@@ -394,6 +412,7 @@ export function HenchTemplatesView() {
                 onApply: handleApply,
                 onDelete: handleDelete,
                 applying,
+                blocked,
               }),
             ),
           ),
@@ -402,7 +421,7 @@ export function HenchTemplatesView() {
 
     user.length > 0
       ? h("div", { class: "hench-templates-section" },
-          h("h2", { class: "hench-templates-section-title" }, "Custom Templates"),
+          h("h3", { class: "hench-templates-section-title" }, "Custom Templates"),
           h("div", { class: "hench-templates-grid" },
             ...user.map((t) =>
               h(TemplateCard, {
@@ -411,6 +430,7 @@ export function HenchTemplatesView() {
                 onApply: handleApply,
                 onDelete: handleDelete,
                 applying,
+                blocked,
               }),
             ),
           ),

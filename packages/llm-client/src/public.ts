@@ -47,7 +47,9 @@
  * - `provider-session.ts` — active provider management and vendor switching
  * - `llm-types.ts` — vendor-neutral types (`LLMVendor`, `LLMConfig`, `CodexConfig`)
  * - `llm-client.ts` — vendor-neutral factory (`createLLMClient`, `detectLLMAuthMode`)
- * - `llm-config.ts` — vendor-neutral project config loader (`loadLLMConfig`)
+ * - `llm-config.ts` — vendor-neutral project config loader (`loadLLMConfig`),
+ *   plus `resolveClaudeConfig`, the per-field `llm.claude.*` ?? legacy
+ *   `claude.*` resolution every reader of those keys shares
  *
  * **Claude providers**
  * - `create-client.ts` — Claude factory with auto-detection logic
@@ -146,7 +148,8 @@ export type {
 export { ClaudeClientError, CLIError, CLI_ERROR_CODES, AuthFailureError } from "./types.js";
 
 // Vendor-neutral config + client factories
-export { loadLLMConfig } from "./llm-config.js";
+export { loadLLMConfig, resolveClaudeConfig } from "./llm-config.js";
+export type { ClaudeFieldSource, ResolvedClaudeConfig } from "./llm-config.js";
 export {
   createLLMClient,
   detectLLMAuthMode,
@@ -407,11 +410,20 @@ export type { VendorModelHeaderOptions, ModelSource } from "./vendor-header.js";
 // Vendor-change detection and model reset
 export {
   isModelCompatibleWithVendor,
+  isChatModelId,
   detectVendorChange,
   resetStaleModel,
   formatVendorChangeWarning,
 } from "./vendor-model-reset.js";
 export type { VendorModelResetResult } from "./vendor-model-reset.js";
+
+// Live model listing from the vendor APIs
+export { listVendorModels } from "./vendor-model-list.js";
+export type {
+  VendorModelListing,
+  ListableVendor,
+  ListVendorModelsOptions,
+} from "./vendor-model-list.js";
 
 // CLI typo correction
 export {

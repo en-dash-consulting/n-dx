@@ -797,7 +797,14 @@ export async function loadClaudeConfig(dir: string): Promise<ClaudeConfig> {
   }
 
   if (merged) {
-    return extractClaudeConfig(merged) ?? {};
+    // llm.claude.<field> over legacy claude.<field>, per field — the rule
+    // resolveClaudeConfig (llm-config.ts) defines. The spread is that rule
+    // because extractClaudeConfig copies only non-empty fields. Inlined, not
+    // imported: llm-config.ts imports this module.
+    const legacy = extractClaudeConfig(merged);
+    const llm = merged.llm && typeof merged.llm === "object" ? (merged.llm as Record<string, unknown>) : undefined;
+    const modern = llm ? extractClaudeConfig({ claude: llm.claude }) : null;
+    return { ...(legacy ?? {}), ...(modern ?? {}) };
   }
   return {};
 }

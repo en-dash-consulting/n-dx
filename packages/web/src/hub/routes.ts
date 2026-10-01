@@ -5,21 +5,26 @@
  *   GET    /api/hub/projects        — registered projects with live child status
  *   GET    /api/hub/queue           — admission limits, what is running, what is waiting
  *   GET    /api/hub/overview        — every project with its child's live status, for the home page
- *
- * Also answered under a project prefix — `/p/<id>/api/hub/queue` — because
- * that is the only address a viewer can reach. The dashboard is served by the
- * project's own server through the proxy, so its base path is `/p/<id>/` and
- * every root-relative fetch it makes is rewritten to sit under it
- * (`installBasePathFetch`). Without this the hub's own API is unreachable
- * from the page the hub is serving, and `/p/<id>/api/hub/queue` would be
- * proxied to a child that has never heard of it. Addressed that way, `/queue`
- * answers about that project rather than the whole machine.
  *   POST   /api/hub/projects        — register { id, repoRoot, ndxBin, worktree?, name? } and start its server
  *   DELETE /api/hub/projects/:id    — stop the server and forget the project
  *   DELETE /api/hub/projects/:id/worktrees/:path
  *                                   — unregister one worktree; the last one
  *                                     takes the project (and, with keepAlive
  *                                     off, the hub) with it
+ *
+ * Every one of those is also answered under a project prefix —
+ * `/p/<id>/api/hub/queue` — and under a worktree slot — `/w/<key>/…`,
+ * `/p/<id>/w/<key>/…` — because those are the only addresses a viewer can
+ * reach. The dashboard is served by the project's own server through the
+ * proxy, so its base path is `/p/<id>/` plus `/w/<key>` on a worktree page,
+ * and every root-relative fetch it makes is rewritten to sit under the whole
+ * of it (`installBasePathFetch`). Without this the hub's own API is
+ * unreachable from the page the hub is serving, and the request would be
+ * proxied to a child that has never heard of it.
+ *
+ * The two are not treated alike. The prefix narrows the answer — addressed
+ * that way, `/queue` is about that project rather than the whole machine —
+ * while the slot is dropped, because no answer here is per worktree.
  *
  * Deliberately framework-free and self-contained: the hub must not import
  * from `src/server/`, so the two JSON helpers are local rather than shared
@@ -31,7 +36,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import { detectBasePath, projectIdFromBasePath, safeDecodeSegment, stripBasePath } from "../shared/index.js";
+import { detectBasePath, projectIdFromBasePath, safeDecodeSegment, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, RegisterProjectInput } from "./hub.js";
 import { buildHubOverview } from "./overview.js";
 import { renderCards } from "./home.js";
@@ -148,8 +153,20 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   // A viewer's fetch arrives under its own base path; the hub's API is the
   // same API either way, and the prefix says which project is asking.
   const prefix = detectBasePath(rawUrl);
-  const url = prefix ? stripBasePath(prefix, rawUrl) : rawUrl;
+  const afterPrefix = prefix ? stripBasePath(prefix, rawUrl) : rawUrl;
   const scopedProjectId = prefix ? projectIdFromBasePath(prefix) : null;
+
+  // That base path also carries `/w/<key>` on a worktree page, and
+  // `installBasePathFetch` puts the whole of it on every root-relative fetch
+  // the viewer makes — so the run-queue strip asks for
+  // `/p/<id>/w/<key>/api/hub/queue`. The slot names the worktree the viewer is
+  // looking at, which is the project server's concern and never this API's:
+  // every answer here is about the hub, or about the project the prefix named.
+  // Dropping it is therefore the whole adjustment. Left on, the path matches
+  // nothing here, falls through to the proxy, and 404s at a project server
+  // that has never heard of `/api/hub` — which the strip renders as "no hub",
+  // silently showing nothing on every worktree page.
+  const { url } = stripWorkspaceSlot(afterPrefix);
 
   if (url !== HUB_PREFIX && !url.startsWith(`${HUB_PREFIX}/`)) return false;
   const path = url.slice(HUB_PREFIX.length);

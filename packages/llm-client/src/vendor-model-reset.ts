@@ -46,6 +46,20 @@ export function isModelCompatibleWithVendor(
 }
 
 /**
+ * Ids that name a model which cannot drive a chat or agent loop. Vendor model
+ * lists mix these in with the chat models (OpenAI's `/v1/models` returns
+ * embeddings, speech, image and moderation models beside `gpt-*`), and the
+ * vendor-prefix test in {@link isModelCompatibleWithVendor} lets several
+ * through (`gpt-4o-realtime-preview`, `gpt-image-1`, `gpt-4o-transcribe`).
+ */
+const NON_CHAT_MODEL_ID = /embed|audio|tts|whisper|image|dall-e|moderation|realtime|transcri|sora/i;
+
+/** Whether `model` is a chat-capable model id — false for embedding, audio, image, moderation, realtime and transcription models. */
+export function isChatModelId(model: string): boolean {
+  return !NON_CHAT_MODEL_ID.test(model);
+}
+
+/**
  * Detect whether the vendor is changing.
  *
  * @param oldVendor  The previous vendor (undefined if not set)

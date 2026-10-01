@@ -1,85 +1,85 @@
-# Layout-literal inventory
-
-Every production source file that still spells out where n-dx keeps its files,
-instead of asking the resolver.
-
-**160 literals across 68 files.** That number is the debt, and it may only go
-down.
-
-## Why this file exists
-
-Where n-dx keeps its state is one decision, and `resolveLayout` owns it:
-`.ndx/rex` or `.rex`, `.ndx/config.json` or `.n-dx.json`, depending on which
-layout the project is on. A literal `.rex/execution-log.jsonl` takes that
-decision a second time, in a file that has no idea which layout it is running
-under.
-
-What makes it worth a policy rather than a style note is how it fails. Nothing
-throws. A `.ndx/` project gets a path nothing writes to, and whatever the
-literal was reaching for is quietly skipped:
-
-- `rex init` created `.ndx/rex/execution-log.jsonl` while adding only
-  `.rex/execution-log*.jsonl` to `.gitignore`, so a generated log stayed
-  trackable and got committed by accident.
-- Every sourcevision reader of the project config guessed `.n-dx.json`, so risk
-  justifications, zone types, the `language` and inventory overrides, archetype
-  overrides, workspace members and the architecture declared for the iso map
-  were all ignored on a new-layout project — and the analysis still succeeded,
-  with different results and nothing to say why.
-
-Both were caught by a human reading a diff. That is not a repeatable control,
-which is what `tests/e2e/layout-literal-policy.test.js` is for.
-
-## The rule
-
-The policy test scans each package's `src/` plus core's orchestration scripts,
-blanks comments, and flags every **path-shaped** string literal naming `.rex`,
-`.hench`, `.sourcevision` or one of the loose `.n-dx*` files. Then:
-
-| Check | Fails when |
-|---|---|
-| Unlisted file | A file not in the tables below holds a literal. This is the one that matters: **new** literals cannot get in. |
-| Grown file | A listed file holds more literals than its recorded count. |
-| Stale row | A listed file holds none. Delete the row and lower the total. |
-
-Comments are blanked because a docstring naming `.rex/` is documentation, and
-the files that explain the layout mention it most. Prose in string form
-(`".hench/ already initialized, skipping"`) is not flagged either: it names a
-folder without deciding where one lives, and flagging it would teach people to
-add exemptions rather than read them.
-
-The `.n-dx*` files are in scope even though the task that asked for this rule
-names only the three directories. The resolver owns those paths too, and the
-config-reader defect above was `.n-dx.json` — a rule that let it through would
-not have caught the bug that prompted the rule.
-
-## What is exempt, and why
-
-`ALLOWED` in the policy test, plus every `src/**/paths.ts`:
-
-| File | Why |
-|---|---|
-| `packages/llm-client/src/layout.ts` | The resolver. Naming the paths is its job. |
-| `packages/core/layout.js` | The hand-written twin the orchestration tier needs, because it may not import a package. Pinned to the resolver by `tests/integration/layout-resolver-contract.test.js`. |
-| `packages/llm-client/src/project-dirs.ts` | The single source of truth for the three directory names. |
-| `packages/sourcevision/src/export/iso-{sources,declared}.ts` | `src/export/` bundles into the dependency-free standalone skill script and may import nothing but `node:` builtins, so it carries its own twins. Pinned by the same contract test. |
-| `packages/rex/src/cli/commands/migrate-layout.ts`, `packages/core/migrate-layout.js` | The command whose whole purpose is moving a project between layouts. Listed ahead of its arrival so the rule needs no edit when it lands. |
-| `packages/*/src/**/paths.ts` | A package's paths module answers the resolver's question for that package. |
-
-## Clearing an entry
-
-Replace the literal with the resolved path:
-
-```js
-import { resolveLayout } from "@n-dx/llm-client";
-const { rexDir, henchDir, sourcevisionDir, configFile } = resolveLayout(root);
-```
-
-A package with a paths module (`rex`, `sourcevision`, `hench`, `web`) asks that
-instead — it already composes the resolver with the package's own filenames.
-Then lower the file's count, or delete its row when it reaches zero, and lower
-the total at the top of this file.
-
+# Layout-literal inventory
+
+Every production source file that still spells out where n-dx keeps its files,
+instead of asking the resolver.
+
+**157 literals across 66 files.** That number is the debt, and it may only go
+down.
+
+## Why this file exists
+
+Where n-dx keeps its state is one decision, and `resolveLayout` owns it:
+`.ndx/rex` or `.rex`, `.ndx/config.json` or `.n-dx.json`, depending on which
+layout the project is on. A literal `.rex/execution-log.jsonl` takes that
+decision a second time, in a file that has no idea which layout it is running
+under.
+
+What makes it worth a policy rather than a style note is how it fails. Nothing
+throws. A `.ndx/` project gets a path nothing writes to, and whatever the
+literal was reaching for is quietly skipped:
+
+- `rex init` created `.ndx/rex/execution-log.jsonl` while adding only
+  `.rex/execution-log*.jsonl` to `.gitignore`, so a generated log stayed
+  trackable and got committed by accident.
+- Every sourcevision reader of the project config guessed `.n-dx.json`, so risk
+  justifications, zone types, the `language` and inventory overrides, archetype
+  overrides, workspace members and the architecture declared for the iso map
+  were all ignored on a new-layout project — and the analysis still succeeded,
+  with different results and nothing to say why.
+
+Both were caught by a human reading a diff. That is not a repeatable control,
+which is what `tests/e2e/layout-literal-policy.test.js` is for.
+
+## The rule
+
+The policy test scans each package's `src/` plus core's orchestration scripts,
+blanks comments, and flags every **path-shaped** string literal naming `.rex`,
+`.hench`, `.sourcevision` or one of the loose `.n-dx*` files. Then:
+
+| Check | Fails when |
+|---|---|
+| Unlisted file | A file not in the tables below holds a literal. This is the one that matters: **new** literals cannot get in. |
+| Grown file | A listed file holds more literals than its recorded count. |
+| Stale row | A listed file holds none. Delete the row and lower the total. |
+
+Comments are blanked because a docstring naming `.rex/` is documentation, and
+the files that explain the layout mention it most. Prose in string form
+(`".hench/ already initialized, skipping"`) is not flagged either: it names a
+folder without deciding where one lives, and flagging it would teach people to
+add exemptions rather than read them.
+
+The `.n-dx*` files are in scope even though the task that asked for this rule
+names only the three directories. The resolver owns those paths too, and the
+config-reader defect above was `.n-dx.json` — a rule that let it through would
+not have caught the bug that prompted the rule.
+
+## What is exempt, and why
+
+`ALLOWED` in the policy test, plus every `src/**/paths.ts`:
+
+| File | Why |
+|---|---|
+| `packages/llm-client/src/layout.ts` | The resolver. Naming the paths is its job. |
+| `packages/core/layout.js` | The hand-written twin the orchestration tier needs, because it may not import a package. Pinned to the resolver by `tests/integration/layout-resolver-contract.test.js`. |
+| `packages/llm-client/src/project-dirs.ts` | The single source of truth for the three directory names. |
+| `packages/sourcevision/src/export/iso-{sources,declared}.ts` | `src/export/` bundles into the dependency-free standalone skill script and may import nothing but `node:` builtins, so it carries its own twins. Pinned by the same contract test. |
+| `packages/rex/src/cli/commands/migrate-layout.ts`, `packages/core/migrate-layout.js` | The command whose whole purpose is moving a project between layouts. Listed ahead of its arrival so the rule needs no edit when it lands. |
+| `packages/*/src/**/paths.ts` | A package's paths module answers the resolver's question for that package. |
+
+## Clearing an entry
+
+Replace the literal with the resolved path:
+
+```js
+import { resolveLayout } from "@n-dx/llm-client";
+const { rexDir, henchDir, sourcevisionDir, configFile } = resolveLayout(root);
+```
+
+A package with a paths module (`rex`, `sourcevision`, `hench`, `web`) asks that
+instead — it already composes the resolver with the package's own filenames.
+Then lower the file's count, or delete its row when it reaches zero, and lower
+the total at the top of this file.
+
 ## When this file goes away
 
 The acceptance criterion behind the rule is absolute: *no* literal outside the
@@ -91,13 +91,13 @@ hench and web are not finished either. What is left:
 | Package | Literals |
 |---|---|
 | core | 60 |
-| web | 55 |
+| web | 52 |
 | hench | 25 |
 | rex | 12 |
 | llm-client | 6 |
 | sourcevision | 2 |
 
-So 140 of the remaining 160 sit in the three packages that sweep was meant to
+So 137 of the remaining 157 sit in the three packages that sweep was meant to
 clear. That is the number this file exists to keep honest: without it the task
 reads as done because a PR with its name on it merged.
 
@@ -190,7 +190,6 @@ more.
 | `packages/web/src/server/routes-llm.ts` | 2 | .n-dx* |
 | `packages/web/src/server/routes-sourcevision-ask.ts` | 2 | .n-dx* |
 | `packages/web/src/server/routes-worktrees.ts` | 2 | .n-dx* |
-| `packages/web/src/viewer/views/llm-provider.ts` | 2 | .n-dx* |
 | `packages/web/src/hub/children.ts` | 1 | .n-dx* |
 | `packages/web/src/server/cli-name.ts` | 1 | .n-dx* |
 | `packages/web/src/server/dashboard-usage.ts` | 1 | .n-dx* |
@@ -208,7 +207,6 @@ more.
 | `packages/web/src/viewer/views/hench-templates.ts` | 1 | .hench |
 | `packages/web/src/viewer/views/iso-map.ts` | 1 | .sourcevision |
 | `packages/web/src/viewer/views/notion-config.ts` | 1 | .rex |
-| `packages/web/src/viewer/views/project-settings.ts` | 1 | .n-dx* |
 | `packages/web/src/viewer/views/workflow-optimization.ts` | 1 | .hench |
 
 ### Registered ahead of merge

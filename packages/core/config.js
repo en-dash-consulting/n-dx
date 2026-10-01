@@ -2005,8 +2005,9 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     (default: 300000 = 5 min; 0 = no timeout)
                                     Raise this when the model is slow to generate or load,
                                     e.g. 7200000 for 2 hours. This is separate from
-                                    cli.timeoutMs / the "CLI Timeouts" settings page, which
-                                    bound the whole command rather than one HTTP request.
+                                    cli.timeoutMs / the CLI timeouts on the Workflow settings
+                                    page, which bound the whole command rather than one
+                                    HTTP request.
   llm.local.verifier.host  string    Hostname of a second local server used to review the
                                     primary model's output before finalizing a run (optional)
   llm.local.verifier.port  number    Port of the verifier server (optional)
@@ -2385,9 +2386,32 @@ async function loadAllConfigs(dir) {
 
 // ── Test connection handler ──────────────────────────────────────────────────
 
+/**
+ * The Claude settings in force, resolving `llm.claude.<field>` over the legacy
+ * top-level `claude.<field>` one field at a time. Returns undefined when
+ * neither location sets anything.
+ *
+ * Delegates to `resolveClaudeConfig` (@n-dx/llm-client) — the one
+ * implementation of the per-field rule, also used by `loadLLMConfig`,
+ * `GET /api/llm/config` and `GET /api/ndx-config` — so the CLI cannot
+ * disagree with them about which value wins. config.js is the spawn-exempt
+ * orchestration script and may not *statically* import packages
+ * (`domain-isolation.test.js`), so this loads it the same way the
+ * vendor-preflight and `runAuthCheck` paths already do: `await import(...)`.
+ *
+ * Reading only `configs.claude` worked while `ndx config llm.claude.<field>`
+ * mirrored its value into the legacy key. That mirror is gone, so a reader
+ * that does not resolve both locations now reports a project configured under
+ * `llm.claude.*` as having no Claude configuration at all.
+ */
+async function resolveClaudeSettings(configs) {
+  const { resolveClaudeConfig } = await import("@n-dx/llm-client");
+  return resolveClaudeConfig(configs?.llm?.claude, configs?.claude).config;
+}
+
 /** Handle --test-connection mode. */
 async function handleTestConnection(configs) {
-  const claudeConfig = configs.claude;
+  const claudeConfig = await resolveClaudeSettings(configs);
   if (!claudeConfig) {
     console.error(
       "No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.",
@@ -2596,7 +2620,16 @@ async function handleSetProjectSection(
   configs,
   flags,
 ) {
-  if (!configs[pkg]) configs[pkg] = {};
+  // A legacy `claude.<field>` write redirects to `llm.claude.<field>` — only
+  // the storage location moves. Validation still keys off "claude" so
+  // `CLAUDE_VALIDATORS` (which — unlike `LLM_VALIDATORS` — covers all of
+  // cli_path/api_key/api_endpoint/model) keeps running exactly as it did
+  // before the redirect existed.
+  const legacyClaudeWrite = pkg === "claude";
+  const storagePkg = legacyClaudeWrite ? "llm" : pkg;
+  const storageSettingPath = legacyClaudeWrite ? `claude.${settingPath}` : settingPath;
+
+  if (!configs[storagePkg]) configs[storagePkg] = {};
 
   const coerced = await coerceAndValidateProjectValue(
     pkg,
@@ -2622,15 +2655,15 @@ async function handleSetProjectSection(
     if (classNote) console.error(classNote);
   }
 
-  setByPath(configs[pkg], settingPath, coerced, pkg);
+  setByPath(configs[storagePkg], storageSettingPath, coerced, storagePkg);
 
-  const targetFile = isLocalProjectSetting(pkg, settingPath)
+  const targetFile = isLocalProjectSetting(storagePkg, storageSettingPath)
     ? LOCAL_CONFIG_FILE
     : PROJECT_CONFIG_FILE;
   const configPath = projectConfigPath(dir, targetFile);
   const current = await loadProjectConfigFile(dir, targetFile);
-  if (!current[pkg] || typeof current[pkg] !== "object") {
-    current[pkg] = {};
+  if (!current[storagePkg] || typeof current[storagePkg] !== "object") {
+    current[storagePkg] = {};
   }
 
   // Vendor-change model reset: capture old values before setting new vendor
@@ -2638,12 +2671,12 @@ async function handleSetProjectSection(
   let oldVendor, oldClaudeModel, oldCodexModel;
   if (pkg === "llm" && settingPath === "vendor") {
     // Capture old values before overwriting
-    oldVendor = current[pkg].vendor;
-    oldClaudeModel = current[pkg].claude?.model;
-    oldCodexModel = current[pkg].codex?.model;
+    oldVendor = current[storagePkg].vendor;
+    oldClaudeModel = current[storagePkg].claude?.model;
+    oldCodexModel = current[storagePkg].codex?.model;
   }
 
-  setByPath(current[pkg], settingPath, coerced, pkg);
+  setByPath(current[storagePkg], storageSettingPath, coerced, storagePkg);
 
   // Now perform vendor-change model reset if needed
   if (pkg === "llm" && settingPath === "vendor") {
@@ -2653,8 +2686,8 @@ async function handleSetProjectSection(
     // Check if Claude model needs to be reset
     const claudeReset = resetStaleModel(oldVendor, oldClaudeModel, coerced);
     if (claudeReset.changed) {
-      if (current[pkg].claude) {
-        delete current[pkg].claude.model;
+      if (current[storagePkg].claude) {
+        delete current[storagePkg].claude.model;
       }
       const warning = formatVendorChangeWarning(
         claudeReset,
@@ -2666,8 +2699,8 @@ async function handleSetProjectSection(
     // Check if Codex model needs to be reset
     const codexReset = resetStaleModel(oldVendor, oldCodexModel, coerced);
     if (codexReset.changed) {
-      if (current[pkg].codex) {
-        delete current[pkg].codex.model;
+      if (current[storagePkg].codex) {
+        delete current[storagePkg].codex.model;
       }
       const warning = formatVendorChangeWarning(
         codexReset,
@@ -2677,28 +2710,37 @@ async function handleSetProjectSection(
     }
   }
 
-  // Compatibility: keep legacy claude.* in sync when setting llm.claude.*
-  if (pkg === "llm" && settingPath.startsWith("claude.")) {
-    if (!current.claude || typeof current.claude !== "object") {
-      current.claude = {};
-    }
-    const legacySetting = settingPath.slice("claude.".length);
-    setByPath(current.claude, legacySetting, coerced);
-  }
+  // Writing `llm.claude.*` used to also mirror the value into the legacy
+  // top-level `claude.*` key. That mirror is gone: every reader now resolves
+  // the two locations per field (`resolveClaudeConfig` in @n-dx/llm-client), so
+  // the legacy copy bought nothing and cost a second place for the same setting
+  // to be wrong. Existing `claude.*` values are deliberately left where they
+  // are — they are still read until 1.0.0.
 
   // Write back to the appropriate file (local or project)
   await saveProjectJSON(configPath, current);
   console.log(`${keyArg} = ${formatValue(coerced)}`);
 
+  // `ndx config claude.<field>` itself is deprecated — surfaced on stderr,
+  // like the other advisories here, so `--json` stdout stays parseable.
+  if (legacyClaudeWrite) {
+    console.error(
+      `Note: "claude.${settingPath}" is deprecated. Wrote "llm.claude.${settingPath}" instead — ` +
+        `use that key directly to avoid this note.`,
+    );
+  }
+
   // A local-only setting that already exists in the shared file was written
   // before this routing existed. Setting it again is the documented migration:
   // the value now lives in the local file, so the shared copy is stale at best
-  // and a committed secret at worst. Remove it, and the legacy `claude.*`
-  // mirror of an `llm.claude.*` key along with it.
+  // and a committed secret at worst. Remove it, and any legacy `claude.*` copy
+  // of an `llm.claude.*` key along with it — this one still fires, because a
+  // secret mirrored into the shared file by an older version must not be left
+  // committed just because the mirror that put it there is gone.
   if (targetFile === LOCAL_CONFIG_FILE) {
-    const sharedPaths = [[pkg, settingPath]];
-    if (pkg === "llm" && settingPath.startsWith("claude.")) {
-      sharedPaths.push(["claude", settingPath.slice("claude.".length)]);
+    const sharedPaths = [[storagePkg, storageSettingPath]];
+    if (storagePkg === "llm" && storageSettingPath.startsWith("claude.")) {
+      sharedPaths.push(["claude", storageSettingPath.slice("claude.".length)]);
     }
     const removed = await removeFromSharedConfig(dir, sharedPaths);
     if (removed.length > 0) {
@@ -2807,7 +2849,7 @@ async function handleSetPackageConfig(
 // ── GET mode handler ─────────────────────────────────────────────────────────
 
 /** Handle GET mode: retrieve and display a single key or whole section. */
-function handleGet(keyArg, configs, flags) {
+async function handleGet(keyArg, configs, flags) {
   // Special handling for top-level language key
   if (keyArg === "language") {
     const value = configs.language || "auto";
@@ -2823,7 +2865,11 @@ function handleGet(keyArg, configs, flags) {
   if (dotIdx === -1) {
     // Show whole package/section config
     const pkg = keyArg;
-    if (!configs[pkg]) {
+    // `claude` resolves `llm.claude.*` over the legacy block per field — a
+    // project configured entirely under the modern key must not report "no
+    // configuration set" just because the legacy section was never written.
+    const sectionConfig = pkg === "claude" ? await resolveClaudeSettings(configs) : configs[pkg];
+    if (!sectionConfig) {
       if (PROJECT_SECTIONS.has(pkg)) {
         console.error(
           `No ${pkg} configuration set. Use 'n-dx config ${pkg}.<key> <value>' to add settings.`,
@@ -2835,9 +2881,9 @@ function handleGet(keyArg, configs, flags) {
     }
 
     if (flags.json) {
-      console.log(JSON.stringify(configs[pkg], null, 2));
+      console.log(JSON.stringify(sectionConfig, null, 2));
     } else {
-      printSection(pkg, configs[pkg]);
+      printSection(pkg, sectionConfig);
       console.log();
     }
     return;
@@ -2845,8 +2891,9 @@ function handleGet(keyArg, configs, flags) {
 
   const pkg = keyArg.slice(0, dotIdx);
   const settingPath = keyArg.slice(dotIdx + 1);
+  const sectionConfig = pkg === "claude" ? await resolveClaudeSettings(configs) : configs[pkg];
 
-  if (!configs[pkg]) {
+  if (!sectionConfig) {
     const defaultValue = getProjectKeyDefault(pkg, settingPath);
     if (defaultValue !== null) {
       printKeyDefault(defaultValue, flags);
@@ -2860,7 +2907,7 @@ function handleGet(keyArg, configs, flags) {
     process.exit(1);
   }
 
-  const value = getByPath(configs[pkg], settingPath, pkg);
+  const value = getByPath(sectionConfig, settingPath, pkg);
   if (value === undefined) {
     const defaultValue = getProjectKeyDefault(pkg, settingPath);
     if (defaultValue !== null) {
@@ -2903,14 +2950,26 @@ function printKeyDefault(defaultValue, flags) {
 // ── SHOW mode handler ────────────────────────────────────────────────────────
 
 /** Handle SHOW mode: display all configs. */
-function handleShowAll(configs, flags) {
+async function handleShowAll(configs, flags) {
+  // Resolve `llm.claude.*` over the legacy block per field so a project
+  // configured entirely under the modern key still shows a `claude` section,
+  // and one with legacy fields beside a partial modern block shows the merge
+  // rather than whichever location happened to load into `configs.claude`.
+  const claude = await resolveClaudeSettings(configs);
+  const displayConfigs = { ...configs };
+  if (claude !== undefined) {
+    displayConfigs.claude = claude;
+  } else {
+    delete displayConfigs.claude;
+  }
+
   if (flags.json) {
-    console.log(JSON.stringify(configs, null, 2));
+    console.log(JSON.stringify(displayConfigs, null, 2));
     return;
   }
 
   console.log("n-dx configuration:");
-  for (const [pkg, config] of Object.entries(configs)) {
+  for (const [pkg, config] of Object.entries(displayConfigs)) {
     if (config._error) {
       console.log(`\n  ${pkg} (error: ${config._error})`);
     } else if (typeof config === "string") {
@@ -3016,12 +3075,12 @@ export async function runConfig(args) {
 
   // GET mode: single key
   if (keyArg) {
-    handleGet(keyArg, configs, flags);
+    await handleGet(keyArg, configs, flags);
     return;
   }
 
   // SHOW mode: all configs
-  handleShowAll(configs, flags);
+  await handleShowAll(configs, flags);
 }
 
 /**
