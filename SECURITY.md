@@ -16,7 +16,7 @@ Report privately through either route:
 1. **GitHub private vulnerability report** (preferred):
    <https://github.com/en-dash-consulting/n-dx/security/advisories/new>.
    This opens a draft advisory that only maintainers can see.
-2. **Email:** <nick@endash.us> with `[n-dx security]` in the subject line.
+2. **Email:** <sterling.h@endash.us> with `[n-dx security]` in the subject line.
 
 Include what you can of the following. A partial report is far better than none.
 
