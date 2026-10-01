@@ -2,9 +2,8 @@
 id: "4fc05c48-48b0-4da3-8126-4fa237b924d9"
 level: "epic"
 title: "Hench"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-26T15:22:13.999Z"
-completedAt: "2026-10-01T19:52:29.706Z"
 endedAt: "2026-10-01T19:52:29.706Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
 lastModified: "2026-10-01T19:52:31.014Z"
@@ -50,3 +49,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Pre-run commit gate: verify uncommitted changes before starting a work loop](./pre-run-commit-gate-verify-uncommitted.md) | completed |
 | [RunRecord fields testGate, dependencyAudit and cleanupTransformations are stripped by the run-record schema on load](./runrecord-fields-testgate.md) | completed |
 | [Skill runs attribute tokens from a code-written usage mark taken when the task starts, not from a model-typed --startedAt window](./skill-runs-attribute-tokens-from-a.md) | completed |
+| [Tell the agent to run git bare from the project root, never behind cd or git -C](./tell-the-agent-to-run-git-bare-from.md) | pending |

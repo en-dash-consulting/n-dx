@@ -1,0 +1,21 @@
+---
+id: "7f00d3e6-73ec-40cb-9bfa-7685378309f8"
+level: "task"
+title: "Tell the agent to run git bare from the project root, never behind cd or git -C"
+status: "pending"
+priority: "high"
+tags:
+  - "hotfix"
+  - "hench"
+  - "run-lifecycle"
+  - "prompt"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "With autoCommit true, the brief's commit step tells the agent to run `git add` and `git commit` bare from the project root: never behind `cd … &&`, in a subshell, or as `git -C`. If it has cd'd away, it returns to the root first"
+  - "With autoCommit false, the staging step gives the same instruction for `git add`, and still says not to run `git commit` and to write .hench-commit-msg.txt"
+  - "A unit test on the built prompt asserts the instruction is present for both autoCommit values"
+  - "The git allowlist in buildAllowedTools is unchanged (no `git -C` or `cd … &&` patterns added)"
+description: "GitHub issue #485, option 1 (prompt guidance). In Claude CLI runs hench pre-approves git one subcommand at a time (Bash(git add:*), Bash(git commit:*), from buildAllowedTools in packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts), and those patterns match by prefix only. An agent that cd's into a package to run its tests and then commits with `cd ../.. && git commit …`, `git -C <dir> …` or `(cd X; git commit)` gets a permission prompt nobody can answer, so the commit is refused and the uncommitted-work gate fails a run whose test gate passed (runs 07eb4cad and 18e1ee3c on feat/live-tab, 2026-10-01; cold sessions too, so separate from #473). Fix: the commit step in buildWorkflow's prompt (packages/hench/src/agent/planning/prompt.ts, the commitStep string for both autoCommit true and false) tells the agent to run git as a bare `git add …` / `git commit …` from the project root, never prefixed by `cd … &&`, wrapped in a subshell, or as `git -C`, and to cd back to the project root first if it has moved. Do not widen the allowlist (option 3): a prefix rule cannot approve `cd <anything> && git …` without approving whatever follows. Option 2 (hench commits the agent's work itself) is out of scope and stays open on #485."
+lastModified: "2026-10-01T19:24:37.464Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
