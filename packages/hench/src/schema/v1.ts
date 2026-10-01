@@ -1222,7 +1222,16 @@ export type RunReviewRecord =
        * itself). Absent when the snapshot could not be taken.
        */
       repairedFiles?: string[];
-      /** Commit that captured the repairs on the autoCommit path. */
+      /**
+       * Commit that captured the repairs when nothing else would have.
+       *
+       * Set on the autoCommit path, and — since #483 — on the commit-prompt
+       * path when the executor committed its own work without writing
+       * `.hench-commit-msg.txt`, so no commit prompt followed to sweep the
+       * repairs in. Absent in the ordinary commit-prompt case, where the
+       * repairs are staged into the executor's own commit rather than getting
+       * one of their own.
+       */
       repairCommit?: string;
       /**
        * True when the reviewer ended waiting on a background command without

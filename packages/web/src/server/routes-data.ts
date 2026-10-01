@@ -4,7 +4,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
-import { join, extname } from "node:path";
+import { join, extname, sep } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
 import { ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "../shared/index.js";
@@ -126,8 +126,10 @@ export function handleDataRoute(
 
     const filePath = join(ctx.svDir, dataFile);
 
-    // Prevent directory traversal
-    if (!filePath.startsWith(ctx.svDir)) {
+    // Prevent directory traversal. The separator matters: a bare prefix check
+    // would accept a sibling directory that merely starts with the same name
+    // (`.sourcevision-old/…`), and the directory itself for an empty name.
+    if (!filePath.startsWith(ctx.svDir + sep)) {
       res.writeHead(403);
       res.end("Forbidden");
       return true;

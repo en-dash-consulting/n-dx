@@ -102,9 +102,25 @@ export function buildSystemPrompt(
   // These steps carry the full instruction. `## Rules` above deliberately does
   // not repeat them — the commit step in particular states the whole procedure
   // here, including why not to commit, rather than half here and half there.
+
+  // In CLI runs git is pre-approved one subcommand at a time — `Bash(git add:*)`,
+  // `Bash(git commit:*)`, from buildAllowedTools — and those patterns match by
+  // prefix only. An agent that cd's into a package to run its tests and then
+  // commits with `cd ../.. && git commit …`, `git -C <dir> …` or `(cd X; git
+  // commit)` matches none of them, so it draws a permission prompt nobody is
+  // there to answer: the commit is refused and the uncommitted-work gate fails a
+  // run whose test gate passed (GitHub #485).
+  //
+  // The fix belongs here rather than in the allowlist. A prefix rule cannot
+  // approve `cd <anything> && git …` without also approving whatever else
+  // follows the `&&`, so widening it trades a stalled run for an escape hatch
+  // around the whole policy.
+  const bareGitRule = (commands: string) =>
+    `Run ${commands} as a bare command from the project root — git must begin the command line, never prefixed by \`cd ... &&\`, wrapped in a subshell such as \`(cd ...; git ...)\`, or redirected with \`git -C <dir>\`. If you have changed directory, return to the project root as its own separate command first.`;
+
   const commitStep = autoCommit
-    ? "Commit your work with git, using a clear commit message"
-    : `Stage exactly the files you changed with \`git add -- <path...>\`, naming each path — never stage the whole tree, which may hold changes that are not yours to commit. Then write your proposed commit message to \`.hench-commit-msg.txt\` at the project root. Do NOT run \`git commit\` — ${cliName} will confirm the commit with the user.`;
+    ? `Commit your work with git, using a clear commit message. ${bareGitRule("\`git add\` and \`git commit\`")}`
+    : `Stage exactly the files you changed with \`git add -- <path...>\`, naming each path — never stage the whole tree, which may hold changes that are not yours to commit. ${bareGitRule("\`git add\`")} Then write your proposed commit message to \`.hench-commit-msg.txt\` at the project root. Do NOT run \`git commit\` — ${cliName} will confirm the commit with the user.`;
 
   const exploreStep = "Explore the codebase to understand context — read the code you are about to change before changing it";
   const testStep = "Run validation/tests if configured";

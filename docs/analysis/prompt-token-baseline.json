@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 22368,
-    "uniqueTokens": 13865,
+    "perCallTokens": 22450,
+    "uniqueTokens": 13947,
     "skills": 13,
     "skillTokens": 17511
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4148,
-      "uniqueTokens": 4148
+      "perCallTokens": 4230,
+      "uniqueTokens": 4230
     },
     "core": {
       "surfaces": 1,
@@ -665,7 +665,7 @@
         "JSON_OBJECT_ONLY": 16
       },
       "ownTokens": 559,
-      "fixedChars": 2356,
+      "fixedChars": 2355,
       "fixedTokens": 589
     },
     {
@@ -727,11 +727,11 @@
       "builder": "buildSystemPrompt",
       "purpose": "The agent's system prompt — role, rules, workflow, error handling.",
       "inline": false,
-      "literals": 66,
+      "literals": 69,
       "constants": {},
-      "ownTokens": 923,
-      "fixedChars": 3689,
-      "fixedTokens": 923
+      "ownTokens": 1005,
+      "fixedChars": 4019,
+      "fixedTokens": 1005
     },
     {
       "pkg": "hench",
@@ -916,13 +916,13 @@
     "hench": {
       "surface": "buildPromptEnvelope",
       "describe": "Full agent envelope (system + brief) for a CLI-provider run.",
-      "chars": 2954,
-      "tokens": 739,
+      "chars": 3253,
+      "tokens": 814,
       "sections": [
         {
           "name": "system",
-          "chars": 2284,
-          "tokens": 571
+          "chars": 2583,
+          "tokens": 646
         },
         {
           "name": "brief",
@@ -930,9 +930,9 @@
           "tokens": 167
         }
       ],
-      "fixedTokens": 1160,
+      "fixedTokens": 1242,
       "branchConditional": true,
-      "unreachedTokens": 421
+      "unreachedTokens": 428
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -987,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "ce3c9f9cb4d5a744",
-  "recordedAt": "2026-10-01T02:43:28.813Z",
-  "commit": "dbe5f3bff638",
+  "contentHash": "6996d67131756847",
+  "recordedAt": "2026-10-01T20:53:20.200Z",
+  "commit": "fcdfaaa1da3f",
   "dirty": false
 }

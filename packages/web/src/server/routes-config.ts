@@ -13,7 +13,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { LLM_VENDOR, resolveLayout, resolveClaudeConfig } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
@@ -154,9 +154,13 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
   const vendorIsClaude = vendor === null || vendor === LLM_VENDOR.CLAUDE;
   if (!model && vendorIsClaude && claude?.model) model = claude.model;
 
-  // For local vendor: query LM Studio for the currently loaded model.
-  // If the live model differs from the stored config, write it back to .n-dx.json
-  // so the displayed name stays in sync without requiring ndx init.
+  // For local vendor: query LM Studio for the currently loaded model and
+  // report that as the live model when it differs from the stored one.
+  //
+  // This is a GET and it must stay read-only; an earlier version persisted the
+  // live name back into `.n-dx.json` here. Nothing depended on the write: the
+  // footer shows the value this response returns, and the next `ndx init` or a
+  // save from the settings UI records whatever model the operator chose.
   if (vendor === LLM_VENDOR.LOCAL && llmConfig) {
     const localCfg = llmConfig.local && typeof llmConfig.local === "object"
       ? llmConfig.local as Record<string, unknown>
@@ -175,31 +179,7 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
       if (resp.ok) {
         const data = await resp.json() as { data?: Array<{ id: string }> };
         const liveModel = data.data?.[0]?.id ?? null;
-        if (liveModel && liveModel !== model) {
-          // Persist live model back to .n-dx.json so config stays current.
-          // Start from the shared file on disk, not the merged view: the
-          // merge carries .n-dx.local.json values (api_key, cli_path) that
-          // must never be copied into the committed file.
-          try {
-            const updated: Record<string, unknown> = readJSON(ndxConfigPath) ?? {};
-            if (!updated.llm || typeof updated.llm !== "object") {
-              updated.llm = { vendor: LLM_VENDOR.LOCAL };
-            }
-            const llm = updated.llm as Record<string, unknown>;
-            if (!llm.local || typeof llm.local !== "object") {
-              llm.local = {};
-            }
-            (llm.local as Record<string, unknown>).model = liveModel;
-            writeFileSync(ndxConfigPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
-            // Invalidate cache so next request re-reads from disk
-            configCaches.clear();
-          } catch {
-            // Write failure is non-fatal — still return the live model
-          }
-          model = liveModel;
-        } else if (liveModel) {
-          model = liveModel;
-        }
+        if (liveModel) model = liveModel;
       }
     } catch {
       // LM Studio not reachable — use stored config value

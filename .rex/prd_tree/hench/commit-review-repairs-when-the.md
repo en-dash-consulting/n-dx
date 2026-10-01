@@ -1,0 +1,26 @@
+---
+id: "c6d1041e-9e6f-4524-b7ee-79148345cf8e"
+level: "task"
+title: "Commit review repairs when the executor committed for itself and left no commit message"
+status: "completed"
+priority: "critical"
+tags:
+  - "hotfix"
+  - "hench"
+  - "run-lifecycle"
+  - "review"
+source: "ndx-capture"
+startedAt: "2026-10-01T19:20:13.855Z"
+completedAt: "2026-10-01T19:52:25.336Z"
+endedAt: "2026-10-01T19:52:25.336Z"
+resolutionType: "code-change"
+resolutionDetail: "finalizeRun's uncommitted-work gate now calls commitOrphanedReviewRepairs when autoCommit is off and no commit prompt follows. It commits the repairs through commitReviewRepairsIfNeeded only when HEAD moved past run.startHead and the repairs are the only dirt left; a refused commit renders formatReviewRepairsUncommittedRefusal, which names the cause and gives a git add/commit plus `ndx rex update --status=completed` recovery with no stash option and no re-run advice. Four integration tests added."
+acceptanceCriteria:
+  - "With autoCommit false, an executor that committed its own work with no .hench-commit-msg.txt, and a review that repaired a file, the run completes and the run produced two commits: the executor's and a `fix(review): apply adversarial-review repairs (run <id>)` commit holding the repairs"
+  - "If hench cannot make that commit, the refusal names the cause (review repairs uncommitted: the executor committed without a message file) instead of the generic uncommitted-work message, and its hint gives the two-command recovery: commit the repaired paths, then `ndx rex update <id> --status=completed`"
+  - "When the executor did not commit (HEAD still at startHead) or other work is still dirty, hench does not commit the repairs and the existing refusal is unchanged (run 2fb96507 behaviour)"
+  - "The commit prompt path (non-empty .hench-commit-msg.txt) and the autoCommit path behave as before"
+description: "GitHub issue #483 (caos run 4b733f14). With hench.autoCommit false, review repairs are committed only by the commit prompt (performCommitPromptIfNeeded in packages/hench/src/agent/lifecycle/shared.ts), which stages them via stageReviewRepairs before `git commit -F .hench-commit-msg.txt` and returns early when that file is missing or empty. When the executor commits its own work with `git commit` and writes no message file, nothing commits the repairs, and since #422 the uncommitted-work gate in finalizeRun correctly refuses them, so a run whose work and repairs were both correct ends failed and its task is reset to pending. commitReviewRepairs (agent/analysis/review-repairs.ts) already exists but only the autoCommit path calls it, through commitReviewRepairsIfNeeded.\n\nDesign: in finalizeRun's uncommitted-work gate, before findUncommittedWork, when !autoCommit and no commit prompt follows (pendingCommitMessageExists false) and the usable review has repairedFiles, call a new helper (commitOrphanedReviewRepairs). It commits the repairs through commitReviewRepairsIfNeeded only when (a) run.startHead is set and HEAD has moved past it, so the executor or the commit-msg watcher committed during this run, and (b) findUncommittedWork discounting PRD_COMMIT_PATHS plus the repairs is clean, so nothing else is left. Without (a) the repairs may be the whole uncommitted feature (run 2fb96507) and must not land as a fix(review) commit; without (b) the existing refusal is right. If the commit was attempted and threw (for example the checkout guard, checkRunGitOrigin), return the error and have the gate use a new formatReviewRepairsUncommittedRefusal (uncommitted-work-gate.ts) that names the cause, gives path-scoped git add/commit commands without the git stash alternative (add a setAside option to renderRecoveryCommands), then `ndx rex update <taskId> --status=completed`, and does not say to re-run. Update the doc comments on commitReviewRepairsIfNeeded and RunRecord review.repairCommit (schema/v1.ts). Tests go in packages/hench/tests/integration/uncommitted-work-completion.test.ts under the autoCommit=false describe. Fixtures must set run.startHead and run.branch, or the origin guard treats the run as detached. Cover: success with two commits since startHead; a repair commit refused by a mismatched run.branch giving the named refusal; HEAD unchanged meaning no commit and the generic refusal; other dirt meaning no commit and the generic refusal."
+lastModified: "2026-10-01T19:52:26.457Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
