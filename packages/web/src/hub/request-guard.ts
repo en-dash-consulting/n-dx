@@ -118,16 +118,26 @@ export function guardHubRequest(req: IncomingMessage, res: ServerResponse, hubPo
   return false;
 }
 
+/** What the hub makes of a WebSocket handshake. */
+export type UpgradeVerdict = "allowed" | "misdirected" | "forbidden";
+
 /**
- * Whether a WebSocket upgrade may be forwarded.
+ * Judge a WebSocket upgrade.
  *
  * A handshake carries no preflight, so this is the only check there is: a
  * page that opened `ws://localhost:3117/p/<id>/` would otherwise read every
  * frame the project broadcasts — PRD changes, agent stdout, run state.
  *
  * The `Host` rule is applied here as well, so the HTTP and upgrade paths cannot
- * disagree about what "this server" means.
+ * disagree about what "this server" means — and it is reported separately from
+ * the origin rule so the caller can answer 421 where the HTTP path answers 421
+ * and 403 where it answers 403. A single boolean collapsed both into 403, which
+ * also disagreed with the project server's own upgrade path (`server/websocket.ts`).
  */
-export function upgradeAllowed(req: Pick<IncomingMessage, "headers">, hubPort: number | undefined): boolean {
-  return hostAllowed(req, hubPort) && classifyOrigin(req, hubPort) !== "untrusted";
+export function upgradeVerdict(
+  req: Pick<IncomingMessage, "headers">,
+  hubPort: number | undefined,
+): UpgradeVerdict {
+  if (!hostAllowed(req, hubPort)) return "misdirected";
+  return classifyOrigin(req, hubPort) === "untrusted" ? "forbidden" : "allowed";
 }

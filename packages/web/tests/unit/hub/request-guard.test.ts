@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { classifyOrigin, guardHubRequest, upgradeAllowed } from "../../../src/hub/request-guard.js";
+import { classifyOrigin, guardHubRequest, upgradeVerdict } from "../../../src/hub/request-guard.js";
 
 const HUB_PORT = 3117;
 
@@ -170,19 +170,27 @@ describe("guardHubRequest — Host validation", () => {
   });
 });
 
-describe("upgradeAllowed", () => {
+describe("upgradeVerdict", () => {
   it("refuses a WebSocket handshake from another origin, and allows the dashboard's", () => {
     // A handshake carries no preflight, so this is the only check there is:
     // otherwise any open page could read every frame a project broadcasts.
-    expect(upgradeAllowed(req("GET", { origin: "http://evil.test" }), HUB_PORT)).toBe(false);
-    expect(upgradeAllowed(req("GET", { origin: "http://localhost:3117" }), HUB_PORT)).toBe(true);
-    expect(upgradeAllowed(req("GET"), HUB_PORT)).toBe(true);
+    expect(upgradeVerdict(req("GET", { origin: "http://evil.test" }), HUB_PORT)).toBe("forbidden");
+    expect(upgradeVerdict(req("GET", { origin: "http://localhost:3117" }), HUB_PORT)).toBe("allowed");
+    expect(upgradeVerdict(req("GET"), HUB_PORT)).toBe("allowed");
   });
 
   it("refuses a handshake whose Host is not the hub, whatever its Origin", () => {
-    expect(upgradeAllowed(req("GET", { host: "attacker.example:3117" }), HUB_PORT)).toBe(false);
+    // "misdirected", not "forbidden": the caller answers 421, as the HTTP path
+    // and the project server's own upgrade path both do for a foreign Host.
+    // A single boolean here made every rejection a 403.
+    expect(upgradeVerdict(req("GET", { host: "attacker.example:3117" }), HUB_PORT)).toBe("misdirected");
     expect(
-      upgradeAllowed(req("GET", { host: "attacker.example:3117", origin: "http://localhost:3117" }), HUB_PORT),
-    ).toBe(false);
+      upgradeVerdict(req("GET", { host: "attacker.example:3117", origin: "http://localhost:3117" }), HUB_PORT),
+    ).toBe("misdirected");
+    // The Host rule wins over the origin rule, so a handshake that breaks both
+    // is still reported as misdirected rather than forbidden.
+    expect(
+      upgradeVerdict(req("GET", { host: "attacker.example:3117", origin: "http://evil.test" }), HUB_PORT),
+    ).toBe("misdirected");
   });
 });
