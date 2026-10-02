@@ -390,11 +390,12 @@ function reviewModelKey(vendor: LLMVendor, source: ReturnType<typeof reviewModel
  * Quote a command-line word only when it needs it: single quotes for a POSIX
  * shell, double quotes on win32 (cmd.exe and PowerShell do not read single
  * quotes as quoting). A backslash is a path separator on win32, an escape in
- * POSIX.
+ * POSIX. `~` is plain on win32 (8.3 short paths such as `RUNNER~1`) but is
+ * tilde expansion in POSIX, so it stays quoted there.
  */
 export function shellWord(word: string, platform: NodeJS.Platform = process.platform): string {
   const win = platform === "win32";
-  if (win ? /^[\w@%+=:,./\\-]+$/.test(word) : /^[\w@%+=:,./-]+$/.test(word)) return word;
+  if (win ? /^[\w@%+=:,./\\~-]+$/.test(word) : /^[\w@%+=:,./-]+$/.test(word)) return word;
   if (win) return `"${word.replace(/"/g, '\\"')}"`;
   return `'${word.replace(/'/g, `'\\''`)}'`;
 }
