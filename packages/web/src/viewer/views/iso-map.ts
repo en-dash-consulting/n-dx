@@ -177,8 +177,12 @@ function dashboardTheme(): "light" | "dark" | null {
  *
  * The frame is sandboxed to an opaque origin, so postMessage with "*" is the
  * only channel; the message carries no data the map could not already see.
+ *
+ * `shownHtml` must be the document the frame is showing — null while no frame
+ * is mounted — so a rebuild that returns identical HTML still re-binds the
+ * remounted frame (the loading state unmounts it).
  */
-export function useIsoFrameSync(frameRef: { current: HTMLIFrameElement | null }, wheelZoom: boolean, html: string | null): void {
+export function useIsoFrameSync(frameRef: { current: HTMLIFrameElement | null }, wheelZoom: boolean, shownHtml: string | null): void {
   const send = useCallback(() => {
     frameRef.current?.contentWindow?.postMessage({ type: "ndx-iso", wheelZoom, theme: dashboardTheme() }, "*");
   }, [frameRef, wheelZoom]);
@@ -189,7 +193,7 @@ export function useIsoFrameSync(frameRef: { current: HTMLIFrameElement | null },
     send();
     frame.addEventListener("load", send);
     return () => frame.removeEventListener("load", send);
-  }, [send, html]);
+  }, [send, shownHtml]);
 
   useEffect(() => {
     const observer = new MutationObserver(send);
@@ -208,7 +212,7 @@ export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = 
   const [controls, setControls] = useState<IsoMapControls>(ISO_MAP_DEFAULTS);
   const { state, html, error, applied, generate } = useIsoMapDocument(analysisStamp, deployed, true);
   const frameRef = useRef<HTMLIFrameElement>(null);
-  useIsoFrameSync(frameRef, false, html);
+  useIsoFrameSync(frameRef, false, state === "ready" ? html : null);
 
   const appliedUrl = buildIsoMapUrl(applied);
 
@@ -419,7 +423,7 @@ export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [] }: Is
   const [expanded, setExpanded] = useState(false);
   // True when `expanded` is the CSS overlay rather than real full screen.
   const [overlay, setOverlay] = useState(false);
-  useIsoFrameSync(frameRef, expanded, html);
+  useIsoFrameSync(frameRef, expanded, state === "ready" ? html : null);
 
   useEffect(() => {
     const sync = () => {

@@ -191,8 +191,10 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
     if (text.length < MIN_INPUT_LENGTH) return;
 
     const reqId = ++requestIdRef.current;
-    triggerPreview(text, reqId, selectedScope || undefined);
-  }, [input, triggerPreview, selectedScope]);
+    // The bar layout hides the scope selector, so a scope picked before
+    // switching to it must not silently apply.
+    triggerPreview(text, reqId, (!bar && selectedScope) || undefined);
+  }, [input, triggerPreview, selectedScope, bar]);
 
   // Cleanup on unmount
   useEffect(() => {

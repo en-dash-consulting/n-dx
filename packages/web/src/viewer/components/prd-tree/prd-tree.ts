@@ -1070,11 +1070,17 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
   });
 
   if (doc.items.length === 0) {
+    // The host's controls carry the Add item action, so an empty PRD keeps them.
     return h(
-      "div",
-      { class: "prd-empty" },
-      h("p", null, "No PRD items yet."),
-      h("p", { class: "prd-empty-hint" }, "Run ", h("code", null, "rex add epic --title=\"...\""), " to get started."),
+      Fragment,
+      null,
+      controls ?? null,
+      h(
+        "div",
+        { class: "prd-empty" },
+        h("p", null, "No PRD items yet."),
+        h("p", { class: "prd-empty-hint" }, "Run ", h("code", null, "rex add epic --title=\"...\""), " to get started."),
+      ),
     );
   }
 
