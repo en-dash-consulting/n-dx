@@ -59,7 +59,12 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
   const [migrating, setMigrating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [preparing, setPreparing] = useState(false);
+  /**
+   * What the open modal was opened for, captured at click. The host's `taskId`
+   * moves under polling hosts (Up Next, Live idle), and a modal that followed
+   * it would keep one task's edits while posting another task's id.
+   */
+  const [prepFor, setPrepFor] = useState<{ taskId: string; workspace?: string } | null>(null);
   const menuId = `start-menu-${taskId}`;
 
   // Escape closes an open menu.
@@ -146,7 +151,7 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
   }, [post]);
 
   const openLive = useCallback((id: string) => {
-    setPreparing(false);
+    setPrepFor(null);
     onStarted();
     if (navigateTo) navigateTo("live-task", { taskId: id });
     else window.location.assign(appUrl(`/live/task/${encodeURIComponent(id)}`));
@@ -157,7 +162,7 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     h("div", { class: "ready-split" },
       h("button", {
         class: "start-task-btn start-task-primary",
-        onClick: (e: Event) => { e.stopPropagation(); setMenuOpen(false); setPreparing(true); },
+        onClick: (e: Event) => { e.stopPropagation(); setMenuOpen(false); setPrepFor({ taskId, workspace }); },
         disabled: busy,
         "aria-label": ariaLabel ?? "Prepare a run of this task with the agent",
       }, loading ? "Starting…" : label),
@@ -190,11 +195,12 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     notice
       ? h("div", { class: "start-task-notice", role: "status" }, notice)
       : null,
-    preparing
+    prepFor
       ? h(PrepareTaskModal, {
-          taskId,
-          workspace,
-          onClose: () => setPreparing(false),
+          key: prepFor.taskId,
+          taskId: prepFor.taskId,
+          workspace: prepFor.workspace,
+          onClose: () => setPrepFor(null),
           onOpenLive: openLive,
         })
       : null,

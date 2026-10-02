@@ -61,7 +61,16 @@ type Reply = { ok: boolean; status: number; data: Record<string, unknown> };
 
 const PERMISSION_MODES = RUN_OPTION_SPECS.find((s) => s.key === "permissionMode")?.values ?? [];
 
-export function PrepareTaskModal({ taskId, workspace, onClose, onOpenLive }: PrepareTaskModalProps) {
+/**
+ * Keyed by task id, so a different `taskId` is a different modal: edits, preview
+ * and queued state belong to the task they were made for and are never carried
+ * to another one, whichever host mounts this.
+ */
+export function PrepareTaskModal(props: PrepareTaskModalProps) {
+  return h(PrepareTaskModalBody, { key: props.taskId, ...props });
+}
+
+function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive }: PrepareTaskModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [prep, setPrep] = useState<PrepResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
