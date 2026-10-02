@@ -181,7 +181,7 @@ export {
   MODEL_CONTEXT_WINDOWS,
   MODEL_COSTS,
 } from "./config.js";
-export type { TaskModelResolution, JudgmentRoute, ModelCost } from "./config.js";
+export type { TaskModelResolution, ModelSourceKey, JudgmentRoute, ModelCost } from "./config.js";
 
 // Model-aware token pricing (the single price table for every cost surface)
 export {
@@ -590,3 +590,25 @@ export type {
   UsageSection,
   UsageDefinition,
 } from "./help-format.js";
+
+// Shared available-memory reading (macOS counts reclaimable pages + kernel pressure)
+export {
+  readAvailableMemory,
+  getAvailableMemory,
+  createAvailableMemoryReader,
+  parseVmStatAvailableBytes,
+  parseDarwinPressureLevel,
+  derivePressure,
+  MEMORY_READING_TTL_MS,
+  MEMORY_EXEC_TIMEOUT_MS,
+  PRESSURE_CRITICAL_USED_PERCENT,
+  PRESSURE_WARN_USED_PERCENT,
+} from "./system-memory.js";
+
+export type {
+  AvailableMemoryReading,
+  MemoryPressure,
+  ExecRunner,
+  SystemMemoryDeps,
+  AvailableMemoryReader,
+} from "./system-memory.js";

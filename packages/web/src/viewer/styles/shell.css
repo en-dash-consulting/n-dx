@@ -439,7 +439,7 @@
 }
 .settings-frame-indicator { font-size: 12px; color: var(--text-muted); }
 .settings-frame-indicator--dirty { color: var(--warn, #e0a030); font-weight: 600; }
-.settings-frame-error { font-size: 12px; color: var(--danger, #e05252); }
+.settings-frame-error { font-size: 12px; color: var(--red); }
 .settings-frame-save {
   margin-left: auto;
   padding: 7px 16px;
@@ -489,7 +489,7 @@
 }
 .leave-guard-keep-btn { border: 1px solid var(--border); background: transparent; color: var(--text); }
 .leave-guard-keep-btn:hover, .leave-guard-keep-btn:focus-visible { background: var(--bg-hover); outline: none; }
-.leave-guard-discard-btn { border: 1px solid transparent; background: var(--danger, #e05252); color: #fff; }
+.leave-guard-discard-btn { border: 1px solid transparent; background: var(--red); color: var(--bg); }
 .leave-guard-discard-btn:hover, .leave-guard-discard-btn:focus-visible { filter: brightness(1.08); outline: none; }
 
 /* ── Stage pages ─────────────────────────────────────────────────────── */

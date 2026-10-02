@@ -801,7 +801,7 @@ async function handleSelfHeal(
 
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
   const verboseFlag = serverVerbosityFlag();
-  const cmdArgs = [...prefixArgs, "self-heal", String(iterations), ...(verboseFlag ? [verboseFlag] : []), ctx.projectDir];
+  const cmdArgs = [...prefixArgs, "self-heal", String(iterations), "--auto", ...(verboseFlag ? [verboseFlag] : []), ctx.projectDir];
 
   // Reset status and start background execution
   selfHealStatus.running = true;

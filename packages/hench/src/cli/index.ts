@@ -153,6 +153,12 @@ async function main(): Promise<void> {
         break;
       }
       case "run": {
+        // --resolve reports what the run would use and acts on nothing.
+        if (flags.resolve !== undefined && flags.resolve !== "false") {
+          const { cmdResolve } = await import("./commands/run-resolve.js");
+          await cmdResolve(resolveDir(), flags);
+          break;
+        }
         const { cmdRun } = await import("./commands/run.js");
         await cmdRun(resolveDir(), flags);
         break;

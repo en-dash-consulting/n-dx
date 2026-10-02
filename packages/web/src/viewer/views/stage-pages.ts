@@ -25,7 +25,7 @@ import {
   type StageSection,
   type StageTab,
 } from "./stages.js";
-import { ProductLogoPng, useProjectStatus, type ProjectStatus } from "../components/index.js";
+import { ProductLogoPng, ReadyToRun, useProjectStatus, type ProjectStatus } from "../components/index.js";
 import { useFeatureToggle, useCliName, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 
@@ -228,6 +228,14 @@ export function StagePage({ stage, validViews, navigateTo, renderView }: StagePa
         h("p", { class: "stage-page-blurb" }, viewBlurb(stage)),
       ),
     ),
+    // Starting a run is the Work stage's job; the list sits above its sections.
+    stage === "work" && !deployed
+      ? h(ReadyToRun, {
+          onPrepare: (taskId: string) => navigateTo("work", { taskId }),
+          onOpenLive: (taskId: string) => navigateTo("live-task", { taskId }),
+          onOpenPrd: () => navigateTo("prd"),
+        })
+      : null,
     sections.map((s) => {
       if (s.plain) return h(PlainSection, { key: s.view, section: s, renderView });
       return h(Section, { key: s.view, stage, section: s, validViews, deployed, navigateTo, renderView });

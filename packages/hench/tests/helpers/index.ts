@@ -282,9 +282,12 @@ export const RM_RETRY = { maxRetries: 10, retryDelay: 100 } as const;
  * `exec` spawns rather than calling execFile (execFile drops the `detached`
  * option, so it cannot make a child a process-group leader), which means
  * `exec("git", ["status", …])` now shows up at the same mocked `spawn` as the CLI.
- * `ps` and `taskkill` appear too, from the tree kill on timeout.
+ * `ps` and `taskkill` appear too, from the tree kill on timeout. On darwin,
+ * `vm_stat` and `sysctl` come from the shared available-memory reading (run-start
+ * memory stats and the pre-spawn check); their benign empty output reads as an
+ * unknown reading, which never blocks.
  */
-const ANCILLARY_SPAWNS = new Set(["git", "ps", "taskkill"]);
+const ANCILLARY_SPAWNS = new Set(["git", "ps", "taskkill", "vm_stat", "sysctl"]);
 
 function isAncillarySpawn(command: string, args: string[] = []): boolean {
   const base = command.replace(/^.*[\\/]/, "").replace(/\.exe$/i, "");

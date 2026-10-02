@@ -9,9 +9,14 @@
  *
  * So execute requests pass through here first. A run is admitted when the
  * machine has room for it — fewer than `maxSessions` in flight across every
- * project, and free memory above `memoryFloorBytes`. Otherwise it is queued
+ * project, and available memory above `memoryFloorBytes`. Otherwise it is queued
  * rather than refused: the operator asked for the work, and a queue position
  * is a better answer than an error they have to remember to retry.
+ *
+ * "Available" is the shared reading from `@n-dx/llm-client`, not `os.freemem()`:
+ * on macOS that counts only free pages and reads ~115 MB on a machine holding
+ * ~3.9 GB it would hand over on demand, which queued every dashboard run on an
+ * idle Mac. An unreadable machine admits — see {@link decideAdmission}.
  *
  * The queue is FIFO across projects, drained by polling rather than by
  * listening for completion events. Polling is what the gate already does to
@@ -24,20 +29,26 @@
  * @module web/hub/admission
  */
 
-import { freemem } from "node:os";
+import { totalmem } from "node:os";
+import { derivePressure, getAvailableMemory, readAvailableMemory, type MemoryPressure } from "@n-dx/llm-client";
+import type { RunOptions } from "../shared/index.js";
 
 /** Bounds the machine will not exceed, whatever any single project would allow. */
 export interface AdmissionLimits {
   /** Dashboard-started runs in flight across every registered project. */
   maxSessions: number;
-  /** Free system memory below which nothing new starts. */
+  /** Available system memory below which nothing new starts. */
   memoryFloorBytes: number;
 }
 
 /** What the gate measured when it decided. */
 export interface AdmissionSnapshot {
   running: number;
-  freeMemoryBytes: number;
+  /**
+   * The shared reading's `availableBytes`, or `null` when the machine could not
+   * be read — which is not the same as "none left", and never holds a run back.
+   */
+  freeMemoryBytes: number | null;
 }
 
 export type AdmissionReason = "at-capacity" | "low-memory";
@@ -52,8 +63,78 @@ export interface QueueEntry {
   /** Workspace (worktree) key the request addressed, or null for the anchor. */
   workspace: string | null;
   taskId: string;
+  /**
+   * The run options the request carried, replayed with it when admitted.
+   * Absent when it carried none. Shape-checked by the proxy and judged by the
+   * project server before queuing (see `validate`), then judged again when the
+   * run starts, since the project may change while the entry waits.
+   */
+  options?: RunOptions;
   enqueuedAt: string;
 }
+
+/** A refusal from the project server, as its execute route answered it. */
+export interface ExecuteRefusal {
+  /** The HTTP status `POST /api/hench/execute` answered (or would have). */
+  status: number;
+  /** Its JSON body; `error` is the message for the operator. */
+  body: Record<string, unknown>;
+}
+
+/** How a queued entry's replay went. */
+export type StartOutcome =
+  | { started: true }
+  | {
+    started: false;
+    /** The server's HTTP status, or null when it could not be reached. */
+    status: number | null;
+    /** Why, in the server's words when it gave any. */
+    error: string;
+  };
+
+/**
+ * A queued entry whose turn came and whose server would not start it. Kept so
+ * the operator who saw "Queued — position N" learns the run is not coming and
+ * why, rather than watching the position vanish.
+ */
+export interface DroppedEntry extends QueueEntry {
+  droppedAt: string;
+  /** The server's HTTP status, or null when it could not be reached. */
+  status: number | null;
+  error: string;
+}
+
+/** How many dropped entries the gate remembers, newest kept. */
+export const MAX_DROPPED_ENTRIES = 20;
+
+/**
+ * A queue or dropped entry as `GET /api/hub/queue` shows it: the options
+ * without `contextNotes`, which can run to 8 KB of operator prose that no
+ * queue strip needs and that an unscoped snapshot would hand to every
+ * project's viewer. `hasNotes` says there were some.
+ */
+export type QueueEntryView<T extends QueueEntry = QueueEntry> = Omit<T, "options"> & {
+  options?: Omit<RunOptions, "contextNotes">;
+  hasNotes?: true;
+};
+
+/** Drop `contextNotes` from an entry, keeping a flag that there were some. */
+export function redactQueueEntry<T extends QueueEntry>(entry: T): QueueEntryView<T> {
+  if (!entry.options) return entry;
+  const { options: full, ...rest } = entry;
+  const { contextNotes, ...options } = full;
+  return {
+    ...rest,
+    ...(Object.keys(options).length > 0 ? { options } : {}),
+    ...(contextNotes ? { hasNotes: true as const } : {}),
+  };
+}
+
+/** The snapshot `GET /api/hub/queue` serves: {@link QueueSnapshot} with entries redacted. */
+export type PublicQueueSnapshot = Omit<QueueSnapshot, "entries" | "dropped"> & {
+  entries: QueueEntryView[];
+  dropped: QueueEntryView<DroppedEntry>[];
+};
 
 export interface QueueSnapshot {
   /**
@@ -61,16 +142,29 @@ export interface QueueSnapshot {
    * through `/p/<id>/`; `queuedTotal` then says how many there are in all.
    */
   entries: QueueEntry[];
+  /**
+   * Entries whose turn came but whose server refused them, oldest first —
+   * narrowed with `entries`. An entry leaves this list when the same task is
+   * asked for again.
+   */
+  dropped: DroppedEntry[];
   /** Entries queued across every project, when `entries` has been narrowed. */
   queuedTotal?: number;
   running: number;
-  freeMemoryBytes: number;
+  /** Available memory the gate last measured; `null` when unreadable. */
+  freeMemoryBytes: number | null;
+  /** The same number, under the name the shared reading uses. */
+  availableBytes: number | null;
+  /** Kernel memory pressure, or `"unknown"` when nothing could be read. */
+  pressure: MemoryPressure;
   limits: AdmissionLimits;
   /**
    * True when the gate is holding everything back for memory rather than for
    * the session cap — the distinction the Overview strip shows as
    * "admission paused: low memory", because waiting behind other runs and
    * waiting for the machine to recover are different situations.
+   *
+   * Always false when the reading is unknown: nothing is being held back.
    */
   memoryPaused: boolean;
 }
@@ -82,13 +176,19 @@ export interface QueueSnapshot {
  * Capacity is checked before memory only so the reason is the more actionable
  * of the two: at the cap, finishing a run releases the next one; below the
  * floor, nothing the operator does inside n-dx helps.
+ *
+ * An unreadable machine (`freeMemoryBytes` null) admits. A memory signal that
+ * does not exist is not a reason to hold work the operator asked for — the
+ * session cap still applies.
  */
 export function decideAdmission(
   snapshot: AdmissionSnapshot,
   limits: AdmissionLimits,
 ): AdmissionDecision {
   if (snapshot.running >= limits.maxSessions) return { admit: false, reason: "at-capacity" };
-  if (snapshot.freeMemoryBytes <= limits.memoryFloorBytes) return { admit: false, reason: "low-memory" };
+  if (snapshot.freeMemoryBytes !== null && snapshot.freeMemoryBytes <= limits.memoryFloorBytes) {
+    return { admit: false, reason: "low-memory" };
+  }
   return { admit: true };
 }
 
@@ -118,13 +218,24 @@ export class AdmissionQueue {
   /**
    * Add an entry, or return where an identical one already sits. Re-asking for
    * a task that is already queued must not move it, nor queue it twice — a
-   * double-clicked button is the common case.
+   * double-clicked button is the common case. The re-ask's options replace the
+   * queued ones: the operator changed how the run starts, not when.
    *
    * @returns 1-based position in the queue.
    */
   enqueue(entry: QueueEntry): { position: number; added: boolean } {
     const existing = this.entries.findIndex((e) => sameQueueEntry(e, entry));
-    if (existing !== -1) return { position: existing + 1, added: false };
+    if (existing !== -1) {
+      const queued = this.entries[existing];
+      this.entries[existing] = {
+        projectId: queued.projectId,
+        workspace: queued.workspace,
+        taskId: queued.taskId,
+        ...(entry.options ? { options: entry.options } : {}),
+        enqueuedAt: queued.enqueuedAt,
+      };
+      return { position: existing + 1, added: false };
+    }
     this.entries.push(entry);
     return { position: this.entries.length, added: true };
   }
@@ -161,10 +272,19 @@ export interface AdmissionGateOptions {
   limits: AdmissionLimits;
   /** Dashboard-started runs in flight across every child. */
   countRunning: () => Promise<number>;
-  /** Start a queued run on its project's server. False means it did not take. */
-  start: (entry: QueueEntry) => Promise<boolean>;
-  /** Injectable for tests; defaults to `os.freemem()`. */
-  freeMemory?: () => number;
+  /** Start a queued run on its project's server, saying why when it did not take. */
+  start: (entry: QueueEntry) => Promise<StartOutcome>;
+  /**
+   * Ask the project server whether a request about to be queued would be
+   * refused. A refusal is answered instead of queuing; null (no verdict, or
+   * the server could not be asked) queues as before.
+   */
+  validate?: (request: Omit<QueueEntry, "enqueuedAt">) => Promise<ExecuteRefusal | null>;
+  /**
+   * Injectable for tests; defaults to the shared reading's `availableBytes`
+   * (`null` when the machine could not be read).
+   */
+  freeMemory?: () => number | null;
   /** How often to retry while anything is queued. Default 2 s. */
   drainIntervalMs?: number;
   /** Called after every change, for anything reporting queue state. */
@@ -174,9 +294,11 @@ export interface AdmissionGateOptions {
 
 export interface AdmitResult {
   admitted: boolean;
-  /** 1-based queue position when it was not admitted. */
+  /** 1-based queue position when it was queued; 0 when admitted or refused. */
   position: number;
   reason?: AdmissionReason;
+  /** The project server's refusal, when it would not have started the run anyway. */
+  refused?: ExecuteRefusal;
 }
 
 /**
@@ -184,29 +306,56 @@ export interface AdmitResult {
  */
 export class AdmissionGate {
   readonly queue = new AdmissionQueue();
+  private dropped: DroppedEntry[] = [];
   private readonly options: AdmissionGateOptions;
-  private readonly freeMemory: () => number;
   private readonly drainIntervalMs: number;
   private readonly log: (message: string) => void;
   private drainTimer: ReturnType<typeof setInterval> | undefined;
   private draining = false;
-  private lastSnapshot: AdmissionSnapshot = { running: 0, freeMemoryBytes: 0 };
+  private lastSnapshot: AdmissionSnapshot = { running: 0, freeMemoryBytes: null };
+  private lastPressure: MemoryPressure = "unknown";
 
   constructor(options: AdmissionGateOptions) {
     this.options = options;
-    this.freeMemory = options.freeMemory ?? freemem;
     this.drainIntervalMs = options.drainIntervalMs ?? 2_000;
     this.log = options.log ?? (() => {});
+    // The reading is cached and never spawns synchronously, so the first
+    // `measure()` would otherwise decide on a "pending" (unknown) macOS machine.
+    // Only when the gate reads the real machine — a test that injects its own
+    // memory must not spawn `vm_stat`.
+    if (options.freeMemory === undefined) void readAvailableMemory().catch(() => {});
   }
 
   get limits(): AdmissionLimits {
     return this.options.limits;
   }
 
+  /**
+   * The machine's available memory and its pressure.
+   *
+   * Behind an injected `freeMemory` there is no kernel signal to ask, so the
+   * pressure is derived from the injected number with the same thresholds the
+   * shared reading uses — one seam, and a test never spawns `vm_stat`.
+   */
+  private measureMemory(): { availableBytes: number | null; pressure: MemoryPressure } {
+    const injected = this.options.freeMemory;
+    if (injected === undefined) {
+      const reading = getAvailableMemory();
+      return { availableBytes: reading.availableBytes, pressure: reading.pressure };
+    }
+    const availableBytes = injected();
+    return {
+      availableBytes,
+      pressure: availableBytes === null ? "unknown" : derivePressure(availableBytes, totalmem()),
+    };
+  }
+
   /** Measure the machine now. */
   async measure(): Promise<AdmissionSnapshot> {
     const running = await this.options.countRunning().catch(() => 0);
-    this.lastSnapshot = { running, freeMemoryBytes: this.freeMemory() };
+    const memory = this.measureMemory();
+    this.lastSnapshot = { running, freeMemoryBytes: memory.availableBytes };
+    this.lastPressure = memory.pressure;
     return this.lastSnapshot;
   }
 
@@ -222,11 +371,18 @@ export class AdmissionGate {
     const decision = decideAdmission(snapshot, this.options.limits);
 
     if (decision.admit && this.queue.length === 0) {
+      if (this.forgetDropped(request)) this.emitChange();
       return { admitted: true, position: 0 };
     }
 
+    // Queuing a request its server will refuse turns a 4xx the operator would
+    // read now into a run that silently never starts. Ask first.
+    const refusal = this.options.validate ? await this.options.validate(request) : null;
+    if (refusal) return { admitted: false, position: 0, refused: refusal };
+
     const reason = decision.admit ? "at-capacity" : decision.reason;
     const { position } = this.queue.enqueue({ ...request, enqueuedAt: new Date().toISOString() });
+    this.forgetDropped(request);
     this.armDrain();
     this.emitChange();
     return { admitted: false, position, reason };
@@ -249,17 +405,19 @@ export class AdmissionGate {
         if (!decideAdmission(snapshot, this.options.limits).admit) break;
 
         const entry = this.queue.shift()!;
-        let started = false;
+        let outcome: StartOutcome;
         try {
-          started = await this.options.start(entry);
+          outcome = await this.options.start(entry);
         } catch (err) {
-          this.log(`[hub] admission: starting ${entry.taskId} failed — ${(err as Error).message}`);
+          outcome = { started: false, status: null, error: (err as Error).message };
         }
-        if (!started) {
-          // Its project may have gone; drop it rather than spin on it forever.
-          this.log(`[hub] admission: dropped queued ${entry.projectId}/${entry.taskId} — its server did not accept it`);
-        } else {
+        if (outcome.started) {
           released++;
+        } else {
+          // Its project may have gone, or its server now refuses the request;
+          // drop it rather than spin on it forever, and keep why.
+          this.log(`[hub] admission: dropped queued ${entry.projectId}/${entry.taskId} — ${outcome.error}`);
+          this.recordDropped(entry, outcome);
         }
         this.emitChange();
       }
@@ -272,7 +430,9 @@ export class AdmissionGate {
 
   /** Forget everything queued for a project the hub no longer serves. */
   forgetProject(projectId: string): void {
-    if (this.queue.dropProject(projectId) > 0) this.emitChange();
+    const droppedBefore = this.dropped.length;
+    this.dropped = this.dropped.filter((d) => d.projectId !== projectId);
+    if (this.queue.dropProject(projectId) > 0 || this.dropped.length !== droppedBefore) this.emitChange();
     if (this.queue.length === 0) this.disarmDrain();
   }
 
@@ -280,8 +440,11 @@ export class AdmissionGate {
     const decision = decideAdmission(this.lastSnapshot, this.options.limits);
     return {
       entries: this.queue.list(),
+      dropped: [...this.dropped],
       running: this.lastSnapshot.running,
       freeMemoryBytes: this.lastSnapshot.freeMemoryBytes,
+      availableBytes: this.lastSnapshot.freeMemoryBytes,
+      pressure: this.lastPressure,
       limits: this.options.limits,
       memoryPaused: !decision.admit && decision.reason === "low-memory",
     };
@@ -290,6 +453,19 @@ export class AdmissionGate {
   /** Stop the drain timer. The hub calls this on close. */
   stop(): void {
     this.disarmDrain();
+  }
+
+  private recordDropped(entry: QueueEntry, outcome: Extract<StartOutcome, { started: false }>): void {
+    this.forgetDropped(entry);
+    this.dropped.push({ ...entry, droppedAt: new Date().toISOString(), status: outcome.status, error: outcome.error });
+    if (this.dropped.length > MAX_DROPPED_ENTRIES) this.dropped.splice(0, this.dropped.length - MAX_DROPPED_ENTRIES);
+  }
+
+  /** Forget the dropped record for a task asked for again. True when there was one. */
+  private forgetDropped(entry: Pick<QueueEntry, "projectId" | "workspace" | "taskId">): boolean {
+    const before = this.dropped.length;
+    this.dropped = this.dropped.filter((d) => !sameQueueEntry(d, entry));
+    return this.dropped.length !== before;
   }
 
   private emitChange(): void {

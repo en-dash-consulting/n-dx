@@ -32,7 +32,12 @@
  * POST   /api/hench/templates             — create/update a user-defined template
  * POST   /api/hench/templates/:id/apply   — apply a template to current config
  * DELETE /api/hench/templates/:id         — delete a user-defined template
+ * GET    /api/hench/prep/:taskId, POST …/preview, GET /api/hench/ready — see routes-hench-prep.ts
  * POST   /api/hench/execute               — trigger Hench run for a specific task
+ *                                            ({ taskId, options? }; options per
+ *                                            src/shared/run-options.ts)
+ * POST   /api/hench/execute/check         — the same request's verdict without starting it
+ *                                            (always 200: { ok } or { ok: false, status, error })
  * GET    /api/hench/execute/status         — get all active execution statuses
  * GET    /api/hench/execute/status/:taskId — get specific task execution status
  * GET    /api/hench/throttle              — current throttle state (paused, concurrency override, etc.)
@@ -47,9 +52,22 @@ import type { FSWatcher } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
-import { totalmem, freemem, loadavg, cpus, hostname } from "node:os";
+import { loadavg, cpus, hostname } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { redactDeep, exec, spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, resolveLayout, type ManagedChild } from "@n-dx/llm-client";
+import {
+  redactDeep,
+  exec,
+  spawnManaged,
+  killWithFallback,
+  listWorktrees,
+  getWorktreeRoot,
+  resolveLayout,
+  getAvailableMemory,
+  readAvailableMemory,
+  type ManagedChild,
+  type AvailableMemoryReading,
+  type MemoryPressure,
+} from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import {
@@ -105,6 +123,8 @@ import {
   type RunLiveness,
 } from "./run-liveness.js";
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
+import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
+import { resetsDeferred, workCommandArgs, type RunOptions } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -136,6 +156,12 @@ export function getAggregator(runsDir: string): IncrementalTaskUsageAggregator {
 interface HenchWorkspaceState {
   /** Active task executions, keyed by task id — prevents concurrent runs on one task. */
   activeExecutions: Map<string, ActiveExecution>;
+  /**
+   * Task ids an execute request is between its checks and its spawn. Taken
+   * synchronously before the first await, so a second request for the same
+   * task cannot pass the checks while the first is still awaiting them.
+   */
+  startingTasks: Set<string>;
   /** Per-process RSS samples for historical data and leak detection. */
   processMemoryTracker: ProcessMemoryTracker;
   /** Time-series snapshots of concurrent process counts and per-task resource metrics. */
@@ -149,6 +175,7 @@ function stateFor(runsDir: string): HenchWorkspaceState {
   if (!state) {
     state = {
       activeExecutions: new Map(),
+      startingTasks: new Set(),
       processMemoryTracker: new ProcessMemoryTracker(),
       executionMetrics: new ConcurrentExecutionMetrics(),
     };
@@ -746,6 +773,9 @@ function routeExecute(rc: RouteContext): boolean | Promise<boolean> | null {
   }
   if (rc.path === "execute" && rc.method === "POST") {
     return handleExecute(rc.req, rc.res, rc.ctx, rc.broadcast);
+  }
+  if (rc.path === "execute/check" && rc.method === "POST") {
+    return handleExecuteCheck(rc.req, rc.res, rc.ctx);
   }
   if (rc.path === "execute/status" && rc.method === "GET") {
     return handleExecuteStatus(rc.res, rc.runsDir);
@@ -1408,8 +1438,13 @@ async function handleTemplateDelete(
 
 // ── Task execution ───────────────────────────────────────────────────
 
-/** Actionable statuses — only tasks in these states can be triggered. */
-const ACTIONABLE_STATUSES = new Set(["pending", "blocked", "deferred"]);
+/**
+ * Statuses a dashboard run may start from. `in_progress` only when no live run
+ * in any worktree and no other worktree's claim holds the task — hench resumes
+ * it. `blocked` is not here: hench refuses blocked tasks, so the route answers
+ * 409 naming the blockers rather than spawning a run that exits at once.
+ */
+const ACTIONABLE_STATUSES = new Set(["pending", "deferred", "in_progress"]);
 
 /** Execution status for a single task run. */
 export interface TaskExecutionStatus {
@@ -1660,6 +1695,95 @@ function findPRDItem(
   return null;
 }
 
+/** A blocking item as the blocked-task 409 names it. */
+interface BlockerSummary {
+  id: string;
+  title: string;
+  status: string;
+}
+
+/** The task's `blockedBy` items, with titles; an id no longer in the PRD keeps its id as title. */
+function describeBlockers(
+  items: Array<Record<string, unknown>>,
+  task: Record<string, unknown>,
+): BlockerSummary[] {
+  const ids = Array.isArray(task.blockedBy)
+    ? task.blockedBy.filter((id): id is string => typeof id === "string")
+    : [];
+  return ids.map((id) => {
+    const blocker = findPRDItem(items, id);
+    return {
+      id,
+      title: typeof blocker?.title === "string" ? blocker.title : id,
+      status: typeof blocker?.status === "string" ? blocker.status : "missing",
+    };
+  });
+}
+
+/** A recorded run that may still be working a task. */
+interface HoldingRun {
+  runId: string;
+  liveness: RunLiveness;
+  reason: string;
+  worktree?: RunWorktree;
+}
+
+/** A {@link HoldingRun} with the task it holds and the root of the worktree whose runs directory records it. */
+export interface HeldRun extends HoldingRun {
+  taskId: string;
+  root: string;
+}
+
+/**
+ * The first run recorded `running` for `taskId`, in any worktree of the
+ * repository (the served directory alone outside one), that is not confirmed
+ * dead. Judged as `GET /api/hench/runs/health` judges it.
+ */
+async function findHoldingRun(ctx: ServerContext, taskId: string): Promise<HoldingRun | null> {
+  const [first] = await collectHeldRuns(ctx, taskId);
+  if (!first) return null;
+  const { taskId: _task, root: _root, ...holding } = first;
+  return holding;
+}
+
+/**
+ * Every run recorded `running` that is not confirmed dead, in any worktree of
+ * the repository (the served directory alone outside one), optionally only
+ * those of `taskId`. One pass over each runs directory, so a caller asking
+ * about many tasks reads the directories once.
+ */
+export async function collectHeldRuns(ctx: ServerContext, taskId?: string): Promise<HeldRun[]> {
+  const now = Date.now();
+  const held: HeldRun[] = [];
+  for (const target of await resolveRunTargets(ctx)) {
+    let files: string[];
+    try {
+      files = readdirSync(target.runsDir);
+    } catch {
+      continue; // no runs directory: no runs
+    }
+    const liveLocks = collectLiveLocks(locksDirOf(resolveLayout(target.root).henchDir));
+    const executions = dashboardExecutionsFor(target.root);
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const run = loadRunFile(target.runsDir, file.replace(/\.json$/, ""));
+      if (!run || run.status !== "running" || typeof run.taskId !== "string") continue;
+      if (taskId !== undefined && run.taskId !== taskId) continue;
+      const verdict = judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, executions);
+      if (verdict.liveness === "orphaned") continue;
+      held.push({
+        taskId: run.taskId,
+        root: target.root,
+        runId: String(run.id ?? file.replace(/\.json$/, "")),
+        liveness: verdict.liveness,
+        reason: verdict.reason,
+        ...(target.worktree ? { worktree: target.worktree } : {}),
+      });
+    }
+  }
+  return held;
+}
+
 /** Broadcast an execution state update. */
 function broadcastExecState(
   broadcast: WebSocketBroadcaster | undefined,
@@ -1673,29 +1797,57 @@ function broadcastExecState(
   });
 }
 
-/** POST /api/hench/execute — trigger Hench run for a specific task. */
-async function handleExecute(
-  req: IncomingMessage,
-  res: ServerResponse,
-  ctx: ServerContext,
-  broadcast?: WebSocketBroadcaster,
-): Promise<boolean> {
-  const { activeExecutions, executionMetrics, processMemoryTracker } = stateForCtx(ctx);
-  // Parse request body
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+/**
+ * What an execute request would get, short of spawning: a refusal with the
+ * status and body the operator should see, consent to a slug migration, or
+ * the task and options a run would start with.
+ */
+type ExecuteVerdict =
+  | { kind: "refused"; status: number; body: Record<string, unknown> }
+  | { kind: "migrate" }
+  | {
+    kind: "runnable";
+    taskId: string;
+    task: Record<string, unknown>;
+    status: string;
+    options: RunOptions;
+  };
 
-  const taskId = body.taskId as string | undefined;
-  if (!taskId || typeof taskId !== "string") {
-    errorResponse(res, 400, "taskId is required");
-    return true;
+const refused = (status: number, body: Record<string, unknown>): ExecuteVerdict =>
+  ({ kind: "refused", status, body });
+
+/** Run `fn`, returning what it threw as a value instead of throwing it. */
+function attempt<T>(fn: () => T): { ok: true; value: T } | { ok: false; error: Error } {
+  try {
+    return { ok: true, value: fn() };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err : new Error(String(err)) };
   }
+}
+
+const alreadyStarting =(taskId: string): Record<string, unknown> =>
+  ({ error: "Task is already starting from another request", taskId });
+
+/**
+ * Every check `POST /api/hench/execute` makes before it spawns, in its order.
+ * Shared with `POST /api/hench/execute/check`, so the hub can ask whether a
+ * request it is about to queue would be refused when its turn came — and the
+ * answer cannot drift from the one the start gives.
+ */
+async function judgeExecuteRequest(
+  ctx: ServerContext,
+  body: Record<string, unknown>,
+  { holdsReservation = false }: { holdsReservation?: boolean } = {},
+): Promise<ExecuteVerdict> {
+  const { activeExecutions, startingTasks } = stateForCtx(ctx);
+  const taskId = body.taskId as string | undefined;
+  if (!taskId || typeof taskId !== "string") return refused(400, { error: "taskId is required" });
+
+  // Options are only ever translated through the allow-list; anything else is
+  // a 400 naming the key, before anything is read or spawned.
+  const checkedOptions = await validateRunOptions(ctx.projectDir, body.options);
+  if (!checkedOptions.ok) return refused(400, { error: checkedOptions.error, key: checkedOptions.key });
+  const options = checkedOptions.options;
 
   // Tree-level fault first: on a tree this build would re-slug, no task is
   // runnable, so reporting it before the per-task checks keeps the operator
@@ -1707,19 +1859,13 @@ async function handleExecute(
     // rule is refused however loudly the client asks, because migrating there
     // is a downgrade wearing a migration's name and `rex migrate-slugs` would
     // refuse it too.
-    if (body.migrateSlugs === true && treeRefusal.migratable) {
-      return await runTreeMigration(res, ctx);
-    }
+    if (body.migrateSlugs === true && treeRefusal.migratable) return { kind: "migrate" };
 
     // 412 Precondition Failed: the request is well-formed and the task is fine;
     // the repository is in a state that forbids acting on it. `migratable` is
     // what lets the viewer offer the fix rather than only quote the problem —
     // and, just as importantly, withhold the offer when the fix is elsewhere.
-    jsonResponse(res, 412, {
-      error: treeRefusal.message,
-      migratable: treeRefusal.migratable,
-    });
-    return true;
+    return refused(412, { error: treeRefusal.message, migratable: treeRefusal.migratable });
   }
 
   // A migrate request is consent to the rename, never to a run. Reaching here
@@ -1727,56 +1873,51 @@ async function handleExecute(
   // between the 412 and the click — so falling through would start the task
   // from the button that promised not to.
   if (body.migrateSlugs === true) {
-    errorResponse(
-      res,
-      409,
-      "The PRD tree already matches this build's slug rule, so there is nothing to migrate. " +
+    return refused(409, {
+      error: "The PRD tree already matches this build's slug rule, so there is nothing to migrate. " +
         "The task was not started — press Start to run it.",
-    );
-    return true;
+    });
   }
 
   // Validate task exists in PRD
   const doc = loadPRDForExecute(ctx);
-  if (!doc) {
-    errorResponse(res, 404, "PRD not found. Run 'rex init' first.");
-    return true;
-  }
+  if (!doc) return refused(404, { error: "PRD not found. Run 'rex init' first." });
 
   const items = doc.items as Array<Record<string, unknown>> | undefined;
-  if (!items) {
-    errorResponse(res, 404, "PRD has no items");
-    return true;
-  }
+  if (!items) return refused(404, { error: "PRD has no items" });
 
   const task = findPRDItem(items, taskId);
-  if (!task) {
-    errorResponse(res, 404, `Task "${taskId}" not found in PRD`);
-    return true;
-  }
+  if (!task) return refused(404, { error: `Task "${taskId}" not found in PRD` });
 
   // Validate task is actionable
   const status = task.status as string;
+  if (status === "blocked") {
+    const blockers = describeBlockers(items, task);
+    const named = blockers.length > 0
+      ? blockers.map((b) => `"${b.title}" (${b.id}, ${b.status})`).join(", ")
+      : "no recorded blockers";
+    return refused(409, {
+      error: `Task is blocked by ${named}. Finish or unblock ${blockers.length === 1 ? "it" : "them"} first.`,
+      taskId,
+      blockedBy: blockers,
+    });
+  }
   if (!ACTIONABLE_STATUSES.has(status)) {
-    errorResponse(res, 409, `Task is in "${status}" status and cannot be executed. Only pending, blocked, or deferred tasks can be triggered.`);
-    return true;
+    return refused(409, {
+      error: `Task is in "${status}" status and cannot be executed. Only pending, deferred, or in-progress tasks with no live run can be triggered.`,
+    });
   }
 
   // Check if new executions are paused via throttle controls
   if (throttleState.paused) {
-    errorResponse(res, 503, "New executions are paused. Resume via the throttle controls before starting new tasks.");
-    return true;
+    return refused(503, { error: "New executions are paused. Resume via the throttle controls before starting new tasks." });
   }
 
   // Check for concurrent execution
+  if (!holdsReservation && startingTasks.has(taskId)) return refused(409, alreadyStarting(taskId));
   if (activeExecutions.has(taskId)) {
     const active = activeExecutions.get(taskId)!;
-    jsonResponse(res, 409, {
-      error: "Task is already being executed",
-      runId: active.runId,
-      taskId,
-    });
-    return true;
+    return refused(409, { error: "Task is already being executed", runId: active.runId, taskId });
   }
 
   // Another worktree of this repository may hold the task. The spawned run
@@ -1794,7 +1935,7 @@ async function handleExecute(
         `because its work is still uncommitted. Deal with that work there, or free the task with ` +
         `'${readCliName(ctx.projectDir)} claim release ${taskId}'.`
       : `Task is being worked on in another worktree: ${claimedBy.worktreeRoot}`;
-    jsonResponse(res, 409, {
+    return refused(409, {
       error,
       taskId,
       claimedBy: {
@@ -1806,8 +1947,107 @@ async function handleExecute(
         ...(claimedBy.reason ? { reason: claimedBy.reason } : {}),
       },
     });
+  }
+
+  // An in-progress task is resumable only when nothing is still working it.
+  // A run that cannot be confirmed dead (live, foreign host, or unknown) holds
+  // it: starting a second agent on the same task is worse than a refusal.
+  if (status === "in_progress") {
+    const holder = await findHoldingRun(ctx, taskId);
+    if (holder) {
+      return refused(409, {
+        error: `Task is in progress in a run that may still be working it (run ${holder.runId}` +
+          `${holder.worktree ? ` in ${holder.worktree.path}` : ""}): ${holder.reason}`,
+        taskId,
+        run: holder,
+      });
+    }
+  }
+
+  return { kind: "runnable", taskId, task, status, options };
+}
+
+/** Parse an execute-shaped body, answering 400 itself when it is not JSON. */
+async function readExecuteBody(req: IncomingMessage, res: ServerResponse): Promise<Record<string, unknown> | null> {
+  try {
+    const raw = await readBody(req, res);
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    errorResponse(res, 400, "Invalid JSON in request body");
+    return null;
+  }
+}
+
+/**
+ * POST /api/hench/execute/check — would this execute request start?
+ *
+ * Answers 200 with `{ ok: true }` or `{ ok: false, status, ...refusal }`,
+ * where `status` and the rest are exactly what `POST /api/hench/execute`
+ * would have answered. Never spawns, writes or migrates. The hub asks it
+ * before it queues a request, so a refusal reaches the operator now rather
+ * than as a run that silently never starts.
+ *
+ * Always 200 so a caller can tell a verdict from a server without this route
+ * (an older child answers 404 for the path, which the hub reads as "no
+ * verdict" and queues as before — never as a start).
+ */
+async function handleExecuteCheck(req: IncomingMessage, res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+  const body = await readExecuteBody(req, res);
+  if (!body) return true;
+  const verdict = await judgeExecuteRequest(ctx, body);
+  if (verdict.kind === "refused") {
+    jsonResponse(res, 200, { ...verdict.body, ok: false, status: verdict.status });
+  } else {
+    jsonResponse(res, 200, { ok: true });
+  }
+  return true;
+}
+
+/** POST /api/hench/execute — trigger Hench run for a specific task. */
+async function handleExecute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const { startingTasks } = stateForCtx(ctx);
+  const body = await readExecuteBody(req, res);
+  if (!body) return true;
+
+  // Reserve the task before the first await below: the checks await claims,
+  // the run holder and the context file, and a second request for the same
+  // task arriving meanwhile would otherwise pass them too and spawn a second
+  // run. Released on every exit; once spawned, activeExecutions holds it.
+  const taskId = typeof body.taskId === "string" && body.taskId ? body.taskId : null;
+  if (taskId) {
+    if (startingTasks.has(taskId)) {
+      jsonResponse(res, 409, alreadyStarting(taskId));
+      return true;
+    }
+    startingTasks.add(taskId);
+  }
+  try {
+    return await startExecution(res, ctx, body, broadcast);
+  } finally {
+    if (taskId) startingTasks.delete(taskId);
+  }
+}
+
+/** The checks and spawn behind `POST /api/hench/execute`, run while the task is reserved. */
+async function startExecution(
+  res: ServerResponse,
+  ctx: ServerContext,
+  body: Record<string, unknown>,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const { activeExecutions, executionMetrics, processMemoryTracker } = stateForCtx(ctx);
+  const verdict = await judgeExecuteRequest(ctx, body, { holdsReservation: true });
+  if (verdict.kind === "refused") {
+    jsonResponse(res, verdict.status, verdict.body);
     return true;
   }
+  if (verdict.kind === "migrate") return await runTreeMigration(res, ctx);
+  const { taskId, task, status, options } = verdict;
 
   // Go through the `ndx` orchestrator's `work` command rather than spawning
   // hench directly. `ndx work` forwards flags straight to `hench run` (see
@@ -1824,10 +2064,19 @@ async function handleExecute(
   // immediately with MODULE_NOT_FOUND.
   const { bin: binPath, args: prefixArgs } = resolveNdxBin(ctx);
   // Pass --reset-deferred when executing a deferred task so hench resets it to pending before running
-  const resetDeferred = status === "deferred";
-  const workArgs = resetDeferred
-    ? ["work", `--task=${taskId}`, "--auto", "--reset-deferred", ctx.projectDir]
-    : ["work", `--task=${taskId}`, "--auto", ctx.projectDir];
+  const resetDeferred = resetsDeferred(status);
+  // contextNotes travels in a file of its own, removed when the run ends.
+  const contextFile = options.contextNotes ? await writeContextNotesFile(options.contextNotes) : null;
+  // Argv, never a shell: each flag is one `--flag` / `--flag=value` word from
+  // the allow-list, and values were refused if they started with '-'.
+  // The same builder prints the Prepare task modal's command line.
+  const workArgs = workCommandArgs({
+    taskId,
+    options,
+    dir: ctx.projectDir,
+    contextFile: contextFile?.path,
+    taskStatus: status,
+  });
   const binArgs = [...prefixArgs, ...workArgs];
 
   // Generate a run ID for tracking (hench will generate its own, but we
@@ -1846,7 +2095,9 @@ async function handleExecute(
   };
 
   // Spawn hench process with streaming stdout so the UI can show live output.
-  const handle = spawnManaged(binPath, binArgs, {
+  // A spawn that throws (rather than rejecting `done`) is answered here, so the
+  // operator gets the reason and the context file does not outlive the request.
+  const spawned = attempt(() => spawnManaged(binPath, binArgs, {
     cwd: ctx.projectDir,
     stdio: "pipe",
     windowsHide: true,
@@ -1882,7 +2133,15 @@ async function handleExecute(
         broadcastExecState(broadcast, { ...entry.state });
       }
     },
-  });
+  }));
+  if (!spawned.ok) {
+    contextFile?.remove().catch((err: unknown) => {
+      console.warn(`[hench] could not remove context file ${contextFile.path}: ${(err as Error).message}`);
+    });
+    errorResponse(res, 500, `Could not start '${readCliName(ctx.projectDir)} work': ${spawned.error.message}`);
+    return true;
+  }
+  const handle = spawned.value;
 
   // Track active execution
   activeExecutions.set(taskId, { runId, handle, state: execState });
@@ -1967,14 +2226,20 @@ async function handleExecute(
       processMemoryTracker.markCompleted(taskId);
       executionMetrics.taskCompleted(taskId);
       activeExecutions.delete(taskId);
+    })
+    .finally(() => {
+      contextFile?.remove().catch((err: unknown) => {
+        console.warn(`[hench] could not remove context file ${contextFile.path}: ${(err as Error).message}`);
+      });
     });
 
-  // Return immediately with tracking info
+  // Return immediately with tracking info, echoing the options the run got.
   jsonResponse(res, 202, {
     runId,
     taskId,
     taskTitle,
     status: "started",
+    options,
   });
   return true;
 }
@@ -2057,11 +2322,11 @@ interface RunTarget {
 }
 
 /** Every worktree of the repository, or the served directory alone outside one. */
-async function resolveRunTargets(rc: RouteContext): Promise<RunTarget[]> {
-  const sources = await resolveRunSources(rc.ctx);
+async function resolveRunTargets(ctx: ServerContext): Promise<RunTarget[]> {
+  const sources = await resolveRunSources(ctx);
   return sources.length > 0
     ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree }))
-    : [{ root: rc.ctx.projectDir, runsDir: rc.runsDir }];
+    : [{ root: ctx.projectDir, runsDir: runsDirOf(ctx) }];
 }
 
 /** Judge a run against its worktree's lock files and this dashboard's children, read now. */
@@ -2080,7 +2345,7 @@ function judgeRunInTarget(target: RunTarget, run: Record<string, unknown>, now: 
  * judged against that worktree's own lock files.
  */
 async function handleRunsHealth(rc: RouteContext): Promise<boolean> {
-  const targets = await resolveRunTargets(rc);
+  const targets = await resolveRunTargets(rc.ctx);
 
   const now = Date.now();
   const runningRuns: Array<{
@@ -2262,7 +2527,7 @@ async function handleReconcile(rc: RouteContext): Promise<boolean> {
   const groups: ReconcileWorktreeResult[] = [];
   const verdicts: Array<{ liveness: RunLiveness }> = [];
 
-  for (const target of await resolveRunTargets(rc)) {
+  for (const target of await resolveRunTargets(rc.ctx)) {
     const group: ReconcileWorktreeResult = {
       ...(target.worktree ? { worktree: target.worktree } : {}),
       runsDir: target.runsDir,
@@ -2537,8 +2802,14 @@ export function startConcurrencyMonitor(
 
 // ── Memory / resource monitoring ──────────────────────────────────────
 
-/** Memory health level for UI indicators. */
-export type MemoryHealthLevel ="healthy" | "warning" | "critical";
+/**
+ * Memory health level for UI indicators.
+ *
+ * `"unknown"` is not a degree of pressure — it means the machine could not be
+ * read at all (macOS with `vm_stat` and `sysctl` both unavailable). Nothing may
+ * warn, throttle or hold a run on it.
+ */
+export type MemoryHealthLevel = "healthy" | "warning" | "critical" | "unknown";
 
 /** Per-process memory snapshot. */
 interface ProcessMemoryEntry {
@@ -2553,9 +2824,20 @@ interface ProcessMemoryEntry {
 export interface MemoryStatus {
   system: {
     totalBytes: number;
-    freeBytes: number;
-    usedBytes: number;
-    usedPercent: number;
+    /**
+     * The shared reading's `availableBytes`, under the name the API has always
+     * used. Not `os.freemem()` on macOS — see `llm-client/system-memory.ts`.
+     * `null` when the machine could not be read.
+     */
+    freeBytes: number | null;
+    /** The same number as {@link freeBytes}, under the name the reading uses. */
+    availableBytes: number | null;
+    usedBytes: number | null;
+    usedPercent: number | null;
+    /** Kernel memory pressure, or `"unknown"` when nothing could be read. */
+    pressure: MemoryPressure;
+    /** Where the reading came from, e.g. `"darwin:vm_stat+sysctl"`, `"os.freemem"`. */
+    source: string;
   };
   server: {
     pid: number;
@@ -2572,16 +2854,19 @@ export interface MemoryStatus {
 }
 
 /**
- * Determine memory health level based on system memory usage percentage.
+ * Memory health from the shared reading's pressure.
  *
- * - healthy: < 75% used (green)
- * - warning: 75–90% used (yellow/orange)
- * - critical: ≥ 90% used (red)
+ * The thresholds themselves live in `llm-client/system-memory.ts` (75% / 90%
+ * used, or macOS's `kern.memorystatus_vm_pressure_level` where it can be read),
+ * so the dashboard, the hub gate and hench's throttle all flag at the same point.
  */
-function computeMemoryHealth(usedPercent: number): MemoryHealthLevel {
-  if (usedPercent >= 90) return "critical";
-  if (usedPercent >= 75) return "warning";
-  return "healthy";
+function healthFromPressure(pressure: MemoryPressure): MemoryHealthLevel {
+  switch (pressure) {
+    case "normal": return "healthy";
+    case "warn": return "warning";
+    case "critical": return "critical";
+    case "unknown": return "unknown";
+  }
 }
 
 /**
@@ -2622,21 +2907,73 @@ function getProcessRss(pid: number): number | null {
 const processOwners = new Map<string, string>();
 
 /**
+ * Where {@link readSystemMemory} gets its reading. Synchronous and cached —
+ * a request must never wait on a `vm_stat` spawn.
+ */
+let readAvailable: () => AvailableMemoryReading = getAvailableMemory;
+
+/**
+ * Point the memory routes at a fixed reading, so a test can exercise a darwin
+ * machine (or an unreadable one) on any platform. `null` restores the shared
+ * reading. Nothing in production calls this.
+ */
+export function setAvailableMemoryReaderForTests(read: (() => AvailableMemoryReading) | null): void {
+  readAvailable = read ?? getAvailableMemory;
+}
+
+/**
+ * Derive the API's `system` block from an available-memory reading.
+ *
+ * `freeBytes` carries `availableBytes` — on macOS `os.freemem()` counts only
+ * free pages and reads ~115 MB on a machine with ~3.9 GB it can hand out, which
+ * is what used to make a healthy Mac read "critical" at 99% used.
+ *
+ * An unreadable machine is not a full one: `freeBytes`, `usedBytes` and
+ * `usedPercent` are all `null` rather than 0, so no consumer can compute a
+ * usage figure out of a reading that does not exist.
+ */
+export function systemMemoryFrom(
+  reading: AvailableMemoryReading,
+): MemoryStatus["system"] & { health: MemoryHealthLevel } {
+  const { availableBytes, totalBytes, pressure, source } = reading;
+  const known = availableBytes !== null;
+  const usedBytes = known ? totalBytes - availableBytes : null;
+  return {
+    totalBytes,
+    freeBytes: availableBytes,
+    availableBytes,
+    usedBytes,
+    usedPercent: usedBytes !== null && totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : null,
+    pressure,
+    source,
+    health: healthFromPressure(pressure),
+  };
+}
+
+/**
  * The machine's memory and its health level — the `system` and `health`
  * parts of `GET /api/hench/memory`, without the per-process `ps` probes,
  * for readers that must answer quickly (the Live overview).
  */
 export function readSystemMemory(): MemoryStatus["system"] & { health: MemoryHealthLevel } {
-  const totalBytes = totalmem();
-  const freeBytes = freemem();
-  const usedBytes = totalBytes - freeBytes;
-  const usedPercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
-  return { totalBytes, freeBytes, usedBytes, usedPercent, health: computeMemoryHealth(usedPercent) };
+  return systemMemoryFrom(readAvailable());
+}
+
+/**
+ * Take one reading so the cache is warm before the first request.
+ *
+ * `getAvailableMemory()` never spawns synchronously: until a darwin reading has
+ * completed it answers `"pending"` with no bytes, which every consumer treats as
+ * unknown. Warming at start-up means the first dashboard paint shows the machine
+ * rather than a dash.
+ */
+export function warmSystemMemory(): void {
+  void readAvailableMemory().catch(() => {});
 }
 
 function collectMemoryStatus(): MemoryStatus {
   processOwners.clear();
-  const { totalBytes, freeBytes, usedBytes, usedPercent, health } = readSystemMemory();
+  const { health, ...system } = readSystemMemory();
 
   const mem = process.memoryUsage();
   const load = loadavg() as [number, number, number];
@@ -2664,7 +3001,7 @@ function collectMemoryStatus(): MemoryStatus {
   }
 
   return {
-    system: { totalBytes, freeBytes, usedBytes, usedPercent },
+    system,
     server: {
       pid: process.pid,
       rssBytes: mem.rss,
@@ -2751,6 +3088,8 @@ function handleMemoryLeaks(res: ServerResponse, runsDir: string): boolean {
 export function startMemoryMonitor(broadcast: WebSocketBroadcaster, anchorRunsDir: string): void {
   const MEMORY_BROADCAST_MS = 10_000;
 
+  warmSystemMemory();
+
   const timer = setInterval(() => {
     const status = collectMemoryStatus();
 
@@ -2770,6 +3109,8 @@ export function startMemoryMonitor(broadcast: WebSocketBroadcaster, anchorRunsDi
       wsState.executionMetrics.recordSnapshot({
         concurrentCount: own.length,
         totalRssBytes: own.reduce((sum, p) => sum + p.rssBytes, 0),
+        // Omitted rather than zeroed when the machine could not be read: a 0%
+        // sample would drag the window's average down as if memory were free.
         systemMemoryPercent: status.system.usedPercent,
         loadAvg1m: status.loadAvg[0],
         perTaskRss: own.map((p) => ({ taskId: p.taskId, rssBytes: p.rssBytes })),

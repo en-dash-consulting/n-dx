@@ -39,7 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks"
 import type { ViewId } from "../types.js";
 import { detectBasePath } from "../external.js";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
-import { ElapsedTime, StartTaskButton, GlossaryLine } from "../components/index.js";
+import { ElapsedTime, TaskStartControl, GlossaryLine } from "../components/index.js";
 import { formatSince } from "../utils/format.js";
 
 // ---------------------------------------------------------------------------
@@ -86,15 +86,28 @@ export interface ExecutionStatus {
   error?: string;
 }
 
-/** The subset of `GET /api/hench/memory` the machine strip reads. */
+/**
+ * The subset of `GET /api/hench/memory` the machine strip reads.
+ *
+ * Every figure is null when the machine could not be read — the strip shows a
+ * dash rather than inventing a percentage.
+ */
 export interface MemoryStatus {
-  system: { totalBytes: number; usedBytes: number; usedPercent: number };
+  system: {
+    totalBytes: number;
+    /** Available memory, not `os.freemem()`. */
+    availableBytes: number | null;
+    usedBytes: number | null;
+    usedPercent: number | null;
+  };
 }
 
 /** The subset of `GET /api/rex/next`'s task the Start working action needs. */
 export interface NextTask {
   id: string;
   title: string;
+  status: string;
+  blockedBy?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -232,9 +245,14 @@ export function workspaceViewUrl(card: Pick<WorkspaceCard, "key" | "isAnchor">, 
   return `${project}${slot}/${view}`;
 }
 
-/** "1.2 GB", "840 MB" — byte counts for the memory tile. */
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "—";
+/** A workspace's Live page for one task — a full-navigation URL (see {@link workspaceViewUrl}). */
+export function workspaceLiveTaskUrl(card: Pick<WorkspaceCard, "key" | "isAnchor">, taskId: string, pathname: string): string {
+  return `${workspaceViewUrl(card, "live", pathname)}/task/${encodeURIComponent(taskId)}`;
+}
+
+/** "1.2 GB", "840 MB" — byte counts for the memory tile. An unknown reading is a dash. */
+export function formatBytes(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes) || bytes < 0) return "—";
   const gb = bytes / 1024 ** 3;
   if (gb >= 1) return `${gb.toFixed(1)} GB`;
   return `${Math.round(bytes / 1024 ** 2)} MB`;
@@ -363,15 +381,20 @@ function StatTile({ value, label, title }: { value: string; label: string; title
 
 function MachineStrip({ stats }: { stats: MachineStats }) {
   const memory = stats.memory;
+  // An unreadable machine gets a dash and says so, rather than a percentage
+  // computed from numbers that do not exist.
+  const known = memory !== null && memory.usedPercent !== null;
   return h("div", { class: "stat-grid workspaces-machine-strip", role: "group", "aria-label": "Machine totals" },
     h(StatTile, {
       value: String(stats.agentsRunning),
       label: stats.agentsRunning === 1 ? "agent running" : "agents running",
     }),
     h(StatTile, {
-      value: memory ? `${Math.round(memory.usedPercent)}%` : "—",
-      label: memory ? `memory in use · ${formatBytes(memory.usedBytes)} of ${formatBytes(memory.totalBytes)}` : "memory in use",
-      title: memory ? `${formatBytes(memory.usedBytes)} of ${formatBytes(memory.totalBytes)}` : undefined,
+      value: known ? `${Math.round(memory.usedPercent!)}%` : "—",
+      label: known
+        ? `memory in use · ${formatBytes(memory.availableBytes)} available of ${formatBytes(memory.totalBytes)}`
+        : memory ? "memory reading unavailable" : "memory in use",
+      title: known ? `${formatBytes(memory.usedBytes)} of ${formatBytes(memory.totalBytes)}` : undefined,
     }),
     h(StatTile, {
       value: String(stats.uncommittedTrees),
@@ -509,12 +532,17 @@ function WorkspaceCardView({ card, doFetch, onChanged }: {
       }, "Open workspace"),
       card.live || !card.nextTask
         ? null
-        : h(StartTaskButton, {
-            taskId: card.nextTask.id,
+        : h(TaskStartControl, {
+            task: card.nextTask,
             workspace: card.key,
             label: "Start working",
             ariaLabel: `Start working in ${card.key} on ${card.nextTask.title}`,
             onStarted: onChanged,
+            // The viewer's own workspace opens Live in-app; any other card's run
+            // is only visible under that workspace's own URL.
+            liveHref: card.isCurrent
+              ? undefined
+              : (id: string) => workspaceLiveTaskUrl(card, id, currentPathname()),
           }),
     ),
   );

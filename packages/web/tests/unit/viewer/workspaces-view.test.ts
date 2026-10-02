@@ -152,7 +152,7 @@ describe("machineStats", () => {
   });
 
   it("passes the machine's memory through, or null when it could not be read", () => {
-    const system = { totalBytes: 100, usedBytes: 40, usedPercent: 40 };
+    const system = { totalBytes: 100, availableBytes: 60, usedBytes: 40, usedPercent: 40 };
     expect(machineStats(cards, new Map(), { system }).memory).toEqual(system);
     expect(machineStats(cards, new Map(), null).memory).toBeNull();
   });
@@ -237,7 +237,7 @@ function makeFetcher(overrides: Record<string, unknown> = {}) {
     "/api/hench/memory": { system: { totalBytes: 16 * 1024 ** 3, usedBytes: 8 * 1024 ** 3, usedPercent: 50 } },
     "/api/hench/execute/status": { executions: [] },
     "/api/hench/concurrency": { totalRunning: 0 },
-    "/api/rex/next": { task: { id: "next-1", title: "Next up" } },
+    "/api/rex/next": { task: { id: "next-1", title: "Next up", status: "pending" } },
     "/api/workspaces/feature/prd-delta": { counts: DELTA },
     ...overrides,
   };
@@ -379,7 +379,43 @@ describe("WorkspacesView", () => {
     expect(branch.querySelector(".workspace-card-stop")).not.toBeNull();
     expect(branch.querySelector(".start-task-btn")).toBeNull();
     expect(anchor.querySelector(".workspace-card-stop")).toBeNull();
-    expect(anchor.querySelector(".start-task-btn")!.textContent).toBe("Start working");
+    expect(anchor.querySelector(".start-task-primary")!.textContent).toBe("Start working");
+  });
+
+  it("offers Resume for an in-progress next task", async () => {
+    const { fetcher } = makeFetcher({ "/api/rex/next": { task: { id: "next-1", title: "Half done", status: "in_progress" } } });
+    root = await mount(h(WorkspacesView, { fetcher, socketFactory: makeSocket().factory }));
+
+    const [anchor] = root.querySelectorAll(".workspace-card");
+    expect(anchor.querySelector(".start-task-primary")!.textContent).toBe("Resume");
+  });
+
+  it("names the blockers of a blocked next task instead of offering a start", async () => {
+    const { fetcher } = makeFetcher({ "/api/rex/next": { task: { id: "next-1", title: "Stuck", status: "blocked", blockedBy: ["up-1"] } } });
+    root = await mount(h(WorkspacesView, { fetcher, socketFactory: makeSocket().factory }));
+
+    const [anchor] = root.querySelectorAll(".workspace-card");
+    expect(anchor.querySelector(".start-task-primary")).toBeNull();
+    expect(anchor.querySelector(".task-blockers")!.textContent).toContain("up-1");
+  });
+
+  it("links a next task that has a live run to its Live page in that worktree", async () => {
+    const { fetcher } = makeFetcher({ "/api/rex/next@feature": { task: { id: "next-1", title: "Next up", status: "pending" } } });
+    const original = globalThis.fetch;
+    // useLive reads the repository-wide feed through the global fetch.
+    globalThis.fetch = vi.fn(async () => jsonResponse({
+      runs: [{ taskId: "next-1", liveness: "live" }], jobs: [], counts: { running: 1, stale: 0, jobs: 0 },
+    })) as unknown as typeof fetch;
+    try {
+      root = await mount(h(WorkspacesView, { fetcher, socketFactory: makeSocket().factory }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+      const branch = root.querySelectorAll(".workspace-card")[1];
+      expect(branch.querySelector(".start-task-primary")).toBeNull();
+      expect(branch.querySelector<HTMLAnchorElement>(".task-live-link")!.getAttribute("href")).toContain("/w/feature/live/task/next-1");
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 
   it("starts a run in the card's worktree, not the viewer's", async () => {
@@ -393,7 +429,10 @@ describe("WorkspacesView", () => {
 
       const branch = root.querySelectorAll(".workspace-card")[1];
       await act(async () => {
-        branch.querySelector<HTMLButtonElement>(".start-task-btn")!.click();
+        branch.querySelector<HTMLButtonElement>(".start-task-caret")!.click();
+      });
+      await act(async () => {
+        branch.querySelector<HTMLButtonElement>('[role="menuitem"]')!.click();
         await new Promise((r) => setTimeout(r, 0));
       });
 

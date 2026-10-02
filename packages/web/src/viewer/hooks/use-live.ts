@@ -32,6 +32,14 @@ export interface LiveWorktreeRef {
 /** Whether a run's process is actually executing — mirrors RunLiveness in server/run-liveness.ts. */
 export type RunLiveness = "live" | "foreign" | "unknown" | "orphaned";
 
+/**
+ * Kernel memory pressure — mirrors MemoryPressure in `@n-dx/llm-client`.
+ *
+ * `"unknown"` means the machine could not be read at all, not that it is under
+ * pressure: nothing may warn on it.
+ */
+export type MemoryPressure = "normal" | "warn" | "critical" | "unknown";
+
 /** Mirrors the fields of LiveRun in server/routes-live.ts that the peek shows. */
 export interface LiveRunSummary {
   runId: string;
@@ -117,6 +125,8 @@ export interface LiveJobFull extends LiveJobSummary {
 export interface LiveNextTask {
   id: string;
   title: string;
+  status: string;
+  blockedBy?: string[];
   priority: string | null;
   epicChain: LiveChainLink[];
 }
@@ -133,7 +143,15 @@ export interface LiveSnapshot extends LiveSummary {
   machine: {
     /** `machine`: the hub's admission gate; `repository`: live runs in every worktree. */
     slots: { scope: "machine" | "repository"; inUse: number; max: number; available: number; queued: number };
-    memory: { freeBytes: number; totalBytes: number; floorBytes: number | null; belowFloor: boolean };
+    /** `freeBytes` and `availableBytes` are the shared reading; null when the machine could not be read. */
+    memory: {
+      freeBytes: number | null;
+      availableBytes: number | null;
+      totalBytes: number;
+      pressure: MemoryPressure;
+      floorBytes: number | null;
+      belowFloor: boolean;
+    };
     llm: { vendor: string | null; model: string | null };
     worktrees: { total: number; withLiveRun: number };
     spend: { todayUsd: number; todayTokens: number; inFlightUsd: number; inFlightTokens: number };

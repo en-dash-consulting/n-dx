@@ -750,8 +750,8 @@
   display: inline-block;
   padding: 2px 6px;
   font-size: 10px;
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--text-secondary) 8%, var(--bg-surface));
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--text-dim) 8%, var(--bg-surface));
   border-radius: 3px;
   white-space: nowrap;
   flex-shrink: 0;
@@ -1832,6 +1832,11 @@
   background: color-mix(in srgb, var(--red) 4%, var(--bg-surface));
 }
 
+/* No reading at all — deliberately uncoloured: unknown is not a pressure level. */
+.memory-panel-unknown {
+  border-color: var(--border);
+}
+
 /* Header */
 .memory-header {
   display: flex;
@@ -1863,6 +1868,10 @@
 .memory-icon-critical {
   color: var(--red);
   animation: memory-pulse 1s ease-in-out infinite;
+}
+
+.memory-icon-unknown {
+  color: var(--text-dim);
 }
 
 @keyframes memory-pulse {
@@ -1900,6 +1909,11 @@
   background: color-mix(in srgb, var(--red) 12%, transparent);
 }
 
+.memory-health-unknown {
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--text-dim) 10%, transparent);
+}
+
 /* Percentage display */
 .memory-pct-display {
   font-weight: var(--weight-bold);
@@ -1935,6 +1949,11 @@
 .memory-pressure-critical {
   background: color-mix(in srgb, var(--red) 10%, transparent);
   color: var(--red);
+}
+
+.memory-pressure-unknown {
+  background: color-mix(in srgb, var(--text-dim) 8%, transparent);
+  color: var(--text-dim);
 }
 
 .memory-pressure-icon {
@@ -1991,6 +2010,10 @@
 .memory-bar-critical {
   background: var(--red);
   animation: memory-bar-pulse 1.5s ease-in-out infinite;
+}
+
+.memory-bar-unknown {
+  background: var(--text-dim);
 }
 
 .memory-bar-server {

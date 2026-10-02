@@ -293,3 +293,13 @@ export type {
   GeminiFunctionDeclaration,
   GeminiSchema,
 } from "@n-dx/llm-client";
+
+// Shared available-memory reading — the same decision the dashboard and hub use.
+// macOS counts reclaimable pages and kernel pressure; unknown is `null`, never 0.
+export {
+  readAvailableMemory,
+  getAvailableMemory,
+  createAvailableMemoryReader,
+} from "@n-dx/llm-client";
+
+export type { AvailableMemoryReading } from "@n-dx/llm-client";

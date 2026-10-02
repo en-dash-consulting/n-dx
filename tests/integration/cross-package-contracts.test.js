@@ -301,6 +301,9 @@ describe("hench → llm-client gateway contract", () => {
     "resolveLayout",
     "detectLayoutMode",
     "relativeToRoot",
+    "readAvailableMemory",
+    "getAvailableMemory",
+    "createAvailableMemoryReader",
   ];
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
@@ -764,7 +767,10 @@ describe("gateway export auto-detection", () => {
         // `relativeToRoot` comes with it because hench init writes `.gitignore`
         // lines naming its own directory, and a name spelled by hand is the
         // same copy by another route.
-        "resolveLayout", "detectLayoutMode", "relativeToRoot"],
+        "resolveLayout", "detectLayoutMode", "relativeToRoot",
+        // Available-memory reading. One reading for hench, the dashboard and
+        // the hub admission floor, so they cannot disagree about the machine.
+        "readAvailableMemory", "getAvailableMemory", "createAvailableMemoryReader"],
       ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "REVIEW_MODELS", "GOOGLE_MODELS",
         "VENDOR_CONTEXT_CHAR_LIMITS",
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
@@ -796,7 +802,7 @@ describe("gateway export auto-detection", () => {
       ...["createRexMcpServer", "ensureLegacyPrdMigrated", "isCompatibleSchema", "findItem", "walkTree",
         "diffTrees",
         "insertChild", "updateInTree", "removeFromTree", "computeStats",
-        "collectAllIds", "findNextTask", "collectCompletedIds",
+        "collectAllIds", "findNextTask", "findActionableTasks", "collectCompletedIds",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates", "validateMerge", "previewMerge", "mergeItems",
         "countSubtree", "computeEpicStats", "computePriorityDistribution",
