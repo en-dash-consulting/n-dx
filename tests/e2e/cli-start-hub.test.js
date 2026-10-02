@@ -84,7 +84,7 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
 
   function runStart(args) {
     try {
-      const stdout = execFileSync("node", [CLI_PATH, "start", ...args], {
+      const stdout = execFileSync("node", [CLI_PATH, "start", "--no-auth", ...args], {
         encoding: "utf-8",
         timeout: 120_000,
         stdio: "pipe",

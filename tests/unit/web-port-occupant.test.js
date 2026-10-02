@@ -19,7 +19,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, symlink } from "node:fs/promises";
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { tmpdir, platform } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -519,12 +519,19 @@ describe("runWeb, on a busy port", () => {
    * `--here` because port occupancy is the single-project server's problem:
    * since 0.7.0 the default registers with the hub, whose children bind
    * ephemeral ports and never contend for 3117.
+   *
+   * `NDX_HOME` is pointed at a temp directory for the duration: `ndx start`
+   * creates the per-user token before spawning, and a unit test must not write
+   * one into the developer's real home — nor read the token they already have,
+   * which would put a machine-specific path in the argv asserted below.
    */
   async function captureServeArgs(dir, rest) {
     const before = {
       SIGINT: process.listeners("SIGINT"),
       SIGTERM: process.listeners("SIGTERM"),
     };
+    const homeBefore = process.env.NDX_HOME;
+    process.env.NDX_HOME = await mkdtemp(join(tmpdir(), "ndx-start-home-"));
     let serveArgs = null;
     try {
       const code = await runWeb(dir, ["--quiet", "--here", ...rest], {
@@ -535,13 +542,16 @@ describe("runWeb, on a busy port", () => {
         __dir: dir,
         commandName: "start",
       });
-      return { code, serveArgs };
+      return { code, serveArgs, ndxHome: process.env.NDX_HOME };
     } finally {
       for (const signal of ["SIGINT", "SIGTERM"]) {
         for (const fn of process.listeners(signal)) {
           if (!before[signal].includes(fn)) process.removeListener(signal, fn);
         }
       }
+      await rm(process.env.NDX_HOME, { recursive: true, force: true });
+      if (homeBefore === undefined) delete process.env.NDX_HOME;
+      else process.env.NDX_HOME = homeBefore;
     }
   }
 
@@ -576,10 +586,32 @@ describe("runWeb, on a busy port", () => {
     const { server, port } = await startServer(() => {});
     await new Promise((res) => server.close(() => res()));
 
-    const { code, serveArgs } = await captureServeArgs(dir, [`--port=${port}`]);
+    const { code, serveArgs, ndxHome } = await captureServeArgs(dir, [`--port=${port}`]);
+
+    expect(code).toBe(0);
+    // The single-project server takes the same per-user token the hub would,
+    // so `--token-file` naming this user's token is part of the contract, not
+    // noise to be matched loosely.
+    expect(serveArgs).toEqual([
+      "serve",
+      `--port=${port}`,
+      dir,
+      `--token-file=${join(ndxHome, "auth.token")}`,
+    ]);
+  }, 20_000);
+
+  it("omits --token-file under --no-auth, and creates no token", async () => {
+    dir = await mkdtemp(join(tmpdir(), "ndx-start-noauth-"));
+    const { server, port } = await startServer(() => {});
+    await new Promise((res) => server.close(() => res()));
+
+    const { code, serveArgs, ndxHome } = await captureServeArgs(dir, [`--port=${port}`, "--no-auth"]);
 
     expect(code).toBe(0);
     expect(serveArgs).toEqual(["serve", `--port=${port}`, dir]);
+    // Not merely unused — never written. A token file left behind would be
+    // sent by the next command's hub probes.
+    expect(existsSync(join(ndxHome, "auth.token"))).toBe(false);
   }, 20_000);
 });
 
