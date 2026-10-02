@@ -35,7 +35,7 @@ import { loadPRDSync } from "./prd-io.js";
 import {
   collectCompletedIds,
   findItem,
-  findNextTask,
+  findActionableTasks,
   openClaimsStore,
   resolveClaimHolder,
 } from "./rex-gateway.js";
@@ -289,17 +289,15 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
   const liveTaskIds = new Set((await collectHeldRuns(ctx)).map((run) => run.taskId));
   const completedIds = collectCompletedIds(doc.items);
 
-  // The order `ndx work --auto` picks in: each pick is excluded and asked again,
-  // starting with every task another worktree holds.
-  const excludeIds = new Set(foreign.keys());
-  const tasks: ReadyTask[] = [];
-  while (tasks.length < limit) {
-    const entry = findNextTask(doc.items, completedIds, { excludeIds });
-    if (!entry) break;
-    excludeIds.add(entry.item.id);
-    const { item, parents } = entry;
+  // The order `ndx work --auto` picks in, in one selection pass. Asking for the
+  // next task once per row rebuilt the comparator each time and froze the
+  // request thread for seconds. Tasks another worktree holds are excluded.
+  const picked = findActionableTasks(doc.items, completedIds, limit, {
+    excludeIds: new Set(foreign.keys()),
+  });
+  const tasks: ReadyTask[] = picked.map(({ item, parents }) => {
     const liveRun = liveTaskIds.has(item.id);
-    tasks.push({
+    return {
       id: item.id,
       title: item.title,
       status: item.status,
@@ -310,8 +308,8 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
       tags: item.tags ?? [],
       resume: item.status === "in_progress" && !liveRun,
       liveRun,
-    });
-  }
+    };
+  });
   // `dir` is what execute passes `ndx work`, so a copied command matches the run.
   jsonResponse(res, 200, { tasks, limit, dir: ctx.projectDir });
   return true;

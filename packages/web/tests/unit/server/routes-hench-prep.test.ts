@@ -24,6 +24,7 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 });
 
 import { TIER_MODELS } from "@n-dx/llm-client";
+import { collectCompletedIds, findNextTask } from "../../../src/server/rex-gateway.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { resetHenchRouteStateForTests } from "../../../src/server/routes-hench.js";
 import {
@@ -424,6 +425,49 @@ describe("hench prep routes", () => {
         liveRun: false,
       });
       expect(tasks[1]).toMatchObject({ criteriaCount: 0, tags: [] });
+    });
+
+    it("returns the order of repeated findNextTask picks, with dependencies and mixed priorities", async () => {
+      const priorities = ["low", "medium", "high", "critical"];
+      const items = [
+        task("base", { priority: "low" }),
+        task("needs-base", { priority: "critical", blockedBy: ["base"] }),
+        task("started", { priority: "low", status: "in_progress" }),
+        ...Array.from({ length: 12 }, (_, i) =>
+          task(`m${String(i).padStart(2, "0")}`, { priority: priorities[i % 4], ...(i % 5 === 0 ? { blockedBy: ["base"] } : {}) })),
+      ];
+      await writeTasks(ctx, items);
+      const expected: string[] = [];
+      const completed = collectCompletedIds(items as never);
+      const excludeIds = new Set<string>();
+      for (;;) {
+        const entry = findNextTask(items as never, completed, { excludeIds });
+        if (!entry) break;
+        excludeIds.add(entry.item.id);
+        expected.push(entry.item.id);
+      }
+      expect(expected.length).toBeGreaterThan(5);
+      const port = await open(ctx);
+      expect((await ready(port, "?limit=50")).tasks.map((t) => t.id)).toEqual(expected.slice(0, 50));
+    });
+
+    it("answers from a 2,000-item tree well under a second", async () => {
+      const features = Array.from({ length: 40 }, (_, f) => ({
+        id: `f${f}`, title: `Feature ${f}`, status: "pending", level: "feature", priority: "medium",
+        children: Array.from({ length: 49 }, (_, t) =>
+          task(`f${f}-t${t}`, {
+            priority: ["low", "medium", "high", "critical"][(f + t) % 4],
+            ...(t > 0 && t % 3 === 0 ? { blockedBy: [`f${f}-t${t - 1}`] } : {}),
+          })),
+      }));
+      await writeTasks(ctx, features);
+      const port = await open(ctx);
+      const started = performance.now();
+      const { tasks } = await ready(port, "?limit=50");
+      const elapsed = performance.now() - started;
+      expect(tasks).toHaveLength(50);
+      // The per-row loop took ~5 s on 1,800 items; one pass takes ~0.2 s.
+      expect(elapsed).toBeLessThan(1000);
     });
 
     it("honours ?limit=N, defaults to 10 and clamps to 1..50", async () => {
