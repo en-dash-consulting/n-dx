@@ -19,6 +19,7 @@ import { assertFreshServerBuild } from "../helpers/built-server-guard.js";
 
 const execFileAsync = promisify(execFile);
 const WEB_PKG = resolve(fileURLToPath(import.meta.url), "../../..");
+const CORE_CLI = resolve(WEB_PKG, "../core/cli.js");
 const SERVER_ENTRY_URL = pathToFileURL(join(WEB_PKG, "dist/server/start.js")).href;
 
 function git(cwd: string, ...args: string[]): string {
@@ -165,7 +166,13 @@ beforeAll(async () => {
   // matters only when no result made it to disk.
   let execError: Error | null = null;
   try {
-    await execFileAsync(process.execPath, [script], { timeout: 90_000, maxBuffer: 10 * 1024 * 1024 });
+    // The server resolves the ndx binary from the environment (resolveNdxBin);
+    // the temp repo has no install of its own, so name the repository's cli.js
+    // for the child instead of depending on the ambient environment. Only the
+    // child's env is set — this process's is never touched, so nothing leaks.
+    const env: NodeJS.ProcessEnv = { ...process.env, NDX_CLI_PATH: CORE_CLI };
+    delete env["N_DX_CLI_PATH"];
+    await execFileAsync(process.execPath, [script], { timeout: 90_000, maxBuffer: 10 * 1024 * 1024, env });
   } catch (err) {
     execError = err as Error;
   }
