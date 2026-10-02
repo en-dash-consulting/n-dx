@@ -316,11 +316,15 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
 /**
  * Map of shorthand model aliases to full Anthropic API model IDs.
  * The Claude CLI resolves these internally, but the API requires full IDs.
+ *
+ * Family aliases are pinned to literal IDs on purpose, not to TIER_MODELS
+ * slots: a tier may move to another family, an alias must not. `sonnet`
+ * follows NEWEST_MODELS because the Sonnet line is the standard default.
  */
 const MODEL_ALIASES: Record<string, string> = {
   sonnet: NEWEST_MODELS.claude,
-  opus: TIER_MODELS.claude.heavy,
-  haiku: TIER_MODELS.claude.light,
+  opus: "claude-opus-5-5",
+  haiku: "claude-haiku-4-5",
   fable: "claude-fable-5-1",
 };
 

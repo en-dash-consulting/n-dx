@@ -253,10 +253,21 @@ describe("Claude 5.5 line", () => {
     expect(TIER_MODELS.claude.standard).toBe("claude-sonnet-5-5");
   });
 
-  it("expands the opus and fable aliases to the newest releases", () => {
+  it("expands each family alias to its current release", () => {
     expect(resolveModel("opus")).toBe("claude-opus-5-5");
+    expect(resolveModel("sonnet")).toBe("claude-sonnet-5-5");
+    expect(resolveModel("haiku")).toBe("claude-haiku-4-5");
     expect(resolveModel("fable")).toBe("claude-fable-5-1");
   });
+
+  // Guards against an alias following a tier slot: re-pointing the heavy tier
+  // at Fable must not make `--model=opus` resolve to Fable.
+  it.each(["opus", "sonnet", "haiku", "fable"])(
+    "resolves the %s alias to a model of the same family",
+    (family) => {
+      expect(resolveModel(family)).toMatch(new RegExp(`^claude-${family}-`));
+    },
+  );
 
   it("knows a 1M context window for every new and superseded Claude 5 model", () => {
     for (const id of [
