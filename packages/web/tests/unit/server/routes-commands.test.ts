@@ -27,7 +27,11 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 });
 
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleCommandsRoute, invalidateAuthCheckCache } from "../../../src/server/routes-commands.js";
+import {
+  handleCommandsRoute,
+  invalidateAuthCheckCache,
+  invalidateCommandEffectsCache,
+} from "../../../src/server/routes-commands.js";
 import { handleLlmRoute } from "../../../src/server/routes-llm.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
@@ -1101,8 +1105,34 @@ describe("commands route — manifest (command reference)", () => {
   let server: Server;
   let port: number;
 
+  /** What the mocked `ndx help --effects --format=json` reports. */
+  const declaredEffects = (names: string[]) =>
+    Object.fromEntries(names.map((name) => [name, {
+      command: name,
+      summary: `${name} summary`,
+      reads: ["somewhere"],
+      writes: [],
+      llm: [],
+      network: [],
+      duration: "seconds",
+      next: "ndx status",
+      extraFieldCoreAdded: { nested: true },
+    }]));
+
+  function mockEffects(effects: Record<string, unknown>): void {
+    execMock.mockResolvedValue({
+      stdout: JSON.stringify({ effects }),
+      stderr: "",
+      exitCode: 0,
+      error: null,
+      started: true,
+    });
+  }
+
   beforeEach(async () => {
     execMock.mockReset();
+    invalidateCommandEffectsCache();
+    mockEffects(declaredEffects(["analyze", "plan", "init", "work"]));
     tmpDir = await mkdtemp(join(tmpdir(), "commands-manifest-"));
     ctx = {
       projectDir: tmpDir,
@@ -1127,6 +1157,53 @@ describe("commands route — manifest (command reference)", () => {
     expect(res.status).toBe(200);
     return res.json() as Promise<Record<string, any>>;
   }
+
+  it("attaches each command's effects exactly as the CLI reported them", async () => {
+    const reported = declaredEffects(["analyze", "plan", "init", "work"]);
+    const body = await getManifest();
+    const all = body.groups.flatMap((g: { commands: Array<Record<string, any>> }) => g.commands);
+
+    expect(body.effectsError).toBeUndefined();
+    // Unknown fields survive: the server passes core's object through, it
+    // does not re-shape it.
+    expect(all.find((c: Record<string, any>) => c.name === "analyze").effects).toEqual(reported.analyze);
+    expect(all.find((c: Record<string, any>) => c.name === "work").effects).toEqual(reported.work);
+    // A command the CLI declared nothing for is null, not omitted.
+    expect(all.find((c: Record<string, any>) => c.name === "config").effects).toBeNull();
+
+    const [bin, args] = execMock.mock.calls[0];
+    expect([bin, ...args].join(" ")).toContain("help --effects --format=json --quiet");
+  });
+
+  it("asks the CLI once and serves later requests from the cache", async () => {
+    await getManifest();
+    await getManifest();
+    expect(execMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("still serves the manifest when the CLI cannot report effects, and retries next time", async () => {
+    execMock.mockResolvedValueOnce({
+      stdout: "",
+      stderr: "Cannot find module cli.js",
+      exitCode: 1,
+      error: new Error("exit 1"),
+      started: true,
+    });
+    const body = await getManifest();
+    const all = body.groups.flatMap((g: { commands: Array<Record<string, any>> }) => g.commands);
+    expect(body.effectsError).toContain("Cannot find module");
+    expect(all.every((c: Record<string, any>) => c.effects === null)).toBe(true);
+
+    const retried = await getManifest();
+    expect(retried.effectsError).toBeUndefined();
+    expect(execMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports unparseable CLI output as an effects error", async () => {
+    execMock.mockResolvedValueOnce({ stdout: "not json", stderr: "", exitCode: 0, error: null, started: true });
+    const body = await getManifest();
+    expect(body.effectsError).toContain("Unparseable");
+  });
 
   it("carries trigger metadata only for dashboard-triggerable commands", async () => {
     const body = await getManifest();
