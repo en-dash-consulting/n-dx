@@ -38,6 +38,7 @@
 
 import { useState, useCallback, useEffect } from "preact/hooks";
 import { usePolling } from "../views/use-polling.js";
+import type { RunOptions } from "../external.js";
 
 /** Mirrors QueueEntry in server-side hub/admission.ts. */
 export interface HubQueueEntry {
@@ -46,6 +47,10 @@ export interface HubQueueEntry {
   workspace: string | null;
   taskId: string;
   enqueuedAt: string;
+  /** The run options it was queued with, minus `contextNotes` (see `hasNotes`). Absent when it had none. */
+  options?: Omit<RunOptions, "contextNotes">;
+  /** It carries notes for the agent, which the hub does not send. */
+  hasNotes?: true;
 }
 
 /** Mirrors DroppedEntry in hub/admission.ts: a queued run whose server refused it at its turn. */

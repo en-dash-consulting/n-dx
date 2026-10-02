@@ -25,8 +25,8 @@ import { mkdirSync } from "node:fs";
 import { basename } from "node:path";
 import { ProjectSupervisor } from "./children.js";
 import type { ChildStatus, SupervisorOptions } from "./children.js";
-import { AdmissionGate, countProjectExecutions } from "./admission.js";
-import type { AdmissionLimits, ExecuteRefusal, QueueEntry, QueueSnapshot, StartOutcome } from "./admission.js";
+import { AdmissionGate, countProjectExecutions, redactQueueEntry } from "./admission.js";
+import type { AdmissionLimits, ExecuteRefusal, PublicQueueSnapshot, QueueEntry, StartOutcome } from "./admission.js";
 import {
   hubConfigPath,
   hubPidPath,
@@ -286,13 +286,18 @@ export class Hub {
    * entry list narrows: asked through `/p/<id>/`, a viewer gets its own
    * project's queue, since it can neither act on nor identify another's.
    */
-  queueSnapshot(projectId?: string): QueueSnapshot {
+  queueSnapshot(projectId?: string): PublicQueueSnapshot {
     const snapshot = this.admission.snapshot();
-    if (projectId === undefined) return snapshot;
-    return {
+    const redacted = {
       ...snapshot,
-      entries: snapshot.entries.filter((entry) => entry.projectId === projectId),
-      dropped: snapshot.dropped.filter((entry) => entry.projectId === projectId),
+      entries: snapshot.entries.map(redactQueueEntry),
+      dropped: snapshot.dropped.map(redactQueueEntry),
+    };
+    if (projectId === undefined) return redacted;
+    return {
+      ...redacted,
+      entries: redacted.entries.filter((entry) => entry.projectId === projectId),
+      dropped: redacted.dropped.filter((entry) => entry.projectId === projectId),
       /** Queued across every project, so "2 of 5 waiting" stays truthful. */
       queuedTotal: snapshot.entries.length,
     };

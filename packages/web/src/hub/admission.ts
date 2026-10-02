@@ -107,6 +107,35 @@ export interface DroppedEntry extends QueueEntry {
 /** How many dropped entries the gate remembers, newest kept. */
 export const MAX_DROPPED_ENTRIES = 20;
 
+/**
+ * A queue or dropped entry as `GET /api/hub/queue` shows it: the options
+ * without `contextNotes`, which can run to 8 KB of operator prose that no
+ * queue strip needs and that an unscoped snapshot would hand to every
+ * project's viewer. `hasNotes` says there were some.
+ */
+export type QueueEntryView<T extends QueueEntry = QueueEntry> = Omit<T, "options"> & {
+  options?: Omit<RunOptions, "contextNotes">;
+  hasNotes?: true;
+};
+
+/** Drop `contextNotes` from an entry, keeping a flag that there were some. */
+export function redactQueueEntry<T extends QueueEntry>(entry: T): QueueEntryView<T> {
+  if (!entry.options) return entry;
+  const { options: full, ...rest } = entry;
+  const { contextNotes, ...options } = full;
+  return {
+    ...rest,
+    ...(Object.keys(options).length > 0 ? { options } : {}),
+    ...(contextNotes ? { hasNotes: true as const } : {}),
+  };
+}
+
+/** The snapshot `GET /api/hub/queue` serves: {@link QueueSnapshot} with entries redacted. */
+export type PublicQueueSnapshot = Omit<QueueSnapshot, "entries" | "dropped"> & {
+  entries: QueueEntryView[];
+  dropped: QueueEntryView<DroppedEntry>[];
+};
+
 export interface QueueSnapshot {
   /**
    * Queued entries. Narrowed to one project when the snapshot was asked for

@@ -506,6 +506,7 @@ async function handleExecuteAdmission(
     taskId,
     projectId: decision.project.id,
     workspace,
+    ...(options ? { options } : {}),
     queueLength: snapshot.entries.length,
     running: snapshot.running,
     limits: snapshot.limits,

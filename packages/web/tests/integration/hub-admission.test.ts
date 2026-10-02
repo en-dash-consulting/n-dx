@@ -204,11 +204,33 @@ describe("hub admission gate", () => {
     const options = { model: "claude-opus-5", review: true, maxTurns: 12, contextNotes: "Keep it small." };
     const queued = await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, options);
     expect(queued.status).toBe(202);
-    expect(Object.keys(await queued.json())).toEqual(expect.arrayContaining(["queued", "position", "reason"]));
+    const body = await queued.json();
+    expect(Object.keys(body)).toEqual(expect.arrayContaining(["queued", "position", "reason"]));
+    // The server's own 202 echoes the options it accepted; so does the queued one.
+    expect(body.options).toEqual(options);
 
     alpha.running.delete("task-1");
     await waitFor(() => beta.received.length === 1, 4_000);
     expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, options });
+  });
+
+  it("never serves contextNotes text from the queue, scoped or not", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    const secret = "private notes for beta's agent";
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { model: "claude-opus-5", contextNotes: secret });
+
+    for (const path of ["/api/hub/queue", "/p/beta/api/hub/queue", "/p/alpha/api/hub/queue"]) {
+      const text = await (await fetch(`http://127.0.0.1:${h.port}${path}`)).text();
+      expect(text).not.toContain(secret);
+      expect(text).not.toContain("contextNotes");
+    }
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue.entries[0]).toMatchObject({
+      taskId: "task-2",
+      options: { model: "claude-opus-5" },
+      hasNotes: true,
+    });
   });
 
   it("takes the newer options when a queued task is asked for again, keeping its place", async () => {
