@@ -66,6 +66,21 @@ const timer = setInterval(() => {
 process.on("SIGTERM", () => { clearInterval(timer); process.exit(143); });
 `;
 
+/**
+ * POSIX records the child's own pid. On win32 `spawnCli` goes through cmd.exe,
+ * so the recorded pid is the wrapper's: it lives exactly as long as the CLI,
+ * which is all liveness needs, but it differs from the child's self-reported pid.
+ */
+function expectVendorPid(vendorPid: number | undefined, childPid: string): void {
+  if (process.platform !== "win32") {
+    expect(vendorPid).toBe(Number(childPid));
+    return;
+  }
+  expect(Number.isInteger(vendorPid)).toBe(true);
+  expect(vendorPid).toBeGreaterThan(0);
+  expect(() => process.kill(vendorPid as number, 0)).not.toThrow();
+}
+
 describe("livelock intercept in spawnWithAdapter", () => {
   let dir: string;
   let script: string;
@@ -175,7 +190,7 @@ describe("livelock intercept in spawnWithAdapter", () => {
     const spawned = spawn("varied", 0, progress);
 
     await waitFor(() => progress.turns > 0);
-    expect(progress.vendorPid).toBe(Number(await readFile(pidFile, "utf-8")));
+    expectVendorPid(progress.vendorPid, await readFile(pidFile, "utf-8"));
 
     await spawned;
     expect(progress.vendorPid).toBeUndefined();
@@ -209,7 +224,7 @@ describe("livelock intercept in spawnWithAdapter", () => {
       childPid = await readFile(pidFile, "utf-8").catch(() => "");
       if (childPid === "") await new Promise((resolve) => setTimeout(resolve, 25));
     }
-    expect(livePid).toBe(Number(childPid));
+    expectVendorPid(livePid, childPid);
 
     await spawned;
     expect(holder.vendorPid).toBeUndefined();

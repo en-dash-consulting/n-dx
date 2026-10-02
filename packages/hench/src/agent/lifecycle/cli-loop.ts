@@ -679,7 +679,8 @@ export interface LiveSpawnProgress {
   /**
    * Pid of the vendor CLI while a spawn is live; cleared when it closes. Not
    * touched by {@link resetLiveSpawnProgress} — that runs between spawns, and
-   * the pid belongs to the process, not to the counters it produced.
+   * the pid belongs to the process, not to the counters it produced. On Windows
+   * it is the cmd.exe wrapper's pid, not the CLI's own.
    */
   vendorPid?: number;
 }

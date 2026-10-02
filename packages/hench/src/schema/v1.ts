@@ -1551,7 +1551,8 @@ export interface RunRecord {
    *
    * Set from the heartbeat while a spawn is live and absent between spawns
    * (retries, the plan-mode prompt) and on the API provider, which spawns
-   * nothing.
+   * nothing. On Windows the CLI is launched through cmd.exe, so this is the
+   * wrapper's pid, which lives exactly as long as the CLI.
    *
    * v1 additive field — old records without it load normally.
    */
