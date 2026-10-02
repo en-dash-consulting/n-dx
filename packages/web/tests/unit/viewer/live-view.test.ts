@@ -122,9 +122,9 @@ describe("reading the snapshot", () => {
 
   it("labels the slots tile with its scope, and names the hub's queue when it holds anything", () => {
     const m = snapshot().machine;
-    expect(machineTiles(m, 0, 2)[0]).toMatchObject({ label: "Agent slots · this repository", value: "1 of 3", detail: "2 starting" });
+    expect(machineTiles(m, 0, 2)[0]).toMatchObject({ label: "Hench slots · this repository", value: "1 of 3", detail: "2 starting" });
     const hub = { ...m, slots: { scope: "machine" as const, inUse: 2, max: 4, available: 2, queued: 0 } };
-    expect(machineTiles(hub, 0, 0)[0]).toMatchObject({ label: "Agent slots · this machine", value: "2 of 4", detail: "0 starting" });
+    expect(machineTiles(hub, 0, 0)[0]).toMatchObject({ label: "Hench slots · this machine", value: "2 of 4", detail: "0 starting" });
     const queued = { ...hub, slots: { ...hub.slots, queued: 3 } };
     expect(machineTiles(queued, 0, 0)[0]?.detail).toBe("0 starting · 3 queued");
   });

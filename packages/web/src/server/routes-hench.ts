@@ -2914,7 +2914,7 @@ export interface ConcurrencyStatus {
   timestamp: string;
 }
 
-/** Agent slots of one workspace: live lock holders against the effective limit. */
+/** Hench slots of one workspace: live lock holders against the effective limit. */
 export interface ConcurrencySlots {
   processCount: number;
   maxConcurrent: number;

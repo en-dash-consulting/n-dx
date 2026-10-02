@@ -21,7 +21,7 @@
  * - **Jobs** — the dashboard job slots (`commandJobsOf`, `rexAnalyzeJobStatus`)
  *   plus each worktree's `analyze-progress.json`, which is how an analysis
  *   started from a terminal shows up at all.
- * - **Machine** — agent slots (runs judged `live` across every worktree, or
+ * - **Machine** — hench slots (runs judged `live` across every worktree, or
  *   the hub's admission state when proxied through it) and `readSystemMemory`;
  *   the memory floor is the hub's admission floor from the per-user config.
  *
@@ -183,7 +183,7 @@ export interface LiveStartingExecution {
 }
 
 /**
- * Agent slots in use against a cap, and what the count covers.
+ * Hench slots in use against a cap, and what the count covers.
  *
  * - `machine` — served through the hub: its admission gate's dashboard
  *   sessions across every registered project, against `maxSessions`.
@@ -224,7 +224,7 @@ export interface LiveSnapshot {
     starting: LiveStartingExecution[];
   };
   machine: {
-    /** Agent slots, over the scope the run list beside it covers or wider. */
+    /** Hench slots, over the scope the run list beside it covers or wider. */
     slots: LiveSlots;
     memory: {
       freeBytes: number;
@@ -684,7 +684,7 @@ const LIVE_PATH = "/api/live";
  *
  * The agent's vendor and model are resolved per request and laid over the
  * cached snapshot, so a config change shows on the next read rather than
- * after the cache turns over. So are the agent slots when the request came
+ * after the cache turns over. So are the hench slots when the request came
  * through the hub, whose proxy states its admission gate's numbers in
  * {@link HUB_ADMISSION_HEADER}: one snapshot can be read both ways.
  */
