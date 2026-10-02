@@ -23,8 +23,17 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
   return { ...actual, exec };
 });
 
+vi.mock("../../../src/server/rex-gateway.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/server/rex-gateway.js")>();
+  return {
+    ...actual,
+    findNextTask: vi.fn(actual.findNextTask),
+    findActionableTasks: vi.fn(actual.findActionableTasks),
+  };
+});
+
 import { TIER_MODELS } from "@n-dx/llm-client";
-import { collectCompletedIds, findNextTask } from "../../../src/server/rex-gateway.js";
+import { collectCompletedIds, findActionableTasks, findNextTask } from "../../../src/server/rex-gateway.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { resetHenchRouteStateForTests } from "../../../src/server/routes-hench.js";
 import {
@@ -451,7 +460,7 @@ describe("hench prep routes", () => {
       expect((await ready(port, "?limit=50")).tasks.map((t) => t.id)).toEqual(expected.slice(0, 50));
     });
 
-    it("answers from a 2,000-item tree well under a second", async () => {
+    it("orders a 2,000-item tree in one selection pass", async () => {
       const features = Array.from({ length: 40 }, (_, f) => ({
         id: `f${f}`, title: `Feature ${f}`, status: "pending", level: "feature", priority: "medium",
         children: Array.from({ length: 49 }, (_, t) =>
@@ -462,12 +471,14 @@ describe("hench prep routes", () => {
       }));
       await writeTasks(ctx, features);
       const port = await open(ctx);
-      const started = performance.now();
+      vi.mocked(findNextTask).mockClear();
+      vi.mocked(findActionableTasks).mockClear();
       const { tasks } = await ready(port, "?limit=50");
-      const elapsed = performance.now() - started;
       expect(tasks).toHaveLength(50);
-      // The per-row loop took ~5 s on 1,800 items; one pass takes ~0.2 s.
-      expect(elapsed).toBeLessThan(1000);
+      // The per-row loop rebuilt the comparator on every call (~5 s on 1,800
+      // items); counting calls pins the regression without a clock.
+      expect(findActionableTasks).toHaveBeenCalledTimes(1);
+      expect(findNextTask).not.toHaveBeenCalled();
     });
 
     it("honours ?limit=N, defaults to 10 and clamps to 1..50", async () => {
