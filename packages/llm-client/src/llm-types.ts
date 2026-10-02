@@ -247,7 +247,9 @@ export interface LLMConfig {
   /**
    * Task class → effort level (`llm.effort.<class>`), matched with the same
    * exact-then-glob rules as `routes`. Returned verbatim by
-   * `resolveTaskModel` for callers that pass `--effort` / `output_config`.
+   * `resolveTaskModel`; Claude API requests send it as `output_config.effort`
+   * after `resolveClaudeApiEffort` validates it. Claude Code CLI runs do not
+   * pass it yet.
    */
   effort?: Record<string, string>;
   /**

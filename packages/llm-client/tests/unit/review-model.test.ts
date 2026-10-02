@@ -18,7 +18,7 @@ import type { LLMConfig } from "../../src/llm-types.js";
 
 describe("resolveReviewModel — precedence", () => {
   it("falls back to the vendor's recommended reviewer with no config", () => {
-    expect(resolveReviewModel("claude")).toBe("claude-opus-5");
+    expect(resolveReviewModel("claude")).toBe("claude-opus-5-5");
     expect(resolveReviewModel("codex")).toBe(NEWEST_MODELS.codex);
     expect(resolveReviewModel("google")).toBe(TIER_MODELS.google.heavy);
   });
@@ -48,7 +48,7 @@ describe("resolveReviewModel — precedence", () => {
   });
 
   it("expands a shorthand alias in the override", () => {
-    expect(resolveReviewModel("claude", undefined, "opus")).toBe("claude-opus-5");
+    expect(resolveReviewModel("claude", undefined, "opus")).toBe("claude-opus-5-5");
   });
 
   it("normalizes a legacy codex id rather than passing it through", () => {
@@ -106,7 +106,7 @@ describe("REVIEW_MODELS catalog", () => {
 
   it("prices the Claude reviewer below the Fable tier it could have picked", () => {
     const reviewer = MODEL_COSTS[REVIEW_MODELS.claude];
-    const fable = MODEL_COSTS["claude-fable-5"];
+    const fable = MODEL_COSTS["claude-fable-5-1"];
 
     expect(reviewer.inputPerMToken).toBeLessThan(fable.inputPerMToken);
     expect(reviewer.outputPerMToken).toBeLessThan(fable.outputPerMToken);

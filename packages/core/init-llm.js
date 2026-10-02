@@ -49,7 +49,15 @@ const LEGACY_CATALOG_MODEL_ALIASES = {
     "gpt-5.3-codex",
     "gpt-5.2",
   ],
-  [LLM_PROVIDER.CLAUDE]: ["claude-sonnet-4-6", "claude-opus-4-8", "claude-opus-4-7"],
+  // Superseded but still served by the API — accepted on re-init, never remapped.
+  [LLM_PROVIDER.CLAUDE]: [
+    "claude-sonnet-5",
+    "claude-opus-5",
+    "claude-fable-5",
+    "claude-sonnet-4-6",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+  ],
   // gemini-2.0-flash and gemini-2.0-flash-lite are shut down by Google, but
   // are still recognised here so upgrading projects get a clean swap rather
   // than an "unknown model" warning on top of the request failure.

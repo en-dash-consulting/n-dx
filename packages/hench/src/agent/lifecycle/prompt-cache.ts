@@ -47,7 +47,7 @@
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
-import type { AnthropicToolDef } from "../../prd/llm-gateway.js";
+import type { AnthropicToolDef, ClaudeEffort } from "../../prd/llm-gateway.js";
 import type { PromptCacheTtl } from "../../schema/index.js";
 
 /**
@@ -85,6 +85,12 @@ export interface CachedRequestInput {
    * `HenchConfig.promptCacheTtl` for the cost tradeoff.
    */
   promptCacheTtl?: PromptCacheTtl;
+  /**
+   * Sent as `output_config.effort` when set. Resolve it with
+   * `resolveClaudeApiEffort` so it matches what the llm-client API provider
+   * sends; absent means no `output_config` at all.
+   */
+  effort?: ClaudeEffort;
 }
 
 /**
@@ -207,6 +213,7 @@ export function buildCachedMessageRequest(
       messages: [...input.messages],
     };
     if (input.systemPrompt) params.system = input.systemPrompt;
+    if (input.effort) params.output_config = { effort: input.effort };
     return params;
   }
 
@@ -219,6 +226,7 @@ export function buildCachedMessageRequest(
     messages: withTrailingCacheBreakpoint(input.messages, input.promptCacheTtl),
   };
   if (system !== undefined) params.system = system;
+  if (input.effort) params.output_config = { effort: input.effort };
 
   return params;
 }
