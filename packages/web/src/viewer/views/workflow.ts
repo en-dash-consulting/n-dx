@@ -19,7 +19,7 @@
 
 import { h } from "preact";
 import { useCallback, useState } from "preact/hooks";
-import { NdxLogoPng, SettingsFrame } from "../components/index.js";
+import { PixelIcon, SettingsFrame } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { HenchConfigSection, useHenchConfigForm } from "./hench-config.js";
@@ -85,7 +85,7 @@ export function WorkflowView({ navigateTo }: { navigateTo: NavigateTo }) {
     h("div", { class: "workflow-container" },
       h("div", { class: "workflow-header" },
         h("div", { class: "workflow-header-brand" },
-          h(NdxLogoPng, { size: 16, class: "workflow-header-logo" }),
+          h(PixelIcon, { name: "workflow", variant: "tile", size: 40, class: "workflow-header-tile" }),
           h("h1", { class: "workflow-header-title" }, "Workflow"),
         ),
         h("p", { class: "workflow-header-subtitle" },

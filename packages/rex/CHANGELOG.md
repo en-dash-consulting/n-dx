@@ -1,5 +1,310 @@
 # @n-dx/rex
 
+## 0.8.0
+
+### Minor Changes
+
+- [#459](https://github.com/en-dash-consulting/n-dx/pull/459) [`0e3623e`](https://github.com/en-dash-consulting/n-dx/commit/0e3623edbc25e417982a93db53aa7ae6b70fae2f) Thanks [@endash-shal](https://github.com/endash-shal)! - 0.8.0 — Find your way
+  
+  A single `.ndx/` directory for project state, with `ndx migrate-layout` to move
+  an existing project onto it. A reorganised dashboard: views are stages, Analysis
+  opens on the codebase map, settings are three pages (Robot Wrangler, Workflow,
+  Project) on a shared save frame, and every moved path redirects. A Live tab for
+  watching every run across a repository's worktrees. A per-user token on the hub
+  and dashboard, and repository trust gating what a checkout's execution config
+  may widen. New Claude model defaults, per-vendor agent models, per-field
+  resolution of the legacy `claude.*` keys, and effects declared for every command
+  and shown in a preflight banner.
+  
+  Every other changeset in this release is a `patch`, which is the repo default
+  and correct for each change on its own. This one makes the aggregate a minor, as
+  the 0.8.0 epic requires.
+
+### Patch Changes
+
+- [#444](https://github.com/en-dash-consulting/n-dx/pull/444) [`0f927d1`](https://github.com/en-dash-consulting/n-dx/commit/0f927d1c8026fb17d997b2e6b83d017795f8898a) Thanks [@endash-shal](https://github.com/endash-shal)! - Drop the unreachable id check from the stale-save guard, and correct the docs around it.
+  
+  Putting the content-digest check ahead of the item-id check made the id check unreachable: a file that reaches it has already failed the digest, so it differs from what the snapshot read, and both branches returned the same answer. Removing it also removes the `savedIds` parameter and the `collectItemIds` walk over the whole tree, which ran on every save. The surrounding docstrings described the id as the thing distinguishing a relocation from a deletion; the digest is, and they now say so.
+
+- [#442](https://github.com/en-dash-consulting/n-dx/pull/442) [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add an optional `assignee` field to PRD items and `ndx work --mine`.
+  
+  `PRDItem.assignee` is an optional identity string, in the same "Name
+  <email>" form `resolveActor` (git `user.name` + `user.email`, falling back
+  to the OS username) resolves for `lastModifiedBy`. It round-trips through
+  the folder tree via the existing passthrough-field path and is omitted
+  entirely when unset — a tree with no `assignee` fields selects tasks
+  exactly as it always has.
+  
+  `findNextTask` / `findActionableTasks` gained an `assignee` filter option
+  (exact match, unset by default) alongside the existing `tags` filter.
+  `hench run --mine` (and `ndx work --mine`) resolves the current user the
+  same way rex stamps `lastModifiedBy`, and restricts autoselection to tasks
+  assigned to that identity. Like `--tags`, an explicit `--task` bypasses the
+  filter, and it is not supported together with `--epic-by-epic`.
+  
+  `resolveActor` is now re-exported through hench's `rex-gateway.ts` so hench
+  resolves the current user the same way rex does, rather than keeping a
+  second, driftable definition of "who is running this" (the gateway's export
+  cap moves from 42 to 43 accordingly).
+
+- [#505](https://github.com/en-dash-consulting/n-dx/pull/505) [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Claude API requests now send `llm.effort` as `output_config.effort`, and Claude Opus 5.5 defaults to `high` effort. `llm.effort` was parsed but never sent. With no matching rule, `claude-opus-5-5` gets `high` so the move from Opus 5 keeps its reasoning depth (Opus 5.5's API default is `medium`), and other models are unchanged. Effort is never sent to a model that rejects it (Haiku 4.5, Sonnet 4.5 and older) or when the value is not `low`, `medium`, `high`, `xhigh` or `max`; both cases print a warning. Claude Code CLI runs are unchanged.
+
+- [#427](https://github.com/en-dash-consulting/n-dx/pull/427) [`f31ece3`](https://github.com/en-dash-consulting/n-dx/commit/f31ece3356eeb3450f62e3ffcebde43852c61bd6) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop the stale-save guard from refusing a save that would repair a corrupt item file.
+  
+  The guard compares each deletion candidate's `mtimeMs` against a `Date.now()` load stamp, and those are two different clocks — the filesystem clock was measured running up to ~4ms ahead of `Date.now()` on Windows, past the guard's 2ms tolerance. A file written just *before* a load could therefore read as newer than it.
+  
+  For a file with no parseable `id` — a corrupt or truncated one — the check ended there and reported it as another writer's work, so the save that would have rewritten it was refused. The corruption became permanent: every subsequent save failed the same way.
+  
+  The content-digest check that already existed now runs first. If a file still digests to exactly what the snapshot loaded from that path, the snapshot has seen its current contents and deleting it destroys nothing unseen, whatever its mtime says. Files the snapshot never read keep the guard's full mtime-based protection.
+
+- [#439](https://github.com/en-dash-consulting/n-dx/pull/439) [`39c6d80`](https://github.com/en-dash-consulting/n-dx/commit/39c6d80441aba2c3dd71d94494b58bf42fc5a4a0) Thanks [@endash-shal](https://github.com/endash-shal)! - Route rex and sourcevision file access through their paths modules
+  
+  Every site that composed its own `.rex/` or `.sourcevision/` path now asks the
+  layout resolver instead, so both packages follow whichever folder layout a
+  project is on rather than assuming the legacy one. `REX_DIR` and `SV_DIR` are
+  gone — a bare directory name is the thing that made the layout a decision taken
+  at ~120 call sites.
+  
+  Behaviour on a legacy project is unchanged. Three user-visible details moved
+  from a fixed string to the resolved location: the legacy-PRD migration banner
+  now names the folder tree the migration actually wrote (reported by
+  `ensureLegacyPrdMigrated` as `folderTreePath`), `rex export`'s refusal message
+  names the PRD directory the project actually uses, and `sv analyze`'s background
+  narration log path follows the analysis directory.
+  
+  `packages/sourcevision/src/export/` bundles into the dependency-free standalone
+  iso-map skill and so cannot import the resolver; it carries a hand-written twin,
+  `analysisDirFor`, pinned to the canonical implementation by
+  `tests/integration/layout-resolver-contract.test.js`.
+
+- [#454](https://github.com/en-dash-consulting/n-dx/pull/454) [`d6a6c0c`](https://github.com/en-dash-consulting/n-dx/commit/d6a6c0c0d0f01674e58b8eddd9855909787b01fa) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Scope `--mine` to what it acts on, name the identity when it matches nothing,
+  and inherit blockers in `rex ready`.
+  
+  `--mine` now matches an item whose own `assignee` *or any ancestor's* carries
+  the identity. Matching only the item's own field meant handing someone a
+  feature or an epic selected nothing at all, because the tasks beneath it carry
+  no field of their own. The rule lives in rex's new `matchesAssignee`, exported
+  through hench's `rex-gateway.ts` (export cap 43 → 44) so "mine" means the same
+  thing everywhere it is asked.
+  
+  The deferred/failing reset offered when a `--mine` menu comes back empty now
+  counts and resets only that identity's tasks. It previously counted the whole
+  PRD and, on "y", reset every deferred and failing task in it — other people's
+  included, committed under the answering operator's name. `ndx work --mine
+  --reset-deferred` is scoped the same way.
+  
+  When `--mine` matches nothing, the message names the identity `resolveActor`
+  produced and says how many actionable tasks exist without the filter; `--loop`
+  no longer reports "All tasks complete", which described the whole project after
+  looking at one slice of it.
+  
+  `rex ready` no longer marks an item whose ancestor is blocked, cancelled,
+  deleted, or has an open `blockedBy`. It inherited requirements from ancestors
+  but checked blockers only on the item itself, so a task under a blocked epic
+  was marked ready although task selection would never offer it. Readiness and
+  selection now share one predicate (`traversalBlock`), and the evaluation names
+  the offending ancestor in its `reason` and in a new optional `blockedAncestor`
+  field.
+
+- [#440](https://github.com/en-dash-consulting/n-dx/pull/440) [`2b144b8`](https://github.com/en-dash-consulting/n-dx/commit/2b144b897262afc597ab9e964febb6cd6c7d9f91) Thanks [@endash-shal](https://github.com/endash-shal)! - Leave an analyze run's recorded cost unset when it cannot be known
+  
+  `priceAnalyzeTokenUsage` ignored `resolveModelPricing(...).known` and priced
+  every run, so an unpriced model was charged at the fallback rates — which are
+  `claude-sonnet-5`'s, making the guess indistinguishable from a real sonnet run.
+  A run whose provider omitted usage priced to exactly `0`. Both reached the
+  `analyze_token_usage` log as numbers, and `ndx`'s run summary presents whatever
+  number it finds as actual spend.
+  
+  It now returns `undefined` unless both the token counts and the model's pricing
+  are known. `JSON.stringify` drops the key, and `formatCost` renders a missing
+  cost as "not recorded" — which tells an operator to go and look, where "$0.00"
+  does not.
+
+- [#442](https://github.com/en-dash-consulting/n-dx/pull/442) [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Point SourceVision's pull-request markdown at the folder tree through rex, fixing an empty Completed Work section.
+  
+  The branch-work collector read `.rex/prd.md`, which no longer exists once a project has migrated to `.rex/prd_tree/`. On every folder-tree project the Completed Work section therefore found nothing and said so, with no error to explain it. It now asks rex two questions instead — `rex tree --format=json` for the PRD and `rex tree-diff --json` for what this branch completed — so no code path reads `prd.md` or `prd.json` for PR markdown.
+  
+  The collector's own copy of the completion diff is gone with it. "What did this branch finish" is rex's question, and it was previously answered by three implementations (the CLI, the dashboard's PRD delta, and this one) that were free to drift apart.
+  
+  `rex tree --format=json` is new: the machine-readable rendering of the same hierarchy `rex tree` prints, filtered identically. It is the folder-tree replacement for the `rex parse-md --stdin` seam that let a consumer outside rex read the PRD without a second parser.
+
+- [#442](https://github.com/en-dash-consulting/n-dx/pull/442) [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Refuse whole-tree PRD rewrites off the default branch without `--allow-on-branch`.
+  
+  `reshape`, `reorganize`, `prune`, the `migrate-*` commands, and
+  `import-bundle --replace` each rewrite the entire `.rex/prd_tree/` in one
+  pass. Run on a feature branch, that rewrite has repeatedly ridden into `main`
+  inside an unrelated pull request. These commands now refuse to run off the
+  repository's default branch (the branch `origin/HEAD` names, else
+  `main`/`master`) unless `--allow-on-branch` is passed; the refusal names the
+  branch and the flag. Read-only previews (`--dry-run`, and `reorganize`
+  without `--accept`) still run anywhere. A tree with no resolvable git branch
+  (no repo, or git unavailable) is unaffected — the guard only fires on a real,
+  named feature branch.
+  
+  `packages/rex/src/core/branch-guard.ts` is the shared guard, wired into each
+  of the six affected `cli/commands/*.ts` files. `hench`'s interactive
+  `migrate-slugs` offer and the dashboard's equivalent tree-conformance-gate
+  route both already gate the migration behind an explicit human confirmation,
+  so both now pass `--allow-on-branch` through to carry that consent — neither
+  flow's behavior changes.
+
+- [#442](https://github.com/en-dash-consulting/n-dx/pull/442) [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `rex tree-diff` (`ndx tree-diff`) to compare two PRD trees.
+  
+  The diff is by item id over the flattened trees, into `added`, `changed`,
+  `completed`, `moved` and `removed`, each entry carrying the item's ancestor
+  chain so a bare id does not have to be looked up to be understood. Because
+  it keys on the id, a reparented item is reported once as `moved` — with both
+  its old and new chains — rather than twice as an unrelated removal and
+  addition.
+  
+  With no flags it compares this checkout's working tree against the default
+  branch, which answers "what has this branch done to the PRD". `--from=<ref>
+  --to=<ref>` compares two commits, `--against=<dir>` compares two checkouts on
+  disk (a worktree against its anchor), and `--json` prints the machine-readable
+  form. Identical trees produce an empty diff. A ref from before the PRD tree
+  existed reports `present: false` rather than reading as a tree-sized list of
+  additions.
+  
+  The command is read-only: it takes no PRD lock and writes nothing, so it can
+  be run while another command is writing the tree. Reading the tree at a ref
+  materialises it into a temp directory through a single
+  `git checkout` with `GIT_INDEX_FILE` pointed at a throwaway index, so the
+  caller's index and working tree are untouched.
+  
+  The dashboard's Workspaces PRD delta now computes through the same
+  `diffTrees` engine rather than its own copy of the id-indexing and
+  field-comparison loop — its published payload is unchanged, but the CLI and
+  the dashboard can no longer disagree about the same pair of trees.
+
+- [#440](https://github.com/en-dash-consulting/n-dx/pull/440) [`2b144b8`](https://github.com/en-dash-consulting/n-dx/commit/2b144b897262afc597ab9e964febb6cd6c7d9f91) Thanks [@endash-shal](https://github.com/endash-shal)! - Show what `ndx analyze`, `ndx plan` and `ndx recommend` are about to do, and what they did
+  
+  Run interactively, these three now print a preflight banner before they start:
+  what the command reads, what it writes (and which writes need `--accept`),
+  which phases call a model and why, and roughly how long it takes. It pauses
+  briefly so you can Ctrl-C, then prints a closing summary of the files written,
+  the LLM calls and tokens, the cost, and the command to run next.
+  
+  `ndx recommend` is declared as making no model calls at all, because it groups
+  SourceVision findings deterministically — knowing which commands are free is
+  the point of the banner as much as knowing which are not.
+  
+  The banner is skipped under `--yes`, `--quiet` and `--format=json`, in CI, and
+  whenever stdout is not a terminal — so autonomous `ndx work` runs and piped
+  invocations are unaffected. Both the banner and the summary go to stderr, so
+  `--format=json` stdout is byte-identical either way. `NDX_PREFLIGHT=always`
+  forces the banner when piping; `NDX_PREFLIGHT_PAUSE_MS` sets the pause.
+  
+  Supporting changes:
+  
+  - `rex analyze` and `rex recommend` now run under the shared monotonic progress
+    reporter from `@n-dx/llm-client`, and rex's spinner registers with it like
+    sourcevision's already did — so a rate-limit retry raised inside an LLM call
+    pauses the spinner and prints its own line instead of corrupting it.
+  - Cost is recorded by the tool that spends it, never recomputed by a reader:
+    `sv analyze` writes `lastAnalysis.llm.costUsd` to the manifest (additive,
+    optional), priced per task class at the model that answered; `rex analyze`
+    adds `costUsd` to its `analyze_token_usage` log entry. The orchestrator
+    cannot import the price table, and a second copy of it would drift — so where
+    no cost was recorded the summary says "not recorded" rather than guessing.
+
+- [#491](https://github.com/en-dash-consulting/n-dx/pull/491) [`161da3d`](https://github.com/en-dash-consulting/n-dx/commit/161da3d04bb668f80ffe1a52c3be880cdeafbab1) Thanks [@endash-shal](https://github.com/endash-shal)! - `verify_criteria` (MCP) no longer runs the repository's test command by default: `runTests` defaults to false, and even when true the command runs only once the repository's execution config is trusted (`ndx trust`). The criteria-to-test mapping is always returned; a skipped run says why.
+
+- [#433](https://github.com/en-dash-consulting/n-dx/pull/433) [`083fa1c`](https://github.com/en-dash-consulting/n-dx/commit/083fa1c22ebdf7d86de03ecc7c59f437ae9d1bab) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `rex log` / `ndx log` as a CLI route for `append_log`.
+  
+  `append_log` was reachable only as a rex MCP tool. Every `ndx work` run in a
+  recent measured batch reported the same gap: the workflow's log step asks the
+  agent to call it, but the rex MCP server was not connected to any of those
+  sessions, and rex owns `execution-log.jsonl` under the write-access protocol,
+  so hand-writing the file is not a substitute. Each run put the detail in its
+  commit message instead.
+  
+  `rex log <event> [--item=<id>] [--detail="..."]` and the `append_log` MCP tool
+  now build their entry through the same `appendExecutionLogEntry` and persist
+  it via the same `PRDStore#appendLog`, so the two routes cannot diverge on
+  shape, truncation (2,000 characters), or rotation (`execution-log.1.jsonl`
+  past 1 MB). `ndx log` in `packages/core` spawns `rex log` — no rex import,
+  same as every other delegated command.
+  
+  rex's default workflow and the `ndx-work` skill now name `ndx log` as the
+  route when no rex MCP server is connected — the ordinary case for a
+  `claude`/`codex` CLI-provider run.
+
+- [#442](https://github.com/en-dash-consulting/n-dx/pull/442) [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `rex ready` to mark PRD items ready to work.
+  
+  An item qualifies when it has at least one `automated` or `metric`
+  requirement — own or inherited from an ancestor — and no open blocker:
+  status isn't `blocked`, and every `blockedBy` id is completed. Items already
+  `completed`, `deferred`, `cancelled`, or `deleted` never qualify.
+  
+  With no `--item`, it walks the whole tree: qualifying items get
+  `ready: true`, items that previously qualified but no longer do get the
+  field cleared, and every item worth explaining (any qualifying item, plus
+  any non-qualifying item that has a requirement of the right type) prints
+  its verdict and reason. `--item=<id>` evaluates and marks a single item.
+  `--format=json` prints the machine-readable form.
+  
+  `ready` is written only as `true` — a non-qualifying item has the field
+  cleared rather than set to `false`, so its absence always means "not
+  currently ready" rather than a stale positive. The field is purely
+  informational: task selection (`rex next` / `get_next_task`) never reads
+  it, so a tree that has never run `rex ready` — which is every tree today —
+  selects exactly as it always has.
+  
+  Fixed a latent round-trip bug in the folder-tree serializer found while
+  adding this: boolean frontmatter fields were always quoted
+  (`JSON.stringify(String(value))`), and the parser checks for a quote before
+  it checks for `true`/`false`, so a boolean silently came back as the
+  *string* `"true"` instead of the boolean. `ready` is the first `PRDItem`
+  field to exercise that path; booleans now emit unquoted.
+
+- [#436](https://github.com/en-dash-consulting/n-dx/pull/436) [`03590e4`](https://github.com/en-dash-consulting/n-dx/commit/03590e4fa8069232774dce4e1d0fe460b969e530) Thanks [@endash-shal](https://github.com/endash-shal)! - Add a folder-layout resolver and a paths module per package.
+  
+  n-dx keeps its state in three dot-directories and five loose `.n-dx*` files, named
+  directly at roughly 380 source files. `resolveLayout` in `@n-dx/llm-client` makes that
+  one decision in one place: it reads a `.ndx/` container first and falls back to the
+  legacy layout silently, so existing projects keep working untouched. Each package gains
+  a paths module (`resolveRexPaths`, `resolveSourcevisionPaths`, `resolveHenchPaths`,
+  `resolveWebPaths`) as the single home for its own folder names, and the orchestration
+  tier gets a hand-written twin in `packages/core/layout.js` — it may not import from any
+  package tier — pinned to the canonical implementation by a contract test.
+  
+  No call sites are rewired yet, so behaviour is unchanged.
+
+- [#454](https://github.com/en-dash-consulting/n-dx/pull/454) [`d6a6c0c`](https://github.com/en-dash-consulting/n-dx/commit/d6a6c0c0d0f01674e58b8eddd9855909787b01fa) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Fix the branch guard, `rex tree-diff` and SourceVision's PR markdown in the cases the 0.8.0 B2 review found.
+  
+  - A stale `origin/HEAD` (one that still names a pruned branch, such as `origin/master` after a rename) is no longer trusted. The branch guard and a bare `rex tree-diff` check the ref exists and otherwise fall back to `main`/`master`, so a user on `main` is no longer refused on their own default branch.
+  - `rex tree-diff` no longer runs the repository's git hooks when it extracts a tree at a ref, so a failing or slow `post-checkout` hook can't break it.
+  - When the baseline ref predates the PRD tree, `rex tree-diff`'s text output now says so instead of listing every item as added.
+  - `sv pr-markdown` warns when either side of the diff has no PRD tree, instead of rendering an empty or whole-project Completed Work section. It no longer forces a local `main` as the base: without an explicit base branch it uses tree-diff's default (`origin/HEAD`, then `main`/`master`) and reports the base tree-diff actually used.
+  - hench's slug-migration offer and the dashboard's migration route no longer bypass the branch guard. On a feature branch they show rex's refusal, naming the branch.
+  - `rex ready --item` without a value, including the space-separated `--item <id>`, now refuses and names `--item=<id>`, as `rex log` and `rex export` already do.
+
+- [#445](https://github.com/en-dash-consulting/n-dx/pull/445) [`cceceb5`](https://github.com/en-dash-consulting/n-dx/commit/cceceb563ba1650f4e70b9cbe63eec9bbd954e4d) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx init` now starts new projects on the `.ndx/` layout
+  
+  A project with no n-dx state gets a single `.ndx/` container holding `rex/`,
+  `hench/`, `sourcevision/` and `config.json`, instead of three dot-directories
+  and a `.n-dx.json` scattered across the root. `.mcp.json` stays at the
+  repository root, because the vendor CLIs read it there.
+  
+  A project that already has n-dx state keeps the layout it has. Re-running init
+  is how people pick up new assistant surfaces and repaired config, and it must
+  not turn into a migration nobody asked for — moving an existing project is
+  `ndx migrate-layout`'s job, where it can snapshot first and `git mv` so history
+  follows.
+  
+  The mechanism is that init creates the container before it spawns the sub-CLIs,
+  so each one resolves its own paths and they cannot disagree. Alongside it, the
+  paths that `ndx init` writes and that every later command reads now come from
+  the resolver rather than from literals: the project and package config files,
+  the `requireInit` check, the `.gitignore` and `.gitattributes` blocks, the git
+  baseline commit, and hench's own state directory across its CLI.
+  
+  `relativeToRoot(layout, path)` is new in `@n-dx/llm-client` (and its
+  orchestration-tier twin), for the several places that need a resolved path as
+  `.gitignore` spells it — root-relative, forward slashes.
+- Updated dependencies [[`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`05a8115`](https://github.com/en-dash-consulting/n-dx/commit/05a811560a19baf95e69bc19a8c906dad2b3fea9), [`39c6d80`](https://github.com/en-dash-consulting/n-dx/commit/39c6d80441aba2c3dd71d94494b58bf42fc5a4a0), [`29c576a`](https://github.com/en-dash-consulting/n-dx/commit/29c576a196ed033d77a35a2dd87952ca6f32902f), [`ccad056`](https://github.com/en-dash-consulting/n-dx/commit/ccad05698ce562b0ae47b283a59854b299884f5c), [`0e3623e`](https://github.com/en-dash-consulting/n-dx/commit/0e3623edbc25e417982a93db53aa7ae6b70fae2f), [`2b144b8`](https://github.com/en-dash-consulting/n-dx/commit/2b144b897262afc597ab9e964febb6cd6c7d9f91), [`aa0ca02`](https://github.com/en-dash-consulting/n-dx/commit/aa0ca024713788ec46248f12df84e7390c64e2c7), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`d3c2169`](https://github.com/en-dash-consulting/n-dx/commit/d3c21692f2a8f7582a114fc69fba1c88a7a0205e), [`161da3d`](https://github.com/en-dash-consulting/n-dx/commit/161da3d04bb668f80ffe1a52c3be880cdeafbab1), [`0bca3ea`](https://github.com/en-dash-consulting/n-dx/commit/0bca3ea0f0336ec4f317504fb518320c6ac6856d), [`03590e4`](https://github.com/en-dash-consulting/n-dx/commit/03590e4fa8069232774dce4e1d0fe460b969e530), [`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9), [`ccad056`](https://github.com/en-dash-consulting/n-dx/commit/ccad05698ce562b0ae47b283a59854b299884f5c), [`cceceb5`](https://github.com/en-dash-consulting/n-dx/commit/cceceb563ba1650f4e70b9cbe63eec9bbd954e4d)]:
+  - @n-dx/llm-client@0.8.0
+
 ## 0.7.2
 
 ### Patch Changes

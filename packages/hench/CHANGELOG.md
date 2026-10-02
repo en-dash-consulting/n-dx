@@ -1,5 +1,530 @@
 # @n-dx/hench
 
+## 0.8.0
+
+### Minor Changes
+
+- [#459](https://github.com/en-dash-consulting/n-dx/pull/459) [`0e3623e`](https://github.com/en-dash-consulting/n-dx/commit/0e3623edbc25e417982a93db53aa7ae6b70fae2f) Thanks [@endash-shal](https://github.com/endash-shal)! - 0.8.0 — Find your way
+  
+  A single `.ndx/` directory for project state, with `ndx migrate-layout` to move
+  an existing project onto it. A reorganised dashboard: views are stages, Analysis
+  opens on the codebase map, settings are three pages (Robot Wrangler, Workflow,
+  Project) on a shared save frame, and every moved path redirects. A Live tab for
+  watching every run across a repository's worktrees. A per-user token on the hub
+  and dashboard, and repository trust gating what a checkout's execution config
+  may widen. New Claude model defaults, per-vendor agent models, per-field
+  resolution of the legacy `claude.*` keys, and effects declared for every command
+  and shown in a preflight banner.
+  
+  Every other changeset in this release is a `patch`, which is the repo default
+  and correct for each change on its own. This one makes the aggregate a minor, as
+  the 0.8.0 epic requires.
+
+### Patch Changes
+
+- [#442](https://github.com/en-dash-consulting/n-dx/pull/442) [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add an optional `assignee` field to PRD items and `ndx work --mine`.
+  
+  `PRDItem.assignee` is an optional identity string, in the same "Name
+  <email>" form `resolveActor` (git `user.name` + `user.email`, falling back
+  to the OS username) resolves for `lastModifiedBy`. It round-trips through
+  the folder tree via the existing passthrough-field path and is omitted
+  entirely when unset — a tree with no `assignee` fields selects tasks
+  exactly as it always has.
+  
+  `findNextTask` / `findActionableTasks` gained an `assignee` filter option
+  (exact match, unset by default) alongside the existing `tags` filter.
+  `hench run --mine` (and `ndx work --mine`) resolves the current user the
+  same way rex stamps `lastModifiedBy`, and restricts autoselection to tasks
+  assigned to that identity. Like `--tags`, an explicit `--task` bypasses the
+  filter, and it is not supported together with `--epic-by-epic`.
+  
+  `resolveActor` is now re-exported through hench's `rex-gateway.ts` so hench
+  resolves the current user the same way rex does, rather than keeping a
+  second, driftable definition of "who is running this" (the gateway's export
+  cap moves from 42 to 43 accordingly).
+
+- [#445](https://github.com/en-dash-consulting/n-dx/pull/445) [`cceceb5`](https://github.com/en-dash-consulting/n-dx/commit/cceceb563ba1650f4e70b9cbe63eec9bbd954e4d) Thanks [@endash-shal](https://github.com/endash-shal)! - Retry a session-cache rename that Windows refuses, and give each write its own temp file
+  
+  `writeCacheFileAtomic` renamed a temp file over `session-cache.json` with no
+  retry. On Windows a rename onto a file any process holds open does not block —
+  it fails with EPERM, EACCES or EBUSY. The cache's lock serialises n-dx's own
+  writers and cannot serialise anyone else, and `readSessionCache` reads *without*
+  the lock by design, so a concurrent reader is enough on its own to make a
+  correctly locked writer throw. Backup, indexing and antivirus software hold
+  files the same way.
+  
+  This was observed, not predicted: a full-suite run failed with `EPERM:
+  operation not permitted, rename '…session-cache.json.30212.tmp' ->
+  '…session-cache.json'` out of the production path, which in a real run would
+  have failed a batch-chain advance.
+  
+  The rename now retries ten times at 50ms while the error is one of those three,
+  mirroring the `RM_RETRY` the test helpers already use for the same class. An
+  error that is not transient is not retried, and one that outlasts every attempt
+  still throws.
+  
+  The temp name also carries a uuid alongside the pid. Two writers in one process
+  share a pid, so a pid-only name is one scratch file between them — the same
+  defect `preview.ts` had already fixed from the other direction, having no lock
+  at all.
+
+- [#433](https://github.com/en-dash-consulting/n-dx/pull/433) [`083fa1c`](https://github.com/en-dash-consulting/n-dx/commit/083fa1c22ebdf7d86de03ecc7c59f437ae9d1bab) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Measure run cost in the adaptive and workflow tuners the same way `checkTokenBudget` does.
+  
+  Both tuners summed input + output, which on a prompt-cached run is roughly a
+  tenth of what the budget counts. Fitted against the 600K template budgets, the
+  adaptive tuner proposed a `tokenBudget` near 112K — below the ~185K a run pays
+  on arrival for its initial context write — so every later run would have failed
+  before doing any work.
+  
+  Counting now goes through one helper (`agent/token-cost.ts`) shared with
+  `checkTokenBudget`: uncached input + cache writes + output, cache reads
+  excluded. Neither tuner proposes a budget below the measured arrival cost, and
+  the workflow tuner's high-consumption threshold is rescaled into the same
+  units. `ProjectMetrics` and `WorkflowStats` gain an additive
+  `contextWriteFloor` field.
+  
+  The rescaled 1.2M high-consumption threshold now applies only when the run set
+  has a non-zero `contextWriteFloor` (at least one completed run paid a cache
+  write). A project with no cache writes still gets the original 100K
+  threshold, so it isn't silenced by a threshold rescaled for a population it
+  isn't part of.
+
+- [#434](https://github.com/en-dash-consulting/n-dx/pull/434) [`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9) Thanks [@endash-shal](https://github.com/endash-shal)! - Carry the token parser's verdict on the runtime event, and serialize session-cache writes.
+  
+  `RuntimeEvent` now carries `tokenDiagnosticStatus` and `tokenCacheProvenance`. Both were computed by `parseTokenUsageWithDiagnostic` and then discarded when the event was built, so the event pipeline re-derived them from the parsed numbers. That inference cannot match the parser: the parser decides from field presence, while the numbers only show values. An explicit `input_tokens: 0` is a complete measurement that inferred as `partial`, and a zero-valued cache count is omitted from `TokenUsage` entirely, so it inferred as `unavailable` where the parser said `measured` — a parity gap between legacy and event-pipeline run records. Consumers prefer the carried values and keep the inference as a fallback for events produced before the fields existed.
+  
+  Session-cache mutations now hold an exclusive lock for the whole read-modify-write, and write through a temp file and a rename. `maxConcurrentProcesses` defaults to 3, so concurrent runs in one checkout are normal: two tasks advancing the same batch chain each persisted their own `tasksUsed` and session id over the other's, and `clearSessionCache` could delete a chain written between its own read and its `rm`, breaking the preservation contract it documents. The lock is best-effort by design — a cache is an optimisation, so it proceeds unlocked after a timeout rather than failing a run, and steals a lock left behind by a killed process.
+
+- [#505](https://github.com/en-dash-consulting/n-dx/pull/505) [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add Claude Opus 5.5, Sonnet 5.5 and Fable 5.1, and move the Claude defaults onto them
+  
+  **The defaults have changed.** The standard tier (and the default when no model is
+  configured) is now `claude-sonnet-5-5`. The heavy tier and the review model are now
+  `claude-opus-5-5`. The `opus` alias now resolves to `claude-opus-5-5` and `fable`
+  to `claude-fable-5-1`. `ndx init` offers Sonnet 5.5 (recommended), Opus 5.5,
+  Fable 5.1 and Haiku 4.5.
+  
+  All three new models have a 1M context window and list pricing, so budget
+  preflight, `ndx usage` and the dashboard spend views price them as known. That
+  includes dated `-YYYYMMDD` snapshots. Previously they fell back to estimated
+  rates and showed `known: false`.
+  
+  `claude-sonnet-5`, `claude-opus-5` and `claude-fable-5` are still priced and
+  resolvable, and `ndx init` accepts them without an unknown-model warning.
+  
+  The dashboard config footer now shows every version part: `sonnet 5.5`,
+  `fable 5.1`, `haiku 4.5`. Before, it showed `sonnet 5` and `haiku 4`.
+  
+  **Pinning back.** Older Claude Code releases can reject the new model ids on
+  CLI-provider runs. If yours does, upgrade Claude Code, or pin the previous model:
+  `ndx config llm.claude.model claude-sonnet-5 .`. For the heavy tier and review,
+  also set `llm.tiers.claude.heavy` and `llm.claude.reviewModel` to
+  `claude-opus-5`.
+
+- [#505](https://github.com/en-dash-consulting/n-dx/pull/505) [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Claude API requests now send `llm.effort` as `output_config.effort`, and Claude Opus 5.5 defaults to `high` effort. `llm.effort` was parsed but never sent. With no matching rule, `claude-opus-5-5` gets `high` so the move from Opus 5 keeps its reasoning depth (Opus 5.5's API default is `medium`), and other models are unchanged. Effort is never sent to a model that rejects it (Haiku 4.5, Sonnet 4.5 and older) or when the value is not `low`, `medium`, `high`, `xhigh` or `max`; both cases print a warning. Claude Code CLI runs are unchanged.
+
+- [#469](https://github.com/en-dash-consulting/n-dx/pull/469) [`aa0ca02`](https://github.com/en-dash-consulting/n-dx/commit/aa0ca024713788ec46248f12df84e7390c64e2c7) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Dashboard: `GET /api/llm/config` reports what `ndx work` will actually run.
+  
+  The response gains an `effective` block — `{ vendor, provider, model,
+  modelSource }` — describing a flagless run. Until now the route returned
+  configured keys and left the reader to perform the resolution over them, which
+  is the step that goes wrong: the answer is assembled from `llm.vendor`, the
+  `llm.*` model fields, `hench.provider` and `hench.models.<vendor>` across two
+  files, and the rungs are not in the order anyone guesses. A page showing
+  `llm.claude.model` can name a model the agent loop does not use, because
+  `hench.models.claude` outranks it and only `ndx work` reads it.
+  
+  `modelSource` names the winning rung using llm-client's exported `ModelSource`
+  union rather than restated literals, minus `cli-override` — a request carries
+  no `--model`, so the route can never observe that rung. `provider` is
+  `hench.provider` after the same switch `cmdRun` applies: a vendor with no CLI
+  (google, local) auto-switches `cli` to `api`.
+  
+  Web cannot import hench, so `packages/web/src/server/effective-agent-config.ts`
+  is a separately maintained twin of hench's `resolveAgentModel` and provider
+  gate. Only the rung *ordering* is copied — every rung's computation is called
+  from `@n-dx/llm-client`, which both packages share. A fixture matrix across
+  all four vendors and nine config shapes runs both sides and compares
+  (`tests/integration/effective-agent-config-contract.test.js`).
+  
+  hench exports `resolveAgentModel` (plus its parameter and result types, and
+  `HenchAgentModels`) from its public API for that contract test, the same reason
+  `VENDOR_PROVIDERS` is already exported: not to be called at runtime, but so the
+  copy web is forced to keep can be checked against the original.
+  
+  A `hench.models` map with any entry hench's schema rejects — an unknown
+  vendor key, a non-string, an empty string — is discarded whole rather than
+  filtered, because that is what hench's own config salvage does with an
+  invalid optional field. Keeping the good entries would report an override
+  `ndx work` does not apply, which `ndx config hench.models.gemini …` (the
+  vendor is `google`) makes easy to hit.
+  
+  Two configurations resolve but would refuse to run — `vendor=codex` with
+  `provider=api`, and a model pinned for a vendor that cannot run it. The route
+  reports the resolution rather than throwing, because a settings page that 500s
+  on a bad saved value is one you cannot use to fix it.
+
+- [#449](https://github.com/en-dash-consulting/n-dx/pull/449) [`ccad056`](https://github.com/en-dash-consulting/n-dx/commit/ccad05698ce562b0ae47b283a59854b299884f5c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `hench.models.<vendor>`, a per-vendor agent-only model override that
+  `ndx work` actually honours, and deprecate the dead `hench.model` scalar.
+  
+  `hench.model` has never been read. `ndx work` resolved its model from
+  `--model`, then llm-client's task-model resolution for `agent.execute`
+  (`llm.routes`, `llm.tiers.<vendor>.<tier>`, `llm.model` / `llm.<vendor>.model`,
+  then the vendor default) — the config field's `"sonnet"` default never reached
+  the agent loop, and on a non-Codex vendor it was meaningless anyway.
+  
+  `hench.models` is an optional map keyed by vendor (`claude`, `codex`,
+  `google`, `local`) of non-empty model strings. Only the entry for the *active*
+  vendor is consulted, so a config can carry a pinned model for every vendor it
+  switches between. It sits between `--model` and all `llm.*` model
+  configuration, which is what makes it agent-only: `analyze`, `plan` and the
+  dashboard's Ask panel keep resolving from `llm.*` alone, so pinning
+  `hench.models.claude` changes the executor without changing what anything else
+  runs. `--model` still wins, and an override incompatible with the active
+  vendor fails with the same actionable error a bad `llm.model` gets.
+  
+  The vendor/model header reports it as `hench-override`. Resolution moved out
+  of `cmdRun` into `cli/commands/agent-model.ts` so the chain is testable on its
+  own.
+  
+  Existing `hench.model` values stay ignored, so no project changes behaviour on
+  upgrade. The new key goes through the same post-merge override validation as
+  every other field: an invalid `hench.models` in `.n-dx.json` warns, falls back,
+  and does not stop the run.
+
+- [#434](https://github.com/en-dash-consulting/n-dx/pull/434) [`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9) Thanks [@endash-shal](https://github.com/endash-shal)! - Version the batch session chain and key it by the identity it was opened under.
+  
+  Under `hench.sessionStrategy=batch`, a task resumes the previous task's session.
+  The chain recorded only vendor, model, a task count and the last task title, so
+  resuming was permitted whenever those four matched — across worktrees, branches,
+  source states and permission sets. Two worktrees of one repository running loops
+  in parallel share all four, which made a cross-worktree resume the ordinary case
+  rather than an edge one.
+  
+  The entry is now versioned (`BATCH_CHAIN_VERSION`) and carries the worktree root,
+  ref, sourcevision fingerprint, execution-policy hash, vendor, model, creation
+  time and last-use time. Any mismatch is a named miss — `worktree-changed`,
+  `ref-changed`, `sourcevision-changed`, `policy-changed`, `vendor-changed`,
+  `model-changed`, `expired`, `idle`, `unversioned`, `version-changed`,
+  `malformed`, alongside the existing `no-chain`, `cap-reached` and `disabled` —
+  and identity is checked before freshness and the cap, so a chain belonging to
+  another checkout says so instead of reporting that it filled up.
+  
+  The policy hash matters more than it looks: `codex exec resume` accepts no
+  sandbox or approval flags, so a resumed thread keeps the policy that created it.
+  Before this change, tightening `hench.guard` between tasks left the next task
+  running under the looser policy with no signal.
+  
+  Two bounds rather than one TTL, because they catch different drift: total age
+  (`hench.batchMaxAgeHours`, default 8) retires a loop whose repository has moved
+  on beneath it, and idle time (`hench.batchMaxIdleHours`, default 1) retires one
+  that stopped while someone worked in the same tree by hand. A single bound would
+  make the last-use stamp unreachable.
+  
+  The ref is keyed on the branch, not HEAD. A task that completes commits, so
+  keying on HEAD would retire the chain after every success — batching disabled by
+  way of it working.
+  
+  Chains written by earlier versions read back as `unversioned` and are declined
+  rather than reinterpreted or treated as an error; the next task simply opens a
+  new one.
+
+- [#434](https://github.com/en-dash-consulting/n-dx/pull/434) [`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `hench cache` for inspecting and clearing the session cache by scope, and evict dead entries automatically.
+  
+  `hench cache list` reports the orientation parent and the batch chain — session id, age, vendor and model, plus the worktree, ref, analysis fingerprint and policy hash a chain was opened under — and marks any entry that is dead for everyone with the reason. `hench cache clear` removes a scope (`--scope=parent|batch|all`), or with `--dead` removes only the dead entries, so dropping a stale chain no longer costs a good orientation parent.
+  
+  Entries that are expired, idle past their window, unreadable, or written by another version of the cache schema are now swept automatically: every run evicts them from the scopes its session strategy does not read, and a task that fails ends its chain rather than handing the failure to the next task. Entries rejected only for identity — another worktree, another policy — are left alone, since they are the correct entry for the run that wrote them.
+  
+  Also fixes `hench validate-tokens`, which had help text and a dispatch case but was rejected as an unknown command.
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `hench check-runs` (also `ndx hench check-runs`) to audit runs recorded as running across every worktree of the repository, grouped by worktree with each run's verdict and reason. `--fix` ends orphaned runs (and unknown ones with `--include-unknown`) using the same status and error prefix as the dashboard's reconcile route; `--strict` exits 1 when any running record is not live; `--worktree=<path>` narrows to one worktree; `--format=json` is for scripts.
+
+- [#498](https://github.com/en-dash-consulting/n-dx/pull/498) [`fc1258a`](https://github.com/en-dash-consulting/n-dx/commit/fc1258ac0aeafb53d693da9e86358c2505f61888) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Forked task sessions are told orientation is over. The first user turn of every forked spawn now starts with a fixed sentence lifting the orientation session's read-only instruction (`ORIENTATION_LIFT_NOTICE`), so a fork no longer refuses to edit ([#473](https://github.com/en-dash-consulting/n-dx/issues/473)). The orientation prompts now limit "do not modify anything" to the orientation session.
+
+- [#498](https://github.com/en-dash-consulting/n-dx/pull/498) [`fc1258a`](https://github.com/en-dash-consulting/n-dx/commit/fc1258ac0aeafb53d693da9e86358c2505f61888) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A forked task attempt that ends with no changes and no file-edit tool calls is now reported as a read-only refusal ("Agent treated the forked session as read-only (no edits made)") and re-spawned once in the same run with a cold spawn, without using retry budget. The session cache is kept. The run record names it (`readOnlyRefusal`, spawn reason `read-only-retry`) and `hench show` prints it. If the cold retry also changes nothing, the run fails with the usual no-changes reason ([#473](https://github.com/en-dash-consulting/n-dx/issues/473)).
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `process/run-liveness.ts`: one verdict (`live`, `foreign`, `unknown`, `orphaned`) on whether a run recorded as running is actually executing, judged from the run's host, its recorded pid and heartbeat, and `.hench/locks/` for records without a pid. EPERM from the pid probe counts as alive.
+
+- [#500](https://github.com/en-dash-consulting/n-dx/pull/500) [`0bca3ea`](https://github.com/en-dash-consulting/n-dx/commit/0bca3ea0f0336ec4f317504fb518320c6ac6856d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - hench's memory throttle and pre-spawn check now read available memory through the shared llm-client reading, so they agree with the dashboard and hub. On macOS the throttle no longer reads `os.freemem()`, which counted only free pages and rejected runs on a healthy Mac. An unknown reading never delays, rejects or blocks a spawn; run memory stats record it as -1 and the end-of-run line says "available memory unknown".
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Write the run log while the run is in progress, and record its path on the run.
+  
+  `.run-logs/<ts>-<runId>.log` was assembled from an in-memory buffer and written
+  once, at run end. Nothing could watch a run as it happened, and a run that was
+  killed mid-way left no log at all — the buffer went with the process.
+  
+  `openRunLog` now opens the file at run start and streams each captured output
+  line through to it as it is emitted, so the log can be tailed live and a crash
+  leaves a readable partial file. `RunRecord` gains an additive `logPath` so a
+  reader does not have to reconstruct the timestamped filename; records written
+  before it load unchanged.
+  
+  The artifact is unchanged: the incremental writer and the end-of-run writer
+  produce byte-identical files for the same lines, pinned by a regression test.
+  The end-of-run writer is still used as the fallback — for a run started without
+  a project directory, and for one whose stream broke part-way, which is rewritten
+  whole from the buffer. Writes are never awaited on the agent loop's path, and a
+  log failure still cannot fail a run.
+  
+  Writing the log early moves `.run-logs/` into the window the run's own gates
+  inspect, so two things move with it: `.run-logs/` joins hench's runtime-artifact
+  discount list (`store/artifacts.ts`), and the `.gitignore` entry is still added
+  at the end of the run rather than the start — editing a tracked file mid-run is
+  what the discount list exists to stop mattering. Without both, the first run in
+  a project that has not got the ignore line refuses to complete over a directory
+  it created itself.
+
+- [#494](https://github.com/en-dash-consulting/n-dx/pull/494) [`bcebf59`](https://github.com/en-dash-consulting/n-dx/commit/bcebf590f2f957382402f78046e1b3cccd59fc89) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Tell the agent to run git as a bare command from the project root
+  
+  Claude CLI pre-approves git one subcommand at a time (`Bash(git add:*)`,
+  `Bash(git commit:*)`), and those patterns match by prefix only. An agent that
+  cd'd into a package to run its tests and then committed with `cd ../.. && git
+  commit …`, `(cd X; git commit)` or `git -C <dir> …` matched none of them, drew a
+  permission prompt nobody was there to answer, and failed the uncommitted-work
+  gate on a run whose test gate had passed.
+  
+  The task brief's commit step now states that git must begin the command line —
+  never behind `cd … &&`, a subshell, or `git -C` — and that an agent which has
+  changed directory returns to the project root first. The git allowlist is
+  unchanged: a prefix rule cannot approve `cd <anything> && git …` without also
+  approving whatever follows the `&&`.
+
+- [#454](https://github.com/en-dash-consulting/n-dx/pull/454) [`d6a6c0c`](https://github.com/en-dash-consulting/n-dx/commit/d6a6c0c0d0f01674e58b8eddd9855909787b01fa) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Scope `--mine` to what it acts on, name the identity when it matches nothing,
+  and inherit blockers in `rex ready`.
+  
+  `--mine` now matches an item whose own `assignee` *or any ancestor's* carries
+  the identity. Matching only the item's own field meant handing someone a
+  feature or an epic selected nothing at all, because the tasks beneath it carry
+  no field of their own. The rule lives in rex's new `matchesAssignee`, exported
+  through hench's `rex-gateway.ts` (export cap 43 → 44) so "mine" means the same
+  thing everywhere it is asked.
+  
+  The deferred/failing reset offered when a `--mine` menu comes back empty now
+  counts and resets only that identity's tasks. It previously counted the whole
+  PRD and, on "y", reset every deferred and failing task in it — other people's
+  included, committed under the answering operator's name. `ndx work --mine
+  --reset-deferred` is scoped the same way.
+  
+  When `--mine` matches nothing, the message names the identity `resolveActor`
+  produced and says how many actionable tasks exist without the filter; `--loop`
+  no longer reports "All tasks complete", which described the whole project after
+  looking at one slice of it.
+  
+  `rex ready` no longer marks an item whose ancestor is blocked, cancelled,
+  deleted, or has an open `blockedBy`. It inherited requirements from ancestors
+  but checked blockers only on the item itself, so a task under a blocked epic
+  was marked ready although task selection would never offer it. Readiness and
+  selection now share one predicate (`traversalBlock`), and the evaluation names
+  the offending ancestor in its `reason` and in a new optional `blockedAncestor`
+  field.
+
+- [#494](https://github.com/en-dash-consulting/n-dx/pull/494) [`bcebf59`](https://github.com/en-dash-consulting/n-dx/commit/bcebf590f2f957382402f78046e1b3cccd59fc89) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Commit review repairs when the executor committed for itself and left no commit message ([#483](https://github.com/en-dash-consulting/n-dx/issues/483)).
+  
+  With `hench.autoCommit` false, review repairs were committed only by the commit prompt, which returns early when `.hench-commit-msg.txt` is missing or empty. An executor that committed its own work with a plain `git commit` left the repairs with no owner, and the uncommitted-work gate correctly refused them — so a run whose work and repairs were both correct ended failed and its task was reset to pending.
+  
+  The completion gate now commits those repairs itself, but only when the executor really did commit (HEAD has moved past the run's starting commit) and the repairs are the only thing left in the tree. Without the first condition the "repairs" may be the whole uncommitted feature, which must not land under a `fix(review):` subject; without the second, the existing refusal is still the right answer.
+  
+  When that commit is refused — a moved checkout, for example — the refusal names the cause instead of the generic uncommitted-work message, and gives the two-command recovery: commit the repaired paths, then `ndx rex update <id> --status=completed`. It does not offer `git stash` and does not tell the operator to re-run a task whose work is already in history.
+
+- [#442](https://github.com/en-dash-consulting/n-dx/pull/442) [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Refuse whole-tree PRD rewrites off the default branch without `--allow-on-branch`.
+  
+  `reshape`, `reorganize`, `prune`, the `migrate-*` commands, and
+  `import-bundle --replace` each rewrite the entire `.rex/prd_tree/` in one
+  pass. Run on a feature branch, that rewrite has repeatedly ridden into `main`
+  inside an unrelated pull request. These commands now refuse to run off the
+  repository's default branch (the branch `origin/HEAD` names, else
+  `main`/`master`) unless `--allow-on-branch` is passed; the refusal names the
+  branch and the flag. Read-only previews (`--dry-run`, and `reorganize`
+  without `--accept`) still run anywhere. A tree with no resolvable git branch
+  (no repo, or git unavailable) is unaffected — the guard only fires on a real,
+  named feature branch.
+  
+  `packages/rex/src/core/branch-guard.ts` is the shared guard, wired into each
+  of the six affected `cli/commands/*.ts` files. `hench`'s interactive
+  `migrate-slugs` offer and the dashboard's equivalent tree-conformance-gate
+  route both already gate the migration behind an explicit human confirmation,
+  so both now pass `--allow-on-branch` through to carry that consent — neither
+  flow's behavior changes.
+
+- [#490](https://github.com/en-dash-consulting/n-dx/pull/490) [`d3c2169`](https://github.com/en-dash-consulting/n-dx/commit/d3c21692f2a8f7582a114fc69fba1c88a7a0205e) Thanks [@endash-shal](https://github.com/endash-shal)! - Run records and run logs are scrubbed of credential-shaped text before they are written. A tool that prints a `.env`, a bearer header or a connection string no longer leaves the secret in `.hench/runs/` or `.run-logs/`; the in-memory record the agent works from is unchanged. The scrub covers the live `.run-logs/` writer as well as the end-of-run one — the live file is the one a real run produces — and both share a stateful redactor, so a private key split across lines is caught and the two writers still produce byte-identical files.
+
+- [#491](https://github.com/en-dash-consulting/n-dx/pull/491) [`161da3d`](https://github.com/en-dash-consulting/n-dx/commit/161da3d04bb668f80ffe1a52c3be880cdeafbab1) Thanks [@endash-shal](https://github.com/endash-shal)! - Honour repository trust. Until the user accepts a checkout's execution config (`hench trust accept`), runs use the default guard — the repository's `.hench/config.json` can tighten it but not widen it — and `bypassPermissions` is lowered to `acceptEdits`; `ndx work` prints the review once per invocation and each run record carries a `trust` summary. New `hench trust [status|accept|revoke]` command. Guard defaults now come from the shared baseline and block credential files. Child processes the agent starts receive an environment stripped of credential-shaped variables (`guard.env.allow` / `guard.env.deny` adjust it). The git tool refuses `--output`, `--output-directory`, `--exec-path`, `--upload-pack`, `--receive-pack` and `--config-env`, which wrote or executed outside the guarded project.
+
+- [#453](https://github.com/en-dash-consulting/n-dx/pull/453) [`c3244ca`](https://github.com/en-dash-consulting/n-dx/commit/c3244cada1baa0347bf22563138baf98ee388c06) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Route hench's and the web dashboard's own `.rex`/`.hench`/`.sourcevision` file access through the folder-layout resolver instead of hardcoded paths.
+  
+  On a project that has migrated to the `.ndx/` container layout, several hench and web code paths previously composed `join(projectDir, ".hench", …)` / `.rex` / `.sourcevision` directly — the sourcevision primer and analysis-fingerprint reads, the retention-log and quota reads, hench's recovery pathspec files, the dashboard's server startup (`ctx.rexDir`/`ctx.svDir`), workspace (worktree) context construction, the worktree run-history route, the aggregation cache's fingerprint sources, the merge graph, token-usage analytics, the usage-cleanup scheduler, and the config/status/commands routes. On `.ndx/` projects these read and wrote nothing, silently: no primer, no fingerprint, no worktree runs, and the dashboard's "initialized" check never turned true. They now resolve through `resolveLayout`/`resolveHenchPaths`/`resolveWebPaths`, as does `hench validate-tokens`. Hench's git bookkeeping paths (the PRD commit and uncommitted-work checks) still assume the legacy layout and move with the follow-up sweep.
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `.run-logs/` now gets its own `.gitignore` (`*`) when hench creates it. Before this, on a project's first run the live log was visible to git before the project `.gitignore` line was added, so `--review` committed it as a review repair and an agent's `git add -A` staged it.
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Record a structured progress event stream for every run, not only verbose ones.
+  
+  Every run now appends typed progress events as JSON Lines to `.hench/runs/<runId>.events.jsonl` as they happen, and records the path on the new additive `RunRecord.eventsPath`. A reader can tail the file while the run is in progress; each line parses as one event on its own, which a single JSON array would not allow until the run was over.
+  
+  The vocabulary is small and closed — brief loaded, files read (batched per turn), file edited, tests run, retry, gate, review started, review report, run finished — with a plain-language `summary` plus optional `turn`, `detail` and named `counts`, so the viewer renders a run without parsing log text.
+  
+  This is distinct from both existing surfaces. `logPath` is the run's terminal output, which a viewer would have to parse back into facts. `RunRecord.events` is the raw `RuntimeEvent` stream, kept only in verbose mode and only written when the run ends. Neither suits a live view.
+  
+  No LLM calls are added and no turn latency: every summary is formatted from values the caller already holds, the events reuse the tool-call and turn hooks both agent loops already run, and writes are handed to Node's stream buffer rather than awaited. Verbose output is unchanged. Records without `eventsPath` load normally.
+  
+  Retention now removes a run's event stream along with the run file. `listRunFiles` matches only `.json`/`.json.gz`, so without this the sidecar would have outlived the record it describes indefinitely.
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Record the agent process pid on every run record.
+  
+  Hench now writes `pid` (its own process) and `vendorPid` (the vendor CLI subprocess while one is live) to the run record when the run starts, and the existing 30-second heartbeat refreshes them. Both are additive optional fields; records without them load normally and mean "pid unknown".
+  
+  `GET /api/hench/runs/health` reports `pid`, `vendorPid` and `pidAlive` beside the heartbeat age, so a slow run (old heartbeat, pid alive) can be told from a dead one (pid gone) whoever started it. `pidAlive` is `null` when no pid was recorded.
+
+- [#447](https://github.com/en-dash-consulting/n-dx/pull/447) [`25ad2a7`](https://github.com/en-dash-consulting/n-dx/commit/25ad2a75b26970c713d7d5d99f01210ce937eb55) Thanks [@endash-shal](https://github.com/endash-shal)! - List every hench setting on the Workflow page and in `hench config`
+  
+  `ndx config`, `hench config` and the dashboard's Workflow page each kept their own
+  hand-written list of hench settings, and the three had drifted. `hench config` was
+  missing sixteen documented keys — `promptCacheTtl`, the whole `prune` and test-gate
+  groups, the git-safety pair, session reuse — and the Workflow page was missing those
+  plus the guard keys the CLI already had. One of them, `guard.memoryMonitor.spawnThreshold`,
+  is named in the message hench prints when it throttles a spawn, so the suggested
+  `hench config` command answered "Unknown config key".
+  
+  All three surfaces now offer every key hench's schema defines, grouped into Session
+  Reuse, Context Prune, Test Gate and Git Safety alongside the existing categories.
+  `tests/e2e/hench-config-gate-contract.test.js` compares the lists and pins each
+  recorded default against hench's own, so they cannot drift apart again.
+  
+  Also fixed:
+  
+  - The dashboard can now edit `prune.*`. Its write gate was per-field and could not see
+    that hench refuses a config whose `prune.retainPairs` reaches its `prune.triggerPairs`;
+    a new sibling-constraint check runs on the finished config, after group completion, on
+    every write path.
+  - The gate understands `min`/`max` bounds, so it no longer accepts a memory threshold
+    above 100 that hench would then refuse.
+  - `language: "swift"` was rejected by hench's own config schema even though `hench init`
+    writes it for a Swift project.
+  - The Workflow page appends any category it does not recognise instead of dropping it,
+    and `hench config --interactive` no longer offers "1-5" when there are nine categories.
+
+- [#436](https://github.com/en-dash-consulting/n-dx/pull/436) [`03590e4`](https://github.com/en-dash-consulting/n-dx/commit/03590e4fa8069232774dce4e1d0fe460b969e530) Thanks [@endash-shal](https://github.com/endash-shal)! - Add a folder-layout resolver and a paths module per package.
+  
+  n-dx keeps its state in three dot-directories and five loose `.n-dx*` files, named
+  directly at roughly 380 source files. `resolveLayout` in `@n-dx/llm-client` makes that
+  one decision in one place: it reads a `.ndx/` container first and falls back to the
+  legacy layout silently, so existing projects keep working untouched. Each package gains
+  a paths module (`resolveRexPaths`, `resolveSourcevisionPaths`, `resolveHenchPaths`,
+  `resolveWebPaths`) as the single home for its own folder names, and the orchestration
+  tier gets a hand-written twin in `packages/core/layout.js` — it may not import from any
+  package tier — pinned to the canonical implementation by a contract test.
+  
+  No call sites are rewired yet, so behaviour is unchanged.
+
+- [#434](https://github.com/en-dash-consulting/n-dx/pull/434) [`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9) Thanks [@endash-shal](https://github.com/endash-shal)! - Record the session strategy, hit/miss reason and token-data provenance on every run.
+  
+  Every run record now carries a `session` field naming which session strategy ran
+  (`fork` / `batch` / `cold`), whether the cache served it, the named reason it did or
+  did not, and how old the entry was. `hench show` and the end-of-run summary print it
+  as one line; the dashboard's run detail gains a Session section. Until now the only
+  trace of that decision was a terminal line nobody was capturing, so "is batching
+  actually hitting?" could not be answered from run history.
+  
+  API-provider runs record the decision too, as `cold` / `api-provider` — that path holds
+  no session resumable by id, and saying so is not the same as saying nothing, which is
+  also what a run that died before reaching the decision looks like.
+  
+  Cache token counts now say where they came from. `tokens.cachedProvenance` and the
+  per-turn `cacheProvenance` distinguish a vendor that accounted for caching and
+  reported none from a vendor that never reported it at all — both of which used to
+  read as a confident `cached: 0`.
+  
+  Fixes two places where Codex cache data was dropped: the token parsers ignored
+  Codex's `cached_input_tokens` / `cache_write_input_tokens` field names, and the Codex
+  JSONL event parser kept only input and output from a turn's `usage`. A Codex turn
+  reporting 45,472 input with 35,072 cached is now split correctly rather than counted
+  entirely as uncached input — the total is unchanged, the attribution and the price
+  are not.
+  
+  All fields are additive; run records written before this change load unchanged.
+
+- [#454](https://github.com/en-dash-consulting/n-dx/pull/454) [`d6a6c0c`](https://github.com/en-dash-consulting/n-dx/commit/d6a6c0c0d0f01674e58b8eddd9855909787b01fa) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Fix the branch guard, `rex tree-diff` and SourceVision's PR markdown in the cases the 0.8.0 B2 review found.
+  
+  - A stale `origin/HEAD` (one that still names a pruned branch, such as `origin/master` after a rename) is no longer trusted. The branch guard and a bare `rex tree-diff` check the ref exists and otherwise fall back to `main`/`master`, so a user on `main` is no longer refused on their own default branch.
+  - `rex tree-diff` no longer runs the repository's git hooks when it extracts a tree at a ref, so a failing or slow `post-checkout` hook can't break it.
+  - When the baseline ref predates the PRD tree, `rex tree-diff`'s text output now says so instead of listing every item as added.
+  - `sv pr-markdown` warns when either side of the diff has no PRD tree, instead of rendering an empty or whole-project Completed Work section. It no longer forces a local `main` as the base: without an explicit base branch it uses tree-diff's default (`origin/HEAD`, then `main`/`master`) and reports the base tree-diff actually used.
+  - hench's slug-migration offer and the dashboard's migration route no longer bypass the branch guard. On a feature branch they show rex's refusal, naming the branch.
+  - `rex ready --item` without a value, including the space-separated `--item <id>`, now refuses and names `--item=<id>`, as `rex log` and `rex export` already do.
+
+- [#449](https://github.com/en-dash-consulting/n-dx/pull/449) [`ccad056`](https://github.com/en-dash-consulting/n-dx/commit/ccad05698ce562b0ae47b283a59854b299884f5c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Validate `.n-dx.json`/`.n-dx.local.json` hench overrides (and workflow template
+  overlays) against `HenchConfigSchema` instead of merging them in unchecked.
+  
+  `loadConfig` validated `.hench/config.json` but then deep-merged the project
+  overrides on top with no validation, so `hench.maxTurns: -5` produced a run
+  that "completed" having executed no turn, `promptCacheTtl: "1hour"` silently
+  degraded to a 5-minute cache marker, and an invalid `prune` group crashed the
+  pruner. Workflow templates hit the same gap through `applyTemplate`.
+  
+  `loadConfig` now re-validates the merged result. An invalid top-level override
+  field reverts to its value in the already-validated base config (or the
+  schema default) with a warning naming the field and the file it came from
+  (`.n-dx.json` or `.n-dx.local.json`) — it never stops the run, matching how a
+  malformed `.hench/config.json` is already salvaged. `hench template apply`
+  gets the same treatment: an invalid template scalar now warns and falls back
+  instead of refusing the whole template.
+  
+  `@n-dx/llm-client` gains `loadProjectOverrideSources`, exposing each
+  project-config file's section separately so a caller can attribute a bad
+  value to the file it came from.
+
+- [#449](https://github.com/en-dash-consulting/n-dx/pull/449) [`ccad056`](https://github.com/en-dash-consulting/n-dx/commit/ccad05698ce562b0ae47b283a59854b299884f5c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `GET /api/llm/catalog`, serving per-vendor model lists and the provider
+  choices hench accepts (claude cli or api, codex cli only, google api, local
+  api), so the dashboard's model picker no longer drifts from llm-client's
+  catalog or hench's own provider rules.
+  
+  Cloud-vendor models come from llm-client's `TIER_MODELS`/`MODEL_COSTS`
+  catalog; local models come from a live probe of the configured local server
+  (empty list with a `reason` when unreachable, never an error). Provider
+  choices come from a new `VENDOR_PROVIDERS` table in
+  `packages/hench/src/cli/commands/provider-support.ts` — extracted from
+  `cmdRun`'s ad hoc provider checks in `run.ts`, now table-driven and re-exported
+  from hench's public API. Web cannot import hench at runtime, so
+  `packages/web/src/server/hench-config-fields.ts` keeps a separately maintained
+  copy of the same table; `tests/integration/cross-package-contracts.test.js`
+  pins the two together.
+  
+  The dashboard's hench-config save path (`PUT /api/hench/config`, plus the
+  adaptive apply/override routes) now rejects a `provider` value the active
+  vendor does not support, naming the vendor and its allowed providers.
+  
+  No viewer changes — the picker UI and `MODEL_SUGGESTIONS` removal are a
+  separate change.
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Document that `vendorPid` is the cmd.exe wrapper's pid on Windows, and make the spawn tests assert liveness there instead of equality with the child's own pid.
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `GET /api/live` and `GET /api/hench/runs/health` report `liveness`, `livenessReason` and `canEnd` for each running run, in every worktree of the repository, with a per-verdict summary (`counts.liveness` and `liveness`). The verdict follows hench's rules — host, then the recorded pid and heartbeat, then that worktree's lock files — and a run the dashboard still holds as a child process is `live`. `runs/health` now spans every worktree and tags each run with its `worktree`. The web server has one `isPidAlive`, counting EPERM as alive.
+
+- [#445](https://github.com/en-dash-consulting/n-dx/pull/445) [`cceceb5`](https://github.com/en-dash-consulting/n-dx/commit/cceceb563ba1650f4e70b9cbe63eec9bbd954e4d) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx init` now starts new projects on the `.ndx/` layout
+  
+  A project with no n-dx state gets a single `.ndx/` container holding `rex/`,
+  `hench/`, `sourcevision/` and `config.json`, instead of three dot-directories
+  and a `.n-dx.json` scattered across the root. `.mcp.json` stays at the
+  repository root, because the vendor CLIs read it there.
+  
+  A project that already has n-dx state keeps the layout it has. Re-running init
+  is how people pick up new assistant surfaces and repaired config, and it must
+  not turn into a migration nobody asked for — moving an existing project is
+  `ndx migrate-layout`'s job, where it can snapshot first and `git mv` so history
+  follows.
+  
+  The mechanism is that init creates the container before it spawns the sub-CLIs,
+  so each one resolves its own paths and they cannot disagree. Alongside it, the
+  paths that `ndx init` writes and that every later command reads now come from
+  the resolver rather than from literals: the project and package config files,
+  the `requireInit` check, the `.gitignore` and `.gitattributes` blocks, the git
+  baseline commit, and hench's own state directory across its CLI.
+  
+  `relativeToRoot(layout, path)` is new in `@n-dx/llm-client` (and its
+  orchestration-tier twin), for the several places that need a resolved path as
+  `.gitignore` spells it — root-relative, forward slashes.
+- Updated dependencies [[`0f927d1`](https://github.com/en-dash-consulting/n-dx/commit/0f927d1c8026fb17d997b2e6b83d017795f8898a), [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50), [`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`05a8115`](https://github.com/en-dash-consulting/n-dx/commit/05a811560a19baf95e69bc19a8c906dad2b3fea9), [`39c6d80`](https://github.com/en-dash-consulting/n-dx/commit/39c6d80441aba2c3dd71d94494b58bf42fc5a4a0), [`f31ece3`](https://github.com/en-dash-consulting/n-dx/commit/f31ece3356eeb3450f62e3ffcebde43852c61bd6), [`29c576a`](https://github.com/en-dash-consulting/n-dx/commit/29c576a196ed033d77a35a2dd87952ca6f32902f), [`39c6d80`](https://github.com/en-dash-consulting/n-dx/commit/39c6d80441aba2c3dd71d94494b58bf42fc5a4a0), [`d6a6c0c`](https://github.com/en-dash-consulting/n-dx/commit/d6a6c0c0d0f01674e58b8eddd9855909787b01fa), [`ccad056`](https://github.com/en-dash-consulting/n-dx/commit/ccad05698ce562b0ae47b283a59854b299884f5c), [`0e3623e`](https://github.com/en-dash-consulting/n-dx/commit/0e3623edbc25e417982a93db53aa7ae6b70fae2f), [`2b144b8`](https://github.com/en-dash-consulting/n-dx/commit/2b144b897262afc597ab9e964febb6cd6c7d9f91), [`2b144b8`](https://github.com/en-dash-consulting/n-dx/commit/2b144b897262afc597ab9e964febb6cd6c7d9f91), [`aa0ca02`](https://github.com/en-dash-consulting/n-dx/commit/aa0ca024713788ec46248f12df84e7390c64e2c7), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50), [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50), [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50), [`2b144b8`](https://github.com/en-dash-consulting/n-dx/commit/2b144b897262afc597ab9e964febb6cd6c7d9f91), [`d3c2169`](https://github.com/en-dash-consulting/n-dx/commit/d3c21692f2a8f7582a114fc69fba1c88a7a0205e), [`161da3d`](https://github.com/en-dash-consulting/n-dx/commit/161da3d04bb668f80ffe1a52c3be880cdeafbab1), [`161da3d`](https://github.com/en-dash-consulting/n-dx/commit/161da3d04bb668f80ffe1a52c3be880cdeafbab1), [`083fa1c`](https://github.com/en-dash-consulting/n-dx/commit/083fa1c22ebdf7d86de03ecc7c59f437ae9d1bab), [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50), [`0bca3ea`](https://github.com/en-dash-consulting/n-dx/commit/0bca3ea0f0336ec4f317504fb518320c6ac6856d), [`03590e4`](https://github.com/en-dash-consulting/n-dx/commit/03590e4fa8069232774dce4e1d0fe460b969e530), [`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9), [`d6a6c0c`](https://github.com/en-dash-consulting/n-dx/commit/d6a6c0c0d0f01674e58b8eddd9855909787b01fa), [`ccad056`](https://github.com/en-dash-consulting/n-dx/commit/ccad05698ce562b0ae47b283a59854b299884f5c), [`cceceb5`](https://github.com/en-dash-consulting/n-dx/commit/cceceb563ba1650f4e70b9cbe63eec9bbd954e4d)]:
+  - @n-dx/rex@0.8.0
+  - @n-dx/llm-client@0.8.0
+
 ## 0.7.2
 
 ### Patch Changes
