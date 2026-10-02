@@ -25,6 +25,7 @@ import {
 import type { WorktreeEntry } from "../../../src/viewer/hooks/use-worktrees.js";
 import type { ClaimEntry } from "../../../src/viewer/hooks/use-claims.js";
 import { claimsForWorktree, indexClaims } from "../../../src/viewer/hooks/use-claims.js";
+import { liveRunCount, type LiveSummary } from "../../../src/viewer/hooks/use-live.js";
 
 function makeClaim(overrides: Partial<ClaimEntry> = {}): ClaimEntry {
   return {
@@ -92,6 +93,22 @@ describe("sessions-panel helpers", () => {
     expect(sessionsPillLabel([makeWorktree(), LINKED])).toBe("2 worktrees · 1 running");
     expect(sessionsPillLabel([makeWorktree(), makeWorktree({ path: "/repo/b" })])).toBe("2 worktrees");
     expect(sessionsPillLabel([makeWorktree()])).toBe("1 worktree");
+  });
+
+  it("takes the running count from the Live feed's verdicts, not the record's status", () => {
+    // LINKED's record says running (runs.running = 1), but the feed judged that run orphaned.
+    expect(sessionsPillLabel([makeWorktree(), LINKED], 0, 0)).toBe("2 worktrees");
+    expect(sessionsPillLabel([makeWorktree(), LINKED], 0, 1)).toBe("2 worktrees · 1 running");
+    expect(sessionsPillLabel([makeWorktree(), LINKED], 1, 0)).toBe("2 worktrees · 1 analysis");
+  });
+
+  it("counts a run as live unless its verdict is orphaned or foreign", () => {
+    const run = (liveness?: "live" | "foreign" | "unknown" | "orphaned") =>
+      ({ runId: "r", taskId: null, taskTitle: null, branch: null, worktree: { name: "w", key: "w", isAnchor: false }, startedAt: null, stale: false, lastProgress: null, liveness }) as LiveSummary["runs"][number];
+    const feed = (runs: LiveSummary["runs"]) => ({ runs, jobs: [] }) as unknown as LiveSummary;
+    expect(liveRunCount(null)).toBe(0);
+    expect(liveRunCount(feed([run("live"), run("orphaned")]))).toBe(1);
+    expect(liveRunCount(feed([run("unknown"), run("foreign"), run()]))).toBe(2);
   });
 
   it("shows only for a repository with more than one worktree", () => {
@@ -191,6 +208,25 @@ describe("SessionsPanel", () => {
       render(h(SessionsPanel, { worktrees }), root);
       expect(root.children.length).toBe(0);
     }
+  });
+
+  it("adds the analysis count to the pill when an analysis is running", () => {
+    render(h(SessionsPanel, { worktrees: [makeWorktree(), LINKED], analyses: 1 }), root);
+    expect(root.querySelector(".sessions-toggle")!.textContent).toContain("2 worktrees · 1 running · 1 analysis");
+  });
+
+  it("links to the Live overview, navigating in place, when Live is available", () => {
+    const navigateTo = vi.fn();
+    render(h(SessionsPanel, { worktrees: [makeWorktree(), LINKED], navigateTo, liveAvailable: true }), root);
+    const link = root.querySelector<HTMLAnchorElement>(".sessions-live-link")!;
+    expect(link.getAttribute("href")).toMatch(/\/live$/);
+    act(() => { link.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("live", undefined);
+  });
+
+  it("offers no Live link when Live is unavailable", () => {
+    render(h(SessionsPanel, { worktrees: [makeWorktree(), LINKED] }), root);
+    expect(root.querySelector(".sessions-live-link")).toBeNull();
   });
 
   it("renders a collapsed pill naming the worktree and running counts", () => {

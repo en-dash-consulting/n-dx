@@ -53,6 +53,7 @@ import {
   aggregateBatchResults,
 } from "./enrich-batch.js";
 import type { BatchResult } from "./enrich-batch.js";
+import { markPass, markBatch } from "./analyze-progress.js";
 
 // ── Public entry point ───────────────────────────────────────────────────────
 
@@ -112,6 +113,8 @@ export async function enrichZonesWithAI(
       };
     }
   }
+
+  markPass(passNumber);
 
   // 1. Meta-evaluation path (pass 5+) — single prompt, no batching
   if (isMetaPass && existingFindings.length > 0) {
@@ -209,13 +212,16 @@ export async function enrichZonesWithAI(
   //    still an independent LLM call. If ANY batch reports an auth error
   //    we short-circuit the whole pass (no point sending another call to a
   //    broken token).
+  //    The batches run concurrently, so progress counts them as they settle.
+  let settledCount = 0;
+  if (batches.length > 0) markBatch("zone enrichment", 0, batches.length);
   const settled = await Promise.allSettled(
     batches.map((batch, bi) =>
       enrichBatch(
         batch, zones, sortedCrossingsArr,
         passNumber, passConfig, previousZones, bi, batches.length,
         new Map<string, string>(), fileArchetypes, hints, projectProfile,
-      ),
+      ).finally(() => markBatch("zone enrichment", ++settledCount, batches.length)),
     ),
   );
 

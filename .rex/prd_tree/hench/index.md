@@ -4,10 +4,10 @@ level: "epic"
 title: "Hench"
 status: "completed"
 startedAt: "2026-03-26T15:22:13.999Z"
-completedAt: "2026-09-17T03:40:02.275Z"
-endedAt: "2026-09-17T03:40:02.275Z"
+completedAt: "2026-10-01T21:08:11.742Z"
+endedAt: "2026-10-01T21:08:11.742Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
-lastModified: "2026-09-17T03:40:02.647Z"
+lastModified: "2026-10-01T21:08:12.137Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -43,9 +43,11 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Strict Self-Heal Tag Scoping Enforcement](./strict-self-heal-tag-scoping-enforcement/index.md) | completed |
 | [Task Repetition Detection and Completion Enforcement in Hench Run Loop](./task-repetition-detection-and/index.md) | completed |
 | [Web UI: Reorganize around SourceVision / Rex / Hench sections](./web-ui-reorganize-around-sourcevision/index.md) | completed |
+| [Commit review repairs when the executor committed for itself and left no commit message](./commit-review-repairs-when-the.md) | completed |
 | [Fix hench parent auto-completion cascade silently skipped + add reconciliation sweep (#293)](./fix-hench-parent-auto-completion.md) | completed |
 | [Fix hench task-completion commit gap + fullTestCommand schema drop (#302)](./fix-hench-task-completion-commit-gap.md) | completed |
 | [Hench task display branches on rex prose, so a reworded selection summary silently blanks the finalize label](./hench-task-display-branches-on-rex.md) | completed |
 | [Pre-run commit gate: verify uncommitted changes before starting a work loop](./pre-run-commit-gate-verify-uncommitted.md) | completed |
 | [RunRecord fields testGate, dependencyAudit and cleanupTransformations are stripped by the run-record schema on load](./runrecord-fields-testgate.md) | completed |
 | [Skill runs attribute tokens from a code-written usage mark taken when the task starts, not from a model-typed --startedAt window](./skill-runs-attribute-tokens-from-a.md) | completed |
+| [Tell the agent to run git bare from the project root, never behind cd or git -C](./tell-the-agent-to-run-git-bare-from.md) | completed |

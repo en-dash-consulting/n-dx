@@ -40,6 +40,7 @@ export {
 export { useProjectMetadata, useCliName } from "./hooks/index.js";
 export { useFeatureToggle } from "./hooks/index.js";
 export { useProjectStatus } from "./hooks/index.js";
+export { useLive, isAnalysisJob } from "./hooks/index.js";
 
 // --- Status indicator components (bottom-bar badges) ---
 export {
@@ -47,6 +48,7 @@ export {
   RexCompletionIndicator,
   HenchActivityIndicator,
   INDICATOR_VIEWS,
+  LIVE_INDICATOR_VIEWS,
 } from "./components/index.js";
 
 // --- Layout: stages, their sections, and the settings list (shell components) ---
@@ -56,6 +58,8 @@ export {
   SETTINGS_ENTRIES,
   isSettingsView,
   isStageId,
+  isLiveView,
+  LIVE_VIEWS,
   stageForView,
   stageProduct,
   visibleStages,

@@ -45,7 +45,11 @@ export class WorkspaceScoped<T> {
 
   /** The workspace's value if it exists, without creating one. */
   peek(ctx: Pick<ServerContext, "workspace" | "projectDir">): T | undefined {
-    return this.slots.get(workspaceKeyOf(ctx));
+    return this.peekByKey(workspaceKeyOf(ctx));
+  }
+
+  peekByKey(key: string): T | undefined {
+    return this.slots.get(key);
   }
 
   /** Every workspace's value — for process-wide sweeps such as shutdown. */

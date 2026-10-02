@@ -55,6 +55,9 @@ export async function cmdShow(
   // from it and lost them.
   info(formatTokenReport(run.tokenUsage, run.tokens?.cachedProvenance));
   if (run.session) info(formatSessionDecision(run.session));
+  if (run.readOnlyRefusal) {
+    info(`Read-only refusal: ${run.readOnlyRefusal.reason} — re-spawned once cold`);
+  }
 
   // Whether this run was reviewed, next to the status it qualifies. The run
   // record is the only copy that outlives the terminal, so a run that was

@@ -41,6 +41,16 @@ describe("isHenchRuntimeArtifact", () => {
     expect(isHenchRuntimeArtifact(".hench-commit-msg.txt")).toBe(true);
   });
 
+  it("matches the run log directory, which exists before the run's gates fire", () => {
+    // The log is written as the run goes, so `.run-logs/` is on disk while
+    // the same run's completion gate reads the tree. Without this the first
+    // run in a project without the ignore line blocks on its own output.
+    expect(isHenchRuntimeArtifact(".run-logs/")).toBe(true);
+    expect(isHenchRuntimeArtifact(".run-logs")).toBe(true);
+    expect(isHenchRuntimeArtifact(".run-logs/2026-04-08T23-21-17-abc.log")).toBe(true);
+    expect(isHenchRuntimeArtifact(".run-logs-archive/x.log")).toBe(false);
+  });
+
   it("does not match operator-authored hench content", () => {
     // .hench/config.json is expected to be tracked — discounting the whole
     // .hench/ tree would hide a real uncommitted config change from the gate.
