@@ -207,16 +207,19 @@ export async function callClaude(
   opts?: { taskClass?: string },
 ): Promise<CallClaudeResult> {
   const client = getClient();
-  const resolved = opts?.taskClass
+  const resolution = opts?.taskClass
     ? resolveTaskModel(opts.taskClass, _llmConfig ?? {}, {
         model,
         vendor: resolveVendor(),
-      }).model
-    : resolveModel(model);
+      })
+    : undefined;
+  const resolved = resolution?.model ?? resolveModel(model);
   const startedAt = Date.now();
   const result: CompletionResult = await client.complete({
     prompt,
     model: resolved,
+    effort: resolution?.effort,
+    taskClass: opts?.taskClass,
   });
   recordLLMCall({
     taskClass: opts?.taskClass ?? "unclassed",

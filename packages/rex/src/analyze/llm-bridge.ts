@@ -68,15 +68,27 @@ function resolveVendor(): LLMVendor {
 export type SpawnRoute = TaskWeight | { taskClass: string; weight?: TaskWeight };
 
 export function resolveConfiguredModel(model?: string, route: SpawnRoute = "standard"): string {
+  return resolveRoute(model, route).model;
+}
+
+/**
+ * The model for a call plus, for a task-class route, the class and its
+ * `llm.effort` value — what the Claude API provider needs to send effort.
+ */
+function resolveRoute(
+  model: string | undefined,
+  route: SpawnRoute,
+): { model: string; effort?: string; taskClass?: string } {
   if (typeof route === "object" && route.taskClass) {
-    return resolveTaskModel(route.taskClass, _llmConfig ?? {}, {
+    const resolution = resolveTaskModel(route.taskClass, _llmConfig ?? {}, {
       model,
       vendor: resolveVendor(),
-    }).model;
+    });
+    return { model: resolution.model, effort: resolution.effort, taskClass: route.taskClass };
   }
-  if (model?.trim()) return model;
+  if (model?.trim()) return { model };
   const weight = typeof route === "object" ? (route.weight ?? "standard") : route;
-  return resolveVendorModel(resolveVendor(), _llmConfig ?? {}, weight);
+  return { model: resolveVendorModel(resolveVendor(), _llmConfig ?? {}, weight) };
 }
 
 // ── Public configuration API ──
@@ -197,7 +209,7 @@ export async function spawnClaude(
     })
     : getClient();
 
-  const result = await client.complete({ prompt, model: resolveConfiguredModel(model, route) });
+  const result = await client.complete({ prompt, ...resolveRoute(model, route) });
   return {
     text: result.text,
     tokenUsage: result.tokenUsage,

@@ -128,6 +128,16 @@ ndx config llm.claude.cli_path /path/to/claude .
 `*.api_key` and `*.cli_path` values are written to `.n-dx.local.json`, which `ndx init` gitignores — never to the shared `.n-dx.json`. Every reader merges the local file over the shared one, so nothing else changes. If a project configured before this routing still has a key in `.n-dx.json`, `ndx config` warns on every run and `ndx ci` fails when that file is git-tracked; re-run `ndx config <key> <value>` to move it (and rotate the key if it was ever committed).
 :::
 
+### Effort (API mode)
+
+`llm.effort` sets the reasoning effort per task class, keyed like `llm.routes` (exact class names or `prd.*`-style prefixes). Values are `low`, `medium`, `high`, `xhigh` and `max`.
+
+```json
+{ "llm": { "effort": { "prd.*": "low", "agent.execute": "xhigh" } } }
+```
+
+With no matching rule, `claude-opus-5-5` gets `high` (Opus 5's API default; Opus 5.5's own is `medium`) and every other model gets the API default. A model that does not accept effort, such as `claude-haiku-4-5`, never receives it, and an unknown value is never sent; both print a warning. CLI mode (Claude Code) does not apply `llm.effort` yet.
+
 ## Codex Configuration
 
 ```sh

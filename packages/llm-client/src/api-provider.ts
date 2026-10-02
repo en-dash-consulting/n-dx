@@ -35,6 +35,7 @@ import type {
 import { ClaudeClientError } from "./types.js";
 import { resolveApiKey, resolveModel } from "./config.js";
 import { parseApiTokenUsage } from "./token-usage.js";
+import { resolveClaudeApiEffort } from "./claude-effort.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo } from "./provider-interface.js";
 import {
   extractRetryAfterMs,
@@ -165,14 +166,18 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
 
     async complete(request: CompletionRequest): Promise<CompletionResult> {
       let lastError: Error | undefined;
+      const model = resolveModel(request.model);
+      const params: Anthropic.MessageCreateParamsNonStreaming = {
+        model,
+        max_tokens: maxTokens,
+        messages: [{ role: "user", content: request.prompt }],
+      };
+      const effort = resolveClaudeApiEffort(model, request.effort, request.taskClass);
+      if (effort) params.output_config = { effort };
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-          const response = await client.messages.create({
-            model: resolveModel(request.model),
-            max_tokens: maxTokens,
-            messages: [{ role: "user", content: request.prompt }],
-          });
+          const response = await client.messages.create(params);
 
           // Extract text from response blocks
           let text = "";
