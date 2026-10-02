@@ -2,15 +2,18 @@
 id: "912477b2-d98f-4367-a8c3-f7bc328e9c02"
 level: "feature"
 title: "Prepare task: run one task from Work with every ndx work option visible"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "0.8.0"
   - "task-prep"
   - "phase-1"
+startedAt: "2026-10-02T12:46:58.099Z"
+completedAt: "2026-10-02T12:46:58.099Z"
+endedAt: "2026-10-02T12:46:58.099Z"
 acceptanceCriteria: []
 description: "Dashboard users cannot do what a terminal user does with `ndx work`. POST /api/hench/execute accepts only `{taskId}` and always runs `ndx work --task=<id> --auto <dir>`, so model, review, permission mode, test gate, budgets, fresh session and allow-dirty can only be changed as saved project config, and none of the seven Start buttons shows which model will run. This feature adds a \"Prepare task\" modal on the Work page: every per-task `ndx work` option, filled in with the value hench would use and where that value came from, editable for one run, with a preflight check list, the equivalent terminal command, a brief preview, and Execute. Start lives in Work; Stop stays in Live, so Execute hands off to /live/task/:id.\n\nPrinciples: (1) hench reports the defaults (`ndx work --resolve`); the dashboard never re-derives them. (2) Every modal state maps to one `ndx work` command line, shown with a Copy button. (3) Anything that would make the run refuse is shown before Execute.\n\nPhase 1 scope: the resolve mode, run options on execute (allow-listed, carried through the hub queue), prep/preview/ready routes, the modal, a Ready to run list, every existing Start button opening the modal (one-click \"Start now\" kept as a secondary menu item), the queued state, and parity fixes: blocked tasks are no longer offered, in-progress tasks with no live run can be resumed, Epic-by-Epic is hidden, Self-Heal gets --auto, and the PRD view keeps the /p/<id>/ prefix.\n\nOut of scope (later phases): saving settings on the task (a `run` field honoured by the CLI), per-task model recommendations (tiers from task size), the Run queue panel for --loop/--epic/--epic-by-epic.\n\nBuilds on #500 (shared available-memory reading): hub admission and /api/live now carry `availableBytes` and `pressure`, and an unknown reading admits. Use those fields; do not read os.freemem()."
-lastModified: "2026-10-02T04:54:24.901Z"
+lastModified: "2026-10-02T12:46:58.506Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -45,7 +48,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [--resolve reports no reviewer model unless --review is passed, so the modal cannot show who reviews](./resolve-reports-no-reviewer-model.md) | completed |
 | [Several new tests would still pass with the behaviour they name reverted](./several-new-tests-would-still-pass.md) | completed |
 | [Show a Ready to run list on the Work page and hide the Epic-by-Epic panel](./show-a-ready-to-run-list-on-the-work.md) | completed |
-| [Start now and Ready to run queued notices never learn the run was dropped](./start-now-and-ready-to-run-queued.md) | pending |
+| [Start now and Ready to run queued notices never learn the run was dropped](./start-now-and-ready-to-run-queued.md) | completed |
 | [Starting a run from a Workspaces card opens Live in the viewer's workspace, not the card's](./starting-a-run-from-a-workspaces-card.md) | completed |
 | [The context-notes temp file is left behind on spawn failure, write failure and shutdown](./the-context-notes-temp-file-is-left.md) | completed |
 | [The dashboard Self-Heal --auto change has no changeset](./the-dashboard-self-heal-auto-change.md) | completed |
