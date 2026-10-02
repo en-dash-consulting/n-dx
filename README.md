@@ -323,10 +323,15 @@ The hub runs one dashboard server per registered repository and exposes each pro
 ```sh
 ndx start .                     # starts the hub if needed and registers this repository
 ndx hub status                  # the hub's pid, port and every registered project
-# Claude example, for the project registered as <id>:
-claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex
-claude mcp add --transport http sourcevision http://localhost:3117/p/<id>/mcp/sourcevision
+# Claude example, for the project registered as <id>. The hub requires the
+# per-user token (see below), so pass it as a header:
+claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex \
+  --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
+claude mcp add --transport http sourcevision http://localhost:3117/p/<id>/mcp/sourcevision \
+  --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
 ```
+
+**Per-user token.** Loopback is shared by every account on a machine, so the hub, the project servers and the preview server require a token that `ndx start` creates in your ndx home (`~/.ndx/auth.token`, mode 0600). The URL `ndx start` prints carries it once (`?ndx_token=…`); the server sets an HttpOnly cookie and redirects to the clean URL, so the browser never asks again. Scripts and MCP clients send it as `X-Ndx-Token` or `Authorization: Bearer`. A request without it is answered 401. Disable with `ndx start --no-auth` or `"web": { "auth": false }` in `.n-dx.json`; a bare `web serve` without `--token-file` also runs without one.
 
 Sessions (`Mcp-Session-Id`), SSE responses and `DELETE` for session close are handled by the project's own server; the hub only proxies. Two registered projects have independent sessions, and a tool call on `/p/A/mcp/rex` writes to A's tree only. `GET /api/hub/projects` lists the registered ids.
 

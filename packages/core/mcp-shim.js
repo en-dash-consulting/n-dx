@@ -33,7 +33,7 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { getMcpServers } from "./assistant-assets.js";
-import { hubHome, hubRequest, isHubMarker, loadHubPort, readHubRegistry, readPidFile, resolveRepo } from "./web.js";
+import { hubHome, hubRequest, isHubMarker, loadHubPort, readAuthTokenFile, readHubRegistry, readPidFile, resolveRepo } from "./web.js";
 
 /** How long a single JSON-RPC round trip may take before it is abandoned. */
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -148,6 +148,10 @@ export async function bridgeStdio(options) {
     };
     if (sessionId) base["Mcp-Session-Id"] = sessionId;
     if (workspace) base["X-Ndx-Workspace"] = workspace;
+    // The hub requires the per-user token when `ndx start` created one; the
+    // shim runs as the same user, so it reads the same file.
+    const token = readAuthTokenFile();
+    if (token) base["X-Ndx-Token"] = token;
     return base;
   };
 

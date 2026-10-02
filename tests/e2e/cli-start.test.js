@@ -16,7 +16,7 @@ const LOOPBACK_HOST = "127.0.0.1";
 // tests/e2e/cli-start-hub.test.js, which redirects $N_DX_HOME.
 function runResult(args) {
   try {
-    const stdout = execFileSync("node", [CLI_PATH, "start", "--here", ...args], {
+    const stdout = execFileSync("node", [CLI_PATH, "start", "--here", "--no-auth", ...args], {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
