@@ -33,5 +33,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Release readiness](./release-readiness/index.md) | pending |
 | [rex log and budget tuners](./rex-log-and-budget-tuners/index.md) | pending |
 | [Settings consolidation](./settings-consolidation/index.md) | completed |
+| [Settings pixel icons](./settings-pixel-icons/index.md) | pending |
 | [Test determinism](./test-determinism/index.md) | completed |
 | [Vendor-aware hench model and provider settings](./vendor-aware-hench-model-and-provider/index.md) | completed |
