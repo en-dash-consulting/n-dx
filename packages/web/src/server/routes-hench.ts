@@ -155,6 +155,12 @@ export function getAggregator(runsDir: string): IncrementalTaskUsageAggregator {
 interface HenchWorkspaceState {
   /** Active task executions, keyed by task id — prevents concurrent runs on one task. */
   activeExecutions: Map<string, ActiveExecution>;
+  /**
+   * Task ids an execute request is between its checks and its spawn. Taken
+   * synchronously before the first await, so a second request for the same
+   * task cannot pass the checks while the first is still awaiting them.
+   */
+  startingTasks: Set<string>;
   /** Per-process RSS samples for historical data and leak detection. */
   processMemoryTracker: ProcessMemoryTracker;
   /** Time-series snapshots of concurrent process counts and per-task resource metrics. */
@@ -168,6 +174,7 @@ function stateFor(runsDir: string): HenchWorkspaceState {
   if (!state) {
     state = {
       activeExecutions: new Map(),
+      startingTasks: new Set(),
       processMemoryTracker: new ProcessMemoryTracker(),
       executionMetrics: new ConcurrentExecutionMetrics(),
     };
@@ -1806,14 +1813,30 @@ type ExecuteVerdict =
 const refused = (status: number, body: Record<string, unknown>): ExecuteVerdict =>
   ({ kind: "refused", status, body });
 
+/** Run `fn`, returning what it threw as a value instead of throwing it. */
+function attempt<T>(fn: () => T): { ok: true; value: T } | { ok: false; error: Error } {
+  try {
+    return { ok: true, value: fn() };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err : new Error(String(err)) };
+  }
+}
+
+const alreadyStarting =(taskId: string): Record<string, unknown> =>
+  ({ error: "Task is already starting from another request", taskId });
+
 /**
  * Every check `POST /api/hench/execute` makes before it spawns, in its order.
  * Shared with `POST /api/hench/execute/check`, so the hub can ask whether a
  * request it is about to queue would be refused when its turn came — and the
  * answer cannot drift from the one the start gives.
  */
-async function judgeExecuteRequest(ctx: ServerContext, body: Record<string, unknown>): Promise<ExecuteVerdict> {
-  const { activeExecutions } = stateForCtx(ctx);
+async function judgeExecuteRequest(
+  ctx: ServerContext,
+  body: Record<string, unknown>,
+  { holdsReservation = false }: { holdsReservation?: boolean } = {},
+): Promise<ExecuteVerdict> {
+  const { activeExecutions, startingTasks } = stateForCtx(ctx);
   const taskId = body.taskId as string | undefined;
   if (!taskId || typeof taskId !== "string") return refused(400, { error: "taskId is required" });
 
@@ -1888,6 +1911,7 @@ async function judgeExecuteRequest(ctx: ServerContext, body: Record<string, unkn
   }
 
   // Check for concurrent execution
+  if (!holdsReservation && startingTasks.has(taskId)) return refused(409, alreadyStarting(taskId));
   if (activeExecutions.has(taskId)) {
     const active = activeExecutions.get(taskId)!;
     return refused(409, { error: "Task is already being executed", runId: active.runId, taskId });
@@ -1983,11 +2007,38 @@ async function handleExecute(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const { activeExecutions, executionMetrics, processMemoryTracker } = stateForCtx(ctx);
+  const { startingTasks } = stateForCtx(ctx);
   const body = await readExecuteBody(req, res);
   if (!body) return true;
 
-  const verdict = await judgeExecuteRequest(ctx, body);
+  // Reserve the task before the first await below: the checks await claims,
+  // the run holder and the context file, and a second request for the same
+  // task arriving meanwhile would otherwise pass them too and spawn a second
+  // run. Released on every exit; once spawned, activeExecutions holds it.
+  const taskId = typeof body.taskId === "string" && body.taskId ? body.taskId : null;
+  if (taskId) {
+    if (startingTasks.has(taskId)) {
+      jsonResponse(res, 409, alreadyStarting(taskId));
+      return true;
+    }
+    startingTasks.add(taskId);
+  }
+  try {
+    return await startExecution(res, ctx, body, broadcast);
+  } finally {
+    if (taskId) startingTasks.delete(taskId);
+  }
+}
+
+/** The checks and spawn behind `POST /api/hench/execute`, run while the task is reserved. */
+async function startExecution(
+  res: ServerResponse,
+  ctx: ServerContext,
+  body: Record<string, unknown>,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const { activeExecutions, executionMetrics, processMemoryTracker } = stateForCtx(ctx);
+  const verdict = await judgeExecuteRequest(ctx, body, { holdsReservation: true });
   if (verdict.kind === "refused") {
     jsonResponse(res, verdict.status, verdict.body);
     return true;
@@ -2041,7 +2092,9 @@ async function handleExecute(
   };
 
   // Spawn hench process with streaming stdout so the UI can show live output.
-  const handle = spawnManaged(binPath, binArgs, {
+  // A spawn that throws (rather than rejecting `done`) is answered here, so the
+  // operator gets the reason and the context file does not outlive the request.
+  const spawned = attempt(() => spawnManaged(binPath, binArgs, {
     cwd: ctx.projectDir,
     stdio: "pipe",
     windowsHide: true,
@@ -2077,7 +2130,15 @@ async function handleExecute(
         broadcastExecState(broadcast, { ...entry.state });
       }
     },
-  });
+  }));
+  if (!spawned.ok) {
+    contextFile?.remove().catch((err: unknown) => {
+      console.warn(`[hench] could not remove context file ${contextFile.path}: ${(err as Error).message}`);
+    });
+    errorResponse(res, 500, `Could not start '${readCliName(ctx.projectDir)} work': ${spawned.error.message}`);
+    return true;
+  }
+  const handle = spawned.value;
 
   // Track active execution
   activeExecutions.set(taskId, { runId, handle, state: execState });
