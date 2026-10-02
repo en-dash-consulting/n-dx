@@ -161,3 +161,31 @@ export function runOptionArgs(options: RunOptions, contextFile?: string): string
   }
   return args;
 }
+
+/** What a dashboard-started `ndx work` run is: one task, its options, the workspace directory. */
+export interface WorkCommand {
+  taskId: string;
+  options: RunOptions;
+  /** The directory the run is for — the server's `ctx.projectDir`. */
+  dir: string;
+  /** Where `contextNotes` was written; see {@link runOptionArgs}. */
+  contextFile?: string;
+  /** A deferred task is reset to pending before the run selects it. */
+  resetDeferred?: boolean;
+}
+
+/**
+ * The `ndx work` argv (without the `ndx` itself) a dashboard execute spawns.
+ * The server spawns exactly this and the Prepare task modal prints it, so the
+ * command a reader copies is the run they are about to start.
+ */
+export function workCommandArgs(command: WorkCommand): string[] {
+  return [
+    "work",
+    `--task=${command.taskId}`,
+    "--auto",
+    ...runOptionArgs(command.options, command.contextFile),
+    ...(command.resetDeferred ? ["--reset-deferred"] : []),
+    command.dir,
+  ];
+}

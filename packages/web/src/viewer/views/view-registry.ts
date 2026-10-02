@@ -6,7 +6,7 @@
  * `buildValidViews` from here instead of 22 individual view modules.
  */
 
-import { h } from "preact";
+import { h, Fragment } from "preact";
 import type { ComponentChild, VNode } from "preact";
 import type { ViewId, NavigateTo, DetailItem, LoadedData, AskSeed } from "../types.js";
 import type { DegradableFeature } from "../performance/index.js";
@@ -56,6 +56,7 @@ import { WorkspacesView } from "./domain-workspaces.js";
 import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
+import { PrepareTaskModal } from "../components/index.js";
 import type { StageId } from "./stages.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 
@@ -129,7 +130,19 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "analyze": stage("analyze"),
   "plan": stage("plan"),
-  "work": stage("work"),
+  // `/work/prep/<taskId>` is the Work page with the Prepare task modal open
+  // over it; closing returns to `/work`, a start hands off to Live.
+  "work": (ctx) => h(Fragment, null,
+    stage("work")(ctx),
+    ctx.selectedTaskId
+      ? h(PrepareTaskModal, {
+          key: ctx.selectedTaskId,
+          taskId: ctx.selectedTaskId,
+          onClose: () => ctx.navigateTo("work"),
+          onOpenLive: (taskId: string) => ctx.navigateTo("live-task", { taskId }),
+        })
+      : null,
+  ),
 
   "workspaces": () =>
     h(WorkspacesView, null),

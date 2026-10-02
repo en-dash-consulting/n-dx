@@ -28,8 +28,8 @@ export {
 export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
 export { HUB_ADMISSION_HEADER, formatHubAdmissionHeader, parseHubAdmissionHeader } from "./hub-admission.js";
 export type { HubAdmissionHeader, HubMemoryPressure } from "./hub-admission.js";
-export { RUN_OPTION_SPECS, CONTEXT_NOTES_MAX_BYTES, checkRunOptions, runOptionArgs } from "./run-options.js";
-export type { RunOptionSpec, RunOptions, RunOptionKey, RunOptionsCheck } from "./run-options.js";
+export { RUN_OPTION_SPECS, CONTEXT_NOTES_MAX_BYTES, checkRunOptions, runOptionArgs, workCommandArgs } from "./run-options.js";
+export type { RunOptionSpec, RunOptions, RunOptionKey, RunOptionsCheck, WorkCommand } from "./run-options.js";
 export {
   SOURCEVISION_SCOPE_VIEWS,
   REX_SCOPE_VIEWS,

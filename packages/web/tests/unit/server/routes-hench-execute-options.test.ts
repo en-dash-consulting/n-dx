@@ -20,7 +20,7 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 import { TIER_MODELS } from "@n-dx/llm-client";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute, resetHenchRouteStateForTests } from "../../../src/server/routes-hench.js";
-import { RUN_OPTION_SPECS } from "../../../src/shared/index.js";
+import { RUN_OPTION_SPECS, workCommandArgs } from "../../../src/shared/index.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const CLAUDE_MODEL = TIER_MODELS.claude.standard;
@@ -121,6 +121,15 @@ describe("POST /api/hench/execute — run options", () => {
       "--allow-dirty",
       contextFlag,
     ]);
+  });
+
+  it("spawns exactly workCommandArgs — the builder the Prepare task modal prints", async () => {
+    const options = { model: CLAUDE_MODEL, review: true, maxTurns: 12, contextNotes: "notes" };
+    expect((await execute({ taskId: "task-1", options })).status).toBe(202);
+    const [, args] = spawnManagedMock.mock.calls[0] as [string, string[], unknown];
+    const contextFile = args.find((a) => a.startsWith("--context-file="))!.slice("--context-file=".length);
+    const expected = workCommandArgs({ taskId: "task-1", options, dir: tmpDir, contextFile });
+    expect(args.slice(args.indexOf("work"))).toEqual(expected);
   });
 
   it("adds nothing for false booleans or no options", async () => {

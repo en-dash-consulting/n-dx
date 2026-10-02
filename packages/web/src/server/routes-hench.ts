@@ -121,7 +121,7 @@ import {
 } from "./run-liveness.js";
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
-import { runOptionArgs } from "../shared/index.js";
+import { workCommandArgs } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -1975,14 +1975,14 @@ async function handleExecute(
   const contextFile = options.contextNotes ? await writeContextNotesFile(options.contextNotes) : null;
   // Argv, never a shell: each flag is one `--flag` / `--flag=value` word from
   // the allow-list, and values were refused if they started with '-'.
-  const workArgs = [
-    "work",
-    `--task=${taskId}`,
-    "--auto",
-    ...runOptionArgs(options, contextFile?.path),
-    ...(resetDeferred ? ["--reset-deferred"] : []),
-    ctx.projectDir,
-  ];
+  // The same builder prints the Prepare task modal's command line.
+  const workArgs = workCommandArgs({
+    taskId,
+    options,
+    dir: ctx.projectDir,
+    contextFile: contextFile?.path,
+    resetDeferred,
+  });
   const binArgs = [...prefixArgs, ...workArgs];
 
   // Generate a run ID for tracking (hench will generate its own, but we

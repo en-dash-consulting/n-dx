@@ -123,6 +123,25 @@ describe("hench prep routes", () => {
       expect(body.workspace).toMatchObject({ root: tmpDir, branch: "from-hench", isAnchor: true, dirty: true, liveRun: false });
     });
 
+    it("adds the run's directory and the item's header fields from the PRD", async () => {
+      await writeTasks(ctx, [{
+        id: "epic-1", title: "The epic", level: "epic", status: "pending", children: [{
+          id: "task-1", title: "Prep me", level: "task", status: "pending", priority: "high",
+          acceptanceCriteria: ["one", "two"],
+        }],
+      }]);
+      const port = await open(ctx);
+      const body = await (await fetch(`http://127.0.0.1:${port}/api/hench/prep/task-1`)).json();
+      expect(body.dir).toBe(tmpDir);
+      expect(body.detail).toEqual({ priority: "high", parentChain: ["The epic"], criteriaCount: 2 });
+    });
+
+    it("answers detail:null for an id the PRD does not have", async () => {
+      const port = await open(ctx);
+      const body = await (await fetch(`http://127.0.0.1:${port}/api/hench/prep/task-1`)).json();
+      expect(body.detail).toBeNull();
+    });
+
     it("spawns `ndx work --task=<id> --resolve <dir>` in the workspace's directory with a 15 s timeout", async () => {
       const port = await open(ctx);
       await fetch(`http://127.0.0.1:${port}/api/hench/prep/task-1`);

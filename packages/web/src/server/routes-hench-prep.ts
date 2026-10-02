@@ -4,8 +4,10 @@
  * GET  /api/hench/prep/:taskId          — `ndx work --task=<id> --resolve`'s JSON (hench's
  *                                         defaults and where each came from, refusals, the
  *                                         equivalent command) plus the vendor's model catalog,
- *                                         the hub's admission state, the worktree's state, and
- *                                         `recommendation: null` (reserved for a later phase)
+ *                                         the hub's admission state, the worktree's state, the
+ *                                         run's directory (`dir`), the item's header fields
+ *                                         (`detail`), and `recommendation: null` (reserved for
+ *                                         a later phase)
  * POST /api/hench/prep/:taskId/preview  — body `{options}`; `ndx work --task=<id> --dry-run
  *                                         <flags>`'s output as `{brief}`
  * GET  /api/hench/ready?limit=N         — the next N tasks in the order `ndx work --auto` would
@@ -32,6 +34,7 @@ import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
 import { loadPRDSync } from "./prd-io.js";
 import {
   collectCompletedIds,
+  findItem,
   findNextTask,
   openClaimsStore,
   resolveClaimHolder,
@@ -157,6 +160,25 @@ async function catalogFor(ctx: ServerContext, resolved: Record<string, unknown>)
   return entry === undefined ? null : { vendor, ...(entry as object) };
 }
 
+/** What the modal's header says about the task beyond hench's `task`; null when the PRD has no such item. */
+export interface PrepDetail {
+  priority: string | null;
+  /** Ancestor titles, epic first. */
+  parentChain: string[];
+  criteriaCount: number;
+}
+
+function detailOf(ctx: ServerContext, taskId: string): PrepDetail | null {
+  const doc = loadPRDSync(ctx.rexDir);
+  const entry = doc ? findItem(doc.items, taskId) : null;
+  if (!entry) return null;
+  return {
+    priority: entry.item.priority ?? null,
+    parentChain: entry.parents.map((p) => p.title),
+    criteriaCount: entry.item.acceptanceCriteria?.length ?? 0,
+  };
+}
+
 /** GET /api/hench/prep/:taskId */
 async function handlePrep(req: IncomingMessage, res: ServerResponse, ctx: ServerContext, taskId: string): Promise<boolean> {
   const run = await runNdx(ctx, ["work", `--task=${taskId}`, "--resolve", ctx.projectDir], PREP_RESOLVE_TIMEOUT_MS);
@@ -176,6 +198,9 @@ async function handlePrep(req: IncomingMessage, res: ServerResponse, ctx: Server
   const [catalog, workspace] = await Promise.all([catalogFor(ctx, resolved), workspaceOf(ctx, resolved)]);
   jsonResponse(res, 200, {
     ...resolved,
+    // The directory the execute spawn passes, so the modal's command line is the spawned one.
+    dir: ctx.projectDir,
+    detail: detailOf(ctx, taskId),
     catalog,
     admission: admissionOf(req),
     workspace: { ...(resolved["workspace"] as object | undefined), ...workspace },

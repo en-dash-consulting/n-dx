@@ -8,9 +8,23 @@ export interface ParsedRoute {
 
 const DEEP_LINK_VIEWS = new Set<ViewId>(["prd", "hench-runs"]);
 
-/** Views whose `subId` is a task id (the rest of `/<view>/<subId>` is a run id or unused). */
+/**
+ * Views whose `subId` is a task id (the rest of `/<view>/<subId>` is a run id or unused).
+ * On `work` it is the task the Prepare task modal is open for.
+ */
 export function isTaskRouteView(view: ViewId): boolean {
-  return view === "prd" || view === "live-task";
+  return view === "prd" || view === "live-task" || view === "work";
+}
+
+/**
+ * The Work page, with the Prepare task modal open at `/work/prep/<taskId>`.
+ * Any other sub-path is the bare Work page: the modal is the only thing a
+ * Work sub-path names, so nothing else may be read as a task id.
+ */
+function parseWorkPath(base: string, sub: string): ParsedRoute | null {
+  if (base !== "work") return null;
+  const prep = /^prep\/([^/]+)$/.exec(sub);
+  return { view: "work", subId: prep ? prep[1] : null };
 }
 
 /**
@@ -38,6 +52,7 @@ export function normalizeLiveView(view: ViewId, subId: string | null): ViewId {
 export function viewPathname(view: ViewId, subId: string | null): string {
   if (view === "live-task") return subId ? `/live/task/${subId}` : "/live";
   if (view === "live-analyze") return "/live/analyze";
+  if (view === "work") return subId ? `/work/prep/${subId}` : "/work";
   return subId ? `/${view}/${subId}` : `/${view}`;
 }
 
@@ -98,7 +113,11 @@ export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>, ba
   // along unexamined, same as an unrecognised sub-path does today, so it is
   // preserved in the address bar rather than dropped.
   const movedAlias = resolveViewAlias(base, validViews);
+  if (movedAlias === "work") return parseWorkPath("work", sub);
   if (movedAlias) return { view: movedAlias, subId: sub || null };
+
+  const work = parseWorkPath(base, sub);
+  if (work && validViews.has("work")) return work;
 
   const live = parseLivePath(base, sub);
   if (live && validViews.has(live.view)) return live;

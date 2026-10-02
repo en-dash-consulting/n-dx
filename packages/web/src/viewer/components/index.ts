@@ -20,6 +20,8 @@ export { LiveTab, PeekLink, jobTarget, runTarget, isCurrentWorktree, liveHref } 
 export type { LiveTabProps, PeekLinkProps, PeekTarget } from "./live-tab.js";
 export { StartTaskButton } from "./start-task-button.js";
 export type { StartTaskButtonProps } from "./start-task-button.js";
+export { PrepareTaskModal } from "./prepare-task-modal.js";
+export type { PrepareTaskModalProps } from "./prepare-task-modal.js";
 
 // ── Banners ──────────────────────────────────────────────────────────
 
