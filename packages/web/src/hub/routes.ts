@@ -34,8 +34,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync, statSync } from "node:fs";
-import { isAbsolute } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join } from "node:path";
 import { detectBasePath, projectIdFromBasePath, safeDecodeSegment, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, RegisterProjectInput } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
@@ -109,6 +109,23 @@ function isDirectory(path: string): boolean {
   }
 }
 
+/**
+ * Whether `pkgRoot` is the real `@n-dx/web` package, by its own package.json.
+ *
+ * Identity, not location: the hub spawns whatever it accepts here, so matching
+ * on where a file sits means anyone who can create a directory can offer it a
+ * process to run.
+ */
+function isNdxWebPackage(pkgRoot: string): boolean {
+  try {
+    const pkg: unknown = JSON.parse(readFileSync(join(pkgRoot, "package.json"), "utf-8"));
+    return !!pkg && typeof pkg === "object" && (pkg as { name?: unknown }).name === "@n-dx/web";
+  } catch {
+    // No package.json, unreadable, or not JSON — not the package.
+    return false;
+  }
+}
+
 /** Validate a registration body. Returns the input or the first problem. */
 /**
  * Whether `ndxBin` is something the hub should spawn.
@@ -121,8 +138,16 @@ function isDirectory(path: string): boolean {
  */
 export function isAcceptableNdxBin(path: string): boolean {
   const normalized = path.replace(/\\/g, "/");
-  if (/\/web\/dist\/cli\/index\.(m|c)?js$/.test(normalized)) return true;
+  // `…/dist/cli/index.js` is a *shape*, and any directory can be given it.
+  // Ask the package that owns the file who it is instead: an impostor dropped
+  // at /tmp/x/web/dist/cli/index.js passed the shape test and was spawned.
+  if (/\/dist\/cli\/index\.(m|c)?js$/.test(normalized)) {
+    return isNdxWebPackage(dirname(dirname(dirname(path))));
+  }
   const base = normalized.slice(normalized.lastIndexOf("/") + 1).toLowerCase();
+  // A launcher is a shim with nothing to interrogate, so its name is all
+  // there is to go on. It stays the weaker of the two checks, which is why
+  // the Origin and token gates in front of registration are the real control.
   return /^(ndx|n-dx)(\.(cmd|exe|ps1))?$/.test(base);
 }
 
@@ -142,7 +167,7 @@ export function parseRegisterInput(body: unknown): { input: RegisterProjectInput
   }
   if (!existsSync(b.ndxBin)) return { problem: `ndxBin does not exist: ${b.ndxBin}` };
   if (!isAcceptableNdxBin(b.ndxBin)) {
-    return { problem: "ndxBin must be @n-dx/web's CLI entry point (…/web/dist/cli/index.js) or an ndx launcher" };
+    return { problem: "ndxBin must be @n-dx/web's own CLI entry point (…/dist/cli/index.js in a package whose package.json names @n-dx/web) or an ndx launcher" };
   }
   if (b.worktree !== undefined) {
     if (typeof b.worktree !== "string" || !isAbsolute(b.worktree)) {

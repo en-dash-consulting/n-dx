@@ -36,6 +36,12 @@ interface Rule {
   replace: string | ((...groups: string[]) => string);
 }
 
+// The key half of an assignment: a name ending in a sensitive word, with or
+// without a prefix, so both `password=` and `GITHUB_TOKEN=` match. Written
+// once and shared by the two assignment rules, which must agree on what a
+// key is.
+const ASSIGNMENT_KEY = "\\b[A-Za-z0-9_.-]*?(?:token|secret|password|passwd|api[_-]?key|apikey|private[_-]?key|credentials?|(?:secret|access)[_-]?key)\\b";
+
 const RULES: readonly Rule[] = [
   {
     kind: "private-key",
@@ -79,16 +85,46 @@ const RULES: readonly Rule[] = [
     pattern: /(\b[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:)([^/\s@]+)(@)/gi,
     replace: (_m: string, before: string, _pw: string, at: string) => `${before}${REDACTED_PASSWORD}${at}`,
   },
+
   {
-    // key=value / key: value / "key": "value" where the key ends in a
-    // sensitive word (with or without a prefix, so both `password=` and
-    // `GITHUB_TOKEN=` match). The value must be at least 8 characters and
-    // contain a letter, so counters and ids are not mistaken for secrets, and
-    // an already-redacted marker is left alone so the pass is idempotent.
+    // key="value with spaces" — the whole quoted value goes. This rule must
+    // come first: the unquoted rule below would otherwise stop at the opening
+    // quote and redact only the first word of a quoted passphrase.
     kind: "assignment",
-    pattern:
-      /(\b[A-Za-z0-9_.-]*?(?:token|secret|password|passwd|api[_-]?key|apikey|private[_-]?key|credentials?|(?:secret|access)[_-]?key)\b["']?\s*[=:]\s*["']?)((?!\[redacted:)(?=[^\s"',;]*[A-Za-z])[^\s"',;]{8,})/gi,
-    replace: (_m: string, head: string) => `${head}${REDACTED_VALUE}`,
+    pattern: new RegExp(
+      `(${ASSIGNMENT_KEY}["']?\\s*[=:]\\s*)(["'])((?!\\[redacted:)(?:[^"'\\\\\\n]|\\\\.)*[A-Za-z](?:[^"'\\\\\\n]|\\\\.)*)\\2`,
+      "gi",
+    ),
+    replace: (_m: string, head: string, quote: string) => `${head}${quote}${REDACTED_VALUE}${quote}`,
+  },
+  {
+    // key=value, unquoted, running to the end of the line.
+    //
+    // Stopping at the first space left `PASSWORD=correct horse battery` almost
+    // entirely in the clear — and worse, matched nothing at all, because the
+    // first word was under the length floor. A passphrase may contain spaces,
+    // so the value is the rest of the line (to a `;` or `,` separator).
+    //
+    // That does mean prose after a credential on the same line goes with it:
+    // `token=abc12345 (expired)` loses the parenthetical. For a credential
+    // scrubber that is the right side to err on — the alternative is leaving
+    // half a secret on screen. Quoted values keep their exact bounds above,
+    // and JSON, where values are always quoted, is unaffected.
+    //
+    // The first character is pinned to a non-space, non-quote on purpose:
+    // `\s*` above would otherwise backtrack to empty and let the value start
+    // at the space before an opening quote — matching a quoted value after
+    // all, and undoing the rule above it.
+    kind: "assignment",
+    pattern: new RegExp(
+      `(${ASSIGNMENT_KEY}["']?\\s*[=:]\\s*)((?!\\[redacted:)(?=[^\\n;,]*[A-Za-z])[^\\s"'\\n;,][^\\n;,]{7,})`,
+      "gi",
+    ),
+    replace: (_m: string, head: string, value: string) => {
+      // Trailing whitespace is not part of the value; keep the line's shape.
+      const trailing = /\s*$/.exec(value)?.[0] ?? "";
+      return `${head}${REDACTED_VALUE}${trailing}`;
+    },
   },
 ];
 
@@ -139,4 +175,71 @@ export function redactDeep<T>(value: T): T {
     return out as T;
   }
   return value;
+}
+
+/** Longest run of withheld lines before a `BEGIN` is judged not to be a key. */
+const MAX_KEY_BLOCK_LINES = 512;
+
+const KEY_BEGIN = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
+const KEY_END = /-----END [A-Z ]*PRIVATE KEY-----/;
+
+/**
+ * A redactor for callers that only ever hold one line at a time.
+ *
+ * {@link redactSecrets} matches against a whole string, so a caller scrubbing
+ * line by line — a streaming log writer, say — cannot catch a PEM private key:
+ * its `BEGIN` and `END` markers sit on different lines, and neither line on its
+ * own looks like anything. The body is base64, so no other rule fires either,
+ * and the whole key lands on disk.
+ *
+ * This keeps the only state that needs. Between the two markers lines are
+ * withheld, and on `END` the block is handed to {@link redactSecrets} whole —
+ * so the output is what whole-string redaction would have produced, rather
+ * than an approximation of it. Every other line is scrubbed and passed through.
+ *
+ * A `BEGIN` with no `END` is not a key: whole-string redaction leaves such text
+ * alone, because the pattern needs both markers. After
+ * {@link MAX_KEY_BLOCK_LINES} the withheld lines are released, scrubbed
+ * individually, and {@link LineRedactor.flush} does the same at end of stream —
+ * so a stray `BEGIN` can neither swallow the rest of the log nor drop it.
+ */
+export interface LineRedactor {
+  /**
+   * Scrub one line. Returns the lines to write — none while a key block is
+   * open, and the whole redacted block when it closes.
+   */
+  push(line: string): string[];
+  /** Release anything still withheld. Call once, at end of stream. */
+  flush(): string[];
+}
+
+/** Create a {@link LineRedactor}. The state is per-stream, so use one per log. */
+export function createLineRedactor(): LineRedactor {
+  let held: string[] | null = null;
+
+  const release = (): string[] => {
+    const lines = held ?? [];
+    held = null;
+    return lines.map((line) => redactSecrets(line));
+  };
+
+  return {
+    push(line: string): string[] {
+      if (held === null) {
+        // A key that opens and closes on one line needs no state at all.
+        if (!KEY_BEGIN.test(line) || KEY_END.test(line)) return [redactSecrets(line)];
+        held = [line];
+        return [];
+      }
+      held.push(line);
+      if (KEY_END.test(line)) {
+        const block = held.join("\n");
+        held = null;
+        return redactSecrets(block).split("\n");
+      }
+      if (held.length > MAX_KEY_BLOCK_LINES) return release();
+      return [];
+    },
+    flush: release,
+  };
 }

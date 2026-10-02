@@ -372,8 +372,9 @@ export {
   redactSecrets,
   redactSecretsDetailed,
   redactDeep,
+  createLineRedactor,
 } from "./redact.js";
-export type { RedactionResult } from "./redact.js";
+export type { RedactionResult, LineRedactor } from "./redact.js";
 
 // Per-user dashboard token file (`<ndx home>/auth.token`); the request check lives in web/shared/auth.ts
 export { AUTH_TOKEN_FILENAME, resolveAuthTokenPath, readAuthToken, ensureAuthToken, hasAuthToken } from "./auth-token.js";

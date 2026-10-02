@@ -23,7 +23,7 @@
 import { join, resolve } from "node:path";
 import { mkdir, open, readFile, writeFile } from "node:fs/promises";
 import type { WriteStream } from "node:fs";
-import { redactSecrets } from "../prd/llm-gateway.js";
+import { createLineRedactor } from "../prd/llm-gateway.js";
 
 const LOG_DIR_NAME = ".run-logs";
 const GITIGNORE_ENTRY = ".run-logs/";
@@ -92,9 +92,11 @@ export async function persistRunLog(
   await ensureRunLogsIgnored(projectDir);
 
   const logPath = runLogPath(projectDir, runId, startedAt);
-  // Same scrub as the run record, and as the streaming writer below: the log
-  // is the agent's terminal, verbatim.
-  const content = lines.length > 0 ? lines.map((line) => redactSecrets(line)).join("\n") + "\n" : "";
+  // Same scrub as the run record, and — through the same redactor — as the
+  // streaming writer below, which is what keeps the two byte-identical.
+  const redactor = createLineRedactor();
+  const scrubbed = [...lines.flatMap((line) => redactor.push(line)), ...redactor.flush()];
+  const content = scrubbed.length > 0 ? scrubbed.join("\n") + "\n" : "";
   await writeFile(logPath, content, "utf-8");
 
   return logPath;
@@ -179,6 +181,15 @@ export async function openRunLog(
     settle?.(failure);
   });
 
+  // One redactor for the life of the stream. It is stateful on purpose: a
+  // PEM private key spans lines, so a per-line scrub cannot see one, and the
+  // key body is base64 that no other rule matches.
+  const redactor = createLineRedactor();
+
+  const writeLines = (lines: readonly string[]): void => {
+    for (const line of lines) stream.write(line + "\n");
+  };
+
   const appendLine = (line: string): void => {
     // Once the stream has failed every further write would fail the same way;
     // the complete file comes from the end-of-run fallback instead.
@@ -187,12 +198,14 @@ export async function openRunLog(
     // on disk. Node buffers what the fd cannot take yet and drains it in
     // order, so the file stays correct — only its tail lags.
     //
-    // Scrubbed exactly as persistRunLog scrubs: this is the writer a real
-    // run uses and persistRunLog only the fallback, so redacting there alone
-    // would leak every credential to the live log — and break the
-    // byte-identical guarantee the module header states and run-log.test.ts
-    // pins.
-    stream.write(redactSecrets(line) + "\n");
+    // Scrubbed exactly as persistRunLog scrubs, through the same redactor:
+    // this is the writer a real run uses and persistRunLog only the fallback,
+    // so redacting there alone would leak every credential to the live log —
+    // and break the byte-identical guarantee the module header states.
+    //
+    // A line inside an open key block returns nothing and is written when the
+    // block closes, so the live log lags by the length of a key and no more.
+    writeLines(redactor.push(line));
   };
 
   for (const line of prefixLines) appendLine(line);
@@ -209,6 +222,10 @@ export async function openRunLog(
         resolve(failure);
         return;
       }
+      // Whatever the redactor is still holding — a `BEGIN` whose `END` never
+      // arrived because the run ended or was killed mid-key. Dropping it
+      // would lose output; it is released scrubbed line by line.
+      writeLines(redactor.flush());
       settleClose = resolve;
       stream.end(() => {
         const settle = settleClose;

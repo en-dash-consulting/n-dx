@@ -71,7 +71,10 @@ export { toCanonicalJSON } from "@n-dx/llm-client";
 // ---- Credential redaction ---------------------------------------------------
 // Applied to every run record and run log before it is written: a tool's
 // output can carry a secret it read, and the records are served and exported.
-export { redactDeep, redactSecrets } from "@n-dx/llm-client";
+// createLineRedactor is the line-at-a-time form the streaming run log needs —
+// a PEM key spans lines, so per-line redactSecrets cannot see one.
+export { redactDeep, redactSecrets, createLineRedactor } from "@n-dx/llm-client";
+export type { LineRedactor } from "@n-dx/llm-client";
 
 // ---- CLI output control -----------------------------------------------------
 export {

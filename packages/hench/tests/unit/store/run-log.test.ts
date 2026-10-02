@@ -327,6 +327,55 @@ describe("openRunLog", () => {
     // Everything else is untouched.
     expect(written).toContain("plain output line");
   });
+
+  it("scrubs a private key split across lines, which a per-line scrub cannot see", async () => {
+    // BEGIN and END sit on different lines and the body is base64, so no single
+    // line looks like a secret to any rule. A per-line scrub therefore wrote the
+    // whole key to disk — live and tailable in the dashboard for the rest of the
+    // run, and kept in the artifact afterwards.
+    const key = [
+      "-----BEGIN RSA PRIVATE KEY-----",
+      "MIIEowIBAAKCAQEAwJ8yq1Tz3kKQmVYd0pLq7nHcR2sFgXaBvNmEtUjWoPyZxCdL",
+      "kRfT9bGhVnQsMzAeXuYpIoCwDrJlNvKtSqBmHgZcFeXaPdUyTrWnLiKjHgFeDcBa",
+      "-----END RSA PRIVATE KEY-----",
+    ];
+    const lines = ["before the key", ...key, "after the key"];
+
+    const writer = await openRunLog(projectDir, "run-pem-1", "2026-04-08T10:00:00Z");
+    for (const line of lines) writer.appendLine(line);
+    expect(await writer.close()).toBeNull();
+
+    const written = await readFile(writer.path, "utf-8");
+    expect(written).not.toContain("MIIEowIBAAKCAQEAwJ8yq1Tz3kKQmVYd0pLq7nHcR2sFgXaBvNmEtUjWoPyZxCdL");
+    expect(written).not.toContain("kRfT9bGhVnQsMzAeXuYpIoCwDrJlNvKtSqBmHgZcFeXaPdUyTrWnLiKjHgFeDcBa");
+    expect(written).toContain("[redacted:private-key]");
+    // The surrounding output is untouched.
+    expect(written).toContain("before the key");
+    expect(written).toContain("after the key");
+
+    // And the end-of-run writer agrees, as the module header promises.
+    const wholeDir = await mkdtemp(join(tmpdir(), "hench-runlog-pem-"));
+    try {
+      const wholePath = await persistRunLog(wholeDir, "run-pem-1", "2026-04-08T10:00:00Z", lines);
+      expect(await readFile(wholePath, "utf-8")).toEqual(written);
+    } finally {
+      await rm(wholeDir, { recursive: true, force: true });
+    }
+  });
+
+  it("releases a BEGIN whose END never arrives instead of swallowing the rest", async () => {
+    // Whole-string redaction leaves an unterminated BEGIN alone, because the
+    // pattern needs both markers — so a run killed mid-key must still get its
+    // lines, not lose everything after the marker.
+    const writer = await openRunLog(projectDir, "run-pem-2", "2026-04-08T10:00:00Z");
+    writer.appendLine("-----BEGIN RSA PRIVATE KEY-----");
+    writer.appendLine("a body whose end never came");
+    expect(await writer.close()).toBeNull();
+
+    const written = await readFile(writer.path, "utf-8");
+    expect(written).toContain("-----BEGIN RSA PRIVATE KEY-----");
+    expect(written).toContain("a body whose end never came");
+  });
 });
 
 /**

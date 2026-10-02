@@ -63,9 +63,37 @@ describe("redactSecrets — credential-shaped assignments", () => {
     expect(redactSecrets("secret: 12345678")).toBe("secret: 12345678");
   });
 
+  it("takes the whole value when it contains spaces, quoted or not", () => {
+    // The value stopped at the first space, so a passphrase was left almost
+    // entirely in the clear — and an unquoted one matched nothing at all,
+    // because its first word was under the length floor.
+    expect(redactSecrets("PASSWORD=correct horse battery")).toBe(`PASSWORD=${REDACTED_VALUE}`);
+    expect(redactSecrets('PASSWORD="correct horse battery staple"')).toBe(`PASSWORD="${REDACTED_VALUE}"`);
+    expect(redactSecrets("passphrase: 'a long secret phrase'")).toBe("passphrase: 'a long secret phrase'");
+    // A quoted value keeps its exact bounds — what follows the closing quote is
+    // not part of the secret and stays readable.
+    expect(redactSecrets('api_key="abcdefghij" rejected')).toBe(`api_key="${REDACTED_VALUE}" rejected`);
+  });
+
+  it("stops at the end of the line, not the end of the text", () => {
+    // Multi-line output must not lose everything after the first assignment.
+    expect(redactSecrets("token=abcdefghij leftover\nkept line")).toBe(
+      `token=${REDACTED_VALUE}\nkept line`,
+    );
+    // A separator ends the value too, so JSON and shell lists survive.
+    expect(redactSecrets("token=abcdefghij, kept")).toBe(`token=${REDACTED_VALUE}, kept`);
+  });
+
   it("is idempotent", () => {
     const once = redactSecrets(`api_key=abcdefghijkl ${GITHUB}`);
     expect(redactSecrets(once)).toBe(once);
+    // The quoted form is the one that regressed: a second pass used to match
+    // the space before the opening quote and redact the marker again.
+    const quoted = redactSecrets('"api_key": "sk-live-abcdefghij"');
+    expect(quoted).toBe(`"api_key": "${REDACTED_VALUE}"`);
+    expect(redactSecrets(quoted)).toBe(quoted);
+    const spaced = redactSecrets("PASSWORD=correct horse battery");
+    expect(redactSecrets(spaced)).toBe(spaced);
   });
 });
 
