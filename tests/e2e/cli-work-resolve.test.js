@@ -74,6 +74,18 @@ describe("ndx work --resolve", () => {
     expect(JSON.parse(result.stdout).refusals.map((r) => r.code)).toEqual(["not-actionable"]);
   });
 
+  it.each(["--resolve=yes", "--resolve=true"])("treats %s as resolve: JSON, exit 0, no run", (flag) => {
+    const result = runResult(["work", "--task=task-1", flag, repo]);
+    expect(result.code, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout).refusals.map((r) => r.code)).toEqual(["not-actionable"]);
+  });
+
+  it("refuses --resolve=yes without --task", () => {
+    const result = runResult(["work", "--resolve=yes", repo]);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toMatch(/--resolve requires --task/);
+  });
+
   it("refuses --resolve without --task", () => {
     const result = runResult(["work", "--resolve", repo]);
     expect(result.code).not.toBe(0);

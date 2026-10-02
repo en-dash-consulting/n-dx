@@ -2086,7 +2086,9 @@ async function handleWork(rest) {
   // nothing. stdout must carry only that object, and an unset vendor is one of
   // the refusals it reports — so no identity line, no vendor gate, and no
   // Ctrl+C revert handler (there is no work to revert).
-  if (flags.includes("--resolve")) {
+  // `--resolve=false` is "no flag", matching hench; any other value resolves,
+  // so a value can never fall through to a real run.
+  if (flags.some((f) => f === "--resolve" || (f.startsWith("--resolve=") && f !== "--resolve=false"))) {
     if (!flags.some((f) => f.startsWith("--task="))) {
       console.error("Error: --resolve requires --task=<id>.");
       console.error("Hint: ndx work --task=<id> --resolve .");
