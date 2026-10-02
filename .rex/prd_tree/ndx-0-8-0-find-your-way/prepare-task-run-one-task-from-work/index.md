@@ -20,7 +20,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [A late brief preview reopens itself after Back, and switching form/preview drops focus](./a-late-brief-preview-reopens-itself.md) | pending |
 | [A malformed PRD makes --resolve exit 1 with no JSON, so the dashboard gets nothing to show](./a-malformed-prd-makes-resolve-exit-1.md) | pending |
-| [A queued run whose options its server refuses at replay disappears without telling anyone](./a-queued-run-whose-options-its-server.md) | pending |
+| [A queued run whose options its server refuses at replay disappears without telling anyone](./a-queued-run-whose-options-its-server.md) | in_progress |
 | [Accept allow-listed run options on POST /api/hench/execute and carry them through the hub queue](./accept-allow-listed-run-options-on.md) | completed |
 | [Add `ndx work --resolve`: print the resolved run settings, their sources and any refusals as JSON without running](./add-ndx-work-resolve-print-the.md) | completed |
 | [Add the prep routes: GET /api/hench/prep/:taskId, POST /api/hench/prep/:taskId/preview and GET /api/hench/ready](./add-the-prep-routes-get-api-hench-prep.md) | completed |
@@ -45,6 +45,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [--resolve reports no reviewer model unless --review is passed, so the modal cannot show who reviews](./resolve-reports-no-reviewer-model.md) | pending |
 | [Several new tests would still pass with the behaviour they name reverted](./several-new-tests-would-still-pass.md) | pending |
 | [Show a Ready to run list on the Work page and hide the Epic-by-Epic panel](./show-a-ready-to-run-list-on-the-work.md) | completed |
+| [Start now and Ready to run queued notices never learn the run was dropped](./start-now-and-ready-to-run-queued.md) | pending |
 | [Starting a run from a Workspaces card opens Live in the viewer's workspace, not the card's](./starting-a-run-from-a-workspaces-card.md) | completed |
 | [The context-notes temp file is left behind on spawn failure, write failure and shutdown](./the-context-notes-temp-file-is-left.md) | pending |
 | [The dashboard Self-Heal --auto change has no changeset](./the-dashboard-self-heal-auto-change.md) | pending |
