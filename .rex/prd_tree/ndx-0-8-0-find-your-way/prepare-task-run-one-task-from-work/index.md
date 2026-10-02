@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Brief preview with Fresh ticked deletes the orientation session cache](./brief-preview-with-fresh-ticked.md) | completed |
 | [Build the Prepare task modal: defaults with sources, per-run overrides, preflight, equivalent command, brief preview and Execute](./build-the-prepare-task-modal-defaults.md) | completed |
 | [Copied ndx work commands are not runnable: an unquoted notes placeholder and POSIX-only quoting](./copied-ndx-work-commands-are-not.md) | pending |
-| [Escape in the Prepare task modal also closes the PRD detail panel underneath](./escape-in-the-prepare-task-modal-also.md) | pending |
+| [Escape in the Prepare task modal also closes the PRD detail panel underneath](./escape-in-the-prepare-task-modal-also.md) | completed |
 | [GET /api/hench/ready blocks the dashboard's event loop for seconds per refresh](./get-api-hench-ready-blocks-the.md) | completed |
 | [GET /api/hench/ready?limit=1e9 returns one row instead of the maximum](./get-api-hench-ready-limit-1e9-returns.md) | pending |
 | [Hub queue types and responses drifted from run options, and the unscoped queue exposes other projects' notes](./hub-queue-types-and-responses-drifted.md) | pending |
