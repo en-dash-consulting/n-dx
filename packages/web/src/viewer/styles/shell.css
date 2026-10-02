@@ -388,7 +388,7 @@
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
 }
-.settings-overlay-glyph { font-size: 16px; color: var(--text-muted); }
+.settings-overlay-glyph { display: inline-flex; align-items: center; color: var(--text-muted); }
 .settings-overlay-crumbs { font-size: 13px; color: var(--text-muted); }
 .settings-overlay-crumbs b { color: var(--text); font-weight: 600; }
 .settings-overlay-body { flex: 1; min-height: 0; display: flex; }
@@ -419,7 +419,8 @@
 .settings-overlay-item:hover { background: var(--bg-hover); color: var(--text); }
 .settings-overlay-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .settings-overlay-item.active { background: var(--bg-active, var(--bg-hover)); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
-.settings-overlay-item-glyph { width: 18px; text-align: center; color: var(--text-muted); }
+.settings-overlay-item-glyph { width: 22px; display: inline-flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); }
+.settings-overlay-glyph svg, .settings-overlay-item-glyph svg, .bottombar-settings svg { display: block; flex-shrink: 0; }
 .settings-overlay-density { margin-top: auto; padding: var(--space-3) var(--space-4) 0; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); }
 .settings-overlay-density-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
 .settings-overlay-content { flex: 1; min-width: 0; overflow-y: auto; padding: var(--space-6); }

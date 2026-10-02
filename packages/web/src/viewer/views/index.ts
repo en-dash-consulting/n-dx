@@ -20,6 +20,7 @@ export {
   viewLabel,
   viewBlurb,
   viewGlyph,
+  viewPixelIcon,
   viewProduct,
   viewProductLabel,
 } from "./view-meta.js";

@@ -23,6 +23,7 @@ import {
   SETTINGS_ENTRIES,
   isSettingsView,
   stageForView,
+  viewGlyph,
   viewLabel,
   visibleStages,
 } from "../../../src/viewer/views/stages.js";
@@ -583,6 +584,9 @@ describe("BottomBar", () => {
     expect(root.querySelector(".bottombar-server")?.textContent).toContain("n-dx 0.7.2");
     const cog = root.querySelector<HTMLButtonElement>(".bottombar-settings")!;
     expect(cog.getAttribute("aria-label")).toBe("Settings");
+    expect(cog.getAttribute("title")).toBe("Settings");
+    expect(cog.querySelector("svg")?.getAttribute("shape-rendering")).toBe("crispEdges");
+    expect(cog.textContent).toBe("");
     act(() => { cog.click(); });
     expect(onOpenSettings).toHaveBeenCalledOnce();
     const commands = root.querySelector<HTMLButtonElement>(".bottombar-commands")!;
@@ -639,6 +643,22 @@ describe("SettingsOverlay", () => {
     expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Commands"]);
     expect(root.querySelector(".fake-settings")).not.toBeNull();
     expect(root.querySelector(".settings-overlay-crumbs")?.textContent).toContain("Robot Wrangler");
+  });
+
+  it("draws each page's pixel glyph, and the gear in the header", async () => {
+    await mount(overlay("robot-wrangler"));
+    const spans = root.querySelectorAll(".settings-overlay-item-glyph");
+    expect(spans).toHaveLength(4);
+    for (const span of spans) {
+      const svg = span.querySelector("svg");
+      expect(svg?.getAttribute("shape-rendering")).toBe("crispEdges");
+      expect(svg?.getAttribute("width")).toBe("22");
+    }
+    expect(root.querySelector(".settings-overlay-glyph svg")?.getAttribute("shape-rendering")).toBe("crispEdges");
+    const text = root.querySelector(".settings-overlay")!.textContent ?? "";
+    expect(text).not.toContain("\u{1F9E0}");
+    expect(text).not.toContain("\u{1F4E4}");
+    expect(viewGlyph("robot-wrangler")).toBe("\u{1F916}");
   });
 
   it("lists the same pages whatever the feature toggles are — Notion and Integrations live on Project", async () => {

@@ -25,6 +25,7 @@ import {
   viewLabel,
   viewBlurb,
   viewGlyph,
+  viewPixelIcon,
   viewProduct,
   STAGES,
   STAGE_ORDER,
@@ -368,7 +369,8 @@ describe("rendered surfaces take their labels from the model", () => {
     for (const text of rendered) {
       expect(text).not.toContain("{cli}");
       const match = SETTINGS_ENTRIES.some((e) =>
-        text === `${viewGlyph(e.view)}${resolveCliLabel(viewLabel(e.view), "n-dx")}`,
+        // A pixel icon is an <svg> with no text; a view without one shows its text glyph.
+        text === `${viewPixelIcon(e.view) ? "" : viewGlyph(e.view)}${resolveCliLabel(viewLabel(e.view), "n-dx")}`,
       );
       expect(match, `settings item "${text}" matches no model entry`).toBe(true);
     }
