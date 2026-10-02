@@ -45,7 +45,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [--resolve reports no reviewer model unless --review is passed, so the modal cannot show who reviews](./resolve-reports-no-reviewer-model.md) | pending |
 | [Several new tests would still pass with the behaviour they name reverted](./several-new-tests-would-still-pass.md) | pending |
 | [Show a Ready to run list on the Work page and hide the Epic-by-Epic panel](./show-a-ready-to-run-list-on-the-work.md) | completed |
-| [Starting a run from a Workspaces card opens Live in the viewer's workspace, not the card's](./starting-a-run-from-a-workspaces-card.md) | pending |
+| [Starting a run from a Workspaces card opens Live in the viewer's workspace, not the card's](./starting-a-run-from-a-workspaces-card.md) | completed |
 | [The context-notes temp file is left behind on spawn failure, write failure and shutdown](./the-context-notes-temp-file-is-left.md) | pending |
 | [The dashboard Self-Heal --auto change has no changeset](./the-dashboard-self-heal-auto-change.md) | pending |
 | [The Live idle card and Workspaces cards never offer Resume for an in-progress task](./the-live-idle-card-and-workspaces.md) | pending |
