@@ -133,7 +133,8 @@ export interface LiveSnapshot extends LiveSummary {
   machine: {
     /** `machine`: the hub's admission gate; `repository`: live runs in every worktree. */
     slots: { scope: "machine" | "repository"; inUse: number; max: number; available: number; queued: number };
-    memory: { freeBytes: number; totalBytes: number; floorBytes: number | null; belowFloor: boolean };
+    /** `freeBytes` is the shared available-memory reading; null when the machine could not be read. */
+    memory: { freeBytes: number | null; totalBytes: number; floorBytes: number | null; belowFloor: boolean };
     llm: { vendor: string | null; model: string | null };
     worktrees: { total: number; withLiveRun: number };
     spend: { todayUsd: number; todayTokens: number; inFlightUsd: number; inFlightTokens: number };

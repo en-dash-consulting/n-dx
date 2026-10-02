@@ -9,9 +9,14 @@
  *
  * So execute requests pass through here first. A run is admitted when the
  * machine has room for it — fewer than `maxSessions` in flight across every
- * project, and free memory above `memoryFloorBytes`. Otherwise it is queued
+ * project, and available memory above `memoryFloorBytes`. Otherwise it is queued
  * rather than refused: the operator asked for the work, and a queue position
  * is a better answer than an error they have to remember to retry.
+ *
+ * "Available" is the shared reading from `@n-dx/llm-client`, not `os.freemem()`:
+ * on macOS that counts only free pages and reads ~115 MB on a machine holding
+ * ~3.9 GB it would hand over on demand, which queued every dashboard run on an
+ * idle Mac. An unreadable machine admits — see {@link decideAdmission}.
  *
  * The queue is FIFO across projects, drained by polling rather than by
  * listening for completion events. Polling is what the gate already does to
@@ -24,20 +29,25 @@
  * @module web/hub/admission
  */
 
-import { freemem } from "node:os";
+import { totalmem } from "node:os";
+import { derivePressure, getAvailableMemory, readAvailableMemory, type MemoryPressure } from "@n-dx/llm-client";
 
 /** Bounds the machine will not exceed, whatever any single project would allow. */
 export interface AdmissionLimits {
   /** Dashboard-started runs in flight across every registered project. */
   maxSessions: number;
-  /** Free system memory below which nothing new starts. */
+  /** Available system memory below which nothing new starts. */
   memoryFloorBytes: number;
 }
 
 /** What the gate measured when it decided. */
 export interface AdmissionSnapshot {
   running: number;
-  freeMemoryBytes: number;
+  /**
+   * The shared reading's `availableBytes`, or `null` when the machine could not
+   * be read — which is not the same as "none left", and never holds a run back.
+   */
+  freeMemoryBytes: number | null;
 }
 
 export type AdmissionReason = "at-capacity" | "low-memory";
@@ -64,13 +74,20 @@ export interface QueueSnapshot {
   /** Entries queued across every project, when `entries` has been narrowed. */
   queuedTotal?: number;
   running: number;
-  freeMemoryBytes: number;
+  /** Available memory the gate last measured; `null` when unreadable. */
+  freeMemoryBytes: number | null;
+  /** The same number, under the name the shared reading uses. */
+  availableBytes: number | null;
+  /** Kernel memory pressure, or `"unknown"` when nothing could be read. */
+  pressure: MemoryPressure;
   limits: AdmissionLimits;
   /**
    * True when the gate is holding everything back for memory rather than for
    * the session cap — the distinction the Overview strip shows as
    * "admission paused: low memory", because waiting behind other runs and
    * waiting for the machine to recover are different situations.
+   *
+   * Always false when the reading is unknown: nothing is being held back.
    */
   memoryPaused: boolean;
 }
@@ -82,13 +99,19 @@ export interface QueueSnapshot {
  * Capacity is checked before memory only so the reason is the more actionable
  * of the two: at the cap, finishing a run releases the next one; below the
  * floor, nothing the operator does inside n-dx helps.
+ *
+ * An unreadable machine (`freeMemoryBytes` null) admits. A memory signal that
+ * does not exist is not a reason to hold work the operator asked for — the
+ * session cap still applies.
  */
 export function decideAdmission(
   snapshot: AdmissionSnapshot,
   limits: AdmissionLimits,
 ): AdmissionDecision {
   if (snapshot.running >= limits.maxSessions) return { admit: false, reason: "at-capacity" };
-  if (snapshot.freeMemoryBytes <= limits.memoryFloorBytes) return { admit: false, reason: "low-memory" };
+  if (snapshot.freeMemoryBytes !== null && snapshot.freeMemoryBytes <= limits.memoryFloorBytes) {
+    return { admit: false, reason: "low-memory" };
+  }
   return { admit: true };
 }
 
@@ -163,8 +186,11 @@ export interface AdmissionGateOptions {
   countRunning: () => Promise<number>;
   /** Start a queued run on its project's server. False means it did not take. */
   start: (entry: QueueEntry) => Promise<boolean>;
-  /** Injectable for tests; defaults to `os.freemem()`. */
-  freeMemory?: () => number;
+  /**
+   * Injectable for tests; defaults to the shared reading's `availableBytes`
+   * (`null` when the machine could not be read).
+   */
+  freeMemory?: () => number | null;
   /** How often to retry while anything is queued. Default 2 s. */
   drainIntervalMs?: number;
   /** Called after every change, for anything reporting queue state. */
@@ -185,28 +211,54 @@ export interface AdmitResult {
 export class AdmissionGate {
   readonly queue = new AdmissionQueue();
   private readonly options: AdmissionGateOptions;
-  private readonly freeMemory: () => number;
   private readonly drainIntervalMs: number;
   private readonly log: (message: string) => void;
   private drainTimer: ReturnType<typeof setInterval> | undefined;
   private draining = false;
-  private lastSnapshot: AdmissionSnapshot = { running: 0, freeMemoryBytes: 0 };
+  private lastSnapshot: AdmissionSnapshot = { running: 0, freeMemoryBytes: null };
+  private lastPressure: MemoryPressure = "unknown";
 
   constructor(options: AdmissionGateOptions) {
     this.options = options;
-    this.freeMemory = options.freeMemory ?? freemem;
     this.drainIntervalMs = options.drainIntervalMs ?? 2_000;
     this.log = options.log ?? (() => {});
+    // The reading is cached and never spawns synchronously, so the first
+    // `measure()` would otherwise decide on a "pending" (unknown) macOS machine.
+    // Only when the gate reads the real machine — a test that injects its own
+    // memory must not spawn `vm_stat`.
+    if (options.freeMemory === undefined) void readAvailableMemory().catch(() => {});
   }
 
   get limits(): AdmissionLimits {
     return this.options.limits;
   }
 
+  /**
+   * The machine's available memory and its pressure.
+   *
+   * Behind an injected `freeMemory` there is no kernel signal to ask, so the
+   * pressure is derived from the injected number with the same thresholds the
+   * shared reading uses — one seam, and a test never spawns `vm_stat`.
+   */
+  private measureMemory(): { availableBytes: number | null; pressure: MemoryPressure } {
+    const injected = this.options.freeMemory;
+    if (injected === undefined) {
+      const reading = getAvailableMemory();
+      return { availableBytes: reading.availableBytes, pressure: reading.pressure };
+    }
+    const availableBytes = injected();
+    return {
+      availableBytes,
+      pressure: availableBytes === null ? "unknown" : derivePressure(availableBytes, totalmem()),
+    };
+  }
+
   /** Measure the machine now. */
   async measure(): Promise<AdmissionSnapshot> {
     const running = await this.options.countRunning().catch(() => 0);
-    this.lastSnapshot = { running, freeMemoryBytes: this.freeMemory() };
+    const memory = this.measureMemory();
+    this.lastSnapshot = { running, freeMemoryBytes: memory.availableBytes };
+    this.lastPressure = memory.pressure;
     return this.lastSnapshot;
   }
 
@@ -282,6 +334,8 @@ export class AdmissionGate {
       entries: this.queue.list(),
       running: this.lastSnapshot.running,
       freeMemoryBytes: this.lastSnapshot.freeMemoryBytes,
+      availableBytes: this.lastSnapshot.freeMemoryBytes,
+      pressure: this.lastPressure,
       limits: this.options.limits,
       memoryPaused: !decision.admit && decision.reason === "low-memory",
     };

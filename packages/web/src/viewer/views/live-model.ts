@@ -197,8 +197,9 @@ export function machineTiles(machine: LiveSnapshot["machine"], runningJobs: numb
     { key: "jobs", label: "Running jobs", value: String(runningJobs), detail: null, warn: false },
     {
       key: "memory",
-      label: "Free memory",
-      value: formatBytes(memory.freeBytes),
+      label: "Available memory",
+      // A machine that could not be read has no number and nothing to warn about.
+      value: memory.freeBytes === null ? "—" : formatBytes(memory.freeBytes),
       detail: memory.floorBytes === null ? null : `floor ${formatBytes(memory.floorBytes)}`,
       warn: memory.belowFloor,
     },
