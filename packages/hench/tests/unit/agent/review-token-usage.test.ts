@@ -69,6 +69,15 @@ function sumOutput(turns: TurnTokenUsage[] | undefined): number {
   return (turns ?? []).reduce((acc, t) => acc + (t.output ?? 0), 0);
 }
 
+describe("chargeReviewToRun — the review's own share", () => {
+  it("records the reviewer's turns and tokens apart from the work, summed over spawns", () => {
+    const r = run();
+    chargeReviewToRun(r, reviewerResult(), REVIEW_MODEL);
+    chargeReviewToRun(r, reviewerResult({ tokenUsage: { input: 10, output: 5, cacheReadInput: 7 }, turnTokenUsage: [] }), REVIEW_MODEL);
+    expect(r.reviewSpend).toEqual({ turns: 2, input: 80010, output: 25805, cacheCreationInput: 0, cacheReadInput: 7 });
+  });
+});
+
 describe("chargeReviewToRun", () => {
   it("appends the reviewer's per-turn entries to the run", () => {
     const r = run();

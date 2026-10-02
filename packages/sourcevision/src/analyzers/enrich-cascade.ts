@@ -42,6 +42,7 @@ import { emptyAnalyzeTokenUsage } from "./token-usage.js";
 import type { AnalyzeTokenUsage } from "../schema/index.js";
 import { routeLayoutFor } from "./route-convention.js";
 import { dedupeZoneNames, isAlgorithmicName, zoneIdsOf } from "./zone-identity.js";
+import { markPass } from "./analyze-progress.js";
 
 /**
  * Fragility probabilities inside this band are neither a finding nor a
@@ -154,6 +155,7 @@ export async function cascadeEnrichment(
 ): Promise<CascadeResult> {
   const tokenUsage = emptyAnalyzeTokenUsage();
   const newFindings: Finding[] = [];
+  markPass(CASCADE_PASS);
 
   // 1. Structural zones are templated; nothing to judge.
   const inventoryByPath = new Map(inventory.files.map((f) => [f.path, f]));

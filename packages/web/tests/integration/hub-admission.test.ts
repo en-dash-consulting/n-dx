@@ -25,13 +25,16 @@ interface FakeChild {
   running: Set<string>;
   /** Execute requests that actually arrived, in order. */
   received: Array<{ taskId: string; workspace: string | null }>;
+  /** The admission header on each `GET /api/live` that arrived. */
+  liveAdmission: Array<string | null>;
 }
 
 async function startFakeChild(dir: string): Promise<FakeChild> {
-  const child: Partial<FakeChild> & { running: Set<string>; received: FakeChild["received"] } = {
+  const child: Partial<FakeChild> & Pick<FakeChild, "running" | "received" | "liveAdmission"> = {
     dir,
     running: new Set<string>(),
     received: [],
+    liveAdmission: [],
   };
 
   const server = createServer((req, res) => {
@@ -51,6 +54,12 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
         rex: { exists: true, percentComplete: 37, nextTaskTitle: "Next thing" },
         hench: { activeRuns: child.running.size },
       });
+    }
+    // A real project server strips the `/w/<key>` slot itself; the hub forwards it.
+    if (url.endsWith("/api/live")) {
+      const header = req.headers["x-ndx-hub-admission"];
+      child.liveAdmission.push((Array.isArray(header) ? header[0] : header) ?? null);
+      return json(200, {});
     }
     if (url === "/api/git/status") {
       return json(200, { isRepo: true, branch: "main", dirty: false, files: [] });
@@ -329,6 +338,16 @@ describe("hub admission gate", () => {
     const res = await fetch(`http://127.0.0.1:${h.port}/p/nope/api/hub/queue`);
     expect(res.status).toBe(404);
     expect((await res.json()).error).toContain("nope");
+  });
+
+  it("states its admission state on a proxied GET /api/live, and drops a client's copy", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-2")).status).toBe(202);
+
+    const spoofed = JSON.stringify({ running: 0, maxSessions: 99, queued: 0 });
+    await fetch(`http://127.0.0.1:${h.port}/p/beta/w/feature/api/live`, { headers: { "x-ndx-hub-admission": spoofed } });
+    expect(beta.liveAdmission).toEqual([JSON.stringify({ running: 1, maxSessions: 1, queued: 1 })]);
   });
 
   it("reports its limits and what is running on the queue endpoint", async () => {

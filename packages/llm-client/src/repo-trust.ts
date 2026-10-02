@@ -49,7 +49,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { resolveLayout, resolveNdxHome, type ResolveNdxHomeOptions } from "./layout.js";
 import { toCanonicalJSON } from "./json.js";
 
@@ -182,7 +182,13 @@ function optionalString(value: unknown): string | null {
 }
 
 function relOf(root: string, path: string): string {
-  return path.startsWith(root) ? path.slice(root.length).replace(/^[\\/]/, "") : path;
+  if (!path.startsWith(root)) return path;
+  // Forward slashes, not the platform separator. These strings are shown to
+  // the user ("Read from: …") and recorded in the trust file, so a Windows
+  // `.hench\config.json` would make the same checkout read differently — and
+  // compare differently — from one on Linux. Split on `sep` rather than a
+  // blanket backslash replace: on POSIX a backslash is a legal filename character.
+  return path.slice(root.length).replace(/^[\\/]/, "").split(sep).join("/");
 }
 
 /**

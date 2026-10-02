@@ -179,6 +179,20 @@ export function isSettingsView(view: ViewId): boolean {
   return SETTINGS_VIEWS.has(view);
 }
 
+// ── Live ───────────────────────────────────────────────────────
+
+/**
+ * The views under the Live tab. Live is not a stage: it sits after the stage
+ * tabs, outside the Analysis → Plan → Work loop, so it is absent from
+ * `STAGE_ORDER` and the prev/next stage links never reach it.
+ */
+export const LIVE_VIEWS: readonly ViewId[] = ["live", "live-task", "live-analyze"];
+
+/** True for the Live overview and every page under it — the views that light the Live tab. */
+export function isLiveView(view: ViewId): boolean {
+  return LIVE_VIEWS.includes(view);
+}
+
 // ── Lookups ────────────────────────────────────────────────────
 
 export function isStageId(view: ViewId): view is StageId {

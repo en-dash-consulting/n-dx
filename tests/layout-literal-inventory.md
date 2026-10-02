@@ -3,7 +3,7 @@
 Every production source file that still spells out where n-dx keeps its files,
 instead of asking the resolver.
 
-**157 literals across 66 files.** That number is the debt, and it may only go
+**155 literals across 66 files.** That number is the debt, and it may only go
 down.
 
 ## Why this file exists
@@ -182,7 +182,7 @@ more.
 
 | File | Literals | Names |
 |---|---|---|
-| `packages/web/src/server/routes-hench.ts` | 12 | .hench, .rex |
+| `packages/web/src/server/routes-hench.ts` | 10 | .hench, .rex |
 | `packages/web/src/server/routes-adaptive.ts` | 6 | .hench |
 | `packages/web/src/server/routes-workflow.ts` | 5 | .hench |
 | `packages/web/src/viewer/views/files.ts` | 3 | .hench, .rex, .sourcevision |

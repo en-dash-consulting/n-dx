@@ -1,31 +1,38 @@
 /**
  * Top navigation: the brand (which is also the way home), the three stage
- * tabs — Analysis, Plan, Work — and search. Nothing else lives up here;
- * settings and commands are on the bottom bar.
+ * tabs — Analysis, Plan, Work — then, after a divider, the Live tab, and
+ * search. Nothing else lives up here; settings and commands are on the bottom bar.
  *
  * A tab is active on its own stage page and on any view that stage lists,
  * so `/zones` keeps Analysis lit and `/hench-runs/<id>` keeps Plan lit.
+ * Live is lit on every Live route and is not part of the stage loop.
  */
 
 import { h } from "preact";
-import type { ViewId } from "../api.js";
-import { stageForView, visibleStages, stageProduct, viewLabel, viewGlyph, useProjectMetadata } from "../api.js";
+import type { ViewId, NavigateTo } from "../api.js";
+import { stageForView, visibleStages, stageProduct, viewLabel, viewGlyph, isLiveView, useProjectMetadata } from "../api.js";
+import { isDeployedMode } from "../deployed-mode.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
+import { LiveTab } from "./live-tab.js";
 
 export interface TopNavProps {
   view: ViewId;
   validViews: ReadonlySet<ViewId>;
   onNavigate: (view: ViewId) => void;
+  /** Lets the Live peek open a page with its id (`/live/task/<id>`) without reloading. */
+  navigateTo?: NavigateTo;
   onOpenSearch: () => void;
   /** Standalone package viewer: brand shows the product mark. */
   scope?: string | null;
 }
 
-export function TopNav({ view, validViews, onNavigate, onOpenSearch, scope = null }: TopNavProps) {
+export function TopNav({ view, validViews, onNavigate, navigateTo, onOpenSearch, scope = null }: TopNavProps) {
   const project = useProjectMetadata();
   const active = stageForView(view, validViews);
   const stages = visibleStages(validViews);
   const scoped = !!scope && scope !== "all";
+  // A static export has no server to ask what is running.
+  const liveEnabled = validViews.has("live") && !isDeployedMode();
 
   return h("header", { class: "topnav" },
     h("button", {
@@ -68,6 +75,10 @@ export function TopNav({ view, validViews, onNavigate, onOpenSearch, scope = nul
           h("span", { class: "topnav-tab-hint" }, product),
         );
       }),
+      // Live is not a stage: it sits after a divider, outside the loop, and
+      // lights on every Live route.
+      liveEnabled ? h("span", { class: "topnav-divider", role: "separator", "aria-orientation": "vertical" }) : null,
+      h(LiveTab, { view, active: isLiveView(view), onNavigate, navigateTo, enabled: liveEnabled }),
     ),
 
     h("button", {

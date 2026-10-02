@@ -8,8 +8,12 @@
  *                                            annotated with its worktree)
  * GET    /api/hench/runs/:id              — full run detail with transcript (?scope=repo
  *                                            searches every worktree)
- * GET    /api/hench/runs/health           — staleness health check for running runs
+ * GET    /api/hench/runs/health           — staleness and liveness of running runs, every worktree
  * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
+ * POST   /api/hench/runs/reconcile        — end orphaned runs in every worktree
+ *                                            ({ dryRun, includeUnknown, runIds })
+ * GET    /api/hench/runs/:id/log          — run log from a byte cursor (?from=N); any worktree
+ * GET    /api/hench/runs/:id/events       — progress events after a seq cursor (?after=N); any worktree
  * GET    /api/hench/task-usage            — incremental per-task token usage aggregation
  * GET    /api/hench/audit                 — audit info for active tasks (PIDs, resource usage)
  * GET    /api/hench/metrics              — concurrent execution metrics and resource utilization
@@ -19,7 +23,8 @@
  * GET    /api/hench/memory/history/:taskId — memory history for a specific task
  * GET    /api/hench/memory/leaks          — leak detection summary for all active processes
  * GET    /api/hench/concurrency           — concurrent execution count, limits, and queue status
- * POST   /api/hench/execute/:taskId/terminate — terminate a running task
+ * POST   /api/hench/execute/:taskId/terminate — terminate a running task (a terminal-started
+ *                                            run is stopped by its recorded pid)
  * GET    /api/hench/config                — current workflow configuration with field metadata
  * PUT    /api/hench/config                — update workflow configuration (partial or full)
  * GET    /api/hench/templates             — list all workflow templates (built-in + user)
@@ -37,12 +42,12 @@
  * POST   /api/hench/throttle/emergency-stop — terminate all running executions immediately
  */
 
-import { readFileSync, readdirSync, writeFileSync, existsSync, watch } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync, existsSync, realpathSync, watch } from "node:fs";
 import type { FSWatcher } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
-import { totalmem, freemem, loadavg, cpus } from "node:os";
+import { totalmem, freemem, loadavg, cpus, hostname } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { exec, spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, resolveLayout, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
@@ -81,6 +86,25 @@ import { readCliName } from "./cli-name.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { ProcessMemoryTracker } from "./process-memory-tracker.js";
 import { ConcurrentExecutionMetrics } from "./concurrent-execution-metrics.js";
+import {
+  isValidRunId,
+  readEventsAfter,
+  readLogChunk,
+  resolveRunEventsFile,
+  resolveRunLogFile,
+  watchRunTail,
+  type LocatedRun,
+} from "./run-tail.js";
+import { isPidAlive, isRunStale } from "./run-staleness.js";
+import {
+  collectLiveLocks,
+  judgeRunLiveness,
+  livenessInputOf,
+  locksDirOf,
+  summarizeLiveness,
+  type RunLiveness,
+} from "./run-liveness.js";
+import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -133,7 +157,7 @@ function stateFor(runsDir: string): HenchWorkspaceState {
   return state;
 }
 
-function runsDirOf(ctx: ServerContext): string {
+function runsDirOf(ctx: Pick<ServerContext, "projectDir">): string {
   return join(ctx.projectDir, ".hench", "runs");
 }
 
@@ -236,7 +260,7 @@ function henchConfigPath(projectDir: string): string {
 }
 
 /** Read the hench config.json directly from disk. */
-function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
+export function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
   try {
     const raw = readFileSync(henchConfigPath(projectDir), "utf-8");
     return JSON.parse(raw) as Record<string, unknown>;
@@ -305,7 +329,7 @@ async function resolveRunSources(ctx: ServerContext): Promise<WorktreeRunsSource
   return worktrees
     .filter((wt) => !wt.bare)
     .map((wt) => ({
-      runsDir: join(wt.path, ".hench", "runs"),
+      runsDir: join(resolveLayout(wt.path).henchDir, "runs"),
       worktree: { name: basename(wt.path), path: wt.path, branch: wt.branch },
       served: servedRoot !== null && wt.path === servedRoot,
     }));
@@ -468,6 +492,128 @@ async function handleRunDetailRepoScope(rc: RouteContext, runId: string): Promis
   return true;
 }
 
+// ── Run tail (log + events) ─────────────────────────────────────────────────
+// `GET /api/hench/runs/:id/log?from=` and `/events?after=`. The run may live in
+// any worktree of the served repository; see run-tail.ts for confinement,
+// cursors and the watch lease behind `hench:run-appended` frames.
+
+/** `git worktree list` per served directory, briefly cached: clients tail about once a second. */
+const tailSourcesCache = new Map<string, { at: number; sources: Promise<WorktreeRunsSource[]> }>();
+const TAIL_SOURCES_TTL_MS = 5_000;
+
+function tailRunSources(ctx: ServerContext): Promise<WorktreeRunsSource[]> {
+  const cached = tailSourcesCache.get(ctx.projectDir);
+  if (cached && Date.now() - cached.at < TAIL_SOURCES_TTL_MS) return cached.sources;
+  const sources = resolveRunSources(ctx);
+  tailSourcesCache.set(ctx.projectDir, { at: Date.now(), sources });
+  return sources;
+}
+
+function samePath(a: string, b: string): boolean {
+  try {
+    return realpathSync.native(a) === realpathSync.native(b);
+  } catch {
+    return a === b;
+  }
+}
+
+/**
+ * Find a run for tailing: the served directory first, then every worktree.
+ * Returns the registered worktree roots alongside, since confinement needs
+ * them. Null when the run is unknown or belongs to no registered worktree.
+ */
+async function locateRunForTail(
+  rc: RouteContext,
+  runId: string,
+): Promise<{ located: LocatedRun; roots: string[] } | null> {
+  if (!isValidRunId(runId)) return null;
+  const sources = await tailRunSources(rc.ctx);
+  const roots = sources.length > 0 ? sources.map((s) => s.worktree.path) : [rc.ctx.projectDir];
+  const candidates = [
+    { runsDir: rc.runsDir, root: rc.ctx.projectDir },
+    ...sources.map((s) => ({ runsDir: s.runsDir, root: s.worktree.path })),
+  ];
+  for (const { runsDir, root } of candidates) {
+    const run = loadRunFile(runsDir, runId);
+    if (!run) continue;
+    const claimed = typeof run.worktreeRoot === "string" ? [run.worktreeRoot, root] : [root];
+    const worktreeRoot = claimed.map((c) => roots.find((r) => samePath(r, c))).find((r) => r !== undefined);
+    if (!worktreeRoot) return null;
+    return { located: { run, runsDir, worktreeRoot }, roots };
+  }
+  return null;
+}
+
+/** Non-negative integer query parameter, or 0. */
+function cursorParam(rc: RouteContext, name: string): number {
+  if (rc.qIdx === -1) return 0;
+  const raw = new URLSearchParams(rc.fullPath.slice(rc.qIdx)).get(name);
+  const value = raw === null ? 0 : Number.parseInt(raw, 10);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/** Take or renew the watch lease on a running run, so appends are announced. */
+function watchIfRunning(rc: RouteContext, runId: string, located: LocatedRun, roots: string[]): void {
+  if (!rc.broadcast || located.run.status !== "running") return;
+  const events = resolveRunEventsFile(located, roots);
+  watchRunTail({
+    key: `${rc.ctx.workspace ?? ""}\u0000${located.runsDir}\u0000${runId}`,
+    runId,
+    logPath: resolveRunLogFile(located, roots)?.path,
+    eventsPath: events.kind === "file" ? events.path : null,
+    broadcast: rc.broadcast,
+  });
+}
+
+/** GET /api/hench/runs/:id/log?from=<byte offset> */
+async function handleRunLogTail(rc: RouteContext, runId: string): Promise<boolean> {
+  const found = await locateRunForTail(rc, runId);
+  const file = found ? resolveRunLogFile(found.located, found.roots) : null;
+  if (!found || !file) {
+    errorResponse(rc.res, 404, `Log for run "${runId}" not found`);
+    return true;
+  }
+  const status = found.located.run.status;
+  const chunk = readLogChunk(file.path, cursorParam(rc, "from"), undefined, { final: status !== "running" });
+  watchIfRunning(rc, runId, found.located, found.roots);
+  jsonResponse(rc.res, 200, {
+    runId,
+    status,
+    running: status === "running",
+    source: file.source,
+    ...chunk,
+    more: chunk.next < chunk.size,
+  });
+  return true;
+}
+
+/** GET /api/hench/runs/:id/events?after=<seq> */
+async function handleRunEventsTail(rc: RouteContext, runId: string): Promise<boolean> {
+  const found = await locateRunForTail(rc, runId);
+  const file = found ? resolveRunEventsFile(found.located, found.roots) : null;
+  if (!found || !file || file.kind === "refused") {
+    errorResponse(rc.res, 404, `Events for run "${runId}" not found`);
+    return true;
+  }
+  const after = cursorParam(rc, "after");
+  const status = found.located.run.status;
+  const base = { runId, status, running: status === "running", after };
+  watchIfRunning(rc, runId, found.located, found.roots);
+  if (file.kind === "absent") {
+    jsonResponse(rc.res, 200, { ...base, available: false, events: [], next: after, more: false });
+    return true;
+  }
+  const chunk = readEventsAfter(file.path, after);
+  jsonResponse(rc.res, 200, {
+    ...base,
+    available: true,
+    events: chunk.events,
+    next: chunk.next,
+    more: chunk.next < chunk.total,
+  });
+  return true;
+}
+
 // ── Sub-routers ─────────────────────────────────────────────────────────────
 // Each sub-router handles a resource group under /api/hench/.
 // Returns false if the path doesn't belong to its group.
@@ -609,16 +755,25 @@ function routeExecute(rc: RouteContext): boolean | Promise<boolean> | null {
   return null;
 }
 
-/** Routes: runs, runs/:id, runs/health, runs/:id/mark-stuck */
+/** Routes: runs, runs/:id, runs/health, runs/reconcile, runs/:id/mark-stuck */
 function routeRuns(rc: RouteContext): boolean | Promise<boolean> | null {
   if (!rc.path.startsWith("runs")) return null;
 
   if (rc.path === "runs/health" && rc.method === "GET") {
-    return handleRunsHealth(rc.res, rc.runsDir);
+    return handleRunsHealth(rc);
+  }
+  if (rc.path === "runs/reconcile" && rc.method === "POST") {
+    return handleReconcile(rc);
   }
   const markStuckMatch = rc.path.match(/^runs\/([^/?]+)\/mark-stuck$/);
   if (markStuckMatch && rc.method === "POST") {
     return handleMarkStuck(markStuckMatch[1], rc.res, rc.runsDir, rc.onStatusInvalidate);
+  }
+  const tailMatch = rc.path.match(/^runs\/([^/?]+)\/(log|events)$/);
+  if (tailMatch && rc.method === "GET") {
+    return tailMatch[2] === "log"
+      ? handleRunLogTail(rc, tailMatch[1]!)
+      : handleRunEventsTail(rc, tailMatch[1]!);
   }
 
   // GET /api/hench/runs — list runs with summary (?limit=N&offset=N&taskId=&scope=repo)
@@ -1267,6 +1422,8 @@ export interface TaskExecutionStatus {
   tokensPerSecond?: number;
   error?: string;
   exitCode?: number | null;
+  /** The run was started with `--reset-deferred` (the task was deferred). */
+  resetDeferred?: boolean;
 }
 
 /** Regex (global) to find all tok/s metrics in a chunk via matchAll. */
@@ -1665,7 +1822,8 @@ async function handleExecute(
   // immediately with MODULE_NOT_FOUND.
   const { bin: binPath, args: prefixArgs } = resolveNdxBin(ctx);
   // Pass --reset-deferred when executing a deferred task so hench resets it to pending before running
-  const workArgs = status === "deferred"
+  const resetDeferred = status === "deferred";
+  const workArgs = resetDeferred
     ? ["work", `--task=${taskId}`, "--auto", "--reset-deferred", ctx.projectDir]
     : ["work", `--task=${taskId}`, "--auto", ctx.projectDir];
   const binArgs = [...prefixArgs, ...workArgs];
@@ -1682,6 +1840,7 @@ async function handleExecute(
     runId,
     status: "starting",
     startedAt: new Date().toISOString(),
+    resetDeferred,
   };
 
   // Spawn hench process with streaming stdout so the UI can show live output.
@@ -1818,6 +1977,16 @@ async function handleExecute(
   return true;
 }
 
+/**
+ * Dashboard-started executions of the workspace served from `projectDir`,
+ * as `GET /api/hench/execute/status` reports them. Never creates state for a
+ * workspace that has none.
+ */
+export function dashboardExecutionsFor(projectDir: string): TaskExecutionStatus[] {
+  const state = workspaceStates.get(runsDirOf({ projectDir }));
+  return state ? Array.from(state.activeExecutions.values(), (entry) => ({ ...entry.state })) : [];
+}
+
 /** GET /api/hench/execute/status — return status of all active executions. */
 function handleExecuteStatus(res: ServerResponse, runsDir: string): boolean {
   const executions: TaskExecutionStatus[] = [];
@@ -1840,9 +2009,6 @@ function handleExecuteStatusForTask(taskId: string, res: ServerResponse, runsDir
 }
 
 // ── Health monitoring ─────────────────────────────────────────────────
-
-/** Default staleness threshold: 5 minutes in milliseconds. */
-const STALE_THRESHOLD_MS = 5 * 60 * 1000;
 
 /**
  * Heartbeat interval expected from the agent (matches hench heartbeat writer).
@@ -1880,15 +2046,39 @@ function computeHeartbeatStatus(
   return { status, missedHeartbeats };
 }
 
-/** GET /api/hench/runs/health — detect stale "running" runs. */
-function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
-  let files: string[];
-  try {
-    files = readdirSync(runsDir);
-  } catch {
-    jsonResponse(res, 200, { activeRuns: 0, staleRuns: 0, runs: [] });
-    return true;
-  }
+/** One worktree's runs, for the routes that sweep every worktree. */
+interface RunTarget {
+  root: string;
+  runsDir: string;
+  /** Absent outside a git repository, where the served directory is the only target. */
+  worktree?: RunWorktree;
+}
+
+/** Every worktree of the repository, or the served directory alone outside one. */
+async function resolveRunTargets(rc: RouteContext): Promise<RunTarget[]> {
+  const sources = await resolveRunSources(rc.ctx);
+  return sources.length > 0
+    ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree }))
+    : [{ root: rc.ctx.projectDir, runsDir: rc.runsDir }];
+}
+
+/** Judge a run against its worktree's lock files and this dashboard's children, read now. */
+function judgeRunInTarget(target: RunTarget, run: Record<string, unknown>, now: number) {
+  const liveLocks = collectLiveLocks(locksDirOf(resolveLayout(target.root).henchDir));
+  return judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, dashboardExecutionsFor(target.root));
+}
+
+/**
+ * GET /api/hench/runs/health — detect stale "running" runs.
+ *
+ * Covers every worktree of the repository (the served directory alone outside
+ * one). Reports the recorded pid's liveness next to the heartbeat age so a
+ * viewer can tell a slow run (old heartbeat, pid alive) from a dead one (pid
+ * gone), and the liveness verdict hench would reach (`run-liveness.ts`),
+ * judged against that worktree's own lock files.
+ */
+async function handleRunsHealth(rc: RouteContext): Promise<boolean> {
+  const targets = await resolveRunTargets(rc);
 
   const now = Date.now();
   const runningRuns: Array<{
@@ -1899,34 +2089,64 @@ function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
     lastActivityAt?: string;
     stale: boolean;
     staleSinceMs?: number;
+    /** Recorded hench pid; absent on records written before the field existed. */
+    pid?: number;
+    /** Recorded vendor CLI pid; absent between spawns and on the API provider. */
+    vendorPid?: number;
+    /** Whether `pid` is still alive. `null` = no pid recorded, i.e. unknown — not dead. */
+    pidAlive: boolean | null;
+    liveness: RunLiveness;
+    livenessReason: string;
+    canEnd: boolean;
+    /** The worktree the run file was read from; absent outside a git repository. */
+    worktree?: RunWorktree;
   }> = [];
 
-  for (const file of files) {
-    if (!file.endsWith(".json")) continue;
-    const id = file.replace(/\.json$/, "");
-    const run = loadRunFile(runsDir, id);
-    if (!run || run.status !== "running") continue;
+  for (const target of targets) {
+    let files: string[];
+    try {
+      files = readdirSync(target.runsDir);
+    } catch {
+      continue;
+    }
+    const executions = dashboardExecutionsFor(target.root);
+    const liveLocks = collectLiveLocks(locksDirOf(resolveLayout(target.root).henchDir));
 
-    const lastActivity = run.lastActivityAt as string | undefined;
-    const lastActivityMs = lastActivity ? new Date(lastActivity).getTime() : null;
-    const stale = lastActivityMs != null
-      ? (now - lastActivityMs) > STALE_THRESHOLD_MS
-      : true; // No lastActivityAt = legacy run, treat as stale if still "running"
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const id = file.replace(/\.json$/, "");
+      const run = loadRunFile(target.runsDir, id);
+      if (!run || run.status !== "running") continue;
 
-    runningRuns.push({
-      id: run.id as string,
-      taskId: run.taskId as string,
-      taskTitle: run.taskTitle as string,
-      startedAt: run.startedAt as string,
-      lastActivityAt: lastActivity,
-      stale,
-      staleSinceMs: lastActivityMs != null ? Math.max(0, now - lastActivityMs) : undefined,
-    });
+      const lastActivity = run.lastActivityAt as string | undefined;
+      const lastActivityMs = lastActivity ? new Date(lastActivity).getTime() : null;
+      const stale = isRunStale(lastActivity, now);
+      const pid = typeof run.pid === "number" ? run.pid : undefined;
+      const verdict = judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, executions);
+
+      runningRuns.push({
+        id: run.id as string,
+        taskId: run.taskId as string,
+        taskTitle: run.taskTitle as string,
+        startedAt: run.startedAt as string,
+        lastActivityAt: lastActivity,
+        stale,
+        staleSinceMs: lastActivityMs != null ? Math.max(0, now - lastActivityMs) : undefined,
+        pid,
+        vendorPid: typeof run.vendorPid === "number" ? run.vendorPid : undefined,
+        pidAlive: pid != null ? isPidAlive(pid) : null,
+        liveness: verdict.liveness,
+        livenessReason: verdict.reason,
+        canEnd: verdict.canEnd,
+        ...(target.worktree ? { worktree: target.worktree } : {}),
+      });
+    }
   }
 
-  jsonResponse(res, 200, {
+  jsonResponse(rc.res, 200, {
     activeRuns: runningRuns.length,
     staleRuns: runningRuns.filter((r) => r.stale).length,
+    liveness: summarizeLiveness(runningRuns),
     runs: runningRuns,
   });
   return true;
@@ -1939,8 +2159,7 @@ function handleMarkStuck(
   runsDir: string,
   onStatusInvalidate?: () => void,
 ): boolean {
-  const runPath = join(runsDir, `${runId}.json`);
-  const run = loadRunFile(runsDir, runId);
+  const run = isValidRunId(runId) ? loadRunFile(runsDir, runId) : null;
   if (!run) {
     errorResponse(res, 404, `Run "${runId}" not found`);
     return true;
@@ -1951,13 +2170,9 @@ function handleMarkStuck(
     return true;
   }
 
-  // Patch the run file on disk
-  run.status = "failed";
-  run.error = "Manually marked as stuck (no recent activity)";
-  run.finishedAt = new Date().toISOString();
-
+  const ended = endedRunRecord(run, MARK_STUCK_REASON);
   try {
-    writeFileSync(runPath, JSON.stringify(run, null, 2) + "\n", "utf-8");
+    writeRunFileAtomic(runsDir, runId, ended);
   } catch (err) {
     errorResponse(res, 500, `Failed to update run: ${err instanceof Error ? err.message : String(err)}`);
     return true;
@@ -1966,8 +2181,173 @@ function handleMarkStuck(
   // Invalidate status cache so sidebar shows updated active/stale counts
   onStatusInvalidate?.();
 
-  jsonResponse(res, 200, { id: runId, status: "failed", markedStuckAt: run.finishedAt });
+  jsonResponse(res, 200, { id: runId, status: "failed", markedStuckAt: ended.finishedAt });
   return true;
+}
+
+// ── Reconciliation ────────────────────────────────────────────────────
+
+/** One running run considered by `POST /api/hench/runs/reconcile`. */
+interface ReconcileOutcome {
+  runId: string;
+  taskId: string;
+  taskTitle: string;
+  /** The verdict the decision rests on — re-judged just before writing, when it got that far. */
+  liveness: RunLiveness;
+  reason: string;
+  /** Whether the run qualified to be ended. */
+  eligible: boolean;
+  /** Whether the run file was rewritten (always false for a dry run). */
+  ended: boolean;
+  /** Why an eligible run was left alone at write time: it finished, or its verdict changed. */
+  skipped?: string;
+  /** The write failed; the run file is unchanged. */
+  error?: string;
+}
+
+/** One worktree's share of a reconcile response. */
+interface ReconcileWorktreeResult {
+  /** Absent outside a git repository. */
+  worktree?: RunWorktree;
+  runsDir: string;
+  outcomes: ReconcileOutcome[];
+}
+
+/**
+ * POST /api/hench/runs/reconcile — end running runs no process is executing,
+ * in every worktree of the repository.
+ *
+ * Ends runs whose verdict is `orphaned`; `unknown` only with `includeUnknown`;
+ * never `live` or `foreign`. Never signals a process — it only rewrites run
+ * records whose owner is already gone, each in its own worktree's
+ * `.hench/runs/`, atomically, in the shape {@link endedRunRecord} defines.
+ * Never touches a PRD.
+ *
+ * Each run is re-read and re-judged immediately before its write, so a run
+ * that came back to life after the sweep (or after a dry run) is left alone.
+ *
+ * Body (all optional):
+ * - `dryRun`         — report what would end; write nothing.
+ * - `includeUnknown` — also end runs whose liveness could not be determined.
+ * - `runIds`         — only consider these run ids.
+ */
+async function handleReconcile(rc: RouteContext): Promise<boolean> {
+  let body: unknown = {};
+  try {
+    const raw = await readBody(rc.req, rc.res);
+    if (raw.trim()) body = JSON.parse(raw);
+  } catch {
+    if (!rc.res.headersSent) errorResponse(rc.res, 400, "Request body must be JSON");
+    return true;
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    errorResponse(rc.res, 400, "Request body must be a JSON object");
+    return true;
+  }
+  const opts = body as Record<string, unknown>;
+  if (opts.runIds !== undefined && !(Array.isArray(opts.runIds) && opts.runIds.every((id) => typeof id === "string"))) {
+    errorResponse(rc.res, 400, "runIds must be an array of run id strings");
+    return true;
+  }
+
+  const dryRun = opts.dryRun === true;
+  const includeUnknown = opts.includeUnknown === true;
+  const runIdFilter = Array.isArray(opts.runIds) ? new Set(opts.runIds as string[]) : null;
+  const endable = (liveness: RunLiveness): boolean =>
+    liveness === "orphaned" || (includeUnknown && liveness === "unknown");
+
+  const now = Date.now();
+  const groups: ReconcileWorktreeResult[] = [];
+  const verdicts: Array<{ liveness: RunLiveness }> = [];
+
+  for (const target of await resolveRunTargets(rc)) {
+    const group: ReconcileWorktreeResult = {
+      ...(target.worktree ? { worktree: target.worktree } : {}),
+      runsDir: target.runsDir,
+      outcomes: [],
+    };
+    groups.push(group);
+
+    let files: string[];
+    try {
+      files = readdirSync(target.runsDir);
+    } catch {
+      continue;
+    }
+    const liveLocks = collectLiveLocks(locksDirOf(resolveLayout(target.root).henchDir));
+    const executions = dashboardExecutionsFor(target.root);
+
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const id = file.slice(0, -".json".length);
+      if (runIdFilter && !runIdFilter.has(id)) continue;
+      const run = loadRunFile(target.runsDir, id);
+      if (!run || run.status !== "running") continue;
+
+      const verdict = judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, executions);
+      verdicts.push(verdict);
+      const outcome: ReconcileOutcome = {
+        runId: id,
+        taskId: typeof run.taskId === "string" ? run.taskId : "",
+        taskTitle: typeof run.taskTitle === "string" ? run.taskTitle : "",
+        liveness: verdict.liveness,
+        reason: verdict.reason,
+        eligible: endable(verdict.liveness),
+        ended: false,
+      };
+      group.outcomes.push(outcome);
+      if (outcome.eligible && !dryRun) endIfStillEndable(target, id, outcome, endable);
+    }
+  }
+
+  const all = groups.flatMap((g) => g.outcomes);
+  const ended = all.filter((o) => o.ended).length;
+  if (ended > 0) rc.onStatusInvalidate?.();
+
+  jsonResponse(rc.res, 200, {
+    dryRun,
+    includeUnknown,
+    ended,
+    eligible: all.filter((o) => o.eligible).length,
+    failed: all.filter((o) => o.error !== undefined).length,
+    worktrees: groups,
+    liveness: summarizeLiveness(verdicts),
+    timestamp: new Date(now).toISOString(),
+  });
+  return true;
+}
+
+/**
+ * Re-read the run and re-judge it with fresh lock files and dashboard
+ * children; end it only if it is still running and still endable. Updates
+ * `outcome` in place with what happened.
+ */
+function endIfStillEndable(
+  target: RunTarget,
+  id: string,
+  outcome: ReconcileOutcome,
+  endable: (liveness: RunLiveness) => boolean,
+): void {
+  const fresh = loadRunFile(target.runsDir, id);
+  if (!fresh || fresh.status !== "running") {
+    outcome.skipped = `Run is no longer running (status "${String(fresh?.status ?? "missing")}").`;
+    return;
+  }
+  const now = Date.now();
+  const verdict = judgeRunInTarget(target, fresh, now);
+  outcome.liveness = verdict.liveness;
+  outcome.reason = verdict.reason;
+  if (!endable(verdict.liveness)) {
+    outcome.eligible = false;
+    outcome.skipped = `Verdict changed to "${verdict.liveness}" before the write.`;
+    return;
+  }
+  try {
+    writeRunFileAtomic(target.runsDir, id, endedRunRecord(fresh, verdict.reason, now));
+    outcome.ended = true;
+  } catch (err) {
+    outcome.error = err instanceof Error ? err.message : String(err);
+  }
 }
 
 // ── Heartbeat monitor ─────────────────────────────────────────────────
@@ -2132,16 +2512,7 @@ export function startConcurrencyMonitor(
 
     const totalRunning = dashboardRunning + diskRunning;
     const utilization = maxConcurrent > 0 ? processCount / maxConcurrent : 0;
-    let level: ConcurrencyLevel;
-    if (processCount >= maxConcurrent) {
-      level = "at_limit";
-    } else if (utilization >= 0.67) {
-      level = "high";
-    } else if (utilization > 0) {
-      level = "moderate";
-    } else {
-      level = "low";
-    }
+    const level = concurrencyLevelOf(processCount, maxConcurrent);
 
     broadcast({
       type: "hench:concurrency-status",
@@ -2165,7 +2536,7 @@ export function startConcurrencyMonitor(
 // ── Memory / resource monitoring ──────────────────────────────────────
 
 /** Memory health level for UI indicators. */
-type MemoryHealthLevel = "healthy" | "warning" | "critical";
+export type MemoryHealthLevel ="healthy" | "warning" | "critical";
 
 /** Per-process memory snapshot. */
 interface ProcessMemoryEntry {
@@ -2177,7 +2548,7 @@ interface ProcessMemoryEntry {
 }
 
 /** Full memory status response shape. */
-interface MemoryStatus {
+export interface MemoryStatus {
   system: {
     totalBytes: number;
     freeBytes: number;
@@ -2248,12 +2619,22 @@ function getProcessRss(pid: number): number | null {
 /** Which workspace's tracker each sampled dashboard process belongs to (taskId → runsDir). */
 const processOwners = new Map<string, string>();
 
-function collectMemoryStatus(): MemoryStatus {
-  processOwners.clear();
+/**
+ * The machine's memory and its health level — the `system` and `health`
+ * parts of `GET /api/hench/memory`, without the per-process `ps` probes,
+ * for readers that must answer quickly (the Live overview).
+ */
+export function readSystemMemory(): MemoryStatus["system"] & { health: MemoryHealthLevel } {
   const totalBytes = totalmem();
   const freeBytes = freemem();
   const usedBytes = totalBytes - freeBytes;
   const usedPercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
+  return { totalBytes, freeBytes, usedBytes, usedPercent, health: computeMemoryHealth(usedPercent) };
+}
+
+function collectMemoryStatus(): MemoryStatus {
+  processOwners.clear();
+  const { totalBytes, freeBytes, usedBytes, usedPercent, health } = readSystemMemory();
 
   const mem = process.memoryUsage();
   const load = loadavg() as [number, number, number];
@@ -2290,7 +2671,7 @@ function collectMemoryStatus(): MemoryStatus {
       externalBytes: mem.external,
     },
     processes,
-    health: computeMemoryHealth(usedPercent),
+    health,
     loadAvg: load,
     cpuCount,
     timestamp: new Date().toISOString(),
@@ -2433,18 +2814,8 @@ interface ConcurrencyLockFile {
 /** Default max concurrent processes (matches hench DEFAULT_HENCH_CONFIG). */
 const DEFAULT_MAX_CONCURRENT_PROCESSES = 3;
 
-/** Check whether a process with the given PID is still alive. */
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Concurrency utilization level for UI indicators. */
-type ConcurrencyLevel = "low" | "moderate" | "high" | "at_limit";
+export type ConcurrencyLevel ="low" | "moderate" | "high" | "at_limit";
 
 // ── Throttle state ────────────────────────────────────────────────────
 
@@ -2501,7 +2872,7 @@ export function resetHenchRouteStateForTests(): void {
  * Get the effective max concurrent processes, respecting the runtime
  * override when set.
  */
-function getEffectiveMaxConcurrent(projectDir: string): number {
+export function getEffectiveMaxConcurrent(projectDir: string): number {
   if (throttleState.concurrencyOverride !== null) {
     return throttleState.concurrencyOverride;
   }
@@ -2524,47 +2895,81 @@ function getEffectiveMaxConcurrent(projectDir: string): number {
  * a utilization level for visual indicators.
  */
 function handleConcurrency(res: ServerResponse, ctx: ServerContext): boolean {
-  const { activeExecutions } = stateForCtx(ctx);
-  const henchDir = join(ctx.projectDir, ".hench");
-  const locksDir = join(henchDir, "locks");
-  const runsDir = join(henchDir, "runs");
+  jsonResponse(res, 200, collectConcurrencyStatus(ctx));
+  return true;
+}
 
-  // 1. Read max concurrent (respects runtime override from throttle controls)
+/** What `GET /api/hench/concurrency` answers. */
+export interface ConcurrencyStatus {
+  processCount: number;
+  maxConcurrent: number;
+  slotsAvailable: number;
+  level: ConcurrencyLevel;
+  utilization: number;
+  totalRunning: number;
+  dashboardActive: number;
+  diskRunning: number;
+  pendingTasks: number;
+  locks: Array<{ pid: number; startedAt: string; taskId?: string }>;
+  timestamp: string;
+}
+
+/** Hench slots of one workspace: live lock holders against the effective limit. */
+export interface ConcurrencySlots {
+  processCount: number;
+  maxConcurrent: number;
+  slotsAvailable: number;
+  level: ConcurrencyLevel;
+  utilization: number;
+  locks: ConcurrencyStatus["locks"];
+}
+
+/**
+ * Slots in use, from the PID lock files hench's limiter holds in
+ * `.hench/locks/` — the authoritative cross-process count — against the
+ * limit (including a throttle override). Reads no run files, so the Live
+ * overview can ask it on every request.
+ */
+export function readConcurrencySlots(ctx: ServerContext): ConcurrencySlots {
+  // Read max concurrent (respects runtime override from throttle controls)
   const maxConcurrent = getEffectiveMaxConcurrent(ctx.projectDir);
 
-  // 2. Read lock files and check PID liveness
-  const activeLocks: Array<{
-    pid: number;
-    startedAt: string;
-    taskId?: string;
-    alive: boolean;
-  }> = [];
+  // Lock files whose PID is alive
+  const locks: ConcurrencyStatus["locks"] = collectLiveLocks(locksDirOf(resolveLayout(ctx.projectDir).henchDir))
+    .map((lock) => ({ pid: lock.pid, startedAt: lock.startedAt, taskId: lock.taskId }));
 
-  try {
-    const files = readdirSync(locksDir);
-    for (const file of files) {
-      if (!file.endsWith(".lock")) continue;
-      try {
-        const raw = readFileSync(join(locksDir, file), "utf-8");
-        const lock = JSON.parse(raw) as ConcurrencyLockFile;
-        const alive = isPidAlive(lock.pid);
-        activeLocks.push({
-          pid: lock.pid,
-          startedAt: lock.startedAt,
-          taskId: lock.taskId,
-          alive,
-        });
-      } catch {
-        // Corrupted lock file — skip
-      }
-    }
-  } catch {
-    // Locks dir doesn't exist yet — no active locks
-  }
+  // The "active process count" is the number of live lock-holding processes,
+  // which is the authoritative cross-process count.
+  const processCount = locks.length;
+  const utilization = maxConcurrent > 0 ? processCount / maxConcurrent : 0;
 
-  const aliveLocks = activeLocks.filter((l) => l.alive);
+  return {
+    processCount,
+    maxConcurrent,
+    // Slots remaining before limit is reached
+    slotsAvailable: Math.max(0, maxConcurrent - processCount),
+    level: concurrencyLevelOf(processCount, maxConcurrent),
+    utilization: Math.min(1, utilization),
+    locks,
+  };
+}
 
-  // 3. Count dashboard-triggered executions
+/** How full `inUse` of `max` slots is. */
+export function concurrencyLevelOf(inUse: number, max: number): ConcurrencyLevel {
+  const utilization = max > 0 ? inUse / max : 0;
+  if (inUse >= max) return "at_limit";
+  if (utilization >= 0.67) return "high";
+  if (utilization > 0) return "moderate";
+  return "low";
+}
+
+/** The concurrency status of one workspace, as `GET /api/hench/concurrency` answers it. */
+export function collectConcurrencyStatus(ctx: ServerContext): ConcurrencyStatus {
+  const { activeExecutions } = stateForCtx(ctx);
+  const runsDir = join(ctx.projectDir, ".hench", "runs");
+  const slots = readConcurrencySlots(ctx);
+
+  // Count dashboard-triggered executions
   const dashboardActive = activeExecutions.size;
   const dashboardRunning = Array.from(activeExecutions.values()).filter(
     (e) => e.state.status === "running" || e.state.status === "starting",
@@ -2598,48 +3003,15 @@ function handleConcurrency(res: ServerResponse, ctx: ServerContext): boolean {
     // PRD not available
   }
 
-  // 6. Compute aggregate counts
-  // The "active process count" is the number of live lock-holding processes,
-  // which is the authoritative cross-process count.
-  const processCount = aliveLocks.length;
-
-  // Total running tasks combines dashboard + disk sources (deduplicated)
-  const totalRunning = dashboardRunning + diskRunningCount;
-
-  // Compute utilization level
-  const utilization = maxConcurrent > 0 ? processCount / maxConcurrent : 0;
-  let level: ConcurrencyLevel;
-  if (processCount >= maxConcurrent) {
-    level = "at_limit";
-  } else if (utilization >= 0.67) {
-    level = "high";
-  } else if (utilization > 0) {
-    level = "moderate";
-  } else {
-    level = "low";
-  }
-
-  // Slots remaining before limit is reached
-  const slotsAvailable = Math.max(0, maxConcurrent - processCount);
-
-  jsonResponse(res, 200, {
-    processCount,
-    maxConcurrent,
-    slotsAvailable,
-    level,
-    utilization: Math.min(1, utilization),
-    totalRunning,
+  return {
+    ...slots,
+    // Total running tasks combines dashboard + disk sources (deduplicated)
+    totalRunning: dashboardRunning + diskRunningCount,
     dashboardActive,
     diskRunning: diskRunningCount,
     pendingTasks: pendingTaskCount,
-    locks: aliveLocks.map((l) => ({
-      pid: l.pid,
-      startedAt: l.startedAt,
-      taskId: l.taskId,
-    })),
     timestamp: new Date().toISOString(),
-  });
-  return true;
+  };
 }
 
 /** Recursively count pending/blocked tasks (leaf tasks only). */
@@ -2730,9 +3102,7 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
 
     const lastActivity = run.lastActivityAt as string | undefined;
     const lastActivityMs = lastActivity ? new Date(lastActivity).getTime() : null;
-    const stale = lastActivityMs != null
-      ? (now - lastActivityMs) > STALE_THRESHOLD_MS
-      : true;
+    const stale = isRunStale(lastActivity, now);
     const startMs = new Date(run.startedAt as string).getTime();
     const hb = computeHeartbeatStatus(lastActivityMs, now);
 
@@ -2773,6 +3143,56 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
   return true;
 }
 
+/** How long a terminal-started run gets to exit on SIGTERM before SIGKILL. */
+const RECORDED_PID_GRACE_MS = 5_000;
+const RECORDED_PID_POLL_MS = 100;
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // EPERM: alive, owned by someone else — and so not ours to signal either.
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+function signalPid(pid: unknown, signal: NodeJS.Signals): boolean {
+  if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, signal);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Stop the hench process of a run the dashboard did not start, by the pid on
+ * its record. A pid is acted on only when the record says it is this host's
+ * and the heartbeat — which re-writes the pid — is fresh: a stale record's pid
+ * may since have been reused by an unrelated process. SIGTERM first, so hench
+ * can stop its vendor child and write its record; SIGKILL to both if it has
+ * not exited after {@link RECORDED_PID_GRACE_MS}. Returns whether a signal
+ * was sent.
+ */
+async function stopRecordedRunProcess(run: Record<string, unknown>): Promise<boolean> {
+  const pid = run.pid;
+  if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  if (typeof run.host === "string" && run.host !== hostname()) return false;
+  if (isRunStale(run.lastActivityAt, Date.now()) || !pidAlive(pid)) return false;
+  if (!signalPid(pid, "SIGTERM")) return false;
+  const deadline = Date.now() + RECORDED_PID_GRACE_MS;
+  while (Date.now() < deadline && pidAlive(pid)) {
+    await new Promise((resolve) => setTimeout(resolve, RECORDED_PID_POLL_MS));
+  }
+  if (pidAlive(pid)) {
+    signalPid(pid, "SIGKILL");
+    signalPid(run.vendorPid, "SIGKILL");
+  }
+  return true;
+}
+
 /** POST /api/hench/execute/:taskId/terminate — terminate a running task. */
 async function handleTerminate(
   taskId: string,
@@ -2797,26 +3217,33 @@ async function handleTerminate(
     for (const file of files) {
       if (!file.endsWith(".json")) continue;
       const id = file.replace(/\.json$/, "");
-      const run = loadRunFile(runsDir, id);
-      if (run && run.status === "running" && run.taskId === taskId) {
-        // Mark as terminated on disk
-        run.status = "failed";
-        run.error = "Terminated via audit interface";
-        run.finishedAt = new Date().toISOString();
-        const runPath = join(runsDir, `${id}.json`);
-        try {
-          writeFileSync(runPath, JSON.stringify(run, null, 2) + "\n", "utf-8");
-        } catch (err) {
-          errorResponse(res, 500, `Failed to update run: ${err instanceof Error ? err.message : String(err)}`);
-          return true;
+      const found = loadRunFile(runsDir, id);
+      if (found && found.status === "running" && found.taskId === taskId) {
+        // Started from a terminal: stop the hench process by its recorded pid
+        // when that pid is trustworthy, then mark the record — re-read, since
+        // hench may have written its own final status while exiting.
+        const signalled = await stopRecordedRunProcess(found);
+        const run = loadRunFile(runsDir, id) ?? found;
+        if (run.status === "running") {
+          run.status = "failed";
+          run.error = "Terminated via audit interface";
+          run.finishedAt = new Date().toISOString();
+          const runPath = join(runsDir, `${id}.json`);
+          try {
+            writeFileSync(runPath, JSON.stringify(run, null, 2) + "\n", "utf-8");
+          } catch (err) {
+            errorResponse(res, 500, `Failed to update run: ${err instanceof Error ? err.message : String(err)}`);
+            return true;
+          }
         }
         onStatusInvalidate?.();
         jsonResponse(res, 200, {
           taskId,
           runId: id,
           terminated: true,
-          method: "disk-mark",
-          message: "Run marked as terminated (process not managed by dashboard)",
+          ...(signalled
+            ? { pid: found.pid, signalSent: true, method: "pid-signal", message: "Process terminated by its recorded pid" }
+            : { method: "disk-mark", message: "Run marked as terminated (process not managed by dashboard)" }),
         });
         return true;
       }

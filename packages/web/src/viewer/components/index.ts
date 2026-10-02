@@ -16,6 +16,8 @@ export { MemoryPanel } from "./memory-panel.js";
 export { WsHealthPanel } from "./ws-health-panel.js";
 export { ThrottleControlsPanel } from "./throttle-controls.js";
 export { DetailPanel } from "./detail-panel.js";
+export { LiveTab, PeekLink, jobTarget, runTarget, isCurrentWorktree, liveHref } from "./live-tab.js";
+export type { LiveTabProps, PeekLinkProps, PeekTarget } from "./live-tab.js";
 export { StartTaskButton } from "./start-task-button.js";
 export type { StartTaskButtonProps } from "./start-task-button.js";
 
@@ -66,6 +68,7 @@ export {
   RexCompletionIndicator,
   HenchActivityIndicator,
   INDICATOR_VIEWS,
+  LIVE_INDICATOR_VIEWS,
   type ProjectStatus,
   type SourceVisionStatus,
   type RexStatus,

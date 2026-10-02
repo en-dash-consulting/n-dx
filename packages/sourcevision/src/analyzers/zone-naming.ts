@@ -27,6 +27,7 @@ import { askJev, choice, noul } from "./jev-client.js";
 import type { JevQuestion, JsonValue } from "./jev-client.js";
 import { tryParseJSON, mergeZonesByName } from "./enrich-parsing.js";
 import { dominantRouteFeature, routePathOf } from "./route-convention.js";
+import { markBatch } from "./analyze-progress.js";
 import type { RouteLayout } from "./route-convention.js";
 
 /**
@@ -435,7 +436,9 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
   const mergeNames = new Map<string, string>(); // zone.id → shared name for mergeZonesByName
   const pairs = ctx.noMerges ? [] : candidatePairs(zones, ctx.crossings);
 
+  const requestCount = Math.ceil(zones.length / ZONES_PER_REQUEST);
   for (let start = 0; start < zones.length; start += ZONES_PER_REQUEST) {
+    markBatch("zone naming", start / ZONES_PER_REQUEST, requestCount);
     const batch = zones.slice(start, start + ZONES_PER_REQUEST);
     const batchIds = new Set(batch.map((z) => z.id));
     const req = buildZoneNamingRequest(batch, ctx, pairs.filter(([a, b]) => batchIds.has(a.id) && batchIds.has(b.id)));
@@ -490,6 +493,7 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
       }
     }
   }
+  markBatch("zone naming", requestCount, requestCount);
 
   // Generated fallback, verified by Jev: one text-model call per chunk of
   // zones, then one Jev request per chunk carrying every zone's pick and fit

@@ -404,13 +404,24 @@ export const RunRecordSchema = z.object({
   spawnCount: z.number().int().nonnegative().optional(),
   spawnBreakdown: z.record(z.number().int().nonnegative()).optional(),
   backgroundResume: z.object({ tool: z.string(), detail: z.string() }).optional(),
+  readOnlyRefusal: z.object({ reason: z.string() }).optional(),
   structuredSummary: RunSummaryDataSchema.optional(),
   memoryStats: RunMemoryStatsSchema.optional(),
   diagnostics: RunDiagnosticsSchema.optional(),
   events: z.array(PersistedRuntimeEventSchema).optional(),
   review: RunReviewRecordSchema.optional(),
+  // Passthrough and all-optional for the same reason as `review` above.
+  reviewPlan: z
+    .object({ model: z.string().optional(), modelSource: z.string().optional(), optional: z.boolean().optional() })
+    .passthrough()
+    .optional(),
+  reviewSpend: z.object({}).passthrough().optional(),
   actor: z.string().optional(),
   host: z.string().optional(),
+  logPath: z.string().optional(),
+  eventsPath: z.string().optional(),
+  pid: z.number().int().positive().optional(),
+  vendorPid: z.number().int().positive().optional(),
   commits: z.array(RunCommitRecordSchema).optional(),
   // Boolean is the legacy shape (records written before the paths existed);
   // new records carry the paths the record commit tried to stage.

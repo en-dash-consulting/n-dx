@@ -188,6 +188,18 @@ async function readRunFile(filePath: string): Promise<unknown> {
  * List run files in a directory (both `.json` and `.json.gz`), excluding
  * hidden files.
  */
+/**
+ * Name of the progress-event sidecar for a run file.
+ *
+ * `<id>.json` and `<id>.json.gz` both map to `<id>.events.jsonl` — the stream is
+ * written once, at run time, and archival never compresses it.
+ *
+ * @internal Exported for testing.
+ */
+export function eventsSidecarFor(runFile: string): string {
+  return runFile.replace(/\.json(\.gz)?$/, "") + ".events.jsonl";
+}
+
 async function listRunFiles(runsDir: string): Promise<string[]> {
   let files: string[];
   try {
@@ -450,6 +462,13 @@ export async function enforceRetentionPolicy(
         error: err instanceof Error ? err.message : String(err),
       });
     }
+    // The run's progress event stream, if it has one. `listRunFiles` does not
+    // match `.jsonl`, so without this the sidecar would outlive the record it
+    // describes — forever, since nothing else ever looks at it. Best-effort and
+    // uncounted: most runs have no sidecar (it is newer than the format, and a
+    // run can finish without one), so its absence is the normal case and not an
+    // error worth reporting.
+    await unlink(join(runsDir, eventsSidecarFor(file))).catch(() => {});
   }
 
   const result: RetentionResult = {

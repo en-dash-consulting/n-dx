@@ -1211,7 +1211,16 @@ export type RunReviewRecord =
        * itself). Absent when the snapshot could not be taken.
        */
       repairedFiles?: string[];
-      /** Commit that captured the repairs on the autoCommit path. */
+      /**
+       * Commit that captured the repairs when nothing else would have.
+       *
+       * Set on the autoCommit path, and — since #483 — on the commit-prompt
+       * path when the executor committed its own work without writing
+       * `.hench-commit-msg.txt`, so no commit prompt followed to sweep the
+       * repairs in. Absent in the ordinary commit-prompt case, where the
+       * repairs are staged into the executor's own commit rather than getting
+       * one of their own.
+       */
       repairCommit?: string;
       /**
        * True when the reviewer ended waiting on a background command without
@@ -1240,6 +1249,28 @@ export type RunReviewRecord =
       /** As on the success shape: the reviewer was resumed once, and still wrote nothing usable. */
       backgroundResumed?: boolean;
     };
+
+/** Which setting chose the reviewer's model. */
+export type ReviewModelSource = "flag" | "vendor-config" | "shared-config" | "vendor-default";
+
+/** The review pass a run was launched with. See {@link RunRecord.reviewPlan}. */
+export interface RunReviewPlan {
+  /** Resolved reviewer model. Empty for the local vendor. */
+  model: string;
+  /** `--review-model`, `llm.<vendor>.reviewModel`, `llm.reviewModel` or the vendor default. */
+  modelSource: ReviewModelSource;
+  /** `--review-optional`: a reviewer that cannot start warns instead of refusing completion. */
+  optional: boolean;
+}
+
+/** Reviewer spend. See {@link RunRecord.reviewSpend}. */
+export interface RunReviewSpend {
+  turns: number;
+  input: number;
+  output: number;
+  cacheCreationInput: number;
+  cacheReadInput: number;
+}
 
 /**
  * A completion whose PRD "record" commit did not land — the work itself is
@@ -1383,6 +1414,15 @@ export interface RunRecord {
    */
   backgroundResume?: { tool: string; detail: string };
   /**
+   * Set when an attempt that forked the warm orientation parent ended with no
+   * changes and no file-edit tool calls, and the run re-spawned the task once
+   * cold (spawn reason `read-only-retry`). `reason` is what was reported for
+   * the refused attempt. Distinguishes this from a fork fallback (the fork
+   * itself failed) and from an ordinary retry. See
+   * `agent/lifecycle/read-only-refusal.ts`. v1 additive field.
+   */
+  readOnlyRefusal?: { reason: string };
+  /**
    * How many times the in-memory conversation window was condensed during
    * the run (tool-output digests and LLM summarization passes both count).
    * Set by the local (LM Studio) tool loop; absent for vendors that manage
@@ -1413,6 +1453,23 @@ export interface RunRecord {
    * v1 additive field — records without it load normally.
    */
   review?: RunReviewRecord;
+  /**
+   * The review pass this run was started with (`--review`), written with the
+   * record at launch. Unlike {@link review}, it exists before the reviewer
+   * does, so a reader can tell "review pending" from "no review requested".
+   * Absent when `--review` was not passed.
+   *
+   * v1 additive field — records without it load normally.
+   */
+  reviewPlan?: RunReviewPlan;
+  /**
+   * What the reviewer spent, accumulated as its spawns finish. Already
+   * included in {@link tokenUsage}; kept apart so the review's share can be
+   * shown. Absent until a reviewer has run.
+   *
+   * v1 additive field — records without it load normally.
+   */
+  reviewSpend?: RunReviewSpend;
   /**
    * Full RuntimeEvent stream captured during the run.
    *
@@ -1462,6 +1519,61 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   host?: string;
+  /**
+   * Absolute path of this run's log file under `.run-logs/`.
+   *
+   * Written before the agent produces anything, because the file is written
+   * incrementally and the point of recording it is to be tailed while the run
+   * is still going — a reader that has to reconstruct the timestamped
+   * filename has already lost the race. Absent when the run was started
+   * without a project directory, or when the log file could not be opened
+   * (the run proceeds either way; the log is not load-bearing).
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  logPath?: string;
+  /**
+   * Absolute path of this run's structured progress event stream, a JSON Lines
+   * file under `.hench/runs/`.
+   *
+   * Distinct from {@link logPath}, which is the run's terminal output, and from
+   * {@link events}, which is the raw `RuntimeEvent` stream kept only in
+   * verbose mode and only at the end of the run. This file carries a small
+   * typed vocabulary — brief loaded, files read, file edited, tests run,
+   * retry, gate, review, finished — written as each happens, so a viewer can
+   * render a run's progress without parsing log text.
+   *
+   * Written before the agent produces anything, for the same reason
+   * {@link logPath} is: the point of recording it is to be tailed while the
+   * run is still going. Absent when the events file could not be opened; the
+   * run proceeds either way, since this is narration rather than state.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  eventsPath?: string;
+  /**
+   * Pid of the hench process driving this run (`process.pid`).
+   *
+   * Written when the run starts and re-written by every heartbeat, so a viewer
+   * can tell a slow run (pid alive, heartbeat old) from a dead one (pid gone)
+   * and can stop a run that was started from a terminal. Meaningful only while
+   * `status` is `"running"`, and only on the host named by {@link host}.
+   *
+   * v1 additive field — old records without it load normally and mean
+   * "pid unknown".
+   */
+  pid?: number;
+  /**
+   * Pid of the vendor CLI subprocess currently spawned for this run.
+   *
+   * Set from the heartbeat while a spawn is live and absent between spawns
+   * (retries, the plan-mode prompt) and on the API provider, which spawns
+   * nothing. On Windows the CLI is launched through cmd.exe, so this is the
+   * wrapper's pid, which lives exactly as long as the CLI.
+   *
+   * v1 additive field — old records without it load normally.
+   */
+  vendorPid?: number;
   /**
    * Commits this run produced — the task's own work commit, the
    * review-repair commit, and the completion-metadata ("record") commit,

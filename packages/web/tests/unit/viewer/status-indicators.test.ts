@@ -99,6 +99,38 @@ describe("SvFreshnessIndicator", () => {
     expect(onNavigate).toHaveBeenCalledWith("overview");
   });
 
+  it("shows the analysis phase and opens the Live analysis page while one runs", () => {
+    const status = {
+      freshness: "fresh" as const,
+      analyzedAt: new Date().toISOString(),
+      minutesAgo: 5,
+      modulesComplete: 5,
+      modulesTotal: 5,
+    };
+    render(h(SvFreshnessIndicator, { status, onNavigate, tabIndex: 0, analysis: { phase: { index: 3, total: 6 } } }), root);
+    expect(root.textContent).toContain("Analyzing · phase 3 of 6");
+    root.querySelector<HTMLElement>(".sidebar-indicator")?.click();
+    expect(onNavigate).toHaveBeenCalledWith("live-analyze");
+
+    // Run over: the badge returns to its freshness reading and target.
+    onNavigate.mockClear();
+    render(h(SvFreshnessIndicator, { status, onNavigate, tabIndex: 0, analysis: null }), root);
+    expect(root.textContent).toContain("Fresh");
+    expect(root.textContent).not.toContain("Analyzing");
+    root.querySelector<HTMLElement>(".sidebar-indicator")?.click();
+    expect(onNavigate).toHaveBeenCalledWith("overview");
+  });
+
+  it("reads plain 'Analyzing' before the first phase starts", () => {
+    render(h(SvFreshnessIndicator, {
+      status: { freshness: "unavailable", analyzedAt: null, minutesAgo: null, modulesComplete: 0, modulesTotal: 0 },
+      onNavigate,
+      tabIndex: 0,
+      analysis: { phase: null },
+    }), root);
+    expect(root.textContent).toBe("Analyzing");
+  });
+
   it("has appropriate aria-label for fresh status", () => {
     render(
       h(SvFreshnessIndicator, {
@@ -360,6 +392,34 @@ describe("HenchActivityIndicator", () => {
     );
     const indicator = root.querySelector<HTMLElement>(".sidebar-indicator");
     indicator?.click();
+    expect(onNavigate).toHaveBeenCalledWith("hench-runs");
+  });
+
+  it("navigates stuck runs to the Live overview", () => {
+    render(
+      h(HenchActivityIndicator, {
+        status: { configured: true, totalRuns: 3, activeRuns: 0, staleRuns: 2 },
+        onNavigate,
+        tabIndex: 0,
+      }),
+      root,
+    );
+    expect(root.textContent).toContain("2 stuck runs");
+    root.querySelector<HTMLElement>(".sidebar-indicator")?.click();
+    expect(onNavigate).toHaveBeenCalledWith("live");
+  });
+
+  it("keeps stuck runs on the run list when Live is out of scope", () => {
+    render(
+      h(HenchActivityIndicator, {
+        status: { configured: true, totalRuns: 3, activeRuns: 0, staleRuns: 1 },
+        onNavigate,
+        tabIndex: 0,
+        liveAvailable: false,
+      }),
+      root,
+    );
+    root.querySelector<HTMLElement>(".sidebar-indicator")?.click();
     expect(onNavigate).toHaveBeenCalledWith("hench-runs");
   });
 

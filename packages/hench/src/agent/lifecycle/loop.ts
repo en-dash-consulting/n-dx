@@ -6,6 +6,7 @@ import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, di
 import type { ToolContext } from "../../tools/contracts.js";
 import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
+import { recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, detail, info, withHeartbeat } from "../../types/output.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
@@ -378,6 +379,9 @@ function recordToolCall(
 ): void {
   run.toolCalls.push(record);
   detector.record({ tool: record.tool, input: record.input, output: record.output });
+  // The API path's counterpart to the CLI loop's processLine hook, so both
+  // produce the same structured progress events from the same vocabulary.
+  recordFileWork(record.tool, record.input, record.turn);
 }
 
 /**

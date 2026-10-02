@@ -411,6 +411,32 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["run", "config"],
   },
+  "check-runs": {
+    tool: "hench",
+    command: "check-runs",
+    summary: "audit runs recorded as running, in every worktree",
+    usage: "hench check-runs [options] [dir]",
+    description:
+      "A run stays \"running\" until its process writes a terminal status; a crash\n" +
+      "or kill -9 leaves it that way. Lists every running record in every\n" +
+      "worktree of the repository, grouped by worktree, with a verdict\n" +
+      "(live, foreign, unknown, orphaned) and the reason. The recorded pid\n" +
+      "decides first, then lock files. Ending a run signals no process.",
+    options: [
+      { flag: "--fix", description: "End orphaned runs (status failed, error \"Ended by audit reconciliation: ...\")" },
+      { flag: "--include-unknown", description: "With --fix, also end runs that could not be confirmed" },
+      { flag: "--strict", description: "Exit 1 when any running record is not live (CI pre-flight)" },
+      { flag: "--worktree=<path>", description: "Audit only the worktree containing <path>" },
+      { flag: "--format=json", description: "Output verdicts as JSON for scripting" },
+    ],
+    examples: [
+      { command: "hench check-runs", description: "Audit every worktree" },
+      { command: "hench check-runs --fix", description: "End orphaned runs" },
+      { command: "hench check-runs --strict --format=json", description: "Pre-flight check for scripts" },
+      { command: "hench check-runs --worktree=../feature-x", description: "Audit one worktree" },
+    ],
+    related: ["status", "show"],
+  },
   "validate-tokens": {
     tool: "hench",
     command: "validate-tokens",
@@ -444,12 +470,13 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   run: ["status", "show"],
   record: ["usage", "status", "show"],
   usage: ["record"],
-  status: ["show", "run", "validate-tokens"],
+  status: ["show", "run", "check-runs", "validate-tokens"],
   show: ["status"],
   config: ["template"],
   template: ["config"],
   cache: ["run", "config"],
   trust: ["run", "config"],
+  "check-runs": ["status", "show"],
   "validate-tokens": ["status", "show"],
 };
 

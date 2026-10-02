@@ -78,6 +78,23 @@ export interface EnsureWarmParentOptions {
 }
 
 /**
+ * First thing a forked task spawn reads in its new user turn.
+ *
+ * A fork inherits the orientation transcript, whose first turn says "do not
+ * modify anything" and whose reply calls the session read-only. Nothing else
+ * in the task prompt lifts that, so a fork can refuse to edit. This sentence
+ * is the fix for parents already cached with the older wording.
+ *
+ * Fixed and task-free on purpose: it lands after the inherited transcript, so
+ * every fork keeps a byte-identical prefix. Keep it in step with the
+ * read-only wording in {@link buildOrientationPrompt} and
+ * {@link buildOrientationSystemPrompt}.
+ */
+export const ORIENTATION_LIFT_NOTICE =
+  "Orientation is over. The read-only instruction from the orientation session no longer " +
+  "applies: this session must edit, test and commit to finish the task below.";
+
+/**
  * System prompt for the orientation session.
  *
  * Read-only is stated here *and* in the task prompt, and the caller also
@@ -90,8 +107,9 @@ export function buildOrientationSystemPrompt(): string {
   return [
     "You are orienting yourself in a codebase so that later sessions can start work immediately.",
     "",
-    "Do not modify anything. Make no edits, no writes, no commits, and run no command that",
-    "changes state. Read and inspect only.",
+    "During this orientation session, do not modify anything. Make no edits, no writes, no",
+    "commits, and run no command that changes state. Read and inspect only. This limit ends",
+    "with the orientation session; later task sessions will be told when they may edit.",
     "",
     "Be brief and concrete. You are building a durable summary that later sessions inherit,",
     "not performing an analysis for a human to read. Prefer facts you verified over",
@@ -125,7 +143,7 @@ export function buildOrientationPrompt(primer?: string): string {
 
   if (!primer) {
     return [
-      "Orient yourself in this repository. Do not modify anything.",
+      "Orient yourself in this repository. During this orientation session, do not modify anything.",
       "",
       "Establish and summarize:",
       ...questions,
@@ -137,7 +155,7 @@ export function buildOrientationPrompt(primer?: string): string {
   }
 
   return [
-    "Orient yourself in this repository. Do not modify anything.",
+    "Orient yourself in this repository. During this orientation session, do not modify anything.",
     "",
     "An automated analysis of this repository already produced the primer below. Treat it",
     "as a starting point, not as gospel: it was distilled from a static analysis and may be",

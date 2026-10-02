@@ -25,7 +25,9 @@ export {
   stripBasePath,
   webSocketUrl,
 } from "./base-path.js";
-export { isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
+export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
+export { HUB_ADMISSION_HEADER, formatHubAdmissionHeader, parseHubAdmissionHeader } from "./hub-admission.js";
+export type { HubAdmissionHeader } from "./hub-admission.js";
 export {
   SOURCEVISION_SCOPE_VIEWS,
   REX_SCOPE_VIEWS,
