@@ -15,6 +15,7 @@ import type {
   LiveRunFull,
   LiveSnapshot,
   LiveWorktreeFull,
+  MemoryPressure,
 } from "../hooks/index.js";
 
 // ── What is running ──────────────────────────────────────────────────
@@ -173,6 +174,21 @@ export function updatedLabel(generatedAt: string, now: number): string {
   return s === null ? "updated" : `updated ${s} s ago`;
 }
 
+const PRESSURE_LABELS: Record<MemoryPressure, string> = {
+  normal: "Normal",
+  warn: "Warn",
+  critical: "Critical",
+  unknown: "Unknown",
+};
+
+/** "<available> available · floor <floor>" — omits the floor clause when there is none, and
+ * collapses to a dash entirely when the reading itself is unknown (no bytes to show at all). */
+function memoryDetail(memory: LiveSnapshot["machine"]["memory"]): string {
+  if (memory.availableBytes === null) return "—";
+  const available = `${formatBytes(memory.availableBytes)} available`;
+  return memory.floorBytes === null ? available : `${available} · floor ${formatBytes(memory.floorBytes)}`;
+}
+
 export interface MachineTile {
   key: string;
   label: string;
@@ -197,11 +213,12 @@ export function machineTiles(machine: LiveSnapshot["machine"], runningJobs: numb
     { key: "jobs", label: "Running jobs", value: String(runningJobs), detail: null, warn: false },
     {
       key: "memory",
-      label: "Available memory",
-      // A machine that could not be read has no number and nothing to warn about.
-      value: memory.freeBytes === null ? "—" : formatBytes(memory.freeBytes),
-      detail: memory.floorBytes === null ? null : `floor ${formatBytes(memory.floorBytes)}`,
-      warn: memory.belowFloor,
+      label: "Memory",
+      value: PRESSURE_LABELS[memory.pressure],
+      detail: memoryDetail(memory),
+      // A machine that could not be read (pressure "unknown") never warns —
+      // belowFloor is already false for one, but pressure is checked directly too.
+      warn: memory.pressure !== "unknown" && (memory.pressure === "warn" || memory.pressure === "critical" || memory.belowFloor),
     },
     {
       key: "model",

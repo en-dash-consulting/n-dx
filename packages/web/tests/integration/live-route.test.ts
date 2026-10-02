@@ -28,11 +28,13 @@ import { clearWorktreesCache, collectWorktrees, runFileParseCountForTests } from
 import { clearStatusCache, handleStatusRoute, type ProjectStatus } from "../../src/server/routes-status.js";
 import { analyzeProgressPath } from "../../src/server/domain-gateway.js";
 import { handleLlmRoute } from "../../src/server/routes-llm.js";
+import { setAvailableMemoryReaderForTests } from "../../src/server/routes-hench.js";
 import { HUB_ADMISSION_HEADER, formatHubAdmissionHeader } from "../../src/shared/index.js";
 import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 import { removeTempDir } from "../helpers/temp-dir.js";
 
 const MINUTE = 60_000;
+const GIB = 1024 ** 3;
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync(
@@ -372,6 +374,50 @@ describe("GET /api/live machine.slots", () => {
 
   it("ignores a malformed admission header", async () => {
     expect((await slots({ [HUB_ADMISSION_HEADER]: "{\"running\":-1}" })).scope).toBe("repository");
+  });
+});
+
+describe("GET /api/live machine.memory", () => {
+  let root: string;
+  let src: LiveSources;
+
+  beforeEach(async () => {
+    root = realpathSync.native(mkdtempSync(join(tmpdir(), "ndx-live-memory-")));
+    src = { listWorkspaces: () => [{ key: "solo", path: root, branch: "main", isAnchor: true }], memoryFloorBytes: () => 2 * GIB };
+  });
+
+  afterEach(async () => {
+    setAvailableMemoryReaderForTests(null);
+    if (root) await removeTempDir(root);
+  });
+
+  it("reports the macOS available reading, not os.freemem(), and clears belowFloor against the real floor", () => {
+    // The bug: os.freemem() read 144 MB free against the hub's 2 GB floor while
+    // ~3.9 GB was reclaimable, so the tile warned on a healthy machine.
+    setAvailableMemoryReaderForTests(() => ({
+      availableBytes: Math.round(3.9 * GIB),
+      totalBytes: 16 * GIB,
+      pressure: "normal",
+      source: "darwin:vm_stat+sysctl",
+    }));
+    const snapshot = buildLiveSnapshot(ctxFor(root, "solo"), src);
+    expect(snapshot.machine.memory.availableBytes).toBe(Math.round(3.9 * GIB));
+    expect(snapshot.machine.memory.pressure).toBe("normal");
+    expect(snapshot.machine.memory.belowFloor).toBe(false);
+  });
+
+  it("never flags an unknown reading, including when freeBytes is null (null <= floor is true in JS)", () => {
+    setAvailableMemoryReaderForTests(() => ({
+      availableBytes: null,
+      totalBytes: 16 * GIB,
+      pressure: "unknown",
+      source: "darwin:unavailable",
+    }));
+    const snapshot = buildLiveSnapshot(ctxFor(root, "solo"), src);
+    expect(snapshot.machine.memory.availableBytes).toBeNull();
+    expect(snapshot.machine.memory.freeBytes).toBeNull();
+    expect(snapshot.machine.memory.pressure).toBe("unknown");
+    expect(snapshot.machine.memory.belowFloor).toBe(false);
   });
 });
 

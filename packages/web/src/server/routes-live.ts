@@ -234,6 +234,8 @@ export interface LiveSnapshot {
       usedPercent: number | null;
       health: MemoryHealthLevel;
       pressure: MemoryPressure;
+      /** Where the reading came from, e.g. `"darwin:vm_stat+sysctl"`, `"os.freemem"`. */
+      source: string;
       /** The hub's admission floor: below it, dashboard runs are queued rather than started. */
       floorBytes: number | null;
       /** Never true on an unknown reading — the hub admits those. */
@@ -645,6 +647,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
         usedPercent: memory.usedPercent,
         health: memory.health,
         pressure: memory.pressure,
+        source: memory.source,
         floorBytes,
         belowFloor: floorBytes !== null && memory.availableBytes !== null && memory.availableBytes <= floorBytes,
       },
