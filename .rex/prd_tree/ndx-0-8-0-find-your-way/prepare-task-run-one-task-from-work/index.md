@@ -32,7 +32,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Escape in the Prepare task modal also closes the PRD detail panel underneath](./escape-in-the-prepare-task-modal-also.md) | completed |
 | [GET /api/hench/ready blocks the dashboard's event loop for seconds per refresh](./get-api-hench-ready-blocks-the.md) | completed |
 | [GET /api/hench/ready?limit=1e9 returns one row instead of the maximum](./get-api-hench-ready-limit-1e9-returns.md) | completed |
-| [Hub queue types and responses drifted from run options, and the unscoped queue exposes other projects' notes](./hub-queue-types-and-responses-drifted.md) | pending |
+| [Hub queue types and responses drifted from run options, and the unscoped queue exposes other projects' notes](./hub-queue-types-and-responses-drifted.md) | completed |
 | [Keep llm.<vendor>.reviewModel and llm.reviewModel in the loaded LLM config](./keep-llm-vendor-reviewmodel-and-llm.md) | pending |
 | [Keep the /p/<id>/ and /w/<key>/ prefix when the PRD view rewrites the URL](./keep-the-p-id-and-w-key-prefix-when.md) | completed |
 | [`ndx work --resolve=<value>` starts a real run instead of resolving](./ndx-work-resolve-value-starts-a-real.md) | completed |
