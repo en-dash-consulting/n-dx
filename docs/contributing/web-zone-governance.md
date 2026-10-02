@@ -111,4 +111,4 @@ Current cohesion is 0.99 (healthy). The primary risk is the server/client co-loc
 
 - **Messaging barrel**: Created as part of the "Create messaging zone public interface" task. See `packages/web/src/viewer/messaging/index.ts`.
 - **Gateway pattern**: Cross-package imports use gateway modules (see `PACKAGE_GUIDELINES.md`). Intra-package zone boundaries use barrel exports instead.
-- **Viewer architecture**: See `docs/viewer-architecture.md` for the package-level composition model.
+- **Viewer architecture**: See `docs/architecture/viewer-architecture.md` for the navigation model.

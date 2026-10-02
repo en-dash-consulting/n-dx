@@ -19,7 +19,7 @@
  * POST /api/commands/refresh         — refresh SourceVision data (live server; --data-only --live-server)
  * GET  /api/commands/refresh/status  — check running refresh status
  * POST /api/commands/refresh/stop    — interrupt the running refresh
- * GET  /api/commands/manifest        — grouped command reference with resolved CLI name and availability
+ * GET  /api/commands/manifest        — grouped command reference with resolved CLI name, availability and core's effects declarations
  * POST /api/commands/fix             — rex fix (body: { dryRun?: boolean }); repairs PRD validation issues
  * POST /api/commands/ci              — ndx ci analysis + health validation (async, see status)
  * GET  /api/commands/ci/status       — CI check status and structured report
@@ -39,7 +39,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { createRequire } from "node:module";
 import { redactSecrets, exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
 import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
@@ -1838,12 +1838,125 @@ const COMMAND_MANIFEST: ManifestGroup[] = [
   },
 ];
 
-/** GET /api/commands/manifest — grouped command reference with availability. */
-function handleManifest(
+// ── Command effects (owned by core) ───────────────────────────────────
+
+/**
+ * One command's declared effects: what it reads, writes, which phases call a
+ * model, what network it touches, and how long it takes.
+ *
+ * Core owns this shape (`packages/core/command-effects.js`). It is typed here
+ * only so the wire contract is legible — the server never builds, edits or
+ * filters a declaration, it passes core's object through untouched, so the
+ * dashboard and the terminal banner cannot describe one command two ways.
+ */
+interface CommandEffectsDeclaration {
+  command: string;
+  summary: string;
+  reads: string[];
+  writes: Array<{ path: string; what: string; conditional?: boolean; when?: string }>;
+  llm: Array<{ phase: string; purpose: string; calls: string }>;
+  network: Array<{ to: "llm-provider" | "remote" | "localhost"; what: string; when?: string }>;
+  noLlmFlags?: string[];
+  delegates?: string;
+  duration: string;
+  next: string;
+  [key: string]: unknown;
+}
+
+interface EffectsLoad {
+  effects: Record<string, CommandEffectsDeclaration> | null;
+  error: string | null;
+}
+
+/**
+ * Loaded declarations, one entry per resolved CLI.
+ *
+ * Read by spawning `<ndx> help --effects --format=json --quiet` rather than importing
+ * core: web cannot depend on @n-dx/core (core depends on web — a cycle), and
+ * the spawn asks the same CLI this dashboard's Run buttons spawn, so the
+ * answer describes the install that will actually run. Declarations are
+ * static per install, so a successful load is kept for the server's life; a
+ * failed one is dropped so the next request retries.
+ */
+const effectsCache = new Map<string, Promise<EffectsLoad>>();
+
+async function spawnCommandEffects(bin: string, args: string[], cwd: string): Promise<EffectsLoad> {
+  // --quiet skips the CLI's npm update check — a network call this read does not need.
+  const result = await foundationExec(bin, [...args, "help", "--effects", "--format=json", "--quiet"], {
+    cwd,
+    timeout: 30_000,
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  if (result.error) {
+    return { effects: null, error: (result.stderr || result.error.message).slice(-1000) };
+  }
+  let parsed: { effects?: unknown };
+  try {
+    parsed = JSON.parse(result.stdout) as { effects?: unknown };
+  } catch (err) {
+    return { effects: null, error: `Unparseable effects output: ${String(err)}` };
+  }
+  if (!parsed.effects || typeof parsed.effects !== "object") {
+    return { effects: null, error: "CLI reported no effects declarations" };
+  }
+  return { effects: parsed.effects as Record<string, CommandEffectsDeclaration>, error: null };
+}
+
+/**
+ * Layout token → `resolveLayout` field, as core's `LAYOUT_TOKENS` declares it.
+ *
+ * Declarations name layout-owned paths as tokens (`{rex}/prd_tree/`) so they
+ * are right on either layout; the manifest serves them unexpanded, beside this
+ * project's `layoutPaths`, and the reader expands. A twin of core's map rather
+ * than an import (core depends on web), pinned to it by
+ * `tests/integration/command-effects-manifest-contract.test.js`.
+ */
+const EFFECTS_LAYOUT_TOKENS = {
+  rex: "rexDir",
+  hench: "henchDir",
+  sourcevision: "sourcevisionDir",
+  config: "configFile",
+  localConfig: "localConfigFile",
+  webPid: "webPidFile",
+  webPort: "webPortFile",
+} as const satisfies Record<string, keyof ReturnType<typeof resolveLayout>>;
+
+/** This project's path for each layout token, relative to its root with forward slashes. */
+function effectsLayoutPaths(layout: ReturnType<typeof resolveLayout>, projectDir: string): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(EFFECTS_LAYOUT_TOKENS).map(([token, field]) => [
+      token,
+      relative(projectDir, layout[field]).split(sep).join("/"),
+    ]),
+  );
+}
+
+/** Drop loaded declarations (tests, and a CLI swapped under a running server). */
+export function invalidateCommandEffectsCache(): void {
+  effectsCache.clear();
+}
+
+/** Core's effects declarations, as reported by this server's ndx CLI. */
+function loadCommandEffects(ctx: ServerContext): Promise<EffectsLoad> {
+  const { bin, args } = resolveNdxBin(ctx);
+  const key = [bin, ...args].join("\0");
+  let pending = effectsCache.get(key);
+  if (!pending) {
+    pending = spawnCommandEffects(bin, args, ctx.projectDir).then((load) => {
+      if (load.error) effectsCache.delete(key);
+      return load;
+    });
+    effectsCache.set(key, pending);
+  }
+  return pending;
+}
+
+/** GET /api/commands/manifest — grouped command reference with availability and effects. */
+async function handleManifest(
   _req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
-): boolean {
+): Promise<boolean> {
   const cliName = readCliName(ctx.projectDir);
   const layout = resolveLayout(ctx.projectDir);
   const initialized = [layout.rexDir, layout.sourcevisionDir, layout.henchDir]
@@ -1860,8 +1973,15 @@ function handleManifest(
     return initialized ? "available" : "needs-init";
   };
 
+  // A CLI that cannot report its effects degrades the manifest rather than
+  // failing it: every row still renders with `effects: null`, and
+  // `effectsError` says why.
+  const { effects, error: effectsError } = await loadCommandEffects(ctx);
+
   jsonResponse(res, 200, {
     cliName,
+    layoutPaths: effectsLayoutPaths(layout, ctx.projectDir),
+    ...(effectsError ? { effectsError } : {}),
     groups: COMMAND_MANIFEST.map((group) => ({
       id: group.id,
       label: group.label,
@@ -1870,6 +1990,7 @@ function handleManifest(
         invocation: `${cliName} ${cmd.name}`,
         description: cmd.description,
         status: statusFor(cmd),
+        effects: effects?.[cmd.name] ?? null,
         ...(cmd.trigger ? { trigger: cmd.trigger } : {}),
       })),
     })),

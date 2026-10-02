@@ -121,6 +121,9 @@ import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
 import { formatNarrationStatus, readNarrationState } from "./narration-status.js";
 import {
+  COMMAND_EFFECTS,
+  LAYOUT_TOKENS,
+  localizeEffects,
   resolveCommandEffects,
   shouldShowPreflight,
   formatPreflightBanner,
@@ -1784,6 +1787,14 @@ function forwardableFlags(flags) {
   return flags.filter((f) => !ORCHESTRATOR_ONLY_FLAGS.has(f));
 }
 
+/** Layout token → project-relative path, for expanding effects declarations. */
+function effectsLayoutPaths(dir) {
+  const layout = resolveLayout(resolve(dir));
+  return Object.fromEntries(
+    Object.entries(LAYOUT_TOKENS).map(([token, field]) => [token, relativeToRoot(layout, layout[field])]),
+  );
+}
+
 /**
  * Run `command`'s work with its declared effects shown first and its actual
  * result shown after.
@@ -1793,16 +1804,18 @@ function forwardableFlags(flags) {
  * appeared. (It is also suppressed under `--format=json`, so that holds twice
  * over — see `shouldShowPreflight`.)
  *
- * A command with no declaration yet gets neither, silently. The effects map is
- * partial by design while the remaining commands are being declared.
+ * Every registry command has a declaration, but only the handlers that call
+ * this pause for one; a name with no declaration gets neither, silently.
  */
 async function withPreflight(command, rest, dir, work) {
   const flags = extractFlags(rest);
-  const effects = resolveCommandEffects(command, flags);
-  if (!effects) {
+  const declared = resolveCommandEffects(command, flags);
+  if (!declared) {
     await work();
     return;
   }
+  // The banner names, and the summary checks, this project's real paths.
+  const effects = localizeEffects(declared, effectsLayoutPaths(dir));
 
   const showing = shouldShowPreflight(flags, { isTTY: process.stdout.isTTY, env: process.env });
   if (showing) {
@@ -3126,6 +3139,13 @@ async function handlePairProgramming(rest) {
 }
 
 function handleHelp(rest) {
+  // Machine-readable effects declarations — what the dashboard's command
+  // manifest serves. JSON only: the human view of a declaration is the
+  // preflight banner the command itself prints.
+  if (rest.includes("--effects")) {
+    process.stdout.write(JSON.stringify({ effects: COMMAND_EFFECTS }, null, 2) + "\n");
+    exitWithCleanup(0);
+  }
   const query = rest.filter((a) => !a.startsWith("-")).join(" ");
   if (!query) {
     showMainHelp();
