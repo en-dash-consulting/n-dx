@@ -17,7 +17,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add per-tier model override fields to LLMConfig schema and config loader](./add-per-tier-model-override-fields-to.md) | completed |
-| [Correct claude-sonnet-5 pricing to the now-standard 2/10 per MTok rate](./correct-claude-sonnet-5-pricing-to-the.md) | in_progress |
+| [Correct claude-sonnet-5 pricing to the now-standard 2/10 per MTok rate](./correct-claude-sonnet-5-pricing-to-the.md) | completed |
 | [Define TaskWeight type and per-vendor tier model constants in llm-client](./define-taskweight-type-and-per-vendor.md) | completed |
 | [Pin the opus, haiku and fable aliases to literal model ids instead of tier slots](./pin-the-opus-haiku-and-fable-aliases.md) | completed |
 | [Send llm.effort on Claude API requests and keep Opus 5.5 at high effort by default](./send-llm-effort-on-claude-api-requests.md) | pending |
