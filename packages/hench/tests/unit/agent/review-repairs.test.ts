@@ -20,6 +20,7 @@ import {
   diffDirtyState,
   commitReviewRepairs,
 } from "../../../src/agent/analysis/review-repairs.js";
+import { openRunLog } from "../../../src/store/run-log.js";
 
 const RUN_ID = "run-1234abcd";
 const TASK_ID = "task-5678efgh";
@@ -74,6 +75,21 @@ describe("review-repairs", () => {
       await writeFile(join(repoDir, "sub/deep/file.ts"), "nested\n");
       const after = await snapshotDirtyState(repoDir);
       expect(diffDirtyState(before, after)).toEqual(["sub/deep/file.ts"]);
+    });
+
+    it("does not attribute the run's own growing log to the review", async () => {
+      // First run in a project: no `.run-logs/` line in .gitignore, and the
+      // reviewer's output streams into the live log between the snapshots.
+      const writer = await openRunLog(repoDir, RUN_ID, "2026-04-08T10:00:00Z");
+      writer.appendLine("[Agent]   executor output");
+      const before = await snapshotDirtyState(repoDir);
+
+      writer.appendLine("[Review]  reviewer output");
+      await writeFile(join(repoDir, "base.ts"), "export const base = 2;\n");
+      await writer.close();
+
+      const after = await snapshotDirtyState(repoDir);
+      expect(diffDirtyState(before, after)).toEqual(["base.ts"]);
     });
   });
 

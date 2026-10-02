@@ -12,7 +12,12 @@ import {
   RexCompletionIndicator,
   HenchActivityIndicator,
   INDICATOR_VIEWS,
+  LIVE_INDICATOR_VIEWS,
+  useLive,
+  isAnalysisJob,
 } from "../api.js";
+import { isDeployedMode } from "../deployed-mode.js";
+import { isCurrentWorktree } from "./live-tab.js";
 import { identityLine, identityTooltip, type ServerIdentity } from "./config-footer.js";
 import { ThemeToggle } from "./theme-toggle.js";
 import { GlobalFAQ } from "./faq.js";
@@ -42,6 +47,14 @@ export function BottomBar({
   commandsOpen,
 }: BottomBarProps) {
   const status = useProjectStatus();
+  const analysisLive = validViews.has(LIVE_INDICATOR_VIEWS.analysis) && !isDeployedMode();
+  const live = useLive(analysisLive);
+  // Only this workspace's analysis: the badge sits in this viewer's bar.
+  const job = analysisLive
+    ? live?.jobs.find((j) => isAnalysisJob(j) && isCurrentWorktree(j.worktree))
+    : undefined;
+  const phase = job?.progress?.phase;
+  const analysis = job ? { phase: phase ? { index: phase.index, total: phase.total } : null } : null;
 
   return h("footer", { class: "bottombar", "aria-label": "Status and controls" },
     h("span", { class: "bottombar-server", title: server ? identityTooltip(server) : undefined },
@@ -60,11 +73,16 @@ export function BottomBar({
 
     h("div", { class: "bottombar-status", role: "group", "aria-label": "Project status" },
       status?.sv && validViews.has(INDICATOR_VIEWS.sv)
-        ? h(SvFreshnessIndicator, { status: status.sv, onNavigate, tabIndex: 0 }) : null,
+        ? h(SvFreshnessIndicator, { status: status.sv, onNavigate, tabIndex: 0, analysis }) : null,
       status?.rex && validViews.has(INDICATOR_VIEWS.rex)
         ? h(RexCompletionIndicator, { status: status.rex, onNavigate, tabIndex: 0 }) : null,
       status?.hench && validViews.has(INDICATOR_VIEWS.hench)
-        ? h(HenchActivityIndicator, { status: status.hench, onNavigate, tabIndex: 0 }) : null,
+        ? h(HenchActivityIndicator, {
+          status: status.hench,
+          onNavigate,
+          tabIndex: 0,
+          liveAvailable: validViews.has(LIVE_INDICATOR_VIEWS.stuck),
+        }) : null,
     ),
 
     h("div", { class: "bottombar-controls" },

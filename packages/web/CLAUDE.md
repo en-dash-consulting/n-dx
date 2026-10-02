@@ -46,6 +46,45 @@ The viewer's UI composition layer — the shell (top-nav, stage-links, bottom-ba
 3. The zone pins in `.n-dx.json` targeting `"web-server"` are no-ops when the zone is absent — they will re-activate if the zone re-appears in Louvain output
 4. The actual server/viewer boundary is enforced by `boundary-check.test.ts` regardless of zone detection — zone dissolution is a metrics artifact, not an architectural violation
 
+## Request gate: Host first, then Origin
+
+Both servers are loopback-only and unauthenticated, so the request gate *is*
+the access control against a web page the operator has open. It has two rules,
+applied in this order, and both live in `src/shared/origin.ts` so the hub
+(`hub/request-guard.ts`) and the project server (`server/request-security.ts`)
+cannot drift:
+
+1. **Host must name loopback on this socket's port** — `localhost`,
+   `127.0.0.1` or `[::1]`, with the exact port, round-tripping through the URL
+   parser unchanged. Anything else is `421 Misdirected Request`, for `GET` as
+   much as `POST`. Behind the hub the proxy rewrites `Host` to
+   `127.0.0.1:<child port>`, so a project server only ever judges requests made
+   to it directly.
+2. **A present `Origin` on a mutation must be this server's own**, compared
+   against the socket port (never `Host`); `Sec-Fetch-Site: cross-site` without
+   an `Origin` is refused too. Safe methods with a foreign `Origin` pass
+   unreflected — the page cannot read them without the CORS header.
+
+Consequences for new code:
+
+- **Every listener gets the gate.** A new `createServer` in this package calls
+  `handleRequestSecurity` (or the hub's `guardHubRequest`) before routing, and
+  its `upgrade` handler applies `isTrustedHost` + the origin check. The
+  dashboard, the hub and the preview server all do.
+- **`GET` must be read-only.** A safe method must not have side effects; a
+  `GET` that writes a file or spawns a process is a bug even on loopback.
+- **Internal clients must use a loopback name.** The hub's health probes and
+  overview fetches use `127.0.0.1:<port>`; a client that reached a server by
+  the machine's hostname or `0.0.0.0` would now get 421. Remote access through
+  a tunnel or devcontainer port-forward is unsupported for the same reason — if
+  it ever becomes a feature it needs an explicit Host allowlist setting, not a
+  relaxed check.
+- **Tests build requests by hand.** `fetch()` will not send a foreign `Host`;
+  use `node:http`'s `request` with `setHost: false` (see
+  `tests/integration/hub-proxy.test.ts`) or the mock request helpers in the
+  unit tests, which default `Host` to the socket so origin tests exercise the
+  origin rule.
+
 ## Feature-toggle enforcement
 
 Toggles in `routes-features.ts`'s registry are enforced in the viewer by
@@ -116,9 +155,13 @@ each one explicitly with the `X-Ndx-Workspace` header rather than the `/w/<key>/
 slot — the slot is already spent on whichever workspace the viewer itself is
 mounted under, and the server reads the header ahead of the slot
 (`workspaceFromHeader` in the dispatcher, not the lenient `resolveWorkspace`).
-Three endpoints answer for the whole repository and are fetched plainly
-(`/api/workspaces`, `/api/worktrees`, `/api/hench/memory`); the rest are per
-workspace.
+Four endpoints answer for the whole repository and are fetched plainly
+(`/api/workspaces`, `/api/worktrees`, `/api/hench/memory`, `/api/live`); the
+rest are per workspace. `/api/live` (`routes-live.ts`) is the Live tab's one
+read — every worktree's running runs and jobs, the queue, the machine strip —
+built from the registry's list and the digest cache behind `/api/worktrees`,
+never from `git` per request. Its `live:changed` frame is tagged `"*"`, like
+the memory monitor's.
 
 **A header naming no known worktree is a 404, on reads as much as on writes.**
 Falling back to the anchor would answer under a name the caller did not ask

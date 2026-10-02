@@ -42,3 +42,16 @@ export type { NextStep, IsoModel, IsoModelInput, IsoSourceMode } from "@n-dx/sou
  * helper never reaches for "@n-dx/sourcevision" itself.
  */
 export type { Manifest, Inventory, Imports, Zones, Components } from "@n-dx/sourcevision";
+
+/**
+ * Live analyze progress (`.sourcevision/.cache/analyze-progress.json`).
+ *
+ * The one sourcevision file read through a loader rather than parsed at the
+ * read site: whether a `running` file is still running depends on its pid,
+ * and "the previous run" is a lookup in `analyses.jsonl`. Both rules belong
+ * to the writer, so the server takes the reader rather than restating them.
+ * The same goes for what an analyze process's command line looks like, which
+ * the Stop route checks before signalling a recorded pid.
+ */
+export { readAnalyzeProgress, analyzeProgressPath, confirmAnalyzeProcess } from "@n-dx/sourcevision";
+export type { AnalyzeProgressReport, ProcessCommandLine } from "@n-dx/sourcevision";

@@ -432,6 +432,41 @@ export function resolveActiveVendor(projectDir: string): string | null {
   return typeof llm["vendor"] === "string" ? llm["vendor"] : null;
 }
 
+/** The agent's vendor and model as the Live views show them; both null when the config cannot be resolved. */
+export interface ActiveAgentModel {
+  vendor: string | null;
+  model: string | null;
+}
+
+const activeAgentModels = new Map<string, ActiveAgentModel>();
+
+/**
+ * The vendor and model `ndx work` runs — the `effective` block of
+ * `GET /api/llm/config`, so the Live strip and Robot Wrangler name the same
+ * robot. Remembered per project for {@link lastActiveAgentModel}.
+ *
+ * A config that fails to resolve (malformed `.n-dx.json`) yields nulls and a
+ * log line rather than a throw: the Live views must keep answering, and the
+ * LLM settings page is where that error is reported.
+ */
+export async function resolveActiveAgentModel(projectDir: string): Promise<ActiveAgentModel> {
+  let resolved: ActiveAgentModel;
+  try {
+    const { vendor, model } = await resolveEffectiveAgentConfig(projectDir);
+    resolved = { vendor, model };
+  } catch (err) {
+    console.error(`[llm] effective agent config unresolved for ${projectDir}: ${(err as Error).message}`);
+    resolved = { vendor: null, model: null };
+  }
+  activeAgentModels.set(projectDir, resolved);
+  return resolved;
+}
+
+/** The last {@link resolveActiveAgentModel} answer for the project, for synchronous snapshot builders. */
+export function lastActiveAgentModel(projectDir: string): ActiveAgentModel {
+  return activeAgentModels.get(projectDir) ?? { vendor: null, model: null };
+}
+
 /**
  * Refusals `ndx work` would raise for the resolved config. The provider check
  * is the one the dashboard already applies on write; the model check is

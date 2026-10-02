@@ -53,6 +53,7 @@ import {
 } from "./domain-hench.js";
 
 import { WorkspacesView } from "./domain-workspaces.js";
+import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import type { StageId } from "./stages.js";
@@ -132,6 +133,18 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "workspaces": () =>
     h(WorkspacesView, null),
+
+  "live": ({ data, navigateTo, jobs }) =>
+    h(LiveView, { navigateTo, analyzedAt: data.manifest?.analyzedAt ?? null, jobs }),
+
+  // Keyed by task: switching tasks in place starts a fresh page, not the last one's run choice.
+  "live-task": (ctx) =>
+    ctx.selectedTaskId
+      ? h(LiveTaskView, { key: ctx.selectedTaskId, taskId: ctx.selectedTaskId, navigateTo: ctx.navigateTo })
+      : REGISTRY["live"](ctx),
+
+  "live-analyze": ({ navigateTo }) =>
+    h(LiveAnalyzeView, { navigateTo }),
 
   "overview": ({ data, jobs }) =>
     h(Overview, { data, jobs }),

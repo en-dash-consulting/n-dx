@@ -41,7 +41,7 @@ import {
 import type { HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute } from "./routes.js";
 import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
-import { guardHubRequest, upgradeAllowed } from "./request-guard.js";
+import { guardHubRequest, upgradeVerdict } from "./request-guard.js";
 
 export const DEFAULT_HUB_PORT = 3117;
 const LOOPBACK_HOST = "127.0.0.1";
@@ -475,8 +475,13 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       });
   });
   server.on("upgrade", (req, socket, head) => {
-    if (!upgradeAllowed(req, hub.listeningPort)) {
-      socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    // The two rejections are distinct, as on the HTTP path and on the project
+    // server's own upgrade path: a `Host` that does not name this hub is 421
+    // Misdirected Request, a foreign `Origin` is 403 Forbidden.
+    const verdict = upgradeVerdict(req, hub.listeningPort);
+    if (verdict !== "allowed") {
+      const statusLine = verdict === "misdirected" ? "421 Misdirected Request" : "403 Forbidden";
+      socket.write(`HTTP/1.1 ${statusLine}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
       socket.destroy();
       return;
     }

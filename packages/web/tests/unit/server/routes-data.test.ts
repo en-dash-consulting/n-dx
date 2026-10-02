@@ -110,4 +110,27 @@ describe("Data routes", () => {
     });
     expect(res.status).toBe(403);
   });
+
+  it("blocks a sibling directory that merely shares the data directory's prefix", async () => {
+    // `.sourcevision-old/` starts with `.sourcevision`, so a bare prefix check
+    // would serve it. The separator in the containment check is what stops it.
+    const sibling = `${svDir}-old`;
+    await mkdir(sibling, { recursive: true });
+    await writeFile(join(sibling, "secret.json"), '{"outside":true}');
+
+    const http = await import("node:http");
+    const send = (path: string) =>
+      new Promise<number>((resolve, reject) => {
+        const req = http.request({ hostname: "127.0.0.1", port, path, method: "GET" }, (res) => {
+          res.resume();
+          res.on("end", () => resolve(res.statusCode ?? 0));
+        });
+        req.on("error", reject);
+        req.end();
+      });
+
+    expect(await send("/data/../.sourcevision-old/secret.json")).toBe(403);
+    // The directory itself (an empty file name) is not a file to serve either.
+    expect(await send("/data/")).toBe(403);
+  });
 });

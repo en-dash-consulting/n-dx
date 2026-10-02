@@ -429,6 +429,63 @@ describe("RunRetention", () => {
       expect(files).not.toContain("old-2.json.gz");
     });
 
+    it("takes the progress-event sidecar with the run it describes", async () => {
+      // `listRunFiles` only matches `.json`/`.json.gz`, so a `.events.jsonl`
+      // left behind here would never be collected by anything, ever.
+      await writeRunFile("old-1.json");
+      await writeRunFile("old-2.json.gz");
+      await writeRunFile("recent.json");
+      await writeFile(join(runsDir, "old-1.events.jsonl"), "{}\n", "utf-8");
+      await writeFile(join(runsDir, "old-2.events.jsonl"), "{}\n", "utf-8");
+      await writeFile(join(runsDir, "recent.events.jsonl"), "{}\n", "utf-8");
+      await setFileAge("old-1.json", 200);
+      await setFileAge("old-2.json.gz", 250);
+
+      await enforceRetentionPolicy(runsDir, {
+        maxAgeDays: 180,
+        enabled: true,
+        warningDays: 30,
+        preserveUsageStats: false,
+      });
+
+      const files = await readdir(runsDir);
+      expect(files).not.toContain("old-1.events.jsonl");
+      expect(files).not.toContain("old-2.events.jsonl");
+      expect(files).toContain("recent.events.jsonl");
+    });
+
+    it("counts only run files, not their sidecars, as deleted", async () => {
+      await writeRunFile("old.json");
+      await writeFile(join(runsDir, "old.events.jsonl"), "{}\n", "utf-8");
+      await setFileAge("old.json", 200);
+
+      const result = await enforceRetentionPolicy(runsDir, {
+        maxAgeDays: 180,
+        enabled: true,
+        warningDays: 30,
+        preserveUsageStats: false,
+      });
+
+      expect(result.filesDeleted).toBe(1);
+      expect(result.errors).toEqual([]);
+    });
+
+    it("reports no error for a run that never had a sidecar", async () => {
+      // The normal case: the stream is newer than the record format.
+      await writeRunFile("old.json");
+      await setFileAge("old.json", 200);
+
+      const result = await enforceRetentionPolicy(runsDir, {
+        maxAgeDays: 180,
+        enabled: true,
+        warningDays: 30,
+        preserveUsageStats: false,
+      });
+
+      expect(result.filesDeleted).toBe(1);
+      expect(result.errors).toEqual([]);
+    });
+
     it("does nothing when disabled", async () => {
       await writeRunFile("old.json");
       await setFileAge("old.json", 200);

@@ -35,7 +35,17 @@ import { connect } from "node:net";
 import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { Duplex } from "node:stream";
-import { HUB_PATH, detectBasePath, isHubChooserPath, loopbackOrigin, projectIdFromBasePath, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
+import {
+  HUB_ADMISSION_HEADER,
+  HUB_PATH,
+  detectBasePath,
+  formatHubAdmissionHeader,
+  isHubChooserPath,
+  loopbackOrigin,
+  projectIdFromBasePath,
+  stripBasePath,
+  stripWorkspaceSlot,
+} from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 import { buildHubOverview } from "./overview.js";
 import { homedir } from "node:os";
@@ -51,6 +61,8 @@ const EXECUTE_PATH = "/api/hench/execute";
 const MAX_EXECUTE_BODY_BYTES = 64 * 1024;
 /** Header telling the project server which prefix the client used, for anything that builds absolute links. */
 const FORWARDED_PREFIX_HEADER = "x-forwarded-prefix";
+/** The Live overview: its agent-slots tile reports the machine's admission state when served through the hub. */
+const LIVE_PATH = "/api/live";
 
 /** What to do with a request that is not the hub's own API. */
 export type ProxyDecision =
@@ -254,8 +266,12 @@ export function proxyHttp(
   path: string,
   prefix: string,
   body?: Buffer,
+  extraHeaders: OutgoingHttpHeaders = {},
 ): void {
   const headers: OutgoingHttpHeaders = { ...req.headers, host: `${UPSTREAM_HOST}:${port}` };
+  // Only the hub states its admission state; a client's copy never reaches the child.
+  delete headers[HUB_ADMISSION_HEADER];
+  Object.assign(headers, extraHeaders);
   if (prefix) headers[FORWARDED_PREFIX_HEADER] = prefix;
   // The browser's Origin names the HUB's port, and the child compares Origin
   // against its own ephemeral one — so a verbatim forward made the child read
@@ -361,7 +377,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
   switch (decision.kind) {
     case "proxy":
       if (await handleExecuteAdmission(req, res, hub, decision)) return;
-      proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix);
+      proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, undefined, await admissionHeadersFor(req, hub, decision));
       return;
     case "html":
       res.writeHead(decision.status, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
@@ -381,6 +397,29 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       return;
     }
   }
+}
+
+/**
+ * The admission header for a `GET /api/live`, measured now; none for anything
+ * else. Measured rather than read from the gate's last decision, which may be
+ * minutes old on an idle machine — the same reason `GET /api/hub/queue` does.
+ */
+async function admissionHeadersFor(
+  req: IncomingMessage,
+  hub: Hub,
+  decision: Extract<ProxyDecision, { kind: "proxy" }>,
+): Promise<OutgoingHttpHeaders> {
+  if ((req.method || "GET") !== "GET") return {};
+  if (stripWorkspaceSlot(decision.path.split("?")[0]).url !== LIVE_PATH) return {};
+  await hub.admission.measure();
+  const snapshot = hub.admission.snapshot();
+  return {
+    [HUB_ADMISSION_HEADER]: formatHubAdmissionHeader({
+      running: snapshot.running,
+      maxSessions: snapshot.limits.maxSessions,
+      queued: snapshot.entries.length,
+    }),
+  };
 }
 
 /**

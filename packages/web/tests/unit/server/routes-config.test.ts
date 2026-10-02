@@ -107,6 +107,37 @@ describe("Config API routes", () => {
       expect(data.authMethod).toBe("api-key");
     });
 
+    it("reports LM Studio's live model for a local vendor without writing .n-dx.json", async () => {
+      // A GET must not have side effects; an earlier version persisted the
+      // live model name back into .n-dx.json from here.
+      const configPath = join(tmpDir, ".n-dx.json");
+      const original = JSON.stringify({ llm: { vendor: "local", local: { host: "localhost", port: 1234, model: "stored-model" } } });
+      await writeFile(configPath, original);
+
+      const realFetch = globalThis.fetch;
+      const calls: string[] = [];
+      globalThis.fetch = (async (input: string | URL | Request) => {
+        calls.push(String(input));
+        return new Response(JSON.stringify({ data: [{ id: "live-model" }] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }) as typeof fetch;
+      try {
+        clearConfigCaches();
+        const res = await realFetch(`http://127.0.0.1:${port}/api/ndx-config`);
+        const data = await res.json();
+        expect(calls).toEqual(["http://localhost:1234/v1/models"]);
+        expect(data.vendor).toBe("local");
+        expect(data.model).toBe("live-model");
+      } finally {
+        globalThis.fetch = realFetch;
+      }
+
+      const { readFile } = await import("node:fs/promises");
+      expect(await readFile(configPath, "utf-8")).toBe(original);
+    });
+
     it("does not report a Claude model as the live model for a non-Claude vendor", async () => {
       // llm.claude.* are Claude's keys. Folding them into the model shown for
       // a codex project names a model that vendor will never run.

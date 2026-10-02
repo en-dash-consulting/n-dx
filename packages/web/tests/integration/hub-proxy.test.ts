@@ -33,12 +33,17 @@ async function register(id: string, repoRoot: string): Promise<void> {
   expect(body.project.status.state).toBe("healthy");
 }
 
-/** Raw WebSocket handshake; resolves with the status line the hub returned. */
-function wsHandshake(path: string, origin?: string): Promise<string> {
+/**
+ * Raw WebSocket handshake; resolves with the status line the hub returned.
+ *
+ * `host` defaults to the hub's own name so the origin cases exercise the origin
+ * rule; the Host case overrides it, which `fetch` and a WebSocket client cannot.
+ */
+function wsHandshake(path: string, origin?: string, host?: string): Promise<string> {
   return new Promise((resolvePromise, reject) => {
     const socket = connect(hub.port, "127.0.0.1", () => {
       socket.write(
-        `GET ${path} HTTP/1.1\r\nHost: 127.0.0.1:${hub.port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n` +
+        `GET ${path} HTTP/1.1\r\nHost: ${host ?? `127.0.0.1:${hub.port}`}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n` +
         (origin ? `Origin: ${origin}\r\n` : "") +
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
       );
@@ -241,6 +246,40 @@ describe("hub origin handling", () => {
     expect((await (await fetch(`http://127.0.0.1:${hub.port}/api/hub/projects/gamma`)).json()).project.id).toBe("gamma");
   }, 60_000);
 
+  it("answers 421 to a read whose Host is not the hub, and never proxies it", async () => {
+    await ensureGamma();
+    // fetch() will not send a foreign Host, so build the request by hand.
+    const { request } = await import("node:http");
+    const send = (host: string, path: string) =>
+      new Promise<{ status: number; body: string }>((resolvePromise, reject) => {
+        const r = request(
+          { host: "127.0.0.1", port: hub.port, method: "GET", path, headers: { Host: host }, setHost: false },
+          (res) => {
+            let body = "";
+            res.on("data", (c: Buffer) => { body += c.toString(); });
+            res.on("end", () => resolvePromise({ status: res.statusCode ?? 0, body }));
+          },
+        );
+        r.on("error", reject);
+        r.end();
+      });
+
+    for (const path of ["/api/hub/overview", "/p/gamma/api/status", "/hub", "/"]) {
+      const foreign = await send(`attacker.example:${hub.port}`, path);
+      expect(foreign.status, path).toBe(421);
+      expect(JSON.parse(foreign.body), path).toEqual({ error: "Request Host does not name this server" });
+    }
+
+    // The same requests with the hub's own name still work — including the
+    // proxied one, where the proxy rewrites Host for the child.
+    for (const host of [`localhost:${hub.port}`, `127.0.0.1:${hub.port}`]) {
+      expect((await send(host, "/api/hub/overview")).status, host).toBe(200);
+      const proxied = await send(host, "/p/gamma/api/status");
+      expect(proxied.status, host).toBe(200);
+      expect(JSON.parse(proxied.body).projectDir, host).toBe(repoA);
+    }
+  }, 60_000);
+
   it("lets the dashboard's own origin mutate through the proxy", async () => {
     await ensureGamma();
     // The child's 404 ("Not found", plain text) is the proof that the request
@@ -261,6 +300,22 @@ describe("hub origin handling", () => {
     await ensureGamma();
     expect(await wsHandshake("/p/gamma", hubOrigin())).toMatch(/^HTTP\/1\.1 101/);
     expect(await wsHandshake("/p/gamma", "http://evil.test")).toMatch(/^HTTP\/1\.1 403/);
+  }, 60_000);
+
+  it("answers 421, not 403, to an upgrade whose Host is not the hub", async () => {
+    await ensureGamma();
+    // The Host rule and the origin rule are different refusals, and the hub
+    // must say so: the HTTP path answers 421 for a foreign Host, and so does
+    // the project server's own upgrade handler. A single boolean verdict here
+    // reported every rejected handshake as 403.
+    for (const origin of [undefined, hubOrigin(), "http://evil.test"]) {
+      expect(
+        await wsHandshake("/p/gamma", origin, `attacker.example:${hub.port}`),
+        `origin=${origin ?? "none"}`,
+      ).toMatch(/^HTTP\/1\.1 421 Misdirected Request/);
+    }
+    // The hub's own names still reach the project server.
+    expect(await wsHandshake("/p/gamma", hubOrigin(), `localhost:${hub.port}`)).toMatch(/^HTTP\/1\.1 101/);
   }, 60_000);
 
   it("stays up when a project prefix carries a malformed escape", async () => {

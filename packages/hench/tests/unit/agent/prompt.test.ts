@@ -181,3 +181,46 @@ describe("buildSystemPrompt — resolved CLI name", () => {
     expect(prompt).not.toContain("n-dx will confirm the commit");
   });
 });
+
+// ── Bare-git instruction (GitHub #485) ────────────────────────────────────────
+// Claude CLI pre-approves git by subcommand prefix (`Bash(git add:*)`,
+// `Bash(git commit:*)`), and a prefix match only sees the start of the command
+// line. An agent that cd's into a package to run its tests and then commits with
+// `cd ../.. && git commit …` raises a permission prompt nobody can answer, so
+// the commit is refused and the uncommitted-work gate fails a run whose test
+// gate passed. The prompt is the fix; widening the allowlist is not.
+describe("buildSystemPrompt — bare git instruction", () => {
+  const project: TaskBriefProject = { name: "test-project" };
+
+  for (const autoCommit of [true, false]) {
+    it(`tells the agent to run git bare from the project root (autoCommit ${autoCommit})`, () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), autoCommit };
+      const prompt = buildSystemPrompt(project, config);
+
+      expect(prompt).toContain("bare command from the project root");
+      // The three shapes that defeat a prefix match.
+      expect(prompt).toContain("cd ... &&");
+      expect(prompt).toContain("(cd ...; git ...)");
+      expect(prompt).toContain("git -C <dir>");
+      // And the recovery when the agent has already moved.
+      expect(prompt).toContain("return to the project root");
+    });
+  }
+
+  it("names both git add and git commit when autoCommit is on", () => {
+    const config = { ...DEFAULT_HENCH_CONFIG(), autoCommit: true };
+    const prompt = buildSystemPrompt(project, config);
+    expect(prompt).toContain("Run `git add` and `git commit` as a bare command");
+  });
+
+  it("names only git add when autoCommit is off, and keeps the staging contract", () => {
+    const config = { ...DEFAULT_HENCH_CONFIG(), autoCommit: false };
+    const prompt = buildSystemPrompt(project, config);
+
+    expect(prompt).toContain("Run `git add` as a bare command");
+    // The bare-git rule must not read as licence to commit here.
+    expect(prompt).not.toContain("Run `git add` and `git commit` as a bare command");
+    expect(prompt).toContain("Do NOT run `git commit`");
+    expect(prompt).toContain(".hench-commit-msg.txt");
+  });
+});

@@ -32,6 +32,7 @@ import {
 } from "./components/index.js";
 import {
   useRouteState,
+  usePageEntry,
   useAppData,
   useMemoryMonitor,
   useCrashRecovery,
@@ -41,6 +42,9 @@ import {
   useGitStatus,
   useWorktrees,
   useClaims,
+  useLive,
+  isAnalysisJob,
+  liveRunCount,
   useFeatureToggle,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
@@ -49,7 +53,8 @@ import { bootstrap } from "./bootstrap.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
 import { installBasePathFetch } from "./base-path.js";
 import { renderActiveView, buildValidViews } from "./views/view-registry.js";
-import { isSettingsView, stageForView } from "./views/stages.js";
+import { isLiveView, isSettingsView, stageForView } from "./views/stages.js";
+import { LiveBar } from "./views/domain-live.js";
 import { initScrollReveal } from "./scroll-reveal.js";
 
 if (isDeployedMode()) {
@@ -133,6 +138,10 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const { status: gitStatus, refetch: refetchGitStatus } = useGitStatus();
   const { worktrees } = useWorktrees();
   const { claims } = useClaims();
+  const liveAvailable = validViews.has("live") && !isDeployedMode();
+  const live = useLive(liveAvailable);
+  const analyses = live?.jobs.filter(isAnalysisJob).length ?? 0;
+  const liveRuns = live ? liveRunCount(live) : null;
   const [searchOpen, openSearch, closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const handleTripleClick = useMemo(
@@ -164,11 +173,12 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // mounted underneath. `pageView` is that page: the current view unless it is
   // a settings view, else the last non-settings view (or home, on a direct load).
   const settingsOpen = isSettingsView(view);
-  const [lastPage, setLastPage] = useState<ViewId>(() => (settingsOpen ? fallbackPage(validViews) : view));
-  useEffect(() => {
-    if (!isSettingsView(view)) setLastPage(view);
-  }, [view]);
-  const pageView: ViewId = settingsOpen ? lastPage : view;
+  const { page, lastEntry } = usePageEntry(
+    { view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId },
+    settingsOpen,
+    fallbackPage(validViews),
+  );
+  const pageView: ViewId = page.view;
   const stage = stageForView(pageView, validViews);
 
   // The commands sheet is UI state, not a route. Any navigation lowers it —
@@ -178,7 +188,15 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const toggleCommands = useCallback(() => setCommandsOpen((open) => !open), []);
   const closeCommands = useCallback(() => setCommandsOpen(false), []);
   const openSettings = useCallback(() => handleSidebarNav("robot-wrangler"), [handleSidebarNav]);
-  const closeSettings = useCallback(() => handleSidebarNav(lastPage), [handleSidebarNav, lastPage]);
+  const closeSettings = useCallback(
+    () => navigateTo(lastEntry.view, {
+      file: lastEntry.file ?? undefined,
+      zone: lastEntry.zone ?? undefined,
+      runId: lastEntry.runId ?? undefined,
+      taskId: lastEntry.taskId ?? undefined,
+    }),
+    [navigateTo, lastEntry],
+  );
 
   const handleRestore = () => {
     const state = restoreCrashState();
@@ -232,7 +250,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
-  const viewCtx = { data, setDetail, setPrdDetailContent, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
+  const viewCtx = { data, setDetail, setPrdDetailContent, selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
   return h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
@@ -240,7 +258,10 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
-    h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, onOpenSearch: openSearch, scope }),
+    h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, navigateTo, onOpenSearch: openSearch, scope }),
+    isLiveView(pageView) && validViews.has("live") && !isDeployedMode()
+      ? h(LiveBar, { view: pageView, taskId: page.taskId, navigateTo })
+      : null,
     h("div", { class: "app-body" },
       h("main", {
         id: "main-content",
@@ -291,7 +312,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
     h(ActiveOperationsTray, { operations: jobs.operations, navigateTo, onStop: jobs.stop }),
     h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
-    h(SessionsPanel, { worktrees, claims, navigateTo }),
+    h(SessionsPanel, { worktrees, claims, navigateTo, analyses, liveRuns, liveAvailable }),
     (showDrop && !hasData)
       ? h("div", { class: "drop-overlay", role: "dialog", "aria-label": "File drop zone" },
           h("div", { class: "drop-box" },

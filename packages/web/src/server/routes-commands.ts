@@ -49,6 +49,7 @@ import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { readCliName } from "./cli-name.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
+import { readAnalyzeProgress } from "./domain-gateway.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 
 const CMD_PREFIX = "/api/commands/";
@@ -519,13 +520,22 @@ async function handleSvAnalyze(
   return true;
 }
 
-/** GET /api/commands/sv-analyze/status */
+/**
+ * GET /api/commands/sv-analyze/status
+ *
+ * The dashboard job's slot (`running`, `recentOutput`, …) as before, plus
+ * `progress`: the structured progress the analyzing process itself publishes
+ * (phase, pass, batch, LLM use, the previous same-mode run's phase timings).
+ * The slot only knows runs this server started; `progress` covers a run
+ * started from a terminal too, so it can say running while `running` is false.
+ * Null until any analysis has run under the progress writer.
+ */
 function handleSvAnalyzeStatus(
   _req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  jsonResponse(res, 200, { ...svAnalyzeSlots.get(ctx).status });
+  jsonResponse(res, 200, { ...svAnalyzeSlots.get(ctx).status, progress: readAnalyzeProgress(ctx.svDir) });
   return true;
 }
 
@@ -1437,6 +1447,74 @@ export function startAsyncJob(
 /** Interrupt a report-producing job started by {@link startAsyncJob}. */
 export function stopAsyncJob(res: ServerResponse, job: AsyncJob, label: string): boolean {
   return stopJob(res, job, label);
+}
+
+/** The dashboard-started background jobs the job tray and the Live overview list. */
+export type CommandJobKind = "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "recommend";
+
+/** One job's status, reduced to what every kind shares. */
+export interface CommandJobSnapshot {
+  kind: CommandJobKind;
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  error: string | null;
+  stopped: boolean;
+  /** Last output line — for refresh, its latest phase — or null. */
+  detail: string | null;
+}
+
+function lastOutputLine(text: string | undefined): string | null {
+  const lines = (text ?? "").trim().split("\n").map((l) => l.trim()).filter(Boolean);
+  return lines.at(-1) ?? null;
+}
+
+/**
+ * Every job one workspace has started, by its key (`workspaceKeyOf`). A
+ * workspace that never started a job has no slots and lists nothing; reading
+ * creates none.
+ */
+export function commandJobsOf(workspaceKey: string): CommandJobSnapshot[] {
+  return [
+    snapshotJob("sv-analyze", svAnalyzeSlots.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.recentOutput)),
+    snapshotJob("self-heal", selfHealSlots.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+    snapshotJob("ci", ciJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+    snapshotJob("reshape", reshapeJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+    snapshotJob("refresh", refreshSlots.peekByKey(workspaceKey)?.status, (s) => s.phases.at(-1) ?? lastOutputLine(s.output)),
+    snapshotJob("recommend", recommendJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+  ].filter((job): job is CommandJobSnapshot => job !== null);
+}
+
+/** What the Live analysis page reads of the dashboard's own analyze slot. */
+export interface SvAnalyzeRunSnapshot {
+  running: boolean;
+  startedAt: string | null;
+  /** When the dashboard's run ended; null while running or never run. */
+  finishedAt: string | null;
+  /** Tail of the analyzer's stdout (about the last 3000 characters). */
+  output: string;
+}
+
+/**
+ * The dashboard's analyze slot for one workspace, or null when that
+ * workspace never started one. Output exists only for runs the dashboard
+ * spawned: a terminal run's stdout belongs to its terminal.
+ */
+export function svAnalyzeRunOf(workspaceKey: string): SvAnalyzeRunSnapshot | null {
+  const status = svAnalyzeSlots.peekByKey(workspaceKey)?.status;
+  return status ? { running: status.running, startedAt: status.startedAt, finishedAt: status.finishedAt, output: status.recentOutput } : null;
+}
+
+type JobStatusBase = Pick<CommandJobSnapshot, "running" | "startedAt" | "finishedAt" | "error" | "stopped">;
+
+function snapshotJob<S extends JobStatusBase>(
+  kind: CommandJobKind,
+  status: S | undefined,
+  detail: (status: S) => string | null,
+): CommandJobSnapshot | null {
+  if (!status) return null;
+  const { running, startedAt, finishedAt, error, stopped } = status;
+  return { kind, running, startedAt, finishedAt, error, stopped, detail: detail(status) };
 }
 
 /**
