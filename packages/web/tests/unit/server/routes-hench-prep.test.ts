@@ -11,7 +11,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { Server } from "node:http";
+import { request as httpRequest, type Server } from "node:http";
 
 const { execMock } = vi.hoisted(() => ({ execMock: vi.fn() }));
 vi.mock("@n-dx/llm-client", async (importOriginal) => {
@@ -38,6 +38,7 @@ import type { ServerContext } from "../../../src/server/types.js";
 import { resetHenchRouteStateForTests } from "../../../src/server/routes-hench.js";
 import {
   handleHenchPrepRoute,
+  PREP_MAX_IN_FLIGHT,
   PREP_PREVIEW_TIMEOUT_MS,
   PREP_RESOLVE_TIMEOUT_MS,
 } from "../../../src/server/routes-hench-prep.js";
@@ -282,6 +283,163 @@ describe("hench prep routes", () => {
       const res = await fetch(`http://127.0.0.1:${port}/api/hench/prep/task-1`);
       expect(res.status).toBe(502);
       expect((await res.json()).stderr).toBe("warn");
+    });
+  });
+
+  describe("abuse resistance", () => {
+    /** A GET with browser metadata headers; fetch cannot set Sec-Fetch-* itself. */
+    function getWith(port: number, path: string, headers: Record<string, string>): Promise<number> {
+      return new Promise((resolve, reject) => {
+        const req = httpRequest({ host: "127.0.0.1", port, path, headers }, (res) => {
+          res.resume();
+          res.on("end", () => resolve(res.statusCode ?? 0));
+        });
+        req.on("error", reject);
+        req.end();
+      });
+    }
+
+    /** A promise and the function that resolves it. */
+    function gate(): { promise: Promise<void>; open: () => void } {
+      let open!: () => void;
+      const promise = new Promise<void>((resolve) => { open = resolve; });
+      return { promise, open };
+    }
+
+    /**
+     * An exec fake that never finishes on its own. `spawned[n]` opens when the
+     * n-th spawn starts and `aborted[n]` when its signal fires, so tests wait on
+     * the event itself rather than on a clock.
+     */
+    function hangUntilAborted(count = 1) {
+      const spawned = Array.from({ length: count }, gate);
+      const aborted = Array.from({ length: count }, gate);
+      let n = 0;
+      execMock.mockImplementation((_cmd: string, _args: string[], opts: { signal?: AbortSignal }) => {
+        const i = n++;
+        spawned[i]?.open();
+        return new Promise((resolve) => {
+          opts.signal?.addEventListener("abort", () => {
+            aborted[i]?.open();
+            resolve({ stdout: "", stderr: "", exitCode: null, error: new Error("killed"), launched: true });
+          });
+        });
+      });
+      return { spawned: spawned.map((g) => g.promise), aborted: aborted.map((g) => g.promise) };
+    }
+
+    /**
+     * Serve the prep routes, reporting each request's arrival (after the handler
+     * has run its synchronous part, so it has joined any shared spawn) and the
+     * close of its connection (after the handler's own close listener has run).
+     */
+    async function openObserved(c: ServerContext) {
+      const arrived: Array<ReturnType<typeof gate>> = Array.from({ length: 8 }, gate);
+      const closed: Array<ReturnType<typeof gate>> = Array.from({ length: 8 }, gate);
+      let n = 0;
+      const s = await startRouteTestServer((req, res) => {
+        const i = n++;
+        const handled = handleHenchPrepRoute(req, res, c);
+        arrived[i]!.open();
+        res.once("close", () => closed[i]!.open());
+        return handled;
+      });
+      served.push({ ctx: c, server: s.server, port: s.port });
+      return { port: s.port, arrived: arrived.map((g) => g.promise), closed: closed.map((g) => g.promise) };
+    }
+
+    it.each(["/api/hench/prep/task-1", "/api/hench/ready"])("%s answers 403 to a cross-site request and spawns nothing", async (path) => {
+      const port = await open(ctx);
+      expect(await getWith(port, path, { "Sec-Fetch-Site": "cross-site" })).toBe(403);
+      expect(await getWith(port, path, { "Sec-Fetch-Site": "same-site" })).toBe(403);
+      expect(await getWith(port, path, { Origin: "http://evil.example" })).toBe(403);
+      expect(execMock).not.toHaveBeenCalled();
+    });
+
+    it("still answers same-origin, typed-URL and header-less requests", async () => {
+      await writeTasks(ctx, [{ id: "task-1", title: "t", level: "task", status: "pending" }]);
+      const port = await open(ctx);
+      for (const path of ["/api/hench/prep/task-1", "/api/hench/ready"]) {
+        expect(await getWith(port, path, {})).toBe(200);
+        expect(await getWith(port, path, { "Sec-Fetch-Site": "same-origin", Origin: `http://127.0.0.1:${port}` })).toBe(200);
+        expect(await getWith(port, path, { "Sec-Fetch-Site": "none" })).toBe(200);
+      }
+    });
+
+    it("coalesces concurrent prep requests for one task into one spawn", async () => {
+      let release!: () => void;
+      execMock.mockImplementation(() => new Promise((resolve) => {
+        release = () => resolve({ stdout: JSON.stringify(RESOLVE_JSON), stderr: "", exitCode: 0, error: null, launched: true });
+      }));
+      const { port, arrived } = await openObserved(ctx);
+      const url = `http://127.0.0.1:${port}/api/hench/prep/task-1`;
+      const replies = [fetch(url), fetch(url), fetch(url)];
+      await Promise.all(arrived.slice(0, 3));
+      release();
+      expect((await Promise.all(replies)).map((r) => r.status)).toEqual([200, 200, 200]);
+      expect(execMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses prep requests for new tasks beyond the in-flight cap", async () => {
+      const { spawned } = hangUntilAborted(PREP_MAX_IN_FLIGHT);
+      const port = await open(ctx);
+      const controllers = Array.from({ length: PREP_MAX_IN_FLIGHT }, () => new AbortController());
+      const held = controllers.map((c, i) =>
+        fetch(`http://127.0.0.1:${port}/api/hench/prep/t${i}`, { signal: c.signal }).catch(() => null));
+      await Promise.all(spawned);
+      const over = await fetch(`http://127.0.0.1:${port}/api/hench/prep/one-too-many`);
+      expect(over.status).toBe(429);
+      expect(execMock).toHaveBeenCalledTimes(PREP_MAX_IN_FLIGHT);
+      controllers.forEach((c) => c.abort());
+      await Promise.all(held);
+    });
+
+    it("kills the resolve child when its only client disconnects", async () => {
+      const { spawned, aborted } = hangUntilAborted();
+      const port = await open(ctx);
+      const controller = new AbortController();
+      const reply = fetch(`http://127.0.0.1:${port}/api/hench/prep/task-1`, { signal: controller.signal }).catch(() => null);
+      await spawned[0];
+      controller.abort();
+      await reply;
+      await aborted[0];
+    });
+
+    it("keeps a shared resolve alive until every waiting client has gone", async () => {
+      const { aborted } = hangUntilAborted();
+      const { port, arrived, closed } = await openObserved(ctx);
+      const url = `http://127.0.0.1:${port}/api/hench/prep/task-1`;
+      const first = new AbortController();
+      const second = new AbortController();
+      const replies = [fetch(url, { signal: first.signal }), fetch(url, { signal: second.signal })].map((p) => p.catch(() => null));
+      // Both requests are attached to the one spawn before the first leaves.
+      await Promise.all(arrived.slice(0, 2));
+      let killed = false;
+      void aborted[0]!.then(() => { killed = true; });
+      first.abort();
+      // Which socket is request 0 is not fixed, so wait for either to close.
+      await Promise.race(closed.slice(0, 2));
+      await Promise.resolve();
+      expect(killed).toBe(false);
+      second.abort();
+      await Promise.all(replies);
+      await aborted[0];
+    });
+
+    it("kills the preview child when the client disconnects", async () => {
+      const { spawned, aborted } = hangUntilAborted();
+      const port = await open(ctx);
+      const controller = new AbortController();
+      const reply = fetch(`http://127.0.0.1:${port}/api/hench/prep/task-1/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ options: {} }),
+        signal: controller.signal,
+      }).catch(() => null);
+      await spawned[0];
+      controller.abort();
+      await reply;
+      await aborted[0];
     });
   });
 

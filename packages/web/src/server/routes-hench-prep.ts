@@ -29,6 +29,7 @@ import { exec, getWorktreeRoot, listWorktrees, resolveLayout } from "@n-dx/llm-c
 import type { ServerContext } from "./types.js";
 import { errorResponse, jsonResponse, readBody } from "./response-utils.js";
 import { resolveNdxBin } from "./routes-commands.js";
+import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
 import { buildLlmCatalog } from "./routes-llm.js";
 import { collectHeldRuns, loadHenchConfig } from "./routes-hench.js";
 import { loadStuckTaskIds, maxFailedAttemptsOf } from "./stuck-tasks.js";
@@ -53,6 +54,14 @@ import type { HubMemoryPressure } from "../shared/index.js";
 export const PREP_RESOLVE_TIMEOUT_MS = 15_000;
 /** A dry run assembles the whole brief, so it gets longer. */
 export const PREP_PREVIEW_TIMEOUT_MS = 30_000;
+
+/**
+ * `ndx` spawns the prep routes may have running at once. Each is a full CLI start
+ * (up to {@link PREP_RESOLVE_TIMEOUT_MS} / {@link PREP_PREVIEW_TIMEOUT_MS}), so an
+ * unbounded loop of requests would stack processes. Past the cap a request that
+ * cannot join an in-flight resolve is answered 429.
+ */
+export const PREP_MAX_IN_FLIGHT = 4;
 
 export const READY_DEFAULT_LIMIT = 10;
 export const READY_MAX_LIMIT = 50;
@@ -105,17 +114,58 @@ function tail(text: string): string {
   return text.length > STDERR_TAIL_BYTES ? text.slice(-STDERR_TAIL_BYTES) : text;
 }
 
-/** Run `ndx <args>` in the workspace's directory, through the same binary the terminal uses. */
-async function runNdx(ctx: ServerContext, args: string[], timeout: number) {
+interface NdxRun {
+  stdout: string;
+  stderr: string;
+  failure: string | null;
+}
+
+/** Spawns running now, across both routes. */
+let inFlight = 0;
+
+/** An identical resolve in flight, joined rather than spawned again. */
+interface SharedResolve {
+  run: Promise<NdxRun>;
+  controller: AbortController;
+  waiters: number;
+}
+const sharedResolves = new Map<string, SharedResolve>();
+
+/**
+ * Run `ndx <args>` in the workspace's directory, through the same binary the
+ * terminal uses. Aborting `signal` kills the child and its tree.
+ */
+async function runNdx(ctx: ServerContext, args: string[], timeout: number, signal?: AbortSignal): Promise<NdxRun> {
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
-  const result = await exec(bin, [...prefixArgs, ...args], { cwd: ctx.projectDir, timeout });
-  const timedOut = result.exitCode === null;
-  const failure = result.exitCode === 0
-    ? null
-    : timedOut
-      ? `Timed out after ${Math.round(timeout / 1000)}s`
-      : `Exited with code ${result.exitCode}`;
-  return { stdout: result.stdout, stderr: result.stderr, failure };
+  inFlight++;
+  try {
+    const result = await exec(bin, [...prefixArgs, ...args], { cwd: ctx.projectDir, timeout, signal });
+    const failure = result.exitCode === 0
+      ? null
+      : signal?.aborted
+        ? "Cancelled: the client disconnected"
+        : result.exitCode === null
+          ? `Timed out after ${Math.round(timeout / 1000)}s`
+          : `Exited with code ${result.exitCode}`;
+    return { stdout: result.stdout, stderr: result.stderr, failure };
+  } finally {
+    inFlight--;
+  }
+}
+
+/** An AbortController that fires when the client goes away before the response is written. */
+function abortOnDisconnect(res: ServerResponse): AbortController {
+  const controller = new AbortController();
+  res.once("close", () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  return controller;
+}
+
+function refuseBusy(res: ServerResponse): true {
+  res.setHeader("Retry-After", "2");
+  jsonResponse(res, 429, { error: "Too many prepare requests in flight; retry shortly" });
+  return true;
 }
 
 function admissionOf(req: IncomingMessage): PrepAdmission | null {
@@ -195,11 +245,30 @@ function resetDeferredArgs(entry: PrdEntry | null): string[] {
 /** GET /api/hench/prep/:taskId */
 async function handlePrep(req: IncomingMessage, res: ServerResponse, ctx: ServerContext, taskId: string): Promise<boolean> {
   const entry = prdEntryOf(ctx, taskId);
-  const run = await runNdx(
-    ctx,
-    ["work", `--task=${taskId}`, "--resolve", ...resetDeferredArgs(entry), ctx.projectDir],
-    PREP_RESOLVE_TIMEOUT_MS,
-  );
+  // Requests for the same task share one spawn; the child is killed only once
+  // every request waiting on it has disconnected.
+  const key = `${ctx.projectDir}\0${taskId}`;
+  let shared = sharedResolves.get(key);
+  if (!shared) {
+    if (inFlight >= PREP_MAX_IN_FLIGHT) return refuseBusy(res);
+    const controller = new AbortController();
+    const started = runNdx(
+      ctx,
+      ["work", `--task=${taskId}`, "--resolve", ...resetDeferredArgs(entry), ctx.projectDir],
+      PREP_RESOLVE_TIMEOUT_MS,
+      controller.signal,
+    ).finally(() => sharedResolves.delete(key));
+    shared = { run: started, controller, waiters: 0 };
+    sharedResolves.set(key, shared);
+  }
+  const joined = shared;
+  joined.waiters++;
+  res.once("close", () => {
+    if (res.writableEnded) return;
+    if (--joined.waiters === 0) joined.controller.abort();
+  });
+  const run = await joined.run;
+  if (res.destroyed) return true;
   if (run.failure) {
     jsonResponse(res, 502, { error: `Could not resolve the run: ${run.failure}`, stderr: tail(run.stderr) });
     return true;
@@ -244,6 +313,8 @@ async function handlePreview(req: IncomingMessage, res: ServerResponse, ctx: Ser
     return true;
   }
   const { options } = checked;
+  if (inFlight >= PREP_MAX_IN_FLIGHT) return refuseBusy(res);
+  const disconnect = abortOnDisconnect(res);
   const contextFile = options.contextNotes ? await writeContextNotesFile(options.contextNotes) : null;
   let run: Awaited<ReturnType<typeof runNdx>>;
   try {
@@ -257,10 +328,12 @@ async function handlePreview(req: IncomingMessage, res: ServerResponse, ctx: Ser
         ctx.projectDir,
       ],
       PREP_PREVIEW_TIMEOUT_MS,
+      disconnect.signal,
     );
   } finally {
     await contextFile?.remove();
   }
+  if (res.destroyed) return true;
   if (run.failure) {
     // A refusal prints its reason on stdout, so it travels with the failure.
     jsonResponse(res, 502, { error: `Could not preview the run: ${run.failure}`, stderr: tail(run.stderr), brief: run.stdout });
@@ -333,7 +406,12 @@ export async function handleHenchPrepRoute(
   const path = url.split("?")[0]!;
   const method = req.method || "GET";
 
-  if (path === READY_PATH && method === "GET") return handleReady(req, res, ctx);
+  // These GETs make the server work (a spawn, a PRD scan), so a foreign page's
+  // <img src> must not be able to trigger them. The browser already blocks the
+  // cross-origin read; the work is not blocked, so refuse it here.
+  if (path === READY_PATH && method === "GET") {
+    return isForeignSiteRequest(req) ? refuseForeignSite(res) : handleReady(req, res, ctx);
+  }
 
   const match = PREP_ROUTE.exec(path);
   if (!match) return false;
@@ -345,5 +423,6 @@ export async function handleHenchPrepRoute(
     return true;
   }
   if (match[2]) return method === "POST" ? handlePreview(req, res, ctx, taskId) : false;
-  return method === "GET" ? handlePrep(req, res, ctx, taskId) : false;
+  if (method !== "GET") return false;
+  return isForeignSiteRequest(req) ? refuseForeignSite(res) : handlePrep(req, res, ctx, taskId);
 }
