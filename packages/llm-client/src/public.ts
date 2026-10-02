@@ -69,6 +69,7 @@
  * - `layout.ts` — folder-layout resolver (`.ndx/` first, legacy fallback)
  * - `project-config.ts` — `.n-dx.json` override loading and merging
  * - `json.ts` — canonical JSON serialization
+ * - `repo-trust.ts` — repository execution-config trust (baseline, digest, per-user trust store)
  * - `redact.ts` — credential redaction for run records, logs and live output
  * - `auth-token.ts` — per-user dashboard token file (`<ndx home>/auth.token`)
  * - `output.ts` — CLI output control (quiet mode)
@@ -363,6 +364,36 @@ export type {
 // Canonical JSON serialization
 export { toCanonicalJSON } from "./json.js";
 
+// Repository trust: what a checkout ships as execution config, and whether
+// this user has accepted it (record kept in <ndx home>/trust/, never in the repo)
+export {
+  SECRET_PATH_PATTERNS,
+  GIT_SUBCOMMAND_BASELINE,
+  guardBaselineForLanguage,
+  clampGuardToBaseline,
+  collectRepoExecutionConfig,
+  assessRepoExecutionConfig,
+  collectRepoInventory,
+  repoTrustRecordPath,
+  readRepoTrustRecord,
+  recordRepoTrust,
+  clearRepoTrust,
+  evaluateRepoTrust,
+  formatRepoTrustReport,
+} from "./repo-trust.js";
+export type {
+  GuardBaseline,
+  RepoMcpServer,
+  RepoExecutionConfig,
+  RepoTrustFindingCode,
+  RepoTrustFinding,
+  RepoInventory,
+  RepoTrustRecord,
+  RepoTrustStoreOptions,
+  RepoTrustState,
+  RepoTrustEvaluation,
+  RepoTrustReportOptions,
+} from "./repo-trust.js";
 // Credential redaction for persisted or displayed text (run records, logs, live output)
 export {
   REDACTED_TOKEN,

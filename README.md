@@ -432,6 +432,20 @@ The only outbound network connections are to the configured LLM API (Anthropic b
 
 A policy engine enforces per-minute rate limits on commands (60/min) and file writes (30/min). Cumulative budgets for total bytes written and total commands are configurable in `.hench/config.json` under `guard.policy`.
 
+### Repository trust
+
+Several files n-dx reads to decide *what it may execute* live inside the repository and are usually tracked by git: the hench guard in `.hench/config.json` (command allowlist, blocked paths, git subcommands, permission mode), the test command in `.rex/config.json`, and the MCP servers in `.mcp.json`. A clone, a fork, or a checked-out pull request can therefore ship a looser policy than your own `ndx init` would have written, and the PRD it carries is what an autonomous run acts on.
+
+`ndx init` ends with a review of what the checkout brought — the findings, plus the PRD items, analysis and run records that came with it — and asks whether to trust it. `ndx trust .` shows the same review at any time; `ndx trust accept .` records your decision in your ndx home (`~/.ndx/trust/`, mode 0600), never in the repository, so another account on the machine cannot pre-approve a repository for you. The dashboard shows the same warning as a strip at the top of every page until you accept.
+
+Until a repository is trusted, `ndx work` runs under the **default guard** (the repository's config can only tighten it, never widen it), `bypassPermissions` is lowered to `acceptEdits`, and the `verify_criteria` MCP tool does not run the repository's test command. A later change to those files shows as *changed* and restricts again until reviewed. `ndx trust revoke .` forgets the decision.
+
+Two limits to know. With `provider: cli`, the vendor CLI (Claude Code, Codex) executes tools under its own permission system; hench's guard governs only hench's own tool loop, so the permission-mode clamp is what reaches a CLI run. And the command allowlist bounds accidents, not adversaries: `node` and `npx` are in it, so an agent that wants to run arbitrary code can. The trust review is what tells you the repository asked for more than the defaults.
+
+### Child-process environment
+
+Commands the agent runs (shell, git, the test runner) receive `process.env` minus variables whose names look like credentials — `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*_API_KEY`, `AWS_*`, and so on. Values are never inspected. A project whose tests need one of them lists it under `guard.env.allow` in `.hench/config.json`; `guard.env.deny` strips more. The default blocked paths also cover credential files (`.env`, `.env.*`, `*.pem`, `*.key`, `.npmrc`, `.netrc`, `.aws/`, `.ssh/`).
+
 ### No install-time hooks
 
 All packages use only `prepare` scripts (TypeScript compilation). There are no `preinstall`, `postinstall`, or native code compilation steps.

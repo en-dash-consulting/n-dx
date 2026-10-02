@@ -41,6 +41,7 @@ export type {
   RunReviewPlan,
   RunReviewSpend,
   RunRecord,
+  RunTrustRecord,
   RunCommitRecord,
   RunCompletionHold,
   RunSessionRecord,

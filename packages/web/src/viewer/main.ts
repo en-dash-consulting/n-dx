@@ -29,6 +29,7 @@ import {
   createTripleClickDetector,
   initTheme,
   initDensity,
+  RepoTrustStrip,
 } from "./components/index.js";
 import {
   useRouteState,
@@ -262,6 +263,10 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     isLiveView(pageView) && validViews.has("live") && !isDeployedMode()
       ? h(LiveBar, { view: pageView, taskId: page.taskId, navigateTo })
       : null,
+    // Repository trust: shown while the checkout's execution config is not
+    // trusted. Server-backed; renders nothing in a standalone viewer. Below
+    // LiveBar so the nav chrome stays contiguous — both sit above main content.
+    h(RepoTrustStrip, null),
     h("div", { class: "app-body" },
       h("main", {
         id: "main-content",
