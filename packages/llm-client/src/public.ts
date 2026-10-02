@@ -184,6 +184,18 @@ export {
 } from "./config.js";
 export type { TaskModelResolution, JudgmentRoute, ModelCost } from "./config.js";
 
+// Claude Messages API effort (output_config.effort)
+export {
+  CLAUDE_EFFORT_LEVELS,
+  EFFORT_CAPABLE_CLAUDE_MODELS,
+  CLAUDE_DEFAULT_EFFORT,
+  isClaudeEffort,
+  supportsClaudeEffort,
+  resolveClaudeApiEffort,
+  resetClaudeEffortWarnings,
+} from "./claude-effort.js";
+export type { ClaudeEffort } from "./claude-effort.js";
+
 // Model-aware token pricing (the single price table for every cost surface)
 export {
   resolveModelPricing,

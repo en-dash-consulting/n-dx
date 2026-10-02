@@ -79,7 +79,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "Other vendors get a fresh reviewer seeded with the task context.\n" +
           "\n" +
           "Model: --review-model wins, then llm.<vendor>.reviewModel, then\n" +
-          "llm.reviewModel, then the vendor default (claude: claude-opus-5).\n" +
+          "llm.reviewModel, then the vendor default (claude: claude-opus-5-5).\n" +
           "The execution model is never inherited — pinning a cheap executor\n" +
           "must not silently downgrade the reviewer.\n" +
           "\n" +
@@ -114,7 +114,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "hench run --loop --epic-by-epic", description: "Continuously process epics in order" },
       { command: "hench run --dry-run .", description: "Preview the brief without execution" },
       { command: "hench run --auto --review", description: "Auto-run with an adversarial review pass after each task" },
-      { command: "hench run --review --review-model=claude-fable-5", description: "Review on a specific model" },
+      { command: "hench run --review --review-model=claude-fable-5-1", description: "Review on a specific model" },
     ],
     related: ["status", "show"],
   },

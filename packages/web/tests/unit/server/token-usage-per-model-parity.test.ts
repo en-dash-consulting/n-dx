@@ -151,7 +151,7 @@ describe("dashboard per-model cost parity with ndx usage", () => {
 
     expect(residual).toBeDefined();
     expect(residual!.known).toBe(false);
-    expect(residual!.pricedAs).toBe("claude-sonnet-5");
+    expect(residual!.pricedAs).toBe("claude-sonnet-5-5");
     expect(webSide.cost.fullyAttributed).toBe(false);
   });
 
@@ -172,7 +172,7 @@ describe("dashboard per-model cost parity with ndx usage", () => {
     const line = webSide.cost.byModel.find((l) => l.model === "some-unreleased-model");
 
     expect(line).toBeDefined();
-    expect(line!).toMatchObject({ known: false, pricedAs: "claude-sonnet-5" });
+    expect(line!).toMatchObject({ known: false, pricedAs: "claude-sonnet-5-5" });
     expect(line!.totalRaw).toBeGreaterThan(0);
     expect(webSide.cost.fullyAttributed).toBe(false);
   });

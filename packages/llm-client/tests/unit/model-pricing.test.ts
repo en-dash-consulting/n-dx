@@ -72,7 +72,37 @@ describe("resolveModelPricing", () => {
   });
 
   it("expands a Claude CLI shorthand", () => {
-    expect(resolveModelPricing("opus")).toMatchObject({ modelId: "claude-opus-5", known: true });
+    expect(resolveModelPricing("opus")).toMatchObject({ modelId: "claude-opus-5-5", known: true });
+    expect(resolveModelPricing("fable")).toMatchObject({ modelId: "claude-fable-5-1", known: true });
+  });
+
+  it.each([
+    // Anthropic list pricing (USD per MTok). Cache read departs from the usual
+    // 0.1x on Opus 5.5 (0.05x) and Fable 5.1 (0.025x).
+    ["claude-opus-5-5", { input: 4, output: 20, cacheWrite: 5, cacheRead: 0.2 }],
+    ["claude-sonnet-5-5", { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 }],
+    ["claude-fable-5-1", { input: 10, output: 50, cacheWrite: 12.5, cacheRead: 0.25 }],
+    // Sonnet 5's $2/$10 launch price became its standard price; the scheduled
+    // rise to $3/$15 was cancelled.
+    ["claude-sonnet-5", { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 }],
+  ])("prices %s at its list rates, dated snapshot included", (modelId, rates) => {
+    for (const id of [modelId, `${modelId}-20261001`]) {
+      const resolved = resolveModelPricing(id);
+      expect(resolved.known, id).toBe(true);
+      expect(resolved.modelId, id).toBe(modelId);
+      expect(resolved.pricing).toEqual({
+        inputPerMillion: rates.input,
+        outputPerMillion: rates.output,
+        cacheWritePerMillion: rates.cacheWrite,
+        cacheReadPerMillion: rates.cacheRead,
+      });
+    }
+  });
+
+  it("keeps the superseded Claude 5 models priced as known", () => {
+    for (const id of ["claude-sonnet-5", "claude-opus-5", "claude-fable-5"]) {
+      expect(resolveModelPricing(id), id).toMatchObject({ modelId: id, known: true });
+    }
   });
 
   it("remaps a retired Codex model to its replacement's rates", () => {
@@ -134,11 +164,11 @@ describe("priceTokens", () => {
 
   it("sums all four token kinds", () => {
     const cost = priceTokens(oneMillionEach, resolveModelPricing("claude-sonnet-5").pricing);
-    expect(cost.inputCost).toBe(3);
-    expect(cost.outputCost).toBe(15);
-    expect(cost.cacheWriteCost).toBe(3.75);
-    expect(cost.cacheReadCost).toBe(0.3);
-    expect(cost.totalRaw).toBeCloseTo(22.05, 10);
+    expect(cost.inputCost).toBe(2);
+    expect(cost.outputCost).toBe(10);
+    expect(cost.cacheWriteCost).toBe(2.5);
+    expect(cost.cacheReadCost).toBe(0.2);
+    expect(cost.totalRaw).toBeCloseTo(14.7, 10);
   });
 
   it("prices the same tokens higher on Opus than on Sonnet", () => {

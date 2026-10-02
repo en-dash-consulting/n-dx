@@ -210,6 +210,10 @@ export {
 } from "@n-dx/llm-client";
 export type { VendorModelResetResult, FailoverAttemptResult } from "@n-dx/llm-client";
 
+// ---- Claude API effort ------------------------------------------------------
+export { resolveClaudeApiEffort } from "@n-dx/llm-client";
+export type { ClaudeEffort } from "@n-dx/llm-client";
+
 // ---- Usage formatting -------------------------------------------------------
 export { formatUsage } from "@n-dx/llm-client";
 
