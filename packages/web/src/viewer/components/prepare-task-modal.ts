@@ -21,7 +21,7 @@
 import { h, Fragment } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
-import { useFocusTrap, useHubQueue, queuePositionOf } from "../hooks/index.js";
+import { useFocusTrap, useHubQueue, queuePositionOf, droppedEntryOf } from "../hooks/index.js";
 import { appUrl } from "../base-path.js";
 import { RUN_OPTION_SPECS } from "../external.js";
 import type { RunOptionKey } from "../external.js";
@@ -86,6 +86,9 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
   const [canMigrate, setCanMigrate] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [queued, setQueued] = useState<QueuedReply | null>(null);
+  // The hub dropped the queued run at its turn; Execute is offered again.
+  const [queueDropped, setQueueDropped] = useState(false);
+  const onQueueDropped = useCallback(() => setQueueDropped(true), []);
 
   // Focus moves in on open — to the close button, the first control, so the
   // trap's wrap points hold from the start — and goes back to whatever opened
@@ -144,6 +147,8 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
     setExecError(null);
     setNotice(null);
     setCanMigrate(false);
+    setQueued(null);
+    setQueueDropped(false);
     try {
       const reply = await request("/api/hench/execute", { taskId, options: runOptionsOf(defaults, edits) });
       if (reply.ok && reply.data.queued === true) {
@@ -219,7 +224,7 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
     body = h(PreviewPanel, { preview, onBack: () => setPreview(null) });
   } else {
     body = h(Form, {
-      prep, defaults, edits, setEdits, taskId, busy, execError, canMigrate, notice, queued,
+      prep, defaults, edits, setEdits, taskId, busy, execError, canMigrate, notice, queued, queueDropped, onQueueDropped,
       onExecute: execute, onMigrate: migrate, onPreview: showPreview, onOpenLive, liveHref,
     });
   }
@@ -274,6 +279,8 @@ interface FormProps {
   canMigrate: boolean;
   notice: string | null;
   queued: QueuedReply | null;
+  queueDropped: boolean;
+  onQueueDropped: () => void;
   onExecute: () => void;
   onMigrate: () => void;
   onPreview: () => void;
@@ -455,7 +462,11 @@ function Form(props: FormProps) {
         ? h("button", { type: "button", class: "prep-btn", onClick: props.onMigrate, disabled: busy }, "Migrate the PRD tree")
         : null,
       notice ? h("p", { class: "prep-notice", role: "status" }, notice) : null,
-      queued ? h(QueuedNotice, { reply: queued, taskId, onOpenLive: props.onOpenLive, liveHref: props.liveHref }) : null,
+      queued
+        ? h(QueuedNotice, {
+          reply: queued, taskId, onOpenLive: props.onOpenLive, liveHref: props.liveHref, onDropped: props.onQueueDropped,
+        })
+        : null,
     ),
 
     h("footer", { class: "prep-footer" },
@@ -472,7 +483,7 @@ function Form(props: FormProps) {
         type: "button",
         class: "prep-btn prep-btn-primary",
         onClick: props.onExecute,
-        disabled: blocked || busy || queued !== null,
+        disabled: blocked || busy || (queued !== null && !props.queueDropped),
       }, busy ? "Starting…" : resume ? "Resume" : "Execute"),
     ),
   );
@@ -562,14 +573,24 @@ function PreviewPanel({ preview, onBack }: {
   );
 }
 
-function QueuedNotice({ reply, taskId, onOpenLive, liveHref }: {
+function QueuedNotice({ reply, taskId, onOpenLive, liveHref, onDropped }: {
   reply: QueuedReply;
   taskId: string;
   onOpenLive: (taskId: string) => void;
   liveHref?: (taskId: string) => string;
+  /** The hub reports the queued run refused at its turn: Execute may be tried again. */
+  onDropped: () => void;
 }) {
   const { queue } = useHubQueue();
   const live = queuePositionOf(queue, taskId);
+  const dropped = live === 0 ? droppedEntryOf(queue, taskId, reply.workspace) : null;
+  useEffect(() => { if (dropped) onDropped(); }, [dropped !== null, onDropped]);
+  if (dropped) {
+    // Its turn came and its server refused it: the run is not coming.
+    const status = dropped.status === null ? "" : ` (HTTP ${dropped.status})`;
+    return h("div", { class: "prep-queued", role: "alert" },
+      h("span", null, `Could not start: ${dropped.error}${status}`));
+  }
   // Out of the queue once the hub has answered without it: admitted.
   const admitted = queue !== null && live === 0;
   const position = live || reply.position;

@@ -492,6 +492,11 @@ async function handleExecuteAdmission(
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
     return true;
   }
+  // The server would refuse it when its turn came: say so now, in its words.
+  if (result.refused) {
+    writeJson(res, result.refused.status, result.refused.body);
+    return true;
+  }
 
   const snapshot = hub.admission.snapshot();
   writeJson(res, 202, {

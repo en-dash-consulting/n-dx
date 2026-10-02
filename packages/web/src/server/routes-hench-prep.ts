@@ -236,7 +236,7 @@ async function handlePreview(req: IncomingMessage, res: ServerResponse, ctx: Ser
     errorResponse(res, 400, "Invalid JSON in request body");
     return true;
   }
-  const checked = validateRunOptions(ctx.projectDir, body["options"]);
+  const checked = await validateRunOptions(ctx.projectDir, body["options"]);
   if (!checked.ok) {
     jsonResponse(res, 400, { error: checked.error, key: checked.key });
     return true;

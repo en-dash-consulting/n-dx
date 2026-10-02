@@ -256,6 +256,8 @@ export interface QueuedReply {
   queued: true;
   position: number;
   reason: "at-capacity" | "low-memory" | string;
+  /** Worktree the hub queued it for; null for the anchor. */
+  workspace?: string | null;
 }
 
 export function queuedReason(reason: string): string {

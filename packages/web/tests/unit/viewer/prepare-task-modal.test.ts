@@ -214,6 +214,32 @@ describe("PrepareTaskModal", () => {
     expect(button("Execute").disabled).toBe(true);
   });
 
+  it("says a queued run could not start, in its server's words, and offers Execute again", async () => {
+    let hubBody: Record<string, unknown> = { entries: [] };
+    await open(prepFixture(), (c) => {
+      if (c.url === "/api/hench/execute") {
+        return { status: 202, body: { queued: true, position: 1, reason: "at-capacity", taskId: "task-1", workspace: null } };
+      }
+      if (c.url === "/api/hub/queue") {
+        return { status: 200, body: { running: 2, limits: { maxSessions: 2, memoryFloorBytes: 0 }, memoryPaused: false, freeMemoryBytes: null, ...hubBody } };
+      }
+      return undefined;
+    });
+    // Its turn came; the server refused it, and the hub kept why.
+    hubBody = {
+      entries: [],
+      dropped: [
+        { projectId: "p", workspace: "other-tree", taskId: "task-1", enqueuedAt: "", droppedAt: "", status: 404, error: "Not this one." },
+        { projectId: "p", workspace: null, taskId: "task-1", enqueuedAt: "", droppedAt: "", status: 409, error: "Task is blocked by X." },
+      ],
+    };
+    await click(button("Execute"));
+    const notice = $(".prep-queued");
+    expect(notice.getAttribute("role")).toBe("alert");
+    expect(notice.textContent).toBe("Could not start: Task is blocked by X. (HTTP 409)");
+    expect(button("Execute").disabled).toBe(false);
+  });
+
   it("shows the server's message when the start is refused", async () => {
     await open(prepFixture(), (c) =>
       c.url === "/api/hench/execute" ? { status: 409, body: { error: "Task is claimed by another worktree." } } : undefined);

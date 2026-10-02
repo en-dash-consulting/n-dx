@@ -410,6 +410,48 @@ describe("POST /api/hench/execute", () => {
     expect(body.taskTitle).toBe("Pending Task");
     expect(body.status).toBe("started");
   });
+
+  describe("POST /api/hench/execute/check", () => {
+    const check = async (body: unknown) => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute/check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      expect(res.status).toBe(200);
+      return res.json();
+    };
+    const executions = async () =>
+      (await (await fetch(`http://127.0.0.1:${port}/api/hench/execute/status`)).json()).executions;
+
+    it("answers the refusal execute would give, with its status, without starting anything", async () => {
+      await writeFile(
+        join(rexDir, "prd.json"),
+        JSON.stringify(makePRD([
+          { id: "task-a", title: "Schema first", status: "pending", level: "task" },
+          { id: "task-blocked", title: "Blocked Task", status: "blocked", level: "task", blockedBy: ["task-a"] },
+        ]), null, 2),
+      );
+
+      const verdict = await check({ taskId: "task-blocked" });
+      expect(verdict).toMatchObject({ ok: false, status: 409, taskId: "task-blocked" });
+      expect(verdict.error).toContain('"Schema first" (task-a, pending)');
+      expect(verdict.blockedBy).toEqual([{ id: "task-a", title: "Schema first", status: "pending" }]);
+
+      expect(await check({ taskId: "task-a", options: { bogus: true } }))
+        .toMatchObject({ ok: false, status: 400, key: "bogus" });
+      expect(await check({})).toEqual({ ok: false, status: 400, error: "taskId is required" });
+    });
+
+    it("says ok for a runnable task and leaves it unstarted", async () => {
+      await writeFile(
+        join(rexDir, "prd.json"),
+        JSON.stringify(makePRD([{ id: "task-1", title: "Pending Task", status: "pending", level: "task" }]), null, 2),
+      );
+      expect(await check({ taskId: "task-1", options: { fresh: true } })).toEqual({ ok: true });
+      expect(await executions()).toEqual([]);
+    });
+  });
 });
 
 describe("GET /api/hench/execute/status", () => {

@@ -65,12 +65,47 @@ export interface QueueEntry {
   taskId: string;
   /**
    * The run options the request carried, replayed with it when admitted.
-   * Absent when it carried none. Only shape-checked here; the project server
-   * still judges them when the run starts.
+   * Absent when it carried none. Shape-checked by the proxy and judged by the
+   * project server before queuing (see `validate`), then judged again when the
+   * run starts, since the project may change while the entry waits.
    */
   options?: RunOptions;
   enqueuedAt: string;
 }
+
+/** A refusal from the project server, as its execute route answered it. */
+export interface ExecuteRefusal {
+  /** The HTTP status `POST /api/hench/execute` answered (or would have). */
+  status: number;
+  /** Its JSON body; `error` is the message for the operator. */
+  body: Record<string, unknown>;
+}
+
+/** How a queued entry's replay went. */
+export type StartOutcome =
+  | { started: true }
+  | {
+    started: false;
+    /** The server's HTTP status, or null when it could not be reached. */
+    status: number | null;
+    /** Why, in the server's words when it gave any. */
+    error: string;
+  };
+
+/**
+ * A queued entry whose turn came and whose server would not start it. Kept so
+ * the operator who saw "Queued — position N" learns the run is not coming and
+ * why, rather than watching the position vanish.
+ */
+export interface DroppedEntry extends QueueEntry {
+  droppedAt: string;
+  /** The server's HTTP status, or null when it could not be reached. */
+  status: number | null;
+  error: string;
+}
+
+/** How many dropped entries the gate remembers, newest kept. */
+export const MAX_DROPPED_ENTRIES = 20;
 
 export interface QueueSnapshot {
   /**
@@ -78,6 +113,12 @@ export interface QueueSnapshot {
    * through `/p/<id>/`; `queuedTotal` then says how many there are in all.
    */
   entries: QueueEntry[];
+  /**
+   * Entries whose turn came but whose server refused them, oldest first —
+   * narrowed with `entries`. An entry leaves this list when the same task is
+   * asked for again.
+   */
+  dropped: DroppedEntry[];
   /** Entries queued across every project, when `entries` has been narrowed. */
   queuedTotal?: number;
   running: number;
@@ -202,8 +243,14 @@ export interface AdmissionGateOptions {
   limits: AdmissionLimits;
   /** Dashboard-started runs in flight across every child. */
   countRunning: () => Promise<number>;
-  /** Start a queued run on its project's server. False means it did not take. */
-  start: (entry: QueueEntry) => Promise<boolean>;
+  /** Start a queued run on its project's server, saying why when it did not take. */
+  start: (entry: QueueEntry) => Promise<StartOutcome>;
+  /**
+   * Ask the project server whether a request about to be queued would be
+   * refused. A refusal is answered instead of queuing; null (no verdict, or
+   * the server could not be asked) queues as before.
+   */
+  validate?: (request: Omit<QueueEntry, "enqueuedAt">) => Promise<ExecuteRefusal | null>;
   /**
    * Injectable for tests; defaults to the shared reading's `availableBytes`
    * (`null` when the machine could not be read).
@@ -218,9 +265,11 @@ export interface AdmissionGateOptions {
 
 export interface AdmitResult {
   admitted: boolean;
-  /** 1-based queue position when it was not admitted. */
+  /** 1-based queue position when it was queued; 0 when admitted or refused. */
   position: number;
   reason?: AdmissionReason;
+  /** The project server's refusal, when it would not have started the run anyway. */
+  refused?: ExecuteRefusal;
 }
 
 /**
@@ -228,6 +277,7 @@ export interface AdmitResult {
  */
 export class AdmissionGate {
   readonly queue = new AdmissionQueue();
+  private dropped: DroppedEntry[] = [];
   private readonly options: AdmissionGateOptions;
   private readonly drainIntervalMs: number;
   private readonly log: (message: string) => void;
@@ -292,11 +342,18 @@ export class AdmissionGate {
     const decision = decideAdmission(snapshot, this.options.limits);
 
     if (decision.admit && this.queue.length === 0) {
+      if (this.forgetDropped(request)) this.emitChange();
       return { admitted: true, position: 0 };
     }
 
+    // Queuing a request its server will refuse turns a 4xx the operator would
+    // read now into a run that silently never starts. Ask first.
+    const refusal = this.options.validate ? await this.options.validate(request) : null;
+    if (refusal) return { admitted: false, position: 0, refused: refusal };
+
     const reason = decision.admit ? "at-capacity" : decision.reason;
     const { position } = this.queue.enqueue({ ...request, enqueuedAt: new Date().toISOString() });
+    this.forgetDropped(request);
     this.armDrain();
     this.emitChange();
     return { admitted: false, position, reason };
@@ -319,17 +376,19 @@ export class AdmissionGate {
         if (!decideAdmission(snapshot, this.options.limits).admit) break;
 
         const entry = this.queue.shift()!;
-        let started = false;
+        let outcome: StartOutcome;
         try {
-          started = await this.options.start(entry);
+          outcome = await this.options.start(entry);
         } catch (err) {
-          this.log(`[hub] admission: starting ${entry.taskId} failed — ${(err as Error).message}`);
+          outcome = { started: false, status: null, error: (err as Error).message };
         }
-        if (!started) {
-          // Its project may have gone; drop it rather than spin on it forever.
-          this.log(`[hub] admission: dropped queued ${entry.projectId}/${entry.taskId} — its server did not accept it`);
-        } else {
+        if (outcome.started) {
           released++;
+        } else {
+          // Its project may have gone, or its server now refuses the request;
+          // drop it rather than spin on it forever, and keep why.
+          this.log(`[hub] admission: dropped queued ${entry.projectId}/${entry.taskId} — ${outcome.error}`);
+          this.recordDropped(entry, outcome);
         }
         this.emitChange();
       }
@@ -342,7 +401,9 @@ export class AdmissionGate {
 
   /** Forget everything queued for a project the hub no longer serves. */
   forgetProject(projectId: string): void {
-    if (this.queue.dropProject(projectId) > 0) this.emitChange();
+    const droppedBefore = this.dropped.length;
+    this.dropped = this.dropped.filter((d) => d.projectId !== projectId);
+    if (this.queue.dropProject(projectId) > 0 || this.dropped.length !== droppedBefore) this.emitChange();
     if (this.queue.length === 0) this.disarmDrain();
   }
 
@@ -350,6 +411,7 @@ export class AdmissionGate {
     const decision = decideAdmission(this.lastSnapshot, this.options.limits);
     return {
       entries: this.queue.list(),
+      dropped: [...this.dropped],
       running: this.lastSnapshot.running,
       freeMemoryBytes: this.lastSnapshot.freeMemoryBytes,
       availableBytes: this.lastSnapshot.freeMemoryBytes,
@@ -362,6 +424,19 @@ export class AdmissionGate {
   /** Stop the drain timer. The hub calls this on close. */
   stop(): void {
     this.disarmDrain();
+  }
+
+  private recordDropped(entry: QueueEntry, outcome: Extract<StartOutcome, { started: false }>): void {
+    this.forgetDropped(entry);
+    this.dropped.push({ ...entry, droppedAt: new Date().toISOString(), status: outcome.status, error: outcome.error });
+    if (this.dropped.length > MAX_DROPPED_ENTRIES) this.dropped.splice(0, this.dropped.length - MAX_DROPPED_ENTRIES);
+  }
+
+  /** Forget the dropped record for a task asked for again. True when there was one. */
+  private forgetDropped(entry: Pick<QueueEntry, "projectId" | "workspace" | "taskId">): boolean {
+    const before = this.dropped.length;
+    this.dropped = this.dropped.filter((d) => !sameQueueEntry(d, entry));
+    return this.dropped.length !== before;
   }
 
   private emitChange(): void {

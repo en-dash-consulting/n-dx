@@ -27,14 +27,23 @@ interface FakeChild {
   received: Array<{ taskId: string; workspace: string | null; options?: Record<string, unknown> }>;
   /** The admission header on each `GET /api/live` that arrived. */
   liveAdmission: Array<string | null>;
+  /** Tasks this server refuses, on execute and on check alike — as a real one would. */
+  refuse: Map<string, { status: number; error: string }>;
+  /** False plays a server from before `POST /api/hench/execute/check` existed. */
+  hasCheckRoute: boolean;
+  /** Check requests that arrived. */
+  checks: string[];
 }
 
 async function startFakeChild(dir: string): Promise<FakeChild> {
-  const child: Partial<FakeChild> & Pick<FakeChild, "running" | "received" | "liveAdmission"> = {
+  const child: Partial<FakeChild> & Pick<FakeChild, "running" | "received" | "liveAdmission" | "refuse" | "hasCheckRoute" | "checks"> = {
     dir,
     running: new Set<string>(),
     received: [],
     liveAdmission: [],
+    refuse: new Map(),
+    hasCheckRoute: true,
+    checks: [],
   };
 
   const server = createServer((req, res) => {
@@ -69,12 +78,28 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
         executions: [...child.running].map((taskId) => ({ taskId, status: "running" })),
       });
     }
+    if (url === "/api/hench/execute/check" && req.method === "POST" && child.hasCheckRoute) {
+      let body = "";
+      req.on("data", (c) => { body += c; });
+      req.on("end", () => {
+        const taskId = (JSON.parse(body || "{}") as { taskId?: string }).taskId ?? "";
+        child.checks.push(taskId);
+        const refusal = child.refuse.get(taskId);
+        json(200, refusal ? { ok: false, status: refusal.status, error: refusal.error, taskId } : { ok: true });
+      });
+      return;
+    }
     if (url === "/api/hench/execute" && req.method === "POST") {
       let body = "";
       req.on("data", (c) => { body += c; });
       req.on("end", () => {
         const parsed = JSON.parse(body || "{}") as { taskId?: string; options?: Record<string, unknown> };
         const taskId = parsed.taskId ?? "";
+        const refusal = child.refuse.get(taskId);
+        if (refusal) {
+          json(refusal.status, { error: refusal.error, taskId });
+          return;
+        }
         const header = req.headers["x-ndx-workspace"];
         child.received.push({
           taskId,
@@ -198,6 +223,60 @@ describe("hub admission gate", () => {
     alpha.running.delete("task-1");
     await waitFor(() => beta.received.length === 1, 4_000);
     expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, options: { maxTurns: 7 } });
+  });
+
+  it("answers the project server's refusal at enqueue time instead of 202 queued", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    // Shape-valid options the server refuses — a model gone from its catalog.
+    const error = 'Run option "model": Model "claude-live-only" is not in the claude catalog.';
+    beta.refuse.set("task-2", { status: 400, error });
+    const res = await execute(h.port, "/p/beta/w/feature/api/hench/execute", "task-2", {}, { model: "claude-live-only" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error, taskId: "task-2" });
+    expect(beta.checks).toEqual(["task-2"]);
+
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue.entries).toEqual([]);
+
+    // Nothing was queued: the next run queued behind it is the first to arrive.
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-3")).status).toBe(202);
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received.map((r) => r.taskId)).toEqual(["task-3"]);
+  });
+
+  it("shows a queued entry its server refused at replay as dropped, with the server's status and reason", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { fresh: true })).status).toBe(202);
+
+    // The task became blocked while it waited.
+    const error = 'Task is blocked by "Other" (t-9, pending). Finish or unblock it first.';
+    beta.refuse.set("task-2", { status: 409, error });
+    alpha.running.delete("task-1");
+
+    const queueUrl = `http://127.0.0.1:${h.port}/p/beta/api/hub/queue`;
+    await waitFor(async () => ((await (await fetch(queueUrl)).json()).dropped ?? []).length === 1, 4_000);
+    const queue = await (await fetch(queueUrl)).json();
+    expect(queue.entries).toEqual([]);
+    expect(queue.dropped).toEqual([
+      expect.objectContaining({ projectId: "beta", taskId: "task-2", options: { fresh: true }, status: 409, error }),
+    ]);
+    // Narrowed like entries: another project's viewer does not see it.
+    const alphaQueue = await (await fetch(`http://127.0.0.1:${h.port}/p/alpha/api/hub/queue`)).json();
+    expect(alphaQueue.dropped).toEqual([]);
+  });
+
+  it("queues as before behind a server that has no check route", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    beta.hasCheckRoute = false;
+
+    // A 404 from the check is no verdict — and is never taken as a start.
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-2")).status).toBe(202);
+    expect(beta.received).toEqual([]);
   });
 
   it("forwards options it cannot accept to the project server rather than queuing them", async () => {
@@ -453,10 +532,10 @@ describe("hub admission gate", () => {
 });
 
 /** Poll until `predicate` holds, or fail the test with a timeout. */
-async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
+async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (predicate()) return;
+    if (await predicate()) return;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   throw new Error(`condition not met within ${timeoutMs}ms`);

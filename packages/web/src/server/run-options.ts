@@ -16,7 +16,7 @@ import { resolveActiveVendor, validateCatalogModel } from "./routes-llm.js";
  * model against the active vendor's catalog and the provider against what
  * the vendor supports. The first problem is reported, naming its key.
  */
-export function validateRunOptions(projectDir: string, input: unknown): RunOptionsCheck {
+export async function validateRunOptions(projectDir: string, input: unknown): Promise<RunOptionsCheck> {
   const checked = checkRunOptions(input);
   if (!checked.ok) return checked;
   const { options } = checked;
@@ -25,7 +25,7 @@ export function validateRunOptions(projectDir: string, input: unknown): RunOptio
   for (const key of ["model", "reviewModel"] as const) {
     const model = options[key];
     if (model === undefined) continue;
-    const error = validateCatalogModel(projectDir, vendor, model);
+    const error = await validateCatalogModel(projectDir, vendor, model);
     if (error) return { ok: false, key, error: `Run option "${key}": ${error}` };
   }
   if (options.provider !== undefined) {

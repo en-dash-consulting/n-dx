@@ -36,6 +36,8 @@
  * POST   /api/hench/execute               — trigger Hench run for a specific task
  *                                            ({ taskId, options? }; options per
  *                                            src/shared/run-options.ts)
+ * POST   /api/hench/execute/check         — the same request's verdict without starting it
+ *                                            (always 200: { ok } or { ok: false, status, error })
  * GET    /api/hench/execute/status         — get all active execution statuses
  * GET    /api/hench/execute/status/:taskId — get specific task execution status
  * GET    /api/hench/throttle              — current throttle state (paused, concurrency override, etc.)
@@ -121,7 +123,7 @@ import {
 } from "./run-liveness.js";
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
-import { resetsDeferred, workCommandArgs } from "../shared/index.js";
+import { resetsDeferred, workCommandArgs, type RunOptions } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -761,6 +763,9 @@ function routeExecute(rc: RouteContext): boolean | Promise<boolean> | null {
   }
   if (rc.path === "execute" && rc.method === "POST") {
     return handleExecute(rc.req, rc.res, rc.ctx, rc.broadcast);
+  }
+  if (rc.path === "execute/check" && rc.method === "POST") {
+    return handleExecuteCheck(rc.req, rc.res, rc.ctx);
   }
   if (rc.path === "execute/status" && rc.method === "GET") {
     return handleExecuteStatus(rc.res, rc.runsDir);
@@ -1782,37 +1787,40 @@ function broadcastExecState(
   });
 }
 
-/** POST /api/hench/execute — trigger Hench run for a specific task. */
-async function handleExecute(
-  req: IncomingMessage,
-  res: ServerResponse,
-  ctx: ServerContext,
-  broadcast?: WebSocketBroadcaster,
-): Promise<boolean> {
-  const { activeExecutions, executionMetrics, processMemoryTracker } = stateForCtx(ctx);
-  // Parse request body
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+/**
+ * What an execute request would get, short of spawning: a refusal with the
+ * status and body the operator should see, consent to a slug migration, or
+ * the task and options a run would start with.
+ */
+type ExecuteVerdict =
+  | { kind: "refused"; status: number; body: Record<string, unknown> }
+  | { kind: "migrate" }
+  | {
+    kind: "runnable";
+    taskId: string;
+    task: Record<string, unknown>;
+    status: string;
+    options: RunOptions;
+  };
 
+const refused = (status: number, body: Record<string, unknown>): ExecuteVerdict =>
+  ({ kind: "refused", status, body });
+
+/**
+ * Every check `POST /api/hench/execute` makes before it spawns, in its order.
+ * Shared with `POST /api/hench/execute/check`, so the hub can ask whether a
+ * request it is about to queue would be refused when its turn came — and the
+ * answer cannot drift from the one the start gives.
+ */
+async function judgeExecuteRequest(ctx: ServerContext, body: Record<string, unknown>): Promise<ExecuteVerdict> {
+  const { activeExecutions } = stateForCtx(ctx);
   const taskId = body.taskId as string | undefined;
-  if (!taskId || typeof taskId !== "string") {
-    errorResponse(res, 400, "taskId is required");
-    return true;
-  }
+  if (!taskId || typeof taskId !== "string") return refused(400, { error: "taskId is required" });
 
   // Options are only ever translated through the allow-list; anything else is
   // a 400 naming the key, before anything is read or spawned.
-  const checkedOptions = validateRunOptions(ctx.projectDir, body.options);
-  if (!checkedOptions.ok) {
-    jsonResponse(res, 400, { error: checkedOptions.error, key: checkedOptions.key });
-    return true;
-  }
+  const checkedOptions = await validateRunOptions(ctx.projectDir, body.options);
+  if (!checkedOptions.ok) return refused(400, { error: checkedOptions.error, key: checkedOptions.key });
   const options = checkedOptions.options;
 
   // Tree-level fault first: on a tree this build would re-slug, no task is
@@ -1825,19 +1833,13 @@ async function handleExecute(
     // rule is refused however loudly the client asks, because migrating there
     // is a downgrade wearing a migration's name and `rex migrate-slugs` would
     // refuse it too.
-    if (body.migrateSlugs === true && treeRefusal.migratable) {
-      return await runTreeMigration(res, ctx);
-    }
+    if (body.migrateSlugs === true && treeRefusal.migratable) return { kind: "migrate" };
 
     // 412 Precondition Failed: the request is well-formed and the task is fine;
     // the repository is in a state that forbids acting on it. `migratable` is
     // what lets the viewer offer the fix rather than only quote the problem —
     // and, just as importantly, withhold the offer when the fix is elsewhere.
-    jsonResponse(res, 412, {
-      error: treeRefusal.message,
-      migratable: treeRefusal.migratable,
-    });
-    return true;
+    return refused(412, { error: treeRefusal.message, migratable: treeRefusal.migratable });
   }
 
   // A migrate request is consent to the rename, never to a run. Reaching here
@@ -1845,33 +1847,21 @@ async function handleExecute(
   // between the 412 and the click — so falling through would start the task
   // from the button that promised not to.
   if (body.migrateSlugs === true) {
-    errorResponse(
-      res,
-      409,
-      "The PRD tree already matches this build's slug rule, so there is nothing to migrate. " +
+    return refused(409, {
+      error: "The PRD tree already matches this build's slug rule, so there is nothing to migrate. " +
         "The task was not started — press Start to run it.",
-    );
-    return true;
+    });
   }
 
   // Validate task exists in PRD
   const doc = loadPRDForExecute(ctx);
-  if (!doc) {
-    errorResponse(res, 404, "PRD not found. Run 'rex init' first.");
-    return true;
-  }
+  if (!doc) return refused(404, { error: "PRD not found. Run 'rex init' first." });
 
   const items = doc.items as Array<Record<string, unknown>> | undefined;
-  if (!items) {
-    errorResponse(res, 404, "PRD has no items");
-    return true;
-  }
+  if (!items) return refused(404, { error: "PRD has no items" });
 
   const task = findPRDItem(items, taskId);
-  if (!task) {
-    errorResponse(res, 404, `Task "${taskId}" not found in PRD`);
-    return true;
-  }
+  if (!task) return refused(404, { error: `Task "${taskId}" not found in PRD` });
 
   // Validate task is actionable
   const status = task.status as string;
@@ -1880,33 +1870,27 @@ async function handleExecute(
     const named = blockers.length > 0
       ? blockers.map((b) => `"${b.title}" (${b.id}, ${b.status})`).join(", ")
       : "no recorded blockers";
-    jsonResponse(res, 409, {
+    return refused(409, {
       error: `Task is blocked by ${named}. Finish or unblock ${blockers.length === 1 ? "it" : "them"} first.`,
       taskId,
       blockedBy: blockers,
     });
-    return true;
   }
   if (!ACTIONABLE_STATUSES.has(status)) {
-    errorResponse(res, 409, `Task is in "${status}" status and cannot be executed. Only pending, deferred, or in-progress tasks with no live run can be triggered.`);
-    return true;
+    return refused(409, {
+      error: `Task is in "${status}" status and cannot be executed. Only pending, deferred, or in-progress tasks with no live run can be triggered.`,
+    });
   }
 
   // Check if new executions are paused via throttle controls
   if (throttleState.paused) {
-    errorResponse(res, 503, "New executions are paused. Resume via the throttle controls before starting new tasks.");
-    return true;
+    return refused(503, { error: "New executions are paused. Resume via the throttle controls before starting new tasks." });
   }
 
   // Check for concurrent execution
   if (activeExecutions.has(taskId)) {
     const active = activeExecutions.get(taskId)!;
-    jsonResponse(res, 409, {
-      error: "Task is already being executed",
-      runId: active.runId,
-      taskId,
-    });
-    return true;
+    return refused(409, { error: "Task is already being executed", runId: active.runId, taskId });
   }
 
   // Another worktree of this repository may hold the task. The spawned run
@@ -1924,7 +1908,7 @@ async function handleExecute(
         `because its work is still uncommitted. Deal with that work there, or free the task with ` +
         `'${readCliName(ctx.projectDir)} claim release ${taskId}'.`
       : `Task is being worked on in another worktree: ${claimedBy.worktreeRoot}`;
-    jsonResponse(res, 409, {
+    return refused(409, {
       error,
       taskId,
       claimedBy: {
@@ -1936,7 +1920,6 @@ async function handleExecute(
         ...(claimedBy.reason ? { reason: claimedBy.reason } : {}),
       },
     });
-    return true;
   }
 
   // An in-progress task is resumable only when nothing is still working it.
@@ -1945,15 +1928,72 @@ async function handleExecute(
   if (status === "in_progress") {
     const holder = await findHoldingRun(ctx, taskId);
     if (holder) {
-      jsonResponse(res, 409, {
+      return refused(409, {
         error: `Task is in progress in a run that may still be working it (run ${holder.runId}` +
           `${holder.worktree ? ` in ${holder.worktree.path}` : ""}): ${holder.reason}`,
         taskId,
         run: holder,
       });
-      return true;
     }
   }
+
+  return { kind: "runnable", taskId, task, status, options };
+}
+
+/** Parse an execute-shaped body, answering 400 itself when it is not JSON. */
+async function readExecuteBody(req: IncomingMessage, res: ServerResponse): Promise<Record<string, unknown> | null> {
+  try {
+    const raw = await readBody(req, res);
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    errorResponse(res, 400, "Invalid JSON in request body");
+    return null;
+  }
+}
+
+/**
+ * POST /api/hench/execute/check — would this execute request start?
+ *
+ * Answers 200 with `{ ok: true }` or `{ ok: false, status, ...refusal }`,
+ * where `status` and the rest are exactly what `POST /api/hench/execute`
+ * would have answered. Never spawns, writes or migrates. The hub asks it
+ * before it queues a request, so a refusal reaches the operator now rather
+ * than as a run that silently never starts.
+ *
+ * Always 200 so a caller can tell a verdict from a server without this route
+ * (an older child answers 404 for the path, which the hub reads as "no
+ * verdict" and queues as before — never as a start).
+ */
+async function handleExecuteCheck(req: IncomingMessage, res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+  const body = await readExecuteBody(req, res);
+  if (!body) return true;
+  const verdict = await judgeExecuteRequest(ctx, body);
+  if (verdict.kind === "refused") {
+    jsonResponse(res, 200, { ...verdict.body, ok: false, status: verdict.status });
+  } else {
+    jsonResponse(res, 200, { ok: true });
+  }
+  return true;
+}
+
+/** POST /api/hench/execute — trigger Hench run for a specific task. */
+async function handleExecute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const { activeExecutions, executionMetrics, processMemoryTracker } = stateForCtx(ctx);
+  const body = await readExecuteBody(req, res);
+  if (!body) return true;
+
+  const verdict = await judgeExecuteRequest(ctx, body);
+  if (verdict.kind === "refused") {
+    jsonResponse(res, verdict.status, verdict.body);
+    return true;
+  }
+  if (verdict.kind === "migrate") return await runTreeMigration(res, ctx);
+  const { taskId, task, status, options } = verdict;
 
   // Go through the `ndx` orchestrator's `work` command rather than spawning
   // hench directly. `ndx work` forwards flags straight to `hench run` (see
