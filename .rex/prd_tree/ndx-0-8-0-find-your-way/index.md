@@ -28,6 +28,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Command transparency](./command-transparency/index.md) | pending |
 | [Dashboard request hardening](./dashboard-request-hardening/index.md) | pending |
 | [Layout resolver](./layout-resolver/index.md) | pending |
+| [Machine memory reads true on macOS](./machine-memory-reads-true-on-macos/index.md) | completed |
 | [Navigation and landings](./navigation-and-landings/index.md) | pending |
 | [PRD storage additive](./prd-storage-additive/index.md) | pending |
 | [Release readiness](./release-readiness/index.md) | pending |

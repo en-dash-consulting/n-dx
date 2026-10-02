@@ -4,6 +4,11 @@
   max-width: 820px;
 }
 
+/* Collapsed it is one row across the page, lined up with the sections below. */
+.rex-analysis-view:not(.rex-analysis-view--expanded) {
+  max-width: none;
+}
+
 .rex-analysis-view-header {
   margin-bottom: 20px;
 }
@@ -22,13 +27,25 @@
 
 /* ── Analysis Tabs ────────────────────────────────────────────────── */
 
+/* Shown once "More" is open: the tabs, then the toggle that closes them. */
+.rex-analysis-tabs-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
 .rex-analysis-tabs {
+  flex: 1;
   display: flex;
   gap: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
-  margin-bottom: var(--space-4);
+}
+
+.rex-analysis-more {
+  white-space: nowrap;
 }
 
 .rex-analysis-tab {

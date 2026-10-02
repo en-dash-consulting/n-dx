@@ -34,7 +34,7 @@ Cached:          6656000 kB
 - Reclaimable slab memory
 - Minus a reserve for low-watermark protection
 
-This is the metric n-dx reads on Linux, falling back to `os.freemem()` (which maps to `MemFree`) if `/proc/meminfo` is unreadable.
+n-dx reads this through plain `os.freemem()` — no `/proc/meminfo` parsing of its own. On libuv >= 1.45 (Node >= 22, the repo's engine floor), libuv's `uv_get_free_memory()` (what `os.freemem()` calls) itself reads `MemAvailable` from `/proc/meminfo`; `os.freemem()` only falls back to `MemFree` on kernels that lack `MemAvailable` (< 3.14, March 2014).
 
 ### Why MemFree Is Misleading on Linux
 
@@ -44,10 +44,9 @@ A healthy Linux system with 16 GB RAM might report only 1 GB `MemFree` while hav
 
 ```
 Platform detected: linux
-  --> Read /proc/meminfo (async)
-  --> Parse MemAvailable via regex: /^MemAvailable:\s+(\d+)\s+kB$/m
-  --> Convert kB to bytes
-  --> If read fails: fallback to os.freemem()
+  --> os.freemem() (no /proc/meminfo parsing in n-dx itself)
+  --> libuv >= 1.45 (Node >= 22): reads MemAvailable
+  --> older kernels (< 3.14, no MemAvailable field): libuv falls back to MemFree
 ```
 
 ### Linux-Specific Quirks
@@ -91,12 +90,17 @@ macOS memory pressure is better indicated by the combination of Free + Inactive 
 
 ### n-dx Implementation
 
+n-dx does **not** use `os.freemem()` on macOS. The shared reader in `@n-dx/llm-client` (`packages/llm-client/src/system-memory.ts`) spawns two read-only commands in parallel:
+
 ```
 Platform detected: darwin
-  --> os.freemem() (vm_stat free pages * page size)
-  --> os.totalmem() (hw.memsize sysctl)
-  --> Usage = (total - free) / total * 100
+  --> vm_stat: (free + inactive + speculative + purgeable pages) x page size --> availableBytes
+  --> sysctl kern.memorystatus_vm_pressure_level: 1 normal / 2 warn / 4 critical --> pressure
+  --> both run via exec() in parallel, result cached 5s, never awaited by a request
+  --> neither readable --> availableBytes: null, pressure: "unknown" (never 0, never os.freemem())
 ```
+
+`kern.memorystatus_vm_pressure_level` is the kernel's own judgment and is what drives the dashboard's health display; `vm_stat`'s page counts drive the available-bytes figure.
 
 ### macOS-Specific Quirks
 
@@ -105,12 +109,12 @@ Platform detected: darwin
 | Memory Compression | macOS compresses inactive pages instead of swapping to disk | Compressed memory appears as "used" but is partially reclaimable |
 | Unified Memory (Apple Silicon) | GPU and CPU share the same physical RAM pool | GPU-intensive workloads reduce available system memory |
 | App Nap | macOS suspends background apps and reduces their memory priority | Dashboard tab in background may have memory reclaimed by OS |
-| Memory Pressure events | macOS has a kernel-level memory pressure notification system | Not accessible from Node.js -- only from native Mach APIs |
+| Memory Pressure events | macOS has a kernel-level memory pressure notification system | Read via `sysctl kern.memorystatus_vm_pressure_level` (1/2/4 -> normal/warn/critical); n-dx does not use the full Mach notification API, just this one value |
 | Swap (compressed) | macOS swaps compressed pages, making swap usage less predictable | Small swap file does not necessarily mean low pressure |
 
 ### Practical Impact
 
-Because `os.freemem()` underreports available memory on macOS, the throttle may trigger earlier than necessary. A system reporting 85% usage (triggering delay) might actually have 40% of RAM reclaimable from inactive pages and compression. This is a conservative bias -- it errs on the side of caution but may unnecessarily throttle executions on macOS systems with plenty of reclaimable memory.
+The shared reader counts `vm_stat`'s free, inactive, speculative and purgeable pages as available, and takes pressure straight from the kernel instead of deriving it from a free-pages approximation. Both commands run in parallel and the result is cached for 5 seconds; no request ever awaits a fresh `vm_stat`/`sysctl` spawn. If neither command can be read, the reading is `availableBytes: null` / `pressure: "unknown"` — and nothing (throttle, pre-spawn check, dashboard health, hub admission) flags, throttles, or queues a run on an unknown reading.
 
 ---
 
@@ -187,28 +191,40 @@ performance.memory = {
 
 ---
 
+## One Reading, Shared by Every Consumer
+
+macOS's `availableBytes`/`pressure` reading (and Linux/Windows's `os.freemem()` passthrough) lives in one place — `@n-dx/llm-client`'s `packages/llm-client/src/system-memory.ts` — and every consumer reads through it instead of calling `os.freemem()` on its own:
+
+- hench's opt-in `MemoryThrottle` and its pre-spawn check
+- the dashboard's memory status panel and the `/api/live` machine tile
+- the hub's admission floor
+
+**Unknown-reading rule:** when the underlying signal can't be read (darwin: both `vm_stat` and `sysctl` fail), the reading is `availableBytes: null` and `pressure: "unknown"` — never a fabricated `0` and never a silent fallback to `os.freemem()`. Every consumer treats "unknown" as "no signal available": nothing flags, throttles, or queues a run on it.
+
+---
+
 ## Platform Comparison Summary
 
 | Aspect | Linux | macOS | Windows |
 |--------|-------|-------|---------|
-| **Free memory API** | `os.freemem()` = `MemFree` (misleading) | `os.freemem()` = vm_stat free pages (misleading) | `os.freemem()` = available physical (accurate) |
-| **n-dx reads** | `/proc/meminfo` `MemAvailable` (accurate) | `os.freemem()` (underestimates availability) | `os.freemem()` (accurate) |
-| **Cache handling** | Page cache counted as available via `MemAvailable` | Inactive pages NOT counted as free | Standby pages counted as available |
+| **Free memory API** | `os.freemem()` = `MemAvailable` via libuv >= 1.45 (falls back to `MemFree` only on kernels < 3.14) | `os.freemem()` = vm_stat free pages only (not what n-dx reads) | `os.freemem()` = available physical (accurate) |
+| **n-dx reads** | `os.freemem()` (accurate; libuv already reads `MemAvailable`) | shared `@n-dx/llm-client` reader: `vm_stat` (free+inactive+speculative+purgeable pages) for bytes, `kern.memorystatus_vm_pressure_level` for pressure | `os.freemem()` (accurate) |
+| **Cache handling** | Page cache counted as available via `MemAvailable` | Inactive/speculative/purgeable pages counted as available via `vm_stat` | Standby pages counted as available |
 | **Memory compression** | zswap/zram (optional, not default) | Always active (transparent to app) | Not used for RAM (page file only) |
 | **Overcommit** | Configurable, can cause silent OOM kills | No overcommit by default | Backed by commit charge / page file |
 | **Container accuracy** | `/proc/meminfo` shows host, not cgroup | N/A (no native container support) | Hyper-V containers vary |
-| **Accuracy rating** | High (with MemAvailable) | Low (conservative bias) | High |
+| **Accuracy rating** | High (`MemAvailable` via libuv) | High (reads reclaimable pages directly, pressure straight from the kernel) | High |
 
 ---
 
 ## Recommendations by Platform
 
 ### Linux
-- **Production environments:** The current `/proc/meminfo` parsing is the correct approach. Ensure the fallback to `os.freemem()` is flagged in diagnostics since it will cause premature throttling.
+- **Production environments:** Plain `os.freemem()` is already the correct reading, since libuv >= 1.45 reads `MemAvailable` itself. Only on kernels without `MemAvailable` (< 3.14) does it fall back to `MemFree`; flag that fallback in diagnostics, since it will cause premature throttling.
 - **Containers:** Be aware that memory limits are invisible. See [Areas of Improvement](/contributing/memory-system-improvements) for container-aware monitoring suggestions.
 
 ### macOS
-- **Development machines:** Expect the throttle to be more conservative than necessary. Developers may want to raise `delayThreshold` from 80% to 85-90% to account for macOS's aggressive caching.
+- **Development machines:** The shared reader already counts reclaimable (inactive/speculative/purgeable) pages and reads kernel pressure directly, so no threshold adjustment is needed to account for macOS's caching behavior.
 - **Apple Silicon:** Unified memory means GPU workloads compete with n-dx for the same RAM pool.
 
 ### Windows

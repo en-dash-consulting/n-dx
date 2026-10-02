@@ -26,8 +26,12 @@ function makeCtx(
       platform: "darwin",
       freemem: () => free,
       totalmem: () => total,
-      readLinuxAvailable: async () => undefined,
-      readDarwinAvailable: async () => undefined,
+      readAvailable: async () => ({
+        availableBytes: free,
+        totalBytes: total,
+        pressure: "normal",
+        source: "darwin:vm_stat+sysctl",
+      }),
     },
   );
 
@@ -113,6 +117,29 @@ describe("dispatchTool — memory check integration", () => {
       "run_command",
       { command: "echo allowed" },
     );
+
+    expect(result).not.toContain("[MEMORY]");
+  });
+
+  it("emits no [MEMORY] block on an unknown reading, even at 99% os.freemem() usage", async () => {
+    const total = 16 * GB;
+    const ctx = makeCtx(99, { spawnThreshold: 50 });
+    ctx.memoryMonitor = new SystemMemoryMonitor(
+      { enabled: true, spawnThreshold: 50 },
+      {
+        platform: "darwin",
+        freemem: () => total * 0.01,
+        totalmem: () => total,
+        readAvailable: async () => ({
+          availableBytes: null,
+          totalBytes: total,
+          pressure: "unknown",
+          source: "darwin:unavailable",
+        }),
+      },
+    );
+
+    const result = await dispatchTool(ctx, "run_command", { command: "echo unknown" });
 
     expect(result).not.toContain("[MEMORY]");
   });

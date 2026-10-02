@@ -19,6 +19,15 @@ import type { IsoModel } from "./iso-model.js";
 export interface RenderIsoMapOptions {
   /** Document title. Defaults to "<project> — architecture map". */
   title?: string;
+  /**
+   * Render for a host page's iframe rather than as a page of its own: the
+   * document fills the frame and never scrolls, the header collapses to
+   * floating controls, the footer is dropped, and a plain scroll wheel is left
+   * to the host page — zoom is Ctrl/⌘ + scroll or pinch until the host turns
+   * wheel zoom on (`{ type: "ndx-iso", wheelZoom: true }` via postMessage).
+   * The host can also force the colour scheme with `theme: "light" | "dark"`.
+   */
+  embed?: boolean;
 }
 
 /** Escape text for interpolation into HTML markup. */
@@ -47,6 +56,7 @@ function embedJSON(value: unknown): string {
 
 export function renderIsoMap(model: IsoModel, options: RenderIsoMapOptions = {}): string {
   const title = options.title ?? `${model.meta.project} — architecture map`;
+  const embed = options.embed === true;
   const meta = model.meta;
 
   const areaCount = model.level === "areas" ? model.nodes.filter((n) => n.kind !== "external" && n.kind !== "infra").length : 0;
@@ -81,7 +91,7 @@ export function renderIsoMap(model: IsoModel, options: RenderIsoMapOptions = {})
     : "";
 
   return `<!doctype html>
-<html lang="en">
+<html lang="en"${embed ? ' class="embed"' : ""}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -110,22 +120,24 @@ ${STYLES}
   <section class="stage" id="stage" aria-label="Isometric architecture map">
     <svg id="iso" role="img" aria-label="Isometric map of ${esc(meta.project)} architecture zones"></svg>
     <div class="legend" role="group" aria-label="Filter by kind">${legend}</div>
+    ${embed ? `<div class="zoomhint" id="zoomhint" role="status" aria-live="polite"></div>` : ""}
   </section>
   <aside class="dossier" id="dossier" aria-live="polite" tabindex="-1" aria-label="Details">
   </aside>
 </main>
 
-<footer class="foot">
+${embed ? "" : `<footer class="foot">
   <h2>What this map does and does not show</h2>
   <ul>${gaps}</ul>
   ${omitted}
   <p class="note">Generated ${esc(meta.analyzedAt)}${meta.gitSha ? ` at ${esc(meta.gitSha.slice(0, 8))}` : ""} by sourcevision.</p>
 </footer>
-
+`}
 <script>
 (function(){
 "use strict";
 var MODEL = ${embedJSON(model)};
+var EMBED = ${embed ? "true" : "false"};
 var ROOT = MODEL;
 // An areas-level map carries one zone scene per area. The URL hash picks the
 // scene at load, and scenes switch in the page — never by navigating, which a
@@ -168,6 +180,24 @@ const STYLES = `
     --tag-bg:#FFFFFF; --tag-ink:#1B1B33; --tag-ink-on:#FFFFFF;
     --body-ink:#33344F;
   }
+}
+:root[data-theme="dark"]{
+  --bg:#12122B; --panel:#1A1940; --line:#2C2B60; --ink:#EFEFF7;
+  --muted:#9B9BC4; --accent:#7FAE33; --warn:#E0A33E; --crit:#E36262;
+  --chip:#232253; --chip-hover:#2C2B66;
+  --ground:#171639; --gridline:#222150;
+  --wire:#4A4990; --wire-hot:#7FAE33; --seam:#C9789E; --seam-unver:#8C6076; --infra:#B0668A;
+  --tag-bg:#1B1A45; --tag-ink:#EFEFF7; --tag-ink-on:#12122B;
+  --body-ink:#D3D3E8;
+}
+:root[data-theme="light"]{
+  --bg:#F4F5FA; --panel:#FFFFFF; --line:#D8DAE8; --ink:#1B1B33;
+  --muted:#5C5F7A; --accent:#4E7A16; --warn:#9A6512; --crit:#B3352F;
+  --chip:#EFF0F7; --chip-hover:#E3E5F2;
+  --ground:#E7E9F5; --gridline:#D2D5E8;
+  --wire:#8E93BC; --wire-hot:#4E7A16; --seam:#A2416C; --seam-unver:#B98BA0; --infra:#8E4467;
+  --tag-bg:#FFFFFF; --tag-ink:#1B1B33; --tag-ink-on:#FFFFFF;
+  --body-ink:#33344F;
 }
 *{box-sizing:border-box}
 body{
@@ -238,6 +268,7 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
 .lg i{width:11px;height:11px;border-radius:2px;display:block}
 .lg .gl{font-size:.78rem;color:var(--muted);width:.9em;text-align:center}
 .lg[aria-pressed="true"]{border-color:var(--accent);font-weight:650}
+.lg .ct{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums;padding:0 .35rem;border-radius:999px;background:var(--chip)}
 
 .dossier{
   border-left:1px solid var(--line);background:var(--panel);
@@ -280,6 +311,49 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
 .foot ul{margin:.5rem 0 0;padding-left:1.05rem;max-width:75ch;font-size:.86rem;color:var(--body-ink)}
 .foot li{margin:.3rem 0}
 .note{color:var(--muted);font-size:.8rem;max-width:75ch;margin:.8rem 0 0}
+
+/* ── Embedded in a host page's frame ─────────────────────────────────────
+   The document is exactly the frame: nothing scrolls but the details panel.
+   The header's title and stats belong to the host, so only the level crumbs
+   and the camera tools remain, floating over the map. */
+.embed,.embed body{height:100%;overflow:hidden}
+.embed body{position:relative;font-size:14px}
+.embed .top{
+  position:absolute;top:0;left:0;right:0;z-index:2;
+  padding:.6rem .7rem;border:0;background:none;pointer-events:none;align-items:flex-start;
+}
+.embed .top > *{pointer-events:auto}
+.embed .ttl h1,.embed .ttl p{display:none}
+.embed .crumbs{
+  margin:0;padding:.3rem .6rem;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.06);
+}
+.embed .crumbs[hidden]{display:none}
+.embed .tools{margin-left:auto}
+.embed .tools button{background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.embed .wrap{height:100%;min-height:0;grid-template-columns:minmax(0,1fr) 300px}
+.embed .top{right:300px}
+.embed .stage svg{min-height:0}
+.embed .dossier{height:100%;max-height:none;overscroll-behavior:contain;font-size:.95em}
+.embed .legend{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;left:.7rem;bottom:.7rem;max-width:calc(100% - 1.4rem)}
+.embed .legend::-webkit-scrollbar{display:none}
+.embed .lg{flex:none}
+.zoomhint{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;
+  padding:.5rem .9rem;border-radius:999px;background:rgba(18,18,43,.82);color:#fff;
+  font-size:.86rem;font-weight:600;pointer-events:none;opacity:0;transition:opacity .15s ease;
+}
+.zoomhint.on{opacity:1}
+/* Nothing selected: no panel, the map takes the whole frame. */
+.embed.idle .wrap{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+.embed.idle .dossier{display:none}
+.embed.idle .top{right:0}
+/* Narrow frame: map over a short, scrolling details strip. */
+@media (max-width:760px){
+  .embed .wrap{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(0,34%)}
+  .embed .top{right:0}
+  .embed .dossier{height:auto;border-left:0;border-top:1px solid var(--line);padding:.8rem .9rem}
+}
 
 @media (prefers-reduced-motion: reduce){
   *{transition:none !important;animation:none !important;scroll-behavior:auto !important}
@@ -651,6 +725,7 @@ order.forEach(function(n){
   }
   // Sub-zones: tiles on the top face, alternating tints so neighbours read
   // apart, each with a title for hover. Not focusable — the dossier lists them.
+  var tileEls = [];
   (n.tiles || []).forEach(function(t, i){
     var tu = u + t.u, tv = v + t.v;
     var tile = el("polygon", {
@@ -658,6 +733,7 @@ order.forEach(function(n){
       fill: shade(base, i % 2 ? 0.14 : 0.04), stroke: shade(base, -0.3), "stroke-width": "0.8"
     });
     tile.setAttribute("class", "tile");
+    tileEls.push({ el: tile, kind: nestedKind(n, t.id), fill: tile.getAttribute("fill") });
     var tt = el("title");
     tt.textContent = t.name + " \u00b7 " + num(t.files) + " files";
     tile.appendChild(tt);
@@ -702,7 +778,7 @@ order.forEach(function(n){
   tg.appendChild(t);
   gTag.appendChild(tg);
 
-  blockEls[n.id] = { g: g, tag: tg, rect: rect, text: t, top: top, base: base };
+  blockEls[n.id] = { g: g, tag: tg, rect: rect, text: t, top: top, base: base, tiles: tileEls };
 
   // Only "click" — listening on pointerup as well fires pick twice per press.
   function pick(ev){
@@ -998,10 +1074,48 @@ function bindPanel(){
 var curNode = null, curEdge = null, byCalls = false;
 var activeKinds = {};
 
+function filtering(){
+  for (var k in activeKinds) if (activeKinds[k]) return true;
+  return false;
+}
 function kindVisible(kind){
-  var any = false;
-  for (var k in activeKinds) if (activeKinds[k]) { any = true; break; }
-  return !any || !!activeKinds[kind];
+  return !filtering() || !!activeKinds[kind];
+}
+
+// Kinds nested under a block at any depth: an area's zones, a zone's
+// sub-zones, and theirs. The legend filters on these too, so an area whose
+// own kind is "support" still lights up for the entry points inside it.
+var NESTED_KINDS = {};
+function nestedKinds(n){
+  if (!n) return {};
+  var key = n.areaId ? "a:" + n.areaId : "z:" + n.id;
+  if (NESTED_KINDS[key]) return NESTED_KINDS[key];
+  var out = {};
+  NESTED_KINDS[key] = out; // set before recursing, so a cycle ends here
+  var sc = sceneFor(n);
+  if (sc) sc.nodes.forEach(function(c){
+    out[c.kind] = (out[c.kind] || 0) + 1;
+    var sub = nestedKinds(c);
+    for (var k in sub) out[k] = (out[k] || 0) + sub[k];
+  });
+  return out;
+}
+// The kind of one of a block's tiles, which are its nested scene's nodes.
+function nestedKind(n, id){
+  var sc = sceneFor(n);
+  if (!sc) return null;
+  for (var i = 0; i < sc.nodes.length; i++) if (sc.nodes[i].id === id) return sc.nodes[i].kind;
+  return null;
+}
+// How many zones nested under a block match the active kinds.
+function nestedMatches(n){
+  if (!filtering()) return 0;
+  var nk = nestedKinds(n), count = 0;
+  for (var k in nk) if (activeKinds[k]) count += nk[k];
+  return count;
+}
+function nodeShown(n){
+  return !!n && (kindVisible(n.kind) || nestedMatches(n) > 0);
 }
 
 function highlighted(){
@@ -1035,8 +1149,18 @@ function refresh(scrollPanel){
 
   NODES.forEach(function(n){
     var b = blockEls[n.id];
-    var shown = kindVisible(n.kind);
+    var own = kindVisible(n.kind);
+    var hits = own ? 0 : nestedMatches(n);
+    var shown = own || hits > 0;
     var on = (n.id === curNode);
+    // Tiles: under a filter, the matching ones take their kind's colour and
+    // the rest recede, so the match is visible on the block's face.
+    var lit = filtering();
+    b.tiles.forEach(function(t){
+      var match = lit && !!activeKinds[t.kind];
+      t.el.setAttribute("fill", match ? (COLOR[t.kind] || t.fill) : t.fill);
+      t.el.setAttribute("fill-opacity", lit && !match ? "0.35" : "1");
+    });
     var linked = focused ? !!near[n.id] : true;
     b.g.setAttribute("opacity", String(!shown ? 0.08 : (on ? 1 : (linked ? 0.85 : 0.28))));
     b.tag.setAttribute("opacity", String(!shown ? 0.05 : (on ? 1 : (linked ? 0.8 : 0.22))));
@@ -1048,13 +1172,18 @@ function refresh(scrollPanel){
     b.top.setAttribute("stroke-width", on ? "2.4" : "1");
     b.g.setAttribute("tabindex", shown ? "0" : "-1");
     b.g.setAttribute("aria-pressed", on ? "true" : "false");
+    // A block lit only by what is inside it says so on its tag.
+    b.rect.style.strokeDasharray = hits > 0 ? "4 2" : "";
+    b.tag.setAttribute("data-nested", hits > 0 ? String(hits) : "");
+    var label = b.g.getAttribute("aria-label").replace(/, [0-9]+ matching inside$/, "");
+    b.g.setAttribute("aria-label", hits > 0 ? label + ", " + hits + " matching inside" : label);
   });
 
   edgeEls.forEach(function(x, i){
     var selFrame = curNode !== null && BY[curNode] && BY[curNode].frame ? curNode : null;
     var hot = (i === curEdge) || (curNode !== null && (x.e.from === curNode || x.e.to === curNode)) ||
       (selFrame !== null && (within(BY[x.e.from], selFrame) || within(BY[x.e.to], selFrame)));
-    var ends = kindVisible((BY[x.e.from] || {}).kind) && kindVisible((BY[x.e.to] || {}).kind);
+    var ends = nodeShown(BY[x.e.from]) && nodeShown(BY[x.e.to]);
     var weight = edgeWeight(x.e);
     var declared = (x.e.seam ? " seam" : "") + (unverifiedSeam(x.e) ? " unver" : "") +
       (x.e.infra ? " infra" : "");
@@ -1069,10 +1198,15 @@ function refresh(scrollPanel){
   else dossier.innerHTML = introHtml();
   bindPanel();
   dossier.scrollTop = 0;
+  // Embedded, the panel only opens for a selection: the introduction is the
+  // host page's job, and the map gets the frame's full width meanwhile.
+  if (EMBED) document.documentElement.classList.toggle("idle", curNode === null && curEdge === null);
 
   // On a narrow layout the panel sits below the map, so a selection would
-  // otherwise update off-screen and read as "clicking does nothing".
-  if (scrollPanel && window.innerWidth <= 1020 && dossier.scrollIntoView) {
+  // otherwise update off-screen and read as "clicking does nothing". Not when
+  // embedded: there the panel is always in the frame, and scrollIntoView
+  // would scroll the host page instead.
+  if (scrollPanel && !EMBED && window.innerWidth <= 1020 && dossier.scrollIntoView) {
     try {
       dossier.scrollIntoView(reduceMotion ? true : { behavior: "smooth", block: "nearest" });
     } catch (err) { /* older browsers */ }
@@ -1096,6 +1230,24 @@ function clearSelection(){
 }
 
 var legendButtons = document.querySelectorAll(".lg");
+// Each legend entry counts the zones of its kind at every depth, so a kind
+// that only occurs inside areas still shows it is there to filter on.
+var KIND_TOTALS = {};
+ROOT.nodes.forEach(function(n){
+  // ROOT, not MODEL: a deep link can open the page on one area's scene.
+  var isArea = ROOT.level === "areas" && !!ROOT.scenes && !!ROOT.scenes[n.id];
+  if (!isArea) KIND_TOTALS[n.kind] = (KIND_TOTALS[n.kind] || 0) + 1;
+  var nk = nestedKinds(isArea ? { id: n.id, areaId: n.id, kind: n.kind } : n);
+  for (var k in nk) KIND_TOTALS[k] = (KIND_TOTALS[k] || 0) + nk[k];
+});
+for (var lc = 0; lc < legendButtons.length; lc++) {
+  var total = KIND_TOTALS[legendButtons[lc].getAttribute("data-kind")] || 0;
+  if (!total) continue;
+  var ct = document.createElement("span");
+  ct.className = "ct";
+  ct.textContent = String(total);
+  legendButtons[lc].appendChild(ct);
+}
 for (var li = 0; li < legendButtons.length; li++) {
   legendButtons[li].addEventListener("click", function(ev){
     var btn = ev.currentTarget, kind = btn.getAttribute("data-kind");
@@ -1128,7 +1280,30 @@ function toVB(ev){
   var p = pt.matrixTransform(m.inverse()); return { x: p.x, y: p.y };
 }
 
+// Embedded, a plain wheel belongs to the host page: the document cannot
+// scroll, so an event left alone chains out to the page around the frame.
+// Ctrl/⌘ + wheel (and a trackpad pinch, which arrives as ctrlKey) still zoom.
+var wheelZoom = !EMBED;
+var hintTimer = 0;
+function zoomHint(){
+  var hint = document.getElementById("zoomhint");
+  if (!hint) return;
+  hint.textContent = (/Mac|iPhone|iPad/.test(navigator.platform) ? "\u2318" : "Ctrl") + " + scroll to zoom";
+  hint.classList.add("on");
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(function(){ hint.classList.remove("on"); }, 1100);
+}
+if (EMBED) {
+  window.addEventListener("message", function(ev){
+    var d = ev.data;
+    if (!d || d.type !== "ndx-iso") return;
+    if (typeof d.wheelZoom === "boolean") wheelZoom = d.wheelZoom;
+    if (d.theme === "light" || d.theme === "dark") document.documentElement.setAttribute("data-theme", d.theme);
+  });
+}
+
 stage.addEventListener("wheel", function(ev){
+  if (!wheelZoom && !ev.ctrlKey && !ev.metaKey) { zoomHint(); return; }
   ev.preventDefault();
   var p = toVB(ev), wx = (p.x - tx) / k, wy = (p.y - ty) / k;
   var nk = Math.max(0.4, Math.min(5, k * Math.exp(-ev.deltaY * 0.0016)));

@@ -4,9 +4,9 @@ import {
   DEFAULT_MEMORY_MONITOR_CONFIG,
 } from "../../../src/process/memory-monitor.js";
 import type {
-  MemoryMonitorConfig,
   MemoryMonitorOverrides,
 } from "../../../src/process/memory-monitor.js";
+import type { AvailableMemoryReading } from "../../../src/prd/llm-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -14,13 +14,29 @@ import type {
 
 const GB = 1024 * 1024 * 1024;
 
-/** Create mock overrides with a given usage percentage. */
+/** A shared-module reading, as `readAvailableMemory()` returns it. */
+function reading(availableBytes: number | null, totalBytes: number): AvailableMemoryReading {
+  return {
+    availableBytes,
+    totalBytes,
+    pressure: availableBytes === null ? "unknown" : "normal",
+    source: availableBytes === null ? "darwin:unavailable" : "darwin:vm_stat+sysctl",
+  };
+}
+
+/**
+ * Create mock overrides with a given os.freemem() usage percentage.
+ *
+ * On darwin the shared reading is injected (`readAvailable`) so no real
+ * `vm_stat` runs; it reports `darwinAvailablePercent` used, or the same as
+ * freemem when that is not given. On linux/win32 the shared module's own
+ * os.freemem() path is used, so the platform decision stays in llm-client.
+ */
 function mockOverrides(
   usagePercent: number,
   opts?: {
     totalGB?: number;
     platform?: NodeJS.Platform;
-    linuxAvailablePercent?: number;
     darwinAvailablePercent?: number;
   },
 ): MemoryMonitorOverrides {
@@ -28,23 +44,15 @@ function mockOverrides(
   const total = totalGB * GB;
   const free = total * (1 - usagePercent / 100);
   const plat = opts?.platform ?? "darwin";
+  const darwinUsed = opts?.darwinAvailablePercent ?? usagePercent;
 
   return {
     platform: plat,
     freemem: () => free,
     totalmem: () => total,
-    readLinuxAvailable: async () => {
-      if (plat === "linux" && opts?.linuxAvailablePercent !== undefined) {
-        return total * (1 - opts.linuxAvailablePercent / 100);
-      }
-      return undefined;
-    },
-    readDarwinAvailable: async () => {
-      if (plat === "darwin" && opts?.darwinAvailablePercent !== undefined) {
-        return total * (1 - opts.darwinAvailablePercent / 100);
-      }
-      return undefined;
-    },
+    ...(plat === "darwin" && {
+      readAvailable: async () => reading(total * (1 - darwinUsed / 100), total),
+    }),
   };
 }
 
@@ -87,33 +95,6 @@ describe("SystemMemoryMonitor", () => {
   });
 
   // -------------------------------------------------------------------------
-  // SystemMemoryReader interface
-  // -------------------------------------------------------------------------
-
-  describe("SystemMemoryReader interface", () => {
-    it("freemem() returns injected value", () => {
-      const overrides = mockOverrides(50, { totalGB: 16 });
-      const monitor = new SystemMemoryMonitor(undefined, overrides);
-      expect(monitor.freemem()).toBe(overrides.freemem!());
-    });
-
-    it("totalmem() returns injected value", () => {
-      const overrides = mockOverrides(50, { totalGB: 16 });
-      const monitor = new SystemMemoryMonitor(undefined, overrides);
-      expect(monitor.totalmem()).toBe(overrides.totalmem!());
-    });
-
-    it("can be used as SystemMemoryReader for MemoryThrottle", async () => {
-      // Just verify it satisfies the interface structurally
-      const monitor = new SystemMemoryMonitor(undefined, mockOverrides(50));
-      expect(typeof monitor.freemem).toBe("function");
-      expect(typeof monitor.totalmem).toBe("function");
-      expect(monitor.freemem()).toBeGreaterThan(0);
-      expect(monitor.totalmem()).toBeGreaterThan(0);
-    });
-  });
-
-  // -------------------------------------------------------------------------
   // snapshot() — macOS/Windows (non-Linux)
   // -------------------------------------------------------------------------
 
@@ -129,7 +110,7 @@ describe("SystemMemoryMonitor", () => {
       expect(snap.usagePercent).toBeCloseTo(50, 0);
       expect(snap.totalMB).toBeCloseTo(16 * 1024, -1);
       expect(snap.freeMB).toBeGreaterThan(0);
-      // On non-Linux, available === free
+      // The injected shared reading matches freemem here
       expect(snap.availableBytes).toBe(snap.freeBytes);
       expect(snap.timestamp).toBeTruthy();
     });
@@ -146,7 +127,7 @@ describe("SystemMemoryMonitor", () => {
       expect(snap.availableBytes).toBe(snap.freeBytes);
     });
 
-    it("reads Windows availability without consulting a platform reader", async () => {
+    it("reads Windows availability straight from os.freemem()", async () => {
       // Pins a measured decision, not an accident. os.freemem() on Windows already
       // reports standby-inclusive availability — measured at -0.08 percentage points
       // against `\Memory\Available MBytes` on a quiet 31.5 GiB box — so no separate
@@ -155,28 +136,15 @@ describe("SystemMemoryMonitor", () => {
       // that shells out would add a child process per tool call. If this test starts
       // failing because a Windows reader was added, the module docblock explains what
       // measurement to bring first.
-      let linuxReads = 0;
-      let darwinReads = 0;
       const monitor = new SystemMemoryMonitor(undefined, {
         platform: "win32",
         totalmem: () => 16 * GB,
         freemem: () => 4 * GB,
-        readLinuxAvailable: async () => {
-          linuxReads += 1;
-          return 8 * GB;
-        },
-        readDarwinAvailable: async () => {
-          darwinReads += 1;
-          return 8 * GB;
-        },
       });
 
       const snap = await monitor.snapshot();
 
-      expect(linuxReads).toBe(0);
-      expect(darwinReads).toBe(0);
-      // Availability comes straight from freemem, so usagePercent follows it: had a
-      // reader been consulted, 8 GiB available would have read as 50% instead.
+      // Availability comes straight from freemem, so usagePercent follows it.
       expect(snap.availableBytes).toBe(4 * GB);
       expect(snap.usagePercent).toBeCloseTo(75, 0);
     });
@@ -186,7 +154,7 @@ describe("SystemMemoryMonitor", () => {
         platform: "darwin",
         freemem: () => 0,
         totalmem: () => 0,
-        readLinuxAvailable: async () => undefined,
+        readAvailable: async () => reading(0, 0),
       });
       const snap = await monitor.snapshot();
       expect(snap.usagePercent).toBe(0);
@@ -217,18 +185,33 @@ describe("SystemMemoryMonitor", () => {
       expect(snap.availableBytes).toBeGreaterThan(snap.freeBytes);
     });
 
-    it("falls back to os.freemem() when vm_stat is unavailable", async () => {
+    it("reports unknown, never os.freemem(), when vm_stat is unavailable", async () => {
       const monitor = new SystemMemoryMonitor(undefined, {
         platform: "darwin",
-        freemem: () => 4 * GB,
+        freemem: () => 115 * 1024 * 1024,
         totalmem: () => 16 * GB,
-        readLinuxAvailable: async () => undefined,
-        readDarwinAvailable: async () => undefined,
+        readAvailable: async () => reading(null, 16 * GB),
       });
       const snap = await monitor.snapshot();
 
-      expect(snap.availableBytes).toBe(snap.freeBytes);
-      expect(snap.usagePercent).toBeCloseTo(75, 0);
+      expect(snap.availableBytes).toBeNull();
+      expect(snap.availableMB).toBeNull();
+      expect(snap.usagePercent).toBeNull();
+      expect(snap.freeBytes).toBe(115 * 1024 * 1024);
+    });
+
+    it("allows spawning on an unknown reading even at 99% os.freemem() usage", async () => {
+      const monitor = new SystemMemoryMonitor({ spawnThreshold: 1 }, {
+        platform: "darwin",
+        freemem: () => 115 * 1024 * 1024,
+        totalmem: () => 16 * GB,
+        readAvailable: async () => reading(null, 16 * GB),
+      });
+      const check = await monitor.checkBeforeSpawn();
+
+      expect(check.allowed).toBe(true);
+      expect(check.reason).toBeUndefined();
+      expect(check.usagePercent).toBeNull();
     });
 
     it("prevents false throttle triggers with realistic macOS memory", async () => {
@@ -253,39 +236,21 @@ describe("SystemMemoryMonitor", () => {
   });
 
   // -------------------------------------------------------------------------
-  // snapshot() — Linux with /proc/meminfo
+  // snapshot() — Linux
   // -------------------------------------------------------------------------
 
   describe("snapshot() — Linux", () => {
-    it("uses MemAvailable for more accurate readings", async () => {
-      // On Linux: os.freemem() reports 20% free, but /proc/meminfo says 40% available
-      // (because buffers/cache are reclaimable)
-      const monitor = new SystemMemoryMonitor(
-        undefined,
-        mockOverrides(80, {
-          platform: "linux",
-          linuxAvailablePercent: 60, // 60% used = 40% available
-        }),
-      );
-      const snap = await monitor.snapshot();
-
-      expect(snap.platform).toBe("linux");
-      // Usage should be based on available (60%), not free (80%)
-      expect(snap.usagePercent).toBeCloseTo(60, 0);
-      // Available should be higher than free (because cache is reclaimable)
-      expect(snap.availableBytes).toBeGreaterThan(snap.freeBytes);
-    });
-
-    it("falls back to freemem when /proc/meminfo is unavailable", async () => {
+    it("takes availability from os.freemem(), which is MemAvailable on Linux", async () => {
+      // libuv ≥ 1.45 returns MemAvailable (cache-inclusive) from os.freemem() on
+      // Linux, so the shared reading uses it directly and reads no /proc/meminfo.
       const monitor = new SystemMemoryMonitor(undefined, {
         platform: "linux",
         freemem: () => 4 * GB,
         totalmem: () => 16 * GB,
-        readLinuxAvailable: async () => undefined, // /proc/meminfo unavailable
       });
       const snap = await monitor.snapshot();
 
-      // Falls back: available === free
+      expect(snap.platform).toBe("linux");
       expect(snap.availableBytes).toBe(snap.freeBytes);
       expect(snap.usagePercent).toBeCloseTo(75, 0);
     });
@@ -389,21 +354,19 @@ describe("SystemMemoryMonitor", () => {
   // -------------------------------------------------------------------------
 
   describe("checkBeforeSpawn() — Linux available memory", () => {
-    it("uses available memory (not free) for threshold comparison", async () => {
-      // os.freemem() says 5% free (95% used) — would block at 90% threshold
-      // But /proc/meminfo says 70% used (30% available) — should allow
-      const monitor = new SystemMemoryMonitor(
+    it("compares os.freemem() (MemAvailable) against the threshold", async () => {
+      const allowed = await new SystemMemoryMonitor(
         { spawnThreshold: 90 },
-        mockOverrides(95, {
-          platform: "linux",
-          linuxAvailablePercent: 70,
-        }),
-      );
-      const check = await monitor.checkBeforeSpawn();
+        mockOverrides(70, { platform: "linux" }),
+      ).checkBeforeSpawn();
+      expect(allowed.allowed).toBe(true);
+      expect(allowed.usagePercent).toBeCloseTo(70, 0);
 
-      // Should be allowed because available-based usage (70%) is below threshold (90%)
-      expect(check.allowed).toBe(true);
-      expect(check.usagePercent).toBeCloseTo(70, 0);
+      const blocked = await new SystemMemoryMonitor(
+        { spawnThreshold: 90 },
+        mockOverrides(95, { platform: "linux" }),
+      ).checkBeforeSpawn();
+      expect(blocked.allowed).toBe(false);
     });
   });
 

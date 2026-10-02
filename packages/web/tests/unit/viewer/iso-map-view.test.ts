@@ -150,7 +150,8 @@ describe("IsoMapView", () => {
   it("requests the default map on mount", async () => {
     mount();
     await settle();
-    expect(urls()).toEqual(["/api/iso-map?source=auto&maxNodes=40&externals=1"]);
+    // The frame asks for the embedded document; the links below do not.
+    expect(urls()).toEqual(["/api/iso-map?source=auto&maxNodes=40&externals=1&embed=1"]);
   });
 
   it("puts the fetched document in a titled, script-sandboxed iframe", async () => {
@@ -232,7 +233,7 @@ describe("IsoMapView", () => {
     });
     await settle();
 
-    expect(urls()[1]).toBe("/api/iso-map?source=scan&maxNodes=12&externals=0");
+    expect(urls()[1]).toBe("/api/iso-map?source=scan&maxNodes=12&externals=0&embed=1");
   });
 
   it("clamps an out-of-range node count instead of sending it", async () => {
@@ -251,7 +252,7 @@ describe("IsoMapView", () => {
     });
     await settle();
 
-    expect(urls()[1]).toBe("/api/iso-map?source=auto&maxNodes=500&externals=1");
+    expect(urls()[1]).toBe("/api/iso-map?source=auto&maxNodes=500&externals=1&embed=1");
     expect(maxNodes.value).toBe("500");
   });
 

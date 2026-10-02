@@ -48,6 +48,8 @@ interface ParsedIsoParams {
   source: IsoSourceMode;
   maxNodes: number;
   includeExternals: boolean;
+  /** Render for the dashboard's iframe (`renderIsoMap`'s `embed`). */
+  embed: boolean;
 }
 
 type ParseResult =
@@ -105,7 +107,13 @@ export function parseIsoParams(search: URLSearchParams): ParseResult {
     includeExternals = rawExternals === "1";
   }
 
-  return { ok: true, params: { source, maxNodes, includeExternals } };
+  const rawEmbed = search.get("embed");
+  if (rawEmbed !== null && rawEmbed !== "" && rawEmbed !== "0" && rawEmbed !== "1") {
+    return { ok: false, reason: `Invalid "embed": expected 0 or 1 (got "${rawEmbed}")` };
+  }
+  const embed = rawEmbed === "1";
+
+  return { ok: true, params: { source, maxNodes, includeExternals, embed } };
 }
 
 /** Send a complete HTML document. */
@@ -188,7 +196,7 @@ export function handleIsoMapRoute(
     return true;
   }
 
-  const { source, maxNodes, includeExternals } = parsed.params;
+  const { source, maxNodes, includeExternals, embed } = parsed.params;
 
   let html: string;
   try {
@@ -214,7 +222,7 @@ export function handleIsoMapRoute(
     }
 
     const model = buildIsoModel(input, { maxNodes, includeExternals });
-    html = renderIsoMap(model);
+    html = renderIsoMap(model, { embed });
   } catch (err) {
     errorResponse(
       res,

@@ -19,7 +19,7 @@
  */
 
 import { h, Fragment, Component } from "preact";
-import type { ComponentType } from "preact";
+import type { ComponentChild, ComponentType } from "preact";
 import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, PRDDocumentData, ItemStatus, ItemLevel, Priority, TaskUsageSummary, WeeklyBudgetResolution, ItemUsageRollup } from "./types.js";
 import type { ClaimEntry } from "../../hooks/index.js";
@@ -804,6 +804,13 @@ export interface PRDTreeProps {
   activeBranch?: string | null;
   /** Called when the user selects a different branch in the toolbar dropdown. */
   onBranchChange?: (branch: string | null) => void;
+  /** Rendered beside the title — the Tasks view's glossary ⓘ. */
+  titleInfo?: ComponentChild;
+  /**
+   * The host view's search and filter controls, rendered beneath the summary
+   * so the tree reads title → progress → filters → items.
+   */
+  controls?: ComponentChild;
 }
 
 // ── Item lookup helper ──────────────────────────────────────────────
@@ -821,7 +828,7 @@ function buildItemMap(items: PRDItemData[]): Map<string, PRDItemData> {
   return map;
 }
 
-export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize, availableBranches, activeBranch, onBranchChange }: PRDTreeProps) {
+export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize, availableBranches, activeBranch, onBranchChange, titleInfo, controls }: PRDTreeProps) {
   // ── Flat item map for delegated event handlers ────────────────────
   const itemMap = useMemo(() => buildItemMap(doc.items), [doc.items]);
   const getItem = useCallback((id: string) => itemMap.get(id) ?? null, [itemMap]);
@@ -1063,11 +1070,17 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
   });
 
   if (doc.items.length === 0) {
+    // The host's controls carry the Add item action, so an empty PRD keeps them.
     return h(
-      "div",
-      { class: "prd-empty" },
-      h("p", null, "No PRD items yet."),
-      h("p", { class: "prd-empty-hint" }, "Run ", h("code", null, "rex add epic --title=\"...\""), " to get started."),
+      Fragment,
+      null,
+      controls ?? null,
+      h(
+        "div",
+        { class: "prd-empty" },
+        h("p", null, "No PRD items yet."),
+        h("p", { class: "prd-empty-hint" }, "Run ", h("code", null, "rex add epic --title=\"...\""), " to get started."),
+      ),
     );
   }
 
@@ -1084,11 +1097,15 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
     h(
       "div",
       { class: "prd-header" },
-      h("h2", { class: "prd-title" }, doc.title),
+      h("div", { class: "prd-title-group" },
+        h("h2", { class: "prd-title" }, doc.title),
+        titleInfo ?? null,
+      ),
       h(Toolbar, { onExpandAll: expandAll, onCollapseAll: collapseAll, availableBranches, activeBranch, onBranchChange }),
     ),
     // Summary
     h(SummaryBar, { items: doc.items }),
+    controls ?? null,
     // Filtered-empty state — items exist but all filtered out
     flatNodes.length === 0
       ? h("div", { class: "prd-filtered-empty" },

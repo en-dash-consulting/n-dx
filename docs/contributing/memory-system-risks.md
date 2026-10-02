@@ -6,7 +6,7 @@ Known risks, design flaws, race conditions, and areas of concern in the memory m
 
 ## Critical Issues
 
-### 1. macOS Memory Reporting Underestimates Availability
+### 1. macOS Memory Reporting Underestimates Availability — Resolved
 
 **Location:** `packages/hench/src/process/memory-monitor.ts`
 **Risk:** Premature throttling / unnecessary execution delays on macOS
@@ -16,6 +16,8 @@ On macOS, `os.freemem()` returns only vm_stat "Free" pages, ignoring Inactive an
 **Impact:** The 80% delay threshold and 90% spawn threshold will trigger significantly earlier than intended on macOS. Developers on macOS will experience unnecessary throttling during normal operation.
 
 **Affected configurations:** All macOS users with default thresholds.
+
+**Resolved:** the shared `@n-dx/llm-client` reader (`packages/llm-client/src/system-memory.ts`) replaced `os.freemem()` on macOS with `vm_stat`'s free+inactive+speculative+purgeable pages and `kern.memorystatus_vm_pressure_level` for pressure, used by every consumer (hench throttle, dashboard, hub).
 
 ### 2. Container Memory Limits Are Invisible
 

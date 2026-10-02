@@ -85,7 +85,8 @@ function tabListKeyDown(e: KeyboardEvent, tabs: readonly StageTab[], activeIndex
 
 function Section({ stage, section, validViews, deployed, navigateTo, renderView }: SectionProps) {
   const key = `${stage}:${section.view}`;
-  const [open, setOpen] = useState<boolean>(() => readOpenState()[key] ?? !!section.open);
+  const [open, setOpen] = useState<boolean>(() =>
+    section.collapsedOnLoad ? false : readOpenState()[key] ?? !!section.open);
   // Scroll sections: bounded by default, full length on Expand. Stored beside
   // the open state under "<stage>:<view>:full".
   const fullKey = `${key}:full`;

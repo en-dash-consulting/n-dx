@@ -152,7 +152,7 @@ describe("machineStats", () => {
   });
 
   it("passes the machine's memory through, or null when it could not be read", () => {
-    const system = { totalBytes: 100, usedBytes: 40, usedPercent: 40 };
+    const system = { totalBytes: 100, availableBytes: 60, usedBytes: 40, usedPercent: 40 };
     expect(machineStats(cards, new Map(), { system }).memory).toEqual(system);
     expect(machineStats(cards, new Map(), null).memory).toBeNull();
   });

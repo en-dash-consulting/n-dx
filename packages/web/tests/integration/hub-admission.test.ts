@@ -114,7 +114,8 @@ describe("hub admission gate", () => {
   let alpha: FakeChild;
   let beta: FakeChild;
   let hub: HubHandle | null = null;
-  let freeMemory = 8 * 1024 * 1024 * 1024;
+  /** The gate's available-memory reading; null is a machine that could not be read. */
+  let freeMemory: number | null = 8 * 1024 * 1024 * 1024;
 
   beforeEach(async () => {
     home = mkdtempSync(join(tmpdir(), "hub-admission-"));
@@ -141,12 +142,12 @@ describe("hub admission gate", () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  async function startTestHub(maxSessions = 1): Promise<HubHandle> {
+  async function startTestHub(maxSessions = 1, memoryFloorBytes = 1_000): Promise<HubHandle> {
     hub = await startHub({
       port: 0,
       homeDir: home,
       healthIntervalMs: 60_000,
-      limits: { maxSessions, memoryFloorBytes: 1_000 },
+      limits: { maxSessions, memoryFloorBytes },
       freeMemory: () => freeMemory,
       drainIntervalMs: 50,
     });
@@ -232,6 +233,33 @@ describe("hub admission gate", () => {
     freeMemory = 8 * 1024 * 1024 * 1024;
     await waitFor(() => alpha.received.length === 1, 4_000);
     expect(alpha.received[0].taskId).toBe("task-1");
+  });
+
+  it("starts the run on an idle Mac, where os.freemem() would have queued it", async () => {
+    // 16 GB Mac: 115 MB free pages, 3.9 GB available once inactive, speculative
+    // and purgeable pages are counted. Against a 2 GB floor the old reading
+    // queued every dashboard run; the shared one admits.
+    const GIB = 1024 ** 3;
+    const h = await startTestHub(4, 2 * GIB);
+    freeMemory = Math.round(3.9 * GIB);
+
+    const res = await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect(res.status).toBe(200);
+    expect(alpha.received.map((r) => r.taskId)).toEqual(["task-1"]);
+
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue).toMatchObject({ memoryPaused: false, availableBytes: Math.round(3.9 * GIB) });
+  });
+
+  it("admits when the machine cannot be read at all, and reports no pause", async () => {
+    const h = await startTestHub(4, 2 * 1024 ** 3);
+    freeMemory = null;
+
+    const res = await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect(res.status).toBe(200);
+
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue).toMatchObject({ memoryPaused: false, freeMemoryBytes: null, pressure: "unknown" });
   });
 
   it("does not queue the same task twice when the button is clicked again", async () => {
