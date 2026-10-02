@@ -1,5 +1,263 @@
 # @n-dx/llm-client
 
+## 0.8.0
+
+### Minor Changes
+
+- [#459](https://github.com/en-dash-consulting/n-dx/pull/459) [`0e3623e`](https://github.com/en-dash-consulting/n-dx/commit/0e3623edbc25e417982a93db53aa7ae6b70fae2f) Thanks [@endash-shal](https://github.com/endash-shal)! - 0.8.0 — Find your way
+  
+  A single `.ndx/` directory for project state, with `ndx migrate-layout` to move
+  an existing project onto it. A reorganised dashboard: views are stages, Analysis
+  opens on the codebase map, settings are three pages (Robot Wrangler, Workflow,
+  Project) on a shared save frame, and every moved path redirects. A Live tab for
+  watching every run across a repository's worktrees. A per-user token on the hub
+  and dashboard, and repository trust gating what a checkout's execution config
+  may widen. New Claude model defaults, per-vendor agent models, per-field
+  resolution of the legacy `claude.*` keys, and effects declared for every command
+  and shown in a preflight banner.
+  
+  Every other changeset in this release is a `patch`, which is the repo default
+  and correct for each change on its own. This one makes the aggregate a minor, as
+  the 0.8.0 epic requires.
+
+### Patch Changes
+
+- [#434](https://github.com/en-dash-consulting/n-dx/pull/434) [`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9) Thanks [@endash-shal](https://github.com/endash-shal)! - Carry the token parser's verdict on the runtime event, and serialize session-cache writes.
+  
+  `RuntimeEvent` now carries `tokenDiagnosticStatus` and `tokenCacheProvenance`. Both were computed by `parseTokenUsageWithDiagnostic` and then discarded when the event was built, so the event pipeline re-derived them from the parsed numbers. That inference cannot match the parser: the parser decides from field presence, while the numbers only show values. An explicit `input_tokens: 0` is a complete measurement that inferred as `partial`, and a zero-valued cache count is omitted from `TokenUsage` entirely, so it inferred as `unavailable` where the parser said `measured` — a parity gap between legacy and event-pipeline run records. Consumers prefer the carried values and keep the inference as a fallback for events produced before the fields existed.
+  
+  Session-cache mutations now hold an exclusive lock for the whole read-modify-write, and write through a temp file and a rename. `maxConcurrentProcesses` defaults to 3, so concurrent runs in one checkout are normal: two tasks advancing the same batch chain each persisted their own `tasksUsed` and session id over the other's, and `clearSessionCache` could delete a chain written between its own read and its `rm`, breaking the preservation contract it documents. The lock is best-effort by design — a cache is an optimisation, so it proceeds unlocked after a timeout rather than failing a run, and steals a lock left behind by a killed process.
+
+- [#505](https://github.com/en-dash-consulting/n-dx/pull/505) [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add Claude Opus 5.5, Sonnet 5.5 and Fable 5.1, and move the Claude defaults onto them
+  
+  **The defaults have changed.** The standard tier (and the default when no model is
+  configured) is now `claude-sonnet-5-5`. The heavy tier and the review model are now
+  `claude-opus-5-5`. The `opus` alias now resolves to `claude-opus-5-5` and `fable`
+  to `claude-fable-5-1`. `ndx init` offers Sonnet 5.5 (recommended), Opus 5.5,
+  Fable 5.1 and Haiku 4.5.
+  
+  All three new models have a 1M context window and list pricing, so budget
+  preflight, `ndx usage` and the dashboard spend views price them as known. That
+  includes dated `-YYYYMMDD` snapshots. Previously they fell back to estimated
+  rates and showed `known: false`.
+  
+  `claude-sonnet-5`, `claude-opus-5` and `claude-fable-5` are still priced and
+  resolvable, and `ndx init` accepts them without an unknown-model warning.
+  
+  The dashboard config footer now shows every version part: `sonnet 5.5`,
+  `fable 5.1`, `haiku 4.5`. Before, it showed `sonnet 5` and `haiku 4`.
+  
+  **Pinning back.** Older Claude Code releases can reject the new model ids on
+  CLI-provider runs. If yours does, upgrade Claude Code, or pin the previous model:
+  `ndx config llm.claude.model claude-sonnet-5 .`. For the heavy tier and review,
+  also set `llm.tiers.claude.heavy` and `llm.claude.reviewModel` to
+  `claude-opus-5`.
+
+- [#505](https://github.com/en-dash-consulting/n-dx/pull/505) [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Claude API requests now send `llm.effort` as `output_config.effort`, and Claude Opus 5.5 defaults to `high` effort. `llm.effort` was parsed but never sent. With no matching rule, `claude-opus-5-5` gets `high` so the move from Opus 5 keeps its reasoning depth (Opus 5.5's API default is `medium`), and other models are unchanged. Effort is never sent to a model that rejects it (Haiku 4.5, Sonnet 4.5 and older) or when the value is not `low`, `medium`, `high`, `xhigh` or `max`; both cases print a warning. Claude Code CLI runs are unchanged.
+
+- [#505](https://github.com/en-dash-consulting/n-dx/pull/505) [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Price `claude-sonnet-5` at $2 input / $10 output / $2.50 cache write / $0.20 cache read per MTok. Anthropic made the launch price standard and cancelled the planned rise to $3/$15, so `ndx usage`, budget preflight and the dashboard spend views were over-reporting Sonnet 5 runs by 50%.
+
+- [#489](https://github.com/en-dash-consulting/n-dx/pull/489) [`05a8115`](https://github.com/en-dash-consulting/n-dx/commit/05a811560a19baf95e69bc19a8c906dad2b3fea9) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `auth-token.ts`: `resolveAuthTokenPath`, `readAuthToken`, `ensureAuthToken` and `hasAuthToken` manage the per-user dashboard token file (`<ndx home>/auth.token`, created with owner-only modes) that the hub and project servers require. An existing token file that is readable by others has its mode tightened to 0600 before it is returned.
+
+- [#439](https://github.com/en-dash-consulting/n-dx/pull/439) [`39c6d80`](https://github.com/en-dash-consulting/n-dx/commit/39c6d80441aba2c3dd71d94494b58bf42fc5a4a0) Thanks [@endash-shal](https://github.com/endash-shal)! - The per-user directory the hub keeps its registry, pid and config in is now `~/.ndx/`, resolved by `resolveNdxHome` alongside the project-layout resolver rather than spelled out at each site.
+  
+  Nothing moves on an existing machine: the lookup takes `$NDX_HOME`, then `$N_DX_HOME`, then `~/.ndx` if it exists, then `~/.n-dx` if it exists, and only a machine with neither starts on `~/.ndx`. A 0.7.x install keeps using `~/.n-dx` until it is migrated. An empty override is treated as unset.
+  
+  `ndx start` now passes the resolved directory to a hub it spawns as `$NDX_HOME`, and the hub reports a bad config key by naming the resolved file rather than a tilde path that may not be the one in force.
+
+- [#482](https://github.com/en-dash-consulting/n-dx/pull/482) [`29c576a`](https://github.com/en-dash-consulting/n-dx/commit/29c576a196ed033d77a35a2dd87952ca6f32902f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `listVendorModels` and `isChatModelId`.
+  
+  `listVendorModels` asks Anthropic's Models API (Claude) or OpenAI's `/v1/models`
+  (Codex) for the models a key can use, with the key resolved as the rest of
+  llm-client does (config, then `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`). It
+  never throws: it returns the models or a reason, and no reason contains the key.
+  Ids are filtered with `isModelCompatibleWithVendor` and the new `isChatModelId`,
+  which drops embedding, audio, image, moderation, realtime and transcription
+  models.
+
+- [#449](https://github.com/en-dash-consulting/n-dx/pull/449) [`ccad056`](https://github.com/en-dash-consulting/n-dx/commit/ccad05698ce562b0ae47b283a59854b299884f5c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `hench-override` to the vendor/model header's model-source union, and
+  export the union as `ModelSource`.
+  
+  The header could describe a model as coming from a CLI flag, an `llm.*` field
+  or the vendor default. `ndx work` now also resolves an agent-only override
+  from `hench.models.<vendor>`, which is none of those three — reporting it as
+  `configured` would have pointed operators at an `llm.*` key that lost.
+  
+  An explicitly pinned model now suppresses the tier label whichever rung pinned
+  it: a `hench-override` model was not chosen by the tier table, so annotating it
+  with a tier would misreport how it was selected. This already applied to
+  `cli-override` and is unchanged for every other source.
+  
+  `ModelSource` is exported so callers can type their own resolution result
+  against the header's union rather than restating the string literals.
+
+- [#440](https://github.com/en-dash-consulting/n-dx/pull/440) [`2b144b8`](https://github.com/en-dash-consulting/n-dx/commit/2b144b897262afc597ab9e964febb6cd6c7d9f91) Thanks [@endash-shal](https://github.com/endash-shal)! - Price a dated model snapshot at its base model
+  
+  Vendors ship ids like `claude-haiku-4-5-20251001` while the price table is keyed
+  on `claude-haiku-4-5`, so the lookup missed and fell back — and the fallback is
+  `claude-sonnet-5`, a real catalogue entry at roughly three times haiku's input
+  rate. Every haiku call was therefore priced at sonnet's rates, and the figure
+  looked measured rather than wrong.
+  
+  `resolveModelPricing` now also tries the id with a trailing eight-digit date
+  removed. Only pricing is affected; model *selection* keeps the id it was given,
+  and a version suffix that is not a date (`jev-1.13.0`) stays unknown rather than
+  being trimmed into something that happens to match.
+
+- [#469](https://github.com/en-dash-consulting/n-dx/pull/469) [`aa0ca02`](https://github.com/en-dash-consulting/n-dx/commit/aa0ca024713788ec46248f12df84e7390c64e2c7) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Resolve the legacy top-level `claude.*` keys against `llm.claude.*` **per
+  field**, and stop writing the legacy copies.
+  
+  **Behaviour change.** A project carrying both an `llm.claude` block and legacy
+  `claude.*` keys now honours each legacy field the new block leaves unset. The
+  fallback used to be block-level (`llmClaude ?? legacyClaude`), so a modern block
+  holding a single field discarded every legacy field beside it — a project that
+  set `claude.api_key` once and later pinned `llm.claude.model` silently lost the
+  key, and `claude.lightModel` silently reverted to the tier default. Nothing said
+  so, because both states are valid config.
+  
+  `resolveClaudeConfig` in `@n-dx/llm-client` is the one implementation of that
+  rule, exported alongside a `sources` map saying where each resolved field came
+  from. `loadLLMConfig`, `GET /api/llm/config` and `GET /api/ndx-config` all use
+  it, so the CLI, the dashboard and the footer can no longer disagree about which
+  value is live.
+  
+  Two further consequences of reading the resolved view:
+  
+  - The dashboard footer's auth check (`GET /api/ndx-config`) now counts a
+    credential set under `llm.claude.api_key` / `llm.claude.cli_path`. It read
+    only the legacy block before, and reported `authMethod: "none"` for a
+    perfectly configured project — it happened to work solely because
+    `packages/core/config.js` mirrored modern writes back into the legacy keys.
+  - That mirror is gone. `ndx config llm.claude.<field>` now writes only
+    `llm.claude.<field>`. Existing `claude.*` values are deliberately left where
+    they are: they are still read until 1.0.0, so rewriting or removing them would
+    change what a project resolves without being asked to. The local-file
+    migration still clears a legacy *secret* from the shared file, because a key
+    mirrored there by an older version must not stay committed.
+  
+  Readers that leaned on that mirror move with it. `ndx config --test-connection`
+  resolves both locations per field, so it tests a credential stored under
+  `llm.claude.cli_path` / `llm.claude.api_key` instead of reporting "No Claude
+  configuration set" for a fully configured project. `ndx auth` already resolved
+  both and is unchanged. `loadClaudeConfig` in `@n-dx/llm-client`, which supplies
+  the API key, CLI path and endpoint to `ndx work` on the API provider and to rex's
+  LLM commands, resolves both locations the same way, so a key set with
+  `ndx config llm.claude.api_key` reaches them.
+  
+  Not yet moved: `ndx config claude.<field>` as a *read*, the whole-section
+  `ndx config claude`, and the `claude` block in `ndx config --json` still answer
+  from the legacy key alone, so they no longer surface a value set under
+  `llm.claude.*`. Read it under its own name (`ndx config llm.claude.<field>`)
+  until that migration lands.
+  
+  Writes go to the modern keys only. `PUT /api/llm/config` refuses `claude.model`
+  and `claude.lightModel` with a 400 naming the `llm.claude.*` replacement, rather
+  than the generic unknown-path error those keys would otherwise get.
+  
+  `GET /api/ndx-config` also stops falling back to `hench.model` for the displayed
+  model. `ndx work` has never read that key, so the footer could name a model
+  nothing would run.
+  
+  One sharp edge worth stating: a legacy `claude.model` that is incompatible with
+  the active vendor was previously masked whenever any `llm.claude` block existed,
+  and is now resolved — so `ndx work` reports it with the same actionable error a
+  bad `llm.claude.model` already gets, instead of silently running the default.
+
+- [#505](https://github.com/en-dash-consulting/n-dx/pull/505) [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Pin the `opus`, `haiku` and `fable` model aliases to literal model ids, so re-pointing a tier can no longer change which model family an alias resolves to.
+
+- [#490](https://github.com/en-dash-consulting/n-dx/pull/490) [`d3c2169`](https://github.com/en-dash-consulting/n-dx/commit/d3c21692f2a8f7582a114fc69fba1c88a7a0205e) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `redactSecrets`, `redactSecretsDetailed` and `redactDeep`: credential redaction for text that is persisted or shown. Well-known token shapes (vendor API-key prefixes, JWTs, private-key blocks, bearer headers, URL passwords) and credential-shaped assignments (`GITHUB_TOKEN=…`, `api_key: …`) are replaced with `[redacted:…]` markers; run-record fields such as token counts are left alone. An assignment's value is taken whole — a quoted value to its closing quote, an unquoted one to the end of the line — so a passphrase containing spaces no longer survives in the clear. `createLineRedactor` is the stateful, line-at-a-time form for callers that never hold the whole text, such as a streaming log writer: it catches a private-key block whose BEGIN and END markers fall on different lines.
+
+- [#491](https://github.com/en-dash-consulting/n-dx/pull/491) [`161da3d`](https://github.com/en-dash-consulting/n-dx/commit/161da3d04bb668f80ffe1a52c3be880cdeafbab1) Thanks [@endash-shal](https://github.com/endash-shal)! - Add repository trust: `evaluateRepoTrust` reads what a checkout ships as execution config (`.hench/config.json` guard and permission mode, `.rex/config.json` test command, `.mcp.json` servers), compares it to the guard baseline for the project's language, and reports whether this user has accepted it. The trust record lives in `<ndx home>/trust/` with owner-only modes, never in the repository. `guardBaselineForLanguage` is now the single source of hench's default allowlists and blocked paths, and the baseline blocks credential files (`.env`, keys, `.npmrc`, `.netrc`, `.aws/`, `.ssh/`) for every language. `clampGuardToBaseline` narrows a guard to that baseline.
+
+- [#500](https://github.com/en-dash-consulting/n-dx/pull/500) [`0bca3ea`](https://github.com/en-dash-consulting/n-dx/commit/0bca3ea0f0336ec4f317504fb518320c6ac6856d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add a shared available-memory reading (`readAvailableMemory`, `getAvailableMemory`).
+  
+  On macOS it counts free + inactive + speculative + purgeable pages from `vm_stat` and takes health from `kern.memorystatus_vm_pressure_level`, instead of `os.freemem()`, which counts only free pages and read a healthy 16 GB Mac as ~115 MB free. When neither can be read the reading is `availableBytes: null` and `pressure: "unknown"`, never 0. Linux and Windows keep `os.freemem()` unchanged. Readings are cached for 5 s and concurrent refreshes share one spawn.
+
+- [#436](https://github.com/en-dash-consulting/n-dx/pull/436) [`03590e4`](https://github.com/en-dash-consulting/n-dx/commit/03590e4fa8069232774dce4e1d0fe460b969e530) Thanks [@endash-shal](https://github.com/endash-shal)! - Add a folder-layout resolver and a paths module per package.
+  
+  n-dx keeps its state in three dot-directories and five loose `.n-dx*` files, named
+  directly at roughly 380 source files. `resolveLayout` in `@n-dx/llm-client` makes that
+  one decision in one place: it reads a `.ndx/` container first and falls back to the
+  legacy layout silently, so existing projects keep working untouched. Each package gains
+  a paths module (`resolveRexPaths`, `resolveSourcevisionPaths`, `resolveHenchPaths`,
+  `resolveWebPaths`) as the single home for its own folder names, and the orchestration
+  tier gets a hand-written twin in `packages/core/layout.js` — it may not import from any
+  package tier — pinned to the canonical implementation by a contract test.
+  
+  No call sites are rewired yet, so behaviour is unchanged.
+
+- [#434](https://github.com/en-dash-consulting/n-dx/pull/434) [`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9) Thanks [@endash-shal](https://github.com/endash-shal)! - Record the session strategy, hit/miss reason and token-data provenance on every run.
+  
+  Every run record now carries a `session` field naming which session strategy ran
+  (`fork` / `batch` / `cold`), whether the cache served it, the named reason it did or
+  did not, and how old the entry was. `hench show` and the end-of-run summary print it
+  as one line; the dashboard's run detail gains a Session section. Until now the only
+  trace of that decision was a terminal line nobody was capturing, so "is batching
+  actually hitting?" could not be answered from run history.
+  
+  API-provider runs record the decision too, as `cold` / `api-provider` — that path holds
+  no session resumable by id, and saying so is not the same as saying nothing, which is
+  also what a run that died before reaching the decision looks like.
+  
+  Cache token counts now say where they came from. `tokens.cachedProvenance` and the
+  per-turn `cacheProvenance` distinguish a vendor that accounted for caching and
+  reported none from a vendor that never reported it at all — both of which used to
+  read as a confident `cached: 0`.
+  
+  Fixes two places where Codex cache data was dropped: the token parsers ignored
+  Codex's `cached_input_tokens` / `cache_write_input_tokens` field names, and the Codex
+  JSONL event parser kept only input and output from a turn's `usage`. A Codex turn
+  reporting 45,472 input with 35,072 cached is now split correctly rather than counted
+  entirely as uncached input — the total is unchanged, the attribution and the price
+  are not.
+  
+  All fields are additive; run records written before this change load unchanged.
+
+- [#449](https://github.com/en-dash-consulting/n-dx/pull/449) [`ccad056`](https://github.com/en-dash-consulting/n-dx/commit/ccad05698ce562b0ae47b283a59854b299884f5c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Validate `.n-dx.json`/`.n-dx.local.json` hench overrides (and workflow template
+  overlays) against `HenchConfigSchema` instead of merging them in unchecked.
+  
+  `loadConfig` validated `.hench/config.json` but then deep-merged the project
+  overrides on top with no validation, so `hench.maxTurns: -5` produced a run
+  that "completed" having executed no turn, `promptCacheTtl: "1hour"` silently
+  degraded to a 5-minute cache marker, and an invalid `prune` group crashed the
+  pruner. Workflow templates hit the same gap through `applyTemplate`.
+  
+  `loadConfig` now re-validates the merged result. An invalid top-level override
+  field reverts to its value in the already-validated base config (or the
+  schema default) with a warning naming the field and the file it came from
+  (`.n-dx.json` or `.n-dx.local.json`) — it never stops the run, matching how a
+  malformed `.hench/config.json` is already salvaged. `hench template apply`
+  gets the same treatment: an invalid template scalar now warns and falls back
+  instead of refusing the whole template.
+  
+  `@n-dx/llm-client` gains `loadProjectOverrideSources`, exposing each
+  project-config file's section separately so a caller can attribute a bad
+  value to the file it came from.
+
+- [#445](https://github.com/en-dash-consulting/n-dx/pull/445) [`cceceb5`](https://github.com/en-dash-consulting/n-dx/commit/cceceb563ba1650f4e70b9cbe63eec9bbd954e4d) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx init` now starts new projects on the `.ndx/` layout
+  
+  A project with no n-dx state gets a single `.ndx/` container holding `rex/`,
+  `hench/`, `sourcevision/` and `config.json`, instead of three dot-directories
+  and a `.n-dx.json` scattered across the root. `.mcp.json` stays at the
+  repository root, because the vendor CLIs read it there.
+  
+  A project that already has n-dx state keeps the layout it has. Re-running init
+  is how people pick up new assistant surfaces and repaired config, and it must
+  not turn into a migration nobody asked for — moving an existing project is
+  `ndx migrate-layout`'s job, where it can snapshot first and `git mv` so history
+  follows.
+  
+  The mechanism is that init creates the container before it spawns the sub-CLIs,
+  so each one resolves its own paths and they cannot disagree. Alongside it, the
+  paths that `ndx init` writes and that every later command reads now come from
+  the resolver rather than from literals: the project and package config files,
+  the `requireInit` check, the `.gitignore` and `.gitattributes` blocks, the git
+  baseline commit, and hench's own state directory across its CLI.
+  
+  `relativeToRoot(layout, path)` is new in `@n-dx/llm-client` (and its
+  orchestration-tier twin), for the several places that need a resolved path as
+  `.gitignore` spells it — root-relative, forward slashes.
+
 ## 0.7.2
 
 ## 0.7.1
