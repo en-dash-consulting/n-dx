@@ -2,13 +2,12 @@
 id: "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3"
 level: "epic"
 title: "LLM Integration"
-status: "completed"
+status: "pending"
 startedAt: "2026-04-13T18:35:49.604Z"
-completedAt: "2026-08-31T16:40:22.247Z"
 endedAt: "2026-08-31T16:40:22.247Z"
 description: "AI client infrastructure: vendor-neutral LLM foundation, token usage tracking and analytics, budget management, vendor support (Claude, Codex), onboarding and authentication.\n\n---\n\nAutomated recommendations from SourceVision analysis. 21 zone+category groups covering 25 total findings."
-lastModified: "2026-08-31T16:40:22.253Z"
-lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+lastModified: "2026-10-02T03:54:47.325Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -37,7 +36,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Init-time LLM Onboarding and Authentication](./init-time-llm-onboarding-and/index.md) | completed |
 | [LLM Client Circular Dependency Resolution](./llm-client-circular-dependency/index.md) | completed |
 | [Memory-Aware Polling Loop Management](./memory-aware-polling-loop-management/index.md) | completed |
-| [Model Tier Registry and Weight-Aware Resolution](./model-tier-registry-and-weight-aware/index.md) | completed |
+| [Model Tier Registry and Weight-Aware Resolution](./model-tier-registry-and-weight-aware/index.md) | pending |
 | [Per-Command Task Weight Classification and Integration](./per-command-task-weight-classification/index.md) | completed |
 | [Polished CLI first-run and re-init experience](./polished-cli-first-run-and-re-init/index.md) | completed |
 | [Rex Command Vendor-Model Binding Regression Fix](./rex-command-vendor-model-binding/index.md) | completed |
