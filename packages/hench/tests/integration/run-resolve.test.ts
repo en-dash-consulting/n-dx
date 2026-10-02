@@ -225,8 +225,6 @@ describe("the resolution report", () => {
   });
 
   it("reports the review model and its source when --review is on", async () => {
-    // llm.local is the one vendor block whose reviewModel the config loader
-    // keeps today; resolve reports what the loaded config says, as a run sees it.
     await projectConfig({ llm: { vendor: "local", local: { reviewModel: "qwen-reviewer" } } });
     const r = await resolve({ task: "t-pending", review: "true" });
 
@@ -241,6 +239,16 @@ describe("the resolution report", () => {
 
     expect(r.resolved.review.value).toBe(false);
     expect(r.resolved.reviewModel).toMatchObject({ value: "qwen-reviewer", source: "llm.local.reviewModel" });
+  });
+
+  it("reports llm.claude.reviewModel and llm.reviewModel as the reviewer's source", async () => {
+    await projectConfig({ llm: { vendor: "claude", claude: { reviewModel: "opus" }, reviewModel: "haiku" } });
+    expect((await resolve({ task: "t-pending", review: "true" })).resolved.reviewModel)
+      .toMatchObject({ value: resolveModel("opus"), source: "llm.claude.reviewModel" });
+
+    await projectConfig({ llm: { vendor: "claude", reviewModel: "haiku" } });
+    expect((await resolve({ task: "t-pending", review: "true" })).resolved.reviewModel)
+      .toMatchObject({ value: resolveModel("haiku"), source: "llm.reviewModel" });
   });
 
   it("drops the permission mode for a vendor without one", async () => {

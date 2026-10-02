@@ -825,6 +825,9 @@ function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null
   if (typeof claude.lightModel === "string" && claude.lightModel) {
     result.lightModel = claude.lightModel;
   }
+  if (typeof claude.reviewModel === "string" && claude.reviewModel) {
+    result.reviewModel = claude.reviewModel;
+  }
   return Object.keys(result).length > 0 ? result : null;
 }
 
