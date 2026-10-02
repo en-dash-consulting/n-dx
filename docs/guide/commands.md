@@ -9,6 +9,8 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | `ndx init [dir]` | Initialize a project for n-dx |
 | `ndx migrate-layout [dir]` | Move an existing project's state into `.ndx/` |
 | `ndx config [key] [value]` | View or edit settings |
+| `ndx which` | Show which n-dx is running: version, path, install kind, git |
+| `ndx trust [status\|accept\|revoke] [dir]` | Review or accept the execution config this checkout ships |
 
 ## Analyze
 
@@ -38,6 +40,10 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | `ndx status [dir]` | Show PRD status tree |
 | `ndx next [dir]` | Print next actionable task |
 | `ndx tree [dir]` | Show full PRD hierarchy with color-coded status |
+| `ndx tree-diff [dir]` | Compare two PRD trees (commits, or a worktree against its anchor) |
+| `ndx claim list\|release [dir]` | Inspect and free cross-worktree task claims |
+| `ndx log <event> [dir]` | Append an execution-log entry (non-MCP route to `append_log`) |
+| `ndx prd export\|import` | Carry the PRD between machines as a JSON bundle, or export a narrative document |
 | `ndx report [dir]` | Generate a JSON health report |
 | `ndx update <id> [dir]` | Update item status, priority, or title |
 | `ndx remove <id> [dir]` | Remove an item and its children |
