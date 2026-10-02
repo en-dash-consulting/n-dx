@@ -63,6 +63,8 @@ const MAX_EXECUTE_BODY_BYTES = 64 * 1024;
 const FORWARDED_PREFIX_HEADER = "x-forwarded-prefix";
 /** The Live overview: its agent-slots tile reports the machine's admission state when served through the hub. */
 const LIVE_PATH = "/api/live";
+/** The Prepare task modal's read: its admission strip reports the same gate state. */
+const PREP_PATH = /^\/api\/hench\/prep\/[^/]+$/;
 
 /** What to do with a request that is not the hub's own API. */
 export type ProxyDecision =
@@ -397,7 +399,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
 }
 
 /**
- * The admission header for a `GET /api/live`, measured now; none for anything
+ * The admission header for a `GET /api/live` or a prep read, measured now; none for anything
  * else. Measured rather than read from the gate's last decision, which may be
  * minutes old on an idle machine — the same reason `GET /api/hub/queue` does.
  */
@@ -407,7 +409,8 @@ async function admissionHeadersFor(
   decision: Extract<ProxyDecision, { kind: "proxy" }>,
 ): Promise<OutgoingHttpHeaders> {
   if ((req.method || "GET") !== "GET") return {};
-  if (stripWorkspaceSlot(decision.path.split("?")[0]).url !== LIVE_PATH) return {};
+  const path = stripWorkspaceSlot(decision.path.split("?")[0]).url;
+  if (path !== LIVE_PATH && !PREP_PATH.test(path)) return {};
   await hub.admission.measure();
   const snapshot = hub.admission.snapshot();
   return {
@@ -415,6 +418,9 @@ async function admissionHeadersFor(
       running: snapshot.running,
       maxSessions: snapshot.limits.maxSessions,
       queued: snapshot.entries.length,
+      availableBytes: snapshot.availableBytes,
+      pressure: snapshot.pressure,
+      memoryPaused: snapshot.memoryPaused,
     }),
   };
 }

@@ -32,6 +32,7 @@
  * POST   /api/hench/templates             — create/update a user-defined template
  * POST   /api/hench/templates/:id/apply   — apply a template to current config
  * DELETE /api/hench/templates/:id         — delete a user-defined template
+ * GET    /api/hench/prep/:taskId, POST …/preview, GET /api/hench/ready — see routes-hench-prep.ts
  * POST   /api/hench/execute               — trigger Hench run for a specific task
  *                                            ({ taskId, options? }; options per
  *                                            src/shared/run-options.ts)
@@ -1712,13 +1713,33 @@ interface HoldingRun {
   worktree?: RunWorktree;
 }
 
+/** A {@link HoldingRun} with the task it holds and the root of the worktree whose runs directory records it. */
+export interface HeldRun extends HoldingRun {
+  taskId: string;
+  root: string;
+}
+
 /**
  * The first run recorded `running` for `taskId`, in any worktree of the
  * repository (the served directory alone outside one), that is not confirmed
  * dead. Judged as `GET /api/hench/runs/health` judges it.
  */
 async function findHoldingRun(ctx: ServerContext, taskId: string): Promise<HoldingRun | null> {
+  const [first] = await collectHeldRuns(ctx, taskId);
+  if (!first) return null;
+  const { taskId: _task, root: _root, ...holding } = first;
+  return holding;
+}
+
+/**
+ * Every run recorded `running` that is not confirmed dead, in any worktree of
+ * the repository (the served directory alone outside one), optionally only
+ * those of `taskId`. One pass over each runs directory, so a caller asking
+ * about many tasks reads the directories once.
+ */
+export async function collectHeldRuns(ctx: ServerContext, taskId?: string): Promise<HeldRun[]> {
   const now = Date.now();
+  const held: HeldRun[] = [];
   for (const target of await resolveRunTargets(ctx)) {
     let files: string[];
     try {
@@ -1731,18 +1752,21 @@ async function findHoldingRun(ctx: ServerContext, taskId: string): Promise<Holdi
     for (const file of files) {
       if (!file.endsWith(".json")) continue;
       const run = loadRunFile(target.runsDir, file.replace(/\.json$/, ""));
-      if (!run || run.status !== "running" || run.taskId !== taskId) continue;
+      if (!run || run.status !== "running" || typeof run.taskId !== "string") continue;
+      if (taskId !== undefined && run.taskId !== taskId) continue;
       const verdict = judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, executions);
       if (verdict.liveness === "orphaned") continue;
-      return {
+      held.push({
+        taskId: run.taskId,
+        root: target.root,
         runId: String(run.id ?? file.replace(/\.json$/, "")),
         liveness: verdict.liveness,
         reason: verdict.reason,
         ...(target.worktree ? { worktree: target.worktree } : {}),
-      };
+      });
     }
   }
-  return null;
+  return held;
 }
 
 /** Broadcast an execution state update. */

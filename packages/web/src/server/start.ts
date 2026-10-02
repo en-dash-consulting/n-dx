@@ -31,6 +31,7 @@ import { handleGitRoute } from "./routes-git.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
 import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
 import { handleLiveTaskRoute } from "./routes-live-task.js";
+import { handleHenchPrepRoute } from "./routes-hench-prep.js";
 import { handleLiveAnalyzeRoute } from "./routes-live-analyze.js";
 import { watchAnalyzeProgress } from "./analyze-progress-watcher.js";
 import { stopRunTailWatches } from "./run-tail.js";
@@ -771,6 +772,7 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, broadcast))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchPrepRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, broadcast, { onStatusInvalidate: invalidateRunCaches }))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleWorkflowRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleAdaptiveRoute(req, res, ctx))) return true;

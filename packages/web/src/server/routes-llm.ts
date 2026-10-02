@@ -837,7 +837,7 @@ export function validateCatalogModel(projectDir: string, vendor: string | null, 
  * literal pinned against hench's own table by the cross-package contract
  * test (see that file's doc comment for why web keeps a copy at all).
  */
-async function buildLlmCatalog(projectDir: string, refresh: boolean): Promise<LlmCatalogResponse> {
+export async function buildLlmCatalog(projectDir: string, refresh: boolean): Promise<LlmCatalogResponse> {
   const config = readEffectiveNdxConfig(projectDir);
   const llmConfig = await loadLLMConfig(projectDir);
   // The model `ndx work` would run with no `hench.models.<vendor>` — resolved

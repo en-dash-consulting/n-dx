@@ -56,7 +56,7 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
       });
     }
     // A real project server strips the `/w/<key>` slot itself; the hub forwards it.
-    if (url.endsWith("/api/live")) {
+    if (url.endsWith("/api/live") || /\/api\/hench\/prep\/[^/]+$/.test(url)) {
       const header = req.headers["x-ndx-hub-admission"];
       child.liveAdmission.push((Array.isArray(header) ? header[0] : header) ?? null);
       return json(200, {});
@@ -424,7 +424,18 @@ describe("hub admission gate", () => {
 
     const spoofed = JSON.stringify({ running: 0, maxSessions: 99, queued: 0 });
     await fetch(`http://127.0.0.1:${h.port}/p/beta/w/feature/api/live`, { headers: { "x-ndx-hub-admission": spoofed } });
-    expect(beta.liveAdmission).toEqual([JSON.stringify({ running: 1, maxSessions: 1, queued: 1 })]);
+    expect(beta.liveAdmission).toEqual([
+      JSON.stringify({ running: 1, maxSessions: 1, queued: 1, availableBytes: 8 * 1024 ** 3, pressure: "normal", memoryPaused: false }),
+    ]);
+  });
+
+  it("states it on a proxied prep read too, including that memory is what holds runs back", async () => {
+    const h = await startTestHub(4);
+    freeMemory = 500;
+    await fetch(`http://127.0.0.1:${h.port}/p/beta/api/hench/prep/task-1`);
+    expect(beta.liveAdmission).toEqual([
+      JSON.stringify({ running: 0, maxSessions: 4, queued: 0, availableBytes: 500, pressure: "critical", memoryPaused: true }),
+    ]);
   });
 
   it("reports its limits and what is running on the queue endpoint", async () => {
