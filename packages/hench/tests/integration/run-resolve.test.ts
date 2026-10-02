@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { resolveModel, NEWEST_MODELS, REVIEW_MODELS, TIER_MODELS } from "@n-dx/llm-client";
 import { resolveRun } from "../../src/cli/commands/run-resolve.js";
@@ -344,6 +344,28 @@ describe("refusals are reported, not thrown", () => {
     const r = await resolve({ task: "t-pending" });
     expect(codes(r)).toEqual(["tree-not-conformant"]);
     expect(typeof r.refusals[0].migratable).toBe("boolean");
+  });
+
+  it("prd-unreadable, with no task, when a tree file cannot be read", async () => {
+    // The tree's metadata file is read strictly: anything but "missing" throws.
+    const metaPath = join(rexDir, TREE_META_FILENAME);
+    await rm(metaPath, { force: true });
+    await mkdir(metaPath);
+
+    const r = await resolve({ task: "t-pending" });
+    expect(r.task).toBeNull();
+    expect(codes(r)).toContain("prd-unreadable");
+    expect(r.refusals[0].message).toMatch(/could not be read/);
+  });
+
+  it("prd-unreadable when the legacy prd.json is corrupt", async () => {
+    await rm(join(rexDir, PRD_TREE_DIRNAME), { recursive: true, force: true });
+    await writeFile(join(rexDir, "prd.json"), '{"schema": "rex/v1", "items": [}', "utf-8");
+
+    const r = await resolve({ task: "t-pending" });
+    expect(r.task).toBeNull();
+    // The deleted tree also leaves the working tree dirty; that is a separate refusal.
+    expect(codes(r)).toContain("prd-unreadable");
   });
 
   it("vendor-unset", async () => {

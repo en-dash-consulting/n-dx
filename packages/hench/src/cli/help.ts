@@ -124,7 +124,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "             autonomous-default, built-in)\n" +
           "  options    the per-run options, with flag, type, values and scope\n" +
           "  refusals   [{code, message}] for each reason the run would not start:\n" +
-          "             task-not-found, not-actionable, claimed-elsewhere,\n" +
+          "             prd-unreadable (task is null), task-not-found, not-actionable, claimed-elsewhere,\n" +
           "             tree-not-conformant, vendor-unset, vendor-cli-missing,\n" +
           "             provider-unsupported, model-vendor-mismatch, dirty-tree\n" +
           "  command    the equivalent ndx work command line\n" +

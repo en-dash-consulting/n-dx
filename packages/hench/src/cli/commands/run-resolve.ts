@@ -60,6 +60,7 @@ export interface Resolved<T> {
 /** Why a run with these flags would refuse to start. */
 export type RunRefusalCode =
   | "task-not-found"
+  | "prd-unreadable"
   | "not-actionable"
   | "claimed-elsewhere"
   | "tree-not-conformant"
@@ -197,10 +198,25 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   };
 
   // ── Task ────────────────────────────────────────────────────────────────
-  const store = await resolveStore(rexDir);
-  const entry = findItem((await store.loadDocument()).items, taskId);
+  // A PRD that cannot be parsed is a refusal the dashboard can show, not a crash
+  // that leaves it with no JSON.
+  let prdItems: PRDItem[] | null = null;
+  try {
+    prdItems = (await (await resolveStore(rexDir)).loadDocument()).items;
+  } catch (err) {
+    refuse(
+      "prd-unreadable",
+      new CLIError(
+        `The PRD could not be read: ${err instanceof Error ? err.message : String(err)}`,
+        "Fix or restore the corrupt file under .rex/, then try again.",
+      ),
+    );
+  }
+  const entry = prdItems ? findItem(prdItems, taskId) : null;
   let task: RunResolution["task"] = null;
-  if (!entry) {
+  if (!prdItems) {
+    // Already refused above; there is no task to describe.
+  } else if (!entry) {
     refuse("task-not-found", new CLIError(`Task not found: ${taskId}`, "Check the id with 'ndx status'."));
   } else {
     const claim = await TaskClaims.forProject(dir, { readOnly: true }).heldElsewhere(taskId);
@@ -219,7 +235,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     if (claim) refuse("claimed-elsewhere", new TaskClaimedElsewhereError(taskId, claim, entry.item.title));
   }
 
-  const treeRefusal = await readTreeConformanceRefusal(rexDir);
+  const treeRefusal = prdItems ? await readTreeConformanceRefusal(rexDir) : null;
   if (treeRefusal) {
     refusals.push({ code: "tree-not-conformant", message: treeRefusal.message, migratable: treeRefusal.migratable });
   }
