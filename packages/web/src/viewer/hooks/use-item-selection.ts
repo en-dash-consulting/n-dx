@@ -9,6 +9,7 @@
  */
 
 import { useState, useCallback, useMemo, useRef } from "preact/hooks";
+import { replaceAppHistory } from "../base-path.js";
 import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
 import type { DetailItem } from "../types.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
@@ -69,9 +70,8 @@ export function useItemSelection({ data, onSelectItem }: ItemSelectionDeps): Ite
   const handleSelectItem = useCallback(
     (item: PRDItemData) => {
       setSelectedItemId(item.id);
-      history.replaceState(
+      replaceAppHistory(
         { view: "prd", file: null, zone: null, runId: null, taskId: item.id },
-        "",
         `/prd/${item.id}`,
       );
       if (onSelectItem) {

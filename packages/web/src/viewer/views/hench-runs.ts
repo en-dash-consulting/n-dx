@@ -11,6 +11,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
+import { replaceAppHistory } from "../base-path.js";
 import { MetricCard } from "../visualization/index.js";
 import {
   BrandedHeader,
@@ -1192,9 +1193,8 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
     if (!targetExists) {
       setDeepLinkError(`Run "${initialRunId}" not found`);
       // Clean URL back to /hench-runs
-      history.replaceState(
+      replaceAppHistory(
         { view: "hench-runs", file: null, zone: null, runId: null },
-        "",
         "/hench-runs",
       );
       return;
@@ -1238,18 +1238,16 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
       // Toggle off — update URL to remove run ID
       setSelectedRunId(null);
       setRunDetail(null);
-      history.replaceState(
+      replaceAppHistory(
         { view: "hench-runs", file: null, zone: null, runId: null },
-        "",
         "/hench-runs",
       );
     } else {
       setSelectedRunId(id);
       fetchDetail(id);
       // Update URL to include run ID for shareability
-      history.replaceState(
+      replaceAppHistory(
         { view: "hench-runs", file: null, zone: null, runId: id },
-        "",
         `/hench-runs/${id}`,
       );
     }
@@ -1260,9 +1258,8 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
     setRunDetail(null);
     setDeepLinkError(null);
     // Clean URL back to /hench-runs
-    history.replaceState(
+    replaceAppHistory(
       { view: "hench-runs", file: null, zone: null, runId: null },
-      "",
       "/hench-runs",
     );
   }, []);
