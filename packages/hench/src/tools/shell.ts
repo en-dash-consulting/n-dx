@@ -13,5 +13,7 @@ export async function toolRunCommand(
     ? guard.checkPath(params.cwd)
     : projectDir;
 
-  return execShell({ command: params.command, cwd, timeout });
+  // The guard's env has credential-shaped variables stripped (guard/env.ts);
+  // a guard without one (lightweight test doubles) falls back to process.env.
+  return execShell({ command: params.command, cwd, timeout, env: guard.childEnv });
 }

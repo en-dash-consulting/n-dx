@@ -1,4 +1,4 @@
-import { PROJECT_DIRS } from "../prd/llm-gateway.js";
+import { PROJECT_DIRS, guardBaselineForLanguage } from "../prd/llm-gateway.js";
 import type { LLMVendor } from "../prd/llm-gateway.js";
 export type { MemoryThrottleConfig } from "../process/memory-throttle.js";
 export type { MemoryMonitorConfig } from "../process/memory-monitor.js";
@@ -495,33 +495,36 @@ export type PromptCacheTtl = "5m" | "1h";
 
 // ── Language-specific guard defaults ──────────────────────────────────
 
+/**
+ * The three allow/block lists come from `@n-dx/llm-client`'s
+ * `guardBaselineForLanguage`, which is also what repository trust compares a
+ * checkout's `.hench/config.json` against — so "the defaults" and "the
+ * baseline an untrusted repository is clamped to" are one table and cannot
+ * drift. The baseline blocks credential files (`.env`, keys) for every
+ * language. The timeouts and limits here are hench's own.
+ */
+function guardWithBaseline(
+  language: string,
+  limits: Omit<GuardConfig, "blockedPaths" | "allowedCommands" | "allowedGitSubcommands">,
+): GuardConfig {
+  return { ...guardBaselineForLanguage(language), ...limits };
+}
+
 /** Guard defaults for JS/TS projects (the existing default). */
-const JS_TS_GUARD_DEFAULTS: GuardConfig = {
-  blockedPaths: [`${PROJECT_DIRS.HENCH}/**`, `${PROJECT_DIRS.REX}/**`, ".git/**", "node_modules/**"],
-  allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"],
+const JS_TS_GUARD_DEFAULTS: GuardConfig = guardWithBaseline("typescript", {
   commandTimeout: 30000,
   maxFileSize: 1048576,
   spawnTimeout: 300000,          // 5 minutes
   maxConcurrentProcesses: 3,
-  allowedGitSubcommands: [
-    "status", "add", "commit", "diff", "log",
-    "branch", "checkout", "stash", "show", "rev-parse",
-  ],
-};
+});
 
 /** Guard defaults for Go projects. */
-const GO_GUARD_DEFAULTS: GuardConfig = {
-  blockedPaths: [`${PROJECT_DIRS.HENCH}/**`, `${PROJECT_DIRS.REX}/**`, ".git/**", "vendor/**"],
-  allowedCommands: ["go", "make", "git", "golangci-lint"],
+const GO_GUARD_DEFAULTS: GuardConfig = guardWithBaseline("go", {
   commandTimeout: 30000,
   maxFileSize: 1048576,
   spawnTimeout: 300000,          // 5 minutes
   maxConcurrentProcesses: 3,
-  allowedGitSubcommands: [
-    "status", "add", "commit", "diff", "log",
-    "branch", "checkout", "stash", "show", "rev-parse",
-  ],
-};
+});
 
 /**
  * Guard defaults for Swift projects (SwiftPM / Xcode).
@@ -533,26 +536,12 @@ const GO_GUARD_DEFAULTS: GuardConfig = {
  * cache) and `DerivedData/` (Xcode build cache) are blocked so the agent
  * can't pollute or trip on them.
  */
-const SWIFT_GUARD_DEFAULTS: GuardConfig = {
-  blockedPaths: [
-    `${PROJECT_DIRS.HENCH}/**`,
-    `${PROJECT_DIRS.REX}/**`,
-    ".git/**",
-    ".build/**",
-    "DerivedData/**",
-    "Pods/**",
-    "Carthage/**",
-  ],
-  allowedCommands: ["swift", "make", "xcodebuild", "xcrun", "git"],
+const SWIFT_GUARD_DEFAULTS: GuardConfig = guardWithBaseline("swift", {
   commandTimeout: 60000,           // Swift builds are slower than `go test` — 60s.
   maxFileSize: 1048576,
   spawnTimeout: 600000,            // 10 minutes — Xcode builds can run long.
   maxConcurrentProcesses: 3,
-  allowedGitSubcommands: [
-    "status", "add", "commit", "diff", "log",
-    "branch", "checkout", "stash", "show", "rev-parse",
-  ],
-};
+});
 
 /**
  * Returns the language-appropriate guard defaults.
@@ -1295,6 +1284,17 @@ export interface RecordCommitPending {
   error: string;
 }
 
+/** Repository-trust summary captured on a run record. */
+export interface RunTrustRecord {
+  state: "baseline" | "trusted" | "untrusted" | "changed";
+  /** Digest of the execution config the run saw. */
+  digest: string;
+  /** True when the guard was clamped to the baseline and bypassPermissions lowered. */
+  restricted: boolean;
+  /** Warning-level findings, one line each. */
+  findings: string[];
+}
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -1329,6 +1329,14 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   vendor?: string;
+  /**
+   * Repository trust at run start: whether the checkout's execution config
+   * (guard, permission mode, test command, MCP servers) was the baseline,
+   * trusted by this user, or restricted because it was not. When `restricted`
+   * is true the run executed under the clamped default guard, whatever
+   * `.hench/config.json` said. v1 additive field.
+   */
+  trust?: RunTrustRecord;
   /**
    * Realpath-resolved root of the git worktree this run started in.
    *

@@ -1695,7 +1695,79 @@ async function handleInit(rest) {
     selection, providerSource, modelSource, assistantResults, readmeResult,
     gitResult, gitCommitResult, skillTrackingHints,
   });
+  await reviewRepoTrustAfterInit(dir, rest, quiet);
   exitWithCleanup(0);
+}
+
+/**
+ * The end-of-init review: what this checkout shipped as execution config,
+ * and whether to trust it.
+ *
+ * A fresh clone can carry a `.hench/config.json`, `.rex/config.json` and
+ * `.mcp.json` that widen what n-dx may execute, plus PRD items an autonomous
+ * run would act on. `hench trust status` compares them to the defaults and
+ * prints the review (spawned, as every hench call from here is — the trust
+ * logic lives in `@n-dx/llm-client`, which the orchestration tier never
+ * imports). When the repository deviates and we are interactive, ask once;
+ * otherwise say how to accept later. Never trusts on `--yes`: an unattended
+ * init is exactly the case where a widened config should stay clamped.
+ *
+ * @param {string} dir
+ * @param {string[]} rest
+ * @param {boolean} quiet
+ */
+async function reviewRepoTrustAfterInit(dir, rest, quiet) {
+  let evaluation = null;
+  try {
+    const probe = await runInitCapture(tools.hench, ["trust", "status", "--format=json", dir]);
+    if (probe.code === 0) evaluation = JSON.parse(probe.stdout);
+  } catch {
+    return;
+  }
+  if (!evaluation || typeof evaluation !== "object") return;
+
+  // Nothing to review on a repository that matches the defaults: keep init's
+  // summary short. Anything else prints the full review, including what the
+  // checkout brought (PRD items, analysis, runs), so the user sees it once.
+  if (evaluation.state === "baseline" && !quiet) {
+    console.log("");
+    console.log("Repository config: matches the defaults (nothing to trust).");
+    return;
+  }
+  console.log("");
+  await run(tools.hench, ["trust", "status", dir]);
+  if (!evaluation.restricted) return;
+
+  if (rest.includes("--yes") || rest.includes("-y") || !process.stdin.isTTY) {
+    console.log("");
+    console.log("Not trusting automatically. Review the findings above, then run: ndx trust accept .");
+    return;
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  let accept = false;
+  try {
+    const answer = await rl.question("\nTrust this repository's execution config now? [y/N] ");
+    accept = /^y(es)?$/i.test(answer.trim());
+  } catch {
+    accept = false;
+  } finally {
+    rl.close();
+  }
+  if (accept) {
+    await run(tools.hench, ["trust", "accept", dir]);
+  } else {
+    console.log("Left untrusted: ndx work runs under the default guard until you run: ndx trust accept .");
+  }
+}
+
+/**
+ * `ndx trust [status|accept|revoke] [dir]` — delegates to `hench trust`.
+ * Not gated on `requireInit`: a checkout can carry `.rex/config.json` or
+ * `.mcp.json` with no `.hench/` at all, and that is exactly what it reviews.
+ */
+async function handleTrust(rest) {
+  const code = await run(tools.hench, ["trust", ...rest]);
+  exitWithCleanup(code);
 }
 
 /**
@@ -3148,6 +3220,7 @@ const COMMAND_DISPATCH = new Map([
   ["refresh",           handleRefresh],
   ["work",              handleWork],
   ["status",            handleStatus],
+  ["trust",             handleTrust],
   ["usage",             handleUsage],
   ["sync",              handleSync],
   ["claim",             handleClaim],

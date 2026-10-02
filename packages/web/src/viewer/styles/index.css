@@ -49,6 +49,7 @@
 @import "./memory-warning.css";
 @import "./crash-recovery.css";
 @import "./degradation-banner.css";
+@import "./repo-trust.css";
 @import "./refresh-queue.css";
 @import "./polling-suspension.css";
 @import "./active-operations.css";

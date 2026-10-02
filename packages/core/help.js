@@ -245,6 +245,13 @@ const COMMAND_REGISTRY = [
     related: ["export", "sync", "status"],
   },
   {
+    name: "trust",
+    category: "Orchestration",
+    summary: "Review or accept what this checkout ships as execution config",
+    keywords: ["trust", "security", "guard", "allowlist", "permission", "malicious", "clone", "fork", "review", "accept", "revoke"],
+    related: ["init", "work", "start"],
+  },
+  {
     name: "self-heal",
     category: "Orchestration",
     summary: "Iterative codebase improvement loop",
@@ -1598,6 +1605,35 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: 'ndx bicker "fix failing tests" --skip-review', description: "Skip review step" },
     ],
     related: ["pair-programming", "work"],
+  },
+  trust: {
+    summary: "review or accept what this checkout ships as execution config",
+    description:
+      "Files n-dx reads to decide what it may execute usually live in the\n" +
+      "repository and are tracked by git: the hench guard in .hench/config.json\n" +
+      "(command allowlist, blocked paths, git subcommands, permission mode),\n" +
+      "the test command in .rex/config.json, and the MCP servers in .mcp.json.\n" +
+      "A clone, a fork or a checked-out pull request can therefore widen them.\n\n" +
+      "'ndx trust' compares them to the defaults for the project's language and\n" +
+      "lists what is wider, plus what else came with the checkout (PRD items,\n" +
+      "analysis, run records). 'ndx init' runs the same review at the end.\n\n" +
+      "Until you accept, 'ndx work' runs under the default guard (the\n" +
+      "repository's config can only tighten it), lowers bypassPermissions to\n" +
+      "acceptEdits, and verify_criteria does not run the repository's test\n" +
+      "command. The dashboard shows the same warning as a strip.\n\n" +
+      "'accept' records the configuration's digest in your ndx home, not in the\n" +
+      "repository, so another account on the machine cannot pre-approve it for\n" +
+      "you. A later change to those files shows as CHANGED and restricts again\n" +
+      "until reviewed. 'revoke' forgets the decision. Delegates to 'hench trust'.",
+    usage: "ndx trust [status|accept|revoke] [options] [dir]",
+    options: [
+      { flag: "--format=json", description: "Print the full evaluation as JSON" },
+    ],
+    examples: [
+      { command: "ndx trust .", description: "Review this checkout" },
+      { command: "ndx trust accept .", description: "Accept its execution config" },
+      { command: "ndx trust revoke .", description: "Forget the decision" },
+    ],
   },
   "self-heal": {
     summary: "iterative codebase improvement loop",
