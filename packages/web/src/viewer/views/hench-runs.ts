@@ -452,7 +452,7 @@ function getStatusColor(status: string): string {
     C: "var(--text-dim)",
     T: "var(--orange)",
   };
-  return colors[status] || "var(--text-secondary)";
+  return colors[status] || "var(--text-dim)";
 }
 
 // ── Sub-components ───────────────────────────────────────────────────

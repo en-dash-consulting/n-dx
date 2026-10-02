@@ -250,7 +250,7 @@
 }
 
 .task-blockers {
-  color: var(--text-secondary, #9ca3af);
+  color: var(--text-dim);
 }
 
 .start-task-error {
@@ -271,7 +271,7 @@
    rename and then stops, so it must not read as the obvious next click. */
 .start-task-migrate-btn {
   font-size: var(--font-xs);
-  color: var(--text-secondary, #9ca3af);
+  color: var(--text-dim);
   background: transparent;
   border: 1px solid var(--border, #374151);
   padding: var(--space-1) var(--space-2);
@@ -282,8 +282,8 @@
 }
 
 .start-task-migrate-btn:hover {
-  color: var(--text-primary, #e5e7eb);
-  border-color: var(--text-secondary, #9ca3af);
+  color: var(--text);
+  border-color: var(--text-dim);
 }
 
 .start-task-migrate-btn:disabled {
@@ -293,7 +293,7 @@
 
 .start-task-notice {
   font-size: var(--font-xs);
-  color: var(--text-secondary, #9ca3af);
+  color: var(--text-dim);
   max-width: 220px;
   text-align: center;
 }

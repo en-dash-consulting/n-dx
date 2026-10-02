@@ -214,7 +214,7 @@
 .ready-menu button { all: unset; cursor: pointer; padding: var(--space-2) var(--space-3); }
 .ready-menu button:hover, .ready-menu button:focus-visible { background: var(--bg-hover); }
 .ready-toast { margin-top: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); }
-.ready-toast-error { border-color: var(--danger, currentColor); }
+.ready-toast-error { border-color: var(--red); }
 
 @media (max-width: 600px) {
   .prep-field { grid-template-columns: minmax(0, 1fr); }
