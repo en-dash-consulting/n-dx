@@ -6,25 +6,21 @@ Prioritized improvements to the memory management subsystem, organized by impact
 
 ## High Impact, Moderate Effort
 
-### 1. macOS Memory Pressure Detection via `vm_stat`
+### 1. macOS Memory Pressure Detection via `vm_stat` — Done
 
-**Addresses:** [Risk #1] macOS memory reporting underestimates availability
+**Addressed:** [Risk #1] macOS memory reporting underestimates availability
 
-Replace `os.freemem()` on macOS with a parsed output of the `vm_stat` command or `sysctl` values that include inactive and purgeable pages.
+Shipped in `@n-dx/llm-client`'s shared reader (`packages/llm-client/src/system-memory.ts`), used by hench's throttle and pre-spawn check, the dashboard, and the hub admission floor.
 
-**Approach:**
+**What shipped (differs from the original proposal):**
 ```
-Available = Free Pages + Inactive Pages + Purgeable Pages
+availableBytes = (Free + Inactive + Speculative + Purgeable pages) x page size   // vm_stat
+pressure       = kern.memorystatus_vm_pressure_level                              // sysctl: 1/2/4 -> normal/warn/critical
 ```
 
-Spawn `vm_stat` as a child process (infrequent -- only when `snapshot()` is called) and parse the output. Alternatively, use `sysctl hw.memsize` for total and compute available from the `vm_stat` page counts.
+Both commands are spawned in parallel and the result is cached for 5 seconds; no request ever awaits a fresh spawn. The original proposal's fallback-to-`os.freemem()` on an unparseable `vm_stat` was **not** built: if `vm_stat` and `sysctl` both fail to produce a signal, the reading is `availableBytes: null` / `pressure: "unknown"` instead — an unreadable machine is unknown, not approximated by a number known to be too low. Nothing acts on an unknown reading.
 
-**Trade-offs:**
-- Adds a child process spawn per snapshot (but snapshots are infrequent -- pre-spawn checks only)
-- `vm_stat` output format could change across macOS versions (mitigated with fallback to `os.freemem()`)
-- More accurate readings mean thresholds that are actually meaningful on macOS
-
-**Expected outcome:** Throttle triggers at 80% of true available memory instead of 80% of a misleadingly low "free" number. Eliminates the majority of false throttle activations on macOS.
+**Outcome:** Throttle and dashboard decisions now reflect reclaimable pages and the kernel's own pressure judgment instead of a misleadingly low "free" number. Eliminates false throttle activations on macOS.
 
 ### 2. Container-Aware Memory Monitoring
 
@@ -240,7 +236,7 @@ When the system memory monitor initializes, log which platform was detected and 
 
 ```
 [memory-monitor] Platform: linux, strategy: /proc/meminfo MemAvailable
-[memory-monitor] Platform: darwin, strategy: os.freemem() (inactive pages not included)
+[memory-monitor] Platform: darwin, strategy: vm_stat + kern.memorystatus_vm_pressure_level (shared reader)
 [memory-monitor] Platform: win32, strategy: os.freemem() (GlobalMemoryStatusEx)
 ```
 
@@ -256,7 +252,7 @@ Verify that all `setInterval` timers used by schedulers (retention, cleanup, bro
 
 | # | Improvement | Impact | Effort | Addresses |
 |---|-----------|--------|--------|-----------|
-| 1 | macOS vm_stat integration | High | Moderate | Risk #1 |
+| 1 | macOS vm_stat integration | High | Moderate | Risk #1 — **Done** |
 | 2 | Container cgroup detection | High | Moderate | Risk #2 |
 | 3 | Async gzip compression | High | Moderate | Risk #3 |
 | 4 | Complete deferred polling tasks | High | Moderate | Deferred tasks |

@@ -58,6 +58,13 @@ describe("decideAdmission", () => {
     expect(decideAdmission({ running: 5, freeMemoryBytes: 1 }, LIMITS))
       .toEqual({ admit: false, reason: "at-capacity" });
   });
+
+  it("admits an unreadable machine — a missing signal holds nothing back", () => {
+    expect(decideAdmission({ running: 0, freeMemoryBytes: null }, LIMITS)).toEqual({ admit: true });
+    // The session cap still applies: only the memory rule is suspended.
+    expect(decideAdmission({ running: 2, freeMemoryBytes: null }, LIMITS))
+      .toEqual({ admit: false, reason: "at-capacity" });
+  });
 });
 
 describe("AdmissionQueue", () => {
@@ -126,11 +133,14 @@ describe("AdmissionQueue", () => {
 describe("AdmissionGate", () => {
   function makeGate(opts: {
     running?: number;
-    freeMemory?: number;
+    freeMemory?: number | null;
     limits?: AdmissionLimits;
     start?: (entry: QueueEntry) => Promise<boolean>;
   } = {}) {
-    const state = { running: opts.running ?? 0, freeMemory: opts.freeMemory ?? 8 * GIB };
+    const state = {
+      running: opts.running ?? 0,
+      freeMemory: opts.freeMemory === undefined ? 8 * GIB : opts.freeMemory,
+    };
     const started: QueueEntry[] = [];
     const gate = new AdmissionGate({
       limits: opts.limits ?? LIMITS,
@@ -162,6 +172,30 @@ describe("AdmissionGate", () => {
     const result = await gate.admit({ projectId: "alpha", workspace: null, taskId: "t1" });
     expect(result).toEqual({ admitted: false, position: 1, reason: "low-memory" });
     expect(gate.snapshot().memoryPaused).toBe(true);
+  });
+
+  it("admits when the machine cannot be read, and reports no memory pause", async () => {
+    const { gate } = makeGate({ freeMemory: null });
+    expect(await gate.admit({ projectId: "alpha", workspace: null, taskId: "t1" }))
+      .toEqual({ admitted: true, position: 0 });
+
+    const snapshot = gate.snapshot();
+    expect(snapshot.memoryPaused).toBe(false);
+    expect(snapshot.freeMemoryBytes).toBeNull();
+    expect(snapshot.availableBytes).toBeNull();
+    expect(snapshot.pressure).toBe("unknown");
+  });
+
+  it("admits on macOS with 115 MB free but 3.9 GB available", async () => {
+    // The whole point of the shared reading: `os.freemem()` would have queued
+    // this run on a machine with 3.9 GB it could hand over immediately.
+    const { gate } = makeGate({
+      freeMemory: Math.round(3.9 * GIB),
+      limits: { maxSessions: 2, memoryFloorBytes: 2 * GIB },
+    });
+    expect(await gate.admit({ projectId: "alpha", workspace: null, taskId: "t1" }))
+      .toEqual({ admitted: true, position: 0 });
+    expect(gate.snapshot().memoryPaused).toBe(false);
   });
 
   it("makes a late arrival wait behind the queue even once a slot frees", async () => {

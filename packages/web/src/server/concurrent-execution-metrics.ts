@@ -45,7 +45,8 @@ export const DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG: ConcurrentExecutionMet
 export interface ExecutionMetricsSnapshot {
   concurrentCount: number;
   totalRssBytes: number;
-  systemMemoryPercent: number;
+  /** `null` when the machine's memory could not be read — not 0. */
+  systemMemoryPercent: number | null;
   loadAvg1m: number;
   timestamp: string;
   epochMs: number;
@@ -196,7 +197,8 @@ export class ConcurrentExecutionMetrics {
   recordSnapshot(input: {
     concurrentCount: number;
     totalRssBytes: number;
-    systemMemoryPercent: number;
+    /** Omit or pass `null` when the machine's memory could not be read. */
+    systemMemoryPercent?: number | null;
     loadAvg1m: number;
     perTaskRss: Array<{ taskId: string; rssBytes: number }>;
   }): void {
@@ -204,7 +206,7 @@ export class ConcurrentExecutionMetrics {
     const snapshot: ExecutionMetricsSnapshot = {
       concurrentCount: input.concurrentCount,
       totalRssBytes: input.totalRssBytes,
-      systemMemoryPercent: input.systemMemoryPercent,
+      systemMemoryPercent: input.systemMemoryPercent ?? null,
       loadAvg1m: input.loadAvg1m,
       timestamp: new Date(now).toISOString(),
       epochMs: now,
@@ -243,7 +245,7 @@ export class ConcurrentExecutionMetrics {
     return {
       concurrentCount: 0,
       totalRssBytes: 0,
-      systemMemoryPercent: 0,
+      systemMemoryPercent: null,
       loadAvg1m: 0,
       timestamp: new Date(now).toISOString(),
       epochMs: now,
@@ -277,6 +279,7 @@ export class ConcurrentExecutionMetrics {
     let sumRss = 0;
     let peakRss = 0;
     let sumMemPercent = 0;
+    let memPercentSamples = 0;
     let peakMemPercent = 0;
     let sumLoad = 0;
     let peakLoad = 0;
@@ -288,8 +291,13 @@ export class ConcurrentExecutionMetrics {
       sumRss += s.totalRssBytes;
       if (s.totalRssBytes > peakRss) peakRss = s.totalRssBytes;
 
-      sumMemPercent += s.systemMemoryPercent;
-      if (s.systemMemoryPercent > peakMemPercent) peakMemPercent = s.systemMemoryPercent;
+      // Unreadable samples are skipped, not counted as 0% — averaging them in
+      // would report a machine with plenty of memory free.
+      if (s.systemMemoryPercent !== null) {
+        sumMemPercent += s.systemMemoryPercent;
+        memPercentSamples += 1;
+        if (s.systemMemoryPercent > peakMemPercent) peakMemPercent = s.systemMemoryPercent;
+      }
 
       sumLoad += s.loadAvg1m;
       if (s.loadAvg1m > peakLoad) peakLoad = s.loadAvg1m;
@@ -304,7 +312,9 @@ export class ConcurrentExecutionMetrics {
       avgConcurrent: Math.round((sumConcurrent / n) * 100) / 100,
       peakTotalRssBytes: peakRss,
       avgTotalRssBytes: Math.round(sumRss / n),
-      avgSystemMemoryPercent: Math.round((sumMemPercent / n) * 100) / 100,
+      avgSystemMemoryPercent: memPercentSamples === 0
+        ? 0
+        : Math.round((sumMemPercent / memPercentSamples) * 100) / 100,
       peakSystemMemoryPercent: peakMemPercent,
       avgLoadAvg1m: Math.round((sumLoad / n) * 100) / 100,
       peakLoadAvg1m: Math.round(peakLoad * 100) / 100,
