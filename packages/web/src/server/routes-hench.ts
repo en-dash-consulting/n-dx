@@ -50,6 +50,7 @@ import { execFileSync } from "node:child_process";
 import { loadavg, cpus, hostname } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
+  redactDeep,
   exec,
   spawnManaged,
   killWithFallback,
@@ -285,7 +286,9 @@ export function loadHenchConfig(projectDir: string): Record<string, unknown> | n
 function loadRunFile(runsDir: string, id: string): Record<string, unknown> | null {
   try {
     const raw = readFileSync(join(runsDir, `${id}.json`), "utf-8");
-    return JSON.parse(raw) as Record<string, unknown>;
+    // Records written before hench scrubbed them at save time may still hold
+    // a secret a tool printed; scrub on the way out as well.
+    return redactDeep(JSON.parse(raw) as Record<string, unknown>);
   } catch {
     return null;
   }

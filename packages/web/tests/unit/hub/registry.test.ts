@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -149,8 +149,20 @@ describe("buildServeCommand", () => {
 
 describe("parseRegisterInput", () => {
   it("accepts a valid body and rejects each malformed field", () => {
-    const ndxBin = join(home, "cli.js");
+    // The hub only spawns @n-dx/web's CLI entry point (or an ndx launcher),
+    // and "is" means the owning package says so — the path shape is not enough.
+    const ndxBin = join(home, "web", "dist", "cli", "index.js");
+    mkdirSync(join(home, "web", "dist", "cli"), { recursive: true });
     writeFileSync(ndxBin, "");
+    writeFileSync(join(home, "web", "package.json"), JSON.stringify({ name: "@n-dx/web" }));
+    const other = join(home, "evil.js");
+    writeFileSync(other, "");
+    expect(parseRegisterInput({ id: "p", repoRoot: home, ndxBin: other })).toHaveProperty("problem");
+    // Same shape, no package behind it: refused.
+    const impostor = join(home, "impostor", "web", "dist", "cli", "index.js");
+    mkdirSync(join(home, "impostor", "web", "dist", "cli"), { recursive: true });
+    writeFileSync(impostor, "");
+    expect(parseRegisterInput({ id: "p", repoRoot: home, ndxBin: impostor })).toHaveProperty("problem");
     const ok = parseRegisterInput({ id: "proj-1", repoRoot: home, ndxBin, name: "  Proj " });
     expect(ok).toEqual({ input: { id: "proj-1", repoRoot: home, ndxBin, worktree: undefined, name: "Proj" } });
 

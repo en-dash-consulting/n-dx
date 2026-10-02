@@ -251,6 +251,9 @@ describe("hench → llm-client gateway contract", () => {
     "loadProjectOverrides",
     "mergeWithOverrides",
     "toCanonicalJSON",
+    "redactDeep",
+    "redactSecrets",
+    "createLineRedactor",
     "setQuiet",
     "isQuiet",
     "setVerbose",
@@ -727,6 +730,7 @@ describe("gateway export auto-detection", () => {
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
         "deepMerge", "loadProjectOverrides", "loadProjectOverrideSources", "mergeWithOverrides", "toCanonicalJSON",
+        "redactDeep", "redactSecrets", "createLineRedactor",
         "setQuiet", "isQuiet", "setVerbose", "isVerbose", "setDebug", "isDebug",
         "info", "result", "verbose", "debug", "warn", "suppressKnownDeprecations",
         "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "carolinaBlue", "yellow",

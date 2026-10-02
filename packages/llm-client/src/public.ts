@@ -69,6 +69,8 @@
  * - `layout.ts` — folder-layout resolver (`.ndx/` first, legacy fallback)
  * - `project-config.ts` — `.n-dx.json` override loading and merging
  * - `json.ts` — canonical JSON serialization
+ * - `redact.ts` — credential redaction for run records, logs and live output
+ * - `auth-token.ts` — per-user dashboard token file (`<ndx home>/auth.token`)
  * - `output.ts` — CLI output control (quiet mode)
  * - `suggest.ts` — CLI typo correction
  * - `help-format.ts` — CLI help formatting and color output
@@ -360,6 +362,23 @@ export type {
 
 // Canonical JSON serialization
 export { toCanonicalJSON } from "./json.js";
+
+// Credential redaction for persisted or displayed text (run records, logs, live output)
+export {
+  REDACTED_TOKEN,
+  REDACTED_VALUE,
+  REDACTED_KEY_BLOCK,
+  REDACTED_PASSWORD,
+  redactSecrets,
+  redactSecretsDetailed,
+  redactDeep,
+  createLineRedactor,
+} from "./redact.js";
+export type { RedactionResult, LineRedactor } from "./redact.js";
+
+// Per-user dashboard token file (`<ndx home>/auth.token`); the request check lives in web/shared/auth.ts
+export { AUTH_TOKEN_FILENAME, resolveAuthTokenPath, readAuthToken, ensureAuthToken, hasAuthToken } from "./auth-token.js";
+export type { AuthTokenPathOptions } from "./auth-token.js";
 
 // Project-level config utilities (.n-dx.json overrides)
 export {
