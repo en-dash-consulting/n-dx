@@ -279,6 +279,19 @@ async function handleNewProject(req: IncomingMessage, res: ServerResponse, hub: 
     return true;
   }
 
+  // The same rule `parseRegisterInput` applies to a caller-supplied `ndxBin`.
+  // Nothing a client sends reaches `selfBin` — it is resolved from this
+  // process's own entry point — so this is an assertion, not a filter, and
+  // it is here because this is the other place the hub decides what to spawn.
+  // Leaving the invariant to one of the two routes is how the next edit to
+  // `resolveSelfBin` quietly becomes an arbitrary-exec bug.
+  if (!isAcceptableNdxBin(hub.selfBin)) {
+    error(res, 500, `The hub will not spawn ${hub.selfBin} — register this folder with \`ndx start\` instead.`);
+    return true;
+  }
+
+  // After both refusals above: a rejected request must not leave an empty
+  // directory behind for the operator to clean up.
   try {
     mkdirSync(plan.path, { recursive: true });
   } catch (err) {

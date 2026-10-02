@@ -74,7 +74,13 @@ describe("hub route — creating a project folder", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "hub-new-"));
-    binPath = join(tmpDir, "ndx-cli.js");
+    // A stand-in for @n-dx/web itself, not just a file: the route applies the
+    // same `isAcceptableNdxBin` rule to `selfBin` that `parseRegisterInput`
+    // applies to a caller's `ndxBin`, and that rule asks the owning
+    // package.json who it is.
+    binPath = join(tmpDir, "web-pkg", "dist", "cli", "index.js");
+    await mkdir(join(tmpDir, "web-pkg", "dist", "cli"), { recursive: true });
+    await writeFile(join(tmpDir, "web-pkg", "package.json"), JSON.stringify({ name: "@n-dx/web" }));
     await writeFile(binPath, "// stand-in for @n-dx/web's CLI\n");
     stub = { projects: [], selfBin: binPath, registered: [] };
 
@@ -200,6 +206,24 @@ describe("hub route — creating a project folder", () => {
     const { status, body } = await create({ parent: tmpDir, name: "my-app" });
     expect(status).toBe(500);
     expect(String(body.error)).toMatch(/ndx start/);
+    expect(existsSync(join(tmpDir, "my-app"))).toBe(false);
+  });
+
+  it("refuses a binary that is not @n-dx/web's own CLI", async () => {
+    // Right path shape, wrong package — the case `isAcceptableNdxBin` exists
+    // for. This route creates the folder and registers it, so it is the second
+    // place the hub decides what to spawn, and has to apply the same rule.
+    const impostor = join(tmpDir, "evil", "dist", "cli", "index.js");
+    await mkdir(join(tmpDir, "evil", "dist", "cli"), { recursive: true });
+    await writeFile(join(tmpDir, "evil", "package.json"), JSON.stringify({ name: "totally-not-ndx" }));
+    await writeFile(impostor, "// not n-dx");
+    stub.selfBin = impostor;
+
+    const { status, body } = await create({ parent: tmpDir, name: "my-app" });
+    expect(status).toBe(500);
+    expect(String(body.error)).toMatch(/will not spawn/);
+    expect(stub.registered).toHaveLength(0);
+    // Refused before `mkdirSync`, so a rejected request leaves no debris.
     expect(existsSync(join(tmpDir, "my-app"))).toBe(false);
   });
 });

@@ -39,7 +39,7 @@ import {
   writeHubPidFile,
 } from "./registry.js";
 import type { HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
-import { handleHubRoute } from "./routes.js";
+import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
 import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 import { guardHubRequest, upgradeRefusal } from "./request-guard.js";
 import { ensureAuthToken } from "@n-dx/llm-client";
@@ -164,8 +164,13 @@ export function normalizeWorktree(path: string): string {
  * `process.argv[1]` is this process's entry — `@n-dx/web`'s `dist/cli/index.js`,
  * which answers `serve` as well as `hub`, so it is exactly what a project
  * server is spawned from. A registered project's own `ndxBin` is the fallback
- * for the case the entry cannot be read back (a bundled or renamed launcher):
- * those paths were good enough to spawn the servers already running.
+ * for the case the entry cannot be read back (a bundled or renamed launcher).
+ *
+ * Every candidate must pass {@link isAcceptableNdxBin}, including the registry
+ * ones: "it is already in the registry" is not evidence, because an entry
+ * written before `parseRegisterInput` enforced that rule can name anything.
+ * Returns "" when no candidate qualifies, which the new-project route reports
+ * rather than spawning.
  */
 export function resolveSelfBin(explicit: string | undefined, registry: HubRegistry): string {
   const candidates = [
@@ -174,7 +179,16 @@ export function resolveSelfBin(explicit: string | undefined, registry: HubRegist
     ...Object.values(registry.projects).map((p) => p.ndxBin),
   ];
   for (const candidate of candidates) {
-    if (candidate && isAbsolute(candidate) && existsSync(candidate)) return candidate;
+    if (!candidate || !isAbsolute(candidate) || !existsSync(candidate)) continue;
+    // The registry entries are the reason this is a filter and not an
+    // assertion: a registration recorded before `parseRegisterInput` learned
+    // this rule can name any executable, and picking it here would hand the
+    // hub an arbitrary program to spawn for every project created from the
+    // dashboard. Skipping rather than failing also keeps the chain useful —
+    // an unrecognizable `process.argv[1]` (a bundled or renamed launcher)
+    // falls through to a registered binary that does pass.
+    if (!isAcceptableNdxBin(candidate)) continue;
+    return candidate;
   }
   return "";
 }
