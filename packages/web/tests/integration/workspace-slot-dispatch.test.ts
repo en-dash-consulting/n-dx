@@ -86,6 +86,30 @@ out.headerBeatsSlot = JSON.parse(
 ).projectDir;
 out.slotStillWinsOverNothing = JSON.parse((await probe("/w/" + key + "/api/status")).text).projectDir;
 
+// The Prepare task routes answer with the directory execute would spawn in
+// (\`dir\`), so it is the workspace the request resolved to, read off the wire.
+// \`ready\` scans the workspace's own PRD. The prep GET spawns \`ndx work
+// --resolve <dir>\`; this fixture has no .hench, so hench refuses and names
+// that directory in its stderr, which the 502 carries back.
+const readyJson = async (path, headers) => {
+  const r = await probe(path, headers);
+  return { status: r.status, dir: r.status === 200 ? JSON.parse(r.text).dir : null };
+};
+out.readyAnchor = await readyJson("/api/hench/ready");
+out.readySlot = await readyJson("/w/" + key + "/api/hench/ready");
+out.readyHeader = await readyJson("/api/hench/ready", { "x-ndx-workspace": key });
+out.readyHeaderBeatsSlot = await readyJson("/w/" + key + "/api/hench/ready", { "x-ndx-workspace": "app" });
+out.readyStaleHeader = (await probe("/api/hench/ready", { "x-ndx-workspace": "no-such-worktree" })).status;
+const prepJson = async (path, headers) => {
+  const r = await probe(path, headers);
+  const body = JSON.parse(r.text);
+  return { status: r.status, dir: body.dir ?? null, stderr: body.stderr ?? "" };
+};
+out.prepAnchor = await prepJson("/api/hench/prep/e1");
+out.prepSlot = await prepJson("/w/" + key + "/api/hench/prep/e1");
+out.prepHeader = await prepJson("/api/hench/prep/e1", { "x-ndx-workspace": key });
+out.prepStaleHeader = (await probe("/api/hench/prep/e1", { "x-ndx-workspace": "no-such-worktree" })).status;
+
 // A header naming no known worktree is refused rather than quietly answered
 // about the anchor — including on a GET, where the fallback would put the
 // anchor's data under another worktree's name. Only a fetch ever sets this
@@ -190,6 +214,29 @@ describe("/w/<key>/ dispatch through the real server", () => {
   it("X-Ndx-Workspace outranks the /w/<key>/ slot", () => {
     expect(result.headerBeatsSlot).toBe(repo);
     expect(result.slotStillWinsOverNothing).toBe(linked);
+  });
+
+  // The Prepare task modal's routes spawn and scan in `ctx.projectDir`; going
+  // through the real dispatcher is what shows a slot or header reaching them.
+  it("the ready list and the prep GET resolve to the slot's, the header's and the anchor's own directory", () => {
+    expect(result.readyAnchor).toEqual({ status: 200, dir: repo });
+    expect(result.readySlot).toEqual({ status: 200, dir: linked });
+    expect(result.readyHeader).toEqual({ status: 200, dir: linked });
+    // The header outranks the slot here as everywhere else.
+    expect(result.readyHeaderBeatsSlot).toEqual({ status: 200, dir: repo });
+
+    const spawnedIn = (probe: { status: number; stderr: string }) => {
+      expect(probe.status).toBe(502);
+      return probe.stderr;
+    };
+    expect(spawnedIn(result.prepAnchor)).toContain(`Missing .hench in ${repo}`);
+    expect(spawnedIn(result.prepSlot)).toContain(`Missing .hench in ${linked}`);
+    expect(spawnedIn(result.prepHeader)).toContain(`Missing .hench in ${linked}`);
+  });
+
+  it("an unknown X-Ndx-Workspace is refused by the ready and prep routes before they scan or spawn", () => {
+    expect(result.readyStaleHeader).toBe(404);
+    expect(result.prepStaleHeader).toBe(404);
   });
 
   it("a header naming no known worktree is refused, on reads as well as writes", () => {

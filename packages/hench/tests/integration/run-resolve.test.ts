@@ -23,6 +23,7 @@ import { resolveModel, NEWEST_MODELS, REVIEW_MODELS, TIER_MODELS } from "@n-dx/l
 import { resolveRun } from "../../src/cli/commands/run-resolve.js";
 import type { RunRefusalCode, RunResolution } from "../../src/cli/commands/run-resolve.js";
 import { cmdRun } from "../../src/cli/commands/run.js";
+import { readSessionCache, writeSessionCache } from "../../src/agent/lifecycle/session-cache.js";
 import { TaskClaims } from "../../src/process/task-claims.js";
 import { resolveStore, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../src/prd/rex-gateway.js";
 import { cleanupProjectDir, commitGitFixtureBaseline, setupProjectDir } from "../helpers/index.js";
@@ -425,6 +426,11 @@ describe("resolving acts on nothing", () => {
 
   it("leaves the PRD, the claims file, hench state, git status and HEAD as they were", async () => {
     const claimsFile = join(projectDir, ".git", "ndx", "claims.json");
+    // --fresh is a real run's cue to discard the orientation session; resolve
+    // must leave a cached one in place, so seed one for it to (not) clear.
+    await writeSessionCache(henchDir, { parentId: "parent-1", svFingerprint: "fp", vendor: "claude", model: "m" });
+    const seeded = await readSessionCache(henchDir);
+    expect(seeded?.parentId).toBe("parent-1");
     const before = {
       rex: await snapshot(rexDir),
       hench: await snapshot(henchDir),
@@ -439,6 +445,7 @@ describe("resolving acts on nothing", () => {
     expect(r.task?.status).toBe("deferred");
 
     expect(await snapshot(rexDir)).toEqual(before.rex);
+    expect(await readSessionCache(henchDir)).toEqual(seeded);
     expect(await snapshot(henchDir)).toEqual(before.hench);
     expect(git(projectDir, "status", "--porcelain", "--untracked-files=all")).toBe(before.status);
     expect(git(projectDir, "rev-parse", "HEAD")).toBe(before.head);

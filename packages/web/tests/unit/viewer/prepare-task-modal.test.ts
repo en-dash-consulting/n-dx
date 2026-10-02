@@ -348,9 +348,38 @@ describe("PrepareTaskModal", () => {
     expect(button("Resume")).toBeDefined();
   });
 
-  it("sends X-Ndx-Workspace on every request when opened for another workspace", async () => {
-    await open(prepFixture(), undefined, { workspace: "feature" });
-    expect(calls[0]!.headers["X-Ndx-Workspace"]).toBe("feature");
+  it("sends X-Ndx-Workspace on prep, preview, execute and migrate when opened for another workspace", async () => {
+    await open(prepFixture(), (c) => {
+      if (c.url.endsWith("/preview")) return { status: 200, body: { brief: "B" } };
+      if (c.url !== "/api/hench/execute") return undefined;
+      return c.body?.migrateSlugs
+        ? { status: 200, body: { message: "Migrated." } }
+        : { status: 412, body: { error: "Tree mismatch.", migratable: true } };
+    }, { workspace: "feature" });
+    await click(button("Preview brief"));
+    await click(button("Back"));
+    await click(button("Execute"));
+    await click(button("Migrate the PRD tree"));
+
+    const kinds = calls.map((c) =>
+      c.url.endsWith("/preview") ? "preview"
+        : c.url === "/api/hench/execute" ? (c.body?.migrateSlugs ? "migrate" : "execute")
+          : "prep");
+    // Migrating re-reads the prep, since the tree it described has changed.
+    expect(kinds).toEqual(["prep", "preview", "execute", "migrate", "prep"]);
+    for (const call of calls) {
+      expect(call.headers["X-Ndx-Workspace"], `${call.method} ${call.url}`).toBe("feature");
+    }
+  });
+
+  it("sends no X-Ndx-Workspace on any request when opened for the anchor", async () => {
+    await open(prepFixture(), (c) =>
+      c.url.endsWith("/preview") ? { status: 200, body: { brief: "B" } } : undefined);
+    await click(button("Preview brief"));
+    await click(button("Back"));
+    await click(button("Execute"));
+    expect(calls.length).toBeGreaterThanOrEqual(3);
+    for (const call of calls) expect(call.headers["X-Ndx-Workspace"], call.url).toBeUndefined();
   });
 
   it("closes on Escape and on the close button, and returns focus to its opener", async () => {

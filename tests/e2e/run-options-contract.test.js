@@ -8,6 +8,8 @@
  *
  * - `resetDeferred` is hench's, never the request's: the route adds
  *   `--reset-deferred` itself for a deferred task.
+ * - Upper bounds are the dashboard's own policy: hench's flag parser takes any
+ *   integer at or above its lower bound (1 for --max-turns, 0 for --token-budget).
  * - `contextNotes` is the dashboard's: its text goes to a temp file passed as
  *   `--context-file`, which is a run input rather than a resolved setting, so
  *   `--resolve` does not list it.
@@ -22,7 +24,11 @@ import { join } from "node:path";
 import { createTmpDir, removeTmpDir, runResult, setupFullProject } from "./e2e-helpers.js";
 
 const ROOT = join(import.meta.dirname, "../..");
-const { RUN_OPTION_SPECS, runOptionArgs } = await import(join(ROOT, "packages/web/dist/shared/run-options.js"));
+// Source, not dist: a stale build would let the table drift from hench unseen.
+// The module is framework-agnostic and imports nothing, so vitest loads it as is.
+const { RUN_OPTION_SPECS, runOptionArgs, checkRunOptions } = await import(
+  join(ROOT, "packages/web/src/shared/run-options.ts")
+);
 const { TIER_MODELS } = await import(join(ROOT, "packages/llm-client/dist/public.js"));
 
 const HENCH_ONLY = new Set(["resetDeferred"]);
@@ -105,5 +111,35 @@ describe("run options contract: dashboard allow-list vs ndx work --resolve", () 
     }
     expect(resolved.maxTurns.value).toBe(9);
     expect(resolved.reviewModel.value).toBe(TIER_MODELS.claude.standard);
+  });
+
+  describe("integer bounds", () => {
+    const integers = RUN_OPTION_SPECS.filter((s) => s.type === "integer");
+
+    it("takes each lower bound from hench: it runs with the bound and refuses one below", () => {
+      expect(integers.length).toBeGreaterThan(0);
+      for (const spec of integers) {
+        const at = runResult(["work", "--task=task-2", "--resolve", `--${spec.flag}=${spec.min}`, repo]);
+        expect(at.code, `${spec.key} at ${spec.min}: ${at.stderr}`).toBe(0);
+        expect(JSON.parse(at.stdout).resolved[spec.key]).toMatchObject({ value: spec.min, source: "cli-flag" });
+
+        const below = runResult(["work", "--task=task-2", "--resolve", `--${spec.flag}=${spec.min - 1}`, repo]);
+        expect(below.code, `${spec.key} at ${spec.min - 1} must be refused`).not.toBe(0);
+
+        expect(checkRunOptions({ [spec.key]: spec.min }).ok, `${spec.key} min`).toBe(true);
+        expect(checkRunOptions({ [spec.key]: spec.min - 1 }).ok, `${spec.key} below`).toBe(false);
+      }
+    });
+
+    it("keeps each upper bound where hench reads it back exactly, and refuses one above", () => {
+      for (const spec of integers) {
+        const at = runResult(["work", "--task=task-2", "--resolve", ...runOptionArgs({ [spec.key]: spec.max }), repo]);
+        expect(at.code, `${spec.key} at ${spec.max}: ${at.stderr}`).toBe(0);
+        expect(JSON.parse(at.stdout).resolved[spec.key].value, spec.key).toBe(spec.max);
+
+        expect(checkRunOptions({ [spec.key]: spec.max }).ok, `${spec.key} max`).toBe(true);
+        expect(checkRunOptions({ [spec.key]: spec.max + 1 }).ok, `${spec.key} above`).toBe(false);
+      }
+    });
   });
 });
