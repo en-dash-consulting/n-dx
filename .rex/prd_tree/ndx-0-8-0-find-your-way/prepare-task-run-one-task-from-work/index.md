@@ -19,7 +19,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Accept allow-listed run options on POST /api/hench/execute and carry them through the hub queue](./accept-allow-listed-run-options-on.md) | pending |
-| [Add `ndx work --resolve`: print the resolved run settings, their sources and any refusals as JSON without running](./add-ndx-work-resolve-print-the.md) | in_progress |
+| [Add `ndx work --resolve`: print the resolved run settings, their sources and any refusals as JSON without running](./add-ndx-work-resolve-print-the.md) | completed |
 | [Add the prep routes: GET /api/hench/prep/:taskId, POST /api/hench/prep/:taskId/preview and GET /api/hench/ready](./add-the-prep-routes-get-api-hench-prep.md) | pending |
 | [Build the Prepare task modal: defaults with sources, per-run overrides, preflight, equivalent command, brief preview and Execute](./build-the-prepare-task-modal-defaults.md) | pending |
 | [Keep llm.<vendor>.reviewModel and llm.reviewModel in the loaded LLM config](./keep-llm-vendor-reviewmodel-and-llm.md) | pending |
