@@ -195,11 +195,13 @@ export function attentionFlag(run: Pick<LiveRunSummary, "stale" | "liveness">): 
 
 /**
  * Runs and jobs both count: the tab's number is everything in flight. A run no
- * process is executing is not in flight, whatever its record says.
+ * process here is executing (orphaned, or recorded on another host) is not in
+ * flight, whatever its record says — so runs are counted by verdict, never as
+ * `counts.running`, which includes those records.
  */
 export function liveRunningCount(live: LiveSummary | null): number {
   if (!live) return 0;
-  return Math.max(0, live.counts.running + live.counts.jobs - live.runs.filter(isDeadRun).length);
+  return liveRunCount(live) + live.counts.jobs;
 }
 
 /** Stuck runs, plus dead or unverifiable ones the stale count does not already include. */

@@ -11,6 +11,7 @@ import { act } from "preact/test-utils";
 import {
   analyzeFraction,
   attentionFlag,
+  liveRunningCount,
   liveTabLabel,
   liveTabState,
   type LiveSummary,
@@ -43,13 +44,19 @@ describe("reading /api/live", () => {
   });
 
   it("counts runs and jobs together as running", () => {
-    const live = snapshot({ counts: { running: 2, stale: 0, jobs: 1 } });
+    const live = snapshot({
+      runs: [run(), run({ runId: "r2" })] as never,
+      counts: { running: 2, stale: 0, jobs: 1 },
+    });
     expect(liveTabState(live)).toBe("running");
     expect(liveTabLabel(live)).toBe("Live, 3 running");
   });
 
   it("needs attention when a run is stuck, and says so", () => {
-    const live = snapshot({ counts: { running: 3, stale: 1, jobs: 0 } });
+    const live = snapshot({
+      runs: [run({ stale: true }), run({ runId: "r2" }), run({ runId: "r3" })] as never,
+      counts: { running: 3, stale: 1, jobs: 0 },
+    });
     expect(liveTabState(live)).toBe("attention");
     expect(liveTabLabel(live)).toBe("Live, 3 running, 1 stuck");
   });
@@ -65,6 +72,22 @@ describe("reading /api/live", () => {
     const fresh = snapshot({ runs: [run({ liveness: "orphaned" })] as never, counts: { running: 1, stale: 0, jobs: 0 } });
     expect(liveTabState(fresh)).toBe("attention");
     expect(liveTabLabel(fresh)).toBe("Live, 0 running, 1 stuck");
+  });
+
+  it("does not count a run recorded on another host as running", () => {
+    const live = snapshot({ runs: [run({ liveness: "foreign" })] as never, counts: { running: 1, stale: 0, jobs: 0 } });
+    expect(liveRunningCount(live)).toBe(0);
+    expect(liveTabState(live)).toBe("idle");
+    expect(liveTabLabel(live)).toBe("Live, nothing running");
+  });
+
+  it("counts live runs and jobs, not foreign or orphaned records", () => {
+    const live = snapshot({
+      runs: [run(), run({ runId: "r2", liveness: "foreign" }), run({ runId: "r3", liveness: "orphaned" })] as never,
+      jobs: [{ id: "j1", kind: "analyze" }] as never,
+      counts: { running: 3, stale: 0, jobs: 1 },
+    });
+    expect(liveRunningCount(live)).toBe(2);
   });
 
   it("names the verdict instead of 'stuck' for the flag", () => {
@@ -140,7 +163,7 @@ describe("the rendered tab", () => {
   });
 
   it("is running: shows the number of runs and jobs", async () => {
-    body = snapshot({ runs: [run()], counts: { running: 2, stale: 0, jobs: 1 } });
+    body = snapshot({ runs: [run(), run({ runId: "r2" })], counts: { running: 2, stale: 0, jobs: 1 } });
     await mount();
     expect(tab().dataset.liveState).toBe("running");
     expect(root.querySelector(".live-count")?.textContent).toBe("3");
@@ -148,7 +171,7 @@ describe("the rendered tab", () => {
   });
 
   it("needs attention: orange state with an N stuck badge", async () => {
-    body = snapshot({ runs: [run({ stale: true })], counts: { running: 3, stale: 1, jobs: 0 } });
+    body = snapshot({ runs: [run({ stale: true }), run({ runId: "r2" }), run({ runId: "r3" })], counts: { running: 3, stale: 1, jobs: 0 } });
     await mount();
     expect(tab().dataset.liveState).toBe("attention");
     expect(root.querySelector(".live-stuck-badge")?.textContent).toBe("1 stuck");

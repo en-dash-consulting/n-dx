@@ -23,7 +23,12 @@ const open = () => FakeSocket.instances.filter((s) => !s.closed);
 const livePollers = () => getRegisteredPollers().filter((p) => p.key === "live");
 
 function summary(running: number): LiveSummary {
-  return { runs: [], jobs: [], counts: { running, stale: 0, jobs: 0 } };
+  const runs = Array.from({ length: running }, (_, i) => ({
+    runId: `r${i}`, taskId: `t${i}`, taskTitle: "Task", branch: "main",
+    worktree: { key: "main", isAnchor: true },
+    startedAt: new Date().toISOString(), stale: false, lastProgress: null,
+  }));
+  return { runs: runs as never, jobs: [], counts: { running, stale: 0, jobs: 0 } };
 }
 
 function Probe() {
