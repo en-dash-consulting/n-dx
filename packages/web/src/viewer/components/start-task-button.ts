@@ -1,12 +1,17 @@
 /**
- * Start Task button — launches an autonomous hench run for a single task
- * via POST /api/hench/execute. The agent sets the task to in_progress
- * itself; callers refresh their own data via `onStarted` and pick up the
- * new run through their existing polling (WebSocket broadcasts land too).
+ * Start Task — a split button. The primary click opens the Prepare task modal
+ * for the task; the menu's "Start now" is the one-click run with no options
+ * (`POST /api/hench/execute {taskId}`), for a reader who wants what the project
+ * config already says. The agent sets the task to in_progress itself; callers
+ * refresh their own data via `onStarted`.
  *
- * Shared by the Rex Dashboard's "Up Next" card and the Hench Runs view's
- * empty state — both are "start the next actionable task" entry points
- * that should behave identically.
+ * Mounted by the Rex Dashboard's Up Next card, the Hench Runs empty state, the
+ * Live idle card, each Workspaces card (which passes `workspace`, sent as
+ * `X-Ndx-Workspace` by both the modal and Start now) and the PRD task panel.
+ *
+ * A hub that queues the run answers 202 `{queued, position, reason}`. That is
+ * not a start: Start now shows the position and the reason, and does not call
+ * `onStarted`.
  *
  * It also carries the dashboard half of the PRD tree's slug-rule gate. A tree
  * this build would re-slug answers 412, and when the server says a migration
@@ -18,7 +23,11 @@
  */
 
 import { h } from "preact";
-import { useState, useCallback } from "preact/hooks";
+import { useState, useCallback, useEffect } from "preact/hooks";
+import type { NavigateTo } from "../types.js";
+import { appUrl } from "../base-path.js";
+import { PrepareTaskModal } from "./prepare-task-modal.js";
+import { queuedReason } from "./prepare-task-model.js";
 
 export interface StartTaskButtonProps {
   taskId: string;
@@ -35,15 +44,31 @@ export interface StartTaskButtonProps {
   workspace?: string;
   /** Accessible name. Defaults to a generic one; set it when several buttons share a page. */
   ariaLabel?: string;
+  /**
+   * Opens the task's Live page after the modal starts a run. Without it the
+   * button loads `/live/task/<id>` as a page navigation.
+   */
+  navigateTo?: NavigateTo;
 }
 
-export function StartTaskButton({ taskId, onStarted, label = "Start Task", workspace, ariaLabel }: StartTaskButtonProps) {
+export function StartTaskButton({ taskId, onStarted, label = "Start Task", workspace, ariaLabel, navigateTo }: StartTaskButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Set when the server reported a refusal `rex migrate-slugs` would fix. */
   const [canMigrate, setCanMigrate] = useState(false);
   const [migrating, setMigrating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const menuId = `start-menu-${taskId}`;
+
+  // Escape closes an open menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
   const post = useCallback(async (payload: Record<string, unknown>) => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -61,8 +86,9 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     };
   }, [taskId, workspace]);
 
-  const handleStart = useCallback(async (e: Event) => {
+  const handleStartNow = useCallback(async (e: Event) => {
     e.stopPropagation();
+    setMenuOpen(false);
     setLoading(true);
     setError(null);
     setNotice(null);
@@ -81,6 +107,11 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
           return;
         }
         throw new Error(message);
+      }
+      // 202 from the hub's queue: accepted, not started. Say where it stands.
+      if (data.queued === true) {
+        setNotice(`Queued — position ${data.position}: ${queuedReason(String(data.reason))}.`);
+        return;
       }
       onStarted();
     } catch (err) {
@@ -114,13 +145,37 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     }
   }, [post]);
 
+  const openLive = useCallback((id: string) => {
+    setPreparing(false);
+    onStarted();
+    if (navigateTo) navigateTo("live-task", { taskId: id });
+    else window.location.assign(appUrl(`/live/task/${encodeURIComponent(id)}`));
+  }, [navigateTo, onStarted]);
+
+  const busy = loading || migrating;
   return h("div", { class: "start-task-wrapper" },
-    h("button", {
-      class: "start-task-btn",
-      onClick: handleStart,
-      disabled: loading || migrating,
-      "aria-label": ariaLabel ?? "Run this task with the agent",
-    }, loading ? "Starting…" : label),
+    h("div", { class: "ready-split" },
+      h("button", {
+        class: "start-task-btn start-task-primary",
+        onClick: (e: Event) => { e.stopPropagation(); setMenuOpen(false); setPreparing(true); },
+        disabled: busy,
+        "aria-label": ariaLabel ?? "Prepare a run of this task with the agent",
+      }, loading ? "Starting…" : label),
+      h("button", {
+        class: "start-task-btn start-task-caret",
+        onClick: (e: Event) => { e.stopPropagation(); setMenuOpen(!menuOpen); },
+        disabled: busy,
+        "aria-haspopup": "menu",
+        "aria-expanded": String(menuOpen),
+        "aria-controls": menuId,
+        "aria-label": ariaLabel ? `More ways to run: ${ariaLabel}` : "More ways to run this task",
+      }, "▾"),
+      menuOpen
+        ? h("div", { class: "ready-menu", id: menuId, role: "menu" },
+            h("button", { type: "button", role: "menuitem", onClick: handleStartNow }, "Start now"),
+          )
+        : null,
+    ),
     error
       ? h("div", { class: "start-task-error", role: "alert" }, error)
       : null,
@@ -134,6 +189,14 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
       : null,
     notice
       ? h("div", { class: "start-task-notice", role: "status" }, notice)
+      : null,
+    preparing
+      ? h(PrepareTaskModal, {
+          taskId,
+          workspace,
+          onClose: () => setPreparing(false),
+          onOpenLive: openLive,
+        })
       : null,
   );
 }

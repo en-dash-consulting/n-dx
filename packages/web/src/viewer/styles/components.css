@@ -229,6 +229,30 @@
   gap: var(--space-1);
 }
 
+/* Split button: the primary opens Prepare task, the caret's menu holds Start now.
+   The container and menu are the shared .ready-split / .ready-menu rules. */
+.start-task-primary {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.start-task-caret {
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.task-live-link,
+.task-blockers {
+  font-size: var(--font-sm);
+}
+
+.task-blockers {
+  color: var(--text-secondary, #9ca3af);
+}
+
 .start-task-error {
   font-size: var(--font-xs);
   color: var(--red, #ef4444);

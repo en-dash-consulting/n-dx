@@ -263,3 +263,34 @@ export function queuedReason(reason: string): string {
   if (reason === "at-capacity") return "every run slot on this machine is busy";
   return reason;
 }
+
+/** What a surface shows in place of (or as) a task's start control. */
+export type StartOffer =
+  | { kind: "start"; resume: boolean }
+  | { kind: "live" }
+  | { kind: "blocked"; blockers: Array<{ id: string; title: string | null }> }
+  | { kind: "none" };
+
+/**
+ * One rule for every surface: pending and deferred tasks start; an in-progress
+ * task with no live run resumes; a task with a live run links to it (Stop lives
+ * in Live); a blocked task names what it waits on; anything else offers nothing.
+ */
+export function startOffer(
+  task: { status: string; blockedBy?: string[] },
+  hasLiveRun: boolean,
+  titleOf: (id: string) => string | null = () => null,
+): StartOffer {
+  if (hasLiveRun) return { kind: "live" };
+  switch (task.status) {
+    case "pending":
+    case "deferred":
+      return { kind: "start", resume: false };
+    case "in_progress":
+      return { kind: "start", resume: true };
+    case "blocked":
+      return { kind: "blocked", blockers: (task.blockedBy ?? []).map((id) => ({ id, title: titleOf(id) })) };
+    default:
+      return { kind: "none" };
+  }
+}

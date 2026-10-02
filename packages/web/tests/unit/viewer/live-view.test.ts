@@ -245,9 +245,11 @@ describe("the rendered page", () => {
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Stop 1 run in this worktree"));
   });
 
-  it("starts the next task through the execute route", async () => {
+  it("starts the next task through the execute route from the Start now menu item", async () => {
     await mount();
-    const start = [...root.querySelectorAll("button")].find((b) => b.textContent === "Start working")!;
+    const caret = root.querySelector<HTMLButtonElement>(".start-task-caret")!;
+    await act(async () => { caret.click(); await flush(); });
+    const start = [...root.querySelectorAll("button")].find((b) => b.textContent === "Start now")!;
     await act(async () => { start.click(); await flush(); });
     const post = calls.find((c) => c.url.includes("/api/hench/execute"));
     expect(post?.init?.method).toBe("POST");

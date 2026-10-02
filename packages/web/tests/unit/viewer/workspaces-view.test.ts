@@ -379,7 +379,7 @@ describe("WorkspacesView", () => {
     expect(branch.querySelector(".workspace-card-stop")).not.toBeNull();
     expect(branch.querySelector(".start-task-btn")).toBeNull();
     expect(anchor.querySelector(".workspace-card-stop")).toBeNull();
-    expect(anchor.querySelector(".start-task-btn")!.textContent).toBe("Start working");
+    expect(anchor.querySelector(".start-task-primary")!.textContent).toBe("Start working");
   });
 
   it("starts a run in the card's worktree, not the viewer's", async () => {
@@ -393,7 +393,10 @@ describe("WorkspacesView", () => {
 
       const branch = root.querySelectorAll(".workspace-card")[1];
       await act(async () => {
-        branch.querySelector<HTMLButtonElement>(".start-task-btn")!.click();
+        branch.querySelector<HTMLButtonElement>(".start-task-caret")!.click();
+      });
+      await act(async () => {
+        branch.querySelector<HTMLButtonElement>('[role="menuitem"]')!.click();
         await new Promise((r) => setTimeout(r, 0));
       });
 

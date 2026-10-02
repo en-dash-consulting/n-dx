@@ -431,8 +431,9 @@ function Recent({ snapshot, navigateTo }: { snapshot: LiveSnapshot; navigateTo: 
 
 // ── Idle ─────────────────────────────────────────────────────────────
 
-function IdleState({ snapshot, analyzedAt, jobs, refresh }: {
+function IdleState({ snapshot, analyzedAt, jobs, refresh, navigateTo }: {
   snapshot: LiveSnapshot;
+  navigateTo: NavigateTo;
   analyzedAt: string | null;
   jobs: JobTray;
   refresh: () => Promise<void>;
@@ -471,7 +472,7 @@ function IdleState({ snapshot, analyzedAt, jobs, refresh }: {
           ? [
             h("p", { key: "t", class: "live-card-title" }, next.title),
             chainLabel(next.epicChain) ? h("p", { key: "c", class: "live-card-chain" }, chainLabel(next.epicChain)) : null,
-            h(StartTaskButton, { key: "b", taskId: next.id, label: "Start working", onStarted: () => { void refresh(); } }),
+            h(StartTaskButton, { key: "b", taskId: next.id, label: "Start working", onStarted: () => { void refresh(); }, navigateTo }),
           ]
           : h("p", { class: "live-muted" }, "Nothing actionable in the PRD."),
       ),
@@ -509,7 +510,7 @@ export function LiveView({ navigateTo, analyzedAt, jobs }: LiveViewProps) {
           h("div", { class: "live-main" },
             needsLook ? h(AttentionSection, { snapshot, navigateTo, refresh }) : null,
             isIdle(snapshot)
-              ? h(IdleState, { snapshot, analyzedAt, jobs, refresh })
+              ? h(IdleState, { snapshot, analyzedAt, jobs, refresh, navigateTo })
               : items.length > 0
                 ? h("section", { "aria-labelledby": "live-running-h" },
                   h("h3", { id: "live-running-h", class: "live-section-title" }, "Running now"),

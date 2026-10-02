@@ -11,7 +11,7 @@ import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/index.js";
 import { RexTaskLink } from "../components/index.js";
-import { StartTaskButton } from "../components/index.js";
+import { TaskStartControl } from "../components/index.js";
 import { SmartAddInput, ReorganizePanel, RestorePanel } from "../components/prd-tree/index.js";
 import { HealthGauge } from "../visualization/index.js";
 import { usePolling } from "../hooks/index.js";
@@ -438,11 +438,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                         )
                       : null,
                   ),
-                  nextTask.status === "pending"
-                    ? h(StartTaskButton, { taskId: nextTask.id, onStarted: fetchDashboard })
-                    : nextTask.status === "in_progress"
-                      ? h("span", { class: "status-badge status-badge--in_progress" }, "In Progress")
-                      : null,
+                  h(TaskStartControl, { task: nextTask, onStarted: fetchDashboard, navigateTo }),
                 ),
                 h(RexTaskLink, {
                   task: { id: nextTask.id, title: nextTask.title, status: nextTask.status, level: nextTask.level, priority: nextTask.priority },

@@ -22,7 +22,7 @@ import {
   MemoryPanel,
   WsHealthPanel,
   ThrottleControlsPanel,
-  StartTaskButton,
+  TaskStartControl,
 } from "../components/index.js";
 import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
 import type { ActiveRun } from "../components/index.js";
@@ -1393,9 +1393,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
                 showLevel: true,
                 showPriority: true,
               }),
-              nextTask.status === "pending"
-                ? h(StartTaskButton, { taskId: nextTask.id, onStarted: fetchRuns, label: "Start Working" })
-                : h("p", { class: "hench-empty-hint" }, `Already ${nextTask.status.replace(/_/g, " ")}.`),
+              h(TaskStartControl, { task: nextTask, onStarted: fetchRuns, label: "Start Working", navigateTo }),
               liveProgress && liveProgress.taskId === nextTask.id
                 ? h("div", {
                     class: "hench-empty-live-progress",
