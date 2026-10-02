@@ -49,6 +49,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Starting a run from a Workspaces card opens Live in the viewer's workspace, not the card's](./starting-a-run-from-a-workspaces-card.md) | completed |
 | [The context-notes temp file is left behind on spawn failure, write failure and shutdown](./the-context-notes-temp-file-is-left.md) | pending |
 | [The dashboard Self-Heal --auto change has no changeset](./the-dashboard-self-heal-auto-change.md) | pending |
-| [The Live idle card and Workspaces cards never offer Resume for an in-progress task](./the-live-idle-card-and-workspaces.md) | pending |
+| [The Live idle card and Workspaces cards never offer Resume for an in-progress task](./the-live-idle-card-and-workspaces.md) | completed |
 | [tokenBudget has no upper bound, so a huge value runs with a budget of 1](./tokenbudget-has-no-upper-bound-so-a.md) | completed |
 | [Two near-simultaneous execute requests for the same task both spawn a run](./two-near-simultaneous-execute-requests.md) | completed |
