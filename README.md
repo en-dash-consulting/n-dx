@@ -250,6 +250,8 @@ ndx config llm.codex.cli_path codex .
 | `ndx config [key] [value]` | View and edit settings (`--json`, `--help`) |
 | `ndx export [dir]` | Export static deployable dashboard (`--out-dir`, `--deploy=github` confirms first — `--yes` for unattended; agent transcripts excluded unless `--include-transcripts`) |
 | `ndx prd export\|import` | Carry the PRD between machines as a portable JSON bundle (`--out`, `--in`, `--replace`), scoped to one item with `--item` (its subtree, its `blockedBy` closure, and its ancestors), or write a stakeholder document with `--format=narrative` (`--include-completed`; one-way) — distinct from `ndx export` above |
+| `ndx which` | Show which n-dx is running: version, `cli.js` path, install kind (registry, global link, checkout) and git ref |
+| `ndx trust [status\|accept\|revoke] [dir]` | Review or accept the execution config a checkout ships (hench guard, test command, `.mcp.json`); `ndx work` runs under the default guard until accepted (`--format=json`) |
 | `ndx iso [dir]` | Render a standalone isometric architecture map (`--source=auto\|sourcevision\|scan`, `--max-nodes=N`, `--no-externals`) |
 | `ndx auth [dir]` | Check and configure LLM provider credentials |
 | `ndx web [dir]` | Dashboard server control (lower-level counterpart to `ndx start`) |
@@ -267,6 +269,7 @@ These are delegated to rex; `ndx <command>` and `rex <command>` are equivalent.
 |---------|-------------|
 | `ndx next [dir]` | Print the next actionable task |
 | `ndx claim list\|release [dir]` | Inspect and free cross-worktree task claims: `list` shows every live claim with its worktree, holder, state and expiry; `release <taskId>` frees one (`--force` while its holder is alive); `release --all` frees this worktree's held and dead-holder claims (`--format=json` throughout) |
+| `ndx log <event> [dir]` | Append an execution-log entry without the rex MCP server (`--item=ID`, `--detail="..."`) |
 | `ndx tree [dir]` | Show the full PRD hierarchy with colour-coded status |
 | `ndx tree-diff [dir]` | Compare two PRD trees into added/changed/completed/moved/removed, each with its ancestor chain. Defaults to this checkout against the default branch; `--from=<ref> --to=<ref>` compares commits, `--against=<dir>` compares two checkouts, `--json` for machine output. Read-only — takes no PRD lock |
 | `ndx update <id> [dir]` | Update item status, priority, or title |

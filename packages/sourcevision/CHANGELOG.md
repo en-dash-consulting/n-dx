@@ -1,5 +1,191 @@
 # @n-dx/sourcevision
 
+## 0.8.0
+
+### Minor Changes
+
+- [#459](https://github.com/en-dash-consulting/n-dx/pull/459) [`0e3623e`](https://github.com/en-dash-consulting/n-dx/commit/0e3623edbc25e417982a93db53aa7ae6b70fae2f) Thanks [@endash-shal](https://github.com/endash-shal)! - 0.8.0 — Find your way
+  
+  A single `.ndx/` directory for project state, with `ndx migrate-layout` to move
+  an existing project onto it. A reorganised dashboard: views are stages, Analysis
+  opens on the codebase map, settings are three pages (Robot Wrangler, Workflow,
+  Project) on a shared save frame, and every moved path redirects. A Live tab for
+  watching every run across a repository's worktrees. A per-user token on the hub
+  and dashboard, and repository trust gating what a checkout's execution config
+  may widen. New Claude model defaults, per-vendor agent models, per-field
+  resolution of the legacy `claude.*` keys, and effects declared for every command
+  and shown in a preflight banner.
+  
+  Every other changeset in this release is a `patch`, which is the repo default
+  and correct for each change on its own. This one makes the aggregate a minor, as
+  the 0.8.0 epic requires.
+
+### Patch Changes
+
+- [#502](https://github.com/en-dash-consulting/n-dx/pull/502) [`21e086d`](https://github.com/en-dash-consulting/n-dx/commit/21e086d6bade2453e179578ab3c5a102a1f445b6) Thanks [@dnaniel](https://github.com/dnaniel)! - The Analysis page now opens on the isometric codebase map. It sits under a one-line bar with the analysis branch, commit, age and the Re-analyze controls, and is followed by a row of stat tiles (files, zones, circular deps, average cohesion and coupling, signals) and a Next Steps panel that collapses to one summary line. Expand takes the map full screen, and Terrain starts collapsed since the page already leads with the map.
+  
+  `renderIsoMap` gains an `embed` option, requested by the dashboard with `GET /api/iso-map?embed=1`: the document fills its frame without scrolling, keeps only the level crumbs and camera tools as floating controls, drops the footer, and opens the details panel only for a selection. A plain scroll wheel is left to the host page, so scrolling past the map scrolls the page; Ctrl/⌘ + scroll or a pinch zooms, and the host can turn plain-wheel zoom on (full screen) and set the colour scheme over `postMessage`. New-tab and download links, `sv iso` and the `/iso-map` skill still produce the standalone page.
+  
+  Legend filters on the map now match nested zones: an area stays lit when any zone or sub-zone inside it has an active kind, the matching tiles on its face take the kind's colour, and each legend entry shows how many zones of that kind exist at every depth.
+  
+  The Plan page opens on a one-row Smart Add bar (description, Generate, and a "More" toggle for batch import, project scan and recent activity) instead of the full form, and the Work dashboard's duplicate Smart Add card is gone. The Plan page's Tasks section reads title → progress → one toolbar row (search, status and tag filters, item actions) → tree, with the hierarchy explainer moved to an ⓘ beside the title. Stage page headers are one compact line, and both pages fit any viewport: the top navigation scrolls inside its bar on phones, the side stage links give way there, and tooltips stay on screen.
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A running `sv analyze` now publishes structured progress to `.sourcevision/.cache/analyze-progress.json`: mode, current phase and every phase's start and end, the enrichment pass, its batch k of n, judgment-cache hits and misses, and LLM calls, tokens and time per task class so far. The file is marked complete or failed when the run ends, and a file whose process has died reads as `interrupted`, never `running`. `GET /api/commands/sv-analyze/status` gains a `progress` field with that report and the previous same-mode run's per-phase timings, for terminal- and dashboard-started runs alike, and the server pushes an `sv:analyze-progress` WebSocket frame within about a second of each change.
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A running analysis now refreshes its progress file every 15 s, and a `running` file not refreshed for two minutes reads as interrupted even when its pid is alive and its command line cannot be read (Windows, no `ps`). Stop on /live/analyze refuses such a file on every platform.
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A stale analyze progress file whose pid the OS has given to another program no longer shows as a running analysis, and Stop on /live/analyze refuses to signal a process whose command line is not an analyze, saying why.
+
+- [#444](https://github.com/en-dash-consulting/n-dx/pull/444) [`0f927d1`](https://github.com/en-dash-consulting/n-dx/commit/0f927d1c8026fb17d997b2e6b83d017795f8898a) Thanks [@endash-shal](https://github.com/endash-shal)! - Read the project config through the layout resolver, not a `.n-dx.json` literal
+  
+  On a project with `.ndx/` the config lives at `.ndx/config.json`, but every
+  sourcevision reader still named the legacy path — `analyze`'s risk-justification
+  and zone-type loaders by deriving it as `resolve(svDir, "..")` plus
+  `.n-dx.json`, which on the new layout resolves to `.ndx/.n-dx.json`, a file
+  nothing ever writes. A missing config is a legitimate state, so each reader fell
+  back to its default without an error: `sourcevision.riskJustifications`,
+  `sourcevision.zones.types`, the `language` and inventory overrides, archetype
+  overrides, workspace members and the declared seams and infrastructure on the
+  iso map were all silently ignored, and the analysis still succeeded with
+  different results.
+  
+  The standalone iso bundle cannot reach the resolver, so it gains a hand-written
+  `projectConfigFor` twin alongside `analysisDirFor`, pinned to the canonical
+  implementation by `tests/integration/layout-resolver-contract.test.js`.
+
+- [#505](https://github.com/en-dash-consulting/n-dx/pull/505) [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Claude API requests now send `llm.effort` as `output_config.effort`, and Claude Opus 5.5 defaults to `high` effort. `llm.effort` was parsed but never sent. With no matching rule, `claude-opus-5-5` gets `high` so the move from Opus 5 keeps its reasoning depth (Opus 5.5's API default is `medium`), and other models are unchanged. Effort is never sent to a model that rejects it (Haiku 4.5, Sonnet 4.5 and older) or when the value is not `low`, `medium`, `high`, `xhigh` or `max`; both cases print a warning. Claude Code CLI runs are unchanged.
+
+- [#496](https://github.com/en-dash-consulting/n-dx/pull/496) [`6a07165`](https://github.com/en-dash-consulting/n-dx/commit/6a07165eb8bdc87e2cf28a7c657a04905faa0918) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add the analysis page at `/live/analyze`: the six phases with what each does, its result once done and its time against the previous run of the same mode; enrichment passes 0 to 4 under Zones with the current batch and judgment-cache reuse; the stdout tail with follow (dashboard-started runs); model calls by task class and cost so far; the `.sourcevision/` files written; notes and recent analyses. Terminal- and dashboard-started analyses update within two seconds. `GET /api/live/analyze` serves the page, and `POST /api/live/analyze/stop` stops a terminal-started analysis by its recorded pid. `sv analyze` now records its command and the last error line in `analyze-progress.json`, and on SIGTERM or SIGINT marks the open phase as an error in the manifest, records the run as failed and exits 128 + the signal, so a stopped analysis names the phase it stopped in.
+
+- [#439](https://github.com/en-dash-consulting/n-dx/pull/439) [`39c6d80`](https://github.com/en-dash-consulting/n-dx/commit/39c6d80441aba2c3dd71d94494b58bf42fc5a4a0) Thanks [@endash-shal](https://github.com/endash-shal)! - Route rex and sourcevision file access through their paths modules
+  
+  Every site that composed its own `.rex/` or `.sourcevision/` path now asks the
+  layout resolver instead, so both packages follow whichever folder layout a
+  project is on rather than assuming the legacy one. `REX_DIR` and `SV_DIR` are
+  gone — a bare directory name is the thing that made the layout a decision taken
+  at ~120 call sites.
+  
+  Behaviour on a legacy project is unchanged. Three user-visible details moved
+  from a fixed string to the resolved location: the legacy-PRD migration banner
+  now names the folder tree the migration actually wrote (reported by
+  `ensureLegacyPrdMigrated` as `folderTreePath`), `rex export`'s refusal message
+  names the PRD directory the project actually uses, and `sv analyze`'s background
+  narration log path follows the analysis directory.
+  
+  `packages/sourcevision/src/export/` bundles into the dependency-free standalone
+  iso-map skill and so cannot import the resolver; it carries a hand-written twin,
+  `analysisDirFor`, pinned to the canonical implementation by
+  `tests/integration/layout-resolver-contract.test.js`.
+
+- [#442](https://github.com/en-dash-consulting/n-dx/pull/442) [`f958d86`](https://github.com/en-dash-consulting/n-dx/commit/f958d865e70b66761f7c619b2b471601cc5ebc50) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Point SourceVision's pull-request markdown at the folder tree through rex, fixing an empty Completed Work section.
+  
+  The branch-work collector read `.rex/prd.md`, which no longer exists once a project has migrated to `.rex/prd_tree/`. On every folder-tree project the Completed Work section therefore found nothing and said so, with no error to explain it. It now asks rex two questions instead — `rex tree --format=json` for the PRD and `rex tree-diff --json` for what this branch completed — so no code path reads `prd.md` or `prd.json` for PR markdown.
+  
+  The collector's own copy of the completion diff is gone with it. "What did this branch finish" is rex's question, and it was previously answered by three implementations (the CLI, the dashboard's PRD delta, and this one) that were free to drift apart.
+  
+  `rex tree --format=json` is new: the machine-readable rendering of the same hierarchy `rex tree` prints, filtered identically. It is the folder-tree replacement for the `rex parse-md --stdin` seam that let a consumer outside rex read the PRD without a second parser.
+
+- [#440](https://github.com/en-dash-consulting/n-dx/pull/440) [`2b144b8`](https://github.com/en-dash-consulting/n-dx/commit/2b144b897262afc597ab9e964febb6cd6c7d9f91) Thanks [@endash-shal](https://github.com/endash-shal)! - Show what `ndx analyze`, `ndx plan` and `ndx recommend` are about to do, and what they did
+  
+  Run interactively, these three now print a preflight banner before they start:
+  what the command reads, what it writes (and which writes need `--accept`),
+  which phases call a model and why, and roughly how long it takes. It pauses
+  briefly so you can Ctrl-C, then prints a closing summary of the files written,
+  the LLM calls and tokens, the cost, and the command to run next.
+  
+  `ndx recommend` is declared as making no model calls at all, because it groups
+  SourceVision findings deterministically — knowing which commands are free is
+  the point of the banner as much as knowing which are not.
+  
+  The banner is skipped under `--yes`, `--quiet` and `--format=json`, in CI, and
+  whenever stdout is not a terminal — so autonomous `ndx work` runs and piped
+  invocations are unaffected. Both the banner and the summary go to stderr, so
+  `--format=json` stdout is byte-identical either way. `NDX_PREFLIGHT=always`
+  forces the banner when piping; `NDX_PREFLIGHT_PAUSE_MS` sets the pause.
+  
+  Supporting changes:
+  
+  - `rex analyze` and `rex recommend` now run under the shared monotonic progress
+    reporter from `@n-dx/llm-client`, and rex's spinner registers with it like
+    sourcevision's already did — so a rate-limit retry raised inside an LLM call
+    pauses the spinner and prints its own line instead of corrupting it.
+  - Cost is recorded by the tool that spends it, never recomputed by a reader:
+    `sv analyze` writes `lastAnalysis.llm.costUsd` to the manifest (additive,
+    optional), priced per task class at the model that answered; `rex analyze`
+    adds `costUsd` to its `analyze_token_usage` log entry. The orchestrator
+    cannot import the price table, and a second copy of it would drift — so where
+    no cost was recorded the summary says "not recorded" rather than guessing.
+
+- [#440](https://github.com/en-dash-consulting/n-dx/pull/440) [`2b144b8`](https://github.com/en-dash-consulting/n-dx/commit/2b144b897262afc597ab9e964febb6cd6c7d9f91) Thanks [@endash-shal](https://github.com/endash-shal)! - Report an unknown run cost as unknown, and scope the summary to the invocation
+  
+  `priceRunLedger` discarded `resolveModelPricing(...).known` and priced every
+  bucket, so a local or unlisted model was charged at the fallback rates — which
+  are `claude-sonnet-5`'s, a real catalogue entry, so the guess read as a
+  measurement. `recordLLMCall` also folds a missing `tokenUsage` in as `0`, so a
+  provider that reported no usage priced to exactly `0`. The manifest's `costUsd`
+  is a single number with no room to say "partly", so one unknowable class now
+  leaves the field off the run entirely; `formatCost` renders that as
+  "not recorded".
+  
+  `collectRunSummary` read `manifest.lastAnalysis` unconditionally, but that is
+  the last analysis the *project* ran, not the last one this command ran — and
+  most commands never run SourceVision. An interactive `ndx recommend .` after an
+  `ndx analyze .` therefore reported the analysis's calls, tokens and dollars as
+  its own, and `plan --file` read the same stale figures. It is now scoped by the
+  run's timestamp, the way the rex half already was.
+  
+  `analyze` also spawns `sv narrate` detached and returns before that child
+  records a token, so the summary now says when a narrator this run queued is
+  still going, rather than presenting an incomplete total as final.
+
+- [#436](https://github.com/en-dash-consulting/n-dx/pull/436) [`03590e4`](https://github.com/en-dash-consulting/n-dx/commit/03590e4fa8069232774dce4e1d0fe460b969e530) Thanks [@endash-shal](https://github.com/endash-shal)! - Add a folder-layout resolver and a paths module per package.
+  
+  n-dx keeps its state in three dot-directories and five loose `.n-dx*` files, named
+  directly at roughly 380 source files. `resolveLayout` in `@n-dx/llm-client` makes that
+  one decision in one place: it reads a `.ndx/` container first and falls back to the
+  legacy layout silently, so existing projects keep working untouched. Each package gains
+  a paths module (`resolveRexPaths`, `resolveSourcevisionPaths`, `resolveHenchPaths`,
+  `resolveWebPaths`) as the single home for its own folder names, and the orchestration
+  tier gets a hand-written twin in `packages/core/layout.js` — it may not import from any
+  package tier — pinned to the canonical implementation by a contract test.
+  
+  No call sites are rewired yet, so behaviour is unchanged.
+
+- [#454](https://github.com/en-dash-consulting/n-dx/pull/454) [`d6a6c0c`](https://github.com/en-dash-consulting/n-dx/commit/d6a6c0c0d0f01674e58b8eddd9855909787b01fa) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Fix the branch guard, `rex tree-diff` and SourceVision's PR markdown in the cases the 0.8.0 B2 review found.
+  
+  - A stale `origin/HEAD` (one that still names a pruned branch, such as `origin/master` after a rename) is no longer trusted. The branch guard and a bare `rex tree-diff` check the ref exists and otherwise fall back to `main`/`master`, so a user on `main` is no longer refused on their own default branch.
+  - `rex tree-diff` no longer runs the repository's git hooks when it extracts a tree at a ref, so a failing or slow `post-checkout` hook can't break it.
+  - When the baseline ref predates the PRD tree, `rex tree-diff`'s text output now says so instead of listing every item as added.
+  - `sv pr-markdown` warns when either side of the diff has no PRD tree, instead of rendering an empty or whole-project Completed Work section. It no longer forces a local `main` as the base: without an explicit base branch it uses tree-diff's default (`origin/HEAD`, then `main`/`master`) and reports the base tree-diff actually used.
+  - hench's slug-migration offer and the dashboard's migration route no longer bypass the branch guard. On a feature branch they show rex's refusal, naming the branch.
+  - `rex ready --item` without a value, including the space-separated `--item <id>`, now refuses and names `--item=<id>`, as `rex log` and `rex export` already do.
+
+- [#445](https://github.com/en-dash-consulting/n-dx/pull/445) [`cceceb5`](https://github.com/en-dash-consulting/n-dx/commit/cceceb563ba1650f4e70b9cbe63eec9bbd954e4d) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx init` now starts new projects on the `.ndx/` layout
+  
+  A project with no n-dx state gets a single `.ndx/` container holding `rex/`,
+  `hench/`, `sourcevision/` and `config.json`, instead of three dot-directories
+  and a `.n-dx.json` scattered across the root. `.mcp.json` stays at the
+  repository root, because the vendor CLIs read it there.
+  
+  A project that already has n-dx state keeps the layout it has. Re-running init
+  is how people pick up new assistant surfaces and repaired config, and it must
+  not turn into a migration nobody asked for — moving an existing project is
+  `ndx migrate-layout`'s job, where it can snapshot first and `git mv` so history
+  follows.
+  
+  The mechanism is that init creates the container before it spawns the sub-CLIs,
+  so each one resolves its own paths and they cannot disagree. Alongside it, the
+  paths that `ndx init` writes and that every later command reads now come from
+  the resolver rather than from literals: the project and package config files,
+  the `requireInit` check, the `.gitignore` and `.gitattributes` blocks, the git
+  baseline commit, and hench's own state directory across its CLI.
+  
+  `relativeToRoot(layout, path)` is new in `@n-dx/llm-client` (and its
+  orchestration-tier twin), for the several places that need a resolved path as
+  `.gitignore` spells it — root-relative, forward slashes.
+- Updated dependencies [[`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`05a8115`](https://github.com/en-dash-consulting/n-dx/commit/05a811560a19baf95e69bc19a8c906dad2b3fea9), [`39c6d80`](https://github.com/en-dash-consulting/n-dx/commit/39c6d80441aba2c3dd71d94494b58bf42fc5a4a0), [`29c576a`](https://github.com/en-dash-consulting/n-dx/commit/29c576a196ed033d77a35a2dd87952ca6f32902f), [`ccad056`](https://github.com/en-dash-consulting/n-dx/commit/ccad05698ce562b0ae47b283a59854b299884f5c), [`0e3623e`](https://github.com/en-dash-consulting/n-dx/commit/0e3623edbc25e417982a93db53aa7ae6b70fae2f), [`2b144b8`](https://github.com/en-dash-consulting/n-dx/commit/2b144b897262afc597ab9e964febb6cd6c7d9f91), [`aa0ca02`](https://github.com/en-dash-consulting/n-dx/commit/aa0ca024713788ec46248f12df84e7390c64e2c7), [`1bcd1e2`](https://github.com/en-dash-consulting/n-dx/commit/1bcd1e25c063cb34a6bba3615b55a7d25adc4fef), [`d3c2169`](https://github.com/en-dash-consulting/n-dx/commit/d3c21692f2a8f7582a114fc69fba1c88a7a0205e), [`161da3d`](https://github.com/en-dash-consulting/n-dx/commit/161da3d04bb668f80ffe1a52c3be880cdeafbab1), [`0bca3ea`](https://github.com/en-dash-consulting/n-dx/commit/0bca3ea0f0336ec4f317504fb518320c6ac6856d), [`03590e4`](https://github.com/en-dash-consulting/n-dx/commit/03590e4fa8069232774dce4e1d0fe460b969e530), [`66705e6`](https://github.com/en-dash-consulting/n-dx/commit/66705e69a1d66651644ef9a5f5ff684669ebf2e9), [`ccad056`](https://github.com/en-dash-consulting/n-dx/commit/ccad05698ce562b0ae47b283a59854b299884f5c), [`cceceb5`](https://github.com/en-dash-consulting/n-dx/commit/cceceb563ba1650f4e70b9cbe63eec9bbd954e4d)]:
+  - @n-dx/llm-client@0.8.0
+
 ## 0.7.2
 
 ### Patch Changes

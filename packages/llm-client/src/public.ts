@@ -184,6 +184,18 @@ export {
 } from "./config.js";
 export type { TaskModelResolution, JudgmentRoute, ModelCost } from "./config.js";
 
+// Claude Messages API effort (output_config.effort)
+export {
+  CLAUDE_EFFORT_LEVELS,
+  EFFORT_CAPABLE_CLAUDE_MODELS,
+  CLAUDE_DEFAULT_EFFORT,
+  isClaudeEffort,
+  supportsClaudeEffort,
+  resolveClaudeApiEffort,
+  resetClaudeEffortWarnings,
+} from "./claude-effort.js";
+export type { ClaudeEffort } from "./claude-effort.js";
+
 // Model-aware token pricing (the single price table for every cost surface)
 export {
   resolveModelPricing,
@@ -621,3 +633,25 @@ export type {
   UsageSection,
   UsageDefinition,
 } from "./help-format.js";
+
+// Shared available-memory reading (macOS counts reclaimable pages + kernel pressure)
+export {
+  readAvailableMemory,
+  getAvailableMemory,
+  createAvailableMemoryReader,
+  parseVmStatAvailableBytes,
+  parseDarwinPressureLevel,
+  derivePressure,
+  MEMORY_READING_TTL_MS,
+  MEMORY_EXEC_TIMEOUT_MS,
+  PRESSURE_CRITICAL_USED_PERCENT,
+  PRESSURE_WARN_USED_PERCENT,
+} from "./system-memory.js";
+
+export type {
+  AvailableMemoryReading,
+  MemoryPressure,
+  ExecRunner,
+  SystemMemoryDeps,
+  AvailableMemoryReader,
+} from "./system-memory.js";

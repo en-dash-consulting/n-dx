@@ -90,8 +90,17 @@ describe("parseIsoParams", () => {
     const result = parseIsoParams(new URLSearchParams());
     expect(result).toEqual({
       ok: true,
-      params: { source: "auto", maxNodes: 40, includeExternals: true },
+      params: { source: "auto", maxNodes: 40, includeExternals: true, embed: false },
     });
+  });
+
+  it("reads embed=1 as the embedded document and rejects other values", () => {
+    const on = parseIsoParams(new URLSearchParams("embed=1"));
+    expect(on.ok && on.params.embed).toBe(true);
+    const off = parseIsoParams(new URLSearchParams("embed=0"));
+    expect(off.ok && off.params.embed).toBe(false);
+    const bad = parseIsoParams(new URLSearchParams("embed=yes"));
+    expect(bad.ok).toBe(false);
   });
 
   it("accepts every valid source mode", () => {

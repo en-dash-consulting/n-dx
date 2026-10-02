@@ -49,7 +49,7 @@ function snapshot(over: Record<string, unknown> = {}): LiveSnapshot {
     queue: { next: [{ id: "n1", title: "Next up", priority: "high", epicChain: [] }], starting: [] },
     machine: {
       slots: { scope: "repository", inUse: 1, max: 3, available: 2, queued: 0 },
-      memory: { freeBytes: 8 * 1024 ** 3, totalBytes: 16 * 1024 ** 3, floorBytes: 2 * 1024 ** 3, belowFloor: false },
+      memory: { freeBytes: 8 * 1024 ** 3, availableBytes: 8 * 1024 ** 3, totalBytes: 16 * 1024 ** 3, pressure: "normal", floorBytes: 2 * 1024 ** 3, belowFloor: false },
       llm: { vendor: "claude", model: "sonnet" },
       worktrees: { total: 4, withLiveRun: 1 },
       spend: { todayUsd: 1.5, todayTokens: 1000, inFlightUsd: 0.25, inFlightTokens: 100 },
@@ -118,6 +118,35 @@ describe("reading the snapshot", () => {
     expect(machineTiles(m, 0, 0).some((t) => t.warn)).toBe(false);
     const tight = { ...m, slots: { ...m.slots, available: 0 }, memory: { ...m.memory, belowFloor: true } };
     expect(machineTiles(tight, 0, 0).filter((t) => t.warn).map((t) => t.key)).toEqual(["slots", "memory"]);
+  });
+
+  it("shows the memory tile's pressure level and available/floor detail", () => {
+    const m = snapshot().machine;
+    const tile = machineTiles(m, 0, 0).find((t) => t.key === "memory");
+    expect(tile).toMatchObject({ label: "Memory", value: "Normal", detail: "8.0 GB available · floor 2.0 GB", warn: false });
+  });
+
+  it("warns the memory tile on warn or critical pressure even when above the floor", () => {
+    const m = snapshot().machine;
+    const warn = { ...m, memory: { ...m.memory, pressure: "warn" as const } };
+    expect(machineTiles(warn, 0, 0).find((t) => t.key === "memory")).toMatchObject({ value: "Warn", warn: true });
+    const critical = { ...m, memory: { ...m.memory, pressure: "critical" as const } };
+    expect(machineTiles(critical, 0, 0).find((t) => t.key === "memory")).toMatchObject({ value: "Critical", warn: true });
+  });
+
+  it("never warns the memory tile on an unknown reading, and shows a dash", () => {
+    const m = snapshot().machine;
+    const unknown = {
+      ...m,
+      memory: { freeBytes: null, availableBytes: null, totalBytes: m.memory.totalBytes, pressure: "unknown" as const, floorBytes: m.memory.floorBytes, belowFloor: false },
+    };
+    expect(machineTiles(unknown, 0, 0).find((t) => t.key === "memory")).toMatchObject({ value: "Unknown", detail: "—", warn: false });
+  });
+
+  it("omits the floor clause from the memory detail when there is no floor", () => {
+    const m = snapshot().machine;
+    const noFloor = { ...m, memory: { ...m.memory, floorBytes: null } };
+    expect(machineTiles(noFloor, 0, 0).find((t) => t.key === "memory")?.detail).toBe("8.0 GB available");
   });
 
   it("labels the slots tile with its scope, and names the hub's queue when it holds anything", () => {

@@ -388,7 +388,7 @@
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
 }
-.settings-overlay-glyph { font-size: 16px; color: var(--text-muted); }
+.settings-overlay-glyph { display: inline-flex; align-items: center; color: var(--text-muted); }
 .settings-overlay-crumbs { font-size: 13px; color: var(--text-muted); }
 .settings-overlay-crumbs b { color: var(--text); font-weight: 600; }
 .settings-overlay-body { flex: 1; min-height: 0; display: flex; }
@@ -419,7 +419,8 @@
 .settings-overlay-item:hover { background: var(--bg-hover); color: var(--text); }
 .settings-overlay-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .settings-overlay-item.active { background: var(--bg-active, var(--bg-hover)); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
-.settings-overlay-item-glyph { width: 18px; text-align: center; color: var(--text-muted); }
+.settings-overlay-item-glyph { width: 22px; display: inline-flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); }
+.settings-overlay-glyph svg, .settings-overlay-item-glyph svg, .bottombar-settings svg { display: block; flex-shrink: 0; }
 .settings-overlay-density { margin-top: auto; padding: var(--space-3) var(--space-4) 0; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); }
 .settings-overlay-density-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
 .settings-overlay-content { flex: 1; min-width: 0; overflow-y: auto; padding: var(--space-6); }
@@ -494,10 +495,13 @@
 
 /* ── Stage pages ─────────────────────────────────────────────────────── */
 
-.stage-page-head { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-5); }
-.stage-page-logo { border-radius: var(--radius-md); }
-.stage-page-title { font-size: 22px; font-weight: 600; margin: 0; }
-.stage-page-blurb { margin: 2px 0 0; color: var(--text-muted); font-size: 13px; }
+/* The breadcrumb already names the stage, so the head is one compact line:
+   mark, name and blurb, wrapping the blurb under the name on a narrow screen. */
+.stage-page-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.stage-page-head > div { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-3); min-width: 0; }
+.stage-page-logo { border-radius: var(--radius-md); width: 28px; height: 28px; flex-shrink: 0; }
+.stage-page-title { font-size: 18px; font-weight: 600; margin: 0; }
+.stage-page-blurb { margin: 0; color: var(--text-muted); font-size: 13px; }
 
 .stage-section { margin-bottom: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-surface); }
 .stage-section--open { border-color: var(--border-strong, var(--border)); }
@@ -635,4 +639,26 @@
   .settings-overlay-body { flex-direction: column; }
   .settings-overlay-nav { width: auto; max-height: 40%; border-right: none; border-bottom: 1px solid var(--border); }
   .stage-section-blurb { display: none; }
+}
+
+/* Phones: the side stage links would sit on top of the content, and the top
+   navigation already reaches every stage — drop them and their gutters. */
+@media (max-width: 560px) {
+  /* Top nav: the tabs scroll sideways inside the bar instead of pushing the
+     page wider than the screen; search collapses to its icon. */
+  .topnav { padding: 0 var(--space-2); gap: var(--space-1); }
+  .topnav-brand { padding-right: var(--space-1); }
+  .topnav-tabs { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .topnav-tabs::-webkit-scrollbar { display: none; }
+  .topnav-tab { flex: none; gap: 4px; }
+  .topnav-tab-glyph { display: none; }
+  .topnav-divider { margin: 0 var(--space-1); }
+  .topnav-search { flex: none; margin-left: 0; }
+  .stage-links { display: none; }
+  .main--staged { padding-left: var(--space-3); padding-right: var(--space-3); }
+  .stage-page-blurb { font-size: 12px; }
+  .stage-section-head { flex-wrap: wrap; padding-bottom: var(--space-2); }
+  .stage-section-toggle { flex-basis: 100%; }
+  .stage-section-tablist { margin-left: var(--space-4); }
+  .stage-section-body { padding-left: var(--space-3); padding-right: var(--space-3); }
 }

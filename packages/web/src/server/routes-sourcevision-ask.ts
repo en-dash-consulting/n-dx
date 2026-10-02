@@ -691,7 +691,7 @@ async function handleAsk(
   // person reads and acts on, which is exactly the work the registry keeps off
   // the light tier — and `llm.routes` reroutes it per project with no code
   // change.
-  const { model } = resolveTaskModel("sourcevision.ask", llmConfig, { vendor });
+  const { model, effort } = resolveTaskModel("sourcevision.ask", llmConfig, { vendor });
   const timeoutMs = resolveAskTimeoutMs(ctx.projectDir);
 
   /**
@@ -729,7 +729,12 @@ async function handleAsk(
   try {
     const result = await completeWithTimeout(
       client,
-      { prompt: buildAskPrompt(parsed.prompt, contextText, context.seeded, refine), model },
+      {
+        prompt: buildAskPrompt(parsed.prompt, contextText, context.seeded, refine),
+        model,
+        effort,
+        taskClass: "sourcevision.ask",
+      },
       timeoutMs,
       (late) => record(late.tokenUsage, "timeout", 0),
     );

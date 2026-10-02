@@ -72,8 +72,11 @@ export interface HubOptions {
    * `hub.memoryFloorBytes` from the same file.
    */
   limits?: Partial<AdmissionLimits>;
-  /** Injectable for tests — the gate's view of free memory. */
-  freeMemory?: () => number;
+  /**
+   * Injectable for tests — the gate's view of available memory. `null` means
+   * the machine could not be read, which admits rather than queues.
+   */
+  freeMemory?: () => number | null;
   /** How often the gate retries queued runs. Default 2 s. */
   drainIntervalMs?: number;
   /**

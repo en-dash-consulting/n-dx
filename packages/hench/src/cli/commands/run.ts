@@ -1249,6 +1249,18 @@ export function formatRunErrorLine(run: RunRecord): string | undefined {
 // Single task execution
 // ---------------------------------------------------------------------------
 
+/**
+ * The system half of the end-of-run memory line. `-1` in the run record means
+ * the reading was unknown; it is reported as such, never as a number.
+ */
+export function formatSystemMemory(stats: NonNullable<RunRecord["memoryStats"]>): string {
+  const toGB = (bytes: number) => (bytes / 1024 / 1024 / 1024).toFixed(1);
+  const totalGB = stats.systemTotalBytes >= 0 ? `${toGB(stats.systemTotalBytes)} GB` : "unknown total";
+  return stats.systemAvailableAtEndBytes >= 0
+    ? `system: ${toGB(stats.systemAvailableAtEndBytes)} / ${totalGB} available`
+    : `system: available memory unknown / ${totalGB}`;
+}
+
 async function runOne(
   dir: string,
   henchDir: string,
@@ -1402,13 +1414,7 @@ async function runOne(
   // Memory stats
   if (run.memoryStats) {
     const peakMB = Math.round(run.memoryStats.peakRssBytes / 1024 / 1024);
-    const availGB = run.memoryStats.systemAvailableAtEndBytes >= 0
-      ? (run.memoryStats.systemAvailableAtEndBytes / 1024 / 1024 / 1024).toFixed(1)
-      : "?";
-    const totalGB = run.memoryStats.systemTotalBytes >= 0
-      ? (run.memoryStats.systemTotalBytes / 1024 / 1024 / 1024).toFixed(1)
-      : "?";
-    info(`Memory: ${peakMB} MB peak RSS (system: ${availGB} / ${totalGB} GB available)`);
+    info(`Memory: ${peakMB} MB peak RSS (${formatSystemMemory(run.memoryStats)})`);
   }
 
   // Context-window churn — set only by the local (LM Studio) loop, so the
@@ -1573,7 +1579,7 @@ export async function cmdRun(
   if (reviewModelFlag !== undefined && !reviewModelFlag.trim()) {
     throw new CLIError(
       "--review-model requires a model id.",
-      "Example: --review-model=claude-opus-5. Omit the flag to use the recommended default for your vendor.",
+      "Example: --review-model=claude-opus-5-5. Omit the flag to use the recommended default for your vendor.",
     );
   }
   if (reviewModelFlag && !reviewPass) {
@@ -1915,15 +1921,18 @@ export async function cmdRun(
   // Delays or rejects runs when system memory is under pressure.
   const throttle = new MemoryThrottle(config.guard.memoryThrottle);
   await throttle.gate(({ decision, memoryUsagePercent, delayMs, attempt, maxRetries }) => {
+    const usage = memoryUsagePercent === null ? "unknown" : `${memoryUsagePercent.toFixed(1)}%`;
     if (decision === "delay") {
       info(
-        `⏳ Memory usage high (${memoryUsagePercent.toFixed(1)}%) — ` +
+        `⏳ Memory usage high (${usage}) — ` +
         `delaying execution ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`,
       );
     } else if (decision === "reject") {
-      info(`🚫 Memory usage critical (${memoryUsagePercent.toFixed(1)}%) — rejecting execution`);
+      info(`🚫 Memory usage critical (${usage}) — rejecting execution`);
     } else if (attempt > 0) {
-      info(`✓ Memory usage recovered (${memoryUsagePercent.toFixed(1)}%) — proceeding`);
+      info(memoryUsagePercent === null
+        ? "✓ Memory reading unknown — proceeding"
+        : `✓ Memory usage recovered (${usage}) — proceeding`);
     }
   });
 

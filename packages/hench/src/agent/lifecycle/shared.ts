@@ -685,13 +685,13 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
   run.lastActivityAt = new Date().toISOString();
   await saveRun(opts.henchDir, run);
 
-  // Capture system memory at run start
+  // Capture system memory at run start (-1 records an unknown reading)
   const monitor = new SystemMemoryMonitor();
   let memoryCtx: MemoryContext;
   try {
     const snap = await monitor.snapshot();
     memoryCtx = {
-      systemAvailableAtStartBytes: snap.availableBytes,
+      systemAvailableAtStartBytes: snap.availableBytes ?? -1,
       systemTotalBytes: snap.totalBytes,
     };
   } catch {
@@ -1697,7 +1697,12 @@ export async function proposePreRunCommitMessage(
       "Write a single-line git commit subject (max 72 chars, conventional-commit " +
       "style, no body, no surrounding quotes or backticks) summarizing these " +
       `uncommitted changes:\n\n${diff.stat}\n\n${diff.diff.slice(0, PRE_RUN_COMMIT_DIFF_CHAR_LIMIT)}`;
-    const { text } = await provider.complete({ prompt, model: resolvedModel });
+    const { text } = await provider.complete({
+      prompt,
+      model: resolvedModel,
+      effort: commitResolution.effort,
+      taskClass: "git.commit-message",
+    });
     // Output contract for the light-tier route: the answer goes straight to
     // `git commit -m`, so a preamble, fence, or paragraph would land in the
     // repository's history. Anything that is not a usable single-line subject
@@ -3151,7 +3156,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     try {
       const monitor = new SystemMemoryMonitor();
       const snap = await monitor.snapshot();
-      systemAvailableAtEndBytes = snap.availableBytes;
+      systemAvailableAtEndBytes = snap.availableBytes ?? -1;
     } catch {
       // Best-effort — leave as -1
     }

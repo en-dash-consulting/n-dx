@@ -9,7 +9,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AuthMode, ClaudeClientOptions } from "./types.js";
 import { ClaudeClientError } from "./types.js";
-import { resolveApiKey, resolveCliPath } from "./config.js";
+import { DEFAULT_CLAUDE_MODEL, resolveApiKey, resolveCliPath } from "./config.js";
 import { exec } from "./exec.js";
 
 // ── CLI availability ─────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ export async function validateApiKey(
 
   try {
     await client.messages.create({
-      model: "claude-sonnet-5",
+      model: DEFAULT_CLAUDE_MODEL,
       max_tokens: 1,
       messages: [{ role: "user", content: "hi" }],
     });

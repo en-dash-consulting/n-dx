@@ -17,7 +17,14 @@
   gap: var(--space-2);
 }
 
-.workflow-header-logo { flex-shrink: 0; }
+.workflow-header-tile {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
 
 .workflow-header-title {
   margin: 0;

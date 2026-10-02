@@ -17,7 +17,14 @@
   gap: var(--spacing-sm);
 }
 
-.llm-header-logo { flex-shrink: 0; }
+.llm-header-tile {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
 
 .llm-header-title {
   font-size: 1.15rem;
