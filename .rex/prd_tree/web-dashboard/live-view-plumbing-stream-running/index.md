@@ -41,6 +41,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [End dead runs across every worktree from one reconcile route, with one terminal status shared with Mark stuck](./end-dead-runs-across-every-worktree.md) | completed |
 | [Expose structured sourcevision analyze progress: phase, enrichment pass, batch and model calls](./expose-structured-sourcevision-analyze.md) | completed |
 | [Live test gaps: clock-dependent analyze route fixture, untested stop handlers and log-stream fallback, unregistered LiveSources seam](./live-test-gaps-clock-dependent-analyze.md) | completed |
+| [Make the analyze stop tests pass on Windows, where SIGTERM terminates without running handlers](./make-the-analyze-stop-tests-pass-on.md) | pending |
 | [Make the Live strip's agent slots match the repository-wide run list, using the hub's admission capacity when served through the hub](./make-the-live-strip-s-agent-slots.md) | completed |
 | [Make the vendorPid spawn tests pass on Windows, where the recorded pid is the cmd.exe wrapper's](./make-the-vendorpid-spawn-tests-pass-on.md) | completed |
 | [On a project's first run the live .run-logs file is not git-ignored, so --review commits it as a review repair](./on-a-project-s-first-run-the-live-run.md) | completed |
