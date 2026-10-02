@@ -2,7 +2,7 @@
 id: "dc49f4e5-44e6-4547-8ff8-fe6b1e4bbf04"
 level: "task"
 title: "`--resolve`'s command quotes Windows 8.3 short paths, failing CLI Smoke (Windows)"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "0.8.0"
@@ -10,11 +10,16 @@ tags:
   - "windows"
   - "ci"
 source: "ci"
+startedAt: "2026-10-02T15:38:09.984Z"
+completedAt: "2026-10-02T15:46:53.238Z"
+endedAt: "2026-10-02T15:46:53.238Z"
+resolutionType: "code-change"
+resolutionDetail: "Added ~ to the win32-only safe set in shellWord; unit tests for win32 short path, win32 space, POSIX ~/x; patch changeset."
 acceptanceCriteria:
   - "shellWord leaves a win32 path containing `~` (an 8.3 short path) unquoted and still double-quotes a win32 path with a space; a unit test covers both."
   - "shellWord still single-quotes a POSIX word starting with `~`; a unit test covers it."
   - "tests/e2e/cli-work-resolve.test.js passes on Windows CI."
 description: "PR #503's CLI Smoke (Windows) job fails in the root e2e step (run 37026775579, job 110903294937): tests/e2e/cli-work-resolve.test.js:50 \"ndx work --resolve > prints only the JSON report and exits 0 when the vendor is unset\" expects `ndx work --task=task-2 --auto C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\ndx-work-resolve-y5YLfN` but gets the path wrapped in double quotes. The runner's temp directory is an 8.3 short path containing `~`, and shellWord (packages/hench/src/cli/commands/run-resolve.ts:395-400, added by the F19 quoting fix) treats `~` as needing quotes on win32. In cmd.exe and PowerShell a `~` inside a word has no special meaning, so it is safe unquoted there; on POSIX a leading `~` is tilde expansion, so it must stay quoted on POSIX.\n\nFix (recommended): add `~` to the win32 safe-character set only. Add unit tests for shellWord: win32 with `C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\x` → unquoted; win32 with a space → double-quoted; posix `~/x` → single-quoted. Keep the e2e assertion as it is (it should pass on every platform after the fix). Patch changeset for @n-dx/hench.\n\n## How to run checks without approval prompts (operator note)\n\nCommands are only pre-approved when they START with `npx`, `node`, `npm`, `git` or `vitest`; never prefix one with `cd … &&`. From the project root: `npx vitest run --root packages/hench <paths>`, `npx tsc -p packages/hench/tsconfig.json --noEmit`, and `npx vitest run tests/e2e/cli-work-resolve.test.js` (it spawns the built CLI: run `npm run build --prefix packages/hench` first)."
-lastModified: "2026-10-02T15:37:58.502Z"
+lastModified: "2026-10-02T15:46:54.096Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
