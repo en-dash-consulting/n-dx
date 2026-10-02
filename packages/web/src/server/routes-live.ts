@@ -204,9 +204,13 @@ function liveSlots(scope: LiveSlots["scope"], inUse: number, max: number, queued
   return { scope, inUse, max, available: Math.max(0, max - inUse), level: concurrencyLevelOf(inUse, max), queued };
 }
 
-/** The slots tile as the hub's admission gate reports it. */
-function hubSlots(admission: HubAdmissionHeader): LiveSlots {
-  return liveSlots("machine", admission.running, admission.maxSessions, admission.queued);
+/**
+ * The slots tile behind the hub: the gate's cap and queue, with in-use never
+ * below the repository's live run list. The gate counts only dashboard-started
+ * sessions, so a terminal-started run would otherwise be listed but not counted.
+ */
+function hubSlots(admission: HubAdmissionHeader, repositoryInUse: number): LiveSlots {
+  return liveSlots("machine", Math.max(admission.running, repositoryInUse), admission.maxSessions, admission.queued);
 }
 
 export interface LiveSnapshot {
@@ -695,7 +699,7 @@ export async function handleLiveRoute(
   const llm = await resolveActiveAgentModel(ctx.projectDir);
   const snapshot = getLiveSnapshot(ctx, sources);
   const admission = parseHubAdmissionHeader(req.headers[HUB_ADMISSION_HEADER]);
-  const slots = admission ? hubSlots(admission) : snapshot.machine.slots;
+  const slots = admission ? hubSlots(admission, snapshot.machine.slots.inUse) : snapshot.machine.slots;
   jsonResponse(res, 200, { ...snapshot, machine: { ...snapshot.machine, llm, slots } });
   return true;
 }

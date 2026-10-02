@@ -363,6 +363,13 @@ describe("GET /api/live machine.slots", () => {
     });
   });
 
+  it("behind the hub, never reports fewer runs in use than the repository's live run list", async () => {
+    const header = formatHubAdmissionHeader({ running: 0, maxSessions: 3, queued: 1 });
+    expect(await slots({ [HUB_ADMISSION_HEADER]: header })).toEqual({
+      scope: "machine", inUse: 1, max: 3, available: 2, level: "moderate", queued: 1,
+    });
+  });
+
   it("ignores a malformed admission header", async () => {
     expect((await slots({ [HUB_ADMISSION_HEADER]: "{\"running\":-1}" })).scope).toBe("repository");
   });
