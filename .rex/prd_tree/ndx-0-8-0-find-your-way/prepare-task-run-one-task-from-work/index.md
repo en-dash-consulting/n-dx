@@ -36,7 +36,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Keep llm.<vendor>.reviewModel and llm.reviewModel in the loaded LLM config](./keep-llm-vendor-reviewmodel-and-llm.md) | pending |
 | [Keep the /p/<id>/ and /w/<key>/ prefix when the PRD view rewrites the URL](./keep-the-p-id-and-w-key-prefix-when.md) | completed |
 | [`ndx work --resolve=<value>` starts a real run instead of resolving](./ndx-work-resolve-value-starts-a-real.md) | completed |
-| [New styles use undefined tokens --text-secondary and --danger, failing light-theme contrast](./new-styles-use-undefined-tokens-text.md) | pending |
+| [New styles use undefined tokens --text-secondary and --danger, failing light-theme contrast](./new-styles-use-undefined-tokens-text.md) | completed |
 | [Open the Prepare task modal from every existing Start button and retire the PRD panel's separate Execute path](./open-the-prepare-task-modal-from-every.md) | completed |
 | [Pass --auto when the dashboard starts Self-Heal](./pass-auto-when-the-dashboard-starts.md) | completed |
 | [Prep resolve and preview refuse every deferred task, so no Start button can start one](./prep-resolve-and-preview-refuse-every.md) | completed |
