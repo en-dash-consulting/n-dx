@@ -26,6 +26,7 @@
  * - Folder layout resolution (resolveLayout, detectLayoutMode, relativeToRoot)
  * - Canonical JSON serialization
  * - Repository trust (guard baseline, execution-config evaluation, trust store)
+ * - Credential redaction (redactDeep, redactSecrets)
  *
  * **Out-of-scope (must NOT be re-exported):**
  * - MCP server/client factories (web-tier concern)
@@ -88,6 +89,13 @@ export type {
   RepoTrustState,
   RepoTrustStoreOptions,
 } from "@n-dx/llm-client";
+// ---- Credential redaction ---------------------------------------------------
+// Applied to every run record and run log before it is written: a tool's
+// output can carry a secret it read, and the records are served and exported.
+// createLineRedactor is the line-at-a-time form the streaming run log needs —
+// a PEM key spans lines, so per-line redactSecrets cannot see one.
+export { redactDeep, redactSecrets, createLineRedactor } from "@n-dx/llm-client";
+export type { LineRedactor } from "@n-dx/llm-client";
 
 // ---- CLI output control -----------------------------------------------------
 export {
