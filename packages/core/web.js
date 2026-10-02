@@ -845,23 +845,9 @@ export function hubDashboardUrl(hubPort, projectId, token) {
   return urlWithAuthToken(`http://localhost:${hubPort}/p/${encodeURIComponent(projectId)}/`, token);
 }
 
-/**
- * `web.auth` from the project's config file; anything but `false` means on.
- *
- * The resolver is asked where that file is rather than spelling it out: on an
- * `.ndx/` project it is `.ndx/config.json`, and a literal `.n-dx.json` here
- * would read nothing and silently leave authentication on for a project that
- * had turned it off. (The `web.port` and `web.mode` readers above still carry
- * that literal — pre-existing debt, tracked in tests/layout-literal-inventory.md.)
- */
+/** `web.auth` from the project's config file; anything but `false` means on. */
 async function loadAuthEnabled(dir) {
-  const configPath = resolveLayout(dir).configFile;
-  if (!(await fileExists(configPath))) return true;
-  try {
-    return JSON.parse(await readFile(configPath, "utf-8"))?.web?.auth !== false;
-  } catch {
-    return true;
-  }
+  return (await loadWebConfig(dir)).auth !== false;
 }
 
 /** Hub port: `<hub home>/config.json` → `{ "hub": { "port": N } }`, default 3117. */
@@ -886,16 +872,29 @@ export async function readHubRegistry(home = hubHome()) {
   }
 }
 
-/** `web.mode` from the project's .n-dx.json: "hub" or "here"; undefined when unset. */
-async function loadConfigMode(dir) {
-  const configPath = join(dir, ".n-dx.json");
-  if (!(await fileExists(configPath))) return undefined;
+/**
+ * The project's `web` config block, or `{}` when absent or unreadable.
+ *
+ * The resolver is asked where the config file is rather than spelling it out:
+ * on an `.ndx/` project it is `.ndx/config.json`, and a literal `.n-dx.json`
+ * here would read nothing — silently leaving authentication on for a project
+ * that had turned it off, and ignoring its port and mode besides.
+ */
+async function loadWebConfig(dir) {
+  const configPath = resolveLayout(dir).configFile;
+  if (!(await fileExists(configPath))) return {};
   try {
-    const mode = JSON.parse(await readFile(configPath, "utf-8"))?.web?.mode;
-    return mode === "hub" || mode === "here" ? mode : undefined;
+    const web = JSON.parse(await readFile(configPath, "utf-8"))?.web;
+    return web && typeof web === "object" ? web : {};
   } catch {
-    return undefined;
+    return {};
   }
+}
+
+/** `web.mode` from the project's config file: "hub" or "here"; undefined when unset. */
+async function loadConfigMode(dir) {
+  const mode = (await loadWebConfig(dir)).mode;
+  return mode === "hub" || mode === "here" ? mode : undefined;
 }
 
 /**

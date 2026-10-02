@@ -282,6 +282,9 @@ describe("openRunLog", () => {
       ["only line"],
       ["  [Agent]   thinking", "  [Tool]    read_file", "           42ms", ""],
       ["line with unicode — ✓ ✗ ❯", "line with \"quotes\" and \\backslashes\\"],
+      // A credential in the output. Both writers scrub, so they still agree —
+      // and if only one of them did, this case is what says so.
+      ["cloning with ghp_0123456789abcdefghijklmnopqrstuvwxyz", "Authorization: Bearer abcdef0123456789ghij"],
     ];
 
     for (const [index, lines] of cases.entries()) {
@@ -301,6 +304,77 @@ describe("openRunLog", () => {
         await rm(wholeDir, { recursive: true, force: true });
       }
     }
+  });
+
+  it("scrubs credentials as it streams, not only at the end of the run", async () => {
+    // The live log is what a real run writes — persistRunLog is the fallback
+    // for a stream that could not be opened or broke. A scrub applied only
+    // there would put every captured token on disk, and leave it tailable in
+    // the dashboard, for the whole run.
+    const writer = await openRunLog(projectDir, "run-redact-1", "2026-04-08T10:00:00Z", [
+      "prefix line with ghp_0123456789abcdefghijklmnopqrstuvwxyz",
+    ]);
+    writer.appendLine("Authorization: Bearer abcdef0123456789ghij");
+    writer.appendLine("plain output line");
+    expect(await writer.close()).toBeNull();
+
+    const written = await readFile(writer.path, "utf-8");
+    expect(written).not.toContain("ghp_0123456789abcdefghijklmnopqrstuvwxyz");
+    expect(written).not.toContain("abcdef0123456789ghij");
+    expect(written).toContain("[redacted:token]");
+    // Prefix lines go through the same path, so they are scrubbed too.
+    expect(written.split("\n")[0]).toContain("prefix line with [redacted:token]");
+    // Everything else is untouched.
+    expect(written).toContain("plain output line");
+  });
+
+  it("scrubs a private key split across lines, which a per-line scrub cannot see", async () => {
+    // BEGIN and END sit on different lines and the body is base64, so no single
+    // line looks like a secret to any rule. A per-line scrub therefore wrote the
+    // whole key to disk — live and tailable in the dashboard for the rest of the
+    // run, and kept in the artifact afterwards.
+    const key = [
+      "-----BEGIN RSA PRIVATE KEY-----",
+      "MIIEowIBAAKCAQEAwJ8yq1Tz3kKQmVYd0pLq7nHcR2sFgXaBvNmEtUjWoPyZxCdL",
+      "kRfT9bGhVnQsMzAeXuYpIoCwDrJlNvKtSqBmHgZcFeXaPdUyTrWnLiKjHgFeDcBa",
+      "-----END RSA PRIVATE KEY-----",
+    ];
+    const lines = ["before the key", ...key, "after the key"];
+
+    const writer = await openRunLog(projectDir, "run-pem-1", "2026-04-08T10:00:00Z");
+    for (const line of lines) writer.appendLine(line);
+    expect(await writer.close()).toBeNull();
+
+    const written = await readFile(writer.path, "utf-8");
+    expect(written).not.toContain("MIIEowIBAAKCAQEAwJ8yq1Tz3kKQmVYd0pLq7nHcR2sFgXaBvNmEtUjWoPyZxCdL");
+    expect(written).not.toContain("kRfT9bGhVnQsMzAeXuYpIoCwDrJlNvKtSqBmHgZcFeXaPdUyTrWnLiKjHgFeDcBa");
+    expect(written).toContain("[redacted:private-key]");
+    // The surrounding output is untouched.
+    expect(written).toContain("before the key");
+    expect(written).toContain("after the key");
+
+    // And the end-of-run writer agrees, as the module header promises.
+    const wholeDir = await mkdtemp(join(tmpdir(), "hench-runlog-pem-"));
+    try {
+      const wholePath = await persistRunLog(wholeDir, "run-pem-1", "2026-04-08T10:00:00Z", lines);
+      expect(await readFile(wholePath, "utf-8")).toEqual(written);
+    } finally {
+      await rm(wholeDir, { recursive: true, force: true });
+    }
+  });
+
+  it("releases a BEGIN whose END never arrives instead of swallowing the rest", async () => {
+    // Whole-string redaction leaves an unterminated BEGIN alone, because the
+    // pattern needs both markers — so a run killed mid-key must still get its
+    // lines, not lose everything after the marker.
+    const writer = await openRunLog(projectDir, "run-pem-2", "2026-04-08T10:00:00Z");
+    writer.appendLine("-----BEGIN RSA PRIVATE KEY-----");
+    writer.appendLine("a body whose end never came");
+    expect(await writer.close()).toBeNull();
+
+    const written = await readFile(writer.path, "utf-8");
+    expect(written).toContain("-----BEGIN RSA PRIVATE KEY-----");
+    expect(written).toContain("a body whose end never came");
   });
 });
 

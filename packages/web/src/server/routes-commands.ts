@@ -41,7 +41,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
-import { exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
+import { redactSecrets, exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
 import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
@@ -314,6 +314,19 @@ function releaseSvWriteLock(ctx: ServerContext): void {
 // ── Handlers ──────────────────────────────────────────────────────────
 
 // ── Full-analysis state tracking ─────────────────────────────────────
+/**
+ * The tail of a command's output as the dashboard shows it.
+ *
+ * Redact *before* slicing, never after: a tail boundary falling inside a token
+ * leaves its surviving half unmatched by every rule, and therefore on screen.
+ * Having one helper is the point — the live sv-analyze path scrubbed its
+ * stream while the completion path overwrote the result with raw stdout, so
+ * credentials appeared the moment the analysis finished.
+ */
+function outputTail(text: string, limit: number): string {
+  return redactSecrets(text).slice(-limit);
+}
+
 
 interface SvAnalyzeStatus {
   running: boolean;
@@ -441,8 +454,8 @@ async function handleSvAnalyze(
       timeout: analyzeTimeout,
       stdio: "pipe",
       onStdout: (chunk) => {
-        svAnalyzeStatus.recentOutput =
-          (svAnalyzeStatus.recentOutput + chunk).slice(-3000);
+        // Live output goes to the dashboard; scrub it like a run record.
+        svAnalyzeStatus.recentOutput = outputTail(svAnalyzeStatus.recentOutput + chunk, 3000);
       },
     });
     svAnalyzeSlot.child = child;
@@ -450,7 +463,7 @@ async function handleSvAnalyze(
       const wasStopped = svAnalyzeSlot.stopRequested;
       svAnalyzeStatus.running = false;
       svAnalyzeStatus.finishedAt = new Date().toISOString();
-      if (stdout !== null) svAnalyzeStatus.recentOutput = stdout.trim().slice(-3000);
+      if (stdout !== null) svAnalyzeStatus.recentOutput = outputTail(stdout.trim(), 3000);
       svAnalyzeStatus.stopped = wasStopped;
       // A kill the operator asked for is not a failed analysis.
       svAnalyzeStatus.error = wasStopped ? null : error;
@@ -498,7 +511,7 @@ async function handleSvAnalyze(
 
     jsonResponse(res, 200, {
       ok: true,
-      output: result.stdout.trim().slice(-2000),
+      output: outputTail(result.stdout.trim(), 2000),
     });
   } catch (err) {
     errorResponse(res, 500, String(err));
@@ -573,7 +586,7 @@ async function handleSync(
       const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
       jsonResponse(res, 200, { ok: true, ...parsed });
     } catch {
-      jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+      jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
     }
   } catch (err) {
     errorResponse(res, 500, String(err));
@@ -693,7 +706,7 @@ async function handleExport(
       return true;
     }
 
-    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+    jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
     errorResponse(res, 500, String(err));
   }
@@ -721,7 +734,7 @@ async function handleInstallSample(
       return true;
     }
 
-    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+    jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
     errorResponse(res, 500, String(err));
   }
@@ -749,7 +762,7 @@ async function handleDestroySample(
       return true;
     }
 
-    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+    jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
     errorResponse(res, 500, String(err));
   }
@@ -1008,7 +1021,7 @@ async function handleInit(
     if (failure) {
       initStatus.running = false;
       initStatus.finishedAt = new Date().toISOString();
-      initStatus.output = (result.stdout || "").trim().slice(-5000);
+      initStatus.output = outputTail((result.stdout || "").trim(), 5000);
       initStatus.error = failure;
       return;
     }
@@ -1033,7 +1046,7 @@ async function handleInit(
 
     initStatus.running = false;
     initStatus.finishedAt = new Date().toISOString();
-    initStatus.output = (result.stdout || "").trim().slice(-5000);
+    initStatus.output = outputTail((result.stdout || "").trim(), 5000);
     initStatus.error = null;
 
     // The project is now initialized — re-register the file watchers that
@@ -1344,7 +1357,7 @@ export function startAsyncJob(
   };
 
   child.done.then((result) => {
-    status.output = (result.stdout || "").trim().slice(-5000);
+    status.output = outputTail((result.stdout || "").trim(), 5000);
     try {
       status.report = JSON.parse(result.stdout);
     } catch {
@@ -1521,7 +1534,7 @@ async function handleFix(
     try {
       jsonResponse(res, 200, { ok: true, dryRun, report: JSON.parse(result.stdout) });
     } catch {
-      jsonResponse(res, 200, { ok: true, dryRun, output: result.stdout.trim().slice(-2000) });
+      jsonResponse(res, 200, { ok: true, dryRun, output: outputTail(result.stdout.trim(), 2000) });
     }
   } catch (err) {
     errorResponse(res, 500, String(err));
@@ -1619,7 +1632,7 @@ async function runAuthCheck(ctx: ServerContext): Promise<AuthCheckResult> {
     const ok = !result.error;
     return {
       ok,
-      output: result.stdout.trim().slice(-2000),
+      output: outputTail(result.stdout.trim(), 2000),
       error: ok ? null : (result.stderr || result.error?.message || "Credential check failed").slice(-1000),
     };
   } catch (err) {
@@ -1684,7 +1697,7 @@ async function handleValidateTokens(
       errorResponse(res, 500, `Token validation failed: ${result.stderr || result.error.message}`);
       return true;
     }
-    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-4000) });
+    jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 4000) });
   } catch (err) {
     errorResponse(res, 500, String(err));
   }
@@ -1714,7 +1727,7 @@ async function handleExportPdf(
       errorResponse(res, 500, `PDF export failed: ${result.stderr || result.error.message}`);
       return true;
     }
-    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+    jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
     errorResponse(res, 500, String(err));
   }
