@@ -18,7 +18,8 @@ import { prepFixture } from "../../helpers/prep-fixture.js";
 
 interface Call { url: string; method: string; headers: Record<string, string>; body: Record<string, unknown> | null }
 
-type Route = (call: Call) => { status: number; body: unknown } | undefined;
+type Answer = { status: number; body: unknown };
+type Route = (call: Call) => Answer | undefined | Promise<Answer | undefined>;
 
 let root: HTMLDivElement | undefined;
 let calls: Call[];
@@ -42,7 +43,7 @@ function stubFetch(prep: PrepResponse, route: Route = () => undefined): void {
       body: typeof init.body === "string" ? JSON.parse(init.body) : null,
     };
     calls.push(call);
-    const answer = route(call)
+    const answer = (await route(call))
       ?? (url.startsWith("/api/hench/prep/") && call.method === "GET" ? { status: 200, body: prep } : { status: 404, body: {} });
     return { ok: answer.status >= 200 && answer.status < 300, status: answer.status, json: async () => answer.body };
   }));
@@ -272,6 +273,43 @@ describe("PrepareTaskModal", () => {
     expect($("pre.prep-brief").textContent).toBe("# Brief\nDo the thing.");
     await click(button("Back"));
     expect($<HTMLInputElement>("#prep-maxTurns").value).toBe("7");
+  });
+
+  it("moves focus to the preview heading on open and back to Preview brief on Back", async () => {
+    await open(prepFixture(), (c) =>
+      c.url.endsWith("/preview") ? { status: 200, body: { brief: "# Brief" } } : undefined);
+    await click(button("Preview brief"));
+    expect(document.activeElement).toBe($(".prep-preview-title"));
+    await click(button("Back"));
+    expect(document.activeElement).toBe(button("Preview brief"));
+  });
+
+  it("ignores a preview reply that arrives after Back, or after a newer request", async () => {
+    const pending: Array<(r: Answer) => void> = [];
+    await open(prepFixture(), (c) => {
+      if (!c.url.endsWith("/preview")) return undefined;
+      // Held until the test settles it.
+      return new Promise<Answer>((r) => pending.push(r));
+    });
+
+    // Preview, Back before it returns, edit a field: the late reply is dropped.
+    await click(button("Preview brief"));
+    await click(button("Back"));
+    await change("prep-maxTurns", "9");
+    await act(async () => { pending[0]!({ status: 200, body: { brief: "OLD" } }); });
+    await flush();
+    expect(document.querySelector("pre.prep-brief")).toBeNull();
+    expect($<HTMLInputElement>("#prep-maxTurns").value).toBe("9");
+
+    // A second request supersedes the first: only the newest reply shows.
+    await click(button("Preview brief"));
+    await click(button("Back"));
+    await click(button("Preview brief"));
+    await act(async () => { pending[2]!({ status: 200, body: { brief: "NEW" } }); });
+    await flush();
+    await act(async () => { pending[1]!({ status: 200, body: { brief: "STALE" } }); });
+    await flush();
+    expect($("pre.prep-brief").textContent).toBe("NEW");
   });
 
   // The prep GET resolves a deferred task with --reset-deferred, so hench

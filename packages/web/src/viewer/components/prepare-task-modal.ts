@@ -193,13 +193,22 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
     }
   }, [request, taskId, load]);
 
+  // Each preview request, and each Back, takes a new number; a reply whose
+  // number is no longer current was asked for options the reader has since left
+  // (Back, then an edit, or a newer request) and must not reopen the preview.
+  const previewSeq = useRef(0);
+  // Set by Back so the Preview button, once the form is back, takes focus.
+  const returnToPreviewButton = useRef(false);
+
   const showPreview = useCallback(async () => {
     if (!defaults) return;
+    const seq = ++previewSeq.current;
     setPreview({ brief: null, error: null, loading: true });
     try {
       const reply = await request(`/api/hench/prep/${encodeURIComponent(taskId)}/preview`, {
         options: runOptionsOf(defaults, edits),
       });
+      if (seq !== previewSeq.current) return;
       const brief = typeof reply.data.brief === "string" ? reply.data.brief : null;
       setPreview({
         brief,
@@ -207,9 +216,30 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
         loading: false,
       });
     } catch (err) {
+      if (seq !== previewSeq.current) return;
       setPreview({ brief: null, error: err instanceof Error ? err.message : "Preview failed", loading: false });
     }
   }, [defaults, edits, request, taskId]);
+
+  const closePreview = useCallback(() => {
+    previewSeq.current++;
+    returnToPreviewButton.current = true;
+    setPreview(null);
+  }, []);
+
+  // Toggling swaps the focused button out of the DOM; put focus where the
+  // reader's place is: the preview heading on open, the Preview button on Back.
+  const previewOpen = preview !== null;
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (previewOpen) {
+      dialog.querySelector<HTMLElement>(".prep-preview-title")?.focus();
+    } else if (returnToPreviewButton.current) {
+      returnToPreviewButton.current = false;
+      dialog.querySelector<HTMLElement>(".prep-preview-btn")?.focus();
+    }
+  }, [previewOpen]);
 
   const onBackdrop = useCallback((e: MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
@@ -224,7 +254,7 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
   } else if (!prep || !defaults) {
     body = h("div", { class: "prep-body" }, h("p", { class: "prep-loading", role: "status" }, "Reading the run settings…"));
   } else if (preview) {
-    body = h(PreviewPanel, { preview, onBack: () => setPreview(null) });
+    body = h(PreviewPanel, { preview, onBack: closePreview });
   } else {
     body = h(Form, {
       prep, defaults, edits, setEdits, taskId, busy, execError, canMigrate, notice, queued, queueDropped, onQueueDropped,
@@ -476,7 +506,7 @@ function Form(props: FormProps) {
     h("footer", { class: "prep-footer" },
       h("span", { class: "prep-change-count", role: "status" },
         `${changes} ${changes === 1 ? "change applies" : "changes apply"} to this run only`),
-      h("button", { type: "button", class: "prep-btn", onClick: props.onPreview }, "Preview brief"),
+      h("button", { type: "button", class: "prep-btn prep-preview-btn", onClick: props.onPreview }, "Preview brief"),
       h("button", {
         type: "button",
         class: "prep-btn",
@@ -564,7 +594,7 @@ function PreviewPanel({ preview, onBack }: {
 }) {
   return h(Fragment, null,
     h("div", { class: "prep-body" },
-      h("h3", { class: "prep-section-title" }, "Brief preview"),
+      h("h3", { class: "prep-section-title prep-preview-title", tabIndex: -1 }, "Brief preview"),
       preview.loading ? h("p", { class: "prep-loading", role: "status" }, "Building the brief…") : null,
       preview.error ? h("p", { class: "prep-error", role: "alert" }, preview.error) : null,
       preview.brief !== null
