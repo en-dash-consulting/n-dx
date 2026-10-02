@@ -155,5 +155,7 @@ export type {
 } from "./language-analysis-strip.js";
 export { GlossaryLine } from "./glossary-line.js";
 export type { GlossaryLineProps } from "./glossary-line.js";
+export { PixelIcon } from "./pixel-icons.js";
+export type { PixelIconName, PixelIconProps, PixelTileName } from "./pixel-icons.js";
 export { InfoTip } from "./info-tip.js";
 export type { InfoTipProps } from "./info-tip.js";
