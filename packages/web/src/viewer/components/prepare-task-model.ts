@@ -237,12 +237,9 @@ export function commandWords(prep: PrepResponse, taskId: string, defaults: PrepD
   ];
 }
 
-/** {@link commandWords} as one shell line; the notes placeholder stays readable. */
+/** {@link commandWords} as one shell line; the notes placeholder is quoted so the pasted line parses. */
 export function commandLine(prep: PrepResponse, taskId: string, defaults: PrepDefaults, edits: PrepEdits): string {
-  const placeholder = `--context-file=${CONTEXT_FILE_PLACEHOLDER}`;
-  return commandWords(prep, taskId, defaults, edits)
-    .map((word) => (word === placeholder ? word : shellWord(word)))
-    .join(" ");
+  return commandWords(prep, taskId, defaults, edits).map(shellWord).join(" ");
 }
 
 /** The model choices: the vendor's catalog, with the current default and edit kept in. */

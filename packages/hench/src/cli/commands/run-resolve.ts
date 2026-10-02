@@ -386,9 +386,17 @@ function reviewModelKey(vendor: LLMVendor, source: ReturnType<typeof reviewModel
   return "vendor-default";
 }
 
-/** Quote a command-line word for a POSIX shell only when it needs it. */
-function shellWord(word: string): string {
-  return /^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replace(/'/g, `'\\''`)}'`;
+/**
+ * Quote a command-line word only when it needs it: single quotes for a POSIX
+ * shell, double quotes on win32 (cmd.exe and PowerShell do not read single
+ * quotes as quoting). A backslash is a path separator on win32, an escape in
+ * POSIX.
+ */
+export function shellWord(word: string, platform: NodeJS.Platform = process.platform): string {
+  const win = platform === "win32";
+  if (win ? /^[\w@%+=:,./\\-]+$/.test(word) : /^[\w@%+=:,./-]+$/.test(word)) return word;
+  if (win) return `"${word.replace(/"/g, '\\"')}"`;
+  return `'${word.replace(/'/g, `'\\''`)}'`;
 }
 
 /**

@@ -23,6 +23,30 @@ import {
 import { workCommandArgs } from "../../../src/shared/index.js";
 import { prepFixture } from "../../helpers/prep-fixture.js";
 
+/** A minimal POSIX tokenizer: whitespace splits, single quotes are literal, an unquoted `<`/`>`/`|`/`&`/`;` throws. */
+function posixWords(line: string): string[] {
+  const words: string[] = [];
+  let cur: string | null = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === "'") {
+      const end = line.indexOf("'", i + 1);
+      if (end < 0) throw new Error("unterminated quote");
+      cur = (cur ?? "") + line.slice(i + 1, end);
+      i = end;
+    } else if (/\s/.test(c)) {
+      if (cur !== null) words.push(cur);
+      cur = null;
+    } else if (/[<>|&;()]/.test(c)) {
+      throw new Error(`unquoted shell operator ${c}`);
+    } else {
+      cur = (cur ?? "") + c;
+    }
+  }
+  if (cur !== null) words.push(cur);
+  return words;
+}
+
 describe("prepare task model", () => {
   const prep = prepFixture();
   const defaults = defaultsOf(prep);
@@ -103,7 +127,9 @@ describe("prepare task model", () => {
       ...workCommandArgs({ taskId: "task-1", options, dir: "/repo", contextFile: CONTEXT_FILE_PLACEHOLDER }),
     ]);
     expect(commandLine(prep, "task-1", defaults, edits))
-      .toBe("ndx work --task=task-1 --auto --review --context-file=<notes-file> /repo");
+      .toBe("ndx work --task=task-1 --auto --review '--context-file=<notes-file>' /repo");
+    expect(posixWords(commandLine(prep, "task-1", defaults, edits)))
+      .toContain(`--context-file=${CONTEXT_FILE_PLACEHOLDER}`);
   });
 
   it("updates the command as fields change, quoting what a shell would split", () => {
