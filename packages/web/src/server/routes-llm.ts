@@ -33,7 +33,7 @@ import {
 import type { LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
 import { VENDOR_PROVIDERS, validateProviderForVendor } from "./hench-config-fields.js";
 import { resolveEffectiveAgentConfig, resolveEffectiveAgentModel } from "./effective-agent-config.js";
-import { getLiveVendorProbe, clearLlmCatalogCache } from "./llm-catalog.js";
+import { getLiveVendorProbe, peekLiveVendorProbe, clearLlmCatalogCache } from "./llm-catalog.js";
 import type { CliInfo, LiveVendorProbe } from "./llm-catalog.js";
 import type { EffectiveAgentConfig } from "./effective-agent-config.js";
 
@@ -805,6 +805,29 @@ function cloudVendorModels(vendor: LLMVendor): string[] {
   const tierModels = Object.values(TIER_MODELS[vendor]).filter((m): m is string => Boolean(m));
   const catalogModels = Object.keys(MODEL_COSTS).filter((id) => isModelCompatibleWithVendor(vendor, id));
   return [...new Set([...tierModels, ...catalogModels])].sort();
+}
+
+/**
+ * Refuse a per-run model the active vendor's catalog does not offer — the
+ * check behind an execute request's `options.model` / `options.reviewModel`.
+ * The catalog is GET /api/llm/catalog's: the built-in list, plus the live
+ * list when one is cached (never fetched here, so a click does not wait on a
+ * vendor API). `local` runs whatever its server has loaded, so any id passes
+ * there, as it does for a config write. Returns an error, or null.
+ */
+export function validateCatalogModel(projectDir: string, vendor: string | null, model: string): string | null {
+  if (vendor === LLM_VENDOR.LOCAL) return null;
+  if (vendor !== LLM_VENDOR.CLAUDE && vendor !== LLM_VENDOR.CODEX && vendor !== LLM_VENDOR.GOOGLE) {
+    return `No LLM vendor is configured (llm.vendor), so model "${model}" cannot be checked.`;
+  }
+  if (!isModelCompatibleWithVendor(vendor, model)) return `Model "${model}" is not a ${vendor} model.`;
+  const live = vendor === LLM_VENDOR.GOOGLE ? null : peekLiveVendorProbe(vendor, projectDir);
+  const models = new Set([
+    ...cloudVendorModels(vendor),
+    ...(live?.listing.ok ? live.listing.models : []),
+  ]);
+  if (!models.has(model)) return `Model "${model}" is not in the ${vendor} catalog.`;
+  return null;
 }
 
 /**

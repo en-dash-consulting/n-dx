@@ -38,6 +38,7 @@ import type { Duplex } from "node:stream";
 import {
   HUB_ADMISSION_HEADER,
   HUB_PATH,
+  checkRunOptions,
   detectBasePath,
   formatHubAdmissionHeader,
   isHubChooserPath,
@@ -46,6 +47,7 @@ import {
   stripBasePath,
   stripWorkspaceSlot,
 } from "../shared/index.js";
+import type { RunOptions } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 import { buildHubOverview } from "./overview.js";
 import { renderHomePage } from "./home.js";
@@ -449,13 +451,23 @@ async function handleExecuteAdmission(
   }
 
   let taskId: string | null = null;
+  let options: RunOptions | undefined;
+  let optionsValid = true;
   try {
-    const parsed = JSON.parse(body.toString("utf-8") || "{}") as { taskId?: unknown };
+    const parsed = JSON.parse(body.toString("utf-8") || "{}") as { taskId?: unknown; options?: unknown };
     if (typeof parsed.taskId === "string" && parsed.taskId) taskId = parsed.taskId;
+    const checked = checkRunOptions(parsed.options);
+    if (checked.ok) {
+      if (Object.keys(checked.options).length > 0) options = checked.options;
+    } else {
+      optionsValid = false;
+    }
   } catch {
     // not JSON — forward and let the server say so
   }
-  if (!taskId) {
+  // Rejected options are forwarded too: queuing them would turn the server's
+  // 400 into a run silently dropped minutes later, when its turn came.
+  if (!taskId || !optionsValid) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
     return true;
   }
@@ -464,7 +476,12 @@ async function handleExecuteAdmission(
   const fromHeader = Array.isArray(header) ? header[0] : header;
   const workspace = fromHeader || slot.key || null;
 
-  const result = await hub.admission.admit({ projectId: decision.project.id, workspace, taskId });
+  const result = await hub.admission.admit({
+    projectId: decision.project.id,
+    workspace,
+    taskId,
+    ...(options ? { options } : {}),
+  });
   if (result.admitted) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
     return true;

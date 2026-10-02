@@ -31,6 +31,7 @@
 
 import { totalmem } from "node:os";
 import { derivePressure, getAvailableMemory, readAvailableMemory, type MemoryPressure } from "@n-dx/llm-client";
+import type { RunOptions } from "../shared/index.js";
 
 /** Bounds the machine will not exceed, whatever any single project would allow. */
 export interface AdmissionLimits {
@@ -62,6 +63,12 @@ export interface QueueEntry {
   /** Workspace (worktree) key the request addressed, or null for the anchor. */
   workspace: string | null;
   taskId: string;
+  /**
+   * The run options the request carried, replayed with it when admitted.
+   * Absent when it carried none. Only shape-checked here; the project server
+   * still judges them when the run starts.
+   */
+  options?: RunOptions;
   enqueuedAt: string;
 }
 
@@ -141,13 +148,24 @@ export class AdmissionQueue {
   /**
    * Add an entry, or return where an identical one already sits. Re-asking for
    * a task that is already queued must not move it, nor queue it twice — a
-   * double-clicked button is the common case.
+   * double-clicked button is the common case. The re-ask's options replace the
+   * queued ones: the operator changed how the run starts, not when.
    *
    * @returns 1-based position in the queue.
    */
   enqueue(entry: QueueEntry): { position: number; added: boolean } {
     const existing = this.entries.findIndex((e) => sameQueueEntry(e, entry));
-    if (existing !== -1) return { position: existing + 1, added: false };
+    if (existing !== -1) {
+      const queued = this.entries[existing];
+      this.entries[existing] = {
+        projectId: queued.projectId,
+        workspace: queued.workspace,
+        taskId: queued.taskId,
+        ...(entry.options ? { options: entry.options } : {}),
+        enqueuedAt: queued.enqueuedAt,
+      };
+      return { position: existing + 1, added: false };
+    }
     this.entries.push(entry);
     return { position: this.entries.length, added: true };
   }

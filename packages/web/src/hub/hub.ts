@@ -199,7 +199,9 @@ export class Hub {
 
   /**
    * Start a queued run on its project's server, as the hub rather than as the
-   * client that queued it — that client got its 202 and is long gone.
+   * client that queued it — that client got its 202 and is long gone. Carries
+   * the options the request was queued with, so a queued run is the run the
+   * operator asked for.
    */
   private async startQueuedExecution(entry: QueueEntry): Promise<boolean> {
     const project = this.getProject(entry.projectId);
@@ -212,7 +214,7 @@ export class Hub {
           "Content-Type": "application/json",
           ...(entry.workspace ? { "x-ndx-workspace": entry.workspace } : {}),
         },
-        body: JSON.stringify({ taskId: entry.taskId }),
+        body: JSON.stringify({ taskId: entry.taskId, ...(entry.options ? { options: entry.options } : {}) }),
         signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {

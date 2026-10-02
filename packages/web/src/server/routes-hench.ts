@@ -33,6 +33,8 @@
  * POST   /api/hench/templates/:id/apply   — apply a template to current config
  * DELETE /api/hench/templates/:id         — delete a user-defined template
  * POST   /api/hench/execute               — trigger Hench run for a specific task
+ *                                            ({ taskId, options? }; options per
+ *                                            src/shared/run-options.ts)
  * GET    /api/hench/execute/status         — get all active execution statuses
  * GET    /api/hench/execute/status/:taskId — get specific task execution status
  * GET    /api/hench/throttle              — current throttle state (paused, concurrency override, etc.)
@@ -117,6 +119,8 @@ import {
   type RunLiveness,
 } from "./run-liveness.js";
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
+import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
+import { runOptionArgs } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -1418,8 +1422,13 @@ async function handleTemplateDelete(
 
 // ── Task execution ───────────────────────────────────────────────────
 
-/** Actionable statuses — only tasks in these states can be triggered. */
-const ACTIONABLE_STATUSES = new Set(["pending", "blocked", "deferred"]);
+/**
+ * Statuses a dashboard run may start from. `in_progress` only when no live run
+ * in any worktree and no other worktree's claim holds the task — hench resumes
+ * it. `blocked` is not here: hench refuses blocked tasks, so the route answers
+ * 409 naming the blockers rather than spawning a run that exits at once.
+ */
+const ACTIONABLE_STATUSES = new Set(["pending", "deferred", "in_progress"]);
 
 /** Execution status for a single task run. */
 export interface TaskExecutionStatus {
@@ -1670,6 +1679,72 @@ function findPRDItem(
   return null;
 }
 
+/** A blocking item as the blocked-task 409 names it. */
+interface BlockerSummary {
+  id: string;
+  title: string;
+  status: string;
+}
+
+/** The task's `blockedBy` items, with titles; an id no longer in the PRD keeps its id as title. */
+function describeBlockers(
+  items: Array<Record<string, unknown>>,
+  task: Record<string, unknown>,
+): BlockerSummary[] {
+  const ids = Array.isArray(task.blockedBy)
+    ? task.blockedBy.filter((id): id is string => typeof id === "string")
+    : [];
+  return ids.map((id) => {
+    const blocker = findPRDItem(items, id);
+    return {
+      id,
+      title: typeof blocker?.title === "string" ? blocker.title : id,
+      status: typeof blocker?.status === "string" ? blocker.status : "missing",
+    };
+  });
+}
+
+/** A recorded run that may still be working a task. */
+interface HoldingRun {
+  runId: string;
+  liveness: RunLiveness;
+  reason: string;
+  worktree?: RunWorktree;
+}
+
+/**
+ * The first run recorded `running` for `taskId`, in any worktree of the
+ * repository (the served directory alone outside one), that is not confirmed
+ * dead. Judged as `GET /api/hench/runs/health` judges it.
+ */
+async function findHoldingRun(ctx: ServerContext, taskId: string): Promise<HoldingRun | null> {
+  const now = Date.now();
+  for (const target of await resolveRunTargets(ctx)) {
+    let files: string[];
+    try {
+      files = readdirSync(target.runsDir);
+    } catch {
+      continue; // no runs directory: no runs
+    }
+    const liveLocks = collectLiveLocks(locksDirOf(resolveLayout(target.root).henchDir));
+    const executions = dashboardExecutionsFor(target.root);
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const run = loadRunFile(target.runsDir, file.replace(/\.json$/, ""));
+      if (!run || run.status !== "running" || run.taskId !== taskId) continue;
+      const verdict = judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, executions);
+      if (verdict.liveness === "orphaned") continue;
+      return {
+        runId: String(run.id ?? file.replace(/\.json$/, "")),
+        liveness: verdict.liveness,
+        reason: verdict.reason,
+        ...(target.worktree ? { worktree: target.worktree } : {}),
+      };
+    }
+  }
+  return null;
+}
+
 /** Broadcast an execution state update. */
 function broadcastExecState(
   broadcast: WebSocketBroadcaster | undefined,
@@ -1706,6 +1781,15 @@ async function handleExecute(
     errorResponse(res, 400, "taskId is required");
     return true;
   }
+
+  // Options are only ever translated through the allow-list; anything else is
+  // a 400 naming the key, before anything is read or spawned.
+  const checkedOptions = validateRunOptions(ctx.projectDir, body.options);
+  if (!checkedOptions.ok) {
+    jsonResponse(res, 400, { error: checkedOptions.error, key: checkedOptions.key });
+    return true;
+  }
+  const options = checkedOptions.options;
 
   // Tree-level fault first: on a tree this build would re-slug, no task is
   // runnable, so reporting it before the per-task checks keeps the operator
@@ -1767,8 +1851,20 @@ async function handleExecute(
 
   // Validate task is actionable
   const status = task.status as string;
+  if (status === "blocked") {
+    const blockers = describeBlockers(items, task);
+    const named = blockers.length > 0
+      ? blockers.map((b) => `"${b.title}" (${b.id}, ${b.status})`).join(", ")
+      : "no recorded blockers";
+    jsonResponse(res, 409, {
+      error: `Task is blocked by ${named}. Finish or unblock ${blockers.length === 1 ? "it" : "them"} first.`,
+      taskId,
+      blockedBy: blockers,
+    });
+    return true;
+  }
   if (!ACTIONABLE_STATUSES.has(status)) {
-    errorResponse(res, 409, `Task is in "${status}" status and cannot be executed. Only pending, blocked, or deferred tasks can be triggered.`);
+    errorResponse(res, 409, `Task is in "${status}" status and cannot be executed. Only pending, deferred, or in-progress tasks with no live run can be triggered.`);
     return true;
   }
 
@@ -1819,6 +1915,22 @@ async function handleExecute(
     return true;
   }
 
+  // An in-progress task is resumable only when nothing is still working it.
+  // A run that cannot be confirmed dead (live, foreign host, or unknown) holds
+  // it: starting a second agent on the same task is worse than a refusal.
+  if (status === "in_progress") {
+    const holder = await findHoldingRun(ctx, taskId);
+    if (holder) {
+      jsonResponse(res, 409, {
+        error: `Task is in progress in a run that may still be working it (run ${holder.runId}` +
+          `${holder.worktree ? ` in ${holder.worktree.path}` : ""}): ${holder.reason}`,
+        taskId,
+        run: holder,
+      });
+      return true;
+    }
+  }
+
   // Go through the `ndx` orchestrator's `work` command rather than spawning
   // hench directly. `ndx work` forwards flags straight to `hench run` (see
   // handleWork in packages/core/cli.js) but also does the vendor-config
@@ -1835,9 +1947,18 @@ async function handleExecute(
   const { bin: binPath, args: prefixArgs } = resolveNdxBin(ctx);
   // Pass --reset-deferred when executing a deferred task so hench resets it to pending before running
   const resetDeferred = status === "deferred";
-  const workArgs = resetDeferred
-    ? ["work", `--task=${taskId}`, "--auto", "--reset-deferred", ctx.projectDir]
-    : ["work", `--task=${taskId}`, "--auto", ctx.projectDir];
+  // contextNotes travels in a file of its own, removed when the run ends.
+  const contextFile = options.contextNotes ? await writeContextNotesFile(options.contextNotes) : null;
+  // Argv, never a shell: each flag is one `--flag` / `--flag=value` word from
+  // the allow-list, and values were refused if they started with '-'.
+  const workArgs = [
+    "work",
+    `--task=${taskId}`,
+    "--auto",
+    ...runOptionArgs(options, contextFile?.path),
+    ...(resetDeferred ? ["--reset-deferred"] : []),
+    ctx.projectDir,
+  ];
   const binArgs = [...prefixArgs, ...workArgs];
 
   // Generate a run ID for tracking (hench will generate its own, but we
@@ -1977,14 +2098,20 @@ async function handleExecute(
       processMemoryTracker.markCompleted(taskId);
       executionMetrics.taskCompleted(taskId);
       activeExecutions.delete(taskId);
+    })
+    .finally(() => {
+      contextFile?.remove().catch((err: unknown) => {
+        console.warn(`[hench] could not remove context file ${contextFile.path}: ${(err as Error).message}`);
+      });
     });
 
-  // Return immediately with tracking info
+  // Return immediately with tracking info, echoing the options the run got.
   jsonResponse(res, 202, {
     runId,
     taskId,
     taskTitle,
     status: "started",
+    options,
   });
   return true;
 }
@@ -2067,11 +2194,11 @@ interface RunTarget {
 }
 
 /** Every worktree of the repository, or the served directory alone outside one. */
-async function resolveRunTargets(rc: RouteContext): Promise<RunTarget[]> {
-  const sources = await resolveRunSources(rc.ctx);
+async function resolveRunTargets(ctx: ServerContext): Promise<RunTarget[]> {
+  const sources = await resolveRunSources(ctx);
   return sources.length > 0
     ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree }))
-    : [{ root: rc.ctx.projectDir, runsDir: rc.runsDir }];
+    : [{ root: ctx.projectDir, runsDir: runsDirOf(ctx) }];
 }
 
 /** Judge a run against its worktree's lock files and this dashboard's children, read now. */
@@ -2090,7 +2217,7 @@ function judgeRunInTarget(target: RunTarget, run: Record<string, unknown>, now: 
  * judged against that worktree's own lock files.
  */
 async function handleRunsHealth(rc: RouteContext): Promise<boolean> {
-  const targets = await resolveRunTargets(rc);
+  const targets = await resolveRunTargets(rc.ctx);
 
   const now = Date.now();
   const runningRuns: Array<{
@@ -2272,7 +2399,7 @@ async function handleReconcile(rc: RouteContext): Promise<boolean> {
   const groups: ReconcileWorktreeResult[] = [];
   const verdicts: Array<{ liveness: RunLiveness }> = [];
 
-  for (const target of await resolveRunTargets(rc)) {
+  for (const target of await resolveRunTargets(rc.ctx)) {
     const group: ReconcileWorktreeResult = {
       ...(target.worktree ? { worktree: target.worktree } : {}),
       runsDir: target.runsDir,

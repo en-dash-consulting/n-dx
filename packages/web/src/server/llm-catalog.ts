@@ -116,6 +116,16 @@ async function probeVendor(
 }
 
 /**
+ * The cached probe for `vendor` while fresh, or null — never probes. For
+ * checks on a hot path that should honour a live list the catalog already
+ * showed without paying for a fetch when it has not.
+ */
+export function peekLiveVendorProbe(vendor: ListableVendor, projectDir: string): LiveVendorProbe | null {
+  const hit = cache.get(cacheKey(projectDir, vendor));
+  return hit && hit.expiresAt > Date.now() ? hit.probe : null;
+}
+
+/**
  * The live list and CLI probe for `vendor`, from cache while fresh.
  * `refresh` bypasses the cache and refills it.
  */

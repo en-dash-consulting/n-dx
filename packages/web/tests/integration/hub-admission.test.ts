@@ -24,7 +24,7 @@ interface FakeChild {
   /** Executions the child reports as in flight. */
   running: Set<string>;
   /** Execute requests that actually arrived, in order. */
-  received: Array<{ taskId: string; workspace: string | null }>;
+  received: Array<{ taskId: string; workspace: string | null; options?: Record<string, unknown> }>;
   /** The admission header on each `GET /api/live` that arrived. */
   liveAdmission: Array<string | null>;
 }
@@ -73,9 +73,14 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
       let body = "";
       req.on("data", (c) => { body += c; });
       req.on("end", () => {
-        const taskId = (JSON.parse(body || "{}") as { taskId?: string }).taskId ?? "";
+        const parsed = JSON.parse(body || "{}") as { taskId?: string; options?: Record<string, unknown> };
+        const taskId = parsed.taskId ?? "";
         const header = req.headers["x-ndx-workspace"];
-        child.received.push({ taskId, workspace: (Array.isArray(header) ? header[0] : header) ?? null });
+        child.received.push({
+          taskId,
+          workspace: (Array.isArray(header) ? header[0] : header) ?? null,
+          ...(parsed.options ? { options: parsed.options } : {}),
+        });
         child.running.add(taskId);
         json(200, { runId: `run-${taskId}`, taskId });
       });
@@ -154,12 +159,56 @@ describe("hub admission gate", () => {
     return hub;
   }
 
-  const execute = (port: number, path: string, taskId: string, headers: Record<string, string> = {}) =>
+  const execute = (
+    port: number,
+    path: string,
+    taskId: string,
+    headers: Record<string, string> = {},
+    options?: Record<string, unknown>,
+  ) =>
     fetch(`http://127.0.0.1:${port}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify(options ? { taskId, options } : { taskId }),
     });
+
+  it("replays a queued run's options when it is admitted", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    const options = { model: "claude-opus-5", review: true, maxTurns: 12, contextNotes: "Keep it small." };
+    const queued = await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, options);
+    expect(queued.status).toBe(202);
+    expect(Object.keys(await queued.json())).toEqual(expect.arrayContaining(["queued", "position", "reason"]));
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, options });
+  });
+
+  it("takes the newer options when a queued task is asked for again, keeping its place", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { fresh: true });
+    await execute(h.port, "/p/beta/api/hench/execute", "task-3");
+
+    const again = await (await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { maxTurns: 7 })).json();
+    expect(again).toMatchObject({ queued: true, position: 1, queueLength: 2 });
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, options: { maxTurns: 7 } });
+  });
+
+  it("forwards options it cannot accept to the project server rather than queuing them", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    // The project server owns the 400; queuing would drop the run silently later.
+    const res = await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { bogus: "--x" });
+    expect(res.status).toBe(200);
+    expect(beta.received).toEqual([{ taskId: "task-2", workspace: null, options: { bogus: "--x" } }]);
+  });
 
   it("forwards the first run and queues the second, across projects", async () => {
     const h = await startTestHub(1);

@@ -2,7 +2,7 @@
 id: "ce8caaa2-05f0-4e69-b8fe-bf0b485f6709"
 level: "task"
 title: "Accept allow-listed run options on POST /api/hench/execute and carry them through the hub queue"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "0.8.0"
@@ -12,6 +12,7 @@ tags:
   - "hub"
 blockedBy:
   - "3e07628e-0eac-4693-a434-40feeb34ac65"
+startedAt: "2026-10-02T06:01:09.169Z"
 acceptanceCriteria:
   - "POST /api/hench/execute with options spawns ndx work with exactly the mapped flags; a test covers every allow-listed key."
   - "Unknown option keys and invalid values return 400 naming the key; no request can inject a flag outside the allow-list or a value starting with '-'."
@@ -21,6 +22,6 @@ acceptanceCriteria:
   - "contextNotes is written to a temp file passed as --context-file and the file is removed when the run ends."
   - "Patch changeset for @n-dx/web."
 description: "POST /api/hench/execute (packages/web/src/server/routes-hench.ts handleExecute ~1675) accepts only {taskId}. Add `options`, translated to `ndx work` flags through an allow-list.\n\nPut the key → flag table in packages/web/src/shared/run-options.ts (framework-agnostic, so the viewer can build the same command line; src/shared has zero upward imports, enforced by boundary-check.test.ts). Validators live server-side: model must be in the active vendor's catalog (llm-catalog.ts / GET /api/llm/catalog) and pass isModelCompatibleWithVendor → `--model=<id>`; provider cli|api and accepted by validateProviderForVendor (hench-config-fields.ts) → `--provider=`; permissionMode default|acceptEdits|bypassPermissions (never plan) → `--permission-mode=`; review boolean → `--review`; reviewModel (only with review) → `--review-model=`; skipTestGate → `--skip-test-gate`; maxTurns integer 1-500 → `--max-turns=`; tokenBudget integer ≥ 0 → `--token-budget=`; fresh → `--fresh`; allowDirty → `--allow-dirty`; contextNotes string ≤ 8 KB → written to a file under os.tmpdir(), passed as `--context-file=<path>`, removed when the run ends. Unknown keys and invalid values answer 400 naming the key. Flags are always the `--flag=value` form (ndx work forwards nothing else) and are passed as argv, never through a shell. A contract test checks the allow-list against the `options` list printed by `ndx work --resolve` (built by the previous task), so a flag added to hench without the dashboard, or vice versa, fails.\n\nStatuses: today ACTIONABLE_STATUSES (routes-hench.ts:1410) is pending, blocked, deferred. hench refuses blocked tasks (packages/hench/src/agent/planning/brief.ts:98) but resumes in_progress ones. Change it to pending, deferred, and in_progress when no live run in any worktree holds the task and no claim does; blocked answers 409 naming the blockers. --reset-deferred stays automatic for deferred.\n\nHub: packages/web/src/hub/proxy.ts (~442) intercepts this request and may queue it; packages/web/src/hub/hub.ts startQueuedExecution (~201) replays only {taskId}, so options would be silently dropped for every queued run. Add `options` to QueueEntry (hub/admission.ts:60), store it at enqueue, replay it, and when the same task in the same workspace is queued again keep its position but take the newer options. The 202 response echoes the accepted options; the queued 202 keeps {queued, position, reason}. This branch includes #500, whose availableBytes/pressure fields the queue snapshot already carries."
-lastModified: "2026-10-02T04:55:12.133Z"
+lastModified: "2026-10-02T06:01:10.750Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
