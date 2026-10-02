@@ -194,6 +194,32 @@ describe("preview layout endpoint", () => {
     expect((await fetch(base + "/")).status).toBe(200);
   });
 
+  it("requires the per-user token when started with a token file, and sets the cookie from the URL", async () => {
+    const dir = await scratch();
+    const doc = join(dir, "mock.html");
+    await writeFile(doc, "<html><body>doc</body></html>", "utf-8");
+    const tokenFile = join(dir, "home", "auth.token");
+    handle = await startPreviewServer(dir, 0, { file: doc, tokenFile });
+    const token = (await readFile(tokenFile, "utf-8")).trim();
+    const base = `http://127.0.0.1:${handle.port}`;
+
+    expect((await fetch(base + "/")).status).toBe(401);
+    expect((await fetch(base + "/", { headers: { "X-Ndx-Token": token } })).status).toBe(200);
+
+    const redirect = await fetch(`${base}/?ndx_token=${encodeURIComponent(token)}`, { redirect: "manual" });
+    expect(redirect.status).toBe(302);
+    expect(redirect.headers.get("location")).toBe("/");
+    expect(redirect.headers.get("set-cookie")).toContain("ndx_token=");
+
+    // A save needs the token too, cookie included.
+    const saved = await fetch(base + "/__preview/layout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `ndx_token=${token}` },
+      body: JSON.stringify({ nav: [] }),
+    });
+    expect(saved.status).toBe(200);
+  });
+
   it("round-trips a layout through disk", async () => {
     const { base, doc } = await serveDoc();
 
