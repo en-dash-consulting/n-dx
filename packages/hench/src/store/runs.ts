@@ -2,7 +2,7 @@ import { join } from "node:path";
 import {readFile, writeFile, readdir, mkdir} from "node:fs/promises";import { gunzip } from "node:zlib";
 import { promisify } from "node:util";
 import { normalizeRunTokens, validateRunRecord } from "../schema/index.js";
-import { toCanonicalJSON } from "../prd/llm-gateway.js";
+import { redactDeep, toCanonicalJSON } from "../prd/llm-gateway.js";
 import type { RunRecord } from "../schema/index.js";
 
 const gunzipAsync = promisify(gunzip);
@@ -33,7 +33,11 @@ export async function saveRun(
   // caller's record so in-memory readers see the same value that was
   // written to disk.
   run.tokens = normalizeRunTokens(run.tokenUsage, run.turnTokenUsage);
-  await writeFile(join(runsDir, `${run.id}.json`), toCanonicalJSON(run), "utf-8");
+  // What reaches disk is scrubbed of credential-shaped text (tool output that
+  // echoed a .env, a bearer header in a failing curl, a connection string in a
+  // stack trace). The in-memory record the agent is still working from is
+  // left as it is; every later save re-applies the same idempotent pass.
+  await writeFile(join(runsDir, `${run.id}.json`), toCanonicalJSON(redactDeep(run)), "utf-8");
 }
 
 export async function loadRun(

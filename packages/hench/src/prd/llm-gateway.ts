@@ -25,6 +25,7 @@
  * - Shared constants (PROJECT_DIRS)
  * - Folder layout resolution (resolveLayout, detectLayoutMode, relativeToRoot)
  * - Canonical JSON serialization
+ * - Credential redaction (redactDeep, redactSecrets)
  *
  * **Out-of-scope (must NOT be re-exported):**
  * - MCP server/client factories (web-tier concern)
@@ -66,6 +67,14 @@ export type { Layout, LayoutMode, ResolveLayoutOptions } from "@n-dx/llm-client"
 
 // ---- Canonical JSON ---------------------------------------------------------
 export { toCanonicalJSON } from "@n-dx/llm-client";
+
+// ---- Credential redaction ---------------------------------------------------
+// Applied to every run record and run log before it is written: a tool's
+// output can carry a secret it read, and the records are served and exported.
+// createLineRedactor is the line-at-a-time form the streaming run log needs —
+// a PEM key spans lines, so per-line redactSecrets cannot see one.
+export { redactDeep, redactSecrets, createLineRedactor } from "@n-dx/llm-client";
+export type { LineRedactor } from "@n-dx/llm-client";
 
 // ---- CLI output control -----------------------------------------------------
 export {

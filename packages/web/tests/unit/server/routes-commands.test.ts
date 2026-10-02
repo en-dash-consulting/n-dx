@@ -1837,3 +1837,76 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
   });
 });
 
+
+describe("commands route — sv-analyze output is scrubbed", () => {
+  // The live stream was redacted, but the paths that run when the analysis
+  // *finishes* were not: the full/targeted job overwrote the scrubbed live
+  // output with raw stdout, and the quick path returned raw stdout straight to
+  // the dashboard. Credentials an analysis echoed therefore appeared the moment
+  // it completed — the one moment a user is certain to be looking.
+  const TOKEN = "ghp_" + "a".repeat(36);
+
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    execMock.mockReset();
+    spawnManagedMock.mockReset();
+    tmpDir = await mkdtemp(join(tmpdir(), "commands-sv-redact-"));
+    await mkdir(join(tmpDir, ".rex"), { recursive: true });
+    ctx = { projectDir: tmpDir, svDir: join(tmpDir, ".sourcevision"), rexDir: join(tmpDir, ".rex"), dev: false };
+    const started = await startRouteTestServer((req, res) => handleCommandsRoute(req, res, ctx));
+    server = started.server;
+    port = started.port;
+  });
+
+  afterEach(async () => {
+    await closeRouteTestServer(server);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  const postAnalyze = (body: unknown) =>
+    fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("scrubs the quick path's response body", async () => {
+    execMock.mockResolvedValue({ stdout: `analysis done
+GH_TOKEN=${TOKEN}
+`, stderr: "", error: null });
+
+    const res = await postAnalyze({ lite: true });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { output: string };
+
+    expect(body.output).not.toContain(TOKEN);
+    expect(body.output).toContain("[redacted:");
+    expect(body.output).toContain("analysis done");
+  });
+
+  it("keeps the full run's completed output scrubbed, not just the live stream", async () => {
+    stubManagedRun({ stdout: `pass 1 complete
+GH_TOKEN=${TOKEN}
+` });
+
+    // 202: the full run is the async singleton, polled through /status.
+    expect((await postAnalyze({ full: true })).status).toBe(202);
+
+    // Poll until the job settles — the completion path is what overwrote the
+    // redacted live buffer, so the assertion has to run after it, not before.
+    let status!: { running: boolean; recentOutput: string };
+    for (let i = 0; i < 50 && (i === 0 || status.running); i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+      status = await (await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze/status`)).json();
+    }
+
+    expect(status.running).toBe(false);
+    expect(status.recentOutput).not.toContain(TOKEN);
+    expect(status.recentOutput).toContain("[redacted:");
+    expect(status.recentOutput).toContain("pass 1 complete");
+  });
+});

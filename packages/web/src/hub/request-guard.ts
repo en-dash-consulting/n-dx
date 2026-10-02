@@ -28,6 +28,11 @@
  * rewrites `Host` for the child (`proxy.ts`), so a server behind the hub never
  * sees the original.
  *
+ * With a per-user token configured (`ndx start` always passes one), every
+ * request must also present it, or it is answered 401; see `enforceHubToken`.
+ * This is what tells this user's browser and CLI apart from another account
+ * on the same machine, which the Host and Origin rules cannot do.
+ *
  * It guards proxied traffic too, not just `/api/hub/*`: the hub is the outer
  * boundary, and it rewrites the forwarded `Origin` for the child behind it
  * (see `proxy.ts`), so the child can no longer tell a browser origin apart.
@@ -36,7 +41,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { isLoopbackHostOnPort, isLoopbackOriginOnPort } from "../shared/index.js";
+import { isLoopbackHostOnPort, isLoopbackOriginOnPort, isAuthenticated, splitTokenQuery, tokensEqual, authCookie } from "../shared/index.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -75,6 +80,40 @@ function rejectHost(res: ServerResponse): true {
   return true;
 }
 
+function rejectUnauthenticated(res: ServerResponse): true {
+  res.writeHead(401, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+    "WWW-Authenticate": 'Bearer realm="n-dx"',
+  });
+  res.end(JSON.stringify({
+    error: "Authentication required",
+    hint: "Open the URL printed by `ndx start`, or send the token from <ndx home>/auth.token as `Authorization: Bearer <token>` or `X-Ndx-Token`.",
+  }));
+  return true;
+}
+
+/**
+ * The per-user token rule, same as the project server's
+ * (`server/request-security.ts`, which the hub cannot import): present it in
+ * a header or the cookie, or — for a safe-method navigation — carry it once
+ * as `?ndx_token=` and be redirected with the cookie set. Returns true when
+ * the request has been answered.
+ */
+export function enforceHubToken(req: IncomingMessage, res: ServerResponse, token: string): boolean {
+  if (isAuthenticated(req.headers, token)) return false;
+  const method = (req.method || "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD") {
+    const { token: fromQuery, location } = splitTokenQuery(req.url ?? "/");
+    if (fromQuery !== null && tokensEqual(fromQuery, token)) {
+      res.writeHead(302, { Location: location, "Set-Cookie": authCookie(token), "Cache-Control": "no-store" });
+      res.end();
+      return true;
+    }
+  }
+  return rejectUnauthenticated(res);
+}
+
 /** Whether the request's `Host` names loopback on the hub's own port. */
 export function hostAllowed(req: Pick<IncomingMessage, "headers">, hubPort: number | undefined): boolean {
   return isLoopbackHostOnPort(singleHeader(req.headers.host), hubPort);
@@ -84,8 +123,14 @@ export function hostAllowed(req: Pick<IncomingMessage, "headers">, hubPort: numb
  * Apply the gate. Returns true when the request has been answered (rejected,
  * or a preflight) and must not be routed further.
  */
-export function guardHubRequest(req: IncomingMessage, res: ServerResponse, hubPort: number | undefined): boolean {
+export function guardHubRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  hubPort: number | undefined,
+  token: string | null = null,
+): boolean {
   if (!hostAllowed(req, hubPort)) return rejectHost(res);
+  if (token && enforceHubToken(req, res, token)) return true;
 
   const method = (req.method || "GET").toUpperCase();
   const mutating = method === "OPTIONS" || !SAFE_METHODS.has(method);
@@ -118,26 +163,28 @@ export function guardHubRequest(req: IncomingMessage, res: ServerResponse, hubPo
   return false;
 }
 
-/** What the hub makes of a WebSocket handshake. */
-export type UpgradeVerdict = "allowed" | "misdirected" | "forbidden";
-
 /**
- * Judge a WebSocket upgrade.
+ * Why a WebSocket handshake is refused, as the status line to answer with, or
+ * null when it may proceed.
  *
  * A handshake carries no preflight, so this is the only check there is: a
  * page that opened `ws://localhost:3117/p/<id>/` would otherwise read every
  * frame the project broadcasts — PRD changes, agent stdout, run state.
  *
- * The `Host` rule is applied here as well, so the HTTP and upgrade paths cannot
- * disagree about what "this server" means — and it is reported separately from
- * the origin rule so the caller can answer 421 where the HTTP path answers 421
- * and 403 where it answers 403. A single boolean collapsed both into 403, which
- * also disagreed with the project server's own upgrade path (`server/websocket.ts`).
+ * The rules apply in the same order as the HTTP gate, and each is reported
+ * distinctly rather than collapsed into one refusal: Host (421 Misdirected
+ * Request), then the per-user token (401 Unauthorized), then Origin (403
+ * Forbidden). A boolean here would have answered 403 for a foreign `Host`,
+ * which contradicts both the HTTP path above and the project server's own
+ * upgrade handler (`server/websocket.ts`).
  */
-export function upgradeVerdict(
+export function upgradeRefusal(
   req: Pick<IncomingMessage, "headers">,
   hubPort: number | undefined,
-): UpgradeVerdict {
-  if (!hostAllowed(req, hubPort)) return "misdirected";
-  return classifyOrigin(req, hubPort) === "untrusted" ? "forbidden" : "allowed";
+  token: string | null = null,
+): "421 Misdirected Request" | "401 Unauthorized" | "403 Forbidden" | null {
+  if (!hostAllowed(req, hubPort)) return "421 Misdirected Request";
+  if (token && !isAuthenticated(req.headers, token)) return "401 Unauthorized";
+  if (classifyOrigin(req, hubPort) === "untrusted") return "403 Forbidden";
+  return null;
 }

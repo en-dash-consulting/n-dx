@@ -63,9 +63,12 @@ export interface ChildSnapshot {
 }
 
 /** Everything a card needs from one child, or the reason it has none. */
-export async function fetchChildSnapshot(port: number, timeoutMs = 2_000): Promise<ChildSnapshot> {
+export async function fetchChildSnapshot(port: number, timeoutMs = 2_000, token: string | null = null): Promise<ChildSnapshot> {
   const get = async (path: string): Promise<unknown | null> => {
-    const res = await fetch(`http://127.0.0.1:${port}${path}`, { signal: AbortSignal.timeout(timeoutMs) });
+    const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: token ? { "X-Ndx-Token": token } : {},
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status} from ${path}`);
     return res.json();
   };
