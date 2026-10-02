@@ -221,11 +221,18 @@ describe("POST /api/live/analyze/stop", () => {
     // Real command-line reader: the child's argv carries `sv analyze`, as the analyzer's does.
     delete sources.processCommandLine;
     child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)", "sv", "analyze"], { stdio: "ignore" });
-    const exited = new Promise<NodeJS.Signals | null>((resolve) => child!.once("exit", (_code, signal) => resolve(signal)));
+    const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) =>
+      child!.once("exit", (code, signal) => resolve({ code, signal })));
     writeProgress({ pid: child.pid });
     const res = await post();
     expect(res.status).toBe(200);
-    expect(await exited).toBe("SIGTERM");
+    const { code, signal } = await exited;
+    if (process.platform === "win32") {
+      // Windows reports an externally terminated process as a non-zero exit code, not a signal.
+      expect(signal !== null || (code !== null && code !== 0)).toBe(true);
+    } else {
+      expect(signal).toBe("SIGTERM");
+    }
   });
 
   it("refuses to signal a pid another program now holds, and says so", async () => {

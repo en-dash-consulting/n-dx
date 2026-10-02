@@ -91,7 +91,10 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
     );
   });
 
-  it("records a SIGTERM as a stop: progress failed, manifest phase in error, exit 143", async () => {
+  // Windows has no POSIX signals: `child.kill("SIGTERM")` terminates the process
+  // outright (TerminateProcess), so no handler runs and "Stopped (SIGTERM)" is never
+  // recorded. The win32 case below covers what is left behind instead.
+  it.skipIf(process.platform === "win32")("records a SIGTERM as a stop: progress failed, manifest phase in error, exit 143", async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
     await cp(FIXTURE_DIR, tmpDir, { recursive: true });
     const svDir = join(tmpDir, ".sourcevision");
@@ -123,6 +126,29 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
     const stopped = Object.values<{ status?: string; error?: string }>(manifest.modules ?? {})
       .filter((m) => m.status === "error");
     expect(stopped.map((m) => m.error)).toContain("Stopped (SIGTERM)");
+  });
+
+  it.runIf(process.platform === "win32")("reports the running file a terminated analyze left behind as interrupted", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
+    await cp(FIXTURE_DIR, tmpDir, { recursive: true });
+    const svDir = join(tmpDir, ".sourcevision");
+
+    const child = spawn(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], { stdio: "ignore" });
+    const exited = new Promise<void>((resolveExit) => child.once("exit", () => resolveExit()));
+    try {
+      await vi.waitFor(() => expect(readAnalyzeProgress(svDir)?.status).toBe("running"), {
+        timeout: 20_000,
+        interval: 5,
+      });
+    } finally {
+      child.kill("SIGTERM");
+    }
+    await exited;
+
+    const progress = readAnalyzeProgress(svDir)!;
+    // The run may have finished before the kill landed; otherwise its pid is dead.
+    expect(["interrupted", "complete"]).toContain(progress.status);
+    expect(progress.running).toBe(false);
   });
 
   it("produces deterministic output", async () => {
