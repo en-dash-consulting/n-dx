@@ -7,9 +7,14 @@
  * Includes context selection (scope proposals under an epic/feature),
  * real-time character count, and example prompts for better input.
  * Proposals can be sent to the ProposalEditor for review or accepted directly.
+ *
+ * The `bar` layout is a single input row (no header, scope or examples) for
+ * a stage page's lead section, where the full form crowded out the PRD.
+ * Switching `bar` on an already-mounted instance keeps what has been typed.
  */
 
 import { h, Fragment } from "preact";
+import type { ComponentChildren } from "preact";
 import { useState, useCallback, useRef, useEffect, useMemo } from "preact/hooks";
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
@@ -20,8 +25,10 @@ import { isContainerLevel, isRootLevel, getLevelLabel } from "./levels.js";
 export interface SmartAddInputProps {
   /** Called when proposals are accepted and PRD should be refreshed. */
   onPrdChanged: () => void;
-  /** When true, renders in a compact layout suitable for dashboard embedding. */
-  compact?: boolean;
+  /** One input row: hides the header, scope selector and example prompts. */
+  bar?: boolean;
+  /** Rendered after Generate in the `bar` row (e.g. a "More" toggle). */
+  barAction?: ComponentChildren;
 }
 
 interface QualityIssue {
@@ -55,7 +62,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
+export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputProps) {
   const [input, setInput] = useState("");
   const [state, setState] = useState<PreviewState>("idle");
   const [proposals, setProposals] = useState<RawProposal[]>([]);
@@ -184,8 +191,10 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
     if (text.length < MIN_INPUT_LENGTH) return;
 
     const reqId = ++requestIdRef.current;
-    triggerPreview(text, reqId, selectedScope || undefined);
-  }, [input, triggerPreview, selectedScope]);
+    // The bar layout hides the scope selector, so a scope picked before
+    // switching to it must not silently apply.
+    triggerPreview(text, reqId, (!bar && selectedScope) || undefined);
+  }, [input, triggerPreview, selectedScope, bar]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -295,22 +304,24 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
     return opt ? `${opt.level}: ${opt.title}` : null;
   }, [selectedScope, scopeOptions]);
 
-  const panelClass = compact ? "smart-add-panel smart-add-panel-compact" : "smart-add-panel";
+  const panelClass = bar ? "smart-add-panel smart-add-panel-bar" : "smart-add-panel";
 
   return h(
     "div",
     { class: panelClass },
 
     // Header
-    h("div", { class: "smart-add-header" },
-      h("h3", { class: "smart-add-title" }, "Smart Add"),
-      h("p", { class: "smart-add-subtitle" },
-        "Describe what you want to build, then click Generate.",
-      ),
-    ),
+    bar
+      ? null
+      : h("div", { class: "smart-add-header" },
+          h("h3", { class: "smart-add-title" }, "Smart Add"),
+          h("p", { class: "smart-add-subtitle" },
+            "Describe what you want to build, then click Generate.",
+          ),
+        ),
 
     // Context selection dropdown
-    scopeOptions.length > 0
+    !bar && scopeOptions.length > 0
       ? h("div", { class: "smart-add-scope" },
           h("label", { class: "smart-add-scope-label" }, "Scope"),
           h("select", {
@@ -337,7 +348,7 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
       : null,
 
     // Example prompts (shown when idle and no input)
-    state === "idle" && trimmedLength === 0
+    !bar && state === "idle" && trimmedLength === 0
       ? h("div", { class: "smart-add-examples" },
           h("span", { class: "smart-add-examples-label" }, "Try something like:"),
           h("div", { class: "smart-add-examples-list" },
@@ -359,9 +370,9 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
       h("textarea", {
         class: "smart-add-textarea",
         value: input,
-        placeholder: "Describe a feature, improvement, or idea...",
+        placeholder: bar ? "Describe what to add to the plan…" : "Describe a feature, improvement, or idea...",
         onInput: (e: Event) => handleInput((e.target as HTMLTextAreaElement).value),
-        rows: compact ? 3 : 4,
+        rows: bar ? 1 : 4,
         "aria-label": "Smart add description",
       }),
       // Character count + status indicator
@@ -394,6 +405,7 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
         onClick: handleSubmit,
         "aria-label": "Generate proposals",
       }, state === "loading" ? "Generating..." : "Generate"),
+      bar ? barAction : null,
     ),
 
     // Loading state with progress

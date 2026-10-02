@@ -40,7 +40,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { realpathSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
-import { resolveLayout } from "@n-dx/llm-client";
+import { resolveLayout, type MemoryPressure } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
@@ -227,12 +227,18 @@ export interface LiveSnapshot {
     /** Hench slots, over the scope the run list beside it covers or wider. */
     slots: LiveSlots;
     memory: {
-      freeBytes: number;
+      /** The shared reading's available bytes; `null` when the machine could not be read. */
+      freeBytes: number | null;
+      availableBytes: number | null;
       totalBytes: number;
-      usedPercent: number;
+      usedPercent: number | null;
       health: MemoryHealthLevel;
+      pressure: MemoryPressure;
+      /** Where the reading came from, e.g. `"darwin:vm_stat+sysctl"`, `"os.freemem"`. */
+      source: string;
       /** The hub's admission floor: below it, dashboard runs are queued rather than started. */
       floorBytes: number | null;
+      /** Never true on an unknown reading — the hub admits those. */
       belowFloor: boolean;
     };
     llm: { vendor: string | null; model: string | null };
@@ -636,11 +642,14 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
       slots: liveSlots("repository", liveRuns, getEffectiveMaxConcurrent(ctx.projectDir)),
       memory: {
         freeBytes: memory.freeBytes,
+        availableBytes: memory.availableBytes,
         totalBytes: memory.totalBytes,
         usedPercent: memory.usedPercent,
         health: memory.health,
+        pressure: memory.pressure,
+        source: memory.source,
         floorBytes,
-        belowFloor: floorBytes !== null && memory.freeBytes <= floorBytes,
+        belowFloor: floorBytes !== null && memory.availableBytes !== null && memory.availableBytes <= floorBytes,
       },
       llm: lastActiveAgentModel(ctx.projectDir),
       worktrees: { total: workspaces.length, withLiveRun },

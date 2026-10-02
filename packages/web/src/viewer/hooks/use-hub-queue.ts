@@ -1,6 +1,7 @@
 /**
  * Polls the hub's admission queue — what is running on this machine, what is
- * waiting, and whether the hub has stopped admitting for want of memory.
+ * waiting, and whether the hub has stopped admitting for want of available
+ * memory.
  *
  * A run started from the dashboard no longer goes straight to the project
  * server: the hub admits it or queues it (`hub/admission.ts`). A queued run
@@ -55,9 +56,17 @@ export interface HubQueueSnapshot {
   queuedTotal?: number;
   /** Dashboard-started runs in flight across every project. */
   running: number;
-  freeMemoryBytes: number;
+  /** Available memory the gate last measured; null when it could not be read. */
+  freeMemoryBytes: number | null;
+  /** The same number, under the name the shared reading uses. */
+  availableBytes?: number | null;
+  /** Kernel memory pressure, or "unknown" when nothing could be read. */
+  pressure?: "normal" | "warn" | "critical" | "unknown";
   limits: { maxSessions: number; memoryFloorBytes: number };
-  /** Nothing is being admitted because free memory is below the floor. */
+  /**
+   * Nothing is being admitted because available memory is below the floor.
+   * Never true on an unknown reading — the hub admits those.
+   */
   memoryPaused: boolean;
 }
 

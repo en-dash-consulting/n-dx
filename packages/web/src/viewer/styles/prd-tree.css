@@ -20,9 +20,17 @@
   gap: var(--space-2);
 }
 
+.prd-title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
 .prd-title {
-  font-size: var(--font-xl);
+  font-size: var(--font-lg);
   font-weight: var(--weight-semibold);
+  margin: 0;
 }
 
 /* Toolbar */
@@ -50,7 +58,7 @@
 /* Summary bar */
 .prd-summary {
   flex: none;
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 /* Tasks view shell — single internal scroll region.
@@ -136,13 +144,21 @@
 .prd-filter-bar {
   flex: none;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  background: var(--bg);
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
   padding: 0 0 var(--space-3);
   margin-bottom: var(--space-1);
   border-bottom: 1px solid var(--border);
 }
+
+/* Search takes the slack; facets and actions sit beside it on a wide screen
+   and wrap beneath it on a narrow one. */
+.prd-filter-bar > .prd-search-row { flex: 1 1 260px; min-width: 0; }
+.prd-filter-bar > .prd-facet-filter { flex: 0 1 auto; min-width: 0; }
+.prd-filter-actions { display: flex; gap: var(--space-2); margin-left: auto; flex-shrink: 0; }
+.prd-filter-bar .prd-facet-clear { align-self: center; }
 
 /* Status filter */
 .prd-status-filter {
@@ -4764,16 +4780,31 @@
   align-self: flex-end;
 }
 
-/* Compact variant (dashboard embedding) */
-.smart-add-panel-compact {
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
+/* Bar variant (stage lead section): one row — input, Generate, action */
+.smart-add-panel-bar {
+  padding: 0;
 }
 
-.smart-add-panel-compact .smart-add-header {
-  margin-bottom: var(--space-3);
+.smart-add-panel-bar .smart-add-input-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: stretch;
+  column-gap: var(--space-2);
+}
+
+.smart-add-panel-bar .smart-add-textarea {
+  grid-area: 1 / 1;
+  min-height: 0;
+  resize: none;
+  padding: var(--space-2) var(--space-3);
+}
+
+.smart-add-panel-bar .smart-add-btn-generate { grid-area: 1 / 2; margin-top: 0; align-self: stretch; }
+.smart-add-panel-bar .smart-add-input-area > :nth-child(4) { grid-area: 1 / 3; }
+
+.smart-add-panel-bar .smart-add-input-status {
+  grid-area: 2 / 1 / 3 / -1;
+  min-height: 0;
 }
 
 /* Context scope selector */
@@ -6184,4 +6215,29 @@
     animation: none;
     transform: scaleX(0.5); /* static partial fill so the element is still visible */
   }
+}
+
+/* ── Narrow screens: tree header and summary ─────────────────── */
+
+@media (max-width: 560px) {
+  /* Smart Add bar: the description gets the full width, buttons beneath. */
+  .smart-add-panel-bar .smart-add-input-area { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--space-2); }
+  .smart-add-panel-bar .smart-add-textarea { grid-area: 1 / 1 / 2 / -1; }
+  .smart-add-panel-bar .smart-add-btn-generate { grid-area: 2 / 1; }
+  .smart-add-panel-bar .smart-add-input-area > :nth-child(4) { grid-area: 2 / 2; }
+  .smart-add-panel-bar .smart-add-input-status { grid-area: 3 / 1 / 4 / -1; }
+}
+
+@media (max-width: 640px) {
+  .prd-summary-stats { gap: var(--space-1) var(--space-3); font-size: var(--font-sm); }
+  .prd-summary-pct { margin-left: 0; flex-basis: 100%; }
+  .prd-filter-actions { margin-left: 0; }
+}
+
+/* The tag typeahead is a column (input, then chosen tags), so its row aligns
+   to the top — centre the label on the input line rather than the column. */
+.prd-facet-row--tags > .prd-facet-label {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
 }

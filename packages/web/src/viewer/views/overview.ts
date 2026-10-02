@@ -1,15 +1,17 @@
 import { h } from "preact";
 import { useState, useCallback, useEffect, useMemo } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
+import type { ComponentChild } from "preact";
 import {
   BarChart,
-  HealthGauge,
   PatternBadge,
-  MetricCard,
   getZoneColorByIndex,
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
+import { formatSince } from "../utils/format.js";
 import { narrationNotice } from "./narration-notice.js";
+import { IsoMapHero } from "./iso-map.js";
+import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { AnalyzeControls, BrandedHeader, InfoTip } from "../components/index.js";
 import type { JobTray } from "../hooks/index.js";
 
@@ -49,6 +51,35 @@ function stepsToMarkdown(steps: NextStep[]): string {
     .join("\n");
 }
 
+const NEXT_STEPS_OPEN_KEY = "ndx.overview.next-steps-open";
+
+function readNextStepsOpen(): boolean {
+  try {
+    return localStorage.getItem(NEXT_STEPS_OPEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeNextStepsOpen(open: boolean): void {
+  try {
+    localStorage.setItem(NEXT_STEPS_OPEN_KEY, open ? "1" : "0");
+  } catch { /* storage unavailable — state lasts for this page */ }
+}
+
+const PRIORITY_ORDER = ["critical", "high", "medium", "low"];
+
+/** `[priority, count]` pairs, most severe first; unknown priorities last. */
+function priorityCounts(steps: NextStep[]): [string, number][] {
+  const counts = new Map<string, number>();
+  for (const s of steps) counts.set(s.priority, (counts.get(s.priority) ?? 0) + 1);
+  const rank = (p: string) => {
+    const i = PRIORITY_ORDER.indexOf(p);
+    return i === -1 ? PRIORITY_ORDER.length : i;
+  };
+  return [...counts.entries()].sort(([a], [b]) => rank(a) - rank(b));
+}
+
 /**
  * Prioritized next-step recommendations — the UI twin of the sourcevision
  * MCP `get_next_steps` tool. Rendered on the Overview so recommendations are
@@ -59,12 +90,17 @@ function stepsToMarkdown(steps: NextStep[]): string {
  * Each step can be copied individually, the whole list can be copied as
  * markdown, and the panel footer offers a confirm-guarded "Capture to PRD"
  * action that files the findings via POST /api/rex/capture-next-steps.
+ *
+ * Collapsed by default to one summary line — the count by priority and the
+ * top step's title — so the map above it stays the first thing on the page.
+ * The open state is remembered per browser.
  */
 export function NextStepsPanel() {
   const [steps, setSteps] = useState<NextStep[] | null>(null);
   const [copied, setCopied] = useState<number | "all" | null>(null);
   const [capture, setCapture] = useState<"idle" | "confirm" | "capturing" | "done" | "error">("idle");
   const [captureMsg, setCaptureMsg] = useState<string | null>(null);
+  const [open, setOpen] = useState<boolean>(() => readNextStepsOpen());
 
   useEffect(() => {
     let cancelled = false;
@@ -117,12 +153,35 @@ export function NextStepsPanel() {
 
   if (!steps) return null;
 
-  return h("div", { class: "overview-section overview-next-steps" },
-    h("div", { class: "section-header-row" },
+  const counts = priorityCounts(steps);
+
+  return h("details", {
+    class: "overview-section overview-next-steps",
+    open,
+    onToggle: (e: Event) => {
+      const next = (e.currentTarget as HTMLDetailsElement).open;
+      setOpen(next);
+      writeNextStepsOpen(next);
+    },
+  },
+    h("summary", { class: "section-header-row next-steps-summary" },
+      h("span", { class: "next-steps-caret", "aria-hidden": "true" }, open ? "▾" : "▸"),
       h("h3", null, "Next Steps"),
+      h("span", { class: "next-steps-counts" },
+        counts.map(([priority, n]) =>
+          h("span", { key: priority, class: `next-step-priority next-step-priority-${priority}` }, `${n} ${priority}`),
+        ),
+      ),
+      !open
+        ? h("span", { class: "next-steps-preview" }, steps[0]!.title)
+        : null,
       h("button", {
         class: "link-btn next-steps-copy-all",
-        onClick: () => handleCopy(stepsToMarkdown(steps), "all"),
+        onClick: (e: Event) => {
+          // Inside <summary>: copying must not also toggle the panel.
+          e.preventDefault();
+          handleCopy(stepsToMarkdown(steps), "all");
+        },
         title: "Copy all recommendations as a markdown list",
         "aria-label": "Copy all next steps as markdown",
         type: "button",
@@ -211,6 +270,41 @@ const LANG_COLORS: Record<string, string> = {
   Rust: "#dea584",
   Go: "#00add8",
 };
+
+/** Green ≥ 0.7, orange ≥ 0.4, red below — higher is better. */
+function healthColor(score: number): string {
+  return score >= 0.7 ? "var(--green)" : score >= 0.4 ? "var(--orange)" : "var(--red)";
+}
+
+interface StatTileProps {
+  glyph: string;
+  label: string;
+  value: string;
+  /** One quiet line under the label. */
+  sub?: string;
+  /** Colour for the value, the glyph's tint and the meter. */
+  tone?: string;
+  /** 0–1 fill for a meter under the value (cohesion, coupling). */
+  meter?: number;
+  info?: ComponentChild;
+}
+
+function StatTile({ glyph, label, value, sub, tone, meter, info }: StatTileProps) {
+  const color = tone ?? "var(--accent)";
+  return h("div", { class: "overview-stat", role: "listitem", style: `--stat-tone: ${color}` },
+    h("span", { class: "overview-stat-glyph", "aria-hidden": "true" }, glyph),
+    h("div", { class: "overview-stat-body" },
+      h("span", { class: "overview-stat-label" }, label, info ?? null),
+      h("span", { class: "overview-stat-value" }, value),
+      meter !== undefined
+        ? h("span", { class: "overview-stat-meter", "aria-hidden": "true" },
+            h("span", { style: `width: ${Math.round(Math.max(0, Math.min(1, meter)) * 100)}%` }),
+          )
+        : null,
+      sub ? h("span", { class: "overview-stat-sub" }, sub) : null,
+    ),
+  );
+}
 
 export function Overview({ data, navigateTo, onSelect, jobs }: OverviewProps) {
   const { manifest, inventory, imports, zones, components } = data;
@@ -302,20 +396,15 @@ export function Overview({ data, navigateTo, onSelect, jobs }: OverviewProps) {
     return zones.zones.filter(z => z.cohesion < 0.4 || z.coupling > 0.5).length;
   }, [zones]);
 
-  return h("div", { class: "overview-container" },
-    // Header with project info
+  const analyzedAgo = manifest ? formatSince(manifest.analyzedAt) : null;
+  const narration = manifest ? narrationNotice(manifest.narration) : null;
+
+  return h("div", { class: "overview-container overview--map-first" },
+    // Kept for the standalone Overview route; the stage page hides view headers.
     manifest
       ? h("div", { class: "overview-header view-header" },
           h(BrandedHeader, { product: "sourcevision", title: "SourceVision", class: "branded-header-sv" }),
           h("h2", { class: "view-title" }, basename(manifest.targetPath)),
-          h("p", { class: "overview-meta" },
-            manifest.gitBranch ? `${manifest.gitBranch} ` : "",
-            manifest.gitSha ? `(${manifest.gitSha.slice(0, 7)}) \u2022 ` : "",
-            new Date(manifest.analyzedAt).toLocaleString()
-          ),
-          narrationNotice(manifest.narration)
-            ? h("p", { class: "overview-meta overview-narration", role: "status" }, narrationNotice(manifest.narration))
-            : null,
         )
       : h("div", { class: "view-header" },
           h(BrandedHeader, { product: "sourcevision", title: "SourceVision", class: "branded-header-sv" }),
@@ -339,91 +428,114 @@ export function Overview({ data, navigateTo, onSelect, jobs }: OverviewProps) {
         )
       : null,
 
-    // Re-analyze trigger
-    h(AnalyzeControls, { jobs }),
+    // One line: which analysis this is, and the controls to refresh it.
+    h("div", { class: "overview-topbar" },
+      manifest
+        ? h("p", { class: "overview-meta" },
+            manifest.gitBranch ? h("span", { class: "overview-meta-branch" }, manifest.gitBranch) : null,
+            manifest.gitSha ? h("code", { class: "overview-meta-sha" }, manifest.gitSha.slice(0, 7)) : null,
+            h("span", { title: new Date(manifest.analyzedAt).toLocaleString() },
+              `analyzed ${analyzedAgo ?? new Date(manifest.analyzedAt).toLocaleString()}`,
+            ),
+            zones?.enrichmentPass
+              ? h("span", { class: "enrichment-badge" },
+                  `Pass ${zones.enrichmentPass}${zones.metaEvaluationCount ? ` + ${zones.metaEvaluationCount} meta` : ""}`,
+                )
+              : null,
+            zones?.lastReset
+              ? h("span", { class: "enrichment-badge reset-badge" },
+                  `Reset from Pass ${zones.lastReset.from} → ${zones.lastReset.to}`,
+                )
+              : null,
+          )
+        : h("span", null),
+      h(AnalyzeControls, { jobs }),
+    ),
+    narration
+      ? h("p", { class: "overview-meta overview-narration", role: "status" }, narration)
+      : null,
 
-    // Prioritized recommendations (hidden until analysis data exists)
-    h(NextStepsPanel, null),
+    // The map leads: the codebase's shape before any number about it.
+    hasZones
+      ? h(IsoMapHero, {
+          analysisStamp: isoMapAnalysisStamp(data),
+          facts: [
+            `${zones!.zones.length} zones`,
+            imports ? `${imports.edges.length.toLocaleString()} imports` : "",
+            manifest?.gitBranch ?? "",
+          ].filter(Boolean),
+          onOpenOptions: navigateTo ? () => navigateTo("iso-map") : undefined,
+        })
+      : null,
 
-    // Main metrics row
-    h("div", { class: "overview-metrics" },
+    // Headline numbers and architecture health, as one row of tiles.
+    h("div", { class: "overview-stats", role: "list", "aria-label": "Codebase summary" },
       inventory
-        ? h(MetricCard, {
-            value: inventory.summary.totalFiles,
+        ? h(StatTile, {
+            glyph: "▤",
             label: "Files",
-          })
-        : null,
-      inventory
-        ? h(MetricCard, {
-            value: Math.round(inventory.summary.totalLines / 1000) + "k",
-            label: "Lines of Code",
+            value: inventory.summary.totalFiles.toLocaleString(),
+            sub: `${Math.round(inventory.summary.totalLines / 1000).toLocaleString()}k lines`,
           })
         : null,
       zones
-        ? h(MetricCard, {
-            value: zones.zones.length,
+        ? h(StatTile, {
+            glyph: "◇",
             label: "Zones",
-            color: "var(--accent)",
+            value: String(zones.zones.length),
+            sub: attentionCount > 0 ? `${attentionCount} need attention` : "all healthy",
+            tone: attentionCount > 0 ? "var(--orange)" : undefined,
             info: h(InfoTip, { term: "zone", label: "zones" }),
           })
         : null,
       imports
-        ? h(MetricCard, {
-            value: imports.summary.circularCount,
-            label: "Circular Deps",
-            color: imports.summary.circularCount > 0 ? "var(--orange)" : "var(--green)",
+        ? h(StatTile, {
+            glyph: "⟲",
+            label: "Circular deps",
+            value: String(imports.summary.circularCount),
+            sub: imports.summary.circularCount > 0 ? "cycles to break" : "no import cycles",
+            tone: imports.summary.circularCount > 0 ? "var(--orange)" : "var(--green)",
           })
-        : null
-    ),
-
-    // Architecture health section
-    healthMetrics && zones
-      ? h("div", { class: "overview-section" },
-          h("div", { class: "section-header-row" },
-            h("h3", null, "Architecture Health"),
-            zones.enrichmentPass
-              ? h("span", { class: "enrichment-badge" },
-                  `Pass ${zones.enrichmentPass}${zones.metaEvaluationCount ? ` + ${zones.metaEvaluationCount} meta` : ""}`
-                )
-              : null,
-            zones.lastReset
-              ? h("span", { class: "enrichment-badge reset-badge" },
-                  `Reset from Pass ${zones.lastReset.from} → ${zones.lastReset.to}`
-                )
-              : null
-          ),
-
-          h("div", { class: "health-row" },
-            // The ⓘ sits beside each gauge, not inside it: the gauge is a
-            // role="meter", whose children are presentational to assistive tech.
-            h("div", { class: "health-gauge-with-info" },
-              h(HealthGauge, {
-                value: healthMetrics.avgCohesion,
-                label: "Avg Cohesion",
-                size: 90,
-              }),
-              h(InfoTip, { term: "cohesion" }),
-            ),
-            h("div", { class: "health-gauge-with-info" },
-              h(HealthGauge, {
-                value: healthMetrics.avgCoupling,
-                label: "Avg Coupling",
-                size: 90,
-                inverted: true,
-              }),
-              h(InfoTip, { term: "coupling" }),
-            ),
+        : null,
+      healthMetrics && zones
+        ? h(StatTile, {
+            glyph: "◉",
+            label: "Avg cohesion",
+            value: healthMetrics.avgCohesion.toFixed(2),
+            sub: "higher is better",
+            tone: healthColor(healthMetrics.avgCohesion),
+            meter: healthMetrics.avgCohesion,
+            info: h(InfoTip, { term: "cohesion" }),
+          })
+        : null,
+      healthMetrics && zones
+        ? h(StatTile, {
+            glyph: "⇄",
+            label: "Avg coupling",
+            value: healthMetrics.avgCoupling.toFixed(2),
+            sub: "lower is better",
+            tone: healthColor(1 - healthMetrics.avgCoupling),
+            meter: healthMetrics.avgCoupling,
+            info: h(InfoTip, { term: "coupling" }),
+          })
+        : null,
+      healthMetrics && (healthMetrics.patterns.length > 0 || healthMetrics.antipatterns.length > 0)
+        ? h("div", { class: "overview-stat overview-stat--signals", role: "listitem" },
+            h("span", { class: "overview-stat-label" }, "Signals"),
             h("div", { class: "pattern-list" },
               healthMetrics.patterns.map(p =>
                 h(PatternBadge, { key: p, type: "pattern", label: p })
               ),
               healthMetrics.antipatterns.map(p =>
                 h(PatternBadge, { key: p, type: "antipattern", label: p })
-              )
-            )
+              ),
+            ),
           )
-        )
-      : null,
+        : null,
+    ),
+
+    // Prioritized recommendations (hidden until analysis data exists)
+    h(NextStepsPanel, null),
 
     // Two-column layout: Languages + Zone summary
     h("div", { class: "overview-columns" },

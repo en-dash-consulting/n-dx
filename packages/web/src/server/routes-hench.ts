@@ -47,9 +47,22 @@ import type { FSWatcher } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
-import { totalmem, freemem, loadavg, cpus, hostname } from "node:os";
+import { loadavg, cpus, hostname } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { redactDeep, exec, spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, resolveLayout, type ManagedChild } from "@n-dx/llm-client";
+import {
+  redactDeep,
+  exec,
+  spawnManaged,
+  killWithFallback,
+  listWorktrees,
+  getWorktreeRoot,
+  resolveLayout,
+  getAvailableMemory,
+  readAvailableMemory,
+  type ManagedChild,
+  type AvailableMemoryReading,
+  type MemoryPressure,
+} from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import {
@@ -2537,8 +2550,14 @@ export function startConcurrencyMonitor(
 
 // ── Memory / resource monitoring ──────────────────────────────────────
 
-/** Memory health level for UI indicators. */
-export type MemoryHealthLevel ="healthy" | "warning" | "critical";
+/**
+ * Memory health level for UI indicators.
+ *
+ * `"unknown"` is not a degree of pressure — it means the machine could not be
+ * read at all (macOS with `vm_stat` and `sysctl` both unavailable). Nothing may
+ * warn, throttle or hold a run on it.
+ */
+export type MemoryHealthLevel = "healthy" | "warning" | "critical" | "unknown";
 
 /** Per-process memory snapshot. */
 interface ProcessMemoryEntry {
@@ -2553,9 +2572,20 @@ interface ProcessMemoryEntry {
 export interface MemoryStatus {
   system: {
     totalBytes: number;
-    freeBytes: number;
-    usedBytes: number;
-    usedPercent: number;
+    /**
+     * The shared reading's `availableBytes`, under the name the API has always
+     * used. Not `os.freemem()` on macOS — see `llm-client/system-memory.ts`.
+     * `null` when the machine could not be read.
+     */
+    freeBytes: number | null;
+    /** The same number as {@link freeBytes}, under the name the reading uses. */
+    availableBytes: number | null;
+    usedBytes: number | null;
+    usedPercent: number | null;
+    /** Kernel memory pressure, or `"unknown"` when nothing could be read. */
+    pressure: MemoryPressure;
+    /** Where the reading came from, e.g. `"darwin:vm_stat+sysctl"`, `"os.freemem"`. */
+    source: string;
   };
   server: {
     pid: number;
@@ -2572,16 +2602,19 @@ export interface MemoryStatus {
 }
 
 /**
- * Determine memory health level based on system memory usage percentage.
+ * Memory health from the shared reading's pressure.
  *
- * - healthy: < 75% used (green)
- * - warning: 75–90% used (yellow/orange)
- * - critical: ≥ 90% used (red)
+ * The thresholds themselves live in `llm-client/system-memory.ts` (75% / 90%
+ * used, or macOS's `kern.memorystatus_vm_pressure_level` where it can be read),
+ * so the dashboard, the hub gate and hench's throttle all flag at the same point.
  */
-function computeMemoryHealth(usedPercent: number): MemoryHealthLevel {
-  if (usedPercent >= 90) return "critical";
-  if (usedPercent >= 75) return "warning";
-  return "healthy";
+function healthFromPressure(pressure: MemoryPressure): MemoryHealthLevel {
+  switch (pressure) {
+    case "normal": return "healthy";
+    case "warn": return "warning";
+    case "critical": return "critical";
+    case "unknown": return "unknown";
+  }
 }
 
 /**
@@ -2622,21 +2655,73 @@ function getProcessRss(pid: number): number | null {
 const processOwners = new Map<string, string>();
 
 /**
+ * Where {@link readSystemMemory} gets its reading. Synchronous and cached —
+ * a request must never wait on a `vm_stat` spawn.
+ */
+let readAvailable: () => AvailableMemoryReading = getAvailableMemory;
+
+/**
+ * Point the memory routes at a fixed reading, so a test can exercise a darwin
+ * machine (or an unreadable one) on any platform. `null` restores the shared
+ * reading. Nothing in production calls this.
+ */
+export function setAvailableMemoryReaderForTests(read: (() => AvailableMemoryReading) | null): void {
+  readAvailable = read ?? getAvailableMemory;
+}
+
+/**
+ * Derive the API's `system` block from an available-memory reading.
+ *
+ * `freeBytes` carries `availableBytes` — on macOS `os.freemem()` counts only
+ * free pages and reads ~115 MB on a machine with ~3.9 GB it can hand out, which
+ * is what used to make a healthy Mac read "critical" at 99% used.
+ *
+ * An unreadable machine is not a full one: `freeBytes`, `usedBytes` and
+ * `usedPercent` are all `null` rather than 0, so no consumer can compute a
+ * usage figure out of a reading that does not exist.
+ */
+export function systemMemoryFrom(
+  reading: AvailableMemoryReading,
+): MemoryStatus["system"] & { health: MemoryHealthLevel } {
+  const { availableBytes, totalBytes, pressure, source } = reading;
+  const known = availableBytes !== null;
+  const usedBytes = known ? totalBytes - availableBytes : null;
+  return {
+    totalBytes,
+    freeBytes: availableBytes,
+    availableBytes,
+    usedBytes,
+    usedPercent: usedBytes !== null && totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : null,
+    pressure,
+    source,
+    health: healthFromPressure(pressure),
+  };
+}
+
+/**
  * The machine's memory and its health level — the `system` and `health`
  * parts of `GET /api/hench/memory`, without the per-process `ps` probes,
  * for readers that must answer quickly (the Live overview).
  */
 export function readSystemMemory(): MemoryStatus["system"] & { health: MemoryHealthLevel } {
-  const totalBytes = totalmem();
-  const freeBytes = freemem();
-  const usedBytes = totalBytes - freeBytes;
-  const usedPercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
-  return { totalBytes, freeBytes, usedBytes, usedPercent, health: computeMemoryHealth(usedPercent) };
+  return systemMemoryFrom(readAvailable());
+}
+
+/**
+ * Take one reading so the cache is warm before the first request.
+ *
+ * `getAvailableMemory()` never spawns synchronously: until a darwin reading has
+ * completed it answers `"pending"` with no bytes, which every consumer treats as
+ * unknown. Warming at start-up means the first dashboard paint shows the machine
+ * rather than a dash.
+ */
+export function warmSystemMemory(): void {
+  void readAvailableMemory().catch(() => {});
 }
 
 function collectMemoryStatus(): MemoryStatus {
   processOwners.clear();
-  const { totalBytes, freeBytes, usedBytes, usedPercent, health } = readSystemMemory();
+  const { health, ...system } = readSystemMemory();
 
   const mem = process.memoryUsage();
   const load = loadavg() as [number, number, number];
@@ -2664,7 +2749,7 @@ function collectMemoryStatus(): MemoryStatus {
   }
 
   return {
-    system: { totalBytes, freeBytes, usedBytes, usedPercent },
+    system,
     server: {
       pid: process.pid,
       rssBytes: mem.rss,
@@ -2751,6 +2836,8 @@ function handleMemoryLeaks(res: ServerResponse, runsDir: string): boolean {
 export function startMemoryMonitor(broadcast: WebSocketBroadcaster, anchorRunsDir: string): void {
   const MEMORY_BROADCAST_MS = 10_000;
 
+  warmSystemMemory();
+
   const timer = setInterval(() => {
     const status = collectMemoryStatus();
 
@@ -2770,6 +2857,8 @@ export function startMemoryMonitor(broadcast: WebSocketBroadcaster, anchorRunsDi
       wsState.executionMetrics.recordSnapshot({
         concurrentCount: own.length,
         totalRssBytes: own.reduce((sum, p) => sum + p.rssBytes, 0),
+        // Omitted rather than zeroed when the machine could not be read: a 0%
+        // sample would drag the window's average down as if memory were free.
         systemMemoryPercent: status.system.usedPercent,
         loadAvg1m: status.loadAvg[0],
         perTaskRss: own.map((p) => ({ taskId: p.taskId, rssBytes: p.rssBytes })),

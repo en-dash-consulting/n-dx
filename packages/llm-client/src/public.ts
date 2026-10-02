@@ -633,3 +633,25 @@ export type {
   UsageSection,
   UsageDefinition,
 } from "./help-format.js";
+
+// Shared available-memory reading (macOS counts reclaimable pages + kernel pressure)
+export {
+  readAvailableMemory,
+  getAvailableMemory,
+  createAvailableMemoryReader,
+  parseVmStatAvailableBytes,
+  parseDarwinPressureLevel,
+  derivePressure,
+  MEMORY_READING_TTL_MS,
+  MEMORY_EXEC_TIMEOUT_MS,
+  PRESSURE_CRITICAL_USED_PERCENT,
+  PRESSURE_WARN_USED_PERCENT,
+} from "./system-memory.js";
+
+export type {
+  AvailableMemoryReading,
+  MemoryPressure,
+  ExecRunner,
+  SystemMemoryDeps,
+  AvailableMemoryReader,
+} from "./system-memory.js";

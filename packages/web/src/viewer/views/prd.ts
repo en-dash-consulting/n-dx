@@ -23,7 +23,7 @@ import { BulkActions } from "../components/prd-tree/bulk-actions.js";
 import { MergePreview } from "../components/prd-tree/merge-preview.js";
 import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js";
 import { DeleteConfirmation } from "../components/prd-tree/delete-confirmation.js";
-import { BrandedHeader, WorkspaceWriteStrip, GlossaryLine } from "../components/index.js";
+import { BrandedHeader, WorkspaceWriteStrip, InfoTip } from "../components/index.js";
 import { CompletionTimeline } from "../components/prd-tree/completion-timeline.js";
 import type { PRDDocumentData, ItemStatus } from "../components/prd-tree/index.js";
 import type { DetailItem, NavigateTo } from "../types.js";
@@ -244,7 +244,6 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       h(BrandedHeader, { product: "rex", title: "Rex", class: "branded-header-rex" }),
       h("h2", { class: "section-header" }, "Tasks"),
     ),
-    h(GlossaryLine, { term: "epic / feature / task" }),
 
     // Which tree an edit here lands in — shown only off the anchor.
     h(WorkspaceWriteStrip, null),
@@ -288,66 +287,6 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
         })
       : null,
 
-    // Sticky filter bar — search input + status filter
-    h("div", { class: "prd-filter-bar" },
-      h("div", { class: "prd-search-row" },
-        h("input", {
-          ref: searchInputRef,
-          class: "prd-search-input",
-          type: "search",
-          placeholder: "Search tasks\u2026 (Ctrl+F)",
-          value: searchQuery,
-          "aria-label": "Search PRD tree",
-          onInput: (e: Event) => setSearchQuery((e.target as HTMLInputElement).value),
-          onKeyDown: handleSearchKeyDown,
-        }),
-        (searchQuery || hasFacets) && searchResult
-          ? h("span", { class: "prd-search-count", "aria-live": "polite" },
-              `${searchResult.matchCount} match${searchResult.matchCount !== 1 ? "es" : ""}`,
-            )
-          : null,
-        searchQuery || hasFacets
-          ? h("button", {
-              class: "prd-search-clear",
-              onClick: () => { setSearchQuery(""); clearFacets(); searchInputRef.current?.focus(); },
-              "aria-label": "Clear search and facets",
-              title: "Clear search and facets",
-            }, "\u00d7")
-          : null,
-        // Command actions inline
-        h("button", {
-          class: `prd-search-action${actions.activeTab === "add" ? " active" : ""}`,
-          onClick: () => { actions.setActiveTab(actions.activeTab === "add" ? null : "add"); actions.setAddParentId(null); },
-          title: "Add item",
-          "aria-label": "Add a new item to the PRD",
-        }, "+"),
-        h("button", {
-          class: `prd-search-action${actions.activeTab === "prune" ? " active" : ""}`,
-          onClick: () => { actions.setActiveTab(actions.activeTab === "prune" ? null : "prune"); },
-          title: "Prune completed",
-          "aria-label": "Remove completed subtrees",
-        }, "\u2702"),
-        navigateTo
-          ? h("button", {
-              class: "prd-search-action",
-              onClick: () => navigateTo("merge-graph"),
-              title: "PRD Graph \u2014 view PRD/merge linkage",
-              "aria-label": "Open PRD graph",
-            }, "\u29c9")
-          : null,
-      ),
-      // Facet filter chips (tags for search, statuses for tree visibility)
-      h(FacetFilter, {
-        availableTags,
-        activeTags,
-        activeStatuses,
-        statusCounts,
-        onTagsChange: setActiveTags,
-        onStatusesChange: setActiveStatuses,
-        onClearAll: () => { clearFacets(); setActiveStatuses(new Set(ALL_STATUSES)); },
-      }),
-    ),
-
     // PRD tree — starts fully collapsed; the user expands what they need.
     h(PRDTree, {
       key: "prd",
@@ -375,6 +314,68 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       availableBranches,
       activeBranch,
       onBranchChange: setActiveBranch,
+      titleInfo: h(InfoTip, { term: "epic / feature / task" }),
+      // Search, facets and item actions — one wrapping row beneath the summary.
+      controls: h("div", { class: "prd-filter-bar" },
+        h("div", { class: "prd-search-row" },
+          h("input", {
+            ref: searchInputRef,
+            class: "prd-search-input",
+            type: "search",
+            placeholder: "Search tasks\u2026 (Ctrl+F)",
+            value: searchQuery,
+            "aria-label": "Search PRD tree",
+            onInput: (e: Event) => setSearchQuery((e.target as HTMLInputElement).value),
+            onKeyDown: handleSearchKeyDown,
+          }),
+          (searchQuery || hasFacets) && searchResult
+            ? h("span", { class: "prd-search-count", "aria-live": "polite" },
+                `${searchResult.matchCount} match${searchResult.matchCount !== 1 ? "es" : ""}`,
+              )
+            : null,
+          searchQuery || hasFacets
+            ? h("button", {
+                class: "prd-search-clear",
+                onClick: () => { setSearchQuery(""); clearFacets(); searchInputRef.current?.focus(); },
+                "aria-label": "Clear search and facets",
+                title: "Clear search and facets",
+              }, "\u00d7")
+            : null,
+        ),
+        // Facet filter chips (tags for search, statuses for tree visibility)
+        h(FacetFilter, {
+          availableTags,
+          activeTags,
+          activeStatuses,
+          statusCounts,
+          onTagsChange: setActiveTags,
+          onStatusesChange: setActiveStatuses,
+          onClearAll: () => { clearFacets(); setActiveStatuses(new Set(ALL_STATUSES)); },
+        }),
+        // Item actions, last so they wrap together on a narrow screen
+        h("div", { class: "prd-filter-actions" },
+          h("button", {
+            class: `prd-search-action${actions.activeTab === "add" ? " active" : ""}`,
+            onClick: () => { actions.setActiveTab(actions.activeTab === "add" ? null : "add"); actions.setAddParentId(null); },
+            title: "Add item",
+            "aria-label": "Add a new item to the PRD",
+          }, "+"),
+          h("button", {
+            class: `prd-search-action${actions.activeTab === "prune" ? " active" : ""}`,
+            onClick: () => { actions.setActiveTab(actions.activeTab === "prune" ? null : "prune"); },
+            title: "Prune completed",
+            "aria-label": "Remove completed subtrees",
+          }, "\u2702"),
+          navigateTo
+            ? h("button", {
+                class: "prd-search-action",
+                onClick: () => navigateTo("merge-graph"),
+                title: "PRD Graph \u2014 view PRD/merge linkage",
+                "aria-label": "Open PRD graph",
+              }, "\u29c9")
+            : null,
+        ),
+      ),
     }),
 
     // Bulk actions bar (floating at bottom)

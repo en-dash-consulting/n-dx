@@ -356,3 +356,75 @@ describe("unverified seam rendering", () => {
     dom.window.close();
   });
 });
+
+describe("iso map embedded in a host page", () => {
+  let dom: JSDOM;
+  let doc: Document;
+  let win: JSDOM["window"];
+
+  const stage = () => doc.getElementById("stage")!;
+  const wheel = (opts: WheelEventInit = {}) => {
+    const ev = new win.WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true, ...opts });
+    stage().dispatchEvent(ev);
+    return ev;
+  };
+  const post = async (data: unknown) => {
+    win.dispatchEvent(new win.MessageEvent("message", { data }));
+  };
+
+  beforeAll(() => {
+    dom = new JSDOM(renderIsoMap(buildIsoModel(makeInput()), { embed: true }), { runScripts: "dangerously" });
+    doc = dom.window.document;
+    win = dom.window;
+  });
+
+  afterAll(() => dom.window.close());
+
+  it("marks the document embedded and drops the footer", () => {
+    expect(doc.documentElement.classList.contains("embed")).toBe(true);
+    expect(doc.querySelector("footer.foot")).toBeNull();
+  });
+
+  it("keeps the details panel closed until something is selected", () => {
+    expect(doc.documentElement.classList.contains("idle")).toBe(true);
+    const core = [...doc.querySelectorAll("#iso .node[role=button]")]
+      .find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Core"))!;
+    core.dispatchEvent(new win.Event("pointerup", { bubbles: true }));
+    core.dispatchEvent(new win.MouseEvent("click", { bubbles: true }));
+    expect(doc.documentElement.classList.contains("idle")).toBe(false);
+    doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Escape" }));
+    expect(doc.documentElement.classList.contains("idle")).toBe(true);
+  });
+
+  it("leaves a plain wheel to the host page and zooms on Ctrl/⌘ + wheel", () => {
+    expect(wheel().defaultPrevented).toBe(false);
+    expect(wheel({ ctrlKey: true }).defaultPrevented).toBe(true);
+    expect(wheel({ metaKey: true }).defaultPrevented).toBe(true);
+  });
+
+  it("zooms on a plain wheel once the host turns wheel zoom on, and follows its theme", async () => {
+    await post({ type: "ndx-iso", wheelZoom: true, theme: "dark" });
+    expect(wheel().defaultPrevented).toBe(true);
+    expect(doc.documentElement.getAttribute("data-theme")).toBe("dark");
+    await post({ type: "ndx-iso", wheelZoom: false });
+    expect(wheel().defaultPrevented).toBe(false);
+  });
+
+  it("ignores messages that are not addressed to it", async () => {
+    await post({ type: "something-else", wheelZoom: true });
+    expect(wheel().defaultPrevented).toBe(false);
+  });
+});
+
+describe("iso map standalone page", () => {
+  it("still zooms on a plain wheel and keeps its footer", () => {
+    const dom = new JSDOM(renderIsoMap(buildIsoModel(makeInput())), { runScripts: "dangerously" });
+    const d = dom.window.document;
+    const ev = new dom.window.WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true });
+    d.getElementById("stage")!.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true);
+    expect(d.querySelector("footer.foot")).not.toBeNull();
+    expect(d.documentElement.classList.contains("embed")).toBe(false);
+    dom.window.close();
+  });
+});
