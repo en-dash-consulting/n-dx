@@ -14,7 +14,8 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { useHenchRunsLiveRefresh } from "../hooks/index.js";
 import { appUrl } from "../base-path.js";
 import { workCommandArgs } from "../external.js";
-import { queuedReason, shellWord } from "./prepare-task-model.js";
+import { shellWord } from "./prepare-task-model.js";
+import { QueuedNotice } from "./queued-notice.js";
 import type { QueuedReply } from "./prepare-task-model.js";
 
 const READY_LIMIT = 10;
@@ -65,6 +66,8 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
+  /** Start now runs the hub queued, until dismissed. */
+  const [queued, setQueued] = useState<Array<{ taskId: string; reply: QueuedReply }>>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const load = useCallback(async () => {
@@ -114,7 +117,10 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
       });
       const data = (await res.json().catch(() => ({}))) as Partial<QueuedReply> & { error?: string };
       if (res.ok && data.queued === true) {
-        say({ text: `Queued — position ${data.position}: ${queuedReason(String(data.reason))}.`, error: false, liveTaskId: task.id });
+        // Not a toast: it would expire in seconds, and a queued run's position
+        // and fate keep changing. The notice follows the hub queue instead.
+        const reply = data as QueuedReply;
+        setQueued((prev) => [...prev.filter((q) => q.taskId !== task.id), { taskId: task.id, reply }]);
       } else if (res.ok) {
         say({ text: `Started “${task.title}”.`, error: false, liveTaskId: task.id });
       } else {
@@ -191,6 +197,13 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
   return h("section", { class: "ready-to-run", "aria-labelledby": "ready-to-run-title" },
     h("h2", { id: "ready-to-run-title", class: "ready-title-head" }, "Ready to run"),
     body,
+    queued.map((q) => h(QueuedNotice, {
+      key: q.taskId,
+      reply: q.reply,
+      taskId: q.taskId,
+      onOpenLive,
+      onDismiss: () => setQueued((prev) => prev.filter((x) => x.taskId !== q.taskId)),
+    })),
     toast
       ? h("div", { class: `ready-toast${toast.error ? " ready-toast-error" : ""}`, role: toast.error ? "alert" : "status" },
           toast.text,

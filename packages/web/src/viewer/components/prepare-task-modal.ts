@@ -21,8 +21,8 @@
 import { h, Fragment } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
-import { useFocusTrap, useHubQueue, queuePositionOf, droppedEntryOf } from "../hooks/index.js";
-import { appUrl } from "../base-path.js";
+import { useFocusTrap } from "../hooks/index.js";
+import { QueuedNotice } from "./queued-notice.js";
 import { RUN_OPTION_SPECS } from "../external.js";
 import type { RunOptionKey } from "../external.js";
 import {
@@ -36,7 +36,6 @@ import {
   modelChoices,
   optionsProblem,
   providerChoices,
-  queuedReason,
   resetField,
   runOptionsOf,
   setField,
@@ -607,41 +606,5 @@ function PreviewPanel({ preview, onBack }: {
     h("footer", { class: "prep-footer" },
       h("button", { type: "button", class: "prep-btn", onClick: onBack }, "Back"),
     ),
-  );
-}
-
-function QueuedNotice({ reply, taskId, onOpenLive, liveHref, onDropped }: {
-  reply: QueuedReply;
-  taskId: string;
-  onOpenLive: (taskId: string) => void;
-  liveHref?: (taskId: string) => string;
-  /** The hub reports the queued run refused at its turn: Execute may be tried again. */
-  onDropped: () => void;
-}) {
-  const { queue } = useHubQueue();
-  const live = queuePositionOf(queue, taskId);
-  const dropped = live === 0 ? droppedEntryOf(queue, taskId, reply.workspace) : null;
-  useEffect(() => { if (dropped) onDropped(); }, [dropped !== null, onDropped]);
-  if (dropped) {
-    // Its turn came and its server refused it: the run is not coming.
-    const status = dropped.status === null ? "" : ` (HTTP ${dropped.status})`;
-    return h("div", { class: "prep-queued", role: "alert" },
-      h("span", null, `Could not start: ${dropped.error}${status}`));
-  }
-  // Out of the queue once the hub has answered without it: admitted.
-  const admitted = queue !== null && live === 0;
-  const position = live || reply.position;
-  return h("div", { class: "prep-queued", role: "status" },
-    admitted
-      ? h("span", null, "Admitted — the run is starting.")
-      : h("span", null, `Queued — position ${position}: ${queuedReason(reply.reason)}.`),
-    " ",
-    h("a", {
-      href: liveHref ? liveHref(taskId) : appUrl(`/live/task/${encodeURIComponent(taskId)}`),
-      onClick: (e: MouseEvent) => {
-        e.preventDefault();
-        onOpenLive(taskId);
-      },
-    }, "Open in Live"),
   );
 }

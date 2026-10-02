@@ -102,10 +102,47 @@ describe("StartTaskButton refusal display", () => {
     const onStarted = vi.fn();
     await clickStart(onStarted);
 
-    const notice = root!.querySelector(".start-task-notice");
+    const notice = root!.querySelector(".prep-queued");
     expect(notice!.textContent).toContain("Queued");
     expect(notice!.textContent).toContain("position 2");
     expect(onStarted).not.toHaveBeenCalled();
+  });
+
+  /** Execute answers 202; the hub queue answers with `snapshot`. */
+  function stubQueued(snapshot: Record<string, unknown>): void {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const queue = url === "/api/hub/queue";
+      return {
+        ok: true,
+        status: queue ? 200 : 202,
+        json: async () => queue ? snapshot : { queued: true, position: 3, reason: "at-capacity" },
+      };
+    }));
+  }
+  const hubSnapshot = (extra: Record<string, unknown>) => ({
+    entries: [], running: 1, freeMemoryBytes: null, limits: { maxSessions: 2, memoryFloorBytes: 0 }, memoryPaused: false, ...extra,
+  });
+  const queueEntry = { projectId: "p", workspace: null, enqueuedAt: "" };
+
+  it("keeps the queued position current from the hub queue", async () => {
+    stubQueued(hubSnapshot({ entries: [{ ...queueEntry, taskId: "other" }, { ...queueEntry, taskId: "t-1" }] }));
+    await clickStart();
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    expect(root!.querySelector(".prep-queued")!.textContent).toContain("position 2");
+  });
+
+  it("says 'Could not start: <reason>' when the hub dropped the queued run at replay", async () => {
+    stubQueued(hubSnapshot({
+      dropped: [{ ...queueEntry, taskId: "t-1", droppedAt: "", status: 409, error: "Task is blocked by X." }],
+    }));
+    await clickStart();
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    const notice = root!.querySelector(".prep-queued")!;
+    expect(notice.getAttribute("role")).toBe("alert");
+    expect(notice.textContent).toContain("Could not start: Task is blocked by X. (HTTP 409)");
+    expect(notice.textContent).not.toContain("position");
   });
 
   it("starts with no options: the body is the task id alone", async () => {

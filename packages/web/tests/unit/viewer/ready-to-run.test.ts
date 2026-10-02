@@ -105,11 +105,45 @@ describe("Ready to run", () => {
     expect(props.onOpenLive).toHaveBeenCalledWith("t-b");
   });
 
-  it("Start now toasts a queued run with its position", async () => {
+  it("Start now shows a queued run with its position, outside the expiring toast", async () => {
     await mount(TASKS, { status: 202, body: { queued: true, position: 2, reason: "at-capacity" } });
     await openMenu(0);
     await click(byText("Start now"));
-    expect(document.querySelector(".ready-toast")!.textContent).toContain("Queued — position 2: every run slot on this machine is busy.");
+    expect(document.querySelector(".prep-queued")!.textContent).toContain("Queued — position 2: every run slot on this machine is busy.");
+    expect(document.querySelector(".ready-toast")).toBeNull();
+  });
+
+  /** Mount with a hub queue answering `hub`, then Start now on the first row (t-b), which the hub queues. */
+  async function startNowQueued(extra: Record<string, unknown>) {
+    const hub = {
+      entries: [], running: 1, freeMemoryBytes: null, limits: { maxSessions: 2, memoryFloorBytes: 0 }, memoryPaused: false, ...extra,
+    };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const body = url.startsWith("/api/hench/ready") ? { tasks: TASKS, limit: 10, dir: "/w" }
+        : url === "/api/hub/queue" ? hub
+        : { queued: true, position: 5, reason: "at-capacity" };
+      return { ok: true, status: url === "/api/hench/execute" ? 202 : 200, json: async () => body };
+    }));
+    root = renderToDiv(h(ReadyToRun, { onPrepare: vi.fn(), onOpenLive: vi.fn(), onOpenPrd: vi.fn() }));
+    await flush();
+    await openMenu(0);
+    await click(byText("Start now"));
+    await flush();
+    return document.querySelector(".prep-queued")!;
+  }
+  const hubEntry = { projectId: "p", workspace: null, enqueuedAt: "" };
+
+  it("a queued Start now keeps its position current from the hub queue", async () => {
+    const notice = await startNowQueued({ entries: [{ ...hubEntry, taskId: "x" }, { ...hubEntry, taskId: "t-b" }] });
+    expect(notice.textContent).toContain("position 2");
+  });
+
+  it("a queued Start now says 'Could not start: <reason>' when the hub dropped it at replay", async () => {
+    const notice = await startNowQueued({
+      dropped: [{ ...hubEntry, taskId: "t-b", droppedAt: "", status: 409, error: "Task is blocked by X." }],
+    });
+    expect(notice.getAttribute("role")).toBe("alert");
+    expect(notice.textContent).toContain("Could not start: Task is blocked by X. (HTTP 409)");
   });
 
   it("Start now shows the refusal message as an alert", async () => {

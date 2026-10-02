@@ -27,7 +27,8 @@ import { useState, useCallback, useEffect } from "preact/hooks";
 import type { NavigateTo } from "../types.js";
 import { appUrl } from "../base-path.js";
 import { PrepareTaskModal } from "./prepare-task-modal.js";
-import { queuedReason } from "./prepare-task-model.js";
+import { QueuedNotice } from "./queued-notice.js";
+import type { QueuedReply } from "./prepare-task-model.js";
 
 export interface StartTaskButtonProps {
   taskId: string;
@@ -65,6 +66,8 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
   const [canMigrate, setCanMigrate] = useState(false);
   const [migrating, setMigrating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  /** The hub's 202 for a Start now it queued; the notice then follows the hub queue. */
+  const [queued, setQueued] = useState<{ reply: QueuedReply; taskId: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   /**
    * What the open modal was opened for, captured at click. The host's `taskId`
@@ -104,6 +107,7 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     setLoading(true);
     setError(null);
     setNotice(null);
+    setQueued(null);
     setCanMigrate(false);
     try {
       const { ok, status, data } = await post({});
@@ -122,7 +126,7 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
       }
       // 202 from the hub's queue: accepted, not started. Say where it stands.
       if (data.queued === true) {
-        setNotice(`Queued — position ${data.position}: ${queuedReason(String(data.reason))}.`);
+        setQueued({ reply: data as unknown as QueuedReply, taskId });
         return;
       }
       onStarted();
@@ -132,7 +136,7 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     } finally {
       setLoading(false);
     }
-  }, [post, onStarted]);
+  }, [post, onStarted, taskId]);
 
   const handleMigrate = useCallback(async (e: Event) => {
     e.stopPropagation();
@@ -202,6 +206,15 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
       : null,
     notice
       ? h("div", { class: "start-task-notice", role: "status" }, notice)
+      : null,
+    queued
+      ? h(QueuedNotice, {
+          reply: queued.reply,
+          taskId: queued.taskId,
+          onOpenLive: openLive,
+          liveHref,
+          onDismiss: () => setQueued(null),
+        })
       : null,
     prepFor
       ? h(PrepareTaskModal, {
