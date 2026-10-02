@@ -31,6 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Machine memory reads true on macOS](./machine-memory-reads-true-on-macos/index.md) | completed |
 | [Navigation and landings](./navigation-and-landings/index.md) | pending |
 | [PRD storage additive](./prd-storage-additive/index.md) | pending |
+| [Prepare task: run one task from Work with every ndx work option visible](./prepare-task-run-one-task-from-work/index.md) | pending |
 | [Release readiness](./release-readiness/index.md) | pending |
 | [rex log and budget tuners](./rex-log-and-budget-tuners/index.md) | pending |
 | [Settings consolidation](./settings-consolidation/index.md) | completed |
