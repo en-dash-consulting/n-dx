@@ -10,6 +10,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { h } from "preact";
 import { act } from "preact/test-utils";
+import { DetailPanel } from "../../../src/viewer/components/detail-panel.js";
 import { PrepareTaskModal } from "../../../src/viewer/components/prepare-task-modal.js";
 import type { PrepResponse } from "../../../src/viewer/components/prepare-task-model.js";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
@@ -314,6 +315,33 @@ describe("PrepareTaskModal", () => {
     cleanupRenderedDiv(root!);
     root = undefined;
     expect(document.activeElement).toBe(opener);
+  });
+
+  it("closes only itself on Escape over the detail panel, and returns focus to Start", async () => {
+    const panelClose = vi.fn();
+    const panelRoot = renderToDiv(h(DetailPanel, {
+      detail: { type: "generic" as const, title: "Task" },
+      onClose: panelClose,
+    }));
+    const start = document.createElement("button");
+    document.body.appendChild(start);
+    start.focus();
+    const { onClose } = await open();
+
+    const esc = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+    await act(async () => { document.dispatchEvent(esc); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(panelClose).not.toHaveBeenCalled();
+    expect(esc.defaultPrevented).toBe(true);
+
+    cleanupRenderedDiv(root!);
+    root = undefined;
+    expect(document.activeElement).toBe(start);
+
+    // Modal gone: Escape closes the panel again.
+    await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true })); });
+    expect(panelClose).toHaveBeenCalledTimes(1);
+    cleanupRenderedDiv(panelRoot);
   });
 
   it("traps Tab inside the dialog", async () => {

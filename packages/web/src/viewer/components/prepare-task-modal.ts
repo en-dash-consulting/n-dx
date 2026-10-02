@@ -104,11 +104,14 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      e.stopPropagation();
+      // Capture phase + stopImmediatePropagation: a host's own document
+      // Escape listener (the PRD detail panel) must not also close.
+      e.preventDefault();
+      e.stopImmediatePropagation();
       onClose();
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
   const request = useCallback(async (path: string, body?: unknown): Promise<Reply> => {
