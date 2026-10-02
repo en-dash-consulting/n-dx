@@ -2,7 +2,7 @@
 id: "f8afecbd-6216-4d72-98b3-b8d9a26836a4"
 level: "task"
 title: "GET /api/hench/ready blocks the dashboard's event loop for seconds per refresh"
-status: "in_progress"
+status: "completed"
 priority: "high"
 tags:
   - "0.8.0"
@@ -13,11 +13,15 @@ tags:
   - "performance"
 source: "ndx-adversarial-review"
 startedAt: "2026-10-02T08:12:03.468Z"
+completedAt: "2026-10-02T08:28:56.405Z"
+endedAt: "2026-10-02T08:28:56.405Z"
+resolutionType: "code-change"
+resolutionDetail: "handleReady uses one findActionableTasks call (85bf26685); follow-up commit fixes the three root policy tests: gateway cap 75, contract list, wall-clock assertion replaced by call count."
 acceptanceCriteria:
   - "GET /api/hench/ready computes its order with a single selection pass, not one findNextTask call per row."
   - "A test asserts the returned order equals the findNextTask-repeated order on a fixture with dependencies and mixed priorities."
   - "A timing test (or benchmark assertion with generous bounds) on a generated 2,000-item tree completes well under one second."
-description: "Verdict: must-fix (introduced; hit on every Ready to run refresh).\n\nScenario: packages/web/src/server/routes-hench-prep.ts:274-292 calls findNextTask once per row, and each call rebuilds the comparator (requirementsScore for every item, buildDependentCounts over the whole tree; rex next-task.ts:205-219), synchronously on the request thread. Measured on this repo's PRD (1,849 items, 28 actionable): the loop takes 4.7 s; one findActionableTasks(items, completed, 50, {excludeIds}) call takes 170 ms and returns the identical order. At 4× the PRD it ran over 2 minutes. ready-to-run.ts:87 refetches on every hench-runs live event, so the dashboard freezes for seconds each time a run changes.\n\nFix (recommended): replace the loop with one findActionableTasks(doc.items, completedIds, limit, { excludeIds }) call (export it through packages/web/src/server/rex-gateway.ts if needed). Keep the row shape, resume/liveRun flags and claimed-task exclusion unchanged."
-lastModified: "2026-10-02T08:12:03.882Z"
+description: "Verdict: must-fix (introduced; hit on every Ready to run refresh).\n\nScenario: packages/web/src/server/routes-hench-prep.ts:274-292 calls findNextTask once per row, and each call rebuilds the comparator (requirementsScore for every item, buildDependentCounts over the whole tree; rex next-task.ts:205-219), synchronously on the request thread. Measured on this repo's PRD (1,849 items, 28 actionable): the loop takes 4.7 s; one findActionableTasks(items, completed, 50, {excludeIds}) call takes 170 ms and returns the identical order. At 4× the PRD it ran over 2 minutes. ready-to-run.ts:87 refetches on every hench-runs live event, so the dashboard freezes for seconds each time a run changes.\n\nFix (recommended): replace the loop with one findActionableTasks(doc.items, completedIds, limit, { excludeIds }) call (export it through packages/web/src/server/rex-gateway.ts if needed). Keep the row shape, resume/liveRun flags and claimed-task exclusion unchanged.\n\n## Operator retry notes (2026-10-02)\n\nThe fix is already committed (85bf26685, \"order GET /api/hench/ready in one selection pass\"); do not redo it. hench's full test gate fails three ROOT tests that only `npm run test` at the project root runs (the web suite passes, which is why earlier runs saw green). Reproduce from the project root with:\n`npx vitest run tests/e2e/architecture-policy.test.js tests/integration/cross-package-contracts.test.js tests/e2e/wall-clock-inventory-policy.test.js`\n1. architecture-policy: \"packages/web/src/server/rex-gateway.ts does not exceed 74 exports\" — it has 75 after adding findActionableTasks. Raise the cap with the reason recorded the way earlier raises in that file are recorded, or reuse an existing gateway export.\n2. cross-package-contracts: \"web rex-gateway source exports match contract test list\" — add the new export to that list.\n3. wall-clock-inventory-policy: the new timing test binds a clock reading without an entry in tests/wall-clock-assertion-inventory.md — add the entry with its bound and why it is load-safe, or replace the wall-clock assertion with a deterministic one (for example, assert one selection pass by counting calls).\nThese three must pass before you commit; the web suite alone is not enough. `pnpm` is not permitted in the sandbox; use `npx vitest run`."
+lastModified: "2026-10-02T08:28:56.801Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
