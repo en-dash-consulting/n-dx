@@ -39,7 +39,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [New styles use undefined tokens --text-secondary and --danger, failing light-theme contrast](./new-styles-use-undefined-tokens-text.md) | pending |
 | [Open the Prepare task modal from every existing Start button and retire the PRD panel's separate Execute path](./open-the-prepare-task-modal-from-every.md) | completed |
 | [Pass --auto when the dashboard starts Self-Heal](./pass-auto-when-the-dashboard-starts.md) | completed |
-| [Prep resolve and preview refuse every deferred task, so no Start button can start one](./prep-resolve-and-preview-refuse-every.md) | pending |
+| [Prep resolve and preview refuse every deferred task, so no Start button can start one](./prep-resolve-and-preview-refuse-every.md) | completed |
 | [Ready to run lists stuck tasks first, though ndx work --auto skips them](./ready-to-run-lists-stuck-tasks-first.md) | pending |
 | [--resolve omits review-optional from its options, and its command drops --mine and --review-optional](./resolve-omits-review-optional-from-its.md) | pending |
 | [--resolve reports no reviewer model unless --review is passed, so the modal cannot show who reviews](./resolve-reports-no-reviewer-model.md) | pending |

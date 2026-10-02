@@ -2,7 +2,7 @@
 id: "a4edde6f-497e-4f59-a6e1-3c2f65eab7f6"
 level: "task"
 title: "Prep resolve and preview refuse every deferred task, so no Start button can start one"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "0.8.0"
@@ -12,11 +12,16 @@ tags:
   - "web-server"
   - "hench"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-02T07:48:57.530Z"
+completedAt: "2026-10-02T08:11:29.100Z"
+endedAt: "2026-10-02T08:11:29.100Z"
+resolutionType: "code-change"
+resolutionDetail: "Prep resolve and preview pass --reset-deferred for deferred tasks (shared resetsDeferred rule, also used by execute and the modal via workCommandArgs taskStatus); hench dry run reads would-reset tasks as pending in memory for brief assembly (AssembleBriefOptions.wouldResetIds), writing nothing."
 acceptanceCriteria:
   - "GET /api/hench/prep/:taskId for a deferred task reports no not-actionable refusal and resolved.resetDeferred true; a route test covers it."
   - "POST /api/hench/prep/:taskId/preview for a deferred task returns a brief, writes nothing (tree, git status and claims unchanged) and a test covers it."
   - "The modal enables Execute for a deferred task, and its command line, the resolve call and the execute argv agree on --reset-deferred."
 description: "Verdict: must-fix (introduced by this feature, on the main path).\n\nScenario: click Start (or Prepare) on a deferred task. Every Start surface now opens the Prepare task modal (8ea209105). GET /api/hench/prep/:taskId spawns `ndx work --task=<id> --resolve <dir>` without `--reset-deferred` (packages/web/src/server/routes-hench-prep.ts:184), so run-resolve.ts:200 (`wouldBeReset`) never lifts the refusal and explicitTaskRefusal reports `not-actionable` (pinned by packages/hench/tests/integration/run-resolve.test.ts:276). The modal treats any refusal as blocking (prepare-task-modal.ts:293; standingRefusals only drops dirty-tree), so Execute is disabled — while execute itself would pass --reset-deferred (routes-hench.ts:1973) and the modal's own command line includes it (prepare-task-model.ts:229). Preview (routes-hench-prep.ts:234) also always 502s for a deferred task: even with the flag, the dry run's resetDeferredTasks does not save, so prepareBrief still sees `deferred` and refuses.\n\nReachable: yes, every deferred task from every Start surface. Not covered: no route test uses a deferred task.\n\nFix (recommended): in both prep routes add `--reset-deferred` when the PRD item is deferred — the same rule execute uses (detailOf already loads the item); make hench's dry run treat a task it would reset as pending for brief building, without writing. Alternative for preview only: have the modal say preview is unavailable for deferred tasks (cheaper, worse UX)."
-lastModified: "2026-10-02T07:47:21.730Z"
+lastModified: "2026-10-02T08:11:29.504Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
