@@ -31,6 +31,19 @@ export type { HubAdmissionHeader, HubMemoryPressure } from "./hub-admission.js";
 export { RUN_OPTION_SPECS, CONTEXT_NOTES_MAX_BYTES, checkRunOptions, resetsDeferred, runOptionArgs, workCommandArgs } from "./run-options.js";
 export type { RunOptionSpec, RunOptions, RunOptionKey, RunOptionsCheck, WorkCommand } from "./run-options.js";
 export {
+  AUTH_COOKIE_NAME,
+  AUTH_HEADER_NAME,
+  AUTH_QUERY_PARAM,
+  tokensEqual,
+  parseCookieValue,
+  presentedToken,
+  isAuthenticated,
+  splitTokenQuery,
+  authCookie,
+  urlWithToken,
+} from "./auth.js";
+export type { AuthHeaders } from "./auth.js";
+export {
   SOURCEVISION_SCOPE_VIEWS,
   REX_SCOPE_VIEWS,
   HENCH_SCOPE_VIEWS,

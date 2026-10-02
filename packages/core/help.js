@@ -1101,6 +1101,18 @@ const ORCHESTRATOR_HELP_DEFS = {
           "3117–3200. A non-n-dx occupant is cleared to free the port.",
       },
       {
+        title: "Access token",
+        content:
+          "Every account on a machine can reach 127.0.0.1, so the hub, the project\n" +
+          "servers and the preview server require a per-user token. 'ndx start'\n" +
+          "creates it at <ndx home>/auth.token (mode 0600), prints a URL that\n" +
+          "carries it once (the server sets an HttpOnly cookie and redirects to the\n" +
+          "clean URL), and passes it to every server it starts. Scripts and MCP\n" +
+          "clients send it as 'X-Ndx-Token: <token>' or 'Authorization: Bearer\n" +
+          "<token>'; the printed 'claude mcp add' lines include the header.\n" +
+          "--no-auth, or web.auth false in .n-dx.json, turns it off.",
+      },
+      {
         title: "Preview mode (--preview)",
         content:
           "Serves an editable UI layout document (packages/web/src/preview/index.html)\n" +
@@ -1124,6 +1136,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--open", description: "Open the project URL in the browser" },
       { flag: "--preview", description: "Serve the UI layout preview document instead of the dashboard" },
       { flag: "--file=<path>", description: "With --preview: serve this HTML document instead of the default" },
+      { flag: "--no-auth", description: "Run without the per-user dashboard token (also: web.auth false in .n-dx.json). Loopback is shared by every account on the host; the token is what keeps another account out" },
     ],
     examples: [
       { command: "ndx start .", description: "Register with the hub; several repos share port 3117" },

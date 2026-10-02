@@ -38,7 +38,7 @@ import { existsSync, statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { detectBasePath, projectIdFromBasePath, safeDecodeSegment, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, RegisterProjectInput } from "./hub.js";
-import { buildHubOverview } from "./overview.js";
+import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { renderCards } from "./home.js";
 
 const HUB_PREFIX = "/api/hub";
@@ -200,7 +200,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   // page was served with, rendered once here rather than a second time in the
   // browser, so there is one renderer and not two that can disagree.
   if (path === "/overview" && method === "GET") {
-    const overview = await buildHubOverview(hub.listProjects());
+    const overview = await buildHubOverview(hub.listProjects(), (port) => fetchChildSnapshot(port, 2_000, hub.token));
     json(res, 200, { ...overview, html: renderCards(overview) });
     return true;
   }

@@ -69,6 +69,7 @@
  * - `layout.ts` — folder-layout resolver (`.ndx/` first, legacy fallback)
  * - `project-config.ts` — `.n-dx.json` override loading and merging
  * - `json.ts` — canonical JSON serialization
+ * - `auth-token.ts` — per-user dashboard token file (`<ndx home>/auth.token`)
  * - `output.ts` — CLI output control (quiet mode)
  * - `suggest.ts` — CLI typo correction
  * - `help-format.ts` — CLI help formatting and color output
@@ -360,6 +361,10 @@ export type {
 
 // Canonical JSON serialization
 export { toCanonicalJSON } from "./json.js";
+
+// Per-user dashboard token file (`<ndx home>/auth.token`); the request check lives in web/shared/auth.ts
+export { AUTH_TOKEN_FILENAME, resolveAuthTokenPath, readAuthToken, ensureAuthToken, hasAuthToken } from "./auth-token.js";
+export type { AuthTokenPathOptions } from "./auth-token.js";
 
 // Project-level config utilities (.n-dx.json overrides)
 export {
