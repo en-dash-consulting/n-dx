@@ -27,7 +27,9 @@
  * each line is printed directly via console.log(), matching prior behaviour.
  *
  * Full output (raw text, no ANSI) is always captured in _capturedLines for
- * log-file persistence by the sibling log-persistence subsystem.
+ * log-file persistence by the sibling log-persistence subsystem, and handed
+ * line by line to the sink installed by setCapturedLineSink() — which is how
+ * a run's `.run-logs/` file grows while the run is still going.
  */
 
 // Re-export shared foundation primitives.
@@ -72,6 +74,34 @@ let _linesRendered = 0;
 
 /** Full plain-text capture of every stream/detail line emitted this run. */
 const _capturedLines: string[] = [];
+
+/** Live consumer of captured lines, or null when nothing is listening. */
+let _lineSink: ((line: string) => void) | null = null;
+
+/**
+ * Record one captured line and hand it to the live sink.
+ *
+ * Every write to {@link _capturedLines} goes through here, so the sink sees
+ * exactly the lines — and in exactly the order — that the end-of-run buffer
+ * holds. That equivalence is what lets the incremental run log produce a file
+ * byte-identical to the one written from the buffer.
+ */
+function capture(line: string): void {
+  _capturedLines.push(line);
+  _lineSink?.(line);
+}
+
+/**
+ * Install a consumer notified of every captured line as it is emitted, or
+ * null to remove the current one. Used by the run lifecycle to stream output
+ * into `.run-logs/` while the run is still in progress.
+ *
+ * The sink must not throw: it is called from inside stream()/detail(), on the
+ * agent loop's own path, where an exception would take down the run.
+ */
+export function setCapturedLineSink(sink: ((line: string) => void) | null): void {
+  _lineSink = sink;
+}
 
 /**
  * Override hook for tests — null means use process.stdout.isTTY.
@@ -169,7 +199,7 @@ function _pushWindowLine(displayLine: string, rawLine: string): void {
   const rawPhysical = rawLine.split("\n");
   const displayPhysical = displayLine.split("\n");
   for (let i = 0; i < rawPhysical.length; i++) {
-    _capturedLines.push(rawPhysical[i] ?? "");
+    capture(rawPhysical[i] ?? "");
     if (_windowLines.length >= ROLLING_WINDOW_SIZE) {
       _windowLines.shift(); // evict the oldest visible row
     }
@@ -326,7 +356,7 @@ export function stream(
     _pushWindowLine(displayLine, rawLine);
   } else {
     console.log(`  ${coloredBracket}${padding} ${coloredText}`);
-    _capturedLines.push(rawLine);
+    capture(rawLine);
   }
 }
 
@@ -345,6 +375,6 @@ export function detail(text: string): void {
     _pushWindowLine(colorDim(indented), indented);
   } else {
     console.log(dim(indented));
-    _capturedLines.push(indented);
+    capture(indented);
   }
 }

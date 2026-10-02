@@ -49,26 +49,22 @@ import {
 
 import {
   HenchRunsView,
-  HenchConfigView,
-  HenchTemplatesView,
   AdaptiveOptimizationView,
 } from "./domain-hench.js";
 
 import { WorkspacesView } from "./domain-workspaces.js";
+import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import type { StageId } from "./stages.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 
 import {
-  NotionConfigView,
-  IntegrationConfigView,
-  FeatureTogglesView,
-  CliTimeoutsView,
+  WorkflowView,
   CommandsView,
   CommandReferenceView,
-  LlmProviderView,
-  ProjectSettingsView,
+  RobotWranglerView,
+  ProjectView,
 } from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
@@ -138,6 +134,18 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "workspaces": () =>
     h(WorkspacesView, null),
 
+  "live": ({ data, navigateTo, jobs }) =>
+    h(LiveView, { navigateTo, analyzedAt: data.manifest?.analyzedAt ?? null, jobs }),
+
+  // Keyed by task: switching tasks in place starts a fresh page, not the last one's run choice.
+  "live-task": (ctx) =>
+    ctx.selectedTaskId
+      ? h(LiveTaskView, { key: ctx.selectedTaskId, taskId: ctx.selectedTaskId, navigateTo: ctx.navigateTo })
+      : REGISTRY["live"](ctx),
+
+  "live-analyze": ({ navigateTo }) =>
+    h(LiveAnalyzeView, { navigateTo }),
+
   "overview": ({ data, jobs }) =>
     h(Overview, { data, jobs }),
 
@@ -195,23 +203,11 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "activity": () =>
     h(ActivityView, null),
 
-  "notion-config": () =>
-    h(NotionConfigView, null),
-
-  "integrations": () =>
-    h(IntegrationConfigView, null),
-
   "hench-runs": ({ navigateTo, selectedRunId }) =>
     h(HenchRunsView, { navigateTo, initialRunId: selectedRunId }),
 
   "hench-audit": ({ navigateTo }) =>
     h(TaskAuditView, { navigateTo }),
-
-  "hench-config": () =>
-    h(HenchConfigView, null),
-
-  "hench-templates": () =>
-    h(HenchTemplatesView, null),
 
   "hench-optimization": () =>
     h(WorkflowOptimizationView, null),
@@ -219,11 +215,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "hench-adaptive": () =>
     h(AdaptiveOptimizationView, null),
 
-  "feature-toggles": () =>
-    h(FeatureTogglesView, null),
-
-  "cli-timeouts": () =>
-    h(CliTimeoutsView, null),
+  "workflow": ({ navigateTo }) =>
+    h(WorkflowView, { navigateTo }),
 
   "commands": ({ jobs }) =>
     h(CommandsView, { jobs }),
@@ -231,11 +224,11 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "command-reference": () =>
     h(CommandReferenceView, null),
 
-  "llm-provider": () =>
-    h(LlmProviderView, null),
+  "robot-wrangler": () =>
+    h(RobotWranglerView, null),
 
-  "project-settings": () =>
-    h(ProjectSettingsView, null),
+  "project": () =>
+    h(ProjectView, null),
 };
 
 /** Render the view identified by `view` using props from `ctx`. */

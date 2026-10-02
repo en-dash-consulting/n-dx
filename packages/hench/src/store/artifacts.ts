@@ -71,8 +71,17 @@ const RUNTIME_ENTRIES_IN_HENCH_DIR: readonly string[] = [
   "session-cache.json",
 ];
 
-/** Runtime output that sits at the project root on either layout. */
-const RUNTIME_ENTRIES_AT_ROOT: readonly string[] = [".hench-commit-msg.txt"];
+/**
+ * Runtime output that sits at the project root on either layout.
+ *
+ * `.run-logs/` is the run log directory. It is created when the run starts —
+ * the log is written as the run goes, not assembled at the end — so it exists
+ * while that same run's completion gate looks at the tree. Without the
+ * discount, the first run in a project that has not got the ignore line yet
+ * refuses to complete over a directory it created itself: the `.hench/mcp/`
+ * story above, again.
+ */
+const RUNTIME_ENTRIES_AT_ROOT: readonly string[] = [".hench-commit-msg.txt", ".run-logs/"];
 
 /**
  * `.gitignore` lines `hench init` writes for a project, named for the layout it

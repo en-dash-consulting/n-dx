@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 22368,
-    "uniqueTokens": 13865,
+    "perCallTokens": 22499,
+    "uniqueTokens": 13996,
     "skills": 13,
     "skillTokens": 17511
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4148,
-      "uniqueTokens": 4148
+      "perCallTokens": 4279,
+      "uniqueTokens": 4279
     },
     "core": {
       "surfaces": 1,
@@ -665,7 +665,7 @@
         "JSON_OBJECT_ONLY": 16
       },
       "ownTokens": 559,
-      "fixedChars": 2355,
+      "fixedChars": 2356,
       "fixedTokens": 589
     },
     {
@@ -727,11 +727,11 @@
       "builder": "buildSystemPrompt",
       "purpose": "The agent's system prompt — role, rules, workflow, error handling.",
       "inline": false,
-      "literals": 66,
+      "literals": 69,
       "constants": {},
-      "ownTokens": 923,
-      "fixedChars": 3689,
-      "fixedTokens": 923
+      "ownTokens": 1005,
+      "fixedChars": 4019,
+      "fixedTokens": 1005
     },
     {
       "pkg": "hench",
@@ -787,11 +787,11 @@
       "builder": "buildOrientationSystemPrompt",
       "purpose": "System prompt for the one-off repository orientation pass.",
       "inline": false,
-      "literals": 9,
+      "literals": 10,
       "constants": {},
-      "ownTokens": 114,
-      "fixedChars": 454,
-      "fixedTokens": 114
+      "ownTokens": 147,
+      "fixedChars": 586,
+      "fixedTokens": 147
     },
     {
       "pkg": "hench",
@@ -801,9 +801,9 @@
       "inline": false,
       "literals": 36,
       "constants": {},
-      "ownTokens": 375,
-      "fixedChars": 1497,
-      "fixedTokens": 375
+      "ownTokens": 391,
+      "fixedChars": 1563,
+      "fixedTokens": 391
     },
     {
       "pkg": "hench",
@@ -916,13 +916,13 @@
     "hench": {
       "surface": "buildPromptEnvelope",
       "describe": "Full agent envelope (system + brief) for a CLI-provider run.",
-      "chars": 2954,
-      "tokens": 739,
+      "chars": 3253,
+      "tokens": 814,
       "sections": [
         {
           "name": "system",
-          "chars": 2284,
-          "tokens": 571
+          "chars": 2583,
+          "tokens": 646
         },
         {
           "name": "brief",
@@ -930,9 +930,9 @@
           "tokens": 167
         }
       ],
-      "fixedTokens": 1160,
+      "fixedTokens": 1242,
       "branchConditional": true,
-      "unreachedTokens": 421
+      "unreachedTokens": 428
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -987,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "584c7bf855939e5e",
-  "recordedAt": "2026-09-29T16:35:20.672Z",
-  "commit": "5909ca118eb7",
+  "contentHash": "ab386a6559cd89a5",
+  "recordedAt": "2026-10-02T03:20:14.037Z",
+  "commit": "358c54c8a662",
   "dirty": false
 }

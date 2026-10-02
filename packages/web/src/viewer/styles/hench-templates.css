@@ -15,6 +15,13 @@
   margin-top: 6px;
 }
 
+/* Shown while the page's unsaved edits keep Apply and Save as template disabled. */
+.hench-templates-blocked-hint {
+  margin: 0 0 var(--space-3);
+  color: var(--orange);
+  font-size: var(--font-sm);
+}
+
 /* Error state */
 .hench-templates-error {
   text-align: center;

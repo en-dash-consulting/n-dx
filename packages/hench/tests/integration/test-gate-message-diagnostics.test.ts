@@ -191,7 +191,7 @@ describe("finalizeRun test-gate failure messages and diagnostics", () => {
     expect(run.diagnostics?.testGateOutputTail).toContain("line 1 of the hung suite");
 
     const logDir = join(projectDir, ".run-logs");
-    const files = await readdir(logDir);
+    const files = (await readdir(logDir)).filter((name) => name.endsWith(".log"));
     expect(files.length).toBeGreaterThan(0);
     const logContent = await readFile(join(logDir, files[0]), "utf-8");
     expect(logContent).toContain("line 1 of the hung suite");

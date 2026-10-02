@@ -428,11 +428,20 @@ export type { VendorModelHeaderOptions, ModelSource } from "./vendor-header.js";
 // Vendor-change detection and model reset
 export {
   isModelCompatibleWithVendor,
+  isChatModelId,
   detectVendorChange,
   resetStaleModel,
   formatVendorChangeWarning,
 } from "./vendor-model-reset.js";
 export type { VendorModelResetResult } from "./vendor-model-reset.js";
+
+// Live model listing from the vendor APIs
+export { listVendorModels } from "./vendor-model-list.js";
+export type {
+  VendorModelListing,
+  ListableVendor,
+  ListVendorModelsOptions,
+} from "./vendor-model-list.js";
 
 // CLI typo correction
 export {

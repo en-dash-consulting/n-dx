@@ -171,9 +171,17 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
         await mount(h(TopNav, {
           view: "analyze", validViews: VALID, onNavigate: () => {}, onOpenSearch: () => {},
         }));
-        const tabs = [...root.querySelectorAll(".topnav-tab")];
+        const tabs = [...root.querySelectorAll(".topnav-tab[data-stage]")];
         expect(tabs.map((t) => accessibleName(t, hidden)))
           .toEqual(STAGE_ORDER.map((id) => viewLabel(id)));
+      });
+
+      it("the Live tab is named for what it shows, not by its dot", async () => {
+        await mount(h(TopNav, {
+          view: "analyze", validViews: VALID, onNavigate: () => {}, onOpenSearch: () => {},
+        }));
+        const live = root.querySelector(".topnav-tab-live")!;
+        expect(accessibleName(live, hidden)).toBe("Live, nothing running");
       });
 
       it("every stage link names the stage it steps to", async () => {
@@ -190,7 +198,7 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
 
       it("every settings entry is named by the navigation model", async () => {
         await mount(h(SettingsOverlay, {
-          view: "llm-provider", validViews: VALID, onNavigate: () => {}, onClose: () => {}, children: null,
+          view: "robot-wrangler", validViews: VALID, onNavigate: () => {}, onClose: () => {}, children: null,
         }));
         const items = [...root.querySelectorAll(".settings-overlay-item")];
         // Two entries are behind default-off feature toggles.

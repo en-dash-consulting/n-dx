@@ -32,6 +32,7 @@ import { ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { askJev, choice, noul, score } from "./jev-client.js";
 import type { JevQuestion, JevResponse, JsonValue } from "./jev-client.js";
 import { collectFileHeaders } from "./file-headers.js";
+import { markBatch } from "./analyze-progress.js";
 
 // ── Thresholds ───────────────────────────────────────────────────────────────
 
@@ -438,10 +439,13 @@ export async function judgeFindings(
   };
 
   const perRequest = evidence ? FINDINGS_PER_REQUEST_WITH_EVIDENCE : FINDINGS_PER_REQUEST;
+  const requestCount = Math.ceil(candidates.length / perRequest);
   for (let start = 0; start < candidates.length; start += perRequest) {
+    markBatch("finding judgment", start / perRequest, requestCount);
     const ok = await judgeBatch(candidates.slice(start, start + perRequest));
     if (!ok) break;
   }
+  if (requestCount > 0) markBatch("finding judgment", requestCount, requestCount);
 
   if (calls > 0) {
     const evidenceNote = evidence
@@ -558,7 +562,9 @@ export async function assessZoneFragility(
   const usage: TokenUsage = { input: 0, output: 0 };
   let calls = 0;
 
+  const requestCount = Math.ceil(zones.length / ZONES_PER_REQUEST);
   for (let start = 0; start < zones.length; start += ZONES_PER_REQUEST) {
+    markBatch("zone fragility", start / ZONES_PER_REQUEST, requestCount);
     const batch = zones.slice(start, start + ZONES_PER_REQUEST);
     const { state, questions, ids } = buildZoneFragilityRequest(batch, crossings);
     let response;
@@ -584,6 +590,7 @@ export async function assessZoneFragility(
       probabilities.set(zone.id, entry);
     }
   }
+  markBatch("zone fragility", requestCount, requestCount);
   return { probabilities, tokenUsage: calls > 0 ? usage : undefined, calls };
 }
 

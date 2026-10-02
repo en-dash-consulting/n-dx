@@ -1,9 +1,11 @@
 /**
- * Notion Configuration view — manages Notion API credentials and connection.
+ * Notion section — Notion API credentials and connection, as the Project page
+ * renders them (only while `rex.notionSync` is on).
  *
- * Provides a secure form for entering Notion API key and database ID,
- * validates input format, tests the connection, and displays connection
- * health status with a green/yellow/red indicator.
+ * The credentials are the form (`useNotionForm`): the page's Save writes them.
+ * Test connection, Sync and Remove Configuration are immediate actions; they
+ * never change whether the form is dirty, and Remove is held back while the
+ * form has unsaved edits so it cannot discard them silently.
  *
  * Data comes from:
  *   GET    /api/notion/config  — current config (masked token)
@@ -13,8 +15,7 @@
  */
 
 import { h, Fragment } from "preact";
-import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { BrandedHeader } from "../components/index.js";
+import { useState, useEffect, useCallback } from "preact/hooks";
 import { NotionSchemaWizard } from "../components/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -62,6 +63,228 @@ function validateDatabaseIdFormat(id: string): string | null {
     return "Database ID must be a valid UUID (32 hex characters)";
   }
   return null;
+}
+
+// ── Form state ───────────────────────────────────────────────────────
+
+/** State and actions of the Notion form. The Project page owns it. */
+export interface NotionForm {
+  config: NotionConfig | null;
+  loading: boolean;
+  /** Why the config could not be loaded. */
+  loadError: string | null;
+  /** Why the last save failed. Cleared by the next save or a discard. */
+  saveError: string | null;
+  /** Why the last immediate action (remove) failed. */
+  actionError: string | null;
+  token: string;
+  databaseId: string;
+  tokenVisible: boolean;
+  fieldErrors: ValidationErrors;
+  testing: boolean;
+  testResult: ConnectionTestResult | null;
+  confirmRemove: boolean;
+  removing: boolean;
+  /** True while a token is typed, or the database ID differs from the saved one. */
+  dirty: boolean;
+  onTokenChange: (value: string) => void;
+  onDatabaseIdChange: (value: string) => void;
+  toggleTokenVisible: () => void;
+  /** POST the current form values to /api/notion/test. Not an edit. */
+  test: () => Promise<void>;
+  setConfirmRemove: (confirm: boolean) => void;
+  /** DELETE the saved config and reset the form. Not an edit. */
+  remove: () => Promise<void>;
+  /**
+   * PUT the credentials to /api/notion/config. Resolves true once saved (or
+   * when nothing is dirty); false leaves the edits in place with an error set.
+   */
+  save: () => Promise<boolean>;
+  /** Drop the typed token and restore the saved database ID. */
+  discard: () => void;
+}
+
+/**
+ * @param enabled False while `rex.notionSync` is off: nothing is fetched and the
+ *   form stays clean, so a hidden section can never hold the page dirty.
+ */
+export function useNotionForm(enabled: boolean): NotionForm {
+  const [loading, setLoading] = useState(true);
+  const [config, setConfig] = useState<NotionConfig | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const [token, setToken] = useState("");
+  const [databaseId, setDatabaseId] = useState("");
+  const [tokenVisible, setTokenVisible] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<ValidationErrors>({});
+
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
+
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const fetchConfig = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notion/config");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Failed to load" }));
+        setLoadError((body as { error?: string }).error ?? "Failed to load configuration");
+        return;
+      }
+      const data = await res.json() as NotionConfig;
+      setConfig(data);
+      setLoadError(null);
+      // The token is never returned in plain text; its field stays empty.
+      setDatabaseId(data.databaseId ?? "");
+      setToken("");
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load configuration");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (enabled) void fetchConfig();
+  }, [enabled, fetchConfig]);
+
+  const savedDatabaseId = config?.databaseId ?? "";
+  const dirty = enabled
+    && (token.trim().length > 0
+      || (databaseId.trim().length > 0 && databaseId.trim() !== savedDatabaseId));
+
+  const onTokenChange = useCallback((value: string) => {
+    setToken(value);
+    const err = value.trim().length > 0 ? validateApiKeyFormat(value) : null;
+    setFieldErrors((prev) => ({ ...prev, token: err ?? undefined }));
+  }, []);
+
+  const onDatabaseIdChange = useCallback((value: string) => {
+    setDatabaseId(value);
+    const err = value.trim().length > 0 ? validateDatabaseIdFormat(value) : null;
+    setFieldErrors((prev) => ({ ...prev, databaseId: err ?? undefined }));
+  }, []);
+
+  const toggleTokenVisible = useCallback(() => setTokenVisible((v) => !v), []);
+
+  const save = useCallback(async (): Promise<boolean> => {
+    if (!dirty) return true;
+    setSaveError(null);
+
+    const payload: Record<string, string> = {};
+    if (token.trim().length > 0) {
+      const tokenErr = validateApiKeyFormat(token);
+      if (tokenErr) {
+        setFieldErrors((prev) => ({ ...prev, token: tokenErr }));
+        setSaveError("Fix the highlighted Notion fields before saving");
+        return false;
+      }
+      payload.token = token.trim();
+    }
+    if (databaseId.trim().length > 0) {
+      const dbErr = validateDatabaseIdFormat(databaseId);
+      if (dbErr) {
+        setFieldErrors((prev) => ({ ...prev, databaseId: dbErr }));
+        setSaveError("Fix the highlighted Notion fields before saving");
+        return false;
+      }
+      payload.databaseId = databaseId.trim();
+    }
+
+    try {
+      const res = await fetch("/api/notion/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Save failed" })) as
+          { error?: string; errors?: ValidationErrors };
+        if (body.errors) setFieldErrors(body.errors);
+        setSaveError(body.error ?? "Notion configuration was not saved");
+        return false;
+      }
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Save failed");
+      return false;
+    }
+
+    // The token is redacted on disk now; clear the field and show what was stored.
+    setTokenVisible(false);
+    setFieldErrors({});
+    await fetchConfig();
+    return true;
+  }, [dirty, token, databaseId, fetchConfig]);
+
+  const discard = useCallback(() => {
+    setToken("");
+    setTokenVisible(false);
+    setDatabaseId(savedDatabaseId);
+    setFieldErrors({});
+    setSaveError(null);
+  }, [savedDatabaseId]);
+
+  const test = useCallback(async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      // Test the form as it stands, saved or not.
+      const payload: Record<string, string> = {};
+      if (token.trim().length > 0) payload.token = token.trim();
+      if (databaseId.trim().length > 0) payload.databaseId = databaseId.trim();
+
+      const res = await fetch("/api/notion/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        setTestResult({ status: "red", message: "Connection test request failed" });
+        return;
+      }
+      setTestResult(await res.json() as ConnectionTestResult);
+    } catch (err) {
+      setTestResult({
+        status: "red",
+        message: err instanceof Error ? err.message : "Connection test failed",
+      });
+    } finally {
+      setTesting(false);
+    }
+  }, [token, databaseId]);
+
+  const remove = useCallback(async () => {
+    setRemoving(true);
+    setActionError(null);
+    try {
+      const res = await fetch("/api/notion/config", { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Remove failed" }));
+        setActionError((body as { error?: string }).error ?? "Remove failed");
+        return;
+      }
+      setTestResult(null);
+      setConfirmRemove(false);
+      await fetchConfig();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Remove failed");
+    } finally {
+      setRemoving(false);
+    }
+  }, [fetchConfig]);
+
+  return {
+    config, loading, loadError, saveError, actionError,
+    token, databaseId, tokenVisible, fieldErrors,
+    testing, testResult, confirmRemove, removing,
+    dirty,
+    onTokenChange, onDatabaseIdChange, toggleTokenVisible,
+    test, setConfirmRemove, remove,
+    save, discard,
+  };
 }
 
 // ── Status indicator component ───────────────────────────────────────
@@ -157,27 +380,30 @@ function SyncPanel() {
     ),
     h("div", { class: "cmd-sync-row" },
       h("button", {
+        type: "button",
         class: "cmd-sync-btn",
         onClick: () => handleSync("push"),
         disabled: syncState === "running",
       },
-        syncState === "running" ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }) : "\u2191",
+        syncState === "running" ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }) : "↑",
         " Push",
       ),
       h("button", {
+        type: "button",
         class: "cmd-sync-btn",
         onClick: () => handleSync("pull"),
         disabled: syncState === "running",
       },
-        syncState === "running" ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }) : "\u2193",
+        syncState === "running" ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }) : "↓",
         " Pull",
       ),
       h("button", {
+        type: "button",
         class: "cmd-sync-btn",
         onClick: () => handleSync("sync"),
         disabled: syncState === "running",
       },
-        syncState === "running" ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }) : "\u21C5",
+        syncState === "running" ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }) : "⇅",
         " Sync",
       ),
     ),
@@ -190,290 +416,64 @@ function SyncPanel() {
   );
 }
 
-// ── Main view ────────────────────────────────────────────────────────
+// ── Section ──────────────────────────────────────────────────────────
 
-export function NotionConfigView() {
-  const [loading, setLoading] = useState(true);
-  const [config, setConfig] = useState<NotionConfig | null>(null);
-  const [error, setError] = useState<string | null>(null);
+/** Why Remove is unavailable, shown beside the button. */
+export const NOTION_REMOVE_BLOCKED_HINT = "Save or discard your Notion edits before removing the configuration.";
 
-  // Form state
-  const [token, setToken] = useState("");
-  const [databaseId, setDatabaseId] = useState("");
-  const [tokenVisible, setTokenVisible] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<ValidationErrors>({});
+export function NotionSection({ form }: { form: NotionForm }) {
+  const { config, fieldErrors } = form;
 
-  // Save state
-  const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Connection test state
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
-
-  // Remove state
-  const [confirmRemove, setConfirmRemove] = useState(false);
-  const [removing, setRemoving] = useState(false);
-
-  // ── Fetch current config ────────────────────────────────────────────
-
-  const fetchConfig = useCallback(async () => {
-    try {
-      const res = await fetch("/api/notion/config");
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setError((body as { error?: string }).error ?? "Failed to load configuration");
-        return;
-      }
-      const data = await res.json() as NotionConfig;
-      setConfig(data);
-      setError(null);
-
-      // Populate form with existing values
-      if (data.configured) {
-        setDatabaseId(data.databaseId ?? "");
-        // Token is never returned in plain text; form stays empty
-        setToken("");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load configuration");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchConfig();
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, [fetchConfig]);
-
-  // ── Validate on change ──────────────────────────────────────────────
-
-  const handleTokenChange = useCallback((e: Event) => {
-    const value = (e.target as HTMLInputElement).value;
-    setToken(value);
-    if (value.trim().length > 0) {
-      const err = validateApiKeyFormat(value);
-      setFieldErrors((prev) => ({ ...prev, token: err ?? undefined }));
-    } else {
-      setFieldErrors((prev) => ({ ...prev, token: undefined }));
-    }
-  }, []);
-
-  const handleDatabaseIdChange = useCallback((e: Event) => {
-    const value = (e.target as HTMLInputElement).value;
-    setDatabaseId(value);
-    if (value.trim().length > 0) {
-      const err = validateDatabaseIdFormat(value);
-      setFieldErrors((prev) => ({ ...prev, databaseId: err ?? undefined }));
-    } else {
-      setFieldErrors((prev) => ({ ...prev, databaseId: undefined }));
-    }
-  }, []);
-
-  // ── Save handler ────────────────────────────────────────────────────
-
-  const handleSave = useCallback(async () => {
-    // Build payload — only include fields that have values
-    const payload: Record<string, string> = {};
-
-    if (token.trim().length > 0) {
-      const tokenErr = validateApiKeyFormat(token);
-      if (tokenErr) {
-        setFieldErrors((prev) => ({ ...prev, token: tokenErr }));
-        return;
-      }
-      payload.token = token.trim();
-    }
-
-    if (databaseId.trim().length > 0) {
-      const dbErr = validateDatabaseIdFormat(databaseId);
-      if (dbErr) {
-        setFieldErrors((prev) => ({ ...prev, databaseId: dbErr }));
-        return;
-      }
-      payload.databaseId = databaseId.trim();
-    }
-
-    if (Object.keys(payload).length === 0) {
-      setError("Enter at least one field to save");
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
-    setSaveSuccess(false);
-
-    try {
-      const res = await fetch("/api/notion/config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Save failed" }));
-        if ((body as { errors?: Record<string, string> }).errors) {
-          setFieldErrors((body as { errors: Record<string, string> }).errors as ValidationErrors);
-        } else {
-          setError((body as { error?: string }).error ?? "Save failed");
-        }
-        return;
-      }
-
-      setSaveSuccess(true);
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => setSaveSuccess(false), 3000);
-
-      // Clear token field after save (it's now redacted on disk)
-      setToken("");
-      setTokenVisible(false);
-
-      // Refresh config display
-      await fetchConfig();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
-  }, [token, databaseId, fetchConfig]);
-
-  // ── Test connection handler ─────────────────────────────────────────
-
-  const handleTest = useCallback(async () => {
-    setTesting(true);
-    setTestResult(null);
-
-    try {
-      // Send current form values for testing
-      const payload: Record<string, string> = {};
-      if (token.trim().length > 0) payload.token = token.trim();
-      if (databaseId.trim().length > 0) payload.databaseId = databaseId.trim();
-
-      const res = await fetch("/api/notion/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        setTestResult({
-          status: "red",
-          message: "Connection test request failed",
-        });
-        return;
-      }
-
-      const result = await res.json() as ConnectionTestResult;
-      setTestResult(result);
-    } catch (err) {
-      setTestResult({
-        status: "red",
-        message: err instanceof Error ? err.message : "Connection test failed",
-      });
-    } finally {
-      setTesting(false);
-    }
-  }, [token, databaseId]);
-
-  // ── Remove handler ──────────────────────────────────────────────────
-
-  const handleRemove = useCallback(async () => {
-    setRemoving(true);
-    try {
-      const res = await fetch("/api/notion/config", { method: "DELETE" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Remove failed" }));
-        setError((body as { error?: string }).error ?? "Remove failed");
-        return;
-      }
-
-      // Reset all state
-      setToken("");
-      setDatabaseId("");
-      setTestResult(null);
-      setConfirmRemove(false);
-      await fetchConfig();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Remove failed");
-    } finally {
-      setRemoving(false);
-    }
-  }, [fetchConfig]);
-
-  // ── Render ──────────────────────────────────────────────────────────
-
-  if (loading) {
-    return h("div", { class: "notion-config-container" },
-      h("div", { class: "loading" }, "Loading Notion configuration..."),
-    );
+  if (form.loading) {
+    return h("div", { class: "loading" }, "Loading Notion configuration...");
   }
 
-  if (error && !config) {
-    return h("div", { class: "notion-config-container" },
-      h(BrandedHeader, { product: "rex", title: "Notion Integration" }),
-      h("div", { class: "notion-config-error-state" },
-        h("p", null, error),
-        h("p", { class: "notion-config-error-hint" },
-          "Make sure ",
-          h("code", null, ".rex/"),
-          " exists. Run ",
-          h("code", null, "rex init"),
-          " to create it.",
-        ),
+  if (form.loadError && !config) {
+    return h("div", { class: "notion-config-error-state" },
+      h("p", null, form.loadError),
+      h("p", { class: "notion-config-error-hint" },
+        "Make sure ",
+        h("code", null, ".rex/"),
+        " exists. Run ",
+        h("code", null, "rex init"),
+        " to create it.",
       ),
     );
   }
 
   const isConfigured = config?.configured ?? false;
+  const error = form.saveError ?? form.actionError;
 
   return h("div", { class: "notion-config-container" },
-    // ── Header ──────────────────────────────────────────────────────────
-    h("div", { class: "notion-config-header" },
-      h(BrandedHeader, { product: "rex", title: "Notion Integration" }),
-      h("p", { class: "notion-config-subtitle" },
-        "Connect your PRD to a Notion database for two-way sync.",
-      ),
+    h("p", { class: "notion-config-subtitle" },
+      "Connect your PRD to a Notion database for two-way sync.",
     ),
 
-    // ── Connection status ───────────────────────────────────────────────
+    // ── Connection status
     h("div", { class: "notion-config-section" },
       h("h3", { class: "notion-config-section-title" },
         h("span", { class: "notion-config-section-icon" }, "\u{1F50C}"),
         "Connection Status",
       ),
-      h(ConnectionStatus, { result: testResult, testing }),
+      h(ConnectionStatus, { result: form.testResult, testing: form.testing }),
       isConfigured
         ? h(EnvVarHint, { envVar: config?.tokenEnvVar ?? null })
         : null,
     ),
 
-    // ── Error banner ────────────────────────────────────────────────────
     error
-      ? h("div", { class: "notion-config-error-banner" }, error)
+      ? h("div", { class: "notion-config-error-banner", role: "alert" }, error)
       : null,
 
-    // ── Save success toast ──────────────────────────────────────────────
-    saveSuccess
-      ? h("div", { class: "notion-config-toast" },
-          h("span", { class: "notion-config-toast-icon" }, "\u2714"),
-          "Configuration saved",
-        )
-      : null,
-
-    // ── Form ────────────────────────────────────────────────────────────
+    // ── Credentials
     h("div", { class: "notion-config-section" },
       h("h3", { class: "notion-config-section-title" },
         h("span", { class: "notion-config-section-icon" }, "\u{1F511}"),
         "Credentials",
       ),
 
-      // API Key field
       h("div", { class: `notion-config-field${fieldErrors.token ? " notion-config-field-error" : ""}` },
-        h("label", { class: "notion-config-label" },
+        h("label", { class: "notion-config-label", htmlFor: "notion-token" },
           "Notion API Key",
           isConfigured
             ? h("span", { class: "notion-config-badge" }, "configured")
@@ -494,32 +494,32 @@ export function NotionConfigView() {
         ),
         h("div", { class: "notion-config-input-row" },
           h("input", {
-            type: tokenVisible ? "text" : "password",
+            id: "notion-token",
+            type: form.tokenVisible ? "text" : "password",
             class: "notion-config-input",
-            value: token,
+            value: form.token,
             placeholder: isConfigured
               ? `Current: ${config?.tokenMasked ?? "****"}`
               : "secret_xxxxx or ntn_xxxxx",
-            onInput: handleTokenChange,
+            onInput: (e: Event) => form.onTokenChange((e.target as HTMLInputElement).value),
             autocomplete: "off",
             spellcheck: false,
           }),
           h("button", {
             type: "button",
             class: "notion-config-toggle-visibility",
-            onClick: () => setTokenVisible(!tokenVisible),
-            title: tokenVisible ? "Hide token" : "Show token",
-            "aria-label": tokenVisible ? "Hide token" : "Show token",
-          }, tokenVisible ? "\u{1F441}" : "\u{1F441}\u200D\u{1F5E8}"),
+            onClick: form.toggleTokenVisible,
+            title: form.tokenVisible ? "Hide token" : "Show token",
+            "aria-label": form.tokenVisible ? "Hide token" : "Show token",
+          }, form.tokenVisible ? "\u{1F441}" : "\u{1F441}‍\u{1F5E8}"),
         ),
         fieldErrors.token
           ? h("div", { class: "notion-config-field-error-text" }, fieldErrors.token)
           : null,
       ),
 
-      // Database ID field
       h("div", { class: `notion-config-field${fieldErrors.databaseId ? " notion-config-field-error" : ""}` },
-        h("label", { class: "notion-config-label" },
+        h("label", { class: "notion-config-label", htmlFor: "notion-database-id" },
           "Database ID",
           isConfigured && config?.databaseId
             ? h("span", { class: "notion-config-badge" }, "configured")
@@ -530,11 +530,12 @@ export function NotionConfigView() {
           h("code", null, "notion.so/{workspace}/{database_id}?v=..."),
         ),
         h("input", {
+          id: "notion-database-id",
           type: "text",
           class: "notion-config-input",
-          value: databaseId,
+          value: form.databaseId,
           placeholder: "e.g. a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
-          onInput: handleDatabaseIdChange,
+          onInput: (e: Event) => form.onDatabaseIdChange((e.target as HTMLInputElement).value),
           autocomplete: "off",
           spellcheck: false,
         }),
@@ -544,62 +545,63 @@ export function NotionConfigView() {
       ),
     ),
 
-    // ── Actions ─────────────────────────────────────────────────────────
+    // ── Immediate actions
     h("div", { class: "notion-config-actions" },
       h("div", { class: "notion-config-actions-primary" },
         h("button", {
           type: "button",
-          class: "notion-config-save-btn",
-          onClick: handleSave,
-          disabled: saving || (token.trim().length === 0 && databaseId.trim().length === 0),
-        }, saving ? "Saving..." : "Save Configuration"),
-        h("button", {
-          type: "button",
           class: "notion-config-test-btn",
-          onClick: handleTest,
-          disabled: testing,
-        }, testing ? "Testing..." : "Test Connection"),
+          onClick: () => void form.test(),
+          disabled: form.testing,
+        }, form.testing ? "Testing..." : "Test Connection"),
       ),
       isConfigured
         ? h("div", { class: "notion-config-actions-danger" },
-            confirmRemove
+            form.confirmRemove
               ? h(Fragment, null,
                   h("span", { class: "notion-config-confirm-text" }, "Remove Notion config?"),
                   h("button", {
                     type: "button",
                     class: "notion-config-confirm-yes",
-                    onClick: handleRemove,
-                    disabled: removing,
-                  }, removing ? "Removing..." : "Yes, Remove"),
+                    onClick: () => void form.remove(),
+                    disabled: form.removing,
+                  }, form.removing ? "Removing..." : "Yes, Remove"),
                   h("button", {
                     type: "button",
                     class: "notion-config-confirm-no",
-                    onClick: () => setConfirmRemove(false),
+                    onClick: () => form.setConfirmRemove(false),
                   }, "Cancel"),
                 )
-              : h("button", {
-                  type: "button",
-                  class: "notion-config-remove-btn",
-                  onClick: () => setConfirmRemove(true),
-                }, "Remove Configuration"),
+              : h(Fragment, null,
+                  h("button", {
+                    type: "button",
+                    class: "notion-config-remove-btn",
+                    onClick: () => form.setConfirmRemove(true),
+                    disabled: form.dirty,
+                    title: form.dirty ? NOTION_REMOVE_BLOCKED_HINT : undefined,
+                  }, "Remove Configuration"),
+                  form.dirty
+                    ? h("span", { class: "notion-config-field-desc" }, NOTION_REMOVE_BLOCKED_HINT)
+                    : null,
+                ),
           )
         : null,
     ),
 
-    // ── Schema validation wizard ──────────────────────────────────────
+    // ── Schema validation wizard
     h("div", { class: "notion-config-section" },
       h(NotionSchemaWizard, { isConfigured }),
     ),
 
-    // ── Sync panel (only when configured) ────────────────────────────
+    // ── Sync panel (only when configured)
     isConfigured
       ? h(SyncPanel, null)
       : null,
 
-    // ── Help section ────────────────────────────────────────────────────
+    // ── Help section
     h("div", { class: "notion-config-section notion-config-help" },
       h("h3", { class: "notion-config-section-title" },
-        h("span", { class: "notion-config-section-icon" }, "\u2139"),
+        h("span", { class: "notion-config-section-icon" }, "ℹ"),
         "Setup Guide",
       ),
       h("ol", { class: "notion-config-steps" },
@@ -619,7 +621,7 @@ export function NotionConfigView() {
         ),
         h("li", null,
           h("strong", null, "Share the database"),
-          " with your integration (click \u2022\u2022\u2022 in the database, then Connections).",
+          " with your integration (click ••• in the database, then Connections).",
         ),
         h("li", null,
           h("strong", null, "Copy the database ID"),

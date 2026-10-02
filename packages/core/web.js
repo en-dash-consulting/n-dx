@@ -52,9 +52,9 @@ import { get as httpGet, request as httpRequest } from "http";
 import { createConnection } from "net";
 import { createHash, randomBytes } from "crypto";
 import { readFile, writeFile, unlink, access } from "fs/promises";
-import { realpathSync, readFileSync, mkdirSync, writeFileSync, chmodSync } from "fs";
+import { realpathSync, readFileSync, mkdirSync, writeFileSync, chmodSync, statSync } from "fs";
 import { basename, dirname, join, resolve } from "path";
-import { NDX_HOME_ENV, resolveNdxHome } from "./layout.js";
+import { NDX_HOME_ENV, resolveLayout, resolveNdxHome } from "./layout.js";
 import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
 
@@ -783,10 +783,25 @@ export function readAuthTokenFile(path = authTokenPath()) {
   }
 }
 
-/** Read the token, creating it (dir 0700, file 0600) when absent. */
+/**
+ * Tighten a token file readable by anyone but its owner. The twin of
+ * `repairTokenMode` in `@n-dx/llm-client`'s auth-token.ts: creating the file
+ * 0600 does nothing for one an older n-dx, an editor or a restored backup left
+ * at 0644, and that file would otherwise stay exposed for good.
+ */
+function repairTokenFileMode(path) {
+  try {
+    if ((statSync(path).mode & 0o077) !== 0) chmodSync(path, 0o600);
+  } catch { /* modes are advisory on some filesystems */ }
+}
+
+/** Read the token, creating it (dir 0700, file 0600) when absent; repair the mode of one that exists. */
 export function ensureAuthTokenFile(path = authTokenPath()) {
   const existing = readAuthTokenFile(path);
-  if (existing) return existing;
+  if (existing) {
+    repairTokenFileMode(path);
+    return existing;
+  }
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const token = randomBytes(32).toString("base64url");
   writeFileSync(path, `${token}\n`, { encoding: "utf-8", mode: 0o600 });
@@ -817,7 +832,20 @@ export function urlWithAuthToken(base, token) {
   return `${base}${base.includes("?") ? "&" : "?"}ndx_token=${encodeURIComponent(token)}`;
 }
 
-/** `web.auth` from the project's .n-dx.json; anything but `false` means on. */
+/**
+ * A hub-served project's dashboard URL: what `ndx start` prints, and what
+ * `--open` hands the browser.
+ *
+ * One function for both because they must not differ. The clean URL answers
+ * 401 when the hub requires a token, and a browser has no other way to be
+ * given one — so `--open` on the untokenized URL opened a dead page while the
+ * terminal showed a working link.
+ */
+export function hubDashboardUrl(hubPort, projectId, token) {
+  return urlWithAuthToken(`http://localhost:${hubPort}/p/${encodeURIComponent(projectId)}/`, token);
+}
+
+/** `web.auth` from the project's config file; anything but `false` means on. */
 async function loadAuthEnabled(dir) {
   return (await loadWebConfig(dir)).auth !== false;
 }
@@ -844,9 +872,16 @@ export async function readHubRegistry(home = hubHome()) {
   }
 }
 
-/** The project's `web` config block from .n-dx.json, or `{}` when absent or unreadable. */
+/**
+ * The project's `web` config block, or `{}` when absent or unreadable.
+ *
+ * The resolver is asked where the config file is rather than spelling it out:
+ * on an `.ndx/` project it is `.ndx/config.json`, and a literal `.n-dx.json`
+ * here would read nothing — silently leaving authentication on for a project
+ * that had turned it off, and ignoring its port and mode besides.
+ */
 async function loadWebConfig(dir) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = resolveLayout(dir).configFile;
   if (!(await fileExists(configPath))) return {};
   try {
     const web = JSON.parse(await readFile(configPath, "utf-8"))?.web;
@@ -856,7 +891,7 @@ async function loadWebConfig(dir) {
   }
 }
 
-/** `web.mode` from the project's .n-dx.json: "hub" or "here"; undefined when unset. */
+/** `web.mode` from the project's config file: "hub" or "here"; undefined when unset. */
 async function loadConfigMode(dir) {
   const mode = (await loadWebConfig(dir)).mode;
   return mode === "hub" || mode === "here" ? mode : undefined;
@@ -957,8 +992,15 @@ export function deriveProjectId(name, { repoRoot, remoteUrl, registryProjects })
   return `${slug}-${hash}`;
 }
 
-/** One JSON request to the hub. Resolves `{ status, body }`; status 0 when unreachable. */
-export function hubRequest(port, method, path, body, timeoutMs = PROBE_TIMEOUT_MS) {
+/**
+ * One JSON request to the hub. Resolves `{ status, body }`; status 0 when
+ * unreachable.
+ *
+ * `sendToken: false` deliberately omits the credential: a 401 from a hub that
+ * was asked anonymously is the only way to tell a hub that *requires* a token
+ * from one that merely tolerated the one we sent.
+ */
+export function hubRequest(port, method, path, body, timeoutMs = PROBE_TIMEOUT_MS, { sendToken = true } = {}) {
   return new Promise((res) => {
     const payload = body === undefined ? null : JSON.stringify(body);
     const req = httpRequest(
@@ -971,7 +1013,7 @@ export function hubRequest(port, method, path, body, timeoutMs = PROBE_TIMEOUT_M
           ...(payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {}),
           // The hub may be running with the per-user token; sending it when
           // the file exists costs nothing against a hub that is not.
-          ...(() => { const t = readAuthTokenFile(); return t ? { "X-Ndx-Token": t } : {}; })(),
+          ...(() => { const t = sendToken ? readAuthTokenFile() : null; return t ? { "X-Ndx-Token": t } : {}; })(),
         },
       },
       (response) => {
@@ -999,11 +1041,56 @@ async function hubIsHealthy(port) {
 }
 
 /**
+ * How the hub on `port` is authenticated — "absent", "open", "token" or
+ * "mismatch" (it wants a token, but not the one in this user's file).
+ *
+ * One hub serves every registered project, so authentication is a property of
+ * the *hub*, not of the project that happens to start it. Judging it from two
+ * probes is what makes that so: an anonymous `/api/hub/health` is refused with
+ * 401 by a hub that requires the token and answered by one that does not, and
+ * the second probe then says whether the token we hold is the one it wants.
+ */
+export async function hubAuthState(port, probe = hubRequest) {
+  const anonymous = await probe(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { sendToken: false });
+  if (anonymous.status === 200 && anonymous.body?.ok === true) return "open";
+  if (anonymous.status !== 401) return "absent";
+  const credentialed = await probe(port, "GET", "/api/hub/health");
+  return credentialed.status === 200 && credentialed.body?.ok === true ? "token" : "mismatch";
+}
+
+/**
+ * What to tell an operator whose hub does not match the mode this command
+ * asked for. Pure, so the wording is unit-tested without a hub.
+ */
+export function hubAuthMismatchMessage(state, wanted, port, tokenFile) {
+  const stop = "Stop it first ('ndx hub stop'), then run this command again.";
+  if (state === "open" && wanted === "token") {
+    // The dangerous direction, and the reason this check exists: reusing the
+    // open hub would serve *this* project with no token at all.
+    return `The n-dx hub already running on port ${port} was started without authentication, so registering this project would serve it unauthenticated too.\n${stop}\nTo join the open hub as it is, pass --no-auth or set web.auth=false.`;
+  }
+  if (state === "token" && wanted === "open") {
+    return `The n-dx hub already running on port ${port} requires the per-user token, so --no-auth (or web.auth=false) cannot apply to it.\n${stop}`;
+  }
+  return `The n-dx hub already running on port ${port} was started with a different token than ${tokenFile ?? "this user's"}.\n${stop}`;
+}
+
+/**
  * Make sure a hub is answering on `port`, spawning one detached if not.
  * Same CLAUDECODE-stripping, detached, unref'd pattern as background mode.
+ *
+ * A hub that is already up is only reused when its authentication matches what
+ * this command asked for. First-writer-wins would otherwise decide the mode for
+ * every later project: one `ndx start --no-auth` left the hub open, and the
+ * next authenticated project silently joined it, token file and all.
  */
 async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
-  if (await hubIsHealthy(port)) return { spawned: false, pid: null };
+  const wanted = tokenFile ? "token" : "open";
+  const state = await hubAuthState(port);
+  if (state !== "absent") {
+    if (state === wanted) return { spawned: false, pid: null };
+    throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile));
+  }
 
   const script = resolve(__dir, tools.web);
   const { CLAUDECODE: _cc, ...env } = process.env;
@@ -1381,9 +1468,10 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   }
 
   const base = `http://localhost:${hubPort}/p/${encodeURIComponent(id)}`;
+  const dashboardUrl = hubDashboardUrl(hubPort, id, token);
   log(`${label}: project "${id}" registered with the hub${status === 200 ? " (already known)" : ""}.`);
   log(`  Repository: ${repo.repoRoot}${repo.worktree !== repo.repoRoot ? `\n  Worktree:   ${repo.worktree}` : ""}${repo.branch ? ` (${repo.branch})` : ""}`);
-  log(`  URL: ${urlWithAuthToken(`${base}/`, token)}`);
+  log(`  URL: ${dashboardUrl}`);
   log(`  MCP (rex):          ${base}/mcp/rex`);
   log(`  MCP (sourcevision): ${base}/mcp/sourcevision`);
   log("");
@@ -1397,7 +1485,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   log("  Codex:   configured automatically via .codex/config.toml (stdio)");
   log("");
   log(`Stop: ${stopCmd} .   (or 'ndx hub stop' for every project)`);
-  if (flags.open) openBrowser(`${base}/`);
+  if (flags.open) openBrowser(dashboardUrl);
   return 0;
 }
 

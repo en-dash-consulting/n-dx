@@ -26,6 +26,8 @@ export {
   webSocketUrl,
 } from "./base-path.js";
 export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
+export { HUB_ADMISSION_HEADER, formatHubAdmissionHeader, parseHubAdmissionHeader } from "./hub-admission.js";
+export type { HubAdmissionHeader } from "./hub-admission.js";
 export {
   AUTH_COOKIE_NAME,
   AUTH_HEADER_NAME,

@@ -1,19 +1,23 @@
 /**
- * Hench Config view — workflow configuration form editor.
+ * Work settings — the hench config section of the Workflow page.
  *
- * Displays current hench configuration in an editable form with proper
- * form controls (dropdowns, number inputs, toggles, tag lists). Shows
- * a real-time impact preview for pending changes, validates client-side,
- * and supports batch saving all changes at once.
+ * `useHenchConfigForm` owns the form state (loaded fields, edits, validation,
+ * save); `HenchConfigSection` renders it with proper form controls
+ * (dropdowns, number inputs, toggles, tag lists) and a real-time impact
+ * preview. `views/workflow.ts` composes both onto the shared SettingsFrame,
+ * which owns Save and the unsaved-changes prompt.
+ *
+ * Provider and model are not rendered: Robot Wrangler owns them, and the
+ * section shows a link there in their place.
  *
  * Data comes from GET /api/hench/config (read) and
  * PUT /api/hench/config (update).
  */
 
 import { h } from "preact";
-import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
-import { BrandedHeader, GlossaryLine } from "../components/index.js";
-import { useCliName } from "../hooks/index.js";
+import type { ComponentChildren } from "preact";
+import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
+import { GlossaryLine } from "../components/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -35,12 +39,12 @@ interface ConfigResponse {
   fields: ConfigField[];
 }
 
-interface AppliedChange {
-  path: string;
-  oldValue: unknown;
-  newValue: unknown;
-  impact: string;
-}
+/**
+ * Fields the server serves that this section does not render: Robot Wrangler
+ * owns provider and model. `CONFIG_FIELD_META` keeps both, because
+ * `tests/e2e/hench-config-gate-contract.test.js` compares its keys with hench's.
+ */
+export const ROBOT_WRANGLER_FIELDS: ReadonlySet<string> = new Set(["provider", "model"]);
 
 // ── Category metadata ────────────────────────────────────────────────
 
@@ -53,7 +57,7 @@ export const CATEGORY_META: Record<string, { label: string; icon: string; descri
   execution: {
     label: "Execution Strategy",
     icon: "\u25B6",
-    description: "Controls how the agent runs: model selection, turn limits, and token budgets",
+    description: "Controls how the agent runs: turn limits, token budgets and permissions",
   },
   session: {
     label: "Session Reuse",
@@ -180,12 +184,6 @@ export function getPreviewImpact(field: ConfigField, rawValue: string): string {
     }
 
     switch (field.path) {
-      case "provider":
-        return value === "cli"
-          ? "Agent will use Claude Code CLI"
-          : "Agent will call Anthropic API directly";
-      case "model":
-        return `Agent will use model "${value}"`;
       case "maxTurns": {
         const n = Number(value);
         return `Agent will stop after ${n} turns (${n <= 10 ? "short" : n <= 30 ? "medium" : "long"} runs)`;
@@ -406,12 +404,14 @@ function FieldEditor({ field, editValue, error, onFieldChange }: {
 
 // ── Category section ─────────────────────────────────────────────────
 
-function CategorySection({ category, fields, editValues, errors, onFieldChange }: {
+function CategorySection({ category, fields, editValues, errors, onFieldChange, lead }: {
   category: string;
   fields: ConfigField[];
   editValues: Record<string, string>;
   errors: Record<string, string | null>;
   onFieldChange: (path: string, rawValue: string) => void;
+  /** Rendered ahead of the fields — the Robot Wrangler link, in place of provider and model. */
+  lead?: ComponentChildren;
 }) {
   const meta = CATEGORY_META[category] ?? { label: category, icon: "\u2022", description: "" };
 
@@ -425,6 +425,7 @@ function CategorySection({ category, fields, editValues, errors, onFieldChange }
       ),
     ),
     h("div", { class: "hench-config-fields" },
+      lead ?? null,
       ...fields.map((field) =>
         h(FieldEditor, {
           key: field.path,
@@ -438,217 +439,155 @@ function CategorySection({ category, fields, editValues, errors, onFieldChange }
   );
 }
 
-// ── Changes summary panel ────────────────────────────────────────────
+// ── Form state ───────────────────────────────────────────────────────
 
-function ChangesSummary({ pendingChanges, onSave, onDiscard, saving }: {
-  pendingChanges: Array<{ path: string; label: string; oldDisplay: string; newDisplay: string; impact: string }>;
-  onSave: () => void;
-  onDiscard: () => void;
-  saving: boolean;
-}) {
-  if (pendingChanges.length === 0) return null;
-
-  return h("div", { class: "hench-config-changes-panel" },
-    h("div", { class: "hench-config-changes-header" },
-      h("span", { class: "hench-config-changes-title" },
-        `${pendingChanges.length} unsaved change${pendingChanges.length > 1 ? "s" : ""}`,
-      ),
-    ),
-    h("div", { class: "hench-config-changes-list" },
-      ...pendingChanges.map((change) =>
-        h("div", { key: change.path, class: "hench-config-change-item" },
-          h("div", { class: "hench-config-change-label" }, change.label),
-          h("div", { class: "hench-config-change-diff" },
-            h("span", { class: "hench-config-change-old" }, change.oldDisplay || "(empty)"),
-            h("span", { class: "hench-config-change-arrow" }, "\u2192"),
-            h("span", { class: "hench-config-change-new" }, change.newDisplay || "(empty)"),
-          ),
-          h("div", { class: "hench-config-change-impact" }, change.impact),
-        ),
-      ),
-    ),
-    h("div", { class: "hench-config-changes-actions" },
-      h("button", {
-        type: "button",
-        class: "hench-config-discard-btn",
-        onClick: onDiscard,
-        disabled: saving,
-      }, "Discard All"),
-      h("button", {
-        type: "button",
-        class: "hench-config-save-all-btn",
-        onClick: onSave,
-        disabled: saving,
-      }, saving ? "Saving..." : "Save All Changes"),
-    ),
-  );
+/** State and actions of the work-settings form. The Workflow page owns it. */
+export interface HenchConfigForm {
+  /** Loaded fields, or null before the first successful load. */
+  data: ConfigResponse | null;
+  loading: boolean;
+  /** Why the config could not be loaded. */
+  loadError: string | null;
+  /** Why the last save failed. Cleared by the next save or a discard. */
+  saveError: string | null;
+  editValues: Record<string, string>;
+  fieldErrors: Record<string, string | null>;
+  /** True while any field differs from its saved value. */
+  dirty: boolean;
+  onFieldChange: (path: string, rawValue: string) => void;
+  /**
+   * PUT the dirty fields to /api/hench/config. Resolves true once saved (or
+   * when nothing is dirty); false leaves the edits in place with `saveError` set.
+   */
+  save: () => Promise<boolean>;
+  /** Drop every edit. */
+  discard: () => void;
+  /** Re-read the saved config, dropping edits — used after a template is applied. */
+  reload: () => Promise<void>;
 }
 
-// ── Toast notification ───────────────────────────────────────────────
-
-function SaveToast({ changes }: { changes: AppliedChange[] }) {
-  if (changes.length === 0) return null;
-
-  return h("div", { class: "hench-config-toast" },
-    h("span", { class: "hench-config-toast-icon" }, "\u2714"),
-    h("span", null, `Saved ${changes.length} change${changes.length > 1 ? "s" : ""}`),
-  );
-}
-
-// ── Main view ────────────────────────────────────────────────────────
-
-export function HenchConfigView() {
-  const cliName = useCliName();
+export function useHenchConfigForm(): HenchConfigForm {
   const [data, setData] = useState<ConfigResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [recentChanges, setRecentChanges] = useState<AppliedChange[]>([]);
-  const [saving, setSaving] = useState(false);
-
-  // Edit state: maps field path → current raw string value in form
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // Maps field path → current raw string value in the form.
   const [editValues, setEditValues] = useState<Record<string, string>>({});
-  // Validation errors per field
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
 
-  // Track toast timeout so we can clean up
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const fetchConfig = useCallback(async () => {
+  const reload = useCallback(async () => {
     try {
       const res = await fetch("/api/hench/config");
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setError((body as { error?: string }).error ?? "Failed to load configuration");
+        setLoadError((body as { error?: string }).error ?? "Failed to load configuration");
         return;
       }
-      const json = await res.json() as ConfigResponse;
-      setData(json);
-      setError(null);
-      // Reset edit state to match loaded values
+      setData(await res.json() as ConfigResponse);
+      setLoadError(null);
       setEditValues({});
       setFieldErrors({});
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load configuration");
+      setLoadError(err instanceof Error ? err.message : "Failed to load configuration");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchConfig();
-  }, [fetchConfig]);
+  useEffect(() => { void reload(); }, [reload]);
 
-  // Clean up toast timer on unmount
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
-
-  const handleFieldChange = useCallback((path: string, rawValue: string) => {
+  const onFieldChange = useCallback((path: string, rawValue: string) => {
     setEditValues((prev) => ({ ...prev, [path]: rawValue }));
-    // Validate on change
-    if (data) {
-      const field = data.fields.find((f) => f.path === path);
-      if (field) {
-        const err = validateField(field, rawValue);
-        setFieldErrors((prev) => ({ ...prev, [path]: err }));
-      }
-    }
+    const field = data?.fields.find((f) => f.path === path);
+    if (field) setFieldErrors((prev) => ({ ...prev, [path]: validateField(field, rawValue) }));
   }, [data]);
 
-  // Compute pending changes
-  const pendingChanges = useMemo(() => {
+  const dirtyFields = useMemo(() => {
     if (!data) return [];
-    const changes: Array<{ path: string; label: string; oldDisplay: string; newDisplay: string; impact: string }> = [];
-    for (const field of data.fields) {
-      const rawValue = editValues[field.path];
-      if (rawValue !== undefined && isDirty(field, rawValue)) {
-        changes.push({
-          path: field.path,
-          label: field.label,
-          oldDisplay: formatDisplayValue(field.value),
-          newDisplay: rawValue,
-          impact: getPreviewImpact(field, rawValue),
-        });
-      }
-    }
-    return changes;
+    return data.fields.filter((f) => {
+      const raw = editValues[f.path];
+      return raw !== undefined && isDirty(f, raw);
+    });
   }, [data, editValues]);
 
-  // Check if all pending changes are valid
-  const hasValidationErrors = useMemo(() => {
-    if (!data) return false;
-    for (const change of pendingChanges) {
-      const field = data.fields.find((f) => f.path === change.path);
-      if (field) {
-        const err = validateField(field, editValues[field.path] ?? formatDisplayValue(field.value));
-        if (err) return true;
+  const save = useCallback(async (): Promise<boolean> => {
+    if (dirtyFields.length === 0) return true;
+    setSaveError(null);
+
+    const changes: Record<string, unknown> = {};
+    for (const field of dirtyFields) {
+      const raw = editValues[field.path] ?? formatDisplayValue(field.value);
+      const invalid = validateField(field, raw);
+      if (invalid) {
+        setSaveError(invalid);
+        return false;
       }
+      changes[field.path] = coerceFieldValue(field, raw);
     }
-    return false;
-  }, [data, pendingChanges, editValues]);
-
-  const handleSaveAll = useCallback(async () => {
-    if (!data || pendingChanges.length === 0 || hasValidationErrors) return;
-
-    setSaving(true);
-    setError(null);
 
     try {
-      // Coerce all values
-      const changes: Record<string, unknown> = {};
-      for (const change of pendingChanges) {
-        const field = data.fields.find((f) => f.path === change.path);
-        if (field) {
-          changes[field.path] = coerceFieldValue(field, editValues[field.path] ?? formatDisplayValue(field.value));
-        }
-      }
-
       const res = await fetch("/api/hench/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ changes }),
       });
-
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: "Save failed" }));
-        setError((body as { error?: string }).error ?? "Save failed");
-        return;
+        setSaveError((body as { error?: string }).error ?? "Save failed");
+        return false;
       }
-
-      const result = await res.json() as { applied: AppliedChange[] };
-
-      // Show toast
-      setRecentChanges(result.applied);
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setRecentChanges([]), 3000);
-
-      // Refresh config (this also clears edit state)
-      await fetchConfig();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSaving(false);
+      setSaveError(err instanceof Error ? err.message : "Save failed");
+      return false;
     }
-  }, [data, pendingChanges, hasValidationErrors, editValues, fetchConfig]);
+    // Re-read so `isDefault`, `impact` and the values reflect what was written.
+    await reload();
+    return true;
+  }, [dirtyFields, editValues, reload]);
 
-  const handleDiscard = useCallback(() => {
+  const discard = useCallback(() => {
     setEditValues({});
     setFieldErrors({});
+    setSaveError(null);
   }, []);
 
-  if (loading) {
+  return {
+    data,
+    loading,
+    loadError,
+    saveError,
+    editValues,
+    fieldErrors,
+    dirty: dirtyFields.length > 0,
+    onFieldChange,
+    save,
+    discard,
+    reload,
+  };
+}
+
+// ── Section ──────────────────────────────────────────────────────────
+
+/**
+ * The work-settings form. `robotWranglerLink` is rendered where provider and
+ * model would be — at the head of their category.
+ */
+export function HenchConfigSection({ form, robotWranglerLink }: {
+  form: HenchConfigForm;
+  robotWranglerLink: ComponentChildren;
+}) {
+  const { data } = form;
+
+  if (form.loading) {
     return h("div", { class: "hench-config-container" },
-      h("div", { class: "loading" }, "Loading configuration..."),
+      h("div", { class: "loading" }, "Loading work settings..."),
     );
   }
 
-  if (error && !data) {
+  if (!data) {
     return h("div", { class: "hench-config-container" },
-      h(BrandedHeader, { product: "hench", title: `${cliName} work — Workflow Configuration` }),
       h("div", { class: "hench-config-error-state" },
-        h("p", null, error),
+        h("p", null, form.loadError ?? "Failed to load configuration"),
         h("p", { class: "hench-config-error-hint" },
           "Make sure ",
           h("code", null, ".hench/"),
@@ -660,41 +599,32 @@ export function HenchConfigView() {
     );
   }
 
-  if (!data) return null;
-
-  // Group fields by category
+  // Group fields by category. A category whose only fields are the ones Robot
+  // Wrangler owns still gets a section, so the link has somewhere to sit.
   const byCategory = new Map<string, ConfigField[]>();
+  let linkCategory: string | null = null;
   for (const field of data.fields) {
-    if (!byCategory.has(field.category)) {
-      byCategory.set(field.category, []);
+    if (!byCategory.has(field.category)) byCategory.set(field.category, []);
+    if (ROBOT_WRANGLER_FIELDS.has(field.path)) {
+      linkCategory ??= field.category;
+      continue;
     }
     byCategory.get(field.category)!.push(field);
   }
 
-  const modifiedCount = data.fields.filter((f) => !f.isDefault).length;
+  const modifiedCount = data.fields
+    .filter((f) => !f.isDefault && !ROBOT_WRANGLER_FIELDS.has(f.path)).length;
 
   return h("div", { class: "hench-config-container" },
-    h("div", { class: "hench-config-header" },
-      h(BrandedHeader, { product: "hench", title: `${cliName} work — Workflow Configuration` }),
-      modifiedCount > 0
-        ? h("span", { class: "hench-config-modified-count" },
-            `${modifiedCount} field${modifiedCount > 1 ? "s differ" : " differs"} from defaults`,
-          )
-        : null,
-    ),
-
-    // Save error banner
-    error
-      ? h("div", { class: "hench-config-save-error" }, error)
+    modifiedCount > 0
+      ? h("p", { class: "hench-config-modified-count" },
+          `${modifiedCount} field${modifiedCount > 1 ? "s differ" : " differs"} from defaults`,
+        )
       : null,
 
-    // Changes summary + save bar (sticky at top when there are changes)
-    h(ChangesSummary, {
-      pendingChanges,
-      onSave: handleSaveAll,
-      onDiscard: handleDiscard,
-      saving,
-    }),
+    form.saveError
+      ? h("div", { class: "hench-config-save-error" }, form.saveError)
+      : null,
 
     // Any category the server sends that CATEGORY_ORDER does not name is
     // appended rather than dropped. Filtering to the known list alone is how a
@@ -703,17 +633,18 @@ export function HenchConfigView() {
     // this array did not. CategorySection already falls back to the raw
     // category name for its heading.
     ...[...CATEGORY_ORDER, ...[...byCategory.keys()].filter((c) => !CATEGORY_ORDER.includes(c))]
-      .filter((cat) => byCategory.has(cat))
+      .filter((cat) => (byCategory.get(cat)?.length ?? 0) > 0 || cat === linkCategory)
       .map((cat) =>
         h(CategorySection, {
           key: cat,
           category: cat,
           fields: byCategory.get(cat)!,
-          editValues,
-          errors: fieldErrors,
-          onFieldChange: handleFieldChange,
+          editValues: form.editValues,
+          errors: form.fieldErrors,
+          onFieldChange: form.onFieldChange,
+          lead: cat === linkCategory ? robotWranglerLink : null,
         }),
       ),
-    h(SaveToast, { changes: recentChanges }),
   );
 }
+

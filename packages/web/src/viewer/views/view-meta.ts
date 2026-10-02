@@ -56,6 +56,28 @@ export const VIEW_META = {
     blurb: "The three stages of the loop, side by side, each with its headline numbers.",
   },
 
+  // ── Live ─────────────────────────────────────────────────────
+  // Not a stage, and not any one package's: it watches work from all three,
+  // so `global` — `StageProduct` has no cross-product value to borrow.
+  live: {
+    label: "Live",
+    glyph: "◉",
+    product: "global",
+    blurb: "Everything running now — agent tasks and analyses, across every worktree.",
+  },
+  "live-task": {
+    label: "Live Task",
+    glyph: "▷",
+    product: "global",
+    blurb: "One running agent task, step by step.",
+  },
+  "live-analyze": {
+    label: "Live Analysis",
+    glyph: "◌",
+    product: "global",
+    blurb: "A running SourceVision analysis: phases, passes and spend.",
+  },
+
   // ── Stages ───────────────────────────────────────────────────
   analyze: {
     label: "Analysis",
@@ -205,12 +227,6 @@ export const VIEW_META = {
     product: "hench",
     blurb: "Per-task run logs and outcomes.",
   },
-  "hench-templates": {
-    label: "Templates",
-    glyph: "▭",
-    product: "hench",
-    blurb: "Run presets: limits, guard rails, provider.",
-  },
   "hench-optimization": {
     label: "Optimization",
     glyph: "↗",
@@ -245,53 +261,29 @@ export const VIEW_META = {
   },
 
   // ── Settings ─────────────────────────────────────────────────
-  "llm-provider": {
-    label: "General",
+  "robot-wrangler": {
+    label: "Robot Wrangler",
     glyph: "\u{1F9E0}",
     product: "global",
     blurb: "Which model answers, and the credentials it answers with.",
   },
-  "project-settings": {
-    label: "{cli} analyze / plan",
+  project: {
+    label: "Project",
     glyph: "▣",
     product: "global",
-    blurb: "Defaults for the analysis and planning commands.",
+    blurb: "Analyze and plan settings, feature flags, and the services the PRD syncs with.",
   },
-  "hench-config": {
-    label: "{cli} work",
+  workflow: {
+    label: "Workflow",
     glyph: "▶",
     product: "global",
-    blurb: "Defaults for agent runs: limits, guard rails, provider.",
-  },
-  "notion-config": {
-    label: "{cli} sync",
-    glyph: "\u{1F50C}",
-    product: "global",
-    blurb: "Push and pull the PRD through a Notion database.",
-  },
-  integrations: {
-    label: "Integrations",
-    glyph: "\u{1F517}",
-    product: "rex",
-    blurb: "Other trackers this PRD can sync with.",
+    blurb: "How agent runs behave: limits, guard rails, templates and command timeouts.",
   },
   commands: {
-    label: "{cli} export / refresh",
+    label: "Commands",
     glyph: "\u{1F4E4}",
     product: "global",
-    blurb: "Defaults for the export and refresh commands.",
-  },
-  "feature-toggles": {
-    label: "Feature Flags",
-    glyph: "\u{1F4CC}",
-    product: "global",
-    blurb: "Turn optional surfaces on and off.",
-  },
-  "cli-timeouts": {
-    label: "CLI Timeouts",
-    glyph: "⏱",
-    product: "global",
-    blurb: "How long each command may run before it is stopped.",
+    blurb: "Run refresh, export, the sample app and self-heal from the dashboard.",
   },
 } as const satisfies Record<ViewId, ViewMeta>;
 

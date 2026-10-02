@@ -136,7 +136,6 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     sections: [
       { view: "rex-dashboard", plain: true },
       { view: "activity", scroll: true },
-      { view: "hench-templates" },
       { view: "token-usage" },
       { view: "hench-audit" },
       { view: "hench-optimization" },
@@ -163,19 +162,14 @@ export function stageProduct(stage: StageId): StageProduct {
 export interface SettingsEntry {
   /** Label and glyph come from this view's entry in `view-meta.ts`. */
   view: ViewId;
-  featureGate?: string;
 }
 
-/** Workflow order: General → analyze/plan → work → sync → export, then cross-cutting. */
+/** Robot Wrangler → Project → Workflow, then Commands (which moves to the Commands sheet in #464). */
 export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
-  { view: "llm-provider" },
-  { view: "project-settings" },
-  { view: "hench-config" },
-  { view: "notion-config", featureGate: "rex.notionSync" },
-  { view: "integrations", featureGate: "rex.integrations" },
+  { view: "robot-wrangler" },
+  { view: "project" },
+  { view: "workflow" },
   { view: "commands" },
-  { view: "feature-toggles" },
-  { view: "cli-timeouts" },
 ];
 
 const SETTINGS_VIEWS: ReadonlySet<ViewId> = new Set(SETTINGS_ENTRIES.map((e) => e.view));
@@ -183,6 +177,20 @@ const SETTINGS_VIEWS: ReadonlySet<ViewId> = new Set(SETTINGS_ENTRIES.map((e) => 
 /** True for views that open in the settings overlay rather than the page. */
 export function isSettingsView(view: ViewId): boolean {
   return SETTINGS_VIEWS.has(view);
+}
+
+// ── Live ───────────────────────────────────────────────────────
+
+/**
+ * The views under the Live tab. Live is not a stage: it sits after the stage
+ * tabs, outside the Analysis → Plan → Work loop, so it is absent from
+ * `STAGE_ORDER` and the prev/next stage links never reach it.
+ */
+export const LIVE_VIEWS: readonly ViewId[] = ["live", "live-task", "live-analyze"];
+
+/** True for the Live overview and every page under it — the views that light the Live tab. */
+export function isLiveView(view: ViewId): boolean {
+  return LIVE_VIEWS.includes(view);
 }
 
 // ── Lookups ────────────────────────────────────────────────────

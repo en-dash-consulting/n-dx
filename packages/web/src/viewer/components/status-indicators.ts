@@ -34,6 +34,22 @@ export const INDICATOR_VIEWS = {
   hench: "hench-runs",
 } as const satisfies Record<"sv" | "rex" | "hench", ViewId>;
 
+/**
+ * The Live pages an indicator opens while there is something live to watch:
+ * a running analysis, or stuck runs. Kept apart from {@link INDICATOR_VIEWS}
+ * because those are the views an indicator opens *at rest*.
+ */
+export const LIVE_INDICATOR_VIEWS = {
+  analysis: "live-analyze",
+  stuck: "live",
+} as const satisfies Record<string, ViewId>;
+
+/** The phase of the analysis running now, as the freshness badge shows it. */
+export interface RunningAnalysis {
+  /** 1-based phase number, or null before the first phase starts. */
+  phase: { index: number; total: number } | null;
+}
+
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
@@ -55,9 +71,30 @@ interface SvIndicatorProps {
   status: SourceVisionStatus;
   onNavigate: (view: ViewId) => void;
   tabIndex: number;
+  /**
+   * An analysis is running now. The badge then reads its phase and opens the
+   * Live analysis page; without it the badge is the freshness reading and
+   * opens Overview. The caller passes it only when that page is in scope.
+   */
+  analysis?: RunningAnalysis | null;
 }
 
-export function SvFreshnessIndicator({ status, onNavigate, tabIndex }: SvIndicatorProps) {
+export function SvFreshnessIndicator({ status, onNavigate, tabIndex, analysis = null }: SvIndicatorProps) {
+  if (analysis) {
+    const phase = analysis.phase;
+    const text = phase ? `Analyzing · phase ${phase.index} of ${phase.total}` : "Analyzing";
+    return h("button", {
+      class: "sidebar-indicator sidebar-indicator-ok",
+      type: "button",
+      tabIndex,
+      "aria-label": `${text} — click to watch`,
+      onClick: () => onNavigate(LIVE_INDICATOR_VIEWS.analysis),
+    },
+      h("span", { class: "indicator-dot indicator-dot-fresh", "aria-hidden": "true" }),
+      h("span", { class: "indicator-text" }, text),
+    );
+  }
+
   if (status.freshness === "unavailable") {
     return h("div", {
       class: "sidebar-indicator sidebar-indicator-warning",
@@ -175,9 +212,11 @@ interface HenchIndicatorProps {
   status: HenchStatus;
   onNavigate: (view: ViewId) => void;
   tabIndex: number;
+  /** The Live overview is in scope, so stuck runs open it rather than the run list. */
+  liveAvailable?: boolean;
 }
 
-export function HenchActivityIndicator({ status, onNavigate, tabIndex }: HenchIndicatorProps) {
+export function HenchActivityIndicator({ status, onNavigate, tabIndex, liveAvailable = true }: HenchIndicatorProps) {
   if (!status.configured) {
     return h("div", {
       class: "sidebar-indicator sidebar-indicator-warning",
@@ -196,7 +235,7 @@ export function HenchActivityIndicator({ status, onNavigate, tabIndex }: HenchIn
     type: "button",
     tabIndex,
     "aria-label": `Hench: ${status.totalRuns} runs${hasStaleRuns ? `, ${status.staleRuns} stuck` : ""} — click to view`,
-    onClick: () => onNavigate(INDICATOR_VIEWS.hench),
+    onClick: () => onNavigate(hasStaleRuns && liveAvailable ? LIVE_INDICATOR_VIEWS.stuck : INDICATOR_VIEWS.hench),
   },
     h("span", {
       class: `indicator-dot ${hasStaleRuns ? "indicator-dot-stale" : "indicator-dot-fresh"}`,

@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { ViewId, NavigateTo, AskSeed } from "../types.js";
-import { parseLegacyHashRoute, resolveLocationRoute } from "../route-state.js";
+import { isTaskRouteView, normalizeLiveView, parseLegacyHashRoute, resolveLocationRoute, viewPathname } from "../route-state.js";
 import { appUrl, getBasePath } from "../base-path.js";
 import { resolveViewAlias } from "../external.js";
 import { guardedLeave } from "./use-leave-guard.js";
@@ -45,7 +45,7 @@ interface HistoryEntry {
 
 function entryUrl(entry: HistoryEntry): string {
   const subId = entry.runId ?? entry.taskId;
-  return subId ? `/${entry.view}/${subId}` : `/${entry.view}`;
+  return viewPathname(entry.view, subId);
 }
 
 /**
@@ -70,7 +70,7 @@ function getInitialRunId(validViews: Set<ViewId>): string | null {
 
 function getInitialTaskId(validViews: Set<ViewId>): string | null {
   const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath());
-  if (!parsed || parsed.view !== "prd") return null;
+  if (!parsed || !isTaskRouteView(parsed.view)) return null;
   return parsed.subId;
 }
 
@@ -94,7 +94,8 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     currentRef.current = { view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed };
   }, [view, selectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed]);
 
-  const applyEntry = useCallback((entry: HistoryEntry, push: boolean) => {
+  const applyEntry = useCallback((raw: HistoryEntry, push: boolean) => {
+    const entry = { ...raw, view: normalizeLiveView(raw.view, raw.taskId) };
     setSelectedFile(entry.file);
     setSelectedZone(entry.zone);
     setSelectedRunId(entry.runId);
@@ -132,7 +133,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     const hashRoute = parseLegacyHashRoute(location.hash, validViews);
     if (hashRoute) {
       const isRunView = hashRoute.view === "hench-runs";
-      const isTaskView = hashRoute.view === "prd";
+      const isTaskView = isTaskRouteView(hashRoute.view);
       const entry: HistoryEntry = {
         view: hashRoute.view,
         file: null,
@@ -159,7 +160,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     }
 
     const handlePopState = (e: PopStateEvent) => {
-      const target: HistoryEntry = (() => {
+      const entryFor = (): HistoryEntry => {
         if (e.state) {
           const s = e.state as {
             view?: string;
@@ -184,7 +185,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
         const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath())
           ?? { view: defaultView(validViews), subId: null };
         const isRunView = parsed.view === "hench-runs";
-        const isTaskView = parsed.view === "prd";
+        const isTaskView = isTaskRouteView(parsed.view);
         return {
           view: parsed.view,
           file: null,
@@ -193,7 +194,9 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
           taskId: isTaskView ? parsed.subId : null,
           askSeed: null,
         };
-      })();
+      };
+      const picked = entryFor();
+      const target = { ...picked, view: normalizeLiveView(picked.view, picked.taskId) };
 
       const applied = guardedLeave(() => {
         setSelectedFile(target.file);

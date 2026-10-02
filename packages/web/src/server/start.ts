@@ -29,11 +29,17 @@ import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
+import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
+import { handleLiveTaskRoute } from "./routes-live-task.js";
+import { handleLiveAnalyzeRoute } from "./routes-live-analyze.js";
+import { watchAnalyzeProgress } from "./analyze-progress-watcher.js";
+import { stopRunTailWatches } from "./run-tail.js";
 import { handleWorkspacesRoute } from "./routes-workspaces.js";
 import { invalidatePrdDelta } from "./prd-delta.js";
 import { WorkspaceRegistry } from "./workspaces.js";
 import type { WatcherHandles, WorkspaceHooks, WorkspaceResources } from "./workspaces.js";
 import { handleStatusRoute, clearStatusCache, buildServerInfo } from "./routes-status.js";
+import { handleHubAbsentRoute } from "./routes-hub-absent.js";
 import { handleConfigRoute } from "./routes-config.js";
 import { handleSearchRoute } from "./routes-search.js";
 import { handleNotionRoute } from "./routes-notion.js";
@@ -139,6 +145,8 @@ export function registerShutdownHandlers(
     registry?.closeAll();
     // Lazily registered per-worktree runs watchers (GET /api/hench/runs?scope=repo).
     closeWorktreeRunWatchers();
+    // Leases taken by GET /api/hench/runs/:id/log|events.
+    stopRunTailWatches();
 
     // Step 1 — terminate hench child processes (highest priority: avoids orphaned agents)
     // Covers both hench-route executions and the rex epic-by-epic execution engine.
@@ -517,7 +525,12 @@ function registerWatchers(
   const prdCacheDir = isInScope(ctx.scope, "rex") && existsSync(ctx.rexDir)
     ? join(ctx.rexDir, PRD_CACHE_DIR)
     : undefined;
-  return { watchers, henchRunsDir, monitorIntervals: [], prdCacheDir };
+  // Polls rather than watches, so it is registered even before
+  // .sourcevision/ exists and needs no re-registration after init.
+  const monitorIntervals = isInScope(ctx.scope, "sourcevision")
+    ? [watchAnalyzeProgress(ctx.svDir, ws.broadcast)]
+    : [];
+  return { watchers, henchRunsDir, monitorIntervals, prdCacheDir };
 }
 
 /**
@@ -710,6 +723,11 @@ async function handleScopedRoute(
   return await run();
 }
 
+/** The Live overview reads the registry's worktree list rather than asking git per request. */
+function liveSourcesOf(registry: WorkspaceRegistry): LiveSources {
+  return { listWorkspaces: () => registry.list() };
+}
+
 async function handleApiRoutes(
   req: IncomingMessage,
   res: ServerResponse,
@@ -734,7 +752,11 @@ async function handleApiRoutes(
   if (await handleProjectRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx, { broadcast, onStatusInvalidate: invalidateRunCaches }))) return true;
+  if (await handleLiveRoute(req, res, ctx, liveSourcesOf(registry))) return true;
+  if (isInScope(ctx.scope, "hench") && handleLiveTaskRoute(req, res, ctx)) return true;
+  if (isInScope(ctx.scope, "sourcevision") && (await handleLiveAnalyzeRoute(req, res, ctx, liveSourcesOf(registry)))) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
+  if (handleHubAbsentRoute(req, res)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleIntegrationRoute(req, res, ctx))) return true;
@@ -1099,6 +1121,9 @@ export async function startServer(
     log: isVerbose() ? verbose : () => {},
   });
   registry.start();
+
+  // Live overview frames: repository-wide, so every workspace's viewer gets them.
+  watcherHandles.monitorIntervals.push(startLiveMonitor(registry.anchor.ctx, liveSourcesOf(registry), everyWorkspaceBroadcast));
 
   const server = createHttpServer(registry, ws, assets, wsHealthTracker, token);
 

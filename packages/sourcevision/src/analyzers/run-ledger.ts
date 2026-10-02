@@ -39,6 +39,23 @@ let _byTaskClass: Record<string, LLMClassUsage> = {};
 let _cacheHits = 0;
 let _cacheMisses = 0;
 let _partition: AnalysisRun["partition"];
+let _listener: (() => void) | null = null;
+
+/**
+ * Be told whenever the ledger changes, or stop being told (`null`).
+ *
+ * One listener: the live progress file (analyze-progress.ts), which
+ * republishes the ledger while the run is still going. A listener rather than
+ * an import keeps this module free of file I/O and of any import back from
+ * the progress writer.
+ */
+export function setRunLedgerListener(listener: (() => void) | null): void {
+  _listener = listener;
+}
+
+function changed(): void {
+  _listener?.();
+}
 
 /** Reset the ledger and start the run clock. */
 export function startRunLedger(mode: AnalysisRun["mode"] = "generative"): void {
@@ -49,6 +66,7 @@ export function startRunLedger(mode: AnalysisRun["mode"] = "generative"): void {
   _cacheHits = 0;
   _cacheMisses = 0;
   _partition = undefined;
+  changed();
 }
 
 /**
@@ -58,10 +76,12 @@ export function startRunLedger(mode: AnalysisRun["mode"] = "generative"): void {
  */
 export function setRunMode(mode: AnalysisRun["mode"]): void {
   _mode = mode;
+  changed();
 }
 
 export function recordPhaseDuration(phase: string, durationMs: number): void {
   _phases[phase] = (_phases[phase] ?? 0) + durationMs;
+  changed();
 }
 
 export function recordLLMCall(rec: LLMCallRecord): void {
@@ -88,6 +108,7 @@ export function recordLLMCall(rec: LLMCallRecord): void {
   // Within a vendor the last model to answer names the bucket (a mid-run
   // model failover is the only way it changes).
   bucket.model = rec.model;
+  changed();
 }
 
 /** The zone phase's partition review; the last one recorded wins. */
@@ -98,6 +119,7 @@ export function recordPartitionReview(partition: NonNullable<AnalysisRun["partit
 export function recordJudgmentCache(hits: number, misses: number): void {
   _cacheHits += hits;
   _cacheMisses += misses;
+  changed();
 }
 
 /** The run so far, as it will be written to the manifest. */

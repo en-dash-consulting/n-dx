@@ -79,6 +79,45 @@ for (const view of VIEWS) {
   });
 }
 
+// Live's pages live under /live, not /<view-id>, so the loop above reaches them
+// only through the bare ids. These are their canonical addresses; /live-task
+// has no task to show and reads as the overview.
+test("Live pages load at their canonical paths without console/page errors", async ({ page }) => {
+  const tracker = trackConsoleErrors(page);
+  const paths = ["/live", "/live/analyze", `/live/task/${fixture.taskId}`];
+  for (const path of paths) {
+    const res = await page.goto(`${dashboard.baseUrl}${path}`, { waitUntil: "domcontentloaded" });
+    expect(res?.ok(), `HTTP status for ${path}`).toBeTruthy();
+    await expect(page.locator('nav[aria-label="Running now"]')).toHaveCount(1, { timeout: 10_000 });
+    await expect(page).toHaveURL(new RegExp(`${path}$`));
+    await page.waitForTimeout(500);
+  }
+  expect(tracker.errors, "console/page errors on the Live pages").toEqual([]);
+});
+
+test("/live-task with no task id shows the Live overview at /live", async ({ page }) => {
+  const tracker = trackConsoleErrors(page);
+  await page.goto(`${dashboard.baseUrl}/live-task`, { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/live$/);
+  await expect(page.locator('nav[aria-label="Running now"]')).toHaveCount(1, { timeout: 10_000 });
+  await expect(page.locator("main")).not.toBeEmpty();
+  expect(tracker.errors).toEqual([]);
+});
+
+test("settings opened over a task page close back to it", async ({ page }) => {
+  const tracker = trackConsoleErrors(page);
+  const path = `/live/task/${fixture.taskId}`;
+  await page.goto(`${dashboard.baseUrl}${path}`, { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".bottombar-settings")).toBeVisible({ timeout: 10_000 });
+
+  await page.locator(".bottombar-settings").click();
+  await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
+  await page.getByRole("button", { name: "Close settings" }).click();
+  await expect(page).toHaveURL(new RegExp(`${path}$`));
+  await expect(page.getByRole("dialog", { name: "Settings" })).toHaveCount(0);
+  expect(tracker.errors).toEqual([]);
+});
+
 test("a bare URL lands on home; a stage tab and a section link update the active view", async ({ page }) => {
   const tracker = trackConsoleErrors(page);
   await page.goto(`${dashboard.baseUrl}/`, { waitUntil: "domcontentloaded" });
@@ -114,7 +153,7 @@ test("settings open over the page from the cog and close back to it", async ({ p
   await expect(page.locator(".bottombar-settings")).toBeVisible({ timeout: 10_000 });
 
   await page.locator(".bottombar-settings").click();
-  await expect(page).toHaveURL(/\/llm-provider$/);
+  await expect(page).toHaveURL(/\/robot-wrangler$/);
   await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
   await expect(page.locator('main .stage-page[data-stage="work"]')).toHaveCount(1); // still mounted underneath
 
@@ -145,6 +184,14 @@ test("the commands sheet lifts over the page and lowers again", async ({ page })
 const ALIASES: Array<[string, string]> = [
   ["overview", "analyze"],
   ["rex-dashboard", "work"],
+  ["llm-provider", "robot-wrangler"],
+  ["hench-config", "workflow"],
+  ["cli-timeouts", "workflow"],
+  ["hench-templates", "workflow"],
+  ["project-settings", "project"],
+  ["feature-toggles", "project"],
+  ["notion-config", "project"],
+  ["integrations", "project"],
 ];
 
 for (const [oldPath, target] of ALIASES) {

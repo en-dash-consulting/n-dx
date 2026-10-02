@@ -29,6 +29,7 @@ import {
   STAGES,
   STAGE_ORDER,
   SETTINGS_ENTRIES,
+  isLiveView,
   ENRICHMENT_THRESHOLDS,
   type StageId,
 } from "../../../src/viewer/views/index.js";
@@ -86,6 +87,7 @@ describe("navigation model: coverage", () => {
 function placementsOf(view: ViewId): string[] {
   const places: string[] = [];
   if (view === "home") places.push("home");
+  if (isLiveView(view)) places.push("live");
   if ((STAGE_ORDER as readonly string[]).includes(view)) places.push(`stage:${view}`);
   for (const stage of STAGE_ORDER) {
     for (const section of STAGES[stage].sections) {
@@ -136,9 +138,10 @@ describe("navigation model: labels", () => {
     expect(viewLabel("activity")).toBe("Execution Log");
   });
 
+  // No label carries the placeholder today (the settings pages that did were
+  // merged into Project), so this holds vacuously until one does again.
   it("resolves the {cli} placeholder in every label that carries one", () => {
     const templated = ALL_VIEWS.filter((v) => viewLabel(v).includes("{cli}"));
-    expect(templated.length).toBeGreaterThan(0);
     for (const view of templated) {
       expect(resolveCliLabel(viewLabel(view), "myapp")).not.toContain("{cli}");
     }
@@ -247,8 +250,20 @@ describe("rendered surfaces take their labels from the model", () => {
       }), root);
     });
     await settle();
-    const labels = [...root.querySelectorAll(".topnav-tab-label")].map((e) => e.textContent);
+    const labels = [...root.querySelectorAll("[data-stage] .topnav-tab-label")].map((e) => e.textContent);
     expect(labels).toEqual(STAGE_ORDER.map((id) => viewLabel(id)));
+  });
+
+  it("the top nav names the Live tab with the model's label, after the stage tabs", async () => {
+    act(() => {
+      render(h(TopNav, {
+        view: "home", validViews: buildValidViews(null), onNavigate: () => {}, onOpenSearch: () => {},
+      }), root);
+    });
+    await settle();
+    const tabs = [...root.querySelectorAll(".topnav-tab")];
+    expect(tabs.map((t) => t.querySelector(".topnav-tab-label")?.textContent))
+      .toEqual([...STAGE_ORDER, "live"].map((id) => viewLabel(id as ViewId)));
   });
 
   it("the Home cards name, describe and mark each stage from the model", async () => {
@@ -341,7 +356,7 @@ describe("rendered surfaces take their labels from the model", () => {
   it("the settings overlay names each entry with the model's label", async () => {
     act(() => {
       render(h(SettingsOverlay, {
-        view: "llm-provider", validViews: buildValidViews(null),
+        view: "robot-wrangler", validViews: buildValidViews(null),
         onNavigate: () => {}, onClose: () => {}, children: null,
       }), root);
     });

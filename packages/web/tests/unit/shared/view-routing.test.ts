@@ -22,6 +22,16 @@ describe("view routing contract", () => {
     expect(views.has("prd")).toBe(false);
   });
 
+  it("lists the three Live views as cross-cutting, so every scope has them", () => {
+    const live = ["live", "live-task", "live-analyze"] as const;
+    for (const view of live) {
+      expect(CROSS_CUTTING_VIEWS).toContain(view);
+      for (const scope of [null, "sourcevision", "rex", "hench"]) {
+        expect(buildValidViews(scope).has(view), `${view} in ${scope}`).toBe(true);
+      }
+    }
+  });
+
   it("treats known SPA paths as shared routing state", () => {
     expect(isKnownViewPath("overview")).toBe(true);
     expect(isKnownViewPath("hench-runs")).toBe(true);
@@ -44,6 +54,23 @@ describe("redirect aliases (0.8.0 navigation merge)", () => {
     expect(rexViews.has("work")).toBe(false);
     expect(rexViews.has("rex-dashboard")).toBe(true);
     expect(resolveViewAlias("rex-dashboard", rexViews)).toBeNull();
+  });
+
+  it("the four merged settings pages redirect to project in every scope, rex included", () => {
+    for (const old of ["project-settings", "feature-toggles", "notion-config", "integrations"]) {
+      for (const scope of [null, "sourcevision", "rex", "hench"]) {
+        expect(resolveViewAlias(old, buildValidViews(scope)), `${old} in ${scope ?? "all"}`).toBe("project");
+      }
+    }
+  });
+
+  it("project is valid in every scope, and the merged ids are no longer views", () => {
+    for (const scope of [null, "sourcevision", "rex", "hench"]) {
+      expect(buildValidViews(scope).has("project")).toBe(true);
+    }
+    for (const old of ["project-settings", "feature-toggles", "notion-config", "integrations"]) {
+      expect(isKnownViewPath(old)).toBe(false);
+    }
   });
 
   it("live full-page views (#425) are not aliased", () => {

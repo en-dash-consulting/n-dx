@@ -15,7 +15,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { resolveNdxHome, type ResolveNdxHomeOptions } from "./layout.js";
 
@@ -42,14 +42,35 @@ export function readAuthToken(path: string): string | null {
 }
 
 /**
+ * Tighten a token file that is readable by anyone but its owner.
+ *
+ * Creating it 0600 only covers the file this process created. A token left at
+ * 0644 by an older n-dx, an editor, or a restored backup is the exact exposure
+ * the token exists to prevent, and it would otherwise survive every later run,
+ * because the create path is the only one that ever set a mode.
+ */
+function repairTokenMode(path: string): void {
+  try {
+    // Group/other bits only; the owner's are none of our business.
+    if ((statSync(path).mode & 0o077) !== 0) chmodSync(path, 0o600);
+  } catch {
+    // Not every filesystem reports or honours modes (Windows, some network
+    // shares). The token is still usable; the profile directory is the boundary.
+  }
+}
+
+/**
  * Read the token, creating it when absent. The directory is 0700 and the
  * file 0600; on Windows the modes are advisory and the profile directory is
  * the boundary. An existing token is never rotated here — every server that
- * is already running was started with it.
+ * is already running was started with it — but its mode is repaired.
  */
 export function ensureAuthToken(path: string): string {
   const existing = readAuthToken(path);
-  if (existing) return existing;
+  if (existing) {
+    repairTokenMode(path);
+    return existing;
+  }
   const dir = dirname(path);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const token = randomBytes(32).toString("base64url");

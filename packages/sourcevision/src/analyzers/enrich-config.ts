@@ -98,14 +98,19 @@ export function getPassConfig(pass: number, existingFindingsCount?: number): Pas
 
 // ── Prompt builders ──────────────────────────────────────────────────────────
 
-/** Pass descriptions for meta-evaluation annotations. */
-const PASS_LABELS: Record<number, string> = {
-  0: "pass 0: automated heuristic",
-  1: "pass 1: LLM zone naming + initial observations",
-  2: "pass 2: LLM cross-zone relationships",
-  3: "pass 3: LLM anti-pattern detection",
-  4: "pass 4: LLM suggestions + risk areas",
+/** What each enrichment pass does — one table for annotations and live progress. */
+const PASS_DESCRIPTIONS: Record<number, string> = {
+  0: "automated heuristic",
+  1: "LLM zone naming + initial observations",
+  2: "LLM cross-zone relationships",
+  3: "LLM anti-pattern detection",
+  4: "LLM suggestions + risk areas",
 };
+
+/** One-line description of an enrichment pass; pass 5+ is the meta-evaluation. */
+export function describePass(pass: number): string {
+  return PASS_DESCRIPTIONS[pass] ?? (pass >= PASS_CONFIGS.length ? "LLM meta-evaluation" : "LLM analysis");
+}
 
 /** Detection method labels for pass 0 findings, inferred from finding text. */
 function detectMethod(f: Finding): string {
@@ -123,7 +128,7 @@ function detectMethod(f: Finding): string {
 
 /** Format a finding line with source pass and detection method annotations. */
 function formatAnnotatedFinding(f: Finding, index: number): string {
-  const passLabel = PASS_LABELS[f.pass] ?? `pass ${f.pass}: LLM analysis`;
+  const passLabel = `pass ${f.pass}: ${PASS_DESCRIPTIONS[f.pass] ?? "LLM analysis"}`;
   const method = detectMethod(f);
   return `  ${index}: [${f.severity ?? "unset"}] (${f.type}) [source: ${passLabel}; method: ${method}] ${f.text}`;
 }

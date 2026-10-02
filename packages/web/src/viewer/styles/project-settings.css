@@ -1,38 +1,4 @@
-/* ── Project Settings view ──────────────────────────────────────── */
-
-.ps-container {
-  padding: var(--space-5);
-  max-width: 720px;
-}
-
-/* Header */
-.ps-header {
-  margin-bottom: var(--space-6);
-}
-
-.ps-header-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-.ps-header-logo {
-  flex-shrink: 0;
-}
-
-.ps-header-title {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.ps-header-subtitle {
-  color: var(--text-dim);
-  font-size: 0.875rem;
-  margin: 0;
-  line-height: 1.5;
-}
+/* ── Project settings section (on the Project page) ─────────────── */
 
 /* Sections */
 .ps-section {
@@ -251,25 +217,6 @@
   color: var(--accent);
 }
 
-/* Save bar */
-.ps-save-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border-top: 1px solid var(--border);
-  background: var(--bg-surface);
-  position: sticky;
-  bottom: 0;
-  margin-top: var(--space-6);
-}
-
-.ps-save-bar-hint {
-  flex: 1;
-  font-size: 0.875rem;
-  color: var(--text-dim);
-}
-
 /* Error states */
 .ps-error-state,
 .ps-error-banner {
@@ -279,26 +226,4 @@
   color: var(--red);
   margin-bottom: var(--space-5);
   font-size: 0.875rem;
-}
-
-/* Toast */
-.ps-toast {
-  position: fixed;
-  bottom: calc(var(--space-6) + var(--bottombar-h, 0px));
-  right: var(--space-6);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  font-size: 0.875rem;
-  color: var(--text);
-  z-index: 1000;
-}
-
-.ps-toast-icon {
-  color: var(--green);
 }
