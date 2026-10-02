@@ -12,7 +12,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { NdxLogoPng, SettingsFrame } from "../components/index.js";
+import { PixelIcon, SettingsFrame } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -1384,7 +1384,7 @@ export function RobotWranglerView() {
 
     h("div", { class: "llm-header" },
       h("div", { class: "llm-header-brand" },
-        h(NdxLogoPng, { size: 16, class: "llm-header-logo" }),
+        h(PixelIcon, { name: "robot-wrangler", variant: "tile", size: 40, class: "llm-header-tile" }),
         h("span", { class: "llm-header-title" }, "Robot Wrangler"),
       ),
       h("p", { class: "llm-header-subtitle" },
