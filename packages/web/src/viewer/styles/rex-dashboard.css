@@ -329,22 +329,6 @@
 /* Next-task status badge uses the shared .status-badge from badges.css */
 /* Start button — see the shared .start-task-* rules in components.css */
 
-/* ── Smart Add (dashboard) ────────────────────────────────────────── */
-
-.rex-dash-smart-add {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-5);
-  min-height: 60px;
-}
-
-.rex-dash-smart-add .smart-add-panel-compact {
-  border: none;
-  padding: 0;
-  background: transparent;
-}
-
 /* ── Epic progress ────────────────────────────────────────────────── */
 
 .rex-dash-epics {
@@ -1029,7 +1013,6 @@
 
   .rex-dash-next,
   .rex-dash-epics,
-  .rex-dash-smart-add,
   .rex-dash-panel {
     padding: var(--space-4);
     border-radius: var(--radius-lg);
