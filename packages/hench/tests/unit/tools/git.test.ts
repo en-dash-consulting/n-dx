@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, execSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { toolGit, tokenizeArgs } from "../../../src/tools/git.js";
+import { toolGit, tokenizeArgs, assertSafeGitArgs } from "../../../src/tools/git.js";
+import { GuardError } from "../../../src/guard/paths.js";
 import type { ToolGuard } from "../../../src/tools/contracts.js";
 import { initGitFixtureRepoSync, RM_RETRY } from "../../helpers/index.js";
 // toolGit now spawns `git` with an explicit argv and NO shell. The
@@ -53,6 +54,38 @@ describe("toolGit", () => {
 
   afterEach(async () => {
     await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
+  });
+
+  describe("options that escape the guarded project", () => {
+    // `blockedPaths` guards the file tools only; `git log --output=<path>`
+    // writes wherever it is told, and the exec-ish options run programs.
+    it("refuses --output in both spellings, and -o where it means --output", () => {
+      expect(() => assertSafeGitArgs("log", ["--output=/tmp/pwned", "-1"])).toThrow(GuardError);
+      expect(() => assertSafeGitArgs("log", ["--output", "/tmp/pwned"])).toThrow(GuardError);
+      expect(() => assertSafeGitArgs("diff", ["-o", "x"])).toThrow(GuardError);
+      expect(() => assertSafeGitArgs("show", ["--output-directory=/tmp"])).toThrow(GuardError);
+      // `git commit -o` is `--only`; the agent may use it.
+      expect(() => assertSafeGitArgs("commit", ["-o", "-m", "x"])).not.toThrow();
+    });
+
+    it("refuses the options that make git run a chosen program", () => {
+      for (const opt of ["--exec-path=/tmp", "--upload-pack=sh", "--receive-pack=sh", "--config-env=x=Y"]) {
+        expect(() => assertSafeGitArgs("log", [opt]), opt).toThrow(GuardError);
+      }
+    });
+
+    it("leaves ordinary flags alone, including ones that are global elsewhere", () => {
+      expect(() => assertSafeGitArgs("log", ["--oneline", "-c", "-n", "5"])).not.toThrow();
+      expect(() => assertSafeGitArgs("rev-parse", ["--git-dir"])).not.toThrow();
+      expect(() => assertSafeGitArgs("diff", ["-C", "--stat"])).not.toThrow();
+    });
+
+    it("is enforced by toolGit before anything is spawned", async () => {
+      await expect(
+        toolGit(guard, projectDir, { subcommand: "log", args: "--output=/tmp/pwned" }),
+      ).rejects.toThrow(/not allowed/);
+      expect(existsSync("/tmp/pwned")).toBe(false);
+    });
   });
 
   describe("allowed subcommands", () => {
