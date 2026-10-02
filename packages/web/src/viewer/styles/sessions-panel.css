@@ -52,6 +52,23 @@
   outline-offset: 2px;
 }
 
+.sessions-live-link {
+  padding: 0 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.sessions-live-link:hover {
+  text-decoration: underline;
+}
+
+.sessions-live-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .sessions-badge-icon {
   flex-shrink: 0;
   color: var(--accent);

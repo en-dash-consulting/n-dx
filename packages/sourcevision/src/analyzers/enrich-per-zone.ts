@@ -28,7 +28,9 @@ import {
 import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { tryParseJSON, extractFindings, deduplicateZoneIds, formatFileLabel, extractZoneInsights, findPrevZone } from "./enrich-parsing.js";
-import {emptyAnalyzeTokenUsage} from "./token-usage.js";import { startSpinner } from "../cli/output.js";
+import { emptyAnalyzeTokenUsage } from "./token-usage.js";
+import { startSpinner } from "../cli/output.js";
+import { markPass, markBatch } from "./analyze-progress.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
 import {
   section,
@@ -408,6 +410,7 @@ export async function enrichZonesPerZone(
   }
 
   console.log(`  [enrich] Per-zone mode: ${zonesToEnrich.length} zones to enrich (${unchangedZones.length} unchanged)`);
+  markPass(passNumber);
 
   // Process zones with limited concurrency
   const totalTokenUsage = emptyAnalyzeTokenUsage();
@@ -419,6 +422,7 @@ export async function enrichZonesPerZone(
     const batch = zonesToEnrich.slice(i, i + MAX_CONCURRENT_ZONES);
     const batchIndex = Math.floor(i / MAX_CONCURRENT_ZONES);
     const batchLabel = totalBatches > 1 ? ` batch ${batchIndex + 1}/${totalBatches}` : "";
+    markBatch("zone enrichment", batchIndex, totalBatches);
     const spinner = startSpinner(
       `  [enrich] Enriching ${batch.length} zone${batch.length === 1 ? "" : "s"}${batchLabel}...`,
     );
@@ -435,6 +439,7 @@ export async function enrichZonesPerZone(
     }
     results.push(...batchResults);
   }
+  markBatch("zone enrichment", totalBatches, totalBatches);
 
   // Aggregate results
   const enrichedZones: Zone[] = [];

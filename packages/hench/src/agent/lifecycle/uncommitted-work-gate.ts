@@ -541,12 +541,20 @@ const POSIX_ONLY_CAVEAT =
  * commands read a pathspec file (`--pathspec-from-file`, git ≥ 2.26): the
  * hostile names never touch a command line, so there is nothing for any shell
  * to expand or split.
+ *
+ * `setAside` controls the trailing `git stash push` alternative. It is right
+ * for a refusal that wants the tree clean again, and wrong for one whose only
+ * correct next step is to land the paths — stashing review repairs away from
+ * the commit they belong to is how they stop existing as far as the next run
+ * is concerned ({@link formatReviewRepairsUncommittedRefusal}).
  */
 function renderRecoveryCommands(
   paths: string[],
   deleted: ReadonlySet<string>,
   files?: RecoveryPathspecs,
+  opts: { setAside?: boolean } = {},
 ): string {
+  const { setAside = true } = opts;
   const existing = paths.filter((p) => !deleted.has(p));
   const gone = paths.filter((p) => deleted.has(p));
   const mode = specMode(paths, files);
@@ -564,8 +572,10 @@ function renderRecoveryCommands(
       lines.push(`  git rm --cached --pathspec-from-file=${mode.files.rm ?? mode.files.all}`);
     }
     lines.push(`  git commit --pathspec-from-file=${mode.files.all}`);
-    lines.push("Or set them aside:");
-    lines.push(`  git stash push --pathspec-from-file=${mode.files.all}`);
+    if (setAside) {
+      lines.push("Or set them aside:");
+      lines.push(`  git stash push --pathspec-from-file=${mode.files.all}`);
+    }
     return lines.join("\n");
   }
 
@@ -578,8 +588,10 @@ function renderRecoveryCommands(
   if (existing.length > 0) lines.push(`  git add -- ${spec(existing)}`);
   if (gone.length > 0) lines.push(`  git rm --cached -- ${spec(gone)}`);
   lines.push(`  git commit -- ${spec(paths)}`);
-  lines.push("Or set them aside:");
-  lines.push(`  git stash push -- ${spec(paths)}`);
+  if (setAside) {
+    lines.push("Or set them aside:");
+    lines.push(`  git stash push -- ${spec(paths)}`);
+  }
   return lines.join("\n");
 }
 
@@ -599,6 +611,47 @@ export function formatUncommittedWorkRefusal(
     `${renderPaths(paths)}\n` +
     `Nothing was discarded. Land the work, then re-run the task.\n` +
     renderRecoveryCommands(paths, deleted, files)
+  );
+}
+
+/**
+ * The refusal for the one case where the *work* landed and only the review
+ * repairs did not (GitHub #483).
+ *
+ * With `hench.autoCommit` false the repairs are normally swept into the commit
+ * prompt's `git commit -F`. When the executor commits its own work and writes
+ * no `.hench-commit-msg.txt`, that prompt never runs, so hench tries to commit
+ * the repairs itself — and this is what it prints when that attempt failed.
+ *
+ * It differs from {@link formatUncommittedWorkRefusal} in the two ways that
+ * matter to whoever reads it:
+ *
+ * - It names the cause, because "N path(s) of its work are still uncommitted"
+ *   sends the reader looking for work the agent forgot to commit, when in fact
+ *   the agent committed everything and a *later* step failed.
+ * - It does not say to re-run, and it does not offer `git stash`. The task's
+ *   own work is already in history; re-running would redo a finished task, and
+ *   stashing the repairs would drop the review's fixes on the floor. The only
+ *   correct ending is to land these paths and mark the task completed, so those
+ *   are the two commands it gives.
+ */
+export function formatReviewRepairsUncommittedRefusal(
+  paths: string[],
+  cause: string,
+  taskId: string,
+  deleted: ReadonlySet<string> = new Set(),
+  files?: RecoveryPathspecs,
+): string {
+  return (
+    `⚠ Refusing to mark this task completed: review repairs uncommitted — ` +
+    `the executor committed without a message file, so no commit prompt followed, ` +
+    `and hench could not commit the repairs itself.\n` +
+    `  ${cause}\n` +
+    `The task's own work is committed; only these ${paths.length} path(s) are loose:\n` +
+    `${renderPaths(paths)}\n` +
+    `Nothing was discarded. Land them, then mark the task completed — do not re-run it.\n` +
+    `${renderRecoveryCommands(paths, deleted, files, { setAside: false })}\n` +
+    `  ndx rex update ${taskId} --status=completed`
   );
 }
 

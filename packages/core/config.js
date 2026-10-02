@@ -651,7 +651,7 @@ async function testApiConnection(apiKey, endpoint, model) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: model || "claude-sonnet-5",
+        model: model || "claude-sonnet-5-5",
         max_tokens: 1,
         messages: [{ role: "user", content: "hi" }],
       }),
@@ -1946,8 +1946,8 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     Validated: must be a valid HTTP(S) URL.
   claude.model             string    Default Claude model for API calls (optional)
                                     Override the default model used by all packages.
-                                    Examples: claude-sonnet-5, claude-opus-5
-                                    Default: claude-sonnet-5
+                                    Examples: claude-sonnet-5-5, claude-opus-5-5
+                                    Default: claude-sonnet-5-5
   claude.lightModel        string    Model override for light-weight tasks (optional)
                                     When set, light-tier tasks use this model instead of
                                     the default haiku. Use for cost/latency optimization.
@@ -2162,6 +2162,11 @@ Self-heal settings (.n-dx.json):
 
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)
+  web.auth                 boolean   Require the per-user dashboard token on the hub,
+                                    dashboard and preview servers (default: true).
+                                    'ndx start' creates <ndx home>/auth.token and prints
+                                    a URL that sets it as a cookie once; false, or
+                                    --no-auth, runs the servers without it
   web.mode                 string    "here" makes 'ndx start' run the single-project
                                     server that owns the port; "hub" registers with
                                     the per-user hub (served at /p/<id>/) — the
@@ -2245,7 +2250,7 @@ Examples:
   n-dx config claude.api_key sk-ant-...        Set Anthropic API key (validates format)
   n-dx config claude.api_endpoint https://proxy.example.com
                                                Set custom API endpoint
-  n-dx config claude.model claude-opus-5       Set default model for API calls
+  n-dx config claude.model claude-opus-5-5     Set default model for API calls
   n-dx config llm.vendor claude                Set active LLM vendor to Claude
   n-dx config llm.vendor codex                 Set active LLM vendor to Codex
   n-dx config llm.vendor google                Set active LLM vendor to Google (Gemini)
@@ -2255,7 +2260,7 @@ Examples:
   n-dx config llm.local.model qwen2.5-14b      Set local model ID (optional)
   n-dx config llm.local.timeoutMs 7200000      Allow 2 hours per local request (0 = no limit)
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
-  n-dx config llm.claude.model claude-opus-5   Set Claude model (llm namespace)
+  n-dx config llm.claude.model claude-opus-5-5 Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex
                                                Set Codex CLI path
   n-dx config llm.autoFailover true            Enable automatic model/vendor failover

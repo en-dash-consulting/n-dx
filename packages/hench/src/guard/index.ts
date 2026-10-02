@@ -54,12 +54,22 @@ import { validateCommand, resolveShellKind } from "./commands.js";
 import type { ShellKind } from "./commands.js";
 import { PolicyEngine } from "./policy.js";
 import type { AuditEntry, SessionCounters } from "./policy.js";
+import { compileEnvPolicy, sanitizeChildEnv } from "./env.js";
 
 export { GuardError, validatePath, simpleGlobMatch } from "./paths.js";
 export { validateCommand, resolveShellKind } from "./commands.js";
 export type { ShellKind } from "./commands.js";
 export { PolicyEngine } from "./policy.js";
-export type { GuardConfig, PolicyLimitsConfig } from "./contracts.js";
+export {
+  DEFAULT_ENV_DENY,
+  DEFAULT_ENV_ALLOW,
+  compileEnvPolicy,
+  envNameAllowed,
+  sanitizeChildEnv,
+  strippedEnvNames,
+} from "./env.js";
+export type { EnvPolicy } from "./env.js";
+export type { GuardConfig, EnvPolicyConfig, PolicyLimitsConfig } from "./contracts.js";
 export type {
   PolicyLimits,
   OperationType,
@@ -76,6 +86,8 @@ export interface GuardRailsOptions {
    * the cmd.exe branch testable on every platform.
    */
   shellKind?: ShellKind;
+  /** The environment to filter for child processes. Defaults to `process.env`; inject for tests. */
+  env?: NodeJS.ProcessEnv;
 }
 
 /**
@@ -97,12 +109,19 @@ export class GuardRails {
   /** Resolved once: the probe behind it costs a subprocess on win32. */
   readonly shellKind: ShellKind;
   readonly policy: PolicyEngine;
+  /**
+   * The environment child processes receive: `process.env` minus
+   * credential-shaped names (see `guard/env.ts`), resolved once per run so a
+   * variable exported mid-run neither appears nor disappears between tools.
+   */
+  readonly childEnv: NodeJS.ProcessEnv;
 
   constructor(projectDir: string, config: GuardConfig, options: GuardRailsOptions = {}) {
     this.projectDir = projectDir;
     this.config = config;
     this.shellKind = options.shellKind ?? resolveShellKind();
     this.policy = new PolicyEngine(config.policy);
+    this.childEnv = sanitizeChildEnv(options.env ?? process.env, compileEnvPolicy(config.env));
   }
 
   checkPath(filepath: string): string {

@@ -17,7 +17,6 @@ const SECTION_SELECTORS = [
   ".overview-columns",
   ".rex-dash-header",
   ".rex-dash-next",
-  ".rex-dash-smart-add",
   ".rex-dash-epics",
   ".rex-dash-panel",
 ].join(", ");

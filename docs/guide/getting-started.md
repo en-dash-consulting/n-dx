@@ -74,8 +74,8 @@ ndx config llm.claude.api_key sk-ant-... .
 # or set the environment variable:
 export ANTHROPIC_API_KEY=sk-ant-...
 
-# Optionally pin a model (default: claude-sonnet-5)
-ndx config llm.claude.model claude-opus-5 .
+# Optionally pin a model (default: claude-sonnet-5-5)
+ndx config llm.claude.model claude-opus-5-5 .
 ```
 
 ```sh

@@ -248,6 +248,8 @@ ndx config llm.codex.cli_path codex .
 | `ndx config [key] [value]` | View and edit settings (`--json`, `--help`) |
 | `ndx export [dir]` | Export static deployable dashboard (`--out-dir`, `--deploy=github` confirms first — `--yes` for unattended; agent transcripts excluded unless `--include-transcripts`) |
 | `ndx prd export\|import` | Carry the PRD between machines as a portable JSON bundle (`--out`, `--in`, `--replace`), scoped to one item with `--item` (its subtree, its `blockedBy` closure, and its ancestors), or write a stakeholder document with `--format=narrative` (`--include-completed`; one-way) — distinct from `ndx export` above |
+| `ndx which` | Show which n-dx is running: version, `cli.js` path, install kind (registry, global link, checkout) and git ref |
+| `ndx trust [status\|accept\|revoke] [dir]` | Review or accept the execution config a checkout ships (hench guard, test command, `.mcp.json`); `ndx work` runs under the default guard until accepted (`--format=json`) |
 | `ndx iso [dir]` | Render a standalone isometric architecture map (`--source=auto\|sourcevision\|scan`, `--max-nodes=N`, `--no-externals`) |
 | `ndx auth [dir]` | Check and configure LLM provider credentials |
 | `ndx web [dir]` | Dashboard server control (lower-level counterpart to `ndx start`) |
@@ -265,6 +267,7 @@ These are delegated to rex; `ndx <command>` and `rex <command>` are equivalent.
 |---------|-------------|
 | `ndx next [dir]` | Print the next actionable task |
 | `ndx claim list\|release [dir]` | Inspect and free cross-worktree task claims: `list` shows every live claim with its worktree, holder, state and expiry; `release <taskId>` frees one (`--force` while its holder is alive); `release --all` frees this worktree's held and dead-holder claims (`--format=json` throughout) |
+| `ndx log <event> [dir]` | Append an execution-log entry without the rex MCP server (`--item=ID`, `--detail="..."`) |
 | `ndx tree [dir]` | Show the full PRD hierarchy with colour-coded status |
 | `ndx tree-diff [dir]` | Compare two PRD trees into added/changed/completed/moved/removed, each with its ancestor chain. Defaults to this checkout against the default branch; `--from=<ref> --to=<ref>` compares commits, `--against=<dir>` compares two checkouts, `--json` for machine output. Read-only — takes no PRD lock |
 | `ndx update <id> [dir]` | Update item status, priority, or title |
@@ -323,10 +326,15 @@ The hub runs one dashboard server per registered repository and exposes each pro
 ```sh
 ndx start .                     # starts the hub if needed and registers this repository
 ndx hub status                  # the hub's pid, port and every registered project
-# Claude example, for the project registered as <id>:
-claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex
-claude mcp add --transport http sourcevision http://localhost:3117/p/<id>/mcp/sourcevision
+# Claude example, for the project registered as <id>. The hub requires the
+# per-user token (see below), so pass it as a header:
+claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex \
+  --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
+claude mcp add --transport http sourcevision http://localhost:3117/p/<id>/mcp/sourcevision \
+  --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
 ```
+
+**Per-user token.** Loopback is shared by every account on a machine, so the hub, the project servers and the preview server require a token that `ndx start` creates in your ndx home (`~/.ndx/auth.token`, mode 0600). The URL `ndx start` prints carries it once (`?ndx_token=…`); the server sets an HttpOnly cookie and redirects to the clean URL, so the browser never asks again. Scripts and MCP clients send it as `X-Ndx-Token` or `Authorization: Bearer`. A request without it is answered 401. Disable with `ndx start --no-auth` or `"web": { "auth": false }` in `.n-dx.json`; a bare `web serve` without `--token-file` also runs without one.
 
 Sessions (`Mcp-Session-Id`), SSE responses and `DELETE` for session close are handled by the project's own server; the hub only proxies. Two registered projects have independent sessions, and a tool call on `/p/A/mcp/rex` writes to A's tree only. `GET /api/hub/projects` lists the registered ids.
 
@@ -409,6 +417,8 @@ Remove `.sourcevision/` if you want to commit the analysis baseline so teammates
 
 n-dx runs an autonomous agent (hench) that reads, writes, and executes commands on your behalf. The security model is designed to keep all operations scoped to the project directory with no ambient access to the rest of your system.
 
+Found a vulnerability? Please report it privately, not in a public issue. [SECURITY.md](SECURITY.md) has the reporting routes, what we treat as in scope, and how fixes are handled and disclosed.
+
 ### Filesystem boundary
 
 Every file operation passes through a guard that validates the resolved path stays within the project directory. Directory traversal (`..`), null-byte injection, and symlink escapes are rejected before any I/O occurs. Additionally, `.hench/`, `.rex/`, `.git/`, and `node_modules/` are blocked by default — the agent cannot modify its own configuration or PRD state through file tools.
@@ -424,6 +434,20 @@ The only outbound network connections are to the configured LLM API (Anthropic b
 ### Rate limiting
 
 A policy engine enforces per-minute rate limits on commands (60/min) and file writes (30/min). Cumulative budgets for total bytes written and total commands are configurable in `.hench/config.json` under `guard.policy`.
+
+### Repository trust
+
+Several files n-dx reads to decide *what it may execute* live inside the repository and are usually tracked by git: the hench guard in `.hench/config.json` (command allowlist, blocked paths, git subcommands, permission mode), the test command in `.rex/config.json`, and the MCP servers in `.mcp.json`. A clone, a fork, or a checked-out pull request can therefore ship a looser policy than your own `ndx init` would have written, and the PRD it carries is what an autonomous run acts on.
+
+`ndx init` ends with a review of what the checkout brought — the findings, plus the PRD items, analysis and run records that came with it — and asks whether to trust it. `ndx trust .` shows the same review at any time; `ndx trust accept .` records your decision in your ndx home (`~/.ndx/trust/`, mode 0600), never in the repository, so another account on the machine cannot pre-approve a repository for you. The dashboard shows the same warning as a strip at the top of every page until you accept.
+
+Until a repository is trusted, `ndx work` runs under the **default guard** (the repository's config can only tighten it, never widen it), `bypassPermissions` is lowered to `acceptEdits`, and the `verify_criteria` MCP tool does not run the repository's test command. A later change to those files shows as *changed* and restricts again until reviewed. `ndx trust revoke .` forgets the decision.
+
+Two limits to know. With `provider: cli`, the vendor CLI (Claude Code, Codex) executes tools under its own permission system; hench's guard governs only hench's own tool loop, so the permission-mode clamp is what reaches a CLI run. And the command allowlist bounds accidents, not adversaries: `node` and `npx` are in it, so an agent that wants to run arbitrary code can. The trust review is what tells you the repository asked for more than the defaults.
+
+### Child-process environment
+
+Commands the agent runs (shell, git, the test runner) receive `process.env` minus variables whose names look like credentials — `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*_API_KEY`, `AWS_*`, and so on. Values are never inspected. A project whose tests need one of them lists it under `guard.env.allow` in `.hench/config.json`; `guard.env.deny` strips more. The default blocked paths also cover credential files (`.env`, `.env.*`, `*.pem`, `*.key`, `.npmrc`, `.netrc`, `.aws/`, `.ssh/`).
 
 ### No install-time hooks
 

@@ -115,3 +115,57 @@ describe("wrapTallColumns", () => {
     expect(nodes.find((n) => n.id === "b")!.col).toBeGreaterThan(Math.max(...nodes.filter((n) => n.id.startsWith("a")).map((n) => n.col)));
   });
 });
+
+describe("legend filters see through areas to nested zones", () => {
+  // a2 (the smaller zone of Alpha) is the only entry-point zone; every area
+  // is mostly logic, so no area's own kind is "entry".
+  function nestedInput(): IsoModelInput {
+    const base = input();
+    const files = new Map(base.files);
+    for (let i = 0; i < 4; i++) files.set(`src/a2/f${i}.ts`, { lineCount: 10, kind: "entry" });
+    return { ...base, files };
+  }
+
+  function mount() {
+    const model = buildIsoModel(nestedInput());
+    const dom = new JSDOM(renderIsoMap(model), { runScripts: "dangerously" });
+    const doc = dom.window.document;
+    const block = (name: string) =>
+      [...doc.querySelectorAll('#iso g.node[role="button"]')].find((g) => (g.getAttribute("aria-label") ?? "").startsWith(name + ","))!;
+    const legend = (kind: string) => doc.querySelector<HTMLButtonElement>(`.lg[data-kind="${kind}"]`)!;
+    return { model, dom, doc, block, legend };
+  }
+
+  it("keeps an area lit when only a zone inside it matches, and dims the rest", () => {
+    const { model, block, legend } = mount();
+    expect(model.nodes.map((n) => n.kind)).not.toContain("entry");
+    legend("entry").click();
+    expect(block("Alpha").getAttribute("opacity")).not.toBe("0.08");
+    expect(block("Alpha").getAttribute("aria-label")).toMatch(/, 1 matching inside$/);
+    expect(block("Beta").getAttribute("opacity")).toBe("0.08");
+  });
+
+  it("colours the matching tile on the area's face and fades the others", () => {
+    const { block, legend } = mount();
+    legend("entry").click();
+    const tiles = [...block("Alpha").querySelectorAll("polygon.tile")];
+    const opacities = tiles.map((t) => t.getAttribute("fill-opacity"));
+    expect(opacities).toContain("1");
+    expect(opacities).toContain("0.35");
+  });
+
+  it("restores every block and tile when the filter is cleared", () => {
+    const { block, legend } = mount();
+    legend("entry").click();
+    legend("entry").click();
+    expect(block("Beta").getAttribute("opacity")).not.toBe("0.08");
+    expect(block("Alpha").getAttribute("aria-label")).not.toMatch(/matching inside/);
+    const tiles = [...block("Alpha").querySelectorAll("polygon.tile")];
+    expect(tiles.every((t) => t.getAttribute("fill-opacity") === "1")).toBe(true);
+  });
+
+  it("counts zones of each kind at every depth on the legend", () => {
+    const { legend } = mount();
+    expect(legend("entry").querySelector(".ct")?.textContent).toBe("1");
+  });
+});

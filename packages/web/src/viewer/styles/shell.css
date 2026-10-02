@@ -71,6 +71,83 @@
 .topnav-tab-label { font-weight: 600; letter-spacing: .02em; }
 .topnav-tab-hint { font-size: 10px; font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-muted); }
 
+/* ── Live tab: after a divider, outside the stage loop ──────────────── */
+
+.topnav-divider { align-self: center; width: 1px; height: 24px; margin: 0 var(--space-2); background: var(--border); flex: none; }
+.topnav-live { position: relative; display: flex; align-self: stretch; }
+.topnav-tab-live { height: 100%; }
+
+/* Status dot: hollow when idle, filled teal and pulsing when running, orange when stuck. */
+.live-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--text-muted);
+  box-sizing: border-box;
+}
+.live-state-running .live-dot { background: var(--accent); border-color: var(--accent); animation: live-pulse 1.6s ease-in-out infinite; }
+.live-state-attention .live-dot { background: var(--orange); border-color: var(--orange); }
+@keyframes live-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  50% { box-shadow: 0 0 0 5px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-state-running .live-dot { animation: none; }
+}
+
+.live-count,
+.live-stuck-badge {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+.live-count { background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--accent); }
+.live-stuck-badge { background: transparent; color: var(--orange); border: 1px solid var(--orange); }
+
+/* Peek: opens under the tab on hover or focus. */
+.live-peek {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 50;
+  width: 340px;
+  max-width: calc(100vw - 2 * var(--space-4));
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .3);
+}
+.live-peek-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.live-peek-empty { margin: 0; padding: var(--space-2) var(--space-3); font-size: 12px; color: var(--text-muted); }
+.live-peek-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12px;
+}
+.live-peek-row:hover { background: var(--bg-hover); }
+.live-peek-row:focus-visible,
+.live-peek-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.live-peek-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-peek-stuck { margin-left: var(--space-2); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--orange); }
+.live-peek-meta { display: flex; gap: var(--space-3); color: var(--text-muted); font-size: 11px; }
+.live-peek-branch { font-family: var(--font-mono, ui-monospace, monospace); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.live-peek-step { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-peek-bar { display: block; height: 4px; margin-top: 2px; border-radius: 2px; background: var(--bg-active, var(--border)); overflow: hidden; }
+.live-peek-bar-fill { display: block; height: 100%; background: var(--accent); }
+.live-peek-open { display: block; margin-top: var(--space-2); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border); color: var(--accent); font-weight: 600; font-size: 12px; text-decoration: none; }
+.live-peek-open:hover { text-decoration: underline; }
+
 .topnav-search {
   margin-left: auto;
   min-width: 220px;
@@ -311,7 +388,7 @@
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
 }
-.settings-overlay-glyph { font-size: 16px; color: var(--text-muted); }
+.settings-overlay-glyph { display: inline-flex; align-items: center; color: var(--text-muted); }
 .settings-overlay-crumbs { font-size: 13px; color: var(--text-muted); }
 .settings-overlay-crumbs b { color: var(--text); font-weight: 600; }
 .settings-overlay-body { flex: 1; min-height: 0; display: flex; }
@@ -342,7 +419,8 @@
 .settings-overlay-item:hover { background: var(--bg-hover); color: var(--text); }
 .settings-overlay-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .settings-overlay-item.active { background: var(--bg-active, var(--bg-hover)); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
-.settings-overlay-item-glyph { width: 18px; text-align: center; color: var(--text-muted); }
+.settings-overlay-item-glyph { width: 22px; display: inline-flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); }
+.settings-overlay-glyph svg, .settings-overlay-item-glyph svg, .bottombar-settings svg { display: block; flex-shrink: 0; }
 .settings-overlay-density { margin-top: auto; padding: var(--space-3) var(--space-4) 0; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); }
 .settings-overlay-density-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
 .settings-overlay-content { flex: 1; min-width: 0; overflow-y: auto; padding: var(--space-6); }
@@ -417,10 +495,13 @@
 
 /* ── Stage pages ─────────────────────────────────────────────────────── */
 
-.stage-page-head { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-5); }
-.stage-page-logo { border-radius: var(--radius-md); }
-.stage-page-title { font-size: 22px; font-weight: 600; margin: 0; }
-.stage-page-blurb { margin: 2px 0 0; color: var(--text-muted); font-size: 13px; }
+/* The breadcrumb already names the stage, so the head is one compact line:
+   mark, name and blurb, wrapping the blurb under the name on a narrow screen. */
+.stage-page-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.stage-page-head > div { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-3); min-width: 0; }
+.stage-page-logo { border-radius: var(--radius-md); width: 28px; height: 28px; flex-shrink: 0; }
+.stage-page-title { font-size: 18px; font-weight: 600; margin: 0; }
+.stage-page-blurb { margin: 0; color: var(--text-muted); font-size: 13px; }
 
 .stage-section { margin-bottom: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-surface); }
 .stage-section--open { border-color: var(--border-strong, var(--border)); }
@@ -539,6 +620,7 @@
 /* ── Narrow screens ──────────────────────────────────────────────────── */
 
 @media (max-width: 960px) {
+  /* The product hints drop; Live has none to drop, and keeps its dot and count. */
   .topnav-search-label, .topnav-subtitle, .topnav-tab-hint { display: none; }
   .topnav-search { min-width: 0; }
   .settings-overlay-nav { width: 200px; }
@@ -557,4 +639,26 @@
   .settings-overlay-body { flex-direction: column; }
   .settings-overlay-nav { width: auto; max-height: 40%; border-right: none; border-bottom: 1px solid var(--border); }
   .stage-section-blurb { display: none; }
+}
+
+/* Phones: the side stage links would sit on top of the content, and the top
+   navigation already reaches every stage — drop them and their gutters. */
+@media (max-width: 560px) {
+  /* Top nav: the tabs scroll sideways inside the bar instead of pushing the
+     page wider than the screen; search collapses to its icon. */
+  .topnav { padding: 0 var(--space-2); gap: var(--space-1); }
+  .topnav-brand { padding-right: var(--space-1); }
+  .topnav-tabs { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .topnav-tabs::-webkit-scrollbar { display: none; }
+  .topnav-tab { flex: none; gap: 4px; }
+  .topnav-tab-glyph { display: none; }
+  .topnav-divider { margin: 0 var(--space-1); }
+  .topnav-search { flex: none; margin-left: 0; }
+  .stage-links { display: none; }
+  .main--staged { padding-left: var(--space-3); padding-right: var(--space-3); }
+  .stage-page-blurb { font-size: 12px; }
+  .stage-section-head { flex-wrap: wrap; padding-bottom: var(--space-2); }
+  .stage-section-toggle { flex-basis: 100%; }
+  .stage-section-tablist { margin-left: var(--space-4); }
+  .stage-section-body { padding-left: var(--space-3); padding-right: var(--space-3); }
 }

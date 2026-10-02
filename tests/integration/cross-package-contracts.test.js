@@ -251,6 +251,15 @@ describe("hench → llm-client gateway contract", () => {
     "loadProjectOverrides",
     "mergeWithOverrides",
     "toCanonicalJSON",
+    "guardBaselineForLanguage",
+    "clampGuardToBaseline",
+    "evaluateRepoTrust",
+    "recordRepoTrust",
+    "clearRepoTrust",
+    "formatRepoTrustReport",
+    "redactDeep",
+    "redactSecrets",
+    "createLineRedactor",
     "setQuiet",
     "isQuiet",
     "setVerbose",
@@ -298,11 +307,14 @@ describe("hench → llm-client gateway contract", () => {
     "resolveLayout",
     "detectLayoutMode",
     "relativeToRoot",
+    "readAvailableMemory",
+    "getAvailableMemory",
+    "createAvailableMemoryReader",
   ];
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
 
-  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS"];
+  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS"];
 
   for (const name of GATEWAY_FUNCTIONS) {
     it(`re-exports "${name}" as a function`, async () => {
@@ -724,6 +736,11 @@ describe("gateway export auto-detection", () => {
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
         "deepMerge", "loadProjectOverrides", "loadProjectOverrideSources", "mergeWithOverrides", "toCanonicalJSON",
+        // Repository trust: the guard baseline and the per-user trust store
+        // are one evaluation shared by hench, the dashboard and ndx init.
+        "guardBaselineForLanguage", "clampGuardToBaseline", "evaluateRepoTrust",
+        "recordRepoTrust", "clearRepoTrust", "formatRepoTrustReport",
+        "redactDeep", "redactSecrets", "createLineRedactor",
         "setQuiet", "isQuiet", "setVerbose", "isVerbose", "setDebug", "isDebug",
         "info", "result", "verbose", "debug", "warn", "suppressKnownDeprecations",
         "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "carolinaBlue", "yellow",
@@ -739,6 +756,9 @@ describe("gateway export auto-detection", () => {
         "parseStreamTokenUsageWithDiagnostic", "mapCodexUsageToTokenUsage",
         "accumulateTokenUsage", "emptyAggregateTokenUsage",
         "resolveModel", "resolveVendorModel", "resolveReviewModel", "resolveTaskModel",
+        // Claude API effort: hench's turn loop must apply the same rule the
+        // llm-client API provider applies, so it shares the one resolver.
+        "resolveClaudeApiEffort",
         "isModelCompatibleWithVendor", "resetStaleModel", "formatVendorChangeWarning",
         "formatUsage", "createPromptEnvelope", "assemblePrompt", "assemblePromptText",
         // Prompt section measurement. Lives in llm-client rather than hench so
@@ -760,12 +780,15 @@ describe("gateway export auto-detection", () => {
         // `relativeToRoot` comes with it because hench init writes `.gitignore`
         // lines naming its own directory, and a name spelled by hand is the
         // same copy by another route.
-        "resolveLayout", "detectLayoutMode", "relativeToRoot"],
+        "resolveLayout", "detectLayoutMode", "relativeToRoot",
+        // Available-memory reading. One reading for hench, the dashboard and
+        // the hub admission floor, so they cannot disagree about the machine.
+        "readAvailableMemory", "getAvailableMemory", "createAvailableMemoryReader"],
       ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "REVIEW_MODELS", "GOOGLE_MODELS",
         "VENDOR_CONTEXT_CHAR_LIMITS",
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
         "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS",
-        "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE"],
+        "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE", "SECRET_PATH_PATTERNS"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));

@@ -52,6 +52,17 @@ describe("heartbeat", () => {
     hb.stop();
   });
 
+  it("stamps the process pid on the record it saves", async () => {
+    const run = makeRunRecord();
+    expect(run.pid).toBeUndefined();
+    const hb = startHeartbeat("/tmp/hench", run, 100);
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(run.pid).toBe(process.pid);
+    hb.stop();
+  });
+
   it("fires multiple times over multiple intervals", async () => {
     const run = makeRunRecord();
     const hb = startHeartbeat("/tmp/hench", run, 50);

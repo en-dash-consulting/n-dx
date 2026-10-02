@@ -865,11 +865,11 @@ totalCacheCreationTokens: 0,
 
     const cost = estimateCost(usage);
 
-    // $3/1M input + $15/1M output = $18
-    expect(cost.total).toBe("$18.00");
-    expect(cost.inputCost).toBe(3);
-    expect(cost.outputCost).toBe(15);
-    expect(cost.totalRaw).toBe(18);
+    // $2/1M input + $10/1M output = $12
+    expect(cost.total).toBe("$12.00");
+    expect(cost.inputCost).toBe(2);
+    expect(cost.outputCost).toBe(10);
+    expect(cost.totalRaw).toBe(12);
   });
 
   it("returns zero for empty usage", () => {
@@ -935,9 +935,9 @@ totalCacheCreationTokens: 0,
 
     const cost = estimateCost(usage);
 
-    // $3 * 500/1M = $0.0015, $15 * 100/1M = $0.0015
+    // $2 * 500/1M = $0.001, $10 * 100/1M = $0.001
     expect(cost.total).toBe("$0.00");
-    expect(cost.totalRaw).toBeCloseTo(0.003, 4);
+    expect(cost.totalRaw).toBeCloseTo(0.002, 4);
   });
 });
 
@@ -995,9 +995,9 @@ describe("estimateCost prices each model at its own rates", () => {
     const sonnet = estimateCost(usageForModels({ "claude-sonnet-5": ONE_MILLION_EACH }));
 
     expect(opus.totalRaw).toBeGreaterThan(sonnet.totalRaw);
-    // Opus: 5 + 25 + 6.25 + 0.50 = $36.75. Sonnet: 3 + 15 + 3.75 + 0.30 = $22.05.
+    // Opus: 5 + 25 + 6.25 + 0.50 = $36.75. Sonnet: 2 + 10 + 2.50 + 0.20 = $14.70.
     expect(opus.total).toBe("$36.75");
-    expect(sonnet.total).toBe("$22.05");
+    expect(sonnet.total).toBe("$14.70");
     expect(opus.byModel).toHaveLength(1);
     expect(opus.byModel[0]).toMatchObject({ model: "claude-opus-5", known: true });
     expect(opus.fullyAttributed).toBe(true);
@@ -1038,7 +1038,7 @@ describe("estimateCost prices each model at its own rates", () => {
     expect(cost.byModel).toHaveLength(1);
     expect(cost.byModel[0]).toMatchObject({
       model: "some-unreleased-model",
-      pricedAs: "claude-sonnet-5",
+      pricedAs: "claude-sonnet-5-5",
       known: false,
     });
     // A guessed rate must never read as a measured one.
@@ -1056,8 +1056,8 @@ describe("estimateCost prices each model at its own rates", () => {
 
     expect(residual).toBeDefined();
     expect(residual!.tokens).toBe(1_000_000);
-    expect(residual!.pricedAs).toBe("claude-sonnet-5");
-    expect(residual!.totalRaw).toBeCloseTo(3, 10); // 1M input at Sonnet's $3
+    expect(residual!.pricedAs).toBe("claude-sonnet-5-5");
+    expect(residual!.totalRaw).toBeCloseTo(2, 10); // 1M input at Sonnet 5.5's $2
     expect(cost.fullyAttributed).toBe(false);
   });
 
@@ -1646,7 +1646,7 @@ describe("groupByTimePeriod", () => {
     const buckets = groupByTimePeriod(events, "day");
 
     expect(buckets).toHaveLength(1);
-    expect(buckets[0].estimatedCost.total).toBe("$18.00");
+    expect(buckets[0].estimatedCost.total).toBe("$12.00");
   });
 
   it("preserves per-package breakdown in buckets", () => {
@@ -1756,20 +1756,20 @@ describe("checkBudget", () => {
   });
 
   it("checks cost budget", () => {
-    // 1M input + 1M output @ Sonnet pricing = $3 + $15 = $18
-    const result = checkBudget(makeUsage(1000000, 1000000), { cost: 20 });
+    // 1M input + 1M output @ Sonnet 5.5 pricing = $2 + $10 = $12
+    const result = checkBudget(makeUsage(1000000, 1000000), { cost: 12.5 });
 
-    expect(result.severity).toBe("warning"); // $18 of $20 = 90%
+    expect(result.severity).toBe("warning"); // $12 of $12.50 = 96%
     expect(result.cost).toBeDefined();
-    expect(result.cost!.used).toBe(18);
-    expect(result.cost!.budget).toBe(20);
-    expect(result.cost!.percent).toBe(90);
+    expect(result.cost!.used).toBe(12);
+    expect(result.cost!.budget).toBe(12.5);
+    expect(result.cost!.percent).toBe(96);
     expect(result.cost!.severity).toBe("warning");
     expect(result.warnings[0]).toContain("Approaching cost budget");
   });
 
   it("returns exceeded when cost exceeds budget", () => {
-    // 1M input + 1M output = $18, budget $10
+    // 1M input + 1M output = $12, budget $10
     const result = checkBudget(makeUsage(1000000, 1000000), { cost: 10 });
 
     expect(result.severity).toBe("exceeded");
@@ -1778,7 +1778,7 @@ describe("checkBudget", () => {
   });
 
   it("returns ok when cost is below budget", () => {
-    // 500 input + 100 output = $0.003, budget $10
+    // 500 input + 100 output = $0.002, budget $10
     const result = checkBudget(makeUsage(500, 100), { cost: 10 });
 
     expect(result.severity).toBe("ok");

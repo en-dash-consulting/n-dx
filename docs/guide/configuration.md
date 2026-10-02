@@ -17,9 +17,9 @@ On re-init, if the vendor and model are already configured the LLM prompts are s
 
 | Vendor | Model ID | Label | Default |
 |--------|----------|-------|---------|
-| `claude` | `claude-sonnet-5` | Claude Sonnet 5 | yes |
-| `claude` | `claude-opus-5` | Claude Opus 5 | |
-| `claude` | `claude-fable-5` | Claude Fable 5 | |
+| `claude` | `claude-sonnet-5-5` | Claude Sonnet 5.5 | yes |
+| `claude` | `claude-opus-5-5` | Claude Opus 5.5 | |
+| `claude` | `claude-fable-5-1` | Claude Fable 5.1 | |
 | `claude` | `claude-haiku-4-5` | Claude Haiku 4.5 | |
 | `codex` | `gpt-5.6-terra` | GPT-5.6 Terra | yes |
 | `codex` | `gpt-5.6-sol` | GPT-5.6 Sol | |
@@ -56,13 +56,13 @@ Examples:
 
 ```sh
 # Fully non-interactive init (CI / scripting)
-ndx init --provider=claude --model=claude-sonnet-5 .
+ndx init --provider=claude --model=claude-sonnet-5-5 .
 
 # Configure both vendors in a single call
-ndx init --provider=claude --claude-model=claude-sonnet-5 --codex-model=gpt-5.6-terra .
+ndx init --provider=claude --claude-model=claude-sonnet-5-5 --codex-model=gpt-5.6-terra .
 
 # A lone vendor-specific flag implies the provider
-ndx init --claude-model=claude-opus-5 .   # implies --provider=claude
+ndx init --claude-model=claude-opus-5-5 .   # implies --provider=claude
 ```
 
 **Flag rules:**
@@ -88,7 +88,7 @@ Example `.n-dx.json` after init:
   "llm": {
     "vendor": "claude",
     "claude": {
-      "model": "claude-sonnet-5"
+      "model": "claude-sonnet-5-5"
     }
   }
 }
@@ -117,8 +117,8 @@ ndx config llm.claude.api_key sk-ant-... .
 # or via environment variable:
 export ANTHROPIC_API_KEY=sk-ant-...
 
-# Pin a model (default: claude-sonnet-5)
-ndx config llm.claude.model claude-opus-5 .
+# Pin a model (default: claude-sonnet-5-5)
+ndx config llm.claude.model claude-opus-5-5 .
 
 # CLI mode
 ndx config llm.claude.cli_path /path/to/claude .
@@ -127,6 +127,16 @@ ndx config llm.claude.cli_path /path/to/claude .
 ::: warning Where keys are stored
 `*.api_key` and `*.cli_path` values are written to `.n-dx.local.json`, which `ndx init` gitignores — never to the shared `.n-dx.json`. Every reader merges the local file over the shared one, so nothing else changes. If a project configured before this routing still has a key in `.n-dx.json`, `ndx config` warns on every run and `ndx ci` fails when that file is git-tracked; re-run `ndx config <key> <value>` to move it (and rotate the key if it was ever committed).
 :::
+
+### Effort (API mode)
+
+`llm.effort` sets the reasoning effort per task class, keyed like `llm.routes` (exact class names or `prd.*`-style prefixes). Values are `low`, `medium`, `high`, `xhigh` and `max`.
+
+```json
+{ "llm": { "effort": { "prd.*": "low", "agent.execute": "xhigh" } } }
+```
+
+With no matching rule, `claude-opus-5-5` gets `high` (Opus 5's API default; Opus 5.5's own is `medium`) and every other model gets the API default. A model that does not accept effort, such as `claude-haiku-4-5`, never receives it, and an unknown value is never sent; both print a warning. CLI mode (Claude Code) does not apply `llm.effort` yet.
 
 ## Codex Configuration
 
@@ -185,7 +195,7 @@ Thresholds — 0.4 classification probability, 0.5 finding confidence, the 0.3/0
 
 **Ids.** A numbered zone id (`routes-7`) with a chosen name takes its id from the name. The old id stays in `previousIds` and still resolves in pins and `get_zone`.
 
-Every `ndx analyze` writes `manifest.lastAnalysis` — mode (`fast` · `generative` · `narrate` · `cascade`), wall-clock per phase, and calls, tokens and time per LLM task class, so you can see which model answered what and how long it took (a class served by two vendors in one run, such as `code.classify` with its escalations, appears once per vendor). The same record is appended to `.sourcevision/.cache/analyses.jsonl` (last 200 runs). Jev answers are cached in `.sourcevision/.cache/judgments.json`, keyed by the question and only the slice of state it references, so a re-run re-asks only what changed; the CLI's token report shows hits and misses. Both cache files are machine-local and safe to delete.
+Every `ndx analyze` writes `manifest.lastAnalysis` — mode (`fast` · `generative` · `narrate` · `cascade`), wall-clock per phase, and calls, tokens and time per LLM task class, so you can see which model answered what and how long it took (a class served by two vendors in one run, such as `code.classify` with its escalations, appears once per vendor). The same record is appended to `.sourcevision/.cache/analyses.jsonl` (last 200 runs). Jev answers are cached in `.sourcevision/.cache/judgments.json`, keyed by the question and only the slice of state it references, so a re-run re-asks only what changed; the CLI's token report shows hits and misses. While a run is in progress it also keeps `.sourcevision/.cache/analyze-progress.json` current — phase, enrichment pass, batch k of n, and LLM use so far — and marks it complete or failed when it ends; the dashboard reads it for runs started from a terminal as well as its own. These cache files are machine-local and safe to delete.
 
 ## Hench Configuration
 

@@ -91,6 +91,15 @@ export interface CompletionRequest {
   cliFlags?: string[];
   /** Timeout in milliseconds (only used in CLI mode). */
   timeoutMs?: number;
+  /**
+   * The `llm.effort` value matched for this call's task class
+   * (`TaskModelResolution.effort`). Only the Claude API provider reads it,
+   * through `resolveClaudeApiEffort`, which validates it and applies the
+   * per-model default; other providers ignore it.
+   */
+  effort?: string;
+  /** Task class of the call, named in effort warnings. */
+  taskClass?: string;
 }
 
 /** Result from a Claude completion request. */

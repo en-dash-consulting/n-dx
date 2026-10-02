@@ -25,10 +25,12 @@ import {
   viewLabel,
   viewBlurb,
   viewGlyph,
+  viewPixelIcon,
   viewProduct,
   STAGES,
   STAGE_ORDER,
   SETTINGS_ENTRIES,
+  isLiveView,
   ENRICHMENT_THRESHOLDS,
   type StageId,
 } from "../../../src/viewer/views/index.js";
@@ -86,6 +88,7 @@ describe("navigation model: coverage", () => {
 function placementsOf(view: ViewId): string[] {
   const places: string[] = [];
   if (view === "home") places.push("home");
+  if (isLiveView(view)) places.push("live");
   if ((STAGE_ORDER as readonly string[]).includes(view)) places.push(`stage:${view}`);
   for (const stage of STAGE_ORDER) {
     for (const section of STAGES[stage].sections) {
@@ -248,8 +251,20 @@ describe("rendered surfaces take their labels from the model", () => {
       }), root);
     });
     await settle();
-    const labels = [...root.querySelectorAll(".topnav-tab-label")].map((e) => e.textContent);
+    const labels = [...root.querySelectorAll("[data-stage] .topnav-tab-label")].map((e) => e.textContent);
     expect(labels).toEqual(STAGE_ORDER.map((id) => viewLabel(id)));
+  });
+
+  it("the top nav names the Live tab with the model's label, after the stage tabs", async () => {
+    act(() => {
+      render(h(TopNav, {
+        view: "home", validViews: buildValidViews(null), onNavigate: () => {}, onOpenSearch: () => {},
+      }), root);
+    });
+    await settle();
+    const tabs = [...root.querySelectorAll(".topnav-tab")];
+    expect(tabs.map((t) => t.querySelector(".topnav-tab-label")?.textContent))
+      .toEqual([...STAGE_ORDER, "live"].map((id) => viewLabel(id as ViewId)));
   });
 
   it("the Home cards name, describe and mark each stage from the model", async () => {
@@ -354,7 +369,8 @@ describe("rendered surfaces take their labels from the model", () => {
     for (const text of rendered) {
       expect(text).not.toContain("{cli}");
       const match = SETTINGS_ENTRIES.some((e) =>
-        text === `${viewGlyph(e.view)}${resolveCliLabel(viewLabel(e.view), "n-dx")}`,
+        // A pixel icon is an <svg> with no text; a view without one shows its text glyph.
+        text === `${viewPixelIcon(e.view) ? "" : viewGlyph(e.view)}${resolveCliLabel(viewLabel(e.view), "n-dx")}`,
       );
       expect(match, `settings item "${text}" matches no model entry`).toBe(true);
     }

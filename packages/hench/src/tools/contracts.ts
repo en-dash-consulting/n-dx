@@ -13,6 +13,12 @@ export interface ToolGuard {
   recordFileWrite(filepath: string, bytesWritten: number): void;
   readonly maxFileSize: number;
   readonly commandTimeout: number;
+  /**
+   * Environment for processes the tools spawn, already filtered of
+   * credential-shaped variables. Optional so lightweight test guards need not
+   * provide one; tools fall back to `process.env` when it is absent.
+   */
+  readonly childEnv?: NodeJS.ProcessEnv;
 }
 
 /**

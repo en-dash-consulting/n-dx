@@ -86,9 +86,20 @@ export interface ExecutionStatus {
   error?: string;
 }
 
-/** The subset of `GET /api/hench/memory` the machine strip reads. */
+/**
+ * The subset of `GET /api/hench/memory` the machine strip reads.
+ *
+ * Every figure is null when the machine could not be read — the strip shows a
+ * dash rather than inventing a percentage.
+ */
 export interface MemoryStatus {
-  system: { totalBytes: number; usedBytes: number; usedPercent: number };
+  system: {
+    totalBytes: number;
+    /** Available memory, not `os.freemem()`. */
+    availableBytes: number | null;
+    usedBytes: number | null;
+    usedPercent: number | null;
+  };
 }
 
 /** The subset of `GET /api/rex/next`'s task the Start working action needs. */
@@ -232,9 +243,9 @@ export function workspaceViewUrl(card: Pick<WorkspaceCard, "key" | "isAnchor">, 
   return `${project}${slot}/${view}`;
 }
 
-/** "1.2 GB", "840 MB" — byte counts for the memory tile. */
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "—";
+/** "1.2 GB", "840 MB" — byte counts for the memory tile. An unknown reading is a dash. */
+export function formatBytes(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes) || bytes < 0) return "—";
   const gb = bytes / 1024 ** 3;
   if (gb >= 1) return `${gb.toFixed(1)} GB`;
   return `${Math.round(bytes / 1024 ** 2)} MB`;
@@ -363,15 +374,20 @@ function StatTile({ value, label, title }: { value: string; label: string; title
 
 function MachineStrip({ stats }: { stats: MachineStats }) {
   const memory = stats.memory;
+  // An unreadable machine gets a dash and says so, rather than a percentage
+  // computed from numbers that do not exist.
+  const known = memory !== null && memory.usedPercent !== null;
   return h("div", { class: "stat-grid workspaces-machine-strip", role: "group", "aria-label": "Machine totals" },
     h(StatTile, {
       value: String(stats.agentsRunning),
       label: stats.agentsRunning === 1 ? "agent running" : "agents running",
     }),
     h(StatTile, {
-      value: memory ? `${Math.round(memory.usedPercent)}%` : "—",
-      label: memory ? `memory in use · ${formatBytes(memory.usedBytes)} of ${formatBytes(memory.totalBytes)}` : "memory in use",
-      title: memory ? `${formatBytes(memory.usedBytes)} of ${formatBytes(memory.totalBytes)}` : undefined,
+      value: known ? `${Math.round(memory.usedPercent!)}%` : "—",
+      label: known
+        ? `memory in use · ${formatBytes(memory.availableBytes)} available of ${formatBytes(memory.totalBytes)}`
+        : memory ? "memory reading unavailable" : "memory in use",
+      title: known ? `${formatBytes(memory.usedBytes)} of ${formatBytes(memory.totalBytes)}` : undefined,
     }),
     h(StatTile, {
       value: String(stats.uncommittedTrees),

@@ -11,12 +11,18 @@
 
 import { describe, it, expect } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { classifyOrigin, guardHubRequest, upgradeAllowed } from "../../../src/hub/request-guard.js";
+import { classifyOrigin, guardHubRequest, upgradeRefusal } from "../../../src/hub/request-guard.js";
 
 const HUB_PORT = 3117;
 
 function req(method: string, headers: Record<string, string | string[]> = {}): IncomingMessage {
-  return { method, headers, url: "/api/hub/projects" } as unknown as IncomingMessage;
+  // Every real client sends Host. Default it to the hub so the origin tests
+  // exercise the origin rule, not the Host rule; the Host tests override it.
+  return {
+    method,
+    headers: { host: `localhost:${HUB_PORT}`, ...headers },
+    url: "/api/hub/projects",
+  } as unknown as IncomingMessage;
 }
 
 interface FakeRes {
@@ -34,8 +40,9 @@ function res(): FakeRes {
     res: null as unknown as ServerResponse,
   };
   state.res = {
-    writeHead(status: number) {
+    writeHead(status: number, headers?: Record<string, string>) {
       state.statusCode = status;
+      for (const [name, value] of Object.entries(headers ?? {})) state.headers[name.toLowerCase()] = value;
       return this;
     },
     setHeader(name: string, value: string) {
@@ -117,12 +124,132 @@ describe("guardHubRequest", () => {
   });
 });
 
-describe("upgradeAllowed", () => {
+describe("guardHubRequest — Host validation", () => {
+  it("answers 421 to a safe-method read whose Host is not the hub", () => {
+    const out = res();
+    expect(
+      guardHubRequest(req("GET", { host: "attacker.example:3117", "sec-fetch-site": "same-origin" }), out.res, HUB_PORT),
+    ).toBe(true);
+    expect(out.statusCode).toBe(421);
+    expect(out.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(JSON.parse(out.body)).toEqual({ error: "Request Host does not name this server" });
+  });
+
+  it("answers 421 to a mutation whose Host is not the hub, even with a trusted Origin", () => {
+    const out = res();
+    expect(
+      guardHubRequest(req("POST", { host: "attacker.example:3117", origin: "http://localhost:3117" }), out.res, HUB_PORT),
+    ).toBe(true);
+    expect(out.statusCode).toBe(421);
+  });
+
+  it("answers 421 when Host names the right machine on the wrong port, or is missing", () => {
+    for (const headers of [{ host: "localhost:3118" }, { host: "localhost" }, { host: "" }]) {
+      const out = res();
+      expect(guardHubRequest(req("GET", headers), out.res, HUB_PORT), JSON.stringify(headers)).toBe(true);
+      expect(out.statusCode, JSON.stringify(headers)).toBe(421);
+    }
+    const noHost = req("GET");
+    delete (noHost.headers as Record<string, unknown>).host;
+    const out = res();
+    expect(guardHubRequest(noHost, out.res, HUB_PORT)).toBe(true);
+    expect(out.statusCode).toBe(421);
+  });
+
+  it("lets every loopback spelling of the hub's own port through", () => {
+    for (const host of ["localhost:3117", "127.0.0.1:3117", "[::1]:3117", "LOCALHOST:3117"]) {
+      const out = res();
+      expect(guardHubRequest(req("GET", { host }), out.res, HUB_PORT), host).toBe(false);
+      expect(out.statusCode, host).toBeNull();
+    }
+  });
+
+  it("refuses everything while the hub has not yet bound a port", () => {
+    const out = res();
+    expect(guardHubRequest(req("GET"), out.res, undefined)).toBe(true);
+    expect(out.statusCode).toBe(421);
+  });
+});
+
+describe("guardHubRequest — per-user token", () => {
+  const TOKEN = "hubtok_0123456789abcdefghijklmnopqrstuv";
+
+  it("is inert without a token and refuses with 401 when one is configured", () => {
+    const a = res();
+    expect(guardHubRequest(req("GET"), a.res, HUB_PORT)).toBe(false);
+    const b = res();
+    expect(guardHubRequest(req("GET"), b.res, HUB_PORT, TOKEN)).toBe(true);
+    expect(b.statusCode).toBe(401);
+    expect(b.headers["www-authenticate"]).toContain("Bearer");
+  });
+
+  it("accepts the token as bearer, header or cookie, including on the spawn route", () => {
+    const carriers: Array<Record<string, string>> = [
+      { authorization: `Bearer ${TOKEN}` },
+      { "x-ndx-token": TOKEN },
+      { cookie: `ndx_token=${TOKEN}` },
+    ];
+    for (const headers of carriers) {
+      const out = res();
+      expect(guardHubRequest(req("POST", { ...headers, origin: "http://localhost:3117" }), out.res, HUB_PORT, TOKEN), JSON.stringify(headers)).toBe(false);
+    }
+  });
+
+  it("sets the cookie and redirects for a navigation that carries the token once", () => {
+    const r = req("GET", {}) as IncomingMessage & { url: string };
+    r.url = `/p/alpha/?ndx_token=${TOKEN}`;
+    const out = res();
+    expect(guardHubRequest(r, out.res, HUB_PORT, TOKEN)).toBe(true);
+    expect(out.statusCode).toBe(302);
+    expect(out.headers["set-cookie"]).toContain(`ndx_token=${TOKEN}`);
+    expect(out.headers["location"]).toBe("/p/alpha/");
+  });
+
+  it("still applies the Host and Origin rules to an authenticated request", () => {
+    const foreignHost = res();
+    expect(guardHubRequest(req("GET", { host: "attacker.example:3117", "x-ndx-token": TOKEN }), foreignHost.res, HUB_PORT, TOKEN)).toBe(true);
+    expect(foreignHost.statusCode).toBe(421);
+    const foreignOrigin = res();
+    expect(guardHubRequest(req("POST", { origin: "http://evil.test", "x-ndx-token": TOKEN }), foreignOrigin.res, HUB_PORT, TOKEN)).toBe(true);
+    expect(foreignOrigin.statusCode).toBe(403);
+  });
+
+  it("requires the token on a WebSocket handshake too, and says 401", () => {
+    expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117" }), HUB_PORT, TOKEN)).toBe("401 Unauthorized");
+    expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117", cookie: `ndx_token=${TOKEN}` }), HUB_PORT, TOKEN)).toBeNull();
+    expect(upgradeRefusal(req("GET", { "x-ndx-token": TOKEN }), HUB_PORT, TOKEN)).toBeNull();
+    expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117" }), HUB_PORT, null)).toBeNull();
+  });
+
+  it("puts the Host rule ahead of the token rule", () => {
+    // Both are broken here; the answer is 421, matching the HTTP gate's order.
+    expect(
+      upgradeRefusal(req("GET", { host: "attacker.example:3117" }), HUB_PORT, TOKEN),
+    ).toBe("421 Misdirected Request");
+  });
+});
+
+describe("upgradeRefusal", () => {
   it("refuses a WebSocket handshake from another origin, and allows the dashboard's", () => {
     // A handshake carries no preflight, so this is the only check there is:
     // otherwise any open page could read every frame a project broadcasts.
-    expect(upgradeAllowed(req("GET", { origin: "http://evil.test" }), HUB_PORT)).toBe(false);
-    expect(upgradeAllowed(req("GET", { origin: "http://localhost:3117" }), HUB_PORT)).toBe(true);
-    expect(upgradeAllowed(req("GET"), HUB_PORT)).toBe(true);
+    expect(upgradeRefusal(req("GET", { origin: "http://evil.test" }), HUB_PORT)).toBe("403 Forbidden");
+    expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117" }), HUB_PORT)).toBeNull();
+    expect(upgradeRefusal(req("GET"), HUB_PORT)).toBeNull();
+  });
+
+  it("refuses a handshake whose Host is not the hub, whatever its Origin", () => {
+    // 421, not 403: the caller writes this status line verbatim, and the HTTP
+    // path and the project server's own upgrade path both answer 421 for a
+    // foreign Host. A boolean verdict made every rejection a 403.
+    expect(upgradeRefusal(req("GET", { host: "attacker.example:3117" }), HUB_PORT)).toBe("421 Misdirected Request");
+    expect(
+      upgradeRefusal(req("GET", { host: "attacker.example:3117", origin: "http://localhost:3117" }), HUB_PORT),
+    ).toBe("421 Misdirected Request");
+    // The Host rule wins over the origin rule, so a handshake that breaks both
+    // is still reported as misdirected rather than forbidden.
+    expect(
+      upgradeRefusal(req("GET", { host: "attacker.example:3117", origin: "http://evil.test" }), HUB_PORT),
+    ).toBe("421 Misdirected Request");
   });
 });

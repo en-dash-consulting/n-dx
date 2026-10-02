@@ -19,8 +19,13 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 
 // ── Types ────────────────────────────────────────────────────────────
 
-/** Resource health level — matches server-side MemoryHealthLevel. */
-type MemoryHealthLevel = "healthy" | "warning" | "critical";
+/**
+ * Resource health level — matches server-side MemoryHealthLevel.
+ *
+ * `"unknown"` means the machine could not be read at all, not that it is under
+ * pressure: it renders as a dash and a plain note, never as a warning.
+ */
+type MemoryHealthLevel = "healthy" | "warning" | "critical" | "unknown";
 
 /** Per-process memory entry from the API. */
 interface ProcessMemoryEntry {
@@ -35,9 +40,11 @@ interface ProcessMemoryEntry {
 interface MemoryStatus {
   system: {
     totalBytes: number;
-    freeBytes: number;
-    usedBytes: number;
-    usedPercent: number;
+    /** Available memory — null when the machine could not be read. */
+    freeBytes: number | null;
+    availableBytes?: number | null;
+    usedBytes: number | null;
+    usedPercent: number | null;
   };
   server: {
     pid: number;
@@ -79,10 +86,17 @@ const HEALTH_CONFIG: Record<MemoryHealthLevel, {
     label: "Critical",
     icon: "●",
   },
+  unknown: {
+    color: "var(--text-dim)",
+    barColor: "var(--text-dim)",
+    label: "Unknown",
+    icon: "○",
+  },
 };
 
-/** Format bytes into a human-readable string. */
-function formatBytes(bytes: number): string {
+/** Format bytes into a human-readable string. An unknown reading is a dash. */
+function formatBytes(bytes: number | null): string {
+  if (bytes === null) return "—";
   if (bytes < 1024) return `${bytes} B`;
   const kb = bytes / 1024;
   if (kb < 1024) return `${Math.round(kb)} KB`;
@@ -94,7 +108,7 @@ function formatBytes(bytes: number): string {
 
 /** Defaults when no data has been fetched yet. */
 const EMPTY_STATUS: MemoryStatus = {
-  system: { totalBytes: 0, freeBytes: 0, usedBytes: 0, usedPercent: 0 },
+  system: { totalBytes: 0, freeBytes: null, usedBytes: null, usedPercent: null },
   server: { pid: 0, rssBytes: 0, heapUsedBytes: 0, heapTotalBytes: 0, externalBytes: 0 },
   processes: [],
   health: "healthy",
@@ -182,7 +196,11 @@ export function MemoryPanel() {
   if (!loaded) return null;
 
   const { system, server, processes, health, loadAvg, cpuCount } = status;
-  const config = HEALTH_CONFIG[health];
+  const config = HEALTH_CONFIG[health] ?? HEALTH_CONFIG.unknown;
+  // A machine that could not be read has no percentage to show and nothing to
+  // warn about — the bar sits empty and the panel says so once.
+  const unknown = health === "unknown" || system.usedPercent === null;
+  const usedPercent = system.usedPercent ?? 0;
 
   return h("div", {
     class: `memory-panel memory-panel-${health}`,
@@ -206,14 +224,25 @@ export function MemoryPanel() {
           class: "memory-pct-display",
           style: `color: ${config.color}`,
         },
-          h("span", { class: "memory-pct-value" }, `${system.usedPercent}`),
-          h("span", { class: "memory-pct-sign" }, "%"),
+          unknown
+            ? h("span", { class: "memory-pct-value" }, "—")
+            : [
+                h("span", { class: "memory-pct-value" }, `${usedPercent}`),
+                h("span", { class: "memory-pct-sign" }, "%"),
+              ],
         ),
       ),
     ),
 
+    // Why there are no numbers — a plain note, not a warning.
+    unknown
+      ? h("div", { class: "memory-pressure-alert memory-pressure-unknown" },
+          h("span", { class: "memory-pressure-text" }, "Memory reading unavailable"),
+        )
+      : null,
+
     // Memory pressure warning (only for warning/critical)
-    health !== "healthy"
+    !unknown && health !== "healthy"
       ? h("div", { class: `memory-pressure-alert memory-pressure-${health}` },
           h("span", { class: "memory-pressure-icon", "aria-hidden": "true" },
             health === "critical" ? "▲" : "△",
@@ -237,12 +266,12 @@ export function MemoryPanel() {
       h("div", { class: "memory-bar-track" },
         h("div", {
           class: `memory-bar-fill memory-bar-${health}`,
-          style: `width: ${system.usedPercent}%`,
+          style: `width: ${unknown ? 0 : usedPercent}%`,
           role: "progressbar",
-          "aria-valuenow": system.usedPercent,
+          ...(unknown ? {} : { "aria-valuenow": usedPercent }),
           "aria-valuemin": 0,
           "aria-valuemax": 100,
-          "aria-label": `System memory: ${system.usedPercent}% used`,
+          "aria-label": unknown ? "System memory: reading unavailable" : `System memory: ${usedPercent}% used`,
         }),
       ),
     ),
@@ -285,7 +314,9 @@ export function MemoryPanel() {
     h("div", { class: "memory-stats" },
       h("div", { class: "memory-stat" },
         h("span", { class: "memory-stat-value" }, formatBytes(system.freeBytes)),
-        h("span", { class: "memory-stat-label" }, "free"),
+        // "available", not "free": on macOS this counts the inactive and
+        // purgeable pages the OS hands back on demand.
+        h("span", { class: "memory-stat-label" }, "available"),
       ),
       h("div", { class: "memory-stat" },
         h("span", { class: "memory-stat-value" }, loadAvg[0].toFixed(2)),

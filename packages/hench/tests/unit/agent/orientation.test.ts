@@ -17,6 +17,7 @@ import {
   buildOrientationPrompt,
   buildOrientationSystemPrompt,
   ensureWarmParent,
+  ORIENTATION_LIFT_NOTICE,
 } from "../../../src/agent/lifecycle/orientation.js";
 import {
   writeSessionCache,
@@ -48,6 +49,23 @@ describe("orientation prompts", () => {
 
     expect(system).toMatch(/do not (modify|change|edit|write)/);
     expect(prompt).toMatch(/do not (modify|change|edit|write)/);
+  });
+
+  it("limits the read-only instruction to the orientation session", () => {
+    // A fork inherits the first user turn; an unscoped "do not modify anything"
+    // reads as binding on the task that follows.
+    const scoped = /during this orientation session, do not modify anything/;
+    expect(buildOrientationSystemPrompt().toLowerCase()).toMatch(scoped);
+    expect(buildOrientationPrompt().toLowerCase()).toMatch(scoped);
+    expect(buildOrientationPrompt(PRIMER).toLowerCase()).toMatch(scoped);
+  });
+
+  it("exports a fixed, task-free lift for forked spawns", () => {
+    expect(ORIENTATION_LIFT_NOTICE).toMatch(/orientation is over/i);
+    expect(ORIENTATION_LIFT_NOTICE).toMatch(/must edit, test and commit/);
+    expect(ORIENTATION_LIFT_NOTICE.toLowerCase()).not.toMatch(
+      /\btask id\b|acceptance criteria/,
+    );
   });
 
   it("asks for the things a task would otherwise rediscover", () => {

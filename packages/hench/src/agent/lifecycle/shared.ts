@@ -15,11 +15,13 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { trustSummaryForRun } from "../../store/trust.js";
+import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -36,7 +38,14 @@ import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
 import type { PromptEnvelope } from "../../prd/llm-gateway.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { saveRun } from "../../store/runs.js";
-import { persistRunLog } from "../../store/run-log.js";
+import { ensureRunLogsIgnored, openRunLog, persistRunLog, type RunLogWriter } from "../../store/run-log.js";
+import {
+  closeActiveRunEvents,
+  emitRunEvent,
+  openRunEvents,
+  setActiveRunEvents,
+  type RunEventWriter,
+} from "../../store/run-events.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { formatBudgetExceeded, type TokenBudgetResult } from "./token-budget.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
@@ -50,7 +59,7 @@ import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } fro
 import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS, OUTPUT_TAIL_LINES } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
-import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines } from "../../types/output.js";
+import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
 import { displayTaskInfo } from "./task-display.js";
 import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
@@ -64,6 +73,7 @@ import {
   findUncommittedWork,
   formatOperatorPrdLeftovers,
   formatRecordCommitPending,
+  formatReviewRepairsUncommittedRefusal,
   formatUncommittedWorkRefusal,
   listDirtyPaths,
   listOperatorOwnedPrdDirt,
@@ -419,6 +429,18 @@ export interface InitRunOptions {
    * in between claim a decision nobody made.
    */
   session?: RunSessionRecord;
+  /**
+   * Number of acceptance criteria on the brief, and the permission mode the
+   * agent will spawn under.
+   *
+   * Only used for the `brief_loaded` progress event. Both loops already hold
+   * these when they call this function, and passing them is what keeps the
+   * event emitted in one place rather than duplicated at each call site.
+   */
+  criteriaCount?: number;
+  permissionMode?: string;
+  /** The review pass the run was launched with (`--review`), recorded on the run from its first save. */
+  reviewPlan?: RunReviewPlan;
 }
 
 /**
@@ -445,11 +467,137 @@ export interface MemoryContext {
   systemTotalBytes: number;
 }
 
+// ---------------------------------------------------------------------------
+// Incremental run log
+// ---------------------------------------------------------------------------
+
+/**
+ * The log file the run currently in this process is streaming into.
+ *
+ * Module state for the same reason the capture buffer behind
+ * `getCapturedLines()` is: output is a process-wide singleton, so at most one
+ * run can be narrating at a time. `--loop` runs tasks one after another, each
+ * opening its own file in {@link beginRunLog} and closing it in
+ * {@link endRunLog}.
+ */
+let _activeRunLog: RunLogWriter | null = null;
+
+/**
+ * Open this run's log and route captured output into it.
+ *
+ * Best-effort by design: a run that cannot open its log still runs, and
+ * {@link endRunLog} writes the whole file at the end instead.
+ *
+ * @returns The writer, or null when no live log could be started.
+ */
+async function beginRunLog(projectDir: string, run: RunRecord): Promise<RunLogWriter | null> {
+  // A previous run that threw before finalizing would otherwise leak its fd
+  // and keep a stale sink installed. Closed and dropped, not rewritten: its
+  // lines belong to that run's file, and this run's buffer is not them.
+  const stale = _activeRunLog;
+  _activeRunLog = null;
+  setCapturedLineSink(null);
+  if (stale) await stale.close();
+
+  try {
+    // Lines already captured before the record existed (the task banner, the
+    // brief) belong to this run's log — passing them as the prefix is what
+    // makes the finished file equal to the whole-buffer write.
+    const writer = await openRunLog(projectDir, run.id, run.startedAt, getCapturedLines());
+    _activeRunLog = writer;
+    setCapturedLineSink(writer.appendLine);
+    return writer;
+  } catch {
+    // Nowhere to write, or no permission to. Not worth failing a run over;
+    // the end-of-run fallback will try once more.
+    return null;
+  }
+}
+
+/**
+ * Close the live log and return the path of the finished file.
+ *
+ * Falls back to a whole-buffer write when there was no live log, or when the
+ * stream broke part-way through — in both cases the operator still ends up
+ * with the complete file the run would have produced before this was
+ * incremental.
+ *
+ * @returns The log path, or undefined when no log could be written at all.
+ */
+async function endRunLog(projectDir: string, run: RunRecord): Promise<string | undefined> {
+  const writer = _activeRunLog;
+  _activeRunLog = null;
+  setCapturedLineSink(null);
+
+  if (writer) {
+    const failure = await writer.close();
+    // Only now, with the run over and its gates behind it: .gitignore is a
+    // tracked file, and editing it mid-run would read as operator work to
+    // this run's own completion gate.
+    await ensureRunLogsIgnored(projectDir);
+    if (!failure) return writer.path;
+    // The stream died mid-run, so the file on disk is short. Fall through and
+    // rewrite it from the capture buffer, which is still complete in memory.
+  }
+
+  try {
+    return await persistRunLog(projectDir, run.id, run.startedAt, getCapturedLines());
+  } catch {
+    // Log persistence is optional; the run result stands.
+    return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Structured progress events
+// ---------------------------------------------------------------------------
+
+/**
+ * Open this run's structured event stream and route {@link emitRunEvent} into
+ * it.
+ *
+ * Best-effort, like the run log: a run that cannot open its events file still
+ * runs, with every emit becoming a no-op. There is no end-of-run fallback —
+ * unlike the log, an event stream assembled after the fact would be exactly the
+ * thing this replaces.
+ *
+ * The writer itself is owned by `store/run-events.ts`, which is why this hands
+ * it straight over rather than keeping a copy: two references to one file
+ * handle is how one of them ends up writing to a closed stream.
+ *
+ * @returns The writer, or null when no stream could be started.
+ */
+async function beginRunEvents(henchDir: string, run: RunRecord): Promise<RunEventWriter | null> {
+  // A previous run that threw before finalizing would otherwise leak its fd and
+  // keep a stale writer installed.
+  await closeActiveRunEvents();
+
+  try {
+    const writer = await openRunEvents(henchDir, run.id);
+    setActiveRunEvents(writer);
+    return writer;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Create a new RunRecord in "running" status and persist it.
  * Also captures a system memory snapshot for later use in finalization.
  * Both loops create identical initial records.
  */
+/**
+ * Repository trust at run start, for the record. Never throws: a run must not
+ * fail because the trust store or a config file could not be read.
+ */
+function captureRunTrust(projectDir: string): RunRecord["trust"] {
+  try {
+    return trustSummaryForRun(evaluateRepoTrust(projectDir));
+  } catch {
+    return undefined;
+  }
+}
+
 export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRecord; memoryCtx: MemoryContext }> {
   // Which checkout this run belongs to. Every automatic commit below re-checks
   // against these three values, so a run whose HEAD is moved mid-run (the
@@ -472,11 +620,14 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     vendor: opts.vendor,
     weight: opts.weight ?? "standard",
     session: opts.session,
+    ...(opts.reviewPlan ? { reviewPlan: opts.reviewPlan } : {}),
     actor: await resolveActor(opts.projectDir ?? "."),
     host: resolveHost(),
+    pid: process.pid,
     ndxVersion: resolveNdxVersion(),
     cliPath: resolveCliPath(),
     ...gitOrigin,
+    trust: captureRunTrust(opts.projectDir ?? "."),
   };
 
   // Emit invocation context to the output stream for CLI and dashboard visibility
@@ -500,16 +651,47 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     };
   }
 
+  // Open the run log before the first save, so the record carries its path
+  // from the moment it is readable. Only when the caller named a project
+  // directory: `.run-logs/` belongs at a project root, and defaulting to the
+  // process cwd would scatter logs (and .gitignore edits) wherever hench
+  // happened to be invoked from.
+  if (opts.projectDir) {
+    const writer = await beginRunLog(opts.projectDir, run);
+    if (writer) run.logPath = writer.path;
+  }
+
+  // The structured event stream. Unconditional, unlike the log: it lives under
+  // `.hench/runs/` next to the record, which every run has by definition, so
+  // there is no project directory to be missing and no `.gitignore` to edit.
+  const eventWriter = await beginRunEvents(opts.henchDir, run);
+  if (eventWriter) run.eventsPath = eventWriter.path;
+
+  emitRunEvent(
+    "brief_loaded",
+    `Brief loaded for "${run.taskTitle}"`,
+    {
+      detail: [
+        `model ${run.model}`,
+        opts.vendor ? `vendor ${opts.vendor}` : undefined,
+        opts.permissionMode ? `permission mode ${opts.permissionMode}` : undefined,
+      ]
+        .filter(Boolean)
+        .join(", "),
+      ...(opts.criteriaCount !== undefined ? { counts: { criteria: opts.criteriaCount } } : {}),
+    },
+  );
+
   run.lastActivityAt = new Date().toISOString();
   await saveRun(opts.henchDir, run);
 
-  // Capture system memory at run start
+  // Capture system memory at run start (-1 records an unknown reading)
   const monitor = new SystemMemoryMonitor();
   let memoryCtx: MemoryContext;
   try {
     const snap = await monitor.snapshot();
     memoryCtx = {
-      systemAvailableAtStartBytes: snap.availableBytes,
+      systemAvailableAtStartBytes: snap.availableBytes ?? -1,
       systemTotalBytes: snap.totalBytes,
     };
   } catch {
@@ -769,8 +951,20 @@ export async function runPostTaskTestsIfNeeded(
     if (!testResult.passed && testResult.output) {
       info(testResult.output.slice(-500));
     }
+    emitRunEvent("tests_run", `Post-task tests ${status.toLowerCase()}${scope}`, {
+      ok: testResult.passed,
+      detail: testCommand,
+      counts: {
+        targetedFiles: testResult.targetedFiles.length,
+        ...(testResult.durationMs != null ? { durationMs: testResult.durationMs } : {}),
+      },
+    });
   } else if (testResult.error) {
     detail(testResult.error);
+    emitRunEvent("tests_run", "Post-task tests did not run", {
+      ok: false,
+      detail: testResult.error,
+    });
   }
 }
 
@@ -1503,7 +1697,12 @@ export async function proposePreRunCommitMessage(
       "Write a single-line git commit subject (max 72 chars, conventional-commit " +
       "style, no body, no surrounding quotes or backticks) summarizing these " +
       `uncommitted changes:\n\n${diff.stat}\n\n${diff.diff.slice(0, PRE_RUN_COMMIT_DIFF_CHAR_LIMIT)}`;
-    const { text } = await provider.complete({ prompt, model: resolvedModel });
+    const { text } = await provider.complete({
+      prompt,
+      model: resolvedModel,
+      effort: commitResolution.effort,
+      taskClass: "git.commit-message",
+    });
     // Output contract for the light-tier route: the answer goes straight to
     // `git commit -m`, so a preamble, fence, or paragraph would land in the
     // repository's history. Anything that is not a usable single-line subject
@@ -1528,12 +1727,20 @@ async function commitPreRunChanges(projectDir: string, message: string): Promise
 
 /**
  * Commit the files the adversarial review pass changed, when there are any.
- * Called on the autoCommit path only: the interactive commit prompt already
- * sweeps repairs into the task's commit, but on autoCommit the executor
- * committed its own work before the review ran, so the repairs have no other
- * owner. A failed repair commit is propagated to finalization so it can
- * withdraw the completion claim rather than leave the repair for a later
- * task to absorb.
+ *
+ * Two callers, both cases where the repairs would otherwise have no owner:
+ *
+ * - The autoCommit path, where the executor committed its own work before the
+ *   review ran and the reviewer is barred from committing.
+ * - {@link commitOrphanedReviewRepairs} on the commit-prompt path, when the
+ *   executor committed for itself and left no message file, so the prompt that
+ *   normally sweeps the repairs in never runs (GitHub #483).
+ *
+ * The ordinary commit-prompt path does not call this: `stageReviewRepairs`
+ * stages the repairs and `git commit -F` lands them with the executor's work.
+ *
+ * A failed repair commit is propagated to the caller so it can withdraw the
+ * completion claim rather than leave the repair for a later task to absorb.
  */
 export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRecord): Promise<void> {
   const review = run.review;
@@ -1564,6 +1771,65 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
         `They remain in the working tree: ${review.repairedFiles.join(", ")}`,
     );
     throw error;
+  }
+}
+
+/**
+ * Commit review repairs the commit prompt was supposed to take but never will
+ * (GitHub #483, caos run 4b733f14).
+ *
+ * With `hench.autoCommit` false the repairs ride along in the prompt's
+ * `git commit -F .hench-commit-msg.txt`. When the executor commits its own work
+ * with a plain `git commit` and writes no message file, that prompt returns
+ * early, nothing commits the repairs, and the uncommitted-work gate correctly
+ * refuses them — so a run whose work *and* repairs were both right ended failed
+ * and its task was reset to pending.
+ *
+ * Both conditions below must hold before this commits anything, and each
+ * guards against a distinct way of making things worse:
+ *
+ * (a) **HEAD moved past `run.startHead`.** Something committed during this run
+ *     — the executor itself, or the commit-message watcher. Without this, the
+ *     "repairs" may be the entire uncommitted feature (the review pass reports
+ *     every path it touched, including files the agent created and the reviewer
+ *     then edited — caos run 2fb96507), and landing that under a
+ *     `fix(review):` subject would mislabel a whole feature. A run record with
+ *     no `startHead` predates the field; it cannot answer the question, so it
+ *     does not get the benefit of the doubt.
+ *
+ * (b) **Nothing else is loose.** The repairs plus the PRD paths are the only
+ *     dirt. If anything else is uncommitted, the existing refusal is the right
+ *     answer and committing a slice of a leaking tree would only obscure it.
+ *
+ * @returns The error from a refused or failed commit, for the caller to render
+ *   as {@link formatReviewRepairsUncommittedRefusal}; undefined when the commit
+ *   landed, or when the conditions above said not to try.
+ */
+async function commitOrphanedReviewRepairs(
+  projectDir: string,
+  run: RunRecord,
+  repairs: readonly string[],
+): Promise<Error | undefined> {
+  if (repairs.length === 0) return undefined;
+
+  // (a) The executor (or the watcher) committed during this run.
+  if (!run.startHead) return undefined;
+  const head = getCurrentHead(projectDir);
+  if (!head || head === run.startHead) return undefined;
+
+  // (b) The repairs are all that is left, once hench's own PRD writes are
+  // discounted — the same discount the gate itself applies a moment later.
+  const remaining = await findUncommittedWork({
+    projectDir,
+    discountPaths: [...PRD_COMMIT_PATHS, ...repairs],
+  });
+  if (!remaining.clean) return undefined;
+
+  try {
+    await commitReviewRepairsIfNeeded(projectDir, run);
+    return undefined;
+  } catch (err) {
+    return err as Error;
   }
 }
 
@@ -2866,6 +3132,8 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   const { run, henchDir, projectDir, config, testCommand, heartbeat, memoryCtx, selfHeal, yes, autonomous, skipFullTestGate } = opts;
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
+  // Every spawn has closed; a leftover heartbeat-written pid would name a process that is gone.
+  delete run.vendorPid;
 
   // Every agent session is over by now, so whatever completion it asked for
   // is on the claim. Nothing is applied until the gates below have passed.
@@ -2888,7 +3156,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     try {
       const monitor = new SystemMemoryMonitor();
       const snap = await monitor.snapshot();
-      systemAvailableAtEndBytes = snap.availableBytes;
+      systemAvailableAtEndBytes = snap.availableBytes ?? -1;
     } catch {
       // Best-effort — leave as -1
     }
@@ -3058,6 +3326,18 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
           if (testGate.totalDurationMs != null) {
             detail(`Elapsed: ${formatDurationMs(testGate.totalDurationMs)}`);
           }
+          emitRunEvent("gate", `Test gate passed — ${packageCount} package(s)`, {
+            ok: true,
+            detail: testGate.command,
+            counts: {
+              packages: packageCount,
+              passed: passCount,
+              failed: 0,
+              ...(testGate.totalDurationMs != null
+                ? { durationMs: testGate.totalDurationMs }
+                : {}),
+            },
+          });
           gateComplete = true;
         } else {
           // Gate failed — prompt for action
@@ -3067,6 +3347,23 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             noPackagesParsed
               ? "✗ Test gate failed — no per-package results were parsed"
               : `✗ ${packageCount - passCount}/${packageCount} package(s) failed`,
+          );
+
+          emitRunEvent(
+            "gate",
+            noPackagesParsed
+              ? "Test gate failed — no per-package results were parsed"
+              : `Test gate failed — ${packageCount - passCount}/${packageCount} package(s)`,
+            {
+              ok: false,
+              detail: failedPackages.join(", ") || testGate.error,
+              counts: {
+                packages: packageCount,
+                passed: passCount,
+                failed: packageCount - passCount,
+                attempt: testGateAttempt,
+              },
+            },
           );
 
           // Show failure details from first failed package
@@ -3081,6 +3378,10 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
           if (action === "rerun") {
             // Loop will retry
             detail("Retrying test gate...");
+            emitRunEvent("retry", "Re-running the test gate", {
+              detail: "operator chose rerun",
+              counts: { attempt: testGateAttempt },
+            });
           } else if (action === "skip") {
             // User chose to skip gate and continue to commit
             testGateSkipped = true;
@@ -3197,6 +3498,9 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   //   changed (diffDirtyState in cli-loop.ts), so it covers files the agent
   //   created and the reviewer then edited. In that run the repairs were the
   //   whole feature, and the refusal named only the manifests.
+  //   When no commit follows at all, commitOrphanedReviewRepairs gets one
+  //   bounded chance to land them itself first (#483) — an executor that
+  //   committed for itself leaves correct work that nothing else will claim.
   // - The staged index, only when the commit prompt will really run — which
   //   takes a non-empty .hench-commit-msg.txt, not just `!autoCommit`. Staged
   //   work with no message file is the #363 leak wearing an `A ` prefix.
@@ -3209,6 +3513,17 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     const review = run.review;
     const repairs = review && review.failed === undefined ? review.repairedFiles ?? [] : [];
     const pendingRepairs = autoCommit || commitPromptFollows ? repairs : [];
+
+    // Neither path above owns the repairs: autoCommit is off, so
+    // commitReviewRepairsIfNeeded is not called downstream, and no message file
+    // means no commit prompt to sweep them in. Commit them here when it is safe
+    // to — otherwise this is a no-op and the gate below refuses as it always
+    // did (GitHub #483).
+    const repairCommitError =
+      !autoCommit && !commitPromptFollows
+        ? await commitOrphanedReviewRepairs(projectDir, run, repairs)
+        : undefined;
+
     const leaked = await findUncommittedWork({
       projectDir,
       stagedCommitFollows: commitPromptFollows,
@@ -3218,11 +3533,16 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       uncommittedWorkRefused = true;
       run.status = "failed";
       const leakedDeleted = deletedAmong(projectDir, leaked.paths);
-      run.error = formatUncommittedWorkRefusal(
-        leaked.paths,
-        leakedDeleted,
-        await prepareRecoveryPathspecs(projectDir, leaked.paths, leakedDeleted),
-      );
+      const pathspecs = await prepareRecoveryPathspecs(projectDir, leaked.paths, leakedDeleted);
+      run.error = repairCommitError
+        ? formatReviewRepairsUncommittedRefusal(
+            leaked.paths,
+            repairCommitError.message,
+            run.taskId,
+            leakedDeleted,
+            pathspecs,
+          )
+        : formatUncommittedWorkRefusal(leaked.paths, leakedDeleted, pathspecs);
       info(`\n${run.error}`);
       if (opts.store) {
         await withdrawCompletionClaim(opts.store, run, run.error);
@@ -3420,6 +3740,22 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // takes, minus hench's own runtime artifacts.
   run.uncommittedPaths = (await findUncommittedWork({ projectDir })).paths;
 
+  // The commit gate's verdict, emitted from the one place that sees every
+  // commit regardless of which path made it. "Passed" means the run left
+  // nothing behind: work that is committed is work the next run can build on,
+  // and a dirty tree is the failure this gate exists to surface.
+  emitRunEvent(
+    "gate",
+    run.uncommittedPaths.length === 0
+      ? `Commit gate passed — ${run.commits.length} commit(s)`
+      : `Commit gate: ${run.uncommittedPaths.length} path(s) left uncommitted`,
+    {
+      ok: run.uncommittedPaths.length === 0,
+      detail: run.commits.map((c) => c.sha.slice(0, 8)).join(", ") || undefined,
+      counts: { commits: run.commits.length, uncommitted: run.uncommittedPaths.length },
+    },
+  );
+
   // A held completion is applied only by a run that ends completed. Applied
   // and then withdrawn (a later commit step failed) counts as not applied.
   if (completionHold) {
@@ -3434,15 +3770,23 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   run.lastActivityAt = run.finishedAt;
   await saveRun(henchDir, run);
 
-  // Persist full run output to .run-logs/ at the project root.
-  // Best-effort: a log write failure must not crash the run.
-  const logLines = getCapturedLines();
-  try {
-    const logPath = await persistRunLog(projectDir, run.id, run.startedAt, logLines);
-    info(`\nRun log: ${logPath}`);
-  } catch {
-    // Swallow — log persistence is optional; the run result stands.
-  }
+  // The last event, before the stream is closed below. A reader tailing the
+  // file learns the run is over from this line rather than from the file
+  // simply stopping — which is indistinguishable from a crash.
+  emitRunEvent("run_finished", `Run ${run.status}`, {
+    ok: run.status === "completed",
+    detail: run.error,
+    counts: {
+      turns: run.turns,
+      durationMs: new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime(),
+    },
+  });
+  await closeActiveRunEvents();
+
+  // Close the run log under .run-logs/ at the project root. The file has been
+  // growing line by line since initRunRecord; this flushes the tail of it.
+  const logPath = await endRunLog(projectDir, run);
+  if (logPath) info(`\nRun log: ${logPath}`);
   resetCapturedLines();
 }
 

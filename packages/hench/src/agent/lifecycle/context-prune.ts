@@ -567,6 +567,8 @@ export function createContextSummarizer(opts: ContextSummarizerOptions): PruneSu
     const { text, tokenUsage } = await opts.provider.complete({
       prompt: buildPruneSummaryPrompt(transcript, opts.taskTitle),
       model: resolution.model,
+      effort: resolution.effort,
+      taskClass: "context.summarize",
     });
     // `tokenUsage` is carried, not dropped: this call is billed like any other,
     // and the model named here is the light tier the class routed to.

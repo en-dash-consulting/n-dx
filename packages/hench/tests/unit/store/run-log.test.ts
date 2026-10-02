@@ -2,7 +2,36 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { basename, isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
-import { persistRunLog } from "../../../src/store/run-log.js";
+import { execFileSync } from "node:child_process";
+import { initGitFixtureRepoSync } from "../../helpers/index.js";
+import {
+  ensureRunLogsIgnored,
+  openRunLog,
+  persistRunLog,
+  runLogPath,
+} from "../../../src/store/run-log.js";
+
+/**
+ * Read `path` until it satisfies `predicate`, or give up after `timeoutMs`.
+ *
+ * The incremental writer hands each line to Node's stream buffer and returns
+ * without awaiting the disk, so a reader has to poll. The timeout doubles as
+ * the acceptance bound: a tail must see new lines within a second.
+ */
+async function readUntil(
+  path: string,
+  predicate: (content: string) => boolean,
+  timeoutMs = 1000,
+): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  let content = "";
+  for (;;) {
+    content = await readFile(path, "utf-8");
+    if (predicate(content)) return content;
+    if (Date.now() >= deadline) return content;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
 
 describe("persistRunLog", () => {
   let projectDir: string;
@@ -28,7 +57,7 @@ describe("persistRunLog", () => {
 
     const logDir = join(projectDir, ".run-logs");
     const { readdir } = await import("node:fs/promises");
-    const files = await readdir(logDir);
+    const files = (await readdir(logDir)).filter((name) => name.endsWith(".log"));
     expect(files).toHaveLength(1);
 
     const content = await readFile(join(logDir, files[0]!), "utf-8");
@@ -63,6 +92,13 @@ describe("persistRunLog", () => {
     expect(filename).toContain("2026-04-08T23-21-17");
   });
 
+  it("resolves a relative project directory to an absolute path", () => {
+    // The path goes on the run record, where a reader in another process has
+    // a different cwd to resolve it against. Asserted on the pure path helper
+    // rather than by chdir-ing the test process, which is shared.
+    expect(isAbsolute(runLogPath("some/project", "run-id-rel", "2026-04-08T00:00:00Z"))).toBe(true);
+  });
+
   it("returns the absolute path of the written file", async () => {
     const logPath = await persistRunLog(projectDir, "run-id-4", "2026-04-08T00:00:00Z", []);
 
@@ -77,7 +113,7 @@ describe("persistRunLog", () => {
     await persistRunLog(projectDir, "run-b", "2026-04-08T10:00:01Z", ["b"]);
 
     const { readdir } = await import("node:fs/promises");
-    const files = await readdir(join(projectDir, ".run-logs"));
+    const files = (await readdir(join(projectDir, ".run-logs"))).filter((name) => name.endsWith(".log"));
     expect(files).toHaveLength(2);
   });
 
@@ -132,5 +168,279 @@ describe("persistRunLog", () => {
       );
       expect(runLogEntries).toHaveLength(1);
     });
+  });
+});
+
+describe("openRunLog", () => {
+  let projectDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-runlog-live-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it("creates the file and the .run-logs/ directory before any line is written", async () => {
+    const writer = await openRunLog(projectDir, "run-live-1", "2026-04-08T23:21:17Z");
+
+    // The point of opening early: a reader can start tailing before the agent
+    // has produced anything at all.
+    await expect(access(writer.path)).resolves.toBeUndefined();
+    expect(await readFile(writer.path, "utf-8")).toBe("");
+
+    expect(await writer.close()).toBeNull();
+  });
+
+  it("uses the same path as the end-of-run writer", async () => {
+    const writer = await openRunLog(projectDir, "run-live-2", "2026-04-08T23:21:17.999Z");
+
+    expect(writer.path).toBe(runLogPath(projectDir, "run-live-2", "2026-04-08T23:21:17.999Z"));
+    expect(isAbsolute(writer.path)).toBe(true);
+    expect(basename(writer.path)).toBe("2026-04-08T23-21-17-run-live-2.log");
+
+    await writer.close();
+  });
+
+  it("grows line by line while the run is still open", async () => {
+    const writer = await openRunLog(projectDir, "run-live-3", "2026-04-08T10:00:00Z");
+
+    writer.appendLine("  [Agent]   thinking");
+    const afterFirst = await readUntil(writer.path, (c) => c.includes("thinking"));
+    expect(afterFirst).toBe("  [Agent]   thinking\n");
+
+    writer.appendLine("  [Tool]    read_file");
+    const afterSecond = await readUntil(writer.path, (c) => c.includes("read_file"));
+    expect(afterSecond).toBe("  [Agent]   thinking\n  [Tool]    read_file\n");
+
+    await writer.close();
+  });
+
+  it("leaves a readable partial log when the run never closes it", async () => {
+    const writer = await openRunLog(projectDir, "run-live-4", "2026-04-08T10:00:00Z");
+    writer.appendLine("line 1");
+    writer.appendLine("line 2");
+
+    // No close() — stands in for a run that was killed mid-way.
+    const partial = await readUntil(writer.path, (c) => c.includes("line 2"));
+    expect(partial).toBe("line 1\nline 2\n");
+
+    await writer.close();
+  });
+
+  it("writes prefix lines first, in order, ahead of streamed ones", async () => {
+    const writer = await openRunLog(
+      projectDir,
+      "run-live-5",
+      "2026-04-08T10:00:00Z",
+      ["preamble a", "preamble b"],
+    );
+    writer.appendLine("streamed c");
+    await writer.close();
+
+    expect(await readFile(writer.path, "utf-8")).toBe("preamble a\npreamble b\nstreamed c\n");
+  });
+
+  it("writes an empty file for a run that produced no output", async () => {
+    const writer = await openRunLog(projectDir, "run-live-6", "2026-04-08T10:00:00Z");
+    await writer.close();
+
+    expect(await readFile(writer.path, "utf-8")).toBe("");
+  });
+
+  it("does not touch .gitignore — that is the end of the run's job", async () => {
+    // .gitignore is tracked, so writing it while the run is in flight shows
+    // the run's own completion gate a modified file it did not expect.
+    // `ensureRunLogsIgnored` runs after the gates instead.
+    const writer = await openRunLog(projectDir, "run-live-7", "2026-04-08T10:00:00Z");
+    await writer.close();
+
+    await expect(access(join(projectDir, ".gitignore"))).rejects.toThrow();
+
+    await ensureRunLogsIgnored(projectDir);
+    expect(await readFile(join(projectDir, ".gitignore"), "utf-8")).toContain(".run-logs/");
+  });
+
+  it("rejects when the log file cannot be opened", async () => {
+    // A directory where the log file should be: open(…, "w") cannot truncate
+    // it, so the caller finds out at open time rather than via a stray event.
+    await mkdir(join(projectDir, ".run-logs"), { recursive: true });
+    await mkdir(runLogPath(projectDir, "run-live-8", "2026-04-08T10:00:00Z"), { recursive: true });
+
+    await expect(
+      openRunLog(projectDir, "run-live-8", "2026-04-08T10:00:00Z"),
+    ).rejects.toThrow();
+  });
+
+  it("is byte-identical to the end-of-run writer for the same lines", async () => {
+    // The regression this file exists to prevent: incremental writing must not
+    // change the artifact. Same lines in, same bytes out — including the
+    // trailing newline and the empty-run case.
+    const cases: readonly (readonly string[])[] = [
+      [],
+      ["only line"],
+      ["  [Agent]   thinking", "  [Tool]    read_file", "           42ms", ""],
+      ["line with unicode — ✓ ✗ ❯", "line with \"quotes\" and \\backslashes\\"],
+      // A credential in the output. Both writers scrub, so they still agree —
+      // and if only one of them did, this case is what says so.
+      ["cloning with ghp_0123456789abcdefghijklmnopqrstuvwxyz", "Authorization: Bearer abcdef0123456789ghij"],
+    ];
+
+    for (const [index, lines] of cases.entries()) {
+      const startedAt = "2026-04-08T10:00:00Z";
+      const streamedDir = await mkdtemp(join(tmpdir(), "hench-runlog-cmp-a-"));
+      const wholeDir = await mkdtemp(join(tmpdir(), "hench-runlog-cmp-b-"));
+      try {
+        const writer = await openRunLog(streamedDir, `cmp-${index}`, startedAt);
+        for (const line of lines) writer.appendLine(line);
+        expect(await writer.close()).toBeNull();
+
+        const wholePath = await persistRunLog(wholeDir, `cmp-${index}`, startedAt, lines);
+
+        expect(await readFile(writer.path)).toEqual(await readFile(wholePath));
+      } finally {
+        await rm(streamedDir, { recursive: true, force: true });
+        await rm(wholeDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("scrubs credentials as it streams, not only at the end of the run", async () => {
+    // The live log is what a real run writes — persistRunLog is the fallback
+    // for a stream that could not be opened or broke. A scrub applied only
+    // there would put every captured token on disk, and leave it tailable in
+    // the dashboard, for the whole run.
+    const writer = await openRunLog(projectDir, "run-redact-1", "2026-04-08T10:00:00Z", [
+      "prefix line with ghp_0123456789abcdefghijklmnopqrstuvwxyz",
+    ]);
+    writer.appendLine("Authorization: Bearer abcdef0123456789ghij");
+    writer.appendLine("plain output line");
+    expect(await writer.close()).toBeNull();
+
+    const written = await readFile(writer.path, "utf-8");
+    expect(written).not.toContain("ghp_0123456789abcdefghijklmnopqrstuvwxyz");
+    expect(written).not.toContain("abcdef0123456789ghij");
+    expect(written).toContain("[redacted:token]");
+    // Prefix lines go through the same path, so they are scrubbed too.
+    expect(written.split("\n")[0]).toContain("prefix line with [redacted:token]");
+    // Everything else is untouched.
+    expect(written).toContain("plain output line");
+  });
+
+  it("scrubs a private key split across lines, which a per-line scrub cannot see", async () => {
+    // BEGIN and END sit on different lines and the body is base64, so no single
+    // line looks like a secret to any rule. A per-line scrub therefore wrote the
+    // whole key to disk — live and tailable in the dashboard for the rest of the
+    // run, and kept in the artifact afterwards.
+    const key = [
+      "-----BEGIN RSA PRIVATE KEY-----",
+      "MIIEowIBAAKCAQEAwJ8yq1Tz3kKQmVYd0pLq7nHcR2sFgXaBvNmEtUjWoPyZxCdL",
+      "kRfT9bGhVnQsMzAeXuYpIoCwDrJlNvKtSqBmHgZcFeXaPdUyTrWnLiKjHgFeDcBa",
+      "-----END RSA PRIVATE KEY-----",
+    ];
+    const lines = ["before the key", ...key, "after the key"];
+
+    const writer = await openRunLog(projectDir, "run-pem-1", "2026-04-08T10:00:00Z");
+    for (const line of lines) writer.appendLine(line);
+    expect(await writer.close()).toBeNull();
+
+    const written = await readFile(writer.path, "utf-8");
+    expect(written).not.toContain("MIIEowIBAAKCAQEAwJ8yq1Tz3kKQmVYd0pLq7nHcR2sFgXaBvNmEtUjWoPyZxCdL");
+    expect(written).not.toContain("kRfT9bGhVnQsMzAeXuYpIoCwDrJlNvKtSqBmHgZcFeXaPdUyTrWnLiKjHgFeDcBa");
+    expect(written).toContain("[redacted:private-key]");
+    // The surrounding output is untouched.
+    expect(written).toContain("before the key");
+    expect(written).toContain("after the key");
+
+    // And the end-of-run writer agrees, as the module header promises.
+    const wholeDir = await mkdtemp(join(tmpdir(), "hench-runlog-pem-"));
+    try {
+      const wholePath = await persistRunLog(wholeDir, "run-pem-1", "2026-04-08T10:00:00Z", lines);
+      expect(await readFile(wholePath, "utf-8")).toEqual(written);
+    } finally {
+      await rm(wholeDir, { recursive: true, force: true });
+    }
+  });
+
+  it("releases a BEGIN whose END never arrives instead of swallowing the rest", async () => {
+    // Whole-string redaction leaves an unterminated BEGIN alone, because the
+    // pattern needs both markers — so a run killed mid-key must still get its
+    // lines, not lose everything after the marker.
+    const writer = await openRunLog(projectDir, "run-pem-2", "2026-04-08T10:00:00Z");
+    writer.appendLine("-----BEGIN RSA PRIVATE KEY-----");
+    writer.appendLine("a body whose end never came");
+    expect(await writer.close()).toBeNull();
+
+    const written = await readFile(writer.path, "utf-8");
+    expect(written).toContain("-----BEGIN RSA PRIVATE KEY-----");
+    expect(written).toContain("a body whose end never came");
+  });
+});
+
+/**
+ * The log directory ignores itself.
+ *
+ * The live log exists from the start of the run, but the project `.gitignore`
+ * line is added only at the end (`ensureRunLogsIgnored`). On a project's first
+ * run that left the growing log visible to git: a review pass listed it as a
+ * repair and committed it, and an agent's `git add -A` swept it into the task
+ * commit. A `*` ignore file inside the directory hides it from the moment the
+ * directory exists, without editing a tracked file mid-run.
+ */
+describe("run log directory ignore file", () => {
+  let projectDir: string;
+
+  const git = (...args: string[]): string =>
+    execFileSync("git", args, { cwd: projectDir, encoding: "utf-8" });
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-runlog-ignore-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it("is written with '*' when the live log creates the directory", async () => {
+    const writer = await openRunLog(projectDir, "run-ign-1", "2026-04-08T10:00:00Z");
+    await writer.close();
+
+    expect(await readFile(join(projectDir, ".run-logs", ".gitignore"), "utf-8")).toBe("*\n");
+  });
+
+  it("is written when the end-of-run writer creates the directory", async () => {
+    await persistRunLog(projectDir, "run-ign-2", "2026-04-08T10:00:00Z", ["x"]);
+
+    expect(await readFile(join(projectDir, ".run-logs", ".gitignore"), "utf-8")).toBe("*\n");
+  });
+
+  it("leaves an existing ignore file in the directory alone", async () => {
+    await mkdir(join(projectDir, ".run-logs"));
+    await writeFile(join(projectDir, ".run-logs", ".gitignore"), "*.log\n");
+
+    const writer = await openRunLog(projectDir, "run-ign-3", "2026-04-08T10:00:00Z");
+    await writer.close();
+
+    expect(await readFile(join(projectDir, ".run-logs", ".gitignore"), "utf-8")).toBe("*.log\n");
+  });
+
+  it("hides a growing first-run log from git status and git add -A", async () => {
+    initGitFixtureRepoSync(projectDir);
+    await writeFile(join(projectDir, "README.md"), "fixture\n");
+    git("add", "-A");
+    git("commit", "-m", "baseline");
+
+    // No `.run-logs/` line in the project's .gitignore.
+    const writer = await openRunLog(projectDir, "run-ign-4", "2026-04-08T10:00:00Z");
+    writer.appendLine("[Agent]   working");
+    await readUntil(writer.path, (content) => content.includes("working"));
+
+    expect(git("status", "--porcelain", "--untracked-files=all")).toBe("");
+    git("add", "-A");
+    expect(git("diff", "--cached", "--name-only")).toBe("");
+
+    await writer.close();
+    expect(git("status", "--porcelain", "--untracked-files=all")).toBe("");
   });
 });

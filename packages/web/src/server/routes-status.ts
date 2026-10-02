@@ -20,6 +20,7 @@ import { computeStats, collectCompletedIds, findNextTask, walkTree } from "./rex
 import type { PRDDocument, TreeStats } from "./rex-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
 import { isProjectInitialized } from "./routes-static.js";
+import { isRunStale } from "./run-staleness.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -268,9 +269,6 @@ function extractRexStatus(ctx: ServerContext): RexStatus {
   }
 }
 
-/** Staleness threshold for running runs: 5 minutes. */
-const HENCH_STALE_THRESHOLD_MS = 5 * 60 * 1000;
-
 function extractHenchStatus(ctx: ServerContext): HenchStatus {
   const henchDir = resolveLayout(ctx.projectDir).henchDir;
   const configPath = join(henchDir, "config.json");
@@ -296,15 +294,7 @@ function extractHenchStatus(ctx: ServerContext): HenchStatus {
           totalRuns++;
           if (run.status === "running") {
             activeRuns++;
-            const lastActivity = run.lastActivityAt as string | undefined;
-            if (lastActivity) {
-              if (now - new Date(lastActivity).getTime() > HENCH_STALE_THRESHOLD_MS) {
-                staleRuns++;
-              }
-            } else {
-              // No lastActivityAt field (legacy run still marked running) = stale
-              staleRuns++;
-            }
+            if (isRunStale(run.lastActivityAt, now)) staleRuns++;
           }
         } catch {
           // Skip unreadable/unparseable files — not counted toward totalRuns

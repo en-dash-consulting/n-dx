@@ -24,6 +24,8 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { writeFile, rename, unlink } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { handleRequestSecurity } from "./request-security.js";
+import { ensureAuthToken } from "@n-dx/llm-client";
 
 /** Default port for the preview server — one above the dashboard's 3117. */
 export const DEFAULT_PREVIEW_PORT = 3118;
@@ -70,6 +72,8 @@ export interface PreviewOptions {
   file?: string;
   /** Poll interval for the injected reload script, in ms. */
   reloadIntervalMs?: number;
+  /** Per-user token file; when set, every request must present the token (see `request-security.ts`). */
+  tokenFile?: string;
 }
 
 export interface PreviewServerHandle {
@@ -367,8 +371,15 @@ export async function startPreviewServer(
   const portFilePath = join(absDir, PREVIEW_PORT_FILE);
 
   const layoutPath = layoutPathFor(docPath);
+  const token = opts.tokenFile ? ensureAuthToken(opts.tokenFile) : null;
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+    // Same gate as the dashboard: loopback Host on this port for every request,
+    // and a browser origin on mutations. The layout endpoint below writes a
+    // file from the request body, so it needs the same protection as the
+    // dashboard's write routes.
+    if (handleRequestSecurity(req, res, { token })) return;
+
     const urlPath = (req.url ?? "/").split("?")[0];
 
     if (urlPath === STATE_ROUTE) {

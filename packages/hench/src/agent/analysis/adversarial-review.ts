@@ -47,7 +47,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { RunReviewRecord } from "../../schema/index.js";
+import type { ReviewModelSource, RunReviewRecord } from "../../schema/index.js";
 
 // ── Report shape ─────────────────────────────────────────────────────────
 
@@ -128,6 +128,39 @@ export interface ReviewReport {
   fixesApplied: boolean;
   /** One-paragraph account of what was attacked, including what was *not*. */
   summary: string;
+}
+
+/** The slice of the LLM config that can name a reviewer model. */
+interface ReviewModelConfig {
+  reviewModel?: string;
+  claude?: { reviewModel?: string };
+  codex?: { reviewModel?: string };
+  google?: { reviewModel?: string };
+  local?: { reviewModel?: string };
+}
+
+/**
+ * Which setting `resolveReviewModel` takes the model from — the same
+ * precedence, answering "which" where it answers "what". Recorded on the run
+ * so the dashboard can say where the reviewer's model came from.
+ */
+export function reviewModelSource(
+  vendor: string,
+  config: ReviewModelConfig | undefined,
+  flag: string | undefined,
+): ReviewModelSource {
+  if (flag) return "flag";
+  const pinned =
+    vendor === "claude"
+      ? config?.claude?.reviewModel
+      : vendor === "codex"
+        ? config?.codex?.reviewModel
+        : vendor === "google"
+          ? config?.google?.reviewModel
+          : config?.local?.reviewModel;
+  if (pinned) return "vendor-config";
+  if (config?.reviewModel) return "shared-config";
+  return "vendor-default";
 }
 
 /** Why a review pass produced no usable report. */

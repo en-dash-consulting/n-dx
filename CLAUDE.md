@@ -75,9 +75,9 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 | Package | Gateway file | Imports from | Re-exports |
 |---------|-------------|--------------|------------|
 | hench | `src/prd/rex-gateway.ts` | rex | 25 functions + 4 constants + 13 types (schema, store, tree, save-file report, tree conformance, task selection, claims, timestamps, auto-completion, parent reset, requirements, level helpers, finding acknowledgment) |
-| hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | 101 functions + 5 classes + 15 constants + 52 types (config, vendor constants, JSON, output and colour, help, errors, process execution and git worktrees, token parsing, model resolution, usage formatting, prompt envelope and failure categories, prompt-section costs, Codex policy flags, tool-definition converters, LM Studio, provider registry, folder-layout resolver) |
+| hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | 114 functions + 5 classes + 16 constants + 60 types (config, vendor constants, JSON, output and colour, help, errors, process execution and git worktrees, token parsing, model resolution, Claude API effort, usage formatting, prompt envelope and failure categories, prompt-section costs, Codex policy flags, tool-definition converters, LM Studio, provider registry, folder-layout resolver, credential redaction, repository trust, available-memory reading) |
 | web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants, tree utilities |
-| web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory, next-step derivation, archetype override, iso-map builder, analysis artifact schema types |
+| web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory, next-step derivation, archetype override, iso-map builder, analysis artifact schema types, live analyze progress reader, analyze command-line check |
 | web | `src/viewer/external.ts` | `src/viewer/messaging/`, `src/shared/`, `src/schema/` | Schema types (V1), data-file constants, RequestDedup — viewer↔server boundary gateway |
 | web | `src/viewer/api.ts` | `src/viewer/types.ts`, `src/viewer/route-state.ts` | Viewer types (LoadedData, NavigateTo, DetailItem), route-state functions — inbound API contract for sibling zones (crash, route, performance) |
 
@@ -176,6 +176,8 @@ Rex and sourcevision expose MCP servers over stdio (default) and HTTP (`ndx star
 
 **HTTP — through the hub:** `ndx start .` registers the repository with the per-user hub and serves it at `http://localhost:3117/p/<id>/`, so each project's endpoints are `…/p/<id>/mcp/rex` and `…/p/<id>/mcp/sourcevision` and several projects share the port without collision. While exactly one project is registered the bare `http://localhost:3117/mcp/rex` still aliases to it; with several, root MCP calls answer `409` listing the ids. HTTP uses [Streamable HTTP](https://modelcontextprotocol.io/) with session management (`Mcp-Session-Id` header, created automatically on first request); the hub proxies, and each project's own server owns its sessions.
 
+**Per-user token:** `ndx start` creates `<ndx home>/auth.token` (mode 0600) and every hub, dashboard and preview request must present it as `X-Ndx-Token`, `Authorization: Bearer`, or the `ndx_token` cookie that the printed URL sets once. HTTP MCP registrations therefore need `--header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"`. Disable with `ndx start --no-auth` or `web.auth: false` in `.n-dx.json`.
+
 **Migrating from stdio to HTTP (Claude):** register with the hub (`ndx start .`), read the project id from the URL it prints (or `ndx hub status`), remove the stdio registrations (`claude mcp remove rex && claude mcp remove sourcevision`), then add the HTTP ones (`claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex`, same for sourcevision).
 
 ### Rex MCP tools
@@ -233,6 +235,7 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 | `.sourcevision/.cache/judgments.json` | Content-addressed cache of Jev answers (question + the state slice it references → answer). Consulted per question inside `askJev`; only misses are sent. Machine-local; safe to delete — the next run re-asks |
 | `.sourcevision/.cache/narration.log` | Output of the detached `sv narrate` child that `analyze` spawns for escalated zones in cascade mode; `manifest.narration` holds its status. Machine-local; safe to delete |
 | `.sourcevision/.cache/analyses.jsonl` | One line per `sv analyze` run — mode, wall-clock per phase, calls/tokens/time per LLM task class (the same record as `manifest.lastAnalysis`, kept for the last 200 runs). Machine-local; safe to delete |
+| `.sourcevision/.cache/analyze-progress.json` | Live progress of the current or last `sv analyze` — phase, enrichment pass, batch k of n, LLM use so far — rewritten as the run moves and marked complete/failed at the end; served as `progress` on `GET /api/commands/sv-analyze/status`. Read it through `readAnalyzeProgress`, which reports a `running` file as `interrupted` when its pid is dead or, where `ps` can tell, now belongs to another program. Machine-local; safe to delete |
 | `.n-dx-web-usage.jsonl` | Dashboard LLM spend ledger — one line per Ask call (vendor, model, token classes, outcome). Read by the LLM Utilization view as the `web` package bucket; not attributed to any PRD item. Machine-local; safe to delete |
 | `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model) |
 | `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
