@@ -205,8 +205,8 @@ export interface ModelCost {
  * rate; `resolveModelPricing` in `model-pricing.ts` serves every other caller
  * (`ndx usage`, the dashboard's spend views). Values are approximate public
  * list pricing as of 2026-08 and should be updated when vendors change rates.
- * Gemini Pro and Claude Sonnet 5 have tiered/introductory rates; the values
- * here are the standard (higher) tier so estimates never under-report.
+ * Gemini Pro has tiered rates; the values here are the standard (higher) tier
+ * so estimates never under-report.
  *
  * Cache rates are written out rather than computed from the input rate: a
  * multiplier expression such as `3.00 * 0.1` evaluates to 0.30000000000000004,
@@ -279,8 +279,8 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
     cacheWritePerMToken: 6.25, cacheReadPerMToken: 0.50,
   },
   "claude-sonnet-5": {
-    inputPerMToken: 3.00, outputPerMToken: 15.00,
-    cacheWritePerMToken: 3.75, cacheReadPerMToken: 0.30,
+    inputPerMToken: 2.00, outputPerMToken: 10.00,
+    cacheWritePerMToken: 2.50, cacheReadPerMToken: 0.20,
   },
   "claude-sonnet-4-6": {
     inputPerMToken: 3.00, outputPerMToken: 15.00,

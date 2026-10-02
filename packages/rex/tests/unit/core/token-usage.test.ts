@@ -995,9 +995,9 @@ describe("estimateCost prices each model at its own rates", () => {
     const sonnet = estimateCost(usageForModels({ "claude-sonnet-5": ONE_MILLION_EACH }));
 
     expect(opus.totalRaw).toBeGreaterThan(sonnet.totalRaw);
-    // Opus: 5 + 25 + 6.25 + 0.50 = $36.75. Sonnet: 3 + 15 + 3.75 + 0.30 = $22.05.
+    // Opus: 5 + 25 + 6.25 + 0.50 = $36.75. Sonnet: 2 + 10 + 2.50 + 0.20 = $14.70.
     expect(opus.total).toBe("$36.75");
-    expect(sonnet.total).toBe("$22.05");
+    expect(sonnet.total).toBe("$14.70");
     expect(opus.byModel).toHaveLength(1);
     expect(opus.byModel[0]).toMatchObject({ model: "claude-opus-5", known: true });
     expect(opus.fullyAttributed).toBe(true);
