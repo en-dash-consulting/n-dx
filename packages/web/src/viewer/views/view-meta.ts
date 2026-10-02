@@ -18,6 +18,7 @@
  */
 
 import type { ViewId } from "../types.js";
+import type { PixelIconName } from "../components/index.js";
 
 /** The package a view belongs to; `global` for views no single package owns. */
 export type ViewProduct = "sourcevision" | "rex" | "hench" | "global";
@@ -34,6 +35,11 @@ export interface ViewMeta {
   label: string;
   /** Decorative mark shown beside the label. Never the accessible name. */
   glyph: string;
+  /**
+   * Pixel-art mark drawn in place of `glyph` where the shell renders one (the
+   * settings overlay). `glyph` stays for text-only consumers.
+   */
+  pixelIcon?: PixelIconName;
   product: ViewProduct;
   /** One line saying what the view is for. */
   blurb: string;
@@ -263,25 +269,29 @@ export const VIEW_META = {
   // ── Settings ─────────────────────────────────────────────────
   "robot-wrangler": {
     label: "Robot Wrangler",
-    glyph: "\u{1F9E0}",
+    glyph: "\u{1F916}",
+    pixelIcon: "robot-wrangler",
     product: "global",
     blurb: "Which model answers, and the credentials it answers with.",
   },
   project: {
     label: "Project",
     glyph: "▣",
+    pixelIcon: "project",
     product: "global",
     blurb: "Analyze and plan settings, feature flags, and the services the PRD syncs with.",
   },
   workflow: {
     label: "Workflow",
     glyph: "▶",
+    pixelIcon: "workflow",
     product: "global",
     blurb: "How agent runs behave: limits, guard rails, templates and command timeouts.",
   },
   commands: {
     label: "Commands",
     glyph: "\u{1F4E4}",
+    pixelIcon: "commands",
     product: "global",
     blurb: "Run refresh, export, the sample app and self-heal from the dashboard.",
   },
@@ -314,6 +324,11 @@ export function viewBlurb(view: ViewId): string {
 
 export function viewGlyph(view: ViewId): string {
   return VIEW_META[view].glyph;
+}
+
+/** The view's pixel-art mark, if it has one. */
+export function viewPixelIcon(view: ViewId): PixelIconName | undefined {
+  return (VIEW_META[view] as ViewMeta).pixelIcon;
 }
 
 export function viewProduct(view: ViewId): ViewProduct {

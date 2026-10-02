@@ -74,6 +74,7 @@ export {
   viewLabel,
   viewBlurb,
   viewGlyph,
+  viewPixelIcon,
   viewProduct,
   viewProductLabel,
 } from "./views/view-meta.js";

@@ -19,6 +19,7 @@ import {
 import { isDeployedMode } from "../deployed-mode.js";
 import { isCurrentWorktree } from "./live-tab.js";
 import { identityLine, identityTooltip, type ServerIdentity } from "./config-footer.js";
+import { PixelIcon } from "./pixel-icons.js";
 import { ThemeToggle } from "./theme-toggle.js";
 import { GlobalFAQ } from "./faq.js";
 
@@ -69,7 +70,7 @@ export function BottomBar({
       "aria-label": "Settings",
       "aria-haspopup": "dialog",
       "aria-expanded": String(settingsOpen),
-    }, "⚙"),
+    }, h(PixelIcon, { name: "settings", variant: "glyph", size: 22 })),
 
     h("div", { class: "bottombar-status", role: "group", "aria-label": "Project status" },
       status?.sv && validViews.has(INDICATOR_VIEWS.sv)

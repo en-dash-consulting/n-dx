@@ -94,6 +94,14 @@
   /* Logo background — purple in dark mode */
   --logo-bg: var(--brand-purple);
   --logo-bg-hover: #7d52ff;
+
+  /* Pixel-art glyph palette (components/pixel-icons.ts) — the mascots' literals */
+  --pixel-purple: #6c41f0;
+  --pixel-teal: #00e5b9;
+  --pixel-steel: #c8c6d6;
+  --pixel-white: #ffffff;
+  --pixel-navy: #001769;
+  --pixel-screen: #000c3d;
 }
 
 /* Light theme */
@@ -119,4 +127,12 @@
   /* Logo background — navy in light mode */
   --logo-bg: var(--brand-navy);
   --logo-bg-hover: #002499;
+
+  /* Pixel-art glyph palette — steel/white/teal darkened to keep ≥3:1 on the light sidebar */
+  --pixel-purple: #6c41f0;
+  --pixel-teal: #00a082;
+  --pixel-steel: #6e7191;
+  --pixel-white: #3d4470;
+  --pixel-navy: #001769;
+  --pixel-screen: #000c3d;
 }
