@@ -2008,9 +2008,15 @@ export async function cmdRun(
     // any task runs. Clearing per task instead would make every task in a
     // loop re-orient, which is the opposite of what the flag is for — the
     // first task then re-orients on the cache miss and the rest reuse it.
+    // A dry run writes nothing (the dashboard's brief preview forwards
+    // --fresh so the preview reflects the setting), so it only reports.
     if (fresh) {
-      await clearSessionCache(henchDir);
-      detail("Discarded the cached orientation session (--fresh)");
+      if (dryRun) {
+        detail("Would discard the cached orientation session (--fresh)");
+      } else {
+        await clearSessionCache(henchDir);
+        detail("Discarded the cached orientation session (--fresh)");
+      }
     }
 
     if (epicByEpic) {
