@@ -24,7 +24,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Accept allow-listed run options on POST /api/hench/execute and carry them through the hub queue](./accept-allow-listed-run-options-on.md) | completed |
 | [Add `ndx work --resolve`: print the resolved run settings, their sources and any refusals as JSON without running](./add-ndx-work-resolve-print-the.md) | completed |
 | [Add the prep routes: GET /api/hench/prep/:taskId, POST /api/hench/prep/:taskId/preview and GET /api/hench/ready](./add-the-prep-routes-get-api-hench-prep.md) | completed |
-| [An open Prepare task modal follows the host's next-task prop, so Execute can start a different task than the one prepared](./an-open-prepare-task-modal-follows-the.md) | pending |
+| [An open Prepare task modal follows the host's next-task prop, so Execute can start a different task than the one prepared](./an-open-prepare-task-modal-follows-the.md) | completed |
 | [Any website the user has open can make the dashboard spawn ndx processes through the prep and ready GETs](./any-website-the-user-has-open-can-make.md) | pending |
 | [Brief preview with Fresh ticked deletes the orientation session cache](./brief-preview-with-fresh-ticked.md) | pending |
 | [Build the Prepare task modal: defaults with sources, per-run overrides, preflight, equivalent command, brief preview and Execute](./build-the-prepare-task-modal-defaults.md) | completed |
