@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Commit the PRD storage migration design document](./commit-the-prd-storage-migration.md) | completed |
 | [Confirm hench.promptCacheTtl 1h is accepted by the live Anthropic API before the cut](./confirm-hench-promptcachettl-1h-is.md) | completed |
 | [Correct every 0.7.1 changeset against the merged behaviour before the cut](./correct-every-0-7-1-changeset-against.md) | completed |
-| [Diagnose and fix the release workflow so publishes create git tags and GitHub releases](./diagnose-and-fix-the-release-workflow.md) | in_progress |
+| [Diagnose and fix the release workflow so publishes create git tags and GitHub releases](./diagnose-and-fix-the-release-workflow.md) | completed |
 | [Fix rex fix timestamp backfill inverting startedAt/completedAt (#375)](./fix-rex-fix-timestamp-backfill.md) | completed |
 | [Make the release verify step wait for npm instead of skipping when the version isn't visible yet](./make-the-release-verify-step-wait-for.md) | pending |
 | [Reproduce Windows near-port relocation never engaging (#367)](./reproduce-windows-near-port-relocation.md) | deferred |

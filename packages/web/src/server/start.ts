@@ -6,7 +6,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { existsSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type FSWatcher } from "node:fs";
 import { writeFile, unlink } from "node:fs/promises";
 import { resolve, join, dirname, basename } from "node:path";
-import { isVerbose, verbose, resolveLayout } from "@n-dx/llm-client";
+import { isVerbose, verbose, resolveLayout, ensureAuthToken } from "@n-dx/llm-client";
 import type { ServerContext, ViewerScope } from "./types.js";
 import { ensureLegacyPrdMigrated } from "./rex-gateway.js";
 import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./routes-static.js";
@@ -45,6 +45,8 @@ import { handleSearchRoute } from "./routes-search.js";
 import { handleNotionRoute } from "./routes-notion.js";
 import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
+import { handleTrustRoute } from "./routes-trust.js";
+import { evaluateRepoTrust, formatRepoTrustReport } from "@n-dx/llm-client";
 import { enforceRouteFeatureGate } from "./route-feature-gates.js";
 import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
@@ -53,7 +55,7 @@ import { handleMergeGraphRoute } from "./routes-merge-graph.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
-import { ALL_DATA_FILES, stripWorkspaceSlot } from "../shared/index.js";
+import { ALL_DATA_FILES, stripWorkspaceSlot, urlWithToken } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
 import { handleRequestSecurity } from "./request-security.js";
 
@@ -238,6 +240,12 @@ export interface StartResult {
 
 export interface ServerOptions {
   dev?: boolean;
+  /**
+   * Per-user token file (`<ndx home>/auth.token`). When set, the token is
+   * created if absent and every request and WebSocket handshake must present
+   * it; `ndx start` always passes this, a bare `web serve` runs without.
+   */
+  tokenFile?: string;
   /** Restrict dashboard to a single package's views and APIs. */
   scope?: ViewerScope;
 }
@@ -752,6 +760,7 @@ async function handleApiRoutes(
   if (handleStatusRoute(req, res, ctx)) return true;
   if (handleHubAbsentRoute(req, res)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
+  if (await handleTrustRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleIntegrationRoute(req, res, ctx))) return true;
   if (await handleFeaturesRoute(req, res, ctx)) return true;
@@ -833,10 +842,11 @@ function createHttpServer(
   ws: ReturnType<typeof createWebSocketManager>,
   assets: ReturnType<typeof resolveStaticAssets>,
   wsHealthTracker: WsHealthTracker,
+  token: string | null,
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
-      if (handleRequestSecurity(req, res)) return;
+      if (handleRequestSecurity(req, res, { token })) return;
       // Request-scoped context. Two things can name a worktree and they do not
       // rank equally: `X-Ndx-Workspace` wins over a leading `/w/<key>/`.
       //
@@ -913,9 +923,11 @@ function logStartup(
   actualPort: number,
   ctx: ServerContext,
   henchRunsDir: string,
+  token: string | null = null,
 ): void {
   const label = ctx.scope ? `${ctx.scope} viewer` : "n-dx dashboard";
-  console.log(`${label} running at http://localhost:${actualPort}`);
+  // With a token the URL carries it once so the browser sets its cookie.
+  console.log(`${label} running at ${token ? urlWithToken(`http://localhost:${actualPort}/`, token) : `http://localhost:${actualPort}`}`);
   if (isInScope(ctx.scope, "sourcevision")) {
     console.log(`Serving data from: ${ctx.svDir}`);
   }
@@ -925,6 +937,18 @@ function logStartup(
   if (isInScope(ctx.scope, "hench") && existsSync(henchRunsDir)) {
     console.log(`Hench runs from: ${henchRunsDir}`);
   }
+  // Repository trust, same evaluation hench applies at run start and the
+  // dashboard shows as a strip. Silent when the checkout matches the defaults
+  // or the user has trusted it; loud otherwise, because `ndx start` is often
+  // the first thing run on a fresh clone.
+  try {
+    const trust = evaluateRepoTrust(ctx.projectDir);
+    if (trust.restricted) {
+      for (const line of formatRepoTrustReport(trust, { acceptCommand: "ndx trust accept ." })) console.log(line);
+    }
+  } catch {
+    // Never block startup on the trust store.
+  }
   console.log(`MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
   console.log(`MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
   console.log(`WebSocket available at ws://localhost:${actualPort}`);
@@ -932,8 +956,9 @@ function logStartup(
   if (ctx.dev) console.log("Dev mode: live reload enabled");
   console.log("");
   console.log("MCP setup:");
-  console.log("  Claude:  claude mcp add --transport http rex http://localhost:" + actualPort + "/mcp/rex");
-  console.log("           claude mcp add --transport http sourcevision http://localhost:" + actualPort + "/mcp/sourcevision");
+  const headerFlag = token ? ' --header "X-Ndx-Token: <token from <ndx home>/auth.token>"' : "";
+  console.log("  Claude:  claude mcp add --transport http rex http://localhost:" + actualPort + "/mcp/rex" + headerFlag);
+  console.log("           claude mcp add --transport http sourcevision http://localhost:" + actualPort + "/mcp/sourcevision" + headerFlag);
   console.log("  Codex:   configured automatically via .codex/config.toml (stdio)");
   console.log("");
   console.log("Press Ctrl+C to stop.");
@@ -1050,7 +1075,10 @@ export async function startServer(
 
   const watcher = createDataWatcher(ctx, assets.viewerPath);
   const wsHealthTracker = new WsHealthTracker();
-  const ws = createWebSocketManager({ healthTracker: wsHealthTracker });
+  // Per-user token: created on first use, shared by every server this user
+  // starts, required on every request and handshake once configured.
+  const token = opts.tokenFile ? ensureAuthToken(opts.tokenFile) : null;
+  const ws = createWebSocketManager({ healthTracker: wsHealthTracker, token });
   const watcherHandles = registerWatchers(ctx, watcher, ws, assets.viewerPath);
 
   // Start heartbeat monitor — periodically checks for unresponsive tasks and
@@ -1112,7 +1140,7 @@ export async function startServer(
   // Live overview frames: repository-wide, so every workspace's viewer gets them.
   watcherHandles.monitorIntervals.push(startLiveMonitor(registry.anchor.ctx, liveSourcesOf(registry), everyWorkspaceBroadcast));
 
-  const server = createHttpServer(registry, ws, assets, wsHealthTracker);
+  const server = createHttpServer(registry, ws, assets, wsHealthTracker, token);
 
   return new Promise<StartResult>((resolvePromise, rejectPromise) => {
     server.once("error", (err: NodeJS.ErrnoException) => {
@@ -1151,7 +1179,7 @@ export async function startServer(
         await refreshPRDCache(rexDir);
       }
 
-      logStartup(actualPort, ctx, watcherHandles.henchRunsDir);
+      logStartup(actualPort, ctx, watcherHandles.henchRunsDir, token);
 
       // ── Graceful shutdown ───────────────────────────────────────────────
       // Single handler coordinates cleanup in dependency order:

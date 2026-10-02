@@ -231,10 +231,10 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
 
   server.tool(
     "verify_criteria",
-    "Map acceptance criteria to test files and optionally run tests to verify them",
+    "Map acceptance criteria to test files, and optionally run the repository's test command against them. Tests run only when runTests is true AND the repository's execution config is trusted (see `ndx trust`); the mapping is always returned.",
     {
       taskId: z.string().optional().describe("Task ID to verify (omit for all tasks)"),
-      runTests: z.boolean().optional().describe("Whether to execute tests (default: true)"),
+      runTests: z.boolean().optional().describe("Execute the test command from .rex/config.json (default: false). Ignored, with a note in the result, while the repository is not trusted."),
     },
     withMigrationWarning((args) => handleVerifyCriteria(store, dir, args)),
   );

@@ -15,7 +15,7 @@
 import { createHash } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import { isTrustedBrowserOrigin, isTrustedHost } from "./request-security.js";
+import { isTrustedBrowserOrigin, isTrustedHost, isAuthenticatedRequest } from "./request-security.js";
 
 // ── Health tracking types ──────────────────────────────────────────────────
 
@@ -339,6 +339,8 @@ export function tagBroadcaster(broadcast: WebSocketBroadcaster, workspace: strin
 export interface WebSocketManagerOptions {
   /** Optional health tracker for connection lifecycle metrics. */
   healthTracker?: WsHealthTracker;
+  /** The per-user token a handshake must present (cookie or header); absent means none is required. */
+  token?: string | null;
 }
 
 /** A connected WebSocket client. */
@@ -525,6 +527,14 @@ export function createWebSocketManager(opts?: WebSocketManagerOptions): {
     // what "this server" means.
     if (!isTrustedHost(req)) {
       socket.write("HTTP/1.1 421 Misdirected Request\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    // The browser sends the ndx_token cookie on a same-origin handshake and a
+    // CLI client sends the header. A handshake has no redirect path, so the
+    // cookie must already have been set by the page that opened the socket.
+    if (opts?.token && !isAuthenticatedRequest(req, opts.token)) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
       socket.destroy();
       return;
     }

@@ -159,3 +159,5 @@ export { PixelIcon } from "./pixel-icons.js";
 export type { PixelIconName, PixelIconProps, PixelTileName } from "./pixel-icons.js";
 export { InfoTip } from "./info-tip.js";
 export type { InfoTipProps } from "./info-tip.js";
+export { RepoTrustStrip, buildTrustNotice } from "./repo-trust-strip.js";
+export type { RepoTrustStripProps, RepoTrustView, RepoTrustNotice, RepoTrustFindingView } from "./repo-trust-strip.js";
