@@ -46,7 +46,7 @@ function snapshot(over: Record<string, unknown> = {}): LiveSnapshot {
   return {
     generatedAt: new Date().toISOString(),
     runs: [], jobs: [],
-    queue: { next: [{ id: "n1", title: "Next up", priority: "high", epicChain: [] }], starting: [] },
+    queue: { next: [{ id: "n1", title: "Next up", status: "pending", priority: "high", epicChain: [] }], starting: [] },
     machine: {
       slots: { scope: "repository", inUse: 1, max: 3, available: 2, queued: 0 },
       memory: { freeBytes: 8 * 1024 ** 3, availableBytes: 8 * 1024 ** 3, totalBytes: 16 * 1024 ** 3, pressure: "normal", floorBytes: 2 * 1024 ** 3, belowFloor: false },
@@ -227,6 +227,19 @@ describe("the rendered page", () => {
     expect(root.textContent).toContain("Run analysis (fast)");
     expect(root.textContent).toContain("Run analysis (deep)");
     expect(root.querySelector(".live-cards")).toBeNull();
+  });
+
+  it("offers Resume for an in-progress next task, not Start working", async () => {
+    body = snapshot({ queue: { next: [{ id: "n1", title: "Half done", status: "in_progress", priority: null, epicChain: [] }], starting: [] } });
+    await mount();
+    expect(root.querySelector(".live-idle .start-task-primary")!.textContent).toBe("Resume");
+  });
+
+  it("names the blockers of a blocked next task instead of offering a start", async () => {
+    body = snapshot({ queue: { next: [{ id: "n1", title: "Stuck", status: "blocked", blockedBy: ["u1"], priority: null, epicChain: [] }], starting: [] } });
+    await mount();
+    expect(root.querySelector(".live-idle .start-task-primary")).toBeNull();
+    expect(root.querySelector(".live-idle .task-blockers")!.textContent).toContain("u1");
   });
 
   it("disables Stop all when every live run is in another worktree, and names the count otherwise", async () => {

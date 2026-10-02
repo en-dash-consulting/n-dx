@@ -39,7 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks"
 import type { ViewId } from "../types.js";
 import { detectBasePath } from "../external.js";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
-import { ElapsedTime, StartTaskButton, GlossaryLine } from "../components/index.js";
+import { ElapsedTime, TaskStartControl, GlossaryLine } from "../components/index.js";
 import { formatSince } from "../utils/format.js";
 
 // ---------------------------------------------------------------------------
@@ -106,6 +106,8 @@ export interface MemoryStatus {
 export interface NextTask {
   id: string;
   title: string;
+  status: string;
+  blockedBy?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -530,8 +532,8 @@ function WorkspaceCardView({ card, doFetch, onChanged }: {
       }, "Open workspace"),
       card.live || !card.nextTask
         ? null
-        : h(StartTaskButton, {
-            taskId: card.nextTask.id,
+        : h(TaskStartControl, {
+            task: card.nextTask,
             workspace: card.key,
             label: "Start working",
             ariaLabel: `Start working in ${card.key} on ${card.nextTask.title}`,

@@ -25,9 +25,14 @@ export interface TaskStartControlProps {
   workspace?: string;
   ariaLabel?: string;
   navigateTo?: NavigateTo;
+  /**
+   * The task's Live page in `workspace` when that is not the viewer's own
+   * (see `StartTaskButtonProps.liveHref`). Also the target of the live link.
+   */
+  liveHref?: (taskId: string) => string;
 }
 
-export function TaskStartControl({ task, titleOf, label, onStarted, workspace, ariaLabel, navigateTo }: TaskStartControlProps) {
+export function TaskStartControl({ task, titleOf, label, onStarted, workspace, ariaLabel, navigateTo, liveHref }: TaskStartControlProps) {
   const live = useLive();
   const hasLiveRun = !!live?.runs.some((run) => run.taskId === task.id && countsAsLive(run));
   const offer = startOffer(task, hasLiveRun, titleOf);
@@ -41,12 +46,13 @@ export function TaskStartControl({ task, titleOf, label, onStarted, workspace, a
         workspace,
         ariaLabel,
         navigateTo,
+        liveHref,
       });
     case "live":
       return h("a", {
         class: "task-live-link",
-        href: appUrl(`/live/task/${encodeURIComponent(task.id)}`),
-        onClick: navigateTo
+        href: liveHref ? liveHref(task.id) : appUrl(`/live/task/${encodeURIComponent(task.id)}`),
+        onClick: navigateTo && !liveHref
           ? (e: MouseEvent) => { e.preventDefault(); navigateTo("live-task", { taskId: task.id }); }
           : undefined,
       }, "Running — open in Live");

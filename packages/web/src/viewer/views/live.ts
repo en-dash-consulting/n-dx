@@ -33,7 +33,7 @@ import {
   type LiveSnapshot,
 } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
-import { PeekLink, StartTaskButton, isCurrentWorktree, jobTarget, liveHref, runTarget } from "../components/index.js";
+import { PeekLink, TaskStartControl, isCurrentWorktree, jobTarget, liveHref, runTarget } from "../components/index.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import {
   attentionReason,
@@ -472,7 +472,7 @@ function IdleState({ snapshot, analyzedAt, jobs, refresh, navigateTo }: {
           ? [
             h("p", { key: "t", class: "live-card-title" }, next.title),
             chainLabel(next.epicChain) ? h("p", { key: "c", class: "live-card-chain" }, chainLabel(next.epicChain)) : null,
-            h(StartTaskButton, { key: "b", taskId: next.id, label: "Start working", onStarted: () => { void refresh(); }, navigateTo }),
+            h(TaskStartControl, { key: "b", task: next, label: "Start working", onStarted: () => { void refresh(); }, navigateTo }),
           ]
           : h("p", { class: "live-muted" }, "Nothing actionable in the PRD."),
       ),
