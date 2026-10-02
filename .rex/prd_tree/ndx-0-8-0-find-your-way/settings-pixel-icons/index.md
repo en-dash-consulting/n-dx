@@ -24,6 +24,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add the settings pixel-art icon set and a PixelIcon component that renders it as inline SVG](./add-the-settings-pixel-art-icon-set.md) | pending |
+| [Add the settings pixel-art icon set and a PixelIcon component that renders it as inline SVG](./add-the-settings-pixel-art-icon-set.md) | completed |
 | [Show each settings page's pixel tile in the Robot Wrangler, Project and Workflow page headers](./show-each-settings-page-s-pixel-tile.md) | pending |
 | [Show the pixel glyphs in the settings overlay sidebar and on the Settings gear](./show-the-pixel-glyphs-in-the-settings.md) | pending |
