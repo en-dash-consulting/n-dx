@@ -19,4 +19,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add per-tier model override fields to LLMConfig schema and config loader](./add-per-tier-model-override-fields-to.md) | completed |
 | [Define TaskWeight type and per-vendor tier model constants in llm-client](./define-taskweight-type-and-per-vendor.md) | completed |
 | [TIER_MODELS entries can drift out of MODEL_COSTS with no test to catch it](./tier-models-entries-can-drift-out-of.md) | completed |
-| [Update Claude model lists and defaults for the Opus 5.5, Sonnet 5.5 and Fable 5.1 releases](./update-claude-model-lists-and-defaults.md) | pending |
+| [Update Claude model lists and defaults for the Opus 5.5, Sonnet 5.5 and Fable 5.1 releases](./update-claude-model-lists-and-defaults.md) | in_progress |

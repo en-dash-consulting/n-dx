@@ -148,13 +148,13 @@ describe("estimateCost prices cache tokens", () => {
   it("charges cache writes at 1.25x input and cache reads at 0.1x", () => {
     const cost = estimateCost(oneMillionEach);
 
-    // Base rates $3 in / $15 out per 1M.
-    expect(cost.inputCost).toBeCloseTo(3, 10);
-    expect(cost.outputCost).toBeCloseTo(15, 10);
-    expect(cost.cacheWriteCost).toBeCloseTo(3.75, 10); // 1.25 x 3
-    expect(cost.cacheReadCost).toBeCloseTo(0.3, 10); // 0.1 x 3
-    expect(cost.totalRaw).toBeCloseTo(22.05, 10);
-    expect(cost.total).toBe("$22.05");
+    // Base rates $2 in / $10 out per 1M.
+    expect(cost.inputCost).toBeCloseTo(2, 10);
+    expect(cost.outputCost).toBeCloseTo(10, 10);
+    expect(cost.cacheWriteCost).toBeCloseTo(2.5, 10); // 1.25 x 2
+    expect(cost.cacheReadCost).toBeCloseTo(0.2, 10); // 0.1 x 2
+    expect(cost.totalRaw).toBeCloseTo(14.7, 10);
+    expect(cost.total).toBe("$14.70");
   });
 
   it("does not silently drop a cache-dominated bill", () => {

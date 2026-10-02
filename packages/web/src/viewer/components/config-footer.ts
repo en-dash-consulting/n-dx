@@ -162,12 +162,17 @@ export function identityTooltip(server: ServerIdentity): string {
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
-function formatModel(model: string | null, vendor: string | null): string {
+/** An 8-digit `-YYYYMMDD` snapshot suffix — a date, not a version part. */
+const SNAPSHOT_DATE = /^\d{8}$/;
+
+export function formatModel(model: string | null, vendor: string | null): string {
   if (!model) return "default";
-  // Shorten official claude model IDs: "claude-sonnet-4-6" → "sonnet 4"
+  // Shorten official claude model IDs: "claude-sonnet-5-5" → "sonnet 5.5".
+  // Every numeric part is kept: "sonnet 5" alone could not tell 5 from 5.5.
   if (model.startsWith("claude-")) {
-    const parts = model.split("-");
-    if (parts.length >= 3) return `${parts[1]} ${parts[2]}`;
+    const [, family, ...rest] = model.split("-");
+    const version = rest.filter((part) => /^\d+$/.test(part) && !SNAPSHOT_DATE.test(part));
+    if (family && version.length > 0) return `${family} ${version.join(".")}`;
   }
   // Truncate long local model IDs (path-style names from LM Studio / Ollama)
   if (model.length > 22) {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadClaudeConfig, resolveApiKey, resolveCliPath, resolveVendorModel, normalizeCodexModel, NEWEST_MODELS, TIER_MODELS, GOOGLE_MODELS } from "../../src/config.js";
+import { loadClaudeConfig, resolveApiKey, resolveCliPath, resolveModel, resolveVendorModel, normalizeCodexModel, DEFAULT_CLAUDE_MODEL, NEWEST_MODELS, TIER_MODELS, GOOGLE_MODELS, MODEL_CONTEXT_WINDOWS } from "../../src/config.js";
 import { isModelCompatibleWithVendor } from "../../src/vendor-model-reset.js";
 
 describe("loadClaudeConfig", () => {
@@ -246,6 +246,28 @@ describe("resolveCliPath", () => {
   });
 });
 
+describe("Claude 5.5 line", () => {
+  it("defaults the standard tier to Sonnet 5.5", () => {
+    expect(DEFAULT_CLAUDE_MODEL).toBe("claude-sonnet-5-5");
+    expect(NEWEST_MODELS.claude).toBe("claude-sonnet-5-5");
+    expect(TIER_MODELS.claude.standard).toBe("claude-sonnet-5-5");
+  });
+
+  it("expands the opus and fable aliases to the newest releases", () => {
+    expect(resolveModel("opus")).toBe("claude-opus-5-5");
+    expect(resolveModel("fable")).toBe("claude-fable-5-1");
+  });
+
+  it("knows a 1M context window for every new and superseded Claude 5 model", () => {
+    for (const id of [
+      "claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1",
+      "claude-opus-5", "claude-sonnet-5", "claude-fable-5",
+    ]) {
+      expect(MODEL_CONTEXT_WINDOWS[id], id).toBe(1_000_000);
+    }
+  });
+});
+
 describe("NEWEST_MODELS", () => {
   it("defines a newest model for claude vendor", () => {
     expect(typeof NEWEST_MODELS.claude).toBe("string");
@@ -289,7 +311,7 @@ describe("TIER_MODELS", () => {
   });
 
   it("claude.heavy maps to opus", () => {
-    expect(TIER_MODELS.claude.heavy).toBe("claude-opus-5");
+    expect(TIER_MODELS.claude.heavy).toBe("claude-opus-5-5");
   });
 
   it("google tiers match GOOGLE_MODELS", () => {
@@ -372,7 +394,7 @@ describe("resolveVendorModel", () => {
   it("expands claude model aliases from config", () => {
     expect(
       resolveVendorModel("claude", { claude: { model: "opus" } }),
-    ).toBe("claude-opus-5");
+    ).toBe("claude-opus-5-5");
   });
 
   it("expands 'sonnet' alias to full claude model ID", () => {
@@ -534,13 +556,13 @@ describe("resolveVendorModel", () => {
   // Heavy weight tests for all vendors
   describe("heavy weight", () => {
     it("returns claude opus for heavy weight", () => {
-      expect(resolveVendorModel("claude", {}, "heavy")).toBe("claude-opus-5");
+      expect(resolveVendorModel("claude", {}, "heavy")).toBe("claude-opus-5-5");
     });
 
     it("heavy weight for claude ignores model config", () => {
       expect(
         resolveVendorModel("claude", { claude: { model: "claude-haiku-4-5" } }, "heavy"),
-      ).toBe("claude-opus-5");
+      ).toBe("claude-opus-5-5");
     });
 
     it("heavy weight for codex returns TIER_MODELS.codex.heavy", () => {
@@ -578,7 +600,7 @@ describe("resolveVendorModel", () => {
 
     it("expands shorthand alias from top-level model for claude", () => {
       const config = { model: "opus" };
-      expect(resolveVendorModel("claude", config)).toBe("claude-opus-5");
+      expect(resolveVendorModel("claude", config)).toBe("claude-opus-5-5");
     });
 
     it("uses top-level model for codex over vendor-pinned", () => {

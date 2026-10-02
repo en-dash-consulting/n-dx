@@ -17,9 +17,9 @@ On re-init, if the vendor and model are already configured the LLM prompts are s
 
 | Vendor | Model ID | Label | Default |
 |--------|----------|-------|---------|
-| `claude` | `claude-sonnet-5` | Claude Sonnet 5 | yes |
-| `claude` | `claude-opus-5` | Claude Opus 5 | |
-| `claude` | `claude-fable-5` | Claude Fable 5 | |
+| `claude` | `claude-sonnet-5-5` | Claude Sonnet 5.5 | yes |
+| `claude` | `claude-opus-5-5` | Claude Opus 5.5 | |
+| `claude` | `claude-fable-5-1` | Claude Fable 5.1 | |
 | `claude` | `claude-haiku-4-5` | Claude Haiku 4.5 | |
 | `codex` | `gpt-5.6-terra` | GPT-5.6 Terra | yes |
 | `codex` | `gpt-5.6-sol` | GPT-5.6 Sol | |
@@ -56,13 +56,13 @@ Examples:
 
 ```sh
 # Fully non-interactive init (CI / scripting)
-ndx init --provider=claude --model=claude-sonnet-5 .
+ndx init --provider=claude --model=claude-sonnet-5-5 .
 
 # Configure both vendors in a single call
-ndx init --provider=claude --claude-model=claude-sonnet-5 --codex-model=gpt-5.6-terra .
+ndx init --provider=claude --claude-model=claude-sonnet-5-5 --codex-model=gpt-5.6-terra .
 
 # A lone vendor-specific flag implies the provider
-ndx init --claude-model=claude-opus-5 .   # implies --provider=claude
+ndx init --claude-model=claude-opus-5-5 .   # implies --provider=claude
 ```
 
 **Flag rules:**
@@ -88,7 +88,7 @@ Example `.n-dx.json` after init:
   "llm": {
     "vendor": "claude",
     "claude": {
-      "model": "claude-sonnet-5"
+      "model": "claude-sonnet-5-5"
     }
   }
 }
@@ -117,8 +117,8 @@ ndx config llm.claude.api_key sk-ant-... .
 # or via environment variable:
 export ANTHROPIC_API_KEY=sk-ant-...
 
-# Pin a model (default: claude-sonnet-5)
-ndx config llm.claude.model claude-opus-5 .
+# Pin a model (default: claude-sonnet-5-5)
+ndx config llm.claude.model claude-opus-5-5 .
 
 # CLI mode
 ndx config llm.claude.cli_path /path/to/claude .

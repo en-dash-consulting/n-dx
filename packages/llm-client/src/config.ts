@@ -30,7 +30,7 @@ const LOCAL_CONFIG_FILE = ".n-dx.local.json";
  * entry that must stay aligned — enforced by the catalog-runtime contract
  * test in `tests/e2e/catalog-runtime-contract.test.js`.
  */
-export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5";
+export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5-5";
 
 /**
  * Canonical 'newest model' per vendor.
@@ -40,7 +40,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5";
  * via `resolveVendorModel()`.
  */
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
-  [LLM_VENDOR.CLAUDE]: "claude-sonnet-5",
+  [LLM_VENDOR.CLAUDE]: DEFAULT_CLAUDE_MODEL,
   [LLM_VENDOR.CODEX]: "gpt-5.6-terra",
   // Google: newest *stable* Pro model. `gemini-3.1-pro-preview` is newer but
   // is a preview release — preview IDs can be renamed or withdrawn, so it is
@@ -82,7 +82,7 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
   [LLM_VENDOR.CLAUDE]: {
     light: "claude-haiku-4-5",
     standard: NEWEST_MODELS.claude,
-    heavy: "claude-opus-5",
+    heavy: "claude-opus-5-5",
   },
   [LLM_VENDOR.CODEX]: {
     light: "gpt-5.6-luna",
@@ -171,6 +171,9 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   "gemini-2.5-pro": 1_000_000,
   // Claude
   "claude-haiku-4-5": 200_000,
+  "claude-fable-5-1": 1_000_000,
+  "claude-opus-5-5": 1_000_000,
+  "claude-sonnet-5-5": 1_000_000,
   "claude-fable-5": 1_000_000,
   "claude-opus-5": 1_000_000,
   "claude-opus-4-8": 1_000_000,
@@ -212,7 +215,7 @@ export interface ModelCost {
  *
  * | Vendor | Cache write | Cache read |
  * |--------|-------------|------------|
- * | Claude | 1.25x input | 0.1x input |
+ * | Claude | 1.25x input | 0.1x input (exceptions: Opus 5.5 0.05x, Fable 5.1 0.025x) |
  * | OpenAI | 1x input (caching is automatic and carries no write premium) | 0.1x input |
  * | Google | 1x input (explicit cache write is billed as input) | 0.25x input |
  *
@@ -244,10 +247,24 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
     inputPerMToken: 1.25, outputPerMToken: 10.00,
     cacheWritePerMToken: 1.25, cacheReadPerMToken: 0.3125,
   },
-  // Claude — cache write at 1.25x input, read at 0.1x.
+  // Claude — cache write at 1.25x input, read at 0.1x (exceptions noted inline).
   "claude-haiku-4-5": {
     inputPerMToken: 1.00, outputPerMToken: 5.00,
     cacheWritePerMToken: 1.25, cacheReadPerMToken: 0.10,
+  },
+  // Cache read at 0.025x input.
+  "claude-fable-5-1": {
+    inputPerMToken: 10.00, outputPerMToken: 50.00,
+    cacheWritePerMToken: 12.50, cacheReadPerMToken: 0.25,
+  },
+  // Cache read at 0.05x input.
+  "claude-opus-5-5": {
+    inputPerMToken: 4.00, outputPerMToken: 20.00,
+    cacheWritePerMToken: 5.00, cacheReadPerMToken: 0.20,
+  },
+  "claude-sonnet-5-5": {
+    inputPerMToken: 2.00, outputPerMToken: 10.00,
+    cacheWritePerMToken: 2.50, cacheReadPerMToken: 0.20,
   },
   "claude-fable-5": {
     inputPerMToken: 10.00, outputPerMToken: 50.00,
@@ -302,9 +319,9 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
  */
 const MODEL_ALIASES: Record<string, string> = {
   sonnet: NEWEST_MODELS.claude,
-  opus: "claude-opus-5",
-  haiku: "claude-haiku-4-5",
-  fable: "claude-fable-5",
+  opus: TIER_MODELS.claude.heavy,
+  haiku: TIER_MODELS.claude.light,
+  fable: "claude-fable-5-1",
 };
 
 /**
@@ -658,11 +675,11 @@ export function resolveJudgmentRoute(
  *
  * ## Per-vendor rationale
  *
- * - **claude → `claude-opus-5`** ($5/$25 per MTok, 1M context). Opus-tier
- *   reasoning at the same input price as Opus 4.8/4.7 and ~1.67x the input
- *   price of the Sonnet 5 execution default. `claude-fable-5` is stronger
- *   still but costs 2x Opus ($10/$50) — available via override, not worth it
- *   as the default for a single-pass review.
+ * - **claude → `claude-opus-5-5`** ($4/$20 per MTok, 1M context). Opus-tier
+ *   reasoning at 2x the price of the Sonnet 5.5 execution default ($2/$10),
+ *   and below Opus 5 ($5/$25). `claude-fable-5-1` is stronger still but costs
+ *   2.5x Opus 5.5 ($10/$50) — available via override, not worth it as the
+ *   default for a single-pass review.
  * - **codex → `gpt-5.6-terra`** (`NEWEST_MODELS.codex`). The review model
  *   equals the execution model. `gpt-5.6-sol` is the heavy tier ($4/$20 vs
  *   terra's $2/$12) — available via override or `reviewModel` config, but not
@@ -675,7 +692,7 @@ export function resolveJudgmentRoute(
  * Override precedence is handled by {@link resolveReviewModel}.
  */
 export const REVIEW_MODELS: Record<LLMVendor, string> = {
-  [LLM_VENDOR.CLAUDE]: "claude-opus-5",
+  [LLM_VENDOR.CLAUDE]: TIER_MODELS.claude.heavy,
   [LLM_VENDOR.CODEX]: NEWEST_MODELS.codex,
   [LLM_VENDOR.GOOGLE]: TIER_MODELS.google.heavy,
   [LLM_VENDOR.LOCAL]: "",
