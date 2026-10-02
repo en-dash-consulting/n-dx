@@ -4,6 +4,11 @@
  *
  * Shows: smart add (natural language → proposals), batch import (multi-file/text),
  * project analysis, pending proposals list with accept/reject, and recent analysis history.
+ *
+ * It is the Plan stage's lead section, so it opens as one Smart Add row and
+ * keeps the PRD tree in view; "More" reveals the tabs and the history. The
+ * Smart Add instance stays in the same tree position in both layouts, so
+ * text typed in the row survives opening "More".
  */
 
 import {h} from "preact";import { useState, useEffect, useCallback } from "preact/hooks";
@@ -27,6 +32,7 @@ type AnalysisTab = "smart-add" | "batch-import" | "scan";
 
 export function AnalysisView() {
   const [activeTab, setActiveTab] = useState<AnalysisTab>("smart-add");
+  const [expanded, setExpanded] = useState(false);
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [logLoading, setLogLoading] = useState(true);
 
@@ -63,9 +69,17 @@ export function AnalysisView() {
     fetchLog();
   }, [fetchLog]);
 
+  const moreToggle = h("button", {
+    type: "button",
+    class: "cmd-btn cmd-btn-secondary rex-analysis-more",
+    onClick: () => setExpanded(!expanded),
+    "aria-expanded": String(expanded),
+    title: expanded ? "Hide import, scan and history" : "Batch import, project scan, scope and history",
+  }, expanded ? "Less ▴" : "More ▾");
+
   return h(
     "div",
-    { class: "rex-analysis-view" },
+    { class: `rex-analysis-view${expanded ? " rex-analysis-view--expanded" : ""}` },
 
     // View header
     h("div", { class: "rex-analysis-view-header view-header" },
@@ -76,51 +90,58 @@ export function AnalysisView() {
       ),
     ),
 
-    // Tab bar
-    h("div", { class: "rex-analysis-tabs" },
-      h("button", {
-        class: `rex-analysis-tab${activeTab === "smart-add" ? " active" : ""}`,
-        onClick: () => setActiveTab("smart-add"),
-        type: "button",
-      }, "Smart Add"),
-      h("button", {
-        class: `rex-analysis-tab${activeTab === "batch-import" ? " active" : ""}`,
-        onClick: () => setActiveTab("batch-import"),
-        type: "button",
-      }, "Batch Import"),
-      h("button", {
-        class: `rex-analysis-tab${activeTab === "scan" ? " active" : ""}`,
-        onClick: () => setActiveTab("scan"),
-        type: "button",
-      }, "Project Scan"),
-    ),
+    // Tab bar (behind "More")
+    expanded
+      ? h("div", { class: "rex-analysis-tabs-row" },
+          h("div", { class: "rex-analysis-tabs" },
+            h("button", {
+              class: `rex-analysis-tab${activeTab === "smart-add" ? " active" : ""}`,
+              onClick: () => setActiveTab("smart-add"),
+              type: "button",
+            }, "Smart Add"),
+            h("button", {
+              class: `rex-analysis-tab${activeTab === "batch-import" ? " active" : ""}`,
+              onClick: () => setActiveTab("batch-import"),
+              type: "button",
+            }, "Batch Import"),
+            h("button", {
+              class: `rex-analysis-tab${activeTab === "scan" ? " active" : ""}`,
+              onClick: () => setActiveTab("scan"),
+              type: "button",
+            }, "Project Scan"),
+          ),
+          moreToggle,
+        )
+      : null,
 
-    // Tab content
-    activeTab === "smart-add"
-      ? h(SmartAddInput, { onPrdChanged: handlePrdChanged })
+    // Tab content — collapsed, always the Smart Add row
+    !expanded || activeTab === "smart-add"
+      ? h(SmartAddInput, { onPrdChanged: handlePrdChanged, bar: !expanded, barAction: expanded ? null : moreToggle })
       : activeTab === "batch-import"
         ? h(BatchImportPanel, { onPrdChanged: handlePrdChanged })
         : h(AnalyzePanel, { onPrdChanged: handlePrdChanged }),
 
-    // Analysis history
-    h("div", { class: "rex-analysis-history" },
-      h("h3", { class: "rex-analysis-history-title" }, "Recent Activity"),
-      logLoading
-        ? h("p", { class: "rex-analysis-history-empty" }, "Loading...")
-        : logEntries.length === 0
-          ? h("p", { class: "rex-analysis-history-empty" }, "No analysis activity recorded yet.")
-          : h("div", { class: "rex-analysis-history-list" },
-              logEntries.map((entry, i) =>
-                h("div", { key: i, class: "rex-analysis-history-entry" },
-                  h("span", { class: "rex-analysis-history-time" }, formatTime(entry.timestamp)),
-                  h("span", { class: `rex-analysis-history-event ${eventClass(entry.event)}` }, formatEvent(entry.event)),
-                  entry.detail
-                    ? h("span", { class: "rex-analysis-history-detail" }, entry.detail)
-                    : null,
+    // Analysis history (behind "More")
+    expanded
+      ? h("div", { class: "rex-analysis-history" },
+          h("h3", { class: "rex-analysis-history-title" }, "Recent Activity"),
+          logLoading
+            ? h("p", { class: "rex-analysis-history-empty" }, "Loading...")
+            : logEntries.length === 0
+              ? h("p", { class: "rex-analysis-history-empty" }, "No analysis activity recorded yet.")
+              : h("div", { class: "rex-analysis-history-list" },
+                  logEntries.map((entry, i) =>
+                    h("div", { key: i, class: "rex-analysis-history-entry" },
+                      h("span", { class: "rex-analysis-history-time" }, formatTime(entry.timestamp)),
+                      h("span", { class: `rex-analysis-history-event ${eventClass(entry.event)}` }, formatEvent(entry.event)),
+                      entry.detail
+                        ? h("span", { class: "rex-analysis-history-detail" }, entry.detail)
+                        : null,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-    ),
+        )
+      : null,
   );
 }
 

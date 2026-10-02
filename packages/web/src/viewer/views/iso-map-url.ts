@@ -92,12 +92,15 @@ export function clampMaxNodes(value: number): number {
  * the user, and a self-describing query string is far easier to tweak by hand
  * than one that relies on defaults.
  */
-export function buildIsoMapUrl(controls: IsoMapControls): string {
+export function buildIsoMapUrl(controls: IsoMapControls, opts: { embed?: boolean } = {}): string {
   const params = new URLSearchParams({
     source: controls.source,
     maxNodes: String(clampMaxNodes(controls.maxNodes)),
     externals: controls.includeExternals ? "1" : "0",
   });
+  // Only the in-page frame asks for the embedded document; new-tab and
+  // download links keep the standalone page.
+  if (opts.embed) params.set("embed", "1");
   return `${ISO_MAP_ENDPOINT}?${params.toString()}`;
 }
 

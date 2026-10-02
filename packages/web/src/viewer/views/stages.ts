@@ -50,6 +50,12 @@ export interface StageSection {
   /** Expanded when the stage page first opens. */
   open?: boolean;
   /**
+   * Always starts collapsed, ignoring the remembered open state — for a
+   * section whose content the page already leads with (Terrain, now that the
+   * Overview opens on the isometric map). It still opens on click.
+   */
+  collapsedOnLoad?: boolean;
+  /**
    * The stage's lead section, shown in the page itself with no dropdown
    * header: always rendered, never collapsible. One per stage, first.
    */
@@ -102,6 +108,7 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "overview", plain: true },
       {
         view: "graph",
+        collapsedOnLoad: true,
         tabs: [
           { view: "iso-map", hiddenWhenDeployed: true },
           { view: "zones" },
