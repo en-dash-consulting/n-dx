@@ -13,7 +13,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   DOC_PATH,
   BEGIN_MARKER,
@@ -24,16 +27,49 @@ import {
 } from "../../scripts/build-cli-ui-gap.mjs";
 import { getOrchestratorCommands } from "../../packages/core/help.js";
 
+/** Windows checkouts (core.autocrlf=true) give this page CRLF; compare on LF. */
+const norm = (s) => s.replace(/\r\n/g, "\n");
+const toCrlf = (s) => norm(s).replace(/\n/g, "\r\n");
+const readDoc = () => norm(readFileSync(DOC_PATH, "utf-8"));
+
 describe("docs/cli-ui-gap.md command effects section", () => {
   it("matches what the generator produces", () => {
-    const committed = readFileSync(DOC_PATH, "utf-8");
+    const committed = readDoc();
     expect(committed, "docs/cli-ui-gap.md is stale — run: node scripts/build-cli-ui-gap.mjs").toBe(
       buildCliUiGap(committed),
     );
   });
 
+  it("accepts a CRLF checkout of the page", () => {
+    const crlf = toCrlf(readDoc());
+    expect(norm(crlf)).toBe(norm(buildCliUiGap(crlf)));
+    expect(norm(buildCliUiGap(crlf))).toBe(readDoc());
+  });
+
+  it("keeps the line ending of the page it regenerates", () => {
+    const crlf = toCrlf(readDoc());
+    expect(buildCliUiGap(crlf)).toBe(crlf);
+    expect(buildCliUiGap(readDoc())).not.toContain("\r");
+  });
+
+  it("the script rewrites a stale CRLF copy with CRLF throughout", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cli-ui-gap-"));
+    try {
+      const file = join(dir, "cli-ui-gap.md");
+      writeFileSync(file, toCrlf(readDoc()).replace("## Command effects", "## Command effects (stale)"));
+      const script = join(import.meta.dirname, "../../scripts/build-cli-ui-gap.mjs");
+      const run = spawnSync(process.execPath, [script, file], { encoding: "utf-8" });
+      expect(run.status, run.stderr).toBe(0);
+      const written = readFileSync(file, "utf-8");
+      expect(written).toBe(toCrlf(readDoc()));
+      expect(written.replace(/\r\n/g, "")).not.toMatch(/[\r\n]/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("lists every orchestrator command, none undeclared", () => {
-    const committed = readFileSync(DOC_PATH, "utf-8");
+    const committed = readDoc();
     const section = committed.slice(committed.indexOf(BEGIN_MARKER), committed.indexOf(END_MARKER));
     for (const name of getOrchestratorCommands()) {
       expect(section, name).toContain(`| \`ndx ${name}\` |`);

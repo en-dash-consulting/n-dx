@@ -20,9 +20,13 @@ const ROOT = join(import.meta.dirname, "../..");
  */
 const DELEGATION_EXEMPT = new Set(["rex", "hench", "sourcevision", "sv"]);
 
+/** Windows checkouts (core.autocrlf=true) give README.md and docs/*.md CRLF; match on LF. */
+const norm = (s) => s.replace(/\r\n/g, "\n");
+const toCrlf = (s) => norm(s).replace(/\n/g, "\r\n");
+
 /** The README body from "## Commands" up to the next top-level section. */
-function readmeCommandsSection() {
-  const readme = readFileSync(join(ROOT, "README.md"), "utf-8");
+function readmeCommandsSection(raw = readFileSync(join(ROOT, "README.md"), "utf-8")) {
+  const readme = norm(raw);
   const start = readme.indexOf("\n## Commands\n");
   if (start === -1) throw new Error('README.md has no "## Commands" section');
   const end = readme.indexOf("\n## ", start + 1);
@@ -30,7 +34,8 @@ function readmeCommandsSection() {
 }
 
 /** True when a table row starts with the command: `ndx <name>` then a space, bracket, pipe or closing tick. */
-function documents(text, name) {
+function documents(raw, name) {
+  const text = norm(raw);
   const escaped = name.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
   return new RegExp("^\\| `ndx " + escaped + "(?=[ `|\\[\\\\])", "m").test(text);
 }
@@ -47,6 +52,15 @@ describe("command reference parity with the help registry", () => {
     const section = readmeCommandsSection();
     const missing = registry.filter((c) => !documents(section, c));
     expect(missing).toEqual([]);
+  });
+
+  it("handles CRLF checkouts of the README and the guide", () => {
+    const readme = readFileSync(join(ROOT, "README.md"), "utf-8");
+    const guide = readFileSync(join(ROOT, "docs/guide/commands.md"), "utf-8");
+    const section = readmeCommandsSection(toCrlf(readme));
+    expect(section).toBe(readmeCommandsSection(readme));
+    expect(registry.filter((c) => !documents(section, c))).toEqual([]);
+    expect(registry.filter((c) => !documents(toCrlf(guide), c))).toEqual([]);
   });
 
   it("docs/guide/commands.md documents every registry command", () => {

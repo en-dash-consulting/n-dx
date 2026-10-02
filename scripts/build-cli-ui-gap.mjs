@@ -12,6 +12,7 @@
  *
  *   node scripts/build-cli-ui-gap.mjs           # rewrite the section
  *   node scripts/build-cli-ui-gap.mjs --check   # fail if the committed doc is stale
+ *   node scripts/build-cli-ui-gap.mjs [--check] <file>   # act on another copy of the page
  */
 
 import { readFileSync, writeFileSync, realpathSync } from "node:fs";
@@ -100,14 +101,21 @@ export function renderCommandEffectsSection(
   return lines.join("\n");
 }
 
-/** `doc` with its generated section replaced. Throws when the markers are missing. */
-export function buildCliUiGap(doc = readFileSync(DOC_PATH, "utf-8")) {
+/**
+ * `rawDoc` with its generated section replaced. Throws when the markers are
+ * missing. The result keeps the line ending `rawDoc` uses (a Windows checkout
+ * is CRLF), so a regenerated file never mixes endings.
+ */
+export function buildCliUiGap(rawDoc = readFileSync(DOC_PATH, "utf-8")) {
+  const eol = rawDoc.includes("\r\n") ? "\r\n" : "\n";
+  const doc = rawDoc.replace(/\r\n/g, "\n");
   const start = doc.indexOf(BEGIN_MARKER);
   const end = doc.indexOf(END_MARKER);
   if (start === -1 || end === -1 || end < start) {
     throw new Error(`${DOC_PATH} is missing the generated-section markers:\n  ${BEGIN_MARKER}\n  ${END_MARKER}`);
   }
-  return doc.slice(0, start) + renderCommandEffectsSection() + doc.slice(end + END_MARKER.length);
+  const built = doc.slice(0, start) + renderCommandEffectsSection() + doc.slice(end + END_MARKER.length);
+  return eol === "\n" ? built : built.replace(/\n/g, eol);
 }
 
 function isMain() {
@@ -120,7 +128,8 @@ function isMain() {
 }
 
 if (isMain()) {
-  const current = readFileSync(DOC_PATH, "utf-8");
+  const target = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? DOC_PATH;
+  const current = readFileSync(target, "utf-8");
   const next = buildCliUiGap(current);
   if (process.argv.includes("--check")) {
     if (next !== current) {
@@ -128,7 +137,7 @@ if (isMain()) {
       process.exitCode = 1;
     }
   } else if (next !== current) {
-    writeFileSync(DOC_PATH, next);
+    writeFileSync(target, next);
     console.log("Updated docs/cli-ui-gap.md");
   } else {
     console.log("docs/cli-ui-gap.md is up to date");
