@@ -25,7 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add `ndx work --resolve`: print the resolved run settings, their sources and any refusals as JSON without running](./add-ndx-work-resolve-print-the.md) | completed |
 | [Add the prep routes: GET /api/hench/prep/:taskId, POST /api/hench/prep/:taskId/preview and GET /api/hench/ready](./add-the-prep-routes-get-api-hench-prep.md) | completed |
 | [An open Prepare task modal follows the host's next-task prop, so Execute can start a different task than the one prepared](./an-open-prepare-task-modal-follows-the.md) | completed |
-| [Any website the user has open can make the dashboard spawn ndx processes through the prep and ready GETs](./any-website-the-user-has-open-can-make.md) | pending |
+| [Any website the user has open can make the dashboard spawn ndx processes through the prep and ready GETs](./any-website-the-user-has-open-can-make.md) | completed |
 | [Brief preview with Fresh ticked deletes the orientation session cache](./brief-preview-with-fresh-ticked.md) | completed |
 | [Build the Prepare task modal: defaults with sources, per-run overrides, preflight, equivalent command, brief preview and Execute](./build-the-prepare-task-modal-defaults.md) | completed |
 | [Copied ndx work commands are not runnable: an unquoted notes placeholder and POSIX-only quoting](./copied-ndx-work-commands-are-not.md) | pending |
