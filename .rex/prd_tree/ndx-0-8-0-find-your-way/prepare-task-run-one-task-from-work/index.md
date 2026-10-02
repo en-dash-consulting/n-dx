@@ -18,7 +18,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Accept allow-listed run options on POST /api/hench/execute and carry them through the hub queue](./accept-allow-listed-run-options-on.md) | in_progress |
+| [Accept allow-listed run options on POST /api/hench/execute and carry them through the hub queue](./accept-allow-listed-run-options-on.md) | completed |
 | [Add `ndx work --resolve`: print the resolved run settings, their sources and any refusals as JSON without running](./add-ndx-work-resolve-print-the.md) | completed |
 | [Add the prep routes: GET /api/hench/prep/:taskId, POST /api/hench/prep/:taskId/preview and GET /api/hench/ready](./add-the-prep-routes-get-api-hench-prep.md) | pending |
 | [Build the Prepare task modal: defaults with sources, per-run overrides, preflight, equivalent command, brief preview and Execute](./build-the-prepare-task-modal-defaults.md) | pending |
