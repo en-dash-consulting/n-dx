@@ -42,6 +42,7 @@ import {
 import {
   HUB_ADMISSION_HEADER,
   parseHubAdmissionHeader,
+  resetsDeferred,
   runOptionArgs,
 } from "../shared/index.js";
 import type { HubMemoryPressure } from "../shared/index.js";
@@ -168,9 +169,14 @@ export interface PrepDetail {
   criteriaCount: number;
 }
 
-function detailOf(ctx: ServerContext, taskId: string): PrepDetail | null {
+type PrdEntry = NonNullable<ReturnType<typeof findItem>>;
+
+function prdEntryOf(ctx: ServerContext, taskId: string): PrdEntry | null {
   const doc = loadPRDSync(ctx.rexDir);
-  const entry = doc ? findItem(doc.items, taskId) : null;
+  return doc ? findItem(doc.items, taskId) : null;
+}
+
+function detailOf(entry: PrdEntry | null): PrepDetail | null {
   if (!entry) return null;
   return {
     priority: entry.item.priority ?? null,
@@ -179,9 +185,19 @@ function detailOf(ctx: ServerContext, taskId: string): PrepDetail | null {
   };
 }
 
+/** `--reset-deferred` when execute would pass it, so resolve and preview describe the run execute starts. */
+function resetDeferredArgs(entry: PrdEntry | null): string[] {
+  return resetsDeferred(entry?.item.status) ? ["--reset-deferred"] : [];
+}
+
 /** GET /api/hench/prep/:taskId */
 async function handlePrep(req: IncomingMessage, res: ServerResponse, ctx: ServerContext, taskId: string): Promise<boolean> {
-  const run = await runNdx(ctx, ["work", `--task=${taskId}`, "--resolve", ctx.projectDir], PREP_RESOLVE_TIMEOUT_MS);
+  const entry = prdEntryOf(ctx, taskId);
+  const run = await runNdx(
+    ctx,
+    ["work", `--task=${taskId}`, "--resolve", ...resetDeferredArgs(entry), ctx.projectDir],
+    PREP_RESOLVE_TIMEOUT_MS,
+  );
   if (run.failure) {
     jsonResponse(res, 502, { error: `Could not resolve the run: ${run.failure}`, stderr: tail(run.stderr) });
     return true;
@@ -200,7 +216,7 @@ async function handlePrep(req: IncomingMessage, res: ServerResponse, ctx: Server
     ...resolved,
     // The directory the execute spawn passes, so the modal's command line is the spawned one.
     dir: ctx.projectDir,
-    detail: detailOf(ctx, taskId),
+    detail: detailOf(entry),
     catalog,
     admission: admissionOf(req),
     workspace: { ...(resolved["workspace"] as object | undefined), ...workspace },
@@ -231,7 +247,13 @@ async function handlePreview(req: IncomingMessage, res: ServerResponse, ctx: Ser
   try {
     run = await runNdx(
       ctx,
-      ["work", `--task=${taskId}`, "--dry-run", ...runOptionArgs(options, contextFile?.path), ctx.projectDir],
+      [
+        "work", `--task=${taskId}`, "--dry-run",
+        ...runOptionArgs(options, contextFile?.path),
+        // The dry run reads the task as reset without writing it.
+        ...resetDeferredArgs(prdEntryOf(ctx, taskId)),
+        ctx.projectDir,
+      ],
       PREP_PREVIEW_TIMEOUT_MS,
     );
   } finally {

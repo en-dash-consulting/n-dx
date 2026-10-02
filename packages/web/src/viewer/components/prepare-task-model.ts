@@ -226,7 +226,7 @@ export function commandWords(prep: PrepResponse, taskId: string, defaults: PrepD
       dir: prep.dir,
       contextFile: CONTEXT_FILE_PLACEHOLDER,
       // The server resets a deferred task to pending before running it.
-      resetDeferred: prep.task?.status === "deferred",
+      taskStatus: prep.task?.status,
     }),
   ];
 }

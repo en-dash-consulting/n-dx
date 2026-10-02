@@ -1964,7 +1964,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Shared: assemble brief, format, build system prompt + envelope, display task info
   const { brief, taskId, briefText, systemPrompt, envelope: baseEnvelope } = await prepareBrief(
     store, config, opts.taskId,
-    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, projectDir, claims: opts.claims },
+    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, projectDir, claims: opts.claims, wouldResetIds: opts.wouldResetIds },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
     opts.extraContext,
   );

@@ -280,7 +280,10 @@ describe("refusals are reported, not thrown", () => {
   });
 
   it("not-actionable is lifted by --reset-deferred for a deferred task", async () => {
-    expect(codes(await resolve({ task: "t-deferred", "reset-deferred": "true" }))).toEqual([]);
+    // What the dashboard's prep GET spawns for a deferred task.
+    const r = await resolve({ task: "t-deferred", "reset-deferred": "true" });
+    expect(codes(r)).toEqual([]);
+    expect(r.resolved.resetDeferred).toEqual({ value: true, source: "cli-flag" });
   });
 
   it("an in-progress task is actionable: the run resumes it", async () => {

@@ -121,7 +121,7 @@ import {
 } from "./run-liveness.js";
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
-import { workCommandArgs } from "../shared/index.js";
+import { resetsDeferred, workCommandArgs } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -1970,7 +1970,7 @@ async function handleExecute(
   // immediately with MODULE_NOT_FOUND.
   const { bin: binPath, args: prefixArgs } = resolveNdxBin(ctx);
   // Pass --reset-deferred when executing a deferred task so hench resets it to pending before running
-  const resetDeferred = status === "deferred";
+  const resetDeferred = resetsDeferred(status);
   // contextNotes travels in a file of its own, removed when the run ends.
   const contextFile = options.contextNotes ? await writeContextNotesFile(options.contextNotes) : null;
   // Argv, never a shell: each flag is one `--flag` / `--flag=value` word from
@@ -1981,7 +1981,7 @@ async function handleExecute(
     options,
     dir: ctx.projectDir,
     contextFile: contextFile?.path,
-    resetDeferred,
+    taskStatus: status,
   });
   const binArgs = [...prefixArgs, ...workArgs];
 

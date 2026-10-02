@@ -170,8 +170,18 @@ export interface WorkCommand {
   dir: string;
   /** Where `contextNotes` was written; see {@link runOptionArgs}. */
   contextFile?: string;
-  /** A deferred task is reset to pending before the run selects it. */
-  resetDeferred?: boolean;
+  /** The task's PRD status; a deferred task gets `--reset-deferred` (see {@link resetsDeferred}). */
+  taskStatus?: string | null;
+}
+
+/**
+ * Whether a dashboard run of a task in `status` passes `--reset-deferred`:
+ * a deferred task is refused by `ndx work --task` unless the run resets it.
+ * Execute, the prep resolve and preview, and the modal's command line all
+ * ask this, so the run they describe is the one execute starts.
+ */
+export function resetsDeferred(status: string | null | undefined): boolean {
+  return status === "deferred";
 }
 
 /**
@@ -185,7 +195,7 @@ export function workCommandArgs(command: WorkCommand): string[] {
     `--task=${command.taskId}`,
     "--auto",
     ...runOptionArgs(command.options, command.contextFile),
-    ...(command.resetDeferred ? ["--reset-deferred"] : []),
+    ...(resetsDeferred(command.taskStatus) ? ["--reset-deferred"] : []),
     command.dir,
   ];
 }

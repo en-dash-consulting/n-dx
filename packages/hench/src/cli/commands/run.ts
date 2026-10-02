@@ -565,6 +565,30 @@ export interface ResetDeferredOptions {
 }
 
 /**
+ * The deferred and failing items `--reset-deferred` returns to pending,
+ * scoped to `assignee` (by the item's own field or an ancestor's) when given.
+ */
+export function collectResettableTasks(
+  items: PRDItem[],
+  assignee?: string,
+): Array<{ id: string; title: string }> {
+  const found: Array<{ id: string; title: string }> = [];
+  const walk = (level: PRDItem[], parents: PRDItem[]) => {
+    for (const item of level) {
+      if (
+        (item.status === "deferred" || item.status === "failing") &&
+        (!assignee || matchesAssignee(item, parents, assignee))
+      ) {
+        found.push({ id: item.id, title: item.title });
+      }
+      if (item.children) walk(item.children, [...parents, item]);
+    }
+  };
+  walk(items, []);
+  return found;
+}
+
+/**
  * Reset deferred and failing tasks to pending so they can be retried.
  *
  * Used by --reset-deferred to let the user restart a run where all tasks
@@ -576,22 +600,7 @@ export async function resetDeferredTasks(
   store: PRDStore,
   opts: ResetDeferredOptions = {},
 ): Promise<number> {
-  const doc = await store.loadDocument();
-  const toReset: Array<{ id: string; title: string }> = [];
-  const assignee = opts.assignee;
-
-  const walk = (items: PRDItem[], parents: PRDItem[]) => {
-    for (const item of items) {
-      if (
-        (item.status === "deferred" || item.status === "failing") &&
-        (!assignee || matchesAssignee(item, parents, assignee))
-      ) {
-        toReset.push({ id: item.id, title: item.title });
-      }
-      if (item.children) walk(item.children, [...parents, item]);
-    }
-  };
-  walk(doc.items, []);
+  const toReset = collectResettableTasks((await store.loadDocument()).items, opts.assignee);
 
   if (!opts.dryRun) {
     for (const t of toReset) {
@@ -1270,6 +1279,7 @@ async function runOne(
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
   assignee?: string,
+  wouldResetIds?: ReadonlySet<string>,
 ): Promise<{ status: string; taskTitle: string; selectedTaskId?: string }> {
   // First statement in the task: a tree this build would re-slug stops the task
   // before the claim below is taken and before any token is spent. The tree can
@@ -1332,6 +1342,7 @@ async function runOne(
         runNumber,
         permissionMode,
         claims,
+        wouldResetIds,
       })
     : await agentLoop({
         config: effectiveConfig as typeof config & { provider: "api" },
@@ -1357,6 +1368,7 @@ async function runOne(
         extraContext,
         runNumber,
         claims,
+        wouldResetIds,
       });
   } finally {
     await claims.releaseAll();
@@ -1686,9 +1698,16 @@ export async function cmdRun(
   // reason the interactive offer is: the run that follows will only work this
   // operator's items, so resetting everyone else's — and committing that under
   // this operator's name — is never what the pair of flags asked for.
+  //
+  // A dry run writes nothing, so its brief reads the tasks the reset would
+  // have returned to pending as pending — the brief a real run would build.
+  let wouldResetIds: ReadonlySet<string> | undefined;
   if (flags["reset-deferred"] === "true") {
     const store = await resolveStore(rexDir);
     await resetDeferredAndCommit(store, dir, { dryRun, ...(assignee ? { assignee } : {}) });
+    if (dryRun) {
+      wouldResetIds = new Set(collectResettableTasks((await store.loadDocument()).items, assignee).map((t) => t.id));
+    }
   }
 
   // Fail fast if CLI provider selected but vendor CLI binary not available.
@@ -1995,7 +2014,7 @@ export async function cmdRun(
     }
 
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
+      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, wouldResetIds);
       return;
     }
 
@@ -2009,9 +2028,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee);
+      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds);
     } else {
-      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee);
+      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds);
     }
   } finally {
     await limiter.release();
@@ -2098,6 +2117,7 @@ async function runIterations(
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
   assignee?: string,
+  wouldResetIds?: ReadonlySet<string>,
 ): Promise<void> {
   // Track attempt counts per task ID within this run invocation
   const attemptTracker = createAttemptTracker();
@@ -2143,6 +2163,7 @@ async function runIterations(
       permissionMode,
       skipTestGate,
       assignee,
+      wouldResetIds,
     );
 
     // Track attempt count for the selected task
@@ -2210,6 +2231,7 @@ async function runLoop(
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
   assignee?: string,
+  wouldResetIds?: ReadonlySet<string>,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -2309,6 +2331,7 @@ async function runLoop(
             permissionMode,
             skipTestGate,
             assignee,
+            wouldResetIds,
           );
           status = result.status;
 
@@ -2501,6 +2524,7 @@ async function runEpicByEpic(
   autonomous?: boolean,
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
+  wouldResetIds?: ReadonlySet<string>,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -2659,6 +2683,7 @@ async function runEpicByEpic(
               permissionMode,
               skipTestGate,
               undefined, // assignee — --mine is refused with --epic-by-epic
+              wouldResetIds,
             );
             status = result.status;
             tasksStarted++;

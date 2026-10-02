@@ -123,6 +123,8 @@ export interface SharedLoopOptions {
   henchDir: string;
   taskId?: string;
   dryRun?: boolean;
+  /** See {@link AssembleBriefOptions.wouldResetIds}. */
+  wouldResetIds?: ReadonlySet<string>;
   model?: string;
   /**
    * Show the diff and prompt for approval before finalizing (`--approve-diff`).

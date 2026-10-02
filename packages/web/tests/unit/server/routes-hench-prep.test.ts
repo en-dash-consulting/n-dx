@@ -153,6 +153,21 @@ describe("hench prep routes", () => {
       expect(PREP_RESOLVE_TIMEOUT_MS).toBe(15_000);
     });
 
+    // Execute passes --reset-deferred for a deferred task; resolving without it
+    // would report the run execute starts as refused (not-actionable).
+    it("resolves a deferred task with --reset-deferred, the run execute starts", async () => {
+      await writeTasks(ctx, [
+        { id: "task-1", title: "Deferred", level: "task", status: "deferred" },
+        { id: "task-2", title: "Pending", level: "task", status: "pending" },
+      ]);
+      const port = await open(ctx);
+      await fetch(`http://127.0.0.1:${port}/api/hench/prep/task-1`);
+      await fetch(`http://127.0.0.1:${port}/api/hench/prep/task-2`);
+      const [deferred, pending] = execMock.mock.calls.map((c) => c[1] as string[]);
+      expect(deferred!.slice(-5)).toEqual(["work", "--task=task-1", "--resolve", "--reset-deferred", tmpDir]);
+      expect(pending).not.toContain("--reset-deferred");
+    });
+
     it("keeps the task id one argv word", async () => {
       const port = await open(ctx);
       await fetch(`http://127.0.0.1:${port}/api/hench/prep/${encodeURIComponent("a b;--auto")}`);
@@ -296,6 +311,16 @@ describe("hench prep routes", () => {
       expect((await preview(port, {})).status).toBe(200);
       const [, args] = execMock.mock.calls[0] as [string, string[]];
       expect(args.slice(args.indexOf("work"))).toEqual(["work", "--task=task-1", "--dry-run", tmpDir]);
+    });
+
+    it("previews a deferred task with --reset-deferred, which a dry run reads as pending without writing", async () => {
+      await writeTasks(ctx, [{ id: "task-1", title: "Deferred", level: "task", status: "deferred" }]);
+      const port = await open(ctx);
+      expect((await preview(port, { options: { fresh: true } })).status).toBe(200);
+      const [, args] = execMock.mock.calls[0] as [string, string[]];
+      expect(args.slice(args.indexOf("work"))).toEqual([
+        "work", "--task=task-1", "--dry-run", "--fresh", "--reset-deferred", tmpDir,
+      ]);
     });
 
     it("hands contextNotes over in a file that is gone when the answer is", async () => {

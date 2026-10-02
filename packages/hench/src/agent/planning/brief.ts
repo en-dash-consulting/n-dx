@@ -55,6 +55,21 @@ export interface AssembleBriefOptions {
    * and the selected task is claimed here — before anything else happens.
    */
   claims?: TaskClaims;
+  /**
+   * Items a dry run's `--reset-deferred` would have returned to pending. The
+   * dry run writes nothing, so the brief reads them as pending in memory —
+   * for both explicit and auto selection — to show the run a real one starts.
+   */
+  wouldResetIds?: ReadonlySet<string>;
+}
+
+/** The items with every id in `ids` read as pending; the input is not changed. */
+function readAsReset(items: PRDItem[], ids: ReadonlySet<string>): PRDItem[] {
+  return items.map((item) => ({
+    ...item,
+    ...(ids.has(item.id) ? { status: "pending" as const } : {}),
+    ...(item.children ? { children: readAsReset(item.children, ids) } : {}),
+  }));
 }
 
 /** Autoselect attempts before giving up on a claim race. */
@@ -202,7 +217,9 @@ export async function assembleTaskBrief(
   taskId?: string,
   options?: AssembleBriefOptions,
 ): Promise<{ brief: TaskBrief; taskId: string }> {
-  const doc = await store.loadDocument();
+  const loaded = await store.loadDocument();
+  const resetIds = options?.wouldResetIds;
+  const doc = resetIds?.size ? { ...loaded, items: readAsReset(loaded.items, resetIds) } : loaded;
   const config = await store.loadConfig();
   const excludeIds = options?.excludeTaskIds;
   const tags = options?.tags?.length ? options.tags : undefined;

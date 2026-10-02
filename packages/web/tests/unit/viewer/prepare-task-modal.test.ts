@@ -247,6 +247,22 @@ describe("PrepareTaskModal", () => {
     expect($<HTMLInputElement>("#prep-maxTurns").value).toBe("7");
   });
 
+  // The prep GET resolves a deferred task with --reset-deferred, so hench
+  // reports no not-actionable refusal; the modal must then let it start.
+  it("enables Execute for a deferred task and shows the --reset-deferred the server will pass", async () => {
+    const { onOpenLive } = await open(
+      prepFixture({ task: { id: "task-1", title: "Prep me", status: "deferred", level: "task" } }),
+      (c) => (c.url === "/api/hench/execute" ? { status: 202, body: { status: "started", taskId: "task-1" } } : undefined),
+    );
+    expect($(".prep-command-line").textContent).toBe("ndx work --task=task-1 --auto --reset-deferred /repo");
+    expect(button("Execute").disabled).toBe(false);
+    await click(button("Execute"));
+    // Execute derives --reset-deferred from the task's status itself; the
+    // request carries no option for it.
+    expect(calls.find((c) => c.url === "/api/hench/execute")!.body).toEqual({ taskId: "task-1", options: {} });
+    expect(onOpenLive).toHaveBeenCalledWith("task-1");
+  });
+
   it("labels Execute Resume for an in-progress task", async () => {
     await open(prepFixture({ task: { id: "task-1", title: "Prep me", status: "in_progress", level: "task" } }));
     expect(button("Resume")).toBeDefined();
