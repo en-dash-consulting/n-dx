@@ -34,7 +34,7 @@ Cached:          6656000 kB
 - Reclaimable slab memory
 - Minus a reserve for low-watermark protection
 
-n-dx reads this through plain `os.freemem()` — no `/proc/meminfo` parsing of its own. On libuv >= 1.45 (Node >= 22, the repo's engine floor), libuv's `uv_get_available_memory()` itself reads `MemAvailable` from `/proc/meminfo`; `os.freemem()` only falls back to `MemFree` on kernels that lack `MemAvailable` (< 3.14, March 2014).
+n-dx reads this through plain `os.freemem()` — no `/proc/meminfo` parsing of its own. On libuv >= 1.45 (Node >= 22, the repo's engine floor), libuv's `uv_get_free_memory()` (what `os.freemem()` calls) itself reads `MemAvailable` from `/proc/meminfo`; `os.freemem()` only falls back to `MemFree` on kernels that lack `MemAvailable` (< 3.14, March 2014).
 
 ### Why MemFree Is Misleading on Linux
 
