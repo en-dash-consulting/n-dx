@@ -491,6 +491,59 @@ describe("hench prep routes", () => {
       expect((await ready(port, "?limit=abc")).tasks).toHaveLength(10);
     });
 
+    describe("stuck tasks", () => {
+      async function writeRun(id: string, taskId: string, status: string): Promise<void> {
+        const dir = join(tmpDir, ".hench", "runs");
+        await mkdir(dir, { recursive: true });
+        await writeFile(join(dir, `${id}.json`), JSON.stringify({ id, taskId, status, startedAt: "2026-10-01T00:00:00Z" }));
+      }
+
+      // Equal priorities throughout: only the dependency chain and the stuck set decide the order.
+      const chain = (): Array<Record<string, unknown>> => [
+        task("a-stuck"),
+        task("b-after-stuck", { blockedBy: ["a-stuck"] }),
+        task("c-after-b", { blockedBy: ["b-after-stuck"] }),
+        task("d-free"),
+      ];
+
+      it("omits a stuck task and offers its dependents, as --auto does", async () => {
+        await writeTasks(ctx, chain());
+        await writeRun("2026-10-01-1", "a-stuck", "failed");
+        await writeRun("2026-10-01-2", "a-stuck", "timeout");
+        await writeRun("2026-10-01-3", "a-stuck", "budget_exceeded");
+        const port = await open(ctx);
+        const ids = (await ready(port)).tasks.map((t) => t.id);
+        expect(ids).not.toContain("a-stuck");
+        expect(ids).toContain("b-after-stuck");
+        expect(ids).not.toContain("c-after-b");
+        // Pinned to the selection --auto runs: stuck ids are excluded and count as completed.
+        const items = chain();
+        const stuck = new Set(["a-stuck"]);
+        const expected = findActionableTasks(items as never, new Set([...collectCompletedIds(items as never), ...stuck]), 10, { excludeIds: stuck }).map((e) => e.item.id);
+        expect(ids).toEqual(expected);
+      });
+
+      it("lists the task once failures are below maxFailedAttempts, or a success intervenes", async () => {
+        await writeTasks(ctx, chain());
+        await writeRun("2026-10-01-1", "a-stuck", "failed");
+        await writeRun("2026-10-01-2", "a-stuck", "failed");
+        const port = await open(ctx);
+        expect((await ready(port)).tasks.map((t) => t.id)).toContain("a-stuck");
+        await writeRun("2026-10-01-3", "a-stuck", "completed");
+        await writeRun("2026-10-01-4", "a-stuck", "failed");
+        expect((await ready(port)).tasks.map((t) => t.id)).toContain("a-stuck");
+      });
+
+      it("honours maxFailedAttempts from the hench config", async () => {
+        await writeTasks(ctx, chain());
+        await mkdir(join(tmpDir, ".hench"), { recursive: true });
+        await writeFile(join(tmpDir, ".hench", "config.json"), JSON.stringify({ maxFailedAttempts: 1 }));
+        await writeRun("2026-10-01-1", "a-stuck", "failed");
+        const port = await open(ctx);
+        expect((await ready(port)).tasks.map((t) => t.id)).not.toContain("a-stuck");
+      });
+    });
+
     it("never lists a blocked task or one another worktree holds", async () => {
       git(tmpDir, "init", "--quiet");
       const holder: ChildProcess = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" });

@@ -24,12 +24,14 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { exec, getWorktreeRoot, listWorktrees } from "@n-dx/llm-client";
+import { join } from "node:path";
+import { exec, getWorktreeRoot, listWorktrees, resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { errorResponse, jsonResponse, readBody } from "./response-utils.js";
 import { resolveNdxBin } from "./routes-commands.js";
 import { buildLlmCatalog } from "./routes-llm.js";
-import { collectHeldRuns } from "./routes-hench.js";
+import { collectHeldRuns, loadHenchConfig } from "./routes-hench.js";
+import { loadStuckTaskIds, maxFailedAttemptsOf } from "./stuck-tasks.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
 import { loadPRDSync } from "./prd-io.js";
 import {
@@ -288,12 +290,18 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
   const foreign = await openClaimsStore(ctx.projectDir).claimedElsewhere(holder.worktreeRoot);
   const liveTaskIds = new Set((await collectHeldRuns(ctx)).map((run) => run.taskId));
   const completedIds = collectCompletedIds(doc.items);
+  // `--auto` skips stuck tasks and counts them done for their dependents; so does this list.
+  const stuckIds = await loadStuckTaskIds(
+    join(resolveLayout(ctx.projectDir).henchDir, "runs"),
+    maxFailedAttemptsOf(loadHenchConfig(ctx.projectDir)),
+  );
+  for (const id of stuckIds) completedIds.add(id);
 
   // The order `ndx work --auto` picks in, in one selection pass. Asking for the
   // next task once per row rebuilt the comparator each time and froze the
   // request thread for seconds. Tasks another worktree holds are excluded.
   const picked = findActionableTasks(doc.items, completedIds, limit, {
-    excludeIds: new Set(foreign.keys()),
+    excludeIds: new Set([...foreign.keys(), ...stuckIds]),
   });
   const tasks: ReadyTask[] = picked.map(({ item, parents }) => {
     const liveRun = liveTaskIds.has(item.id);
