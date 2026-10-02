@@ -13,7 +13,7 @@ tags:
 source: "ndx-adversarial-review"
 acceptanceCriteria:
   - "With an unreadable PRD, `ndx work --task=x --resolve .` prints JSON with a prd-unreadable refusal and exits 0; a test covers a corrupt tree file."
-description: "Verdict: should-fix.\n\nScenario: a corrupt .rex/prd.json or an unparseable tree file makes run-resolve.ts:185-186/207 throw: exit 1, `Error: [NDX_CLI_GENERIC] Expected ',' or '}'…`, no JSON (confirmed). The prep route then answers 502 with a parse error instead of a refusal the modal can show. Fix (recommended): catch load failures and return task: null with a `prd-unreadable` refusal carrying the message, exiting 0."
-lastModified: "2026-10-02T07:47:44.498Z"
+description: "Verdict: should-fix.\n\nScenario: a corrupt .rex/prd.json or an unparseable tree file makes run-resolve.ts:185-186/207 throw: exit 1, `Error: [NDX_CLI_GENERIC] Expected ',' or '}'…`, no JSON (confirmed). The prep route then answers 502 with a parse error instead of a refusal the modal can show. Fix (recommended): catch load failures and return task: null with a `prd-unreadable` refusal carrying the message, exiting 0.\n\n## Checks before committing (operator note)\n\nhench's test gate runs `npm run test` at the project root, which includes ROOT policy tests (tests/e2e/*, tests/integration/*) that no package suite runs: gateway export caps (architecture-policy), gateway contract lists (cross-package-contracts), the wall-clock assertion inventory, domain isolation and boundary checks. If you add a gateway export, a clock-bound test or a cross-package import, update those. Before committing run, from the project root: `npx vitest run tests/e2e tests/integration`, plus `npx vitest run` and `npx tsc --noEmit` from each package you touched. `pnpm` is not permitted in this sandbox. Add a patch changeset (scoped name) for each package you change."
+lastModified: "2026-10-02T08:29:51.862Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
