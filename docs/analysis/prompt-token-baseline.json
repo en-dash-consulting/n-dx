@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 22450,
-    "uniqueTokens": 13947,
+    "perCallTokens": 22499,
+    "uniqueTokens": 13996,
     "skills": 13,
     "skillTokens": 17511
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4230,
-      "uniqueTokens": 4230
+      "perCallTokens": 4279,
+      "uniqueTokens": 4279
     },
     "core": {
       "surfaces": 1,
@@ -787,11 +787,11 @@
       "builder": "buildOrientationSystemPrompt",
       "purpose": "System prompt for the one-off repository orientation pass.",
       "inline": false,
-      "literals": 9,
+      "literals": 10,
       "constants": {},
-      "ownTokens": 114,
-      "fixedChars": 454,
-      "fixedTokens": 114
+      "ownTokens": 147,
+      "fixedChars": 586,
+      "fixedTokens": 147
     },
     {
       "pkg": "hench",
@@ -801,9 +801,9 @@
       "inline": false,
       "literals": 36,
       "constants": {},
-      "ownTokens": 375,
-      "fixedChars": 1497,
-      "fixedTokens": 375
+      "ownTokens": 391,
+      "fixedChars": 1563,
+      "fixedTokens": 391
     },
     {
       "pkg": "hench",
@@ -987,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "4fde0dc8de343045",
-  "recordedAt": "2026-10-01T23:31:30.303Z",
-  "commit": "4842a262875c",
+  "contentHash": "ab386a6559cd89a5",
+  "recordedAt": "2026-10-02T03:20:14.037Z",
+  "commit": "358c54c8a662",
   "dirty": false
 }

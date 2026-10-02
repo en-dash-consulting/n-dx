@@ -41,7 +41,8 @@ export type SpawnReason =
   | "retry"
   | "plan-respawn"
   | "fork-fallback"
-  | "background-resume";
+  | "background-resume"
+  | "read-only-retry";
 
 export interface SpawnLedger {
   /** Total spawns made for this task. */
@@ -61,6 +62,7 @@ export function createSpawnLedger(limit = DEFAULT_MAX_SPAWNS_PER_TASK): SpawnLed
       "plan-respawn": 0,
       "fork-fallback": 0,
       "background-resume": 0,
+      "read-only-retry": 0,
     },
     limit: limit > 0 ? limit : DEFAULT_MAX_SPAWNS_PER_TASK,
   };

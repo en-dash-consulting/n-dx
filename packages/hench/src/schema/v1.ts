@@ -1406,6 +1406,15 @@ export interface RunRecord {
    */
   backgroundResume?: { tool: string; detail: string };
   /**
+   * Set when an attempt that forked the warm orientation parent ended with no
+   * changes and no file-edit tool calls, and the run re-spawned the task once
+   * cold (spawn reason `read-only-retry`). `reason` is what was reported for
+   * the refused attempt. Distinguishes this from a fork fallback (the fork
+   * itself failed) and from an ordinary retry. See
+   * `agent/lifecycle/read-only-refusal.ts`. v1 additive field.
+   */
+  readOnlyRefusal?: { reason: string };
+  /**
    * How many times the in-memory conversation window was condensed during
    * the run (tool-output digests and LLM summarization passes both count).
    * Set by the local (LM Studio) tool loop; absent for vendors that manage
