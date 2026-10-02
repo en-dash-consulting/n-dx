@@ -290,7 +290,8 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
       liveRun,
     });
   }
-  jsonResponse(res, 200, { tasks, limit });
+  // `dir` is what execute passes `ndx work`, so a copied command matches the run.
+  jsonResponse(res, 200, { tasks, limit, dir: ctx.projectDir });
   return true;
 }
 

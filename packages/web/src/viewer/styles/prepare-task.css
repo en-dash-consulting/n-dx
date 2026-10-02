@@ -191,6 +191,31 @@
 .prep-btn-primary { border-color: var(--accent); background: var(--accent); color: var(--bg); }
 .prep-btn-primary:hover:not(:disabled) { background: var(--accent-dim); }
 
+/* ── Ready to run (Work page) ── */
+.ready-to-run { margin-bottom: var(--space-5); }
+.ready-title-head { font-size: var(--font-lg); margin: 0 0 var(--space-2); }
+.ready-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.ready-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); }
+.ready-row + .ready-row { border-top: 1px solid var(--border); }
+.ready-main { flex: 1; min-width: 0; }
+.ready-title { all: unset; cursor: pointer; font-weight: 600; color: var(--text); }
+.ready-title:hover, .ready-title:focus-visible { text-decoration: underline; }
+.ready-meta { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--text-muted); font-size: var(--font-sm); }
+.ready-resume { color: var(--accent); }
+.ready-empty { color: var(--text-muted); margin: 0; }
+.ready-split { position: relative; display: flex; }
+.ready-primary { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ready-caret { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left-color: var(--bg); }
+.ready-menu {
+  position: absolute; right: 0; top: 100%; z-index: 10; min-width: 12rem;
+  display: flex; flex-direction: column; margin-top: var(--space-1);
+  border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg);
+}
+.ready-menu button { all: unset; cursor: pointer; padding: var(--space-2) var(--space-3); }
+.ready-menu button:hover, .ready-menu button:focus-visible { background: var(--bg-hover); }
+.ready-toast { margin-top: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.ready-toast-error { border-color: var(--danger, currentColor); }
+
 @media (max-width: 600px) {
   .prep-field { grid-template-columns: minmax(0, 1fr); }
   .prep-field-meta { grid-column: 1; }

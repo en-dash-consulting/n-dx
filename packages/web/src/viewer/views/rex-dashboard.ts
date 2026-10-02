@@ -12,7 +12,7 @@ import type { ViewId, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/index.js";
 import { RexTaskLink } from "../components/index.js";
 import { StartTaskButton } from "../components/index.js";
-import { SmartAddInput, ExecutionPanel, ReorganizePanel, RestorePanel } from "../components/prd-tree/index.js";
+import { SmartAddInput, ReorganizePanel, RestorePanel } from "../components/prd-tree/index.js";
 import { HealthGauge } from "../visualization/index.js";
 import { usePolling } from "../hooks/index.js";
 
@@ -513,10 +513,9 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
             : h("div", { class: "rex-dash-empty-hint" }, "No epics defined yet."),
         ),
 
-        // Execution controls
-        epics.length > 0
-          ? h(ExecutionPanel, { onPrdChanged: fetchDashboard })
-          : null,
+        // No Epic-by-Epic panel: it ran `hench run` from the project's own build,
+        // outside the hub queue and the throttle, and Live could not stop it.
+        // Runs start from Ready to run (stage-pages.ts) and the Prepare modal.
       ),
 
       // ── Right sidebar ─────────────────────────────────────────────

@@ -212,7 +212,7 @@ export function admissionLine(admission: PrepResponse["admission"]): { queues: b
 export const CONTEXT_FILE_PLACEHOLDER = "<notes-file>";
 
 /** Quote a word for a POSIX shell only when it needs it (hench's `shellWord`). */
-function shellWord(word: string): string {
+export function shellWord(word: string): string {
   return /^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replace(/'/g, `'\\''`)}'`;
 }
 

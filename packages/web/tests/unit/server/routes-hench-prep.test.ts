@@ -361,7 +361,7 @@ describe("hench prep routes", () => {
       return { id, title: `Task ${id}`, status: "pending", level: "task", priority: "medium", ...extra };
     }
 
-    async function ready(port: number, query = ""): Promise<{ tasks: Array<Record<string, unknown>>; limit: number }> {
+    async function ready(port: number, query = ""): Promise<{ tasks: Array<Record<string, unknown>>; limit: number; dir: string }> {
       const res = await fetch(`http://127.0.0.1:${port}/api/hench/ready${query}`);
       expect(res.status).toBe(200);
       return res.json();
@@ -382,8 +382,9 @@ describe("hench prep routes", () => {
         },
       ]);
       const port = await open(ctx);
-      const { tasks, limit } = await ready(port);
+      const { tasks, limit, dir } = await ready(port);
       expect(limit).toBe(10);
+      expect(dir).toBe(ctx.projectDir);
       expect(tasks.map((t) => t.id)).toEqual(["crit", "high", "low"]);
       expect(tasks[0]).toEqual({
         id: "crit",
