@@ -20,7 +20,7 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 import { TIER_MODELS } from "@n-dx/llm-client";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute, resetHenchRouteStateForTests } from "../../../src/server/routes-hench.js";
-import { RUN_OPTION_SPECS, workCommandArgs } from "../../../src/shared/index.js";
+import { RUN_OPTION_SPECS, checkRunOptions, runOptionArgs, workCommandArgs } from "../../../src/shared/index.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const CLAUDE_MODEL = TIER_MODELS.claude.standard;
@@ -132,6 +132,20 @@ describe("POST /api/hench/execute — run options", () => {
     expect(args.slice(args.indexOf("work"))).toEqual(expected);
   });
 
+  it("serializes every integer option as plain decimal digits", () => {
+    const largest = { maxTurns: 500, tokenBudget: Number.MAX_SAFE_INTEGER };
+    for (const options of [largest, { maxTurns: 1, tokenBudget: 0 }, { tokenBudget: 1e15 }]) {
+      const check = checkRunOptions(options);
+      expect(check.ok).toBe(true);
+      if (!check.ok) continue;
+      const args = runOptionArgs(check.options);
+      expect(args.length).toBe(Object.keys(options).length);
+      for (const arg of args) expect(arg).toMatch(/^--[a-z-]+=\d+$/);
+    }
+    expect(runOptionArgs(largest)).toEqual(["--max-turns=500", `--token-budget=${Number.MAX_SAFE_INTEGER}`]);
+    expect(checkRunOptions({ tokenBudget: 1e21 })).toMatchObject({ ok: false, key: "tokenBudget" });
+  });
+
   it("adds nothing for false booleans or no options", async () => {
     const res = await execute({ taskId: "task-1", options: { review: false, fresh: false } });
     expect(res.status).toBe(202);
@@ -157,6 +171,9 @@ describe("POST /api/hench/execute — run options", () => {
     [{ maxTurns: 501 }, "maxTurns"],
     [{ maxTurns: 2.5 }, "maxTurns"],
     [{ tokenBudget: -1 }, "tokenBudget"],
+    [{ tokenBudget: 1e21 }, "tokenBudget"],
+    [{ tokenBudget: Number.MAX_SAFE_INTEGER + 1 }, "tokenBudget"],
+    [{ tokenBudget: Number.POSITIVE_INFINITY }, "tokenBudget"],
     [{ permissionMode: "plan" }, "permissionMode"],
     [{ provider: "shell" }, "provider"],
     [{ review: "yes" }, "review"],

@@ -50,5 +50,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The context-notes temp file is left behind on spawn failure, write failure and shutdown](./the-context-notes-temp-file-is-left.md) | pending |
 | [The dashboard Self-Heal --auto change has no changeset](./the-dashboard-self-heal-auto-change.md) | pending |
 | [The Live idle card and Workspaces cards never offer Resume for an in-progress task](./the-live-idle-card-and-workspaces.md) | pending |
-| [tokenBudget has no upper bound, so a huge value runs with a budget of 1](./tokenbudget-has-no-upper-bound-so-a.md) | pending |
+| [tokenBudget has no upper bound, so a huge value runs with a budget of 1](./tokenbudget-has-no-upper-bound-so-a.md) | in_progress |
 | [Two near-simultaneous execute requests for the same task both spawn a run](./two-near-simultaneous-execute-requests.md) | completed |

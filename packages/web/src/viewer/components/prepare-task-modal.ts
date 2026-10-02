@@ -409,6 +409,7 @@ function Form(props: FormProps) {
             id: "prep-tokenBudget",
             type: "number",
             min: 0,
+            max: Number.MAX_SAFE_INTEGER,
             value: Number.isNaN(tokenBudget) ? "" : String(tokenBudget),
             onInput: (e: Event) => set("tokenBudget", numberOf((e.target as HTMLInputElement).value)),
           })),

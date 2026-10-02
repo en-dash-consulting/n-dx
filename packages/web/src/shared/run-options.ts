@@ -68,7 +68,7 @@ export const RUN_OPTION_SPECS: readonly RunOptionSpec[] = [
   { key: "reviewModel", flag: "review-model", type: "string", maxBytes: MODEL_ID_MAX_BYTES },
   { key: "skipTestGate", flag: "skip-test-gate", type: "boolean" },
   { key: "maxTurns", flag: "max-turns", type: "integer", min: 1, max: 500 },
-  { key: "tokenBudget", flag: "token-budget", type: "integer", min: 0 },
+  { key: "tokenBudget", flag: "token-budget", type: "integer", min: 0, max: Number.MAX_SAFE_INTEGER },
   { key: "fresh", flag: "fresh", type: "boolean" },
   { key: "allowDirty", flag: "allow-dirty", type: "boolean" },
   { key: "contextNotes", flag: "context-file", type: "string", maxBytes: CONTEXT_NOTES_MAX_BYTES, via: "file" },
@@ -80,6 +80,9 @@ export type RunOptionsCheck =
   | { ok: false; key: string; error: string };
 
 const byteLength = (value: string): number => new TextEncoder().encode(value).length;
+
+/** What an integer flag value must look like once serialized. */
+const PLAIN_DIGITS = /^\d+$/;
 
 /** C0, DEL and C1 control characters. */
 const CONTROL_CHAR = /[\u0000-\u001f\u007f-\u009f]/;
@@ -96,6 +99,9 @@ function checkValue(spec: RunOptionSpec, value: unknown): string | null {
       if (typeof value !== "number" || !Number.isInteger(value)) return "must be an integer";
       if (spec.min !== undefined && value < spec.min) return `must be at least ${spec.min}`;
       if (spec.max !== undefined && value > spec.max) return `must be at most ${spec.max}`;
+      // hench reads the flag with parseInt, which stops at the "e" in "1e+21"
+      // and runs with 1. Only a plain-digit decimal form survives that.
+      if (!PLAIN_DIGITS.test(String(value))) return "must be written as plain decimal digits";
       return null;
     }
     case "string": {
