@@ -17,6 +17,7 @@ import { handleSourcevisionAskRoute } from "./routes-sourcevision-ask.js";
 import { handleIsoMapRoute } from "./routes-iso-map.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
+import { settleContextNotesRemovals, sweepStaleContextNotes } from "./run-options.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, closeWorktreeRunWatchers, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
 import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
@@ -156,6 +157,8 @@ export function registerShutdownHandlers(
       shutdownActiveExecutions(),
       shutdownRexExecution(),
     ]);
+    // Runs that just ended remove their notes file from a `.finally`; wait for it.
+    await settleContextNotesRemovals();
     componentStatus.push({ component: "hench-executions", ok: henchResult.failed === 0 });
     componentStatus.push({
       component: "rex-execution",
@@ -1063,6 +1066,9 @@ export async function startServer(
   const anchorBroadcast = tagBroadcaster(ws.broadcast, workspaceTagOf(ctx));
   const everyWorkspaceBroadcast = tagBroadcaster(ws.broadcast, BROADCAST_ALL_WORKSPACES);
   if (isInScope(scope, "hench")) {
+    sweepStaleContextNotes().catch((err: unknown) => {
+      console.warn(`[hench] stale context-file sweep failed: ${(err as Error).message}`);
+    });
     startHeartbeatMonitor(watcherHandles.henchRunsDir, anchorBroadcast);
     startConcurrencyMonitor(ctx, anchorBroadcast);
     startMemoryMonitor(everyWorkspaceBroadcast, watcherHandles.henchRunsDir);

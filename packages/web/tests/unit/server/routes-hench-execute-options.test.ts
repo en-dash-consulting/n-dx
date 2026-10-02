@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
@@ -20,6 +20,7 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 import { TIER_MODELS } from "@n-dx/llm-client";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute, resetHenchRouteStateForTests } from "../../../src/server/routes-hench.js";
+import { settleContextNotesRemovals } from "../../../src/server/run-options.js";
 import { RUN_OPTION_SPECS, checkRunOptions, runOptionArgs, workCommandArgs } from "../../../src/shared/index.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
@@ -165,6 +166,18 @@ describe("POST /api/hench/execute — run options", () => {
 
     finishRun({ exitCode: 0, stdout: "", stderr: "" });
     await vi.waitFor(() => expect(existsSync(path)).toBe(false));
+  });
+
+  it("removes the contextNotes file when spawn throws", async () => {
+    spawnManagedMock.mockImplementationOnce(() => { throw new Error("spawn EACCES"); });
+    const before = new Set(readdirSync(tmpdir()).filter((n) => n.startsWith("ndx-context-")));
+
+    const res = await execute({ taskId: "task-1", options: { contextNotes: "private" } });
+    expect(res.status).toBe(500);
+
+    await settleContextNotesRemovals();
+    const left = readdirSync(tmpdir()).filter((n) => n.startsWith("ndx-context-") && !before.has(n));
+    expect(left).toEqual([]);
   });
 
   it.each([
