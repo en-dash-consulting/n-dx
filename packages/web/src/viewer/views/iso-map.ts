@@ -47,9 +47,9 @@ import {
 } from "./iso-map-url.js";
 import { appUrl } from "../base-path.js";
 
-type LoadState = "loading" | "ready" | "empty" | "error";
+export type IsoMapLoadState = "loading" | "ready" | "empty" | "error";
 
-interface IsoMapError {
+export interface IsoMapError {
   status: number;
   message: string;
   /** True when switching Source to "scan" is a plausible fix. */
@@ -70,16 +70,25 @@ async function readRouteError(res: Response): Promise<IsoMapError> {
   return { status: res.status, message, suggestScan: res.status === 404 };
 }
 
-export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = {}) {
-  const deployed = isDeployedMode();
-  const cliName = useCliName();
+export interface IsoMapDocument {
+  state: IsoMapLoadState;
+  html: string | null;
+  error: IsoMapError | null;
+  /** The controls that produced the document on screen. */
+  applied: IsoMapControls;
+  generate: (next: IsoMapControls) => Promise<void>;
+}
 
-  // Pending control state (what the form shows) is kept separate from the
-  // applied state (what produced the document on screen) so that editing the
-  // controls never silently invalidates the map the user is looking at.
-  const [controls, setControls] = useState<IsoMapControls>(ISO_MAP_DEFAULTS);
+/**
+ * Fetch the map document for a control state and keep it current.
+ *
+ * Shared by the full Isometric Map view and the Overview's embedded hero, so
+ * both regenerate on the same analysis stamp and handle the empty and error
+ * responses the same way. Does nothing in deployed mode — there is no server.
+ */
+export function useIsoMapDocument(analysisStamp: string, deployed: boolean, embed = false): IsoMapDocument {
   const [applied, setApplied] = useState<IsoMapControls>(ISO_MAP_DEFAULTS);
-  const [state, setState] = useState<LoadState>("loading");
+  const [state, setState] = useState<IsoMapLoadState>("loading");
   const [html, setHtml] = useState<string | null>(null);
   const [error, setError] = useState<IsoMapError | null>(null);
 
@@ -94,7 +103,7 @@ export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = 
     setState("loading");
     setError(null);
     try {
-      const res = await fetch(buildIsoMapUrl(next));
+      const res = await fetch(buildIsoMapUrl(next, { embed }));
       if (!res.ok) {
         const routeError = await readRouteError(res);
         if (!mountedRef.current || seq !== requestSeqRef.current) return;
@@ -133,7 +142,7 @@ export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = 
       });
       setState("error");
     }
-  }, []);
+  }, [embed]);
 
   // Render the default map on first paint so the view is never an empty shell.
   useEffect(() => {
@@ -151,6 +160,55 @@ export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = 
     lastStampRef.current = analysisStamp;
     void generate(appliedRef.current);
   }, [analysisStamp, deployed, generate]);
+
+  return { state, html, error, applied, generate };
+}
+
+/** The dashboard's resolved theme — `data-theme` on <html>, set by theme-toggle. */
+function dashboardTheme(): "light" | "dark" | null {
+  const t = document.documentElement.getAttribute("data-theme");
+  return t === "light" || t === "dark" ? t : null;
+}
+
+/**
+ * Keep an embedded map in step with the dashboard: its colour scheme follows
+ * the theme toggle (not just the OS), and plain-wheel zoom is on only when the
+ * host says so — off in the page, where the wheel must scroll the page.
+ *
+ * The frame is sandboxed to an opaque origin, so postMessage with "*" is the
+ * only channel; the message carries no data the map could not already see.
+ */
+export function useIsoFrameSync(frameRef: { current: HTMLIFrameElement | null }, wheelZoom: boolean, html: string | null): void {
+  const send = useCallback(() => {
+    frameRef.current?.contentWindow?.postMessage({ type: "ndx-iso", wheelZoom, theme: dashboardTheme() }, "*");
+  }, [frameRef, wheelZoom]);
+
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    send();
+    frame.addEventListener("load", send);
+    return () => frame.removeEventListener("load", send);
+  }, [send, html]);
+
+  useEffect(() => {
+    const observer = new MutationObserver(send);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
+  }, [send]);
+}
+
+export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = {}) {
+  const deployed = isDeployedMode();
+  const cliName = useCliName();
+
+  // Pending control state (what the form shows) is kept separate from the
+  // applied state (what produced the document on screen) so that editing the
+  // controls never silently invalidates the map the user is looking at.
+  const [controls, setControls] = useState<IsoMapControls>(ISO_MAP_DEFAULTS);
+  const { state, html, error, applied, generate } = useIsoMapDocument(analysisStamp, deployed, true);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  useIsoFrameSync(frameRef, false, html);
 
   const appliedUrl = buildIsoMapUrl(applied);
 
@@ -195,7 +253,7 @@ export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = 
     header,
     h("p", { class: "section-sub" },
       "A 3D isometric view of this codebase's zones and the imports between them. ",
-      "Drag to pan, scroll to zoom, click a zone to inspect it.",
+      "Drag to pan, Ctrl/⌘ + scroll or pinch to zoom, click a zone to inspect it.",
     ),
 
     // ── Generation controls ───────────────────────────────────────────
@@ -312,6 +370,7 @@ export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = 
       state === "ready" && html !== null
         ? h(Fragment, null,
             h("iframe", {
+              ref: frameRef,
               class: "iso-map-frame",
               title: "Isometric architecture map",
               srcdoc: html,
@@ -322,6 +381,162 @@ export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = 
               + `externals ${applied.includeExternals ? "on" : "off"}`,
             ),
           )
+        : null,
+    ),
+  );
+}
+
+// ── Embedded hero ──────────────────────────────────────────────
+
+export interface IsoMapHeroProps {
+  analysisStamp?: string;
+  /** Opens the full Isometric Map view, where source and node count are set. */
+  onOpenOptions?: () => void;
+  /** Short facts shown beside the title — "43 zones", "2,239 files". */
+  facts?: readonly string[];
+}
+
+/**
+ * The map as the Overview's lead: default controls, no form, and an Expand
+ * button that takes it full screen. Expand uses the Fullscreen API, so Esc
+ * leaves it even while focus is inside the iframe; where the API is missing
+ * the hero falls back to a fixed overlay with its own Close button.
+ *
+ * The frame holds the map's embedded document, which never scrolls and leaves
+ * a plain wheel to the page — so scrolling past the map scrolls the page.
+ * Zoom is Ctrl/⌘ + scroll or pinch in place, and the plain wheel while
+ * expanded, where there is no page to scroll.
+ *
+ * Renders nothing in deployed mode — the Overview has plenty to show without
+ * a card explaining why the map is absent.
+ */
+export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [] }: IsoMapHeroProps) {
+  const deployed = isDeployedMode();
+  const cliName = useCliName();
+  const { state, html, error, applied, generate } = useIsoMapDocument(analysisStamp, deployed, true);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  // True when `expanded` is the CSS overlay rather than real full screen.
+  const [overlay, setOverlay] = useState(false);
+  useIsoFrameSync(frameRef, expanded, html);
+
+  useEffect(() => {
+    const sync = () => {
+      if (!overlay) setExpanded(document.fullscreenElement === rootRef.current && rootRef.current !== null);
+    };
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, [overlay]);
+
+  useEffect(() => {
+    if (!overlay) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setOverlay(false); setExpanded(false); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [overlay]);
+
+  const toggleExpanded = useCallback(() => {
+    const el = rootRef.current;
+    if (expanded) {
+      if (overlay) { setOverlay(false); setExpanded(false); }
+      else void document.exitFullscreen?.();
+      return;
+    }
+    if (el?.requestFullscreen) {
+      el.requestFullscreen().catch(() => { setOverlay(true); setExpanded(true); });
+    } else {
+      setOverlay(true);
+      setExpanded(true);
+    }
+  }, [expanded, overlay]);
+
+  if (deployed) return null;
+
+  // New tab and download get the standalone page, not the embedded document.
+  const standaloneUrl = buildIsoMapUrl(applied);
+
+  return h("section", {
+    ref: rootRef,
+    class: `iso-hero${expanded ? " iso-hero--expanded" : ""}${overlay ? " iso-hero--overlay" : ""}`,
+    role: overlay ? "dialog" : undefined,
+    "aria-label": "Codebase map",
+  },
+    h("header", { class: "iso-hero-bar" },
+      h("div", { class: "iso-hero-heading" },
+        h("span", { class: "iso-hero-mark", "aria-hidden": "true" }, "◆"),
+        h("h3", { class: "iso-hero-title" }, "Codebase map"),
+        facts.length > 0
+          ? h("ul", { class: "iso-hero-facts", "aria-label": "Map summary" },
+              facts.map((f) => h("li", { key: f }, f)),
+            )
+          : null,
+      ),
+      h("div", { class: "iso-hero-actions" },
+        h("span", { class: "iso-hero-hint" },
+          "Click a block for details · double-click to open it · ",
+          expanded ? "scroll to zoom" : "Ctrl/⌘ + scroll to zoom",
+        ),
+        state === "ready"
+          ? h("button", {
+              type: "button",
+              class: "iso-hero-btn",
+              onClick: () => void generate(applied),
+              title: "Rebuild the map from the current analysis",
+            }, h("span", { "aria-hidden": "true" }, "↻"), "Rebuild")
+          : null,
+        onOpenOptions && !expanded
+          ? h("button", {
+              type: "button",
+              class: "iso-hero-btn",
+              onClick: onOpenOptions,
+              title: "Change the source, node count and external packages",
+            }, "Options")
+          : null,
+        h("a", {
+          class: "iso-hero-btn",
+          href: appUrl(standaloneUrl),
+          target: "_blank",
+          rel: "noopener noreferrer",
+          title: "Open the map on its own in a new tab",
+        }, "New tab", h("span", { "aria-hidden": "true" }, "↗")),
+        h("button", {
+          type: "button",
+          class: "iso-hero-btn iso-hero-btn--primary",
+          onClick: toggleExpanded,
+          "aria-pressed": String(expanded),
+          title: expanded ? "Leave full screen (Esc)" : "Show the map full screen",
+        }, h("span", { "aria-hidden": "true" }, expanded ? "✕" : "⛶"), expanded ? "Close" : "Expand"),
+      ),
+    ),
+    h("div", { class: "iso-hero-stage" },
+      state === "loading"
+        ? h("div", { class: "iso-hero-placeholder", role: "status", "aria-live": "polite" },
+            h("div", { class: "cmd-spinner", "aria-hidden": "true" }),
+            h("span", null, "Building the map…"),
+          )
+        : null,
+      (state === "error" || state === "empty") && error
+        ? h("div", { class: "iso-hero-placeholder iso-hero-placeholder--msg", role: state === "empty" ? "status" : "alert" },
+            h("strong", null, state === "empty" ? "Nothing to map yet" : "Could not build the map"),
+            h("span", null, error.message),
+            error.suggestScan
+              ? h("span", { class: "cmd-panel-hint" },
+                  "Run ", h("code", null, `${cliName} analyze .`), " or re-analyze above.",
+                )
+              : null,
+          )
+        : null,
+      state === "ready" && html !== null
+        ? h("iframe", {
+            ref: frameRef,
+            class: "iso-hero-frame",
+            title: "Isometric architecture map",
+            srcdoc: html,
+            sandbox: "allow-scripts",
+          })
         : null,
     ),
   );
