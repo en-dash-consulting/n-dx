@@ -670,13 +670,13 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
   run.lastActivityAt = new Date().toISOString();
   await saveRun(opts.henchDir, run);
 
-  // Capture system memory at run start
+  // Capture system memory at run start (-1 records an unknown reading)
   const monitor = new SystemMemoryMonitor();
   let memoryCtx: MemoryContext;
   try {
     const snap = await monitor.snapshot();
     memoryCtx = {
-      systemAvailableAtStartBytes: snap.availableBytes,
+      systemAvailableAtStartBytes: snap.availableBytes ?? -1,
       systemTotalBytes: snap.totalBytes,
     };
   } catch {
@@ -3136,7 +3136,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     try {
       const monitor = new SystemMemoryMonitor();
       const snap = await monitor.snapshot();
-      systemAvailableAtEndBytes = snap.availableBytes;
+      systemAvailableAtEndBytes = snap.availableBytes ?? -1;
     } catch {
       // Best-effort — leave as -1
     }

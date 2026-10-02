@@ -627,6 +627,41 @@ describe("shared lifecycle", () => {
     });
   });
 
+  describe("memoryStats on an unknown reading", () => {
+    it("records -1 for system available bytes at start and end", async () => {
+      const { initRunRecord, finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");
+      const { SystemMemoryMonitor } = await import("../../../src/process/memory-monitor.js");
+      const spy = vi.spyOn(SystemMemoryMonitor.prototype, "snapshot").mockResolvedValue({
+        platform: "darwin",
+        totalBytes: 16 * 1024 ** 3,
+        freeBytes: 115 * 1024 ** 2,
+        availableBytes: null,
+        usagePercent: null,
+        totalMB: 16 * 1024,
+        freeMB: 115,
+        availableMB: null,
+        timestamp: new Date().toISOString(),
+      });
+      try {
+        const { run, memoryCtx } = await initRunRecord({
+          taskId: "task-1",
+          taskTitle: "Test task",
+          model: "claude-sonnet-4-6",
+          henchDir,
+        });
+        expect(memoryCtx.systemAvailableAtStartBytes).toBe(-1);
+
+        await finalizeRun({ run, henchDir, projectDir, memoryCtx });
+
+        expect(run.memoryStats!.systemAvailableAtStartBytes).toBe(-1);
+        expect(run.memoryStats!.systemAvailableAtEndBytes).toBe(-1);
+        expect(run.memoryStats!.systemTotalBytes).toBe(16 * 1024 ** 3);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
   describe("RunDiagnostics schema backward compatibility", () => {
     it("validates records without new runtime identity fields", async () => {
       const { RunRecordSchema } = await import("../../../src/schema/validate.js");

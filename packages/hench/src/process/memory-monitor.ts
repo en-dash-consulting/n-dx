@@ -1,25 +1,28 @@
 /**
  * Cross-platform system memory monitoring for pre-spawn checks.
  *
- * Provides real-time memory usage detection across macOS, Linux, and Windows
- * by using platform-specific APIs when available and falling back to
- * `os.freemem()`/`os.totalmem()` as a baseline.
+ * Reads available memory through the shared llm-client reading
+ * (`readAvailableMemory()`), the one the dashboard and hub admission also use,
+ * so hench never disagrees with them about how much memory is left.
  *
  * Key differences from {@link MemoryThrottle}:
  * - **MemoryThrottle** is the entry-gate decision engine (delay/reject at run start)
- * - **SystemMemoryMonitor** provides accurate cross-platform memory readings
- *   and a lightweight pre-spawn check for the tool dispatch path
+ * - **SystemMemoryMonitor** is the lightweight pre-spawn check for the tool
+ *   dispatch path
  *
  * Integration points:
- * - Implements `SystemMemoryReader` for use as a `MemoryThrottle` backend
  * - Standalone `checkBeforeSpawn()` for per-tool-call memory gating
- * - `snapshot()` for API/dashboard exposure
+ * - `snapshot()` for API/dashboard exposure and run memory stats
  *
- * Platform behavior:
- * - **Linux**: reads `/proc/meminfo` for `MemAvailable` (accounts for
- *   page cache and reclaimable slab memory the kernel can reclaim)
- * - **macOS**: uses `os.freemem()` (Darwin's `vm_stat` free pages)
- * - **Windows**: uses `os.freemem()` (Win32 `GlobalMemoryStatusEx`)
+ * Platform behavior (decided in llm-client `system-memory.ts`):
+ * - **Linux**: `os.freemem()`, which is `MemAvailable` (libuv ≥ 1.45)
+ * - **macOS**: free + inactive + speculative + purgeable pages from `vm_stat`,
+ *   cached for 5 s so tool calls do not each spawn `vm_stat`. When it cannot be
+ *   read the reading is unknown — never `os.freemem()`, which counts only
+ *   Darwin's free pages (115 MB on a healthy 16 GB Mac).
+ * - **Windows**: `os.freemem()` (Win32 `GlobalMemoryStatusEx`)
+ *
+ * An unknown reading (`availableBytes: null`) never blocks a spawn.
  *
  * ## Windows uses os.freemem() BY DECISION, not for want of a better reader
  *
@@ -54,19 +57,15 @@
  * spawns a process would add a child process per tool call to buy a correction of
  * under a tenth of a percentage point. `wmic` is also deprecated and absent from
  * newer Windows images. If a future machine class does show a decision-moving gap,
- * the `MemoryMonitorOverrides` seam is where a cached reader would go — but bring
- * the measurement first.
+ * the shared reader in llm-client's `system-memory.ts` (which already caches the
+ * darwin reading) is where it would go — but bring the measurement first.
  *
  * @module hench/process/memory-monitor
  */
 
-import { freemem, totalmem, platform } from "node:os";
-import { readFile } from "node:fs/promises";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import type { SystemMemoryReader } from "./memory-throttle.js";
-
-const execFileAsync = promisify(execFile);
+import { freemem, platform } from "node:os";
+import { createAvailableMemoryReader, readAvailableMemory } from "../prd/llm-gateway.js";
+import type { AvailableMemoryReading } from "../prd/llm-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -111,19 +110,19 @@ export interface SystemMemorySnapshot {
   /** Free memory in bytes (OS-reported, does not account for cache). */
   freeBytes: number;
   /**
-   * Available memory in bytes.
-   * On Linux, this is `MemAvailable` from `/proc/meminfo` (accounts for
-   * buffers/cache). On other platforms, falls back to `freeBytes`.
+   * Available memory in bytes, from the shared reading: `MemAvailable` on
+   * Linux, reclaimable pages from `vm_stat` on macOS, `os.freemem()` on
+   * Windows. `null` when the reading is unknown.
    */
-  availableBytes: number;
-  /** Memory usage as a percentage (0–100), based on available memory. */
-  usagePercent: number;
+  availableBytes: number | null;
+  /** Memory usage as a percentage (0–100), based on available memory. `null` when unknown. */
+  usagePercent: number | null;
   /** Total memory in MB. */
   totalMB: number;
   /** Free memory in MB. */
   freeMB: number;
-  /** Available memory in MB. */
-  availableMB: number;
+  /** Available memory in MB. `null` when unknown. */
+  availableMB: number | null;
   /** ISO timestamp of this snapshot. */
   timestamp: string;
 }
@@ -134,94 +133,16 @@ export interface SystemMemorySnapshot {
 export interface SpawnMemoryCheck {
   /** Whether spawning is allowed. */
   allowed: boolean;
-  /** Current memory usage percentage. */
-  usagePercent: number;
+  /** Current memory usage percentage. `null` when the reading is unknown. */
+  usagePercent: number | null;
   /** Configured spawn threshold. */
   spawnThreshold: number;
-  /** Available memory in MB. */
-  availableMB: number;
+  /** Available memory in MB. `null` when the reading is unknown. */
+  availableMB: number | null;
   /** Total memory in MB. */
   totalMB: number;
   /** Human-readable reason when blocked. Undefined when allowed. */
   reason?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Platform-specific memory readers
-// ---------------------------------------------------------------------------
-
-/**
- * Parse Linux `/proc/meminfo` for `MemAvailable`.
- *
- * `MemAvailable` is more accurate than `MemFree` because it accounts for
- * page cache and reclaimable slab memory that the kernel can reclaim
- * under memory pressure. Available since Linux 3.14 (2014).
- *
- * @returns Available memory in bytes, or `undefined` if not readable.
- */
-async function readLinuxAvailableMemory(): Promise<number | undefined> {
-  try {
-    const content = await readFile("/proc/meminfo", "utf-8");
-    const match = content.match(/^MemAvailable:\s+(\d+)\s+kB$/m);
-    if (match) {
-      return parseInt(match[1]!, 10) * 1024; // kB → bytes
-    }
-  } catch {
-    // /proc/meminfo not available — fall back to os.freemem()
-  }
-  return undefined;
-}
-
-/**
- * Parse macOS `vm_stat` output to compute available memory.
- *
- * macOS `os.freemem()` only reports "Free" pages, ignoring Inactive,
- * Speculative, and Purgeable pages that are immediately reclaimable. This
- * causes the system to dramatically underreport available memory — a Mac
- * with 32 GB RAM may report only 500 MB "free" while 10+ GB of
- * reclaimable pages sit idle.
- *
- * Available = (Free + Inactive + Speculative + Purgeable) * pageSize
- *
- * - **Free**: completely unused pages
- * - **Inactive**: pages not recently referenced, immediately reclaimable
- * - **Speculative**: pre-fetched file data the kernel read ahead,
- *   immediately reclaimable
- * - **Purgeable**: volatile caches the kernel can discard instantly
- *
- * @returns Available memory in bytes, or `undefined` if vm_stat fails.
- */
-async function readDarwinAvailableMemory(): Promise<number | undefined> {
-  try {
-    const { stdout } = await execFileAsync("vm_stat", [], { timeout: 5000 });
-
-    // vm_stat reports page size on the first line:
-    //   "Mach Virtual Memory Statistics: (page size of 16384 bytes)"
-    const pageSizeMatch = stdout.match(/page size of (\d+) bytes/);
-    const pageSize = pageSizeMatch ? parseInt(pageSizeMatch[1]!, 10) : 16384;
-
-    // Parse page counts from lines like:
-    //   "Pages free:         12345."
-    //   "Pages inactive:     67890."
-    //   "Pages speculative:  22222."
-    //   "Pages purgeable:    11111."
-    const parse = (label: string): number => {
-      const re = new RegExp(`^${label}:\\s+(\\d+)`, "m");
-      const m = stdout.match(re);
-      return m ? parseInt(m[1]!, 10) : 0;
-    };
-
-    const free = parse("Pages free");
-    const inactive = parse("Pages inactive");
-    const speculative = parse("Pages speculative");
-    const purgeable = parse("Pages purgeable");
-
-    const availableBytes = (free + inactive + speculative + purgeable) * pageSize;
-    return availableBytes > 0 ? availableBytes : undefined;
-  } catch {
-    // vm_stat not available or timed out — fall back to os.freemem()
-  }
-  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +151,11 @@ async function readDarwinAvailableMemory(): Promise<number | undefined> {
 
 /**
  * Optional overrides for deterministic testing.
- * When provided, these replace the real OS and filesystem calls.
+ *
+ * `readAvailable` replaces the shared reading outright. Without it, overriding
+ * `platform`, `freemem` or `totalmem` builds a private shared-module reader over
+ * those values (so the platform decision still lives in llm-client); with no
+ * overrides at all the process-wide cached reading is used.
  */
 export interface MemoryMonitorOverrides {
   /** Override detected platform. */
@@ -239,10 +164,21 @@ export interface MemoryMonitorOverrides {
   freemem?: () => number;
   /** Override `os.totalmem()`. */
   totalmem?: () => number;
-  /** Override Linux `/proc/meminfo` reader. */
-  readLinuxAvailable?: () => Promise<number | undefined>;
-  /** Override macOS `vm_stat` reader. */
-  readDarwinAvailable?: () => Promise<number | undefined>;
+  /** Override the available-memory reading. */
+  readAvailable?: () => Promise<AvailableMemoryReading>;
+}
+
+function resolveReader(overrides: MemoryMonitorOverrides | undefined): () => Promise<AvailableMemoryReading> {
+  if (overrides?.readAvailable) return overrides.readAvailable;
+  if (overrides?.platform === undefined && overrides?.freemem === undefined && overrides?.totalmem === undefined) {
+    return readAvailableMemory;
+  }
+  const reader = createAvailableMemoryReader({
+    ...(overrides.platform !== undefined && { platform: overrides.platform }),
+    ...(overrides.freemem !== undefined && { freemem: overrides.freemem }),
+    ...(overrides.totalmem !== undefined && { totalmem: overrides.totalmem }),
+  });
+  return () => reader.read();
 }
 
 // ---------------------------------------------------------------------------
@@ -252,12 +188,10 @@ export interface MemoryMonitorOverrides {
 /**
  * Cross-platform system memory monitor.
  *
- * Provides accurate memory readings and a pre-spawn check that can be
- * called before every child process creation in the tool dispatch path.
- *
- * Implements {@link SystemMemoryReader} so it can also serve as the
- * backend for {@link MemoryThrottle}, ensuring consistent memory readings
- * across both the entry-gate check and per-spawn checks.
+ * Provides memory readings and a pre-spawn check that can be called before
+ * every child process creation in the tool dispatch path. Readings come from
+ * the shared llm-client reading, as do {@link MemoryThrottle}'s, so the
+ * entry-gate and per-spawn checks agree.
  *
  * @example
  * ```ts
@@ -271,19 +205,14 @@ export interface MemoryMonitorOverrides {
  *
  * // Full snapshot for dashboard/API
  * const snap = await monitor.snapshot();
- * console.log(`Memory: ${snap.usagePercent}% used`);
- *
- * // As SystemMemoryReader for MemoryThrottle
- * const throttle = new MemoryThrottle(throttleConfig, monitor);
+ * console.log(`Memory: ${snap.usagePercent ?? "unknown"}% used`);
  * ```
  */
-export class SystemMemoryMonitor implements SystemMemoryReader {
+export class SystemMemoryMonitor {
   private readonly _config: MemoryMonitorConfig;
   private readonly _platform: NodeJS.Platform;
   private readonly _freemem: () => number;
-  private readonly _totalmem: () => number;
-  private readonly _readLinuxAvailable: () => Promise<number | undefined>;
-  private readonly _readDarwinAvailable: () => Promise<number | undefined>;
+  private readonly _readAvailable: () => Promise<AvailableMemoryReading>;
 
   constructor(
     config?: Partial<MemoryMonitorConfig>,
@@ -292,9 +221,7 @@ export class SystemMemoryMonitor implements SystemMemoryReader {
     this._config = { ...DEFAULT_MEMORY_MONITOR_CONFIG, ...config };
     this._platform = overrides?.platform ?? platform();
     this._freemem = overrides?.freemem ?? freemem;
-    this._totalmem = overrides?.totalmem ?? totalmem;
-    this._readLinuxAvailable = overrides?.readLinuxAvailable ?? readLinuxAvailableMemory;
-    this._readDarwinAvailable = overrides?.readDarwinAvailable ?? readDarwinAvailableMemory;
+    this._readAvailable = resolveReader(overrides);
 
     // Validate threshold
     if (this._config.spawnThreshold < 0 || this._config.spawnThreshold > 100) {
@@ -313,53 +240,28 @@ export class SystemMemoryMonitor implements SystemMemoryReader {
   }
 
   // -----------------------------------------------------------------------
-  // SystemMemoryReader implementation (for MemoryThrottle compatibility)
-  // -----------------------------------------------------------------------
-
-  /** Free system memory in bytes. Synchronous (uses OS module). */
-  freemem(): number {
-    return this._freemem();
-  }
-
-  /** Total system memory in bytes. */
-  totalmem(): number {
-    return this._totalmem();
-  }
-
-  // -----------------------------------------------------------------------
   // Snapshot
   // -----------------------------------------------------------------------
 
   /**
-   * Take a detailed cross-platform memory snapshot.
+   * Take a detailed cross-platform memory snapshot from the shared reading.
    *
-   * Linux reads `/proc/meminfo` and macOS derives from `vm_stat`, because on those
-   * platforms `os.freemem()` genuinely understates what is reclaimable. Windows
-   * needs neither: `os.freemem()` already reports standby-inclusive availability
-   * there, verified by measurement — see the module docblock before adding a reader.
+   * `availableBytes`, `availableMB` and `usagePercent` are `null` when the
+   * reading is unknown (macOS with `vm_stat` unreadable). `freeBytes` is always
+   * raw `os.freemem()` and is never substituted for an unknown availability.
    */
   async snapshot(): Promise<SystemMemorySnapshot> {
-    const totalBytes = this._totalmem();
+    const reading = await this._readAvailable();
+    const { availableBytes, totalBytes } = reading;
     const freeBytes = this._freemem();
 
-    // Try platform-specific available memory
-    let availableBytes = freeBytes;
-    if (this._platform === "linux") {
-      const linuxAvailable = await this._readLinuxAvailable();
-      if (linuxAvailable !== undefined) {
-        availableBytes = linuxAvailable;
-      }
-    } else if (this._platform === "darwin") {
-      const darwinAvailable = await this._readDarwinAvailable();
-      if (darwinAvailable !== undefined) {
-        availableBytes = darwinAvailable;
-      }
-    }
-
     const toMB = (bytes: number) => Math.round((bytes / 1024 / 1024) * 100) / 100;
-    const usagePercent = totalBytes > 0
-      ? Math.round(((totalBytes - availableBytes) / totalBytes) * 10000) / 100
-      : 0;
+    let usagePercent: number | null = null;
+    if (availableBytes !== null) {
+      usagePercent = totalBytes > 0
+        ? Math.round(((totalBytes - availableBytes) / totalBytes) * 10000) / 100
+        : 0;
+    }
 
     return {
       platform: this._platform,
@@ -369,7 +271,7 @@ export class SystemMemoryMonitor implements SystemMemoryReader {
       usagePercent,
       totalMB: toMB(totalBytes),
       freeMB: toMB(freeBytes),
-      availableMB: toMB(availableBytes),
+      availableMB: availableBytes === null ? null : toMB(availableBytes),
       timestamp: new Date().toISOString(),
     };
   }
@@ -385,31 +287,29 @@ export class SystemMemoryMonitor implements SystemMemoryReader {
    * Called before every process-spawning tool (`run_command`, `git`)
    * to prevent system-wide memory pressure.
    *
-   * When disabled (via config), always returns `{ allowed: true }`.
+   * When disabled (via config), or when the reading is unknown, always returns
+   * `{ allowed: true }` — an unknown reading is no memory signal, not a low one.
    *
    * @returns Structured result with the decision and current memory state.
    */
   async checkBeforeSpawn(): Promise<SpawnMemoryCheck> {
-    if (!this._config.enabled) {
-      const snap = await this.snapshot();
-      return {
-        allowed: true,
-        usagePercent: snap.usagePercent,
-        spawnThreshold: this._config.spawnThreshold,
-        availableMB: snap.availableMB,
-        totalMB: snap.totalMB,
-      };
-    }
-
     const snap = await this.snapshot();
-    const allowed = snap.usagePercent < this._config.spawnThreshold;
-
-    return {
-      allowed,
+    const base = {
       usagePercent: snap.usagePercent,
       spawnThreshold: this._config.spawnThreshold,
       availableMB: snap.availableMB,
       totalMB: snap.totalMB,
+    };
+
+    if (!this._config.enabled || snap.usagePercent === null || snap.availableMB === null) {
+      return { allowed: true, ...base };
+    }
+
+    const allowed = snap.usagePercent < this._config.spawnThreshold;
+
+    return {
+      allowed,
+      ...base,
       reason: allowed
         ? undefined
         : `System memory usage (${snap.usagePercent.toFixed(1)}%) exceeds spawn threshold ` +
