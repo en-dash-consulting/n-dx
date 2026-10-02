@@ -343,11 +343,16 @@ async function handlePreview(req: IncomingMessage, res: ServerResponse, ctx: Ser
   return true;
 }
 
-/** The `limit` query parameter: default {@link READY_DEFAULT_LIMIT}, clamped to 1..{@link READY_MAX_LIMIT}. */
+/**
+ * The `limit` query parameter: default {@link READY_DEFAULT_LIMIT}, clamped to
+ * 1..{@link READY_MAX_LIMIT}. The whole value must be a number and an integer —
+ * `Number()` reads `1e9` as a billion, where `parseInt` read it as 1 and `10abc`
+ * as 10. Blank, partial or fractional values fall back to the default.
+ */
 function readyLimit(url: string): number {
   const raw = new URL(url, "http://localhost").searchParams.get("limit");
-  const n = raw === null ? NaN : Number.parseInt(raw, 10);
-  if (!Number.isFinite(n)) return READY_DEFAULT_LIMIT;
+  const n = raw === null || raw.trim() === "" ? NaN : Number(raw);
+  if (!Number.isInteger(n)) return READY_DEFAULT_LIMIT;
   return Math.min(READY_MAX_LIMIT, Math.max(1, n));
 }
 

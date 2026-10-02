@@ -649,6 +649,19 @@ describe("hench prep routes", () => {
       expect((await ready(port, "?limit=abc")).tasks).toHaveLength(10);
     });
 
+    it("reads the whole limit value: 1e9 is the maximum, partial or fractional values the default, negatives 1", async () => {
+      await writeTasks(ctx, Array.from({ length: 60 }, (_, i) => task(`t${String(i).padStart(2, "0")}`)));
+      const port = await open(ctx);
+      expect((await ready(port, "?limit=1e9")).tasks).toHaveLength(50);
+      expect((await ready(port, "?limit=10abc")).tasks).toHaveLength(10);
+      expect((await ready(port, "?limit=3abc")).tasks).toHaveLength(10);
+      expect((await ready(port, "?limit=2.5")).tasks).toHaveLength(10);
+      expect((await ready(port, "?limit=")).tasks).toHaveLength(10);
+      expect((await ready(port, "?limit=Infinity")).tasks).toHaveLength(10);
+      expect((await ready(port, "?limit=-5")).tasks).toHaveLength(1);
+      expect((await ready(port, "?limit=-1e9")).tasks).toHaveLength(1);
+    });
+
     describe("stuck tasks", () => {
       async function writeRun(id: string, taskId: string, status: string): Promise<void> {
         const dir = join(tmpDir, ".hench", "runs");
