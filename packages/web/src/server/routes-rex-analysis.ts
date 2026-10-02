@@ -19,6 +19,7 @@ import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
 import { startAsyncJob, stopAsyncJob, newAsyncJob } from "./routes-commands.js";
+import type { AsyncJobStatus } from "./routes-commands.js";
 
 import {
   type PRDItem,
@@ -561,6 +562,14 @@ async function handleAnalyze(
     res, analyzeJob, "Analyze", binPath, binArgs, ctx,
     timeoutMs, broadcast, input.accept ? "rex:prd-changed" : undefined,
   );
+}
+
+/**
+ * The Project Scan job's status — one per server process, not per workspace,
+ * so it names no worktree. Read by the Live overview.
+ */
+export function rexAnalyzeJobStatus(): AsyncJobStatus {
+  return { ...analyzeJob.status };
 }
 
 /** Handle GET /api/rex/analyze/status */

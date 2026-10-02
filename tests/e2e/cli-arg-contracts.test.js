@@ -131,6 +131,7 @@ const HENCH_COMMANDS = [
   "show",
   "review",
   "cache",
+  "check-runs",
   "validate-tokens",
 ];
 

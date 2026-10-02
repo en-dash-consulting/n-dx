@@ -28,6 +28,7 @@ import { toolRexAppendLog } from "../../tools/rex.js";
 import {checkTokenBudget, formatBudgetExceeded} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
+import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
 import { isSpinningRun } from "../analysis/spin.js";
 import { createLivelockDetector } from "../analysis/livelock.js";
@@ -43,6 +44,7 @@ import {
   parkDeferredFindings,
   deferredFindings,
   mergeDispositionsIntoRaw,
+  reviewModelSource,
 } from "../analysis/adversarial-review.js";
 import type {
   ReviewPassOutcome,
@@ -662,12 +664,25 @@ export interface SpawnWithAdapterOptions {
    * carries until the process closes (GH #362).
    */
   liveProgress?: LiveSpawnProgress;
+  /**
+   * Receives only the vendor pid, for spawns whose turns and tokens are charged
+   * to the run another way (review, orientation) and so must not feed the
+   * heartbeat's counters. Ignored when {@link liveProgress} is set.
+   */
+  pidHolder?: Pick<LiveSpawnProgress, "vendorPid">;
 }
 
 /** Mid-spawn counters. Mutated in place; read by the heartbeat. */
 export interface LiveSpawnProgress {
   turns: number;
   tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
+  /**
+   * Pid of the vendor CLI while a spawn is live; cleared when it closes. Not
+   * touched by {@link resetLiveSpawnProgress} — that runs between spawns, and
+   * the pid belongs to the process, not to the counters it produced. On Windows
+   * it is the cmd.exe wrapper's pid, not the CLI's own.
+   */
+  vendorPid?: number;
 }
 
 export function createLiveSpawnProgress(): LiveSpawnProgress {
@@ -723,6 +738,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
     useEventPipeline, accumulator, livelock, liveProgress,
   } = opts;
+  const pidHolder = liveProgress ?? opts.pidHolder;
 
   return new Promise((resolve, reject) => {
     const stdinMode = spawnConfig.stdinContent !== null ? "pipe" : "ignore";
@@ -733,6 +749,10 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
       env: cliEnv ?? process.env,
     });
+
+    // proc.pid is undefined when the spawn failed outright (ENOENT); the
+    // `error` handler below clears it either way.
+    if (pidHolder) pidHolder.vendorPid = proc.pid;
 
     // Write stdin content if the adapter requires it (Claude: pipe-based prompt)
     if (spawnConfig.stdinContent !== null && proc.stdin) {
@@ -786,6 +806,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     });
 
     proc.on("error", (err) => {
+      if (pidHolder) pidHolder.vendorPid = undefined;
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         // Keep the vendor-specific prefix (matched by formatCLIError) and
         // append the cross-platform diagnoseCliInvocation detail, which
@@ -809,6 +830,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     });
 
     proc.on("close", (code) => {
+      if (pidHolder) pidHolder.vendorPid = undefined;
       // Flush remaining buffered output
       if (lineBuffer.trim()) {
         processLine(lineBuffer);
@@ -1069,6 +1091,14 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
       // Step 1: Parse the line through the adapter for event classification
       const event = adapter.parseEvent(line, turnCounter.value + 1, {});
 
+      // Narrate file work onto the run's structured event stream. Placed here,
+      // above the pipeline branches, so it happens once for both of them —
+      // and reuses the tool call the adapter has already parsed rather than
+      // adding a second pass over the output.
+      if (event?.type === "tool_use" && event.toolCall) {
+        recordFileWork(event.toolCall.tool, event.toolCall.input, event.turn);
+      }
+
       // Plan-mode intercept: when the agent calls ExitPlanMode, capture the
       // plan text and terminate the spawn so the outer loop can prompt the
       // user (or auto-accept) and re-run with permissionMode "acceptEdits".
@@ -1287,6 +1317,8 @@ export interface ReviewPassContext {
    * servers and must be pinned to the same worktree.
    */
   mcpConfigPath?: string;
+  /** Run's heartbeat-visible pid holder, so the record shows the reviewer's pid. */
+  pidHolder?: Pick<LiveSpawnProgress, "vendorPid">;
 }
 
 /**
@@ -1314,6 +1346,16 @@ export function chargeReviewToRun(
   reviewModel: string,
 ): void {
   run.tokenUsage = addTokenUsage(run.tokenUsage ?? { input: 0, output: 0 }, result.tokenUsage);
+
+  // The review's own share, kept apart for the Live page's Review tab.
+  const spend = run.reviewSpend ?? { turns: 0, input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0 };
+  run.reviewSpend = {
+    turns: spend.turns + result.turnTokenUsage.length,
+    input: spend.input + (result.tokenUsage.input ?? 0),
+    output: spend.output + (result.tokenUsage.output ?? 0),
+    cacheCreationInput: spend.cacheCreationInput + (result.tokenUsage.cacheCreationInput ?? 0),
+    cacheReadInput: spend.cacheReadInput + (result.tokenUsage.cacheReadInput ?? 0),
+  };
 
   if (result.turnTokenUsage.length === 0) return;
 
@@ -1410,6 +1452,12 @@ async function runAdversarialReviewPass(
       `${ctx.reviewModel || "the loaded model"}...`,
   );
 
+  emitRunEvent(
+    "review_started",
+    `Adversarial review started on ${ctx.reviewModel || "the loaded model"}`,
+    { detail: resumeSessionId ? "resuming the work session" : "fresh session" },
+  );
+
   // Bracket the reviewer spawn with working-tree snapshots so its repairs can
   // be identified — and committed — without sweeping pre-existing dirt. A
   // failed snapshot degrades to "repairs unknown", never to a failed review.
@@ -1435,6 +1483,7 @@ async function runAdversarialReviewPass(
           cliEnv: ctx.cliEnv,
           cwd: inv.projectDir,
           tokenMetadata: { vendor: ctx.vendor, model: ctx.reviewModel },
+          pidHolder: ctx.pidHolder,
         }),
       );
     } catch (err) {
@@ -1542,6 +1591,17 @@ async function runAdversarialReviewPass(
     backgroundResumed: backgroundResumed || undefined,
   };
 
+  emitRunEvent("review_report", `Review report written — ${report.findings.length} finding(s)`, {
+    ok: unresolved.unrepairedMustFix.length === 0,
+    detail: reportPath,
+    counts: {
+      findings: report.findings.length,
+      unresolved: unresolved.all.length,
+      unrepairedMustFix: unresolved.unrepairedMustFix.length,
+      deferred: deferred.length,
+    },
+  });
+
   return { ok: true, report };
 }
 
@@ -1614,6 +1674,12 @@ function reportReviewFailure(run: RunRecord, outcome: ReviewPassOutcome & { ok: 
   info(`⚠ Adversarial review did not complete (${outcome.reason}): ${outcome.detail}`);
   info("  The task's own validation still passed — continuing without review findings.");
   run.review = { failed: outcome.reason, detail: outcome.detail };
+  // A review that silently did not happen is indistinguishable on the Work tab
+  // from one that found nothing, so the stream says which.
+  emitRunEvent("review_report", `Adversarial review did not complete (${outcome.reason})`, {
+    ok: false,
+    detail: outcome.detail,
+  });
 }
 
 // ── Successful result processing ──────────────────────────────────────────
@@ -1827,6 +1893,10 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
   if (attempt < retryConfig.maxRetries) {
     const delay = computeDelay(attempt, retryConfig.baseDelayMs, retryConfig.maxDelayMs);
     info(`retry ${attempt + 1}/${retryConfig.maxRetries}: transient error, waiting ${delay}ms`);
+    emitRunEvent("retry", `Retrying after a transient error (${attempt + 1}/${retryConfig.maxRetries})`, {
+      detail: result.error,
+      counts: { attempt: attempt + 1, maxAttempts: retryConfig.maxRetries, delayMs: delay },
+    });
     await sleep(delay);
     return "retry";
   }
@@ -1906,8 +1976,20 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     allowedGitSubcommands: config.guard.allowedGitSubcommands,
   };
 
+  // The review the run is launched with, resolved up front so the record
+  // carries it from its first save (the Live page shows a Review tab from the
+  // start, and says which setting chose the model).
+  const reviewModel = opts.reviewPass ? resolveReviewModel(vendor, llmConfig, opts.reviewModel) : undefined;
+
   // Shared: initialize run record + capture start memory snapshot
   const { run, memoryCtx } = await initRunRecord({
+    reviewPlan: reviewModel === undefined
+      ? undefined
+      : {
+        model: reviewModel,
+        modelSource: reviewModelSource(vendor, llmConfig, opts.reviewModel),
+        optional: opts.reviewOptional === true,
+      },
     taskId,
     taskTitle: brief.task.title,
     model,
@@ -1921,6 +2003,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     // The routed tier for the agent loop — "standard" unless llm.routes
     // reroutes agent.execute — so `ndx usage` can report spend per tier.
     weight: resolveTaskModel("agent.execute", llmConfig, { vendor }).tier,
+    criteriaCount: brief.task.acceptanceCriteria?.length,
+    permissionMode: opts.permissionMode,
   });
 
   // CLI-specific: load config for CLI path and env resolution
@@ -1953,7 +2037,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Assemble the review-pass context once, if `--review` is on. Building it
   // here rather than at the call site keeps the per-attempt success path free
   // of config resolution, and makes "review is off" a single undefined value.
-  const reviewPassContext: ReviewPassContext | undefined = opts.reviewPass
+  const liveProgress = createLiveSpawnProgress();
+  const reviewPassContext: ReviewPassContext | undefined = reviewModel !== undefined
     ? {
         adapter,
         vendor,
@@ -1961,7 +2046,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         cliEnv,
         policy,
         henchDir,
-        reviewModel: resolveReviewModel(vendor, llmConfig, opts.reviewModel),
+        reviewModel,
         // The reviewer has to be able to apply must-fixes and run the
         // project's checks. `plan` would leave it able to do neither, so the
         // review pass always runs with edit permission regardless of the
@@ -1971,6 +2056,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         autonomous: autonomous || opts.yes === true || process.stdin.isTTY !== true,
         taskTitle: brief.task.title,
         mcpConfigPath,
+        pidHolder: liveProgress,
       }
     : undefined;
 
@@ -2000,8 +2086,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // repetition. The detector clears itself whenever the agent writes a file.
   const livelock = createLivelockDetector({ threshold: config.livelockThreshold });
 
-  // Counters for the in-flight spawn, folded onto the record by the heartbeat.
-  const liveProgress = createLiveSpawnProgress();
+  // Counters for the in-flight spawn (`liveProgress`, created above), folded
+  // onto the record by the heartbeat.
 
   // Start heartbeat — writes lastActivityAt to disk periodically so the CLI
   // subprocess doesn't appear stale to the web dashboard during long tool calls,
@@ -2011,6 +2097,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const heartbeat = startHeartbeat(henchDir, run, undefined, () => {
     run.turns = accumulated.turns + liveProgress.turns;
     run.tokenUsage = addTokenUsage(accumulated.tokenUsage, liveProgress.tokenUsage);
+    // Absent between spawns: a stale vendor pid would read as a live child.
+    if (liveProgress.vendorPid !== undefined) run.vendorPid = liveProgress.vendorPid;
+    else delete run.vendorPid;
   });
 
   // Start the commit-message watcher. If the agent writes `.hench-commit-msg.txt`
@@ -2162,6 +2251,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           cliEnv,
           cwd: projectDir,
           tokenMetadata,
+          pidHolder: liveProgress,
         }),
     });
     warmParentId = decision.parentId;

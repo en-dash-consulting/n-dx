@@ -56,6 +56,28 @@ export const VIEW_META = {
     blurb: "The three stages of the loop, side by side, each with its headline numbers.",
   },
 
+  // ── Live ─────────────────────────────────────────────────────
+  // Not a stage, and not any one package's: it watches work from all three,
+  // so `global` — `StageProduct` has no cross-product value to borrow.
+  live: {
+    label: "Live",
+    glyph: "◉",
+    product: "global",
+    blurb: "Everything running now — agent tasks and analyses, across every worktree.",
+  },
+  "live-task": {
+    label: "Live Task",
+    glyph: "▷",
+    product: "global",
+    blurb: "One running agent task, step by step.",
+  },
+  "live-analyze": {
+    label: "Live Analysis",
+    glyph: "◌",
+    product: "global",
+    blurb: "A running SourceVision analysis: phases, passes and spend.",
+  },
+
   // ── Stages ───────────────────────────────────────────────────
   analyze: {
     label: "Analysis",

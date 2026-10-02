@@ -155,9 +155,13 @@ each one explicitly with the `X-Ndx-Workspace` header rather than the `/w/<key>/
 slot — the slot is already spent on whichever workspace the viewer itself is
 mounted under, and the server reads the header ahead of the slot
 (`workspaceFromHeader` in the dispatcher, not the lenient `resolveWorkspace`).
-Three endpoints answer for the whole repository and are fetched plainly
-(`/api/workspaces`, `/api/worktrees`, `/api/hench/memory`); the rest are per
-workspace.
+Four endpoints answer for the whole repository and are fetched plainly
+(`/api/workspaces`, `/api/worktrees`, `/api/hench/memory`, `/api/live`); the
+rest are per workspace. `/api/live` (`routes-live.ts`) is the Live tab's one
+read — every worktree's running runs and jobs, the queue, the machine strip —
+built from the registry's list and the digest cache behind `/api/worktrees`,
+never from `git` per request. Its `live:changed` frame is tagged `"*"`, like
+the memory monitor's.
 
 **A header naming no known worktree is a 404, on reads as much as on writes.**
 Falling back to the anchor would answer under a name the caller did not ask

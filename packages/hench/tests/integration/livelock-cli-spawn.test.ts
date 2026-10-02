@@ -66,6 +66,21 @@ const timer = setInterval(() => {
 process.on("SIGTERM", () => { clearInterval(timer); process.exit(143); });
 `;
 
+/**
+ * POSIX records the child's own pid. On win32 `spawnCli` goes through cmd.exe,
+ * so the recorded pid is the wrapper's: it lives exactly as long as the CLI,
+ * which is all liveness needs, but it differs from the child's self-reported pid.
+ */
+function expectVendorPid(vendorPid: number | undefined, childPid: string): void {
+  if (process.platform !== "win32") {
+    expect(vendorPid).toBe(Number(childPid));
+    return;
+  }
+  expect(Number.isInteger(vendorPid)).toBe(true);
+  expect(vendorPid).toBeGreaterThan(0);
+  expect(() => process.kill(vendorPid as number, 0)).not.toThrow();
+}
+
 describe("livelock intercept in spawnWithAdapter", () => {
   let dir: string;
   let script: string;
@@ -167,5 +182,51 @@ describe("livelock intercept in spawnWithAdapter", () => {
     const result = await spawned;
     expect(result.error).toBeUndefined();
     expect(result.toolCalls.length).toBeGreaterThan(0);
+  }, 20_000);
+
+  it("exposes the child's pid while it runs and clears it once it closes", async () => {
+    // What the heartbeat reads to write `vendorPid` onto the run record.
+    const progress = createLiveSpawnProgress();
+    const spawned = spawn("varied", 0, progress);
+
+    await waitFor(() => progress.turns > 0);
+    expectVendorPid(progress.vendorPid, await readFile(pidFile, "utf-8"));
+
+    await spawned;
+    expect(progress.vendorPid).toBeUndefined();
+  }, 20_000);
+
+  it("records the pid in a pid-only holder without touching run counters (review, orientation)", async () => {
+    // Review and orientation spawns are charged to the run another way, so they
+    // pass a holder that must see the pid but never the turns or tokens.
+    const holder: { vendorPid?: number } = {};
+    const spawned = spawnWithAdapter({
+      adapter: claudeCliAdapter,
+      spawnConfig: {
+        binary: process.execPath,
+        args: [script, "varied"],
+        env: { ...process.env, HENCH_TEST_CHILD_PID: pidFile },
+        stdinContent: null,
+        cwd: dir,
+      },
+      cliBinary: process.execPath,
+      cliEnv: { ...process.env, HENCH_TEST_CHILD_PID: pidFile },
+      cwd: dir,
+      tokenMetadata: { vendor: "claude", model: "sonnet" },
+      pidHolder: holder,
+    });
+
+    await waitFor(() => holder.vendorPid !== undefined);
+    const livePid = holder.vendorPid;
+    // The child writes its own pid on startup; wait for that before comparing.
+    let childPid = "";
+    for (let i = 0; i < 200 && childPid === ""; i++) {
+      childPid = await readFile(pidFile, "utf-8").catch(() => "");
+      if (childPid === "") await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    expectVendorPid(livePid, childPid);
+
+    await spawned;
+    expect(holder.vendorPid).toBeUndefined();
   }, 20_000);
 });
