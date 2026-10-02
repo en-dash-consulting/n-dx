@@ -4,7 +4,6 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
-import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
 import { classifyChangedFiles } from "../../store/file-classifier.js";
 import type { FileCategory } from "../../store/file-classifier.js";
 import { loadConfig } from "../../store/config.js";
@@ -31,7 +30,7 @@ import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
-import { safeParseInt, safeParseNonNegInt } from "./constants.js";
+import { safeParseInt } from "./constants.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
@@ -47,7 +46,16 @@ import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../sto
 import type { LLMVendor } from "../../prd/llm-gateway.js";
 import { LLM_VENDOR, printVendorModelHeader, resolveModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, createSpinner } from "../../prd/llm-gateway.js";
 import { resolveAgentModel } from "./agent-model.js";
-import { isProviderSupported } from "./provider-support.js";
+import {
+  parseBudgetFlags,
+  parsePermissionModeFlag,
+  parseReviewOptions,
+  resolveRunPermissionMode,
+  resolveRunProvider,
+  reviewProviderError,
+  selectCliModelOverride,
+} from "./run-settings.js";
+import type { ReviewOptions } from "./run-settings.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
 import { formatQueueStatus } from "../../queue/format.js";
 import { resolveSchedulingPriority } from "../../queue/priority-scheduler.js";
@@ -76,29 +84,7 @@ export interface AttemptTracker {
   hasReachedMaxAttempts(taskId: string): boolean;
 }
 
-/**
- * The two independent review controls, bundled so the run functions keep a
- * single positional slot for them.
- *
- * They are genuinely independent and may both be on. The adversarial pass runs
- * first, so its must-fix repairs are already in the tree when the diff gate
- * shows a human what they are approving.
- */
-export interface ReviewOptions {
-  /** `--approve-diff` — show the diff and prompt before finalizing. */
-  approveDiff: boolean;
-  /** `--review` — run the adversarial review pass after validation. */
-  reviewPass: boolean;
-  /** `--review-model` — override the model the reviewer runs on. */
-  reviewModel?: string;
-  /**
-   * `--review-optional` — downgrade the missing-review gate to a warning.
-   *
-   * Off by default: `--review` is an opt-in gate, and a gate that silently
-   * no-ops when its reviewer cannot start is worse than no gate at all.
-   */
-  reviewOptional: boolean;
-}
+export type { ReviewOptions } from "./run-settings.js";
 
 const MAX_TASK_ATTEMPTS = 3;
 
@@ -1514,6 +1500,8 @@ export async function cmdRun(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  // `--resolve` never reaches here: the CLI dispatches it to cmdResolve
+  // (run-resolve.ts), which reports this function's decisions without acting.
   const henchDir = resolveHenchPaths(dir).henchDir;
   // An invalid field in hench's config.json must not refuse the whole run —
   // fall back to that field's default and say so, so a bad edit (often made
@@ -1526,22 +1514,11 @@ export async function cmdRun(
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
 
-  // The CLI flag accepts both the vendor-neutral `--model` and the
-  // vendor-specific `--claude-model` / `--codex-model` (the latter pair is
-  // also recognized by `ndx init`; supporting them here means
-  // `ndx work --claude-model=…` works end-to-end).
-  const cliModelOverride =
-    flags.model
-    ?? (llmVendor === LLM_VENDOR.CLAUDE
-      ? flags["claude-model"]
-      : llmVendor === LLM_VENDOR.CODEX
-        ? flags["codex-model"]
-        : flags["google-model"]);
   // Resolution chain and the vendor-compatibility check both live in
   // agent-model.ts: --model > hench.models.<vendor> > llm.* > vendor default.
   const { model: resolvedModel, source: modelSource } = resolveAgentModel({
     vendor: llmVendor,
-    cliModelOverride,
+    cliModelOverride: selectCliModelOverride(flags, llmVendor).value,
     henchModels: config.models,
     llmConfig,
   });
@@ -1560,38 +1537,9 @@ export async function cmdRun(
   // consistent with how --quiet suppresses info() output.
   if (flags.format === "json") setQuiet(true);
 
-  let provider = (flags.provider as "cli" | "api") ?? config.provider;
+  let provider: "cli" | "api" = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
-  // `--review` now selects the adversarial review pass. The interactive
-  // diff-approval gate that used to own this flag moved to `--approve-diff`.
-  const reviewPass = flags.review === "true";
-  const approveDiff = flags["approve-diff"] === "true";
-  const reviewModelFlag = flags["review-model"];
-  if (reviewModelFlag !== undefined && !reviewModelFlag.trim()) {
-    throw new CLIError(
-      "--review-model requires a model id.",
-      "Example: --review-model=claude-opus-5. Omit the flag to use the recommended default for your vendor.",
-    );
-  }
-  if (reviewModelFlag && !reviewPass) {
-    throw new CLIError(
-      "--review-model was passed without --review.",
-      "The review model only applies to the adversarial review pass. Add --review, or drop --review-model.",
-    );
-  }
-  const reviewOptional = flags["review-optional"] === "true";
-  if (reviewOptional && !reviewPass) {
-    throw new CLIError(
-      "--review-optional was passed without --review.",
-      "It only relaxes the gate the review pass installs. Add --review, or drop --review-optional.",
-    );
-  }
-  const reviewOpts: ReviewOptions = {
-    approveDiff,
-    reviewPass,
-    reviewModel: reviewModelFlag?.trim() || undefined,
-    reviewOptional,
-  };
+  const reviewOpts: ReviewOptions = parseReviewOptions(flags);
   // --no-rollback always wins; otherwise read config (defaults to true).
   // Note: the failure rollback is prompt-only — it never runs without an
   // interactive confirmation, so this flag only governs whether that prompt
@@ -1623,13 +1571,7 @@ export async function cmdRun(
   // --permission-mode: validate against the four supported Claude CLI modes.
   // Resolution order (flag > config > runtime default) is computed below
   // after `autonomous` is derived, since the autonomous default depends on it.
-  const permissionModeFlag = flags["permission-mode"];
-  if (permissionModeFlag !== undefined && !isPermissionMode(permissionModeFlag)) {
-    throw new CLIError(
-      `Invalid --permission-mode value "${permissionModeFlag}".`,
-      `Use one of: ${PERMISSION_MODES.join(", ")}.`,
-    );
-  }
+  const permissionModeFlag = parsePermissionModeFlag(flags);
   let tagsFilter = flags["tags"]
     ? (flags["tags"] as string).split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
@@ -1664,35 +1606,14 @@ export async function cmdRun(
   }
   const assignee = mine ? await resolveActor(dir) : undefined;
 
-  // VENDOR_PROVIDERS (provider-support.ts) is the single source of truth:
-  // claude accepts cli or api; codex only cli (no API loop); google and local
-  // only api (no CLI binary exists). A vendor that rejects "cli" always
-  // accepts "api" instead, so an unsupported "cli" auto-switches silently —
-  // ndx config / ndx init persist hench.provider=api automatically when
-  // local or google is selected as the vendor, so this branch is a safety
-  // net for projects configured outside of those flows. An unsupported "api"
-  // (codex only) has no such fallback and fails loudly instead.
-  if (!dryRun && !isProviderSupported(llmVendor, provider)) {
-    if (provider === "cli") {
-      provider = "api";
-    } else {
-      throw new CLIError(
-        "Hench API provider is only supported for vendor=claude or vendor=google.",
-        "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
-      );
-    }
-  }
-
-  // The adversarial review pass spawns a second vendor CLI session, so it
-  // exists only on the CLI provider. Fail loudly rather than accepting the
-  // flag and doing nothing: a silent no-op here would report "reviewed" runs
-  // that were never reviewed, which is worse than not offering the flag.
-  if (reviewOpts.reviewPass && provider === "api" && !dryRun) {
-    throw new CLIError(
-      `--review requires the CLI provider, but this run resolved to provider="api"` +
-        `${llmVendor === LLM_VENDOR.GOOGLE || llmVendor === LLM_VENDOR.LOCAL ? ` (vendor="${llmVendor}" has no CLI binary)` : ""}.`,
-      "Switch with 'ndx config hench.provider cli' on a vendor that has a CLI (claude, codex), or drop --review.",
-    );
+  // Provider support per vendor, and the review pass's need for the CLI
+  // provider, are decided in run-settings.ts — shared with --resolve.
+  if (!dryRun) {
+    const resolvedProvider = resolveRunProvider(provider, llmVendor);
+    if (resolvedProvider.error) throw resolvedProvider.error;
+    provider = resolvedProvider.provider;
+    const reviewError = reviewOpts.reviewPass ? reviewProviderError(llmVendor, provider) : undefined;
+    if (reviewError) throw reviewError;
   }
 
   if (reviewOpts.reviewPass) {
@@ -1831,8 +1752,7 @@ export async function cmdRun(
   }
 
   const iterations = flags.iterations ? safeParseInt(flags.iterations, "iterations") : 1;
-  const maxTurns = flags["max-turns"] ? safeParseInt(flags["max-turns"], "max-turns") : undefined;
-  const tokenBudget = flags["token-budget"] != null ? safeParseNonNegInt(flags["token-budget"], "token-budget") : undefined;
+  const { maxTurns, tokenBudget } = parseBudgetFlags(flags);
   const pauseMs = flags["loop-pause"]
     ? safeParseInt(flags["loop-pause"], "loop-pause")
     : config.loopPauseMs;
@@ -2016,20 +1936,21 @@ export async function cmdRun(
     // governs task autoselect above — both are facets of "running unattended".
     const autonomous = auto || loop || epicByEpic;
 
-    // Resolve the effective permission mode for the spawned Claude session.
-    // Precedence: --permission-mode flag > config.permissionMode > autonomous
-    // default ("acceptEdits") > undefined (Claude CLI's built-in default).
-    // Codex spawns ignore this — warn the user that the value will be dropped.
-    let effectivePermissionMode: PermissionMode | undefined =
-      (permissionModeFlag as PermissionMode | undefined) ??
-      config.permissionMode ??
-      (autonomous ? "acceptEdits" : undefined);
-    if (effectivePermissionMode && llmVendor !== LLM_VENDOR.CLAUDE) {
+    // The effective permission mode for the spawned Claude session (see
+    // resolveRunPermissionMode for the precedence). Other vendors have no such
+    // setting — warn that the value is dropped.
+    const permission = resolveRunPermissionMode({
+      flag: permissionModeFlag,
+      configured: config.permissionMode,
+      autonomous,
+      vendor: llmVendor,
+    });
+    if (permission.dropped) {
       info(
-        `⚠ --permission-mode is a Claude CLI feature; ignoring "${effectivePermissionMode}" for vendor=${llmVendor}.`,
+        `⚠ --permission-mode is a Claude CLI feature; ignoring "${permission.dropped}" for vendor=${llmVendor}.`,
       );
-      effectivePermissionMode = undefined;
     }
+    const effectivePermissionMode: PermissionMode | undefined = permission.value;
 
     // The checkout this invocation belongs to. Captured before the gate can
     // prompt, so the gate's commit is bound to the branch and worktree the

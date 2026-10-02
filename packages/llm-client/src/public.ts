@@ -179,7 +179,7 @@ export {
   MODEL_CONTEXT_WINDOWS,
   MODEL_COSTS,
 } from "./config.js";
-export type { TaskModelResolution, JudgmentRoute, ModelCost } from "./config.js";
+export type { TaskModelResolution, ModelSourceKey, JudgmentRoute, ModelCost } from "./config.js";
 
 // Model-aware token pricing (the single price table for every cost surface)
 export {

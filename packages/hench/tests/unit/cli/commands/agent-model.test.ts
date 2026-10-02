@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { NEWEST_MODELS, resolveModel } from "@n-dx/llm-client";
 import type { LLMConfig } from "@n-dx/llm-client";
-import { resolveAgentModel } from "../../../../src/cli/commands/agent-model.js";
+import { checkAgentModel, resolveAgentModel } from "../../../../src/cli/commands/agent-model.js";
 import { CLIError } from "../../../../src/cli/errors.js";
 
 describe("resolveAgentModel", () => {
@@ -198,5 +198,42 @@ describe("resolveAgentModel", () => {
 
     expect(result.model).toBe(NEWEST_MODELS.claude);
     expect(result.source).toBe("default");
+  });
+});
+
+describe("resolveAgentModel — the rung names the config key that supplied the model", () => {
+  const cases: Array<[string, Parameters<typeof resolveAgentModel>[0], string]> = [
+    ["--model", { vendor: "claude", cliModelOverride: "opus", henchModels: { claude: "sonnet" } }, "cli-flag"],
+    ["hench.models.<vendor>", { vendor: "codex", henchModels: { codex: "gpt-5.6-terra" } }, "hench.models.codex"],
+    ["llm.model", { vendor: "claude", llmConfig: { vendor: "claude", model: "opus", claude: { model: "sonnet" } } }, "llm.model"],
+    ["llm.<vendor>.model", { vendor: "claude", llmConfig: { vendor: "claude", claude: { model: "sonnet" } } }, "llm.claude.model"],
+    ["llm.routes", { vendor: "claude", llmConfig: { vendor: "claude", routes: { "agent.execute": "heavy" } } }, "llm.routes"],
+    [
+      "llm.tiers.<vendor>.<tier>",
+      {
+        vendor: "claude",
+        llmConfig: { vendor: "claude", routes: { "agent.execute": "heavy" }, tiers: { claude: { heavy: "opus" } } },
+      },
+      "llm.tiers.claude.heavy",
+    ],
+    ["vendor default", { vendor: "claude", llmConfig: { vendor: "claude" } }, "vendor-default"],
+  ];
+
+  it.each(cases)("%s", (_label, params, rung) => {
+    expect(resolveAgentModel(params).rung).toBe(rung);
+  });
+});
+
+describe("checkAgentModel", () => {
+  it("returns the mismatch a run would throw instead of throwing it", () => {
+    const llmConfig: LLMConfig = { vendor: "claude", model: "gpt-5.6-terra" };
+    const checked = checkAgentModel({ vendor: "claude", llmConfig });
+
+    expect(checked.mismatch).toBeInstanceOf(CLIError);
+    expect(() => resolveAgentModel({ vendor: "claude", llmConfig })).toThrow(checked.mismatch?.message);
+  });
+
+  it("returns no mismatch for a compatible model", () => {
+    expect(checkAgentModel({ vendor: "claude", henchModels: { claude: "opus" } }).mismatch).toBeUndefined();
   });
 });
