@@ -19,7 +19,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { resolveModel, NEWEST_MODELS, TIER_MODELS } from "@n-dx/llm-client";
+import { resolveModel, NEWEST_MODELS, REVIEW_MODELS, TIER_MODELS } from "@n-dx/llm-client";
 import { resolveRun } from "../../src/cli/commands/run-resolve.js";
 import type { RunRefusalCode, RunResolution } from "../../src/cli/commands/run-resolve.js";
 import { cmdRun } from "../../src/cli/commands/run.js";
@@ -113,7 +113,8 @@ describe("the resolution report", () => {
       provider: { value: "cli", source: "hench.provider" },
       permissionMode: { value: "acceptEdits", source: "autonomous-default" },
       review: { value: false, source: "built-in" },
-      reviewModel: { value: null, source: "built-in" },
+      // Reported without --review: the reviewer a review would use.
+      reviewModel: { value: REVIEW_MODELS.claude, source: "vendor-default", vendorDefault: REVIEW_MODELS.claude },
       reviewOptional: { value: false, source: "built-in" },
       skipTestGate: { value: false, source: "built-in" },
       maxTurns: { value: 50, source: "hench.maxTurns" },
@@ -228,9 +229,17 @@ describe("the resolution report", () => {
     await projectConfig({ llm: { vendor: "local", local: { reviewModel: "qwen-reviewer" } } });
     const r = await resolve({ task: "t-pending", review: "true" });
 
-    expect(r.resolved.reviewModel).toEqual({ value: "qwen-reviewer", source: "llm.local.reviewModel" });
+    expect(r.resolved.reviewModel).toMatchObject({ value: "qwen-reviewer", source: "llm.local.reviewModel" });
     expect((await resolve({ task: "t-pending", review: "true", "review-model": "other" })).resolved.reviewModel)
-      .toEqual({ value: "other", source: "cli-flag" });
+      .toMatchObject({ value: "other", source: "cli-flag" });
+  });
+
+  it("reports the reviewer and its source without --review, review staying off", async () => {
+    await projectConfig({ llm: { vendor: "local", local: { reviewModel: "qwen-reviewer" } } });
+    const r = await resolve({ task: "t-pending" });
+
+    expect(r.resolved.review.value).toBe(false);
+    expect(r.resolved.reviewModel).toMatchObject({ value: "qwen-reviewer", source: "llm.local.reviewModel" });
   });
 
   it("drops the permission mode for a vendor without one", async () => {

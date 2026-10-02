@@ -349,6 +349,7 @@ function Form(props: FormProps) {
   const command = commandLine(prep, taskId, defaults, edits);
   const model = effective(defaults, edits, "model");
   const reviewModel = effective(defaults, edits, "reviewModel");
+  const vendorDefault = prep.resolved.reviewModel.vendorDefault;
   const maxTurns = effective(defaults, edits, "maxTurns");
   const tokenBudget = effective(defaults, edits, "tokenBudget");
   const permissionModes = [...new Set([defaults.permissionMode, ...PERMISSION_MODES])];
@@ -399,8 +400,10 @@ function Form(props: FormProps) {
             disabled: !reviewOn,
             onChange: (e: Event) => set("reviewModel", (e.target as HTMLSelectElement).value),
           },
-            h("option", { value: "" }, "Vendor default"),
-            modelChoices(prep, reviewModel).map((m) => h("option", { key: m, value: m }, m)))),
+            // Vendor default is the built-in reviewer sent explicitly, so it can
+            // override a configured reviewer; the other models follow.
+            vendorDefault ? h("option", { key: "vendor-default", value: vendorDefault }, `Vendor default (${vendorDefault})`) : null,
+            modelChoices(prep, reviewModel).filter((m) => m !== vendorDefault).map((m) => h("option", { key: m, value: m }, m)))),
         h(Field, { label: "Permission mode", ...field("permissionMode") },
           h("select", {
             id: "prep-permissionMode",

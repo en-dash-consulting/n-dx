@@ -11,7 +11,7 @@ export function prepFixture(overrides: Partial<PrepResponse> = {}): PrepResponse
       provider: { value: "api", source: "hench.provider" },
       permissionMode: { value: "acceptEdits", source: "autonomous-default" },
       review: { value: false, source: "built-in" },
-      reviewModel: { value: null, source: "built-in" },
+      reviewModel: { value: "claude-sonnet", source: "llm.claude.reviewModel", vendorDefault: "claude-opus" },
       reviewOptional: { value: false, source: "built-in" },
       skipTestGate: { value: false, source: "built-in" },
       maxTurns: { value: 50, source: "hench.maxTurns" },

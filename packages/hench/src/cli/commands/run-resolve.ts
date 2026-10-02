@@ -20,7 +20,7 @@
 import { dirname, join } from "node:path";
 import { resolveStore, findItem, matchesAssignee, resolveActor } from "../../prd/rex-gateway.js";
 import type { PRDItem } from "../../prd/rex-gateway.js";
-import { LLM_VENDOR, getGitCommonDir, resolveReviewModel } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, REVIEW_MODELS, getGitCommonDir, resolveReviewModel } from "../../prd/llm-gateway.js";
 import type { LLMVendor } from "../../prd/llm-gateway.js";
 import { PERMISSION_MODES } from "../../schema/index.js";
 import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
@@ -98,7 +98,8 @@ export interface ResolvedSettings {
   provider: Resolved<string>;
   permissionMode: Resolved<string | null>;
   review: Resolved<boolean>;
-  reviewModel: Resolved<string | null>;
+  /** Always the reviewer a review would use; `review.value` says whether one runs. `vendorDefault` is the vendor's built-in. */
+  reviewModel: Resolved<string> & { vendorDefault: string };
   reviewOptional: Resolved<boolean>;
   skipTestGate: Resolved<boolean>;
   maxTurns: Resolved<number>;
@@ -301,12 +302,11 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
             : permission.origin,
     },
     review: flagged("review"),
-    reviewModel: reviewOpts.reviewPass
-      ? {
-          value: resolveReviewModel(vendor, llmConfig, reviewOpts.reviewModel),
-          source: reviewModelKey(vendor, reviewModelSource(vendor, llmConfig, reviewOpts.reviewModel)),
-        }
-      : { value: null, source: "built-in" },
+    reviewModel: {
+      value: resolveReviewModel(vendor, llmConfig, reviewOpts.reviewModel),
+      source: reviewModelKey(vendor, reviewModelSource(vendor, llmConfig, reviewOpts.reviewModel)),
+      vendorDefault: REVIEW_MODELS[vendor] ?? "",
+    },
     reviewOptional: reviewOpts.reviewOptional
       ? { value: true, source: "cli-flag" }
       : { value: false, source: "built-in" },

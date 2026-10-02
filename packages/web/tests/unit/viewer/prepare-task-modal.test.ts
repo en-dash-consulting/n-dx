@@ -153,6 +153,21 @@ describe("PrepareTaskModal", () => {
     expect($(".prep-change-count").textContent).toBe("0 changes apply to this run only");
   });
 
+  it("shows the reviewer when review goes on, and sends vendor default explicitly over a configured reviewer", async () => {
+    await open();
+    expect($<HTMLSelectElement>("#prep-reviewModel").value).toBe("claude-sonnet");
+    expect(fieldOf("prep-reviewModel").textContent).toContain("from llm.claude.reviewModel");
+    await change("prep-review", "on");
+    await change("prep-reviewModel", "claude-opus");
+    expect($<HTMLSelectElement>("#prep-reviewModel").selectedOptions[0].textContent).toBe("Vendor default (claude-opus)");
+    expect($(".prep-command-line").textContent).toBe(
+      "ndx work --task=task-1 --auto --review --review-model=claude-opus /repo",
+    );
+    // Back to the configured reviewer clears the edit.
+    await change("prep-reviewModel", "claude-sonnet");
+    expect($(".prep-command-line").textContent).toBe("ndx work --task=task-1 --auto --review /repo");
+  });
+
   it("enables the review model only with review on, and max turns only on the api provider", async () => {
     await open();
     await change("prep-review", "on");

@@ -38,7 +38,8 @@ export interface PrepResolvedSettings {
   provider: PrepResolved<string>;
   permissionMode: PrepResolved<string | null>;
   review: PrepResolved<boolean>;
-  reviewModel: PrepResolved<string | null>;
+  /** `vendorDefault` is the vendor's built-in reviewer, the target of the modal's "Vendor default" choice. */
+  reviewModel: PrepResolved<string> & { vendorDefault: string };
   reviewOptional: PrepResolved<boolean>;
   skipTestGate: PrepResolved<boolean>;
   maxTurns: PrepResolved<number>;
@@ -101,7 +102,7 @@ export function defaultsOf(prep: PrepResponse): PrepDefaults {
     provider: r.provider.value,
     permissionMode: r.permissionMode.value ?? "",
     review: r.review.value,
-    reviewModel: r.reviewModel.value ?? "",
+    reviewModel: r.reviewModel.value,
     reviewOptional: r.reviewOptional.value,
     skipTestGate: r.skipTestGate.value,
     maxTurns: r.maxTurns.value,
