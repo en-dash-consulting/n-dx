@@ -20,7 +20,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [A late brief preview reopens itself after Back, and switching form/preview drops focus](./a-late-brief-preview-reopens-itself.md) | pending |
 | [A malformed PRD makes --resolve exit 1 with no JSON, so the dashboard gets nothing to show](./a-malformed-prd-makes-resolve-exit-1.md) | pending |
-| [A queued run whose options its server refuses at replay disappears without telling anyone](./a-queued-run-whose-options-its-server.md) | in_progress |
+| [A queued run whose options its server refuses at replay disappears without telling anyone](./a-queued-run-whose-options-its-server.md) | completed |
 | [Accept allow-listed run options on POST /api/hench/execute and carry them through the hub queue](./accept-allow-listed-run-options-on.md) | completed |
 | [Add `ndx work --resolve`: print the resolved run settings, their sources and any refusals as JSON without running](./add-ndx-work-resolve-print-the.md) | completed |
 | [Add the prep routes: GET /api/hench/prep/:taskId, POST /api/hench/prep/:taskId/preview and GET /api/hench/ready](./add-the-prep-routes-get-api-hench-prep.md) | completed |
