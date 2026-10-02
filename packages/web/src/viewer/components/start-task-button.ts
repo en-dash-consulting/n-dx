@@ -49,9 +49,16 @@ export interface StartTaskButtonProps {
    * button loads `/live/task/<id>` as a page navigation.
    */
   navigateTo?: NavigateTo;
+  /**
+   * The task's Live page in `workspace` when that is not the viewer's own.
+   * Set, a start (and the queued link) does a full navigation to it, because
+   * the SPA's Live view reads the viewer's workspace, not the run's. Unset,
+   * Live opens in-app.
+   */
+  liveHref?: (taskId: string) => string;
 }
 
-export function StartTaskButton({ taskId, onStarted, label = "Start Task", workspace, ariaLabel, navigateTo }: StartTaskButtonProps) {
+export function StartTaskButton({ taskId, onStarted, label = "Start Task", workspace, ariaLabel, navigateTo, liveHref }: StartTaskButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Set when the server reported a refusal `rex migrate-slugs` would fix. */
@@ -153,9 +160,10 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
   const openLive = useCallback((id: string) => {
     setPrepFor(null);
     onStarted();
-    if (navigateTo) navigateTo("live-task", { taskId: id });
+    if (liveHref) window.location.assign(liveHref(id));
+    else if (navigateTo) navigateTo("live-task", { taskId: id });
     else window.location.assign(appUrl(`/live/task/${encodeURIComponent(id)}`));
-  }, [navigateTo, onStarted]);
+  }, [navigateTo, liveHref, onStarted]);
 
   const busy = loading || migrating;
   return h("div", { class: "start-task-wrapper" },
@@ -202,6 +210,7 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
           workspace: prepFor.workspace,
           onClose: () => setPrepFor(null),
           onOpenLive: openLive,
+          liveHref,
         })
       : null,
   );

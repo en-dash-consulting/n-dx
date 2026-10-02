@@ -243,6 +243,11 @@ export function workspaceViewUrl(card: Pick<WorkspaceCard, "key" | "isAnchor">, 
   return `${project}${slot}/${view}`;
 }
 
+/** A workspace's Live page for one task — a full-navigation URL (see {@link workspaceViewUrl}). */
+export function workspaceLiveTaskUrl(card: Pick<WorkspaceCard, "key" | "isAnchor">, taskId: string, pathname: string): string {
+  return `${workspaceViewUrl(card, "live", pathname)}/task/${encodeURIComponent(taskId)}`;
+}
+
 /** "1.2 GB", "840 MB" — byte counts for the memory tile. An unknown reading is a dash. */
 export function formatBytes(bytes: number | null): string {
   if (bytes === null || !Number.isFinite(bytes) || bytes < 0) return "—";
@@ -531,6 +536,11 @@ function WorkspaceCardView({ card, doFetch, onChanged }: {
             label: "Start working",
             ariaLabel: `Start working in ${card.key} on ${card.nextTask.title}`,
             onStarted: onChanged,
+            // The viewer's own workspace opens Live in-app; any other card's run
+            // is only visible under that workspace's own URL.
+            liveHref: card.isCurrent
+              ? undefined
+              : (id: string) => workspaceLiveTaskUrl(card, id, currentPathname()),
           }),
     ),
   );

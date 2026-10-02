@@ -53,6 +53,11 @@ export interface PrepareTaskModalProps {
   onClose: () => void;
   /** Open the task's Live page — after a start, or from the queued notice. */
   onOpenLive: (taskId: string) => void;
+  /**
+   * Where the task's Live page is when it is not in this viewer's workspace.
+   * Used as the queued notice's link target; clicks still go through `onOpenLive`.
+   */
+  liveHref?: (taskId: string) => string;
 }
 
 const TITLE_ID = "prepare-task-title";
@@ -70,7 +75,7 @@ export function PrepareTaskModal(props: PrepareTaskModalProps) {
   return h(PrepareTaskModalBody, { key: props.taskId, ...props });
 }
 
-function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive }: PrepareTaskModalProps) {
+function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref }: PrepareTaskModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [prep, setPrep] = useState<PrepResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -215,7 +220,7 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive }: Prepar
   } else {
     body = h(Form, {
       prep, defaults, edits, setEdits, taskId, busy, execError, canMigrate, notice, queued,
-      onExecute: execute, onMigrate: migrate, onPreview: showPreview, onOpenLive,
+      onExecute: execute, onMigrate: migrate, onPreview: showPreview, onOpenLive, liveHref,
     });
   }
 
@@ -273,6 +278,7 @@ interface FormProps {
   onMigrate: () => void;
   onPreview: () => void;
   onOpenLive: (taskId: string) => void;
+  liveHref?: (taskId: string) => string;
 }
 
 function Form(props: FormProps) {
@@ -449,7 +455,7 @@ function Form(props: FormProps) {
         ? h("button", { type: "button", class: "prep-btn", onClick: props.onMigrate, disabled: busy }, "Migrate the PRD tree")
         : null,
       notice ? h("p", { class: "prep-notice", role: "status" }, notice) : null,
-      queued ? h(QueuedNotice, { reply: queued, taskId, onOpenLive: props.onOpenLive }) : null,
+      queued ? h(QueuedNotice, { reply: queued, taskId, onOpenLive: props.onOpenLive, liveHref: props.liveHref }) : null,
     ),
 
     h("footer", { class: "prep-footer" },
@@ -556,10 +562,11 @@ function PreviewPanel({ preview, onBack }: {
   );
 }
 
-function QueuedNotice({ reply, taskId, onOpenLive }: {
+function QueuedNotice({ reply, taskId, onOpenLive, liveHref }: {
   reply: QueuedReply;
   taskId: string;
   onOpenLive: (taskId: string) => void;
+  liveHref?: (taskId: string) => string;
 }) {
   const { queue } = useHubQueue();
   const live = queuePositionOf(queue, taskId);
@@ -572,7 +579,7 @@ function QueuedNotice({ reply, taskId, onOpenLive }: {
       : h("span", null, `Queued — position ${position}: ${queuedReason(reply.reason)}.`),
     " ",
     h("a", {
-      href: appUrl(`/live/task/${encodeURIComponent(taskId)}`),
+      href: liveHref ? liveHref(taskId) : appUrl(`/live/task/${encodeURIComponent(taskId)}`),
       onClick: (e: MouseEvent) => {
         e.preventDefault();
         onOpenLive(taskId);
