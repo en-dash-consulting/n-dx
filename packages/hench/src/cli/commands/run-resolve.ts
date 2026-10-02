@@ -99,6 +99,7 @@ export interface ResolvedSettings {
   permissionMode: Resolved<string | null>;
   review: Resolved<boolean>;
   reviewModel: Resolved<string | null>;
+  reviewOptional: Resolved<boolean>;
   skipTestGate: Resolved<boolean>;
   maxTurns: Resolved<number>;
   tokenBudget: Resolved<number>;
@@ -126,6 +127,18 @@ export interface RunResolution {
 }
 
 /**
+ * Flags that change what a run does but are not settings the dashboard edits,
+ * so they are not in {@link RUN_OPTIONS}. The command line still carries them:
+ * dropping one prints a command that behaves differently (`--mine` scopes
+ * `--reset-deferred` to the operator's own tasks).
+ */
+const PASSTHROUGH_FLAGS: ReadonlyArray<{ flag: string; type: "boolean" | "string" }> = [
+  { flag: "mine", type: "boolean" },
+  { flag: "priority", type: "string" },
+  { flag: "context-file", type: "string" },
+];
+
+/**
  * Every per-run option, in command-line order. Values for `provider` are
  * narrowed to the active vendor's providers in the report.
  */
@@ -135,6 +148,7 @@ const RUN_OPTIONS: readonly RunOption[] = [
   { key: "permissionMode", flag: "permission-mode", type: "enum", values: PERMISSION_MODES, scope: "task", description: "Permission mode for the spawned Claude session (Claude only)." },
   { key: "review", flag: "review", type: "boolean", scope: "task", description: "Run the adversarial review pass after the task validates, before the commit." },
   { key: "reviewModel", flag: "review-model", type: "string", scope: "task", description: "Model the reviewer runs on (requires review)." },
+  { key: "reviewOptional", flag: "review-optional", type: "boolean", scope: "task", description: "Downgrade the missing-review gate to a warning when the reviewer cannot start (requires review)." },
   { key: "skipTestGate", flag: "skip-test-gate", type: "boolean", scope: "task", description: "Skip the full test suite gate before the commit." },
   { key: "maxTurns", flag: "max-turns", type: "integer", scope: "task", description: "Turn limit for the agent loop (API provider)." },
   { key: "tokenBudget", flag: "token-budget", type: "integer", scope: "task", description: "Token budget for the run; 0 means unlimited." },
@@ -293,6 +307,9 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
           source: reviewModelKey(vendor, reviewModelSource(vendor, llmConfig, reviewOpts.reviewModel)),
         }
       : { value: null, source: "built-in" },
+    reviewOptional: reviewOpts.reviewOptional
+      ? { value: true, source: "cli-flag" }
+      : { value: false, source: "built-in" },
     skipTestGate:
       flags["skip-test-gate"] === "true"
         ? { value: true, source: "cli-flag" }
@@ -360,7 +377,8 @@ function shellWord(word: string): string {
 
 /**
  * The `ndx work` command a run with these settings is: the task, `--auto`,
- * then each run option the flags carry in {@link RUN_OPTIONS} order. A model
+ * then each run option the flags carry in {@link RUN_OPTIONS} order, then the
+ * {@link PASSTHROUGH_FLAGS}. A model
  * given as `--<vendor>-model` is written as `--model`, which it is equivalent
  * to and which outranks it.
  */
@@ -378,6 +396,15 @@ function formatRunCommand(
       if (value === "true") words.push(`--${option.flag}`);
     } else {
       words.push(`--${option.flag}=${shellWord(value)}`);
+    }
+  }
+  for (const { flag, type } of PASSTHROUGH_FLAGS) {
+    const value = flags[flag];
+    if (value === undefined) continue;
+    if (type === "boolean") {
+      if (value === "true") words.push(`--${flag}`);
+    } else {
+      words.push(`--${flag}=${shellWord(value)}`);
     }
   }
   words.push(shellWord(dir));

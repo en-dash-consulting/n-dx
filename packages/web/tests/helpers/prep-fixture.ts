@@ -12,6 +12,7 @@ export function prepFixture(overrides: Partial<PrepResponse> = {}): PrepResponse
       permissionMode: { value: "acceptEdits", source: "autonomous-default" },
       review: { value: false, source: "built-in" },
       reviewModel: { value: null, source: "built-in" },
+      reviewOptional: { value: false, source: "built-in" },
       skipTestGate: { value: false, source: "built-in" },
       maxTurns: { value: 50, source: "hench.maxTurns" },
       tokenBudget: { value: 0, source: "built-in" },

@@ -114,6 +114,7 @@ describe("the resolution report", () => {
       permissionMode: { value: "acceptEdits", source: "autonomous-default" },
       review: { value: false, source: "built-in" },
       reviewModel: { value: null, source: "built-in" },
+      reviewOptional: { value: false, source: "built-in" },
       skipTestGate: { value: false, source: "built-in" },
       maxTurns: { value: 50, source: "hench.maxTurns" },
       tokenBudget: { value: 0, source: "hench.tokenBudget" },
@@ -149,6 +150,7 @@ describe("the resolution report", () => {
       "permission-mode": "plan",
       review: "true",
       "review-model": "sonnet",
+      "review-optional": "true",
       "skip-test-gate": "true",
       "max-turns": "7",
       "token-budget": "1000",
@@ -168,7 +170,25 @@ describe("the resolution report", () => {
     expect(codes(r)).toEqual(["provider-unsupported"]);
     expect(r.command).toBe(
       "ndx work --task=t-pending --auto --model=opus --provider=api --permission-mode=plan --review " +
-        `--review-model=sonnet --skip-test-gate --max-turns=7 --token-budget=1000 --fresh --allow-dirty --reset-deferred ${projectDir}`,
+        `--review-model=sonnet --review-optional --skip-test-gate --max-turns=7 --token-budget=1000 --fresh --allow-dirty --reset-deferred ${projectDir}`,
+    );
+  });
+
+  it("keeps the flags that change behaviour but are not options: --mine, --priority, --context-file", async () => {
+    const r = await resolve({
+      task: "t-deferred",
+      "reset-deferred": "true",
+      mine: "true",
+      priority: "high",
+      "context-file": "/tmp/notes with space.md",
+      review: "true",
+      "review-optional": "true",
+    });
+
+    expect(r.resolved.reviewOptional).toEqual({ value: true, source: "cli-flag" });
+    expect(r.command).toBe(
+      "ndx work --task=t-deferred --auto --review --review-optional --reset-deferred --mine --priority=high " +
+        `--context-file='/tmp/notes with space.md' ${projectDir}`,
     );
   });
 

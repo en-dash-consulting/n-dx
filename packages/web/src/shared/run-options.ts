@@ -39,6 +39,7 @@ export interface RunOptions {
   permissionMode?: "default" | "acceptEdits" | "bypassPermissions";
   review?: boolean;
   reviewModel?: string;
+  reviewOptional?: boolean;
   skipTestGate?: boolean;
   maxTurns?: number;
   tokenBudget?: number;
@@ -66,6 +67,7 @@ export const RUN_OPTION_SPECS: readonly RunOptionSpec[] = [
   { key: "permissionMode", flag: "permission-mode", type: "enum", values: ["default", "acceptEdits", "bypassPermissions"] },
   { key: "review", flag: "review", type: "boolean" },
   { key: "reviewModel", flag: "review-model", type: "string", maxBytes: MODEL_ID_MAX_BYTES },
+  { key: "reviewOptional", flag: "review-optional", type: "boolean" },
   { key: "skipTestGate", flag: "skip-test-gate", type: "boolean" },
   { key: "maxTurns", flag: "max-turns", type: "integer", min: 1, max: 500 },
   { key: "tokenBudget", flag: "token-budget", type: "integer", min: 0, max: Number.MAX_SAFE_INTEGER },
@@ -142,6 +144,10 @@ export function checkRunOptions(input: unknown): RunOptionsCheck {
   }
   if (options.reviewModel !== undefined && options.review !== true) {
     return { ok: false, key: "reviewModel", error: 'Run option "reviewModel" requires "review": true' };
+  }
+  // hench refuses --review-optional without --review; only a true value does.
+  if (options.reviewOptional === true && options.review !== true) {
+    return { ok: false, key: "reviewOptional", error: 'Run option "reviewOptional" requires "review": true' };
   }
   return { ok: true, options: options as RunOptions };
 }

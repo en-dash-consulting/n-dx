@@ -39,6 +39,7 @@ export interface PrepResolvedSettings {
   permissionMode: PrepResolved<string | null>;
   review: PrepResolved<boolean>;
   reviewModel: PrepResolved<string | null>;
+  reviewOptional: PrepResolved<boolean>;
   skipTestGate: PrepResolved<boolean>;
   maxTurns: PrepResolved<number>;
   tokenBudget: PrepResolved<number>;
@@ -84,6 +85,7 @@ export interface PrepDefaults {
   permissionMode: string;
   review: boolean;
   reviewModel: string;
+  reviewOptional: boolean;
   skipTestGate: boolean;
   maxTurns: number;
   tokenBudget: number;
@@ -100,6 +102,7 @@ export function defaultsOf(prep: PrepResponse): PrepDefaults {
     permissionMode: r.permissionMode.value ?? "",
     review: r.review.value,
     reviewModel: r.reviewModel.value ?? "",
+    reviewOptional: r.reviewOptional.value,
     skipTestGate: r.skipTestGate.value,
     maxTurns: r.maxTurns.value,
     tokenBudget: r.tokenBudget.value,
@@ -154,8 +157,10 @@ export function maxTurnsApplies(defaults: PrepDefaults, edits: PrepEdits): boole
  */
 export function runOptionsOf(defaults: PrepDefaults, edits: PrepEdits): RunOptions {
   const options: Record<string, unknown> = { ...edits };
-  if (effective(defaults, edits, "review") !== true) delete options.reviewModel;
-  else if (options.reviewModel !== undefined) options.review = true;
+  if (effective(defaults, edits, "review") !== true) {
+    delete options.reviewModel;
+    delete options.reviewOptional;
+  } else if (options.reviewModel !== undefined) options.review = true;
   if (!maxTurnsApplies(defaults, edits)) delete options.maxTurns;
   for (const [key, value] of Object.entries(options)) if (value === false) delete options[key];
   return options as RunOptions;
