@@ -15,6 +15,8 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { trustSummaryForRun } from "../../store/trust.js";
+import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
@@ -584,6 +586,18 @@ async function beginRunEvents(henchDir: string, run: RunRecord): Promise<RunEven
  * Also captures a system memory snapshot for later use in finalization.
  * Both loops create identical initial records.
  */
+/**
+ * Repository trust at run start, for the record. Never throws: a run must not
+ * fail because the trust store or a config file could not be read.
+ */
+function captureRunTrust(projectDir: string): RunRecord["trust"] {
+  try {
+    return trustSummaryForRun(evaluateRepoTrust(projectDir));
+  } catch {
+    return undefined;
+  }
+}
+
 export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRecord; memoryCtx: MemoryContext }> {
   // Which checkout this run belongs to. Every automatic commit below re-checks
   // against these three values, so a run whose HEAD is moved mid-run (the
@@ -613,6 +627,7 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     ndxVersion: resolveNdxVersion(),
     cliPath: resolveCliPath(),
     ...gitOrigin,
+    trust: captureRunTrust(opts.projectDir ?? "."),
   };
 
   // Emit invocation context to the output stream for CLI and dashboard visibility

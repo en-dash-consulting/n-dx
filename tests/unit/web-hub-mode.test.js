@@ -6,11 +6,15 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { platform, tmpdir } from "node:os";
 import {
   deriveProjectId,
+  ensureAuthTokenFile,
+  hubAuthMismatchMessage,
+  hubAuthState,
+  hubDashboardUrl,
   loadHubPort,
   parseMainWorktree,
   readHubRegistry,
@@ -123,5 +127,97 @@ describe("resolveRepo", () => {
 
   it("outside a repository: the directory stands for itself", () => {
     expect(resolveRepo(plain)).toEqual({ repoRoot: plain, worktree: plain, branch: null, remoteUrl: null, isRepo: false });
+  });
+});
+
+
+describe("hubAuthState", () => {
+  /** A probe stub: `/api/hub/health` answers one way anonymously, another with the token. */
+  const probe = (anonymous, credentialed) => (_port, _method, _path, _body, _timeout, opts = {}) =>
+    Promise.resolve(opts.sendToken === false ? anonymous : credentialed);
+
+  const ok = { status: 200, body: { ok: true } };
+  const unauthorized = { status: 401, body: { error: "Unauthorized" } };
+  const unreachable = { status: 0, body: null };
+
+  it("calls a hub that answers an anonymous probe open", async () => {
+    // It served health to a caller with no credential at all; every project it
+    // takes on is served the same way.
+    expect(await hubAuthState(3117, probe(ok, ok))).toBe("open");
+  });
+
+  it("calls a hub that refuses the anonymous probe but accepts ours a token hub", async () => {
+    expect(await hubAuthState(3117, probe(unauthorized, ok))).toBe("token");
+  });
+
+  it("reports a mismatch when the hub wants a token but not the one we hold", async () => {
+    // A hub started from another token file, or one rotated since. Reusing it
+    // would fail at registration with a bare 401 and no explanation.
+    expect(await hubAuthState(3117, probe(unauthorized, unauthorized))).toBe("mismatch");
+  });
+
+  it("reports absent when nothing answers", async () => {
+    expect(await hubAuthState(3117, probe(unreachable, unreachable))).toBe("absent");
+    // A 200 that is not the health payload is not a hub either.
+    expect(await hubAuthState(3117, probe({ status: 200, body: null }, ok))).toBe("absent");
+  });
+});
+
+describe("hubAuthMismatchMessage", () => {
+  it("names the exposure when an open hub would serve an authenticated project", () => {
+    const msg = hubAuthMismatchMessage("open", "token", 3117, "/home/u/.ndx/auth.token");
+    expect(msg).toContain("without authentication");
+    expect(msg).toContain("ndx hub stop");
+    // The way out that does not require stopping anything is stated too.
+    expect(msg).toContain("--no-auth");
+  });
+
+  it("explains the other direction without implying an exposure", () => {
+    const msg = hubAuthMismatchMessage("token", "open", 3117, null);
+    expect(msg).toContain("requires the per-user token");
+    expect(msg).toContain("ndx hub stop");
+    expect(msg).not.toContain("would serve this project unauthenticated");
+  });
+
+  it("names the token file when the hub holds a different one", () => {
+    expect(hubAuthMismatchMessage("mismatch", "token", 3117, "/home/u/.ndx/auth.token"))
+      .toContain("/home/u/.ndx/auth.token");
+  });
+});
+
+describe("hubDashboardUrl", () => {
+  it("carries the token so --open and the printed URL cannot diverge", () => {
+    expect(hubDashboardUrl(3117, "my app", "tok/en")).toBe(
+      "http://localhost:3117/p/my%20app/?ndx_token=tok%2Fen",
+    );
+  });
+
+  it("is the plain URL when there is no token", () => {
+    expect(hubDashboardUrl(3117, "alpha", null)).toBe("http://localhost:3117/p/alpha/");
+  });
+});
+
+describe("ensureAuthTokenFile", () => {
+  let home;
+  beforeAll(() => { home = mkdtempSync(join(tmpdir(), "ndx-token-")); });
+  afterAll(() => { rmSync(home, { recursive: true, force: true }); });
+
+  it("creates the token once and never rotates it", () => {
+    const path = join(home, "create.token");
+    const first = ensureAuthTokenFile(path);
+    expect(first).toMatch(/^[A-Za-z0-9_-]{32,}$/);
+    expect(ensureAuthTokenFile(path)).toBe(first);
+  });
+
+  it.skipIf(platform() === "win32")("repairs the mode of a token that is readable by others", () => {
+    // The exposure the token exists to prevent, left behind by an older n-dx,
+    // an editor, or a restored backup. Creating the file 0600 does nothing for
+    // one that already exists, so it stayed 0644 for good.
+    const path = join(home, "loose.token");
+    writeFileSync(path, "pre-existing-token\n");
+    chmodSync(path, 0o644);
+
+    expect(ensureAuthTokenFile(path)).toBe("pre-existing-token");
+    expect(statSync(path).mode & 0o777).toBe(0o600);
   });
 });
