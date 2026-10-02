@@ -18,7 +18,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A late brief preview reopens itself after Back, and switching form/preview drops focus](./a-late-brief-preview-reopens-itself.md) | pending |
+| [A late brief preview reopens itself after Back, and switching form/preview drops focus](./a-late-brief-preview-reopens-itself.md) | completed |
 | [A malformed PRD makes --resolve exit 1 with no JSON, so the dashboard gets nothing to show](./a-malformed-prd-makes-resolve-exit-1.md) | pending |
 | [A queued run whose options its server refuses at replay disappears without telling anyone](./a-queued-run-whose-options-its-server.md) | completed |
 | [Accept allow-listed run options on POST /api/hench/execute and carry them through the hub queue](./accept-allow-listed-run-options-on.md) | completed |
