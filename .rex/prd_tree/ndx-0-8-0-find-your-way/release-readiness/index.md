@@ -27,5 +27,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Lock the README and docs/guide command references to the help registry](./lock-the-readme-and-docs-guide-command.md) | pending |
 | [Make the ci child-cleanup e2e test deterministic under full-suite load](./make-the-ci-child-cleanup-e2e-test.md) | pending |
 | [Regenerate the 0.8.0 documents, run the navigation contract and compare pages against the wireframes](./regenerate-the-0-8-0-documents-run-the.md) | pending |
-| [Rewrite viewer-architecture.md for the shipped navigation model](./rewrite-viewer-architecture-md-for-the.md) | pending |
+| [Rewrite viewer-architecture.md for the shipped navigation model](./rewrite-viewer-architecture-md-for-the.md) | completed |
 | [Write the 0.8.0 release note and confirm per-package tags and GitHub releases after publish](./write-the-0-8-0-release-note-and.md) | pending |
