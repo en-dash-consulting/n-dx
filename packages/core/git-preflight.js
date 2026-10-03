@@ -94,7 +94,8 @@ export function runGitInit(dir) {
  *   - `inside`          → target directory already inside a git repo; no action.
  *   - `initialized`     → user consented and `git init` succeeded.
  *   - `declined`        → user answered "no"; auto-commit features disabled.
- *   - `non-interactive` → no TTY (or `quiet`); treated as decline, warning persists.
+ *   - `non-interactive` → no TTY (or `quiet`) and no explicit consent; treated as a
+ *                         decline, warning persists.
  *   - `init-failed`     → user consented but `git init` failed (e.g. git missing).
  * @property {string} [error]  Error detail when status === "init-failed".
  */
@@ -105,19 +106,34 @@ export function runGitInit(dir) {
  * runs — those resolve to `non-interactive` so the caller can still surface
  * the persistent warning in the recap.
  *
+ * `consent` answers the prompt ahead of time, which is what a caller that has
+ * no TTY to prompt on needs: `ndx init --git` on the command line, and the
+ * dashboard setup wizard, which asks the question in the browser and spawns
+ * `ndx init` with piped stdio. `true` creates the repository, `false` declines
+ * it outright (no prompt, warning still surfaced), `undefined` keeps the
+ * interactive behaviour.
+ *
  * @param {string} dir
- * @param {{ quiet?: boolean }} [opts]
+ * @param {{ quiet?: boolean, consent?: boolean }} [opts]
  * @returns {Promise<GitPreflightResult>}
  */
-export async function runGitPreflight(dir, { quiet = false } = {}) {
+export async function runGitPreflight(dir, { quiet = false, consent } = {}) {
   if (isInsideGitRepo(dir)) return { status: "inside" };
+
+  if (consent === false) return { status: "declined" };
+  if (consent === true) {
+    const result = runGitInit(dir);
+    if (!result.ok) return { status: "init-failed", error: result.error };
+    if (!quiet) process.stdout.write(`Initialized empty Git repository in ${resolve(dir)}\n`);
+    return { status: "initialized" };
+  }
 
   const interactive = isInteractive() && !quiet;
 
   if (interactive) {
     process.stdout.write(PREFLIGHT_MESSAGE);
-    const consent = await promptYesNo("Initialize git in this directory now? [Y/n] ");
-    if (consent === false) return { status: "declined" };
+    const answer = await promptYesNo("Initialize git in this directory now? [Y/n] ");
+    if (answer === false) return { status: "declined" };
 
     const result = runGitInit(dir);
     if (!result.ok) return { status: "init-failed", error: result.error };

@@ -43,7 +43,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 
 | Command | Writes | LLM phases (calls) | Network | Takes |
 |---------|--------|--------------------|---------|-------|
-| `ndx init` | `{rex}/, {hench}/, {sourcevision}/`<br>`{config}, .gitignore, .gitattributes`<br>CLAUDE.md, AGENTS.md, .claude/, .agents/, .codex/, .mcp.json<br>README.md<br>`~/.claude.json` (only with --mcp-scope=local) | auth probe ~0-1 | llm-provider | under a minute |
+| `ndx init` | `{rex}/, {hench}/, {sourcevision}/`<br>`{config}, .gitignore, .gitattributes`<br>CLAUDE.md, AGENTS.md, .claude/, .agents/, .codex/, .mcp.json<br>README.md<br>`~/.claude.json` (only with --mcp-scope=local)<br>`.git/` (only with --git, or on a TTY when the preflight prompt is accepted) | auth probe ~0-1 | llm-provider | under a minute |
 | `ndx migrate-layout` | `.ndx/`<br>`.gitignore, .gitattributes`<br>git commits (only without --no-commit) | none | none | seconds |
 | `ndx analyze` | `{sourcevision}/` | classify ~0-N batches of 30 files<br>zones ~1-2 per batch of 7 zones; more passes with --full<br>primer ~0-1<br>narration ~1 per escalated zone<br>_none with `--fast`_ | llm-provider | under a minute on a small repo; several minutes with --deep or --full |
 | `ndx recommend` | `{rex}/acknowledged-findings.json` (only with --acknowledge)<br>`{rex}/prd_tree/` (only with --accept) | none | none | seconds |

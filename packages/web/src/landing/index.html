@@ -302,6 +302,25 @@
             </div>
           </fieldset>
 
+          <!--
+            Version control — revealed only when this folder is not already
+            inside a git repository (see initSetupWizard's preflight fetch).
+            `ndx init`'s own git prompt needs a TTY the dashboard does not
+            have, so the question is asked here instead.
+          -->
+          <fieldset class="wizard-fieldset wizard-git" id="wizard-git-fieldset" hidden>
+            <legend class="wizard-label">This folder is not a git repository</legend>
+            <label class="wizard-checkbox">
+              <input type="checkbox" id="wizard-git" name="git" checked>
+              <span>Create a git repository here</span>
+            </label>
+            <p class="wizard-git-hint" id="wizard-git-hint">
+              n-dx records autonomous work as commits — without a repository, auto-commit,
+              pair programming, and the hench run loop stay disabled. Your initialized
+              project is committed as a starting point.
+            </p>
+          </fieldset>
+
           <button type="submit" class="btn btn-primary wizard-submit" id="wizard-submit">
             <span class="wizard-submit-label">Initialize project</span>
             <span class="wizard-submit-spinner" aria-hidden="true" hidden></span>

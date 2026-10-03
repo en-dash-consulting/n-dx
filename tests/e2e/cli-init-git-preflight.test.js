@@ -95,6 +95,30 @@ describe("ndx init: git preflight", () => {
     expect(output).not.toContain("Initial git commit skipped");
   });
 
+  // `--git` / `--no-git` answer the prompt ahead of time. Without them a run
+  // with no TTY can never create a repository, which is what the dashboard's
+  // setup wizard (piped stdio) and scripted inits hit.
+  it("creates the repository when --git answers the prompt in a non-interactive run", () => {
+    const output = run(["init", "--provider=codex", "--no-claude", "--git", tmpDir], { env: initEnv });
+    expect(existsSync(join(tmpDir, ".git"))).toBe(true);
+    expect(output).not.toContain("not a git repository");
+    expect(output).not.toContain("auto-commit features are disabled");
+    expect(output).toContain("LLM configuration");
+  });
+
+  it("keeps the warning and writes nothing when --no-git declines the prompt", () => {
+    const output = run(["init", "--provider=codex", "--no-claude", "--no-git", tmpDir], { env: initEnv });
+    expect(existsSync(join(tmpDir, ".git"))).toBe(false);
+    expect(output).toContain("not a git repository");
+    expect(output).toContain("auto-commit features are disabled");
+  });
+
+  it("rejects --git and --no-git together rather than picking one", () => {
+    expect(() => run(["init", "--provider=codex", "--no-claude", "--git", "--no-git", tmpDir], { env: initEnv }))
+      .toThrow(/--git and --no-git cannot be combined/);
+    expect(existsSync(join(tmpDir, ".git"))).toBe(false);
+  });
+
   it("does not attempt the baseline commit in non-interactive runs (no consent)", () => {
     // Without a TTY, runGitPreflight returns `non-interactive` and the
     // baseline commit step is skipped entirely.  Pin the absence so a future

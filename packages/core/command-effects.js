@@ -197,6 +197,7 @@ export const COMMAND_EFFECTS = {
       { path: "CLAUDE.md, AGENTS.md, .claude/, .agents/, .codex/, .mcp.json", what: "assistant instructions, skills and MCP registration" },
       { path: "README.md", what: "a README, or README.proposed.md beside an existing one" },
       { path: "~/.claude.json", what: "local-scope MCP registration", conditional: true, when: "with --mcp-scope=local" },
+      { path: ".git/", what: "a git repository and a `chore: n-dx init` baseline commit", conditional: true, when: "with --git, or on a TTY when the preflight prompt is accepted" },
     ],
     llm: [{ phase: "auth probe", purpose: "check the chosen vendor answers", calls: "0-1" }],
     network: [LLM_PROVIDER],

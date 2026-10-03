@@ -127,6 +127,28 @@ describe("git-preflight: runGitPreflight", () => {
     const result = await runGitPreflight(tmpDir, { quiet: true });
     expect(result.status).toBe("non-interactive");
   });
+
+  // `consent` is how a caller with no TTY answers the prompt: `ndx init --git`
+  // and the dashboard setup wizard, which asks the question in the browser.
+  it.runIf(GIT_OK)("creates the repository when consent is given up front", async () => {
+    const result = await runGitPreflight(tmpDir, { quiet: true, consent: true });
+    expect(result.status).toBe("initialized");
+    expect(isInsideGitRepo(tmpDir)).toBe(true);
+  });
+
+  it("declines without prompting or writing when consent is refused", async () => {
+    const result = await runGitPreflight(tmpDir, { quiet: true, consent: false });
+    expect(result.status).toBe("declined");
+    expect(isInsideGitRepo(tmpDir)).toBe(false);
+    // A decline still warns — the project works, auto-commit features do not.
+    expect(formatGitWarningLines(result).length).toBeGreaterThan(0);
+  });
+
+  it("returns status:inside for a directory already in a repo, whatever the consent", async () => {
+    await mkdir(join(tmpDir, ".git"));
+    expect((await runGitPreflight(tmpDir, { quiet: true, consent: true })).status).toBe("inside");
+    expect((await runGitPreflight(tmpDir, { quiet: true, consent: false })).status).toBe("inside");
+  });
 });
 
 describe("git-preflight: formatGitInitCommitLines", () => {
