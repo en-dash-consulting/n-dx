@@ -1,5 +1,74 @@
 # @n-dx/web
 
+## 0.8.1
+
+### Patch Changes
+
+- [#486](https://github.com/en-dash-consulting/n-dx/pull/486) [`153f6a2`](https://github.com/en-dash-consulting/n-dx/commit/153f6a2babfc936f39fd659a4a8e6686a826b5f8) Thanks [@endash-shal](https://github.com/endash-shal)! - Initialize a blank folder — including its git repository — from the dashboard.
+  
+  `ndx start` in an empty folder already served the setup page with an
+  **Initialize project** button, but the init it ran could never create a git
+  repository: the preflight prompt that offers one needs a TTY, and the wizard
+  spawns `ndx init` with piped stdio. A folder set up that way stayed outside
+  version control, with auto-commit, pair programming, and the hench run loop
+  silently disabled.
+  
+  `ndx init` now takes `--git` / `--no-git`, which answer that prompt ahead of
+  time — the only way a run without a TTY can create a repository. `--git` also
+  gets the `chore: n-dx init` baseline commit the interactive path makes, so the
+  working tree is clean straight out of init.
+  
+  The setup wizard asks the question in the browser instead. A new
+  `GET /api/commands/init/preflight` reports whether the folder is already a
+  repository and whether `git` is on PATH; the question appears only when there
+  is something to decide, is disabled with an explanation when git is missing,
+  and travels to `POST /api/commands/init` as `git: boolean`. The init status
+  endpoint reports `gitRequested` / `gitInitialized`, confirmed from disk rather
+  than from the exit code — `ndx init` treats a failed `git init` as a warning
+  and still exits 0.
+  
+  The wizard also addresses the project through its hub prefix now. Plain `ndx
+  start` registers with the per-user hub, which serves each project at
+  `/p/<id>/`; the page's root-relative `fetch("/api/...")` calls reached the hub
+  instead, which answers 409 once a second project is registered.
+  
+  Initializing from the dashboard also moves the running server onto the layout
+  init wrote. A server started in an empty folder resolves its paths before
+  anything exists, so it holds the legacy roots (`.rex`, `.sourcevision`,
+  `.hench`) while `ndx init` gives a new project the `.ndx/` container — the
+  dashboard went on serving the setup page, and every data route read an empty
+  project, until the server was restarted by hand.
+
+- [#486](https://github.com/en-dash-consulting/n-dx/pull/486) [`153f6a2`](https://github.com/en-dash-consulting/n-dx/commit/153f6a2babfc936f39fd659a4a8e6686a826b5f8) Thanks [@endash-shal](https://github.com/endash-shal)! - Start a new project from the hub.
+  
+  The hub's chooser listed the repositories `ndx start` had registered and gave
+  no way to add one — a new project meant leaving the browser, making a folder,
+  and running the CLI there. It now has a **New project** button: a folder name,
+  the directory to put it in, and the exact absolute path it will create, checked
+  against the filesystem as you type.
+  
+  That preview is the point. `GET /api/hub/new-project` resolves the path
+  server-side and says whether it can be created, so `..`, a relative parent and
+  a `~` all display as what they actually are, and the refusals arrive before
+  anything is written: a parent that does not exist, a name that is really a path,
+  a folder that already has content (pointed at `ndx start` instead). An existing
+  *empty* folder is adopted, and says so.
+  
+  `POST /api/hub/projects/new` re-plans rather than trusting the client, creates
+  the folder, registers it with the hub's own n-dx binary, and answers with its
+  URL — the setup wizard an uninitialized project already serves, which is where
+  assistants, the LLM vendor and the git repository get decided. One path into
+  init, the one that already works. The button is busy, with a spinner and the
+  path it is creating, for the seconds the folder and its server take.
+  
+  A hub-created folder also gets the `.n-dx-web.pid` / `.n-dx-web.port` markers
+  `ndx start` would have left, so `ndx start status` and `ndx start stop` work in
+  it like any other registered project.
+- Updated dependencies []:
+  - @n-dx/llm-client@0.8.1
+  - @n-dx/rex@0.8.1
+  - @n-dx/sourcevision@0.8.1
+
 ## 0.8.0
 
 ### Minor Changes
