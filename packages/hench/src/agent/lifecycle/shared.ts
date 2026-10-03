@@ -26,7 +26,7 @@ import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { exec, getCurrentHead, execStdout } from "../../process/exec.js";
-import { execGitMutation } from "../../process/git-mutation.js";
+import { execCheckedGit, execGitMutation } from "../../process/git-mutation.js";
 import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
@@ -1612,8 +1612,11 @@ const PRE_RUN_COMMIT_DIFF_CHAR_LIMIT = 12_000;
 /** Deterministic message used when the LLM is unavailable or errors. */
 const PRE_RUN_COMMIT_FALLBACK_MESSAGE = "chore: commit local changes before hench run";
 
-export type PreRunCommitChoice = "commit" | "stop" | "proceed";
+export type PreRunCommitChoice = "commit" | "stash" | "discard" | "stop" | "proceed";
 export type PreRunCommitGateResult = "proceed" | "stop";
+
+/** Stash label prefix, so `git stash list` says where the entry came from. */
+const PRE_RUN_STASH_PREFIX = "hench pre-run";
 
 /**
  * How the pre-run prompt should present its choices.
@@ -1633,6 +1636,10 @@ export interface PreRunPromptOptions {
  * the default: "proceed" normally, "commit" when escalated or when proceeding
  * is disallowed. A "proceed" answer while disallowed re-resolves to the
  * default rather than sneaking past requireCleanTree. Exported for tests.
+ *
+ * `s` stays bound to "stop" — it has meant that since the gate shipped, and
+ * silently repointing a one-key answer at `stash` would make muscle memory
+ * start a run the operator meant to abort. Stash takes `t`, discard `d`.
  */
 export function resolvePreRunCommitAnswer(
   answer: string | null,
@@ -1642,24 +1649,43 @@ export function resolvePreRunCommitAnswer(
   const fallback: PreRunCommitChoice = escalate || !allowProceed ? "commit" : "proceed";
   const trimmed = answer.trim().toLowerCase();
   if (trimmed === "c" || trimmed === "commit") return "commit";
+  if (trimmed === "t" || trimmed === "stash") return "stash";
+  if (trimmed === "d" || trimmed === "discard") return "discard";
   if (trimmed === "s" || trimmed === "stop") return "stop";
   if ((trimmed === "p" || trimmed === "proceed") && allowProceed) return "proceed";
   return fallback;
 }
 
 /**
- * Three-way prompt for the pre-run commit gate. Bare Enter takes the least
- * dangerous default (proceed normally, commit when escalated); Ctrl-C stops
- * (treat an interrupt as "don't start the run"). Built on the same
- * SIGINT-suspended readline core as the yes/no prompt.
+ * Prompt for the pre-run commit gate. Bare Enter takes the least dangerous
+ * default (proceed normally, commit when escalated); Ctrl-C stops (treat an
+ * interrupt as "don't start the run"). Built on the same SIGINT-suspended
+ * readline core as the yes/no prompt.
+ *
+ * `discard` is never a default and never reachable by a bare Enter — the
+ * caller confirms it separately before anything is removed.
  */
 async function promptPreRunCommitChoice(opts: PreRunPromptOptions): Promise<PreRunCommitChoice> {
   const def = opts.escalate || !opts.allowProceed ? "commit" : "proceed";
-  const choices = opts.allowProceed ? "[c]ommit / [s]top / [p]roceed" : "[c]ommit / [s]top";
+  const choices = opts.allowProceed
+    ? "[c]ommit / s[t]ash / [d]iscard / [s]top / [p]roceed"
+    : "[c]ommit / s[t]ash / [d]iscard / [s]top";
   const answer = await readLineWithSuspendedSigint(
-    `\nCommit these changes first? ${choices} (default: ${def}) `,
+    `\nWhat should happen to these changes? ${choices} (default: ${def}) `,
   );
   return resolvePreRunCommitAnswer(answer, opts);
+}
+
+/**
+ * Confirm a discard. Defaults to No: of the five answers this is the only one
+ * that destroys work, so it is the only one that costs a second keystroke.
+ */
+async function confirmPreRunDiscard(fileCount: number): Promise<boolean> {
+  return askYesNoWithSuspendedSigint(
+    `\nDiscard ${fileCount} uncommitted file(s)? Tracked changes are reverted and ` +
+      `untracked files are deleted. [y/N] `,
+    { interruptMode: "hold-then-exit", defaultYes: false },
+  );
 }
 
 /**
@@ -1723,6 +1749,79 @@ async function commitPreRunChanges(projectDir: string, message: string): Promise
   await execGitMutation(projectDir, ["add", "-A"], 30_000);
   const trailers = `N-DX: pre-run commit gate\n${buildCoAuthoredByTrailerLine()}`;
   await execGitMutation(projectDir, ["commit", "-m", message, "-m", trailers], 30_000);
+}
+
+/**
+ * Set the pre-existing changes aside under the same generated message the
+ * commit option would have used, prefixed so `git stash list` says where the
+ * entry came from.
+ *
+ * `--include-untracked` matters: the gate counts untracked files as dirty, so
+ * a stash that left them behind would hand the run a tree the gate had just
+ * reported as handled. Ignored files stay put (no `--all`) — `.hench/`,
+ * `node_modules/` and the rest are not the operator's work.
+ */
+async function stashPreRunChanges(projectDir: string, message: string): Promise<void> {
+  await execGitMutation(
+    projectDir,
+    ["stash", "push", "--include-untracked", "-m", `${PRE_RUN_STASH_PREFIX}: ${message}`],
+    60_000,
+  );
+}
+
+/**
+ * Discard the pre-existing changes: revert tracked files to HEAD and remove
+ * untracked ones.
+ *
+ * Done as a stash that is immediately dropped, rather than
+ * `git reset --hard` + `git clean -fd`. Both remove the same files, but the
+ * stash leaves a commit behind: dropping it only unlinks the ref, so the
+ * operator who answers `d` and then remembers what was in there has a sha to
+ * recover from (`git stash store <sha>` then `git stash pop`) until git gc
+ * reaps it. `git stash create` was the obvious way to snapshot first and is
+ * the wrong one — it has no `--include-untracked`, so the half of the discard
+ * that deletes new files would not have been in the snapshot at all.
+ *
+ * Ignored files are never touched (no `--all`, and no `git clean -x` anywhere
+ * in this path): `.hench/`, build output and tool state are not the changes
+ * this gate is about.
+ *
+ * Returns the dropped stash's sha, or undefined when git made no stash (an
+ * already-clean tree) — in which case nothing is dropped either. The drop is
+ * conditional on the subject matching the marker written moments earlier, so
+ * a pre-existing `stash@{0}` belonging to the operator can never be the entry
+ * this removes.
+ */
+async function discardPreRunChanges(projectDir: string): Promise<string | undefined> {
+  const marker = `${PRE_RUN_STASH_PREFIX} discard ${Date.now()}`;
+  await execGitMutation(
+    projectDir,
+    ["stash", "push", "--include-untracked", "-m", marker],
+    60_000,
+  );
+
+  let snapshot: string | undefined;
+  try {
+    const top = await execCheckedGit(
+      projectDir,
+      ["log", "-1", "--format=%H%x00%s", "refs/stash"],
+      15_000,
+    );
+    const [sha, subject = ""] = top.stdout.trim().split("\0");
+    if (sha && subject.includes(marker)) snapshot = sha;
+  } catch {
+    // No stash ref at all — nothing was stashed, so nothing to drop.
+  }
+  if (!snapshot) return undefined;
+
+  try {
+    await execGitMutation(projectDir, ["stash", "drop"], 15_000);
+  } catch {
+    // The entry stays in the stash list. The changes are still out of the
+    // working tree, which is what was asked for; the operator sees it in
+    // `git stash list` rather than losing it.
+  }
+  return snapshot;
 }
 
 /**
@@ -2128,8 +2227,8 @@ async function commitCompletionMetadata(
  *
  * WHY THIS EXISTS (GitHub #365). `--reset-deferred` resets deferred/failing
  * tasks to pending by writing the PRD tree, and moments later the pre-run
- * commit gate ({@link performPreRunCommitGateIfNeeded}) refuses an autonomous
- * run against *any* dirty tree — including the dirt the reset itself just
+ * commit gate ({@link performPreRunCommitGateIfNeeded}) stops — or, on a TTY,
+ * interrogates — an autonomous run against *any* dirty tree — including the dirt the reset itself just
  * produced. That made the flag deadlock against itself on the exact case it
  * exists for (resuming after an interruption), and the refusal exited 0, so
  * an unattended caller read it as success and the tasks stayed deferred.
@@ -2212,7 +2311,10 @@ export interface PreRunCommitGateOptions {
     collectDiff?: (dir: string) => Promise<ReviewDiff>;
     proposeMessage?: (diff: ReviewDiff, henchDir: string, model?: string) => Promise<string>;
     promptChoice?: (promptOpts: PreRunPromptOptions) => Promise<PreRunCommitChoice>;
+    confirmDiscard?: (fileCount: number) => Promise<boolean>;
     commit?: (dir: string, message: string) => Promise<void>;
+    stash?: (dir: string, message: string) => Promise<void>;
+    discard?: (dir: string) => Promise<string | undefined>;
     checkOrigin?: (dir: string, origin: RunGitOrigin | undefined) => string | undefined;
     isTTY?: boolean;
   };
@@ -2222,15 +2324,25 @@ export interface PreRunCommitGateOptions {
  * One-time pre-run git gate. Runs once per `hench run` invocation, before the
  * work loop begins (never per iteration). When the working tree carries
  * pre-existing uncommitted changes and the session is interactive, it shows
- * the diff stat plus a proposed commit message and asks whether to commit,
- * stop, or proceed. Clean trees always proceed without prompting.
+ * the diff stat plus a proposed message and asks what to do with them:
  *
- * Autonomous runs (--auto/--loop/--epic-by-epic) can't prompt without stalling
- * an unattended loop, so a dirty tree makes them *abort* by default rather than
- * silently absorb the pre-existing changes — pass `--allow-dirty` (allowDirty)
- * to proceed anyway. Other non-interactive runs (e.g. --yes, piped) proceed
- * unless `hench.git.requireCleanTree` is set (then they stop too, again
- * unless --allow-dirty).
+ * - `commit` — stage everything and commit under the generated message.
+ * - `stash`  — `git stash push -u` under the same generated message.
+ * - `discard` — revert tracked files and delete untracked ones, after a
+ *   second confirmation defaulting to No. A `git stash create` snapshot is
+ *   taken first, and its sha reported, so the answer is still recoverable.
+ * - `stop` / `proceed` — as before.
+ *
+ * Clean trees always proceed without prompting.
+ *
+ * Autonomous runs (--auto/--loop/--epic-by-epic) must not silently fold
+ * pre-existing changes into hench's own commits. On a TTY they get the same
+ * prompt — it runs once, before the loop, so it cannot stall an iteration —
+ * with the escalated default (commit) and an explicit `proceed` standing in
+ * for `--allow-dirty`. Without a TTY they abort as before. Other
+ * non-interactive runs (--yes, piped) proceed unless
+ * `hench.git.requireCleanTree` is set (then they stop too, again unless
+ * --allow-dirty).
  *
  * The gate is size-aware: when the uncommitted changes reach the checkpoint
  * threshold (`hench.git.checkpointThreshold` lines changed, default
@@ -2250,7 +2362,10 @@ export async function performPreRunCommitGateIfNeeded(
   const collectDiff = deps.collectDiff ?? ((dir: string) => collectReviewDiff(dir));
   const proposeMessage = deps.proposeMessage ?? proposePreRunCommitMessage;
   const promptChoice = deps.promptChoice ?? promptPreRunCommitChoice;
+  const confirmDiscard = deps.confirmDiscard ?? confirmPreRunDiscard;
   const commit = deps.commit ?? commitPreRunChanges;
+  const stash = deps.stash ?? stashPreRunChanges;
+  const discard = deps.discard ?? discardPreRunChanges;
   const checkOrigin = deps.checkOrigin ?? checkRunGitOrigin;
   const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
   const checkpointThreshold = opts.checkpointThreshold ?? DEFAULT_CHECKPOINT_THRESHOLD;
@@ -2266,12 +2381,23 @@ export async function performPreRunCommitGateIfNeeded(
 
   const magnitude = await measureMagnitude(projectDir);
   const magnitudeLabel = `${dirty.length} uncommitted file(s), ${magnitude.linesChanged} line(s) changed`;
+  // An autonomous run that would otherwise have refused is itself an
+  // escalation: the prompt must not let a bare Enter proceed into the loop
+  // with someone else's changes in the tree, so the default becomes "commit"
+  // exactly as it does above the checkpoint threshold.
+  const autonomousDirty = Boolean(autonomous) && !allowDirty;
   const escalate =
-    !allowDirty && checkpointThreshold > 0 && magnitude.linesChanged >= checkpointThreshold;
+    autonomousDirty ||
+    (!allowDirty && checkpointThreshold > 0 && magnitude.linesChanged >= checkpointThreshold);
 
-  // Only prompt in an attended TTY session. Autonomous (--auto/--loop/
-  // --epic-by-epic) and --yes runs can't prompt without stalling.
-  const isInteractive = isTTY && !yes && !autonomous;
+  // Only prompt in an attended TTY session. Autonomous runs are included, but
+  // only where they would otherwise have been refused outright: this gate runs
+  // once per invocation, before the work loop starts, so a prompt here cannot
+  // stall an iteration mid-flight — and refusing to start was the worse
+  // outcome when someone was sitting there able to answer. `--allow-dirty` is
+  // the operator saying "just go", so it keeps the silent autonomous path;
+  // --yes and non-TTY runs still can't prompt and keep the fail-fast below.
+  const isInteractive = isTTY && !yes && (!autonomous || autonomousDirty);
   if (!isInteractive) {
     // Autonomous runs must not fold a pre-existing dirty tree into hench's own
     // commits. They can't prompt (that would hang an unattended loop), so fail
@@ -2302,7 +2428,12 @@ export async function performPreRunCommitGateIfNeeded(
   section("Uncommitted changes detected");
   subsection("Changes");
   info(diff.stat || `${dirty.length} file(s)`);
-  if (escalate) {
+  if (autonomousDirty) {
+    info(
+      `⚠ An autonomous run would fold ${magnitudeLabel} into its own commits. ` +
+        `Deal with them first, or choose proceed to accept that (same as --allow-dirty).`,
+    );
+  } else if (escalate) {
     info(
       `⚠ Large uncommitted change: ${magnitudeLabel} (threshold: ${checkpointThreshold}). ` +
         `Committing a checkpoint before the run is strongly recommended.`,
@@ -2314,27 +2445,54 @@ export async function performPreRunCommitGateIfNeeded(
   subsection("Proposed commit message");
   info(proposed);
 
-  const choice = await promptChoice({ escalate, allowProceed: !requireCleanTree });
+  const allowProceed = !requireCleanTree;
+  const choice = await promptChoice({ escalate, allowProceed });
   if (choice === "stop") return "stop";
-  if (choice === "commit") {
-    // Between capture and here the operator answered a prompt, which is long
-    // enough for another process to move the checkout. The changes stay in
-    // the tree and the caller must not start a run that could absorb them.
-    const drift = checkOrigin(projectDir, opts.origin);
-    if (drift) {
-      info(
-        `⚠ Refusing to commit pre-existing changes: ${drift}. ` +
-          `They remain in the working tree.`,
-      );
-      return "proceed";
-    }
-    try {
+  if (choice === "proceed") return "proceed";
+
+  // Leaving the changes where they are: honest when the operator was free to
+  // proceed anyway, wrong when the run was only allowed to start because they
+  // were going to be dealt with.
+  const leaveInPlace = (): PreRunCommitGateResult =>
+    allowProceed && !autonomousDirty ? "proceed" : "stop";
+
+  if (choice === "discard" && !(await confirmDiscard(dirty.length))) {
+    info("Discard cancelled — changes left in the working tree.");
+    return leaveInPlace();
+  }
+
+  // Between capture and here the operator answered a prompt, which is long
+  // enough for another process to move the checkout. The changes stay in the
+  // tree and the caller must not start a run that could absorb them.
+  const drift = checkOrigin(projectDir, opts.origin);
+  if (drift) {
+    info(
+      `⚠ Refusing to ${choice} pre-existing changes: ${drift}. ` +
+        `They remain in the working tree.`,
+    );
+    return leaveInPlace();
+  }
+
+  try {
+    if (choice === "commit") {
       await commit(projectDir, proposed);
       info("Committed pre-existing changes. Starting run…");
-    } catch (err) {
-      info(`⚠ Pre-run commit failed: ${(err as Error).message} — stopping before work starts.`);
-      return "stop";
+    } else if (choice === "stash") {
+      await stash(projectDir, proposed);
+      info("Stashed pre-existing changes (git stash pop to restore). Starting run…");
+    } else {
+      const snapshot = await discard(projectDir);
+      info(
+        snapshot
+          ? `Discarded pre-existing changes. Recoverable until git gc: git stash store ${snapshot}`
+          : "Discarded pre-existing changes.",
+      );
     }
+  } catch (err) {
+    info(
+      `⚠ Pre-run ${choice} failed: ${(err as Error).message} — stopping before work starts.`,
+    );
+    return "stop";
   }
   return "proceed";
 }
