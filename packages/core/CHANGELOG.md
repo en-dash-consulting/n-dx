@@ -1,5 +1,50 @@
 # @n-dx/core
 
+## 0.8.1
+
+### Patch Changes
+
+- [#486](https://github.com/en-dash-consulting/n-dx/pull/486) [`153f6a2`](https://github.com/en-dash-consulting/n-dx/commit/153f6a2babfc936f39fd659a4a8e6686a826b5f8) Thanks [@endash-shal](https://github.com/endash-shal)! - Initialize a blank folder — including its git repository — from the dashboard.
+  
+  `ndx start` in an empty folder already served the setup page with an
+  **Initialize project** button, but the init it ran could never create a git
+  repository: the preflight prompt that offers one needs a TTY, and the wizard
+  spawns `ndx init` with piped stdio. A folder set up that way stayed outside
+  version control, with auto-commit, pair programming, and the hench run loop
+  silently disabled.
+  
+  `ndx init` now takes `--git` / `--no-git`, which answer that prompt ahead of
+  time — the only way a run without a TTY can create a repository. `--git` also
+  gets the `chore: n-dx init` baseline commit the interactive path makes, so the
+  working tree is clean straight out of init.
+  
+  The setup wizard asks the question in the browser instead. A new
+  `GET /api/commands/init/preflight` reports whether the folder is already a
+  repository and whether `git` is on PATH; the question appears only when there
+  is something to decide, is disabled with an explanation when git is missing,
+  and travels to `POST /api/commands/init` as `git: boolean`. The init status
+  endpoint reports `gitRequested` / `gitInitialized`, confirmed from disk rather
+  than from the exit code — `ndx init` treats a failed `git init` as a warning
+  and still exits 0.
+  
+  The wizard also addresses the project through its hub prefix now. Plain `ndx
+  start` registers with the per-user hub, which serves each project at
+  `/p/<id>/`; the page's root-relative `fetch("/api/...")` calls reached the hub
+  instead, which answers 409 once a second project is registered.
+  
+  Initializing from the dashboard also moves the running server onto the layout
+  init wrote. A server started in an empty folder resolves its paths before
+  anything exists, so it holds the legacy roots (`.rex`, `.sourcevision`,
+  `.hench`) while `ndx init` gives a new project the `.ndx/` container — the
+  dashboard went on serving the setup page, and every data route read an empty
+  project, until the server was restarted by hand.
+- Updated dependencies [[`153f6a2`](https://github.com/en-dash-consulting/n-dx/commit/153f6a2babfc936f39fd659a4a8e6686a826b5f8), [`153f6a2`](https://github.com/en-dash-consulting/n-dx/commit/153f6a2babfc936f39fd659a4a8e6686a826b5f8)]:
+  - @n-dx/web@0.8.1
+  - @n-dx/hench@0.8.1
+  - @n-dx/llm-client@0.8.1
+  - @n-dx/rex@0.8.1
+  - @n-dx/sourcevision@0.8.1
+
 ## 0.8.0
 
 ### Minor Changes

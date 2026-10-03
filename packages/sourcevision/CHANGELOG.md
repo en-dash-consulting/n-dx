@@ -1,5 +1,12 @@
 # @n-dx/sourcevision
 
+## 0.8.1
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @n-dx/llm-client@0.8.1
+
 ## 0.8.0
 
 ### Minor Changes
