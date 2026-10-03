@@ -5,6 +5,7 @@
  *
  * POST /api/commands/init            — bootstrap ndx init from the dashboard's setup wizard (pre-init only)
  * GET  /api/commands/init/status     — check running init status
+ * GET  /api/commands/init/preflight  — pre-init environment check (git repo / git on PATH)
  * POST /api/commands/sv-analyze      — re-run sourcevision analyze (full: true → async, see status)
  * GET  /api/commands/sv-analyze/status — check running full-analysis status
  * POST /api/commands/sv-analyze/stop — interrupt the running full analysis
@@ -39,7 +40,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, dirname, relative, resolve, sep } from "node:path";
 import { createRequire } from "node:module";
 import { redactSecrets, exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
 import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
@@ -150,6 +151,15 @@ interface InitStatus {
   finishedAt: string | null;
   output: string;
   error: string | null;
+  /** True when this run was asked to create a git repository (`git: true`). */
+  gitRequested: boolean;
+  /**
+   * Whether the directory is a git repository now that init has finished.
+   * Null until a run that requested one completes — the wizard reports
+   * "repository created" from this rather than from the run's exit code,
+   * because `ndx init` treats a failed `git init` as a warning, not a failure.
+   */
+  gitInitialized: boolean | null;
 }
 
 // Module-level singleton — one init at a time per server process. The
@@ -162,6 +172,8 @@ const initStatuses = new WorkspaceScoped<InitStatus>(() => ({
   finishedAt: null,
   output: "",
   error: null,
+  gitRequested: false,
+  gitInitialized: null,
 }));
 
 // ── Binary resolution helpers ─────────────────────────────────────────
@@ -930,8 +942,13 @@ function handleSelfHealStatus(
  * which is why this handler requires `provider` explicitly rather than
  * falling back to an interactive default.
  *
+ * The same piped stdio is why `git` is part of the body: `ndx init`'s git
+ * preflight prompt never fires without a TTY, so a blank folder would stay
+ * outside version control no matter what the operator wanted. The wizard asks
+ * in the browser instead and the answer travels as `--git` / `--no-git`.
+ *
  * Body: { assistants?: ("claude"|"codex")[], provider: "claude"|"codex"|"google"|"local",
- *   googleApiKey?: string, localHost?: string, localPort?: number }
+ *   googleApiKey?: string, localHost?: string, localPort?: number, git?: boolean }
  */
 async function handleInit(
   req: IncomingMessage,
@@ -950,6 +967,7 @@ async function handleInit(
   let googleApiKey = "";
   let localHost = "";
   let localPort: number | undefined;
+  let git: boolean | undefined;
 
   try {
     const body = await readBody(req, res);
@@ -959,6 +977,7 @@ async function handleInit(
       googleApiKey?: unknown;
       localHost?: unknown;
       localPort?: unknown;
+      git?: unknown;
     };
 
     if (Array.isArray(input.assistants) && input.assistants.length > 0) {
@@ -973,6 +992,8 @@ async function handleInit(
       return true;
     }
     provider = input.provider;
+
+    if (typeof input.git === "boolean") git = input.git;
 
     if (typeof input.googleApiKey === "string") googleApiKey = input.googleApiKey.trim();
     if (typeof input.localHost === "string") localHost = input.localHost.trim();
@@ -989,6 +1010,9 @@ async function handleInit(
     ...prefixArgs, "init", "--quiet",
     `--provider=${provider}`,
     `--assistants=${assistants.join(",")}`,
+    // Omitted when the wizard sent no answer, so `ndx init` keeps its own
+    // default rather than this route deciding for it.
+    ...(git === undefined ? [] : [git ? "--git" : "--no-git"]),
     ctx.projectDir,
   ];
 
@@ -997,6 +1021,8 @@ async function handleInit(
   initStatus.finishedAt = null;
   initStatus.output = "";
   initStatus.error = null;
+  initStatus.gitRequested = git === true;
+  initStatus.gitInitialized = null;
 
   // Return 202 immediately, run in background — first-time init runs a
   // sourcevision analyze pass and can take a while on a large repo.
@@ -1023,6 +1049,7 @@ async function handleInit(
       initStatus.finishedAt = new Date().toISOString();
       initStatus.output = outputTail((result.stdout || "").trim(), 5000);
       initStatus.error = failure;
+      if (git === true) initStatus.gitInitialized = isInsideGitRepo(ctx.projectDir);
       return;
     }
 
@@ -1048,6 +1075,10 @@ async function handleInit(
     initStatus.finishedAt = new Date().toISOString();
     initStatus.output = outputTail((result.stdout || "").trim(), 5000);
     initStatus.error = null;
+    // `ndx init` reports a failed `git init` as a warning in its recap and
+    // still exits 0, so the repository is confirmed on disk rather than
+    // inferred from the exit code.
+    if (git === true) initStatus.gitInitialized = isInsideGitRepo(ctx.projectDir);
 
     // The project is now initialized — re-register the file watchers that
     // were skipped at server startup (because .rex/.sourcevision/.hench
@@ -1061,6 +1092,57 @@ async function handleInit(
     initStatus.error = String(err);
   });
 
+  return true;
+}
+
+/**
+ * Walk up from `dir` looking for a `.git` entry. A submodule or linked
+ * worktree keeps a `.git` *file* rather than a directory, so both forms count.
+ *
+ * Mirrors `isInsideGitRepo` in packages/core/git-preflight.js — duplicated
+ * rather than imported because core is the orchestration tier and the web
+ * server, two tiers below it, must not import from it.
+ */
+function isInsideGitRepo(dir: string): boolean {
+  let cur = resolve(dir);
+  for (;;) {
+    if (existsSync(join(cur, ".git"))) return true;
+    const parent = dirname(cur);
+    if (parent === cur) return false;
+    cur = parent;
+  }
+}
+
+/**
+ * GET /api/commands/init/preflight — what the setup wizard needs to know
+ * about this folder before it offers to initialize it:
+ *
+ *   isRepo       — already inside a git working tree (the wizard then has no
+ *                  git question to ask).
+ *   gitAvailable — `git` answers on this machine's PATH. Without it, asking
+ *                  for a repository can only produce a warning, so the wizard
+ *                  says so up front instead of after a five-minute init.
+ *
+ * Pre-init only, like the rest of the wizard's surface; safe to call at any
+ * time (it reads the filesystem and runs `git --version`).
+ */
+async function handleInitPreflight(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  const isRepo = isInsideGitRepo(ctx.projectDir);
+  const version = await foundationExec("git", ["--version"], {
+    cwd: ctx.projectDir,
+    timeout: 10_000,
+  }).catch(() => null);
+  jsonResponse(res, 200, {
+    isRepo,
+    // `launched` is what separates "git is not installed" from "git ran and
+    // said no" — an exitCode check alone reports both as unavailable.
+    gitAvailable: version !== null && version.launched && version.exitCode === 0,
+    projectDir: ctx.projectDir,
+  });
   return true;
 }
 
@@ -2047,6 +2129,9 @@ export function handleCommandsRoute(
   }
   if (path === "init/status" && method === "GET") {
     return handleInitStatus(req, res, ctx);
+  }
+  if (path === "init/preflight" && method === "GET") {
+    return handleInitPreflight(req, res, ctx);
   }
   if (path === "sv-analyze" && method === "POST") {
     return handleSvAnalyze(req, res, ctx, broadcast);

@@ -117,8 +117,10 @@ describe("renderHomePage", () => {
     const start = doc.querySelector(".card .action-primary")!;
     expect(start.textContent).toBe("Start working");
     expect(start.getAttribute("href")).toBe("/p/alpha/hench-runs");
-    // No form, no POST — the existing Start Task button on that view owns it.
-    expect(doc.querySelector("form")).toBeNull();
+    // No form, no POST on a card — the existing Start Task button on that
+    // view owns starting a run. (The page's one form is the new-project
+    // panel in the header, which is about creating a project, not running one.)
+    expect(doc.querySelector(".cards form")).toBeNull();
   });
 
   it("says what to do when nothing is registered", () => {
@@ -135,6 +137,54 @@ describe("renderHomePage", () => {
     expect(doc.querySelector("img")).toBeNull();
     expect(doc.querySelector(".card-title a")?.textContent).toBe('<img src=x onerror="alert(1)">');
     expect(doc.querySelector(".path")?.textContent).toBe("/repos/a&b");
+  });
+});
+
+describe("the new-project panel", () => {
+  const PARENT = "/code/projects";
+
+  it("offers a New project button that controls the panel, closed to begin with", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS, PARENT));
+    const toggle = doc.getElementById("new-toggle")!;
+    expect(toggle.textContent).toBe("New project");
+    expect(toggle.getAttribute("aria-controls")).toBe("new-panel");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(doc.getElementById("new-panel")?.hasAttribute("hidden")).toBe(true);
+  });
+
+  it("shows the folder the project would go in before anything is typed", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS, PARENT));
+    expect(doc.querySelector<HTMLInputElement>("#new-parent")?.getAttribute("value")).toBe(PARENT);
+    // The path is on screen in the first paint, not only once a fetch answers.
+    expect(doc.getElementById("new-preview")?.textContent).toContain(PARENT);
+  });
+
+  it("announces the path and the progress to a screen reader", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS, PARENT));
+    expect(doc.getElementById("new-preview")?.getAttribute("aria-live")).toBe("polite");
+    expect(doc.getElementById("new-status")?.getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("keeps the submit button disabled until a path has been checked", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS, PARENT));
+    expect(doc.querySelector<HTMLButtonElement>("#new-submit")?.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("asks the server for the path rather than joining it in the browser", () => {
+    const html = renderHomePage(TWO_PROJECTS, PARENT);
+    expect(html).toContain("/api/hub/new-project?");
+    expect(html).toContain("/api/hub/projects/new");
+  });
+
+  it("escapes a parent directory rather than letting it close the attribute", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS, '/x" onfocus="alert(1)'));
+    expect(doc.querySelector<HTMLInputElement>("#new-parent")?.getAttribute("onfocus")).toBeNull();
+  });
+
+  it("invites creating one when nothing is registered yet", () => {
+    const doc = renderToDocument(renderHomePage({ projects: [], generatedAt: "t" }, PARENT));
+    expect(doc.getElementById("new-toggle")).not.toBeNull();
+    expect(doc.querySelector(".empty")?.textContent).toContain("Create one above");
   });
 });
 
