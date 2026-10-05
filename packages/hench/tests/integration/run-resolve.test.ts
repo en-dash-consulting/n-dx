@@ -19,9 +19,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve as resolvePath } from "node:path";
 import { resolveModel, NEWEST_MODELS, REVIEW_MODELS, TIER_MODELS } from "@n-dx/llm-client";
-import { resolveRun } from "../../src/cli/commands/run-resolve.js";
+import { resolveRun, shellWord } from "../../src/cli/commands/run-resolve.js";
 import type { RunRefusalCode, RunResolution } from "../../src/cli/commands/run-resolve.js";
 import { cmdRun } from "../../src/cli/commands/run.js";
 import { readSessionCache, writeSessionCache } from "../../src/agent/lifecycle/session-cache.js";
@@ -56,6 +56,11 @@ const extraDirs: string[] = [];
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim();
+}
+
+/** Git prints forward slashes on Windows; resolve() gives the native form the code reports. */
+function gitToplevel(cwd: string): string {
+  return resolvePath(git(cwd, "rev-parse", "--show-toplevel"));
 }
 
 /** Write `.n-dx.json` and commit it, so the tree stays clean. */
@@ -104,7 +109,7 @@ describe("the resolution report", () => {
       claimedBy: null,
     });
     expect(r.workspace).toEqual({
-      root: git(projectDir, "rev-parse", "--show-toplevel"),
+      root: gitToplevel(projectDir),
       branch: git(projectDir, "branch", "--show-current"),
       isAnchor: true,
       dirty: false,
@@ -191,7 +196,7 @@ describe("the resolution report", () => {
     expect(r.resolved.reviewOptional).toEqual({ value: true, source: "cli-flag" });
     expect(r.command).toBe(
       "ndx work --task=t-deferred --auto --review --review-optional --reset-deferred --mine --priority=high " +
-        `--context-file='/tmp/notes with space.md' ${projectDir}`,
+        `--context-file=${shellWord("/tmp/notes with space.md")} ${projectDir}`,
     );
   });
 
@@ -387,7 +392,7 @@ describe("refusals are reported, not thrown", () => {
     try {
       const r = await resolve({ task: "t-pending" });
       expect(codes(r)).toEqual(["claimed-elsewhere"]);
-      expect(r.task?.claimedBy?.worktree).toBe(git(other, "rev-parse", "--show-toplevel"));
+      expect(r.task?.claimedBy?.worktree).toBe(gitToplevel(other));
     } finally {
       await claims.releaseAll();
     }
