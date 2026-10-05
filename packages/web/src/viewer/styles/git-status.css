@@ -117,6 +117,7 @@
 
 .git-file-row {
   display: flex;
+  align-items: center;
 }
 
 .git-file-toggle {
@@ -124,6 +125,7 @@
   align-items: center;
   gap: 0.4rem;
   width: 100%;
+  min-width: 0;
   padding: 0.3rem 0.5rem;
   background: none;
   border: none;
@@ -156,6 +158,44 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Untracked rows only — adds the path to .gitignore. Kept visually quiet
+ * (dimmed until the row is hovered) so it doesn't compete with the diff
+ * toggle, which is the primary action on every row. */
+.git-file-ignore-btn {
+  flex-shrink: 0;
+  margin-right: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+.git-file-row:hover .git-file-ignore-btn,
+.git-file-ignore-btn:focus-visible {
+  opacity: 1;
+  border-color: var(--border);
+}
+
+.git-file-ignore-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.git-file-ignore-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.git-file-ignore-error {
+  padding: 0.2rem 0.5rem 0.35rem;
+  font-size: 0.7rem;
+  color: var(--red);
 }
 
 .git-file-diff-container {
