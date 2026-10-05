@@ -22,4 +22,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Document that stdio MCP servers follow the client's roots in worktree sessions](./document-that-stdio-mcp-servers-follow.md) | pending |
 | [MCP shim bridge mode opens the hub session for the client's worktree from MCP roots](./mcp-shim-bridge-mode-opens-the-hub.md) | completed |
 | [Rex stdio MCP server resolves its workspace from the client's MCP roots](./rex-stdio-mcp-server-resolves-its.md) | completed |
-| [Sourcevision stdio MCP server resolves its workspace from the client's MCP roots](./sourcevision-stdio-mcp-server-resolves.md) | pending |
+| [Sourcevision stdio MCP server resolves its workspace from the client's MCP roots](./sourcevision-stdio-mcp-server-resolves.md) | completed |
