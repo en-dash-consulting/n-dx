@@ -18,5 +18,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Prepare task: run one task from Work with every ndx work option visible](./prepare-task-run-one-task-from-work/index.md) | pending |
+| [Prepare task: run one task from Work with every ndx work option visible](./prepare-task-run-one-task-from-work/index.md) | completed |
 | [The hub sends no per-user token on its own calls to project servers, so queued runs and the session cap fail with auth on](./the-hub-sends-no-per-user-token-on-its.md) | pending |
