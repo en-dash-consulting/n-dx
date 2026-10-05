@@ -1,6 +1,12 @@
 export type { PRDStore, StoreCapabilities } from "./contracts.js";
 export { FileStore, ensureRexDir, PRD_FILENAME } from "./file-adapter.js";
-export { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath, resolveRexPaths } from "./paths.js";
+export {
+  PRD_CACHE_DIRNAME,
+  PRD_TREE_DIRNAME,
+  TREE_META_FILENAME,
+  prdLockPath,
+  resolveRexPaths,
+} from "./paths.js";
 export type { RexPaths } from "./paths.js";
 export {
   sanitizeBranchName,

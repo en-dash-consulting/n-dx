@@ -99,6 +99,12 @@ export interface ExecOptions {
    */
   treeKill?: boolean;
   /**
+   * Stop the command when this signal aborts, its process tree included under
+   * {@link treeKill}. Resolves `exitCode: null` with a `killed: true` error, like
+   * an outside signal. A signal already aborted never spawns: `launched: false`.
+   */
+  signal?: AbortSignal;
+  /**
    * BETA, default OFF. On timeout, freeze the process tree with SIGSTOP and prove
    * it is stopped before killing it, instead of signalling and sweeping. POSIX
    * only; no effect on Windows, which has no pure-JS pause.
@@ -194,6 +200,7 @@ export function exec(
     env,
     onData,
     treeKill = true,
+    signal: abortSignal,
     freeze = isPosixFreezeKillEnabled(env ?? process.env),
     _platform = process.platform as NodeJS.Platform,
     _windowsVerbatimArguments,
@@ -208,12 +215,15 @@ export function exec(
     let stderrBytes = 0;
     let overflowed: "stdout" | "stderr" | null = null;
     let timedOut = false;
+    let aborted = false;
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let releaseInterrupts: (() => void) | undefined;
+    let detachAbort: (() => void) | undefined;
 
     const finish = (result: ExecResult): void => {
       if (timer) clearTimeout(timer);
+      detachAbort?.();
       // Both are cleanup for a child that is done: every path here either never
       // spawned one, or reaches this after it has stopped. Leaving the
       // registration behind would forward a later Ctrl-C to a dead group and,
@@ -225,6 +235,17 @@ export function exec(
     };
 
     const text = (chunks: Buffer[]): string => Buffer.concat(chunks).toString("utf-8");
+
+    if (abortSignal?.aborted) {
+      finish({
+        stdout: "",
+        stderr: "",
+        exitCode: null,
+        error: Object.assign(new Error(`Command aborted before it started: ${display}`), { killed: true }),
+        launched: false,
+      });
+      return;
+    }
 
     const spawnOptions = treeKill ? treeKillSpawnOptions(_platform) : {};
 
@@ -340,7 +361,7 @@ export function exec(
       // (hench tests/unit/tools/shell.test.ts), and silently as a leaked process
       // everywhere else. An externally delivered signal is not ours to wait on, so
       // it still reports immediately.
-      if (timedOut) return;
+      if (timedOut || aborted) return;
       if (signal !== null) {
         finish({
           stdout,
@@ -387,6 +408,27 @@ export function exec(
             });
           });
       }, timeout);
+    }
+
+    if (abortSignal) {
+      const onAbort = (): void => {
+        if (settled || timedOut) return;
+        aborted = true;
+        // Like the timeout path, settle only once the tree has been stopped.
+        void stopChild()
+          .catch(() => { /* best effort — see the timeout path */ })
+          .then(() => {
+            finish({
+              stdout: text(stdoutChunks),
+              stderr: text(stderrChunks),
+              exitCode: null,
+              error: killedError(display, timeout, false, "SIGTERM"),
+              launched: true,
+            });
+          });
+      };
+      abortSignal.addEventListener("abort", onAbort, { once: true });
+      detachAbort = () => abortSignal.removeEventListener("abort", onAbort);
     }
 
     // Close the child's stdin immediately. stdio is piped so callers get buffered

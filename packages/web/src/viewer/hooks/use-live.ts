@@ -125,6 +125,8 @@ export interface LiveJobFull extends LiveJobSummary {
 export interface LiveNextTask {
   id: string;
   title: string;
+  status: string;
+  blockedBy?: string[];
   priority: string | null;
   epicChain: LiveChainLink[];
 }

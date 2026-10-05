@@ -25,8 +25,8 @@ import { existsSync, mkdirSync } from "node:fs";
 import { basename, isAbsolute } from "node:path";
 import { ProjectSupervisor } from "./children.js";
 import type { ChildStatus, SupervisorOptions } from "./children.js";
-import { AdmissionGate, countProjectExecutions } from "./admission.js";
-import type { AdmissionLimits, QueueEntry, QueueSnapshot } from "./admission.js";
+import { AdmissionGate, countProjectExecutions, redactQueueEntry } from "./admission.js";
+import type { AdmissionLimits, ExecuteRefusal, PublicQueueSnapshot, QueueEntry, StartOutcome } from "./admission.js";
 import {
   hubConfigPath,
   hubPidPath,
@@ -157,6 +157,34 @@ export function normalizeWorktree(path: string): string {
   return trimmed || path;
 }
 
+/** POST an execute-shaped request for a queue entry to its project server, as the hub. */
+function postExecute(
+  port: number,
+  path: string,
+  entry: Omit<QueueEntry, "enqueuedAt">,
+  timeoutMs: number,
+): Promise<Response> {
+  return fetch(`http://127.0.0.1:${port}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(entry.workspace ? { "x-ndx-workspace": entry.workspace } : {}),
+    },
+    body: JSON.stringify({ taskId: entry.taskId, ...(entry.options ? { options: entry.options } : {}) }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+}
+
+/** A response's JSON body when it is an object; null for anything else. */
+async function readJsonObject(res: Response): Promise<Record<string, unknown> | null> {
+  try {
+    const body: unknown = await res.json();
+    return body !== null && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : null;
+  } catch {
+    return null; // not JSON: the caller falls back to the status alone
+  }
+}
+
 /**
  * Hub state and operations, independent of HTTP so the routes stay thin and
  * the lifecycle is testable without a socket.
@@ -240,6 +268,7 @@ export class Hub {
       },
       countRunning: () => this.countRunningExecutions(),
       start: (entry) => this.startQueuedExecution(entry),
+      validate: (request) => this.validateQueuedExecution(request),
       freeMemory: options.freeMemory,
       drainIntervalMs: options.drainIntervalMs,
       log: this.log,
@@ -257,32 +286,54 @@ export class Hub {
 
   /**
    * Start a queued run on its project's server, as the hub rather than as the
-   * client that queued it — that client got its 202 and is long gone.
+   * client that queued it — that client got its 202 and is long gone. Carries
+   * the options the request was queued with, so a queued run is the run the
+   * operator asked for.
    */
-  private async startQueuedExecution(entry: QueueEntry): Promise<boolean> {
-    const project = this.getProject(entry.projectId);
-    const port = project?.status.port ?? project?.port ?? null;
-    if (port === null) return false;
+  private async startQueuedExecution(entry: QueueEntry): Promise<StartOutcome> {
+    const port = this.projectPort(entry.projectId);
+    if (port === null) return { started: false, status: null, error: "Its project is no longer served by the hub." };
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(entry.workspace ? { "x-ndx-workspace": entry.workspace } : {}),
-        },
-        body: JSON.stringify({ taskId: entry.taskId }),
-        signal: AbortSignal.timeout(30_000),
-      });
+      const res = await postExecute(port, "/api/hench/execute", entry, 30_000);
       if (!res.ok) {
+        const body = await readJsonObject(res);
+        const error = typeof body?.error === "string" && body.error ? body.error : `HTTP ${res.status}`;
         this.log(`[hub] admission: ${entry.projectId}/${entry.taskId} refused by its server (HTTP ${res.status})`);
-        return false;
+        return { started: false, status: res.status, error };
       }
       this.log(`[hub] admission: started queued ${entry.projectId}/${entry.taskId}`);
-      return true;
+      return { started: true };
     } catch (err) {
       this.log(`[hub] admission: could not start ${entry.projectId}/${entry.taskId} — ${(err as Error).message}`);
-      return false;
+      return { started: false, status: null, error: `Its server could not be reached: ${(err as Error).message}` };
     }
+  }
+
+  /**
+   * Ask a request's project server, before queuing it, whether it would start
+   * (`POST /api/hench/execute/check`). Null when there is no verdict — the
+   * server is unreachable, or predates the route and answers 404 — and the
+   * request queues as it always did; the replay is still judged, and a refusal
+   * then is recorded as dropped.
+   */
+  private async validateQueuedExecution(request: Omit<QueueEntry, "enqueuedAt">): Promise<ExecuteRefusal | null> {
+    const port = this.projectPort(request.projectId);
+    if (port === null) return null;
+    try {
+      const res = await postExecute(port, "/api/hench/execute/check", request, 10_000);
+      if (res.status !== 200) return null;
+      const verdict = await readJsonObject(res);
+      if (verdict?.ok !== false || typeof verdict.status !== "number") return null;
+      const { ok: _ok, status, ...body } = verdict;
+      return { status: status as number, body };
+    } catch {
+      return null;
+    }
+  }
+
+  private projectPort(projectId: string): number | null {
+    const project = this.getProject(projectId);
+    return project?.status.port ?? project?.port ?? null;
   }
 
   /**
@@ -293,12 +344,18 @@ export class Hub {
    * entry list narrows: asked through `/p/<id>/`, a viewer gets its own
    * project's queue, since it can neither act on nor identify another's.
    */
-  queueSnapshot(projectId?: string): QueueSnapshot {
+  queueSnapshot(projectId?: string): PublicQueueSnapshot {
     const snapshot = this.admission.snapshot();
-    if (projectId === undefined) return snapshot;
-    return {
+    const redacted = {
       ...snapshot,
-      entries: snapshot.entries.filter((entry) => entry.projectId === projectId),
+      entries: snapshot.entries.map(redactQueueEntry),
+      dropped: snapshot.dropped.map(redactQueueEntry),
+    };
+    if (projectId === undefined) return redacted;
+    return {
+      ...redacted,
+      entries: redacted.entries.filter((entry) => entry.projectId === projectId),
+      dropped: redacted.dropped.filter((entry) => entry.projectId === projectId),
       /** Queued across every project, so "2 of 5 waiting" stays truthful. */
       queuedTotal: snapshot.entries.length,
     };

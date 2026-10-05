@@ -9,6 +9,7 @@
 
 import { useState, useCallback } from "preact/hooks";
 import type { VNode } from "preact";
+import { replaceAppHistory } from "../base-path.js";
 import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
 import { findItemById, collectSubtreeIds, removeItemById } from "../components/prd-tree/tree-utils.js";
 
@@ -99,9 +100,8 @@ export function useDeleteActions({
       if (selectedItemId && affectedIds.has(selectedItemId)) {
         setSelectedItemId(null);
         if (onDetailContent) onDetailContent(null);
-        history.replaceState(
+        replaceAppHistory(
           { view: "prd", file: null, zone: null, runId: null, taskId: null },
-          "",
           "/prd",
         );
       }

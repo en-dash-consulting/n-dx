@@ -229,6 +229,30 @@
   gap: var(--space-1);
 }
 
+/* Split button: the primary opens Prepare task, the caret's menu holds Start now.
+   The container and menu are the shared .ready-split / .ready-menu rules. */
+.start-task-primary {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.start-task-caret {
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.task-live-link,
+.task-blockers {
+  font-size: var(--font-sm);
+}
+
+.task-blockers {
+  color: var(--text-dim);
+}
+
 .start-task-error {
   font-size: var(--font-xs);
   color: var(--red, #ef4444);
@@ -247,7 +271,7 @@
    rename and then stops, so it must not read as the obvious next click. */
 .start-task-migrate-btn {
   font-size: var(--font-xs);
-  color: var(--text-secondary, #9ca3af);
+  color: var(--text-dim);
   background: transparent;
   border: 1px solid var(--border, #374151);
   padding: var(--space-1) var(--space-2);
@@ -258,8 +282,8 @@
 }
 
 .start-task-migrate-btn:hover {
-  color: var(--text-primary, #e5e7eb);
-  border-color: var(--text-secondary, #9ca3af);
+  color: var(--text);
+  border-color: var(--text-dim);
 }
 
 .start-task-migrate-btn:disabled {
@@ -269,7 +293,7 @@
 
 .start-task-notice {
   font-size: var(--font-xs);
-  color: var(--text-secondary, #9ca3af);
+  color: var(--text-dim);
   max-width: 220px;
   text-align: center;
 }

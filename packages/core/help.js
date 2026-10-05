@@ -999,6 +999,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--iterations=<n>", description: "Run multiple tasks sequentially" },
       { flag: "--loop", description: "Run continuously until all tasks complete or Ctrl+C" },
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
+      { flag: "--resolve", description: "With --task: print, as JSON, the settings an autonomous run would use, the config key behind each, and every reason it would refuse to start. Runs nothing, and works without a configured vendor (reported as a refusal). See 'hench run --help'" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
       { flag: "--review-optional", description: "Accept a best-effort review: warn instead of refusing the completion when the reviewer cannot start" },
@@ -1013,6 +1014,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     examples: [
       { command: "ndx work", description: "Run next task interactively" },
       { command: "ndx work --task=abc123 .", description: "Run a specific task" },
+      { command: "ndx work --task=abc123 --resolve .", description: "Show what a run of abc123 would use, without running it" },
       { command: "ndx work --auto --loop .", description: "Continuously auto-run tasks" },
       { command: "ndx work --auto --yes .", description: "Run unattended, auto-commit each task" },
       { command: "ndx work --dry-run .", description: "Preview the brief without execution" },

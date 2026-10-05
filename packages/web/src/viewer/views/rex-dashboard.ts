@@ -11,8 +11,8 @@ import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/index.js";
 import { RexTaskLink } from "../components/index.js";
-import { StartTaskButton } from "../components/index.js";
-import { ExecutionPanel, ReorganizePanel, RestorePanel } from "../components/prd-tree/index.js";
+import { TaskStartControl } from "../components/index.js";
+import { ReorganizePanel, RestorePanel } from "../components/prd-tree/index.js";
 import { HealthGauge } from "../visualization/index.js";
 import { usePolling } from "../hooks/index.js";
 
@@ -438,11 +438,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                         )
                       : null,
                   ),
-                  nextTask.status === "pending"
-                    ? h(StartTaskButton, { taskId: nextTask.id, onStarted: fetchDashboard })
-                    : nextTask.status === "in_progress"
-                      ? h("span", { class: "status-badge status-badge--in_progress" }, "In Progress")
-                      : null,
+                  h(TaskStartControl, { task: nextTask, onStarted: fetchDashboard, navigateTo }),
                 ),
                 h(RexTaskLink, {
                   task: { id: nextTask.id, title: nextTask.title, status: nextTask.status, level: nextTask.level, priority: nextTask.priority },
@@ -505,10 +501,9 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
             : h("div", { class: "rex-dash-empty-hint" }, "No epics defined yet."),
         ),
 
-        // Execution controls
-        epics.length > 0
-          ? h(ExecutionPanel, { onPrdChanged: fetchDashboard })
-          : null,
+        // No Epic-by-Epic panel: it ran `hench run` from the project's own build,
+        // outside the hub queue and the throttle, and Live could not stop it.
+        // Runs start from Ready to run (stage-pages.ts) and the Prepare modal.
       ),
 
       // ── Right sidebar ─────────────────────────────────────────────
