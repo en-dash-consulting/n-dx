@@ -227,7 +227,8 @@ function registerOverviewTools(server: McpServer, context: McpContext): void {
     }
 
     const summary = {
-      project: data.manifest.targetPath.split("/").pop(),
+      // Either separator: targetPath is backslash-delimited on Windows.
+      project: data.manifest.targetPath.split(/[\\/]/).filter(Boolean).pop(),
       git: [data.manifest.gitBranch, data.manifest.gitSha?.slice(0, 7)].filter(Boolean).join(" @ ") || null,
       files: data.inventory.summary.totalFiles,
       lines: data.inventory.summary.totalLines,
