@@ -181,3 +181,28 @@ export function handleRequestSecurity(
 
   return false;
 }
+
+/**
+ * Whether a browser is making this request on behalf of another site.
+ *
+ * {@link handleRequestSecurity} lets every safe-method request through, which is
+ * right for reads whose answer a foreign page cannot see. It is wrong for a GET
+ * that makes this server do work — spawn a process, scan the PRD — because a
+ * page's `<img src>` triggers it without needing to read anything. Such routes
+ * call this and answer 403.
+ *
+ * Refuses a foreign `Origin`, and any `Sec-Fetch-Site` other than `same-origin`
+ * or `none` (a typed URL). A same-site page on another loopback port is refused
+ * too. Requests with neither header (CLI, MCP, curl) pass.
+ */
+export function isForeignSiteRequest(req: IncomingMessage): boolean {
+  const origin = singleHeader(req.headers.origin);
+  if (origin && !isTrustedBrowserOrigin(origin, req)) return true;
+  const site = singleHeader(req.headers["sec-fetch-site"])?.toLowerCase();
+  return site !== undefined && site !== "same-origin" && site !== "none";
+}
+
+/** Answer 403 to a request {@link isForeignSiteRequest} refused. */
+export function refuseForeignSite(res: ServerResponse): true {
+  return rejectCrossOrigin(res);
+}

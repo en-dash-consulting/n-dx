@@ -24,17 +24,26 @@ interface FakeChild {
   /** Executions the child reports as in flight. */
   running: Set<string>;
   /** Execute requests that actually arrived, in order. */
-  received: Array<{ taskId: string; workspace: string | null }>;
+  received: Array<{ taskId: string; workspace: string | null; options?: Record<string, unknown> }>;
   /** The admission header on each `GET /api/live` that arrived. */
   liveAdmission: Array<string | null>;
+  /** Tasks this server refuses, on execute and on check alike — as a real one would. */
+  refuse: Map<string, { status: number; error: string }>;
+  /** False plays a server from before `POST /api/hench/execute/check` existed. */
+  hasCheckRoute: boolean;
+  /** Check requests that arrived. */
+  checks: string[];
 }
 
 async function startFakeChild(dir: string): Promise<FakeChild> {
-  const child: Partial<FakeChild> & Pick<FakeChild, "running" | "received" | "liveAdmission"> = {
+  const child: Partial<FakeChild> & Pick<FakeChild, "running" | "received" | "liveAdmission" | "refuse" | "hasCheckRoute" | "checks"> = {
     dir,
     running: new Set<string>(),
     received: [],
     liveAdmission: [],
+    refuse: new Map(),
+    hasCheckRoute: true,
+    checks: [],
   };
 
   const server = createServer((req, res) => {
@@ -56,7 +65,7 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
       });
     }
     // A real project server strips the `/w/<key>` slot itself; the hub forwards it.
-    if (url.endsWith("/api/live")) {
+    if (url.endsWith("/api/live") || /\/api\/hench\/prep\/[^/]+$/.test(url)) {
       const header = req.headers["x-ndx-hub-admission"];
       child.liveAdmission.push((Array.isArray(header) ? header[0] : header) ?? null);
       return json(200, {});
@@ -69,13 +78,34 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
         executions: [...child.running].map((taskId) => ({ taskId, status: "running" })),
       });
     }
-    if (url === "/api/hench/execute" && req.method === "POST") {
+    if (url === "/api/hench/execute/check" && req.method === "POST" && child.hasCheckRoute) {
       let body = "";
       req.on("data", (c) => { body += c; });
       req.on("end", () => {
         const taskId = (JSON.parse(body || "{}") as { taskId?: string }).taskId ?? "";
+        child.checks.push(taskId);
+        const refusal = child.refuse.get(taskId);
+        json(200, refusal ? { ok: false, status: refusal.status, error: refusal.error, taskId } : { ok: true });
+      });
+      return;
+    }
+    if (url === "/api/hench/execute" && req.method === "POST") {
+      let body = "";
+      req.on("data", (c) => { body += c; });
+      req.on("end", () => {
+        const parsed = JSON.parse(body || "{}") as { taskId?: string; options?: Record<string, unknown> };
+        const taskId = parsed.taskId ?? "";
+        const refusal = child.refuse.get(taskId);
+        if (refusal) {
+          json(refusal.status, { error: refusal.error, taskId });
+          return;
+        }
         const header = req.headers["x-ndx-workspace"];
-        child.received.push({ taskId, workspace: (Array.isArray(header) ? header[0] : header) ?? null });
+        child.received.push({
+          taskId,
+          workspace: (Array.isArray(header) ? header[0] : header) ?? null,
+          ...(parsed.options ? { options: parsed.options } : {}),
+        });
         child.running.add(taskId);
         json(200, { runId: `run-${taskId}`, taskId });
       });
@@ -154,12 +184,132 @@ describe("hub admission gate", () => {
     return hub;
   }
 
-  const execute = (port: number, path: string, taskId: string, headers: Record<string, string> = {}) =>
+  const execute = (
+    port: number,
+    path: string,
+    taskId: string,
+    headers: Record<string, string> = {},
+    options?: Record<string, unknown>,
+  ) =>
     fetch(`http://127.0.0.1:${port}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify(options ? { taskId, options } : { taskId }),
     });
+
+  it("replays a queued run's options when it is admitted", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    const options = { model: "claude-opus-5", review: true, maxTurns: 12, contextNotes: "Keep it small." };
+    const queued = await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, options);
+    expect(queued.status).toBe(202);
+    const body = await queued.json();
+    expect(Object.keys(body)).toEqual(expect.arrayContaining(["queued", "position", "reason"]));
+    // The server's own 202 echoes the options it accepted; so does the queued one.
+    expect(body.options).toEqual(options);
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, options });
+  });
+
+  it("never serves contextNotes text from the queue, scoped or not", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    const secret = "private notes for beta's agent";
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { model: "claude-opus-5", contextNotes: secret });
+
+    for (const path of ["/api/hub/queue", "/p/beta/api/hub/queue", "/p/alpha/api/hub/queue"]) {
+      const text = await (await fetch(`http://127.0.0.1:${h.port}${path}`)).text();
+      expect(text).not.toContain(secret);
+      expect(text).not.toContain("contextNotes");
+    }
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue.entries[0]).toMatchObject({
+      taskId: "task-2",
+      options: { model: "claude-opus-5" },
+      hasNotes: true,
+    });
+  });
+
+  it("takes the newer options when a queued task is asked for again, keeping its place", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { fresh: true });
+    await execute(h.port, "/p/beta/api/hench/execute", "task-3");
+
+    const again = await (await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { maxTurns: 7 })).json();
+    expect(again).toMatchObject({ queued: true, position: 1, queueLength: 2 });
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, options: { maxTurns: 7 } });
+  });
+
+  it("answers the project server's refusal at enqueue time instead of 202 queued", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    // Shape-valid options the server refuses — a model gone from its catalog.
+    const error = 'Run option "model": Model "claude-live-only" is not in the claude catalog.';
+    beta.refuse.set("task-2", { status: 400, error });
+    const res = await execute(h.port, "/p/beta/w/feature/api/hench/execute", "task-2", {}, { model: "claude-live-only" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error, taskId: "task-2" });
+    expect(beta.checks).toEqual(["task-2"]);
+
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue.entries).toEqual([]);
+
+    // Nothing was queued: the next run queued behind it is the first to arrive.
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-3")).status).toBe(202);
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received.map((r) => r.taskId)).toEqual(["task-3"]);
+  });
+
+  it("shows a queued entry its server refused at replay as dropped, with the server's status and reason", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { fresh: true })).status).toBe(202);
+
+    // The task became blocked while it waited.
+    const error = 'Task is blocked by "Other" (t-9, pending). Finish or unblock it first.';
+    beta.refuse.set("task-2", { status: 409, error });
+    alpha.running.delete("task-1");
+
+    const queueUrl = `http://127.0.0.1:${h.port}/p/beta/api/hub/queue`;
+    await waitFor(async () => ((await (await fetch(queueUrl)).json()).dropped ?? []).length === 1, 4_000);
+    const queue = await (await fetch(queueUrl)).json();
+    expect(queue.entries).toEqual([]);
+    expect(queue.dropped).toEqual([
+      expect.objectContaining({ projectId: "beta", taskId: "task-2", options: { fresh: true }, status: 409, error }),
+    ]);
+    // Narrowed like entries: another project's viewer does not see it.
+    const alphaQueue = await (await fetch(`http://127.0.0.1:${h.port}/p/alpha/api/hub/queue`)).json();
+    expect(alphaQueue.dropped).toEqual([]);
+  });
+
+  it("queues as before behind a server that has no check route", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    beta.hasCheckRoute = false;
+
+    // A 404 from the check is no verdict — and is never taken as a start.
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-2")).status).toBe(202);
+    expect(beta.received).toEqual([]);
+  });
+
+  it("forwards options it cannot accept to the project server rather than queuing them", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    // The project server owns the 400; queuing would drop the run silently later.
+    const res = await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { bogus: "--x" });
+    expect(res.status).toBe(200);
+    expect(beta.received).toEqual([{ taskId: "task-2", workspace: null, options: { bogus: "--x" } }]);
+  });
 
   it("forwards the first run and queues the second, across projects", async () => {
     const h = await startTestHub(1);
@@ -375,7 +525,18 @@ describe("hub admission gate", () => {
 
     const spoofed = JSON.stringify({ running: 0, maxSessions: 99, queued: 0 });
     await fetch(`http://127.0.0.1:${h.port}/p/beta/w/feature/api/live`, { headers: { "x-ndx-hub-admission": spoofed } });
-    expect(beta.liveAdmission).toEqual([JSON.stringify({ running: 1, maxSessions: 1, queued: 1 })]);
+    expect(beta.liveAdmission).toEqual([
+      JSON.stringify({ running: 1, maxSessions: 1, queued: 1, availableBytes: 8 * 1024 ** 3, pressure: "normal", memoryPaused: false }),
+    ]);
+  });
+
+  it("states it on a proxied prep read too, including that memory is what holds runs back", async () => {
+    const h = await startTestHub(4);
+    freeMemory = 500;
+    await fetch(`http://127.0.0.1:${h.port}/p/beta/api/hench/prep/task-1`);
+    expect(beta.liveAdmission).toEqual([
+      JSON.stringify({ running: 0, maxSessions: 4, queued: 0, availableBytes: 500, pressure: "critical", memoryPaused: true }),
+    ]);
   });
 
   it("reports its limits and what is running on the queue endpoint", async () => {
@@ -393,10 +554,10 @@ describe("hub admission gate", () => {
 });
 
 /** Poll until `predicate` holds, or fail the test with a timeout. */
-async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
+async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (predicate()) return;
+    if (await predicate()) return;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   throw new Error(`condition not met within ${timeoutMs}ms`);

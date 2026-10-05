@@ -181,6 +181,28 @@ describe("exec", () => {
     }
   });
 
+  it("stops a running command when its AbortSignal aborts, without waiting for the timeout", async () => {
+    const spawned = fakeSpawn({ hang: true });
+    mockSpawn.mockImplementation(spawned.impl);
+    const controller = new AbortController();
+
+    const pending = exec("sleep", ["600"], { cwd: "/tmp", timeout: 600_000, signal: controller.signal, _platform: "linux" });
+    controller.abort();
+    const result = await pending;
+
+    expect(result.exitCode).toBeNull();
+    expect(result.launched).toBe(true);
+    expect((result.error as { killed?: boolean }).killed).toBe(true);
+    expect(result.error?.message).not.toContain("timed out");
+  });
+
+  it("does not spawn when its AbortSignal is already aborted", async () => {
+    const result = await exec("sleep", ["1"], { cwd: "/tmp", timeout: 1000, signal: AbortSignal.abort() });
+
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ exitCode: null, launched: false });
+  });
+
   it("resolves with exitCode 1 when the spawn itself fails", async () => {
     const failure = Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" });
     mockSpawn.mockImplementation(fakeSpawn({ spawnError: failure }).impl);

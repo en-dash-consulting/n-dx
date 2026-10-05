@@ -78,7 +78,7 @@ export { diffTrees } from "@n-dx/rex";
 export type { TreeDiff } from "@n-dx/rex";
 
 // ---- Rex task selection -----------------------------------------------------
-export { findNextTask, collectCompletedIds } from "@n-dx/rex";
+export { findNextTask, findActionableTasks, collectCompletedIds } from "@n-dx/rex";
 
 // ---- Rex cross-worktree task claims -----------------------------------------
 // The dashboard's execute route refuses (409) a task another worktree holds.

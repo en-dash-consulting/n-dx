@@ -40,12 +40,20 @@ function stubFetch(status: number, body: unknown): void {
   );
 }
 
-async function clickStart(onStarted = () => {}): Promise<void> {
-  root = renderToDiv(h(StartTaskButton, { taskId: "t-1", onStarted }));
+/** Open the menu and choose "Start now" — the one-click run with no options. */
+async function chooseStartNow(): Promise<void> {
   await act(async () => {
-    root!.querySelector<HTMLButtonElement>(".start-task-btn")!.click();
+    root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click();
+  });
+  await act(async () => {
+    root!.querySelector<HTMLButtonElement>('[role="menuitem"]')!.click();
     await new Promise((r) => setTimeout(r, 0));
   });
+}
+
+async function clickStart(onStarted = () => {}): Promise<void> {
+  root = renderToDiv(h(StartTaskButton, { taskId: "t-1", onStarted }));
+  await chooseStartNow();
 }
 
 describe("StartTaskButton refusal display", () => {
@@ -85,6 +93,87 @@ describe("StartTaskButton refusal display", () => {
 
     expect(root!.querySelector(".start-task-error")).toBeNull();
     expect(onStarted).toHaveBeenCalledOnce();
+  });
+
+  // The hub answers 202 when it holds the run back. That is accepted, not started.
+  it("shows the queue position and reason, never started, when the hub queues the run", async () => {
+    stubFetch(202, { queued: true, position: 2, reason: "at-capacity" });
+
+    const onStarted = vi.fn();
+    await clickStart(onStarted);
+
+    const notice = root!.querySelector(".prep-queued");
+    expect(notice!.textContent).toContain("Queued");
+    expect(notice!.textContent).toContain("position 2");
+    expect(onStarted).not.toHaveBeenCalled();
+  });
+
+  /** Execute answers 202; the hub queue answers with `snapshot`. */
+  function stubQueued(snapshot: Record<string, unknown>): void {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const queue = url === "/api/hub/queue";
+      return {
+        ok: true,
+        status: queue ? 200 : 202,
+        json: async () => queue ? snapshot : { queued: true, position: 3, reason: "at-capacity" },
+      };
+    }));
+  }
+  const hubSnapshot = (extra: Record<string, unknown>) => ({
+    entries: [], running: 1, freeMemoryBytes: null, limits: { maxSessions: 2, memoryFloorBytes: 0 }, memoryPaused: false, ...extra,
+  });
+  const queueEntry = { projectId: "p", workspace: null, enqueuedAt: "" };
+
+  it("keeps the queued position current from the hub queue", async () => {
+    stubQueued(hubSnapshot({ entries: [{ ...queueEntry, taskId: "other" }, { ...queueEntry, taskId: "t-1" }] }));
+    await clickStart();
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    expect(root!.querySelector(".prep-queued")!.textContent).toContain("position 2");
+  });
+
+  it("says 'Could not start: <reason>' when the hub dropped the queued run at replay", async () => {
+    stubQueued(hubSnapshot({
+      dropped: [{ ...queueEntry, taskId: "t-1", droppedAt: "", status: 409, error: "Task is blocked by X." }],
+    }));
+    await clickStart();
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    const notice = root!.querySelector(".prep-queued")!;
+    expect(notice.getAttribute("role")).toBe("alert");
+    expect(notice.textContent).toContain("Could not start: Task is blocked by X. (HTTP 409)");
+    expect(notice.textContent).not.toContain("position");
+  });
+
+  it("starts with no options: the body is the task id alone", async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }));
+    vi.stubGlobal("fetch", fetchMock);
+    root = renderToDiv(h(StartTaskButton, { taskId: "t-1", onStarted: () => {}, workspace: "feat" }));
+
+    await chooseStartNow();
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, { body: string; headers: Record<string, string> }];
+    expect(JSON.parse(init.body)).toEqual({ taskId: "t-1" });
+    expect(init.headers["X-Ndx-Workspace"]).toBe("feat");
+  });
+});
+
+describe("StartTaskButton primary click", () => {
+  it("opens the Prepare task modal, addressing the workspace, and starts nothing", async () => {
+    const fetchMock = vi.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: "x" }) }));
+    vi.stubGlobal("fetch", fetchMock);
+    root = renderToDiv(h(StartTaskButton, { taskId: "t-1", onStarted: () => {}, workspace: "feat" }));
+
+    await act(async () => {
+      root!.querySelector<HTMLButtonElement>(".start-task-primary")!.click();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    const calls = fetchMock.mock.calls as unknown as Array<[string, { method: string; headers: Record<string, string> }]>;
+    expect(calls.every(([url]) => url !== "/api/hench/execute")).toBe(true);
+    const prep = calls.find(([url]) => url === "/api/hench/prep/t-1");
+    expect(prep?.[1].headers["X-Ndx-Workspace"]).toBe("feat");
   });
 });
 
@@ -145,7 +234,10 @@ describe("StartTaskButton migration offer", () => {
       stubFetch(412, { error: REFUSAL, migratable: true });
       root = renderToDiv(h(StartTaskButton, { taskId: "t-1", onStarted: () => {} }));
       await act(async () => {
-        root!.querySelector<HTMLButtonElement>(".start-task-btn")!.click();
+        root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click();
+      });
+      await act(async () => {
+        root!.querySelector<HTMLButtonElement>('[role="menuitem"]')!.click();
         await vi.advanceTimersByTimeAsync(0);
       });
 

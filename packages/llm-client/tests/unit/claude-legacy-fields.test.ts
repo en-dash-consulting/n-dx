@@ -18,12 +18,13 @@ import { resolveClaudeConfig, loadLLMConfig } from "../../src/llm-config.js";
 import { loadClaudeConfig } from "../../src/config.js";
 
 /** Every field the legacy top-level `claude` block could carry. */
-const FIELDS = ["model", "lightModel", "cli_path", "api_key", "api_endpoint"] as const;
+const FIELDS = ["model", "lightModel", "reviewModel", "cli_path", "api_key", "api_endpoint"] as const;
 
 /** A distinguishable value per field, so a cross-wired field is visible. */
 const MODERN = {
   model: "modern-model",
   lightModel: "modern-light",
+  reviewModel: "modern-review",
   cli_path: "/modern/claude",
   api_key: "sk-modern",
   api_endpoint: "https://modern.example",
@@ -32,6 +33,7 @@ const MODERN = {
 const LEGACY = {
   model: "legacy-model",
   lightModel: "legacy-light",
+  reviewModel: "legacy-review",
   cli_path: "/legacy/claude",
   api_key: "sk-legacy",
   api_endpoint: "https://legacy.example",
