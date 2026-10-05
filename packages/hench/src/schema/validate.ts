@@ -165,11 +165,13 @@ export const HenchConfigSchema = z.object({
   // rationale for 15 minutes.
   fullTestTimeoutMs: z.number().int().nonnegative().optional().default(900_000),
   permissionMode: z.enum(["default", "acceptEdits", "bypassPermissions", "plan"]).optional(),
+  promptAgentToMarkInProgress: z.boolean().optional(),
   commitMsgTimeoutMs: z.number().int().nonnegative().optional().default(300_000),
   git: z
     .object({
       checkpointThreshold: z.number().int().nonnegative().optional(),
       requireCleanTree: z.boolean().optional(),
+      commitMessage: z.enum(["deterministic", "llm"]).optional(),
     })
     .optional(),
   promptCache: z.boolean().optional(),

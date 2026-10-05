@@ -22,7 +22,8 @@ import { join } from "node:path";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
-import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
+import { DEFAULT_CHECKPOINT_THRESHOLD, DEFAULT_GIT_COMMIT_MESSAGE_SOURCE } from "../../schema/index.js";
+import type { GitCommitMessageSource } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { exec, getCurrentHead, execStdout } from "../../process/exec.js";
@@ -54,6 +55,7 @@ import { commitReviewRepairs } from "../analysis/review-repairs.js";
 import { formatMissingReviewRefusal, reviewNeverRan } from "../analysis/adversarial-review.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
+import { buildPreRunCommitSubject } from "./pre-run-commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS, OUTPUT_TAIL_LINES } from "../../tools/test-runner.js";
@@ -1662,6 +1664,27 @@ async function promptPreRunCommitChoice(opts: PreRunPromptOptions): Promise<PreR
   return resolvePreRunCommitAnswer(answer, opts);
 }
 
+/** What the deterministic subject builder needs from the gate. */
+export interface PreRunSubjectContext {
+  /** Project-relative paths of every dirty file, runtime artifacts already discounted. */
+  paths: readonly string[];
+  /** Lines changed against HEAD, from the same measurement the gate reports. */
+  counts?: { linesChanged: number };
+  /** The `hench.git.commitMessage` setting, when the caller passed one. */
+  source?: GitCommitMessageSource | undefined;
+}
+
+/**
+ * Which subject source to use. Absent config means the default, which is
+ * deterministic — the switch exists to restore the model call, not to
+ * enable it.
+ */
+function resolveCommitMessageSource(
+  source: GitCommitMessageSource | undefined,
+): GitCommitMessageSource {
+  return source ?? DEFAULT_GIT_COMMIT_MESSAGE_SOURCE;
+}
+
 /**
  * Best-effort LLM commit subject for pre-existing changes. Falls back to a
  * deterministic message when no provider/credentials are available or the
@@ -1680,7 +1703,23 @@ export async function proposePreRunCommitMessage(
   diff: ReviewDiff,
   henchDir: string,
   model?: string,
+  context?: PreRunSubjectContext,
 ): Promise<string> {
+  // Default path: compute the subject from the file list. No provider, no
+  // credentials, no round trip before the prompt can be shown. See
+  // `pre-run-commit-subject.ts` for why a model adds nothing here that is
+  // worth those costs.
+  if (resolveCommitMessageSource(context?.source) === "deterministic") {
+    const paths = context?.paths ?? [];
+    if (paths.length > 0) {
+      return buildPreRunCommitSubject(paths, context?.counts);
+    }
+    // No path list to describe — only happens through an injected test seam
+    // or a caller predating `context`. The generic message is still better
+    // than an empty subject.
+    return PRE_RUN_COMMIT_FALLBACK_MESSAGE;
+  }
+
   try {
     const llmConfig = await loadLLMConfig(henchDir);
     const provider = defaultRegistry.getActiveProvider(llmConfig);
@@ -2199,6 +2238,13 @@ export interface PreRunCommitGateOptions {
    */
   requireCleanTree?: boolean;
   /**
+   * Where the proposed commit subject comes from, from
+   * `hench.git.commitMessage`. Omitted means the default, which is
+   * {@link DEFAULT_GIT_COMMIT_MESSAGE_SOURCE} — computed from the dirty
+   * file list rather than asked of a model.
+   */
+  commitMessageSource?: GitCommitMessageSource;
+  /**
    * Checkout the invocation started in, captured by the caller immediately
    * before this gate runs. The gate refuses to commit when the working tree
    * has moved to another branch or worktree since. Omitted (or empty, outside
@@ -2210,7 +2256,7 @@ export interface PreRunCommitGateOptions {
     listDirty?: (dir: string) => Promise<string[]>;
     measureMagnitude?: (dir: string) => Promise<ChangeMagnitude>;
     collectDiff?: (dir: string) => Promise<ReviewDiff>;
-    proposeMessage?: (diff: ReviewDiff, henchDir: string, model?: string) => Promise<string>;
+    proposeMessage?: (diff: ReviewDiff, henchDir: string, model?: string, context?: PreRunSubjectContext) => Promise<string>;
     promptChoice?: (promptOpts: PreRunPromptOptions) => Promise<PreRunCommitChoice>;
     commit?: (dir: string, message: string) => Promise<void>;
     checkOrigin?: (dir: string, origin: RunGitOrigin | undefined) => string | undefined;
@@ -2297,7 +2343,11 @@ export async function performPreRunCommitGateIfNeeded(
   }
 
   const diff = await collectDiff(projectDir);
-  const proposed = await proposeMessage(diff, henchDir, model);
+  const proposed = await proposeMessage(diff, henchDir, model, {
+    paths: dirty,
+    counts: { linesChanged: magnitude.linesChanged },
+    source: opts.commitMessageSource,
+  });
 
   section("Uncommitted changes detected");
   subsection("Changes");
