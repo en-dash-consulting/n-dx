@@ -25,4 +25,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [MCP shim bridge mode opens the hub session for the client's worktree from MCP roots](./mcp-shim-bridge-mode-opens-the-hub.md) | completed |
 | [Rex stdio MCP server resolves its workspace from the client's MCP roots](./rex-stdio-mcp-server-resolves-its.md) | completed |
 | [Sourcevision stdio MCP server resolves its workspace from the client's MCP roots](./sourcevision-stdio-mcp-server-resolves.md) | completed |
-| [sv get_overview reports the project name, not the full path, on Windows](./sv-get-overview-reports-the-project.md) | pending |
+| [sv get_overview reports the project name, not the full path, on Windows](./sv-get-overview-reports-the-project.md) | in_progress |
