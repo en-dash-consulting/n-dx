@@ -97,6 +97,7 @@ import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, V
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
+  NDX_CONTAINER_DIRNAME,
   type ExecutionPolicy,
   type RuntimeEvent,
   type PromptSection,
@@ -1575,7 +1576,10 @@ async function runAdversarialReviewPass(
     try {
       const postReviewState = await snapshotDirtyState(inv.projectDir);
       repairedFiles = diffDirtyState(preReviewState, postReviewState).filter(
-        (path) => !path.startsWith(".rex/") && !path.startsWith(".hench/"),
+        (path) =>
+          !path.startsWith(".rex/") &&
+          !path.startsWith(".hench/") &&
+          !path.startsWith(`${NDX_CONTAINER_DIRNAME}/`),
       );
     } catch {
       repairedFiles = undefined;

@@ -63,7 +63,12 @@ export {
 } from "@n-dx/llm-client";
 
 // ---- Folder layout ----------------------------------------------------------
-export { detectLayoutMode, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
+export {
+  NDX_CONTAINER_DIRNAME,
+  detectLayoutMode,
+  relativeToRoot,
+  resolveLayout,
+} from "@n-dx/llm-client";
 export type { Layout, LayoutMode, ResolveLayoutOptions } from "@n-dx/llm-client";
 
 // ---- Canonical JSON ---------------------------------------------------------
