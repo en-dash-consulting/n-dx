@@ -45,6 +45,23 @@ export const PRD_TREE_DIRNAME = "prd_tree";
 export const TREE_META_FILENAME = "tree-meta.json";
 
 /**
+ * Name of the derived-state directory inside `.rex/`.
+ *
+ * Nothing in rex writes it. The dashboard's file watcher regenerates
+ * `<PRD_CACHE_DIRNAME>/prd.json` from the folder tree on every tree write, as
+ * a read fast path for the web server — so it is machine-local, disposable,
+ * and must never be committed.
+ *
+ * It lives here rather than in the web package because it names a folder
+ * *inside* rex's directory, and this module is the only place rex names one.
+ * Two consumers depend on that: `rex init` gitignores it, and hench's
+ * completion gate discounts it. Before both did, a run made while `ndx start`
+ * was up had the watcher's rewrite counted as the task's own leaked work, and
+ * every completion was refused.
+ */
+export const PRD_CACHE_DIRNAME = ".cache";
+
+/**
  * Name of the advisory lock file that guards `.rex/<PRD_TREE_DIRNAME>/`.
  *
  * One lock name for one resource. `FileStore` and `FolderTreeStore` both
@@ -69,6 +86,8 @@ export interface RexPaths {
   treeMetaPath: string;
   /** The advisory lock guarding the folder tree. */
   prdLockPath: string;
+  /** Derived, disposable state — never committed. See {@link PRD_CACHE_DIRNAME}. */
+  cacheDir: string;
 }
 
 /**
@@ -88,5 +107,6 @@ export function resolveRexPaths(
     prdTreeDir: join(rexDir, PRD_TREE_DIRNAME),
     treeMetaPath: join(rexDir, TREE_META_FILENAME),
     prdLockPath: prdLockPath(rexDir),
+    cacheDir: join(rexDir, PRD_CACHE_DIRNAME),
   };
 }
