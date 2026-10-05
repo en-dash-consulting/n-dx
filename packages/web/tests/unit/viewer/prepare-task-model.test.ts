@@ -106,6 +106,13 @@ describe("prepare task model", () => {
     expect(warned[1]).toMatch(/two runs would share one working tree/);
   });
 
+  it("shows hench's warnings in the preflight", () => {
+    const warned = workspaceWarnings(prepFixture({
+      warnings: [{ code: "untrusted-repository", message: "Repository is not trusted" }],
+    }));
+    expect(warned).toEqual(["Repository is not trusted"]);
+  });
+
   it("says the run will queue when the hub is full or memory-paused, and nothing alarming for an unknown reading", () => {
     expect(admissionLine(null)).toBeNull();
     const base = { running: 1, max: 2, queued: 0, availableBytes: null, pressure: "unknown" as const, memoryPaused: false };

@@ -23,6 +23,7 @@ import type { PRDItem } from "../../prd/rex-gateway.js";
 import { LLM_VENDOR, REVIEW_MODELS, getGitCommonDir, resolveReviewModel } from "../../prd/llm-gateway.js";
 import type { LLMVendor } from "../../prd/llm-gateway.js";
 import { PERMISSION_MODES } from "../../schema/index.js";
+import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 import { resolveHenchPaths } from "../../store/paths.js";
@@ -52,7 +53,7 @@ export interface Resolved<T> {
   value: T;
   /**
    * `cli-flag`, `hench.<key>`, `hench.models.<vendor>`, an `llm.*` key,
-   * `vendor-default`, `autonomous-default` or `built-in`.
+   * `vendor-default`, `autonomous-default`, `repository-trust` or `built-in`.
    */
   source: string;
 }
@@ -69,6 +70,12 @@ export type RunRefusalCode =
   | "provider-unsupported"
   | "model-vendor-mismatch"
   | "dirty-tree";
+
+/** A condition worth showing before the run that does not stop it. */
+export interface RunWarning {
+  code: "untrusted-repository";
+  message: string;
+}
 
 export interface RunRefusal {
   code: RunRefusalCode;
@@ -124,6 +131,7 @@ export interface RunResolution {
   resolved: ResolvedSettings;
   options: RunOption[];
   refusals: RunRefusal[];
+  warnings: RunWarning[];
   /** The `ndx work` command line a run with these settings is. */
   command: string;
 }
@@ -298,6 +306,13 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     autonomous: true,
     vendor,
   });
+  // Repository trust, applied as a run applies it: while the checkout's
+  // execution config is untrusted, bypassPermissions is lowered to acceptEdits.
+  // A warning, not a refusal — the run still starts.
+  const trust = applyRepoTrust(config, dir, permission.value);
+  const warnings: RunWarning[] = trust.evaluation.restricted
+    ? [{ code: "untrusted-repository", message: formatTrustWarningForRun(trust.evaluation, provider.provider).join("\n") }]
+    : [];
   const flagged = (flag: string): Resolved<boolean> =>
     flags[flag] === "true" ? { value: true, source: "cli-flag" } : { value: false, source: "built-in" };
 
@@ -309,13 +324,15 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       source: provider.switched ? "vendor-default" : flags.provider !== undefined ? "cli-flag" : henchSource("provider"),
     },
     permissionMode: {
-      value: permission.value ?? null,
+      value: trust.permissionMode ?? null,
       source:
-        permission.dropped !== undefined || permission.value === undefined
-          ? "built-in"
-          : permission.origin === "config"
-            ? "hench.permissionMode"
-            : permission.origin,
+        trust.permissionMode !== permission.value
+          ? "repository-trust"
+          : permission.dropped !== undefined || permission.value === undefined
+            ? "built-in"
+            : permission.origin === "config"
+              ? "hench.permissionMode"
+              : permission.origin,
     },
     review: flagged("review"),
     reviewModel: {
@@ -358,6 +375,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       option.key === "provider" ? { ...option, values: VENDOR_PROVIDERS[vendor] } : { ...option },
     ),
     refusals,
+    warnings,
     command: formatRunCommand(taskId, dir, flags, modelOverride.value),
   };
 }

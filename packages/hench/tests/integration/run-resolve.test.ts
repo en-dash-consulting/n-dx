@@ -17,7 +17,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveModel, NEWEST_MODELS, REVIEW_MODELS, TIER_MODELS } from "@n-dx/llm-client";
 import { resolveRun } from "../../src/cli/commands/run-resolve.js";
@@ -257,6 +258,55 @@ describe("the resolution report", () => {
 
     expect(r.resolved.permissionMode).toEqual({ value: null, source: "built-in" });
     expect(r.options.find((o) => o.key === "provider")?.values).toEqual(["cli"]);
+  });
+
+  describe("repository trust", () => {
+    let trustHome: string;
+
+    /** Widen the guard so the checkout ships execution config of its own. */
+    async function widenGuard(): Promise<void> {
+      const path = join(henchDir, "config.json");
+      const config = JSON.parse(await readFile(path, "utf-8"));
+      config.guard = { ...config.guard, allowedCommands: [...config.guard.allowedCommands, "bash"] };
+      await writeFile(path, JSON.stringify(config), "utf-8");
+      git(projectDir, "add", "-A");
+      git(projectDir, "commit", "-q", "-m", "widen guard");
+    }
+
+    beforeEach(async () => {
+      trustHome = await mkdtemp(join(tmpdir(), "hench-resolve-trust-"));
+      vi.stubEnv("NDX_HOME", trustHome);
+    });
+
+    afterEach(async () => {
+      vi.unstubAllEnvs();
+      await rm(trustHome, { recursive: true, force: true });
+    });
+
+    it("reports bypassPermissions as written on a trusted repository", async () => {
+      const r = await resolve({ task: "t-pending", "permission-mode": "bypassPermissions" });
+
+      expect(r.resolved.permissionMode).toEqual({ value: "bypassPermissions", source: "cli-flag" });
+      expect(r.warnings).toEqual([]);
+    });
+
+    it("lowers bypassPermissions to acceptEdits with a warning, not a refusal, on an untrusted one", async () => {
+      await widenGuard();
+      const r = await resolve({ task: "t-pending", "permission-mode": "bypassPermissions" });
+
+      expect(r.resolved.permissionMode).toEqual({ value: "acceptEdits", source: "repository-trust" });
+      expect(r.warnings.map((w) => w.code)).toEqual(["untrusted-repository"]);
+      expect(r.warnings[0].message).toMatch(/trust/i);
+      expect(codes(r)).toEqual([]);
+    });
+
+    it("leaves a lower mode alone but still warns on an untrusted repository", async () => {
+      await widenGuard();
+      const r = await resolve({ task: "t-pending", "permission-mode": "plan" });
+
+      expect(r.resolved.permissionMode).toEqual({ value: "plan", source: "cli-flag" });
+      expect(r.warnings.map((w) => w.code)).toEqual(["untrusted-repository"]);
+    });
   });
 
   it("refuses --resolve without --task", async () => {

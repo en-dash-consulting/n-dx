@@ -32,6 +32,12 @@ export interface PrepRefusal {
   migratable?: boolean;
 }
 
+/** A condition shown before a run that does not stop it. */
+export interface PrepWarning {
+  code: string;
+  message: string;
+}
+
 export interface PrepResolvedSettings {
   vendor: PrepResolved<string>;
   model: PrepResolved<string>;
@@ -62,6 +68,8 @@ export interface PrepResponse {
   resolved: PrepResolvedSettings;
   options: Array<{ key: string; values?: readonly string[] }>;
   refusals: PrepRefusal[];
+  /** Absent from a hench that predates warnings. */
+  warnings?: PrepWarning[];
   dir: string;
   detail: { priority: string | null; parentChain: string[]; criteriaCount: number } | null;
   catalog: { vendor: string; models: string[]; providers: string[] } | null;
@@ -191,6 +199,7 @@ export function workspaceWarnings(prep: PrepResponse): string[] {
   if (prep.workspace.liveRun) {
     warnings.push("A run is already live in this worktree — two runs would share one working tree");
   }
+  for (const w of prep.warnings ?? []) warnings.push(w.message);
   return warnings;
 }
 
