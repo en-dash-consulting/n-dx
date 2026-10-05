@@ -293,6 +293,14 @@ export {
 } from "./create-client.js";
 export type { CreateClientOptions } from "./create-client.js";
 
+// MCP client roots → served workspace
+export { resolveWorkspaceFromRoots } from "./workspace-roots.js";
+export type {
+  WorkspaceRoot,
+  ResolveWorkspaceFromRootsOptions,
+  WorkspaceResolution,
+} from "./workspace-roots.js";
+
 // Auth detection and validation
 export {
   detectCliAvailability,
