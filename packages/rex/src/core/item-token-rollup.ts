@@ -47,6 +47,24 @@ export interface ItemTokenTuple {
   /** Tokens consumed re-reading prompt-cache entries across turns. */
   cacheRead: number;
   total: number;
+  /**
+   * What these tokens cost, in USD.
+   *
+   * Carried through the rollup rather than derived from it, because the rate
+   * depends on the model and `total` has already lost that — one item's runs
+   * can span Haiku and Opus, whose output rates differ by a factor of twelve.
+   * The caller prices each run at the model that run recorded and the tree
+   * arithmetic here only adds the results up.
+   *
+   * It is also the only honest headline for an agent workload. `total` is
+   * dominated by cache reads, which are billed at a tenth of the input rate,
+   * so a tree column showing `total` reports tens of millions for work that
+   * cost a few dollars — the number that made the dashboard unreadable.
+   *
+   * Optional on input so a caller with no model information can omit it;
+   * every tuple this module *returns* carries a number.
+   */
+  costUsd?: number;
 }
 
 /**
@@ -90,7 +108,7 @@ export interface ItemTokenAggregation {
 // ---------------------------------------------------------------------------
 
 function zeroTuple(): ItemTokenTuple {
-  return { input: 0, output: 0, cacheCreation: 0, cacheRead: 0, total: 0 };
+  return { input: 0, output: 0, cacheCreation: 0, cacheRead: 0, total: 0, costUsd: 0 };
 }
 
 function addInto(target: ItemTokenTuple, src: ItemTokenTuple): void {
@@ -99,6 +117,10 @@ function addInto(target: ItemTokenTuple, src: ItemTokenTuple): void {
   target.cacheCreation += src.cacheCreation;
   target.cacheRead += src.cacheRead;
   target.total += src.total;
+  // A contribution with no priced cost adds no cost. That under-reports rather
+  // than guessing a rate, and the caller can tell the two apart by comparing
+  // tokens against dollars.
+  target.costUsd = (target.costUsd ?? 0) + (src.costUsd ?? 0);
 }
 
 function emptyTotals(): ItemTokenTotals {
@@ -177,6 +199,7 @@ export function aggregateItemTokenUsage(
     t.total.cacheCreation = t.self.cacheCreation + t.descendants.cacheCreation;
     t.total.cacheRead = t.self.cacheRead + t.descendants.cacheRead;
     t.total.total = t.self.total + t.descendants.total;
+    t.total.costUsd = (t.self.costUsd ?? 0) + (t.descendants.costUsd ?? 0);
     t.runCount = runCount;
     return t;
   }

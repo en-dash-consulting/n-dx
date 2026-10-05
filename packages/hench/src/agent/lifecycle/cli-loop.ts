@@ -103,6 +103,7 @@ import {
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
+import { UsageMessageFilter } from "../../prd/llm-gateway.js";
 import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
 import { PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
 import { resolveAgentCliEffort } from "./agent-effort.js";
@@ -519,12 +520,18 @@ export function toPersistedEvent(event: RuntimeEvent): PersistedRuntimeEvent {
  * (`event.usage`, `event.message.usage`) and returns a RuntimeEvent
  * for accumulation, or `null` if no usage was found.
  *
+ * `seen` is what keeps one vendor message from being counted once per content
+ * block — Claude's stream-json repeats the whole `message`, `usage` included,
+ * on every block of a turn. Omit it only in tests that feed a single payload;
+ * every production caller passes the spawn's filter.
+ *
  * @internal Exported for testing.
  */
 export function rawJsonToTokenUsageEvent(
   rawJson: Record<string, unknown>,
   turn: number,
   metadata: SpawnTokenMetadata,
+  seen?: UsageMessageFilter,
 ): RuntimeEvent | null {
   let usage: Record<string, unknown> | undefined;
 
@@ -538,6 +545,10 @@ export function rawJsonToTokenUsageEvent(
   }
 
   if (!usage) return null;
+
+  // A repeat of a message already counted. Dropping it here rather than at the
+  // call site means every consumer of this function inherits the rule.
+  if (seen && !seen.accept(rawJson)) return null;
 
   // Carry the parser's verdict on the event. Dropping it here is what forced
   // the event pipeline to re-infer both values from the parsed numbers, and
@@ -570,6 +581,7 @@ function extractTokenUsage(
   result: SpawnResult,
   turnCounter: { value: number },
   tokenMetadata: SpawnTokenMetadata,
+  seen: UsageMessageFilter,
 ): void {
   let usage: Record<string, unknown> | undefined;
 
@@ -586,6 +598,10 @@ function extractTokenUsage(
   }
 
   if (!usage) return;
+
+  // See {@link rawJsonToTokenUsageEvent}: the same message arrives once per
+  // content block, each copy carrying the finished turn's full usage.
+  if (!seen.accept(rawJson)) return;
 
   const { usage: parsed, diagnosticStatus, cacheProvenance } = parseTokenUsageWithDiagnostic(usage);
 
@@ -799,6 +815,10 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     };
 
     const turnCounter = { value: 0 };
+    // One per spawn: usage identity is only meaningful within a single
+    // vendor conversation, and a filter shared across spawns would suppress a
+    // retry's legitimately re-sent opening message.
+    const usageFilter = new UsageMessageFilter();
     let lineBuffer = "";
     let stderr = "";
     let fullStdout = "";
@@ -1190,7 +1210,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
           try {
             const rawJson = JSON.parse(line);
             captureSessionId(rawJson);
-            const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata);
+            const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata, usageFilter);
             if (tokenEvent) {
               accumulator.push(tokenEvent);
               // Mirror the accumulator's own arithmetic (a plain sum over token
@@ -1242,7 +1262,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
           try {
             const rawJson = JSON.parse(line);
             captureSessionId(rawJson);
-            extractTokenUsage(rawJson, result, turnCounter, tokenMetadata);
+            extractTokenUsage(rawJson, result, turnCounter, tokenMetadata, usageFilter);
 
             // Extract completion metadata (num_turns, cost_usd, fallback usage)
             const type = rawJson.type as string | undefined;

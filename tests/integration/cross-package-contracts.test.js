@@ -825,6 +825,7 @@ describe("gateway export auto-detection", () => {
         "parseApiTokenUsage", "parseApiTokenUsageWithDiagnostic", "parseStreamTokenUsage",
         "parseStreamTokenUsageWithDiagnostic", "mapCodexUsageToTokenUsage",
         "accumulateTokenUsage", "emptyAggregateTokenUsage",
+        "usageMessageId", "UsageMessageFilter",
         "resolveModel", "resolveVendorModel", "resolveReviewModel", "resolveTaskModel",
         // Claude API effort: hench's turn loop must apply the same rule the
         // llm-client API provider applies, so it shares the one resolver.

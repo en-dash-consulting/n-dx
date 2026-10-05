@@ -29,11 +29,26 @@ describe("shared-types structural contract", () => {
       const acc: TaskUsageAccumulator = {
         totalTokens: 1000,
         runCount: 5,
+        inputTokens: 100,
+        outputTokens: 200,
+        cacheCreationTokens: 300,
+        cacheReadTokens: 400,
+        costUsd: 0.0125,
+        costFullyAttributed: true,
       };
 
       expect(acc.totalTokens).toBe(1000);
       expect(acc.runCount).toBe(5);
-      expect(Object.keys(acc).sort()).toEqual(["runCount", "totalTokens"]);
+      expect(Object.keys(acc).sort()).toEqual([
+        "cacheCreationTokens",
+        "cacheReadTokens",
+        "costFullyAttributed",
+        "costUsd",
+        "inputTokens",
+        "outputTokens",
+        "runCount",
+        "totalTokens",
+      ]);
     });
   });
 
@@ -157,12 +172,37 @@ describe("shared-types structural contract", () => {
 
     it("TaskUsageAccumulator values are numeric", () => {
       // Ensures accumulator math works correctly
-      const a: TaskUsageAccumulator = { totalTokens: 100, runCount: 1 };
-      const b: TaskUsageAccumulator = { totalTokens: 200, runCount: 2 };
+      const a: TaskUsageAccumulator = {
+        totalTokens: 100,
+        runCount: 1,
+        inputTokens: 10,
+        outputTokens: 20,
+        cacheCreationTokens: 30,
+        cacheReadTokens: 40,
+        costUsd: 0.001,
+        costFullyAttributed: true,
+      };
+      const b: TaskUsageAccumulator = {
+        totalTokens: 200,
+        runCount: 2,
+        inputTokens: 20,
+        outputTokens: 40,
+        cacheCreationTokens: 60,
+        cacheReadTokens: 80,
+        costUsd: 0.002,
+        costFullyAttributed: false,
+      };
 
       const merged: TaskUsageAccumulator = {
         totalTokens: a.totalTokens + b.totalTokens,
         runCount: a.runCount + b.runCount,
+        inputTokens: a.inputTokens + b.inputTokens,
+        outputTokens: a.outputTokens + b.outputTokens,
+        cacheCreationTokens: a.cacheCreationTokens + b.cacheCreationTokens,
+        cacheReadTokens: a.cacheReadTokens + b.cacheReadTokens,
+        costUsd: a.costUsd + b.costUsd,
+        // Not arithmetic: a merge is fully attributed only if both halves were.
+        costFullyAttributed: a.costFullyAttributed && b.costFullyAttributed,
       };
 
       expect(merged.totalTokens).toBe(300);

@@ -191,6 +191,8 @@ export {
   mapCodexUsageToTokenUsage,
   accumulateTokenUsage,
   emptyAggregateTokenUsage,
+  usageMessageId,
+  UsageMessageFilter,
 } from "@n-dx/llm-client";
 
 export type {
