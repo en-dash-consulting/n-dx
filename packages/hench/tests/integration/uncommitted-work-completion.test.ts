@@ -524,15 +524,54 @@ describe("finalizeRun — uncommitted-work gate", () => {
         expect(run.status).toBe("completed");
         expect(statuses).toEqual(["completed"]);
 
+        // Three commits, in the order they are made: the executor's own, the
+        // repair commit, then the PRD completion record. The record used to be
+        // skipped entirely on this path — the executor committed for itself and
+        // wrote no message file, so nothing owned the completion write and it
+        // sat in the tree with the task marked done.
         const subjects = await subjectsSince(startHead);
-        expect(subjects).toHaveLength(2);
+        expect(subjects).toHaveLength(3);
         expect(subjects[0]).toBe("feat: executor committed itself");
         expect(subjects[1]).toBe(
           `fix(review): apply adversarial-review repairs (run ${run.id})`,
         );
-        expect(await headFiles()).toEqual(["lib.ts"]);
-        expect(await porcelain()).not.toContain("lib.ts");
+        expect(subjects[2]).toContain("chore(prd):");
+
+        // The repair is in the repair commit, not merely somewhere in the
+        // range — asked of that commit by sha, since HEAD is now the record.
         expect(run.review?.repairCommit).toMatch(/^[0-9a-f]{40}$/);
+        const { stdout: repairFiles } = await execAsync(
+          `git show --name-only --format= ${run.review!.repairCommit}`,
+          { cwd: projectDir },
+        );
+        expect(repairFiles.split("\n").filter(Boolean)).toEqual(["lib.ts"]);
+        expect(await porcelain()).not.toContain("lib.ts");
+      });
+
+      it("commits the PRD record even with no repairs to carry it", async () => {
+        // The reported failure, with nothing else going on: the executor
+        // committed its own work, wrote no message file, and the run had no
+        // review repairs. Nothing downstream touched the tree, so the
+        // completion write `updateCompletedTaskStatus` makes sat there with
+        // the task marked completed — and the next autonomous run's pre-run
+        // gate refused to start over a path hench had written itself. Reported
+        // against UI work, where committing as you go is the norm.
+        const startHead = await head();
+        await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+        await execAsync("git add src.ts", { cwd: projectDir });
+        await execAsync('git commit -m "feat: executor committed itself"', { cwd: projectDir });
+
+        const run = await buildRunAtOrigin(startHead);
+        await runFinalize(run, buildStore(), false);
+
+        expect(run.status).toBe("completed");
+
+        const subjects = await subjectsSince(startHead);
+        expect(subjects).toHaveLength(2);
+        expect(subjects[1]).toContain("chore(prd):");
+
+        // What the next run actually depends on.
+        expect(await porcelain()).not.toContain("prd_tree");
       });
 
       it("names the cause when the repair commit is refused, and says how to finish", async () => {

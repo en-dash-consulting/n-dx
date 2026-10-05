@@ -177,7 +177,10 @@ describe("Gemini agentic tool-use loop", () => {
     expect(result.run.tokenUsage.output).toBe(38);
 
     // This completed through the real git-derived path, not a mocked verdict.
-    expect(execFileSync("git", ["show", "--format=", "--name-only", "HEAD"], {
+    // Asked of the file's own history rather than of HEAD: the PRD completion
+    // record is committed after the work, so HEAD is that record and the work
+    // is HEAD~1. Which commit it landed in is not what this test is about.
+    expect(execFileSync("git", ["log", "--format=", "--name-only", "--", "gemini-output.ts"], {
       cwd: projectDir,
       encoding: "utf-8",
     })).toContain("gemini-output.ts");
