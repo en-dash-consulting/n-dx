@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute, resetHenchRouteStateForTests, shutdownActiveExecutions } from "../../../src/server/routes-hench.js";
@@ -274,13 +274,24 @@ describe("POST /api/hench/execute", () => {
     expect(body.error).toContain("cannot be executed");
   });
 
-  it("rejects in_progress task with 409", async () => {
+  it("rejects an in_progress task a live run still holds with 409 naming the run", async () => {
     await writeFile(
       join(rexDir, "prd.json"),
       JSON.stringify(makePRD([
         { id: "task-1", title: "Active Task", status: "in_progress", level: "task" },
       ]), null, 2),
     );
+    // A run recorded by this (live) process, reporting now: not resumable.
+    await writeFile(join(henchDir, "runs", "run-live.json"), JSON.stringify({
+      id: "run-live",
+      taskId: "task-1",
+      taskTitle: "Active Task",
+      status: "running",
+      startedAt: new Date().toISOString(),
+      lastActivityAt: new Date().toISOString(),
+      pid: process.pid,
+      host: hostname(),
+    }));
 
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
@@ -290,7 +301,32 @@ describe("POST /api/hench/execute", () => {
     expect(res.status).toBe(409);
 
     const body = await res.json();
-    expect(body.error).toContain("in_progress");
+    expect(body.error).toContain("run-live");
+    expect(body.run).toMatchObject({ runId: "run-live", liveness: "live" });
+  });
+
+  it("rejects a blocked task with 409 naming its blockers", async () => {
+    await writeFile(
+      join(rexDir, "prd.json"),
+      JSON.stringify(makePRD([
+        { id: "task-a", title: "Schema first", status: "pending", level: "task" },
+        { id: "task-blocked", title: "Blocked Task", status: "blocked", level: "task", blockedBy: ["task-a", "gone"] },
+      ]), null, 2),
+    );
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: "task-blocked" }),
+    });
+    expect(res.status).toBe(409);
+
+    const body = await res.json();
+    expect(body.error).toContain('"Schema first" (task-a, pending)');
+    expect(body.blockedBy).toEqual([
+      { id: "task-a", title: "Schema first", status: "pending" },
+      { id: "gone", title: "gone", status: "missing" },
+    ]);
   });
 
   it("accepts deferred task and returns 202", async () => {
@@ -375,24 +411,46 @@ describe("POST /api/hench/execute", () => {
     expect(body.status).toBe("started");
   });
 
-  it("accepts blocked task and returns 202", async () => {
-    await writeFile(
-      join(rexDir, "prd.json"),
-      JSON.stringify(makePRD([
-        { id: "task-blocked", title: "Blocked Task", status: "blocked", level: "task" },
-      ]), null, 2),
-    );
+  describe("POST /api/hench/execute/check", () => {
+    const check = async (body: unknown) => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute/check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      expect(res.status).toBe(200);
+      return res.json();
+    };
+    const executions = async () =>
+      (await (await fetch(`http://127.0.0.1:${port}/api/hench/execute/status`)).json()).executions;
 
-    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: "task-blocked" }),
+    it("answers the refusal execute would give, with its status, without starting anything", async () => {
+      await writeFile(
+        join(rexDir, "prd.json"),
+        JSON.stringify(makePRD([
+          { id: "task-a", title: "Schema first", status: "pending", level: "task" },
+          { id: "task-blocked", title: "Blocked Task", status: "blocked", level: "task", blockedBy: ["task-a"] },
+        ]), null, 2),
+      );
+
+      const verdict = await check({ taskId: "task-blocked" });
+      expect(verdict).toMatchObject({ ok: false, status: 409, taskId: "task-blocked" });
+      expect(verdict.error).toContain('"Schema first" (task-a, pending)');
+      expect(verdict.blockedBy).toEqual([{ id: "task-a", title: "Schema first", status: "pending" }]);
+
+      expect(await check({ taskId: "task-a", options: { bogus: true } }))
+        .toMatchObject({ ok: false, status: 400, key: "bogus" });
+      expect(await check({})).toEqual({ ok: false, status: 400, error: "taskId is required" });
     });
-    expect(res.status).toBe(202);
 
-    const body = await res.json();
-    expect(body.taskId).toBe("task-blocked");
-    expect(body.status).toBe("started");
+    it("says ok for a runnable task and leaves it unstarted", async () => {
+      await writeFile(
+        join(rexDir, "prd.json"),
+        JSON.stringify(makePRD([{ id: "task-1", title: "Pending Task", status: "pending", level: "task" }]), null, 2),
+      );
+      expect(await check({ taskId: "task-1", options: { fresh: true } })).toEqual({ ok: true });
+      expect(await executions()).toEqual([]);
+    });
   });
 });
 

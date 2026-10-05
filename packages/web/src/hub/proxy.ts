@@ -38,6 +38,7 @@ import type { Duplex } from "node:stream";
 import {
   HUB_ADMISSION_HEADER,
   HUB_PATH,
+  checkRunOptions,
   detectBasePath,
   formatHubAdmissionHeader,
   isHubChooserPath,
@@ -45,7 +46,11 @@ import {
   projectIdFromBasePath,
   stripBasePath,
   stripWorkspaceSlot,
+  RUN_MODES,
+  MAX_DASHBOARD_ITERATIONS,
+  MIN_DASHBOARD_ITERATIONS,
 } from "../shared/index.js";
+import type { RunMode, RunOptions } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { homedir } from "node:os";
@@ -63,6 +68,8 @@ const MAX_EXECUTE_BODY_BYTES = 64 * 1024;
 const FORWARDED_PREFIX_HEADER = "x-forwarded-prefix";
 /** The Live overview: its agent-slots tile reports the machine's admission state when served through the hub. */
 const LIVE_PATH = "/api/live";
+/** The Prepare task modal's read: its admission strip reports the same gate state. */
+const PREP_PATH = /^\/api\/hench\/prep\/[^/]+$/;
 
 /** What to do with a request that is not the hub's own API. */
 export type ProxyDecision =
@@ -404,7 +411,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
 }
 
 /**
- * The admission header for a `GET /api/live`, measured now; none for anything
+ * The admission header for a `GET /api/live` or a prep read, measured now; none for anything
  * else. Measured rather than read from the gate's last decision, which may be
  * minutes old on an idle machine — the same reason `GET /api/hub/queue` does.
  */
@@ -414,7 +421,8 @@ async function admissionHeadersFor(
   decision: Extract<ProxyDecision, { kind: "proxy" }>,
 ): Promise<OutgoingHttpHeaders> {
   if ((req.method || "GET") !== "GET") return {};
-  if (stripWorkspaceSlot(decision.path.split("?")[0]).url !== LIVE_PATH) return {};
+  const path = stripWorkspaceSlot(decision.path.split("?")[0]).url;
+  if (path !== LIVE_PATH && !PREP_PATH.test(path)) return {};
   await hub.admission.measure();
   const snapshot = hub.admission.snapshot();
   return {
@@ -422,6 +430,9 @@ async function admissionHeadersFor(
       running: snapshot.running,
       maxSessions: snapshot.limits.maxSessions,
       queued: snapshot.entries.length,
+      availableBytes: snapshot.availableBytes,
+      pressure: snapshot.pressure,
+      memoryPaused: snapshot.memoryPaused,
     }),
   };
 }
@@ -458,13 +469,47 @@ async function handleExecuteAdmission(
   }
 
   let taskId: string | null = null;
+  let options: RunOptions | undefined;
+  let optionsValid = true;
+  let mode: RunMode | undefined;
+  let iterations: number | undefined;
   try {
-    const parsed = JSON.parse(body.toString("utf-8") || "{}") as { taskId?: unknown };
+    const parsed = JSON.parse(body.toString("utf-8") || "{}") as {
+      taskId?: unknown;
+      options?: unknown;
+      mode?: unknown;
+      iterations?: unknown;
+    };
     if (typeof parsed.taskId === "string" && parsed.taskId) taskId = parsed.taskId;
+    const checked = checkRunOptions(parsed.options);
+    if (checked.ok) {
+      if (Object.keys(checked.options).length > 0) options = checked.options;
+    } else {
+      optionsValid = false;
+    }
+    // Shape-only, like the options check above: a mode the project server will
+    // refuse is forwarded rather than queued, so its 400 arrives now instead of
+    // when the entry's turn comes. Anything unrecognised simply stays absent,
+    // which replays as `single` — the same argv the hub has always sent.
+    if (typeof parsed.mode === "string" && RUN_MODES.has(parsed.mode)) {
+      mode = parsed.mode as RunMode;
+      if (
+        mode === "iterations" && typeof parsed.iterations === "number" &&
+        Number.isInteger(parsed.iterations) &&
+        parsed.iterations >= MIN_DASHBOARD_ITERATIONS && parsed.iterations <= MAX_DASHBOARD_ITERATIONS
+      ) {
+        iterations = parsed.iterations;
+      } else if (mode === "iterations") {
+        // A count the server would refuse: forward and let it say so.
+        optionsValid = false;
+      }
+    }
   } catch {
     // not JSON — forward and let the server say so
   }
-  if (!taskId) {
+  // Rejected options are forwarded too: queuing them would turn the server's
+  // 400 into a run silently dropped minutes later, when its turn came.
+  if (!taskId || !optionsValid) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
     return true;
   }
@@ -473,9 +518,21 @@ async function handleExecuteAdmission(
   const fromHeader = Array.isArray(header) ? header[0] : header;
   const workspace = fromHeader || slot.key || null;
 
-  const result = await hub.admission.admit({ projectId: decision.project.id, workspace, taskId });
+  const result = await hub.admission.admit({
+    projectId: decision.project.id,
+    workspace,
+    taskId,
+    ...(options ? { options } : {}),
+    ...(mode && mode !== "single" ? { mode } : {}),
+    ...(iterations !== undefined ? { iterations } : {}),
+  });
   if (result.admitted) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
+    return true;
+  }
+  // The server would refuse it when its turn came: say so now, in its words.
+  if (result.refused) {
+    writeJson(res, result.refused.status, result.refused.body);
     return true;
   }
 
@@ -487,6 +544,9 @@ async function handleExecuteAdmission(
     taskId,
     projectId: decision.project.id,
     workspace,
+    ...(options ? { options } : {}),
+    ...(mode && mode !== "single" ? { mode } : {}),
+    ...(iterations !== undefined ? { iterations } : {}),
     queueLength: snapshot.entries.length,
     running: snapshot.running,
     limits: snapshot.limits,

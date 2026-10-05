@@ -9,17 +9,22 @@
  * preference: leaving it on "until done" would turn the next, unrelated click
  * into a queue-long run the operator did not choose.
  *
+ * Since the Prepare task modal landed, Start Task is a split button: the
+ * primary opens the modal for one task, and the caret's menu holds Start now.
+ * The picker rides with Start now — the modal configures one run of one task
+ * and prints the command line for it, while the mode says how many tasks the
+ * click works through.
+ *
  * @see packages/web/src/viewer/components/start-task-button.ts
- * @see packages/web/src/server/routes-hench.ts — the matching RunMode contract
+ * @see packages/web/src/shared/run-options.ts — the RunMode contract all three
+ *      of the server, the hub queue and this picker read
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { h } from "preact";
 import { act } from "preact/test-utils";
-import {
-  StartTaskButton,
-  MAX_ITERATIONS,
-} from "../../../src/viewer/components/start-task-button.js";
+import { StartTaskButton } from "../../../src/viewer/components/start-task-button.js";
+import { MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "../../../src/shared/index.js";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
 
 let root: HTMLDivElement | undefined;
@@ -69,9 +74,21 @@ async function setMode(value: string): Promise<void> {
   });
 }
 
+/** The caret's menu item, with the menu opened if it is not already. */
+async function openStartNow(): Promise<HTMLButtonElement> {
+  if (!root!.querySelector(".ready-menu")) {
+    await act(async () => {
+      root!.querySelector<HTMLButtonElement>(".start-task-caret")!.click();
+    });
+  }
+  return root!.querySelector<HTMLButtonElement>(".ready-menu [role='menuitem']")!;
+}
+
+/** Start now — the one-click run the picker qualifies. */
 async function clickStart(): Promise<void> {
+  const item = await openStartNow();
   await act(async () => {
-    root!.querySelector<HTMLButtonElement>(".start-task-btn")!.click();
+    item.click();
     await new Promise((r) => setTimeout(r, 0));
   });
 }
@@ -117,7 +134,11 @@ describe("StartTaskButton run modes", () => {
     render({ runModes: true });
     await setMode("iterations");
     const input = root!.querySelector<HTMLInputElement>(".start-task-iterations")!;
-    for (const [typed, expected] of [["999", MAX_ITERATIONS], ["1", 2], ["0", 2]] as const) {
+    for (const [typed, expected] of [
+      ["999", MAX_DASHBOARD_ITERATIONS],
+      ["1", MIN_DASHBOARD_ITERATIONS],
+      ["0", MIN_DASHBOARD_ITERATIONS],
+    ] as const) {
       await act(async () => {
         input.value = typed;
         input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -128,19 +149,30 @@ describe("StartTaskButton run modes", () => {
     }
   });
 
-  it("says on the button how much work the click starts", async () => {
+  it("says on Start now how much work the click starts", async () => {
     render({ runModes: true, label: "Start working" });
-    const button = () => root!.querySelector<HTMLButtonElement>(".start-task-btn")!;
-    expect(button().textContent).toBe("Start working");
+    expect((await openStartNow()).textContent).toBe("Start now");
 
     await setMode("loop");
     // A picker that only changed hidden behaviour is how someone launches a
     // queue-long run believing they started one task.
-    expect(button().textContent).toContain("until done");
-    expect(button().getAttribute("aria-label")).toContain("until the queue is empty");
+    expect((await openStartNow()).textContent).toContain("until done");
+    expect((await openStartNow()).getAttribute("aria-label")).toContain("until the queue is empty");
 
     await setMode("iterations");
-    expect(button().textContent).toContain("3 tasks");
+    expect((await openStartNow()).textContent).toContain("3 tasks");
+  });
+
+  it("leaves the modal's own button alone, because the modal is one task", async () => {
+    // The primary opens Prepare task, which resolves and prints the command
+    // line for a single run. A mode on that label would describe a run the
+    // modal does not start.
+    render({ runModes: true, label: "Start working" });
+    const primary = root!.querySelector<HTMLButtonElement>(".start-task-primary")!;
+    expect(primary.textContent).toBe("Start working");
+
+    await setMode("loop");
+    expect(primary.textContent).toBe("Start working");
   });
 
   it("falls back to one task after a run starts", async () => {

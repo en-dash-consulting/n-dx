@@ -79,6 +79,7 @@ function extractGoogleConfig(value: unknown): GoogleConfig | undefined {
   if (typeof v.api_endpoint === "string" && v.api_endpoint) cfg.api_endpoint = v.api_endpoint;
   if (typeof v.model === "string" && v.model) cfg.model = v.model;
   if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = v.lightModel;
+  if (typeof v.reviewModel === "string" && v.reviewModel) cfg.reviewModel = v.reviewModel;
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
@@ -92,6 +93,7 @@ function extractClaudeConfig(value: unknown): ClaudeConfig | undefined {
   if (typeof v.api_endpoint === "string" && v.api_endpoint) cfg.api_endpoint = v.api_endpoint;
   if (typeof v.model === "string" && v.model) cfg.model = v.model;
   if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = v.lightModel;
+  if (typeof v.reviewModel === "string" && v.reviewModel) cfg.reviewModel = v.reviewModel;
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
@@ -107,7 +109,7 @@ export interface ResolvedClaudeConfig {
 }
 
 /** The fields a Claude config carries, and which both locations may set. */
-const CLAUDE_FIELDS = ["cli_path", "api_key", "api_endpoint", "model", "lightModel"] as const;
+const CLAUDE_FIELDS = ["cli_path", "api_key", "api_endpoint", "model", "lightModel", "reviewModel"] as const;
 
 /**
  * Resolve the modern `llm.claude` block against the legacy top-level `claude`
@@ -161,6 +163,7 @@ function extractCodexConfig(value: unknown): CodexConfig | undefined {
   if (typeof v.api_endpoint === "string" && v.api_endpoint) cfg.api_endpoint = v.api_endpoint;
   if (typeof v.model === "string" && v.model) cfg.model = normalizeCodexModel(v.model);
   if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = normalizeCodexModel(v.lightModel);
+  if (typeof v.reviewModel === "string" && v.reviewModel) cfg.reviewModel = normalizeCodexModel(v.reviewModel);
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
@@ -242,6 +245,12 @@ function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
     // shorthand→full-id expansion happens later in `resolveModel()`.
     config.model =
       llmVendor === LLM_VENDOR.CODEX ? normalizeCodexModel(rawTopLevelModel) : rawTopLevelModel;
+  }
+  const rawReviewModel =
+    typeof llm?.reviewModel === "string" && llm.reviewModel ? llm.reviewModel : undefined;
+  if (rawReviewModel) {
+    config.reviewModel =
+      llmVendor === LLM_VENDOR.CODEX ? normalizeCodexModel(rawReviewModel) : rawReviewModel;
   }
   if (claude) config.claude = claude;
   if (llmCodex) config.codex = llmCodex;

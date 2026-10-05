@@ -6,15 +6,15 @@
  * controls for updating status, priority, and tags.
  */
 
-import { getWebSocketUrl, acceptsFrame } from "../../base-path.js";
 import { h, Fragment } from "preact";
-import { useState, useCallback, useEffect, useRef } from "preact/hooks";
+import { useState, useCallback, useEffect } from "preact/hooks";
 import type { PRDItemData, ItemStatus, Priority, ItemLevel, RequirementData, RequirementCategory, RequirementValidationType, TaskUsageSummary, WeeklyBudgetResolution } from "./types.js";
 import type { NavigateTo } from "../../types.js";
 import { formatTimestamp } from "./compute.js";
 import { formatTokenCount, fmtDuration } from "../../utils/format.js";
 import { findItemById } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
+import { TaskStartControl } from "../task-start-control.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 import { isWorkItem, getLevelLabel, getChildLevel } from "./levels.js";
 import { useIndexMd } from "../../hooks/index.js";
@@ -36,8 +36,6 @@ export interface TaskDetailProps {
   onUpdate?: (id: string, updates: Partial<PRDItemData>) => void;
   /** Called to navigate to a different item in the tree. */
   onNavigateToItem?: (id: string) => void;
-  /** Called to trigger Hench execution for this task. */
-  onExecuteTask?: (taskId: string) => Promise<void>;
   /** Called when PRD data may have changed (e.g. after execution completes). */
   onPrdChanged?: () => void;
   /** Called to add a child item under the current item. */
@@ -1008,287 +1006,6 @@ function RequirementsList({
   );
 }
 
-/** Statuses that allow triggering Hench execution. */
-const TRIGGERABLE_STATUSES: Set<ItemStatus> = new Set(["pending", "blocked", "deferred"]);
-
-/** Execution progress state received from WebSocket. */
-interface ExecProgress {
-  taskId: string;
-  taskTitle: string;
-  runId: string;
-  status: "starting" | "running" | "completed" | "failed";
-  startedAt: string;
-  finishedAt?: string;
-  lastOutput?: string;
-  error?: string;
-}
-
-/** Status labels for the execution progress indicator. */
-const EXEC_STATUS_LABELS: Record<string, string> = {
-  starting: "Starting\u2026",
-  running: "Running\u2026",
-  completed: "Completed",
-  failed: "Failed",
-};
-
-/** Status icons for the execution progress indicator. */
-const EXEC_STATUS_ICONS: Record<string, string> = {
-  starting: "\u25d0",  // ◐
-  running: "\u25d0",   // ◐
-  completed: "\u25cf", // ●
-  failed: "\u2716",    // ✖
-};
-
-/** Execute task button with real-time progress tracking via WebSocket. */
-function ExecuteTaskButton({
-  item,
-  onExecute,
-  onPrdChanged,
-}: {
-  item: PRDItemData;
-  onExecute?: (taskId: string) => Promise<void>;
-  onPrdChanged?: () => void;
-}) {
-  const [executing, setExecuting] = useState(false);
-  const [resultMessage, setResultMessage] = useState<string | null>(null);
-  const [execProgress, setExecProgress] = useState<ExecProgress | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const isTriggerable = TRIGGERABLE_STATUSES.has(item.status);
-  const isTaskLevel = isWorkItem(item.level);
-
-  // Check initial execution status on mount (handles page refresh during execution)
-  useEffect(() => {
-    if (!isTaskLevel) return;
-    fetch(`/api/hench/execute/status/${item.id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.execution && (data.execution.status === "starting" || data.execution.status === "running")) {
-          setExecProgress(data.execution);
-          setExecuting(true);
-        }
-      })
-      .catch(() => { /* ignore */ });
-  }, [item.id, isTaskLevel]);
-
-  // Connect to WebSocket for live progress when executing
-  useEffect(() => {
-    if (!executing) return;
-
-    const wsUrl = getWebSocketUrl();
-    let ws: WebSocket;
-
-    try {
-      ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          // Another worktree's frame on the shared socket — not ours to react to.
-          if (!acceptsFrame(msg)) return;
-          if (msg.type === "hench:task-execution-progress" && msg.state) {
-            const state = msg.state as ExecProgress;
-            if (state.taskId !== item.id) return;
-
-            setExecProgress(state);
-
-            if (state.status === "completed") {
-              setExecuting(false);
-              setResultMessage("Execution completed");
-              // Notify parent to refresh PRD data
-              if (onPrdChanged) onPrdChanged();
-              resultTimerRef.current = setTimeout(() => {
-                setResultMessage(null);
-                setExecProgress(null);
-              }, 5000);
-            } else if (state.status === "failed") {
-              setExecuting(false);
-              setResultMessage(state.error || "Execution failed");
-              if (onPrdChanged) onPrdChanged();
-              resultTimerRef.current = setTimeout(() => {
-                setResultMessage(null);
-                setExecProgress(null);
-              }, 8000);
-            }
-          }
-          // Also listen for PRD changes during execution
-          if (msg.type === "rex:prd-changed" && onPrdChanged) {
-            onPrdChanged();
-          }
-        } catch {
-          // Ignore malformed messages
-        }
-      };
-
-      ws.onclose = () => {
-        wsRef.current = null;
-      };
-    } catch {
-      // WebSocket not available — fall back to polling
-    }
-
-    // Polling fallback: check execution status every 3s
-    const pollInterval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/hench/execute/status/${item.id}`);
-        const data = await res.json();
-        if (data.execution) {
-          setExecProgress(data.execution);
-          if (data.execution.status === "completed" || data.execution.status === "failed") {
-            setExecuting(false);
-            const isSuccess = data.execution.status === "completed";
-            setResultMessage(isSuccess ? "Execution completed" : (data.execution.error || "Execution failed"));
-            if (onPrdChanged) onPrdChanged();
-            resultTimerRef.current = setTimeout(() => {
-              setResultMessage(null);
-              setExecProgress(null);
-            }, isSuccess ? 5000 : 8000);
-          }
-        } else if (executing) {
-          // No active execution found — may have completed between polls
-          setExecuting(false);
-          setExecProgress(null);
-          if (onPrdChanged) onPrdChanged();
-        }
-      } catch {
-        // ignore
-      }
-    }, 3000);
-
-    return () => {
-      clearInterval(pollInterval);
-      if (wsRef.current) {
-        try { wsRef.current.close(); } catch { /* ignore */ }
-        wsRef.current = null;
-      }
-    };
-  }, [executing, item.id, onPrdChanged]);
-
-  // Clean up timers on unmount
-  useEffect(() => {
-    return () => {
-      if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
-    };
-  }, []);
-
-  // Hide the button entirely for tasks that can't be triggered and aren't currently executing.
-  // This prevents showing a permanently-disabled button for completed/cancelled tasks.
-  if (!onExecute || !isTaskLevel || (!isTriggerable && !executing)) return null;
-
-  const handleClick = useCallback(async () => {
-    if (executing || !isTriggerable) return;
-    setExecuting(true);
-    setResultMessage(null);
-    setExecProgress(null);
-    if (resultTimerRef.current) {
-      clearTimeout(resultTimerRef.current);
-      resultTimerRef.current = null;
-    }
-    try {
-      await onExecute(item.id);
-      // Initial state will be set via WebSocket / polling
-    } catch (err) {
-      setExecuting(false);
-      setResultMessage(err instanceof Error ? err.message : "Failed to start");
-      resultTimerRef.current = setTimeout(() => setResultMessage(null), 5000);
-    }
-  }, [item.id, executing, isTriggerable, onExecute]);
-
-  const isActive = execProgress && (execProgress.status === "starting" || execProgress.status === "running");
-  const isDone = execProgress && (execProgress.status === "completed" || execProgress.status === "failed");
-
-  return h(
-    "div",
-    { class: "task-execute-section" },
-
-    // Execute / progress button
-    h(
-      "button",
-      {
-        class: `task-execute-btn${executing ? " executing" : ""}${!isTriggerable && !executing ? " disabled" : ""}`,
-        onClick: handleClick,
-        disabled: !isTriggerable || executing,
-        title: !isTriggerable && !executing
-          ? `Cannot execute: task is ${item.status}`
-          : executing
-            ? "Execution in progress\u2026"
-            : "Run Hench agent on this task",
-        "aria-label": "Execute task with Hench",
-      },
-      h("span", { class: "task-execute-icon" },
-        isActive ? EXEC_STATUS_ICONS[execProgress!.status] : executing ? "\u25d0" : "\u25b6",
-      ),
-      h("span", { class: "task-execute-label" },
-        isActive ? EXEC_STATUS_LABELS[execProgress!.status] : executing ? "Starting\u2026" : "Execute",
-      ),
-    ),
-
-    // Result message (shown briefly after completion)
-    resultMessage && !isActive
-      ? h("span", {
-          class: `task-execute-result${
-            resultMessage.startsWith("Execution completed") ? " success" : " error"
-          }`,
-        }, resultMessage)
-      : null,
-
-    // Stop button (shown while execution is active)
-    isActive
-      ? h("button", {
-          class: "task-execute-stop-btn",
-          title: "Cancel this execution",
-          "aria-label": "Stop execution",
-          onClick: async () => {
-            try {
-              await fetch(`/api/hench/execute/${item.id}/terminate`, { method: "POST" });
-            } catch {
-              // ignore \u2014 server will clean up
-            }
-          },
-        },
-          h("span", null, "\u23f9"),
-          " Stop",
-        )
-      : null,
-
-    // Live progress indicator (shown during execution)
-    isActive
-      ? h("div", { class: "task-exec-progress" },
-          // Animated progress bar
-          h("div", { class: "task-exec-progress-bar" },
-            h("div", { class: "task-exec-progress-fill" }),
-          ),
-          // Status text
-          h("span", { class: `task-exec-status task-exec-status-${execProgress!.status}` },
-            execProgress!.status === "running" ? "Agent is working\u2026" : "Initializing\u2026",
-          ),
-          // Last output snippet
-          execProgress!.lastOutput
-            ? h("div", { class: "task-exec-output" },
-                h("code", null, execProgress!.lastOutput),
-              )
-            : null,
-        )
-      : null,
-
-    // Completion summary
-    isDone
-      ? h("div", { class: `task-exec-done task-exec-done-${execProgress!.status}` },
-          h("span", { class: "task-exec-done-icon" },
-            execProgress!.status === "completed" ? "\u2713" : "\u2717",
-          ),
-          h("span", { class: "task-exec-done-text" },
-            execProgress!.status === "completed"
-              ? "Task execution completed"
-              : `Failed: ${execProgress!.error || "Unknown error"}`,
-          ),
-        )
-      : null,
-  );
-}
-
 // ── Hench Runs list ──────────────────────────────────────────────────
 
 /** Summary of a hench run, matching the server's RunSummary shape. */
@@ -1459,7 +1176,7 @@ function IndexMdSectionsRenderer({ itemId }: { itemId: string }) {
 
 // ── Main component ───────────────────────────────────────────────────
 
-export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, allItems, onUpdate, onNavigateToItem, onExecuteTask, onPrdChanged, onAddChild, onRemove, navigateTo }: TaskDetailProps) {
+export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, allItems, onUpdate, onNavigateToItem, onPrdChanged, onAddChild, onRemove, navigateTo }: TaskDetailProps) {
   const [saving, setSaving] = useState(false);
   const [pendingFailStatus, setPendingFailStatus] = useState(false);
   const [failureReason, setFailureReason] = useState("");
@@ -1577,8 +1294,17 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
         onRequestReason: onUpdate ? handleRequestReason : undefined,
       }),
 
-      // Execute button (only for tasks/subtasks)
-      h(ExecuteTaskButton, { item, onExecute: onExecuteTask, onPrdChanged }),
+      // Start control (only for tasks/subtasks)
+      isWorkItem(item.level)
+        ? h("div", { class: "task-execute-section" },
+            h(TaskStartControl, {
+              task: item,
+              titleOf: (id: string) => findItemById(allItems, id)?.title ?? null,
+              onStarted: () => onPrdChanged?.(),
+              navigateTo,
+            }),
+          )
+        : null,
 
       // Inline failure reason input form
       (pendingFailStatus || editingFailureReason)

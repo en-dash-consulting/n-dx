@@ -20,7 +20,7 @@ Latest analysis (2026-08-24, `main`): `web-viewer` 205 files (cohesion 0.98 / co
 
 ## `src/shared/` addition policy
 
-`src/shared/` holds 5 framework-neutral modules (`data-files.ts`, `features.ts`, `index.ts`, `view-id.ts`, `view-routing.ts`). Because both server and viewer files import it, Louvain typically absorbs it into `web-viewer` rather than emitting a separate `web-shared` zone — that is a detection artifact, not a boundary violation, and the rules below apply regardless:
+`src/shared/` holds framework-neutral modules behind its `index.ts` barrel (data files, features, view ids and routing, base paths, origin checks, the hub admission header, and the run-option allow-list in `run-options.ts`). Because both server and viewer files import it, Louvain typically absorbs it into `web-viewer` rather than emitting a separate `web-shared` zone — that is a detection artifact, not a boundary violation, and the rules below apply regardless:
 
 - **Framework-agnostic only:** `src/shared/` must not contain Preact/React imports or server-only (`node:*`) imports. If a utility needs framework APIs, it belongs in the consuming zone.
 - **Barrel import enforcement:** Consumers must import through `shared/index.ts` rather than directly from leaf files (`data-files.ts`, `view-id.ts`). Enforced by `boundary-check.test.ts`.

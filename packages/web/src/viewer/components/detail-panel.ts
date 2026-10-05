@@ -20,7 +20,7 @@ export function DetailPanel({ detail, data, navigateTo, onClose, prdDetailConten
   useEffect(() => {
     if (!detail) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);

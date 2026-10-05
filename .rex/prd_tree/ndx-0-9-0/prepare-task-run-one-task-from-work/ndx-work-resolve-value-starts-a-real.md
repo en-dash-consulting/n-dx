@@ -1,0 +1,25 @@
+---
+id: "b19433c4-1594-42a9-85e4-f1c728f42363"
+level: "task"
+title: "`ndx work --resolve=<value>` starts a real run instead of resolving"
+status: "completed"
+priority: "low"
+tags:
+  - "0.8.0"
+  - "task-prep"
+  - "ndx-adversarial-review"
+  - "severity:low"
+  - "core"
+  - "hench"
+source: "ndx-adversarial-review"
+startedAt: "2026-10-02T10:59:14.726Z"
+completedAt: "2026-10-02T11:12:24.572Z"
+endedAt: "2026-10-02T11:12:24.572Z"
+resolutionType: "code-change"
+resolutionDetail: "core matches --resolve and --resolve=* (except =false); hench resolves for any value but false. Tests in both."
+acceptanceCriteria:
+  - "`--resolve=yes` and `--resolve=true` resolve and never start a run; `--resolve=false` behaves as no flag or is rejected; tests in core and hench."
+description: "Verdict: should-fix (low severity, but a flag named resolve must never run).\n\nScenario: `ndx work --task=X --resolve=yes .` fails core's flags.includes('--resolve') (packages/core/cli.js:2089), so core prints the identity line, applies the vendor gate and installs the Ctrl+C handler; hench sees resolve='yes' (not 'true') and falls through to cmdRun (packages/hench/src/cli/index.ts:157) — a real run. Fix (recommended): core matches `--resolve` and `--resolve=*`; hench treats any resolve value other than 'false' as resolve, or rejects other values with an error.\n\n## Checks before committing (operator note)\n\nhench's test gate runs `npm run test` at the project root, which includes ROOT policy tests (tests/e2e/*, tests/integration/*) that no package suite runs: gateway export caps (architecture-policy), gateway contract lists (cross-package-contracts), the wall-clock assertion inventory, domain isolation and boundary checks. If you add a gateway export, a clock-bound test or a cross-package import, update those. Before committing run, from the project root: `npx vitest run tests/e2e tests/integration`, plus `npx vitest run` and `npx tsc --noEmit` from each package you touched. `pnpm` is not permitted in this sandbox. Add a patch changeset (scoped name) for each package you change.\n\n## Operator retry notes (2026-10-02)\n\nA previous run of this task wrote the fix (packages/core/cli.js, packages/hench/src/cli/index.ts, tests in tests/e2e/cli-work-resolve.test.js and packages/hench/tests/e2e/run-flag-conflicts.test.ts, and .changeset/resolve-value-never-runs.md); they are uncommitted in the working tree. Its tsc/vitest calls were held for approval, so it could not verify them, and hench's test gate then failed the two new e2e tests because those spawn the BUILT CLI and hench's dist was stale. The operator has since rebuilt hench's dist; both test files now pass (7 and 5 tests). Review the edits, run the checks listed below, and commit; do not rewrite them unless a check fails. e2e tests that spawn the CLI need an up-to-date dist of the package they spawn."
+lastModified: "2026-10-02T11:12:24.983Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

@@ -101,8 +101,6 @@ export interface PRDActionsState {
   handleNavigateToItem: (id: string) => void;
   /** Add a child item from the detail panel. */
   handleAddChild: (input: { title: string; parentId: string; level: string; description?: string; priority?: string }) => Promise<void>;
-  /** Start a hench execution for a task. */
-  handleExecuteTask: (taskId: string) => Promise<void>;
   /** Add an item from the command bar form. */
   handleAddItem: (input: AddItemInput) => Promise<void>;
   /** Add an item from the inline tree form. */
@@ -235,24 +233,6 @@ export function usePRDActions({
     [fetchPRDData, fetchTaskUsage, showToast],
   );
 
-  // ── Execute task ─────────────────────────────────────────────────
-
-  const handleExecuteTask = useCallback(
-    async (taskId: string) => {
-      const res = await fetch("/api/hench/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        throw new Error(body.error || `HTTP ${res.status}`);
-      }
-      showToast(`Hench execution started for task`);
-    },
-    [showToast],
-  );
-
   // ── Add item (command bar form) ──────────────────────────────────
 
   const handleAddItem = useCallback(
@@ -365,7 +345,6 @@ export function usePRDActions({
         allItems: data.items,
         onUpdate: handleItemUpdate,
         onNavigateToItem: handleNavigateToItem,
-        onExecuteTask: handleExecuteTask,
         onPrdChanged: () => {
           fetchPRDData();
           fetchTaskUsage();
@@ -385,7 +364,6 @@ export function usePRDActions({
     onDetailContent,
     handleItemUpdate,
     handleNavigateToItem,
-    handleExecuteTask,
     fetchPRDData,
     fetchTaskUsage,
     handleAddChild,
@@ -410,7 +388,6 @@ export function usePRDActions({
     clearBulkSelection,
     handleNavigateToItem,
     handleAddChild,
-    handleExecuteTask,
     handleAddItem,
     handleInlineAddItem,
     handleRemoveItemFromTree,
