@@ -80,6 +80,8 @@ Rex and sourcevision expose MCP servers over stdio (default) and HTTP (`ndx star
 
 **stdio (default):** `ndx init` writes a tracked `.mcp.json` at the project root with cwd-relative commands (`ndx rex mcp .`, `ndx sv mcp .`) — committed to the repo, so every worktree and clone gets the same working registration. Claude Code shows a one-time approval prompt for a project's servers the first time it opens the checkout. If `ndx` isn't on `PATH`, use `npx -y @n-dx/core rex mcp .` / `npx -y @n-dx/core sv mcp .`, or re-run init with `--mcp-scope=local` to fall back to the older per-machine `claude mcp add --scope local` registration.
 
+**Worktree sessions follow the client's roots:** the stdio rex and sourcevision servers (and `ndx mcp <server>` when it bridges to the hub) resolve their workspace from the client's MCP roots (`roots/list`), not only from the directory they were started in. Claude desktop starts a worktree session's project servers in the main checkout while the session itself runs in `<repo>/.claude/worktrees/<name>`; without roots, `.` would resolve to the main checkout and writes would land in the wrong PRD (#499). When the client's worktree cannot be served (a root outside the repository, or unresolvable), writes are refused with an error rather than misrouted. Verify a session's write target with rex `get_capabilities`: `workspace.source` reads `roots` when the client's root was used (`startup` means the launch directory), `workspace.projectDir` names the tree being written, and `workspace.refused` is set while writes are refused.
+
 **HTTP — through the hub:** `ndx start .` registers the repository with the per-user hub and serves it at `http://localhost:3117/p/<id>/`, so each project's endpoints are `…/p/<id>/mcp/rex` and `…/p/<id>/mcp/sourcevision` and several projects share the port without collision. While exactly one project is registered the bare `http://localhost:3117/mcp/rex` still aliases to it; with several, root MCP calls answer `409` listing the ids. HTTP uses [Streamable HTTP](https://modelcontextprotocol.io/) with session management (`Mcp-Session-Id` header, created automatically on first request); the hub proxies, and each project's own server owns its sessions.
 
 **Per-user token:** `ndx start` creates `<ndx home>/auth.token` (mode 0600) and every hub, dashboard and preview request must present it as `X-Ndx-Token`, `Authorization: Bearer`, or the `ndx_token` cookie that the printed URL sets once. HTTP MCP registrations therefore need `--header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"`. Disable with `ndx start --no-auth` or `web.auth: false` in `.n-dx.json`.
@@ -108,7 +110,7 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 - `append_log` — write structured log entry
 - `sync_with_remote` — sync with remote adapter (e.g. Notion)
 - `get_token_usage` — roll up hench run token totals per PRD item (self/descendants/total) with orphans surfaced separately
-- `get_capabilities` — server capabilities and configuration
+- `get_capabilities` — server capabilities and configuration, plus the `workspace` block (`projectDir`, `source`, `refused`) naming the tree this session writes
 
 ### Sourcevision MCP tools
 
