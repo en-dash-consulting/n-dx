@@ -30,7 +30,10 @@ function makeOpts(
   const collectDiff = vi.fn(async () => DIFF);
   const proposeMessage = vi.fn(async () => "chore: tidy up");
   const promptChoice = vi.fn(async () => overrides.choice ?? "proceed");
+  const confirmDiscard = vi.fn(async () => true);
   const commit = vi.fn(async () => {});
+  const stash = vi.fn(async () => {});
+  const discard = vi.fn(async () => "deadbeef");
 
   const opts: PreRunCommitGateOptions = {
     projectDir: "/tmp/proj",
@@ -48,12 +51,27 @@ function makeOpts(
       collectDiff: overrides.collectDiff ?? collectDiff,
       proposeMessage: overrides.proposeMessage ?? proposeMessage,
       promptChoice: overrides.promptChoice ?? promptChoice,
+      confirmDiscard: overrides.confirmDiscard ?? confirmDiscard,
       commit: overrides.commit ?? commit,
+      stash: overrides.stash ?? stash,
+      discard: overrides.discard ?? discard,
+      checkOrigin: overrides.checkOrigin ?? (() => undefined),
       isTTY: overrides.isTTY ?? true,
     },
   };
 
-  return { opts, listDirty, measureMagnitude, collectDiff, proposeMessage, promptChoice, commit };
+  return {
+    opts,
+    listDirty,
+    measureMagnitude,
+    collectDiff,
+    proposeMessage,
+    promptChoice,
+    confirmDiscard,
+    commit,
+    stash,
+    discard,
+  };
 }
 
 describe("performPreRunCommitGateIfNeeded", () => {
@@ -78,11 +96,38 @@ describe("performPreRunCommitGateIfNeeded", () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
-  it("aborts a dirty autonomous run without prompting", async () => {
-    const { opts, promptChoice, commit } = makeOpts({ autonomous: true });
+  it("aborts a dirty autonomous run with no TTY to prompt on", async () => {
+    const { opts, promptChoice, commit } = makeOpts({ autonomous: true, isTTY: false });
     expect(await performPreRunCommitGateIfNeeded(opts)).toBe("stop");
     expect(promptChoice).not.toHaveBeenCalled();
     expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("aborts a dirty autonomous --yes run without prompting", async () => {
+    const { opts, promptChoice } = makeOpts({ autonomous: true, yes: true });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("stop");
+    expect(promptChoice).not.toHaveBeenCalled();
+  });
+
+  it("prompts an attended dirty autonomous run instead of refusing it", async () => {
+    const { opts, promptChoice, commit } = makeOpts({ autonomous: true, choice: "commit" });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("proceed");
+    // Escalated: a bare Enter must not walk a loop into someone else's changes.
+    expect(promptChoice).toHaveBeenCalledWith({ escalate: true, allowProceed: true });
+    expect(commit).toHaveBeenCalledWith("/tmp/proj", "chore: tidy up");
+  });
+
+  it("stops an attended dirty autonomous run that leaves the changes in place", async () => {
+    const { opts, commit, stash, discard } = makeOpts({ autonomous: true, choice: "stop" });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("stop");
+    expect(commit).not.toHaveBeenCalled();
+    expect(stash).not.toHaveBeenCalled();
+    expect(discard).not.toHaveBeenCalled();
+  });
+
+  it("lets an attended dirty autonomous run proceed explicitly", async () => {
+    const { opts } = makeOpts({ autonomous: true, choice: "proceed" });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("proceed");
   });
 
   it("proceeds without prompting for a clean autonomous run", async () => {
@@ -119,6 +164,79 @@ describe("performPreRunCommitGateIfNeeded", () => {
     const { opts, commit } = makeOpts({ choice: "proceed" });
     expect(await performPreRunCommitGateIfNeeded(opts)).toBe("proceed");
     expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("stashes under the proposed message and proceeds on 'stash'", async () => {
+    const { opts, stash, commit } = makeOpts({ choice: "stash" });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("proceed");
+    expect(stash).toHaveBeenCalledWith("/tmp/proj", "chore: tidy up");
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("confirms before discarding, then discards and proceeds", async () => {
+    const { opts, discard, confirmDiscard } = makeOpts({
+      choice: "discard",
+      dirty: [" M a.ts", "?? b.ts"],
+    });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("proceed");
+    expect(confirmDiscard).toHaveBeenCalledWith(2);
+    expect(discard).toHaveBeenCalledWith("/tmp/proj");
+  });
+
+  it("discards nothing when the confirmation is declined", async () => {
+    const confirmDiscard = vi.fn(async () => false);
+    const { opts, discard } = makeOpts({ choice: "discard", confirmDiscard });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("proceed");
+    expect(discard).not.toHaveBeenCalled();
+  });
+
+  it("stops rather than proceeding when a declined discard would start an autonomous run", async () => {
+    const confirmDiscard = vi.fn(async () => false);
+    const { opts, discard } = makeOpts({
+      choice: "discard",
+      confirmDiscard,
+      autonomous: true,
+    });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("stop");
+    expect(discard).not.toHaveBeenCalled();
+  });
+
+  it("stops before work starts when the stash fails", async () => {
+    const stash = vi.fn(async () => {
+      throw new Error("cannot stash");
+    });
+    const { opts } = makeOpts({ choice: "stash", stash });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("stop");
+    expect(stash).toHaveBeenCalledOnce();
+  });
+
+  it("stops before work starts when the discard fails", async () => {
+    const discard = vi.fn(async () => {
+      throw new Error("cannot clean");
+    });
+    const { opts } = makeOpts({ choice: "discard", discard });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("stop");
+    expect(discard).toHaveBeenCalledOnce();
+  });
+
+  describe("checkout drift", () => {
+    it("leaves the changes in place and proceeds when the checkout moved", async () => {
+      const checkOrigin = vi.fn(() => "the working tree moved to another branch");
+      const { opts, stash } = makeOpts({ choice: "stash", checkOrigin });
+      expect(await performPreRunCommitGateIfNeeded(opts)).toBe("proceed");
+      expect(stash).not.toHaveBeenCalled();
+    });
+
+    it("stops when drift leaves a requireCleanTree run with a dirty tree", async () => {
+      const checkOrigin = vi.fn(() => "the working tree moved to another branch");
+      const { opts, commit } = makeOpts({
+        choice: "commit",
+        checkOrigin,
+        requireCleanTree: true,
+      });
+      expect(await performPreRunCommitGateIfNeeded(opts)).toBe("stop");
+      expect(commit).not.toHaveBeenCalled();
+    });
   });
 
   it("stops before work starts when the commit fails", async () => {
@@ -248,6 +366,27 @@ describe("resolvePreRunCommitAnswer", () => {
     for (const mode of [normal, escalated, cleanOnly]) {
       expect(resolvePreRunCommitAnswer("c", mode)).toBe("commit");
       expect(resolvePreRunCommitAnswer("stop", mode)).toBe("stop");
+    }
+  });
+
+  it("maps stash and discard answers regardless of mode", () => {
+    for (const mode of [normal, escalated, cleanOnly]) {
+      expect(resolvePreRunCommitAnswer("t", mode)).toBe("stash");
+      expect(resolvePreRunCommitAnswer("stash", mode)).toBe("stash");
+      expect(resolvePreRunCommitAnswer("d", mode)).toBe("discard");
+      expect(resolvePreRunCommitAnswer("discard", mode)).toBe("discard");
+    }
+  });
+
+  it("keeps 's' bound to stop, not stash", () => {
+    expect(resolvePreRunCommitAnswer("s", normal)).toBe("stop");
+  });
+
+  it("never reaches discard by default", () => {
+    for (const mode of [normal, escalated, cleanOnly]) {
+      expect(resolvePreRunCommitAnswer("", mode)).not.toBe("discard");
+      expect(resolvePreRunCommitAnswer("yes please", mode)).not.toBe("discard");
+      expect(resolvePreRunCommitAnswer(null, mode)).not.toBe("discard");
     }
   });
 
