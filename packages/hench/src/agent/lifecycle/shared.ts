@@ -68,7 +68,6 @@ import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
 import {
   PRD_COMMIT_PATHS,
-  PRD_STAGE_PATHS,
   deletedAmong,
   findUncommittedWork,
   formatOperatorPrdLeftovers,
@@ -78,6 +77,8 @@ import {
   listDirtyPaths,
   listOperatorOwnedPrdDirt,
   partitionDirtyPaths,
+  prdStagePaths,
+  rexDirName,
   prepareRecoveryPathspecs,
   renderPaths,
 } from "./uncommitted-work-gate.js";
@@ -1961,7 +1962,7 @@ async function isGitIgnored(projectDir: string, relativePath: string): Promise<b
  * gitignored, and should be staged by a commit that lands a PRD write.
  *
  * One helper for both staging sites — {@link commitPrdTreeIfStaged} and the
- * commit prompt — and its candidates come from {@link PRD_STAGE_PATHS}, the
+ * commit prompt — and its candidates come from {@link prdStagePaths}, the
  * same definition the uncommitted-work gate's discount derives from. The two
  * sets drifted twice when they were maintained by hand: `tree-meta.json` was
  * discounted by nobody and staged by nobody, so every completion was refused;
@@ -1985,12 +1986,13 @@ export async function prdPathsToStage(
 ): Promise<string[]> {
   const { join } = await import("node:path");
   const { existsSync } = await import("node:fs");
+  const rexDir = rexDirName(projectDir);
   const candidates = [
-    ...PRD_STAGE_PATHS,
+    ...prdStagePaths(projectDir),
     // Prompt-only legacy extra: read-only for years, never written by a PRD
     // mutation, so it is neither staged by the completion commit nor
     // discounted by the gate — a dirty prd.md is operator work.
-    ...(opts.includeLegacyMarkdown ? [`.rex/${PRD_MARKDOWN_FILENAME}`] : []),
+    ...(opts.includeLegacyMarkdown ? [`${rexDir}/${PRD_MARKDOWN_FILENAME}`] : []),
   ];
   const existing = candidates.filter((relativePath) => existsSync(join(projectDir, relativePath)));
 
@@ -2044,8 +2046,9 @@ async function scopePrdPathsToReport(
   // forward slashes on every platform. Compare on the forward-slash form —
   // git accepts it on Windows too.
   const allowedRoots = new Set(rootPaths.map((p) => p.split(sep).join("/")));
-  const treePrefix = `.rex/${PRD_TREE_DIRNAME}/`;
-  const treeAllowed = allowedRoots.has(`.rex/${PRD_TREE_DIRNAME}`);
+  const rexDir = rexDirName(projectDir);
+  const treePrefix = `${rexDir}/${PRD_TREE_DIRNAME}/`;
+  const treeAllowed = allowedRoots.has(`${rexDir}/${PRD_TREE_DIRNAME}`);
 
   const scoped: string[] = [];
   const seen = new Set<string>();
@@ -2070,7 +2073,7 @@ async function scopePrdPathsToReport(
     }
   }
 
-  const metaPath = `.rex/${TREE_META_FILENAME}`;
+  const metaPath = `${rexDir}/${TREE_META_FILENAME}`;
   if (allowedRoots.has(metaPath)) push(metaPath);
 
   return scoped;
@@ -2140,7 +2143,7 @@ async function commitPrdTreeIfStaged(
     return { staged: 0, error: err as Error, paths: prdPaths };
   }
 
-  const staged = await countStagedFiles(projectDir, [".rex/"]);
+  const staged = await countStagedFiles(projectDir, [`${rexDirName(projectDir)}/`]);
   if (staged === 0) {
     return { staged: 0, paths: prdPaths };
   }
@@ -2216,7 +2219,7 @@ async function commitCompletionMetadata(
   // permanently dirty and the next autonomous run refused at the pre-run gate.
   const operatorDirt = await listOperatorOwnedPrdDirt(projectDir);
   if (operatorDirt.length > 0) {
-    info(`\n${formatOperatorPrdLeftovers(operatorDirt)}`);
+    info(`\n${formatOperatorPrdLeftovers(operatorDirt, rexDirName(projectDir))}`);
   }
   return result;
 }
