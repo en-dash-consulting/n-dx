@@ -8,7 +8,8 @@
 
 /* ── Smart-add / batch import / analyze panels ─────────────────────── */
 .ndx-deployed .smart-add-panel,
-.ndx-deployed .smart-add-panel-compact,
+.ndx-deployed .rex-analysis-tabs-row,
+.ndx-deployed .rex-analysis-more,
 .ndx-deployed .batch-import-panel,
 .ndx-deployed .rex-analyze-panel,
 .ndx-deployed .rex-add-form,
@@ -55,7 +56,6 @@
 }
 
 /* ── Dashboard action buttons ──────────────────────────────────────── */
-.ndx-deployed .rex-dash-smart-add,
 .ndx-deployed .rex-dash-action,
 .ndx-deployed .rex-dash-header-action,
 .ndx-deployed .rex-dash-panel-action {

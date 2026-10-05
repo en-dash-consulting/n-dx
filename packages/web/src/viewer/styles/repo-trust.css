@@ -1,0 +1,80 @@
+/* Repository trust strip — shown while the checkout's execution config is
+   not trusted. Sits directly under the top nav, full width, warning tone. */
+.repo-trust-strip {
+  background: color-mix(in srgb, var(--warning, #c98a00) 10%, var(--bg-surface));
+  border-bottom: 1px solid color-mix(in srgb, var(--warning, #c98a00) 40%, var(--border));
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-sm);
+  color: var(--text);
+}
+
+.repo-trust-strip__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.repo-trust-strip__icon {
+  color: var(--warning, #c98a00);
+  font-size: var(--font-md);
+  line-height: 1.4;
+}
+
+.repo-trust-strip__text {
+  flex: 1 1 24rem;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.repo-trust-strip__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.repo-trust-strip__btn {
+  font: inherit;
+  font-size: var(--font-sm);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.repo-trust-strip__btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.repo-trust-strip__btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.repo-trust-strip__btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+.repo-trust-strip__list {
+  margin: var(--space-2) 0 0 1.75rem;
+  padding: 0 0 0 var(--space-4);
+  line-height: 1.5;
+}
+
+.repo-trust-strip__warning::marker {
+  color: var(--warning, #c98a00);
+}
+
+.repo-trust-strip__info {
+  color: var(--text-dim);
+}
+
+.repo-trust-strip__error {
+  margin-top: var(--space-2);
+  color: var(--danger, #b3261e);
+}

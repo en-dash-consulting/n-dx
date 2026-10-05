@@ -76,7 +76,7 @@ export function parseReviewOptions(flags: Record<string, string>): ReviewOptions
   if (reviewModelFlag !== undefined && !reviewModelFlag.trim()) {
     throw new CLIError(
       "--review-model requires a model id.",
-      "Example: --review-model=claude-opus-5. Omit the flag to use the recommended default for your vendor.",
+      "Example: --review-model=claude-opus-5-5. Omit the flag to use the recommended default for your vendor.",
     );
   }
   if (reviewModelFlag && !reviewPass) {

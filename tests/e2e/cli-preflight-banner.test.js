@@ -103,6 +103,15 @@ describe("preflight banner", () => {
     expect(stderr).toContain("Ctrl-C");
   });
 
+  it("names this project's real paths, never the declaration's layout tokens", () => {
+    // Declarations write `{rex}/prd_tree/`; the CLI must expand them before
+    // printing, or the banner names a folder nobody has and the run summary
+    // checks it — reporting a written file as untouched.
+    const { stderr } = runResult(["recommend", dir], { env: env({ NDX_PREFLIGHT: "always" }) });
+    expect(stderr).toContain(".rex/prd_tree/");
+    expect(stderr).not.toMatch(/\{(rex|hench|sourcevision|config)\}/);
+  });
+
   it("does not print the banner when stdout is a pipe", () => {
     // The autonomous case: `ndx work` spawns its children with piped stdio.
     const { stderr } = runResult(["recommend", dir], { env: env() });

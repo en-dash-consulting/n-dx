@@ -112,7 +112,6 @@
 .overview-col,
 .rex-dash-header,
 .rex-dash-next,
-.rex-dash-smart-add,
 .rex-dash-epics,
 .rex-dash-panel {
   position: relative;
@@ -124,7 +123,6 @@
 .overview-col > *,
 .rex-dash-header > *,
 .rex-dash-next > *,
-.rex-dash-smart-add > *,
 .rex-dash-epics > *,
 .rex-dash-panel > * {
   position: relative;
@@ -315,19 +313,6 @@
   background-position: 5px 5px;
 }
 
-/* Smart-add section: thin circle */
-.rex-dash-smart-add::after {
-  content: "";
-  position: absolute;
-  bottom: -60px;
-  right: -60px;
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  border: 1px solid var(--deco-stroke-color);
-  pointer-events: none;
-  z-index: 0;
-}
 
 /* ══════════════════════════════════════════════════════════════════
    Reusable decoration utility classes

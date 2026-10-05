@@ -23,6 +23,7 @@ import {
   SETTINGS_ENTRIES,
   isSettingsView,
   stageForView,
+  viewGlyph,
   viewLabel,
   visibleStages,
 } from "../../../src/viewer/views/stages.js";
@@ -326,9 +327,24 @@ describe("StagePage", () => {
     expect(root.querySelector('.stage-section[data-view="hench-audit"] .stage-section-expand')).toBeNull();
   });
 
-  it("shows the Terrain section with Map, Isometric map and Zones tabs, switching bodies with the active tab", async () => {
+  /** Terrain always starts collapsed (the Overview leads with its map), so open it by hand. */
+  function openTerrain(): void {
+    const toggle = root.querySelector<HTMLButtonElement>('.stage-section[data-view="graph"] .stage-section-toggle')!;
+    if (toggle.getAttribute("aria-expanded") !== "true") act(() => { toggle.click(); });
+  }
+
+  it("starts Terrain collapsed on every load, even when it was left open", async () => {
+    expect(STAGES.analyze.sections.find((s) => s.view === "graph")?.collapsedOnLoad).toBe(true);
     localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
     await mount(page("analyze"));
+    const toggle = root.querySelector('.stage-section[data-view="graph"] .stage-section-toggle')!;
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(root.querySelector('[data-rendered="graph"]')).toBeNull();
+  });
+
+  it("shows the Terrain section with Map, Isometric map and Zones tabs, switching bodies with the active tab", async () => {
+    await mount(page("analyze"));
+    openTerrain();
     const terrain = root.querySelector('.stage-section[data-view="graph"]')!;
     expect(terrain.querySelector(".stage-section-title")?.textContent).toBe("Terrain");
     expect(terrain.querySelector('[data-rendered="graph"]')).not.toBeNull();
@@ -354,8 +370,8 @@ describe("StagePage", () => {
   });
 
   it("moves the active Terrain tab with the arrow keys, wrapping at the ends", async () => {
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
     await mount(page("analyze"));
+    openTerrain();
     const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.stage-section[data-view="graph"] [role="tab"]'));
 
     act(() => { tabs[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true })); });
@@ -368,8 +384,8 @@ describe("StagePage", () => {
   it("drops the Isometric map tab in deployed mode, keeping Map and Zones", async () => {
     window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "" };
     try {
-      localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
       await mount(page("analyze"));
+      openTerrain();
       const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.stage-section[data-view="graph"] [role="tab"]'));
       expect(tabs.map((t) => t.textContent)).toEqual(["Repository Map", "Zones"]);
     } finally {
@@ -400,8 +416,8 @@ describe("StagePage", () => {
     // has to follow the tab. Without this, switching to Zones and pressing
     // Open silently lands on the Repository Map — the section's own view.
     const navigateTo = vi.fn();
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
     await mount(page("analyze", ALL, navigateTo));
+    openTerrain();
     const terrain = root.querySelector('.stage-section[data-view="graph"]')!;
     const open = terrain.querySelector<HTMLButtonElement>(".stage-section-open")!;
 
@@ -583,6 +599,9 @@ describe("BottomBar", () => {
     expect(root.querySelector(".bottombar-server")?.textContent).toContain("n-dx 0.7.2");
     const cog = root.querySelector<HTMLButtonElement>(".bottombar-settings")!;
     expect(cog.getAttribute("aria-label")).toBe("Settings");
+    expect(cog.getAttribute("title")).toBe("Settings");
+    expect(cog.querySelector("svg")?.getAttribute("shape-rendering")).toBe("crispEdges");
+    expect(cog.textContent).toBe("");
     act(() => { cog.click(); });
     expect(onOpenSettings).toHaveBeenCalledOnce();
     const commands = root.querySelector<HTMLButtonElement>(".bottombar-commands")!;
@@ -639,6 +658,22 @@ describe("SettingsOverlay", () => {
     expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Commands"]);
     expect(root.querySelector(".fake-settings")).not.toBeNull();
     expect(root.querySelector(".settings-overlay-crumbs")?.textContent).toContain("Robot Wrangler");
+  });
+
+  it("draws each page's pixel glyph, and the gear in the header", async () => {
+    await mount(overlay("robot-wrangler"));
+    const spans = root.querySelectorAll(".settings-overlay-item-glyph");
+    expect(spans).toHaveLength(4);
+    for (const span of spans) {
+      const svg = span.querySelector("svg");
+      expect(svg?.getAttribute("shape-rendering")).toBe("crispEdges");
+      expect(svg?.getAttribute("width")).toBe("22");
+    }
+    expect(root.querySelector(".settings-overlay-glyph svg")?.getAttribute("shape-rendering")).toBe("crispEdges");
+    const text = root.querySelector(".settings-overlay")!.textContent ?? "";
+    expect(text).not.toContain("\u{1F9E0}");
+    expect(text).not.toContain("\u{1F4E4}");
+    expect(viewGlyph("robot-wrangler")).toBe("\u{1F916}");
   });
 
   it("lists the same pages whatever the feature toggles are — Notion and Integrations live on Project", async () => {

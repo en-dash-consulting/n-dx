@@ -353,7 +353,7 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 50;
-  width: 280px;
+  width: min(280px, calc(100vw - 32px));
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-strong, var(--border));
   border-radius: var(--radius-md);

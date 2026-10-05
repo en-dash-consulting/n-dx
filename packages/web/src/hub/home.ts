@@ -103,8 +103,8 @@ body {
 header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.5rem; }
 h1 { font-size: 1.25rem; margin: 0; font-weight: 600; }
 .count { color: var(--text-muted); font-size: 0.8rem; }
-.theme-toggle {
-  margin-left: auto; background: var(--bg-surface); color: var(--text-dim);
+#new-toggle { margin-left: auto; }
+.theme-toggle { background: var(--bg-surface); color: var(--text-dim);
   border: 1px solid var(--border); border-radius: 6px; padding: 0.35rem 0.6rem;
   font: inherit; font-size: 0.75rem; cursor: pointer;
 }
@@ -140,6 +140,54 @@ h1 { font-size: 1.25rem; margin: 0; font-weight: 600; }
 a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .empty { color: var(--text-dim); }
 .empty code { background: var(--bg-hover); padding: 0.1rem 0.35rem; border-radius: 4px; }
+
+/* New-project form */
+.new-btn {
+  background: var(--accent); color: var(--bg); border: 1px solid var(--accent);
+  border-radius: 6px; padding: 0.35rem 0.7rem; font: inherit; font-size: 0.78rem;
+  font-weight: 600; cursor: pointer;
+}
+.new-btn:hover { opacity: 0.9; }
+.new-panel {
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem; margin-bottom: 1.25rem; display: grid; gap: 0.75rem;
+}
+.new-panel[hidden] { display: none; }
+.new-row { display: grid; gap: 0.75rem; grid-template-columns: 2fr 1fr; }
+@media (max-width: 34rem) { .new-row { grid-template-columns: 1fr; } }
+.new-field { display: grid; gap: 0.25rem; min-width: 0; }
+.new-field label { font-size: 0.72rem; color: var(--text-dim); }
+.new-field input {
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.4rem 0.55rem; font: inherit; font-size: 0.82rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min-width: 0;
+}
+.new-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.new-preview {
+  font-size: 0.75rem; color: var(--text-dim); margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere;
+}
+.new-preview strong { color: var(--text); font-weight: 600; }
+.new-problem { color: var(--red); }
+.new-note { color: var(--orange); }
+.new-actions { display: flex; align-items: center; gap: 0.75rem; }
+.new-actions button[disabled] { opacity: 0.5; cursor: not-allowed; }
+.new-cancel {
+  background: var(--bg-hover); color: var(--text-dim); border: 1px solid var(--border-strong);
+  border-radius: 6px; padding: 0.35rem 0.7rem; font: inherit; font-size: 0.78rem; cursor: pointer;
+}
+.new-status { font-size: 0.78rem; color: var(--text-dim); display: flex; align-items: center; gap: 0.4rem; }
+.new-status[hidden] { display: none; }
+.new-status-error { color: var(--red); }
+.spinner {
+  width: 0.85rem; height: 0.85rem; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--border-strong); border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+}
 `;
 
 /**
@@ -165,6 +213,167 @@ const REFRESH_SCRIPT = `
   setInterval(tick, 5000);
 })();
 `;
+
+/**
+ * The new-project form: preview as you type, then create.
+ *
+ * Two things it must never do. It must not create a folder the operator has
+ * not seen the full path of — hence the preview line, refreshed from the
+ * server (which resolves the path, so `~`, `..` and a relative parent all
+ * display as what they actually are) rather than joined together in the
+ * browser. And it must not look idle while it works: creating the folder,
+ * starting its server and waiting for it to answer takes seconds, so the
+ * button goes busy and says which of those is happening.
+ */
+const NEW_PROJECT_SCRIPT = `
+(function () {
+  // The panel *is* the form — one element, so there is no arrangement in
+  // which the fields are on screen but the submit handler is not wired.
+  var form = document.getElementById("new-panel");
+  var toggle = document.getElementById("new-toggle");
+  if (!form || !toggle) return;
+  var panel = form;
+  var parentInput = document.getElementById("new-parent");
+  var nameInput = document.getElementById("new-name");
+  var preview = document.getElementById("new-preview");
+  var submit = document.getElementById("new-submit");
+  var status = document.getElementById("new-status");
+  var statusText = document.getElementById("new-status-text");
+  var spinner = document.getElementById("new-spinner");
+  var timer = null;
+  var busy = false;
+
+  function setStatus(message, isError, spinning) {
+    status.hidden = !message;
+    statusText.textContent = message || "";
+    status.className = isError ? "new-status new-status-error" : "new-status";
+    spinner.hidden = !spinning;
+  }
+
+  function render(data) {
+    if (busy) return;
+    var path = data.path || "";
+    if (data.problem) {
+      preview.innerHTML = '<span class="new-problem"></span>';
+      preview.firstChild.textContent = data.problem;
+      submit.disabled = true;
+      return;
+    }
+    preview.textContent = "Will create: ";
+    var strong = document.createElement("strong");
+    strong.textContent = path;
+    preview.appendChild(strong);
+    if (data.note) {
+      var note = document.createElement("span");
+      note.className = "new-note";
+      note.textContent = " — " + data.note;
+      preview.appendChild(note);
+    }
+    submit.disabled = false;
+  }
+
+  function query(opts) {
+    var params = new URLSearchParams({ parent: parentInput.value, name: nameInput.value });
+    return fetch("/api/hub/new-project?" + params.toString(), { headers: { accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return;
+        if (opts && opts.fillParent && !parentInput.value) parentInput.value = data.defaultParent || "";
+        render(data);
+      })
+      .catch(function () {});
+  }
+
+  function schedule() {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(query, 180);
+  }
+
+  toggle.addEventListener("click", function () {
+    var opening = panel.hidden;
+    panel.hidden = !opening;
+    toggle.setAttribute("aria-expanded", String(opening));
+    if (opening) {
+      query({ fillParent: true });
+      nameInput.focus();
+    }
+  });
+
+  var cancel = document.getElementById("new-cancel");
+  if (cancel) {
+    cancel.addEventListener("click", function () {
+      panel.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.focus();
+    });
+  }
+
+  parentInput.addEventListener("input", schedule);
+  nameInput.addEventListener("input", schedule);
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (busy || submit.disabled) return;
+    busy = true;
+    submit.disabled = true;
+    setStatus("Creating the folder and starting its server…", false, true);
+    fetch("/api/hub/projects/new", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ parent: parentInput.value, name: nameInput.value })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { status: r.status, body: body }; }); })
+      .then(function (result) {
+        if (result.status === 201) {
+          setStatus("Opening setup for " + result.body.path + "…", false, true);
+          location.href = result.body.url;
+          return;
+        }
+        busy = false;
+        submit.disabled = false;
+        setStatus(result.body.error || ("Could not create the project (HTTP " + result.status + ")."), true, false);
+      })
+      .catch(function (err) {
+        busy = false;
+        submit.disabled = false;
+        setStatus(String(err && err.message ? err.message : err), true, false);
+      });
+  });
+
+  // Prefill the suggested parent even before the panel is opened, so the
+  // first thing shown is a real path rather than an empty box.
+  query({ fillParent: true });
+})();
+`;
+
+/**
+ * The new-project panel. `defaultParent` is rendered into the field rather
+ * than fetched, so the path is on screen in the first paint — the script
+ * refreshes it, but a slow or failed fetch still leaves something true there.
+ */
+export function renderNewProjectPanel(defaultParent: string): string {
+  return `<form class="new-panel" id="new-panel" hidden>
+    <div class="new-row">
+      <div class="new-field">
+        <label for="new-parent">Folder it goes in</label>
+        <input type="text" id="new-parent" name="parent" value="${escapeHtml(defaultParent)}" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="new-field">
+        <label for="new-name">Project folder name</label>
+        <input type="text" id="new-name" name="name" placeholder="my-project" spellcheck="false" autocomplete="off">
+      </div>
+    </div>
+    <p class="new-preview" id="new-preview" role="status" aria-live="polite">Will create: <strong>${escapeHtml(defaultParent)}</strong></p>
+    <div class="new-actions">
+      <button type="submit" class="new-btn" id="new-submit" disabled>Create and set up</button>
+      <button type="button" class="new-cancel" id="new-cancel">Cancel</button>
+      <span class="new-status" id="new-status" role="status" aria-live="polite" hidden>
+        <span class="spinner" id="new-spinner" aria-hidden="true" hidden></span>
+        <span id="new-status-text"></span>
+      </span>
+    </div>
+  </form>`;
+}
 
 function statusDot(card: ProjectCard): string {
   const state = card.reachable ? card.state : "unreachable";
@@ -208,11 +417,17 @@ export function renderCards(overview: HubOverview): string {
   return overview.projects.map(renderCard).join("");
 }
 
-/** The whole page. */
-export function renderHomePage(overview: HubOverview): string {
+/**
+ * The whole page.
+ *
+ * @param defaultParent Directory the new-project form offers to create in —
+ *   {@link defaultParentDir}'s answer, passed in rather than computed here so
+ *   this module stays pure rendering.
+ */
+export function renderHomePage(overview: HubOverview, defaultParent = ""): string {
   const { projects } = overview;
   const body = projects.length === 0
-    ? `<p class="empty">No project is registered. Run <code>ndx start</code> in a repository to register it.</p>`
+    ? `<p class="empty">No project is registered yet. Create one above, or run <code>ndx start</code> in a repository you already have.</p>`
     : `<ul class="cards" id="cards">${renderCards(overview)}</ul>`;
 
   const count = projects.length === 1 ? "1 project" : `${projects.length} projects`;
@@ -241,8 +456,10 @@ export function renderHomePage(overview: HubOverview): string {
   <header>
     <h1>n-dx hub</h1>
     <span class="count">${escapeHtml(count)}</span>
+    <button class="new-btn" type="button" id="new-toggle" aria-expanded="false" aria-controls="new-panel">New project</button>
     <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Toggle colour theme">Theme</button>
   </header>
+  ${renderNewProjectPanel(defaultParent)}
   ${body}
 </div>
 <script>
@@ -257,6 +474,7 @@ export function renderHomePage(overview: HubOverview): string {
   })();
 </script>
 <script>${REFRESH_SCRIPT}</script>
+<script>${NEW_PROJECT_SCRIPT}</script>
 </body>
 </html>`;
 }

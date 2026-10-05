@@ -1206,6 +1206,29 @@ section.in-view .section-subtitle {
   border-radius: var(--radius-sm);
 }
 
+/* Version-control question — only rendered for a folder outside git */
+.wizard-git {
+  padding: var(--space-3);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.wizard-git-hint {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.wizard-checkbox input:disabled {
+  cursor: not-allowed;
+}
+
+.wizard-checkbox:has(input:disabled) {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
 .wizard-vendor-fields {
   display: flex;
   flex-direction: column;

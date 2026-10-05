@@ -476,9 +476,29 @@ describe("SmartAddInput", () => {
     expect(textarea.value.length).toBeGreaterThan(0);
   });
 
-  it("renders compact variant when compact prop is true", () => {
-    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), compact: true }));
-    expect(root.querySelector(".smart-add-panel-compact")).toBeTruthy();
+  it("bar variant is one row: no header or examples, single-line input, action after Generate", () => {
+    const root = renderToDiv(h(SmartAddInput, {
+      onPrdChanged: vi.fn(),
+      bar: true,
+      barAction: h("button", { type: "button", class: "bar-action" }, "More"),
+    }));
+    expect(root.querySelector(".smart-add-panel-bar")).toBeTruthy();
+    expect(root.querySelector(".smart-add-header")).toBeNull();
+    expect(root.querySelector(".smart-add-examples")).toBeNull();
+    expect(root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!.rows).toBe(1);
+    const area = root.querySelector(".smart-add-input-area")!;
+    expect(area.lastElementChild!.classList.contains("bar-action")).toBe(true);
+  });
+
+  it("keeps typed text when switching out of the bar variant", async () => {
+    const root = document.createElement("div");
+    render(h(SmartAddInput, { onPrdChanged: vi.fn(), bar: true }), root);
+    typeInTextarea(root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!, "Add a CSV export to reports");
+    await flush();
+    render(h(SmartAddInput, { onPrdChanged: vi.fn() }), root);
+    await flush();
+    expect(root.querySelector(".smart-add-header")).toBeTruthy();
+    expect(root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!.value).toBe("Add a CSV export to reports");
   });
 
   it("shows scope dropdown when PRD has epics", async () => {

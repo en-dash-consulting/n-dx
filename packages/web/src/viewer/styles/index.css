@@ -20,6 +20,7 @@
 @import "./a11y.css";
 @import "./prd-tree.css";
 @import "./rex-dashboard.css";
+@import "./analysis.css";
 @import "./token-usage.css";
 @import "./validation.css";
 @import "./hench-runs.css";
@@ -49,6 +50,7 @@
 @import "./memory-warning.css";
 @import "./crash-recovery.css";
 @import "./degradation-banner.css";
+@import "./repo-trust.css";
 @import "./refresh-queue.css";
 @import "./polling-suspension.css";
 @import "./active-operations.css";

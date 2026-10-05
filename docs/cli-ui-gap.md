@@ -33,6 +33,69 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 
 ---
 
+<!-- BEGIN GENERATED: command-effects (scripts/build-cli-ui-gap.mjs) -->
+
+## Command effects
+
+_Generated from `packages/core/command-effects.js` — the same declarations the terminal preflight banner prints and `GET /api/commands/manifest` serves. Edit the declarations, then run `node scripts/build-cli-ui-gap.mjs`._
+
+Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the .ndx layout), `{hench}` = `.hench` (`.ndx/hench` on the .ndx layout), `{sourcevision}` = `.sourcevision` (`.ndx/sourcevision` on the .ndx layout), `{config}` = `.n-dx.json` (`.ndx/config.json` on the .ndx layout), `{localConfig}` = `.n-dx.local.json` (`.ndx/config.local.json` on the .ndx layout), `{webPid}` = `.n-dx-web.pid` (`.ndx/web.pid` on the .ndx layout), `{webPort}` = `.n-dx-web.port` (`.ndx/web.port` on the .ndx layout).
+
+| Command | Writes | LLM phases (calls) | Network | Takes |
+|---------|--------|--------------------|---------|-------|
+| `ndx init` | `{rex}/, {hench}/, {sourcevision}/`<br>`{config}, .gitignore, .gitattributes`<br>CLAUDE.md, AGENTS.md, .claude/, .agents/, .codex/, .mcp.json<br>README.md<br>`~/.claude.json` (only with --mcp-scope=local)<br>`.git/` (only with --git, or on a TTY when the preflight prompt is accepted) | auth probe ~0-1 | llm-provider | under a minute |
+| `ndx migrate-layout` | `.ndx/`<br>`.gitignore, .gitattributes`<br>git commits (only without --no-commit) | none | none | seconds |
+| `ndx analyze` | `{sourcevision}/` | classify ~0-N batches of 30 files<br>zones ~1-2 per batch of 7 zones; more passes with --full<br>primer ~0-1<br>narration ~1 per escalated zone<br>_none with `--fast`_ | llm-provider | under a minute on a small repo; several minutes with --deep or --full |
+| `ndx recommend` | `{rex}/acknowledged-findings.json` (only with --acknowledge)<br>`{rex}/prd_tree/` (only with --accept) | none | none | seconds |
+| `ndx plan` | `{sourcevision}/`<br>`{rex}/pending-proposals.json`<br>`{rex}/prd_tree/` (only with --accept) | classify ~0-N batches of 30 files<br>zones ~1-2 per batch of 7 zones; more passes with --full<br>primer ~0-1<br>narration ~1 per escalated zone<br>proposals ~1 per proposal batch<br>decomposition ~0-1 per oversized proposal<br>_none with `--no-llm`_ | llm-provider | a few minutes — it runs a full analysis first |
+| `ndx add` | `{rex}/pending-smart-proposals.json`<br>`{rex}/prd_tree/` (only with --accept or --title, or when accepted at the prompt)<br>`{rex}/execution-log.jsonl` | smart add ~1 (none with --title)<br>consolidation ~0-2 | llm-provider (only without --title) | seconds to under a minute |
+| `ndx refresh` | `{sourcevision}/` (only without --ui-only)<br>`{sourcevision}/dashboard-artifacts.json`<br>the dashboard build (only without --data-only or --no-build) | classify ~0-N batches of 30 files<br>zones ~1-2 per batch of 7 zones; more passes with --full<br>primer ~0-1<br>narration ~1 per escalated zone<br>_none with `--fast` or `--ui-only`_ | llm-provider<br>localhost (only with --live-server) | a minute to several minutes |
+| `ndx work` | source files<br>git commits (only when autoCommit is on, the default)<br>`{hench}/runs/`<br>`{rex}/prd_tree/`<br>`{rex}/execution-log.jsonl`<br>`<git-common-dir>/ndx/claims.json` | agent ~1 agent session per task<br>review ~0-1 per task<br>commit message ~0-1<br>_none with `--dry-run`_ | llm-provider | minutes per task; --loop runs until the queue is empty |
+| `ndx status` | nothing (read-only) | none | none | seconds |
+| `ndx usage` | nothing (read-only) | none | none | seconds |
+| `ndx claim` | `<git-common-dir>/ndx/claims.json` (only on release) | none | none | seconds |
+| `ndx sync` | `{rex}/prd_tree/` (only without --push)<br>`{rex}/execution-log.jsonl`<br>the remote tracker (only without --pull or --dry-run) | none | remote | seconds to a minute |
+| `ndx start` | `{webPid} and {webPort}`<br>`~/.ndx/hub.json`<br>`~/.ndx/auth.token` | none | localhost | long-running server; hub mode returns once registered |
+| `ndx install-sample` | `sample-app/`<br>`{rex}/prd_tree/sample-app-improvements/` | none | none | seconds |
+| `ndx destroy-sample` | `sample-app/`<br>`{rex}/prd_tree/` | none | none | seconds |
+| `ndx dev` | the dashboard build | none | localhost | until stopped |
+| `ndx web` | `{webPid} and {webPort}`<br>`~/.ndx/hub.json`<br>`~/.ndx/auth.token` | none | localhost | long-running server; hub mode returns once registered |
+| `ndx ci` | `{sourcevision}/` | none | none | minutes |
+| `ndx which` | nothing (read-only) | none | none | seconds |
+| `ndx config` | `{config}, {localConfig}, {rex}/config.json, {hench}/config.json` (only when setting a value) | auth probe ~0-1 | llm-provider (only when setting llm.vendor, or with --test-connection) | seconds |
+| `ndx auth` | nothing (read-only) | auth probe ~1 | llm-provider | seconds |
+| `ndx export` | `ndx-export/`<br>`.gitignore`<br>the n-dx-dashboard branch (only with --deploy=github) | none | remote (only with --deploy=github) | seconds to a minute |
+| `ndx prd` | the --out file (only on export)<br>`{rex}/prd_tree/` (only on import)<br>`{rex}/.backups/` (only on import, without --no-snapshot) | none | none | seconds |
+| `ndx trust` | `~/.ndx/trust/` (only on accept or revoke) | none | none | seconds |
+| `ndx self-heal` | `{sourcevision}/`<br>`{rex}/prd_tree/`<br>`{rex}/acknowledged-findings.json`<br>source files (only without --capture-only)<br>git commits (only without --capture-only)<br>`{hench}/runs/` (only without --capture-only) | analysis ~several per zone batch, per iteration<br>agent ~1 agent session per task | llm-provider | long — tens of minutes to hours |
+| `ndx pair-programming` | `{rex}/prd_tree/`<br>`{hench}/runs/`<br>source files | agent ~1 agent session<br>review ~1-2 reviewer sessions<br>remediation ~0-1 agent session | llm-provider | minutes to tens of minutes |
+| `ndx bicker` | `{rex}/prd_tree/`<br>`{hench}/runs/`<br>source files | agent ~1 agent session<br>review ~1-2 reviewer sessions<br>remediation ~0-1 agent session | llm-provider | minutes to tens of minutes |
+| `ndx validate` | `{rex}/prd_tree/` (only with --post-merge --repair, or when a fix is accepted at the prompt) | none | none | seconds |
+| `ndx fix` | `{rex}/prd_tree/` (only without --dry-run) | none | none | seconds |
+| `ndx health` | nothing (read-only) | none | none | seconds |
+| `ndx report` | nothing (read-only) | none | none | seconds |
+| `ndx verify` | nothing (read-only) | none | none | seconds to two minutes |
+| `ndx log` | `{rex}/execution-log.jsonl` | none | none | seconds |
+| `ndx update` | `{rex}/prd_tree/`<br>`{rex}/execution-log.jsonl` | none | none | seconds |
+| `ndx remove` | `{rex}/prd_tree/`<br>`{rex}/execution-log.jsonl` | none | none | seconds |
+| `ndx move` | `{rex}/prd_tree/`<br>`{rex}/execution-log.jsonl` | none | none | seconds |
+| `ndx reshape` | `{rex}/.backups/`<br>`{rex}/prd_tree/` (only with --accept)<br>`{rex}/archive.json` (only with --accept) | proposals ~1-N<br>merge bodies ~0-N | llm-provider | a minute to several minutes |
+| `ndx reorganize` | `{rex}/.backups/`<br>`{rex}/prd_tree/` (only with --accept or --accept-llm) | proposals ~0-N<br>_none with `--fast` or `--mode=fast`_ | llm-provider | about a minute |
+| `ndx prune` | `{rex}/.backups/`<br>`{rex}/prd_tree/` (only without --dry-run)<br>`{rex}/archive.json` (only without --dry-run) | consolidation ~0-1 (none with --no-consolidate) | llm-provider | seconds to a minute |
+| `ndx next` | nothing (read-only) | none | none | seconds |
+| `ndx tree` | nothing (read-only) | none | none | seconds |
+| `ndx tree-diff` | nothing (read-only) | none | none | seconds |
+| `ndx reset` | `{sourcevision}/` | none | none | seconds |
+| `ndx show` | nothing (read-only) | none | none | seconds |
+| `ndx rex` | `{rex}/` (only for a subcommand that writes) | subcommand ~varies | llm-provider (only for a subcommand that calls a model) | depends on the subcommand |
+| `ndx hench` | `{hench}/` (only for a subcommand that writes) | subcommand ~varies | llm-provider (only for a subcommand that calls a model) | depends on the subcommand |
+| `ndx sourcevision` | `{sourcevision}/` (only for a subcommand that writes) | subcommand ~varies | llm-provider (only for a subcommand that calls a model) | depends on the subcommand |
+| `ndx sv` | `{sourcevision}/` (only for a subcommand that writes) | subcommand ~varies | llm-provider (only for a subcommand that calls a model) | depends on the subcommand |
+
+<!-- END GENERATED: command-effects -->
+
+---
+
 ## ndx orchestration commands
 
 | Command | Coverage | Impact | Notes |

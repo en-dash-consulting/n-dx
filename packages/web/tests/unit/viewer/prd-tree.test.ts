@@ -351,6 +351,16 @@ describe("PRDTree", () => {
     expect(root.textContent).toContain("No PRD items yet");
   });
 
+  it("keeps the host's controls on an empty PRD, so the first item can be added", () => {
+    const emptyDoc: PRDDocumentData = { schema: "rex/v1", title: "Empty Project", items: [] };
+    const root = renderToDiv(h(PRDTree, {
+      document: emptyDoc,
+      controls: h("div", { class: "prd-filter-bar" }, h("button", { "aria-label": "Add a new item to the PRD" }, "+")),
+    }));
+    expect(root.querySelector('.prd-filter-bar [aria-label="Add a new item to the PRD"]')).not.toBeNull();
+    expect(root.textContent).toContain("No PRD items yet");
+  });
+
   it("respects defaultExpandDepth=0 by hiding children", () => {
     const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 0 }));
     // Epics should show

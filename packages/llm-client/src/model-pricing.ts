@@ -37,7 +37,7 @@ export interface ModelTokenPricing {
  * a fallback-priced figure off as measured. Pricing an unknown model at zero
  * would be worse than being wrong — it would read as "this cost nothing".
  */
-export const FALLBACK_PRICING_MODEL = "claude-sonnet-5";
+export const FALLBACK_PRICING_MODEL = "claude-sonnet-5-5";
 
 /** Rates applied when a model id cannot be resolved. See {@link FALLBACK_PRICING_MODEL}. */
 export const FALLBACK_MODEL_PRICING: ModelTokenPricing = toPricing(

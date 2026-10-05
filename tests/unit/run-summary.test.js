@@ -19,10 +19,10 @@ const EFFECTS = {
   writes: [
     { path: ".sourcevision/", what: "analysis" },
     { path: ".rex/pending-proposals.json", what: "proposals" },
-    { path: ".rex/prd_tree/", what: "items", conditional: true, when: "--accept" },
+    { path: ".rex/prd_tree/", what: "items", conditional: true, when: "with --accept" },
   ],
   llm: [],
-  network: "llm-provider",
+  network: [{ to: "llm-provider", what: "the configured LLM vendor" }],
   duration: "…",
   next: "ndx status",
 };

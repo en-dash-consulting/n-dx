@@ -57,6 +57,12 @@ The init command sets up everything — analysis metadata, PRD storage, agent co
 
 By default both surfaces are provisioned. Use `--claude-only` or `--codex-only` to limit to one assistant.
 
+::: tip Starting from an empty folder?
+`ndx init` offers to run `git init` for you when the folder is not inside a repository — n-dx records autonomous work as commits, so without one, auto-commit, pair programming, and the hench run loop stay disabled. Answer the prompt, or pass `--git` / `--no-git` to answer it ahead of time (required for scripted runs, which have no prompt).
+
+You can also skip the terminal entirely: `ndx start` in an empty folder serves a setup page with an **Initialize project** button, which asks the same questions — assistants, LLM provider, and whether to create the git repository — and then opens the dashboard.
+:::
+
 ::: tip Already initialized?
 Running `ndx init` again is safe. It detects existing assistant surfaces and reuses them. If only one assistant's artifacts exist, re-init skips the other unless you explicitly request it.
 :::

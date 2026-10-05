@@ -9,11 +9,13 @@
  * first line, this is the second.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { isAcceptableNdxBin } from "../../../src/hub/routes.js";
+import { resolveSelfBin } from "../../../src/hub/hub.js";
+import type { HubRegistry, ProjectRecord } from "../../../src/hub/registry.js";
 
 let root: string;
 
@@ -63,5 +65,53 @@ describe("isAcceptableNdxBin", () => {
     }
     expect(isAcceptableNdxBin("/usr/local/bin/curl")).toBe(false);
     expect(isAcceptableNdxBin("/usr/local/bin/ndx-helper")).toBe(false);
+  });
+});
+
+/** A registry holding one project that names `ndxBin`. */
+function registryNaming(ndxBin: string): HubRegistry {
+  return {
+    projects: { alpha: { id: "alpha", ndxBin } as unknown as ProjectRecord },
+  } as unknown as HubRegistry;
+}
+
+/**
+ * `selfBin` is the binary the hub registers a project *it* created with, so it
+ * ends in a spawn just as a caller-supplied `ndxBin` does — and its candidate
+ * chain reaches into the registry, where an entry written before
+ * `isAcceptableNdxBin` existed can name anything at all.
+ */
+describe("resolveSelfBin", () => {
+  const empty = { projects: {} } as unknown as HubRegistry;
+
+  // The chain consults `process.argv[1]` between the explicit argument and
+  // the registry. Under vitest that is the runner's own entry, which would
+  // make these assertions depend on how the suite was launched — so pin it to
+  // something the rule plainly refuses and let each case say what it means.
+  const realArgv1 = process.argv[1];
+  beforeEach(() => { process.argv[1] = "/usr/local/bin/curl"; });
+  afterEach(() => { process.argv[1] = realArgv1; });
+
+  it("takes an explicit binary when it is the real package", () => {
+    const good = plantEntryPoint("self-explicit", "@n-dx/web");
+    expect(resolveSelfBin(good, empty)).toBe(good);
+  });
+
+  it("skips an unacceptable candidate instead of returning it", () => {
+    const impostor = plantEntryPoint("self-impostor", "totally-not-ndx");
+    expect(resolveSelfBin(impostor, empty)).not.toBe(impostor);
+  });
+
+  it("will not inherit an impostor from a stale registry entry", () => {
+    // The whole point: "it is already registered" is not evidence, because the
+    // entry may predate the rule. Falling through to "" is what the
+    // new-project route reports rather than spawning.
+    const impostor = plantEntryPoint("self-stale", "totally-not-ndx");
+    expect(resolveSelfBin("/nope/missing", registryNaming(impostor))).toBe("");
+  });
+
+  it("falls through an unrecognizable entry point to a registered binary that passes", () => {
+    const good = plantEntryPoint("self-fallback", "@n-dx/web");
+    expect(resolveSelfBin("/nope/missing", registryNaming(good))).toBe(good);
   });
 });

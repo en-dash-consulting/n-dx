@@ -91,7 +91,7 @@ async function main(): Promise<void> {
   // `validate-tokens` and `cache` both dispatch below; omitting either here
   // makes the command unreachable, since an unlisted name is rejected as
   // unknown before the switch is ever reached.
-  const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template", "review", "cache", "validate-tokens", "check-runs"];
+  const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template", "review", "cache", "trust", "validate-tokens", "check-runs"];
 
   // Orchestration commands that belong to ndx, not hench directly
   const NDX_ONLY_COMMANDS: Record<string, string> = {
@@ -136,8 +136,18 @@ async function main(): Promise<void> {
     // positional, so a lone arg is the subcommand and not a path.
     const cacheDir = usageDir;
 
-    // Ensure .hench/ exists for all known commands except init
-    if (command !== "init") {
+    // `trust <sub> [dir]`: same shape again. It is also exempt from the
+    // .hench/ check below — a checkout can carry .rex/config.json or .mcp.json
+    // with no .hench/ at all, and that is exactly what it reviews.
+    const trustDir = (): string => {
+      const subs = new Set(["status", "accept", "revoke"]);
+      const [first, second] = positional;
+      const candidate = first && subs.has(first) ? second : first;
+      return candidate && !candidate.startsWith("-") ? resolve(candidate) : process.cwd();
+    };
+
+    // Ensure .hench/ exists for all known commands except init and trust
+    if (command !== "init" && command !== "trust") {
       const dirFor: Record<string, () => string> = {
         usage: usageDir,
         review: reviewDir,
@@ -210,6 +220,11 @@ async function main(): Promise<void> {
       case "cache": {
         const { cmdCache } = await import("./commands/cache.js");
         await cmdCache(cacheDir(), positional, flags);
+        break;
+      }
+      case "trust": {
+        const { cmdTrust } = await import("./commands/trust.js");
+        await cmdTrust(trustDir(), positional, flags);
         break;
       }
       case "validate-tokens": {

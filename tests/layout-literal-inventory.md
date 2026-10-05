@@ -3,7 +3,7 @@
 Every production source file that still spells out where n-dx keeps its files,
 instead of asking the resolver.
 
-**155 literals across 66 files.** That number is the debt, and it may only go
+**149 literals across 65 files.** That number is the debt, and it may only go
 down.
 
 ## Why this file exists
@@ -90,14 +90,14 @@ hench and web are not finished either. What is left:
 
 | Package | Literals |
 |---|---|
-| core | 60 |
+| core | 54 |
 | web | 52 |
 | hench | 25 |
 | rex | 12 |
 | llm-client | 6 |
 | sourcevision | 2 |
 
-So 137 of the remaining 157 sit in the three packages that sweep was meant to
+So 131 of the remaining 149 sit in the three packages that sweep was meant to
 clear. That is the number this file exists to keep honest: without it the task
 reads as done because a PR with its name on it merged.
 
@@ -119,7 +119,6 @@ more.
 |---|---|---|
 | `packages/core/ci.js` | 14 | .hench, .rex, .sourcevision |
 | `packages/core/export.js` | 7 | .hench, .rex, .sourcevision |
-| `packages/core/command-effects.js` | 6 | .rex, .sourcevision |
 | `packages/core/pair-programming.js` | 6 | .n-dx*, .rex, .sourcevision |
 | `packages/core/web.js` | 5 | .n-dx*, .rex |
 | `packages/core/readme-generator.js` | 3 | .hench, .rex, .sourcevision |

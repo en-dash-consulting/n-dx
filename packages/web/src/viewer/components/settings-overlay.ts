@@ -11,8 +11,9 @@ import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ViewId } from "../api.js";
-import { SETTINGS_ENTRIES, useCliName, viewLabel, viewGlyph } from "../api.js";
+import { SETTINGS_ENTRIES, useCliName, viewLabel, viewGlyph, viewPixelIcon } from "../api.js";
 import { resolveCliLabel } from "../hooks/index.js";
+import { PixelIcon } from "./pixel-icons.js";
 import { ConfigFooter, type ServerIdentity } from "./config-footer.js";
 import { SidebarDensitySelector } from "./density-selector.js";
 
@@ -37,6 +38,7 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
     .map((e) => ({
       view: e.view,
       glyph: viewGlyph(e.view),
+      pixelIcon: viewPixelIcon(e.view),
       label: resolveCliLabel(viewLabel(e.view), cliName),
     })), [validViews, cliName]);
 
@@ -56,7 +58,8 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
     "aria-label": "Settings",
   },
     h("div", { class: "settings-overlay-head" },
-      h("span", { class: "settings-overlay-glyph", "aria-hidden": "true" }, "⚙"),
+      h("span", { class: "settings-overlay-glyph", "aria-hidden": "true" },
+        h(PixelIcon, { name: "settings", variant: "glyph", size: 22 })),
       h("div", { class: "settings-overlay-crumbs" },
         "Settings",
         current ? h("span", { class: "settings-overlay-sep", "aria-hidden": "true" }, " / ") : null,
@@ -81,7 +84,8 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
             onClick: () => onNavigate(e.view),
             "aria-current": e.view === view ? "page" : undefined,
           },
-            h("span", { class: "settings-overlay-item-glyph", "aria-hidden": "true" }, e.glyph),
+            h("span", { class: "settings-overlay-item-glyph", "aria-hidden": "true" },
+              e.pixelIcon ? h(PixelIcon, { name: e.pixelIcon, variant: "glyph", size: 22 }) : e.glyph),
             e.label,
           ),
         ),
