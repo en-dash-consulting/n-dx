@@ -110,6 +110,7 @@ import {
   initRunRecord,
   captureStartingHead,
   captureBaselineUntracked,
+  captureBaselineDirty,
   runReviewGate,
   finalizeRun,
   recordClaimLoss,
@@ -2096,6 +2097,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Snapshot untracked files before the agent runs, so a rollback removes only
   // the files the agent creates — never the user's pre-existing work (#303).
   const baselineUntracked = await captureBaselineUntracked(projectDir);
+  // Snapshot everything already dirty, so the run's own work can be told
+  // apart from the operator's at commit time (see stageRunWork).
+  const baselineDirty = await captureBaselineDirty(projectDir);
 
   const retryConfig: RetryConfig = config.retry ?? {
     maxRetries: 3,
@@ -2133,11 +2137,24 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     else delete run.vendorPid;
   });
 
-  // Start the commit-message watcher. If the agent writes `.hench-commit-msg.txt`
-  // and the run terminates before the normal commit-prompt flow can process it
-  // (timeout, crash), the timer fires and auto-commits the staged changes.
-  // The watcher is cancelled before finalizeRun so the two paths cannot race.
-  const commitMsgTimeoutMs = config.commitMsgTimeoutMs ?? 300_000;
+  // Start the commit-message watcher.
+  //
+  // Off by default (`hench.commitMsgTimeoutMs` 0), and the default is the
+  // whole point. Armed, this timer fires mid-run and commits whatever is
+  // staged at that instant — before the test gate, before the
+  // uncommitted-work gate, before the completion is written. That is a
+  // commit made ahead of any verification that the task is done, and it
+  // stages nothing itself: not the PRD paths, not the review repairs. Worse,
+  // `didAutoCommit()` then short-circuits performCommitPromptIfNeeded, so
+  // the completion write never reaches a commit at all and the next run's
+  // pre-run gate inherits it.
+  //
+  // What it was for was a run that dies after the agent staged its work but
+  // before finalization. That case is covered without committing early: the
+  // uncommitted-work gate refuses to record the task done, and the next
+  // run's pre-run commit gate offers the leftovers as a checkpoint. Set a
+  // positive timeout to restore the timer, knowing it commits unverified.
+  const commitMsgTimeoutMs = config.commitMsgTimeoutMs ?? 0;
   const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher({
     projectDir,
     timeoutMs: commitMsgTimeoutMs,
@@ -2760,6 +2777,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     skipFullTestGate: config.skipFullTestGate,
     commitWatcher,
     baselineUntracked,
+    baselineDirty,
     startingHead,
     reviewOptional: opts.reviewOptional,
   });
