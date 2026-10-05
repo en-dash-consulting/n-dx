@@ -174,6 +174,39 @@ export function runOptionArgs(options: RunOptions, contextFile?: string): string
   return args;
 }
 
+/**
+ * How many tasks one Execute request works through.
+ *
+ * The dashboard had exactly one of these — "the next task, once" — while the
+ * CLI it spawns has had `--iterations` and `--loop` all along, so the only way
+ * to leave an agent working through a queue was to go to a terminal.
+ *
+ * `single` is the historical behaviour and the default: a request that names
+ * no mode produces the same argv it always did.
+ *
+ * Lives here rather than on the server because all three readers need it — the
+ * server spawns the run, the hub queues and replays it, and the viewer picks
+ * it. A copy in any of them is a copy free to drift.
+ */
+export type RunMode = "single" | "iterations" | "loop";
+
+/** The accepted `mode` values, for request validation. */
+export const RUN_MODES: ReadonlySet<string> = new Set<RunMode>(["single", "iterations", "loop"]);
+
+/**
+ * Upper bound on `--iterations` from the dashboard.
+ *
+ * Not a CLI limit — `hench run` takes any count. It is a limit on what one
+ * unattended click may commit to: the browser's tab can be closed a second
+ * later, and the spawned process outlives it. Past this, `loop` is the honest
+ * choice, because it stops when the queue is empty rather than when a number
+ * runs out.
+ */
+export const MAX_DASHBOARD_ITERATIONS = 25;
+
+/** The smallest `--iterations` worth asking for; one task is `single`. */
+export const MIN_DASHBOARD_ITERATIONS = 2;
+
 /** What a dashboard-started `ndx work` run is: one task, its options, the workspace directory. */
 export interface WorkCommand {
   taskId: string;
@@ -184,6 +217,74 @@ export interface WorkCommand {
   contextFile?: string;
   /** The task's PRD status; a deferred task gets `--reset-deferred` (see {@link resetsDeferred}). */
   taskStatus?: string | null;
+  /**
+   * How many tasks the run works through. Omitted (or `single`) is the argv
+   * this builder has always produced.
+   */
+  mode?: RunMode;
+  /** Task count for `mode: "iterations"`; ignored in every other mode. */
+  iterations?: number;
+}
+
+/** A run mode read off a request body, or the refusal it earns. */
+export type RunModeCheck =
+  | { ok: true; mode: RunMode; iterations?: number }
+  | { ok: false; error: string };
+
+/**
+ * Read and validate the run mode on an execute request.
+ *
+ * One validator for all three readers — the execute route, the
+ * `execute/check` the hub asks before queuing, and the hub proxy itself — so
+ * a body one of them refuses is never a body another silently accepts.
+ *
+ * That drift was a real defect, not a hypothetical: the proxy used to keep a
+ * mode only if it recognised it, and drop anything else. A saturated hub
+ * therefore queued `{ mode: "looop" }` as a single-task run and started it a
+ * minute later, where the direct route would have answered 400 — the same
+ * request judged two ways depending on how busy the machine was.
+ *
+ * Absent is `single`: that is the historical behaviour and what a client
+ * naming no mode asks for. Present-but-unrecognised is an error, never a
+ * fallback to `single` — a client that misspelled its mode asked for
+ * something, and running one task is not it.
+ */
+export function checkRunMode(body: { mode?: unknown; iterations?: unknown }): RunModeCheck {
+  const raw = body.mode;
+  if (raw === undefined || raw === null) return { ok: true, mode: "single" };
+  if (typeof raw !== "string" || !RUN_MODES.has(raw)) {
+    return { ok: false, error: `mode must be one of: ${[...RUN_MODES].join(", ")}` };
+  }
+  const mode = raw as RunMode;
+  if (mode !== "iterations") return { ok: true, mode };
+
+  // Refused rather than defaulted: "iterations" with no count is a client that
+  // lost its number somewhere, and silently running one task would report
+  // success for something nobody asked for.
+  const count = body.iterations;
+  if (
+    typeof count !== "number" || !Number.isInteger(count) ||
+    count < MIN_DASHBOARD_ITERATIONS || count > MAX_DASHBOARD_ITERATIONS
+  ) {
+    return {
+      ok: false,
+      error: `iterations must be an integer between ${MIN_DASHBOARD_ITERATIONS} and ${MAX_DASHBOARD_ITERATIONS} when mode is "iterations"`,
+    };
+  }
+  return { ok: true, mode, iterations: count };
+}
+
+/**
+ * The `--iterations` / `--loop` flags for a run mode.
+ *
+ * `--task` names where to start in every mode; hench autoselects by priority
+ * for each task after the first, so a loop or a multi-task run begins exactly
+ * where the operator clicked.
+ */
+function runModeArgs(mode: RunMode | undefined, iterations: number | undefined): string[] {
+  if (mode === "loop") return ["--loop"];
+  if (mode === "iterations" && iterations !== undefined) return [`--iterations=${iterations}`];
+  return [];
 }
 
 /**
@@ -206,6 +307,7 @@ export function workCommandArgs(command: WorkCommand): string[] {
     "work",
     `--task=${command.taskId}`,
     "--auto",
+    ...runModeArgs(command.mode, command.iterations),
     ...runOptionArgs(command.options, command.contextFile),
     ...(resetsDeferred(command.taskStatus) ? ["--reset-deferred"] : []),
     command.dir,
