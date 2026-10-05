@@ -18,6 +18,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Analyze pipeline improvements](./analyze-pipeline-improvements/index.md) | completed |
 | [Automatic PR Markdown Generation](./automatic-pr-markdown-generation/index.md) | completed |
 | [Background Tab Resource Optimization](./background-tab-resource-optimization/index.md) | completed |
+| [Cross-repo meta-scan foundation: repo identity, persisted infrastructure, outbound dependencies, multi-source crossings](./cross-repo-meta-scan-foundation-repo/index.md) | pending |
 | [Fix 1: Go Zone Edge Resolution](./fix-1-go-zone-edge-resolution/index.md) | completed |
 | [Fix 2: Mixed-Language Support](./fix-2-mixed-language-support/index.md) | completed |
 | [Fix observation in sourcevision-2 (1 finding)](./fix-observation-in-sourcevision-2-1/index.md) | completed |
@@ -38,6 +39,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [PR Markdown View Toggle and Copy UX](./pr-markdown-view-toggle-and-copy-ux/index.md) | completed |
 | [Recursive zone architecture](./recursive-zone-architecture/index.md) | completed |
 | [Resolve critical SourceVision architectural findings](./resolve-critical-sourcevision/index.md) | completed |
+| [SDLC readiness profile and scorecard: evidence-based CI/CD maturity for agent readiness](./sdlc-readiness-profile-and-scorecard/index.md) | pending |
 | [SourceVision Ask Panel (text exchange: explain findings, refine the PRD)](./sourcevision-ask-panel-text-exchange/index.md) | completed |
 | [SourceVision Findings Remediation](./sourcevision-findings-remediation/index.md) | completed |
 | [SourceVision Import Graph Visualization Enhancement](./sourcevision-import-graph/index.md) | completed |
@@ -56,5 +58,4 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [ArchitectureView calls useMemo after its enrichment-gate early return](./architectureview-calls-usememo-after.md) | completed |
 | [Fix conditional hook order in the Problems and Suggestions views](./fix-conditional-hook-order-in-the.md) | completed |
 | [Optional 3D isometric architecture map generator](./optional-3d-isometric-architecture-map.md) | completed |
-| [Readiness analysis: ship-confidence signals for tests, rerun safety, deploy, infra and monitoring](./readiness-analysis-ship-confidence.md) | pending |
 | [sv analyze: skip git worktree checkouts in sub-analysis discovery](./sv-analyze-skip-git-worktree-checkouts.md) | completed |
