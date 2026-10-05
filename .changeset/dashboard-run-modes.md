@@ -42,11 +42,24 @@ resets to a single task once a run starts — a picker that only changed hidden
 behaviour, or one that stayed on "until done", is how someone launches a
 queue-long run believing they started one task.
 
+One validator judges the mode everywhere it is read — the execute route, the
+`execute/check` the hub asks before queuing, and the hub proxy. A mode is
+validated in `judgeExecuteRequest`, the function both server routes share, so
+`execute/check` answers for it too; without that the hub could admit a request
+only the spawn would refuse. A present-but-unrecognised mode is an error rather
+than a fall back to `single`: the proxy used to keep only the modes it
+recognised and drop the rest, so a saturated hub queued `{ mode: "looop" }` as
+a single-task run and started it a minute later, where the direct route
+answered 400 — the same request judged two ways depending on how busy the
+machine was.
+
 The mode travels with the request through the hub's queue. A queued entry is
 replayed from what the hub stored, not from the original body, so a mode that
 stopped at the queue would start one task under a 202 that said "until done";
 `QueueEntry` therefore carries it alongside the run options, and the hub's 202
-echoes it. The flags themselves are emitted by `workCommandArgs`, the one
+echoes it — including through the duplicate-entry replacement, which rebuilds
+the entry field by field, so a re-ask that changed the mode drained with the
+old one. The flags themselves are emitted by `workCommandArgs`, the one
 builder the server spawns from and the modal prints from, rather than being
 appended at the spawn site. `RunMode` and the iteration bounds moved to
 `src/shared/run-options.ts` for the same reason: the server, the hub and the

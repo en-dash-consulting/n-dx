@@ -226,6 +226,54 @@ export interface WorkCommand {
   iterations?: number;
 }
 
+/** A run mode read off a request body, or the refusal it earns. */
+export type RunModeCheck =
+  | { ok: true; mode: RunMode; iterations?: number }
+  | { ok: false; error: string };
+
+/**
+ * Read and validate the run mode on an execute request.
+ *
+ * One validator for all three readers — the execute route, the
+ * `execute/check` the hub asks before queuing, and the hub proxy itself — so
+ * a body one of them refuses is never a body another silently accepts.
+ *
+ * That drift was a real defect, not a hypothetical: the proxy used to keep a
+ * mode only if it recognised it, and drop anything else. A saturated hub
+ * therefore queued `{ mode: "looop" }` as a single-task run and started it a
+ * minute later, where the direct route would have answered 400 — the same
+ * request judged two ways depending on how busy the machine was.
+ *
+ * Absent is `single`: that is the historical behaviour and what a client
+ * naming no mode asks for. Present-but-unrecognised is an error, never a
+ * fallback to `single` — a client that misspelled its mode asked for
+ * something, and running one task is not it.
+ */
+export function checkRunMode(body: { mode?: unknown; iterations?: unknown }): RunModeCheck {
+  const raw = body.mode;
+  if (raw === undefined || raw === null) return { ok: true, mode: "single" };
+  if (typeof raw !== "string" || !RUN_MODES.has(raw)) {
+    return { ok: false, error: `mode must be one of: ${[...RUN_MODES].join(", ")}` };
+  }
+  const mode = raw as RunMode;
+  if (mode !== "iterations") return { ok: true, mode };
+
+  // Refused rather than defaulted: "iterations" with no count is a client that
+  // lost its number somewhere, and silently running one task would report
+  // success for something nobody asked for.
+  const count = body.iterations;
+  if (
+    typeof count !== "number" || !Number.isInteger(count) ||
+    count < MIN_DASHBOARD_ITERATIONS || count > MAX_DASHBOARD_ITERATIONS
+  ) {
+    return {
+      ok: false,
+      error: `iterations must be an integer between ${MIN_DASHBOARD_ITERATIONS} and ${MAX_DASHBOARD_ITERATIONS} when mode is "iterations"`,
+    };
+  }
+  return { ok: true, mode, iterations: count };
+}
+
 /**
  * The `--iterations` / `--loop` flags for a run mode.
  *

@@ -50,6 +50,16 @@ describe("POST /api/hench/execute — run modes", () => {
     return { status: res.status, data, args: call ? call[1] : undefined };
   }
 
+  /** Ask `POST /api/hench/execute/check` what `body` would get, without starting it. */
+  async function check(body: Record<string, unknown>) {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute/check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: "task-1", ...body }),
+    });
+    return await res.json() as { ok: boolean; status?: number; error?: string };
+  }
+
   beforeEach(async () => {
     resetHenchRouteStateForTests();
     spawnManagedMock.mockReset();
@@ -162,6 +172,28 @@ describe("POST /api/hench/execute — run modes", () => {
     });
     expect(status).toBe(202);
     expect(args).toContain(`--iterations=${MAX_DASHBOARD_ITERATIONS}`);
+  });
+
+  it("answers for the mode on execute/check, which the hub asks before queuing", async () => {
+    // The hub queues on the strength of this route's answer. A mode only the
+    // spawn refused would be admitted, queued, and replayed as a single task —
+    // the direct route's 400 turned into a quieter, later, wrong run.
+    expect(await check({ mode: "looop" })).toMatchObject({
+      ok: false,
+      status: 400,
+      error: expect.stringContaining("mode must be one of"),
+    });
+    expect(await check({ mode: "iterations" })).toMatchObject({ ok: false, status: 400 });
+    expect(await check({ mode: "iterations", iterations: MAX_DASHBOARD_ITERATIONS + 1 }))
+      .toMatchObject({ ok: false, status: 400 });
+    expect(spawnManagedMock).not.toHaveBeenCalled();
+  });
+
+  it("passes a mode it would run on execute/check", async () => {
+    expect(await check({ mode: "loop" })).toMatchObject({ ok: true });
+    expect(await check({ mode: "iterations", iterations: 3 })).toMatchObject({ ok: true });
+    expect(await check({})).toMatchObject({ ok: true });
+    expect(spawnManagedMock).not.toHaveBeenCalled();
   });
 
   it("reports the mode on the execution status", async () => {

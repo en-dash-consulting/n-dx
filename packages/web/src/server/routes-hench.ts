@@ -124,7 +124,7 @@ import {
 } from "./run-liveness.js";
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
-import { resetsDeferred, workCommandArgs, RUN_MODES, MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS, type RunOptions, type RunMode } from "../shared/index.js";
+import { resetsDeferred, workCommandArgs, checkRunMode, MAX_DASHBOARD_ITERATIONS, type RunOptions, type RunMode } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -1831,6 +1831,10 @@ type ExecuteVerdict =
     task: Record<string, unknown>;
     status: string;
     options: RunOptions;
+    /** How many tasks the request works through; `single` when it named none. */
+    mode: RunMode;
+    /** Task count for `mode: "iterations"`, already range-checked. */
+    iterations?: number;
   };
 
 const refused = (status: number, body: Record<string, unknown>): ExecuteVerdict =>
@@ -1868,6 +1872,13 @@ async function judgeExecuteRequest(
   const checkedOptions = await validateRunOptions(ctx.projectDir, body.options);
   if (!checkedOptions.ok) return refused(400, { error: checkedOptions.error, key: checkedOptions.key });
   const options = checkedOptions.options;
+
+  // The run mode is judged here rather than at the spawn, so `execute/check`
+  // answers for it too. The hub asks that route before queuing anything, and a
+  // mode only the spawn refused would be accepted into the queue and then run
+  // as a single task — the drift this function's docblock exists to prevent.
+  const checkedMode = checkRunMode(body);
+  if (!checkedMode.ok) return refused(400, { error: checkedMode.error });
 
   // Tree-level fault first: on a tree this build would re-slug, no task is
   // runnable, so reporting it before the per-task checks keeps the operator
@@ -1984,7 +1995,15 @@ async function judgeExecuteRequest(
     }
   }
 
-  return { kind: "runnable", taskId, task, status, options };
+  return {
+    kind: "runnable",
+    taskId,
+    task,
+    status,
+    options,
+    mode: checkedMode.mode,
+    ...(checkedMode.iterations !== undefined ? { iterations: checkedMode.iterations } : {}),
+  };
 }
 
 /** Parse an execute-shaped body, answering 400 itself when it is not JSON. */
@@ -2067,37 +2086,10 @@ async function startExecution(
     return true;
   }
   if (verdict.kind === "migrate") return await runTreeMigration(res, ctx);
-  const { taskId, task, status, options } = verdict;
-
-  // Run mode: how many tasks this one request works through. Parsed after the
-  // task checks above, which all still apply — every mode starts on this task,
-  // and the modes that continue past it autoselect from there.
-  const modeRaw = body.mode === undefined ? "single" : body.mode;
-  if (typeof modeRaw !== "string" || !RUN_MODES.has(modeRaw)) {
-    errorResponse(res, 400, `mode must be one of: ${[...RUN_MODES].join(", ")}`);
-    return true;
-  }
-  const mode = modeRaw as RunMode;
-
-  let iterations: number | undefined;
-  if (mode === "iterations") {
-    const raw = body.iterations;
-    // Rejected rather than defaulted: "iterations" with no count is a client
-    // that lost its number somewhere, and silently running one task would
-    // report success for something nobody asked for.
-    if (
-      typeof raw !== "number" || !Number.isInteger(raw) ||
-      raw < MIN_DASHBOARD_ITERATIONS || raw > MAX_DASHBOARD_ITERATIONS
-    ) {
-      errorResponse(
-        res,
-        400,
-        `iterations must be an integer between ${MIN_DASHBOARD_ITERATIONS} and ${MAX_DASHBOARD_ITERATIONS} when mode is "iterations"`,
-      );
-      return true;
-    }
-    iterations = raw;
-  }
+  // How many tasks this one request works through, judged above with the rest
+  // of the request so `execute/check` answers for it too. Every mode starts on
+  // this task; the modes that continue past it autoselect from there.
+  const { taskId, task, status, options, mode, iterations } = verdict;
 
   // Go through the `ndx` orchestrator's `work` command rather than spawning
   // hench directly. `ndx work` forwards flags straight to `hench run` (see

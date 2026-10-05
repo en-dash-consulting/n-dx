@@ -46,9 +46,7 @@ import {
   projectIdFromBasePath,
   stripBasePath,
   stripWorkspaceSlot,
-  RUN_MODES,
-  MAX_DASHBOARD_ITERATIONS,
-  MIN_DASHBOARD_ITERATIONS,
+  checkRunMode,
 } from "../shared/index.js";
 import type { RunMode, RunOptions } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
@@ -487,28 +485,24 @@ async function handleExecuteAdmission(
     } else {
       optionsValid = false;
     }
-    // Shape-only, like the options check above: a mode the project server will
-    // refuse is forwarded rather than queued, so its 400 arrives now instead of
-    // when the entry's turn comes. Anything unrecognised simply stays absent,
-    // which replays as `single` — the same argv the hub has always sent.
-    if (typeof parsed.mode === "string" && RUN_MODES.has(parsed.mode)) {
-      mode = parsed.mode as RunMode;
-      if (
-        mode === "iterations" && typeof parsed.iterations === "number" &&
-        Number.isInteger(parsed.iterations) &&
-        parsed.iterations >= MIN_DASHBOARD_ITERATIONS && parsed.iterations <= MAX_DASHBOARD_ITERATIONS
-      ) {
-        iterations = parsed.iterations;
-      } else if (mode === "iterations") {
-        // A count the server would refuse: forward and let it say so.
-        optionsValid = false;
-      }
+    // The same validator the execute route and `execute/check` use, so a mode
+    // this forwards is a mode they accept. Judging it here by hand is what let
+    // `{ mode: "looop" }` be queued as a single-task run on a busy machine and
+    // 400'd on an idle one.
+    const checkedMode = checkRunMode(parsed);
+    if (checkedMode.ok) {
+      if (checkedMode.mode !== "single") mode = checkedMode.mode;
+      iterations = checkedMode.iterations;
+    } else {
+      // Forwarded, not queued — see the comment below the catch.
+      optionsValid = false;
     }
   } catch {
     // not JSON — forward and let the server say so
   }
-  // Rejected options are forwarded too: queuing them would turn the server's
-  // 400 into a run silently dropped minutes later, when its turn came.
+  // A rejected option or run mode is forwarded too: queuing it would turn the
+  // server's 400 into a run silently dropped minutes later, when its turn came
+  // — or, worse for a mode, into a run that starts and does less than it said.
   if (!taskId || !optionsValid) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
     return true;

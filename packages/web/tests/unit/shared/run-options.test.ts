@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { RUN_OPTION_SPECS, checkRunOptions, runOptionArgs, workCommandArgs } from "../../../src/shared/index.js";
+import {
+  RUN_OPTION_SPECS,
+  checkRunOptions,
+  checkRunMode,
+  runOptionArgs,
+  workCommandArgs,
+  MAX_DASHBOARD_ITERATIONS,
+  MIN_DASHBOARD_ITERATIONS,
+} from "../../../src/shared/index.js";
 
 describe("run options", () => {
   it("treats absent options as none", () => {
@@ -164,5 +172,51 @@ describe("run modes in the command line", () => {
     })).toEqual([
       "work", "--task=t-1", "--auto", "--iterations=3", "--model=m", "--reset-deferred", "/repo",
     ]);
+  });
+});
+
+describe("checkRunMode", () => {
+  it("reads an absent mode as single, the historical behaviour", () => {
+    expect(checkRunMode({})).toEqual({ ok: true, mode: "single" });
+    expect(checkRunMode({ mode: undefined })).toEqual({ ok: true, mode: "single" });
+    expect(checkRunMode({ mode: null })).toEqual({ ok: true, mode: "single" });
+  });
+
+  it("refuses a mode it does not recognise rather than falling back to single", () => {
+    // The fallback is the defect: a saturated hub queued `{ mode: "looop" }`
+    // as one task and ran it, where the direct route answered 400. A client
+    // that misspelled its mode asked for something, and one task is not it.
+    for (const mode of ["looop", "LOOP", "", "all", 3, true, {}]) {
+      expect(checkRunMode({ mode }), String(mode)).toMatchObject({ ok: false });
+    }
+    expect(checkRunMode({ mode: "looop" })).toEqual({
+      ok: false,
+      error: "mode must be one of: single, iterations, loop",
+    });
+  });
+
+  it("accepts loop with no count", () => {
+    expect(checkRunMode({ mode: "loop" })).toEqual({ ok: true, mode: "loop" });
+  });
+
+  it("requires a count inside the bounds for iterations", () => {
+    expect(checkRunMode({ mode: "iterations", iterations: 4 }))
+      .toEqual({ ok: true, mode: "iterations", iterations: 4 });
+    expect(checkRunMode({ mode: "iterations", iterations: MIN_DASHBOARD_ITERATIONS }))
+      .toMatchObject({ ok: true });
+    expect(checkRunMode({ mode: "iterations", iterations: MAX_DASHBOARD_ITERATIONS }))
+      .toMatchObject({ ok: true });
+
+    for (const iterations of [
+      undefined, MIN_DASHBOARD_ITERATIONS - 1, MAX_DASHBOARD_ITERATIONS + 1, 2.5, NaN, Infinity, "3",
+    ]) {
+      expect(checkRunMode({ mode: "iterations", iterations }), String(iterations))
+        .toMatchObject({ ok: false });
+    }
+  });
+
+  it("ignores a count the mode does not use", () => {
+    expect(checkRunMode({ mode: "loop", iterations: 99 })).toEqual({ ok: true, mode: "loop" });
+    expect(checkRunMode({ mode: "single", iterations: 99 })).toEqual({ ok: true, mode: "single" });
   });
 });
