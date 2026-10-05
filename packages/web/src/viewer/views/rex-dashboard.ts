@@ -439,7 +439,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                       : null,
                   ),
                   nextTask.status === "pending"
-                    ? h(StartTaskButton, { taskId: nextTask.id, onStarted: fetchDashboard })
+                    ? h(StartTaskButton, { taskId: nextTask.id, onStarted: fetchDashboard, runModes: true })
                     : nextTask.status === "in_progress"
                       ? h("span", { class: "status-badge status-badge--in_progress" }, "In Progress")
                       : null,

@@ -471,7 +471,7 @@ function IdleState({ snapshot, analyzedAt, jobs, refresh }: {
           ? [
             h("p", { key: "t", class: "live-card-title" }, next.title),
             chainLabel(next.epicChain) ? h("p", { key: "c", class: "live-card-chain" }, chainLabel(next.epicChain)) : null,
-            h(StartTaskButton, { key: "b", taskId: next.id, label: "Start working", onStarted: () => { void refresh(); } }),
+            h(StartTaskButton, { key: "b", taskId: next.id, label: "Start working", runModes: true, onStarted: () => { void refresh(); } }),
           ]
           : h("p", { class: "live-muted" }, "Nothing actionable in the PRD."),
       ),

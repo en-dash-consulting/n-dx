@@ -1424,6 +1424,32 @@ async function handleTemplateDelete(
 /** Actionable statuses — only tasks in these states can be triggered. */
 const ACTIONABLE_STATUSES = new Set(["pending", "blocked", "deferred"]);
 
+/**
+ * How many tasks one Execute request works through.
+ *
+ * The dashboard had exactly one of these — "the next task, once" — while the
+ * CLI it spawns has had `--iterations` and `--loop` all along, so the only way
+ * to leave an agent working through a queue was to go to a terminal.
+ *
+ * `single` is the historical behaviour and the default: a request that names
+ * no mode produces the same argv it always did.
+ */
+export type RunMode = "single" | "iterations" | "loop";
+
+/**
+ * Upper bound on `--iterations` from the dashboard.
+ *
+ * Not a CLI limit — `hench run` takes any count. It is a limit on what one
+ * unattended click may commit to: the browser's tab can be closed a second
+ * later, and the spawned process outlives it. Past this, `loop` is the honest
+ * choice, because it stops when the queue is empty rather than when a number
+ * runs out.
+ */
+export const MAX_DASHBOARD_ITERATIONS = 25;
+
+/** The accepted `mode` values, as the request validator checks them. */
+const RUN_MODES: ReadonlySet<string> = new Set<RunMode>(["single", "iterations", "loop"]);
+
 /** Execution status for a single task run. */
 export interface TaskExecutionStatus {
   taskId: string;
@@ -1439,6 +1465,14 @@ export interface TaskExecutionStatus {
   exitCode?: number | null;
   /** The run was started with `--reset-deferred` (the task was deferred). */
   resetDeferred?: boolean;
+  /**
+   * How many tasks this run works through. Absent means `single` — every
+   * execution recorded before run modes existed, and every request that does
+   * not ask for one.
+   */
+  mode?: RunMode;
+  /** Task count for `mode: "iterations"`. Absent for the other modes. */
+  iterations?: number;
 }
 
 /** Regex (global) to find all tok/s metrics in a chunk via matchAll. */
@@ -1822,6 +1856,33 @@ async function handleExecute(
     return true;
   }
 
+  // Run mode: how many tasks this one request works through. Parsed after the
+  // task checks above, which all still apply — every mode starts on this task,
+  // and the modes that continue past it autoselect from there.
+  const modeRaw = body.mode === undefined ? "single" : body.mode;
+  if (typeof modeRaw !== "string" || !RUN_MODES.has(modeRaw)) {
+    errorResponse(res, 400, `mode must be one of: ${[...RUN_MODES].join(", ")}`);
+    return true;
+  }
+  const mode = modeRaw as RunMode;
+
+  let iterations: number | undefined;
+  if (mode === "iterations") {
+    const raw = body.iterations;
+    // Rejected rather than defaulted: "iterations" with no count is a client
+    // that lost its number somewhere, and silently running one task would
+    // report success for something nobody asked for.
+    if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 2 || raw > MAX_DASHBOARD_ITERATIONS) {
+      errorResponse(
+        res,
+        400,
+        `iterations must be an integer between 2 and ${MAX_DASHBOARD_ITERATIONS} when mode is "iterations"`,
+      );
+      return true;
+    }
+    iterations = raw;
+  }
+
   // Go through the `ndx` orchestrator's `work` command rather than spawning
   // hench directly. `ndx work` forwards flags straight to `hench run` (see
   // handleWork in packages/core/cli.js) but also does the vendor-config
@@ -1838,9 +1899,21 @@ async function handleExecute(
   const { bin: binPath, args: prefixArgs } = resolveNdxBin(ctx);
   // Pass --reset-deferred when executing a deferred task so hench resets it to pending before running
   const resetDeferred = status === "deferred";
-  const workArgs = resetDeferred
-    ? ["work", `--task=${taskId}`, "--auto", "--reset-deferred", ctx.projectDir]
-    : ["work", `--task=${taskId}`, "--auto", ctx.projectDir];
+  // `--task` names where to start; the mode flag decides whether anything
+  // follows. hench autoselects by priority for every task after the first, so
+  // a loop or a multi-task run begins exactly where the operator clicked.
+  const modeArgs =
+    mode === "loop" ? ["--loop"] :
+    mode === "iterations" ? [`--iterations=${iterations}`] :
+    [];
+  const workArgs = [
+    "work",
+    `--task=${taskId}`,
+    "--auto",
+    ...modeArgs,
+    ...(resetDeferred ? ["--reset-deferred"] : []),
+    ctx.projectDir,
+  ];
   const binArgs = [...prefixArgs, ...workArgs];
 
   // Generate a run ID for tracking (hench will generate its own, but we
@@ -1856,6 +1929,8 @@ async function handleExecute(
     status: "starting",
     startedAt: new Date().toISOString(),
     resetDeferred,
+    mode,
+    ...(iterations !== undefined ? { iterations } : {}),
   };
 
   // Spawn hench process with streaming stdout so the UI can show live output.
@@ -1988,6 +2063,8 @@ async function handleExecute(
     taskId,
     taskTitle,
     status: "started",
+    mode,
+    ...(iterations !== undefined ? { iterations } : {}),
   });
   return true;
 }

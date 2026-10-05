@@ -1397,7 +1397,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
                 showPriority: true,
               }),
               nextTask.status === "pending"
-                ? h(StartTaskButton, { taskId: nextTask.id, onStarted: fetchRuns, label: "Start Working" })
+                ? h(StartTaskButton, { taskId: nextTask.id, onStarted: fetchRuns, label: "Start Working", runModes: true })
                 : h("p", { class: "hench-empty-hint" }, `Already ${nextTask.status.replace(/_/g, " ")}.`),
               liveProgress && liveProgress.taskId === nextTask.id
                 ? h("div", {

@@ -229,6 +229,61 @@
   gap: var(--space-1);
 }
 
+/* The button and its run-mode picker sit on one line; they wrap together
+   rather than the picker dropping away from the button it modifies. */
+.start-task-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.start-task-mode {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Secondary to the button by design: the picker qualifies the action, it is
+   not the action. Same height so the pair reads as one control. */
+.start-task-mode-select,
+.start-task-iterations {
+  font-size: var(--font-xs);
+  font-family: inherit;
+  color: var(--text-secondary, #9ca3af);
+  background: var(--bg-elevated, transparent);
+  border: 1px solid var(--border, #374151);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-1-5);
+  cursor: pointer;
+}
+
+.start-task-iterations {
+  width: 4.5rem;
+  cursor: text;
+}
+
+.start-task-mode-select:disabled,
+.start-task-iterations:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.start-task-mode-select:focus-visible,
+.start-task-iterations:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Shown only for the loop mode, which is the one choice whose end condition
+   is not obvious from its label. */
+.start-task-mode-hint {
+  font-size: var(--font-xs);
+  color: var(--text-secondary, #9ca3af);
+  max-width: 260px;
+  text-align: center;
+}
+
 .start-task-error {
   font-size: var(--font-xs);
   color: var(--red, #ef4444);
