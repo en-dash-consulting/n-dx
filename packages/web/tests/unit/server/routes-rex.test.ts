@@ -743,6 +743,53 @@ describe("Rex API routes", () => {
       expect(newEpic.children[0].children[0].tags).toEqual(["ui", "core"]);
     });
 
+    it("keeps valid LoE fields and drops invalid ones", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept-edited`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proposals: [{
+            epic: { title: "LoE Epic" },
+            features: [{
+              title: "LoE Feature",
+              tasks: [
+                {
+                  title: "Valid LoE",
+                  loe: 1.5,
+                  loeRationale: "Two small endpoints",
+                  loeConfidence: "medium",
+                  selected: true,
+                },
+                {
+                  title: "Invalid LoE",
+                  loe: -2,
+                  loeRationale: 7,
+                  loeConfidence: "certain",
+                  selected: true,
+                },
+              ],
+              selected: true,
+            }],
+            selected: true,
+          }],
+        }),
+      });
+      const bodyText = await res.text();
+      expect(res.status, bodyText).toBe(200);
+
+      const doc = await readPRDFromStore(rexDir);
+      const epic = doc.items.find((i) => i.title === "LoE Epic")!;
+      const tasks = epic.children![0]!.children!;
+      const valid = tasks.find((t) => t.title === "Valid LoE")!;
+      expect(valid.loe).toBe(1.5);
+      expect(valid.loeRationale).toBe("Two small endpoints");
+      expect(valid.loeConfidence).toBe("medium");
+      const invalid = tasks.find((t) => t.title === "Invalid LoE")!;
+      expect(invalid).not.toHaveProperty("loe");
+      expect(invalid).not.toHaveProperty("loeRationale");
+      expect(invalid).not.toHaveProperty("loeConfidence");
+    });
+
     it("skips deselected items", async () => {
       const res = await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept-edited`, {
         method: "POST",
@@ -906,6 +953,57 @@ describe("Rex API routes", () => {
       const lastEntry = JSON.parse(lines[lines.length - 1]);
       expect(lastEntry.event).toBe("proposals_edited_accept");
       expect(lastEntry.detail).toContain("proposal editor");
+    });
+  });
+
+  describe("POST /api/rex/proposals/accept", () => {
+    it("keeps LoE fields from pending proposals and drops invalid ones", async () => {
+      await writeFile(
+        join(rexDir, "pending-proposals.json"),
+        JSON.stringify([{
+          epic: { title: "Pending LoE Epic", source: "analyze" },
+          features: [{
+            title: "Pending LoE Feature",
+            source: "analyze",
+            tasks: [
+              {
+                title: "Valid LoE",
+                source: "analyze",
+                sourceFile: "a.ts",
+                loe: 3,
+                loeRationale: "Touches the serializer",
+                loeConfidence: "high",
+              },
+              {
+                title: "Invalid LoE",
+                source: "analyze",
+                sourceFile: "b.ts",
+                loe: "3",
+                loeConfidence: "certain",
+              },
+            ],
+          }],
+        }]),
+      );
+
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const bodyText = await res.text();
+      expect(res.status, bodyText).toBe(200);
+
+      const doc = await readPRDFromStore(rexDir);
+      const epic = doc.items.find((i) => i.title === "Pending LoE Epic")!;
+      const tasks = epic.children![0]!.children!;
+      const valid = tasks.find((t) => t.title === "Valid LoE")!;
+      expect(valid.loe).toBe(3);
+      expect(valid.loeRationale).toBe("Touches the serializer");
+      expect(valid.loeConfidence).toBe("high");
+      const invalid = tasks.find((t) => t.title === "Invalid LoE")!;
+      expect(invalid).not.toHaveProperty("loe");
+      expect(invalid).not.toHaveProperty("loeConfidence");
     });
   });
 

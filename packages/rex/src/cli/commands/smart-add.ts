@@ -31,6 +31,7 @@ import {
   getLLMVendor,
   applyConsolidationGuard,
 } from "../../analyze/index.js";
+import { pickLoEFields } from "../../analyze/index.js";
 import type { Proposal, QualityIssue } from "../../analyze/index.js";
 import {PRIORITY_ORDER, LOE_DEFAULTS} from "../../schema/index.js";import type { PRDItem, ItemLevel, DuplicateOverrideMarker, LoEConfig } from "../../schema/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
@@ -885,6 +886,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...pickLoEFields(t),
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             featureId,
@@ -943,6 +945,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...pickLoEFields(t),
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             featureId,
@@ -977,6 +980,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...pickLoEFields(t),
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             parentId,
@@ -1010,6 +1014,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...pickLoEFields(t),
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             parentId,
