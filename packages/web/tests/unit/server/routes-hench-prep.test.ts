@@ -103,7 +103,7 @@ describe("hench prep routes", () => {
     execMock.mockReset();
     execMock.mockResolvedValue({ stdout: JSON.stringify(RESOLVE_JSON), stderr: "", exitCode: 0, error: null, started: true });
     served = [];
-    tmpDir = realpathSync(await mkdtemp(join(tmpdir(), "hench-prep-")));
+    tmpDir = realpathSync.native(await mkdtemp(join(tmpdir(), "hench-prep-")));
     ctx = await seedWorkspace(tmpDir);
   });
 
@@ -191,7 +191,7 @@ describe("hench prep routes", () => {
       await writeFile(join(tmpDir, "file.txt"), "x");
       git(tmpDir, "add", "file.txt");
       git(tmpDir, "commit", "--quiet", "-m", "init");
-      const linked = join(realpathSync(await mkdtemp(join(tmpdir(), "hench-prep-wt-"))), "feature");
+      const linked = join(realpathSync.native(await mkdtemp(join(tmpdir(), "hench-prep-wt-"))), "feature");
       git(tmpDir, "worktree", "add", "--quiet", "-b", "feature", linked);
       try {
         const featureCtx: ServerContext = { ...(await seedWorkspace(linked)), workspace: "feature" };
@@ -774,7 +774,7 @@ describe("hench prep routes", () => {
     });
 
     it("lists the addressed workspace's tasks", async () => {
-      const otherDir = realpathSync(await mkdtemp(join(tmpdir(), "hench-prep-other-")));
+      const otherDir = realpathSync.native(await mkdtemp(join(tmpdir(), "hench-prep-other-")));
       try {
         const other = await seedWorkspace(otherDir);
         await writeTasks(ctx, [task("anchor-task")]);
