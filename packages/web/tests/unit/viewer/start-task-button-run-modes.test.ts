@@ -30,17 +30,30 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Stub a successful execute POST and return the spy. */
+/**
+ * Stub a successful execute POST and return the spy.
+ *
+ * The parameters are declared even though the body ignores them: `vi.fn` takes
+ * the call-argument tuple from the implementation's signature, so a zero-arg
+ * stub records calls as `[]` and {@link bodyOf} has no `[1]` to read.
+ */
 function stubOk() {
-  const spy = vi.fn(async () => ({ ok: true, status: 202, json: async () => ({ runId: "r1" }) }));
+  const spy = vi.fn(async (_url: string, _init?: RequestInit) => ({
+    ok: true,
+    status: 202,
+    json: async () => ({ runId: "r1" }),
+  }));
   vi.stubGlobal("fetch", spy);
   return spy;
 }
 
 /** The JSON body of the Nth execute POST. */
 function bodyOf(spy: ReturnType<typeof stubOk>, call = 0): Record<string, unknown> {
-  const init = spy.mock.calls[call]![1] as { body: string };
-  return JSON.parse(init.body) as Record<string, unknown>;
+  const body = spy.mock.calls[call]?.[1]?.body;
+  if (typeof body !== "string") {
+    throw new Error(`execute call ${call} had no JSON body`);
+  }
+  return JSON.parse(body) as Record<string, unknown>;
 }
 
 function render(props: Record<string, unknown> = {}) {
