@@ -19,4 +19,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Docs and changesets for PR 1: loe as engineer-weeks, loeRationale, loeConfidence, object encoding](./docs-and-changesets-for-pr-1-loe-as.md) | pending |
 | [Front matter keeps loe as a number, keeps loeRationale and loeConfidence, and never writes [object Object]](./front-matter-keeps-loe-as-a-number.md) | completed |
-| [R0: keep loe, loeRationale and loeConfidence on every proposal accept path](./r0-keep-loe-loerationale-and.md) | pending |
+| [R0: keep loe, loeRationale and loeConfidence on every proposal accept path](./r0-keep-loe-loerationale-and.md) | completed |
