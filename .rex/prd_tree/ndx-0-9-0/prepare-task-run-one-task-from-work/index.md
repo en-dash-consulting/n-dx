@@ -44,7 +44,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Pass --auto when the dashboard starts Self-Heal](./pass-auto-when-the-dashboard-starts.md) | completed |
 | [Prep resolve and preview refuse every deferred task, so no Start button can start one](./prep-resolve-and-preview-refuse-every.md) | completed |
 | [Ready to run lists stuck tasks first, though ndx work --auto skips them](./ready-to-run-lists-stuck-tasks-first.md) | completed |
-| [repo-trust.css uses the retired --danger token, failing style-tokens after merging main](./repo-trust-css-uses-the-retired-danger.md) | pending |
+| [repo-trust.css uses the retired --danger token, failing style-tokens after merging main](./repo-trust-css-uses-the-retired-danger.md) | completed |
 | [--resolve omits review-optional from its options, and its command drops --mine and --review-optional](./resolve-omits-review-optional-from-its.md) | completed |
 | [--resolve reports no reviewer model unless --review is passed, so the modal cannot show who reviews](./resolve-reports-no-reviewer-model.md) | completed |
 | [`--resolve`'s command quotes Windows 8.3 short paths, failing CLI Smoke (Windows)](./resolve-s-command-quotes-windows-8-3.md) | completed |
