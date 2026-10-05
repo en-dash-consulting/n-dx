@@ -93,7 +93,12 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
       let body = "";
       req.on("data", (c) => { body += c; });
       req.on("end", () => {
-        const parsed = JSON.parse(body || "{}") as { taskId?: string; options?: Record<string, unknown> };
+        const parsed = JSON.parse(body || "{}") as {
+          taskId?: string;
+          options?: Record<string, unknown>;
+          mode?: string;
+          iterations?: number;
+        };
         const taskId = parsed.taskId ?? "";
         const refusal = child.refuse.get(taskId);
         if (refusal) {
@@ -105,6 +110,8 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
           taskId,
           workspace: (Array.isArray(header) ? header[0] : header) ?? null,
           ...(parsed.options ? { options: parsed.options } : {}),
+          ...(parsed.mode ? { mode: parsed.mode } : {}),
+          ...(parsed.iterations !== undefined ? { iterations: parsed.iterations } : {}),
         });
         child.running.add(taskId);
         json(200, { runId: `run-${taskId}`, taskId });
@@ -190,11 +197,13 @@ describe("hub admission gate", () => {
     taskId: string,
     headers: Record<string, string> = {},
     options?: Record<string, unknown>,
+    /** Top-level fields beside `options` — today the run mode and its count. */
+    extra: Record<string, unknown> = {},
   ) =>
     fetch(`http://127.0.0.1:${port}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify(options ? { taskId, options } : { taskId }),
+      body: JSON.stringify({ taskId, ...(options ? { options } : {}), ...extra }),
     });
 
   it("replays a queued run's options when it is admitted", async () => {
@@ -212,6 +221,137 @@ describe("hub admission gate", () => {
     alpha.running.delete("task-1");
     await waitFor(() => beta.received.length === 1, 4_000);
     expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, options });
+  });
+
+  it("replays a queued run's mode, so a loop does not come back as one task", async () => {
+    // The entry is what gets replayed, not the original request — the client
+    // that sent it got its 202 and is gone. A mode that did not survive the
+    // queue would start a single task under a 202 that said "until done".
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    const queued = await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { mode: "loop" });
+    expect(queued.status).toBe(202);
+    expect(await queued.json()).toMatchObject({ queued: true, mode: "loop" });
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, mode: "loop" });
+  });
+
+  it("replays an iterations count with its mode", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, { model: "claude-opus-5" },
+      { mode: "iterations", iterations: 4 },
+    );
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({
+      taskId: "task-2",
+      workspace: null,
+      options: { model: "claude-opus-5" },
+      mode: "iterations",
+      iterations: 4,
+    });
+  });
+
+  it("drains a re-asked task with the mode of the latest ask", async () => {
+    // The queue replaces a duplicate entry field by field. A mode left out of
+    // that replacement meant the 202 said "until done" and the run, a minute
+    // later, did one task.
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2");
+    const again = await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { mode: "loop" },
+    );
+    expect(await again.json()).toMatchObject({ queued: true, position: 1, queueLength: 1, mode: "loop" });
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, mode: "loop" });
+  });
+
+  it("drains a re-asked task with the newer iterations count", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined,
+      { mode: "iterations", iterations: 3 },
+    );
+    await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined,
+      { mode: "iterations", iterations: 9 },
+    );
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({
+      taskId: "task-2", workspace: null, mode: "iterations", iterations: 9,
+    });
+  });
+
+  it("drops the mode when the re-ask goes back to one task", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { mode: "loop" });
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2");
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null });
+  });
+
+  it("forwards an unrecognised mode instead of queuing it as one task", async () => {
+    // Judged by the same validator the execute route uses, so a busy machine
+    // and an idle one answer a misspelled mode the same way. Queuing it would
+    // turn the route's 400 into a run that starts and does less than it said.
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    const res = await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { mode: "looop" },
+    );
+    expect(res.status).not.toBe(202);
+
+    // Forwarded to its project server, not held in the queue.
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toMatchObject({ taskId: "task-2", mode: "looop" });
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue.entries).toEqual([]);
+  });
+
+  it("sends a single run with no mode at all, as it always did", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { mode: "single" });
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null });
+  });
+
+  it("forwards a count its mode cannot accept rather than queuing it", async () => {
+    // Same rule as a rejected option: queuing it would turn the project
+    // server's 400 into a run silently dropped when its turn came.
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    const res = await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined,
+      { mode: "iterations", iterations: 0 },
+    );
+    // Forwarded, not queued: the project server answers for its own request.
+    expect(res.status).not.toBe(202);
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toMatchObject({ taskId: "task-2", mode: "iterations", iterations: 0 });
   });
 
   it("never serves contextNotes text from the queue, scoped or not", async () => {

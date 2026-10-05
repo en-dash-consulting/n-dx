@@ -1393,7 +1393,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
                 showLevel: true,
                 showPriority: true,
               }),
-              h(TaskStartControl, { task: nextTask, onStarted: fetchRuns, label: "Start Working", navigateTo }),
+              h(TaskStartControl, { task: nextTask, onStarted: fetchRuns, label: "Start Working", runModes: true, navigateTo }),
               liveProgress && liveProgress.taskId === nextTask.id
                 ? h("div", {
                     class: "hench-empty-live-progress",

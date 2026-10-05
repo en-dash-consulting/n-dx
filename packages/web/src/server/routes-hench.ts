@@ -124,7 +124,7 @@ import {
 } from "./run-liveness.js";
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
-import { resetsDeferred, workCommandArgs, type RunOptions } from "../shared/index.js";
+import { resetsDeferred, workCommandArgs, checkRunMode, MAX_DASHBOARD_ITERATIONS, type RunOptions, type RunMode } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -1446,6 +1446,18 @@ async function handleTemplateDelete(
  */
 const ACTIONABLE_STATUSES = new Set(["pending", "deferred", "in_progress"]);
 
+/**
+ * The run-mode vocabulary, re-exported from `src/shared/run-options.ts`.
+ *
+ * It moved there when the mode started travelling through `workCommandArgs`
+ * and the hub's queue: the server spawns the run, the hub replays it and the
+ * viewer picks it, so the definition belongs in the layer all three read. The
+ * names stay exported here because this is where callers already import them
+ * from, and because the 400 below quotes them.
+ */
+export type { RunMode };
+export { MAX_DASHBOARD_ITERATIONS };
+
 /** Execution status for a single task run. */
 export interface TaskExecutionStatus {
   taskId: string;
@@ -1461,6 +1473,14 @@ export interface TaskExecutionStatus {
   exitCode?: number | null;
   /** The run was started with `--reset-deferred` (the task was deferred). */
   resetDeferred?: boolean;
+  /**
+   * How many tasks this run works through. Absent means `single` — every
+   * execution recorded before run modes existed, and every request that does
+   * not ask for one.
+   */
+  mode?: RunMode;
+  /** Task count for `mode: "iterations"`. Absent for the other modes. */
+  iterations?: number;
 }
 
 /** Regex (global) to find all tok/s metrics in a chunk via matchAll. */
@@ -1811,6 +1831,10 @@ type ExecuteVerdict =
     task: Record<string, unknown>;
     status: string;
     options: RunOptions;
+    /** How many tasks the request works through; `single` when it named none. */
+    mode: RunMode;
+    /** Task count for `mode: "iterations"`, already range-checked. */
+    iterations?: number;
   };
 
 const refused = (status: number, body: Record<string, unknown>): ExecuteVerdict =>
@@ -1848,6 +1872,13 @@ async function judgeExecuteRequest(
   const checkedOptions = await validateRunOptions(ctx.projectDir, body.options);
   if (!checkedOptions.ok) return refused(400, { error: checkedOptions.error, key: checkedOptions.key });
   const options = checkedOptions.options;
+
+  // The run mode is judged here rather than at the spawn, so `execute/check`
+  // answers for it too. The hub asks that route before queuing anything, and a
+  // mode only the spawn refused would be accepted into the queue and then run
+  // as a single task — the drift this function's docblock exists to prevent.
+  const checkedMode = checkRunMode(body);
+  if (!checkedMode.ok) return refused(400, { error: checkedMode.error });
 
   // Tree-level fault first: on a tree this build would re-slug, no task is
   // runnable, so reporting it before the per-task checks keeps the operator
@@ -1964,7 +1995,15 @@ async function judgeExecuteRequest(
     }
   }
 
-  return { kind: "runnable", taskId, task, status, options };
+  return {
+    kind: "runnable",
+    taskId,
+    task,
+    status,
+    options,
+    mode: checkedMode.mode,
+    ...(checkedMode.iterations !== undefined ? { iterations: checkedMode.iterations } : {}),
+  };
 }
 
 /** Parse an execute-shaped body, answering 400 itself when it is not JSON. */
@@ -2047,7 +2086,10 @@ async function startExecution(
     return true;
   }
   if (verdict.kind === "migrate") return await runTreeMigration(res, ctx);
-  const { taskId, task, status, options } = verdict;
+  // How many tasks this one request works through, judged above with the rest
+  // of the request so `execute/check` answers for it too. Every mode starts on
+  // this task; the modes that continue past it autoselect from there.
+  const { taskId, task, status, options, mode, iterations } = verdict;
 
   // Go through the `ndx` orchestrator's `work` command rather than spawning
   // hench directly. `ndx work` forwards flags straight to `hench run` (see
@@ -2069,13 +2111,17 @@ async function startExecution(
   const contextFile = options.contextNotes ? await writeContextNotesFile(options.contextNotes) : null;
   // Argv, never a shell: each flag is one `--flag` / `--flag=value` word from
   // the allow-list, and values were refused if they started with '-'.
-  // The same builder prints the Prepare task modal's command line.
+  // The same builder prints the Prepare task modal's command line, and the run
+  // mode goes through it rather than being appended here — one place knows how
+  // to turn a dashboard request into `ndx work` argv.
   const workArgs = workCommandArgs({
     taskId,
     options,
     dir: ctx.projectDir,
     contextFile: contextFile?.path,
     taskStatus: status,
+    mode,
+    iterations,
   });
   const binArgs = [...prefixArgs, ...workArgs];
 
@@ -2092,6 +2138,8 @@ async function startExecution(
     status: "starting",
     startedAt: new Date().toISOString(),
     resetDeferred,
+    mode,
+    ...(iterations !== undefined ? { iterations } : {}),
   };
 
   // Spawn hench process with streaming stdout so the UI can show live output.
@@ -2240,6 +2288,8 @@ async function startExecution(
     taskTitle,
     status: "started",
     options,
+    mode,
+    ...(iterations !== undefined ? { iterations } : {}),
   });
   return true;
 }

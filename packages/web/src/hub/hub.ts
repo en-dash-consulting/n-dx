@@ -170,7 +170,12 @@ function postExecute(
       "Content-Type": "application/json",
       ...(entry.workspace ? { "x-ndx-workspace": entry.workspace } : {}),
     },
-    body: JSON.stringify({ taskId: entry.taskId, ...(entry.options ? { options: entry.options } : {}) }),
+    body: JSON.stringify({
+      taskId: entry.taskId,
+      ...(entry.options ? { options: entry.options } : {}),
+      ...(entry.mode ? { mode: entry.mode } : {}),
+      ...(entry.iterations !== undefined ? { iterations: entry.iterations } : {}),
+    }),
     signal: AbortSignal.timeout(timeoutMs),
   });
 }
