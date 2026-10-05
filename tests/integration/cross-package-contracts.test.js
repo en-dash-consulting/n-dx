@@ -188,6 +188,7 @@ describe("hench → rex gateway contract", () => {
     "SCHEMA_VERSION",
     "PRD_TREE_DIRNAME",
     "TREE_META_FILENAME",
+    "PRD_CACHE_DIRNAME",
     "SELF_HEAL_TAG",
   ];
 
@@ -315,6 +316,7 @@ describe("hench → llm-client gateway contract", () => {
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
 
   const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS"];
+  const GATEWAY_STRING_CONSTANTS = ["NDX_CONTAINER_DIRNAME"];
 
   for (const name of GATEWAY_FUNCTIONS) {
     it(`re-exports "${name}" as a function`, async () => {
@@ -343,6 +345,16 @@ describe("hench → llm-client gateway contract", () => {
       }
       expect(gateway[name], `hench llm-gateway missing "${name}"`).toBeDefined();
       expect(typeof gateway[name]).toBe("object");
+    });
+  }
+
+  for (const name of GATEWAY_STRING_CONSTANTS) {
+    it(`re-exports "${name}" as a string constant`, async () => {
+      if (!gateway) {
+        gateway = await import("../../packages/hench/dist/prd/llm-gateway.js");
+      }
+      expect(gateway[name], `hench llm-gateway missing "${name}"`).toBeDefined();
+      expect(typeof gateway[name]).toBe("string");
     });
   }
 
@@ -433,6 +445,7 @@ describe("web → rex gateway contract", () => {
     "VALID_VALIDATION_TYPES",
     "CHILD_LEVEL",
     "PRD_TREE_DIRNAME",
+    "PRD_CACHE_DIRNAME",
   ];
 
   for (const name of GATEWAY_FUNCTIONS) {
@@ -709,8 +722,8 @@ describe("gateway export auto-detection", () => {
         "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding", "resolveActor"],
-      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "TREE_META_FILENAME", "SELF_HEAL_TAG",
-        "checkTreeConformance"],
+      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "TREE_META_FILENAME", "PRD_CACHE_DIRNAME",
+        "SELF_HEAL_TAG", "checkTreeConformance"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));
@@ -788,7 +801,8 @@ describe("gateway export auto-detection", () => {
         "VENDOR_CONTEXT_CHAR_LIMITS",
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
         "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS",
-        "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE", "SECRET_PATH_PATTERNS"],
+        "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE", "SECRET_PATH_PATTERNS",
+        "NDX_CONTAINER_DIRNAME"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));
@@ -815,7 +829,7 @@ describe("gateway export auto-detection", () => {
       ...["createRexMcpServer", "ensureLegacyPrdMigrated", "isCompatibleSchema", "findItem", "walkTree",
         "diffTrees",
         "insertChild", "updateInTree", "removeFromTree", "computeStats",
-        "collectAllIds", "findNextTask", "collectCompletedIds",
+        "collectAllIds", "findNextTask", "findActionableTasks", "collectCompletedIds",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates", "validateMerge", "previewMerge", "mergeItems",
         "countSubtree", "computeEpicStats", "computePriorityDistribution",
@@ -828,7 +842,8 @@ describe("gateway export auto-detection", () => {
         "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "cascadeParentReset",
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId",
         "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
-        "VALID_VALIDATION_TYPES", "CHILD_LEVEL", "estimateCostFromTotals"],
+        "VALID_VALIDATION_TYPES", "CHILD_LEVEL", "PRD_CACHE_DIRNAME",
+        "estimateCostFromTotals"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance"],
     ]);
 

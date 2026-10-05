@@ -101,6 +101,51 @@ describe("findUncommittedWork", () => {
     expect(result.paths).toEqual([".rex/tree-meta.json.bak"]);
   });
 
+  it("discounts the same PRD writes on the .ndx/ layout", async () => {
+    // The observed failure. A project on the `.ndx/` layout had its PRD tree
+    // at `.ndx/rex/prd_tree/`, which the discount list — spelled `.rex/…` and
+    // nothing else — did not match. Hench's own completion write was counted
+    // as the agent's leaked work and *every* task completion was refused,
+    // with the refusal naming the files hench had just written itself.
+    await expect(
+      findUncommittedWork(
+        withDirty(
+          [
+            " M .ndx/rex/prd_tree/deck-scoring/design-and-implement-format-specific.md",
+            " M .ndx/rex/prd_tree/deck-scoring/index.md",
+            " M .ndx/rex/tree-meta.json",
+            " M .ndx/rex/execution-log.jsonl",
+          ],
+          { discountPaths: [...PRD_COMMIT_PATHS] },
+        ),
+      ),
+    ).resolves.toEqual({ clean: true, paths: [] });
+  });
+
+  it("discounts the dashboard's derived PRD cache on both layouts", async () => {
+    // `.cache/prd.json` is regenerated from the tree by the `ndx start` file
+    // watcher on every PRD write. A run made while the dashboard was up had
+    // the watcher's rewrite counted as the task's own work.
+    for (const rexDir of [".rex", ".ndx/rex"]) {
+      await expect(
+        findUncommittedWork(
+          withDirty([` M ${rexDir}/.cache/prd.json`], { discountPaths: [...PRD_COMMIT_PATHS] }),
+        ),
+      ).resolves.toEqual({ clean: true, paths: [] });
+    }
+  });
+
+  it("still refuses on the agent's own work beside discounted PRD writes", async () => {
+    // The discount must not widen into "anything dirty during a PRD write".
+    const result = await findUncommittedWork(
+      withDirty([" M .ndx/rex/prd_tree/t/index.md", "?? src/scoring/core/registry.ts"], {
+        discountPaths: [...PRD_COMMIT_PATHS],
+      }),
+    );
+    expect(result.clean).toBe(false);
+    expect(result.paths).toEqual(["src/scoring/core/registry.ts"]);
+  });
+
   it("still refuses on operator .rex content outside the PRD tree", async () => {
     const result = await findUncommittedWork(
       withDirty([" M .rex/config.json"], { discountPaths: [...PRD_COMMIT_PATHS] }),
@@ -205,25 +250,50 @@ describe("refusal messages", () => {
 // drift in either direction.
 
 describe("PRD staged and discounted sets derive from one definition", () => {
-  it("the discount covers exactly the staged paths plus the operator-owned writes", async () => {
-    const { PRD_STAGE_PATHS, OPERATOR_PRD_PATHS } = await import(
+  it("the discount covers exactly the staged paths plus every unstaged write, on both layouts", async () => {
+    const { mkdtemp, mkdir, rm } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { prdStagePaths, OPERATOR_PRD_PATHS } = await import(
       "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
     );
 
-    // Every staged path is discounted (a directory as its slash-suffixed
-    // prefix), every operator-owned write is discounted, and nothing else is.
-    const derived = [
-      ...PRD_STAGE_PATHS.map((p) => (PRD_COMMIT_PATHS.includes(`${p}/`) ? `${p}/` : p)),
-      ...OPERATOR_PRD_PATHS,
-    ];
-    expect([...PRD_COMMIT_PATHS].sort()).toEqual([...derived].sort());
+    // The staged set is layout-resolved (a writer picks one spelling); the
+    // discount is a classifier covering both. So the parity check runs per
+    // layout against the half of the discount that layout owns.
+    const roots: string[] = [];
+    const rootFor = async (layout: "legacy" | "ndx"): Promise<string> => {
+      const dir = await mkdtemp(join(tmpdir(), `hench-discount-parity-${layout}-`));
+      roots.push(dir);
+      if (layout === "ndx") await mkdir(join(dir, ".ndx"), { recursive: true });
+      return dir;
+    };
+    try {
+    for (const [rexDir, projectDir] of [
+      [".rex", await rootFor("legacy")],
+      [".ndx/rex", await rootFor("ndx")],
+    ] as const) {
+      const owned = PRD_COMMIT_PATHS.filter((p) => p.startsWith(`${rexDir}/`));
+      const staged = prdStagePaths(projectDir);
+      const derived = [
+        ...staged.map((p) => (owned.includes(`${p}/`) ? `${p}/` : p)),
+        ...OPERATOR_PRD_PATHS.filter((p) => p.startsWith(`${rexDir}/`)),
+        // Ephemeral: discounted, staged by nobody, reported to nobody.
+        `${rexDir}/.cache/`,
+      ];
+      expect([...owned].sort(), rexDir).toEqual([...derived].sort());
+    }
+    } finally {
+      for (const dir of roots) {
+        await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+      }
+    }
   });
 
   it("prdPathsToStage stages exactly the definition's hench-staged entries", async () => {
     const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
     const { join } = await import("node:path");
     const { prdPathsToStage } = await import("../../../../src/agent/lifecycle/shared.js");
-    const { PRD_STAGE_PATHS, OPERATOR_PRD_PATHS } = await import(
+    const { prdStagePaths, OPERATOR_PRD_PATHS } = await import(
       "../../../../src/agent/lifecycle/uncommitted-work-gate.js"
     );
 
@@ -232,25 +302,37 @@ describe("PRD staged and discounted sets derive from one definition", () => {
     // hench-staged half of the definition. A hardcoded candidate added to
     // prdPathsToStage outside the definition would surface here as an extra;
     // an entry reclassified to hench-staged would appear automatically.
-    const projectDir = await mkdtemp(join(tmpdir(), "hench-stage-discount-parity-"));
-    try {
-      for (const p of [...PRD_STAGE_PATHS, ...OPERATOR_PRD_PATHS]) {
-        const abs = join(projectDir, p);
-        if (p.includes("prd_tree")) {
-          await mkdir(abs, { recursive: true });
-        } else {
-          await mkdir(join(projectDir, ".rex"), { recursive: true });
-          await writeFile(abs, "x", "utf-8");
+    //
+    // Run on both layouts. On `.ndx/` the whole chain used to resolve to
+    // `.rex/…`, which exists on no such project: prdPathsToStage returned
+    // nothing, the completion commit landed empty, and the gate then refused
+    // the task over the very PRD writes it had declined to stage.
+    for (const layout of ["legacy", "ndx"] as const) {
+      const projectDir = await mkdtemp(join(tmpdir(), `hench-stage-discount-${layout}-`));
+      try {
+        if (layout === "ndx") await mkdir(join(projectDir, ".ndx"), { recursive: true });
+        const expected = prdStagePaths(projectDir);
+        const operatorOwned = OPERATOR_PRD_PATHS.filter((p) =>
+          p.startsWith(layout === "ndx" ? ".ndx/rex/" : ".rex/"),
+        );
+        for (const p of [...expected, ...operatorOwned]) {
+          const abs = join(projectDir, p);
+          if (p.includes("prd_tree")) {
+            await mkdir(abs, { recursive: true });
+          } else {
+            await mkdir(join(abs, ".."), { recursive: true });
+            await writeFile(abs, "x", "utf-8");
+          }
         }
-      }
 
-      const staged = await prdPathsToStage(projectDir);
-      expect([...staged].sort()).toEqual([...PRD_STAGE_PATHS].sort());
-      for (const operatorPath of OPERATOR_PRD_PATHS) {
-        expect(staged).not.toContain(operatorPath);
+        const staged = await prdPathsToStage(projectDir);
+        expect([...staged].sort(), layout).toEqual([...expected].sort());
+        for (const operatorPath of operatorOwned) {
+          expect(staged, layout).not.toContain(operatorPath);
+        }
+      } finally {
+        await rm(projectDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       }
-    } finally {
-      await rm(projectDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   });
 });

@@ -159,6 +159,24 @@ describe("resolveTaskModel — the free tier", () => {
   });
 });
 
+describe("resolveTaskModel — source names the key that supplied the model", () => {
+  const cases: Array<[string, LLMConfig, string, string?]> = [
+    ["vendor default", { vendor: "claude" }, "vendor-default"],
+    ["llm.model", { vendor: "codex", model: "gpt-5.6-luna", codex: { model: "gpt-5.6-terra" } }, "llm.model"],
+    ["llm.<vendor>.model", { vendor: "codex", codex: { model: "gpt-5.6-terra" } }, "llm.codex.model"],
+    ["llm.tiers.<vendor>.<tier>", { vendor: "claude", model: "sonnet", tiers: { claude: { standard: "opus" } } }, "llm.tiers.claude.standard"],
+    ["llm.routes to a catalog tier", { vendor: "claude", routes: { "agent.execute": "heavy" } }, "llm.routes"],
+    ["a route that lands on a configured slot", { vendor: "claude", model: "sonnet", routes: { "agent.*": "standard" } }, "llm.model"],
+    ["llm.<vendor>.lightModel", { vendor: "google", routes: { "agent.execute": "light" }, google: { lightModel: "gemini-x" } }, "llm.google.lightModel"],
+    ["llm.tiers.<vendor>.free", { vendor: "local", routes: { "agent.execute": "free" }, tiers: { local: { free: "qwen" } } }, "llm.tiers.local.free"],
+    ["an explicit model", { vendor: "claude", model: "sonnet" }, "explicit", "opus"],
+  ];
+
+  it.each(cases)("%s", (_label, config, source, model) => {
+    expect(resolveTaskModel("agent.execute", config, model ? { model } : undefined).source).toBe(source);
+  });
+});
+
 describe("resolveTaskModel — explicit model and vendors", () => {
   it("an explicit model always wins, normalized for the vendor", () => {
     const r = resolveTaskModel("git.commit-message", { vendor: "claude" }, { model: "opus" });

@@ -46,6 +46,14 @@ describe("hench run — flag conflict refusals", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
+  // --resolve is a mode: any value but "false" resolves and never runs. With no
+  // --task, resolve's own refusal is the proof the run path was not taken.
+  it.each(["--resolve", "--resolve=true", "--resolve=yes"])("treats %s as resolve, not a run", (flag) => {
+    const { stderr, code } = runResult(["run", flag, tmpDir]);
+    expect(code).not.toBe(0);
+    expect(stderr).toMatch(/--resolve requires --task/);
+  });
+
   it("refuses --mine together with --epic-by-epic instead of ignoring it", () => {
     const { stderr, code } = runResult(["run", "--mine", "--epic-by-epic", tmpDir]);
 

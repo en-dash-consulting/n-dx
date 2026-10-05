@@ -103,7 +103,7 @@ export { SCHEMA_VERSION, isCompatibleSchema, assertSchemaVersion } from "@n-dx/r
 export { resolveStore } from "@n-dx/rex";
 
 // ---- Folder-tree storage path -----------------------------------------------
-export { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "@n-dx/rex";
+export { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "@n-dx/rex";
 
 // ---- Save file report ---------------------------------------------------------
 // What the last PRD save(s) actually wrote and deleted, project-relative.
