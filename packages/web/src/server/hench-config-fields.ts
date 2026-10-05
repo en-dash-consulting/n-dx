@@ -115,9 +115,11 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
   // ── Git safety ──
   { path: "rollbackOnFailure", label: "Rollback on Failure", description: "Revert uncommitted changes when a run fails", type: "boolean", category: "git" },
   { path: "autoCommit", label: "Auto Commit", description: "Let the agent commit itself at the end of a run", type: "boolean", category: "git", defaultValue: false },
+  { path: "promptAgentToMarkInProgress", label: "Agent Marks In Progress", description: "Keep the workflow step asking the agent to set in_progress. Hench already does it before the agent starts, so the step is a duplicate write", type: "boolean", category: "execution", defaultValue: false },
   { path: "commitMsgTimeoutMs", label: "Commit Message Timeout (ms)", description: "How long the commit-message generation call may run. 0 means no limit", type: "number", integer: true, category: "git", defaultValue: 300000 },
   { path: "git.checkpointThreshold", label: "Checkpoint Threshold (lines)", description: "Lines changed at/above which the pre-run gate defaults to committing a checkpoint. 0 disables", type: "number", integer: true, category: "git" },
   { path: "git.requireCleanTree", label: "Require Clean Tree", description: "Refuse to start runs against a dirty working tree", type: "boolean", category: "git" },
+  { path: "git.commitMessage", label: "Pre-run Commit Subject", description: "Where the pre-run gate's proposed subject comes from: built from the changed file list, or summarised by a light-tier model", type: "enum", enumValues: ["deterministic", "llm"], category: "git", defaultValue: "deterministic" },
 
   // ── Guard rails ──
   { path: "guard.blockedPaths", label: "Blocked Paths", description: "Glob patterns for paths the agent cannot modify", type: "array", category: "guard" },
