@@ -14,7 +14,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "sourcevision's recommendations enter through the one door: as changes with suggested amends or touches.\n\nRoadmap PR 20 · wave 2 · lane models-analysis."
-lastModified: "2026-10-06T04:20:06.172Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-06T15:51:46.926Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -22,4 +23,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Emit recommendations as changes and show the map delta in PR markdown](./emit-recommendations-as-changes-and.md) | pending |
+| [Emit recommendations as changes and show the product layer delta in PR markdown](./emit-recommendations-as-changes-and.md) | pending |

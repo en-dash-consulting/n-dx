@@ -12,10 +12,12 @@ tags:
   - "critical-path"
 blockedBy:
   - "30dbd22d-d325-4345-a66f-a1a8aa6a10f1"
+  - "8b38b308-be40-4cb1-9f92-ee0233f0b8ac"
 source: "roadmap"
 acceptanceCriteria: []
 description: "Critical path. Dual-read keeps main working on the v1 tree while v2 code lands. Run with the strongest model tier and --review.\n\nRoadmap PR 9 · wave 1 · lane rex-store."
-lastModified: "2026-10-06T04:19:25.134Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T16:54:41.696Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
