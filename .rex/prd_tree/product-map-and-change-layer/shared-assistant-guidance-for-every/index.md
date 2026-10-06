@@ -20,4 +20,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Move vendor-neutral sections from the Claude addendum into the shared guidance](./move-vendor-neutral-sections-from-the.md) | in_progress |
+| [Codex never sees the per-package governance or the path-scoped rules, because they live only in Claude-loaded files](./codex-never-sees-the-per-package.md) | pending |
+| [Move vendor-neutral sections from the Claude addendum into the shared guidance](./move-vendor-neutral-sections-from-the.md) | completed |
+| [Nothing stops AGENTS.md growing past Codex's 32 KiB project-doc limit, where Codex silently drops the tail](./nothing-stops-agents-md-growing-past.md) | pending |
