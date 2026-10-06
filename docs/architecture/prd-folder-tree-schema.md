@@ -826,7 +826,7 @@ The serializer (PRD → folder tree) must:
 13. **Subtasks:** For task items with leaf subtasks, do not generate `## Subtask:` sections. Subtasks are serialized as sibling files/folders, not as sections.
 14. Write atomically: build the entire tree into a temp directory, then rename it into place to prevent partial states.
 15. Preserve unknown frontmatter fields (round-trip fidelity for future extensions).
-16. **Value encoding:** Scalars are written as quoted strings, except `loe`, which is written as a bare number. Object-valued fields (plain objects, class instances, null-prototype objects, and objects inside lists) are written as inline JSON, never as `[object Object]`.
+16. **Value encoding:** Strings and other scalars are written as quoted strings; booleans are written bare (`true`/`false`, e.g. `ready: true`); `loe` is written as a bare number. Object-valued fields (plain objects, class instances, null-prototype objects, and objects inside lists) are written as inline JSON, never as `[object Object]`.
 17. **Uniqueness enforcement:** Verify that no two sibling items (at any level) have the same slug. If a slug collision is detected, append the item's `-{id6}` suffix (or positional suffix if needed) to resolve it.
 
 ---
