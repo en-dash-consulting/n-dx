@@ -12,8 +12,8 @@ import {
   lookupJudgments,
   storeJudgments,
   JUDGMENT_CACHE_FILE,
-} from "../../../src/analyzers/judgment-cache.js";
-import { choice, noul } from "../../../src/analyzers/jev-client.js";
+} from "../../src/judgment-cache.js";
+import { choice, noul } from "../../src/jev-client.js";
 
 const state = {
   project: { languages: ["TypeScript"] },
@@ -98,5 +98,12 @@ describe("lookup and store", () => {
     configureJudgmentCache({ svDir: dir });
     writeFileSync(path, "{not json");
     expect(Object.keys(lookupJudgments(state, { a: qa }, "jev-latest").misses)).toEqual(["a"]);
+  });
+
+  it("writes under the directory the caller named, not a hard-coded one", () => {
+    const l = lookupJudgments(state, { a: qa }, "jev-latest");
+    storeJudgments(l.keys, { a: { type: "choice", choice: "service", probabilities: { service: 1 }, confidence: 1 } }, "jev");
+    expect(existsSync(join(dir, ".cache", JUDGMENT_CACHE_FILE))).toBe(true);
+    expect(JUDGMENT_CACHE_FILE).toBe("judgments.json");
   });
 });

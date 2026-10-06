@@ -26,8 +26,8 @@ import type {
 import { BUILTIN_ARCHETYPES } from "./archetypes.js";
 import { sortClassifications } from "../util/sort.js";
 import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
-import { askJev, choice } from "./jev-client.js";
-import type { ChoiceQuestion, JsonValue } from "./jev-client.js";
+import { askJev, choice } from "@n-dx/llm-client";
+import type { ChoiceQuestion, JsonValue } from "@n-dx/llm-client";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";

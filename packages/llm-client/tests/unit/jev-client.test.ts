@@ -1,10 +1,34 @@
-import { describe, it, expect, vi } from "vitest";
-import { askJev, choice, noul, score, JEV_ENDPOINT, JEV_MODEL } from "../../../src/analyzers/jev-client.js";
-import { ClaudeClientError } from "@n-dx/llm-client";
-import { startRunLedger, snapshotRunLedger } from "../../../src/analyzers/run-ledger.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import {
+  askJev,
+  choice,
+  noul,
+  score,
+  setJevObserver,
+  JEV_ENDPOINT,
+  JEV_MODEL,
+  JEV_VENDOR,
+} from "../../src/jev-client.js";
+import type { JevCallRecord } from "../../src/jev-client.js";
+import { ClaudeClientError } from "../../src/types.js";
 
 const env = { TYPESAFE_API_KEY: "tsk_test" } as NodeJS.ProcessEnv;
 const noSleep = vi.fn(async () => {});
+
+/** Collects what the client reports, standing in for a consumer's run ledger. */
+function recordingObserver() {
+  const calls: JevCallRecord[] = [];
+  const cacheStats: Array<[number, number]> = [];
+  setJevObserver({
+    onCall: (rec) => calls.push(rec),
+    onCacheStats: (hits, misses) => cacheStats.push([hits, misses]),
+  });
+  return { calls, cacheStats };
+}
+
+afterEach(() => {
+  setJevObserver(null);
+});
 
 function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -157,20 +181,54 @@ describe("askJev — noul and score answers", () => {
   });
 });
 
-describe("askJev — run ledger", () => {
-  it("records a successful call under its task class with the answering model and usage", async () => {
-    startRunLedger("cascade");
+describe("askJev — observer", () => {
+  it("reports a successful call under its task class with the answering model and usage", async () => {
+    const { calls } = recordingObserver();
     const fetchImpl = vi.fn(async () => jsonResponse(200, okBody));
     await askJev(request, { fetchImpl, env, sleep: noSleep, taskClass: "code.classify" });
-    const { byTaskClass } = snapshotRunLedger().llm;
-    expect(byTaskClass["code.classify"]).toMatchObject({ calls: 1, inputTokens: 120, outputTokens: 6, vendor: "typesafe", model: "jev-1.13.0" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      taskClass: "code.classify",
+      vendor: JEV_VENDOR,
+      model: "jev-1.13.0",
+      tokenUsage: { input: 120, output: 6 },
+    });
+    expect(calls[0].durationMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("records nothing for a failed call", async () => {
-    startRunLedger("cascade");
+  it("falls back to the unclassed task class when the call site declares none", async () => {
+    const { calls } = recordingObserver();
+    const fetchImpl = vi.fn(async () => jsonResponse(200, okBody));
+    await askJev(request, { fetchImpl, env, sleep: noSleep });
+    expect(calls[0].taskClass).toBe("unclassed");
+  });
+
+  it("reports nothing for a failed call", async () => {
+    const { calls } = recordingObserver();
     const fetchImpl = vi.fn(async () => new Response("no", { status: 401 }));
     await askJev(request, { fetchImpl, env, sleep: noSleep, taskClass: "code.classify" }).catch(() => {});
-    expect(snapshotRunLedger().llm.byTaskClass).toEqual({});
+    expect(calls).toEqual([]);
+  });
+
+  it("makes the call with no observer registered at all", async () => {
+    setJevObserver(null);
+    const fetchImpl = vi.fn(async () => jsonResponse(200, okBody));
+    const res = await askJev(request, { fetchImpl, env, sleep: noSleep });
+    expect(res.answers.f0.choice).toBe("service");
+  });
+
+  it("makes the call with an observer that implements neither method", async () => {
+    setJevObserver({});
+    const fetchImpl = vi.fn(async () => jsonResponse(200, okBody));
+    const res = await askJev(request, { fetchImpl, env, sleep: noSleep });
+    expect(res.answers.f0.choice).toBe("service");
+  });
+
+  it("reports no cache stats while the judgment cache is unconfigured", async () => {
+    const { cacheStats } = recordingObserver();
+    const fetchImpl = vi.fn(async () => jsonResponse(200, okBody));
+    await askJev(request, { fetchImpl, env, sleep: noSleep });
+    expect(cacheStats).toEqual([]);
   });
 });
 
@@ -179,11 +237,11 @@ describe("askJev — judgment cache", () => {
     const { mkdtempSync, rmSync } = await import("node:fs");
     const { tmpdir } = await import("node:os");
     const { join } = await import("node:path");
-    const { configureJudgmentCache } = await import("../../../src/analyzers/judgment-cache.js");
+    const { configureJudgmentCache } = await import("../../src/judgment-cache.js");
     const dir = mkdtempSync(join(tmpdir(), "sv-jev-cache-"));
     configureJudgmentCache({ svDir: dir });
+    const { cacheStats } = recordingObserver();
     try {
-      startRunLedger("cascade");
       const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
         const sent = JSON.parse(init.body as string);
         const answers: Record<string, unknown> = {};
@@ -218,7 +276,9 @@ describe("askJev — judgment cache", () => {
       const sent = JSON.parse((fetchImpl.mock.calls[1] as unknown as [string, RequestInit])[1].body as string);
       expect(Object.keys(sent.questions)).toEqual(["f1"]);
 
-      expect(snapshotRunLedger().llm.judgmentCache).toEqual({ hits: 3, misses: 3 });
+      // Three requests: 0+2 misses, 2+0 hits, 1+1 — totalling 3 hits, 3 misses.
+      const totals = cacheStats.reduce(([h, m], [hits, misses]) => [h + hits, m + misses], [0, 0]);
+      expect(totals).toEqual([3, 3]);
     } finally {
       configureJudgmentCache(undefined);
       rmSync(dir, { recursive: true, force: true });

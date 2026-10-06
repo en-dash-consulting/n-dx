@@ -21,5 +21,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Move the Jev client and judgment cache from sourcevision into llm-client](./move-the-jev-client-and-judgment-cache.md) | pending |
-| [Redact Bitbucket app passwords and access tokens](./redact-bitbucket-app-passwords-and.md) | pending |
+| [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | pending |
+| [Make the llm-client seam registry readable by every assistant, not only Claude](./make-the-llm-client-seam-registry.md) | completed |
+| [Move the Jev client and judgment cache from sourcevision into llm-client](./move-the-jev-client-and-judgment-cache.md) | completed |
+| [Redact Bitbucket app passwords and access tokens](./redact-bitbucket-app-passwords-and.md) | completed |
