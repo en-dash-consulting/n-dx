@@ -44,6 +44,9 @@ interface RawProposalTask {
   acceptanceCriteria?: string[];
   priority?: string;
   tags?: string[];
+  loe?: number;
+  loeRationale?: string;
+  loeConfidence?: string;
 }
 
 /** Internal editable state for a task. */
@@ -54,6 +57,10 @@ interface EditableTask {
   tags: string;
   /** Carried verbatim from the proposal; not inline-editable in the UI. */
   acceptanceCriteria: string[];
+  /** LoE estimate carried verbatim from the proposal; not editable here. */
+  loe?: number;
+  loeRationale?: string;
+  loeConfidence?: string;
   selected: boolean;
 }
 
@@ -107,6 +114,9 @@ function toEditable(proposals: RawProposal[]): EditableProposal[] {
         priority: t.priority ?? "",
         tags: (t.tags ?? []).join(", "),
         acceptanceCriteria: t.acceptanceCriteria ?? [],
+        ...(t.loe !== undefined ? { loe: t.loe } : {}),
+        ...(t.loeRationale !== undefined ? { loeRationale: t.loeRationale } : {}),
+        ...(t.loeConfidence !== undefined ? { loeConfidence: t.loeConfidence } : {}),
         selected: true,
       })),
     })),
@@ -309,6 +319,9 @@ export function ProposalEditor({ proposals: rawProposals, onAccepted, onCancel }
               acceptanceCriteria: t.acceptanceCriteria.length > 0 ? t.acceptanceCriteria : undefined,
               priority: t.priority || undefined,
               tags: t.tags ? t.tags.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
+              loe: t.loe,
+              loeRationale: t.loeRationale,
+              loeConfidence: t.loeConfidence,
               selected: t.selected,
             })),
             selected: f.selected,

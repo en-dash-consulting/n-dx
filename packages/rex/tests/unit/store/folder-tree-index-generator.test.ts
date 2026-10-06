@@ -607,3 +607,36 @@ describe("generateIndexMd", () => {
     expect(output).toContain("- Criterion 1");
   });
 });
+
+describe("generateIndexMd: loe fields and object encoding", () => {
+  const base = { id: "t-1", level: "task", title: "T", status: "pending" } as const;
+
+  it("writes loe as a bare number with rationale and valid confidence", () => {
+    const out = generateIndexMd(
+      { ...base, loe: 2, loeRationale: "why", loeConfidence: "high" } as unknown as PRDItem,
+      [],
+      [],
+    );
+    expect(out).toContain("loe: 2\n");
+    expect(out).toContain('loeRationale: "why"');
+    expect(out).toContain('loeConfidence: "high"');
+  });
+
+  it("drops an invalid loeConfidence", () => {
+    const out = generateIndexMd({ ...base, loeConfidence: "certain" } as unknown as PRDItem, [], []);
+    expect(out).not.toContain("loeConfidence");
+  });
+
+  it("writes any object as JSON, never [object Object]", () => {
+    class Meta {
+      a = 1;
+    }
+    const out = generateIndexMd(
+      { ...base, meta: new Meta(), list: [new Meta()] } as unknown as PRDItem,
+      [],
+      [],
+    );
+    expect(out).not.toContain("[object Object]");
+    expect(out).toContain('meta: {"a":1}');
+  });
+});

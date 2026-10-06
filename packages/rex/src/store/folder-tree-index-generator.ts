@@ -205,6 +205,8 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
     "failureReason",
     "acceptanceCriteria",
     "loe",
+    "loeRationale",
+    "loeConfidence",
     "description",
   ];
 
@@ -217,8 +219,6 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
     "mergedProposals",
     "tokenUsage",
     "duration",
-    "loeRationale",
-    "loeConfidence",
   ]);
 
   const emitted = new Set<string>();
@@ -226,8 +226,9 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
   for (const key of ORDERED_FIELDS) {
     const value = (item as Record<string, unknown>)[key];
     if (value === undefined || value === null) continue;
-    emitYamlField(lines, key, value);
     emitted.add(key);
+    if (key === "loeConfidence" && !["low", "medium", "high"].includes(value as string)) continue;
+    emitYamlField(lines, key, value);
   }
 
   // Emit unknown extra fields alphabetically
@@ -248,8 +249,8 @@ function emitYamlField(lines: string[], key: string, value: unknown): void {
     } else {
       lines.push(`${key}:`);
       for (const item of value) {
-        if (item !== null && typeof item === "object" && !Array.isArray(item)) {
-          // Object items emit as inline JSON (valid YAML flow mapping).
+        if (item !== null && typeof item === "object") {
+          // Any object item emits as inline JSON, never "[object Object]".
           lines.push(`  - ${JSON.stringify(item)}`);
         } else {
           lines.push(`  - ${JSON.stringify(String(item))}`);
@@ -257,8 +258,10 @@ function emitYamlField(lines: string[], key: string, value: unknown): void {
       }
     }
   } else if (value !== null && typeof value === "object") {
-    // Plain objects emit as inline JSON (valid YAML flow mapping).
+    // Any object emits as inline JSON, never "[object Object]".
     lines.push(`${key}: ${JSON.stringify(value)}`);
+  } else if (key === "loe" && typeof value === "number" && Number.isFinite(value)) {
+    lines.push(`${key}: ${value}`);
   } else {
     // Quote all scalar values consistently with folder-tree-serializer.ts
     lines.push(`${key}: ${JSON.stringify(String(value))}`);

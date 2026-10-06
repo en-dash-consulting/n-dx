@@ -14,7 +14,8 @@ export type {
   DuplicateReasonReference,
   DuplicateReasonMetadata,
 } from "./propose.js";
-export { buildProposals } from "./propose.js";
+export type { LoEFields } from "./propose.js";
+export { buildProposals, pickLoEFields } from "./propose.js";
 
 export { similarity, deduplicateScanResults } from "./dedupe.js";
 

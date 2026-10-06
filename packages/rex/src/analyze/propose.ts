@@ -48,6 +48,27 @@ export interface ProposalTask {
   duplicateReason?: DuplicateReasonMetadata;
 }
 
+/** LoE fields a proposal task may carry onto the PRD item built from it. */
+export interface LoEFields {
+  loe?: number;
+  loeRationale?: string;
+  loeConfidence?: "low" | "medium" | "high";
+}
+
+/**
+ * Pick the valid LoE fields from a proposal task, for spreading into the item
+ * built on accept. `loe` must be a positive finite number, `loeRationale` a
+ * string, `loeConfidence` one of low/medium/high; anything else is dropped.
+ */
+export function pickLoEFields(task: LoEFields): LoEFields {
+  const out: LoEFields = {};
+  if (typeof task.loe === "number" && Number.isFinite(task.loe) && task.loe > 0) out.loe = task.loe;
+  if (typeof task.loeRationale === "string") out.loeRationale = task.loeRationale;
+  const c = task.loeConfidence;
+  if (c === "low" || c === "medium" || c === "high") out.loeConfidence = c;
+  return out;
+}
+
 /** Decomposition metadata attached to a task that exceeded the LoE threshold. */
 export interface TaskDecomposition {
   /** Child tasks produced by decomposition. */
