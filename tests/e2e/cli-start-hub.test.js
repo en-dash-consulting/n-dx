@@ -49,10 +49,38 @@ function findAvailablePort() {
   });
 }
 
-async function getJson(url) {
-  const res = await fetch(url);
-  const text = await res.text();
-  return { status: res.status, body: text ? JSON.parse(text) : null };
+/**
+ * GET a JSON endpoint, retrying only a connection-level failure.
+ *
+ * `fetch` pools keep-alive sockets. The hub closes an idle connection on its own
+ * schedule, and reusing one it has already closed surfaces as `TypeError: fetch
+ * failed` / `ECONNRESET` — not a product result, just a dead socket from an
+ * earlier test in this file. That is what failed the two-project registration
+ * case inside the full root suite while it passed alone, and it is the same
+ * hazard tests/e2e/cli-start-two-projects.test.js's `getStatus` avoids by
+ * declining to use `fetch` at all.
+ *
+ * It also covers the other transport-level race in this file: `--background`
+ * returns before the detached server has finished binding, so the first GET can
+ * arrive at a closed port.
+ *
+ * Only the transport is retried. Any response that arrives — including the 409
+ * the ambiguous-root case asserts — is returned as-is, so no status assertion is
+ * softened by this. A hub that is genuinely down therefore costs the full
+ * budget before throwing; the one such call is in afterAll's best-effort sweep.
+ */
+async function getJson(url, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      const res = await fetch(url);
+      const text = await res.text();
+      return { status: res.status, body: text ? JSON.parse(text) : null };
+    } catch (err) {
+      if (!(err instanceof TypeError) || Date.now() >= deadline) throw err;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
 }
 
 function isAlive(pid) {

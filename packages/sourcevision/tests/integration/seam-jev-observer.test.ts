@@ -4,7 +4,8 @@
  * `askJev` lives in `@n-dx/llm-client` (foundation tier) and so cannot import
  * sourcevision's run ledger. The accounting is inverted through
  * `setJevObserver`, and sourcevision registers the ledger's recorders in
- * `cmdAnalyze`'s setup. TypeScript checks that `recordLLMCall` and
+ * `initAndLoadLLMConfig` — the bootstrap `sv analyze` and `sv narrate` share, so
+ * neither command's ledger loses Jev calls. TypeScript checks that `recordLLMCall` and
  * `recordJudgmentCache` are structurally acceptable as `JevObserver` methods;
  * it cannot check that the client actually calls them, nor that the numbers
  * arrive in the shape the ledger reports. Both are what the ledger assertions
@@ -12,7 +13,8 @@
  *
  * @see packages/llm-client/src/jev-client.ts — the injection site
  * @see packages/sourcevision/src/cli/commands/analyze.ts — the registration site
- * @see packages/llm-client/CLAUDE.md — Injection seam registry
+ *      (`initAndLoadLLMConfig`)
+ * @see packages/llm-client/AGENTS.md — Injection seam registry
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";

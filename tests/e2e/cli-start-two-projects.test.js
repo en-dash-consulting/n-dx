@@ -110,6 +110,34 @@ async function readBoundPort(dir) {
 }
 
 /**
+ * Poll `read` until it yields a value, rather than reading once.
+ *
+ * `ndx start --background` returns as soon as the parent has handed off; the
+ * detached server writes its pid and port files a moment later. Reading either
+ * one immediately is a race that an idle machine hides and a loaded one loses.
+ * It lost inside the full root suite (twice, while the same file passed alone):
+ * `readBoundPort` returned null, and every later assertion then blamed the
+ * product for a file that simply had not been written yet — `expected null to
+ * be type of 'number'`, then `No dashboard answered on :null`. Worse, a missed
+ * pid file also keeps that server out of `startedPids`, so afterAll cannot reap
+ * it. Project A's readiness was already awaited through `waitForStatus`; this
+ * gives the files both projects write the same guarantee.
+ *
+ * Failing here names the missing file, which is the fact worth reporting.
+ */
+async function waitForWrittenValue(read, what, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const value = await read();
+    if (value !== null) return value;
+    if (Date.now() >= deadline) {
+      throw new Error(`${what} was not written within ${timeoutMs}ms`);
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
+/**
  * Record a started server's pid so afterAll can reap it. Returns the pid, or
  * null when the pid file is missing — the caller asserts on that separately.
  */
@@ -249,15 +277,15 @@ describe("two projects start dashboards concurrently", { timeout: 120_000 }, () 
 
     // Project A claims the port first.
     const startA = runStart([`--port=${requestedPort}`, "--background", dirA]);
-    pidA = await capturePid(dirA);
     expect(startA.code, startA.stderr).toBe(0);
+    pidA = await waitForWrittenValue(() => capturePid(dirA), `project A's ${PID_FILE}`);
     await waitForStatus(requestedPort);
 
     // Project B asks for the same port. It must relocate, not kill.
     startB = runStart([`--port=${requestedPort}`, "--background", dirB]);
-    pidB = await capturePid(dirB);
     expect(startB.code, startB.stderr).toBe(0);
-    portB = await readBoundPort(dirB);
+    pidB = await waitForWrittenValue(() => capturePid(dirB), `project B's ${PID_FILE}`);
+    portB = await waitForWrittenValue(() => readBoundPort(dirB), `project B's ${PORT_FILE}`);
   }, 90_000);
 
   afterAll(async () => {
