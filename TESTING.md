@@ -59,7 +59,7 @@ Test-file pointers for the scenarios added above:
 
 ### Running a subset of suites
 
-`node scripts/run-all-tests.mjs` runs every suite. Suites are labelled `root` plus each package directory that has a `test` script (`rex`, `hench`, `web`, …). `core` has no suite of its own; its tests are in `root`.
+`node scripts/run-all-tests.mjs` runs every suite. Suites are labelled `root`, `root-policy` (a subset of `root`) plus each package directory that has a `test` script (`rex`, `hench`, `web`, …). `core` has no suite of its own; its tests are in `root`.
 
 ```sh
 node scripts/run-all-tests.mjs                       # root + every package
@@ -71,6 +71,7 @@ node scripts/run-all-tests.mjs affected <baseRef> --list   # print the selection
 `affected` compares the working tree to `<baseRef>` (committed, staged, unstaged and untracked files). Rules live in `scripts/lib/select-suites.mjs`:
 
 - A change to a package's sources selects that package and every workspace package that depends on it. A change under `src/cli/` also selects `root`, whose e2e tests spawn the CLIs. Tests-only changes select that package; docs and Markdown select nothing.
+- Any change under `packages/<dir>/src/` or `packages/<dir>/tests/` also selects `root-policy` unless `root` is selected (root includes it, so the two never run together). `root-policy` is the ~2 s set of static root tests that police package sources and tests: `architecture-policy`, `domain-isolation`, `shell-spawn-inventory-policy`, `wall-clock-inventory-policy`, `layout-literal-policy` and `obfuscated-code-policy` (`ROOT_POLICY_TEST_FILES` in `scripts/lib/select-suites.mjs`). Run it alone with `node scripts/run-all-tests.mjs root-policy`. `all` and `packages` do not include it.
 - `scripts/`, `tests/`, `.github/`, other top-level files, `packages/core/` (non-Markdown) and instruction surfaces (`AGENTS.md`, `CLAUDE.md`, `.claude/`, `.agents/`, `.codex/`, `.mcp.json`, `.rex/workflow.md`, `packages/core/assistant-assets/`) select `root`.
 - Run-everything triggers: `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `vitest.config.js`, `scripts/run-all-tests.mjs`, `scripts/run-vitest-bind-aware.mjs`.
 - Machine-written state (`.rex/prd_tree/`, `.hench/`, `.sourcevision/`) selects nothing.

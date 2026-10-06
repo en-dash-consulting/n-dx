@@ -1,10 +1,16 @@
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import {
+  ROOT_POLICY_TEST_FILES,
   parsePorcelainZ,
   resolveLabels,
   selectAffected,
   validLabels,
 } from "../../scripts/lib/select-suites.mjs";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const pkg = (dir, deps = [], hasTest = true) => ({
   dir,
@@ -24,12 +30,15 @@ const MANIFESTS = [
   pkg("web", ["llm-client", "rex", "sourcevision"]),
 ];
 
+/** Every suite `all` and run-everything selections run: root-policy is inside root. */
+const everySuite = validLabels(MANIFESTS).filter((l) => l !== "root-policy");
+
 const select = (...files) => selectAffected(files, MANIFESTS);
 
 describe("selectAffected", () => {
-  it("selects an llm-client src change plus every dependent, but not root", () => {
+  it("selects an llm-client src change plus every dependent and root-policy, but not root", () => {
     const { suites, reasons } = select("packages/llm-client/src/foo.ts");
-    expect(suites).toEqual(["hench", "llm-client", "rex", "sourcevision", "web"]);
+    expect(suites).toEqual(["root-policy", "hench", "llm-client", "rex", "sourcevision", "web"]);
     expect(reasons["llm-client"]).toBe("packages/llm-client/src/foo.ts");
     expect(reasons.rex).toBe("dependent of llm-client");
     expect(reasons.hench).toBe("dependent of llm-client");
@@ -37,7 +46,7 @@ describe("selectAffected", () => {
 
   it("follows dependents transitively", () => {
     const { suites, reasons } = select("packages/rex/src/x.ts");
-    expect(suites).toEqual(["hench", "rex", "web"]);
+    expect(suites).toEqual(["root-policy", "hench", "rex", "web"]);
     expect(reasons.hench).toBe("dependent of rex");
   });
 
@@ -67,12 +76,40 @@ describe("selectAffected", () => {
     "scripts/run-vitest-bind-aware.mjs",
   ])("runs every suite when %s changes", (file) => {
     const { suites, reasons } = select(file);
-    expect(suites).toEqual(validLabels(MANIFESTS));
+    expect(suites).toEqual(everySuite);
     expect(reasons.web).toContain(file);
   });
 
-  it("selects only the package for a test-only change in it", () => {
-    expect(select("packages/llm-client/tests/unit/a.test.ts").suites).toEqual(["llm-client"]);
+  it("selects the package and root-policy for a test-only change in it", () => {
+    expect(select("packages/llm-client/tests/unit/a.test.ts").suites).toEqual(["root-policy", "llm-client"]);
+    const hench = select("packages/hench/tests/unit/tools/new.test.ts");
+    expect(hench.suites).toEqual(["root-policy", "hench"]);
+    expect(hench.reasons["root-policy"]).toBe("packages/hench/tests/unit/tools/new.test.ts");
+  });
+
+  it("selects root-policy for a hench src change outside src/cli", () => {
+    expect(select("packages/hench/src/agent/lifecycle/foo.ts").suites).toEqual(["root-policy", "hench"]);
+  });
+
+  it("selects root-policy for a web src change", () => {
+    expect(select("packages/web/src/server/routes-hench.ts").suites).toEqual(["root-policy", "web"]);
+  });
+
+  it("never selects root-policy together with root", () => {
+    for (const files of [
+      ["packages/hench/src/cli/run.ts"],
+      ["packages/hench/src/a.ts", "scripts/x.mjs"],
+      ["packages/rex/package.json"],
+      ["packages/hench/tests/a.test.ts", "AGENTS.md"],
+    ]) {
+      const { suites } = selectAffected(files, MANIFESTS);
+      expect(suites).toContain("root");
+      expect(suites).not.toContain("root-policy");
+    }
+  });
+
+  it("does not select root-policy for docs, state or core-only changes", () => {
+    expect(select("packages/hench/README.md", ".rex/prd_tree/a/index.md", "packages/core/cli.js").suites).toEqual(["root"]);
   });
 
   it("maps core changes to root, ignoring core docs", () => {
@@ -133,9 +170,15 @@ describe("resolveLabels", () => {
   });
 
   it("keeps all, root and packages meanings", () => {
-    expect(resolveLabels(["all"], MANIFESTS).labels).toEqual(validLabels(MANIFESTS));
+    expect(resolveLabels(["all"], MANIFESTS).labels).toEqual(everySuite);
     expect(resolveLabels(["root"], MANIFESTS).labels).toEqual(["root"]);
     expect(resolveLabels(["packages"], MANIFESTS).labels).toEqual(["hench", "llm-client", "rex", "sourcevision", "web"]);
+  });
+
+  it("accepts root-policy, and drops it when root is also wanted", () => {
+    expect(validLabels(MANIFESTS)).toContain("root-policy");
+    expect(resolveLabels(["root-policy"], MANIFESTS).labels).toEqual(["root-policy"]);
+    expect(resolveLabels(["root-policy,root", "rex"], MANIFESTS).labels).toEqual(["root", "rex"]);
   });
 
   it("reports unknown labels with the valid set; core has no suite", () => {
@@ -143,6 +186,14 @@ describe("resolveLabels", () => {
       unknown: ["nope", "core"],
       valid: validLabels(MANIFESTS),
     });
+  });
+});
+
+describe("ROOT_POLICY_TEST_FILES", () => {
+  it("lists only files that exist", () => {
+    for (const file of ROOT_POLICY_TEST_FILES) {
+      expect(existsSync(resolve(ROOT, file)), file).toBe(true);
+    }
   });
 });
 

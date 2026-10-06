@@ -10,6 +10,27 @@
 
 export const ROOT_LABEL = "root";
 
+/**
+ * Label of the static root policy tests that read package sources and tests.
+ * `root` includes them, so the two are never run together.
+ */
+export const ROOT_POLICY_LABEL = "root-policy";
+
+/**
+ * The root tests that police package sources and tests (spawn-only, gateways,
+ * shell/wall-clock/layout inventories, obfuscation). About 2 s together. A
+ * package-only change still has to run them: without them only CI catches a
+ * violation. A unit test fails if a listed file is missing.
+ */
+export const ROOT_POLICY_TEST_FILES = [
+  "tests/e2e/architecture-policy.test.js",
+  "tests/e2e/domain-isolation.test.js",
+  "tests/e2e/shell-spawn-inventory-policy.test.js",
+  "tests/e2e/wall-clock-inventory-policy.test.js",
+  "tests/e2e/layout-literal-policy.test.js",
+  "tests/e2e/obfuscated-code-policy.test.js",
+];
+
 /** A change to any of these can alter every suite, so every suite runs. */
 export const RUN_EVERYTHING_FILES = [
   "pnpm-lock.yaml",
@@ -52,9 +73,13 @@ function isInstructionSurface(file) {
  * @property {Record<string, string>} [devDependencies]
  */
 
-/** Canonical labels, in run order: root first, then packages in manifest order. */
+/**
+ * Canonical labels, in run order: root, root-policy, then packages in manifest
+ * order. `all` and run-everything selections leave out root-policy, which root
+ * already covers.
+ */
 export function validLabels(manifests) {
-  return [ROOT_LABEL, ...manifests.filter((m) => m.hasTest).map((m) => m.dir)];
+  return [ROOT_LABEL, ROOT_POLICY_LABEL, ...manifests.filter((m) => m.hasTest).map((m) => m.dir)];
 }
 
 /**
@@ -65,7 +90,7 @@ export function validLabels(manifests) {
  */
 export function resolveLabels(tokens, manifests) {
   const valid = validLabels(manifests);
-  const packageLabels = valid.filter((l) => l !== ROOT_LABEL);
+  const packageLabels = valid.filter((l) => l !== ROOT_LABEL && l !== ROOT_POLICY_LABEL);
   const byName = new Map(manifests.filter((m) => m.hasTest).map((m) => [m.name, m.dir]));
   const wanted = new Set();
   const unknown = [];
@@ -80,6 +105,8 @@ export function resolveLabels(tokens, manifests) {
     else unknown.push(token);
   }
   if (unknown.length > 0) return { unknown, valid };
+  // root runs the policy tests already; never run them twice.
+  if (wanted.has(ROOT_LABEL)) wanted.delete(ROOT_POLICY_LABEL);
   return { labels: valid.filter((l) => wanted.has(l)) };
 }
 
@@ -117,6 +144,7 @@ export function selectAffected(changedFiles, manifests) {
   const dirs = new Set(manifests.map((m) => m.dir));
   const testable = validLabels(manifests);
   const finish = () => {
+    if (reasons.has(ROOT_LABEL)) reasons.delete(ROOT_POLICY_LABEL);
     const suites = testable.filter((l) => reasons.has(l));
     return { suites, reasons: Object.fromEntries(suites.map((l) => [l, reasons.get(l)])) };
   };
@@ -151,10 +179,12 @@ export function selectAffected(changedFiles, manifests) {
         mark(ROOT_LABEL, file);
       } else if (rest.startsWith("tests/")) {
         mark(dir, file);
+        mark(ROOT_POLICY_LABEL, file);
       } else if (rest.startsWith("docs/") || isMarkdown(rest)) {
         // docs only: nothing to test
       } else {
         markPackage(dir, file);
+        if (rest.startsWith("src/")) mark(ROOT_POLICY_LABEL, file);
         if (rest.startsWith("src/cli/")) mark(ROOT_LABEL, file);
       }
       continue;

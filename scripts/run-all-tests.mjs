@@ -28,7 +28,8 @@
  *   node scripts/run-all-tests.mjs            # root + every package
  *   node scripts/run-all-tests.mjs root       # root suites only
  *   node scripts/run-all-tests.mjs packages   # workspace packages only
- *   node scripts/run-all-tests.mjs rex,web    # named suites (root, or a package dir name)
+ *   node scripts/run-all-tests.mjs root-policy # the six static root policy tests (~2 s)
+ *   node scripts/run-all-tests.mjs rex,web   # named suites (root, or a package dir name)
  *   node scripts/run-all-tests.mjs affected <baseRef>   # only suites the change touches
  *   add --list to print the selection and exit without running anything
  *
@@ -41,7 +42,7 @@ import { readdirSync, readFileSync, existsSync, mkdirSync, createWriteStream } f
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSyncCli, spawnCli } from "../packages/core/win-spawn.js";
-import { ROOT_LABEL, parsePorcelainZ, resolveLabels, selectAffected, validLabels } from "./lib/select-suites.mjs";
+import { ROOT_LABEL, ROOT_POLICY_LABEL, ROOT_POLICY_TEST_FILES, parsePorcelainZ, resolveLabels, selectAffected, validLabels } from "./lib/select-suites.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -99,7 +100,7 @@ function runSuite(label, binary, args) {
     }
 
     // A spawn that never starts is a failed suite, not an absent one — the
-    // behaviour `execFileSyncCli` gives to give us by throwing.
+    // behaviour `execFileSyncCli` gives us by throwing.
     child.on("error", (err) => {
       const message = `\nFailed to start ${label}: ${err.message}\n`;
       process.stderr.write(message);
@@ -155,6 +156,15 @@ function suiteFor(label, manifests) {
       args: [resolve(ROOT, "scripts/run-vitest-bind-aware.mjs"), "root"],
     };
   }
+  if (label === ROOT_POLICY_LABEL) {
+    // Same runner and root vitest config as `root`, restricted to the policy files.
+    return {
+      short: label,
+      label: "root policy (static)",
+      binary: process.execPath,
+      args: [resolve(ROOT, "scripts/run-vitest-bind-aware.mjs"), "root", ...ROOT_POLICY_TEST_FILES],
+    };
+  }
   const { name } = manifests.find((m) => m.dir === label);
   return {
     short: label,
@@ -204,7 +214,7 @@ if (positional[0] === "affected") {
   if (changed === null) {
     // Never select nothing by mistake: an unknown change set means everything.
     console.warn("WARNING: falling back to running ALL suites.");
-    labels = validLabels(manifests);
+    labels = validLabels(manifests).filter((l) => l !== ROOT_POLICY_LABEL);
   } else {
     ({ suites: labels, reasons } = selectAffected(changed, manifests));
   }
