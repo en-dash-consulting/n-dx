@@ -89,9 +89,6 @@ const MAX_PORT = 65535;
 /** Ceiling on the port probe: a dashboard answers /api/status in single-digit ms. */
 const PROBE_TIMEOUT_MS = 1_500;
 
-/** Ceiling on waiting for a --background server to listen; cut short if it dies. */
-const BACKGROUND_READY_TIMEOUT_MS = 30_000;
-
 /** Cap on the probe response we will buffer — the real payload is a few KB. */
 const PROBE_MAX_BYTES = 256 * 1024;
 
@@ -281,43 +278,6 @@ export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS, path = "
       done(null);
     });
     req.on("error", () => done(null));
-  });
-}
-
-/**
- * Does `port` answer like an n-dx server that wants a token we do not have?
- *
- * Both the dashboard and the hub refuse a token-less request with 401 and
- * `WWW-Authenticate: Bearer realm="n-dx"` (request-security.ts and
- * hub/request-guard.ts). Such a server answers every probe 401, so
- * {@link probeStatusEndpoint} returns null and {@link probeHubEndpoint} finds
- * no hub — which used to send it down the kill path. A dashboard started under
- * another home's token (another user, another N_DX_HOME, a parallel test) is
- * never this invocation's to kill.
- *
- * @param {number} port
- * @param {number} [timeoutMs]
- * @returns {Promise<boolean>}
- */
-export function probeTokenProtectedNdx(port, timeoutMs = PROBE_TIMEOUT_MS) {
-  return new Promise((res) => {
-    let settled = false;
-    const done = (value) => {
-      if (settled) return;
-      settled = true;
-      res(value);
-    };
-    const req = httpGet({ host: "127.0.0.1", port, path: "/api/status", timeout: timeoutMs }, (response) => {
-      const challenge = String(response.headers["www-authenticate"] ?? "");
-      response.resume();
-      req.destroy();
-      done(response.statusCode === 401 && /realm="n-dx"/.test(challenge));
-    });
-    req.on("timeout", () => {
-      req.destroy();
-      done(false);
-    });
-    req.on("error", () => done(false));
   });
 }
 
@@ -564,16 +524,13 @@ export async function removePortFile(dir, files = DASHBOARD_FILES) {
 
 /**
  * Wait for the server process to write its port file, polling at intervals.
- * Returns the actual port, or null if the timeout expires or `isAlive` reports
- * the server gone.
+ * Returns the actual port or null if the timeout expires.
  */
-export async function waitForPortFile(dir, timeoutMs = 5000, intervalMs = 100, files = DASHBOARD_FILES, isAlive = () => true) {
+async function waitForPortFile(dir, timeoutMs = 5000, intervalMs = 100, files = DASHBOARD_FILES) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const port = await readPortFile(dir, files);
     if (port !== null) return port;
-    // A dead server will never write it; stop waiting rather than run out the clock.
-    if (!isAlive()) return null;
     await new Promise((r) => setTimeout(r, intervalMs));
   }
   return null;
@@ -1691,19 +1648,15 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       // it. Relocating is the same answer as for a peer.
       const hub = await probeHubEndpoint(port);
       const occupant = hub ? null : classifyPortOccupant(await probeStatusEndpoint(port), absDir);
-      const protectedNdx = occupant?.kind === "unknown" && (await probeTokenProtectedNdx(port));
 
-      // Three occupants must be left alone, and the answer for each is to move:
-      // the hub, which supervises other projects' servers; a peer dashboard
-      // serving a different directory; and an n-dx server whose token we lack,
-      // which cannot be attributed and so cannot be assumed to be ours.
+      // Two occupants must be left alone, and the answer for both is to move:
+      // the hub, which supervises other projects' servers, and a peer
+      // dashboard serving a different directory.
       const leaveAlone = hub
         ? `The n-dx hub (PID ${hub.pid}) is on :${port} serving ${hub.projects} project(s)`
         : occupant.kind === "peer"
           ? `n-dx dashboard for ${occupant.projectDir} is already on :${port}`
-          : protectedNdx
-            ? `A token-protected n-dx server is already on :${port}`
-            : null;
+          : null;
 
       if (leaveAlone) {
         const next = await findRelocationPort(port);
@@ -1767,18 +1720,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     // Wait for the server to write its port file with the actual bound port.
     // This handles dynamic port allocation — the actual port may differ from
     // the requested port if the requested port was already in use.
-    //
-    // The port file is written only once the server is listening, so this is
-    // also the readiness signal: returning earlier hands the caller a URL that
-    // refuses connections. A loaded machine can take well over 5s to get there,
-    // so wait as long as the server is alive, up to a generous ceiling.
-    const actualPort = await waitForPortFile(
-      absDir,
-      BACKGROUND_READY_TIMEOUT_MS,
-      undefined,
-      files,
-      () => isProcessRunning(child.pid),
-    );
+    const actualPort = await waitForPortFile(absDir, undefined, undefined, files);
 
     if (actualPort === null) {
       // Server may have failed to start. Check if process is still running.

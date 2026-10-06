@@ -14,7 +14,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync, spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   createTmpDir,
@@ -26,40 +25,26 @@ import {
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 const LOOPBACK_HOST = "127.0.0.1";
-/** Mirrors PORT_FILE in packages/web/src/server/start.ts. */
-const PORT_FILE = ".n-dx-web.port";
 
 function isListenPermissionError(error) {
   return Boolean(error && typeof error === "object" && error.code === "EPERM");
 }
 
 /**
- * Wait for the spawned server and return the port it actually bound.
- *
- * The requested port is only a hint: it is probed free, then released before
- * the server starts, so under a parallel run another suite's server can take
- * it. `ndx start` then falls forward to the next free port and records it in
- * the port file. Polling the requested port instead would reach that other
- * (auth-enforcing) server and fail every request with 401.
+ * Wait for the server to accept connections on the given port.
+ * Polls with fetch every 200ms, up to the timeout.
  */
-async function waitForServer(dir, child, getStderr, timeoutMs = 8000) {
+async function waitForServer(port, timeoutMs = 8000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) {
-      throw new Error(`Server exited (${child.exitCode}) before listening:\n${getStderr()}`);
-    }
     try {
-      // Written by our server after it binds, into our own tmp dir — so the
-      // port it names is ours. The fetch only confirms it is accepting.
-      const port = Number((await readFile(join(dir, PORT_FILE), "utf-8")).trim());
-      await fetch(`http://localhost:${port}/`);
-      return port;
+      await fetch(`http://localhost:${port}/api/health`);
+      return;
     } catch {
-      // Port file not written yet, or server not accepting yet.
+      await new Promise((r) => setTimeout(r, 200));
     }
-    await new Promise((r) => setTimeout(r, 200));
   }
-  throw new Error(`Server did not start within ${timeoutMs}ms:\n${getStderr()}`);
+  throw new Error(`Server did not start within ${timeoutMs}ms`);
 }
 
 describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
@@ -100,10 +85,11 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
       env: { ...process.env },
     });
 
+    // Capture stderr for debugging if needed
     let stderr = "";
     serverProcess.stderr.on("data", (chunk) => { stderr += chunk; });
 
-    port = await waitForServer(tmpDir, serverProcess, () => stderr);
+    await waitForServer(port);
   }, 15000);
 
   afterAll(async () => {
