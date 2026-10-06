@@ -89,8 +89,19 @@ other assistants read nested `AGENTS.md` files but not `CLAUDE.md`, so a registr
 written only to `CLAUDE.md` is invisible to most of the agents it governs — and a
 registry copied into both drifts. `packages/llm-client/` is the reference pair,
 and `tests/e2e/instruction-alignment.test.js` fails any package that keeps the
-two files side by side without the import. Path-scoped rules that Claude Code
-alone consumes still belong in `.claude/rules/`.
+two files side by side without the import — or that has a `CLAUDE.md` with no
+`AGENTS.md` next to it at all.
+
+`.claude/rules/` is read by Claude Code and nothing else, so it is for
+path-scoped *pointers* into a package's `AGENTS.md`, never for the table itself.
+The same test fails a new `.claude/rules/*-injection-seams.md` for any package
+beyond core and web. Those two, plus `web-gateway-boundary.md`, still hold a
+full second copy of content that now also lives in `packages/core/AGENTS.md` and
+`packages/web/AGENTS.md`: `.claude/` is a protected path, so reducing them to
+pointers needs an interactive approval and has not happened yet. Until it does,
+the test pins every table row in a rule file to the AGENTS.md that owns it, so
+the two copies cannot become two different registries. **Edit the AGENTS.md
+copy** — it is the one every assistant reads.
 
 **Rule:** Every new row added to either table requires a corresponding
 integration test in the same PR. Never widen the gap between table entries and

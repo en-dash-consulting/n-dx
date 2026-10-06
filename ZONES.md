@@ -1,9 +1,9 @@
 # Zone Governance
 
-Companion document to `CLAUDE.md` — covers zone promotion, naming conventions, and the zone-pin manifest.
+Companion document to the root instruction files — covers zone promotion, naming conventions, and the zone-pin manifest.
 
-`CLAUDE.md` is generated from `packages/core/assistant-assets/` and ships to every
-`ndx init` target, so it carries only the **threshold rule** and the universal
+`AGENTS.md` and `CLAUDE.md` are generated from `packages/core/assistant-assets/` and ship to every
+`ndx init` target, so they carry only the **threshold rule** and the universal
 governance rules. n-dx's own measured zone data lives here instead, because this file
 is repo-internal and is not templated into downstream projects.
 
@@ -39,7 +39,7 @@ their directory-level policies still apply.
 
 | Old zone ID | Current status |
 |-------------|----------------|
-| `web-shared` | Directory `packages/web/src/shared/` still exists (5 files); Louvain now absorbs it into `web-viewer`. Policy lives in `packages/web/CLAUDE.md`. |
+| `web-shared` | Directory `packages/web/src/shared/` still exists (5 files); Louvain now absorbs it into `web-viewer`. Policy lives in `packages/web/AGENTS.md`. |
 | `crash` | Directory `packages/web/src/viewer/crash/` still exists with barrel enforcement in `boundary-check.test.ts`. |
 | `viewer-ui-hub` | Now reported as `web-composition-layer` (4 files, 0.65 / 0.35). |
 | `prd-fix-command` | Now reported as `rex-fix` (4 files, 0.57 / 0.43). |
@@ -58,7 +58,7 @@ A zone is **formally governed** when its sub-directory crosses the **5-file reli
 
 ### Checklist (triggered at > 5 files)
 
-- [ ] **Zone policy entry** — Add the zone to the inventory above, plus a named policy subsection in the owning package's `CLAUDE.md` (`packages/<pkg>/CLAUDE.md`) with zone purpose and any addition rules. Do **not** add measured values to the root `CLAUDE.md` — it is generated and ships downstream.
+- [ ] **Zone policy entry** — Add the zone to the inventory above, plus a named policy subsection in the owning package's `AGENTS.md` (`packages/<pkg>/AGENTS.md`), with zone purpose and any addition rules. It goes in `AGENTS.md`, not the `CLAUDE.md` beside it: that file is a one-line `@AGENTS.md` import, and a policy written only there is invisible to Codex and every other assistant. Do **not** add measured values to the root `AGENTS.md`/`CLAUDE.md` — they are generated and ship downstream.
 - [ ] **Zone-pin configuration** — Add explicit zone pins for anchor files in `.n-dx.json` under `sourcevision.zones.pins`. Without pins, Louvain may reassign files across re-analyses, making trend tracking unreliable.
 - [ ] **`index.ts` barrel** — If the zone is a physical directory sub-zone, ensure a barrel file exists that exports the public API. This enables barrel import enforcement in `boundary-check.test.ts`.
 - [ ] **`.sourcevision/zone-pins.md` entry** — Add all pinned files to the zone-pin manifest with a reason for each pin.
@@ -68,7 +68,7 @@ A zone is **formally governed** when its sub-directory crosses the **5-file reli
 
 - Adding a zone to governance without adding pins → zone ID may silently diverge after re-analysis.
 - Adding pins without a governance entry → the policy is invisible to contributors.
-- Hand-editing measured metrics into the root `CLAUDE.md` → the assistant-body-drift test fails, and n-dx's internals leak into every `ndx init` target.
+- Hand-editing measured metrics into the root `AGENTS.md`/`CLAUDE.md` → the assistant-body-drift test fails, and n-dx's internals leak into every `ndx init` target.
 - Creating a barrel without updating `boundary-check.test.ts` → barrel enforcement is never activated.
 
 ---
@@ -166,7 +166,7 @@ Files pinned to eliminate phantom cross-zone edges from Louvain misclassificatio
   expect Louvain to absorb this zone — the pin is retained because the
   `sourcevision-` prefix misclassification it guards against is still possible.
 
-**web-viewer-search-overlay zone** — Search overlay component and its dedicated test. Pinned to replace the misleading `web-helpers` zone name (which implied a general utility bucket) with a bounded, intent-revealing ID. The component participates in a confirmed zone-level cycle with `web-viewer`; see "Confirmed zone-level cycles" in CLAUDE.md.
+**web-viewer-search-overlay zone** — Search overlay component and its dedicated test. Pinned to replace the misleading `web-helpers` zone name (which implied a general utility bucket) with a bounded, intent-revealing ID. The component participates in a confirmed zone-level cycle with `web-viewer`; see "Confirmed zone-level cycles" in the root `AGENTS.md`.
 - `packages/web/src/viewer/components/search-overlay.ts` → `web-viewer-search-overlay` — sole production file in the zone; anchor for cycle documentation
 - `packages/web/tests/unit/viewer/search-overlay.test.ts` → `web-viewer-search-overlay` — dedicated component test
 - `packages/web/tests/helpers/preact-test-support.ts` → `web-viewer` — test utility used by multiple viewer tests (tree-view, search-overlay); belongs in viewer zone, not search-overlay satellite

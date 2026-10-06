@@ -127,12 +127,13 @@ describe("shared guidance equivalence", () => {
 // ── Vendor-specific content ──────────────────────────────────────────────────
 
 describe("Claude-specific content", () => {
-  it("CLAUDE.md includes injection seam registry references", () => {
-    // The inline "### Injection seam registry" section was later replaced by
-    // a pointer sentence to the path-scoped rule files that now hold this
-    // content (.claude/rules/*-injection-seams.md) — check for those instead.
-    expect(claudeContent).toContain(".claude/rules/web-injection-seams.md");
-    expect(claudeContent).toContain(".claude/rules/core-injection-seams.md");
+  it("CLAUDE.md explains what .claude/rules/ is for", () => {
+    // The seam registries themselves are no longer here, nor in the rule files
+    // they used to point at: they live in the owning package's AGENTS.md, so
+    // Codex can read them too. What stays Claude-only is the note that
+    // `.claude/rules/` holds path-scoped pointers and must not grow a table.
+    expect(claudeContent).toContain(".claude/rules/");
+    expect(agentsContent).not.toContain(".claude/rules/");
   });
 
   it("CLAUDE.md includes MCP Servers section", () => {
@@ -373,31 +374,41 @@ describe("init writes both instruction files", () => {
  * AGENTS.md and its CLAUDE.md is the Claude Code `@AGENTS.md` import of it.
  * See TESTING.md, "Co-evolution Rule: Seam Registry and Gateway Table".
  *
- * Packages whose CLAUDE.md predates the rule and have no AGENTS.md beside it
- * are not failed here — the rule binds the pair, not the pace of migration.
+ * Every package CLAUDE.md is held to this, with no grandfathering: a CLAUDE.md
+ * without an AGENTS.md beside it is guidance Codex cannot reach, which is the
+ * whole failure this pairing exists to prevent.
  */
 describe("package instruction surfaces", () => {
   const PACKAGES_DIR = join(ROOT, "packages");
 
-  const paired = readdirSync(PACKAGES_DIR, { withFileTypes: true })
+  const withClaude = readdirSync(PACKAGES_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => ({
       pkg: entry.name,
       claude: join(PACKAGES_DIR, entry.name, "CLAUDE.md"),
       agents: join(PACKAGES_DIR, entry.name, "AGENTS.md"),
     }))
-    .filter(({ claude, agents }) => existsSync(claude) && existsSync(agents));
+    .filter(({ claude }) => existsSync(claude));
 
   it("llm-client keeps its guidance in AGENTS.md", () => {
     // Also guarantees the it.each blocks below are not vacuously empty.
-    expect(paired.map(({ pkg }) => pkg)).toContain("llm-client");
+    expect(withClaude.map(({ pkg }) => pkg)).toContain("llm-client");
   });
 
-  it.each(paired)("packages/$pkg/CLAUDE.md imports AGENTS.md", ({ claude }) => {
+  it.each(withClaude)("packages/$pkg/CLAUDE.md has an AGENTS.md beside it", ({ agents }) => {
+    expect(
+      existsSync(agents),
+      `a package CLAUDE.md with no AGENTS.md beside it is guidance only Claude ` +
+        `Code can read. Move the content into AGENTS.md and reduce CLAUDE.md to ` +
+        `the @AGENTS.md import — packages/llm-client/ is the reference pair.`,
+    ).toBe(true);
+  });
+
+  it.each(withClaude)("packages/$pkg/CLAUDE.md imports AGENTS.md", ({ claude }) => {
     expect(readFileSync(claude, "utf-8")).toMatch(/^@AGENTS\.md$/m);
   });
 
-  it.each(paired)("packages/$pkg/CLAUDE.md holds no guidance of its own", ({ claude }) => {
+  it.each(withClaude)("packages/$pkg/CLAUDE.md holds no guidance of its own", ({ claude }) => {
     const contents = readFileSync(claude, "utf-8");
     // A heading or a table row is content that was copied rather than imported,
     // which is the drift this pairing exists to prevent.
@@ -413,6 +424,17 @@ describe("package instruction surfaces", () => {
     expect(agents).toContain("## llm-client injection seam registry");
     expect(agents).toContain("JevObserver");
     expect(agents).toContain("## Judgment cache directory");
+  });
+
+  it("web and core keep their governance in AGENTS.md", () => {
+    const web = readFileSync(join(PACKAGES_DIR, "web", "AGENTS.md"), "utf-8");
+    expect(web).toContain("## Web injection seam registry");
+    expect(web).toContain("## Web viewer gateway boundary");
+    expect(web).toContain("RegisterSchedulerOptions");
+
+    const core = readFileSync(join(PACKAGES_DIR, "core", "AGENTS.md"), "utf-8");
+    expect(core).toContain("## Core injection seam registry");
+    expect(core).toContain("registerChild");
   });
 
   it("the Jev seam row names the function that registers the observer", () => {
@@ -437,4 +459,91 @@ describe("package instruction surfaces", () => {
     const end = body.indexOf("\n}\n");
     expect(body.slice(0, end)).toContain("setJevObserver(");
   });
+});
+
+// ── Path-scoped rules stay pointers ──────────────────────────────────────────
+
+/**
+ * `.claude/rules/` is loaded by Claude Code and by nothing else, so a registry
+ * kept there is out of Codex's reach for the same reason a package CLAUDE.md
+ * is. The canonical copy of each one now sits in the owning package's
+ * AGENTS.md.
+ *
+ * The rule files themselves are meant to shrink to path-scoped pointers, which
+ * would leave one copy. They have not yet: `.claude/` is a protected path that
+ * only an interactive approval can write, so the migration that moved these
+ * registries into AGENTS.md could not also rewrite them. Until that follow-up
+ * lands there are two copies, and the drift guard below is what keeps them from
+ * becoming two *different* registries — every table row in a rule file must
+ * appear verbatim in the package AGENTS.md that now owns it.
+ *
+ * When the rule files are reduced to pointers, delete `pinnedAgainstDrift` and
+ * assert instead that each file contains no table row at all.
+ */
+describe("path-scoped injection seam rules", () => {
+  const RULES_DIR = join(ROOT, ".claude/rules");
+
+  /** The only two packages whose seam registry predates the AGENTS.md rule. */
+  const ALLOWED_SEAM_RULES = ["core-injection-seams.md", "web-injection-seams.md"];
+
+  /** Rule file → the AGENTS.md that holds the canonical copy of its content. */
+  const pinnedAgainstDrift = [
+    { rule: "core-injection-seams.md", pkg: "core" },
+    { rule: "web-injection-seams.md", pkg: "web" },
+    { rule: "web-gateway-boundary.md", pkg: "web" },
+  ];
+
+  const seamRules = readdirSync(RULES_DIR).filter((name) =>
+    name.endsWith("-injection-seams.md"),
+  );
+
+  it("no package beyond core and web has a .claude/rules seam registry", () => {
+    const unexpected = seamRules.filter((name) => !ALLOWED_SEAM_RULES.includes(name));
+    expect(
+      unexpected,
+      `a seam registry in .claude/rules/ is invisible to Codex and every other ` +
+        `assistant. Put a new package's registry in packages/<pkg>/AGENTS.md ` +
+        `with its CLAUDE.md reduced to @AGENTS.md — packages/llm-client/ is the ` +
+        `reference pair.`,
+    ).toEqual([]);
+  });
+
+  it.each(pinnedAgainstDrift)(
+    "$rule names a section that packages/$pkg/AGENTS.md actually has",
+    ({ rule, pkg }) => {
+      // Covers the prose-only rule, which has no table row for the drift guard
+      // below to compare. Renaming the AGENTS.md section without renaming the
+      // rule leaves the pointer dangling.
+      const title = readFileSync(join(RULES_DIR, rule), "utf-8")
+        .split("\n")
+        .find((line) => line.startsWith("# "))
+        ?.slice(2)
+        .trim();
+      expect(title, `${rule} has no title heading`).toBeTruthy();
+      expect(
+        readFileSync(join(ROOT, "packages", pkg, "AGENTS.md"), "utf-8"),
+        `packages/${pkg}/AGENTS.md has no "## ${title}" section for ` +
+          `.claude/rules/${rule} to point at.`,
+      ).toContain(`## ${title}`);
+    },
+  );
+
+  it.each(pinnedAgainstDrift)(
+    "$rule has not drifted from packages/$pkg/AGENTS.md",
+    ({ rule, pkg }) => {
+      const ruleRows = readFileSync(join(RULES_DIR, rule), "utf-8")
+        .split("\n")
+        .filter((line) => line.startsWith("| ") && !/^\|[\s|-]+\|$/.test(line));
+      const agents = readFileSync(join(ROOT, "packages", pkg, "AGENTS.md"), "utf-8");
+
+      const missing = ruleRows.filter((row) => !agents.includes(row));
+      expect(
+        missing,
+        `.claude/rules/${rule} still holds a second copy of this registry, and ` +
+          `these rows are no longer in packages/${pkg}/AGENTS.md — the copy ` +
+          `every assistant other than Claude Code reads. Update the AGENTS.md ` +
+          `copy too, or finish reducing the rule file to a pointer.`,
+      ).toEqual([]);
+    },
+  );
 });

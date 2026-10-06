@@ -21,7 +21,7 @@
  * ## Theme
  *
  * The same mechanism the viewer uses, not the same component: the hub zone
- * must not import from `src/viewer/` (see packages/web/CLAUDE.md), and the
+ * must not import from `src/viewer/` (see packages/web/AGENTS.md), and the
  * viewer's toggle is a Preact component this page has no runtime for. What is
  * shared is what matters — the `sv-theme` localStorage key and the
  * `data-theme` attribute — so a theme chosen here is the theme the dashboard

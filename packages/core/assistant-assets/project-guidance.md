@@ -81,10 +81,12 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 Rules:
 - **One gateway per source package** — all runtime imports from a given upstream package pass through a single gateway. A consumer may have multiple gateways (e.g. web has separate gateways for rex and sourcevision).
 - **Re-export only** — gateways re-export; they contain no logic. Enforced by `domain-isolation.test.js`.
-- **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Package-specific exemptions are documented in path-scoped rules (e.g. `.claude/rules/web-gateway-boundary.md`).
+- **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Package-specific exemptions are documented in the owning package's `AGENTS.md` (e.g. "Web viewer gateway boundary" in `packages/web/AGENTS.md`).
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
-See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-package gateway, messaging exemption, and injection-seam registry are documented in `.claude/rules/web-gateway-boundary.md` and `.claude/rules/web-injection-seams.md`; core's injection-seam registry (the `cli.js` → `pair-programming.js` `registerChild` seam) is in `.claude/rules/core-injection-seams.md`.
+See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-package gateway, messaging exemption, and injection-seam registry are in `packages/web/AGENTS.md`; core's injection-seam registry (the `cli.js` → `pair-programming.js` `registerChild` seam) is in `packages/core/AGENTS.md`; `@n-dx/llm-client`'s is in `packages/llm-client/AGENTS.md`.
+
+**Package-level guidance lives in `packages/<pkg>/AGENTS.md`.** Zone policies, seam registries and any other note that governs one package belong there, because every assistant reads a package's `AGENTS.md`. The `CLAUDE.md` beside it is a one-line `@AGENTS.md` import and holds nothing of its own; `tests/e2e/instruction-alignment.test.js` fails a package that breaks either half of that pair.
 
 ### Tier boundary crossing: spawn vs gateway
 

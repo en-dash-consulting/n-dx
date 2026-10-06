@@ -82,10 +82,12 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 Rules:
 - **One gateway per source package** — all runtime imports from a given upstream package pass through a single gateway. A consumer may have multiple gateways (e.g. web has separate gateways for rex and sourcevision).
 - **Re-export only** — gateways re-export; they contain no logic. Enforced by `domain-isolation.test.js`.
-- **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Package-specific exemptions are documented in path-scoped rules (e.g. `.claude/rules/web-gateway-boundary.md`).
+- **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Package-specific exemptions are documented in the owning package's `AGENTS.md` (e.g. "Web viewer gateway boundary" in `packages/web/AGENTS.md`).
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
-See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-package gateway, messaging exemption, and injection-seam registry are documented in `.claude/rules/web-gateway-boundary.md` and `.claude/rules/web-injection-seams.md`; core's injection-seam registry (the `cli.js` → `pair-programming.js` `registerChild` seam) is in `.claude/rules/core-injection-seams.md`.
+See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-package gateway, messaging exemption, and injection-seam registry are in `packages/web/AGENTS.md`; core's injection-seam registry (the `cli.js` → `pair-programming.js` `registerChild` seam) is in `packages/core/AGENTS.md`; `@n-dx/llm-client`'s is in `packages/llm-client/AGENTS.md`.
+
+**Package-level guidance lives in `packages/<pkg>/AGENTS.md`.** Zone policies, seam registries and any other note that governs one package belong there, because every assistant reads a package's `AGENTS.md`. The `CLAUDE.md` beside it is a one-line `@AGENTS.md` import and holds nothing of its own; `tests/e2e/instruction-alignment.test.js` fails a package that breaks either half of that pair.
 
 ### Tier boundary crossing: spawn vs gateway
 
@@ -136,9 +138,9 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 ### Claude-specific guidance files
 
-Package-specific zone governance for `web`, `rex`, and `hench` now lives in each package's own `CLAUDE.md` (`packages/web/CLAUDE.md`, `packages/rex/CLAUDE.md`, `packages/hench/CLAUDE.md`), which loads only when working under that directory.
+Claude Code loads a package's own `CLAUDE.md` when work happens under that directory — `packages/web/CLAUDE.md`, `packages/rex/CLAUDE.md`, `packages/hench/CLAUDE.md`, `packages/core/CLAUDE.md`, `packages/llm-client/CLAUDE.md`. Each is a one-line `@AGENTS.md` import; the guidance itself is in the sibling `AGENTS.md`, so edit it there.
 
-HTTP-request concurrency notes for the web server live in `packages/web/CLAUDE.md`.
+`.claude/rules/` narrows a package's guidance to the directory you are editing (`packages/core/**`, `packages/web/src/server/**`, `packages/web/src/viewer/**`). Only Claude Code reads it, so it is for pointers, not content: do not add a registry or a policy table here, because it would be invisible to every other assistant. Its three current files still carry a full copy of sections that also live in `packages/core/AGENTS.md` and `packages/web/AGENTS.md` — edit the AGENTS.md copy, which is the canonical one; `tests/e2e/instruction-alignment.test.js` fails if the two diverge.
 
 
 ### Package conventions
