@@ -120,10 +120,13 @@ const RULES: readonly Rule[] = [
     // this flag is the only thing marking it as a credential.
     //
     // The password must be 8+ characters and hold a letter, which is what
-    // separates a credential from `docker run -u 1000:1000`. The user is kept,
-    // as in a URL — it is usually a service account name.
+    // separates a credential from `docker run -u 1000:1000`. It must not
+    // start with a slash either: `git push -u https://…` and
+    // `diff -u C:\…` put a colon after the flag too, and what follows is a
+    // URL or a path. The user is kept, as in a URL — it is usually a service
+    // account name.
     kind: "user-password",
-    pattern: /(^|\s)(-u|--user)([=\s]+)([^\s:=]{1,64}):((?!\[redacted:)(?=\S*[A-Za-z])\S{8,})/g,
+    pattern: /(^|\s)(-u|--user)([=\s]+)([^\s:=]{1,64}):((?!\[redacted:)(?![/\\])(?=\S*[A-Za-z])\S{8,})/g,
     replace: (_m: string, lead: string, flag: string, sep: string, user: string) =>
       `${lead}${flag}${sep}${user}:${REDACTED_PASSWORD}`,
   },

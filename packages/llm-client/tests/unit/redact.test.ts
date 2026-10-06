@@ -110,6 +110,12 @@ describe("redactSecrets — Bitbucket and Atlassian credentials", () => {
       "Basic internationalization support landed",
       "docker run -u 1000:1000 alpine",
       "psql -u postgres localhost",
+      // A URL or a Windows path after the flag holds a colon too, but what
+      // follows it starts with a slash — never a password. Real userinfo in a
+      // URL is the url-password rule's job.
+      "pip install --user git+https://github.com/org/repo.git",
+      "git push -u https://github.com/org/repo.git main",
+      "diff -u C:\\Users\\ryan\\a.txt C:\\Users\\ryan\\b.txt",
       "See bitbucket-pipelines.yml for the ATBB migration notes",
     ].join("\n");
     expect(redactSecrets(prose)).toBe(prose);
