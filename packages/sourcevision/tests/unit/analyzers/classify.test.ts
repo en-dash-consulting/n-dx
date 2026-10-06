@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { analyzeClassifications, buildClassificationMap, enrichClassificationsWithLLM, mergeClassificationResults } from "../../../src/analyzers/classify.js";
 import { callClaude, getJudgmentRoute } from "../../../src/analyzers/claude-client.js";
-import { askJev } from "../../../src/analyzers/jev-client.js";
+import { askJev } from "@n-dx/llm-client";
 import type { Inventory, Imports, Classifications, ArchetypeDefinition } from "../../../src/schema/index.js";
 
 vi.mock("../../../src/analyzers/claude-client.js", async () => {
@@ -16,8 +16,8 @@ vi.mock("../../../src/analyzers/claude-client.js", async () => {
   };
 });
 
-vi.mock("../../../src/analyzers/jev-client.js", async () => {
-  const actual = await import("../../../src/analyzers/jev-client.js");
+vi.mock("@n-dx/llm-client", async () => {
+  const actual = await import("@n-dx/llm-client");
   return { ...actual, askJev: vi.fn() };
 });
 

@@ -9,13 +9,13 @@ vi.mock("../../../src/analyzers/claude-client.js", async () => {
     ClaudeClientError: actual.ClaudeClientError,
   };
 });
-vi.mock("../../../src/analyzers/jev-client.js", async () => {
-  const actual = await import("../../../src/analyzers/jev-client.js");
+vi.mock("@n-dx/llm-client", async () => {
+  const actual = await import("@n-dx/llm-client");
   return { ...actual, askJev: vi.fn() };
 });
 
 import { getJudgmentRoute } from "../../../src/analyzers/claude-client.js";
-import { askJev } from "../../../src/analyzers/jev-client.js";
+import { askJev } from "@n-dx/llm-client";
 import {
   judgeFindings,
   judgeZoneFragility,

@@ -663,3 +663,51 @@ export type {
   SystemMemoryDeps,
   AvailableMemoryReader,
 } from "./system-memory.js";
+
+// TypeSafe Jev — judgment-shaped calls (typed questions, calibrated answers).
+// Foundation-tier because rex and sourcevision both need judgments and cannot
+// import each other; per-call accounting is inverted through setJevObserver.
+export {
+  askJev,
+  choice,
+  noul,
+  score,
+  setJevObserver,
+  JEV_ENDPOINT,
+  JEV_MODEL,
+  JEV_VENDOR,
+} from "./jev-client.js";
+
+export type {
+  AskJevOptions,
+  ChoiceAnswer,
+  ChoiceQuestion,
+  JevAnswer,
+  JevCallRecord,
+  JevObserver,
+  JevQuestion,
+  JevRequest,
+  JevResponse,
+  JsonValue,
+  NoulAnswer,
+  NoulQuestion,
+  ScoreAnswer,
+  ScoreQuestion,
+} from "./jev-client.js";
+
+// Content-addressed cache for Jev answers. The consumer names the directory;
+// this module has no opinion about where a package keeps its state.
+export {
+  configureJudgmentCache,
+  isJudgmentCacheConfigured,
+  lookupJudgments,
+  storeJudgments,
+  judgmentKey,
+  canonicalJSON,
+  referencedPaths,
+  resolvePath,
+  JUDGMENT_CACHE_FILE,
+  JUDGMENT_CACHE_MAX_ENTRIES,
+} from "./judgment-cache.js";
+
+export type { CacheLookup } from "./judgment-cache.js";
