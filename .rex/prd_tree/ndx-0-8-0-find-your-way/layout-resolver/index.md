@@ -27,5 +27,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Add ndx migrate-layout to move an existing project to .ndx/](./add-ndx-migrate-layout-to-move-an.md) | completed |
 | [Make ndx init write the .ndx/ layout for new projects](./make-ndx-init-write-the-ndx-layout-for.md) | completed |
 | [Move the per-user directory to ~/.ndx/ with NDX_HOME, reading ~/.n-dx/ and N_DX_HOME as fallbacks](./move-the-per-user-directory-to-ndx.md) | completed |
+| [ndx init summary names the tool directories the project actually uses](./ndx-init-summary-names-the-tool.md) | pending |
 | [Route hench and web file access through their paths modules](./route-hench-and-web-file-access.md) | completed |
 | [Route rex and sourcevision file access through their paths modules](./route-rex-and-sourcevision-file-access.md) | completed |
