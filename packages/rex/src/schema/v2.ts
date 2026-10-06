@@ -26,7 +26,7 @@
  * |--------------------------------------------------|----------------------------------------------|
  * | id, type, title, slug, displayId, aliases        | status, startedAt, completedAt, endedAt      |
  * | tags, source, blockedBy, body, hypotheses*       | activeIntervals                              |
- * | area: stewards                                   | failureReason, resolutionType/Detail         |
+ * | area: summary, stewards                          | failureReason, resolutionType/Detail         |
  * | capability: statement, criteria, requirements,   | metAt, specReviewed, checks (map nodes)      |
  * |   dependsOn                                      | appliedIn, shippedIn, prs, issues (changes)  |
  * | constraint: statement, requirements, appliesTo   | commits, links*                              |
@@ -217,6 +217,8 @@ interface BaseIntent {
 
 export interface AreaIntent extends BaseIntent {
   type: "area";
+  /** One-paragraph description of what the area covers. */
+  summary?: string;
   stewards?: Steward[];
 }
 
@@ -284,7 +286,12 @@ const baseIntentShape = {
 };
 
 export const AreaIntentSchema = z
-  .object({ ...baseIntentShape, type: z.literal("area"), stewards: z.array(z.string()).optional() })
+  .object({
+    ...baseIntentShape,
+    type: z.literal("area"),
+    summary: z.string().optional(),
+    stewards: z.array(z.string()).optional(),
+  })
   .passthrough();
 
 export const CapabilityIntentSchema = z

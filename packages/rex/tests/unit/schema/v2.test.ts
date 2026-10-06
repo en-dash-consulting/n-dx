@@ -137,6 +137,13 @@ describe("criteria and amendments", () => {
 });
 
 describe("per-type intent", () => {
+  it("area summary is an optional string", () => {
+    const area = { id: ID, type: "area", title: "Store", slug: "store" };
+    expect(AreaIntentSchema.safeParse({ ...area, summary: "Where PRD state lives." }).success).toBe(true);
+    expect(AreaIntentSchema.safeParse(area).success).toBe(true);
+    expect(AreaIntentSchema.safeParse({ ...area, summary: 3 }).success).toBe(false);
+  });
+
   it("parses each node type", () => {
     const common = { id: ID, title: "Node", slug: "node" };
     expect(AreaIntentSchema.safeParse({ ...common, type: "area", stewards: ["ryan.k@endash.us", "@acme/web"] }).success).toBe(true);
@@ -272,7 +279,7 @@ describe("passthrough", () => {
 describe("field coverage (design intent/state tables)", () => {
   const COMMON_INTENT = ["id", "type", "title", "slug", "displayId", "aliases", "tags", "source", "blockedBy", "body", "hypotheses"];
   const cases: Array<[string, { shape: Record<string, unknown> }, string[]]> = [
-    ["area", AreaIntentSchema, ["stewards"]],
+    ["area", AreaIntentSchema, ["summary", "stewards"]],
     ["capability", CapabilityIntentSchema, ["statement", "criteria", "requirements", "dependsOn"]],
     ["constraint", ConstraintIntentSchema, ["statement", "requirements", "appliesTo"]],
     ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "loe", "requirements"]],
