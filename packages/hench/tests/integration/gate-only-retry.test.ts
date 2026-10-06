@@ -37,7 +37,7 @@ interface GateCall {
   testCommand?: string;
 }
 
-describe("cliLoop — gate-only retry", () => {
+describe("gate-only retry", () => {
   let projectDir: string;
   let henchDir: string;
   let rexDir: string;
@@ -315,6 +315,57 @@ describe("cliLoop — gate-only retry", () => {
       expect(cli.invocations).toHaveLength(1);
       expect(run.gateOnlyRetry).toBeDefined();
       expect(run.review).toMatchObject({ findingCount: 0 });
+    });
+  });
+
+  describe("through agentLoop (API provider)", () => {
+    it("gates the committed work with no provider constructed, and applies the held resolution", async () => {
+      const source = await seedGateFailure();
+      // Resolving a provider needs an API client; a gate-only retry must never get that far.
+      const { defaultRegistry } = await import("../../src/prd/llm-gateway.js");
+      const create = vi.spyOn(defaultRegistry, "create").mockImplementation(() => {
+        throw new Error("provider constructed via create");
+      });
+      const getActive = vi.spyOn(defaultRegistry, "getActiveProvider").mockImplementation(() => {
+        throw new Error("provider constructed via getActiveProvider");
+      });
+
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+      const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
+      const config = await loadConfig(henchDir);
+      const store = createStore("file", rexDir);
+      let run: RunRecord;
+      try {
+        ({ run } = await agentLoop({
+          config: { ...config, provider: "api" },
+          store,
+          projectDir,
+          henchDir,
+          taskId: "task-1",
+          autonomous: true,
+          yes: true,
+          runHistory: await listRuns(henchDir),
+          claims,
+        }));
+      } finally {
+        await claims.releaseAll();
+      }
+
+      expect(create).not.toHaveBeenCalled();
+      expect(getActive).not.toHaveBeenCalled();
+      expect(cli.invocations).toHaveLength(0);
+      expect(gateCalls).toHaveLength(1);
+      expect(gateCalls[0]!.filesChanged).toContain("feature.ts");
+      expect(gateCalls[0]!.testCommand).toBe(`node --version ${baseline}`);
+      expect(run.testGate?.base).toBe(baseline);
+
+      expect(run.status).toBe("completed");
+      expect(run.completionHold?.outcome).toBe("applied");
+      const item = await store.getItem("task-1");
+      expect(item?.status).toBe("completed");
+      expect(item?.resolutionDetail).toBe("Added the feature");
+      expect(run.gateOnlyRetry).toEqual({ sourceRunId: source.id, base: baseline, commits: source.commits });
+      expect((await loadRun(henchDir, run.id)).gateOnlyRetry).toEqual(run.gateOnlyRetry);
     });
   });
 });
