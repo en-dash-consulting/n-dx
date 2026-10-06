@@ -123,6 +123,12 @@ import { executeGateOnlyRetry, planGateOnlyRetry } from "./gate-only-retry.js";
 import type { VendorAdapter, SpawnConfig } from "./vendor-adapter.js";
 import { resolveVendorAdapter } from "./adapters/index.js";
 import { EventAccumulator } from "./event-accumulator.js";
+import {
+  describePriorAttemptWork,
+  findPriorAttemptWork,
+  suppressionNote,
+  type PriorAttemptWork,
+} from "./prior-attempt-work.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
 import type { PromptSectionDiagnostic, PersistedRuntimeEvent } from "../../schema/index.js";
 import { handlePlanModeStall, formatPlanModeAppendix } from "./plan-mode-prompt.js";
@@ -1739,6 +1745,8 @@ interface SuccessContext {
    * used its one read-only-refusal retry.
    */
   readOnlyRetryAvailable?: boolean;
+  /** Task files earlier attempts already committed to the branch (#539). */
+  priorAttemptWork?: PriorAttemptWork;
 }
 
 /**
@@ -1835,6 +1843,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
       forked: ctx.readOnlyRetryAvailable === true,
       noChanges: !validation.hasChanges,
       toolNames: result.toolCalls.map((c) => c.tool),
+      priorAttemptWorkOnBranch: ctx.priorAttemptWork !== undefined,
     })
   ) {
     // A fork that never tried to edit: the inherited orientation turn won.
@@ -1849,12 +1858,32 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     return "read-only-retry";
   } else {
     // Completion rejected — no meaningful changes
+    const prior = ctx.priorAttemptWork;
+    // The refusal check stood down only because earlier attempts own the work.
+    const suppressed =
+      prior !== undefined &&
+      isReadOnlyRefusal({
+        forked: ctx.readOnlyRetryAvailable === true,
+        noChanges: !validation.hasChanges,
+        toolNames: result.toolCalls.map((c) => c.tool),
+      });
+    const explanation = suppressed ? describePriorAttemptWork(prior, taskId) : undefined;
     run.status = "failed";
     run.summary = result.summary;
-    run.error = validation.reason;
-    info(`\nCompletion rejected: ${validation.reason}`);
+    run.error = explanation ? `${validation.reason} ${explanation}` : validation.reason;
+    info(`\nCompletion rejected: ${run.error}`);
     info(formatValidationResult(validation));
-    await handleRunFailure(store, taskId, "pending", "completion_rejected", formatValidationResult(validation));
+    if (suppressed) {
+      run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: "unknown", notes: [] };
+      run.diagnostics.notes.push(suppressionNote(prior));
+    }
+    await handleRunFailure(
+      store,
+      taskId,
+      "pending",
+      "completion_rejected",
+      explanation ? `${formatValidationResult(validation)}\n${explanation}` : formatValidationResult(validation),
+    );
   }
 
   return "break";
@@ -2368,6 +2397,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // orientation as still in force (#473). The parent is not broken, so the
   // cache stays; this run stops forking and re-spawns cold once, again
   // without charging retry budget.
+  // Task files earlier attempts already committed: an empty diff over them is
+  // finished work, not a read-only refusal (#539). Computed once per run.
+  const priorAttemptWork = await findPriorAttemptWork({ projectDir, taskId, runHistory: opts.runHistory });
   let readOnlyRetryUsed = false;
   /** True for the one cold spawn that follows a read-only refusal. */
   let readOnlyRetryPending = false;
@@ -2717,6 +2749,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           attemptAccumulator,
           runAccumulator,
           readOnlyRetryAvailable: lastSpawnForked && !readOnlyRetryUsed,
+          priorAttemptWork,
         });
         if (action === "read-only-retry") {
           // Stop forking for the rest of the run but keep the cache entry:
