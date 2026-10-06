@@ -1873,8 +1873,12 @@ Hench test-gate settings (mandatory full-suite gate before commit):
                                      is also using the machine, and a timeout aborts a task whose
                                      work is already done. Prefer raising this over skipping the
                                      gate.
-  hench.commitMsgTimeoutMs number    How long the commit-message generation call may run before it
-                                     is killed (default: 300000 — 5 minutes; 0 means no limit)
+  hench.commitMsgTimeoutMs number    Mid-run auto-commit timer, armed when the agent writes
+                                     .hench-commit-msg.txt. On expiry it commits whatever is
+                                     staged at that moment — before the test gate, the
+                                     uncommitted-work gate, or the completion write. Default 0
+                                     (disabled), so the only commit happens after the task is
+                                     verified complete.
   hench.promptAgentToMarkInProgress
                            boolean   Keep the workflow step telling the agent to mark its task
                                      in_progress via rex_update_status (default: false). Hench

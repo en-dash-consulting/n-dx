@@ -361,13 +361,15 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
   {
     path: "commitMsgTimeoutMs",
     label: "Commit Message Timeout (ms)",
-    description: "How long the commit-message generation call may run. 0 means no limit",
+    description:
+      "Mid-run auto-commit timer, armed when the agent writes .hench-commit-msg.txt. " +
+      "0 (default) disables it — the commit then happens only after the task is verified complete",
     type: "number",
     category: "git",
     impact: (v) =>
       Number(v) === 0
-        ? "Commit-message generation runs without a time limit"
-        : `Commit-message generation killed after ${Number(v) / 60000} minutes`,
+        ? "No mid-run commit: the only commit happens after the task is verified complete"
+        : `Commits whatever is staged ${Number(v) / 60000} minutes after the agent writes its message — before any verification`,
   },
   {
     path: "git.checkpointThreshold",

@@ -172,7 +172,7 @@ export const HenchConfigSchema = z.object({
     .boolean()
     .optional()
     .default(DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS),
-  commitMsgTimeoutMs: z.number().int().nonnegative().optional().default(300_000),
+  commitMsgTimeoutMs: z.number().int().nonnegative().optional().default(0),
   git: z
     .object({
       checkpointThreshold: z.number().int().nonnegative().optional(),
