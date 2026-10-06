@@ -2,7 +2,7 @@
 id: "078d06e8-aef0-4061-8e6a-074950d56b38"
 level: "task"
 title: "Move the Jev client and judgment cache from sourcevision into llm-client"
-status: "in_progress"
+status: "completed"
 priority: "medium"
 tags:
   - "pr-04"
@@ -11,11 +11,15 @@ tags:
   - "sourcevision"
 source: "roadmap"
 startedAt: "2026-10-06T07:44:22.830Z"
+completedAt: "2026-10-06T08:20:13.987Z"
+endedAt: "2026-10-06T08:20:13.987Z"
+resolutionType: "code-change"
+resolutionDetail: "Moved jev-client.ts and judgment-cache.ts from packages/sourcevision/src/analyzers/ into packages/llm-client/src/, exported both from llm-client's public.ts (18 runtime symbols + 15 types), and repointed sourcevision's four analyzer call sites and analyze.ts at @n-dx/llm-client. The run-ledger import that a foundation module cannot make is now the JevObserver injection seam, registered once in initAndLoadLLMConfig (shared by sv analyze and sv narrate). Cache path and file format unchanged. 6/6 suites green."
 acceptanceCriteria:
   - "sourcevision's Jev behaviour and judgment cache are unchanged (existing tests pass)"
   - "llm-client exports the Jev client and judgment cache"
   - "domain-isolation.test.js passes with the new import direction"
 description: "Move sourcevision/src/analyzers/jev-client.ts and judgment-cache.ts into llm-client, export them from its public API, and import them in sourcevision from there. Keep the cache file location and format unchanged."
-lastModified: "2026-10-06T07:44:23.258Z"
+lastModified: "2026-10-06T08:20:14.420Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

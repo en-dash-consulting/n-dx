@@ -21,5 +21,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Move the Jev client and judgment cache from sourcevision into llm-client](./move-the-jev-client-and-judgment-cache.md) | in_progress |
+| [Move the Jev client and judgment cache from sourcevision into llm-client](./move-the-jev-client-and-judgment-cache.md) | completed |
 | [Redact Bitbucket app passwords and access tokens](./redact-bitbucket-app-passwords-and.md) | pending |
