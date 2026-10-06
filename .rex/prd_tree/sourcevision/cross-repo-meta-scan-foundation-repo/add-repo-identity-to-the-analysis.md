@@ -12,6 +12,7 @@ acceptanceCriteria:
   - "A fixture manifest written before this change validates unchanged through `schema/validate.ts`."
   - "Unit tests under `packages/sourcevision/tests/unit/analyzers/` cover the remote-present, remote-absent and non-git-directory cases."
 description: "`manifest.json` has `targetPath` but no name, remote or id, so two analyses cannot be told apart or correlated once they leave their own directory. Add `repo: { name, remoteUrl: string | null, remoteHost, remotePath, defaultBranch: string | null }` to `Manifest` in `schema/v1.ts` and populate it in `analyzers/manifest.ts`.\n\nDerive `name` from the remote path when a remote is present, falling back to the directory name. Read the git remote origin the way `export/iso-sources.ts` already does and extract one shared helper rather than writing a second reader. Leave `schemaVersion` alone unless `schema/validate.ts` requires a bump; the field is optional so analyses produced before it keep validating."
-lastModified: "2026-10-05T17:34:57.419Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-06T22:01:02.234Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

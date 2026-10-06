@@ -18,6 +18,7 @@ acceptanceCriteria:
   - "The analyzer is invoked from `cli/commands/analyze.ts` beside the project profile, and every `sv analyze` writes the file."
   - "With no LLM key configured the analyzer completes and makes no network call; with a key present the deterministic fields are identical to the keyless run."
 description: "`analyzers/sdlc-profile.ts` needs file types the inventory deliberately throws away — the `codeOnly` filter in `analyzers/inventory.ts` defaults to true and drops YAML, JSON, TOML, Dockerfile and `.tf`. Widening the inventory to reach them would pollute zone detection, so the analyzer gets its own bounded traversal, the way `project-profile.ts` and `export/iso-declared.ts` already do.\n\nBounds: respect `.gitignore` and `.sourcevisionignore`, skip `node_modules` and vendored directories, cap depth and file count, never read a file over 1 MB.\n\nParse CI definitions into steps for GitHub Actions, GitLab CI, CircleCI and Bitbucket, with Jenkinsfile handled heuristically. Parse `package.json` scripts, Makefile targets, pyproject and go.mod for the `commands` section. Reuse `export/iso-declared.ts` for Terraform and CloudFormation rather than parsing them again.\n\nWire it into `cli/commands/analyze.ts` beside the project profile so every analyze writes the file. The deterministic path takes no LLM and no network. The existing `analyzers/enrich-judge.ts` cascade may refine genuinely ambiguous judgements such as \"does this job deploy?\" when a key is present, but the deterministic result has to stand alone and be unchanged when it is not."
-lastModified: "2026-10-05T17:38:03.102Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-06T22:01:02.234Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

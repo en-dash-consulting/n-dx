@@ -14,6 +14,7 @@ acceptanceCriteria:
   - "`outbound.json` is registered in `schema/data-files.ts`, written by every `sv analyze`, canonically sorted, and produced with no LLM and no network call."
   - "Unit tests under `packages/sourcevision/tests/unit/analyzers/` cover each client family for both languages and both `targetSource` paths."
 description: "SourceVision detects only the provider side of HTTP — `analyzers/server-route-detection.ts` and `go-route-detection.ts` produce inbound `ServerRoute` entries. Without the consumer side, a repo that calls another repo is invisible. Add `analyzers/outbound-detection.ts`, mirroring the shape of the route detectors, producing:\n\n`OutboundDependency { file, line, kind: \"http\" | \"grpc\" | \"queue\" | \"database\" | \"cache\" | \"env\", target: string, targetSource: \"literal\" | \"env\" | \"config\" | \"unknown\", client: string, confidence }`\n\nJS/TS goes through the TypeScript compiler API: `fetch`, axios, got, undici, ky, node-fetch; gRPC clients; SQS/SNS/Kafka/RabbitMQ clients; pg/mysql/mongo/redis clients. Go reuses the existing Go parsing: `net/http`, grpc, aws-sdk, sarama, go-redis, `database/sql`.\n\nRecord URL literals, the `process.env.X` / `os.Getenv(\"X\")` names feeding a client, and OpenAPI or `.proto` files as declared contracts. Deterministic, no LLM, no network. Store as `outbound.json`.\n\nOpen question to resolve here: what `confidence` an env-var-sourced target should carry, given the next task matches those names against other members' routes."
-lastModified: "2026-10-05T17:35:23.259Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-06T22:01:02.234Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

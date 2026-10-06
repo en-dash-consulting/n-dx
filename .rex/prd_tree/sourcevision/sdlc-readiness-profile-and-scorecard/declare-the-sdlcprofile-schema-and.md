@@ -13,6 +13,7 @@ acceptanceCriteria:
   - "`schema/validate.ts` accepts a valid profile and rejects one with a detection missing evidence or carrying an unknown confidence value."
   - "An analysis produced before this field exists still validates."
 description: "Schema first, so the analyzer and the scorecard are written against a settled shape. Add `SdlcProfile` to `packages/sourcevision/src/schema/v1.ts` and `sdlcProfile: \"sdlc-profile.json\"` to `schema/data-files.ts`, following the `ProjectProfile` precedent rather than forking it.\n\nThe load-bearing rule is that nothing is asserted without proof: every detection carries `{ kind, path, line?, excerpt?, confidence: \"certain\" | \"likely\" | \"inferred\" }`. Sections are commands, tests, ci, cd, rollback, migrations, featureFlags, qualityGates, observability, containers and iac.\n\nThe `commands` section is the one with a future beyond this feature — `test-command-resolver.ts`, rex's `.rex/config.json` `test`, and `readme-generator.js` `detectCommands` each discover commands their own way, and this section is meant to be adoptable by all three later. Design it for that; do not rewrite them here."
-lastModified: "2026-10-05T17:37:17.078Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-06T22:01:02.234Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
