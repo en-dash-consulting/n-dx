@@ -14,4 +14,4 @@ Validate with scoped commands. Do not run the whole repository suite.
 
 Cost: one full pass (`pnpm test`, `run-all-tests.mjs`) takes ~9 min quiet, ~14 min loaded; the root suite alone 2.5–6 min. hench's gate runs the affected suites after you finish, and CI runs everything on three OSes. Widen only when a scoped failure needs it.
 
-Pre-existing failures unrelated to your change: log them and continue. Do not fix them in this task.
+**Pre-existing failures.** A failing test you did not cause still blocks this branch's PR, because CI runs every suite. If the failing test or the code it covers changed on this branch (`git log main..HEAD -- <paths>`), it is this branch's defect: fix it here. If it is not, do not fix it inside this task: record it with `append_log` and in your summary so it becomes its own task. Never skip, weaken or delete a test to get green.
