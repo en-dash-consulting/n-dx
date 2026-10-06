@@ -1,0 +1,19 @@
+---
+id: "21c17d38-c771-4e30-9db4-281733055adc"
+level: "task"
+title: "Detect outbound dependencies for JS/TS and Go into outbound.json"
+status: "pending"
+priority: "high"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "`analyzers/outbound-detection.ts` emits `OutboundDependency` records with `file`, `line`, `kind`, `target`, `targetSource`, `client` and `confidence`, typed in `schema/v1.ts`."
+  - "JS/TS detection runs through the TypeScript compiler API and covers `fetch`, axios, got, undici, ky, node-fetch, gRPC clients, SQS/SNS/Kafka/RabbitMQ clients and pg/mysql/mongo/redis clients."
+  - "Go detection reuses the existing Go parsing and covers `net/http`, grpc, aws-sdk, sarama, go-redis and `database/sql`."
+  - "A target given as a URL literal records `targetSource: \"literal\"`; one reaching the client through `process.env.X` or `os.Getenv(\"X\")` records `targetSource: \"env\"` with the variable name as `target`."
+  - "OpenAPI and `.proto` files found in the repo are recorded as declared contracts."
+  - "`outbound.json` is registered in `schema/data-files.ts`, written by every `sv analyze`, canonically sorted, and produced with no LLM and no network call."
+  - "Unit tests under `packages/sourcevision/tests/unit/analyzers/` cover each client family for both languages and both `targetSource` paths."
+description: "SourceVision detects only the provider side of HTTP — `analyzers/server-route-detection.ts` and `go-route-detection.ts` produce inbound `ServerRoute` entries. Without the consumer side, a repo that calls another repo is invisible. Add `analyzers/outbound-detection.ts`, mirroring the shape of the route detectors, producing:\n\n`OutboundDependency { file, line, kind: \"http\" | \"grpc\" | \"queue\" | \"database\" | \"cache\" | \"env\", target: string, targetSource: \"literal\" | \"env\" | \"config\" | \"unknown\", client: string, confidence }`\n\nJS/TS goes through the TypeScript compiler API: `fetch`, axios, got, undici, ky, node-fetch; gRPC clients; SQS/SNS/Kafka/RabbitMQ clients; pg/mysql/mongo/redis clients. Go reuses the existing Go parsing: `net/http`, grpc, aws-sdk, sarama, go-redis, `database/sql`.\n\nRecord URL literals, the `process.env.X` / `os.Getenv(\"X\")` names feeding a client, and OpenAPI or `.proto` files as declared contracts. Deterministic, no LLM, no network. Store as `outbound.json`.\n\nOpen question to resolve here: what `confidence` an env-var-sourced target should carry, given the next task matches those names against other members' routes."
+lastModified: "2026-10-05T17:35:23.259Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---

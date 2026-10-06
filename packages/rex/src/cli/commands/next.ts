@@ -30,7 +30,7 @@ export async function cmdNext(
   // Emit migration notification to CLI and execution log
   await emitMigrationNotification(migrationResult, flags, (entry) => store.appendLog(entry));
   const doc = await store.loadDocument();
-  doc.items = await loadItemsPreferFolderTree(rexDir, store);
+  doc.items = await loadItemsPreferFolderTree(rexDir, store, doc);
 
   if (doc.items.length === 0) {
     result("No items in PRD. Run: rex add epic --title=\"...\" " + dir);

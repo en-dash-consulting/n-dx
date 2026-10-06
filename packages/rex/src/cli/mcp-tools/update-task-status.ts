@@ -3,8 +3,6 @@ import { deleteItem, cleanBlockedByRefs } from "../../core/delete.js";
 import { validateTransition } from "../../core/transitions.js";
 import { computeTimestampUpdates } from "../../core/timestamps.js";
 import { findAutoCompletions } from "../../core/parent-completion.js";
-import { resolveRexPaths } from "../../store/index.js";
-import { syncFolderTree } from "../commands/folder-tree-sync.js";
 import { holdCompletionForRun, describeHeldCompletion } from "../completion-hold.js";
 import type { PRDItem, ItemStatus } from "../../schema/index.js";
 import type { PRDStore, TaskClaim } from "../../store/index.js";
@@ -92,8 +90,6 @@ export async function handleUpdateTaskStatus(
         detail: `Deleted ${existing.level}: ${existing.title} (${deletedIds.length} item(s) removed)`,
       });
 
-      await syncFolderTree(resolveRexPaths(projectDir).rexDir, store);
-
       return textResult(
         JSON.stringify({
           id,
@@ -161,8 +157,6 @@ export async function handleUpdateTaskStatus(
         autoCompleted.push(item);
       }
     }
-
-    await syncFolderTree(resolveRexPaths(projectDir).rexDir, store);
 
     return textResult(
       JSON.stringify({

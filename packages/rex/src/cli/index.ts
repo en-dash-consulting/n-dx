@@ -105,6 +105,7 @@ const VALUE_KEYS = new Set([
   "group-by",
   "accept-llm",
   "detail",
+  "run",
   ...MULTI_VALUE_KEYS,
 ]);
 

@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { findItem } from "../../core/tree.js";
 import { validateDAG } from "../../core/dag.js";
-import { resolveRexPaths } from "../../store/index.js";
-import { syncFolderTree } from "../commands/folder-tree-sync.js";
+import { validateRunSettings, RunSettingsSchema } from "../../schema/validate.js";
 import type { PRDItem, Priority } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
@@ -21,6 +20,8 @@ export async function handleEditItem(
     tags?: string[];
     source?: string;
     blockedBy?: string[];
+    /** Object replaces the whole block; `null` (or `{}`) removes it. */
+    run?: unknown;
   },
 ): Promise<McpResult> {
   try {
@@ -46,6 +47,12 @@ export async function handleEditItem(
     }
     if (args.tags !== undefined) updates.tags = args.tags;
     if (args.source !== undefined) updates.source = args.source;
+    if (args.run !== undefined) {
+      const runCheck = validateRunSettings(args.run);
+      if (!runCheck.ok) return textResult(`Invalid run settings: ${runCheck.error}`, true);
+      // Undefined removes the block: the serializer skips an absent `run`.
+      updates.run = runCheck.value;
+    }
     if (args.blockedBy !== undefined) {
       // Validate dependencies before persisting
       const doc = await store.loadDocument();
@@ -68,7 +75,7 @@ export async function handleEditItem(
 
     if (Object.keys(updates).length === 0) {
       return textResult(
-        "No fields to update. Provide at least one field (title, description, acceptanceCriteria, priority, tags, source, blockedBy).",
+        "No fields to update. Provide at least one field (title, description, acceptanceCriteria, priority, tags, source, blockedBy, run).",
         true,
       );
     }
@@ -82,8 +89,6 @@ export async function handleEditItem(
       itemId: args.id,
       detail: `Edited ${existing.level} "${existing.title}": ${changedFields.join(", ")}`,
     });
-
-    await syncFolderTree(resolveRexPaths(projectDir).rexDir, store);
 
     const updated = await store.getItem(args.id);
     return textResult(
@@ -100,7 +105,7 @@ export async function handleEditItem(
 
 export const editItemTool = defineTool({
   name: "edit_item",
-  description: "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags). Use for content changes — use update_task_status for status/lifecycle transitions.",
+  description: "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
   schema: {
     id: z.string().describe("Item ID"),
     title: z.string().optional().describe("New title"),
@@ -111,6 +116,7 @@ export const editItemTool = defineTool({
     tags: z.array(z.string()).optional().describe("New tags"),
     source: z.string().optional().describe("New source"),
     blockedBy: z.array(z.string()).optional().describe("New blocked-by IDs"),
+    run: RunSettingsSchema.nullable().optional().describe("Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Vendor-agnostic keys: tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id}), provider, permissionMode, review, reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
   },
   access: "write",
   run: (ws, args) => handleEditItem(ws.store, ws.projectDir, args),

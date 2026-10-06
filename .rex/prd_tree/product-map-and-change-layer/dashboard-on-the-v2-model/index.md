@@ -15,7 +15,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Wire the new views and remap existing ones; nothing in Plan, Work or Live may break.\n\nRoadmap PR 21 · wave 2 · lane web."
-lastModified: "2026-10-06T04:20:09.390Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-06T15:51:47.411Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -24,4 +25,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add direct map editing, workflow settings and Bitbucket remote parsing](./add-direct-map-editing-workflow.md) | pending |
+| [Add one host-neutral remote-URL helper in llm-client](./add-one-host-neutral-remote-url-helper.md) | pending |
 | [Make item routes type-aware and remap views that use level](./make-item-routes-type-aware-and-remap.md) | pending |

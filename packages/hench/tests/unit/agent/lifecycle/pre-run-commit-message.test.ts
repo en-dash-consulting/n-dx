@@ -2,6 +2,11 @@
  * Unit tests for light-tier model routing in the pre-run commit-message
  * generation path (proposePreRunCommitMessage).
  *
+ * The model route is opt-in since `hench.git.commitMessage` defaulted to
+ * "deterministic", so every case here passes `source: "llm"` to select it.
+ * The default path — and the fact that it reaches no provider at all — is
+ * covered at the bottom of this file.
+ *
  * Commit-message generation is a mechanical single-shot call, so it should
  * resolve the vendor's light-tier model instead of the run's standard model.
  * The gate passes the run's resolved model in; when that value matches the
@@ -48,20 +53,20 @@ describe("proposePreRunCommitMessage light-tier routing", () => {
   it("uses the light-tier model when the passed model is the standard resolution", async () => {
     // The gate passes the run's resolved model — the config-derived standard
     // model when no --model flag was given.
-    const message = await proposePreRunCommitMessage(diff, henchDir, NEWEST_MODELS.claude);
+    const message = await proposePreRunCommitMessage(diff, henchDir, NEWEST_MODELS.claude, { paths: ["x.ts"], source: "llm" });
 
     expect(capturedModels).toEqual([TIER_MODELS.claude.light]);
     expect(message).toBe("feat: add a line to x");
   });
 
   it("uses the light-tier model when no model is passed at all", async () => {
-    await proposePreRunCommitMessage(diff, henchDir);
+    await proposePreRunCommitMessage(diff, henchDir, undefined, { paths: ["x.ts"], source: "llm" });
 
     expect(capturedModels).toEqual([TIER_MODELS.claude.light]);
   });
 
   it("honors an explicit model override (differs from the standard resolution)", async () => {
-    await proposePreRunCommitMessage(diff, henchDir, "claude-opus-4-7");
+    await proposePreRunCommitMessage(diff, henchDir, "claude-opus-4-7", { paths: ["x.ts"], source: "llm" });
 
     expect(capturedModels).toEqual(["claude-opus-4-7"]);
   });
@@ -75,7 +80,7 @@ describe("proposePreRunCommitMessage light-tier routing", () => {
       "utf-8",
     );
 
-    await proposePreRunCommitMessage(diff, henchDir, NEWEST_MODELS.claude);
+    await proposePreRunCommitMessage(diff, henchDir, NEWEST_MODELS.claude, { paths: ["x.ts"], source: "llm" });
 
     expect(capturedModels).toEqual(["claude-custom-light"]);
   });
@@ -85,8 +90,72 @@ describe("proposePreRunCommitMessage light-tier routing", () => {
       throw new Error("no credentials");
     });
 
-    const message = await proposePreRunCommitMessage(diff, henchDir);
+    const message = await proposePreRunCommitMessage(diff, henchDir, undefined, { paths: ["x.ts"], source: "llm" });
 
     expect(message).toBe("chore: commit local changes before hench run");
+  });
+});
+
+/**
+ * The default route. The point of these is not the wording — that is
+ * `pre-run-commit-subject.test.ts` — but that the provider is never
+ * consulted, so the gate cannot be delayed or derailed by one.
+ */
+describe("proposePreRunCommitMessage default (deterministic) route", () => {
+  let tmpDir: string;
+  let henchDir: string;
+  let providerCalls: number;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "hench-commit-msg-det-"));
+    henchDir = join(tmpDir, ".hench");
+    providerCalls = 0;
+    vi.spyOn(defaultRegistry, "getActiveProvider").mockReturnValue({
+      complete: async () => {
+        providerCalls++;
+        return { text: "feat: something a model made up" };
+      },
+    } as never);
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await rm(tmpDir, { recursive: true, force: true, ...RM_RETRY });
+  });
+
+  it("builds the subject from the paths without reaching a provider", async () => {
+    const message = await proposePreRunCommitMessage(diff, henchDir, NEWEST_MODELS.claude, {
+      paths: ["packages/web/src/a.ts", "packages/rex/src/b.ts"],
+      counts: { linesChanged: 12 },
+    });
+
+    expect(providerCalls).toBe(0);
+    expect(message).toBe("chore(rex,web): pre-run checkpoint, 2 files, 12 lines");
+  });
+
+  it("is the route taken when no source is given at all", async () => {
+    const message = await proposePreRunCommitMessage(diff, henchDir, undefined, {
+      paths: ["docs/a.md"],
+    });
+
+    expect(providerCalls).toBe(0);
+    expect(message).toBe("docs(docs): pre-run checkpoint, 1 file");
+  });
+
+  it("falls back to the generic message when it has no paths to describe", async () => {
+    const message = await proposePreRunCommitMessage(diff, henchDir);
+
+    expect(providerCalls).toBe(0);
+    expect(message).toBe("chore: commit local changes before hench run");
+  });
+
+  it("explicitly selecting the model route still reaches the provider", async () => {
+    const message = await proposePreRunCommitMessage(diff, henchDir, NEWEST_MODELS.claude, {
+      paths: ["packages/web/src/a.ts"],
+      source: "llm",
+    });
+
+    expect(providerCalls).toBe(1);
+    expect(message).toBe("feat: something a model made up");
   });
 });

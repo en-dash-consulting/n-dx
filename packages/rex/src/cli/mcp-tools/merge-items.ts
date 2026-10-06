@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { validateMerge, previewMerge, mergeItems } from "../../core/merge.js";
-import { syncFolderTree } from "../commands/folder-tree-sync.js";
 import type { PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
@@ -57,8 +56,6 @@ export async function handleMergeItems(
       itemId: targetId,
       detail: `Merged ${sourceIds.length} items into "${targetId}". Absorbed: ${absorbedTitles}. ${result.reparentedChildIds.length} children reparented, ${result.rewrittenDependencyCount} dependency references rewritten.`,
     });
-
-    await syncFolderTree(rexDir, store);
 
     return textResult(JSON.stringify(result, null, 2));
   } catch (err) {

@@ -24,8 +24,8 @@
 
 import type { PartitionHealth, PartitionReview, Zone, ZoneCrossing } from "../schema/index.js";
 import { ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
-import { askJev, noul } from "./jev-client.js";
-import type { JsonValue } from "./jev-client.js";
+import { askJev, noul } from "@n-dx/llm-client";
+import type { JsonValue } from "@n-dx/llm-client";
 
 // ── Thresholds ───────────────────────────────────────────────────────────────
 

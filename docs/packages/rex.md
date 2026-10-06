@@ -28,6 +28,8 @@ rex next .                           # next actionable task
 rex add "description" .              # smart add via LLM
 rex add --file=ideas.txt .           # import from file
 rex update <id> --status=completed . # update item
+rex update <id> --run='{"tier":"heavy","models":{"claude":"claude-opus-5-5"},"review":true}' .  # save run settings (replaces the whole block)
+rex update <id> --run=null .         # clear saved run settings (--run= does the same)
 rex move <id> --parent=<parent-id> . # reparent item
 rex remove <id> .                    # remove item and descendants
 rex reshape .                        # LLM-powered PRD restructuring
@@ -103,8 +105,8 @@ Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes 
 | `claim_task` | Hold a task for this worktree so other worktrees skip it |
 | `release_task` | Give back a claim without changing the task's status |
 | `update_task_status` | Update item status. While a `hench run` in this worktree holds the task, `completed` is recorded for the run to apply after its test gate rather than written |
-| `add_item` | Add epic/feature/task/subtask |
-| `edit_item` | Edit item content (title, description, priority, tags) |
+| `add_item` | Add epic/feature/task/subtask (optional `run` block of saved run settings: portable `tier` plus optional per-vendor `models` pins) |
+| `edit_item` | Edit item content (title, description, priority, tags, `run`). A `run` object replaces the whole saved block; `null` removes it |
 | `get_item` | Full item details with parent chain |
 | `move_item` | Reparent an item in the PRD tree |
 | `merge_items` | Consolidate duplicate sibling items |

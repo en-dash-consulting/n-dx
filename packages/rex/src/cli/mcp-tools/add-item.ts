@@ -4,7 +4,7 @@ import { getAllLevels } from "../../schema/index.js";
 import { validateDAG } from "../../core/dag.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 import { FileStore, resolvePRDFile } from "../../store/index.js";
-import { syncFolderTree } from "../commands/folder-tree-sync.js";
+import { validateRunSettings, RunSettingsSchema } from "../../schema/validate.js";
 import type { PRDItem, ItemLevel, Priority } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
@@ -24,9 +24,13 @@ export async function handleAddItem(
     tags?: string[];
     source?: string;
     blockedBy?: string[];
+    run?: unknown;
   },
 ): Promise<McpResult> {
   try {
+    const runCheck = validateRunSettings(args.run);
+    if (!runCheck.ok) return textResult(`Invalid run settings: ${runCheck.error}`, true);
+
     if (!args.parentId && store instanceof FileStore) {
       const resolution = await resolvePRDFile(rexDir, projectDir);
       store.setCurrentBranchFile(resolution.filename);
@@ -45,6 +49,7 @@ export async function handleAddItem(
     if (args.tags) item.tags = args.tags;
     if (args.source) item.source = args.source;
     if (args.blockedBy) item.blockedBy = args.blockedBy;
+    if (runCheck.value) item.run = runCheck.value;
 
     // Validate dependencies before persisting
     if (item.blockedBy && item.blockedBy.length > 0) {
@@ -74,8 +79,6 @@ export async function handleAddItem(
       detail: `Added ${args.level}: ${args.title}`,
     });
 
-    await syncFolderTree(rexDir, store);
-
     return textResult(JSON.stringify({ id, level: args.level, title: args.title, resetItems }));
   } catch (err) {
     return textResult(`Error: ${(err as Error).message}`, true);
@@ -95,6 +98,7 @@ export const addItemTool = defineTool({
     tags: z.array(z.string()).optional().describe("Tags"),
     source: z.string().optional().describe("Source of this item"),
     blockedBy: z.array(z.string()).optional().describe("IDs of blocking items"),
+    run: RunSettingsSchema.optional().describe("Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
   },
   access: "write",
   run: (ws, args) => handleAddItem(ws.store, ws.projectDir, ws.rexDir, args),

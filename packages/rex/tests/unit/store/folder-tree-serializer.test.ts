@@ -1217,3 +1217,129 @@ describe("writtenPaths and deletedPaths", () => {
     expect(result.directoriesRemoved).toBe(1);
   });
 });
+
+// ── LoE fields and object encoding ────────────────────────────────────────────
+
+describe("serializeFolderTree: loe fields and object encoding", () => {
+  async function roundTrip(extra: Record<string, unknown>) {
+    const task = makeTask("55555555-0000-0000-0000-000000000000", "LoE Task", extra as Partial<PRDItem>);
+    await serializeFolderTree([task], testDir);
+    const files = await collectFiles(testDir);
+    const file = files.find((f) => f.endsWith(".md"))!;
+    const content = await readFile(file, "utf-8");
+    const parsed = await parseFolderTree(testDir);
+    return { content, item: parsed.items[0] as Record<string, unknown> };
+  }
+
+  it("writes loe as a bare number and reads it back as a number", async () => {
+    const { content, item } = await roundTrip({
+      loe: 2.5,
+      loeRationale: "Touches two stores",
+      loeConfidence: "medium",
+    });
+    expect(content).toContain("loe: 2.5\n");
+    expect(content).toContain('loeRationale: "Touches two stores"');
+    expect(content).toContain('loeConfidence: "medium"');
+    expect(item["loe"]).toBe(2.5);
+    expect(item["loeRationale"]).toBe("Touches two stores");
+    expect(item["loeConfidence"]).toBe("medium");
+  });
+
+  it("reads a numeric loe string back as a number", async () => {
+    const { item } = await roundTrip({ loe: "3" });
+    expect(item["loe"]).toBe(3);
+  });
+
+  it("preserves a legacy non-numeric loe string", async () => {
+    const { content, item } = await roundTrip({ loe: "m" });
+    expect(content).toContain('loe: "m"');
+    expect(item["loe"]).toBe("m");
+  });
+
+  it("drops an invalid loeConfidence", async () => {
+    const { content, item } = await roundTrip({ loe: 1, loeConfidence: "certain" });
+    expect(content).not.toContain("loeConfidence");
+    expect(item["loeConfidence"]).toBeUndefined();
+  });
+
+  it("writes class instances, null-prototype objects and objects in arrays as JSON", async () => {
+    class Meta {
+      constructor(public a: number) {}
+    }
+    const bare = Object.create(null) as Record<string, unknown>;
+    bare.b = "x";
+    const { content, item } = await roundTrip({
+      classy: new Meta(1),
+      bare,
+      list: [new Meta(2), ["nested"]],
+    });
+    expect(content).not.toContain("[object Object]");
+    expect(content).toContain('classy: {"a":1}');
+    expect(content).toContain('bare: {"b":"x"}');
+    expect(item["classy"]).toEqual({ a: 1 });
+    expect(item["bare"]).toEqual({ b: "x" });
+    expect(item["list"]).toEqual([{ a: 2 }, ["nested"]]);
+  });
+});
+
+describe("serializeFolderTree: run settings", () => {
+  const FULL_RUN = {
+    tier: "heavy",
+    models: { claude: "claude-opus-5-5", codex: "gpt-5.6-sol" },
+    provider: "api",
+    permissionMode: "acceptEdits",
+    review: false,
+    reviewTier: "standard",
+    reviewModels: { claude: "claude-sonnet-5" },
+    reviewOptional: false,
+    skipTestGate: false,
+    maxTurns: 40,
+    tokenBudget: 0,
+    contextNotes: 'Line one\nline "two": # not a comment\n---\nend',
+  };
+
+  async function roundTrip(extra: Record<string, unknown>) {
+    const task = makeTask("66666666-0000-0000-0000-000000000000", "Run Task", extra as Partial<PRDItem>);
+    await serializeFolderTree([task], testDir);
+    const files = await collectFiles(testDir);
+    const file = files.find((f) => f.endsWith(".md"))!;
+    const content = await readFile(file, "utf-8");
+    const parsed = await parseFolderTree(testDir);
+    return { file, content, parsed, item: parsed.items[0] as Record<string, unknown> };
+  }
+
+  it("round-trips every key with its type, including false booleans and zero", async () => {
+    const { content, item } = await roundTrip({ run: FULL_RUN });
+    expect(content).toContain(`run: ${JSON.stringify(FULL_RUN)}\n`);
+    expect(item["run"]).toStrictEqual(FULL_RUN);
+  });
+
+  it("writes run after the loe fields and before description", async () => {
+    const { content } = await roundTrip({ loe: 1, description: "d", run: { review: true } });
+    expect(content.indexOf("loe: 1")).toBeLessThan(content.indexOf("run: "));
+    expect(content.indexOf("run: ")).toBeLessThan(content.indexOf("description:"));
+  });
+
+  it("never writes an empty run block", async () => {
+    const { content, item } = await roundTrip({ run: {} });
+    expect(content).not.toMatch(/^run:/m);
+    expect(item["run"]).toBeUndefined();
+  });
+
+  it("keeps a malformed run on load and warns, without failing the parse", async () => {
+    const { file, content } = await roundTrip({ run: { review: true } });
+    await writeFile(file, content.replace('run: {"review":true}', 'run: {"review":"yes","colour":"blue"}'), "utf-8");
+    const parsed = await parseFolderTree(testDir);
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.items[0].run).toEqual({ review: "yes", colour: "blue" });
+    expect(parsed.warnings.some((w) => w.message.includes("run"))).toBe(true);
+  });
+
+  it("drops a run that is not a JSON object, with a warning", async () => {
+    const { file, content } = await roundTrip({ run: { review: true } });
+    await writeFile(file, content.replace('run: {"review":true}', 'run: "fast"'), "utf-8");
+    const parsed = await parseFolderTree(testDir);
+    expect(parsed.items[0].run).toBeUndefined();
+    expect(parsed.warnings.some((w) => w.message.includes("run"))).toBe(true);
+  });
+});

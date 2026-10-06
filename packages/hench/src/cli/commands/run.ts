@@ -2084,6 +2084,7 @@ export async function cmdRun(
       // takes precedence over both settings.
       checkpointThreshold: config.git?.checkpointThreshold,
       requireCleanTree: config.git?.requireCleanTree,
+      commitMessageSource: config.git?.commitMessage,
     });
     if (gate === "stop") {
       info("Stopped before running. Commit or discard your changes, then re-run.");
