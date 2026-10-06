@@ -126,6 +126,17 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
       v ? "Runs proceed without prompting" : "Runs may stop to ask for confirmation",
   },
   {
+    path: "promptAgentToMarkInProgress",
+    label: "Agent Marks In Progress",
+    description: "Keep the workflow step asking the agent to set in_progress. Hench already does it before the agent starts, so the step is a duplicate write",
+    type: "boolean",
+    category: "execution",
+    impact: (v) =>
+      v
+        ? "Agent is told to mark its task in_progress — one extra tool round trip rewriting a value hench already wrote"
+        : "Workflow omits the step; hench makes the in_progress transition itself before the agent starts",
+  },
+  {
     path: "maxSpawnsPerTask",
     label: "Max Spawns per Task",
     description: "Ceiling on vendor spawns for one task, counting retries and fallbacks",
@@ -379,6 +390,18 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     category: "git",
     impact: (v) =>
       v ? "Runs abort on a dirty working tree" : "Runs may start against a dirty working tree",
+  },
+  {
+    path: "git.commitMessage",
+    label: "Pre-run Commit Subject",
+    description: "Where the pre-run gate's proposed subject comes from: built from the changed file list, or summarised by a light-tier model",
+    type: "enum",
+    enumValues: ["deterministic", "llm"],
+    category: "git",
+    impact: (v) =>
+      v === "llm"
+        ? "Pre-run gate asks a light-tier model to summarise the diff for its proposed subject"
+        : "Pre-run gate builds its proposed subject from the dirty file list — no model call",
   },
 
   // ── Guard settings ──
