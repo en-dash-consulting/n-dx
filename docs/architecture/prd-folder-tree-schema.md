@@ -169,7 +169,9 @@ No additional fields. Epics are containers; detail lives in descendants.
 ```yaml
 acceptanceCriteria:   # list    REQUIRED — may be empty list ([])
   - "Criterion text"
-loe:                  # string  optional — xs | s | m | l | xl (level of effort)
+loe:                  # number  optional — level of effort in engineer-weeks
+loeRationale:         # string  optional — why that estimate
+loeConfidence:        # string  optional — low | medium | high
 ```
 
 ### Task-Level Fields (additional)
@@ -177,10 +179,12 @@ loe:                  # string  optional — xs | s | m | l | xl (level of effor
 ```yaml
 acceptanceCriteria:   # list    REQUIRED — may be empty list ([])
   - "Criterion text"
-loe:                  # string  optional — xs | s | m | l | xl
+loe:                  # number  optional — level of effort in engineer-weeks
+loeRationale:         # string  optional — why that estimate
+loeConfidence:        # string  optional — low | medium | high
 ```
 
-**`loe` values:** `xs` = < 1 day, `s` = 1–3 days, `m` = 3–5 days, `l` = 1–2 weeks, `xl` = > 2 weeks.
+**`loe` is a bare number of engineer-weeks** (e.g. `loe: 0.5`), not a size bucket. Files written earlier may still hold `xs`–`xl` strings or quoted numbers: the parser reads a numeric string as a number and keeps any other string as-is. An invalid `loeConfidence` is dropped on read and write.
 
 ---
 
@@ -264,7 +268,7 @@ resolutionDetail: >-
 acceptanceCriteria:
   - "After rebuilding rex or sourcevision, the HTTP MCP server serves updated tool schemas without manual restart"
   - "No impact on active MCP sessions (new sessions get new schemas, existing sessions continue)"
-loe: m
+loe: 1
 description: >-
   The HTTP MCP server holds tool schemas in memory from startup. When rex or
   sourcevision are rebuilt, the running server still serves old schemas. Users
@@ -344,7 +348,7 @@ resolutionDetail: >-
 acceptanceCriteria:
   - "Token Usage is reachable from global nav without being scoped to Rex"
   - "Routing and UI metadata are consistent with other global dashboard sections"
-loe: s
+loe: 0.5
 description: >-
   Make Token Usage a first-class global dashboard destination instead of a
   Rex-scoped view so routing and UI metadata remain consistent across sections.
@@ -822,7 +826,8 @@ The serializer (PRD → folder tree) must:
 13. **Subtasks:** For task items with leaf subtasks, do not generate `## Subtask:` sections. Subtasks are serialized as sibling files/folders, not as sections.
 14. Write atomically: build the entire tree into a temp directory, then rename it into place to prevent partial states.
 15. Preserve unknown frontmatter fields (round-trip fidelity for future extensions).
-16. **Uniqueness enforcement:** Verify that no two sibling items (at any level) have the same slug. If a slug collision is detected, append the item's `-{id6}` suffix (or positional suffix if needed) to resolve it.
+16. **Value encoding:** Scalars are written as quoted strings, except `loe`, which is written as a bare number. Object-valued fields (plain objects, class instances, null-prototype objects, and objects inside lists) are written as inline JSON, never as `[object Object]`.
+17. **Uniqueness enforcement:** Verify that no two sibling items (at any level) have the same slug. If a slug collision is detected, append the item's `-{id6}` suffix (or positional suffix if needed) to resolve it.
 
 ---
 
@@ -860,7 +865,9 @@ The parser (folder tree → PRD) must:
 | `status` | required | required | required | required | required |
 | `description` | required | required | required | optional | optional |
 | `acceptanceCriteria` | — | required | required | optional | optional |
-| `loe` | — | optional | optional | — | — |
+| `loe` (engineer-weeks, number) | — | optional | optional | — | — |
+| `loeRationale` | — | optional | optional | — | — |
+| `loeConfidence` (`low`, `medium`, `high`) | — | optional | optional | — | — |
 | `priority` | optional | optional | optional | optional | optional |
 | `tags` | optional | optional | optional | — | — |
 | `source` | optional | optional | optional | — | — |
