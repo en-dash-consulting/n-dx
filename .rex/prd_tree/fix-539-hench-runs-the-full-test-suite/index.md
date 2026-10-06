@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Absorb gate flakes: re-run only the failed suites once before failing an unattended run](./absorb-gate-flakes-re-run-only-the.md) | pending |
 | [Gate-only retry: skip the agent when the previous run failed only at the gate with its work committed](./gate-only-retry-skip-the-agent-when.md) | pending |
-| [hench.testGate.command: a gate command template with {base}, recording the suites it selected](./hench-testgate-command-a-gate-command.md) | pending |
+| [hench.testGate.command: a gate command template with {base}, recording the suites it selected](./hench-testgate-command-a-gate-command.md) | completed |
 | [isReadOnlyRefusal returns false when earlier attempts already committed the task's files](./isreadonlyrefusal-returns-false-when.md) | pending |
 | [Opt this repo into the scoped gate and flake re-run; document the test-gate templates; changeset](./opt-this-repo-into-the-scoped-gate-and.md) | pending |
 | [run-all-tests.mjs runs git through win-spawn's execFileSyncCli, not node:child_process](./run-all-tests-mjs-runs-git-through-win.md) | completed |
