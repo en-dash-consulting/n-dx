@@ -862,8 +862,13 @@ export async function runTestGate(
   };
 
   if (second.result.passed) {
+    // The gate's own selection stays top-level; the re-run's labels are the
+    // failed subset and live on `rerun.suites`.
+    const selected = first.result.suites;
+    const { suites: _rerunSuites, ...rerunResult } = second.result;
     return {
-      ...second.result,
+      ...rerunResult,
+      ...(selected ? { suites: selected } : {}),
       flakyRerun: plan.suites.map((suite) => ({
         suite,
         firstFailure: firstFailureForSuite(first.output, suite, first.result.failureDigest),
@@ -872,6 +877,7 @@ export async function runTestGate(
         command: first.result.command,
         totalDurationMs: first.result.totalDurationMs,
         failedSuites: plan.suites,
+        ...(selected ? { suites: selected } : {}),
       },
       rerun,
     };

@@ -153,6 +153,9 @@ describe("hench.testGate.rerunCommand", () => {
     expect(run.testGate?.firstAttempt).toMatchObject({ command: gate, failedSuites: ["rex", "root"] });
     expect(run.testGate?.firstAttempt?.totalDurationMs).toEqual(expect.any(Number));
     expect(run.testGate?.rerun).toMatchObject({ suites: ["rex", "root"], passed: true });
+    // The gate's own selection survives the re-run, which only saw the failed labels.
+    expect(run.testGate?.suites).toEqual(["hench", "rex", "root"]);
+    expect(run.testGate?.firstAttempt?.suites).toEqual(["hench", "rex", "root"]);
     expect(logged.join("\n")).toMatch(/Flaky: rex, root failed, then passed on a re-run/);
   });
 
@@ -165,6 +168,7 @@ describe("hench.testGate.rerunCommand", () => {
     expect(run.testGate?.passed).toBe(false);
     expect(run.testGate?.command).toBe(gate);
     expect(run.testGate?.rerun).toMatchObject({ suites: ["rex", "root"], passed: false });
+    expect(run.testGate?.suites).toEqual(["hench", "rex", "root"]);
     expect(run.testGate?.rerun?.totalDurationMs).toEqual(expect.any(Number));
     expect(run.testGate?.flakyRerun).toBeUndefined();
     // Diagnostics come from the re-run.

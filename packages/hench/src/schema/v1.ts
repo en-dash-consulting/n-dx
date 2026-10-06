@@ -1109,6 +1109,8 @@ export interface TestGateFirstAttempt {
   command?: string;
   totalDurationMs?: number;
   failedSuites: string[];
+  /** Suites the first attempt selected (its own `selected-suites=` line). */
+  suites?: string[];
 }
 
 /** See {@link TestGateResult.rerun}. */
