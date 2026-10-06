@@ -2,13 +2,12 @@
 id: "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6"
 level: "epic"
 title: "CLI & Developer Tools"
-status: "completed"
+status: "pending"
 startedAt: "2026-04-02T17:55:36.327Z"
-completedAt: "2026-09-17T03:54:48.313Z"
 endedAt: "2026-09-17T03:54:48.313Z"
 description: "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline."
-lastModified: "2026-09-17T03:54:48.319Z"
-lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+lastModified: "2026-10-06T21:24:15.191Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -53,6 +52,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Verbose TypeScript and Boilerplate Pattern Simplification](./verbose-typescript-and-boilerplate/index.md) | completed |
 | [Web UI Design and User Experience Enhancement](./web-ui-design-and-user-experience/index.md) | completed |
 | [Workflow Use Case Guides](./workflow-use-case-guides/index.md) | completed |
+| [A usage mark taken inside another mark's window makes both records claim the overlap](./a-usage-mark-taken-inside-another-mark.md) | pending |
 | [`date -Is`, the timestamp example in every recording skill, fails on macOS (BSD date)](./date-is-the-timestamp-example-in-every.md) | completed |
 | [Diagnose why the auto-commit step does not fire after MCP-driven PRD mutations in Claude Code skills](./diagnose-why-the-auto-commit-step-does.md) | completed |
 | [hench init must gitignore .hench/locks/ or the first autonomous run self-blocks](./hench-init-must-gitignore-hench-locks.md) | completed |
