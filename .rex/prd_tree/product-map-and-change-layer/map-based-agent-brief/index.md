@@ -15,7 +15,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "The brief carries the capability being changed, its constraints and where it lives in code, not a release title. Same for every vendor.\n\nRoadmap PR 19 · wave 2 · lane hench."
-lastModified: "2026-10-06T04:19:59.762Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-06T15:51:46.209Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

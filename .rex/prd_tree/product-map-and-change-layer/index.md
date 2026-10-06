@@ -45,3 +45,4 @@ plannedRelease: "1.0.0"
 | [Split the rex MCP tools into one module per tool](./split-the-rex-mcp-tools-into-one/index.md) | pending |
 | [Stamp shippedIn from any CI](./stamp-shippedin-from-any-ci/index.md) | pending |
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | pending |
+| [Review follow-ups for the product map work](./review-follow-ups-for-the-product-map.md) | pending |

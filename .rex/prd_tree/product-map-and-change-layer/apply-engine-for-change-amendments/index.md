@@ -14,7 +14,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Apply merges a change's amendments into the map, deterministically, with no model call. Run with the strongest model tier and --review.\n\nRoadmap PR 10 · wave 1 · lane rex-domain."
-lastModified: "2026-10-06T04:19:26.490Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:18.381Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

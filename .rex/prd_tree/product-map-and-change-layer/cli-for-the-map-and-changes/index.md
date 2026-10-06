@@ -15,7 +15,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "New verbs and layer-aware restructuring.\n\nRoadmap PR 18 · wave 2 · lane rex-surface."
-lastModified: "2026-10-06T04:19:52.716Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:31.582Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

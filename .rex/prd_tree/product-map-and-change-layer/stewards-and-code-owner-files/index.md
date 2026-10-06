@@ -15,7 +15,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Stewards are declared on the map and enforced through each host's code-owner file. Git email is the identity.\n\nRoadmap PR 25 · wave 3 · lane core-docs."
-lastModified: "2026-10-06T04:20:33.321Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:38.602Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

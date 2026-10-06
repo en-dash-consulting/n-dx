@@ -14,7 +14,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Build the new views against v2 fixtures only, so the UI work can run in parallel with the store. No routes or wiring.\n\nRoadmap PR 14 · wave 1 · lane web."
-lastModified: "2026-10-06T04:19:39.623Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-06T15:51:44.218Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

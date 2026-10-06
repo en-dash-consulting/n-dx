@@ -15,7 +15,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Critical path. Dual-read keeps main working on the v1 tree while v2 code lands. Run with the strongest model tier and --review.\n\nRoadmap PR 9 · wave 1 · lane rex-store."
-lastModified: "2026-10-06T04:19:25.134Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:16.612Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

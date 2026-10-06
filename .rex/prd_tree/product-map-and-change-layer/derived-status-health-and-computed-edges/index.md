@@ -14,7 +14,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Capability status and health are derived, never set. Computed edges are cached, never committed.\n\nRoadmap PR 11 · wave 1 · lane rex-domain."
-lastModified: "2026-10-06T04:19:28.516Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:20.104Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -24,3 +25,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Compute edges, derived kind and alias resolution](./compute-edges-derived-kind-and-alias.md) | pending |
 | [Compute intent status and health for map nodes](./compute-intent-status-and-health-for.md) | pending |
+| [Work out when a change landed from git history](./work-out-when-a-change-landed-from-git.md) | pending |

@@ -15,7 +15,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Critical path. One module writes all tool state: one committed state.yaml per folder, keyed by item id.\n\nRoadmap PR 8 · wave 1 · lane rex-store."
-lastModified: "2026-10-06T04:19:24.478Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:14.802Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

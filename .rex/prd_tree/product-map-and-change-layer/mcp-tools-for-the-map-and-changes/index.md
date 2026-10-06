@@ -16,7 +16,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Critical path. Tool names stay; shapes freeze at 1.0.0.\n\nRoadmap PR 17 · wave 2 · lane rex-surface."
-lastModified: "2026-10-06T04:19:48.640Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:29.882Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
