@@ -673,8 +673,6 @@ export {
   noul,
   score,
   setJevObserver,
-  JEV_ENDPOINT,
-  JEV_MODEL,
   JEV_VENDOR,
 } from "./jev-client.js";
 
@@ -696,18 +694,6 @@ export type {
 } from "./jev-client.js";
 
 // Content-addressed cache for Jev answers. The consumer names the directory;
-// this module has no opinion about where a package keeps its state.
-export {
-  configureJudgmentCache,
-  isJudgmentCacheConfigured,
-  lookupJudgments,
-  storeJudgments,
-  judgmentKey,
-  canonicalJSON,
-  referencedPaths,
-  resolvePath,
-  JUDGMENT_CACHE_FILE,
-  JUDGMENT_CACHE_MAX_ENTRIES,
-} from "./judgment-cache.js";
-
-export type { CacheLookup } from "./judgment-cache.js";
+// this module has no opinion about where a package keeps its state. Only the
+// switch is public — askJev does the lookups and stores itself.
+export { configureJudgmentCache } from "./judgment-cache.js";
