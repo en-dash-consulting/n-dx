@@ -22,5 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add the v2 node types and fields](./add-the-v2-node-types-and-fields.md) | completed |
-| [Add the v2 validation rules as pure functions](./add-the-v2-validation-rules-as-pure.md) | pending |
+| [Add the v2 validation rules as pure functions](./add-the-v2-validation-rules-as-pure.md) | completed |
+| [long-revised measures revision age from lastModified, which any state write resets](./long-revised-measures-revision-age.md) | pending |
+| [Title lint rejects dependency versions such as "Upgrade zod to 3.25.76" as release tokens](./title-lint-rejects-dependency-versions.md) | pending |
 | [v2 schema field coverage is checked against a reconstructed field list, not the design doc's intent/state tables](./v2-schema-field-coverage-is-checked.md) | pending |
