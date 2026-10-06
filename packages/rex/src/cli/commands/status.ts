@@ -136,7 +136,7 @@ export async function cmdStatus(
   // Emit migration notification to CLI and execution log
   await emitMigrationNotification(migrationResult, flags, (entry) => store.appendLog(entry));
   const doc = await store.loadDocument();
-  doc.items = await loadItemsPreferFolderTree(rexDir, store);
+  doc.items = await loadItemsPreferFolderTree(rexDir, store, doc);
 
   // Compute coverage if requested
   let verifyResult: VerifyResult | undefined;

@@ -13,7 +13,6 @@ import {
  resolveRexPaths } from "../../store/index.js";
 import { findItem } from "../../core/tree.js";
 import { getFolderTreePath } from "../folder-tree-path.js";
-import { syncFolderTree } from "./folder-tree-sync.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 
 import { CLIError } from "../errors.js";
@@ -31,6 +30,7 @@ import {
   getLLMVendor,
   applyConsolidationGuard,
 } from "../../analyze/index.js";
+import { pickLoEFields } from "../../analyze/index.js";
 import type { Proposal, QualityIssue } from "../../analyze/index.js";
 import {PRIORITY_ORDER, LOE_DEFAULTS} from "../../schema/index.js";import type { PRDItem, ItemLevel, DuplicateOverrideMarker, LoEConfig } from "../../schema/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
@@ -885,6 +885,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...pickLoEFields(t),
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             featureId,
@@ -943,6 +944,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...pickLoEFields(t),
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             featureId,
@@ -977,6 +979,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...pickLoEFields(t),
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             parentId,
@@ -1010,6 +1013,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...pickLoEFields(t),
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             parentId,
@@ -1076,7 +1080,6 @@ async function acceptProposals(
   await clearPending(dir);
 
   // Persist the updated tree to the folder structure.
-  await syncFolderTree(rexDir, store);
 
   // Resolve folder-tree paths for newly added items. Items removed by the
   // empty-container cleanup above are naturally excluded since they're no
