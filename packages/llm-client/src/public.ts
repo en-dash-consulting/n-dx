@@ -69,6 +69,9 @@
  * - `layout.ts` — folder-layout resolver (`.ndx/` first, legacy fallback)
  * - `project-config.ts` — `.n-dx.json` override loading and merging
  * - `json.ts` — canonical JSON serialization
+ * - `repo-trust.ts` — repository execution-config trust (baseline, digest, per-user trust store)
+ * - `redact.ts` — credential redaction for run records, logs and live output
+ * - `auth-token.ts` — per-user dashboard token file (`<ndx home>/auth.token`)
  * - `output.ts` — CLI output control (quiet mode)
  * - `suggest.ts` — CLI typo correction
  * - `help-format.ts` — CLI help formatting and color output
@@ -179,7 +182,19 @@ export {
   MODEL_CONTEXT_WINDOWS,
   MODEL_COSTS,
 } from "./config.js";
-export type { TaskModelResolution, JudgmentRoute, ModelCost } from "./config.js";
+export type { TaskModelResolution, ModelSourceKey, JudgmentRoute, ModelCost } from "./config.js";
+
+// Claude Messages API effort (output_config.effort)
+export {
+  CLAUDE_EFFORT_LEVELS,
+  EFFORT_CAPABLE_CLAUDE_MODELS,
+  CLAUDE_DEFAULT_EFFORT,
+  isClaudeEffort,
+  supportsClaudeEffort,
+  resolveClaudeApiEffort,
+  resetClaudeEffortWarnings,
+} from "./claude-effort.js";
+export type { ClaudeEffort } from "./claude-effort.js";
 
 // Model-aware token pricing (the single price table for every cost surface)
 export {
@@ -278,6 +293,14 @@ export {
 } from "./create-client.js";
 export type { CreateClientOptions } from "./create-client.js";
 
+// MCP client roots → served workspace
+export { resolveWorkspaceFromRoots } from "./workspace-roots.js";
+export type {
+  WorkspaceRoot,
+  ResolveWorkspaceFromRootsOptions,
+  WorkspaceResolution,
+} from "./workspace-roots.js";
+
 // Auth detection and validation
 export {
   detectCliAvailability,
@@ -360,6 +383,53 @@ export type {
 
 // Canonical JSON serialization
 export { toCanonicalJSON } from "./json.js";
+
+// Repository trust: what a checkout ships as execution config, and whether
+// this user has accepted it (record kept in <ndx home>/trust/, never in the repo)
+export {
+  SECRET_PATH_PATTERNS,
+  GIT_SUBCOMMAND_BASELINE,
+  guardBaselineForLanguage,
+  clampGuardToBaseline,
+  collectRepoExecutionConfig,
+  assessRepoExecutionConfig,
+  collectRepoInventory,
+  repoTrustRecordPath,
+  readRepoTrustRecord,
+  recordRepoTrust,
+  clearRepoTrust,
+  evaluateRepoTrust,
+  formatRepoTrustReport,
+} from "./repo-trust.js";
+export type {
+  GuardBaseline,
+  RepoMcpServer,
+  RepoExecutionConfig,
+  RepoTrustFindingCode,
+  RepoTrustFinding,
+  RepoInventory,
+  RepoTrustRecord,
+  RepoTrustStoreOptions,
+  RepoTrustState,
+  RepoTrustEvaluation,
+  RepoTrustReportOptions,
+} from "./repo-trust.js";
+// Credential redaction for persisted or displayed text (run records, logs, live output)
+export {
+  REDACTED_TOKEN,
+  REDACTED_VALUE,
+  REDACTED_KEY_BLOCK,
+  REDACTED_PASSWORD,
+  redactSecrets,
+  redactSecretsDetailed,
+  redactDeep,
+  createLineRedactor,
+} from "./redact.js";
+export type { RedactionResult, LineRedactor } from "./redact.js";
+
+// Per-user dashboard token file (`<ndx home>/auth.token`); the request check lives in web/shared/auth.ts
+export { AUTH_TOKEN_FILENAME, resolveAuthTokenPath, readAuthToken, ensureAuthToken, hasAuthToken } from "./auth-token.js";
+export type { AuthTokenPathOptions } from "./auth-token.js";
 
 // Project-level config utilities (.n-dx.json overrides)
 export {
@@ -571,3 +641,25 @@ export type {
   UsageSection,
   UsageDefinition,
 } from "./help-format.js";
+
+// Shared available-memory reading (macOS counts reclaimable pages + kernel pressure)
+export {
+  readAvailableMemory,
+  getAvailableMemory,
+  createAvailableMemoryReader,
+  parseVmStatAvailableBytes,
+  parseDarwinPressureLevel,
+  derivePressure,
+  MEMORY_READING_TTL_MS,
+  MEMORY_EXEC_TIMEOUT_MS,
+  PRESSURE_CRITICAL_USED_PERCENT,
+  PRESSURE_WARN_USED_PERCENT,
+} from "./system-memory.js";
+
+export type {
+  AvailableMemoryReading,
+  MemoryPressure,
+  ExecRunner,
+  SystemMemoryDeps,
+  AvailableMemoryReader,
+} from "./system-memory.js";

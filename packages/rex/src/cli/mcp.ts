@@ -1,11 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { RootsListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { join } from "node:path";
-import { resolveStore, resolveRemoteStore, SyncEngine, ensureLegacyPrdMigrated, openClaimsStore, resolveClaimHolder, resolveRexPaths, PRD_TREE_DIRNAME } from "../store/index.js";
+import { resolve } from "node:path";
+import { resolveRemoteStore, SyncEngine } from "../store/index.js";
 import { TOOL_VERSION } from "./commands/constants.js";
 import { getAllLevels } from "../schema/index.js";
-import { formatMigrationBanner, getMigrationMcpWarning } from "./migration-notification.js";
+import { openRexWorkspace, WorkspaceBinding, type RexWorkspace } from "./mcp-workspace.js";
 import {
   handleGetPrdStatus,
   handleGetNextTask,
@@ -45,46 +46,75 @@ import {
  * await server.connect(transport);
  * ```
  */
-export async function createRexMcpServer(dir: string): Promise<McpServer> {
-  const rexDir = resolveRexPaths(dir).rexDir;
+export interface CreateRexMcpServerOptions {
+  /**
+   * Follow the client's MCP roots (#499). Only the stdio entry point sets it,
+   * and it takes effect only when `dir` is the process cwd — the implicit `.`
+   * of a tracked `.mcp.json`. An explicit directory, and the web/hub factory,
+   * keep the dir they were given.
+   */
+  resolveWorkspaceFromClientRoots?: boolean;
+}
 
-  // Ensure legacy .rex/prd.json is migrated to folder-tree format before any PRD operations
-  const migrationResult = await ensureLegacyPrdMigrated(dir);
-  if (migrationResult.migrated) {
-    const banner = formatMigrationBanner(
-      migrationResult.backupPath ?? "(unknown)",
-      migrationResult.itemCount ?? 0,
-      migrationResult.folderTreePath ?? PRD_TREE_DIRNAME,
-    );
-    console.error(banner);
-  }
+/** A tool result as the handlers in mcp-tools.ts build it. */
+type ToolResult = {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+  warning?: string;
+};
 
-  const store = await resolveStore(rexDir);
-  // Cross-worktree claims: selection skips tasks another worktree is working
-  // on. Outside a repository this is the no-op store and nothing is skipped.
-  const claims = { store: openClaimsStore(dir), worktreeRoot: resolveClaimHolder(dir).worktreeRoot };
+/**
+ * Whether a call writes the PRD or claims. Writes are refused while the
+ * client's root cannot be served; reads answer from the startup dir.
+ */
+type Access = "read" | "write";
+
+export async function createRexMcpServer(
+  dir: string,
+  options: CreateRexMcpServerOptions = {},
+): Promise<McpServer> {
+  const startup = await openRexWorkspace(dir, "startup", dir);
+  const followRoots = options.resolveWorkspaceFromClientRoots === true && resolve(dir) === resolve(process.cwd());
+  const binding = followRoots ? WorkspaceBinding.tracking(startup) : WorkspaceBinding.fixed(startup);
 
   const server = new McpServer({
     name: "rex",
     version: TOOL_VERSION,
   });
 
-  // Store migration warning for first tool call injection
-  const migrationWarning = migrationResult.migrated
-    ? getMigrationMcpWarning(migrationResult)
-    : undefined;
-  let migrationWarningEmitted = false;
+  if (followRoots) {
+    const protocol = server.server;
+    const resolveFromRoots = () =>
+      binding.resolve(async (timeout) => (await protocol.listRoots(undefined, { timeout })).roots);
+    // Roots exist only once the client has initialized.
+    protocol.oninitialized = () => {
+      if (protocol.getClientCapabilities()?.roots) void resolveFromRoots();
+      else binding.settleWithoutRoots();
+    };
+    protocol.setNotificationHandler(RootsListChangedNotificationSchema, async () => {
+      await resolveFromRoots();
+    });
+  }
 
-  // Helper to inject migration warning into first tool call
-  const withMigrationWarning = <T extends any[], R extends { warning?: string }>(
-    handler: (...args: T) => Promise<R>,
-  ): ((...args: T) => Promise<R>) => {
-    return async (...args: T): Promise<R> => {
-      const result = await handler(...args);
-      if (migrationWarning && !migrationWarningEmitted) {
-        migrationWarningEmitted = true;
-        result.warning = migrationWarning;
+  /**
+   * Run a handler against the workspace current at call time — after any
+   * in-flight roots resolution — refusing writes the client's root cannot
+   * take, and attaching the one-time migration notice.
+   */
+  const withWorkspace = <T extends any[]>(
+    access: Access | ((...args: T) => Access),
+    handler: (ws: RexWorkspace, ...args: T) => Promise<ToolResult>,
+  ): ((...args: T) => Promise<ToolResult>) => {
+    return async (...args: T): Promise<ToolResult> => {
+      const ws = await binding.ready();
+      const kind = typeof access === "function" ? access(...args) : access;
+      if (ws.refused && kind === "write") {
+        return { content: [{ type: "text", text: `Error: ${ws.refused}` }], isError: true };
       }
+      const result = await handler(ws, ...args);
+      const warnings = [ws.refused, ws.migrationWarning].filter((w): w is string => Boolean(w));
+      ws.migrationWarning = undefined;
+      if (warnings.length > 0) result.warning = warnings.join("\n\n");
       return result;
     };
   };
@@ -92,7 +122,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
   // --- Tools ---
 
   server.tool("get_prd_status", "Get PRD title, overall stats, and per-epic stats. Use to understand project scope and progress.", {},
-    withMigrationWarning(() => handleGetPrdStatus(store)));
+    withWorkspace("read", (ws) => handleGetPrdStatus(ws.store)));
 
   server.tool(
     "get_next_task",
@@ -100,7 +130,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
     {
       tags: z.array(z.string()).optional().describe("Only return tasks that have at least one of these tags. Omit to return any task regardless of tags."),
     },
-    withMigrationWarning((args) => handleGetNextTask(store, args, claims)),
+    withWorkspace("read", (ws, args) => handleGetNextTask(ws.store, args, ws.claims)),
   );
 
   server.tool(
@@ -114,7 +144,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       resolutionType: z.enum(["code-change", "config-override", "acknowledgment", "deferred", "unclassified"]).optional().describe("How the task was resolved (required when status is 'completed')"),
       resolutionDetail: z.string().optional().describe("Brief description of how the resolution was achieved"),
     },
-    withMigrationWarning((args) => handleUpdateTaskStatus(store, dir, args, claims)),
+    withWorkspace("write", (ws, args) => handleUpdateTaskStatus(ws.store, ws.projectDir, args, ws.claims)),
   );
 
   // Claims are how two worktrees of one repository avoid picking the same
@@ -127,7 +157,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
     {
       id: z.string().describe("Task ID to claim"),
     },
-    withMigrationWarning((args) => handleClaimTask(store, args, claims)),
+    withWorkspace("write", (ws, args) => handleClaimTask(ws.store, args, ws.claims)),
   );
 
   server.tool(
@@ -136,7 +166,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
     {
       id: z.string().describe("Task ID to release"),
     },
-    withMigrationWarning((args) => handleReleaseTask(args, claims)),
+    withWorkspace("write", (ws, args) => handleReleaseTask(args, ws.claims)),
   );
 
   server.tool(
@@ -153,7 +183,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       source: z.string().optional().describe("Source of this item"),
       blockedBy: z.array(z.string()).optional().describe("IDs of blocking items"),
     },
-    withMigrationWarning((args) => handleAddItem(store, dir, rexDir, args)),
+    withWorkspace("write", (ws, args) => handleAddItem(ws.store, ws.projectDir, ws.rexDir, args)),
   );
 
   server.tool(
@@ -170,7 +200,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       source: z.string().optional().describe("New source"),
       blockedBy: z.array(z.string()).optional().describe("New blocked-by IDs"),
     },
-    withMigrationWarning((args) => handleEditItem(store, dir, args)),
+    withWorkspace("write", (ws, args) => handleEditItem(ws.store, ws.projectDir, args)),
   );
 
   server.tool(
@@ -180,7 +210,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       id: z.string().describe("Item ID to move"),
       parentId: z.string().optional().describe("New parent ID (omit to move to root)"),
     },
-    withMigrationWarning((args) => handleMoveItem(store, rexDir, args)),
+    withWorkspace("write", (ws, args) => handleMoveItem(ws.store, ws.rexDir, args)),
   );
 
   server.tool(
@@ -193,7 +223,10 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       title: z.string().optional().describe("New title for the merged item (default: keep target's title)"),
       description: z.string().optional().describe("New description (default: combine all descriptions)"),
     },
-    withMigrationWarning((args) => handleMergeItems(store, rexDir, args)),
+    withWorkspace(
+      (args) => (args.preview ? "read" : "write"),
+      (ws, args) => handleMergeItems(ws.store, ws.rexDir, args),
+    ),
   );
 
   server.tool(
@@ -202,7 +235,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
     {
       id: z.string().describe("Item ID"),
     },
-    withMigrationWarning((args) => handleGetItem(store, args)),
+    withWorkspace("read", (ws, args) => handleGetItem(ws.store, args)),
   );
 
   server.tool(
@@ -213,7 +246,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       itemId: z.string().optional().describe("Related item ID"),
       detail: z.string().optional().describe("Event details"),
     },
-    withMigrationWarning((args) => handleAppendLog(store, args)),
+    withWorkspace("write", (ws, args) => handleAppendLog(ws.store, args)),
   );
 
   server.tool(
@@ -223,20 +256,20 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       direction: z.enum(["push", "pull", "sync"]).optional().describe("Sync direction (default: sync)"),
       adapter: z.string().optional().describe("Adapter name (default: notion)"),
     },
-    withMigrationWarning((args) => handleSyncWithRemote(store, rexDir, args, resolveRemoteStore, SyncEngine)),
+    withWorkspace("write", (ws, args) => handleSyncWithRemote(ws.store, ws.rexDir, args, resolveRemoteStore, SyncEngine)),
   );
 
   server.tool("get_recommendations", "Get SourceVision-based recommendations for PRD items. Use alongside get_findings for data-driven planning.", {},
-    withMigrationWarning(() => handleGetRecommendations()));
+    withWorkspace("read", () => handleGetRecommendations()));
 
   server.tool(
     "verify_criteria",
-    "Map acceptance criteria to test files and optionally run tests to verify them",
+    "Map acceptance criteria to test files, and optionally run the repository's test command against them. Tests run only when runTests is true AND the repository's execution config is trusted (see `ndx trust`); the mapping is always returned.",
     {
       taskId: z.string().optional().describe("Task ID to verify (omit for all tasks)"),
-      runTests: z.boolean().optional().describe("Whether to execute tests (default: true)"),
+      runTests: z.boolean().optional().describe("Execute the test command from .rex/config.json (default: false). Ignored, with a note in the result, while the repository is not trusted."),
     },
-    withMigrationWarning((args) => handleVerifyCriteria(store, dir, args)),
+    withWorkspace("read", (ws, args) => handleVerifyCriteria(ws.store, ws.projectDir, args)),
   );
 
   server.tool(
@@ -247,11 +280,14 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       includeCompleted: z.boolean().optional().describe("Include completed items in similarity analysis (default: false)"),
       mode: z.enum(["fast", "full"]).optional().describe("Analysis mode: 'fast' (programmatic only) or 'full' (programmatic + LLM, default)"),
     },
-    withMigrationWarning((args) => handleReorganize(store, dir, args)),
+    withWorkspace(
+      (args) => (args.accept ? "write" : "read"),
+      (ws, args) => handleReorganize(ws.store, ws.projectDir, args),
+    ),
   );
 
   server.tool("health", "Get structure health score with dimensional breakdown (depth, balance, granularity, completeness, staleness)", {},
-    withMigrationWarning(() => handleHealth(store)));
+    withWorkspace("read", (ws) => handleHealth(ws.store)));
 
   server.tool(
     "facets",
@@ -259,7 +295,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
     {
       itemId: z.string().optional().describe("Item ID to get facet suggestions for (omit for overview)"),
     },
-    withMigrationWarning((args) => handleFacets(store, args)),
+    withWorkspace("read", (ws, args) => handleFacets(ws.store, args)),
   );
 
   server.tool(
@@ -268,43 +304,58 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
     {
       id: z.string().optional().describe("Optional: only return rollup for this item"),
     },
-    withMigrationWarning((args) => handleGetTokenUsage(store, dir, args)),
+    withWorkspace("read", (ws, args) => handleGetTokenUsage(ws.store, ws.projectDir, args)),
   );
 
   server.tool("get_capabilities", "Get Rex server capabilities and configuration", {},
-    withMigrationWarning(() => handleGetCapabilities(store)));
+    withWorkspace("read", (ws) => handleGetCapabilities(ws.store, {
+      projectDir: ws.projectDir,
+      rexDir: ws.rexDir,
+      source: ws.source,
+      startupDir: ws.startupDir,
+      ...(ws.refused ? { refused: ws.refused } : {}),
+    })));
 
   // --- Resources ---
 
-  server.resource("prd", "rex://prd", async (uri) => ({
-    contents: [
-      {
-        uri: uri.href,
-        mimeType: "application/json",
-        text: JSON.stringify(await store.loadDocument(), null, 2),
-      },
-    ],
-  }));
+  server.resource("prd", "rex://prd", async (uri) => {
+    const { store } = await binding.ready();
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(await store.loadDocument(), null, 2),
+        },
+      ],
+    };
+  });
 
-  server.resource("workflow", "rex://workflow", async (uri) => ({
-    contents: [
-      {
-        uri: uri.href,
-        mimeType: "text/markdown",
-        text: await store.loadWorkflow(),
-      },
-    ],
-  }));
+  server.resource("workflow", "rex://workflow", async (uri) => {
+    const { store } = await binding.ready();
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/markdown",
+          text: await store.loadWorkflow(),
+        },
+      ],
+    };
+  });
 
-  server.resource("log", "rex://log", async (uri) => ({
-    contents: [
-      {
-        uri: uri.href,
-        mimeType: "application/json",
-        text: JSON.stringify(await store.readLog(50), null, 2),
-      },
-    ],
-  }));
+  server.resource("log", "rex://log", async (uri) => {
+    const { store } = await binding.ready();
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(await store.readLog(50), null, 2),
+        },
+      ],
+    };
+  });
 
   return server;
 }
@@ -312,11 +363,13 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
 /**
  * Start the Rex MCP server over stdio (for `rex mcp <dir>` CLI command).
  *
- * This is the original entry point preserved for backward compatibility.
- * For HTTP or other transports, use {@link createRexMcpServer} instead.
+ * Follows the client's MCP roots when `dir` is the cwd, so a session in a
+ * linked worktree is served that worktree even when its client spawned the
+ * server in the main checkout (#499). For HTTP or other transports, use
+ * {@link createRexMcpServer} instead.
  */
 export async function startMcpServer(dir: string): Promise<void> {
-  const server = await createRexMcpServer(dir);
+  const server = await createRexMcpServer(dir, { resolveWorkspaceFromClientRoots: true });
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

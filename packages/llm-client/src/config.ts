@@ -30,7 +30,7 @@ const LOCAL_CONFIG_FILE = ".n-dx.local.json";
  * entry that must stay aligned — enforced by the catalog-runtime contract
  * test in `tests/e2e/catalog-runtime-contract.test.js`.
  */
-export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5";
+export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5-5";
 
 /**
  * Canonical 'newest model' per vendor.
@@ -40,7 +40,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5";
  * via `resolveVendorModel()`.
  */
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
-  [LLM_VENDOR.CLAUDE]: "claude-sonnet-5",
+  [LLM_VENDOR.CLAUDE]: DEFAULT_CLAUDE_MODEL,
   [LLM_VENDOR.CODEX]: "gpt-5.6-terra",
   // Google: newest *stable* Pro model. `gemini-3.1-pro-preview` is newer but
   // is a preview release — preview IDs can be renamed or withdrawn, so it is
@@ -82,7 +82,7 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
   [LLM_VENDOR.CLAUDE]: {
     light: "claude-haiku-4-5",
     standard: NEWEST_MODELS.claude,
-    heavy: "claude-opus-5",
+    heavy: "claude-opus-5-5",
   },
   [LLM_VENDOR.CODEX]: {
     light: "gpt-5.6-luna",
@@ -171,6 +171,9 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   "gemini-2.5-pro": 1_000_000,
   // Claude
   "claude-haiku-4-5": 200_000,
+  "claude-fable-5-1": 1_000_000,
+  "claude-opus-5-5": 1_000_000,
+  "claude-sonnet-5-5": 1_000_000,
   "claude-fable-5": 1_000_000,
   "claude-opus-5": 1_000_000,
   "claude-opus-4-8": 1_000_000,
@@ -202,8 +205,8 @@ export interface ModelCost {
  * rate; `resolveModelPricing` in `model-pricing.ts` serves every other caller
  * (`ndx usage`, the dashboard's spend views). Values are approximate public
  * list pricing as of 2026-08 and should be updated when vendors change rates.
- * Gemini Pro and Claude Sonnet 5 have tiered/introductory rates; the values
- * here are the standard (higher) tier so estimates never under-report.
+ * Gemini Pro has tiered rates; the values here are the standard (higher) tier
+ * so estimates never under-report.
  *
  * Cache rates are written out rather than computed from the input rate: a
  * multiplier expression such as `3.00 * 0.1` evaluates to 0.30000000000000004,
@@ -212,7 +215,7 @@ export interface ModelCost {
  *
  * | Vendor | Cache write | Cache read |
  * |--------|-------------|------------|
- * | Claude | 1.25x input | 0.1x input |
+ * | Claude | 1.25x input | 0.1x input (exceptions: Opus 5.5 0.05x, Fable 5.1 0.025x) |
  * | OpenAI | 1x input (caching is automatic and carries no write premium) | 0.1x input |
  * | Google | 1x input (explicit cache write is billed as input) | 0.25x input |
  *
@@ -244,10 +247,24 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
     inputPerMToken: 1.25, outputPerMToken: 10.00,
     cacheWritePerMToken: 1.25, cacheReadPerMToken: 0.3125,
   },
-  // Claude — cache write at 1.25x input, read at 0.1x.
+  // Claude — cache write at 1.25x input, read at 0.1x (exceptions noted inline).
   "claude-haiku-4-5": {
     inputPerMToken: 1.00, outputPerMToken: 5.00,
     cacheWritePerMToken: 1.25, cacheReadPerMToken: 0.10,
+  },
+  // Cache read at 0.025x input.
+  "claude-fable-5-1": {
+    inputPerMToken: 10.00, outputPerMToken: 50.00,
+    cacheWritePerMToken: 12.50, cacheReadPerMToken: 0.25,
+  },
+  // Cache read at 0.05x input.
+  "claude-opus-5-5": {
+    inputPerMToken: 4.00, outputPerMToken: 20.00,
+    cacheWritePerMToken: 5.00, cacheReadPerMToken: 0.20,
+  },
+  "claude-sonnet-5-5": {
+    inputPerMToken: 2.00, outputPerMToken: 10.00,
+    cacheWritePerMToken: 2.50, cacheReadPerMToken: 0.20,
   },
   "claude-fable-5": {
     inputPerMToken: 10.00, outputPerMToken: 50.00,
@@ -262,8 +279,8 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
     cacheWritePerMToken: 6.25, cacheReadPerMToken: 0.50,
   },
   "claude-sonnet-5": {
-    inputPerMToken: 3.00, outputPerMToken: 15.00,
-    cacheWritePerMToken: 3.75, cacheReadPerMToken: 0.30,
+    inputPerMToken: 2.00, outputPerMToken: 10.00,
+    cacheWritePerMToken: 2.50, cacheReadPerMToken: 0.20,
   },
   "claude-sonnet-4-6": {
     inputPerMToken: 3.00, outputPerMToken: 15.00,
@@ -299,12 +316,16 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
 /**
  * Map of shorthand model aliases to full Anthropic API model IDs.
  * The Claude CLI resolves these internally, but the API requires full IDs.
+ *
+ * Family aliases are pinned to literal IDs on purpose, not to TIER_MODELS
+ * slots: a tier may move to another family, an alias must not. `sonnet`
+ * follows NEWEST_MODELS because the Sonnet line is the standard default.
  */
 const MODEL_ALIASES: Record<string, string> = {
   sonnet: NEWEST_MODELS.claude,
-  opus: "claude-opus-5",
+  opus: "claude-opus-5-5",
   haiku: "claude-haiku-4-5",
-  fable: "claude-fable-5",
+  fable: "claude-fable-5-1",
 };
 
 /**
@@ -356,82 +377,118 @@ export function resolveVendorModel(
   config?: LLMConfig,
   weight: TaskWeight = "standard",
 ): string {
+  return resolveVendorModelWithSource(vendor, config, weight).model;
+}
+
+/**
+ * The config key that supplied a resolved model, so a caller can say *why* a
+ * model was picked without re-deriving the precedence:
+ *
+ * - `llm.model`, `llm.<vendor>.model`, `llm.<vendor>.lightModel` — that slot
+ * - `llm.tiers.<vendor>.<tier>` — a per-tier override
+ * - `llm.routes` — a configured route picked a tier whose catalog model ran
+ * - `vendor-default` — the vendor's catalog model for the tier
+ * - `explicit` — the caller passed the model in
+ */
+export type ModelSourceKey =
+  | "explicit"
+  | "llm.routes"
+  | "llm.model"
+  | `llm.${string}.model`
+  | `llm.${string}.lightModel`
+  | `llm.tiers.${string}.${string}`
+  | "vendor-default";
+
+/**
+ * {@link resolveVendorModel} together with the slot that supplied the model.
+ * This is the one implementation of the precedence — `resolveVendorModel`
+ * returns its model half — so a reported source cannot drift from the choice.
+ */
+function resolveVendorModelWithSource(
+  vendor: LLMVendor,
+  config: LLMConfig | undefined,
+  weight: TaskWeight,
+): { model: string; source: ModelSourceKey } {
+  const catalog = (model: string): { model: string; source: ModelSourceKey } => ({
+    model,
+    source: "vendor-default",
+  });
   if (vendor === LLM_VENDOR.CLAUDE) {
     if (weight === "light") {
       // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
       if (config?.claude?.lightModel) {
-        return resolveModel(config.claude.lightModel);
+        return { model: resolveModel(config.claude.lightModel), source: "llm.claude.lightModel" };
       }
-      return resolveModel(TIER_MODELS.claude.light);
+      return catalog(resolveModel(TIER_MODELS.claude.light));
     }
     if (weight === "heavy") {
       // Heavy tier: always uses the most capable model; no config override path.
-      return resolveModel(TIER_MODELS.claude.heavy);
+      return catalog(resolveModel(TIER_MODELS.claude.heavy));
     }
     // Standard tier precedence: top-level llm.model > llm.claude.model > tier default.
     if (config?.model) {
-      return resolveModel(config.model);
+      return { model: resolveModel(config.model), source: "llm.model" };
     }
     if (config?.claude?.model) {
-      return resolveModel(config.claude.model);
+      return { model: resolveModel(config.claude.model), source: "llm.claude.model" };
     }
-    return resolveModel(TIER_MODELS.claude.standard);
+    return catalog(resolveModel(TIER_MODELS.claude.standard));
   }
   if (vendor === LLM_VENDOR.CODEX) {
     if (weight === "light") {
       // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
       if (config?.codex?.lightModel) {
-        return normalizeCodexModel(config.codex.lightModel);
+        return { model: normalizeCodexModel(config.codex.lightModel), source: "llm.codex.lightModel" };
       }
-      return TIER_MODELS.codex.light;
+      return catalog(TIER_MODELS.codex.light);
     }
     if (weight === "heavy") {
       // Heavy tier: always uses the most capable model; no config override path.
-      return TIER_MODELS.codex.heavy;
+      return catalog(TIER_MODELS.codex.heavy);
     }
     // Standard tier precedence: top-level llm.model > llm.codex.model > tier default.
     if (config?.model) {
-      return normalizeCodexModel(config.model);
+      return { model: normalizeCodexModel(config.model), source: "llm.model" };
     }
     if (config?.codex?.model) {
-      return normalizeCodexModel(config.codex.model);
+      return { model: normalizeCodexModel(config.codex.model), source: "llm.codex.model" };
     }
-    return TIER_MODELS.codex.standard;
+    return catalog(TIER_MODELS.codex.standard);
   }
   if (vendor === LLM_VENDOR.GOOGLE) {
     if (weight === "light") {
       if (config?.google?.lightModel) {
-        return config.google.lightModel;
+        return { model: config.google.lightModel, source: "llm.google.lightModel" };
       }
-      return TIER_MODELS.google.light;
+      return catalog(TIER_MODELS.google.light);
     }
     if (weight === "heavy") {
       // Heavy tier: always uses the most capable model; no config override path.
-      return TIER_MODELS.google.heavy;
+      return catalog(TIER_MODELS.google.heavy);
     }
     // Standard tier precedence: top-level llm.model > llm.google.model > tier default.
     if (config?.model) {
-      return config.model;
+      return { model: config.model, source: "llm.model" };
     }
     if (config?.google?.model) {
-      return config.google.model;
+      return { model: config.google.model, source: "llm.google.model" };
     }
-    return TIER_MODELS.google.standard;
+    return catalog(TIER_MODELS.google.standard);
   }
   if (vendor === LLM_VENDOR.LOCAL) {
     // Light tier: prefer lightModel, then fall back to model, then "".
     if (weight === "light" && config?.local?.lightModel) {
-      return config.local.lightModel;
+      return { model: config.local.lightModel, source: "llm.local.lightModel" };
     }
     // Standard/heavy: prefer top-level model > llm.local.model > "" (use whatever is loaded).
-    if (config?.model) return config.model;
-    if (config?.local?.model) return config.local.model;
-    return ""; // LM Studio uses whichever model is currently loaded
+    if (config?.model) return { model: config.model, source: "llm.model" };
+    if (config?.local?.model) return { model: config.local.model, source: "llm.local.model" };
+    return catalog(""); // LM Studio uses whichever model is currently loaded
   }
 
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).
-  return (NEWEST_MODELS as Record<string, string>)[vendor] ?? "";
+  return catalog((NEWEST_MODELS as Record<string, string>)[vendor] ?? "");
 }
 
 /**
@@ -492,6 +549,8 @@ export interface TaskModelResolution {
   tier: TaskTier;
   /** Effort level from `llm.effort`, when a class rule matches. */
   effort?: string;
+  /** The config key that supplied {@link model} — see {@link ModelSourceKey}. */
+  source: ModelSourceKey;
 }
 
 /**
@@ -564,21 +623,35 @@ export function resolveTaskModel(
   let tier: TaskTier = routed !== undefined && isTaskTier(routed) ? routed : "standard";
 
   if (opts?.model?.trim()) {
-    return { model: normalizeExplicitModel(vendor, opts.model.trim()), tier, effort };
+    return { model: normalizeExplicitModel(vendor, opts.model.trim()), tier, effort, source: "explicit" };
   }
 
   if (tier === "free") {
     const freeModel = config?.tiers?.[vendor]?.free;
-    if (freeModel) return { model: freeModel, tier: "free", effort };
+    if (freeModel) return { model: freeModel, tier: "free", effort, source: `llm.tiers.${vendor}.free` };
     tier = "light";
   }
 
   const tierOverride = config?.tiers?.[vendor]?.[tier];
   if (tierOverride) {
-    return { model: normalizeExplicitModel(vendor, tierOverride), tier, effort };
+    return {
+      model: normalizeExplicitModel(vendor, tierOverride),
+      tier,
+      effort,
+      source: `llm.tiers.${vendor}.${tier}`,
+    };
   }
 
-  return { model: resolveVendorModel(vendor, config, tier), tier, effort };
+  const resolved = resolveVendorModelWithSource(vendor, config, tier);
+  // A catalog model reached through a configured route was picked by the
+  // route, not by the vendor default.
+  const routedByConfig = configured !== undefined && configured !== JUDGMENT_ROUTE_TYPESAFE;
+  return {
+    model: resolved.model,
+    tier,
+    effort,
+    source: resolved.source === "vendor-default" && routedByConfig ? "llm.routes" : resolved.source,
+  };
 }
 
 // ── Judgment routes ──────────────────────────────────────────────────────────
@@ -658,11 +731,11 @@ export function resolveJudgmentRoute(
  *
  * ## Per-vendor rationale
  *
- * - **claude → `claude-opus-5`** ($5/$25 per MTok, 1M context). Opus-tier
- *   reasoning at the same input price as Opus 4.8/4.7 and ~1.67x the input
- *   price of the Sonnet 5 execution default. `claude-fable-5` is stronger
- *   still but costs 2x Opus ($10/$50) — available via override, not worth it
- *   as the default for a single-pass review.
+ * - **claude → `claude-opus-5-5`** ($4/$20 per MTok, 1M context). Opus-tier
+ *   reasoning at 2x the price of the Sonnet 5.5 execution default ($2/$10),
+ *   and below Opus 5 ($5/$25). `claude-fable-5-1` is stronger still but costs
+ *   2.5x Opus 5.5 ($10/$50) — available via override, not worth it as the
+ *   default for a single-pass review.
  * - **codex → `gpt-5.6-terra`** (`NEWEST_MODELS.codex`). The review model
  *   equals the execution model. `gpt-5.6-sol` is the heavy tier ($4/$20 vs
  *   terra's $2/$12) — available via override or `reviewModel` config, but not
@@ -675,7 +748,7 @@ export function resolveJudgmentRoute(
  * Override precedence is handled by {@link resolveReviewModel}.
  */
 export const REVIEW_MODELS: Record<LLMVendor, string> = {
-  [LLM_VENDOR.CLAUDE]: "claude-opus-5",
+  [LLM_VENDOR.CLAUDE]: TIER_MODELS.claude.heavy,
   [LLM_VENDOR.CODEX]: NEWEST_MODELS.codex,
   [LLM_VENDOR.GOOGLE]: TIER_MODELS.google.heavy,
   [LLM_VENDOR.LOCAL]: "",
@@ -772,6 +845,9 @@ function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null
   }
   if (typeof claude.lightModel === "string" && claude.lightModel) {
     result.lightModel = claude.lightModel;
+  }
+  if (typeof claude.reviewModel === "string" && claude.reviewModel) {
+    result.reviewModel = claude.reviewModel;
   }
   return Object.keys(result).length > 0 ? result : null;
 }

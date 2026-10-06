@@ -25,7 +25,24 @@ export {
   stripBasePath,
   webSocketUrl,
 } from "./base-path.js";
-export { isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
+export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
+export { HUB_ADMISSION_HEADER, formatHubAdmissionHeader, parseHubAdmissionHeader } from "./hub-admission.js";
+export type { HubAdmissionHeader, HubMemoryPressure } from "./hub-admission.js";
+export { RUN_OPTION_SPECS, CONTEXT_NOTES_MAX_BYTES, checkRunOptions, resetsDeferred, runOptionArgs, workCommandArgs, checkRunMode, RUN_MODES, MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "./run-options.js";
+export type { RunOptionSpec, RunOptions, RunOptionKey, RunOptionsCheck, WorkCommand, RunMode, RunModeCheck } from "./run-options.js";
+export {
+  AUTH_COOKIE_NAME,
+  AUTH_HEADER_NAME,
+  AUTH_QUERY_PARAM,
+  tokensEqual,
+  parseCookieValue,
+  presentedToken,
+  isAuthenticated,
+  splitTokenQuery,
+  authCookie,
+  urlWithToken,
+} from "./auth.js";
+export type { AuthHeaders } from "./auth.js";
 export {
   SOURCEVISION_SCOPE_VIEWS,
   REX_SCOPE_VIEWS,

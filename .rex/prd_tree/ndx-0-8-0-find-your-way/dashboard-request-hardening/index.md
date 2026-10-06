@@ -22,6 +22,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add a SECURITY.md with a private reporting route](./add-a-security-md-with-a-private.md) | pending |
+| [Add a SECURITY.md with a private reporting route](./add-a-security-md-with-a-private.md) | completed |
 | [Stop GET /api/ndx-config from writing .n-dx.json](./stop-get-api-ndx-config-from-writing-n.md) | pending |
-| [Validate the Host header on hub and dashboard server requests](./validate-the-host-header-on-hub-and.md) | pending |
+| [Validate the Host header on hub and dashboard server requests](./validate-the-host-header-on-hub-and.md) | completed |

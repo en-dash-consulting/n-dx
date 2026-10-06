@@ -75,12 +75,44 @@ function initCopyButtons(): void {
 
 // ── Setup wizard (bootstraps this project without a terminal) ──
 
+/**
+ * Where this page is mounted. Standalone (`ndx start --here`) it is served at
+ * `/`; behind the per-user hub — which is what plain `ndx start` registers
+ * with — it is served at `/p/<id>/`, and a worktree other than the anchor sits
+ * under `/w/<key>/`. A root-relative `fetch("/api/…")` from there reaches the
+ * hub rather than this project: with one project registered the hub aliases it
+ * back, but with two it answers 409 and the wizard would initialize nothing.
+ *
+ * Deliberately a local copy of `detectViewerBasePath` (src/shared/base-path.ts)
+ * rather than an import: the landing page is a self-contained zone with no
+ * imports into the dashboard viewer (see build.js), so the prefix shapes are
+ * duplicated here on purpose. Keep the two in step.
+ */
+function apiUrl(path: string): string {
+  const pathname = typeof location === "undefined" ? "" : location.pathname;
+  const project = /^\/p\/[^/?#]+/.exec(pathname)?.[0] ?? "";
+  const workspace = /^\/w\/[^/?#]+/.exec(pathname.slice(project.length))?.[0] ?? "";
+  return `${project}${workspace}${path}`;
+}
+
 interface InitStatusResponse {
   running: boolean;
   startedAt: string | null;
   finishedAt: string | null;
   output: string;
   error: string | null;
+  /** Whether this run was asked to create a git repository. */
+  gitRequested?: boolean;
+  /** Whether the folder is a repository now — null until a git run finishes. */
+  gitInitialized?: boolean | null;
+}
+
+/** GET /api/commands/init/preflight — what this folder looks like pre-init. */
+interface InitPreflightResponse {
+  /** Already inside a git working tree. */
+  isRepo: boolean;
+  /** `git` answers on this machine's PATH. */
+  gitAvailable: boolean;
 }
 
 const WIZARD_VENDOR_HINTS: Record<string, string> = {
@@ -107,9 +139,43 @@ function initSetupWizard(): void {
   const googleKeyInput = document.getElementById("wizard-google-key") as HTMLInputElement | null;
   const localHostInput = document.getElementById("wizard-local-host") as HTMLInputElement | null;
   const localPortInput = document.getElementById("wizard-local-port") as HTMLInputElement | null;
+  const gitFieldset = document.getElementById("wizard-git-fieldset") as HTMLFieldSetElement | null;
+  const gitCheckbox = document.getElementById("wizard-git") as HTMLInputElement | null;
+  const gitHint = document.getElementById("wizard-git-hint");
 
   let selectedVendor = "claude";
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Ask the server what this folder is before offering to set it up. The git
+   * question only appears for a folder that is not already in a repository —
+   * for everything else there is nothing to decide, so nothing is shown.
+   *
+   * A failed preflight leaves the fieldset hidden: the wizard then sends no
+   * git answer at all and `ndx init` keeps its own default, which is exactly
+   * the behaviour this page had before the question existed.
+   */
+  async function loadPreflight(): Promise<void> {
+    try {
+      const res = await fetch(apiUrl("/api/commands/init/preflight"));
+      if (!res.ok) return;
+      const data = (await res.json()) as InitPreflightResponse;
+      if (data.isRepo || !gitFieldset) return;
+      gitFieldset.hidden = false;
+      if (!data.gitAvailable && gitCheckbox && gitHint) {
+        // Nothing to offer: `git init` would fail and init would carry a
+        // warning instead of a repository.
+        gitCheckbox.checked = false;
+        gitCheckbox.disabled = true;
+        gitHint.textContent =
+          "git was not found on this machine's PATH. Install git, then run `git init` here "
+          + "and re-run setup to enable n-dx's auto-commit features.";
+      }
+    } catch {
+      // Offline or an older server — leave the question out rather than
+      // guessing at an answer the operator never gave.
+    }
+  }
 
   function selectVendor(vendor: string): void {
     selectedVendor = vendor;
@@ -149,7 +215,7 @@ function initSetupWizard(): void {
 
   async function pollStatus(): Promise<void> {
     try {
-      const res = await fetch("/api/commands/init/status");
+      const res = await fetch(apiUrl("/api/commands/init/status"));
       if (!res.ok) return;
       const data = (await res.json()) as InitStatusResponse;
       if (data.running || !data.finishedAt) return;
@@ -161,11 +227,22 @@ function initSetupWizard(): void {
         return;
       }
       if (progressEl) progressEl.hidden = true;
-      if (successEl) successEl.hidden = false;
+      if (successEl) {
+        if (data.gitRequested && data.gitInitialized === false) {
+          // Init itself succeeded — only the repository is missing, so this is
+          // a note on the success line rather than an error.
+          successEl.append(" (git repository could not be created — is git installed?)");
+        } else if (data.gitInitialized) {
+          successEl.append(" Git repository created.");
+        }
+        successEl.hidden = false;
+      }
       // The server now sees .rex/.sourcevision/.hench on disk, so the next
       // request to "/" serves the real dashboard instead of this page.
       setTimeout(() => {
-        location.href = "/";
+        // Same prefix as the API calls — "/" would land on the hub's chooser
+        // (or another project) instead of the dashboard just initialized.
+        location.href = apiUrl("/");
       }, 900);
     } catch {
       // Transient network hiccup — keep polling, the interval will retry.
@@ -186,6 +263,11 @@ function initSetupWizard(): void {
     }
 
     const body: Record<string, unknown> = { assistants, provider: selectedVendor };
+    // Only sent when the question was actually asked — a hidden fieldset means
+    // the folder is already a repository (or the preflight never answered).
+    if (gitFieldset && !gitFieldset.hidden && gitCheckbox && !gitCheckbox.disabled) {
+      body.git = gitCheckbox.checked;
+    }
     if (selectedVendor === "google") {
       const key = googleKeyInput?.value.trim();
       if (key) body.googleApiKey = key;
@@ -205,7 +287,7 @@ function initSetupWizard(): void {
 
     void (async () => {
       try {
-        const res = await fetch("/api/commands/init", {
+        const res = await fetch(apiUrl("/api/commands/init"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -228,6 +310,7 @@ function initSetupWizard(): void {
   });
 
   selectVendor(selectedVendor);
+  void loadPreflight();
 }
 
 // ── "Prefer the terminal?" toggle for the raw CLI fallback ──

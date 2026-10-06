@@ -48,7 +48,14 @@
 
 // ---- Store ------------------------------------------------------------------
 
-export { resolveStore, PRD_FILENAME, PRD_TREE_DIRNAME, TREE_META_FILENAME, SELF_HEAL_TAG } from "./store/index.js";
+export {
+  resolveStore,
+  PRD_FILENAME,
+  PRD_CACHE_DIRNAME,
+  PRD_TREE_DIRNAME,
+  TREE_META_FILENAME,
+  SELF_HEAL_TAG,
+} from "./store/index.js";
 
 // Cross-worktree task claims (git common dir)
 export {

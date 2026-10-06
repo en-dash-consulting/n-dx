@@ -15,6 +15,7 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import {
   ConfigFooter,
+  formatModel,
   identityLine,
   identityTooltip,
   installRootLabel,
@@ -54,6 +55,25 @@ describe("installRootLabel", () => {
   it("returns null rather than a placeholder when there is nothing to show", () => {
     expect(installRootLabel("")).toBeNull();
     expect(installRootLabel("cli.js")).toBeNull();
+  });
+});
+
+describe("formatModel", () => {
+  it("keeps every version part of a Claude id, so 5.5 is not read as 5", () => {
+    expect(formatModel("claude-sonnet-5-5", "claude")).toBe("sonnet 5.5");
+    expect(formatModel("claude-fable-5-1", "claude")).toBe("fable 5.1");
+    expect(formatModel("claude-haiku-4-5", "claude")).toBe("haiku 4.5");
+    expect(formatModel("claude-opus-5", "claude")).toBe("opus 5");
+  });
+
+  it("does not render a dated snapshot suffix as a version part", () => {
+    expect(formatModel("claude-sonnet-5-5-20261001", "claude")).toBe("sonnet 5.5");
+    expect(formatModel("claude-opus-5-20260601", "claude")).toBe("opus 5");
+  });
+
+  it("falls back to 'default' and leaves short non-Claude ids alone", () => {
+    expect(formatModel(null, null)).toBe("default");
+    expect(formatModel("gpt-5.6-terra", "codex")).toBe("gpt-5.6-terra");
   });
 });
 

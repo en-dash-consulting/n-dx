@@ -32,8 +32,9 @@
 
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
 import { getMcpServers } from "./assistant-assets.js";
-import { hubHome, hubRequest, isHubMarker, loadHubPort, readHubRegistry, readPidFile, resolveRepo } from "./web.js";
+import { hubHome, hubRequest, isHubMarker, loadHubPort, readAuthTokenFile, readHubRegistry, readPidFile, resolveRepo } from "./web.js";
 
 /** How long a single JSON-RPC round trip may take before it is abandoned. */
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -109,6 +110,41 @@ export function findRegisteredProject(projects, repoRoot) {
 }
 
 /**
+ * The workspace key a client root names, or why it names none.
+ *
+ * A root in the target repository addresses that repository's worktree:
+ * null for the anchor (the project server resolves it without a header),
+ * otherwise the worktree's basename, which is the key the server assigns.
+ *
+ * @param {Array<{uri?: string}>|undefined} roots  `roots/list` result.
+ * @param {string} repoRoot  The registered project's repository root.
+ * @param {(dir: string) => {isRepo: boolean, repoRoot: string, worktree: string}} resolveRepoImpl
+ * @returns {{workspace: string|null, root: string} | {skip: string}}
+ */
+export function workspaceFromRoots(roots, repoRoot, resolveRepoImpl = resolveRepo) {
+  const fileRoot = (Array.isArray(roots) ? roots : [])
+    .find((root) => typeof root?.uri === "string" && root.uri.startsWith("file:"));
+  if (!fileRoot) return { skip: "the client listed no file: root" };
+
+  let path;
+  try {
+    path = fileURLToPath(fileRoot.uri);
+  } catch (err) {
+    return { skip: `client root ${fileRoot.uri} is not a usable path (${err.message})` };
+  }
+  const repo = resolveRepoImpl(path);
+  if (!repo.isRepo || repo.repoRoot !== repoRoot) {
+    return { skip: `client root ${path} is outside ${repoRoot}` };
+  }
+  return { workspace: repo.worktree === repo.repoRoot ? null : basenameOf(repo.worktree), root: path };
+}
+
+/** Prefix of the ids the shim gives its own `roots/list` requests to the client. */
+const ROOTS_REQUEST_PREFIX = "ndx-shim-roots-";
+/** How long held frames wait for the client to answer `roots/list`. */
+const ROOTS_TIMEOUT_MS = 2_000;
+
+/**
  * Bridge stdio frames to a hub endpoint until `input` ends.
  *
  * Messages are handled one at a time. Ordering is not a protocol requirement
@@ -116,49 +152,81 @@ export function findRegisteredProject(projects, repoRoot) {
  * before anything else is sent, and a serial pipeline gets that for free
  * without a special case that could be got wrong.
  *
+ * **Following the client's roots.** The editor may launch this shim in a
+ * different checkout from the one its session runs in (Claude desktop starts
+ * project MCP servers in the main checkout for a worktree session, #499), so
+ * the cwd-derived `workspace` can name the wrong tree. When `repoRoot` is
+ * given and the client advertises `capabilities.roots`, the bridge asks it
+ * `roots/list` after `notifications/initialized`, holding later frames until
+ * the answer (or `rootsTimeoutMs`). The hub binds a session's workspace at
+ * `initialize`, so a root naming another worktree of the same repository
+ * re-opens the session there — the remembered `initialize` and `initialized`
+ * are replayed with the new header and their responses swallowed — and the
+ * first session is closed. The client sees one session throughout.
+ * `notifications/roots/list_changed` repeats the exchange and is not
+ * forwarded: a POST-only bridge gives the hub server no way to ask back.
+ *
  * @param {object} options
  * @param {string} options.url        `http://127.0.0.1:<port>/p/<id>/mcp/<server>`
  * @param {string|null} options.workspace  Worktree key for `X-Ndx-Workspace`.
+ * @param {string} [options.repoRoot] Registered project's repository root; enables following roots.
  * @param {NodeJS.ReadableStream} options.input
  * @param {NodeJS.WritableStream} options.output
  * @param {typeof fetch} [options.fetchImpl]
  * @param {number} [options.timeoutMs]
+ * @param {number} [options.rootsTimeoutMs]
+ * @param {typeof resolveRepo} [options.resolveRepoImpl]
  * @param {(message: string) => void} [options.log]
  * @returns {Promise<void>} Resolves once input ends and the session is closed.
  */
 export async function bridgeStdio(options) {
   const {
     url,
-    workspace,
+    repoRoot,
     input,
     output,
     fetchImpl = fetch,
     timeoutMs = REQUEST_TIMEOUT_MS,
+    rootsTimeoutMs = ROOTS_TIMEOUT_MS,
+    resolveRepoImpl = resolveRepo,
     log = logStderr,
   } = options;
 
+  let workspace = options.workspace;
   let sessionId = null;
   let closed = false;
 
-  const headers = () => {
+  /** The client's handshake, kept to re-open the session on another workspace. */
+  let initializeFrame = null;
+  let initializedFrame = null;
+  let clientHasRoots = false;
+  /** Outstanding shim-owned `roots/list` requests, by id. */
+  const rootsWaiters = new Map();
+  let rootsSeq = 0;
+
+  const headers = (session = sessionId, ws = workspace) => {
     const base = {
       "Content-Type": "application/json",
       // Both, because the transport picks per response and either is valid.
       Accept: "application/json, text/event-stream",
     };
-    if (sessionId) base["Mcp-Session-Id"] = sessionId;
-    if (workspace) base["X-Ndx-Workspace"] = workspace;
+    if (session) base["Mcp-Session-Id"] = session;
+    if (ws) base["X-Ndx-Workspace"] = ws;
+    // The hub requires the per-user token when `ndx start` created one; the
+    // shim runs as the same user, so it reads the same file.
+    const token = readAuthTokenFile();
+    if (token) base["X-Ndx-Token"] = token;
     return base;
   };
 
   /** POST one frame, retrying once: a hub restart mid-session is a dropped socket, not an error to surface. */
-  async function post(message) {
+  async function post(message, requestHeaders = headers()) {
     let lastError = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         return await fetchImpl(url, {
           method: "POST",
-          headers: headers(),
+          headers: requestHeaders,
           body: JSON.stringify(message),
           signal: AbortSignal.timeout(timeoutMs),
         });
@@ -217,26 +285,113 @@ export async function bridgeStdio(options) {
     }
   }
 
+  /** DELETE a hub session. The hub reaps idle sessions anyway, so a failed goodbye is not worth a line. */
+  async function deleteSession(session, ws) {
+    try {
+      await fetchImpl(url, {
+        method: "DELETE",
+        headers: headers(session, ws),
+        signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+      });
+    } catch {
+      // See above: nothing to do about it, and the hub cleans up after us.
+    }
+  }
+
   /** Tell the hub the session is over, so the server can release it. */
   async function closeSession() {
     if (closed || !sessionId) return;
     closed = true;
-    try {
-      await fetchImpl(url, {
-        method: "DELETE",
-        headers: headers(),
-        signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+    await deleteSession(sessionId, workspace);
+  }
+
+  /**
+   * Ask the client for its roots; null when it does not answer in time.
+   * The answer is matched in the line handler, never on the serial chain this
+   * runs on — the chain is what is waiting.
+   */
+  function askClientRoots() {
+    const id = `${ROOTS_REQUEST_PREFIX}${++rootsSeq}`;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        rootsWaiters.delete(id);
+        resolve(null);
+      }, rootsTimeoutMs);
+      rootsWaiters.set(id, (message) => {
+        clearTimeout(timer);
+        rootsWaiters.delete(id);
+        resolve(message);
       });
-    } catch {
-      // The hub reaps idle sessions anyway; a failed goodbye is not worth a line.
+      write({ jsonrpc: "2.0", id, method: "roots/list" });
+    });
+  }
+
+  /**
+   * Open a hub session for `next` with the client's remembered handshake,
+   * swallowing the responses the client has already had from the first one.
+   *
+   * @returns {Promise<string|null>} the new session id, or null on failure
+   */
+  async function openSessionFor(next) {
+    const res = await post(initializeFrame, headers(null, next));
+    const assigned = res.headers.get("mcp-session-id");
+    await res.text();
+    if (!res.ok || !assigned) {
+      log(`hub answered ${res.status} re-opening the session for workspace ${next ?? "(anchor)"}`);
+      if (assigned) await deleteSession(assigned, next);
+      return null;
     }
+    if (initializedFrame) {
+      const ack = await post(initializedFrame, headers(assigned, next));
+      await ack.text();
+    }
+    return assigned;
+  }
+
+  /** Re-target the bridge at the worktree the client's roots name. */
+  async function followClientRoots() {
+    const answer = await askClientRoots();
+    if (!answer) {
+      log(`client did not answer roots/list within ${rootsTimeoutMs} ms — keeping workspace ${workspace ?? "(anchor)"}`);
+      return;
+    }
+    if (answer.error) {
+      log(`client refused roots/list (${answer.error.message ?? "error"}) — keeping workspace ${workspace ?? "(anchor)"}`);
+      return;
+    }
+
+    const decision = workspaceFromRoots(answer.result?.roots, repoRoot, resolveRepoImpl);
+    if ("skip" in decision) {
+      log(`${decision.skip} — keeping workspace ${workspace ?? "(anchor)"}`);
+      return;
+    }
+    if (decision.workspace === workspace) return;
+
+    let next;
+    try {
+      next = await openSessionFor(decision.workspace);
+    } catch (err) {
+      log(`could not re-open the session for ${decision.root}: ${err.message}`);
+      return;
+    }
+    if (!next) return;
+
+    const previous = { session: sessionId, workspace };
+    sessionId = next;
+    workspace = decision.workspace;
+    log(`bridging to ${url} (workspace ${workspace ?? "(anchor)"}, from client root)`);
+    if (previous.session) await deleteSession(previous.session, previous.workspace);
   }
 
   const lines = createInterface({ input, crlfDelay: Infinity });
+  const followsRoots = () => Boolean(repoRoot) && clientHasRoots && initializeFrame !== null;
 
   // Serial: each frame is awaited before the next is read, so `initialize`
   // has established the session before anything that needs it is sent.
   let chain = Promise.resolve();
+  const enqueue = (step) => {
+    chain = chain.then(step).catch((err) => log(`handler failed: ${err.message}`));
+  };
   lines.on("line", (line) => {
     const text = line.trim();
     if (!text) return;
@@ -247,7 +402,30 @@ export async function bridgeStdio(options) {
       log(`ignored a line that is not JSON: ${text.slice(0, 120)}`);
       return;
     }
-    chain = chain.then(() => handle(message)).catch((err) => log(`handler failed: ${err.message}`));
+
+    // The client's answer to the shim's own roots/list. Matched here, ahead of
+    // the chain that is blocked waiting for it, and never forwarded. A late
+    // answer to a timed-out request is dropped the same way.
+    if (typeof message.id === "string" && message.id.startsWith(ROOTS_REQUEST_PREFIX) && message.method === undefined) {
+      rootsWaiters.get(message.id)?.(message);
+      return;
+    }
+
+    if (message.method === "initialize") {
+      initializeFrame = message;
+      clientHasRoots = Boolean(message.params?.capabilities?.roots);
+    }
+
+    if (message.method === "notifications/roots/list_changed") {
+      if (followsRoots()) enqueue(followClientRoots);
+      return;
+    }
+
+    enqueue(() => handle(message));
+    if (message.method === "notifications/initialized") {
+      initializedFrame = message;
+      if (followsRoots()) enqueue(followClientRoots);
+    }
   });
 
   await new Promise((resolve) => {
@@ -310,6 +488,7 @@ export async function runMcpShim(server, dir, { tools = {}, spawnImpl } = {}) {
   await bridgeStdio({
     url: target.url,
     workspace: target.workspace,
+    repoRoot: target.repoRoot,
     input: process.stdin,
     output: process.stdout,
   });
@@ -351,7 +530,7 @@ async function readHubMarker(dir) {
  * 2. The per-user `config.json` plus a registry lookup by repository root, for a
  *    worktree that was never registered from itself.
  *
- * @returns {Promise<{url: string, workspace: string|null}|null>}
+ * @returns {Promise<{url: string, workspace: string|null, repoRoot: string}|null>}
  */
 export async function resolveHubTarget(server, dir) {
   const repo = resolveRepo(dir);
@@ -379,6 +558,7 @@ export async function resolveHubTarget(server, dir) {
   return {
     url: `http://127.0.0.1:${port}/p/${encodeURIComponent(id)}/mcp/${encodeURIComponent(server)}`,
     workspace,
+    repoRoot: repo.repoRoot,
   };
 }
 

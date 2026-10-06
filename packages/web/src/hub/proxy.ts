@@ -35,10 +35,25 @@ import { connect } from "node:net";
 import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { Duplex } from "node:stream";
-import { HUB_PATH, detectBasePath, isHubChooserPath, loopbackOrigin, projectIdFromBasePath, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
+import {
+  HUB_ADMISSION_HEADER,
+  HUB_PATH,
+  checkRunOptions,
+  detectBasePath,
+  formatHubAdmissionHeader,
+  isHubChooserPath,
+  loopbackOrigin,
+  projectIdFromBasePath,
+  stripBasePath,
+  stripWorkspaceSlot,
+  checkRunMode,
+} from "../shared/index.js";
+import type { RunMode, RunOptions } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
-import { buildHubOverview } from "./overview.js";
+import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
+import { homedir } from "node:os";
 import { renderHomePage } from "./home.js";
+import { defaultParentDir } from "./new-project.js";
 
 const UPSTREAM_HOST = "127.0.0.1";
 /** `ndx refresh --live-server` posts here; with several projects the body's `dir` picks one. */
@@ -49,6 +64,10 @@ const EXECUTE_PATH = "/api/hench/execute";
 const MAX_EXECUTE_BODY_BYTES = 64 * 1024;
 /** Header telling the project server which prefix the client used, for anything that builds absolute links. */
 const FORWARDED_PREFIX_HEADER = "x-forwarded-prefix";
+/** The Live overview: its agent-slots tile reports the machine's admission state when served through the hub. */
+const LIVE_PATH = "/api/live";
+/** The Prepare task modal's read: its admission strip reports the same gate state. */
+const PREP_PATH = /^\/api\/hench\/prep\/[^/]+$/;
 
 /** What to do with a request that is not the hub's own API. */
 export type ProxyDecision =
@@ -252,8 +271,12 @@ export function proxyHttp(
   path: string,
   prefix: string,
   body?: Buffer,
+  extraHeaders: OutgoingHttpHeaders = {},
 ): void {
   const headers: OutgoingHttpHeaders = { ...req.headers, host: `${UPSTREAM_HOST}:${port}` };
+  // Only the hub states its admission state; a client's copy never reaches the child.
+  delete headers[HUB_ADMISSION_HEADER];
+  Object.assign(headers, extraHeaders);
   if (prefix) headers[FORWARDED_PREFIX_HEADER] = prefix;
   // The browser's Origin names the HUB's port, and the child compares Origin
   // against its own ephemeral one — so a verbatim forward made the child read
@@ -359,7 +382,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
   switch (decision.kind) {
     case "proxy":
       if (await handleExecuteAdmission(req, res, hub, decision)) return;
-      proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix);
+      proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, undefined, await admissionHeadersFor(req, hub, decision));
       return;
     case "html":
       res.writeHead(decision.status, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
@@ -369,13 +392,47 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       writeJson(res, decision.status, decision.body);
       return;
     case "home": {
-      const overview = await buildHubOverview(hub.listProjects());
-      const html = renderHomePage(overview);
+      const projects = hub.listProjects();
+      // The token goes on the hub's own probes of each child, exactly as
+      // `/api/hub/overview` does it: a child started with `--token-file`
+      // answers 401 without it, and every card would render "unreachable"
+      // until the page's first client-side refresh corrected itself.
+      const overview = await buildHubOverview(projects, (port) => fetchChildSnapshot(port, 2_000, hub.token));
+      // Where the "New project" form offers to create: wherever most of the
+      // registered projects already live, else the user's home.
+      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()));
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
       res.end(html);
       return;
     }
   }
+}
+
+/**
+ * The admission header for a `GET /api/live` or a prep read, measured now; none for anything
+ * else. Measured rather than read from the gate's last decision, which may be
+ * minutes old on an idle machine — the same reason `GET /api/hub/queue` does.
+ */
+async function admissionHeadersFor(
+  req: IncomingMessage,
+  hub: Hub,
+  decision: Extract<ProxyDecision, { kind: "proxy" }>,
+): Promise<OutgoingHttpHeaders> {
+  if ((req.method || "GET") !== "GET") return {};
+  const path = stripWorkspaceSlot(decision.path.split("?")[0]).url;
+  if (path !== LIVE_PATH && !PREP_PATH.test(path)) return {};
+  await hub.admission.measure();
+  const snapshot = hub.admission.snapshot();
+  return {
+    [HUB_ADMISSION_HEADER]: formatHubAdmissionHeader({
+      running: snapshot.running,
+      maxSessions: snapshot.limits.maxSessions,
+      queued: snapshot.entries.length,
+      availableBytes: snapshot.availableBytes,
+      pressure: snapshot.pressure,
+      memoryPaused: snapshot.memoryPaused,
+    }),
+  };
 }
 
 /**
@@ -410,13 +467,43 @@ async function handleExecuteAdmission(
   }
 
   let taskId: string | null = null;
+  let options: RunOptions | undefined;
+  let optionsValid = true;
+  let mode: RunMode | undefined;
+  let iterations: number | undefined;
   try {
-    const parsed = JSON.parse(body.toString("utf-8") || "{}") as { taskId?: unknown };
+    const parsed = JSON.parse(body.toString("utf-8") || "{}") as {
+      taskId?: unknown;
+      options?: unknown;
+      mode?: unknown;
+      iterations?: unknown;
+    };
     if (typeof parsed.taskId === "string" && parsed.taskId) taskId = parsed.taskId;
+    const checked = checkRunOptions(parsed.options);
+    if (checked.ok) {
+      if (Object.keys(checked.options).length > 0) options = checked.options;
+    } else {
+      optionsValid = false;
+    }
+    // The same validator the execute route and `execute/check` use, so a mode
+    // this forwards is a mode they accept. Judging it here by hand is what let
+    // `{ mode: "looop" }` be queued as a single-task run on a busy machine and
+    // 400'd on an idle one.
+    const checkedMode = checkRunMode(parsed);
+    if (checkedMode.ok) {
+      if (checkedMode.mode !== "single") mode = checkedMode.mode;
+      iterations = checkedMode.iterations;
+    } else {
+      // Forwarded, not queued — see the comment below the catch.
+      optionsValid = false;
+    }
   } catch {
     // not JSON — forward and let the server say so
   }
-  if (!taskId) {
+  // A rejected option or run mode is forwarded too: queuing it would turn the
+  // server's 400 into a run silently dropped minutes later, when its turn came
+  // — or, worse for a mode, into a run that starts and does less than it said.
+  if (!taskId || !optionsValid) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
     return true;
   }
@@ -425,9 +512,21 @@ async function handleExecuteAdmission(
   const fromHeader = Array.isArray(header) ? header[0] : header;
   const workspace = fromHeader || slot.key || null;
 
-  const result = await hub.admission.admit({ projectId: decision.project.id, workspace, taskId });
+  const result = await hub.admission.admit({
+    projectId: decision.project.id,
+    workspace,
+    taskId,
+    ...(options ? { options } : {}),
+    ...(mode && mode !== "single" ? { mode } : {}),
+    ...(iterations !== undefined ? { iterations } : {}),
+  });
   if (result.admitted) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
+    return true;
+  }
+  // The server would refuse it when its turn came: say so now, in its words.
+  if (result.refused) {
+    writeJson(res, result.refused.status, result.refused.body);
     return true;
   }
 
@@ -439,6 +538,9 @@ async function handleExecuteAdmission(
     taskId,
     projectId: decision.project.id,
     workspace,
+    ...(options ? { options } : {}),
+    ...(mode && mode !== "single" ? { mode } : {}),
+    ...(iterations !== undefined ? { iterations } : {}),
     queueLength: snapshot.entries.length,
     running: snapshot.running,
     limits: snapshot.limits,

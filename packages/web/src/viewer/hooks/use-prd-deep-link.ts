@@ -15,7 +15,9 @@
  * component's render and CRUD logic.
  */
 
-import {useState, useEffect, useRef} from "preact/hooks";import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
+import {useState, useEffect, useRef} from "preact/hooks";
+import { replaceAppHistory } from "../base-path.js";
+import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
 import { findItemById, getAncestorIds } from "../components/prd-tree/tree-utils.js";
 
 export interface PRDDeepLinkDeps {
@@ -72,9 +74,8 @@ export function usePRDDeepLink({
     if (!item) {
       setDeepLinkError(`Task "${initialTaskId}" not found`);
       // Clean URL back to /prd
-      history.replaceState(
+      replaceAppHistory(
         { view: "prd", file: null, zone: null, runId: null, taskId: null },
-        "",
         "/prd",
       );
       return;

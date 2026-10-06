@@ -6,7 +6,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { existsSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type FSWatcher } from "node:fs";
 import { writeFile, unlink } from "node:fs/promises";
 import { resolve, join, dirname, basename } from "node:path";
-import { isVerbose, verbose, resolveLayout } from "@n-dx/llm-client";
+import { isVerbose, verbose, resolveLayout, ensureAuthToken } from "@n-dx/llm-client";
 import type { ServerContext, ViewerScope } from "./types.js";
 import { ensureLegacyPrdMigrated } from "./rex-gateway.js";
 import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./routes-static.js";
@@ -17,6 +17,7 @@ import { handleSourcevisionAskRoute } from "./routes-sourcevision-ask.js";
 import { handleIsoMapRoute } from "./routes-iso-map.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
+import { settleContextNotesRemovals, sweepStaleContextNotes } from "./run-options.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, closeWorktreeRunWatchers, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
 import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
@@ -29,6 +30,12 @@ import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
+import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
+import { handleLiveTaskRoute } from "./routes-live-task.js";
+import { handleHenchPrepRoute } from "./routes-hench-prep.js";
+import { handleLiveAnalyzeRoute } from "./routes-live-analyze.js";
+import { watchAnalyzeProgress } from "./analyze-progress-watcher.js";
+import { stopRunTailWatches } from "./run-tail.js";
 import { handleWorkspacesRoute } from "./routes-workspaces.js";
 import { invalidatePrdDelta } from "./prd-delta.js";
 import { WorkspaceRegistry } from "./workspaces.js";
@@ -40,6 +47,8 @@ import { handleSearchRoute } from "./routes-search.js";
 import { handleNotionRoute } from "./routes-notion.js";
 import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
+import { handleTrustRoute } from "./routes-trust.js";
+import { evaluateRepoTrust, formatRepoTrustReport } from "@n-dx/llm-client";
 import { enforceRouteFeatureGate } from "./route-feature-gates.js";
 import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
@@ -48,7 +57,7 @@ import { handleMergeGraphRoute } from "./routes-merge-graph.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
-import { ALL_DATA_FILES, stripWorkspaceSlot } from "../shared/index.js";
+import { ALL_DATA_FILES, stripWorkspaceSlot, urlWithToken } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
 import { handleRequestSecurity } from "./request-security.js";
 
@@ -140,6 +149,8 @@ export function registerShutdownHandlers(
     registry?.closeAll();
     // Lazily registered per-worktree runs watchers (GET /api/hench/runs?scope=repo).
     closeWorktreeRunWatchers();
+    // Leases taken by GET /api/hench/runs/:id/log|events.
+    stopRunTailWatches();
 
     // Step 1 — terminate hench child processes (highest priority: avoids orphaned agents)
     // Covers both hench-route executions and the rex epic-by-epic execution engine.
@@ -148,6 +159,8 @@ export function registerShutdownHandlers(
       shutdownActiveExecutions(),
       shutdownRexExecution(),
     ]);
+    // Runs that just ended remove their notes file from a `.finally`; wait for it.
+    await settleContextNotesRemovals();
     componentStatus.push({ component: "hench-executions", ok: henchResult.failed === 0 });
     componentStatus.push({
       component: "rex-execution",
@@ -231,6 +244,12 @@ export interface StartResult {
 
 export interface ServerOptions {
   dev?: boolean;
+  /**
+   * Per-user token file (`<ndx home>/auth.token`). When set, the token is
+   * created if absent and every request and WebSocket handshake must present
+   * it; `ndx start` always passes this, a bare `web serve` runs without.
+   */
+  tokenFile?: string;
   /** Restrict dashboard to a single package's views and APIs. */
   scope?: ViewerScope;
 }
@@ -512,7 +531,12 @@ function registerWatchers(
   const prdCacheDir = isInScope(ctx.scope, "rex") && existsSync(ctx.rexDir)
     ? join(ctx.rexDir, PRD_CACHE_DIR)
     : undefined;
-  return { watchers, henchRunsDir, monitorIntervals: [], prdCacheDir };
+  // Polls rather than watches, so it is registered even before
+  // .sourcevision/ exists and needs no re-registration after init.
+  const monitorIntervals = isInScope(ctx.scope, "sourcevision")
+    ? [watchAnalyzeProgress(ctx.svDir, ws.broadcast)]
+    : [];
+  return { watchers, henchRunsDir, monitorIntervals, prdCacheDir };
 }
 
 /**
@@ -535,6 +559,32 @@ function registerWatchers(
  * the only way to double up — which the setup wizard's own pre-init-only
  * gating (see `isProjectInitialized`) rules out in practice.
  */
+/**
+ * Re-resolve the project's layout after a successful `ndx init`.
+ *
+ * `ctx.svDir` / `ctx.rexDir` and the hench runs directory are resolved once in
+ * {@link startServer}. On a blank folder there is no state to detect, so they
+ * resolve to the legacy root paths (`.sourcevision`, `.rex`, `.hench`) — but
+ * `ndx init` gives a *new* project the `.ndx/` container instead. Without this
+ * the server kept pointing at directories init never created: the landing page
+ * was served forever (`isProjectInitialized` reads those paths), every data
+ * route read an empty project, and the only cure was restarting the server —
+ * which is exactly what initializing from the dashboard is meant to avoid.
+ *
+ * Mutates `ctx` rather than rebuilding it: the anchor's context is a single
+ * long-lived object that every request and every already-registered watcher
+ * reads, so replacing it would leave them on the stale copy.
+ *
+ * Exported for the regression test that pins the `.ndx/` case, the same way
+ * {@link refreshPRDCache} is.
+ */
+export function refreshProjectLayout(ctx: ServerContext, handles: WatcherHandles): void {
+  const layout = resolveLayout(ctx.projectDir);
+  ctx.svDir = layout.sourcevisionDir;
+  ctx.rexDir = layout.rexDir;
+  handles.henchRunsDir = join(layout.henchDir, "runs");
+}
+
 function reregisterProjectWatchers(
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,
@@ -705,6 +755,11 @@ async function handleScopedRoute(
   return await run();
 }
 
+/** The Live overview reads the registry's worktree list rather than asking git per request. */
+function liveSourcesOf(registry: WorkspaceRegistry): LiveSources {
+  return { listWorkspaces: () => registry.list() };
+}
+
 async function handleApiRoutes(
   req: IncomingMessage,
   res: ServerResponse,
@@ -729,9 +784,13 @@ async function handleApiRoutes(
   if (await handleProjectRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx, { broadcast, onStatusInvalidate: invalidateRunCaches }))) return true;
+  if (await handleLiveRoute(req, res, ctx, liveSourcesOf(registry))) return true;
+  if (isInScope(ctx.scope, "hench") && handleLiveTaskRoute(req, res, ctx)) return true;
+  if (isInScope(ctx.scope, "sourcevision") && (await handleLiveAnalyzeRoute(req, res, ctx, liveSourcesOf(registry)))) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
   if (handleHubAbsentRoute(req, res)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
+  if (await handleTrustRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleIntegrationRoute(req, res, ctx))) return true;
   if (await handleFeaturesRoute(req, res, ctx)) return true;
@@ -741,7 +800,14 @@ async function handleApiRoutes(
   if (await handleScopedRoute(true, () => handleCommandsRoute(req, res, ctx, broadcast, {
     onProjectInitialized: () => {
       clearStatusCache();
+      // Layout first: the watchers below are registered against ctx's
+      // directories, which init may have just moved under `.ndx/`.
+      refreshProjectLayout(ctx, watcherHandles);
       reregisterProjectWatchers(ctx, watcher, { broadcast }, watcherHandles);
+      if (isInScope(ctx.scope, "rex") && existsSync(ctx.rexDir)) {
+        watcherHandles.prdCacheDir = join(ctx.rexDir, PRD_CACHE_DIR);
+        void refreshPRDCache(ctx.rexDir);
+      }
     },
   }))) return true;
   // Ask must be dispatched before the general sourcevision route so
@@ -751,6 +817,7 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, broadcast))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchPrepRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, broadcast, { onStatusInvalidate: invalidateRunCaches }))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleWorkflowRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleAdaptiveRoute(req, res, ctx))) return true;
@@ -813,10 +880,11 @@ function createHttpServer(
   ws: ReturnType<typeof createWebSocketManager>,
   assets: ReturnType<typeof resolveStaticAssets>,
   wsHealthTracker: WsHealthTracker,
+  token: string | null,
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
-      if (handleRequestSecurity(req, res)) return;
+      if (handleRequestSecurity(req, res, { token })) return;
       // Request-scoped context. Two things can name a worktree and they do not
       // rank equally: `X-Ndx-Workspace` wins over a leading `/w/<key>/`.
       //
@@ -893,9 +961,11 @@ function logStartup(
   actualPort: number,
   ctx: ServerContext,
   henchRunsDir: string,
+  token: string | null = null,
 ): void {
   const label = ctx.scope ? `${ctx.scope} viewer` : "n-dx dashboard";
-  console.log(`${label} running at http://localhost:${actualPort}`);
+  // With a token the URL carries it once so the browser sets its cookie.
+  console.log(`${label} running at ${token ? urlWithToken(`http://localhost:${actualPort}/`, token) : `http://localhost:${actualPort}`}`);
   if (isInScope(ctx.scope, "sourcevision")) {
     console.log(`Serving data from: ${ctx.svDir}`);
   }
@@ -905,6 +975,18 @@ function logStartup(
   if (isInScope(ctx.scope, "hench") && existsSync(henchRunsDir)) {
     console.log(`Hench runs from: ${henchRunsDir}`);
   }
+  // Repository trust, same evaluation hench applies at run start and the
+  // dashboard shows as a strip. Silent when the checkout matches the defaults
+  // or the user has trusted it; loud otherwise, because `ndx start` is often
+  // the first thing run on a fresh clone.
+  try {
+    const trust = evaluateRepoTrust(ctx.projectDir);
+    if (trust.restricted) {
+      for (const line of formatRepoTrustReport(trust, { acceptCommand: "ndx trust accept ." })) console.log(line);
+    }
+  } catch {
+    // Never block startup on the trust store.
+  }
   console.log(`MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
   console.log(`MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
   console.log(`WebSocket available at ws://localhost:${actualPort}`);
@@ -912,8 +994,9 @@ function logStartup(
   if (ctx.dev) console.log("Dev mode: live reload enabled");
   console.log("");
   console.log("MCP setup:");
-  console.log("  Claude:  claude mcp add --transport http rex http://localhost:" + actualPort + "/mcp/rex");
-  console.log("           claude mcp add --transport http sourcevision http://localhost:" + actualPort + "/mcp/sourcevision");
+  const headerFlag = token ? ' --header "X-Ndx-Token: <token from <ndx home>/auth.token>"' : "";
+  console.log("  Claude:  claude mcp add --transport http rex http://localhost:" + actualPort + "/mcp/rex" + headerFlag);
+  console.log("           claude mcp add --transport http sourcevision http://localhost:" + actualPort + "/mcp/sourcevision" + headerFlag);
   console.log("  Codex:   configured automatically via .codex/config.toml (stdio)");
   console.log("");
   console.log("Press Ctrl+C to stop.");
@@ -1030,7 +1113,10 @@ export async function startServer(
 
   const watcher = createDataWatcher(ctx, assets.viewerPath);
   const wsHealthTracker = new WsHealthTracker();
-  const ws = createWebSocketManager({ healthTracker: wsHealthTracker });
+  // Per-user token: created on first use, shared by every server this user
+  // starts, required on every request and handshake once configured.
+  const token = opts.tokenFile ? ensureAuthToken(opts.tokenFile) : null;
+  const ws = createWebSocketManager({ healthTracker: wsHealthTracker, token });
   const watcherHandles = registerWatchers(ctx, watcher, ws, assets.viewerPath);
 
   // Start heartbeat monitor — periodically checks for unresponsive tasks and
@@ -1041,6 +1127,9 @@ export async function startServer(
   const anchorBroadcast = tagBroadcaster(ws.broadcast, workspaceTagOf(ctx));
   const everyWorkspaceBroadcast = tagBroadcaster(ws.broadcast, BROADCAST_ALL_WORKSPACES);
   if (isInScope(scope, "hench")) {
+    sweepStaleContextNotes().catch((err: unknown) => {
+      console.warn(`[hench] stale context-file sweep failed: ${(err as Error).message}`);
+    });
     startHeartbeatMonitor(watcherHandles.henchRunsDir, anchorBroadcast);
     startConcurrencyMonitor(ctx, anchorBroadcast);
     startMemoryMonitor(everyWorkspaceBroadcast, watcherHandles.henchRunsDir);
@@ -1089,7 +1178,10 @@ export async function startServer(
   });
   registry.start();
 
-  const server = createHttpServer(registry, ws, assets, wsHealthTracker);
+  // Live overview frames: repository-wide, so every workspace's viewer gets them.
+  watcherHandles.monitorIntervals.push(startLiveMonitor(registry.anchor.ctx, liveSourcesOf(registry), everyWorkspaceBroadcast));
+
+  const server = createHttpServer(registry, ws, assets, wsHealthTracker, token);
 
   return new Promise<StartResult>((resolvePromise, rejectPromise) => {
     server.once("error", (err: NodeJS.ErrnoException) => {
@@ -1128,7 +1220,7 @@ export async function startServer(
         await refreshPRDCache(rexDir);
       }
 
-      logStartup(actualPort, ctx, watcherHandles.henchRunsDir);
+      logStartup(actualPort, ctx, watcherHandles.henchRunsDir, token);
 
       // ── Graceful shutdown ───────────────────────────────────────────────
       // Single handler coordinates cleanup in dependency order:

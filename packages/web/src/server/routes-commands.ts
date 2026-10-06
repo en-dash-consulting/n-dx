@@ -5,6 +5,7 @@
  *
  * POST /api/commands/init            — bootstrap ndx init from the dashboard's setup wizard (pre-init only)
  * GET  /api/commands/init/status     — check running init status
+ * GET  /api/commands/init/preflight  — pre-init environment check (git repo / git on PATH)
  * POST /api/commands/sv-analyze      — re-run sourcevision analyze (full: true → async, see status)
  * GET  /api/commands/sv-analyze/status — check running full-analysis status
  * POST /api/commands/sv-analyze/stop — interrupt the running full analysis
@@ -19,7 +20,7 @@
  * POST /api/commands/refresh         — refresh SourceVision data (live server; --data-only --live-server)
  * GET  /api/commands/refresh/status  — check running refresh status
  * POST /api/commands/refresh/stop    — interrupt the running refresh
- * GET  /api/commands/manifest        — grouped command reference with resolved CLI name and availability
+ * GET  /api/commands/manifest        — grouped command reference with resolved CLI name, availability and core's effects declarations
  * POST /api/commands/fix             — rex fix (body: { dryRun?: boolean }); repairs PRD validation issues
  * POST /api/commands/ci              — ndx ci analysis + health validation (async, see status)
  * GET  /api/commands/ci/status       — CI check status and structured report
@@ -39,15 +40,16 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname, relative, resolve, sep } from "node:path";
 import { createRequire } from "node:module";
-import { exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
+import { redactSecrets, exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
 import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { readCliName } from "./cli-name.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
+import { readAnalyzeProgress } from "./domain-gateway.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 
 const CMD_PREFIX = "/api/commands/";
@@ -149,6 +151,15 @@ interface InitStatus {
   finishedAt: string | null;
   output: string;
   error: string | null;
+  /** True when this run was asked to create a git repository (`git: true`). */
+  gitRequested: boolean;
+  /**
+   * Whether the directory is a git repository now that init has finished.
+   * Null until a run that requested one completes — the wizard reports
+   * "repository created" from this rather than from the run's exit code,
+   * because `ndx init` treats a failed `git init` as a warning, not a failure.
+   */
+  gitInitialized: boolean | null;
 }
 
 // Module-level singleton — one init at a time per server process. The
@@ -161,6 +172,8 @@ const initStatuses = new WorkspaceScoped<InitStatus>(() => ({
   finishedAt: null,
   output: "",
   error: null,
+  gitRequested: false,
+  gitInitialized: null,
 }));
 
 // ── Binary resolution helpers ─────────────────────────────────────────
@@ -313,6 +326,19 @@ function releaseSvWriteLock(ctx: ServerContext): void {
 // ── Handlers ──────────────────────────────────────────────────────────
 
 // ── Full-analysis state tracking ─────────────────────────────────────
+/**
+ * The tail of a command's output as the dashboard shows it.
+ *
+ * Redact *before* slicing, never after: a tail boundary falling inside a token
+ * leaves its surviving half unmatched by every rule, and therefore on screen.
+ * Having one helper is the point — the live sv-analyze path scrubbed its
+ * stream while the completion path overwrote the result with raw stdout, so
+ * credentials appeared the moment the analysis finished.
+ */
+function outputTail(text: string, limit: number): string {
+  return redactSecrets(text).slice(-limit);
+}
+
 
 interface SvAnalyzeStatus {
   running: boolean;
@@ -440,8 +466,8 @@ async function handleSvAnalyze(
       timeout: analyzeTimeout,
       stdio: "pipe",
       onStdout: (chunk) => {
-        svAnalyzeStatus.recentOutput =
-          (svAnalyzeStatus.recentOutput + chunk).slice(-3000);
+        // Live output goes to the dashboard; scrub it like a run record.
+        svAnalyzeStatus.recentOutput = outputTail(svAnalyzeStatus.recentOutput + chunk, 3000);
       },
     });
     svAnalyzeSlot.child = child;
@@ -449,7 +475,7 @@ async function handleSvAnalyze(
       const wasStopped = svAnalyzeSlot.stopRequested;
       svAnalyzeStatus.running = false;
       svAnalyzeStatus.finishedAt = new Date().toISOString();
-      if (stdout !== null) svAnalyzeStatus.recentOutput = stdout.trim().slice(-3000);
+      if (stdout !== null) svAnalyzeStatus.recentOutput = outputTail(stdout.trim(), 3000);
       svAnalyzeStatus.stopped = wasStopped;
       // A kill the operator asked for is not a failed analysis.
       svAnalyzeStatus.error = wasStopped ? null : error;
@@ -497,7 +523,7 @@ async function handleSvAnalyze(
 
     jsonResponse(res, 200, {
       ok: true,
-      output: result.stdout.trim().slice(-2000),
+      output: outputTail(result.stdout.trim(), 2000),
     });
   } catch (err) {
     errorResponse(res, 500, String(err));
@@ -507,13 +533,22 @@ async function handleSvAnalyze(
   return true;
 }
 
-/** GET /api/commands/sv-analyze/status */
+/**
+ * GET /api/commands/sv-analyze/status
+ *
+ * The dashboard job's slot (`running`, `recentOutput`, …) as before, plus
+ * `progress`: the structured progress the analyzing process itself publishes
+ * (phase, pass, batch, LLM use, the previous same-mode run's phase timings).
+ * The slot only knows runs this server started; `progress` covers a run
+ * started from a terminal too, so it can say running while `running` is false.
+ * Null until any analysis has run under the progress writer.
+ */
 function handleSvAnalyzeStatus(
   _req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  jsonResponse(res, 200, { ...svAnalyzeSlots.get(ctx).status });
+  jsonResponse(res, 200, { ...svAnalyzeSlots.get(ctx).status, progress: readAnalyzeProgress(ctx.svDir) });
   return true;
 }
 
@@ -563,7 +598,7 @@ async function handleSync(
       const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
       jsonResponse(res, 200, { ok: true, ...parsed });
     } catch {
-      jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+      jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
     }
   } catch (err) {
     errorResponse(res, 500, String(err));
@@ -683,7 +718,7 @@ async function handleExport(
       return true;
     }
 
-    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+    jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
     errorResponse(res, 500, String(err));
   }
@@ -711,7 +746,7 @@ async function handleInstallSample(
       return true;
     }
 
-    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+    jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
     errorResponse(res, 500, String(err));
   }
@@ -739,7 +774,7 @@ async function handleDestroySample(
       return true;
     }
 
-    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+    jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
     errorResponse(res, 500, String(err));
   }
@@ -778,7 +813,7 @@ async function handleSelfHeal(
 
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
   const verboseFlag = serverVerbosityFlag();
-  const cmdArgs = [...prefixArgs, "self-heal", String(iterations), ...(verboseFlag ? [verboseFlag] : []), ctx.projectDir];
+  const cmdArgs = [...prefixArgs, "self-heal", String(iterations), "--auto", ...(verboseFlag ? [verboseFlag] : []), ctx.projectDir];
 
   // Reset status and start background execution
   selfHealStatus.running = true;
@@ -907,8 +942,13 @@ function handleSelfHealStatus(
  * which is why this handler requires `provider` explicitly rather than
  * falling back to an interactive default.
  *
+ * The same piped stdio is why `git` is part of the body: `ndx init`'s git
+ * preflight prompt never fires without a TTY, so a blank folder would stay
+ * outside version control no matter what the operator wanted. The wizard asks
+ * in the browser instead and the answer travels as `--git` / `--no-git`.
+ *
  * Body: { assistants?: ("claude"|"codex")[], provider: "claude"|"codex"|"google"|"local",
- *   googleApiKey?: string, localHost?: string, localPort?: number }
+ *   googleApiKey?: string, localHost?: string, localPort?: number, git?: boolean }
  */
 async function handleInit(
   req: IncomingMessage,
@@ -927,6 +967,7 @@ async function handleInit(
   let googleApiKey = "";
   let localHost = "";
   let localPort: number | undefined;
+  let git: boolean | undefined;
 
   try {
     const body = await readBody(req, res);
@@ -936,6 +977,7 @@ async function handleInit(
       googleApiKey?: unknown;
       localHost?: unknown;
       localPort?: unknown;
+      git?: unknown;
     };
 
     if (Array.isArray(input.assistants) && input.assistants.length > 0) {
@@ -950,6 +992,8 @@ async function handleInit(
       return true;
     }
     provider = input.provider;
+
+    if (typeof input.git === "boolean") git = input.git;
 
     if (typeof input.googleApiKey === "string") googleApiKey = input.googleApiKey.trim();
     if (typeof input.localHost === "string") localHost = input.localHost.trim();
@@ -966,6 +1010,9 @@ async function handleInit(
     ...prefixArgs, "init", "--quiet",
     `--provider=${provider}`,
     `--assistants=${assistants.join(",")}`,
+    // Omitted when the wizard sent no answer, so `ndx init` keeps its own
+    // default rather than this route deciding for it.
+    ...(git === undefined ? [] : [git ? "--git" : "--no-git"]),
     ctx.projectDir,
   ];
 
@@ -974,6 +1021,8 @@ async function handleInit(
   initStatus.finishedAt = null;
   initStatus.output = "";
   initStatus.error = null;
+  initStatus.gitRequested = git === true;
+  initStatus.gitInitialized = null;
 
   // Return 202 immediately, run in background — first-time init runs a
   // sourcevision analyze pass and can take a while on a large repo.
@@ -998,8 +1047,9 @@ async function handleInit(
     if (failure) {
       initStatus.running = false;
       initStatus.finishedAt = new Date().toISOString();
-      initStatus.output = (result.stdout || "").trim().slice(-5000);
+      initStatus.output = outputTail((result.stdout || "").trim(), 5000);
       initStatus.error = failure;
+      if (git === true) initStatus.gitInitialized = isInsideGitRepo(ctx.projectDir);
       return;
     }
 
@@ -1023,8 +1073,12 @@ async function handleInit(
 
     initStatus.running = false;
     initStatus.finishedAt = new Date().toISOString();
-    initStatus.output = (result.stdout || "").trim().slice(-5000);
+    initStatus.output = outputTail((result.stdout || "").trim(), 5000);
     initStatus.error = null;
+    // `ndx init` reports a failed `git init` as a warning in its recap and
+    // still exits 0, so the repository is confirmed on disk rather than
+    // inferred from the exit code.
+    if (git === true) initStatus.gitInitialized = isInsideGitRepo(ctx.projectDir);
 
     // The project is now initialized — re-register the file watchers that
     // were skipped at server startup (because .rex/.sourcevision/.hench
@@ -1038,6 +1092,57 @@ async function handleInit(
     initStatus.error = String(err);
   });
 
+  return true;
+}
+
+/**
+ * Walk up from `dir` looking for a `.git` entry. A submodule or linked
+ * worktree keeps a `.git` *file* rather than a directory, so both forms count.
+ *
+ * Mirrors `isInsideGitRepo` in packages/core/git-preflight.js — duplicated
+ * rather than imported because core is the orchestration tier and the web
+ * server, two tiers below it, must not import from it.
+ */
+function isInsideGitRepo(dir: string): boolean {
+  let cur = resolve(dir);
+  for (;;) {
+    if (existsSync(join(cur, ".git"))) return true;
+    const parent = dirname(cur);
+    if (parent === cur) return false;
+    cur = parent;
+  }
+}
+
+/**
+ * GET /api/commands/init/preflight — what the setup wizard needs to know
+ * about this folder before it offers to initialize it:
+ *
+ *   isRepo       — already inside a git working tree (the wizard then has no
+ *                  git question to ask).
+ *   gitAvailable — `git` answers on this machine's PATH. Without it, asking
+ *                  for a repository can only produce a warning, so the wizard
+ *                  says so up front instead of after a five-minute init.
+ *
+ * Pre-init only, like the rest of the wizard's surface; safe to call at any
+ * time (it reads the filesystem and runs `git --version`).
+ */
+async function handleInitPreflight(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  const isRepo = isInsideGitRepo(ctx.projectDir);
+  const version = await foundationExec("git", ["--version"], {
+    cwd: ctx.projectDir,
+    timeout: 10_000,
+  }).catch(() => null);
+  jsonResponse(res, 200, {
+    isRepo,
+    // `launched` is what separates "git is not installed" from "git ran and
+    // said no" — an exitCode check alone reports both as unavailable.
+    gitAvailable: version !== null && version.launched && version.exitCode === 0,
+    projectDir: ctx.projectDir,
+  });
   return true;
 }
 
@@ -1334,7 +1439,7 @@ export function startAsyncJob(
   };
 
   child.done.then((result) => {
-    status.output = (result.stdout || "").trim().slice(-5000);
+    status.output = outputTail((result.stdout || "").trim(), 5000);
     try {
       status.report = JSON.parse(result.stdout);
     } catch {
@@ -1355,6 +1460,74 @@ export function startAsyncJob(
 /** Interrupt a report-producing job started by {@link startAsyncJob}. */
 export function stopAsyncJob(res: ServerResponse, job: AsyncJob, label: string): boolean {
   return stopJob(res, job, label);
+}
+
+/** The dashboard-started background jobs the job tray and the Live overview list. */
+export type CommandJobKind = "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "recommend";
+
+/** One job's status, reduced to what every kind shares. */
+export interface CommandJobSnapshot {
+  kind: CommandJobKind;
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  error: string | null;
+  stopped: boolean;
+  /** Last output line — for refresh, its latest phase — or null. */
+  detail: string | null;
+}
+
+function lastOutputLine(text: string | undefined): string | null {
+  const lines = (text ?? "").trim().split("\n").map((l) => l.trim()).filter(Boolean);
+  return lines.at(-1) ?? null;
+}
+
+/**
+ * Every job one workspace has started, by its key (`workspaceKeyOf`). A
+ * workspace that never started a job has no slots and lists nothing; reading
+ * creates none.
+ */
+export function commandJobsOf(workspaceKey: string): CommandJobSnapshot[] {
+  return [
+    snapshotJob("sv-analyze", svAnalyzeSlots.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.recentOutput)),
+    snapshotJob("self-heal", selfHealSlots.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+    snapshotJob("ci", ciJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+    snapshotJob("reshape", reshapeJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+    snapshotJob("refresh", refreshSlots.peekByKey(workspaceKey)?.status, (s) => s.phases.at(-1) ?? lastOutputLine(s.output)),
+    snapshotJob("recommend", recommendJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+  ].filter((job): job is CommandJobSnapshot => job !== null);
+}
+
+/** What the Live analysis page reads of the dashboard's own analyze slot. */
+export interface SvAnalyzeRunSnapshot {
+  running: boolean;
+  startedAt: string | null;
+  /** When the dashboard's run ended; null while running or never run. */
+  finishedAt: string | null;
+  /** Tail of the analyzer's stdout (about the last 3000 characters). */
+  output: string;
+}
+
+/**
+ * The dashboard's analyze slot for one workspace, or null when that
+ * workspace never started one. Output exists only for runs the dashboard
+ * spawned: a terminal run's stdout belongs to its terminal.
+ */
+export function svAnalyzeRunOf(workspaceKey: string): SvAnalyzeRunSnapshot | null {
+  const status = svAnalyzeSlots.peekByKey(workspaceKey)?.status;
+  return status ? { running: status.running, startedAt: status.startedAt, finishedAt: status.finishedAt, output: status.recentOutput } : null;
+}
+
+type JobStatusBase = Pick<CommandJobSnapshot, "running" | "startedAt" | "finishedAt" | "error" | "stopped">;
+
+function snapshotJob<S extends JobStatusBase>(
+  kind: CommandJobKind,
+  status: S | undefined,
+  detail: (status: S) => string | null,
+): CommandJobSnapshot | null {
+  if (!status) return null;
+  const { running, startedAt, finishedAt, error, stopped } = status;
+  return { kind, running, startedAt, finishedAt, error, stopped, detail: detail(status) };
 }
 
 /**
@@ -1443,7 +1616,7 @@ async function handleFix(
     try {
       jsonResponse(res, 200, { ok: true, dryRun, report: JSON.parse(result.stdout) });
     } catch {
-      jsonResponse(res, 200, { ok: true, dryRun, output: result.stdout.trim().slice(-2000) });
+      jsonResponse(res, 200, { ok: true, dryRun, output: outputTail(result.stdout.trim(), 2000) });
     }
   } catch (err) {
     errorResponse(res, 500, String(err));
@@ -1541,7 +1714,7 @@ async function runAuthCheck(ctx: ServerContext): Promise<AuthCheckResult> {
     const ok = !result.error;
     return {
       ok,
-      output: result.stdout.trim().slice(-2000),
+      output: outputTail(result.stdout.trim(), 2000),
       error: ok ? null : (result.stderr || result.error?.message || "Credential check failed").slice(-1000),
     };
   } catch (err) {
@@ -1606,7 +1779,7 @@ async function handleValidateTokens(
       errorResponse(res, 500, `Token validation failed: ${result.stderr || result.error.message}`);
       return true;
     }
-    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-4000) });
+    jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 4000) });
   } catch (err) {
     errorResponse(res, 500, String(err));
   }
@@ -1636,7 +1809,7 @@ async function handleExportPdf(
       errorResponse(res, 500, `PDF export failed: ${result.stderr || result.error.message}`);
       return true;
     }
-    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+    jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
     errorResponse(res, 500, String(err));
   }
@@ -1747,12 +1920,125 @@ const COMMAND_MANIFEST: ManifestGroup[] = [
   },
 ];
 
-/** GET /api/commands/manifest — grouped command reference with availability. */
-function handleManifest(
+// ── Command effects (owned by core) ───────────────────────────────────
+
+/**
+ * One command's declared effects: what it reads, writes, which phases call a
+ * model, what network it touches, and how long it takes.
+ *
+ * Core owns this shape (`packages/core/command-effects.js`). It is typed here
+ * only so the wire contract is legible — the server never builds, edits or
+ * filters a declaration, it passes core's object through untouched, so the
+ * dashboard and the terminal banner cannot describe one command two ways.
+ */
+interface CommandEffectsDeclaration {
+  command: string;
+  summary: string;
+  reads: string[];
+  writes: Array<{ path: string; what: string; conditional?: boolean; when?: string }>;
+  llm: Array<{ phase: string; purpose: string; calls: string }>;
+  network: Array<{ to: "llm-provider" | "remote" | "localhost"; what: string; when?: string }>;
+  noLlmFlags?: string[];
+  delegates?: string;
+  duration: string;
+  next: string;
+  [key: string]: unknown;
+}
+
+interface EffectsLoad {
+  effects: Record<string, CommandEffectsDeclaration> | null;
+  error: string | null;
+}
+
+/**
+ * Loaded declarations, one entry per resolved CLI.
+ *
+ * Read by spawning `<ndx> help --effects --format=json --quiet` rather than importing
+ * core: web cannot depend on @n-dx/core (core depends on web — a cycle), and
+ * the spawn asks the same CLI this dashboard's Run buttons spawn, so the
+ * answer describes the install that will actually run. Declarations are
+ * static per install, so a successful load is kept for the server's life; a
+ * failed one is dropped so the next request retries.
+ */
+const effectsCache = new Map<string, Promise<EffectsLoad>>();
+
+async function spawnCommandEffects(bin: string, args: string[], cwd: string): Promise<EffectsLoad> {
+  // --quiet skips the CLI's npm update check — a network call this read does not need.
+  const result = await foundationExec(bin, [...args, "help", "--effects", "--format=json", "--quiet"], {
+    cwd,
+    timeout: 30_000,
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  if (result.error) {
+    return { effects: null, error: (result.stderr || result.error.message).slice(-1000) };
+  }
+  let parsed: { effects?: unknown };
+  try {
+    parsed = JSON.parse(result.stdout) as { effects?: unknown };
+  } catch (err) {
+    return { effects: null, error: `Unparseable effects output: ${String(err)}` };
+  }
+  if (!parsed.effects || typeof parsed.effects !== "object") {
+    return { effects: null, error: "CLI reported no effects declarations" };
+  }
+  return { effects: parsed.effects as Record<string, CommandEffectsDeclaration>, error: null };
+}
+
+/**
+ * Layout token → `resolveLayout` field, as core's `LAYOUT_TOKENS` declares it.
+ *
+ * Declarations name layout-owned paths as tokens (`{rex}/prd_tree/`) so they
+ * are right on either layout; the manifest serves them unexpanded, beside this
+ * project's `layoutPaths`, and the reader expands. A twin of core's map rather
+ * than an import (core depends on web), pinned to it by
+ * `tests/integration/command-effects-manifest-contract.test.js`.
+ */
+const EFFECTS_LAYOUT_TOKENS = {
+  rex: "rexDir",
+  hench: "henchDir",
+  sourcevision: "sourcevisionDir",
+  config: "configFile",
+  localConfig: "localConfigFile",
+  webPid: "webPidFile",
+  webPort: "webPortFile",
+} as const satisfies Record<string, keyof ReturnType<typeof resolveLayout>>;
+
+/** This project's path for each layout token, relative to its root with forward slashes. */
+function effectsLayoutPaths(layout: ReturnType<typeof resolveLayout>, projectDir: string): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(EFFECTS_LAYOUT_TOKENS).map(([token, field]) => [
+      token,
+      relative(projectDir, layout[field]).split(sep).join("/"),
+    ]),
+  );
+}
+
+/** Drop loaded declarations (tests, and a CLI swapped under a running server). */
+export function invalidateCommandEffectsCache(): void {
+  effectsCache.clear();
+}
+
+/** Core's effects declarations, as reported by this server's ndx CLI. */
+function loadCommandEffects(ctx: ServerContext): Promise<EffectsLoad> {
+  const { bin, args } = resolveNdxBin(ctx);
+  const key = [bin, ...args].join("\0");
+  let pending = effectsCache.get(key);
+  if (!pending) {
+    pending = spawnCommandEffects(bin, args, ctx.projectDir).then((load) => {
+      if (load.error) effectsCache.delete(key);
+      return load;
+    });
+    effectsCache.set(key, pending);
+  }
+  return pending;
+}
+
+/** GET /api/commands/manifest — grouped command reference with availability and effects. */
+async function handleManifest(
   _req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
-): boolean {
+): Promise<boolean> {
   const cliName = readCliName(ctx.projectDir);
   const layout = resolveLayout(ctx.projectDir);
   const initialized = [layout.rexDir, layout.sourcevisionDir, layout.henchDir]
@@ -1769,8 +2055,15 @@ function handleManifest(
     return initialized ? "available" : "needs-init";
   };
 
+  // A CLI that cannot report its effects degrades the manifest rather than
+  // failing it: every row still renders with `effects: null`, and
+  // `effectsError` says why.
+  const { effects, error: effectsError } = await loadCommandEffects(ctx);
+
   jsonResponse(res, 200, {
     cliName,
+    layoutPaths: effectsLayoutPaths(layout, ctx.projectDir),
+    ...(effectsError ? { effectsError } : {}),
     groups: COMMAND_MANIFEST.map((group) => ({
       id: group.id,
       label: group.label,
@@ -1779,6 +2072,7 @@ function handleManifest(
         invocation: `${cliName} ${cmd.name}`,
         description: cmd.description,
         status: statusFor(cmd),
+        effects: effects?.[cmd.name] ?? null,
         ...(cmd.trigger ? { trigger: cmd.trigger } : {}),
       })),
     })),
@@ -1835,6 +2129,9 @@ export function handleCommandsRoute(
   }
   if (path === "init/status" && method === "GET") {
     return handleInitStatus(req, res, ctx);
+  }
+  if (path === "init/preflight" && method === "GET") {
+    return handleInitPreflight(req, res, ctx);
   }
   if (path === "sv-analyze" && method === "POST") {
     return handleSvAnalyze(req, res, ctx, broadcast);

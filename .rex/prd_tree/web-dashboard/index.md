@@ -7,7 +7,7 @@ startedAt: "2026-03-24T05:27:03.754Z"
 endedAt: "2026-09-10T17:46:28.941Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
 lastModified: "2026-10-01T21:41:25.141Z"
-lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -23,6 +23,9 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Folder-Tree-Style Context Graph Visualization](./folder-tree-style-context-graph/index.md) | completed |
 | [Geometric Decorative Design System for ndx UI](./geometric-decorative-design-system-for/index.md) | completed |
 | [Item completion timeline view](./item-completion-timeline-view/index.md) | completed |
+| [Live tab: watch every running task and analysis from one place](./live-tab-watch-every-running-task-and/index.md) | completed |
+| [Live view: completed-run summaries for tasks and analyses](./live-view-completed-run-summaries-for/index.md) | pending |
+| [Live view plumbing: stream running hench and analyze progress to the dashboard](./live-view-plumbing-stream-running/index.md) | pending |
 | [N-Rex Easter Egg — Triple-Click Dino Takeover](./n-rex-easter-egg-triple-click-dino/index.md) | completed |
 | [ndx as the single CLI interface](./ndx-as-the-single-cli-interface/index.md) | completed |
 | [ndx Dashboard Refresh Orchestration](./ndx-dashboard-refresh-orchestration/index.md) | completed |
@@ -43,7 +46,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-http.md) | completed |
 | [Match settings-page text boxes to the Analyze & Import input style and fix dark-mode native form chrome](./match-settings-page-text-boxes-to-the.md) | completed |
 | [Overview Next Steps panel: consistent formatting, copyable items, and capture-to-PRD action](./overview-next-steps-panel-consistent.md) | completed |
-| [PRD timeline view: time-ordered default with a tree toggle and recency desaturation](./prd-timeline-view-time-ordered-default.md) | pending |
 | [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-before.md) | completed |
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-contract-in.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-hench.md) | completed |
+

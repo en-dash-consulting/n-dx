@@ -25,6 +25,8 @@
  * - Shared constants (PROJECT_DIRS)
  * - Folder layout resolution (resolveLayout, detectLayoutMode, relativeToRoot)
  * - Canonical JSON serialization
+ * - Repository trust (guard baseline, execution-config evaluation, trust store)
+ * - Credential redaction (redactDeep, redactSecrets)
  *
  * **Out-of-scope (must NOT be re-exported):**
  * - MCP server/client factories (web-tier concern)
@@ -61,11 +63,44 @@ export {
 } from "@n-dx/llm-client";
 
 // ---- Folder layout ----------------------------------------------------------
-export { detectLayoutMode, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
+export {
+  NDX_CONTAINER_DIRNAME,
+  detectLayoutMode,
+  relativeToRoot,
+  resolveLayout,
+} from "@n-dx/llm-client";
 export type { Layout, LayoutMode, ResolveLayoutOptions } from "@n-dx/llm-client";
 
 // ---- Canonical JSON ---------------------------------------------------------
 export { toCanonicalJSON } from "@n-dx/llm-client";
+
+// ---- Repository trust -------------------------------------------------------
+// What a checkout ships as execution config (guard, permission mode, test
+// command, MCP servers) and whether this user has accepted it. The record
+// lives in the per-user ndx home, never in the repository.
+export {
+  SECRET_PATH_PATTERNS,
+  guardBaselineForLanguage,
+  clampGuardToBaseline,
+  evaluateRepoTrust,
+  recordRepoTrust,
+  clearRepoTrust,
+  formatRepoTrustReport,
+} from "@n-dx/llm-client";
+export type {
+  GuardBaseline,
+  RepoTrustEvaluation,
+  RepoTrustFinding,
+  RepoTrustState,
+  RepoTrustStoreOptions,
+} from "@n-dx/llm-client";
+// ---- Credential redaction ---------------------------------------------------
+// Applied to every run record and run log before it is written: a tool's
+// output can carry a secret it read, and the records are served and exported.
+// createLineRedactor is the line-at-a-time form the streaming run log needs —
+// a PEM key spans lines, so per-line redactSecrets cannot see one.
+export { redactDeep, redactSecrets, createLineRedactor } from "@n-dx/llm-client";
+export type { LineRedactor } from "@n-dx/llm-client";
 
 // ---- CLI output control -----------------------------------------------------
 export {
@@ -180,6 +215,10 @@ export {
 } from "@n-dx/llm-client";
 export type { VendorModelResetResult, FailoverAttemptResult } from "@n-dx/llm-client";
 
+// ---- Claude API effort ------------------------------------------------------
+export { resolveClaudeApiEffort } from "@n-dx/llm-client";
+export type { ClaudeEffort } from "@n-dx/llm-client";
+
 // ---- Usage formatting -------------------------------------------------------
 export { formatUsage } from "@n-dx/llm-client";
 
@@ -284,3 +323,13 @@ export type {
   GeminiFunctionDeclaration,
   GeminiSchema,
 } from "@n-dx/llm-client";
+
+// Shared available-memory reading — the same decision the dashboard and hub use.
+// macOS counts reclaimable pages and kernel pressure; unknown is `null`, never 0.
+export {
+  readAvailableMemory,
+  getAvailableMemory,
+  createAvailableMemoryReader,
+} from "@n-dx/llm-client";
+
+export type { AvailableMemoryReading } from "@n-dx/llm-client";

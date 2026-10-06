@@ -21,12 +21,12 @@
 
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
-import { mkdirSync } from "node:fs";
-import { basename } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
+import { basename, isAbsolute } from "node:path";
 import { ProjectSupervisor } from "./children.js";
 import type { ChildStatus, SupervisorOptions } from "./children.js";
-import { AdmissionGate, countProjectExecutions } from "./admission.js";
-import type { AdmissionLimits, QueueEntry, QueueSnapshot } from "./admission.js";
+import { AdmissionGate, countProjectExecutions, redactQueueEntry } from "./admission.js";
+import type { AdmissionLimits, ExecuteRefusal, PublicQueueSnapshot, QueueEntry, StartOutcome } from "./admission.js";
 import {
   hubConfigPath,
   hubPidPath,
@@ -39,9 +39,10 @@ import {
   writeHubPidFile,
 } from "./registry.js";
 import type { HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
-import { handleHubRoute } from "./routes.js";
+import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
 import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
-import { guardHubRequest, upgradeAllowed } from "./request-guard.js";
+import { guardHubRequest, upgradeRefusal } from "./request-guard.js";
+import { ensureAuthToken } from "@n-dx/llm-client";
 
 export const DEFAULT_HUB_PORT = 3117;
 const LOOPBACK_HOST = "127.0.0.1";
@@ -49,6 +50,12 @@ const LOOPBACK_HOST = "127.0.0.1";
 export interface HubOptions {
   /** Port to listen on. 0 asks the OS for a free one (tests). Default 3117. */
   port?: number;
+  /**
+   * Per-user token file (`<ndx home>/auth.token`). When set, the token is
+   * created if absent, every hub request must present it, and the project
+   * servers the hub spawns are started with the same file.
+   */
+  tokenFile?: string;
   /** Directory holding hub.json and hub.pid. Defaults to {@link resolveHubHome}. */
   homeDir?: string;
   /** How often each project server is health-checked. Default 15 s. */
@@ -65,8 +72,11 @@ export interface HubOptions {
    * `hub.memoryFloorBytes` from the same file.
    */
   limits?: Partial<AdmissionLimits>;
-  /** Injectable for tests — the gate's view of free memory. */
-  freeMemory?: () => number;
+  /**
+   * Injectable for tests — the gate's view of available memory. `null` means
+   * the machine could not be read, which admits rather than queues.
+   */
+  freeMemory?: () => number | null;
   /** How often the gate retries queued runs. Default 2 s. */
   drainIntervalMs?: number;
   /**
@@ -76,6 +86,16 @@ export interface HubOptions {
    * response has flushed before pulling the server out from under it.
    */
   onEmpty?: () => void;
+  /**
+   * The n-dx binary a project created *from the hub* is registered with.
+   *
+   * Every other project names its own (`ndxBin` on the registration, so each
+   * repository can run its own n-dx version), but a folder the hub creates has
+   * nobody to name one — so it inherits the hub's own. Defaults to the script
+   * this process was started from, which is `@n-dx/web`'s CLI, the same entry
+   * `buildServeCommand` expects.
+   */
+  selfBin?: string;
   log?: (message: string) => void;
 }
 
@@ -137,10 +157,78 @@ export function normalizeWorktree(path: string): string {
   return trimmed || path;
 }
 
+/** POST an execute-shaped request for a queue entry to its project server, as the hub. */
+function postExecute(
+  port: number,
+  path: string,
+  entry: Omit<QueueEntry, "enqueuedAt">,
+  timeoutMs: number,
+): Promise<Response> {
+  return fetch(`http://127.0.0.1:${port}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(entry.workspace ? { "x-ndx-workspace": entry.workspace } : {}),
+    },
+    body: JSON.stringify({
+      taskId: entry.taskId,
+      ...(entry.options ? { options: entry.options } : {}),
+      ...(entry.mode ? { mode: entry.mode } : {}),
+      ...(entry.iterations !== undefined ? { iterations: entry.iterations } : {}),
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+}
+
+/** A response's JSON body when it is an object; null for anything else. */
+async function readJsonObject(res: Response): Promise<Record<string, unknown> | null> {
+  try {
+    const body: unknown = await res.json();
+    return body !== null && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : null;
+  } catch {
+    return null; // not JSON: the caller falls back to the status alone
+  }
+}
+
 /**
  * Hub state and operations, independent of HTTP so the routes stay thin and
  * the lifecycle is testable without a socket.
  */
+/**
+ * The binary to register hub-created projects with.
+ *
+ * `process.argv[1]` is this process's entry — `@n-dx/web`'s `dist/cli/index.js`,
+ * which answers `serve` as well as `hub`, so it is exactly what a project
+ * server is spawned from. A registered project's own `ndxBin` is the fallback
+ * for the case the entry cannot be read back (a bundled or renamed launcher).
+ *
+ * Every candidate must pass {@link isAcceptableNdxBin}, including the registry
+ * ones: "it is already in the registry" is not evidence, because an entry
+ * written before `parseRegisterInput` enforced that rule can name anything.
+ * Returns "" when no candidate qualifies, which the new-project route reports
+ * rather than spawning.
+ */
+export function resolveSelfBin(explicit: string | undefined, registry: HubRegistry): string {
+  const candidates = [
+    explicit,
+    process.argv[1],
+    ...Object.values(registry.projects).map((p) => p.ndxBin),
+  ];
+  for (const candidate of candidates) {
+    if (!candidate || !isAbsolute(candidate) || !existsSync(candidate)) continue;
+    // The registry entries are the reason this is a filter and not an
+    // assertion: a registration recorded before `parseRegisterInput` learned
+    // this rule can name any executable, and picking it here would hand the
+    // hub an arbitrary program to spawn for every project created from the
+    // dashboard. Skipping rather than failing also keeps the chain useful —
+    // an unrecognizable `process.argv[1]` (a bundled or renamed launcher)
+    // falls through to a registered binary that does pass.
+    if (!isAcceptableNdxBin(candidate)) continue;
+    return candidate;
+  }
+  return "";
+}
+
 export class Hub {
   readonly hubHome: string;
   readonly registryPath: string;
@@ -151,6 +239,10 @@ export class Hub {
   readonly admission: AdmissionGate;
   /** Keys the per-user `config.json` got wrong, for {@link startHub} to report once. */
   readonly configProblems: HubConfigProblem[];
+  /** The n-dx binary projects created from the hub are registered with. */
+  readonly selfBin: string;
+  /** The per-user token every request must present, or null when running without one. */
+  readonly token: string | null;
   private readonly registry: HubRegistry;
   private readonly supervisors = new Map<string, ProjectSupervisor>();
   private readonly supervisorOptions: SupervisorOptions;
@@ -167,8 +259,10 @@ export class Hub {
     const { config, problems } = readHubConfig(hubConfigPath(this.hubHome));
     this.configProblems = problems;
     this.keepAlive = options.keepAlive ?? config.keepAlive;
-    this.supervisorOptions = { log: this.log, ...options.supervisor };
+    this.token = options.tokenFile ? ensureAuthToken(options.tokenFile) : null;
+    this.supervisorOptions = { log: this.log, tokenFile: options.tokenFile, token: this.token, ...options.supervisor };
     this.registry = loadRegistry(this.registryPath);
+    this.selfBin = resolveSelfBin(options.selfBin, this.registry);
     for (const record of Object.values(this.registry.projects)) {
       this.supervisors.set(record.id, new ProjectSupervisor(record, this.supervisorOptions));
     }
@@ -179,6 +273,7 @@ export class Hub {
       },
       countRunning: () => this.countRunningExecutions(),
       start: (entry) => this.startQueuedExecution(entry),
+      validate: (request) => this.validateQueuedExecution(request),
       freeMemory: options.freeMemory,
       drainIntervalMs: options.drainIntervalMs,
       log: this.log,
@@ -196,32 +291,54 @@ export class Hub {
 
   /**
    * Start a queued run on its project's server, as the hub rather than as the
-   * client that queued it — that client got its 202 and is long gone.
+   * client that queued it — that client got its 202 and is long gone. Carries
+   * the options the request was queued with, so a queued run is the run the
+   * operator asked for.
    */
-  private async startQueuedExecution(entry: QueueEntry): Promise<boolean> {
-    const project = this.getProject(entry.projectId);
-    const port = project?.status.port ?? project?.port ?? null;
-    if (port === null) return false;
+  private async startQueuedExecution(entry: QueueEntry): Promise<StartOutcome> {
+    const port = this.projectPort(entry.projectId);
+    if (port === null) return { started: false, status: null, error: "Its project is no longer served by the hub." };
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(entry.workspace ? { "x-ndx-workspace": entry.workspace } : {}),
-        },
-        body: JSON.stringify({ taskId: entry.taskId }),
-        signal: AbortSignal.timeout(30_000),
-      });
+      const res = await postExecute(port, "/api/hench/execute", entry, 30_000);
       if (!res.ok) {
+        const body = await readJsonObject(res);
+        const error = typeof body?.error === "string" && body.error ? body.error : `HTTP ${res.status}`;
         this.log(`[hub] admission: ${entry.projectId}/${entry.taskId} refused by its server (HTTP ${res.status})`);
-        return false;
+        return { started: false, status: res.status, error };
       }
       this.log(`[hub] admission: started queued ${entry.projectId}/${entry.taskId}`);
-      return true;
+      return { started: true };
     } catch (err) {
       this.log(`[hub] admission: could not start ${entry.projectId}/${entry.taskId} — ${(err as Error).message}`);
-      return false;
+      return { started: false, status: null, error: `Its server could not be reached: ${(err as Error).message}` };
     }
+  }
+
+  /**
+   * Ask a request's project server, before queuing it, whether it would start
+   * (`POST /api/hench/execute/check`). Null when there is no verdict — the
+   * server is unreachable, or predates the route and answers 404 — and the
+   * request queues as it always did; the replay is still judged, and a refusal
+   * then is recorded as dropped.
+   */
+  private async validateQueuedExecution(request: Omit<QueueEntry, "enqueuedAt">): Promise<ExecuteRefusal | null> {
+    const port = this.projectPort(request.projectId);
+    if (port === null) return null;
+    try {
+      const res = await postExecute(port, "/api/hench/execute/check", request, 10_000);
+      if (res.status !== 200) return null;
+      const verdict = await readJsonObject(res);
+      if (verdict?.ok !== false || typeof verdict.status !== "number") return null;
+      const { ok: _ok, status, ...body } = verdict;
+      return { status: status as number, body };
+    } catch {
+      return null;
+    }
+  }
+
+  private projectPort(projectId: string): number | null {
+    const project = this.getProject(projectId);
+    return project?.status.port ?? project?.port ?? null;
   }
 
   /**
@@ -232,12 +349,18 @@ export class Hub {
    * entry list narrows: asked through `/p/<id>/`, a viewer gets its own
    * project's queue, since it can neither act on nor identify another's.
    */
-  queueSnapshot(projectId?: string): QueueSnapshot {
+  queueSnapshot(projectId?: string): PublicQueueSnapshot {
     const snapshot = this.admission.snapshot();
-    if (projectId === undefined) return snapshot;
-    return {
+    const redacted = {
       ...snapshot,
-      entries: snapshot.entries.filter((entry) => entry.projectId === projectId),
+      entries: snapshot.entries.map(redactQueueEntry),
+      dropped: snapshot.dropped.map(redactQueueEntry),
+    };
+    if (projectId === undefined) return redacted;
+    return {
+      ...redacted,
+      entries: redacted.entries.filter((entry) => entry.projectId === projectId),
+      dropped: redacted.dropped.filter((entry) => entry.projectId === projectId),
       /** Queued across every project, so "2 of 5 waiting" stays truthful. */
       queuedTotal: snapshot.entries.length,
     };
@@ -423,7 +546,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     // The origin gate is the hub's outer boundary and runs before any routing:
     // registration spawns a process, and the project servers behind the proxy
     // see a rewritten Origin, so this is where a browser request is judged.
-    if (guardHubRequest(req, res, hub.listeningPort)) return;
+    if (guardHubRequest(req, res, hub.listeningPort, hub.token)) return;
     void handleHubRoute(req, res, hub)
       .then((handled) => {
         // Everything that is not the hub's own API belongs to a project server:
@@ -441,8 +564,12 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       });
   });
   server.on("upgrade", (req, socket, head) => {
-    if (!upgradeAllowed(req, hub.listeningPort)) {
-      socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    // Each refusal keeps its own status line, as on the HTTP path and on the
+    // project server's own upgrade path: a `Host` that does not name this hub
+    // is 421 Misdirected Request, a missing token 401, a foreign `Origin` 403.
+    const refusal = upgradeRefusal(req, hub.listeningPort, hub.token);
+    if (refusal !== null) {
+      socket.write(`HTTP/1.1 ${refusal}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
       socket.destroy();
       return;
     }

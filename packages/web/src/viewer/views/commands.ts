@@ -488,6 +488,7 @@ export function SelfHealPanel({ jobs }: { jobs: JobTray }) {
         h("div", null,
           h("strong", null, "This operation modifies the PRD."),
           " Self-heal will analyze the codebase and autonomously execute tasks. " +
+          "Once started it runs unattended — no prompts — until it finishes or you stop it. " +
           "Do not run other write operations concurrently.",
         ),
       ),

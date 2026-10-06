@@ -173,3 +173,76 @@ describe("startCommitMsgWatcher — timeout handler branches", () => {
     expect(staged.trim()).toBe("src.ts");
   });
 });
+
+/**
+ * The timer is off unless someone turns it on.
+ *
+ * Armed, it commits whatever is staged at expiry — before the test gate, the
+ * uncommitted-work gate and the completion write have had their say — and it
+ * stages nothing itself, so the PRD paths and any review repairs are left
+ * out. It then suppresses the real commit path through `didAutoCommit()`, so
+ * the completion write never reaches a commit either. That is the whole
+ * reason `hench.commitMsgTimeoutMs` now defaults to 0.
+ */
+describe("startCommitMsgWatcher — disabled by default (timeoutMs 0)", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "commit-watcher-off-"));
+    await setupGitRepo(dir);
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true, ...RM_RETRY });
+  });
+
+  it("never commits, however long it waits, and leaves the message file alone", async () => {
+    const { startCommitMsgWatcher } = await import(
+      "../../../../src/agent/lifecycle/commit-msg-watcher.js"
+    );
+    const before = await getHeadSubject(dir);
+
+    await writeFile(join(dir, "staged.ts"), "export const y = 2;\n", "utf-8");
+    await execAsync("git add staged.ts", { cwd: dir });
+    const msgPath = join(dir, ".hench-commit-msg.txt");
+    await writeFile(msgPath, "feat: the agent's proposed subject\n", "utf-8");
+
+    // Fake timers rather than a real sleep: advancing an hour proves no
+    // timer was armed, where waiting 300ms would only prove none fired yet.
+    vi.useFakeTimers();
+    const watcher = startCommitMsgWatcher({ projectDir: dir, timeoutMs: 0 });
+    try {
+      await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+
+      expect(watcher.didAutoCommit()).toBe(false);
+      expect(await getHeadSubject(dir)).toBe(before);
+      // Both the staged work and the message are left for the normal path.
+      expect(existsSync(msgPath)).toBe(true);
+      const { stdout } = await execAsync("git diff --cached --name-only", { cwd: dir });
+      expect(stdout.trim()).toBe("staged.ts");
+    } finally {
+      watcher.cancel();
+      vi.useRealTimers();
+    }
+  });
+});
+
+/**
+ * The schema default is the mechanism that makes the above the default, so
+ * it is pinned here rather than left to the field's docblock.
+ */
+describe("commitMsgTimeoutMs default", () => {
+  it("parses to 0 when the key is absent", async () => {
+    const { validateConfig } = await import("../../../../src/schema/validate.js");
+    const { DEFAULT_HENCH_CONFIG } = await import("../../../../src/schema/v1.js");
+
+    const withoutKey: Record<string, unknown> = { ...DEFAULT_HENCH_CONFIG() };
+    delete withoutKey["commitMsgTimeoutMs"];
+
+    const result = validateConfig(withoutKey);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.commitMsgTimeoutMs).toBe(0);
+    }
+  });
+});

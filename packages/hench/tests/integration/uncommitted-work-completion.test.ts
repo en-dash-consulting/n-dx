@@ -453,6 +453,206 @@ describe("finalizeRun — uncommitted-work gate", () => {
       expect(stdout).toContain("app/utils/mcp-auth.server.ts");
     });
 
+    /**
+     * The executor committed for itself and wrote no message file (GitHub
+     * #483, caos run 4b733f14). Nothing downstream owns the repairs —
+     * `commitReviewRepairsIfNeeded` runs only on autoCommit, and the commit
+     * prompt returns early without a message file — so since #422 the gate
+     * refused a run whose work *and* repairs were both correct, and the task
+     * was reset to pending. `commitOrphanedReviewRepairs` now commits them,
+     * but only when the executor really did commit and nothing else is loose.
+     */
+    describe("executor committed for itself, no message file (#483)", () => {
+      /** HEAD right now — the fixture's `startHead` for a run about to begin. */
+      async function head(): Promise<string> {
+        const { stdout } = await execAsync("git rev-parse HEAD", { cwd: projectDir });
+        return stdout.trim();
+      }
+
+      async function branch(): Promise<string> {
+        const { stdout } = await execAsync("git rev-parse --abbrev-ref HEAD", { cwd: projectDir });
+        return stdout.trim();
+      }
+
+      /** Commit subjects since `since`, oldest first. */
+      async function subjectsSince(since: string): Promise<string[]> {
+        const { stdout } = await execAsync(`git log --reverse --format=%s ${since}..HEAD`, {
+          cwd: projectDir,
+        });
+        return stdout.split("\n").filter(Boolean);
+      }
+
+      /**
+       * A run whose origin matches the fixture's checkout. Both fields are
+       * required: with `startHead` alone `checkRunGitOrigin` reads the run as
+       * having started detached, and refuses every commit because HEAD is now
+       * on a branch.
+       */
+      async function buildRunAtOrigin(startHead: string): Promise<RunRecord> {
+        const run = buildCompletedRun();
+        run.startHead = startHead;
+        run.branch = await branch();
+        return run;
+      }
+
+      /** Commit `lib.ts` so a later edit to it is a repair to tracked content. */
+      async function commitLib(): Promise<void> {
+        await writeFile(join(projectDir, "lib.ts"), "export const lib = 1;\n", "utf-8");
+        await execAsync("git add lib.ts", { cwd: projectDir });
+        await execAsync('git commit -m "chore: lib"', { cwd: projectDir });
+      }
+
+      async function repairLib(): Promise<void> {
+        await writeFile(join(projectDir, "lib.ts"), "export const lib = 2; // repaired\n", "utf-8");
+      }
+
+      it("commits the repairs itself and completes the run", async () => {
+        await commitLib();
+        const startHead = await head();
+
+        // The executor commits its own work with a plain `git commit` — no
+        // .hench-commit-msg.txt is ever written.
+        await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+        await execAsync("git add src.ts", { cwd: projectDir });
+        await execAsync('git commit -m "feat: executor committed itself"', { cwd: projectDir });
+        await repairLib();
+
+        const run = await buildRunAtOrigin(startHead);
+        run.review = buildUsableReview(["lib.ts"]);
+        await runFinalize(run, buildStore(), false);
+
+        expect(run.status).toBe("completed");
+        expect(statuses).toEqual(["completed"]);
+
+        // Three commits, in the order they are made: the executor's own, the
+        // repair commit, then the PRD completion record. The record used to be
+        // skipped entirely on this path — the executor committed for itself and
+        // wrote no message file, so nothing owned the completion write and it
+        // sat in the tree with the task marked done.
+        const subjects = await subjectsSince(startHead);
+        expect(subjects).toHaveLength(3);
+        expect(subjects[0]).toBe("feat: executor committed itself");
+        expect(subjects[1]).toBe(
+          `fix(review): apply adversarial-review repairs (run ${run.id})`,
+        );
+        expect(subjects[2]).toContain("chore(prd):");
+
+        // The repair is in the repair commit, not merely somewhere in the
+        // range — asked of that commit by sha, since HEAD is now the record.
+        expect(run.review?.repairCommit).toMatch(/^[0-9a-f]{40}$/);
+        const { stdout: repairFiles } = await execAsync(
+          `git show --name-only --format= ${run.review!.repairCommit}`,
+          { cwd: projectDir },
+        );
+        expect(repairFiles.split("\n").filter(Boolean)).toEqual(["lib.ts"]);
+        expect(await porcelain()).not.toContain("lib.ts");
+      });
+
+      it("commits the PRD record even with no repairs to carry it", async () => {
+        // The reported failure, with nothing else going on: the executor
+        // committed its own work, wrote no message file, and the run had no
+        // review repairs. Nothing downstream touched the tree, so the
+        // completion write `updateCompletedTaskStatus` makes sat there with
+        // the task marked completed — and the next autonomous run's pre-run
+        // gate refused to start over a path hench had written itself. Reported
+        // against UI work, where committing as you go is the norm.
+        const startHead = await head();
+        await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+        await execAsync("git add src.ts", { cwd: projectDir });
+        await execAsync('git commit -m "feat: executor committed itself"', { cwd: projectDir });
+
+        const run = await buildRunAtOrigin(startHead);
+        await runFinalize(run, buildStore(), false);
+
+        expect(run.status).toBe("completed");
+
+        const subjects = await subjectsSince(startHead);
+        expect(subjects).toHaveLength(2);
+        expect(subjects[1]).toContain("chore(prd):");
+
+        // What the next run actually depends on.
+        expect(await porcelain()).not.toContain("prd_tree");
+      });
+
+      it("names the cause when the repair commit is refused, and says how to finish", async () => {
+        await commitLib();
+        const startHead = await head();
+        await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+        await execAsync("git add src.ts", { cwd: projectDir });
+        await execAsync('git commit -m "feat: executor committed itself"', { cwd: projectDir });
+        await repairLib();
+
+        const run = await buildRunAtOrigin(startHead);
+        // The checkout moved out from under the run — checkRunGitOrigin makes
+        // commitReviewRepairs throw rather than commit to the wrong branch.
+        run.branch = "some-other-branch";
+        run.review = buildUsableReview(["lib.ts"]);
+        await runFinalize(run, buildStore(), false);
+
+        expect(run.status).toBe("failed");
+        expect(statuses).not.toContain("completed");
+        expect(run.error).toContain("review repairs uncommitted");
+        // The cause, not just the symptom.
+        expect(run.error).toContain("some-other-branch");
+        expect(run.error).toContain("lib.ts");
+        // The two-command recovery, and nothing that would lose the repairs.
+        expect(run.error).toContain("git add -- lib.ts");
+        expect(run.error).toContain(`ndx rex update ${taskId} --status=completed`);
+        expect(run.error).not.toContain("git stash");
+        expect(run.error).not.toContain("re-run the task");
+        // Nothing was discarded, and no half-made commit landed.
+        expect(await porcelain()).toContain("lib.ts");
+        expect(await subjectsSince(startHead)).toHaveLength(1);
+      });
+
+      it("does not commit when the executor never committed (run 2fb96507 behaviour)", async () => {
+        await commitLib();
+        const startHead = await head();
+        // HEAD is still startHead: nothing committed during this run, so the
+        // "repairs" may be the whole uncommitted feature.
+        await repairLib();
+
+        const run = await buildRunAtOrigin(startHead);
+        run.review = buildUsableReview(["lib.ts"]);
+        await runFinalize(run, buildStore(), false);
+
+        expect(run.status).toBe("failed");
+        expect(statuses).not.toContain("completed");
+        // The generic refusal, unchanged.
+        expect(run.error).toContain("still uncommitted");
+        expect(run.error).not.toContain("review repairs uncommitted");
+        expect(run.error).toContain("lib.ts");
+        expect(await subjectsSince(startHead)).toHaveLength(0);
+        expect(await porcelain()).toContain("lib.ts");
+      });
+
+      it("does not commit when other work is still loose", async () => {
+        await commitLib();
+        const startHead = await head();
+        await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+        await execAsync("git add src.ts", { cwd: projectDir });
+        await execAsync('git commit -m "feat: executor committed itself"', { cwd: projectDir });
+        await repairLib();
+        // Something the review never touched and nothing will commit.
+        await writeFile(join(projectDir, "stray.log"), "scratch output\n", "utf-8");
+
+        const run = await buildRunAtOrigin(startHead);
+        run.review = buildUsableReview(["lib.ts"]);
+        await runFinalize(run, buildStore(), false);
+
+        expect(run.status).toBe("failed");
+        expect(statuses).not.toContain("completed");
+        expect(run.error).toContain("still uncommitted");
+        expect(run.error).not.toContain("review repairs uncommitted");
+        expect(run.error).toContain("stray.log");
+        expect(run.error).toContain("lib.ts");
+        // Only the executor's commit — the repairs were not sliced off a
+        // leaking tree.
+        expect(await subjectsSince(startHead)).toHaveLength(1);
+        expect(await porcelain()).toContain("lib.ts");
+      });
+    });
+
     it("does not discount repairs when the review produced no usable report", async () => {
       await writeFile(join(projectDir, "lib.ts"), "export const lib = 1;\n", "utf-8");
       await execAsync("git add lib.ts", { cwd: projectDir });

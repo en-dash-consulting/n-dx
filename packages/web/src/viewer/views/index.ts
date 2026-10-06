@@ -20,6 +20,7 @@ export {
   viewLabel,
   viewBlurb,
   viewGlyph,
+  viewPixelIcon,
   viewProduct,
   viewProductLabel,
 } from "./view-meta.js";
@@ -30,6 +31,8 @@ export {
   SETTINGS_ENTRIES,
   isSettingsView,
   isStageId,
+  isLiveView,
+  LIVE_VIEWS,
   stageForView,
   stageProduct,
   visibleStages,

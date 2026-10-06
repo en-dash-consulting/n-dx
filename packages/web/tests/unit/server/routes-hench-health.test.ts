@@ -151,6 +151,50 @@ describe("Hench runs health endpoint", () => {
     expect(data.runs[0].stale).toBe(true);
     expect(data.runs[0].lastActivityAt).toBeUndefined();
   });
+
+  describe("recorded pid", () => {
+    async function writeRunning(id: string, extra: Record<string, unknown>): Promise<void> {
+      await writeFile(join(tmpDir, ".hench", "runs", `${id}.json`), JSON.stringify({
+        id,
+        taskId: "t",
+        taskTitle: "Task",
+        startedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
+        status: "running",
+        turns: 1,
+        tokenUsage: { input: 1, output: 1 },
+        toolCalls: [],
+        model: "sonnet",
+        ...extra,
+      }));
+    }
+
+    async function health() {
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs/health`);
+      return (await res.json()).runs[0];
+    }
+
+    it("reports a live pid as alive, with the vendor pid", async () => {
+      await writeRunning("pid-live", { pid: process.pid, vendorPid: process.pid });
+      const run = await health();
+      expect(run.pid).toBe(process.pid);
+      expect(run.vendorPid).toBe(process.pid);
+      expect(run.pidAlive).toBe(true);
+    });
+
+    it("reports a pid that no longer exists as not alive", async () => {
+      // Pids are bounded well below 2^31 on every supported platform.
+      await writeRunning("pid-dead", { pid: 2_147_483_646 });
+      expect((await health()).pidAlive).toBe(false);
+    });
+
+    it("reports pid unknown (null, not dead) for a record without the field", async () => {
+      await writeRunning("pid-none", {});
+      const run = await health();
+      expect(run.pid).toBeUndefined();
+      expect(run.pidAlive).toBeNull();
+    });
+  });
 });
 
 describe("Hench mark-stuck endpoint", () => {

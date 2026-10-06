@@ -432,6 +432,41 @@ export function resolveActiveVendor(projectDir: string): string | null {
   return typeof llm["vendor"] === "string" ? llm["vendor"] : null;
 }
 
+/** The agent's vendor and model as the Live views show them; both null when the config cannot be resolved. */
+export interface ActiveAgentModel {
+  vendor: string | null;
+  model: string | null;
+}
+
+const activeAgentModels = new Map<string, ActiveAgentModel>();
+
+/**
+ * The vendor and model `ndx work` runs — the `effective` block of
+ * `GET /api/llm/config`, so the Live strip and Robot Wrangler name the same
+ * robot. Remembered per project for {@link lastActiveAgentModel}.
+ *
+ * A config that fails to resolve (malformed `.n-dx.json`) yields nulls and a
+ * log line rather than a throw: the Live views must keep answering, and the
+ * LLM settings page is where that error is reported.
+ */
+export async function resolveActiveAgentModel(projectDir: string): Promise<ActiveAgentModel> {
+  let resolved: ActiveAgentModel;
+  try {
+    const { vendor, model } = await resolveEffectiveAgentConfig(projectDir);
+    resolved = { vendor, model };
+  } catch (err) {
+    console.error(`[llm] effective agent config unresolved for ${projectDir}: ${(err as Error).message}`);
+    resolved = { vendor: null, model: null };
+  }
+  activeAgentModels.set(projectDir, resolved);
+  return resolved;
+}
+
+/** The last {@link resolveActiveAgentModel} answer for the project, for synchronous snapshot builders. */
+export function lastActiveAgentModel(projectDir: string): ActiveAgentModel {
+  return activeAgentModels.get(projectDir) ?? { vendor: null, model: null };
+}
+
 /**
  * Refusals `ndx work` would raise for the resolved config. The provider check
  * is the one the dashboard already applies on write; the model check is
@@ -773,13 +808,42 @@ function cloudVendorModels(vendor: LLMVendor): string[] {
 }
 
 /**
+ * Refuse a per-run model the active vendor's catalog does not offer — the
+ * check behind an execute request's `options.model` / `options.reviewModel`.
+ * The catalog is GET /api/llm/catalog's: the built-in list, plus the live
+ * list. The live list is fetched (through the catalog's cache) only when the
+ * built-in list misses, so a built-in model never waits on a vendor API —
+ * while a live-only model the modal offered still passes once the cache has
+ * expired, which a peek at the cache alone would refuse. `local` runs
+ * whatever its server has loaded, so any id passes there, as it does for a
+ * config write. Returns an error, or null.
+ */
+export async function validateCatalogModel(
+  projectDir: string,
+  vendor: string | null,
+  model: string,
+): Promise<string | null> {
+  if (vendor === LLM_VENDOR.LOCAL) return null;
+  if (vendor !== LLM_VENDOR.CLAUDE && vendor !== LLM_VENDOR.CODEX && vendor !== LLM_VENDOR.GOOGLE) {
+    return `No LLM vendor is configured (llm.vendor), so model "${model}" cannot be checked.`;
+  }
+  if (!isModelCompatibleWithVendor(vendor, model)) return `Model "${model}" is not a ${vendor} model.`;
+  if (cloudVendorModels(vendor).includes(model)) return null;
+  if (vendor !== LLM_VENDOR.GOOGLE) {
+    const live = await getLiveVendorProbe(vendor, projectDir);
+    if (live.listing.ok && live.listing.models.includes(model)) return null;
+  }
+  return `Model "${model}" is not in the ${vendor} catalog.`;
+}
+
+/**
  * Build the vendor/model/provider catalog: cloud-vendor models from
  * llm-client's catalog, local models from a live probe of the configured
  * local server, and provider choices from {@link VENDOR_PROVIDERS} — the
  * literal pinned against hench's own table by the cross-package contract
  * test (see that file's doc comment for why web keeps a copy at all).
  */
-async function buildLlmCatalog(projectDir: string, refresh: boolean): Promise<LlmCatalogResponse> {
+export async function buildLlmCatalog(projectDir: string, refresh: boolean): Promise<LlmCatalogResponse> {
   const config = readEffectiveNdxConfig(projectDir);
   const llmConfig = await loadLLMConfig(projectDir);
   // The model `ndx work` would run with no `hench.models.<vendor>` — resolved

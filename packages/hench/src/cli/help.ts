@@ -52,6 +52,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--priority=<level>", description: "Override task scheduling priority (critical|high|medium|low)" },
       { flag: "--reset-deferred", description: "Reset all deferred/failing tasks to pending before running" },
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
+      { flag: "--resolve", description: "With --task: print the settings the run would use, where each came from, and why it would refuse, as JSON. Runs nothing (see below)" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
       { flag: "--review-optional", description: "Accept a best-effort review: warn instead of refusing the completion when the reviewer cannot start" },
@@ -60,7 +61,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },
       { flag: "--model=<model>", description: "Override the Claude model" },
       { flag: "--permission-mode=<mode>", description: "Claude permission posture: default | acceptEdits | bypassPermissions | plan (autonomous runs default to acceptEdits)" },
-      { flag: "--allow-dirty", description: "Start with an uncommitted working tree: autonomous runs (--auto/--loop/--epic-by-epic) abort by default, and this flag also overrides hench.git.requireCleanTree and hench.git.checkpointThreshold escalation" },
+      { flag: "--allow-dirty", description: "Start with an uncommitted working tree: autonomous runs (--auto/--loop/--epic-by-epic) prompt to commit/stash/discard on a TTY and abort without one, and this flag also overrides hench.git.requireCleanTree and hench.git.checkpointThreshold escalation" },
       { flag: "--skip-test-gate", description: "Skip the mandatory full test suite gate before commit for this invocation (persistent equivalent: hench.skipFullTestGate config)" },
       { flag: "--fresh", description: "Discard the cached orientation session and orient again before forking task spawns (see hench.sessionStrategy)" },
     ],
@@ -79,7 +80,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "Other vendors get a fresh reviewer seeded with the task context.\n" +
           "\n" +
           "Model: --review-model wins, then llm.<vendor>.reviewModel, then\n" +
-          "llm.reviewModel, then the vendor default (claude: claude-opus-5).\n" +
+          "llm.reviewModel, then the vendor default (claude: claude-opus-5-5).\n" +
           "The execution model is never inherited — pinning a cheap executor\n" +
           "must not silently downgrade the reviewer.\n" +
           "\n" +
@@ -106,15 +107,41 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "hench.git.requireCleanTree=true, dirty runs must commit or stop.\n" +
           "Precedence: --allow-dirty flag > hench.git.* config > defaults.",
       },
+      {
+        title: "Resolve (--resolve)",
+        content:
+          "hench run --task=<id> --resolve [flags] [dir] reads the same config and\n" +
+          "parses the same flags as a run, resolved as an autonomous (--auto) run,\n" +
+          "and prints one JSON object on stdout:\n" +
+          "  task       id, title, status, level, blockedBy, claimedBy\n" +
+          "  workspace  root, branch, isAnchor, dirty\n" +
+          "  resolved   vendor, model, provider, permissionMode, review,\n" +
+          "             reviewModel, skipTestGate, maxTurns, tokenBudget, fresh,\n" +
+          "             allowDirty, resetDeferred — each {value, source}, where\n" +
+          "             source is the key that supplied it (cli-flag,\n" +
+          "             hench.models.<vendor>, llm.routes, llm.tiers.<vendor>.<tier>,\n" +
+          "             llm.model, llm.<vendor>.model, vendor-default, hench.<key>,\n" +
+          "             autonomous-default, built-in)\n" +
+          "  options    the per-run options, with flag, type, values and scope\n" +
+          "  refusals   [{code, message}] for each reason the run would not start:\n" +
+          "             prd-unreadable (task is null), task-not-found, not-actionable, claimed-elsewhere,\n" +
+          "             tree-not-conformant, vendor-unset, vendor-cli-missing,\n" +
+          "             provider-unsupported, model-vendor-mismatch, dirty-tree\n" +
+          "  command    the equivalent ndx work command line\n" +
+          "\n" +
+          "Exits 0 when it reports refusals. Takes no claim, writes nothing (no\n" +
+          "--reset-deferred, no commit), and starts no vendor CLI or LLM call.",
+      },
     ],
     examples: [
       { command: "hench run", description: "Run next task (interactive selection)" },
+      { command: "hench run --task=abc123 --resolve --review .", description: "Show what a reviewed run of abc123 would use, without running it" },
       { command: "hench run --task=abc123", description: "Run a specific task" },
       { command: "hench run --epic=\"Auth\" --auto", description: "Auto-run tasks in the Auth epic" },
       { command: "hench run --loop --epic-by-epic", description: "Continuously process epics in order" },
       { command: "hench run --dry-run .", description: "Preview the brief without execution" },
       { command: "hench run --auto --review", description: "Auto-run with an adversarial review pass after each task" },
-      { command: "hench run --review --review-model=claude-fable-5", description: "Review on a specific model" },
+      { command: "hench run --review --review-model=claude-fable-5-1", description: "Review on a specific model" },
     ],
     related: ["status", "show"],
   },
@@ -331,6 +358,41 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["config"],
   },
+  trust: {
+    tool: "hench",
+    command: "trust",
+    summary: "review or accept what this checkout ships as execution config",
+    usage: [
+      "hench trust [status] [options] [dir]",
+      "hench trust accept [dir]",
+      "hench trust revoke [dir]",
+    ],
+    description:
+      "Files n-dx reads to decide what it may execute usually live in the\n" +
+      "repository and are tracked by git: the guard in .hench/config.json\n" +
+      "(command allowlist, blocked paths, git subcommands, permission mode),\n" +
+      "the test command in .rex/config.json, and the MCP servers in .mcp.json.\n" +
+      "A clone, a fork or a checked-out pull request can therefore widen them.\n" +
+      "\n" +
+      "status compares them to the defaults for the project's language and\n" +
+      "lists what is wider, plus what else came with the checkout (PRD items,\n" +
+      "analysis, run records). Until you accept, hench runs under the default\n" +
+      "guard — the repository's config can only tighten it — lowers\n" +
+      "bypassPermissions to acceptEdits, and verify_criteria does not run the\n" +
+      "repository's test command.\n" +
+      "\n" +
+      "accept records the current configuration's digest in your ndx home\n" +
+      "(not in the repository). A later change to those files shows as\n" +
+      "CHANGED and restricts again until reviewed. revoke forgets the decision.",
+    options: [
+      { flag: "--format=json", description: "Print the full evaluation as JSON" },
+    ],
+    examples: [
+      { command: "hench trust .", description: "Review this checkout" },
+      { command: "hench trust accept .", description: "Accept its execution config" },
+    ],
+    related: ["run", "config"],
+  },
   cache: {
     tool: "hench",
     command: "cache",
@@ -376,6 +438,32 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["run", "config"],
   },
+  "check-runs": {
+    tool: "hench",
+    command: "check-runs",
+    summary: "audit runs recorded as running, in every worktree",
+    usage: "hench check-runs [options] [dir]",
+    description:
+      "A run stays \"running\" until its process writes a terminal status; a crash\n" +
+      "or kill -9 leaves it that way. Lists every running record in every\n" +
+      "worktree of the repository, grouped by worktree, with a verdict\n" +
+      "(live, foreign, unknown, orphaned) and the reason. The recorded pid\n" +
+      "decides first, then lock files. Ending a run signals no process.",
+    options: [
+      { flag: "--fix", description: "End orphaned runs (status failed, error \"Ended by audit reconciliation: ...\")" },
+      { flag: "--include-unknown", description: "With --fix, also end runs that could not be confirmed" },
+      { flag: "--strict", description: "Exit 1 when any running record is not live (CI pre-flight)" },
+      { flag: "--worktree=<path>", description: "Audit only the worktree containing <path>" },
+      { flag: "--format=json", description: "Output verdicts as JSON for scripting" },
+    ],
+    examples: [
+      { command: "hench check-runs", description: "Audit every worktree" },
+      { command: "hench check-runs --fix", description: "End orphaned runs" },
+      { command: "hench check-runs --strict --format=json", description: "Pre-flight check for scripts" },
+      { command: "hench check-runs --worktree=../feature-x", description: "Audit one worktree" },
+    ],
+    related: ["status", "show"],
+  },
   "validate-tokens": {
     tool: "hench",
     command: "validate-tokens",
@@ -409,11 +497,13 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   run: ["status", "show"],
   record: ["usage", "status", "show"],
   usage: ["record"],
-  status: ["show", "run", "validate-tokens"],
+  status: ["show", "run", "check-runs", "validate-tokens"],
   show: ["status"],
   config: ["template"],
   template: ["config"],
   cache: ["run", "config"],
+  trust: ["run", "config"],
+  "check-runs": ["status", "show"],
   "validate-tokens": ["status", "show"],
 };
 

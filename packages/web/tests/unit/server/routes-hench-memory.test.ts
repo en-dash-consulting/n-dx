@@ -3,9 +3,12 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
+import type { AvailableMemoryReading } from "@n-dx/llm-client";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { handleHenchRoute, setAvailableMemoryReaderForTests } from "../../../src/server/routes-hench.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
+
+const GIB = 1024 ** 3;
 
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
@@ -45,13 +48,45 @@ describe("GET /api/hench/memory", () => {
       rexDir: join(tmpDir, ".rex"),
       dev: false,
     };
+    // A known machine by default: the reading is cached and refreshed in the
+    // background, so an uninjected darwin test would see "pending" or not
+    // depending on how fast `vm_stat` answered.
+    setAvailableMemoryReaderForTests(() => ({
+      availableBytes: 8 * GIB,
+      totalBytes: 16 * GIB,
+      pressure: "normal",
+      source: "os.freemem",
+    }));
     ({ server, port } = await startTestServer(ctx));
   });
 
   afterEach(async () => {
+    setAvailableMemoryReaderForTests(null);
     await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
+
+  /** Answer the route from a fixed reading, as a machine of any platform would. */
+  function inject(reading: AvailableMemoryReading): void {
+    setAvailableMemoryReaderForTests(() => reading);
+  }
+
+  async function getMemory(): Promise<{
+    system: {
+      totalBytes: number;
+      freeBytes: number | null;
+      availableBytes: number | null;
+      usedBytes: number | null;
+      usedPercent: number | null;
+      pressure: string;
+      source: string;
+    };
+    health: string;
+  }> {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/memory`);
+    expect(res.status).toBe(200);
+    return await res.json();
+  }
 
   it("returns 200 with memory status", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/memory`);
@@ -117,5 +152,55 @@ describe("GET /api/hench/memory", () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/memory`);
     const data = await res.json();
     expect(data.processes).toEqual([]);
+  });
+
+  it("reports the macOS available reading, not os.freemem()", async () => {
+    // The bug: a healthy 16 GB Mac reads 115 MB free (99% used, "critical")
+    // while holding ~3.9 GB of inactive and purgeable pages it hands back.
+    inject({
+      availableBytes: Math.round(3.9 * GIB),
+      totalBytes: 16 * GIB,
+      pressure: "normal",
+      source: "darwin:vm_stat+sysctl",
+    });
+
+    const data = await getMemory();
+    expect(data.health).toBe("healthy");
+    expect(data.system.availableBytes).toBe(Math.round(3.9 * GIB));
+    expect(data.system.freeBytes).toBe(data.system.availableBytes);
+    expect(data.system.usedPercent).toBe(76);
+    expect(data.system.pressure).toBe("normal");
+    expect(data.system.source).toBe("darwin:vm_stat+sysctl");
+  });
+
+  it("maps warn and critical pressure onto the health level", async () => {
+    inject({ availableBytes: 3 * GIB, totalBytes: 16 * GIB, pressure: "warn", source: "darwin:sysctl" });
+    expect((await getMemory()).health).toBe("warning");
+
+    inject({ availableBytes: 1 * GIB, totalBytes: 16 * GIB, pressure: "critical", source: "darwin:sysctl" });
+    expect((await getMemory()).health).toBe("critical");
+  });
+
+  it("reports an unreadable machine as unknown with no derived figures", async () => {
+    inject({ availableBytes: null, totalBytes: 16 * GIB, pressure: "unknown", source: "darwin:unavailable" });
+
+    const data = await getMemory();
+    expect(data.health).toBe("unknown");
+    expect(data.system.freeBytes).toBeNull();
+    expect(data.system.availableBytes).toBeNull();
+    expect(data.system.usedBytes).toBeNull();
+    expect(data.system.usedPercent).toBeNull();
+    // Total memory is an `os.totalmem()` read and stays known.
+    expect(data.system.totalBytes).toBe(16 * GIB);
+  });
+
+  it("keeps the os.freemem() platforms reading exactly as before", async () => {
+    // linux / win32 pass os.freemem() through unchanged: 4 GB of 16 GB is 75%
+    // used, which is the "warn" threshold and so a warning, as it was.
+    inject({ availableBytes: 4 * GIB, totalBytes: 16 * GIB, pressure: "warn", source: "os.freemem" });
+
+    const data = await getMemory();
+    expect(data.system.usedPercent).toBe(75);
+    expect(data.health).toBe("warning");
   });
 });

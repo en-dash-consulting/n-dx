@@ -5,7 +5,12 @@
  *   GET    /api/hub/projects        — registered projects with live child status
  *   GET    /api/hub/queue           — admission limits, what is running, what is waiting
  *   GET    /api/hub/overview        — every project with its child's live status, for the home page
+ *   GET    /api/hub/new-project     — where a new project would go: the suggested
+ *                                     parent, and (with ?parent=&name=) the exact
+ *                                     absolute path those would create
  *   POST   /api/hub/projects        — register { id, repoRoot, ndxBin, worktree?, name? } and start its server
+ *   POST   /api/hub/projects/new    — create { parent, name } as a folder, register it,
+ *                                     and answer with the URL of its setup page
  *   DELETE /api/hub/projects/:id    — stop the server and forget the project
  *   DELETE /api/hub/projects/:id/worktrees/:path
  *                                   — unregister one worktree; the last one
@@ -34,12 +39,15 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync, statSync } from "node:fs";
-import { isAbsolute } from "node:path";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join } from "node:path";
 import { detectBasePath, projectIdFromBasePath, safeDecodeSegment, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, RegisterProjectInput } from "./hub.js";
-import { buildHubOverview } from "./overview.js";
+import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { renderCards } from "./home.js";
+import { defaultParentDir, deriveProjectId, planNewProject, writeHubMarkerFiles } from "./new-project.js";
+import type { NewProjectPlan } from "./new-project.js";
 
 const HUB_PREFIX = "/api/hub";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -109,7 +117,48 @@ function isDirectory(path: string): boolean {
   }
 }
 
+/**
+ * Whether `pkgRoot` is the real `@n-dx/web` package, by its own package.json.
+ *
+ * Identity, not location: the hub spawns whatever it accepts here, so matching
+ * on where a file sits means anyone who can create a directory can offer it a
+ * process to run.
+ */
+function isNdxWebPackage(pkgRoot: string): boolean {
+  try {
+    const pkg: unknown = JSON.parse(readFileSync(join(pkgRoot, "package.json"), "utf-8"));
+    return !!pkg && typeof pkg === "object" && (pkg as { name?: unknown }).name === "@n-dx/web";
+  } catch {
+    // No package.json, unreadable, or not JSON — not the package.
+    return false;
+  }
+}
+
 /** Validate a registration body. Returns the input or the first problem. */
+/**
+ * Whether `ndxBin` is something the hub should spawn.
+ *
+ * Registration already needs the dashboard's Origin and the per-user token,
+ * so only this user's own processes reach it; this is the belt to those
+ * braces. The hub exists to run `web serve`, so it accepts the one script
+ * that is — `@n-dx/web`'s `dist/cli/index.js`, from a checkout or an
+ * install — or an `ndx` / `n-dx` launcher, and refuses any other executable.
+ */
+export function isAcceptableNdxBin(path: string): boolean {
+  const normalized = path.replace(/\\/g, "/");
+  // `…/dist/cli/index.js` is a *shape*, and any directory can be given it.
+  // Ask the package that owns the file who it is instead: an impostor dropped
+  // at /tmp/x/web/dist/cli/index.js passed the shape test and was spawned.
+  if (/\/dist\/cli\/index\.(m|c)?js$/.test(normalized)) {
+    return isNdxWebPackage(dirname(dirname(dirname(path))));
+  }
+  const base = normalized.slice(normalized.lastIndexOf("/") + 1).toLowerCase();
+  // A launcher is a shim with nothing to interrogate, so its name is all
+  // there is to go on. It stays the weaker of the two checks, which is why
+  // the Origin and token gates in front of registration are the real control.
+  return /^(ndx|n-dx)(\.(cmd|exe|ps1))?$/.test(base);
+}
+
 export function parseRegisterInput(body: unknown): { input: RegisterProjectInput } | { problem: string } {
   if (!body || typeof body !== "object") return { problem: "body must be a JSON object" };
   const b = body as Record<string, unknown>;
@@ -125,6 +174,9 @@ export function parseRegisterInput(body: unknown): { input: RegisterProjectInput
     return { problem: "ndxBin must be an absolute path" };
   }
   if (!existsSync(b.ndxBin)) return { problem: `ndxBin does not exist: ${b.ndxBin}` };
+  if (!isAcceptableNdxBin(b.ndxBin)) {
+    return { problem: "ndxBin must be @n-dx/web's own CLI entry point (…/dist/cli/index.js in a package whose package.json names @n-dx/web) or an ndx launcher" };
+  }
   if (b.worktree !== undefined) {
     if (typeof b.worktree !== "string" || !isAbsolute(b.worktree)) {
       return { problem: "worktree must be an absolute path" };
@@ -146,9 +198,137 @@ export function parseRegisterInput(body: unknown): { input: RegisterProjectInput
   };
 }
 
+/**
+ * Serialize a plan for the form: the path it would create, whether it can, and
+ * the suggested parent so the field can be prefilled on first load.
+ */
+function newProjectAnswer(plan: NewProjectPlan, defaultParent: string): Record<string, unknown> {
+  return {
+    defaultParent,
+    parent: plan.parent,
+    name: plan.name,
+    path: plan.path,
+    ok: plan.ok,
+    problem: plan.problem,
+    note: plan.note,
+    exists: plan.exists,
+  };
+}
+
+/**
+ * GET /api/hub/new-project[?parent=&name=] — the preview behind the form's
+ * "will create" line.
+ *
+ * Answers 200 whatever it finds, including for a path it refuses: the form
+ * shows `problem` as the operator types, and a 4xx for a half-typed name would
+ * be noise in the console on every keystroke. Creation is the POST below, and
+ * it re-plans rather than trusting this answer.
+ */
+function handleNewProjectPreview(res: ServerResponse, hub: Hub, query: URLSearchParams): boolean {
+  const defaultParent = defaultParentDir(hub.listProjects().map((p) => p.repoRoot), homedir());
+  const parent = query.get("parent") ?? "";
+  const name = query.get("name") ?? "";
+  const plan = planNewProject({ parent: parent || defaultParent, name });
+  json(res, 200, newProjectAnswer(plan, defaultParent));
+  return true;
+}
+
+/**
+ * POST /api/hub/projects/new — create the folder and register it.
+ *
+ * The folder is all this makes: `ndx init` is not run here. The answer carries
+ * the new project's URL, the browser goes there, and the project server's own
+ * setup wizard does the initializing — one path into init, the one that
+ * already asks about assistants, the LLM vendor and git.
+ */
+async function handleNewProject(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<boolean> {
+  let body: unknown;
+  try {
+    body = await readJsonBody(req);
+  } catch (err) {
+    error(res, 400, (err as Error).message);
+    return true;
+  }
+  const b = (body ?? {}) as Record<string, unknown>;
+  const defaultParent = defaultParentDir(hub.listProjects().map((p) => p.repoRoot), homedir());
+  const parent = typeof b.parent === "string" && b.parent.trim() ? b.parent : defaultParent;
+  const name = typeof b.name === "string" ? b.name : "";
+
+  // Re-planned here rather than taken from the preview: the filesystem may
+  // have changed since, and a client is not a source of truth about what it
+  // is allowed to create.
+  const plan = planNewProject({ parent, name });
+  if (!plan.ok) {
+    json(res, 400, { error: plan.problem, ...newProjectAnswer(plan, defaultParent) });
+    return true;
+  }
+
+  const registered = hub.listProjects().find((p) => p.repoRoot === plan.path || p.worktrees.includes(plan.path));
+  if (registered) {
+    json(res, 409, {
+      error: `That folder is already registered as "${registered.id}".`,
+      project: registered,
+      url: `/p/${encodeURIComponent(registered.id)}/`,
+      ...newProjectAnswer(plan, defaultParent),
+    });
+    return true;
+  }
+
+  if (!hub.selfBin) {
+    error(res, 500, "The hub cannot tell which n-dx binary to run — register this folder with `ndx start` instead.");
+    return true;
+  }
+
+  // The same rule `parseRegisterInput` applies to a caller-supplied `ndxBin`.
+  // Nothing a client sends reaches `selfBin` — it is resolved from this
+  // process's own entry point — so this is an assertion, not a filter, and
+  // it is here because this is the other place the hub decides what to spawn.
+  // Leaving the invariant to one of the two routes is how the next edit to
+  // `resolveSelfBin` quietly becomes an arbitrary-exec bug.
+  if (!isAcceptableNdxBin(hub.selfBin)) {
+    error(res, 500, `The hub will not spawn ${hub.selfBin} — register this folder with \`ndx start\` instead.`);
+    return true;
+  }
+
+  // After both refusals above: a rejected request must not leave an empty
+  // directory behind for the operator to clean up.
+  try {
+    mkdirSync(plan.path, { recursive: true });
+  } catch (err) {
+    error(res, 500, `Could not create ${plan.path}: ${(err as Error).message}`);
+    return true;
+  }
+
+  const taken = new Map(hub.listProjects().map((p) => [p.id, p.repoRoot]));
+  const id = deriveProjectId(plan.path, taken);
+  const { project } = await hub.registerProject({
+    id,
+    repoRoot: plan.path,
+    ndxBin: hub.selfBin,
+    worktree: plan.path,
+    name: plan.name,
+  });
+
+  // The markers `ndx start` would have left. Written after the child has its
+  // port, so the folder is indistinguishable from one registered by the CLI —
+  // which is what makes `ndx start stop` work in it.
+  if (hub.listeningPort) {
+    writeHubMarkerFiles(plan.path, { hubPid: process.pid, hubPort: hub.listeningPort, projectId: id });
+  }
+
+  json(res, 201, {
+    project,
+    path: plan.path,
+    // Where the setup wizard is: the project server serves it at the project
+    // root while the folder is uninitialized.
+    url: `/p/${encodeURIComponent(id)}/`,
+  });
+  return true;
+}
+
 /** Handle a `/api/hub/*` request. Returns false when the path is not the hub's. */
 export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<boolean> {
-  const rawUrl = (req.url || "/").split("?")[0];
+  const [rawUrl, rawQuery = ""] = (req.url || "/").split("?");
 
   // A viewer's fetch arrives under its own base path; the hub's API is the
   // same API either way, and the prefix says which project is asking.
@@ -200,7 +380,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   // page was served with, rendered once here rather than a second time in the
   // browser, so there is one renderer and not two that can disagree.
   if (path === "/overview" && method === "GET") {
-    const overview = await buildHubOverview(hub.listProjects());
+    const overview = await buildHubOverview(hub.listProjects(), (port) => fetchChildSnapshot(port, 2_000, hub.token));
     json(res, 200, { ...overview, html: renderCards(overview) });
     return true;
   }
@@ -212,6 +392,14 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
     await hub.admission.measure();
     json(res, 200, hub.queueSnapshot(scopedProjectId ?? undefined));
     return true;
+  }
+
+  if (path === "/new-project" && method === "GET") {
+    return handleNewProjectPreview(res, hub, new URLSearchParams(rawQuery));
+  }
+
+  if (path === "/projects/new" && method === "POST") {
+    return handleNewProject(req, res, hub);
   }
 
   if (path === "/projects" && method === "POST") {

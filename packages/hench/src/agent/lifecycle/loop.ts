@@ -6,6 +6,7 @@ import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, di
 import type { ToolContext } from "../../tools/contracts.js";
 import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
+import { recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, detail, info, withHeartbeat } from "../../types/output.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
@@ -26,6 +27,7 @@ import type {
 import type { TokenUsage } from "../../schema/index.js";
 import { checkTokenBudget } from "./token-budget.js";
 import { buildCachedMessageRequest } from "./prompt-cache.js";
+import { resolveAgentApiEffort } from "./api-effort.js";
 import {
   ConversationPruner,
   PRUNE_BRIDGE_TEXT,
@@ -46,6 +48,7 @@ import {
   API_SESSION_DECISION,
   captureStartingHead,
   captureBaselineUntracked,
+  captureBaselineDirty,
   runReviewGate,
   finalizeRun,
   recordClaimLoss,
@@ -243,8 +246,12 @@ async function callWithFailover(
         currentVendor = apiResources.vendor;
         currentModel = nextModel;
 
-        // Update params with new model
+        // Update params with new model. Effort is re-resolved for it: the
+        // next model may not accept one, and sending it would 400.
         const updatedParams = { ...params, model: nextModel };
+        delete updatedParams.output_config;
+        const nextEffort = resolveAgentApiEffort(nextModel, llmConfig);
+        if (nextEffort) updatedParams.output_config = { effort: nextEffort };
 
         // Try the call with the new client/model
         return await callWithRetry(client, updatedParams);
@@ -378,6 +385,9 @@ function recordToolCall(
 ): void {
   run.toolCalls.push(record);
   detector.record({ tool: record.tool, input: record.input, output: record.output });
+  // The API path's counterpart to the CLI loop's processLine hook, so both
+  // produce the same structured progress events from the same vocabulary.
+  recordFileWork(record.tool, record.input, record.turn);
 }
 
 /**
@@ -700,6 +710,8 @@ interface GeminiToolLoopParams {
   startingHead: string | undefined;
   /** Untracked files present before the run, for scoped rollback (#303). */
   baselineUntracked: string[];
+  /** Everything dirty before the run, so stageRunWork leaves it alone. */
+  baselineDirty: string[];
   /** Resolved LLM config — routes the prune summary to its own tier. */
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>;
   opts: AgentLoopOptions;
@@ -727,7 +739,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   const {
     provider, config, model, systemPrompt, briefText, taskTitle, testCommand,
     taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead,
-    baselineUntracked, llmConfig, opts,
+    baselineUntracked, baselineDirty, llmConfig, opts,
   } = params;
 
   const hasToolCalling =
@@ -935,6 +947,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
     baselineUntracked,
+    baselineDirty,
     startingHead,
   });
 
@@ -1288,13 +1301,14 @@ async function runLocalToolLoop(params: {
   tokenBudget: number | undefined;
   startingHead: string | undefined;
   baselineUntracked: string[];
+  baselineDirty: string[];
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>;
   opts: AgentLoopOptions;
 }): Promise<AgentLoopResult> {
   const {
     provider, config, model, systemPrompt, briefText, taskTitle, testCommand,
     taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead,
-    baselineUntracked, llmConfig, opts,
+    baselineUntracked, baselineDirty, llmConfig, opts,
   } = params;
 
   // Resolve the base URL from config
@@ -1703,6 +1717,7 @@ async function runLocalToolLoop(params: {
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
     baselineUntracked,
+    baselineDirty,
     startingHead,
   });
 
@@ -1722,7 +1737,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Shared: assemble brief, format, build system prompt, display task info
   const { brief, taskId, briefText, systemPrompt } = await prepareBrief(
     store, config, opts.taskId,
-    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, claims: opts.claims },
+    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, claims: opts.claims, wouldResetIds: opts.wouldResetIds },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
     opts.extraContext,
   );
@@ -1750,6 +1765,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Snapshot untracked files before the agent runs, so a rollback removes only
   // the files the agent creates — never the user's pre-existing work (#303).
   const baselineUntracked = await captureBaselineUntracked(projectDir);
+  // Snapshot everything already dirty, so the run's own work can be told
+  // apart from the operator's at commit time (see stageRunWork).
+  const baselineDirty = await captureBaselineDirty(projectDir);
 
   // Resolve provider — registry or legacy path based on config flag
   const llmConfig = await loadLLMConfig(henchDir);
@@ -1789,6 +1807,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       tokenBudget,
       startingHead,
       baselineUntracked,
+      baselineDirty,
       llmConfig,
       opts,
     });
@@ -1812,6 +1831,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       tokenBudget,
       startingHead,
       baselineUntracked,
+      baselineDirty,
       llmConfig,
       opts,
     });
@@ -1840,6 +1860,10 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: briefText },
   ];
+
+  // Resolved once per run, not per turn. initApiResources has already
+  // rejected any vendor but Claude, so this is always a Claude API request.
+  const effort = resolveAgentApiEffort(model, llmConfig);
 
   // Batched, summarizing prune. Cutting the oldest turns every turn — the old
   // behavior — changed the prompt prefix on every request and made the cache
@@ -1916,6 +1940,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
             messages,
             promptCache: config.promptCache,
             promptCacheTtl: config.promptCacheTtl,
+            effort,
           }),
           config,
           vendor,
@@ -2099,6 +2124,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
     baselineUntracked,
+    baselineDirty,
     startingHead,
   });
 

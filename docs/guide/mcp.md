@@ -10,6 +10,12 @@ Rex and SourceVision expose [Model Context Protocol](https://modelcontextprotoco
 
 If `ndx` isn't on `PATH`, run the CLI through npx instead: `npx -y @n-dx/core rex mcp .` / `npx -y @n-dx/core sv mcp .`. Pass `--mcp-scope=local` to `ndx init` to fall back to the older `claude mcp add --scope local` registration (per-machine, absolute server path) instead of `.mcp.json`. The project directory it records is cwd-relative, like `.mcp.json`'s — an absolute one would pin every worktree of the repository to a single checkout, because Claude Code applies a repository's local-scope entry to sessions started in its linked worktrees. `ndx init` reports any absolute-path entry it finds along with the `claude mcp remove --scope local` command that retires it.
 
+### Worktree sessions
+
+Claude desktop starts a worktree session's project servers in the main checkout (so `.` resolves there) while the session itself runs in `<repo>/.claude/worktrees/<name>`. The stdio rex and sourcevision servers, and `ndx mcp <server>` when it bridges to the hub, resolve their workspace from the client's MCP roots (`roots/list`) and rebind on `roots/list_changed`, so writes land in the session's own `.rex/prd_tree/`. Clients that advertise no roots keep the launch directory. A root outside the repository, or one that can't be served, refuses writes with an error rather than misrouting them.
+
+Verify a session's write target with rex `get_capabilities` — its `workspace` block reports `source` (`roots` when the client's root was used, `startup` for the launch directory), `projectDir` (the tree being written), and `refused` (set while writes are refused). In a desktop worktree session `source` should read `roots`.
+
 For multi-project setups, HTTP transport is available but is only safe with **one n-dx project running at a time** until the multi-project hub (0.7.0) lands — see [Transport Options](#transport-options) below.
 
 ### Codex
@@ -93,7 +99,7 @@ Claude uses double-underscore prefixes (`mcp__{server}__{tool}`) to namespace to
 | `get_recommendations` | SourceVision-based recommendations |
 | `append_log` | Write to the execution log |
 | `sync_with_remote` | Sync with remote adapter (e.g. Notion) |
-| `get_capabilities` | Server capabilities and configuration |
+| `get_capabilities` | Server capabilities and configuration, plus the `workspace` block (resolved project dir, source, refusal) |
 
 ## SourceVision MCP Tools
 

@@ -20,6 +20,10 @@ function makeRequest(
   const normalized = Object.fromEntries(
     Object.entries(headers).map(([name, value]) => [name.toLowerCase(), value]),
   );
+  // Every real client sends Host. Default it to this socket so the origin
+  // tests below exercise the origin rule, not the Host rule; the Host tests
+  // override it explicitly.
+  normalized.host ??= `127.0.0.1:${localPort}`;
   return {
     method,
     headers: normalized,
@@ -58,6 +62,149 @@ function makeResponse(): MockResponse {
     body: () => responseBody,
   };
 }
+
+describe("HTTP request Host validation", () => {
+  it.each(["GET", "HEAD", "POST"])(
+    "answers 421 to a %s whose Host is not loopback, before route dispatch",
+    (method) => {
+      const req = makeRequest(method, {
+        Host: "attacker.example:3117",
+        "Sec-Fetch-Site": "same-origin",
+      });
+      const res = makeResponse();
+
+      expect(handleRequestSecurity(req, res.response)).toBe(true);
+      expect(res.status()).toBe(421);
+      expect(res.headers.get("access-control-allow-origin")).toBeUndefined();
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      expect(JSON.parse(res.body() ?? "{}")).toEqual({ error: "Request Host does not name this server" });
+    },
+  );
+
+  it.each(["localhost:3117", "127.0.0.1:3117", "[::1]:3117"])(
+    "lets a GET through when Host is %s on the socket's own port",
+    (host) => {
+      const req = makeRequest("GET", { Host: host });
+      const res = makeResponse();
+
+      expect(handleRequestSecurity(req, res.response)).toBe(false);
+      expect(res.status()).toBeUndefined();
+    },
+  );
+
+  it("judges Host against the socket's port, not the port the client claims", () => {
+    // The project server behind the hub listens on an ephemeral port; a Host
+    // naming the hub's well-known port would be a request that never came
+    // through the proxy (which rewrites Host to the child's port).
+    const req = makeRequest("GET", { Host: "localhost:3117" }, 4242);
+    const res = makeResponse();
+
+    expect(handleRequestSecurity(req, res.response)).toBe(true);
+    expect(res.status()).toBe(421);
+  });
+
+  it("refuses a request with no Host at all", () => {
+    const req = makeRequest("GET");
+    delete (req.headers as Record<string, unknown>).host;
+    const res = makeResponse();
+
+    expect(handleRequestSecurity(req, res.response)).toBe(true);
+    expect(res.status()).toBe(421);
+  });
+
+  it("checks Host before Origin, so a trusted Origin cannot rescue a bad Host", () => {
+    const req = makeRequest("POST", {
+      Host: "attacker.example:3117",
+      Origin: "http://127.0.0.1:3117",
+    });
+    const res = makeResponse();
+
+    expect(handleRequestSecurity(req, res.response)).toBe(true);
+    expect(res.status()).toBe(421);
+    expect(res.headers.get("access-control-allow-origin")).toBeUndefined();
+  });
+});
+
+describe("HTTP request token (per-user)", () => {
+  const TOKEN = "tok_abcdefghijklmnopqrstuvwxyz0123456789";
+  const opts = { token: TOKEN };
+
+  it("does nothing when no token is configured", () => {
+    const req = makeRequest("GET");
+    const res = makeResponse();
+    expect(handleRequestSecurity(req, res.response, {})).toBe(false);
+    expect(handleRequestSecurity(req, res.response, { token: null })).toBe(false);
+  });
+
+  it("answers 401 with WWW-Authenticate to a request that presents nothing", () => {
+    const req = makeRequest("GET");
+    const res = makeResponse();
+    expect(handleRequestSecurity(req, res.response, opts)).toBe(true);
+    expect(res.status()).toBe(401);
+    expect(res.headers.get("www-authenticate")).toContain("Bearer");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(JSON.parse(res.body() ?? "{}").error).toBe("Authentication required");
+  });
+
+  it.each<[string, Record<string, string>]>([
+    ["bearer header", { Authorization: `Bearer ${TOKEN}` }],
+    ["X-Ndx-Token header", { "X-Ndx-Token": TOKEN }],
+    ["cookie", { Cookie: `theme=dark; ndx_token=${TOKEN}` }],
+  ])("lets a request through that presents the token as a %s", (_label, headers) => {
+    const req = makeRequest("POST", headers);
+    const res = makeResponse();
+    expect(handleRequestSecurity(req, res.response, opts)).toBe(false);
+    expect(res.status()).toBeUndefined();
+  });
+
+  it("refuses a wrong token in every place", () => {
+    const wrong: Array<Record<string, string>> = [
+      { Authorization: `Bearer ${TOKEN}x` },
+      { "X-Ndx-Token": TOKEN.slice(1) },
+      { Cookie: "ndx_token=nope" },
+      { Authorization: `Basic ${TOKEN}` },
+    ];
+    for (const headers of wrong) {
+      const req = makeRequest("GET", headers);
+      const res = makeResponse();
+      expect(handleRequestSecurity(req, res.response, opts), JSON.stringify(headers)).toBe(true);
+      expect(res.status(), JSON.stringify(headers)).toBe(401);
+    }
+  });
+
+  it("turns a GET navigation carrying ?ndx_token= into a cookie and a redirect without it", () => {
+    const req = makeRequest("GET");
+    (req as { url?: string }).url = `/p/app/prd?view=tree&ndx_token=${TOKEN}`;
+    const res = makeResponse();
+    expect(handleRequestSecurity(req, res.response, opts)).toBe(true);
+    expect(res.status()).toBe(302);
+    expect(res.headers.get("location")).toBe("/p/app/prd?view=tree");
+    expect(res.headers.get("set-cookie")).toContain(`ndx_token=${TOKEN}`);
+    expect(res.headers.get("set-cookie")).toContain("HttpOnly");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("does not accept the query token on a mutation, or a wrong query token at all", () => {
+    const post = makeRequest("POST");
+    (post as { url?: string }).url = `/api/x?ndx_token=${TOKEN}`;
+    const out = makeResponse();
+    expect(handleRequestSecurity(post, out.response, opts)).toBe(true);
+    expect(out.status()).toBe(401);
+
+    const wrong = makeRequest("GET");
+    (wrong as { url?: string }).url = `/?ndx_token=${TOKEN}x`;
+    const out2 = makeResponse();
+    expect(handleRequestSecurity(wrong, out2.response, opts)).toBe(true);
+    expect(out2.status()).toBe(401);
+  });
+
+  it("checks Host before the token, so a valid token on a foreign Host is still 421", () => {
+    const req = makeRequest("GET", { Host: "attacker.example:3117", Authorization: `Bearer ${TOKEN}` });
+    const res = makeResponse();
+    expect(handleRequestSecurity(req, res.response, opts)).toBe(true);
+    expect(res.status()).toBe(421);
+  });
+});
 
 describe("HTTP request origin protection", () => {
   it.each(["POST", "PUT", "PATCH", "DELETE"])(
@@ -137,15 +284,26 @@ describe("HTTP request origin protection", () => {
     expect(res.status()).toBe(403);
   });
 
-  it("does not trust a non-loopback Origin even if it could match Host", () => {
+  it("does not trust a non-loopback Origin on the right port even behind a loopback Host", () => {
+    // The origin rule compares against the socket's port, never the Host
+    // header, so a matching port on a foreign name buys nothing.
     const req = makeRequest("POST", {
-      Host: "attacker.example:3117",
+      Host: "127.0.0.1:3117",
       Origin: "http://attacker.example:3117",
     });
     const res = makeResponse();
 
     expect(handleRequestSecurity(req, res.response)).toBe(true);
     expect(res.status()).toBe(403);
+
+    // When Host matches that foreign Origin as well, the Host rule refuses first.
+    const foreignHost = makeRequest("POST", {
+      Host: "attacker.example:3117",
+      Origin: "http://attacker.example:3117",
+    });
+    const out = makeResponse();
+    expect(handleRequestSecurity(foreignHost, out.response)).toBe(true);
+    expect(out.status()).toBe(421);
   });
 });
 

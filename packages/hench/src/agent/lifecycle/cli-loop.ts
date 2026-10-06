@@ -28,6 +28,7 @@ import { toolRexAppendLog } from "../../tools/rex.js";
 import {checkTokenBudget, formatBudgetExceeded} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
+import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
 import { isSpinningRun } from "../analysis/spin.js";
 import { createLivelockDetector } from "../analysis/livelock.js";
@@ -43,6 +44,7 @@ import {
   parkDeferredFindings,
   deferredFindings,
   mergeDispositionsIntoRaw,
+  reviewModelSource,
 } from "../analysis/adversarial-review.js";
 import type {
   ReviewPassOutcome,
@@ -51,7 +53,12 @@ import type {
 } from "../analysis/adversarial-review.js";
 import { snapshotDirtyState, diffDirtyState } from "../analysis/review-repairs.js";
 import type { DirtySnapshot } from "../analysis/review-repairs.js";
-import { ensureWarmParent } from "./orientation.js";
+import { ensureWarmParent, ORIENTATION_LIFT_NOTICE } from "./orientation.js";
+import {
+  buildReadOnlyRetryNotice,
+  describeReadOnlyRefusal,
+  isReadOnlyRefusal,
+} from "./read-only-refusal.js";
 import {
   resolveSessionStrategy,
   clearSessionCache,
@@ -90,6 +97,7 @@ import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, V
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
+  NDX_CONTAINER_DIRNAME,
   type ExecutionPolicy,
   type RuntimeEvent,
   type PromptSection,
@@ -103,6 +111,7 @@ import {
   initRunRecord,
   captureStartingHead,
   captureBaselineUntracked,
+  captureBaselineDirty,
   runReviewGate,
   finalizeRun,
   recordClaimLoss,
@@ -662,12 +671,25 @@ export interface SpawnWithAdapterOptions {
    * carries until the process closes (GH #362).
    */
   liveProgress?: LiveSpawnProgress;
+  /**
+   * Receives only the vendor pid, for spawns whose turns and tokens are charged
+   * to the run another way (review, orientation) and so must not feed the
+   * heartbeat's counters. Ignored when {@link liveProgress} is set.
+   */
+  pidHolder?: Pick<LiveSpawnProgress, "vendorPid">;
 }
 
 /** Mid-spawn counters. Mutated in place; read by the heartbeat. */
 export interface LiveSpawnProgress {
   turns: number;
   tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
+  /**
+   * Pid of the vendor CLI while a spawn is live; cleared when it closes. Not
+   * touched by {@link resetLiveSpawnProgress} — that runs between spawns, and
+   * the pid belongs to the process, not to the counters it produced. On Windows
+   * it is the cmd.exe wrapper's pid, not the CLI's own.
+   */
+  vendorPid?: number;
 }
 
 export function createLiveSpawnProgress(): LiveSpawnProgress {
@@ -723,6 +745,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
     useEventPipeline, accumulator, livelock, liveProgress,
   } = opts;
+  const pidHolder = liveProgress ?? opts.pidHolder;
 
   return new Promise((resolve, reject) => {
     const stdinMode = spawnConfig.stdinContent !== null ? "pipe" : "ignore";
@@ -733,6 +756,10 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
       env: cliEnv ?? process.env,
     });
+
+    // proc.pid is undefined when the spawn failed outright (ENOENT); the
+    // `error` handler below clears it either way.
+    if (pidHolder) pidHolder.vendorPid = proc.pid;
 
     // Write stdin content if the adapter requires it (Claude: pipe-based prompt)
     if (spawnConfig.stdinContent !== null && proc.stdin) {
@@ -786,6 +813,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     });
 
     proc.on("error", (err) => {
+      if (pidHolder) pidHolder.vendorPid = undefined;
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         // Keep the vendor-specific prefix (matched by formatCLIError) and
         // append the cross-platform diagnoseCliInvocation detail, which
@@ -809,6 +837,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     });
 
     proc.on("close", (code) => {
+      if (pidHolder) pidHolder.vendorPid = undefined;
       // Flush remaining buffered output
       if (lineBuffer.trim()) {
         processLine(lineBuffer);
@@ -1069,6 +1098,14 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
       // Step 1: Parse the line through the adapter for event classification
       const event = adapter.parseEvent(line, turnCounter.value + 1, {});
 
+      // Narrate file work onto the run's structured event stream. Placed here,
+      // above the pipeline branches, so it happens once for both of them —
+      // and reuses the tool call the adapter has already parsed rather than
+      // adding a second pass over the output.
+      if (event?.type === "tool_use" && event.toolCall) {
+        recordFileWork(event.toolCall.tool, event.toolCall.input, event.turn);
+      }
+
       // Plan-mode intercept: when the agent calls ExitPlanMode, capture the
       // plan text and terminate the spawn so the outer loop can prompt the
       // user (or auto-accept) and re-run with permissionMode "acceptEdits".
@@ -1287,6 +1324,8 @@ export interface ReviewPassContext {
    * servers and must be pinned to the same worktree.
    */
   mcpConfigPath?: string;
+  /** Run's heartbeat-visible pid holder, so the record shows the reviewer's pid. */
+  pidHolder?: Pick<LiveSpawnProgress, "vendorPid">;
 }
 
 /**
@@ -1314,6 +1353,16 @@ export function chargeReviewToRun(
   reviewModel: string,
 ): void {
   run.tokenUsage = addTokenUsage(run.tokenUsage ?? { input: 0, output: 0 }, result.tokenUsage);
+
+  // The review's own share, kept apart for the Live page's Review tab.
+  const spend = run.reviewSpend ?? { turns: 0, input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0 };
+  run.reviewSpend = {
+    turns: spend.turns + result.turnTokenUsage.length,
+    input: spend.input + (result.tokenUsage.input ?? 0),
+    output: spend.output + (result.tokenUsage.output ?? 0),
+    cacheCreationInput: spend.cacheCreationInput + (result.tokenUsage.cacheCreationInput ?? 0),
+    cacheReadInput: spend.cacheReadInput + (result.tokenUsage.cacheReadInput ?? 0),
+  };
 
   if (result.turnTokenUsage.length === 0) return;
 
@@ -1410,6 +1459,12 @@ async function runAdversarialReviewPass(
       `${ctx.reviewModel || "the loaded model"}...`,
   );
 
+  emitRunEvent(
+    "review_started",
+    `Adversarial review started on ${ctx.reviewModel || "the loaded model"}`,
+    { detail: resumeSessionId ? "resuming the work session" : "fresh session" },
+  );
+
   // Bracket the reviewer spawn with working-tree snapshots so its repairs can
   // be identified — and committed — without sweeping pre-existing dirt. A
   // failed snapshot degrades to "repairs unknown", never to a failed review.
@@ -1435,6 +1490,7 @@ async function runAdversarialReviewPass(
           cliEnv: ctx.cliEnv,
           cwd: inv.projectDir,
           tokenMetadata: { vendor: ctx.vendor, model: ctx.reviewModel },
+          pidHolder: ctx.pidHolder,
         }),
       );
     } catch (err) {
@@ -1521,7 +1577,10 @@ async function runAdversarialReviewPass(
     try {
       const postReviewState = await snapshotDirtyState(inv.projectDir);
       repairedFiles = diffDirtyState(preReviewState, postReviewState).filter(
-        (path) => !path.startsWith(".rex/") && !path.startsWith(".hench/"),
+        (path) =>
+          !path.startsWith(".rex/") &&
+          !path.startsWith(".hench/") &&
+          !path.startsWith(`${NDX_CONTAINER_DIRNAME}/`),
       );
     } catch {
       repairedFiles = undefined;
@@ -1541,6 +1600,17 @@ async function runAdversarialReviewPass(
     repairedFiles,
     backgroundResumed: backgroundResumed || undefined,
   };
+
+  emitRunEvent("review_report", `Review report written — ${report.findings.length} finding(s)`, {
+    ok: unresolved.unrepairedMustFix.length === 0,
+    detail: reportPath,
+    counts: {
+      findings: report.findings.length,
+      unresolved: unresolved.all.length,
+      unrepairedMustFix: unresolved.unrepairedMustFix.length,
+      deferred: deferred.length,
+    },
+  });
 
   return { ok: true, report };
 }
@@ -1614,12 +1684,22 @@ function reportReviewFailure(run: RunRecord, outcome: ReviewPassOutcome & { ok: 
   info(`⚠ Adversarial review did not complete (${outcome.reason}): ${outcome.detail}`);
   info("  The task's own validation still passed — continuing without review findings.");
   run.review = { failed: outcome.reason, detail: outcome.detail };
+  // A review that silently did not happen is indistinguishable on the Work tab
+  // from one that found nothing, so the stream says which.
+  emitRunEvent("review_report", `Adversarial review did not complete (${outcome.reason})`, {
+    ok: false,
+    detail: outcome.detail,
+  });
 }
 
 // ── Successful result processing ──────────────────────────────────────────
 
-/** Return value from processSuccessfulResult indicating whether the loop should break. */
-type SuccessAction = "break" | "continue";
+/**
+ * Return value from processSuccessfulResult indicating whether the loop should
+ * break. `read-only-retry` means the attempt was a read-only refusal and the
+ * task should be re-spawned cold without charging the retry budget.
+ */
+type SuccessAction = "break" | "continue" | "read-only-retry";
 
 interface SuccessContext {
   run: RunRecord;
@@ -1653,6 +1733,11 @@ interface SuccessContext {
   attemptAccumulator?: EventAccumulator;
   /** Cross-retry EventAccumulator (event pipeline path). */
   runAccumulator?: EventAccumulator;
+  /**
+   * True when this attempt forked the warm parent and the run has not yet
+   * used its one read-only-refusal retry.
+   */
+  readOnlyRetryAvailable?: boolean;
 }
 
 /**
@@ -1744,6 +1829,23 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     run.summary = result.summary;
     // Note: PRD status update deferred to performCommitPromptIfNeeded
     // so it's staged alongside code changes in the same commit.
+  } else if (
+    isReadOnlyRefusal({
+      forked: ctx.readOnlyRetryAvailable === true,
+      noChanges: !validation.hasChanges,
+      toolNames: result.toolCalls.map((c) => c.tool),
+    })
+  ) {
+    // A fork that never tried to edit: the inherited orientation turn won.
+    // Not a task failure — the caller re-spawns cold once.
+    const reason = describeReadOnlyRefusal(result.summary);
+    run.readOnlyRefusal = { reason };
+    info(`\n⚠ ${reason}. Retrying this task once with a cold spawn.`);
+    await toolRexAppendLog(store, taskId, {
+      event: "read_only_refusal_retried",
+      detail: `${reason}. Re-spawned cold once.`,
+    });
+    return "read-only-retry";
   } else {
     // Completion rejected — no meaningful changes
     run.status = "failed";
@@ -1827,6 +1929,10 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
   if (attempt < retryConfig.maxRetries) {
     const delay = computeDelay(attempt, retryConfig.baseDelayMs, retryConfig.maxDelayMs);
     info(`retry ${attempt + 1}/${retryConfig.maxRetries}: transient error, waiting ${delay}ms`);
+    emitRunEvent("retry", `Retrying after a transient error (${attempt + 1}/${retryConfig.maxRetries})`, {
+      detail: result.error,
+      counts: { attempt: attempt + 1, maxAttempts: retryConfig.maxRetries, delayMs: delay },
+    });
     await sleep(delay);
     return "retry";
   }
@@ -1863,7 +1969,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Shared: assemble brief, format, build system prompt + envelope, display task info
   const { brief, taskId, briefText, systemPrompt, envelope: baseEnvelope } = await prepareBrief(
     store, config, opts.taskId,
-    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, projectDir, claims: opts.claims },
+    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, projectDir, claims: opts.claims, wouldResetIds: opts.wouldResetIds },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
     opts.extraContext,
   );
@@ -1906,8 +2012,20 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     allowedGitSubcommands: config.guard.allowedGitSubcommands,
   };
 
+  // The review the run is launched with, resolved up front so the record
+  // carries it from its first save (the Live page shows a Review tab from the
+  // start, and says which setting chose the model).
+  const reviewModel = opts.reviewPass ? resolveReviewModel(vendor, llmConfig, opts.reviewModel) : undefined;
+
   // Shared: initialize run record + capture start memory snapshot
   const { run, memoryCtx } = await initRunRecord({
+    reviewPlan: reviewModel === undefined
+      ? undefined
+      : {
+        model: reviewModel,
+        modelSource: reviewModelSource(vendor, llmConfig, opts.reviewModel),
+        optional: opts.reviewOptional === true,
+      },
     taskId,
     taskTitle: brief.task.title,
     model,
@@ -1921,6 +2039,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     // The routed tier for the agent loop — "standard" unless llm.routes
     // reroutes agent.execute — so `ndx usage` can report spend per tier.
     weight: resolveTaskModel("agent.execute", llmConfig, { vendor }).tier,
+    criteriaCount: brief.task.acceptanceCriteria?.length,
+    permissionMode: opts.permissionMode,
   });
 
   // CLI-specific: load config for CLI path and env resolution
@@ -1953,7 +2073,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Assemble the review-pass context once, if `--review` is on. Building it
   // here rather than at the call site keeps the per-attempt success path free
   // of config resolution, and makes "review is off" a single undefined value.
-  const reviewPassContext: ReviewPassContext | undefined = opts.reviewPass
+  const liveProgress = createLiveSpawnProgress();
+  const reviewPassContext: ReviewPassContext | undefined = reviewModel !== undefined
     ? {
         adapter,
         vendor,
@@ -1961,7 +2082,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         cliEnv,
         policy,
         henchDir,
-        reviewModel: resolveReviewModel(vendor, llmConfig, opts.reviewModel),
+        reviewModel,
         // The reviewer has to be able to apply must-fixes and run the
         // project's checks. `plan` would leave it able to do neither, so the
         // review pass always runs with edit permission regardless of the
@@ -1971,6 +2092,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         autonomous: autonomous || opts.yes === true || process.stdin.isTTY !== true,
         taskTitle: brief.task.title,
         mcpConfigPath,
+        pidHolder: liveProgress,
       }
     : undefined;
 
@@ -1979,6 +2101,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Snapshot untracked files before the agent runs, so a rollback removes only
   // the files the agent creates — never the user's pre-existing work (#303).
   const baselineUntracked = await captureBaselineUntracked(projectDir);
+  // Snapshot everything already dirty, so the run's own work can be told
+  // apart from the operator's at commit time (see stageRunWork).
+  const baselineDirty = await captureBaselineDirty(projectDir);
 
   const retryConfig: RetryConfig = config.retry ?? {
     maxRetries: 3,
@@ -2000,8 +2125,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // repetition. The detector clears itself whenever the agent writes a file.
   const livelock = createLivelockDetector({ threshold: config.livelockThreshold });
 
-  // Counters for the in-flight spawn, folded onto the record by the heartbeat.
-  const liveProgress = createLiveSpawnProgress();
+  // Counters for the in-flight spawn (`liveProgress`, created above), folded
+  // onto the record by the heartbeat.
 
   // Start heartbeat — writes lastActivityAt to disk periodically so the CLI
   // subprocess doesn't appear stale to the web dashboard during long tool calls,
@@ -2011,13 +2136,29 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const heartbeat = startHeartbeat(henchDir, run, undefined, () => {
     run.turns = accumulated.turns + liveProgress.turns;
     run.tokenUsage = addTokenUsage(accumulated.tokenUsage, liveProgress.tokenUsage);
+    // Absent between spawns: a stale vendor pid would read as a live child.
+    if (liveProgress.vendorPid !== undefined) run.vendorPid = liveProgress.vendorPid;
+    else delete run.vendorPid;
   });
 
-  // Start the commit-message watcher. If the agent writes `.hench-commit-msg.txt`
-  // and the run terminates before the normal commit-prompt flow can process it
-  // (timeout, crash), the timer fires and auto-commits the staged changes.
-  // The watcher is cancelled before finalizeRun so the two paths cannot race.
-  const commitMsgTimeoutMs = config.commitMsgTimeoutMs ?? 300_000;
+  // Start the commit-message watcher.
+  //
+  // Off by default (`hench.commitMsgTimeoutMs` 0), and the default is the
+  // whole point. Armed, this timer fires mid-run and commits whatever is
+  // staged at that instant — before the test gate, before the
+  // uncommitted-work gate, before the completion is written. That is a
+  // commit made ahead of any verification that the task is done, and it
+  // stages nothing itself: not the PRD paths, not the review repairs. Worse,
+  // `didAutoCommit()` then short-circuits performCommitPromptIfNeeded, so
+  // the completion write never reaches a commit at all and the next run's
+  // pre-run gate inherits it.
+  //
+  // What it was for was a run that dies after the agent staged its work but
+  // before finalization. That case is covered without committing early: the
+  // uncommitted-work gate refuses to record the task done, and the next
+  // run's pre-run commit gate offers the leftovers as a checkpoint. Set a
+  // positive timeout to restore the timer, knowing it commits unverified.
+  const commitMsgTimeoutMs = config.commitMsgTimeoutMs ?? 0;
   const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher({
     projectDir,
     timeoutMs: commitMsgTimeoutMs,
@@ -2162,6 +2303,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           cliEnv,
           cwd: projectDir,
           tokenMetadata,
+          pidHolder: liveProgress,
         }),
     });
     warmParentId = decision.parentId;
@@ -2183,6 +2325,16 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // drops the cache, disables forking for the rest of the run, and re-spawns
   // cold without consuming retry budget (the same shape as a plan re-spawn).
   let forkFallbackUsed = false;
+
+  // A fork that ends with no diff and no edit calls treated the inherited
+  // orientation as still in force (#473). The parent is not broken, so the
+  // cache stays; this run stops forking and re-spawns cold once, again
+  // without charging retry budget.
+  let readOnlyRetryUsed = false;
+  /** True for the one cold spawn that follows a read-only refusal. */
+  let readOnlyRetryPending = false;
+  /** Whether the most recent spawn forked the warm parent. */
+  let lastSpawnForked = false;
 
   // Plan-mode bookkeeping: when the spawned Claude session emits an
   // ExitPlanMode tool_use we kill the spawn, prompt the user (or auto-accept
@@ -2272,11 +2424,18 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // attempt, so the notice would restate what it just did and grow the
         // prompt on every retry.
         const needsRetryNotice = shouldSendRetryNotice(attempt, retryResumeSessionId);
+        // A fork inherits the orientation transcript, which declares itself
+        // read-only. Lift that before the brief; a resume continues a session
+        // that already left orientation, so it never gets the sentence.
+        const forkingWarmParent =
+          !backgroundResumeSessionId && !retryResumeSessionId && !!warmParentId;
         const briefContent =
+          (forkingWarmParent ? `${ORIENTATION_LIFT_NOTICE}\n\n` : "") +
           boundaryDivider +
           (needsRetryNotice
             ? boundedBriefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns)
             : boundedBriefText) +
+          (readOnlyRetryPending ? buildReadOnlyRetryNotice() : "") +
           (planModeAppendix ? `\n\n${planModeAppendix}` : "");
 
         // Build the per-attempt PromptEnvelope. On the first attempt with
@@ -2289,7 +2448,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
               { name: "system" as PromptSectionName, content: systemPrompt } as PromptSection,
               { name: "brief" as PromptSectionName, content: WORK_SESSION_RESUME_MESSAGE } as PromptSection,
             ])
-          : attempt === 0 && !planModeAppendix
+          : attempt === 0 && !planModeAppendix && !forkingWarmParent && !readOnlyRetryPending
           ? baseEnvelope
           : createPromptEnvelope([
               { name: "system" as PromptSectionName, content: systemPrompt } as PromptSection,
@@ -2314,8 +2473,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           // wins over everything and never forks.
           resumeSessionId:
             backgroundResumeSessionId ?? retryResumeSessionId ?? warmParentId ?? batchResumeId,
-          forkSession:
-            !backgroundResumeSessionId && !retryResumeSessionId && warmParentId ? true : undefined,
+          forkSession: forkingWarmParent ? true : undefined,
           mcpConfigPath,
         });
 
@@ -2328,6 +2486,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
         if (backgroundResumeSessionId) {
           subsection("Resuming the session: it ended waiting on a background command");
+        } else if (readOnlyRetryPending) {
+          subsection("Re-spawn cold after a read-only refusal");
         } else if (attempt > 0 && planRespawns === 0) {
           subsection(`Retry ${attempt}/${retryConfig.maxRetries}`);
         } else if (planRespawns > 0) {
@@ -2381,6 +2541,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         resetLiveSpawnProgress(liveProgress);
         const wasBackgroundResume = backgroundResumeSessionId !== undefined;
         backgroundResumeSessionId = undefined;
+        lastSpawnForked = forkingWarmParent;
+        readOnlyRetryPending = false;
 
         // Merge per-attempt events into the cross-retry accumulator. Includes
         // events from spawns terminated by plan-mode interception so token
@@ -2516,7 +2678,21 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           baselineUntracked,
           attemptAccumulator,
           runAccumulator,
+          readOnlyRetryAvailable: lastSpawnForked && !readOnlyRetryUsed,
         });
+        if (action === "read-only-retry") {
+          // Stop forking for the rest of the run but keep the cache entry:
+          // the parent is fine, and other tasks and runs can still fork it.
+          readOnlyRetryUsed = true;
+          readOnlyRetryPending = true;
+          warmParentId = undefined;
+          retryResumeSessionId = undefined;
+          nextSpawnReason = "read-only-retry";
+          // Undo the loop increment: like a fork fallback, the cold re-spawn
+          // does not consume retry budget.
+          attempt--;
+          continue;
+        }
         if (action === "break") break;
       } else {
         const action = await processErrorResult({
@@ -2605,6 +2781,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     skipFullTestGate: config.skipFullTestGate,
     commitWatcher,
     baselineUntracked,
+    baselineDirty,
     startingHead,
     reviewOptional: opts.reviewOptional,
   });

@@ -31,6 +31,14 @@ export {
 export type { HubRegistry, ProjectRecord, HubPidFile, HubConfig, HubConfigResult, HubConfigProblem } from "./registry.js";
 export { parseRegisterInput, handleHubRoute } from "./routes.js";
 export {
+  planNewProject,
+  validateProjectName,
+  slugifyProjectId,
+  deriveProjectId,
+  defaultParentDir,
+} from "./new-project.js";
+export type { NewProjectInput, NewProjectPlan } from "./new-project.js";
+export {
   AdmissionGate,
   AdmissionQueue,
   decideAdmission,
@@ -44,8 +52,11 @@ export type {
   AdmissionReason,
   AdmissionGateOptions,
   AdmitResult,
+  DroppedEntry,
+  ExecuteRefusal,
   QueueEntry,
   QueueSnapshot,
+  StartOutcome,
 } from "./admission.js";
 export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 export type { ProxyDecision } from "./proxy.js";

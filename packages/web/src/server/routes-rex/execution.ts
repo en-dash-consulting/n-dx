@@ -3,6 +3,13 @@
  *
  * Manages the in-memory execution state machine that runs hench
  * sequentially across epics, with pause/resume support.
+ *
+ * No dashboard surface calls these routes any more: the Epic-by-Epic panel is
+ * no longer rendered, because this path runs `hench run` from the project's own
+ * build (it fails outside the n-dx monorepo), records a failed epic as
+ * completed, and bypasses the hub queue and the throttle. The routes stay until
+ * the planned Run queue panel replaces them (--loop / --epic / --epic-by-epic
+ * through the hub).
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";

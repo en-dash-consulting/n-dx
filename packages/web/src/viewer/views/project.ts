@@ -22,7 +22,7 @@
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
-import { NdxLogoPng, SettingsFrame } from "../components/index.js";
+import { PixelIcon, SettingsFrame } from "../components/index.js";
 import { useCliName, useFeatureToggle } from "../hooks/index.js";
 import { ProjectSettingsSection, useProjectSettingsForm } from "./project-settings.js";
 import { FeatureTogglesSection, useFeatureTogglesForm } from "./feature-toggles.js";
@@ -106,7 +106,7 @@ export function ProjectView() {
     h("div", { class: "project-container" },
       h("div", { class: "project-header" },
         h("div", { class: "project-header-brand" },
-          h(NdxLogoPng, { size: 16, class: "project-header-logo" }),
+          h(PixelIcon, { name: "project", variant: "tile", size: 40, class: "project-header-tile" }),
           h("h1", { class: "project-header-title" }, "Project"),
         ),
         h("p", { class: "project-header-subtitle" },

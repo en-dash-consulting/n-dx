@@ -121,6 +121,9 @@ import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
 import { formatNarrationStatus, readNarrationState } from "./narration-status.js";
 import {
+  COMMAND_EFFECTS,
+  LAYOUT_TOKENS,
+  localizeEffects,
   resolveCommandEffects,
   shouldShowPreflight,
   formatPreflightBanner,
@@ -571,6 +574,34 @@ function stripInitProviderFlag(args) {
 
 function stripInitModelFlag(args) {
   return args.filter((a) => !a.startsWith("--model="));
+}
+
+/**
+ * Read the git-repository consent flags accepted by `ndx init`.
+ *
+ * `--git` / `--no-git` answer the git preflight prompt up front, which is the
+ * only way a run without a TTY can create a repository: the prompt never fires
+ * when stdio is piped, so the dashboard's setup wizard (which asks the question
+ * in the browser) and scripted inits would otherwise always land on the
+ * "not a git repository" warning.
+ *
+ * @param {string[]} args
+ * @returns {boolean|undefined} true for --git, false for --no-git, undefined when neither is present.
+ */
+function extractInitGitConsent(args) {
+  const wantsGit = args.includes("--git");
+  const refusesGit = args.includes("--no-git");
+  if (wantsGit && refusesGit) {
+    console.error("Error: --git and --no-git cannot be combined.");
+    exitWithCleanup(1);
+  }
+  if (wantsGit) return true;
+  if (refusesGit) return false;
+  return undefined;
+}
+
+function stripInitGitFlags(args) {
+  return args.filter((a) => a !== "--git" && a !== "--no-git");
 }
 
 function extractInitClaudeModel(args) {
@@ -1192,7 +1223,9 @@ function parseInitFlagSet(rest) {
  * @returns {string[]}
  */
 function buildInitArgs(rest) {
-  return stripAssistantFlags(stripInitVendorModelFlags(stripInitModelFlag(stripInitProviderFlag(rest))));
+  return stripInitGitFlags(
+    stripAssistantFlags(stripInitVendorModelFlags(stripInitModelFlag(stripInitProviderFlag(rest)))),
+  );
 }
 
 /**
@@ -1507,6 +1540,7 @@ function establishInitLayout(dir) {
 async function handleInit(rest) {
   const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
 
+  const gitConsent = extractInitGitConsent(rest);
   const initArgs = buildInitArgs(rest);
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
@@ -1516,8 +1550,9 @@ async function handleInit(rest) {
 
   // Git preflight runs before any tool-directory setup so a declined prompt
   // does not leave the project half-initialized. The check is a pure
-  // filesystem walk for `.git`; the prompt only surfaces when interactive.
-  const gitResult = await runGitPreflight(dir, { quiet });
+  // filesystem walk for `.git`; the prompt only surfaces when interactive and
+  // neither --git nor --no-git already answered it.
+  const gitResult = await runGitPreflight(dir, { quiet, consent: gitConsent });
 
   const assistantEnabled = resolveInitAssistants(rest, dir);
   const llmResult = await selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, {
@@ -1663,7 +1698,79 @@ async function handleInit(rest) {
     selection, providerSource, modelSource, assistantResults, readmeResult,
     gitResult, gitCommitResult, skillTrackingHints,
   });
+  await reviewRepoTrustAfterInit(dir, rest, quiet);
   exitWithCleanup(0);
+}
+
+/**
+ * The end-of-init review: what this checkout shipped as execution config,
+ * and whether to trust it.
+ *
+ * A fresh clone can carry a `.hench/config.json`, `.rex/config.json` and
+ * `.mcp.json` that widen what n-dx may execute, plus PRD items an autonomous
+ * run would act on. `hench trust status` compares them to the defaults and
+ * prints the review (spawned, as every hench call from here is — the trust
+ * logic lives in `@n-dx/llm-client`, which the orchestration tier never
+ * imports). When the repository deviates and we are interactive, ask once;
+ * otherwise say how to accept later. Never trusts on `--yes`: an unattended
+ * init is exactly the case where a widened config should stay clamped.
+ *
+ * @param {string} dir
+ * @param {string[]} rest
+ * @param {boolean} quiet
+ */
+async function reviewRepoTrustAfterInit(dir, rest, quiet) {
+  let evaluation = null;
+  try {
+    const probe = await runInitCapture(tools.hench, ["trust", "status", "--format=json", dir]);
+    if (probe.code === 0) evaluation = JSON.parse(probe.stdout);
+  } catch {
+    return;
+  }
+  if (!evaluation || typeof evaluation !== "object") return;
+
+  // Nothing to review on a repository that matches the defaults: keep init's
+  // summary short. Anything else prints the full review, including what the
+  // checkout brought (PRD items, analysis, runs), so the user sees it once.
+  if (evaluation.state === "baseline" && !quiet) {
+    console.log("");
+    console.log("Repository config: matches the defaults (nothing to trust).");
+    return;
+  }
+  console.log("");
+  await run(tools.hench, ["trust", "status", dir]);
+  if (!evaluation.restricted) return;
+
+  if (rest.includes("--yes") || rest.includes("-y") || !process.stdin.isTTY) {
+    console.log("");
+    console.log("Not trusting automatically. Review the findings above, then run: ndx trust accept .");
+    return;
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  let accept = false;
+  try {
+    const answer = await rl.question("\nTrust this repository's execution config now? [y/N] ");
+    accept = /^y(es)?$/i.test(answer.trim());
+  } catch {
+    accept = false;
+  } finally {
+    rl.close();
+  }
+  if (accept) {
+    await run(tools.hench, ["trust", "accept", dir]);
+  } else {
+    console.log("Left untrusted: ndx work runs under the default guard until you run: ndx trust accept .");
+  }
+}
+
+/**
+ * `ndx trust [status|accept|revoke] [dir]` — delegates to `hench trust`.
+ * Not gated on `requireInit`: a checkout can carry `.rex/config.json` or
+ * `.mcp.json` with no `.hench/` at all, and that is exactly what it reviews.
+ */
+async function handleTrust(rest) {
+  const code = await run(tools.hench, ["trust", ...rest]);
+  exitWithCleanup(code);
 }
 
 /**
@@ -1712,6 +1819,14 @@ function forwardableFlags(flags) {
   return flags.filter((f) => !ORCHESTRATOR_ONLY_FLAGS.has(f));
 }
 
+/** Layout token → project-relative path, for expanding effects declarations. */
+function effectsLayoutPaths(dir) {
+  const layout = resolveLayout(resolve(dir));
+  return Object.fromEntries(
+    Object.entries(LAYOUT_TOKENS).map(([token, field]) => [token, relativeToRoot(layout, layout[field])]),
+  );
+}
+
 /**
  * Run `command`'s work with its declared effects shown first and its actual
  * result shown after.
@@ -1721,16 +1836,18 @@ function forwardableFlags(flags) {
  * appeared. (It is also suppressed under `--format=json`, so that holds twice
  * over — see `shouldShowPreflight`.)
  *
- * A command with no declaration yet gets neither, silently. The effects map is
- * partial by design while the remaining commands are being declared.
+ * Every registry command has a declaration, but only the handlers that call
+ * this pause for one; a name with no declaration gets neither, silently.
  */
 async function withPreflight(command, rest, dir, work) {
   const flags = extractFlags(rest);
-  const effects = resolveCommandEffects(command, flags);
-  if (!effects) {
+  const declared = resolveCommandEffects(command, flags);
+  if (!declared) {
     await work();
     return;
   }
+  // The banner names, and the summary checks, this project's real paths.
+  const effects = localizeEffects(declared, effectsLayoutPaths(dir));
 
   const showing = shouldShowPreflight(flags, { isTTY: process.stdout.isTTY, env: process.env });
   if (showing) {
@@ -2081,6 +2198,22 @@ async function handleWork(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, ["rex", "hench"]);
   const flags = extractFlags(rest);
+
+  // --resolve: hench prints one JSON object describing the run and runs
+  // nothing. stdout must carry only that object, and an unset vendor is one of
+  // the refusals it reports — so no identity line, no vendor gate, and no
+  // Ctrl+C revert handler (there is no work to revert).
+  // `--resolve=false` is "no flag", matching hench; any other value resolves,
+  // so a value can never fall through to a real run.
+  if (flags.some((f) => f === "--resolve" || (f.startsWith("--resolve=") && f !== "--resolve=false"))) {
+    if (!flags.some((f) => f.startsWith("--task="))) {
+      console.error("Error: --resolve requires --task=<id>.");
+      console.error("Hint: ndx work --task=<id> --resolve .");
+      exitWithCleanup(1);
+    }
+    await runOrDie(tools.hench, ["run", ...flags, dir]);
+    exitWithCleanup(0);
+  }
 
   // Which n-dx is about to run, against which checkout. A run is the most
   // expensive thing this CLI starts and the hardest to attribute afterwards:
@@ -3054,6 +3187,13 @@ async function handlePairProgramming(rest) {
 }
 
 function handleHelp(rest) {
+  // Machine-readable effects declarations — what the dashboard's command
+  // manifest serves. JSON only: the human view of a declaration is the
+  // preflight banner the command itself prints.
+  if (rest.includes("--effects")) {
+    process.stdout.write(JSON.stringify({ effects: COMMAND_EFFECTS }, null, 2) + "\n");
+    exitWithCleanup(0);
+  }
   const query = rest.filter((a) => !a.startsWith("-")).join(" ");
   if (!query) {
     showMainHelp();
@@ -3116,6 +3256,7 @@ const COMMAND_DISPATCH = new Map([
   ["refresh",           handleRefresh],
   ["work",              handleWork],
   ["status",            handleStatus],
+  ["trust",             handleTrust],
   ["usage",             handleUsage],
   ["sync",              handleSync],
   ["claim",             handleClaim],

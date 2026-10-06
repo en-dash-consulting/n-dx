@@ -84,6 +84,9 @@ export function startHeartbeat(
     }
 
     run.lastActivityAt = new Date().toISOString();
+    // Re-stamped on every beat so the pid lands within one heartbeat even for a
+    // record that was created without it (e.g. resumed from an older writer).
+    run.pid = process.pid;
     try {
       beforeSave?.();
     } catch {

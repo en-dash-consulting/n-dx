@@ -858,9 +858,18 @@ describe("LLM_MODEL_CATALOG", () => {
   });
 
   // Contract tests: recommended defaults match known runtime defaults
-  it("recommended Claude model is claude-sonnet-5", () => {
-    const recommended = LLM_MODEL_CATALOG.claude.find((m) => m.recommended);
-    expect(recommended.id).toBe("claude-sonnet-5");
+  it("recommended Claude model is claude-sonnet-5-5, and it is the only one", () => {
+    const recommended = LLM_MODEL_CATALOG.claude.filter((m) => m.recommended);
+    expect(recommended.map((m) => m.id)).toEqual(["claude-sonnet-5-5"]);
+  });
+
+  it("lists the Claude 5.5 line plus Haiku 4.5", () => {
+    expect(LLM_MODEL_CATALOG.claude.map((m) => m.id)).toEqual([
+      "claude-sonnet-5-5",
+      "claude-opus-5-5",
+      "claude-fable-5-1",
+      "claude-haiku-4-5",
+    ]);
   });
 
   it("recommended Codex model is gpt-5.6-terra", () => {
@@ -890,7 +899,7 @@ describe("getRecommendedModel", () => {
     const recommended = getRecommendedModel("claude");
     expect(recommended).toBeDefined();
     expect(recommended.recommended).toBe(true);
-    expect(recommended.id).toBe("claude-sonnet-5");
+    expect(recommended.id).toBe("claude-sonnet-5-5");
   });
 
   it("returns recommended model for codex", () => {
@@ -1096,7 +1105,7 @@ describe("validateInitFlags", () => {
     });
 
     it("does not warn when model is in vendor catalog", () => {
-      const { warnings } = validateInitFlags({ provider: "claude", model: "claude-sonnet-5" });
+      const { warnings } = validateInitFlags({ provider: "claude", model: "claude-sonnet-5-5" });
       expect(warnings).toEqual([]);
     });
 
@@ -1104,6 +1113,15 @@ describe("validateInitFlags", () => {
       const { warnings } = validateInitFlags({ provider: "claude", model: "claude-sonnet-4-6" });
       expect(warnings).toEqual([]);
     });
+
+    it.each(["claude-sonnet-5", "claude-opus-5", "claude-fable-5"])(
+      "does not warn when a project is still pinned to superseded %s",
+      (claudeModel) => {
+        const { errors, warnings } = validateInitFlags({ claudeModel });
+        expect(errors).toEqual([]);
+        expect(warnings).toEqual([]);
+      },
+    );
 
     it("does not warn when codex model is in codex catalog", () => {
       const { warnings } = validateInitFlags({ codexModel: "gpt-5.5" });
@@ -1117,7 +1135,7 @@ describe("validateInitFlags", () => {
 
     it("includes known model IDs in warning message", () => {
       const { warnings } = validateInitFlags({ provider: "claude", model: "unknown-model" });
-      expect(warnings[0]).toContain("claude-sonnet-5");
+      expect(warnings[0]).toContain("claude-sonnet-5-5");
     });
 
     it("does not warn when there are errors (skips catalog check)", () => {

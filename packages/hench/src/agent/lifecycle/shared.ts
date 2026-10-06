@@ -15,16 +15,18 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { trustSummaryForRun } from "../../store/trust.js";
+import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { exec, getCurrentHead, execStdout } from "../../process/exec.js";
-import { execGitMutation } from "../../process/git-mutation.js";
+import { execCheckedGit, execGitMutation } from "../../process/git-mutation.js";
 import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
@@ -34,9 +36,21 @@ import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
 import type { PromptEnvelope } from "../../prd/llm-gateway.js";
-import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
+import {
+  excludeHenchRuntimeArtifacts,
+  matchesProjectPath,
+  parsePorcelainPath,
+  repoRelativePrefix,
+} from "../../store/artifacts.js";
 import { saveRun } from "../../store/runs.js";
-import { persistRunLog } from "../../store/run-log.js";
+import { ensureRunLogsIgnored, openRunLog, persistRunLog, type RunLogWriter } from "../../store/run-log.js";
+import {
+  closeActiveRunEvents,
+  emitRunEvent,
+  openRunEvents,
+  setActiveRunEvents,
+  type RunEventWriter,
+} from "../../store/run-events.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { formatBudgetExceeded, type TokenBudgetResult } from "./token-budget.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
@@ -50,7 +64,7 @@ import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } fro
 import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS, OUTPUT_TAIL_LINES } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
-import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines } from "../../types/output.js";
+import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
 import { displayTaskInfo } from "./task-display.js";
 import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
@@ -59,15 +73,17 @@ import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
 import {
   PRD_COMMIT_PATHS,
-  PRD_STAGE_PATHS,
   deletedAmong,
   findUncommittedWork,
   formatOperatorPrdLeftovers,
   formatRecordCommitPending,
+  formatReviewRepairsUncommittedRefusal,
   formatUncommittedWorkRefusal,
   listDirtyPaths,
   listOperatorOwnedPrdDirt,
   partitionDirtyPaths,
+  prdStagePaths,
+  rexDirName,
   prepareRecoveryPathspecs,
   renderPaths,
 } from "./uncommitted-work-gate.js";
@@ -115,6 +131,8 @@ export interface SharedLoopOptions {
   henchDir: string;
   taskId?: string;
   dryRun?: boolean;
+  /** See {@link AssembleBriefOptions.wouldResetIds}. */
+  wouldResetIds?: ReadonlySet<string>;
   model?: string;
   /**
    * Show the diff and prompt for approval before finalizing (`--approve-diff`).
@@ -419,6 +437,18 @@ export interface InitRunOptions {
    * in between claim a decision nobody made.
    */
   session?: RunSessionRecord;
+  /**
+   * Number of acceptance criteria on the brief, and the permission mode the
+   * agent will spawn under.
+   *
+   * Only used for the `brief_loaded` progress event. Both loops already hold
+   * these when they call this function, and passing them is what keeps the
+   * event emitted in one place rather than duplicated at each call site.
+   */
+  criteriaCount?: number;
+  permissionMode?: string;
+  /** The review pass the run was launched with (`--review`), recorded on the run from its first save. */
+  reviewPlan?: RunReviewPlan;
 }
 
 /**
@@ -445,11 +475,137 @@ export interface MemoryContext {
   systemTotalBytes: number;
 }
 
+// ---------------------------------------------------------------------------
+// Incremental run log
+// ---------------------------------------------------------------------------
+
+/**
+ * The log file the run currently in this process is streaming into.
+ *
+ * Module state for the same reason the capture buffer behind
+ * `getCapturedLines()` is: output is a process-wide singleton, so at most one
+ * run can be narrating at a time. `--loop` runs tasks one after another, each
+ * opening its own file in {@link beginRunLog} and closing it in
+ * {@link endRunLog}.
+ */
+let _activeRunLog: RunLogWriter | null = null;
+
+/**
+ * Open this run's log and route captured output into it.
+ *
+ * Best-effort by design: a run that cannot open its log still runs, and
+ * {@link endRunLog} writes the whole file at the end instead.
+ *
+ * @returns The writer, or null when no live log could be started.
+ */
+async function beginRunLog(projectDir: string, run: RunRecord): Promise<RunLogWriter | null> {
+  // A previous run that threw before finalizing would otherwise leak its fd
+  // and keep a stale sink installed. Closed and dropped, not rewritten: its
+  // lines belong to that run's file, and this run's buffer is not them.
+  const stale = _activeRunLog;
+  _activeRunLog = null;
+  setCapturedLineSink(null);
+  if (stale) await stale.close();
+
+  try {
+    // Lines already captured before the record existed (the task banner, the
+    // brief) belong to this run's log — passing them as the prefix is what
+    // makes the finished file equal to the whole-buffer write.
+    const writer = await openRunLog(projectDir, run.id, run.startedAt, getCapturedLines());
+    _activeRunLog = writer;
+    setCapturedLineSink(writer.appendLine);
+    return writer;
+  } catch {
+    // Nowhere to write, or no permission to. Not worth failing a run over;
+    // the end-of-run fallback will try once more.
+    return null;
+  }
+}
+
+/**
+ * Close the live log and return the path of the finished file.
+ *
+ * Falls back to a whole-buffer write when there was no live log, or when the
+ * stream broke part-way through — in both cases the operator still ends up
+ * with the complete file the run would have produced before this was
+ * incremental.
+ *
+ * @returns The log path, or undefined when no log could be written at all.
+ */
+async function endRunLog(projectDir: string, run: RunRecord): Promise<string | undefined> {
+  const writer = _activeRunLog;
+  _activeRunLog = null;
+  setCapturedLineSink(null);
+
+  if (writer) {
+    const failure = await writer.close();
+    // Only now, with the run over and its gates behind it: .gitignore is a
+    // tracked file, and editing it mid-run would read as operator work to
+    // this run's own completion gate.
+    await ensureRunLogsIgnored(projectDir);
+    if (!failure) return writer.path;
+    // The stream died mid-run, so the file on disk is short. Fall through and
+    // rewrite it from the capture buffer, which is still complete in memory.
+  }
+
+  try {
+    return await persistRunLog(projectDir, run.id, run.startedAt, getCapturedLines());
+  } catch {
+    // Log persistence is optional; the run result stands.
+    return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Structured progress events
+// ---------------------------------------------------------------------------
+
+/**
+ * Open this run's structured event stream and route {@link emitRunEvent} into
+ * it.
+ *
+ * Best-effort, like the run log: a run that cannot open its events file still
+ * runs, with every emit becoming a no-op. There is no end-of-run fallback —
+ * unlike the log, an event stream assembled after the fact would be exactly the
+ * thing this replaces.
+ *
+ * The writer itself is owned by `store/run-events.ts`, which is why this hands
+ * it straight over rather than keeping a copy: two references to one file
+ * handle is how one of them ends up writing to a closed stream.
+ *
+ * @returns The writer, or null when no stream could be started.
+ */
+async function beginRunEvents(henchDir: string, run: RunRecord): Promise<RunEventWriter | null> {
+  // A previous run that threw before finalizing would otherwise leak its fd and
+  // keep a stale writer installed.
+  await closeActiveRunEvents();
+
+  try {
+    const writer = await openRunEvents(henchDir, run.id);
+    setActiveRunEvents(writer);
+    return writer;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Create a new RunRecord in "running" status and persist it.
  * Also captures a system memory snapshot for later use in finalization.
  * Both loops create identical initial records.
  */
+/**
+ * Repository trust at run start, for the record. Never throws: a run must not
+ * fail because the trust store or a config file could not be read.
+ */
+function captureRunTrust(projectDir: string): RunRecord["trust"] {
+  try {
+    return trustSummaryForRun(evaluateRepoTrust(projectDir));
+  } catch {
+    return undefined;
+  }
+}
+
 export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRecord; memoryCtx: MemoryContext }> {
   // Which checkout this run belongs to. Every automatic commit below re-checks
   // against these three values, so a run whose HEAD is moved mid-run (the
@@ -472,11 +628,14 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     vendor: opts.vendor,
     weight: opts.weight ?? "standard",
     session: opts.session,
+    ...(opts.reviewPlan ? { reviewPlan: opts.reviewPlan } : {}),
     actor: await resolveActor(opts.projectDir ?? "."),
     host: resolveHost(),
+    pid: process.pid,
     ndxVersion: resolveNdxVersion(),
     cliPath: resolveCliPath(),
     ...gitOrigin,
+    trust: captureRunTrust(opts.projectDir ?? "."),
   };
 
   // Emit invocation context to the output stream for CLI and dashboard visibility
@@ -500,16 +659,47 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     };
   }
 
+  // Open the run log before the first save, so the record carries its path
+  // from the moment it is readable. Only when the caller named a project
+  // directory: `.run-logs/` belongs at a project root, and defaulting to the
+  // process cwd would scatter logs (and .gitignore edits) wherever hench
+  // happened to be invoked from.
+  if (opts.projectDir) {
+    const writer = await beginRunLog(opts.projectDir, run);
+    if (writer) run.logPath = writer.path;
+  }
+
+  // The structured event stream. Unconditional, unlike the log: it lives under
+  // `.hench/runs/` next to the record, which every run has by definition, so
+  // there is no project directory to be missing and no `.gitignore` to edit.
+  const eventWriter = await beginRunEvents(opts.henchDir, run);
+  if (eventWriter) run.eventsPath = eventWriter.path;
+
+  emitRunEvent(
+    "brief_loaded",
+    `Brief loaded for "${run.taskTitle}"`,
+    {
+      detail: [
+        `model ${run.model}`,
+        opts.vendor ? `vendor ${opts.vendor}` : undefined,
+        opts.permissionMode ? `permission mode ${opts.permissionMode}` : undefined,
+      ]
+        .filter(Boolean)
+        .join(", "),
+      ...(opts.criteriaCount !== undefined ? { counts: { criteria: opts.criteriaCount } } : {}),
+    },
+  );
+
   run.lastActivityAt = new Date().toISOString();
   await saveRun(opts.henchDir, run);
 
-  // Capture system memory at run start
+  // Capture system memory at run start (-1 records an unknown reading)
   const monitor = new SystemMemoryMonitor();
   let memoryCtx: MemoryContext;
   try {
     const snap = await monitor.snapshot();
     memoryCtx = {
-      systemAvailableAtStartBytes: snap.availableBytes,
+      systemAvailableAtStartBytes: snap.availableBytes ?? -1,
       systemTotalBytes: snap.totalBytes,
     };
   } catch {
@@ -549,6 +739,107 @@ export function captureStartingHead(projectDir: string): string | undefined {
  */
 export async function captureBaselineUntracked(projectDir: string): Promise<string[]> {
   return listUntrackedPaths(projectDir);
+}
+
+/**
+ * Capture every dirty path present BEFORE the agent runs.
+ *
+ * This is the "not mine" list for {@link stageRunWork}: a path already dirty
+ * when the run started is the operator's, not the run's, and staging it would
+ * fold their unfinished work into the task's commit. Usually empty — the
+ * pre-run commit gate refuses to start an autonomous run against a dirty tree
+ * — but `--allow-dirty` and `hench.git.requireCleanTree: false` both permit
+ * it, and those are exactly the cases where getting this wrong costs someone
+ * their work.
+ *
+ * Paths are repository-relative, as `git status --porcelain` reports them.
+ * Returns `[]` when the tree is clean or git is unavailable; an empty baseline
+ * correctly means "everything dirty at the end is the run's".
+ */
+export async function captureBaselineDirty(projectDir: string): Promise<string[]> {
+  const lines = await excludeHenchRuntimeArtifacts(await listDirtyPaths(projectDir), projectDir);
+  return lines.map(parsePorcelainPath);
+}
+
+/** What {@link stageRunWork} did, for the caller to report or fail on. */
+export interface StageRunWorkResult {
+  /** Repository-relative paths newly staged by this call. */
+  staged: string[];
+  /** Set when a `git add` failed; the caller decides whether that is fatal. */
+  error?: Error;
+}
+
+/**
+ * Stage the work this run produced, so the commit contains all of it.
+ *
+ * WHY THIS EXISTS. The commit only ever contained what the *agent* had
+ * staged: the prompt tells it to `git add -- <path...>` naming each path, and
+ * any file it forgot was simply absent from the commit. The uncommitted-work
+ * gate downstream would then refuse the completion and fail a run whose work
+ * was finished and correct — or, when something committed ahead of the gate,
+ * the task was recorded complete with files left behind. Asking the agent to
+ * enumerate its own side effects correctly, every time, is the part that does
+ * not hold; the filesystem already knows the answer.
+ *
+ * WHAT IT WILL NOT STAGE, and why each exclusion is load-bearing:
+ *
+ * - **Anything dirty before the run started** (`baselineDirty`). That is the
+ *   operator's work in progress. This is the one rule that keeps "stage the
+ *   rest" from meaning `git add -A`, which is explicitly what the agent is
+ *   told never to do.
+ * - **Hench's own runtime artifacts**, including `.hench-commit-msg.txt`
+ *   itself — committing the sentinel would be absurd, and the run-logs are
+ *   gitignored by `hench init` anyway.
+ * - **The PRD paths.** `performCommitPromptIfNeeded` stages those itself
+ *   after writing the completion, so that the status transition and the code
+ *   land together. Staging them here would capture the PRD as it was
+ *   *before* the completion was written.
+ *
+ * Deliberately additive: it never unstages anything, so work the agent did
+ * stage is untouched and this only ever closes the gap.
+ *
+ * @param projectDir     The run's working directory.
+ * @param baselineDirty  Dirty paths from {@link captureBaselineDirty}.
+ *                       Undefined means no baseline was captured, and nothing
+ *                       is staged — an unknown baseline cannot distinguish
+ *                       the run's work from the operator's.
+ */
+export async function stageRunWork(
+  projectDir: string,
+  baselineDirty: string[] | undefined,
+): Promise<StageRunWorkResult> {
+  if (baselineDirty === undefined) return { staged: [] };
+
+  const dirtyNow = await excludeHenchRuntimeArtifacts(
+    await listDirtyPaths(projectDir),
+    projectDir,
+  );
+  if (dirtyNow.length === 0) return { staged: [] };
+
+  const preexisting = new Set(baselineDirty);
+  const repoPrefix = await repoRelativePrefix(projectDir);
+
+  const candidates = dirtyNow
+    .map(parsePorcelainPath)
+    .filter((path) => !preexisting.has(path))
+    .filter((path) => !matchesProjectPath(path, PRD_COMMIT_PATHS, repoPrefix));
+
+  if (candidates.length === 0) return { staged: [] };
+
+  try {
+    // One `git add` per path, pathspec-literal: a path is a path here, never
+    // a glob, and a file genuinely named with a bracket or star must stage as
+    // itself. `--` additionally stops a leading-dash filename reading as a
+    // flag. Deletions stage as deletions, which is what `git add` does for a
+    // missing file given explicitly.
+    for (const path of candidates) {
+      await execGitMutation(projectDir, ["add", "--", `:(literal)${path}`], 15_000);
+    }
+  } catch (err) {
+    return { staged: [], error: err as Error };
+  }
+
+  return { staged: candidates };
 }
 
 // ---------------------------------------------------------------------------
@@ -769,8 +1060,20 @@ export async function runPostTaskTestsIfNeeded(
     if (!testResult.passed && testResult.output) {
       info(testResult.output.slice(-500));
     }
+    emitRunEvent("tests_run", `Post-task tests ${status.toLowerCase()}${scope}`, {
+      ok: testResult.passed,
+      detail: testCommand,
+      counts: {
+        targetedFiles: testResult.targetedFiles.length,
+        ...(testResult.durationMs != null ? { durationMs: testResult.durationMs } : {}),
+      },
+    });
   } else if (testResult.error) {
     detail(testResult.error);
+    emitRunEvent("tests_run", "Post-task tests did not run", {
+      ok: false,
+      detail: testResult.error,
+    });
   }
 }
 
@@ -935,6 +1238,17 @@ export interface FinalizeRunOptions {
    * an untracked file that was already there is the user's, not the run's.
    */
   baselineUntracked?: string[];
+  /**
+   * Every path dirty before the run started (via
+   * {@link captureBaselineDirty}).
+   *
+   * The "not mine" list for {@link stageRunWork}: anything already dirty is
+   * the operator's and is never staged into the task's commit. Omitting it
+   * disables that staging entirely — an unknown baseline cannot tell the
+   * run's work from the operator's, and guessing is how someone's
+   * work-in-progress ends up inside a task commit.
+   */
+  baselineDirty?: string[];
   /**
    * Commit the run started from (via {@link captureStartingHead}).
    *
@@ -1418,8 +1732,11 @@ const PRE_RUN_COMMIT_DIFF_CHAR_LIMIT = 12_000;
 /** Deterministic message used when the LLM is unavailable or errors. */
 const PRE_RUN_COMMIT_FALLBACK_MESSAGE = "chore: commit local changes before hench run";
 
-export type PreRunCommitChoice = "commit" | "stop" | "proceed";
+export type PreRunCommitChoice = "commit" | "stash" | "discard" | "stop" | "proceed";
 export type PreRunCommitGateResult = "proceed" | "stop";
+
+/** Stash label prefix, so `git stash list` says where the entry came from. */
+const PRE_RUN_STASH_PREFIX = "hench pre-run";
 
 /**
  * How the pre-run prompt should present its choices.
@@ -1439,6 +1756,10 @@ export interface PreRunPromptOptions {
  * the default: "proceed" normally, "commit" when escalated or when proceeding
  * is disallowed. A "proceed" answer while disallowed re-resolves to the
  * default rather than sneaking past requireCleanTree. Exported for tests.
+ *
+ * `s` stays bound to "stop" — it has meant that since the gate shipped, and
+ * silently repointing a one-key answer at `stash` would make muscle memory
+ * start a run the operator meant to abort. Stash takes `t`, discard `d`.
  */
 export function resolvePreRunCommitAnswer(
   answer: string | null,
@@ -1448,24 +1769,43 @@ export function resolvePreRunCommitAnswer(
   const fallback: PreRunCommitChoice = escalate || !allowProceed ? "commit" : "proceed";
   const trimmed = answer.trim().toLowerCase();
   if (trimmed === "c" || trimmed === "commit") return "commit";
+  if (trimmed === "t" || trimmed === "stash") return "stash";
+  if (trimmed === "d" || trimmed === "discard") return "discard";
   if (trimmed === "s" || trimmed === "stop") return "stop";
   if ((trimmed === "p" || trimmed === "proceed") && allowProceed) return "proceed";
   return fallback;
 }
 
 /**
- * Three-way prompt for the pre-run commit gate. Bare Enter takes the least
- * dangerous default (proceed normally, commit when escalated); Ctrl-C stops
- * (treat an interrupt as "don't start the run"). Built on the same
- * SIGINT-suspended readline core as the yes/no prompt.
+ * Prompt for the pre-run commit gate. Bare Enter takes the least dangerous
+ * default (proceed normally, commit when escalated); Ctrl-C stops (treat an
+ * interrupt as "don't start the run"). Built on the same SIGINT-suspended
+ * readline core as the yes/no prompt.
+ *
+ * `discard` is never a default and never reachable by a bare Enter — the
+ * caller confirms it separately before anything is removed.
  */
 async function promptPreRunCommitChoice(opts: PreRunPromptOptions): Promise<PreRunCommitChoice> {
   const def = opts.escalate || !opts.allowProceed ? "commit" : "proceed";
-  const choices = opts.allowProceed ? "[c]ommit / [s]top / [p]roceed" : "[c]ommit / [s]top";
+  const choices = opts.allowProceed
+    ? "[c]ommit / s[t]ash / [d]iscard / [s]top / [p]roceed"
+    : "[c]ommit / s[t]ash / [d]iscard / [s]top";
   const answer = await readLineWithSuspendedSigint(
-    `\nCommit these changes first? ${choices} (default: ${def}) `,
+    `\nWhat should happen to these changes? ${choices} (default: ${def}) `,
   );
   return resolvePreRunCommitAnswer(answer, opts);
+}
+
+/**
+ * Confirm a discard. Defaults to No: of the five answers this is the only one
+ * that destroys work, so it is the only one that costs a second keystroke.
+ */
+async function confirmPreRunDiscard(fileCount: number): Promise<boolean> {
+  return askYesNoWithSuspendedSigint(
+    `\nDiscard ${fileCount} uncommitted file(s)? Tracked changes are reverted and ` +
+      `untracked files are deleted. [y/N] `,
+    { interruptMode: "hold-then-exit", defaultYes: false },
+  );
 }
 
 /**
@@ -1503,7 +1843,12 @@ export async function proposePreRunCommitMessage(
       "Write a single-line git commit subject (max 72 chars, conventional-commit " +
       "style, no body, no surrounding quotes or backticks) summarizing these " +
       `uncommitted changes:\n\n${diff.stat}\n\n${diff.diff.slice(0, PRE_RUN_COMMIT_DIFF_CHAR_LIMIT)}`;
-    const { text } = await provider.complete({ prompt, model: resolvedModel });
+    const { text } = await provider.complete({
+      prompt,
+      model: resolvedModel,
+      effort: commitResolution.effort,
+      taskClass: "git.commit-message",
+    });
     // Output contract for the light-tier route: the answer goes straight to
     // `git commit -m`, so a preamble, fence, or paragraph would land in the
     // repository's history. Anything that is not a usable single-line subject
@@ -1527,13 +1872,94 @@ async function commitPreRunChanges(projectDir: string, message: string): Promise
 }
 
 /**
+ * Set the pre-existing changes aside under the same generated message the
+ * commit option would have used, prefixed so `git stash list` says where the
+ * entry came from.
+ *
+ * `--include-untracked` matters: the gate counts untracked files as dirty, so
+ * a stash that left them behind would hand the run a tree the gate had just
+ * reported as handled. Ignored files stay put (no `--all`) — `.hench/`,
+ * `node_modules/` and the rest are not the operator's work.
+ */
+async function stashPreRunChanges(projectDir: string, message: string): Promise<void> {
+  await execGitMutation(
+    projectDir,
+    ["stash", "push", "--include-untracked", "-m", `${PRE_RUN_STASH_PREFIX}: ${message}`],
+    60_000,
+  );
+}
+
+/**
+ * Discard the pre-existing changes: revert tracked files to HEAD and remove
+ * untracked ones.
+ *
+ * Done as a stash that is immediately dropped, rather than
+ * `git reset --hard` + `git clean -fd`. Both remove the same files, but the
+ * stash leaves a commit behind: dropping it only unlinks the ref, so the
+ * operator who answers `d` and then remembers what was in there has a sha to
+ * recover from (`git stash store <sha>` then `git stash pop`) until git gc
+ * reaps it. `git stash create` was the obvious way to snapshot first and is
+ * the wrong one — it has no `--include-untracked`, so the half of the discard
+ * that deletes new files would not have been in the snapshot at all.
+ *
+ * Ignored files are never touched (no `--all`, and no `git clean -x` anywhere
+ * in this path): `.hench/`, build output and tool state are not the changes
+ * this gate is about.
+ *
+ * Returns the dropped stash's sha, or undefined when git made no stash (an
+ * already-clean tree) — in which case nothing is dropped either. The drop is
+ * conditional on the subject matching the marker written moments earlier, so
+ * a pre-existing `stash@{0}` belonging to the operator can never be the entry
+ * this removes.
+ */
+async function discardPreRunChanges(projectDir: string): Promise<string | undefined> {
+  const marker = `${PRE_RUN_STASH_PREFIX} discard ${Date.now()}`;
+  await execGitMutation(
+    projectDir,
+    ["stash", "push", "--include-untracked", "-m", marker],
+    60_000,
+  );
+
+  let snapshot: string | undefined;
+  try {
+    const top = await execCheckedGit(
+      projectDir,
+      ["log", "-1", "--format=%H%x00%s", "refs/stash"],
+      15_000,
+    );
+    const [sha, subject = ""] = top.stdout.trim().split("\0");
+    if (sha && subject.includes(marker)) snapshot = sha;
+  } catch {
+    // No stash ref at all — nothing was stashed, so nothing to drop.
+  }
+  if (!snapshot) return undefined;
+
+  try {
+    await execGitMutation(projectDir, ["stash", "drop"], 15_000);
+  } catch {
+    // The entry stays in the stash list. The changes are still out of the
+    // working tree, which is what was asked for; the operator sees it in
+    // `git stash list` rather than losing it.
+  }
+  return snapshot;
+}
+
+/**
  * Commit the files the adversarial review pass changed, when there are any.
- * Called on the autoCommit path only: the interactive commit prompt already
- * sweeps repairs into the task's commit, but on autoCommit the executor
- * committed its own work before the review ran, so the repairs have no other
- * owner. A failed repair commit is propagated to finalization so it can
- * withdraw the completion claim rather than leave the repair for a later
- * task to absorb.
+ *
+ * Two callers, both cases where the repairs would otherwise have no owner:
+ *
+ * - The autoCommit path, where the executor committed its own work before the
+ *   review ran and the reviewer is barred from committing.
+ * - {@link commitOrphanedReviewRepairs} on the commit-prompt path, when the
+ *   executor committed for itself and left no message file, so the prompt that
+ *   normally sweeps the repairs in never runs (GitHub #483).
+ *
+ * The ordinary commit-prompt path does not call this: `stageReviewRepairs`
+ * stages the repairs and `git commit -F` lands them with the executor's work.
+ *
+ * A failed repair commit is propagated to the caller so it can withdraw the
+ * completion claim rather than leave the repair for a later task to absorb.
  */
 export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRecord): Promise<void> {
   const review = run.review;
@@ -1567,6 +1993,65 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
   }
 }
 
+/**
+ * Commit review repairs the commit prompt was supposed to take but never will
+ * (GitHub #483, caos run 4b733f14).
+ *
+ * With `hench.autoCommit` false the repairs ride along in the prompt's
+ * `git commit -F .hench-commit-msg.txt`. When the executor commits its own work
+ * with a plain `git commit` and writes no message file, that prompt returns
+ * early, nothing commits the repairs, and the uncommitted-work gate correctly
+ * refuses them — so a run whose work *and* repairs were both right ended failed
+ * and its task was reset to pending.
+ *
+ * Both conditions below must hold before this commits anything, and each
+ * guards against a distinct way of making things worse:
+ *
+ * (a) **HEAD moved past `run.startHead`.** Something committed during this run
+ *     — the executor itself, or the commit-message watcher. Without this, the
+ *     "repairs" may be the entire uncommitted feature (the review pass reports
+ *     every path it touched, including files the agent created and the reviewer
+ *     then edited — caos run 2fb96507), and landing that under a
+ *     `fix(review):` subject would mislabel a whole feature. A run record with
+ *     no `startHead` predates the field; it cannot answer the question, so it
+ *     does not get the benefit of the doubt.
+ *
+ * (b) **Nothing else is loose.** The repairs plus the PRD paths are the only
+ *     dirt. If anything else is uncommitted, the existing refusal is the right
+ *     answer and committing a slice of a leaking tree would only obscure it.
+ *
+ * @returns The error from a refused or failed commit, for the caller to render
+ *   as {@link formatReviewRepairsUncommittedRefusal}; undefined when the commit
+ *   landed, or when the conditions above said not to try.
+ */
+async function commitOrphanedReviewRepairs(
+  projectDir: string,
+  run: RunRecord,
+  repairs: readonly string[],
+): Promise<Error | undefined> {
+  if (repairs.length === 0) return undefined;
+
+  // (a) The executor (or the watcher) committed during this run.
+  if (!run.startHead) return undefined;
+  const head = getCurrentHead(projectDir);
+  if (!head || head === run.startHead) return undefined;
+
+  // (b) The repairs are all that is left, once hench's own PRD writes are
+  // discounted — the same discount the gate itself applies a moment later.
+  const remaining = await findUncommittedWork({
+    projectDir,
+    discountPaths: [...PRD_COMMIT_PATHS, ...repairs],
+  });
+  if (!remaining.clean) return undefined;
+
+  try {
+    await commitReviewRepairsIfNeeded(projectDir, run);
+    return undefined;
+  } catch (err) {
+    return err as Error;
+  }
+}
+
 /** The legacy flat-markdown PRD. Read-only for years; still staged if present. */
 const PRD_MARKDOWN_FILENAME = "prd.md";
 
@@ -1596,7 +2081,7 @@ async function isGitIgnored(projectDir: string, relativePath: string): Promise<b
  * gitignored, and should be staged by a commit that lands a PRD write.
  *
  * One helper for both staging sites — {@link commitPrdTreeIfStaged} and the
- * commit prompt — and its candidates come from {@link PRD_STAGE_PATHS}, the
+ * commit prompt — and its candidates come from {@link prdStagePaths}, the
  * same definition the uncommitted-work gate's discount derives from. The two
  * sets drifted twice when they were maintained by hand: `tree-meta.json` was
  * discounted by nobody and staged by nobody, so every completion was refused;
@@ -1620,12 +2105,13 @@ export async function prdPathsToStage(
 ): Promise<string[]> {
   const { join } = await import("node:path");
   const { existsSync } = await import("node:fs");
+  const rexDir = rexDirName(projectDir);
   const candidates = [
-    ...PRD_STAGE_PATHS,
+    ...prdStagePaths(projectDir),
     // Prompt-only legacy extra: read-only for years, never written by a PRD
     // mutation, so it is neither staged by the completion commit nor
     // discounted by the gate — a dirty prd.md is operator work.
-    ...(opts.includeLegacyMarkdown ? [`.rex/${PRD_MARKDOWN_FILENAME}`] : []),
+    ...(opts.includeLegacyMarkdown ? [`${rexDir}/${PRD_MARKDOWN_FILENAME}`] : []),
   ];
   const existing = candidates.filter((relativePath) => existsSync(join(projectDir, relativePath)));
 
@@ -1679,8 +2165,9 @@ async function scopePrdPathsToReport(
   // forward slashes on every platform. Compare on the forward-slash form —
   // git accepts it on Windows too.
   const allowedRoots = new Set(rootPaths.map((p) => p.split(sep).join("/")));
-  const treePrefix = `.rex/${PRD_TREE_DIRNAME}/`;
-  const treeAllowed = allowedRoots.has(`.rex/${PRD_TREE_DIRNAME}`);
+  const rexDir = rexDirName(projectDir);
+  const treePrefix = `${rexDir}/${PRD_TREE_DIRNAME}/`;
+  const treeAllowed = allowedRoots.has(`${rexDir}/${PRD_TREE_DIRNAME}`);
 
   const scoped: string[] = [];
   const seen = new Set<string>();
@@ -1705,7 +2192,7 @@ async function scopePrdPathsToReport(
     }
   }
 
-  const metaPath = `.rex/${TREE_META_FILENAME}`;
+  const metaPath = `${rexDir}/${TREE_META_FILENAME}`;
   if (allowedRoots.has(metaPath)) push(metaPath);
 
   return scoped;
@@ -1775,7 +2262,7 @@ async function commitPrdTreeIfStaged(
     return { staged: 0, error: err as Error, paths: prdPaths };
   }
 
-  const staged = await countStagedFiles(projectDir, [".rex/"]);
+  const staged = await countStagedFiles(projectDir, [`${rexDirName(projectDir)}/`]);
   if (staged === 0) {
     return { staged: 0, paths: prdPaths };
   }
@@ -1851,7 +2338,7 @@ async function commitCompletionMetadata(
   // permanently dirty and the next autonomous run refused at the pre-run gate.
   const operatorDirt = await listOperatorOwnedPrdDirt(projectDir);
   if (operatorDirt.length > 0) {
-    info(`\n${formatOperatorPrdLeftovers(operatorDirt)}`);
+    info(`\n${formatOperatorPrdLeftovers(operatorDirt, rexDirName(projectDir))}`);
   }
   return result;
 }
@@ -1862,8 +2349,8 @@ async function commitCompletionMetadata(
  *
  * WHY THIS EXISTS (GitHub #365). `--reset-deferred` resets deferred/failing
  * tasks to pending by writing the PRD tree, and moments later the pre-run
- * commit gate ({@link performPreRunCommitGateIfNeeded}) refuses an autonomous
- * run against *any* dirty tree — including the dirt the reset itself just
+ * commit gate ({@link performPreRunCommitGateIfNeeded}) stops — or, on a TTY,
+ * interrogates — an autonomous run against *any* dirty tree — including the dirt the reset itself just
  * produced. That made the flag deadlock against itself on the exact case it
  * exists for (resuming after an interruption), and the refusal exited 0, so
  * an unattended caller read it as success and the tasks stayed deferred.
@@ -1946,7 +2433,10 @@ export interface PreRunCommitGateOptions {
     collectDiff?: (dir: string) => Promise<ReviewDiff>;
     proposeMessage?: (diff: ReviewDiff, henchDir: string, model?: string) => Promise<string>;
     promptChoice?: (promptOpts: PreRunPromptOptions) => Promise<PreRunCommitChoice>;
+    confirmDiscard?: (fileCount: number) => Promise<boolean>;
     commit?: (dir: string, message: string) => Promise<void>;
+    stash?: (dir: string, message: string) => Promise<void>;
+    discard?: (dir: string) => Promise<string | undefined>;
     checkOrigin?: (dir: string, origin: RunGitOrigin | undefined) => string | undefined;
     isTTY?: boolean;
   };
@@ -1956,15 +2446,25 @@ export interface PreRunCommitGateOptions {
  * One-time pre-run git gate. Runs once per `hench run` invocation, before the
  * work loop begins (never per iteration). When the working tree carries
  * pre-existing uncommitted changes and the session is interactive, it shows
- * the diff stat plus a proposed commit message and asks whether to commit,
- * stop, or proceed. Clean trees always proceed without prompting.
+ * the diff stat plus a proposed message and asks what to do with them:
  *
- * Autonomous runs (--auto/--loop/--epic-by-epic) can't prompt without stalling
- * an unattended loop, so a dirty tree makes them *abort* by default rather than
- * silently absorb the pre-existing changes — pass `--allow-dirty` (allowDirty)
- * to proceed anyway. Other non-interactive runs (e.g. --yes, piped) proceed
- * unless `hench.git.requireCleanTree` is set (then they stop too, again
- * unless --allow-dirty).
+ * - `commit` — stage everything and commit under the generated message.
+ * - `stash`  — `git stash push -u` under the same generated message.
+ * - `discard` — revert tracked files and delete untracked ones, after a
+ *   second confirmation defaulting to No. A `git stash create` snapshot is
+ *   taken first, and its sha reported, so the answer is still recoverable.
+ * - `stop` / `proceed` — as before.
+ *
+ * Clean trees always proceed without prompting.
+ *
+ * Autonomous runs (--auto/--loop/--epic-by-epic) must not silently fold
+ * pre-existing changes into hench's own commits. On a TTY they get the same
+ * prompt — it runs once, before the loop, so it cannot stall an iteration —
+ * with the escalated default (commit) and an explicit `proceed` standing in
+ * for `--allow-dirty`. Without a TTY they abort as before. Other
+ * non-interactive runs (--yes, piped) proceed unless
+ * `hench.git.requireCleanTree` is set (then they stop too, again unless
+ * --allow-dirty).
  *
  * The gate is size-aware: when the uncommitted changes reach the checkpoint
  * threshold (`hench.git.checkpointThreshold` lines changed, default
@@ -1984,7 +2484,10 @@ export async function performPreRunCommitGateIfNeeded(
   const collectDiff = deps.collectDiff ?? ((dir: string) => collectReviewDiff(dir));
   const proposeMessage = deps.proposeMessage ?? proposePreRunCommitMessage;
   const promptChoice = deps.promptChoice ?? promptPreRunCommitChoice;
+  const confirmDiscard = deps.confirmDiscard ?? confirmPreRunDiscard;
   const commit = deps.commit ?? commitPreRunChanges;
+  const stash = deps.stash ?? stashPreRunChanges;
+  const discard = deps.discard ?? discardPreRunChanges;
   const checkOrigin = deps.checkOrigin ?? checkRunGitOrigin;
   const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
   const checkpointThreshold = opts.checkpointThreshold ?? DEFAULT_CHECKPOINT_THRESHOLD;
@@ -2000,12 +2503,23 @@ export async function performPreRunCommitGateIfNeeded(
 
   const magnitude = await measureMagnitude(projectDir);
   const magnitudeLabel = `${dirty.length} uncommitted file(s), ${magnitude.linesChanged} line(s) changed`;
+  // An autonomous run that would otherwise have refused is itself an
+  // escalation: the prompt must not let a bare Enter proceed into the loop
+  // with someone else's changes in the tree, so the default becomes "commit"
+  // exactly as it does above the checkpoint threshold.
+  const autonomousDirty = Boolean(autonomous) && !allowDirty;
   const escalate =
-    !allowDirty && checkpointThreshold > 0 && magnitude.linesChanged >= checkpointThreshold;
+    autonomousDirty ||
+    (!allowDirty && checkpointThreshold > 0 && magnitude.linesChanged >= checkpointThreshold);
 
-  // Only prompt in an attended TTY session. Autonomous (--auto/--loop/
-  // --epic-by-epic) and --yes runs can't prompt without stalling.
-  const isInteractive = isTTY && !yes && !autonomous;
+  // Only prompt in an attended TTY session. Autonomous runs are included, but
+  // only where they would otherwise have been refused outright: this gate runs
+  // once per invocation, before the work loop starts, so a prompt here cannot
+  // stall an iteration mid-flight — and refusing to start was the worse
+  // outcome when someone was sitting there able to answer. `--allow-dirty` is
+  // the operator saying "just go", so it keeps the silent autonomous path;
+  // --yes and non-TTY runs still can't prompt and keep the fail-fast below.
+  const isInteractive = isTTY && !yes && (!autonomous || autonomousDirty);
   if (!isInteractive) {
     // Autonomous runs must not fold a pre-existing dirty tree into hench's own
     // commits. They can't prompt (that would hang an unattended loop), so fail
@@ -2036,7 +2550,12 @@ export async function performPreRunCommitGateIfNeeded(
   section("Uncommitted changes detected");
   subsection("Changes");
   info(diff.stat || `${dirty.length} file(s)`);
-  if (escalate) {
+  if (autonomousDirty) {
+    info(
+      `⚠ An autonomous run would fold ${magnitudeLabel} into its own commits. ` +
+        `Deal with them first, or choose proceed to accept that (same as --allow-dirty).`,
+    );
+  } else if (escalate) {
     info(
       `⚠ Large uncommitted change: ${magnitudeLabel} (threshold: ${checkpointThreshold}). ` +
         `Committing a checkpoint before the run is strongly recommended.`,
@@ -2048,27 +2567,54 @@ export async function performPreRunCommitGateIfNeeded(
   subsection("Proposed commit message");
   info(proposed);
 
-  const choice = await promptChoice({ escalate, allowProceed: !requireCleanTree });
+  const allowProceed = !requireCleanTree;
+  const choice = await promptChoice({ escalate, allowProceed });
   if (choice === "stop") return "stop";
-  if (choice === "commit") {
-    // Between capture and here the operator answered a prompt, which is long
-    // enough for another process to move the checkout. The changes stay in
-    // the tree and the caller must not start a run that could absorb them.
-    const drift = checkOrigin(projectDir, opts.origin);
-    if (drift) {
-      info(
-        `⚠ Refusing to commit pre-existing changes: ${drift}. ` +
-          `They remain in the working tree.`,
-      );
-      return "proceed";
-    }
-    try {
+  if (choice === "proceed") return "proceed";
+
+  // Leaving the changes where they are: honest when the operator was free to
+  // proceed anyway, wrong when the run was only allowed to start because they
+  // were going to be dealt with.
+  const leaveInPlace = (): PreRunCommitGateResult =>
+    allowProceed && !autonomousDirty ? "proceed" : "stop";
+
+  if (choice === "discard" && !(await confirmDiscard(dirty.length))) {
+    info("Discard cancelled — changes left in the working tree.");
+    return leaveInPlace();
+  }
+
+  // Between capture and here the operator answered a prompt, which is long
+  // enough for another process to move the checkout. The changes stay in the
+  // tree and the caller must not start a run that could absorb them.
+  const drift = checkOrigin(projectDir, opts.origin);
+  if (drift) {
+    info(
+      `⚠ Refusing to ${choice} pre-existing changes: ${drift}. ` +
+        `They remain in the working tree.`,
+    );
+    return leaveInPlace();
+  }
+
+  try {
+    if (choice === "commit") {
       await commit(projectDir, proposed);
       info("Committed pre-existing changes. Starting run…");
-    } catch (err) {
-      info(`⚠ Pre-run commit failed: ${(err as Error).message} — stopping before work starts.`);
-      return "stop";
+    } else if (choice === "stash") {
+      await stash(projectDir, proposed);
+      info("Stashed pre-existing changes (git stash pop to restore). Starting run…");
+    } else {
+      const snapshot = await discard(projectDir);
+      info(
+        snapshot
+          ? `Discarded pre-existing changes. Recoverable until git gc: git stash store ${snapshot}`
+          : "Discarded pre-existing changes.",
+      );
     }
+  } catch (err) {
+    info(
+      `⚠ Pre-run ${choice} failed: ${(err as Error).message} — stopping before work starts.`,
+    );
+    return "stop";
   }
   return "proceed";
 }
@@ -2128,6 +2674,26 @@ export async function updateCompletedTaskStatus(
 }
 
 /**
+ * What {@link performCommitPromptIfNeeded} did, so the caller knows whether the
+ * PRD completion record still needs a commit of its own.
+ *
+ * Only `declined` is a reason not to make one. A human who said no owns the
+ * working tree from that point, and landing PRD state they just refused to
+ * commit would take the decision back off them. Every other outcome leaves the
+ * record with no owner, which is the leak this type exists to close.
+ */
+export type CommitPromptOutcome =
+  /** autoCommit, or the run did not complete — the prompt never applied. */
+  | "not-applicable"
+  /** The prompt committed; the PRD paths rode along in that commit. */
+  | "committed"
+  /** A human declined at the prompt. Their tree, their call. */
+  | "declined"
+  /** The prompt bowed out: no message file, an empty one, an empty index, or
+   *  the watcher had already committed. Nothing of the PRD was committed. */
+  | "no-commit";
+
+/**
  * When the agent wrote a pending commit message, show it to the user and
  * prompt them to approve the commit. Runs `git commit -F <file>` on accept,
  * deletes the sentinel on both accept and decline.
@@ -2153,8 +2719,8 @@ export async function performCommitPromptIfNeeded(
   store?: PRDStore,
   taskId?: string,
   commitWatcher?: CommitMsgWatcher,
-): Promise<void> {
-  if (autoCommit || run.status !== "completed") return;
+): Promise<CommitPromptOutcome> {
+  if (autoCommit || run.status !== "completed") return "not-applicable";
 
   const { join } = await import("node:path");
   const { readFileSync, existsSync, unlinkSync } = await import("node:fs");
@@ -2165,20 +2731,20 @@ export async function performCommitPromptIfNeeded(
   // this point, the file may be gone. Check the watcher's flag to detect this case.
   if (commitWatcher?.didAutoCommit()) {
     detail("Auto-commit: timer-expiry auto-commit acknowledged — proceeding to next task.");
-    return;
+    return "no-commit";
   }
 
-  if (!existsSync(msgPath)) return;
+  if (!existsSync(msgPath)) return "no-commit";
 
   let message = "";
   try {
     message = readFileSync(msgPath, "utf-8").trim();
   } catch {
-    return;
+    return "no-commit";
   }
   if (!message) {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "no-commit";
   }
 
   // Reviewer repairs ride the same commit as the executor's work; the
@@ -2194,14 +2760,14 @@ export async function performCommitPromptIfNeeded(
       await withdrawCompletionClaim(store, run, run.error);
     }
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "no-commit";
   }
 
   const stagedCount = await countStagedFiles(projectDir);
   if (stagedCount === 0) {
     info("\nPending commit message found but no staged changes — skipping commit.");
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "no-commit";
   }
 
   subsection("Proposed Commit");
@@ -2221,7 +2787,7 @@ export async function performCommitPromptIfNeeded(
   if (!confirmed) {
     info(`Commit declined — ${stagedCount} file(s) left staged.`);
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "declined";
   }
 
   // Task completion criteria gate: verify code-classified tasks have code file changes.
@@ -2235,7 +2801,7 @@ export async function performCommitPromptIfNeeded(
       run.error = gateResult.reason;
       info(`\n${gateResult.reason}`);
       try { unlinkSync(msgPath); } catch { /* ignore */ }
-      return;
+      return "no-commit";
     }
   }
 
@@ -2284,7 +2850,7 @@ export async function performCommitPromptIfNeeded(
         info(`\n${run.error}`);
         await withdrawCompletionClaim(store, run, run.error);
         try { unlinkSync(msgPath); } catch { /* ignore */ }
-        return;
+        return "no-commit";
       }
     } catch (err) {
       // Best-effort: if PRD update fails, proceed with commit anyway
@@ -2455,6 +3021,10 @@ export async function performCommitPromptIfNeeded(
   } finally {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
   }
+
+  // Reached only by falling out of the commit block above: the commit ran,
+  // or it threw and the catch already marked the run failed.
+  return "committed";
 }
 
 // ---------------------------------------------------------------------------
@@ -2866,6 +3436,8 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   const { run, henchDir, projectDir, config, testCommand, heartbeat, memoryCtx, selfHeal, yes, autonomous, skipFullTestGate } = opts;
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
+  // Every spawn has closed; a leftover heartbeat-written pid would name a process that is gone.
+  delete run.vendorPid;
 
   // Every agent session is over by now, so whatever completion it asked for
   // is on the claim. Nothing is applied until the gates below have passed.
@@ -2888,7 +3460,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     try {
       const monitor = new SystemMemoryMonitor();
       const snap = await monitor.snapshot();
-      systemAvailableAtEndBytes = snap.availableBytes;
+      systemAvailableAtEndBytes = snap.availableBytes ?? -1;
     } catch {
       // Best-effort — leave as -1
     }
@@ -3058,6 +3630,18 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
           if (testGate.totalDurationMs != null) {
             detail(`Elapsed: ${formatDurationMs(testGate.totalDurationMs)}`);
           }
+          emitRunEvent("gate", `Test gate passed — ${packageCount} package(s)`, {
+            ok: true,
+            detail: testGate.command,
+            counts: {
+              packages: packageCount,
+              passed: passCount,
+              failed: 0,
+              ...(testGate.totalDurationMs != null
+                ? { durationMs: testGate.totalDurationMs }
+                : {}),
+            },
+          });
           gateComplete = true;
         } else {
           // Gate failed — prompt for action
@@ -3067,6 +3651,23 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             noPackagesParsed
               ? "✗ Test gate failed — no per-package results were parsed"
               : `✗ ${packageCount - passCount}/${packageCount} package(s) failed`,
+          );
+
+          emitRunEvent(
+            "gate",
+            noPackagesParsed
+              ? "Test gate failed — no per-package results were parsed"
+              : `Test gate failed — ${packageCount - passCount}/${packageCount} package(s)`,
+            {
+              ok: false,
+              detail: failedPackages.join(", ") || testGate.error,
+              counts: {
+                packages: packageCount,
+                passed: passCount,
+                failed: packageCount - passCount,
+                attempt: testGateAttempt,
+              },
+            },
           );
 
           // Show failure details from first failed package
@@ -3081,6 +3682,10 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
           if (action === "rerun") {
             // Loop will retry
             detail("Retrying test gate...");
+            emitRunEvent("retry", "Re-running the test gate", {
+              detail: "operator chose rerun",
+              counts: { attempt: testGateAttempt },
+            });
           } else if (action === "skip") {
             // User chose to skip gate and continue to commit
             testGateSkipped = true;
@@ -3197,11 +3802,45 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   //   changed (diffDirtyState in cli-loop.ts), so it covers files the agent
   //   created and the reviewer then edited. In that run the repairs were the
   //   whole feature, and the refusal named only the manifests.
+  //   When no commit follows at all, commitOrphanedReviewRepairs gets one
+  //   bounded chance to land them itself first (#483) — an executor that
+  //   committed for itself leaves correct work that nothing else will claim.
   // - The staged index, only when the commit prompt will really run — which
   //   takes a non-empty .hench-commit-msg.txt, not just `!autoCommit`. Staged
   //   work with no message file is the #363 leak wearing an `A ` prefix.
   //
   // Anything else is finished work with no owner.
+  // Stage the run's own work before the gate inspects the tree.
+  //
+  // Order matters and is the whole point. The gate's job is to refuse a
+  // completion claim while finished work sits uncommitted; it is not to
+  // punish the agent for an incomplete `git add`. Staging first means the
+  // gate sees the run's work as staged — so it passes, and the commit below
+  // carries all of it — while anything that is *not* the run's work (the
+  // operator's pre-existing edits, which `stageRunWork` excludes by
+  // baseline) is still dirty and still refused, exactly as before.
+  //
+  // Only on the commit-prompt path: with autoCommit the agent has already
+  // committed, and staging more here would hand the next commit files the
+  // executor deliberately left out.
+  if (run.status === "completed" && opts.autoCommit !== true) {
+    const staged = await stageRunWork(projectDir, opts.baselineDirty);
+    if (staged.error) {
+      // Not fatal on its own. The gate below is about to look at the same
+      // tree and will refuse if this failure actually left work behind, with
+      // a message that names the paths — which beats failing here with a git
+      // error and no list.
+      detail(`Warning: could not stage the run's work: ${staged.error.message}`);
+      if (run.diagnostics) {
+        run.diagnostics.notes.push(`stage_run_work_failed: ${staged.error.message}`);
+      }
+    } else if (staged.staged.length > 0) {
+      detail(
+        `Staged ${staged.staged.length} file(s) the run changed but the agent had not staged`,
+      );
+    }
+  }
+
   let uncommittedWorkRefused = false;
   if (run.status === "completed") {
     const autoCommit = opts.autoCommit === true;
@@ -3209,6 +3848,17 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     const review = run.review;
     const repairs = review && review.failed === undefined ? review.repairedFiles ?? [] : [];
     const pendingRepairs = autoCommit || commitPromptFollows ? repairs : [];
+
+    // Neither path above owns the repairs: autoCommit is off, so
+    // commitReviewRepairsIfNeeded is not called downstream, and no message file
+    // means no commit prompt to sweep them in. Commit them here when it is safe
+    // to — otherwise this is a no-op and the gate below refuses as it always
+    // did (GitHub #483).
+    const repairCommitError =
+      !autoCommit && !commitPromptFollows
+        ? await commitOrphanedReviewRepairs(projectDir, run, repairs)
+        : undefined;
+
     const leaked = await findUncommittedWork({
       projectDir,
       stagedCommitFollows: commitPromptFollows,
@@ -3218,11 +3868,16 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       uncommittedWorkRefused = true;
       run.status = "failed";
       const leakedDeleted = deletedAmong(projectDir, leaked.paths);
-      run.error = formatUncommittedWorkRefusal(
-        leaked.paths,
-        leakedDeleted,
-        await prepareRecoveryPathspecs(projectDir, leaked.paths, leakedDeleted),
-      );
+      const pathspecs = await prepareRecoveryPathspecs(projectDir, leaked.paths, leakedDeleted);
+      run.error = repairCommitError
+        ? formatReviewRepairsUncommittedRefusal(
+            leaked.paths,
+            repairCommitError.message,
+            run.taskId,
+            leakedDeleted,
+            pathspecs,
+          )
+        : formatUncommittedWorkRefusal(leaked.paths, leakedDeleted, pathspecs);
       info(`\n${run.error}`);
       if (opts.store) {
         await withdrawCompletionClaim(opts.store, run, run.error);
@@ -3289,7 +3944,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // staged alongside code changes and included in the same commit.
   // The commitWatcher is checked to detect if the timer-expiry auto-commit
   // already fired and committed changes.
-  await performCommitPromptIfNeeded(
+  const commitPrompt = await performCommitPromptIfNeeded(
     run,
     projectDir,
     opts.autoCommit === true,
@@ -3300,13 +3955,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     opts.commitWatcher,
   );
 
-  // On the autoCommit path performCommitPromptIfNeeded is a no-op, so the
-  // completion metadata written by updateCompletedTaskStatus would otherwise
-  // be left uncommitted. Commit it now in a small dedicated second commit.
-  // Review repairs go first: the executor committed its own work before the
-  // review pass ran and the reviewer is barred from committing, so without
-  // this commit its must-fix repairs would be orphaned in the working tree
-  // and swept into whatever commit happens next.
+  // Review repairs: only the autoCommit path needs them swept here. The
+  // executor committed its own work before the review pass ran and the
+  // reviewer is barred from committing, so without this commit its must-fix
+  // repairs would be orphaned in the working tree and swept into whatever
+  // commit happens next. On the prompt path `stageReviewRepairs` already put
+  // them in that commit, and when neither owns them
+  // `commitOrphanedReviewRepairs` ran back at the gate (#483).
   if (opts.autoCommit === true && run.status === "completed" && run.taskId) {
     try {
       await commitReviewRepairsIfNeeded(projectDir, run);
@@ -3320,6 +3975,33 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       }
     }
 
+  }
+
+  // The PRD completion record gets a commit of its own on EVERY path that
+  // would otherwise leave it uncommitted — not just autoCommit, which was
+  // the whole of what this used to cover.
+  //
+  // `updateCompletedTaskStatus` writes the tree a few lines above, and on
+  // the prompt path the commit-attribution write lands *after* the commit it
+  // records. Either way the tree is dirty once the task is done. The
+  // autoCommit path had this second commit; the prompt path only ever got
+  // one by reaching its own `git commit`, and it bows out before that
+  // whenever the executor already committed for itself — no message file, an
+  // empty one, an empty index, or the watcher having fired first. All four
+  // are ordinary endings for a task where the agent commits as it goes, and
+  // every one of them left `prd_tree/` dirty with the task marked completed.
+  // The next autonomous run's pre-run gate then refused to start over a
+  // write hench had made itself: the task was done and the queue was stuck
+  // behind it.
+  //
+  // `declined` is the one exception. A human who said no at the prompt owns
+  // the working tree from that point, and landing PRD state they just
+  // refused to commit would take the decision back off them.
+  //
+  // Safe after a prompt that *did* commit: those PRD paths rode in that
+  // commit, so there is nothing left to stage — except the attribution
+  // write, which is exactly what this should pick up.
+  if (run.taskId && commitPrompt !== "declined") {
     if (run.status === "completed") {
       // Drained here, at the commit point, so the pathspec covers every PRD
       // save this run made since the last commit — not just the last one.
@@ -3420,6 +4102,22 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // takes, minus hench's own runtime artifacts.
   run.uncommittedPaths = (await findUncommittedWork({ projectDir })).paths;
 
+  // The commit gate's verdict, emitted from the one place that sees every
+  // commit regardless of which path made it. "Passed" means the run left
+  // nothing behind: work that is committed is work the next run can build on,
+  // and a dirty tree is the failure this gate exists to surface.
+  emitRunEvent(
+    "gate",
+    run.uncommittedPaths.length === 0
+      ? `Commit gate passed — ${run.commits.length} commit(s)`
+      : `Commit gate: ${run.uncommittedPaths.length} path(s) left uncommitted`,
+    {
+      ok: run.uncommittedPaths.length === 0,
+      detail: run.commits.map((c) => c.sha.slice(0, 8)).join(", ") || undefined,
+      counts: { commits: run.commits.length, uncommitted: run.uncommittedPaths.length },
+    },
+  );
+
   // A held completion is applied only by a run that ends completed. Applied
   // and then withdrawn (a later commit step failed) counts as not applied.
   if (completionHold) {
@@ -3434,15 +4132,23 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   run.lastActivityAt = run.finishedAt;
   await saveRun(henchDir, run);
 
-  // Persist full run output to .run-logs/ at the project root.
-  // Best-effort: a log write failure must not crash the run.
-  const logLines = getCapturedLines();
-  try {
-    const logPath = await persistRunLog(projectDir, run.id, run.startedAt, logLines);
-    info(`\nRun log: ${logPath}`);
-  } catch {
-    // Swallow — log persistence is optional; the run result stands.
-  }
+  // The last event, before the stream is closed below. A reader tailing the
+  // file learns the run is over from this line rather than from the file
+  // simply stopping — which is indistinguishable from a crash.
+  emitRunEvent("run_finished", `Run ${run.status}`, {
+    ok: run.status === "completed",
+    detail: run.error,
+    counts: {
+      turns: run.turns,
+      durationMs: new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime(),
+    },
+  });
+  await closeActiveRunEvents();
+
+  // Close the run log under .run-logs/ at the project root. The file has been
+  // growing line by line since initRunRecord; this flushes the tail of it.
+  const logPath = await endRunLog(projectDir, run);
+  if (logPath) info(`\nRun log: ${logPath}`);
   resetCapturedLines();
 }
 

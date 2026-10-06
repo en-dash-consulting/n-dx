@@ -8,8 +8,10 @@
  * (performPreRunCommitGateIfNeeded, packages/hench) refuses to start against
  * a dirty tree, and the dashboard had no visibility into that at all — a
  * blocked run looked like an opaque failure. Deliberately narrow: stage-all
- * + commit only, no partial staging, branch switching, or conflict
- * resolution — see routes-git.ts for the full rationale.
+ * + commit, discard-all, and per-file "Ignore" for untracked paths (build
+ * output and scratch files are the usual reason the gate trips) — no
+ * partial staging, branch switching, or conflict resolution. See
+ * routes-git.ts for the full rationale.
  */
 
 import { h, Fragment } from "preact";
@@ -56,10 +58,12 @@ function DiffView({ diff }: { diff: string }) {
   );
 }
 
-function FileRow({ file }: { file: GitStatusFile }) {
+function FileRow({ file, onIgnored }: { file: GitStatusFile; onIgnored: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [result, setResult] = useState<DiffResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [ignoring, setIgnoring] = useState(false);
+  const [ignoreError, setIgnoreError] = useState<string | null>(null);
 
   const toggle = useCallback(async () => {
     setExpanded((v) => !v);
@@ -76,13 +80,47 @@ function FileRow({ file }: { file: GitStatusFile }) {
     }
   }, [file.path, result, loading]);
 
+  // Only offered for untracked paths: .gitignore has no effect on a file
+  // git already tracks, so the button would be a no-op everywhere else.
+  const handleIgnore = useCallback(async (e: Event) => {
+    e.stopPropagation();
+    setIgnoring(true);
+    setIgnoreError(null);
+    try {
+      const res = await fetch("/api/git/ignore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: file.path }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      onIgnored();
+    } catch (err) {
+      setIgnoreError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIgnoring(false);
+    }
+  }, [file.path, onIgnored]);
+
   return h(Fragment, null,
     h("li", { class: `git-file-row git-file-${file.status}` },
       h("button", { class: "git-file-toggle", type: "button", onClick: toggle },
         h("span", { class: "git-file-code", "aria-hidden": "true" }, STATUS_LABEL[file.status]),
         h("span", { class: "git-file-path" }, file.path),
       ),
+      file.status === "untracked"
+        ? h("button", {
+            class: "git-file-ignore-btn",
+            type: "button",
+            disabled: ignoring,
+            title: `Add ${file.path} to .gitignore`,
+            onClick: handleIgnore,
+          }, ignoring ? "Ignoring…" : "Ignore")
+        : null,
     ),
+    ignoreError
+      ? h("li", { class: "git-file-ignore-error", role: "alert" }, ignoreError)
+      : null,
     expanded
       ? h("li", { class: "git-file-diff-container" },
           loading
@@ -109,8 +147,8 @@ function FileRow({ file }: { file: GitStatusFile }) {
 }
 
 function GitStatusPanel({
-  status, onCommitted, onClose,
-}: { status: GitStatus; onCommitted: () => void; onClose: () => void }) {
+  status, onCommitted, onRefresh, onClose,
+}: { status: GitStatus; onCommitted: () => void; onRefresh: () => void; onClose: () => void }) {
   const [message, setMessage] = useState("");
   const [committing, setCommitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -171,7 +209,7 @@ function GitStatusPanel({
       "Autonomous runs (Start Working, self-heal, etc.) refuse to start against a dirty tree. Commit here, or from a terminal.",
     ),
     h("ul", { class: "git-file-list" },
-      status.files.map((f) => h(FileRow, { key: f.path, file: f })),
+      status.files.map((f) => h(FileRow, { key: f.path, file: f, onIgnored: onRefresh })),
     ),
 
     confirmingDiscard
@@ -245,6 +283,9 @@ export function GitStatusBanner({ status, onCommitted }: GitStatusBannerProps) {
       : h(GitStatusPanel, {
           status,
           onCommitted: () => { setExpanded(false); onCommitted(); },
+          // Ignoring a file refreshes the list in place — the panel stays
+          // open because the usual next move is to ignore another one.
+          onRefresh: onCommitted,
           onClose: () => setExpanded(false),
         }),
   );

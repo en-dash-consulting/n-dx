@@ -1,10 +1,11 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { execFileSync } from "node:child_process";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtemp, cp, rm } from "node:fs/promises";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { validate, InventorySchema, ImportsSchema, ClassificationsSchema, ZonesSchema, ComponentsSchema } from "../../src/schema/validate.js";
+import { readAnalyzeProgress } from "../../src/analyzers/analyze-progress.js";
 
 const validateInventory = (data: unknown) => validate(InventorySchema, data);
 const validateImports = (data: unknown) => validate(ImportsSchema, data);
@@ -60,6 +61,94 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
 
     const components = JSON.parse(readFileSync(join(svDir, "components.json"), "utf-8"));
     expect(validateComponents(components).ok).toBe(true);
+  });
+
+  it("publishes progress while it runs and leaves it finished, with the previous same-mode run attached", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
+    await cp(FIXTURE_DIR, tmpDir, { recursive: true });
+    const svDir = join(tmpDir, ".sourcevision");
+    const run = () => execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], { encoding: "utf-8", timeout: 30000 });
+
+    run();
+    const first = readAnalyzeProgress(svDir)!;
+    expect(first).toMatchObject({ status: "complete", running: false, stale: false, mode: "fast", phase: null, pass: null, batch: null });
+    expect(first.pid).not.toBe(process.pid);
+    expect(first.endedAt).toBeDefined();
+    expect(first.phases.map((p) => [p.index, p.name])).toEqual([
+      [1, "inventory"], [2, "imports"], [3, "classifications"], [4, "zones"], [5, "components"], [6, "callgraph"],
+    ]);
+    for (const p of first.phases.slice(0, 5)) expect(p).toMatchObject({ outcome: "ok" });
+    expect(first.previous).toBeNull();
+
+    run();
+    const second = readAnalyzeProgress(svDir)!;
+    expect(second.startedAt > first.startedAt).toBe(true);
+    // The first run's own history line, not the second's.
+    expect(second.previous?.at).toBeDefined();
+    expect(Date.parse(second.previous!.at)).toBeLessThan(Date.parse(second.startedAt));
+    expect(Object.keys(second.previous!.phases)).toEqual(
+      expect.arrayContaining(["inventory", "imports", "classifications", "zones", "components"]),
+    );
+  });
+
+  // Windows has no POSIX signals: `child.kill("SIGTERM")` terminates the process
+  // outright (TerminateProcess), so no handler runs and "Stopped (SIGTERM)" is never
+  // recorded. The win32 case below covers what is left behind instead.
+  it.skipIf(process.platform === "win32")("records a SIGTERM as a stop: progress failed, manifest phase in error, exit 143", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
+    await cp(FIXTURE_DIR, tmpDir, { recursive: true });
+    const svDir = join(tmpDir, ".sourcevision");
+
+    const child = spawn(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], { stdio: "ignore" });
+    const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit) => {
+      child.once("exit", (code, signal) => resolveExit({ code, signal }));
+    });
+    try {
+      // The handlers are installed right after the progress file is created.
+      await vi.waitFor(() => expect(readAnalyzeProgress(svDir)?.status).toBe("running"), {
+        timeout: 20_000,
+        interval: 5,
+      });
+      child.kill("SIGTERM");
+    } catch (error) {
+      child.kill("SIGKILL");
+      throw error;
+    }
+
+    // 128 + SIGTERM(15); a run that finished before the signal would exit 0.
+    expect(await exited).toEqual({ code: 143, signal: null });
+
+    const progress = readAnalyzeProgress(svDir)!;
+    expect(progress).toMatchObject({ status: "failed", running: false });
+    expect(progress.error).toBe("Stopped (SIGTERM)");
+
+    const manifest = JSON.parse(readFileSync(join(svDir, "manifest.json"), "utf-8"));
+    const stopped = Object.values<{ status?: string; error?: string }>(manifest.modules ?? {})
+      .filter((m) => m.status === "error");
+    expect(stopped.map((m) => m.error)).toContain("Stopped (SIGTERM)");
+  });
+
+  it.runIf(process.platform === "win32")("reports the running file a terminated analyze left behind as interrupted", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
+    await cp(FIXTURE_DIR, tmpDir, { recursive: true });
+    const svDir = join(tmpDir, ".sourcevision");
+
+    const child = spawn(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], { stdio: "ignore" });
+    const exited = new Promise<void>((resolveExit) => child.once("exit", () => resolveExit()));
+    try {
+      await vi.waitFor(() => expect(readAnalyzeProgress(svDir)?.status).toBe("running"), {
+        timeout: 20_000,
+        interval: 5,
+      });
+    } finally {
+      child.kill("SIGTERM");
+    }
+    await exited;
+
+    const progress = readAnalyzeProgress(svDir)!;
+    // The run may have finished before the kill landed; otherwise its pid is dead.
+    expect(["interrupted", "complete"]).toContain(progress.status);
+    expect(progress.running).toBe(false);
   });
 
   it("produces deterministic output", async () => {

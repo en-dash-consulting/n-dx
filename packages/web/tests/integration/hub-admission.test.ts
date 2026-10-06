@@ -24,14 +24,26 @@ interface FakeChild {
   /** Executions the child reports as in flight. */
   running: Set<string>;
   /** Execute requests that actually arrived, in order. */
-  received: Array<{ taskId: string; workspace: string | null }>;
+  received: Array<{ taskId: string; workspace: string | null; options?: Record<string, unknown> }>;
+  /** The admission header on each `GET /api/live` that arrived. */
+  liveAdmission: Array<string | null>;
+  /** Tasks this server refuses, on execute and on check alike — as a real one would. */
+  refuse: Map<string, { status: number; error: string }>;
+  /** False plays a server from before `POST /api/hench/execute/check` existed. */
+  hasCheckRoute: boolean;
+  /** Check requests that arrived. */
+  checks: string[];
 }
 
 async function startFakeChild(dir: string): Promise<FakeChild> {
-  const child: Partial<FakeChild> & { running: Set<string>; received: FakeChild["received"] } = {
+  const child: Partial<FakeChild> & Pick<FakeChild, "running" | "received" | "liveAdmission" | "refuse" | "hasCheckRoute" | "checks"> = {
     dir,
     running: new Set<string>(),
     received: [],
+    liveAdmission: [],
+    refuse: new Map(),
+    hasCheckRoute: true,
+    checks: [],
   };
 
   const server = createServer((req, res) => {
@@ -52,6 +64,12 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
         hench: { activeRuns: child.running.size },
       });
     }
+    // A real project server strips the `/w/<key>` slot itself; the hub forwards it.
+    if (url.endsWith("/api/live") || /\/api\/hench\/prep\/[^/]+$/.test(url)) {
+      const header = req.headers["x-ndx-hub-admission"];
+      child.liveAdmission.push((Array.isArray(header) ? header[0] : header) ?? null);
+      return json(200, {});
+    }
     if (url === "/api/git/status") {
       return json(200, { isRepo: true, branch: "main", dirty: false, files: [] });
     }
@@ -60,13 +78,41 @@ async function startFakeChild(dir: string): Promise<FakeChild> {
         executions: [...child.running].map((taskId) => ({ taskId, status: "running" })),
       });
     }
-    if (url === "/api/hench/execute" && req.method === "POST") {
+    if (url === "/api/hench/execute/check" && req.method === "POST" && child.hasCheckRoute) {
       let body = "";
       req.on("data", (c) => { body += c; });
       req.on("end", () => {
         const taskId = (JSON.parse(body || "{}") as { taskId?: string }).taskId ?? "";
+        child.checks.push(taskId);
+        const refusal = child.refuse.get(taskId);
+        json(200, refusal ? { ok: false, status: refusal.status, error: refusal.error, taskId } : { ok: true });
+      });
+      return;
+    }
+    if (url === "/api/hench/execute" && req.method === "POST") {
+      let body = "";
+      req.on("data", (c) => { body += c; });
+      req.on("end", () => {
+        const parsed = JSON.parse(body || "{}") as {
+          taskId?: string;
+          options?: Record<string, unknown>;
+          mode?: string;
+          iterations?: number;
+        };
+        const taskId = parsed.taskId ?? "";
+        const refusal = child.refuse.get(taskId);
+        if (refusal) {
+          json(refusal.status, { error: refusal.error, taskId });
+          return;
+        }
         const header = req.headers["x-ndx-workspace"];
-        child.received.push({ taskId, workspace: (Array.isArray(header) ? header[0] : header) ?? null });
+        child.received.push({
+          taskId,
+          workspace: (Array.isArray(header) ? header[0] : header) ?? null,
+          ...(parsed.options ? { options: parsed.options } : {}),
+          ...(parsed.mode ? { mode: parsed.mode } : {}),
+          ...(parsed.iterations !== undefined ? { iterations: parsed.iterations } : {}),
+        });
         child.running.add(taskId);
         json(200, { runId: `run-${taskId}`, taskId });
       });
@@ -105,7 +151,8 @@ describe("hub admission gate", () => {
   let alpha: FakeChild;
   let beta: FakeChild;
   let hub: HubHandle | null = null;
-  let freeMemory = 8 * 1024 * 1024 * 1024;
+  /** The gate's available-memory reading; null is a machine that could not be read. */
+  let freeMemory: number | null = 8 * 1024 * 1024 * 1024;
 
   beforeEach(async () => {
     home = mkdtempSync(join(tmpdir(), "hub-admission-"));
@@ -132,24 +179,277 @@ describe("hub admission gate", () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  async function startTestHub(maxSessions = 1): Promise<HubHandle> {
+  async function startTestHub(maxSessions = 1, memoryFloorBytes = 1_000): Promise<HubHandle> {
     hub = await startHub({
       port: 0,
       homeDir: home,
       healthIntervalMs: 60_000,
-      limits: { maxSessions, memoryFloorBytes: 1_000 },
+      limits: { maxSessions, memoryFloorBytes },
       freeMemory: () => freeMemory,
       drainIntervalMs: 50,
     });
     return hub;
   }
 
-  const execute = (port: number, path: string, taskId: string, headers: Record<string, string> = {}) =>
+  const execute = (
+    port: number,
+    path: string,
+    taskId: string,
+    headers: Record<string, string> = {},
+    options?: Record<string, unknown>,
+    /** Top-level fields beside `options` — today the run mode and its count. */
+    extra: Record<string, unknown> = {},
+  ) =>
     fetch(`http://127.0.0.1:${port}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({ taskId, ...(options ? { options } : {}), ...extra }),
     });
+
+  it("replays a queued run's options when it is admitted", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    const options = { model: "claude-opus-5", review: true, maxTurns: 12, contextNotes: "Keep it small." };
+    const queued = await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, options);
+    expect(queued.status).toBe(202);
+    const body = await queued.json();
+    expect(Object.keys(body)).toEqual(expect.arrayContaining(["queued", "position", "reason"]));
+    // The server's own 202 echoes the options it accepted; so does the queued one.
+    expect(body.options).toEqual(options);
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, options });
+  });
+
+  it("replays a queued run's mode, so a loop does not come back as one task", async () => {
+    // The entry is what gets replayed, not the original request — the client
+    // that sent it got its 202 and is gone. A mode that did not survive the
+    // queue would start a single task under a 202 that said "until done".
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    const queued = await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { mode: "loop" });
+    expect(queued.status).toBe(202);
+    expect(await queued.json()).toMatchObject({ queued: true, mode: "loop" });
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, mode: "loop" });
+  });
+
+  it("replays an iterations count with its mode", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, { model: "claude-opus-5" },
+      { mode: "iterations", iterations: 4 },
+    );
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({
+      taskId: "task-2",
+      workspace: null,
+      options: { model: "claude-opus-5" },
+      mode: "iterations",
+      iterations: 4,
+    });
+  });
+
+  it("drains a re-asked task with the mode of the latest ask", async () => {
+    // The queue replaces a duplicate entry field by field. A mode left out of
+    // that replacement meant the 202 said "until done" and the run, a minute
+    // later, did one task.
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2");
+    const again = await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { mode: "loop" },
+    );
+    expect(await again.json()).toMatchObject({ queued: true, position: 1, queueLength: 1, mode: "loop" });
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, mode: "loop" });
+  });
+
+  it("drains a re-asked task with the newer iterations count", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined,
+      { mode: "iterations", iterations: 3 },
+    );
+    await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined,
+      { mode: "iterations", iterations: 9 },
+    );
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({
+      taskId: "task-2", workspace: null, mode: "iterations", iterations: 9,
+    });
+  });
+
+  it("drops the mode when the re-ask goes back to one task", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { mode: "loop" });
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2");
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null });
+  });
+
+  it("forwards an unrecognised mode instead of queuing it as one task", async () => {
+    // Judged by the same validator the execute route uses, so a busy machine
+    // and an idle one answer a misspelled mode the same way. Queuing it would
+    // turn the route's 400 into a run that starts and does less than it said.
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    const res = await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { mode: "looop" },
+    );
+    expect(res.status).not.toBe(202);
+
+    // Forwarded to its project server, not held in the queue.
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toMatchObject({ taskId: "task-2", mode: "looop" });
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue.entries).toEqual([]);
+  });
+
+  it("sends a single run with no mode at all, as it always did", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined, { mode: "single" });
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null });
+  });
+
+  it("forwards a count its mode cannot accept rather than queuing it", async () => {
+    // Same rule as a rejected option: queuing it would turn the project
+    // server's 400 into a run silently dropped when its turn came.
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    const res = await execute(
+      h.port, "/p/beta/api/hench/execute", "task-2", {}, undefined,
+      { mode: "iterations", iterations: 0 },
+    );
+    // Forwarded, not queued: the project server answers for its own request.
+    expect(res.status).not.toBe(202);
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toMatchObject({ taskId: "task-2", mode: "iterations", iterations: 0 });
+  });
+
+  it("never serves contextNotes text from the queue, scoped or not", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    const secret = "private notes for beta's agent";
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { model: "claude-opus-5", contextNotes: secret });
+
+    for (const path of ["/api/hub/queue", "/p/beta/api/hub/queue", "/p/alpha/api/hub/queue"]) {
+      const text = await (await fetch(`http://127.0.0.1:${h.port}${path}`)).text();
+      expect(text).not.toContain(secret);
+      expect(text).not.toContain("contextNotes");
+    }
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue.entries[0]).toMatchObject({
+      taskId: "task-2",
+      options: { model: "claude-opus-5" },
+      hasNotes: true,
+    });
+  });
+
+  it("takes the newer options when a queued task is asked for again, keeping its place", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { fresh: true });
+    await execute(h.port, "/p/beta/api/hench/execute", "task-3");
+
+    const again = await (await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { maxTurns: 7 })).json();
+    expect(again).toMatchObject({ queued: true, position: 1, queueLength: 2 });
+
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received[0]).toEqual({ taskId: "task-2", workspace: null, options: { maxTurns: 7 } });
+  });
+
+  it("answers the project server's refusal at enqueue time instead of 202 queued", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    // Shape-valid options the server refuses — a model gone from its catalog.
+    const error = 'Run option "model": Model "claude-live-only" is not in the claude catalog.';
+    beta.refuse.set("task-2", { status: 400, error });
+    const res = await execute(h.port, "/p/beta/w/feature/api/hench/execute", "task-2", {}, { model: "claude-live-only" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error, taskId: "task-2" });
+    expect(beta.checks).toEqual(["task-2"]);
+
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue.entries).toEqual([]);
+
+    // Nothing was queued: the next run queued behind it is the first to arrive.
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-3")).status).toBe(202);
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect(beta.received.map((r) => r.taskId)).toEqual(["task-3"]);
+  });
+
+  it("shows a queued entry its server refused at replay as dropped, with the server's status and reason", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { fresh: true })).status).toBe(202);
+
+    // The task became blocked while it waited.
+    const error = 'Task is blocked by "Other" (t-9, pending). Finish or unblock it first.';
+    beta.refuse.set("task-2", { status: 409, error });
+    alpha.running.delete("task-1");
+
+    const queueUrl = `http://127.0.0.1:${h.port}/p/beta/api/hub/queue`;
+    await waitFor(async () => ((await (await fetch(queueUrl)).json()).dropped ?? []).length === 1, 4_000);
+    const queue = await (await fetch(queueUrl)).json();
+    expect(queue.entries).toEqual([]);
+    expect(queue.dropped).toEqual([
+      expect.objectContaining({ projectId: "beta", taskId: "task-2", options: { fresh: true }, status: 409, error }),
+    ]);
+    // Narrowed like entries: another project's viewer does not see it.
+    const alphaQueue = await (await fetch(`http://127.0.0.1:${h.port}/p/alpha/api/hub/queue`)).json();
+    expect(alphaQueue.dropped).toEqual([]);
+  });
+
+  it("queues as before behind a server that has no check route", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    beta.hasCheckRoute = false;
+
+    // A 404 from the check is no verdict — and is never taken as a start.
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-2")).status).toBe(202);
+    expect(beta.received).toEqual([]);
+  });
+
+  it("forwards options it cannot accept to the project server rather than queuing them", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+
+    // The project server owns the 400; queuing would drop the run silently later.
+    const res = await execute(h.port, "/p/beta/api/hench/execute", "task-2", {}, { bogus: "--x" });
+    expect(res.status).toBe(200);
+    expect(beta.received).toEqual([{ taskId: "task-2", workspace: null, options: { bogus: "--x" } }]);
+  });
 
   it("forwards the first run and queues the second, across projects", async () => {
     const h = await startTestHub(1);
@@ -223,6 +523,33 @@ describe("hub admission gate", () => {
     freeMemory = 8 * 1024 * 1024 * 1024;
     await waitFor(() => alpha.received.length === 1, 4_000);
     expect(alpha.received[0].taskId).toBe("task-1");
+  });
+
+  it("starts the run on an idle Mac, where os.freemem() would have queued it", async () => {
+    // 16 GB Mac: 115 MB free pages, 3.9 GB available once inactive, speculative
+    // and purgeable pages are counted. Against a 2 GB floor the old reading
+    // queued every dashboard run; the shared one admits.
+    const GIB = 1024 ** 3;
+    const h = await startTestHub(4, 2 * GIB);
+    freeMemory = Math.round(3.9 * GIB);
+
+    const res = await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect(res.status).toBe(200);
+    expect(alpha.received.map((r) => r.taskId)).toEqual(["task-1"]);
+
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue).toMatchObject({ memoryPaused: false, availableBytes: Math.round(3.9 * GIB) });
+  });
+
+  it("admits when the machine cannot be read at all, and reports no pause", async () => {
+    const h = await startTestHub(4, 2 * 1024 ** 3);
+    freeMemory = null;
+
+    const res = await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect(res.status).toBe(200);
+
+    const queue = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(queue).toMatchObject({ memoryPaused: false, freeMemoryBytes: null, pressure: "unknown" });
   });
 
   it("does not queue the same task twice when the button is clicked again", async () => {
@@ -331,6 +658,27 @@ describe("hub admission gate", () => {
     expect((await res.json()).error).toContain("nope");
   });
 
+  it("states its admission state on a proxied GET /api/live, and drops a client's copy", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-2")).status).toBe(202);
+
+    const spoofed = JSON.stringify({ running: 0, maxSessions: 99, queued: 0 });
+    await fetch(`http://127.0.0.1:${h.port}/p/beta/w/feature/api/live`, { headers: { "x-ndx-hub-admission": spoofed } });
+    expect(beta.liveAdmission).toEqual([
+      JSON.stringify({ running: 1, maxSessions: 1, queued: 1, availableBytes: 8 * 1024 ** 3, pressure: "normal", memoryPaused: false }),
+    ]);
+  });
+
+  it("states it on a proxied prep read too, including that memory is what holds runs back", async () => {
+    const h = await startTestHub(4);
+    freeMemory = 500;
+    await fetch(`http://127.0.0.1:${h.port}/p/beta/api/hench/prep/task-1`);
+    expect(beta.liveAdmission).toEqual([
+      JSON.stringify({ running: 0, maxSessions: 4, queued: 0, availableBytes: 500, pressure: "critical", memoryPaused: true }),
+    ]);
+  });
+
   it("reports its limits and what is running on the queue endpoint", async () => {
     const h = await startTestHub(2);
     await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
@@ -346,10 +694,10 @@ describe("hub admission gate", () => {
 });
 
 /** Poll until `predicate` holds, or fail the test with a timeout. */
-async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
+async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (predicate()) return;
+    if (await predicate()) return;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   throw new Error(`condition not met within ${timeoutMs}ms`);

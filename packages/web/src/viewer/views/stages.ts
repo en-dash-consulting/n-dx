@@ -50,6 +50,12 @@ export interface StageSection {
   /** Expanded when the stage page first opens. */
   open?: boolean;
   /**
+   * Always starts collapsed, ignoring the remembered open state — for a
+   * section whose content the page already leads with (Terrain, now that the
+   * Overview opens on the isometric map). It still opens on click.
+   */
+  collapsedOnLoad?: boolean;
+  /**
    * The stage's lead section, shown in the page itself with no dropdown
    * header: always rendered, never collapsible. One per stage, first.
    */
@@ -102,6 +108,7 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "overview", plain: true },
       {
         view: "graph",
+        collapsedOnLoad: true,
         tabs: [
           { view: "iso-map", hiddenWhenDeployed: true },
           { view: "zones" },
@@ -177,6 +184,20 @@ const SETTINGS_VIEWS: ReadonlySet<ViewId> = new Set(SETTINGS_ENTRIES.map((e) => 
 /** True for views that open in the settings overlay rather than the page. */
 export function isSettingsView(view: ViewId): boolean {
   return SETTINGS_VIEWS.has(view);
+}
+
+// ── Live ───────────────────────────────────────────────────────
+
+/**
+ * The views under the Live tab. Live is not a stage: it sits after the stage
+ * tabs, outside the Analysis → Plan → Work loop, so it is absent from
+ * `STAGE_ORDER` and the prev/next stage links never reach it.
+ */
+export const LIVE_VIEWS: readonly ViewId[] = ["live", "live-task", "live-analyze"];
+
+/** True for the Live overview and every page under it — the views that light the Live tab. */
+export function isLiveView(view: ViewId): boolean {
+  return LIVE_VIEWS.includes(view);
 }
 
 // ── Lookups ────────────────────────────────────────────────────

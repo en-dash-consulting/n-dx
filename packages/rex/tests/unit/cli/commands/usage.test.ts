@@ -321,7 +321,7 @@ describe("cmdUsage", () => {
 
   describe("cost estimation", () => {
     it("estimates cost using default Sonnet pricing", async () => {
-      // Sonnet: $3/1M input, $15/1M output
+      // Sonnet 5.5: $2/1M input, $10/1M output
       writeHenchRun(tmp, "run-1", {
         startedAt: "2026-01-16T10:00:00.000Z",
         status: "completed",
@@ -333,8 +333,8 @@ describe("cmdUsage", () => {
       const out = output();
       const parsed = JSON.parse(out);
 
-      // $3 input + $15 output = $18
-      expect(parsed.estimatedCost.total).toBe("$18.00");
+      // $2 input + $10 output = $12
+      expect(parsed.estimatedCost.total).toBe("$12.00");
     });
 
     it("shows zero cost when no tokens", async () => {
@@ -497,7 +497,7 @@ describe("cmdUsage", () => {
       const parsed = JSON.parse(out);
 
       expect(parsed.periods[0].estimatedCost).toBeDefined();
-      expect(parsed.periods[0].estimatedCost.total).toBe("$18.00");
+      expect(parsed.periods[0].estimatedCost.total).toBe("$12.00");
     });
 
     it("omits periods from JSON when no --group specified", async () => {
@@ -579,9 +579,9 @@ describe("cmdUsage", () => {
     it("shows cost budget warning", async () => {
       writeConfig(tmp, {
         ...MINIMAL_CONFIG,
-        budget: { cost: 20, warnAt: 80 },
+        budget: { cost: 12.5, warnAt: 80 },
       });
-      // 1M input + 1M output @ Sonnet pricing = $18 → 90% of $20
+      // 1M input + 1M output @ Sonnet 5.5 pricing = $12 → 96% of $12.50
       writeHenchRun(tmp, "run-1", {
         startedAt: "2026-01-16T10:00:00.000Z",
         status: "completed",

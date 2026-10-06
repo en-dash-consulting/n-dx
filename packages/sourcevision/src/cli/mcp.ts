@@ -5,9 +5,10 @@
 
 import { readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, type ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
+import { RootsListChangedNotificationSchema, type CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { z, type ZodRawShape } from "zod";
 import type {
   Manifest,
   Inventory,
@@ -25,6 +26,7 @@ import {
 } from "./sourcevision-core.js";
 import { findZoneById } from "../analyzers/zone-identity.js";
 import { resolveSourcevisionPaths } from "../paths.js";
+import { WorkspaceBinding, type BoundWorkspace } from "./mcp-workspace.js";
 
 interface SourcevisionData {
   manifest: Manifest | null;
@@ -97,21 +99,52 @@ function manifestMtime(svDir: string): number {
   }
 }
 
-export function createSourcevisionMcpServer(targetDir: string): McpServer {
-  const context = createMcpContext(targetDir);
+export interface CreateSourcevisionMcpServerOptions {
+  /**
+   * Follow the client's MCP roots (#499). Only the stdio entry point sets it,
+   * and it takes effect only when `targetDir` is the process cwd — the
+   * implicit `.` of a tracked `.mcp.json`. An explicit directory, and the
+   * web/hub factory, keep the dir they were given.
+   */
+  resolveWorkspaceFromClientRoots?: boolean;
+}
+
+export function createSourcevisionMcpServer(
+  targetDir: string,
+  options: CreateSourcevisionMcpServerOptions = {},
+): McpServer {
+  const startup = openWorkspace(targetDir);
+  const followRoots = options.resolveWorkspaceFromClientRoots === true && startup.absDir === resolve(process.cwd());
+  const binding = followRoots ? WorkspaceBinding.tracking(startup, openWorkspace) : WorkspaceBinding.fixed(startup);
+  const context = createMcpContext(binding);
   const server = new McpServer({ name: "sourcevision", version: TOOL_VERSION });
+
+  if (followRoots) {
+    const protocol = server.server;
+    const resolveFromRoots = () =>
+      binding.resolve(async (timeout) => (await protocol.listRoots(undefined, { timeout })).roots);
+    // Roots exist only once the client has initialized.
+    protocol.oninitialized = () => {
+      if (protocol.getClientCapabilities()?.roots) void resolveFromRoots();
+      else binding.settleWithoutRoots();
+    };
+    protocol.setNotificationHandler(RootsListChangedNotificationSchema, async () => {
+      await resolveFromRoots();
+    });
+  }
+
   registerMcpTools(server, context);
   registerMcpResources(server, context);
   return server;
 }
 
-interface McpContext {
-  absDir: string;
+/** One served directory and its data cache. */
+interface Workspace extends BoundWorkspace {
   freshData: () => SourcevisionData;
   invalidateCache: () => void;
 }
 
-function createMcpContext(targetDir: string): McpContext {
+function openWorkspace(targetDir: string): Workspace {
   const absDir = resolve(targetDir);
   const svDir = resolveSourcevisionPaths(absDir).svDir;
   let cachedData = loadData(absDir);
@@ -133,18 +166,69 @@ function createMcpContext(targetDir: string): McpContext {
   };
 }
 
+/**
+ * What handlers see. They read the workspace current at call time, after
+ * {@link McpContext.serve} has waited (bounded) for any roots resolution.
+ */
+interface McpContext {
+  readonly absDir: string;
+  /** Set while the client's root cannot be served: writes must be refused. */
+  readonly refused: string | undefined;
+  freshData: () => SourcevisionData;
+  invalidateCache: () => void;
+  /** Run a handler once the workspace has settled. */
+  serve: <R>(handler: () => R | Promise<R>) => Promise<R>;
+}
+
+function createMcpContext(binding: WorkspaceBinding<Workspace>): McpContext {
+  return {
+    get absDir() { return binding.current.absDir; },
+    get refused() { return binding.current.refused; },
+    freshData: () => binding.current.freshData(),
+    invalidateCache: () => binding.current.invalidateCache(),
+    serve: async (handler) => {
+      await binding.ready();
+      return handler();
+    },
+  };
+}
+
+/**
+ * Register a tool whose handler runs after the workspace has settled. While
+ * the client's root is refused, results carry the reason as an extra text
+ * block, since the data answered is the startup dir's.
+ */
+function registerTool<S extends ZodRawShape>(
+  server: McpServer,
+  context: McpContext,
+  name: string,
+  description: string,
+  schema: S,
+  handler: ToolCallback<S>,
+): void {
+  const run = handler as (...args: unknown[]) => CallToolResult | Promise<CallToolResult>;
+  server.tool(name, description, schema, (async (...args: unknown[]) => {
+    const result = await context.serve(() => run(...args));
+    const refused = context.refused;
+    return refused && !result.isError
+      ? { ...result, content: [...result.content, { type: "text" as const, text: `Warning: ${refused}` }] }
+      : result;
+  }) as ToolCallback<S>);
+}
+
 // ── Tool registration groups ─────────────────────────────────────────
 // Each function registers a cohesive group of related MCP tools.
 
 function registerOverviewTools(server: McpServer, context: McpContext): void {
-  server.tool("get_overview", "Get project summary statistics. Good starting point when the user asks about the project or its architecture.", {}, () => {
+  registerTool(server, context, "get_overview","Get project summary statistics. Good starting point when the user asks about the project or its architecture.", {}, () => {
     const data = context.freshData();
     if (!data.manifest || !data.inventory) {
       return { content: [{ type: "text", text: "No analysis data available. Run 'sourcevision analyze' first." }] };
     }
 
     const summary = {
-      project: data.manifest.targetPath.split("/").pop(),
+      // Either separator: targetPath is backslash-delimited on Windows.
+      project: data.manifest.targetPath.split(/[\\/]/).filter(Boolean).pop(),
       git: [data.manifest.gitBranch, data.manifest.gitSha?.slice(0, 7)].filter(Boolean).join(" @ ") || null,
       files: data.inventory.summary.totalFiles,
       lines: data.inventory.summary.totalLines,
@@ -162,7 +246,9 @@ function registerOverviewTools(server: McpServer, context: McpContext): void {
     return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
   });
 
-  server.tool(
+  registerTool(
+    server,
+    context,
     "get_next_steps",
     "Get prioritized list of what to work on next based on analysis findings. Use when planning work or looking for improvement opportunities.",
     {
@@ -247,7 +333,9 @@ export function summarizeZonesResource(zones: Zones | null | undefined): {
 }
 
 function registerZoneTools(server: McpServer, context: McpContext): void {
-  server.tool(
+  registerTool(
+    server,
+    context,
     "get_zone",
     "Get details for a specific zone. Use to understand architectural context before making changes to files in a zone.",
     { id: z.string().describe("Zone ID") },
@@ -278,7 +366,9 @@ function registerZoneTools(server: McpServer, context: McpContext): void {
     }
   );
 
-  server.tool(
+  registerTool(
+    server,
+    context,
     "get_findings",
     "Get analysis findings (anti-patterns, suggestions, observations). Check before modifying code in an area to see known issues.",
     {
@@ -307,7 +397,9 @@ function registerZoneTools(server: McpServer, context: McpContext): void {
 }
 
 function registerFileTools(server: McpServer, context: McpContext): void {
-  server.tool(
+  registerTool(
+    server,
+    context,
     "get_file_info",
     "Get inventory entry, zone, and imports for a file. Use before modifying a file to understand its role and dependencies.",
     { path: z.string().describe("File path (relative to project root)") },
@@ -342,7 +434,9 @@ function registerFileTools(server: McpServer, context: McpContext): void {
     }
   );
 
-  server.tool(
+  registerTool(
+    server,
+    context,
     "search_files",
     "Search the file inventory by path, role, or language. Use to find files related to a feature or module.",
     {
@@ -381,7 +475,9 @@ function registerFileTools(server: McpServer, context: McpContext): void {
     }
   );
 
-  server.tool(
+  registerTool(
+    server,
+    context,
     "get_imports",
     "Get import graph edges, optionally filtered to a specific file. Use to trace dependencies and understand coupling between modules.",
     { file: z.string().optional().describe("Filter to imports from/to this file") },
@@ -411,7 +507,9 @@ function registerFileTools(server: McpServer, context: McpContext): void {
 }
 
 function registerClassificationTools(server: McpServer, context: McpContext): void {
-  server.tool(
+  registerTool(
+    server,
+    context,
     "get_classifications",
     "Get file archetype classifications (e.g., utility, entrypoint, route-handler). Use to understand file roles across the codebase.",
     {
@@ -447,7 +545,9 @@ function registerClassificationTools(server: McpServer, context: McpContext): vo
     }
   );
 
-  server.tool(
+  registerTool(
+    server,
+    context,
     "set_file_archetype",
     "Override the archetype classification for a file (persists to .n-dx.json). Use when the automatic classification is wrong.",
     {
@@ -455,6 +555,9 @@ function registerClassificationTools(server: McpServer, context: McpContext): vo
       archetype: z.string().describe("Archetype ID to assign (e.g., utility, route-handler, entrypoint)"),
     },
     ({ path, archetype }) => {
+      if (context.refused) {
+        return { content: [{ type: "text", text: `Error: ${context.refused}` }], isError: true };
+      }
       const data = context.freshData();
       const file = data.inventory?.files.find((f) => f.path === path);
       if (!file) {
@@ -485,7 +588,7 @@ function registerClassificationTools(server: McpServer, context: McpContext): vo
 }
 
 function registerComponentTools(server: McpServer, context: McpContext): void {
-  server.tool("get_route_tree", "Get the route structure (pages, API routes, layouts). Use when working on routing or navigation.", {}, () => {
+  registerTool(server, context, "get_route_tree","Get the route structure (pages, API routes, layouts). Use when working on routing or navigation.", {}, () => {
     const data = context.freshData();
     if (!data.components) {
       return { content: [{ type: "text", text: "No components data available." }] };
@@ -518,8 +621,8 @@ function registerMcpResources(server: McpServer, context: McpContext): void {
     "summary",
     "sourcevision://summary",
     { description: "Condensed codebase context (CONTEXT.md)" },
-    () => {
-      const data = context.freshData();
+    async () => {
+      const data = await context.serve(() => context.freshData());
       if (!data.manifest || !data.inventory || !data.imports || !data.zones) {
         return {
           contents: [{
@@ -553,8 +656,8 @@ function registerMcpResources(server: McpServer, context: McpContext): void {
     "zones",
     "sourcevision://zones",
     { description: "Zone analysis data" },
-    () => {
-      const data = context.freshData();
+    async () => {
+      const data = await context.serve(() => context.freshData());
       return {
         contents: [{
           uri: "sourcevision://zones",
@@ -569,8 +672,8 @@ function registerMcpResources(server: McpServer, context: McpContext): void {
     "routes",
     "sourcevision://routes",
     { description: "Route tree data" },
-    () => {
-      const data = context.freshData();
+    async () => {
+      const data = await context.serve(() => context.freshData());
       return {
         contents: [{
           uri: "sourcevision://routes",
@@ -591,7 +694,11 @@ function registerMcpResources(server: McpServer, context: McpContext): void {
 /**
  * Start the Sourcevision MCP server over stdio (for `sv mcp <dir>` CLI command).
  *
- * This is the original entry point preserved for backward compatibility.
+ * Follows the client's MCP roots when `targetDir` is the cwd, so a session in a
+ * linked worktree is served that worktree even when its client spawned the
+ * server in the main checkout (#499). The startup dir must still hold
+ * `.sourcevision/`: the main checkout normally does, and a startup dir without
+ * it exits rather than waiting to see whether a root has one.
  * For HTTP or other transports, use {@link createSourcevisionMcpServer} instead.
  */
 export async function startMcpServer(targetDir: string): Promise<void> {
@@ -604,7 +711,7 @@ export async function startMcpServer(targetDir: string): Promise<void> {
     process.exit(1);
   }
 
-  const server = createSourcevisionMcpServer(absDir);
+  const server = createSourcevisionMcpServer(absDir, { resolveWorkspaceFromClientRoots: true });
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

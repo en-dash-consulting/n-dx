@@ -55,7 +55,7 @@
 .enrichment-badge {
   font-size: 10px;
   padding: 3px 8px;
-  background: var(--accent-dim);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--accent);
   border-radius: 4px;
   font-weight: 500;
@@ -231,7 +231,9 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   flex-shrink: 0;
-  background: var(--accent-dim);
+  /* A tint, not --accent-dim: that token is a dark green in the light theme,
+     which left accent text unreadable on it. */
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--accent);
 }
 
@@ -366,4 +368,352 @@
   margin-bottom: 6px;
   overflow-x: auto;
   white-space: nowrap;
+}
+
+/* ── Map-first layout ──────────────────────────────────────────────
+   The Overview as the Analysis stage's lead: a one-line meta + controls bar,
+   the isometric map as the hero, then one compact stats strip and the
+   collapsed Next Steps. Fills the stage page's width at every size. */
+
+.overview--map-first {
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.overview--map-first > * { margin-bottom: 0; }
+
+/* The decorative section numerals were placed for a fixed stack of cards;
+   in this layout they collide with content. */
+.overview--map-first .overview-section::after,
+.overview--map-first .overview-section::before,
+.overview--map-first .overview-col::before { content: none; }
+
+.overview-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.overview-topbar .overview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-sm, 12px);
+  color: var(--text-dim);
+}
+
+.overview-meta-branch { color: var(--text); font-weight: 600; }
+
+.overview-meta-sha {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+}
+
+.overview-topbar .overview-reanalyze { margin: 0; flex-wrap: wrap; }
+
+.overview-narration { margin: 0; }
+
+/* ── Map hero ───────────────────────────────────────────────────── */
+
+.iso-hero {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -18px rgba(0, 0, 0, 0.18);
+}
+
+.iso-hero-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, var(--bg-surface)), var(--bg-surface));
+}
+
+.iso-hero-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.iso-hero-mark {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.iso-hero-title { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; }
+
+.iso-hero-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.iso-hero-facts li {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.iso-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+.iso-hero-hint {
+  margin-right: 4px;
+  font-size: 11px;
+  color: var(--text-muted, var(--text-dim));
+  white-space: nowrap;
+}
+
+.iso-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.iso-hero-btn:hover,
+.iso-hero-btn:focus-visible { border-color: var(--accent); background: var(--bg-hover, var(--bg)); outline: none; }
+
+.iso-hero-btn--primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.iso-hero-btn--primary:hover,
+.iso-hero-btn--primary:focus-visible { background: color-mix(in srgb, var(--accent) 88%, black); color: var(--bg); }
+
+.iso-hero-stage {
+  position: relative;
+  /* Most of a laptop screen, with the stat tiles peeking in below it; grows
+     with the viewport on large displays. */
+  height: clamp(360px, 62vh, 1100px);
+}
+
+.iso-hero-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--bg-surface);
+}
+
+.iso-hero-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+}
+
+.iso-hero-placeholder--msg { flex-direction: column; gap: var(--space-2); }
+.iso-hero-placeholder--msg strong { color: var(--text); }
+
+/* Full screen (Fullscreen API) and the overlay fallback share one layout:
+   the bar on top, the map filling the rest. */
+.iso-hero:fullscreen,
+.iso-hero--overlay {
+  border-radius: 0;
+  border: none;
+  background: var(--bg);
+  box-shadow: none;
+}
+
+.iso-hero--overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.iso-hero--expanded .iso-hero-stage { flex: 1; height: auto; }
+
+/* ── Stat tiles ─────────────────────────────────────────────────── */
+
+.overview-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.overview-stat {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.overview-stat:hover { border-color: color-mix(in srgb, var(--stat-tone, var(--accent)) 45%, var(--border)); }
+
+.overview-stat-glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--stat-tone, var(--accent)) 14%, transparent);
+  color: var(--stat-tone, var(--accent));
+  font-size: 16px;
+}
+
+.overview-stat-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+
+.overview-stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.overview-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--stat-tone, var(--text));
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-stat-meter {
+  display: block;
+  height: 4px;
+  margin: 4px 0 2px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.overview-stat-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--stat-tone, var(--accent));
+}
+
+.overview-stat-sub {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-dim);
+}
+
+.overview-stat--signals {
+  grid-column: span 2;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overview-stat--signals .pattern-list { min-width: 0; }
+
+/* Tooltips open from the tile's edge rather than centred on the ⓘ, so a tile
+   near the side of the screen never pushes its bubble off it. */
+.overview-stat .info-tip { position: static; }
+.overview-stat .info-tip-bubble { left: 0; transform: none; }
+
+/* ── Collapsible Next Steps ─────────────────────────────────────── */
+
+.overview--map-first .overview-next-steps { padding: 0; }
+
+.next-steps-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+}
+
+.next-steps-summary::-webkit-details-marker { display: none; }
+.next-steps-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 12px; }
+
+.next-steps-caret { width: 12px; color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
+
+.next-steps-summary h3 { flex-shrink: 0; }
+
+.next-steps-counts { display: inline-flex; gap: 6px; flex-shrink: 0; }
+
+.next-steps-preview {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.next-steps-summary .next-steps-copy-all { margin-left: auto; flex-shrink: 0; }
+
+.overview-next-steps[open] .next-steps-list,
+.overview-next-steps[open] .next-steps-footer { padding: 0 var(--space-4); }
+
+.overview-next-steps[open] .next-steps-footer { padding-bottom: var(--space-4); }
+
+/* Descriptions carry long comma-separated file lists — let them wrap. */
+.next-step-desc { overflow-wrap: anywhere; }
+
+/* ── Small viewports ────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .iso-hero-stage { height: clamp(300px, 62vh, 560px); }
+  .overview-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .overview-stat { padding: 12px; gap: 10px; }
+  .overview-stat-glyph { width: 28px; height: 28px; font-size: 14px; }
+  .overview-stat-value { font-size: 20px; }
+  .overview-stat:nth-child(even) .info-tip-bubble { left: auto; right: 0; }
+  .iso-hero-hint { display: none; }
+  .next-steps-preview { display: none; }
+  .next-steps-summary { flex-wrap: wrap; }
 }

@@ -245,6 +245,13 @@ const COMMAND_REGISTRY = [
     related: ["export", "sync", "status"],
   },
   {
+    name: "trust",
+    category: "Orchestration",
+    summary: "Review or accept what this checkout ships as execution config",
+    keywords: ["trust", "security", "guard", "allowlist", "permission", "malicious", "clone", "fork", "review", "accept", "revoke"],
+    related: ["init", "work", "start"],
+  },
+  {
     name: "self-heal",
     category: "Orchestration",
     summary: "Iterative codebase improvement loop",
@@ -840,7 +847,7 @@ const ORCHESTRATOR_HELP_DEFS = {
   },
   init: {
     summary: "initialize all tools",
-    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude, codex, google, or local) unless --provider is given.\nProvisions assistant surfaces for both Claude and Codex unless limited\nby --no-claude, --no-codex, --claude-only, --codex-only, or --assistants=.\n\nThe init summary reports each assistant surface separately, listing the\nspecific artifacts (instruction files, skills, permissions, MCP servers)\nthat were provisioned for the repo.",
+    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude, codex, google, or local) unless --provider is given.\nProvisions assistant surfaces for both Claude and Codex unless limited\nby --no-claude, --no-codex, --claude-only, --codex-only, or --assistants=.\n\nWhen the target directory is not inside a git repository, init offers to\ncreate one. That prompt only appears on a TTY — pass --git (or --no-git) to\nanswer it ahead of time, which is what scripted and dashboard-driven runs\nmust do.\n\nThe init summary reports each assistant surface separately, listing the\nspecific artifacts (instruction files, skills, permissions, MCP servers)\nthat were provisioned for the repo.",
     usage: "ndx init [options] [dir]",
     options: [
       { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
@@ -849,6 +856,8 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--claude-model=<id>", description: "Claude model ID (implies --provider=claude)" },
       { flag: "--codex-model=<id>", description: "Codex model ID (implies --provider=codex)" },
       { flag: "--analyze", description: "Also run SourceVision analysis after init" },
+      { flag: "--git", description: "Create a git repository when the target directory is not in one (answers the preflight prompt; required for non-interactive runs)" },
+      { flag: "--no-git", description: "Never create a git repository — skip the preflight prompt and leave auto-commit features off" },
       { flag: "--no-claude", description: "Skip Claude Code integration (no CLAUDE.md, .claude/ modifications)" },
       { flag: "--no-codex", description: "Skip Codex integration (no AGENTS.md, .agents/, .codex/ modifications)" },
       { flag: "--claude-only", description: "Provision only Claude Code surfaces (equivalent to --no-codex)" },
@@ -860,11 +869,12 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx init", description: "Initialize in current directory (prompts for vendor)" },
       { command: "ndx init --provider=claude .", description: "Initialize with Claude (skips vendor prompt)" },
       { command: "ndx init --provider=codex .", description: "Initialize with Codex (skips vendor prompt)" },
-      { command: "ndx init --provider=claude --model=claude-sonnet-5 .", description: "Set vendor and model explicitly" },
-      { command: "ndx init --claude-model=claude-sonnet-5 .", description: "Set Claude model (implies --provider=claude)" },
+      { command: "ndx init --provider=claude --model=claude-sonnet-5-5 .", description: "Set vendor and model explicitly" },
+      { command: "ndx init --claude-model=claude-sonnet-5-5 .", description: "Set Claude model (implies --provider=claude)" },
       { command: "ndx init --codex-model=gpt-5.6-terra .", description: "Set Codex model (implies --provider=codex)" },
-      { command: "ndx init --claude-model=claude-sonnet-5 --codex-model=gpt-5.6-terra .", description: "Configure both vendors at once" },
+      { command: "ndx init --claude-model=claude-sonnet-5-5 --codex-model=gpt-5.6-terra .", description: "Configure both vendors at once" },
       { command: "ndx init --analyze .", description: "Initialize and analyze codebase" },
+      { command: "ndx init --git .", description: "Initialize a blank folder and create a git repository in it" },
       { command: "ndx init --claude-only .", description: "Initialize with Claude surfaces only" },
       { command: "ndx init --codex-only .", description: "Initialize with Codex surfaces only" },
       { command: "ndx init --no-codex .", description: "Initialize without Codex integration" },
@@ -989,6 +999,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--iterations=<n>", description: "Run multiple tasks sequentially" },
       { flag: "--loop", description: "Run continuously until all tasks complete or Ctrl+C" },
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
+      { flag: "--resolve", description: "With --task: print, as JSON, the settings an autonomous run would use, the config key behind each, and every reason it would refuse to start. Runs nothing, and works without a configured vendor (reported as a refusal). See 'hench run --help'" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
       { flag: "--review-optional", description: "Accept a best-effort review: warn instead of refusing the completion when the reviewer cannot start" },
@@ -1003,11 +1014,12 @@ const ORCHESTRATOR_HELP_DEFS = {
     examples: [
       { command: "ndx work", description: "Run next task interactively" },
       { command: "ndx work --task=abc123 .", description: "Run a specific task" },
+      { command: "ndx work --task=abc123 --resolve .", description: "Show what a run of abc123 would use, without running it" },
       { command: "ndx work --auto --loop .", description: "Continuously auto-run tasks" },
       { command: "ndx work --auto --yes .", description: "Run unattended, auto-commit each task" },
       { command: "ndx work --dry-run .", description: "Preview the brief without execution" },
       { command: "ndx work --auto --review .", description: "Auto-run with an adversarial review pass after each task" },
-      { command: "ndx work --review --review-model=claude-fable-5 .", description: "Review on a specific model" },
+      { command: "ndx work --review --review-model=claude-fable-5-1 .", description: "Review on a specific model" },
     ],
     related: ["plan", "status"],
   },
@@ -1099,6 +1111,18 @@ const ORCHESTRATOR_HELP_DEFS = {
           "3117–3200. A non-n-dx occupant is cleared to free the port.",
       },
       {
+        title: "Access token",
+        content:
+          "Every account on a machine can reach 127.0.0.1, so the hub, the project\n" +
+          "servers and the preview server require a per-user token. 'ndx start'\n" +
+          "creates it at <ndx home>/auth.token (mode 0600), prints a URL that\n" +
+          "carries it once (the server sets an HttpOnly cookie and redirects to the\n" +
+          "clean URL), and passes it to every server it starts. Scripts and MCP\n" +
+          "clients send it as 'X-Ndx-Token: <token>' or 'Authorization: Bearer\n" +
+          "<token>'; the printed 'claude mcp add' lines include the header.\n" +
+          "--no-auth, or web.auth false in .n-dx.json, turns it off.",
+      },
+      {
         title: "Preview mode (--preview)",
         content:
           "Serves an editable UI layout document (packages/web/src/preview/index.html)\n" +
@@ -1122,6 +1146,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--open", description: "Open the project URL in the browser" },
       { flag: "--preview", description: "Serve the UI layout preview document instead of the dashboard" },
       { flag: "--file=<path>", description: "With --preview: serve this HTML document instead of the default" },
+      { flag: "--no-auth", description: "Run without the per-user dashboard token (also: web.auth false in .n-dx.json). Loopback is shared by every account on the host; the token is what keeps another account out" },
     ],
     examples: [
       { command: "ndx start .", description: "Register with the hub; several repos share port 3117" },
@@ -1582,6 +1607,35 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: 'ndx bicker "fix failing tests" --skip-review', description: "Skip review step" },
     ],
     related: ["pair-programming", "work"],
+  },
+  trust: {
+    summary: "review or accept what this checkout ships as execution config",
+    description:
+      "Files n-dx reads to decide what it may execute usually live in the\n" +
+      "repository and are tracked by git: the hench guard in .hench/config.json\n" +
+      "(command allowlist, blocked paths, git subcommands, permission mode),\n" +
+      "the test command in .rex/config.json, and the MCP servers in .mcp.json.\n" +
+      "A clone, a fork or a checked-out pull request can therefore widen them.\n\n" +
+      "'ndx trust' compares them to the defaults for the project's language and\n" +
+      "lists what is wider, plus what else came with the checkout (PRD items,\n" +
+      "analysis, run records). 'ndx init' runs the same review at the end.\n\n" +
+      "Until you accept, 'ndx work' runs under the default guard (the\n" +
+      "repository's config can only tighten it), lowers bypassPermissions to\n" +
+      "acceptEdits, and verify_criteria does not run the repository's test\n" +
+      "command. The dashboard shows the same warning as a strip.\n\n" +
+      "'accept' records the configuration's digest in your ndx home, not in the\n" +
+      "repository, so another account on the machine cannot pre-approve it for\n" +
+      "you. A later change to those files shows as CHANGED and restricts again\n" +
+      "until reviewed. 'revoke' forgets the decision. Delegates to 'hench trust'.",
+    usage: "ndx trust [status|accept|revoke] [options] [dir]",
+    options: [
+      { flag: "--format=json", description: "Print the full evaluation as JSON" },
+    ],
+    examples: [
+      { command: "ndx trust .", description: "Review this checkout" },
+      { command: "ndx trust accept .", description: "Accept its execution config" },
+      { command: "ndx trust revoke .", description: "Forget the decision" },
+    ],
   },
   "self-heal": {
     summary: "iterative codebase improvement loop",

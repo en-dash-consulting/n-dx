@@ -14,6 +14,7 @@ prevent future contributors from replacing injection with direct imports.
 |----------------|---------------|---------------------|-----------------|
 | `src/server/start.ts` | `src/server/task-usage.ts` (barrel facade — re-exports from `task-usage/register-scheduler.ts`; import through the facade, not the subdirectory file directly) | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
 | `src/server/start.ts` | `src/server/workspaces.ts` (`WorkspaceRegistry`) | `setup(ctx)` → watchers + PRD cache for a worktree, `teardown(handles)` — built by `createWorkspaceHooks` in start.ts, which owns the watcher registration helpers; the registry must not import start.ts | `WorkspaceHooks` |
+| `src/server/start.ts` | `src/server/routes-live.ts` (also passed to `routes-live-analyze.ts`, which imports the type from routes-live) | `listWorkspaces()` → every worktree in the registry, `memoryFloorBytes()` (optional; defaults to the hub config) — built by `liveSourcesOf` in start.ts so the Live routes never import the workspace registry | `LiveSources` |
 
 Rules:
 - **Prefer injection over import** when the target module would otherwise need to import

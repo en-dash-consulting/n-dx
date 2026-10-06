@@ -13,6 +13,11 @@ export type ViewId =
   | "analyze"
   | "plan"
   | "work"
+  // Live sits outside the loop: one overview, one page per running task, and
+  // the sourcevision analysis page. Cross-cutting, like `home`.
+  | "live"
+  | "live-task"
+  | "live-analyze"
   | "overview"
   | "graph"
   | "zones"

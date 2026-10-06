@@ -29,6 +29,9 @@ const EXPECTED_EXPORTS = [
   // Folder-tree storage path
   "PRD_TREE_DIRNAME",
   "TREE_META_FILENAME",
+  // Derived, never-committed state inside rex's directory. The completion
+  // gate discounts it; `rex init` gitignores it from the same constant.
+  "PRD_CACHE_DIRNAME",
   // Save file report — the paths the last PRD save(s) wrote and deleted
   "takeSaveFileReport",
   // PRD tree slug conformance — the pre-run gate
@@ -43,6 +46,9 @@ const EXPECTED_EXPORTS = [
   "findActionableTasks",
   "collectCompletedIds",
   "explainSelection",
+  // The subtree-pruning rule the selector applies. Hench reads it to say why
+  // an epic has nothing selectable when its tasks all read "pending".
+  "traversalBlock",
   "matchesAssignee",
   // Cross-worktree task claims
   "openClaimsStore",
@@ -107,6 +113,7 @@ describe("rex-gateway compatibility", () => {
     "SCHEMA_VERSION",
     "PRD_TREE_DIRNAME",
     "TREE_META_FILENAME",
+    "PRD_CACHE_DIRNAME",
     "SELF_HEAL_TAG",
   ]);
 

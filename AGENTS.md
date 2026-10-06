@@ -93,6 +93,7 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 | `.sourcevision/.cache/judgments.json` | Content-addressed cache of Jev answers (question + the state slice it references → answer). Consulted per question inside `askJev`; only misses are sent. Machine-local; safe to delete — the next run re-asks |
 | `.sourcevision/.cache/narration.log` | Output of the detached `sv narrate` child that `analyze` spawns for escalated zones in cascade mode; `manifest.narration` holds its status. Machine-local; safe to delete |
 | `.sourcevision/.cache/analyses.jsonl` | One line per `sv analyze` run — mode, wall-clock per phase, calls/tokens/time per LLM task class (the same record as `manifest.lastAnalysis`, kept for the last 200 runs). Machine-local; safe to delete |
+| `.sourcevision/.cache/analyze-progress.json` | Live progress of the current or last `sv analyze` — phase, enrichment pass, batch k of n, LLM use so far — rewritten as the run moves and marked complete/failed at the end; served as `progress` on `GET /api/commands/sv-analyze/status`. Read it through `readAnalyzeProgress`, which reports a `running` file as `interrupted` when its pid is dead or, where `ps` can tell, now belongs to another program. Machine-local; safe to delete |
 | `.n-dx-web-usage.jsonl` | Dashboard LLM spend ledger — one line per Ask call (vendor, model, token classes, outcome). Read by the LLM Utilization view as the `web` package bucket; not attributed to any PRD item. Machine-local; safe to delete |
 | `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model) |
 | `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
@@ -103,7 +104,7 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `OPEN_SOURCE_SCOPE.md` | Licensing boundaries, included/excluded components, and contribution expectations |
 
-> **PRD file layout.** Subtasks are encoded as sections within the parent task's `index.md` (not separate directories). `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running — do not read it from code outside the web server. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
+> **PRD file layout.** Subtasks are encoded as sections within the parent task's `index.md` (not separate directories). `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running — do not read it from code outside the web server, and never commit it (`rex init` gitignores it; hench's completion gate discounts it, so a run made while the dashboard is up is not refused over the watcher's rewrite). See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
 
 ## Workflow
 

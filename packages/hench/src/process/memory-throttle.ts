@@ -14,10 +14,16 @@
  * concurrency via lock files, while the memory throttle adds a
  * resource-aware gate before the limiter is even consulted.
  *
+ * By default memory is read through the shared llm-client reading — the one
+ * the dashboard and hub use — not `os.freemem()`, which on macOS counts only
+ * free pages (115 MB on a healthy 16 GB Mac). An unknown reading decides
+ * "allow" regardless of thresholds.
+ *
  * @module hench/process/memory-throttle
  */
 
-import { freemem, totalmem } from "node:os";
+import { getAvailableMemory, readAvailableMemory } from "../prd/llm-gateway.js";
+import type { AvailableMemoryReading } from "../prd/llm-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -124,13 +130,13 @@ export type ThrottleDecision = "allow" | "delay" | "reject";
 export interface MemoryThrottleStatus {
   /** Whether memory throttling is enabled. */
   enabled: boolean;
-  /** Current system memory usage as a percentage (0–100). */
-  memoryUsagePercent: number;
-  /** Free system memory in MB. */
-  freeMemoryMB: number;
+  /** Current system memory usage as a percentage (0–100). `null` when the reading is unknown. */
+  memoryUsagePercent: number | null;
+  /** Available system memory in MB. `null` when the reading is unknown. */
+  freeMemoryMB: number | null;
   /** Total system memory in MB. */
   totalMemoryMB: number;
-  /** Throttle decision based on current memory state. */
+  /** Throttle decision based on current memory state ("allow" when unknown). */
   decision: ThrottleDecision;
   /** Configured delay threshold percentage. */
   delayThreshold: number;
@@ -145,20 +151,37 @@ export interface MemoryThrottleStatus {
 // ---------------------------------------------------------------------------
 
 /**
- * Interface for reading system memory. Defaults to `os.freemem()`/`os.totalmem()`.
- * Injected via constructor for deterministic testing.
+ * Interface for reading system memory, injected via constructor for
+ * deterministic testing. Without one, the throttle uses the shared
+ * available-memory reading (`readAvailableMemory()` / `getAvailableMemory()`).
  */
 export interface SystemMemoryReader {
-  /** Free system memory in bytes. */
+  /** Available system memory in bytes. */
   freemem(): number;
   /** Total system memory in bytes. */
   totalmem(): number;
 }
 
-const DEFAULT_MEMORY_READER: SystemMemoryReader = {
-  freemem,
-  totalmem,
-};
+/** A memory sample: usage and available MB are both known, or both `null`. */
+type MemorySample =
+  | { usagePercent: number; freeMB: number; totalMB: number }
+  | { usagePercent: null; freeMB: null; totalMB: number };
+
+function toMB(bytes: number): number {
+  return Math.round((bytes / 1024 / 1024) * 100) / 100;
+}
+
+function sampleFrom(availableBytes: number | null, totalBytes: number): MemorySample {
+  if (availableBytes === null) return { usagePercent: null, freeMB: null, totalMB: toMB(totalBytes) };
+  const usagePercent = totalBytes > 0
+    ? Math.round(((totalBytes - availableBytes) / totalBytes) * 10000) / 100
+    : 0;
+  return { usagePercent, freeMB: toMB(availableBytes), totalMB: toMB(totalBytes) };
+}
+
+function sampleFromReading(reading: AvailableMemoryReading): MemorySample {
+  return sampleFrom(reading.availableBytes, reading.totalBytes);
+}
 
 // ---------------------------------------------------------------------------
 // MemoryThrottle
@@ -187,14 +210,14 @@ const DEFAULT_MEMORY_READER: SystemMemoryReader = {
  */
 export class MemoryThrottle {
   private readonly _config: MemoryThrottleConfig;
-  private readonly _memReader: SystemMemoryReader;
+  private readonly _memReader: SystemMemoryReader | undefined;
 
   constructor(
     config?: Partial<MemoryThrottleConfig>,
     memReader?: SystemMemoryReader,
   ) {
     this._config = { ...DEFAULT_MEMORY_THROTTLE_CONFIG, ...config };
-    this._memReader = memReader ?? DEFAULT_MEMORY_READER;
+    this._memReader = memReader;
 
     // Validate thresholds
     if (this._config.delayThreshold < 0 || this._config.delayThreshold > 100) {
@@ -217,30 +240,28 @@ export class MemoryThrottle {
   // Memory sampling
   // -----------------------------------------------------------------------
 
-  /**
-   * Read current system memory state.
-   */
-  private _readMemory(): { usagePercent: number; freeMB: number; totalMB: number } {
-    const free = this._memReader.freemem();
-    const total = this._memReader.totalmem();
-    const toMB = (bytes: number) => Math.round((bytes / 1024 / 1024) * 100) / 100;
+  /** Sample from the injected reader, if any. */
+  private _readInjected(): MemorySample | undefined {
+    const reader = this._memReader;
+    return reader ? sampleFrom(reader.freemem(), reader.totalmem()) : undefined;
+  }
 
-    const usagePercent = total > 0
-      ? Math.round(((total - free) / total) * 10000) / 100
-      : 0;
+  /** Read current memory, awaiting a fresh-enough shared reading. */
+  private async _readMemory(): Promise<MemorySample> {
+    return this._readInjected() ?? sampleFromReading(await readAvailableMemory());
+  }
 
-    return {
-      usagePercent,
-      freeMB: toMB(free),
-      totalMB: toMB(total),
-    };
+  /** Read current memory without awaiting: the cached shared reading. */
+  private _readMemoryNow(): MemorySample {
+    return this._readInjected() ?? sampleFromReading(getAvailableMemory());
   }
 
   /**
    * Determine the throttle decision based on current memory.
+   * An unknown reading is no memory signal, so it always allows.
    */
-  private _decide(usagePercent: number): ThrottleDecision {
-    if (!this._config.enabled) return "allow";
+  private _decide(usagePercent: number | null): ThrottleDecision {
+    if (!this._config.enabled || usagePercent === null) return "allow";
     if (usagePercent >= this._config.rejectThreshold) return "reject";
     if (usagePercent >= this._config.delayThreshold) return "delay";
     return "allow";
@@ -252,9 +273,13 @@ export class MemoryThrottle {
 
   /**
    * Get a point-in-time snapshot of memory state and throttle decision.
+   *
+   * Synchronous, so it reads the cached shared reading (`getAvailableMemory()`),
+   * which never awaits a spawn; before the first macOS reading completes it is
+   * unknown and the decision is "allow".
    */
   status(): MemoryThrottleStatus {
-    const { usagePercent, freeMB, totalMB } = this._readMemory();
+    const { usagePercent, freeMB, totalMB } = this._readMemoryNow();
     return {
       enabled: this._config.enabled,
       memoryUsagePercent: usagePercent,
@@ -278,7 +303,8 @@ export class MemoryThrottle {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   gate(onThrottle?: (info: {
     decision: ThrottleDecision;
-    memoryUsagePercent: number;
+    /** `null` only on an "allow" after a delay, when the reading became unknown. */
+    memoryUsagePercent: number | null;
     delayMs?: number;
     attempt: number;
     maxRetries: number;
@@ -288,7 +314,7 @@ export class MemoryThrottle {
 
   private async _gateInternal(onThrottle?: (info: {
     decision: ThrottleDecision;
-    memoryUsagePercent: number;
+    memoryUsagePercent: number | null;
     delayMs?: number;
     attempt: number;
     maxRetries: number;
@@ -296,16 +322,16 @@ export class MemoryThrottle {
     if (!this._config.enabled) return;
 
     for (let attempt = 0; attempt <= this._config.maxRetries; attempt++) {
-      const { usagePercent, freeMB, totalMB } = this._readMemory();
-      const decision = this._decide(usagePercent);
+      const sample = await this._readMemory();
+      const decision = this._decide(sample.usagePercent);
 
-      if (decision === "allow") {
+      if (decision === "allow" || sample.usagePercent === null) {
         // First attempt is immediate — no notification needed.
         // On subsequent attempts (after delays), notify that we're proceeding.
         if (attempt > 0) {
           onThrottle?.({
-            decision,
-            memoryUsagePercent: usagePercent,
+            decision: "allow",
+            memoryUsagePercent: sample.usagePercent,
             attempt,
             maxRetries: this._config.maxRetries,
           });
@@ -313,6 +339,7 @@ export class MemoryThrottle {
         return;
       }
 
+      const { usagePercent, freeMB, totalMB } = sample;
       if (decision === "reject") {
         onThrottle?.({
           decision,
@@ -346,17 +373,15 @@ export class MemoryThrottle {
     }
 
     // Exhausted all retries while in delay zone — check one final time
-    const { usagePercent, freeMB, totalMB } = this._readMemory();
-    const finalDecision = this._decide(usagePercent);
-
-    if (finalDecision === "allow") return;
+    const final = await this._readMemory();
+    if (final.usagePercent === null || this._decide(final.usagePercent) === "allow") return;
 
     // Still throttled after max retries — reject
     throw new MemoryThrottleRejectError(
-      usagePercent,
+      final.usagePercent,
       this._config.delayThreshold, // report against delay threshold since we timed out waiting
-      freeMB,
-      totalMB,
+      final.freeMB,
+      final.totalMB,
     );
   }
 }

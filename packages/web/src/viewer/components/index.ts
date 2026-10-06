@@ -16,8 +16,16 @@ export { MemoryPanel } from "./memory-panel.js";
 export { WsHealthPanel } from "./ws-health-panel.js";
 export { ThrottleControlsPanel } from "./throttle-controls.js";
 export { DetailPanel } from "./detail-panel.js";
+export { LiveTab, PeekLink, jobTarget, runTarget, isCurrentWorktree, liveHref } from "./live-tab.js";
+export type { LiveTabProps, PeekLinkProps, PeekTarget } from "./live-tab.js";
 export { StartTaskButton } from "./start-task-button.js";
 export type { StartTaskButtonProps } from "./start-task-button.js";
+export { TaskStartControl } from "./task-start-control.js";
+export type { TaskStartControlProps } from "./task-start-control.js";
+export { PrepareTaskModal } from "./prepare-task-modal.js";
+export type { PrepareTaskModalProps } from "./prepare-task-modal.js";
+export { ReadyToRun } from "./ready-to-run.js";
+export type { ReadyToRunProps } from "./ready-to-run.js";
 
 // ── Banners ──────────────────────────────────────────────────────────
 
@@ -66,6 +74,7 @@ export {
   RexCompletionIndicator,
   HenchActivityIndicator,
   INDICATOR_VIEWS,
+  LIVE_INDICATOR_VIEWS,
   type ProjectStatus,
   type SourceVisionStatus,
   type RexStatus,
@@ -152,5 +161,9 @@ export type {
 } from "./language-analysis-strip.js";
 export { GlossaryLine } from "./glossary-line.js";
 export type { GlossaryLineProps } from "./glossary-line.js";
+export { PixelIcon } from "./pixel-icons.js";
+export type { PixelIconName, PixelIconProps, PixelTileName } from "./pixel-icons.js";
 export { InfoTip } from "./info-tip.js";
 export type { InfoTipProps } from "./info-tip.js";
+export { RepoTrustStrip, buildTrustNotice } from "./repo-trust-strip.js";
+export type { RepoTrustStripProps, RepoTrustView, RepoTrustNotice, RepoTrustFindingView } from "./repo-trust-strip.js";

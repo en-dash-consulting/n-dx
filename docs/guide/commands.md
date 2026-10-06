@@ -9,6 +9,8 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | `ndx init [dir]` | Initialize a project for n-dx |
 | `ndx migrate-layout [dir]` | Move an existing project's state into `.ndx/` |
 | `ndx config [key] [value]` | View or edit settings |
+| `ndx which` | Show which n-dx is running: version, path, install kind, git |
+| `ndx trust [status\|accept\|revoke] [dir]` | Review or accept the execution config this checkout ships |
 
 ## Analyze
 
@@ -38,6 +40,10 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | `ndx status [dir]` | Show PRD status tree |
 | `ndx next [dir]` | Print next actionable task |
 | `ndx tree [dir]` | Show full PRD hierarchy with color-coded status |
+| `ndx tree-diff [dir]` | Compare two PRD trees (commits, or a worktree against its anchor) |
+| `ndx claim list\|release [dir]` | Inspect and free cross-worktree task claims |
+| `ndx log <event> [dir]` | Append an execution-log entry (non-MCP route to `append_log`) |
+| `ndx prd export\|import` | Carry the PRD between machines as a JSON bundle, or export a narrative document |
 | `ndx report [dir]` | Generate a JSON health report |
 | `ndx update <id> [dir]` | Update item status, priority, or title |
 | `ndx remove <id> [dir]` | Remove an item and its children |
@@ -94,9 +100,13 @@ ndx init --claude-only .         # provision only Claude surfaces
 ndx init --codex-only .          # provision only Codex surfaces
 ndx init --assistants=claude .   # equivalent to --claude-only
 ndx init --no-codex .            # skip Codex provisioning
+ndx init --git .                 # also create a git repository (answers the preflight prompt)
+ndx init --no-git .              # never create one
 ```
 
 Initializes the project: creates analysis metadata (`.sourcevision/`), PRD storage (`.rex/`), agent configuration (`.hench/`), and assistant-specific artifacts. By default both Claude and Codex surfaces are provisioned.
+
+When the directory is not inside a git repository, init offers to create one — n-dx records autonomous work as commits, so without a repository auto-commit, pair programming, and the hench run loop stay disabled. That prompt needs a TTY: scripted runs and the dashboard's setup wizard answer it with `--git` or `--no-git` instead. A repository created this way also gets a `chore: n-dx init` baseline commit, so the working tree is clean straight out of init.
 
 On re-run, detects existing assistant surfaces and narrows provisioning to match. If only Claude artifacts exist, Codex is skipped (and vice versa) unless you explicitly pass an assistant flag.
 
@@ -159,7 +169,7 @@ ndx work --auto --iterations=4 .       # run 4 tasks sequentially
 ndx work --task=abc123 .               # specific task
 ndx work --epic="Auth System" --auto . # scope to epic
 ndx work --dry-run .                   # preview without executing
-ndx work --model=claude-opus-5 .          # override model
+ndx work --model=claude-opus-5-5 .        # override model
 ndx work --auto --loop .               # run continuously until done
 ```
 
@@ -209,6 +219,8 @@ ndx start --background .    # daemon mode
 ndx start status .          # check if running
 ndx start stop .            # stop daemon
 ```
+
+`ndx start` registers the repository with the per-user hub, whose chooser at `http://localhost:3117/hub` lists every registered project. **New project** there creates one that does not exist yet: give it a folder name and the directory to put it in, check the absolute path it previews — resolved by the server as you type, so `..` and a relative parent show as what they really are — and it creates the folder, registers it, and opens the same setup wizard an empty folder gets (assistants, LLM vendor, and whether to create a git repository). A folder that already has content is refused, with a pointer to `ndx start` for registering an existing project instead.
 
 ### status
 

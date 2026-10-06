@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initConfig } from "../../../src/store/config.js";
@@ -627,6 +627,41 @@ describe("shared lifecycle", () => {
     });
   });
 
+  describe("memoryStats on an unknown reading", () => {
+    it("records -1 for system available bytes at start and end", async () => {
+      const { initRunRecord, finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");
+      const { SystemMemoryMonitor } = await import("../../../src/process/memory-monitor.js");
+      const spy = vi.spyOn(SystemMemoryMonitor.prototype, "snapshot").mockResolvedValue({
+        platform: "darwin",
+        totalBytes: 16 * 1024 ** 3,
+        freeBytes: 115 * 1024 ** 2,
+        availableBytes: null,
+        usagePercent: null,
+        totalMB: 16 * 1024,
+        freeMB: 115,
+        availableMB: null,
+        timestamp: new Date().toISOString(),
+      });
+      try {
+        const { run, memoryCtx } = await initRunRecord({
+          taskId: "task-1",
+          taskTitle: "Test task",
+          model: "claude-sonnet-4-6",
+          henchDir,
+        });
+        expect(memoryCtx.systemAvailableAtStartBytes).toBe(-1);
+
+        await finalizeRun({ run, henchDir, projectDir, memoryCtx });
+
+        expect(run.memoryStats!.systemAvailableAtStartBytes).toBe(-1);
+        expect(run.memoryStats!.systemAvailableAtEndBytes).toBe(-1);
+        expect(run.memoryStats!.systemTotalBytes).toBe(16 * 1024 ** 3);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
   describe("RunDiagnostics schema backward compatibility", () => {
     it("validates records without new runtime identity fields", async () => {
       const { RunRecordSchema } = await import("../../../src/schema/validate.js");
@@ -928,6 +963,365 @@ describe("shared lifecycle", () => {
       const { run } = await initRunRecord({ taskId: "task-1", taskTitle: "Test task", model: "sonnet", henchDir, vendor: "claude" });
       expect(() => recordClaimLoss(undefined, run, henchDir)).not.toThrow();
       expect(run.claimLost).toBeUndefined();
+    });
+  });
+
+  /**
+   * The run log is written while the run is in progress, not assembled at the
+   * end. Both loops go through `initRunRecord` and `finalizeRun`, so what is
+   * asserted here holds for CLI-loop and API-loop runs alike.
+   *
+   * Byte-equality between the incremental writer and the end-of-run writer is
+   * pinned in `tests/unit/store/run-log.test.ts`; these tests cover the
+   * plumbing — that a run opens one, records its path, and streams into it.
+   */
+  describe("incremental run log", () => {
+    /** Read `path` until `predicate` holds, or give up after `timeoutMs`. */
+    async function readUntil(
+      path: string,
+      predicate: (content: string) => boolean,
+      timeoutMs = 1000,
+    ): Promise<string> {
+      const deadline = Date.now() + timeoutMs;
+      for (;;) {
+        const content = await readFile(path, "utf-8");
+        if (predicate(content) || Date.now() >= deadline) return content;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
+
+    let consoleLog: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(async () => {
+      const { resetCapturedLines } = await import("../../../src/types/output.js");
+      resetCapturedLines();
+      // stream()/detail() print as they capture; the capture is what is under
+      // test, the printing is noise.
+      consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleLog.mockRestore();
+    });
+
+    it("opens the log at run start and records its path on the run", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+      const { loadRun } = await import("../../../src/store/runs.js");
+
+      const { run } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        projectDir,
+        vendor: "claude",
+      });
+
+      expect(run.logPath).toBeDefined();
+      expect(run.logPath).toContain(run.id);
+      // Readable before the agent has produced a single line — the whole point
+      // of recording the path rather than letting readers guess the filename.
+      expect(await readFile(run.logPath!, "utf-8")).toBe("");
+
+      // And the path is on the persisted record, not only the in-memory one.
+      expect((await loadRun(henchDir, run.id))?.logPath).toBe(run.logPath);
+    });
+
+    it("grows line by line while the run is in progress", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+      const { stream, detail, getCapturedLines } = await import("../../../src/types/output.js");
+
+      const { run } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        projectDir,
+        vendor: "claude",
+      });
+
+      stream("Agent", "reading the brief");
+      detail("1.2s");
+
+      const live = await readUntil(run.logPath!, (c) => c.includes("1.2s"));
+      expect(live).toBe(getCapturedLines().join("\n") + "\n");
+      expect(live).toContain("reading the brief");
+    });
+
+    it("leaves every captured line in the file when the run finalizes", async () => {
+      const { initRunRecord, finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");
+      const { stream } = await import("../../../src/types/output.js");
+
+      const { run, memoryCtx } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        projectDir,
+        vendor: "claude",
+      });
+
+      stream("Agent", "did the work");
+      const midRun = await readUntil(run.logPath!, (c) => c.includes("did the work"));
+
+      await finalizeRun({ run, henchDir, projectDir, memoryCtx });
+
+      const finished = await readFile(run.logPath!, "utf-8");
+      // Appended to, never rewritten: whatever a tail had already read is
+      // still the start of the finished file, byte for byte.
+      expect(finished.startsWith(midRun)).toBe(true);
+      expect(finished.endsWith("\n")).toBe(true);
+    });
+
+    it("still writes the log at run end when no project directory was given", async () => {
+      const { initRunRecord, finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");
+      const { stream } = await import("../../../src/types/output.js");
+      const { readdir } = await import("node:fs/promises");
+
+      // No projectDir on init: there is no project root to put .run-logs/ in,
+      // so no live log is opened and finalizeRun writes the whole file.
+      const { run, memoryCtx } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        vendor: "claude",
+      });
+      expect(run.logPath).toBeUndefined();
+
+      stream("Agent", "did the work");
+      await finalizeRun({ run, henchDir, projectDir, memoryCtx });
+
+      const files = (await readdir(join(projectDir, ".run-logs"))).filter((name) => name.endsWith(".log"));
+      expect(files).toHaveLength(1);
+      expect(await readFile(join(projectDir, ".run-logs", files[0]!), "utf-8"))
+        .toContain("did the work");
+    });
+
+    it("loads a run record written before logPath existed", async () => {
+      const { RunRecordSchema } = await import("../../../src/schema/validate.js");
+
+      const legacy = {
+        id: "run-legacy",
+        taskId: "task-1",
+        taskTitle: "old task",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        status: "completed",
+        turns: 1,
+        tokenUsage: { input: 10, output: 5 },
+        toolCalls: [],
+        model: "sonnet",
+      };
+
+      const parsed = RunRecordSchema.safeParse(legacy);
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data.logPath).toBeUndefined();
+    });
+  });
+
+  /**
+   * The structured progress event stream, written for every run rather than
+   * only verbose ones. Both loops go through `initRunRecord` and `finalizeRun`,
+   * so what is asserted here holds for CLI-loop and API-loop runs alike.
+   *
+   * The file format and the event vocabulary are pinned in
+   * `tests/unit/store/run-events.test.ts`; these tests cover the plumbing —
+   * that every run opens one, records its path, and closes it.
+   */
+  describe("structured progress events", () => {
+    type ParsedEvent = {
+      kind: string;
+      summary: string;
+      at: string;
+      counts?: Record<string, number>;
+      detail?: string;
+      ok?: boolean;
+    };
+
+    /** Parse whatever is in the file right now. */
+    async function eventsIn(path: string): Promise<ParsedEvent[]> {
+      return (await readFile(path, "utf-8"))
+        .split("\n")
+        .filter(Boolean)
+        .map((l) => JSON.parse(l) as ParsedEvent);
+    }
+
+    /**
+     * Wait for `count` events, retrying the read.
+     *
+     * Retried rather than slept on: the writer hands each line to Node's
+     * buffer without awaiting the disk, so a fixed sleep would let a loaded
+     * machine decide the verdict instead of the code.
+     */
+    async function readEvents(path: string, count: number): Promise<ParsedEvent[]> {
+      return vi.waitFor(async () => {
+        const events = await eventsIn(path);
+        expect(events.length).toBeGreaterThanOrEqual(count);
+        return events;
+      });
+    }
+
+    let consoleLog: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(async () => {
+      const { resetCapturedLines } = await import("../../../src/types/output.js");
+      resetCapturedLines();
+      consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleLog.mockRestore();
+    });
+
+    it("opens the stream at run start and records its path on the run", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+      const { loadRun } = await import("../../../src/store/runs.js");
+
+      const { run } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        projectDir,
+        vendor: "claude",
+        criteriaCount: 4,
+        permissionMode: "acceptEdits",
+      });
+
+      expect(run.eventsPath).toBeDefined();
+      expect(run.eventsPath).toContain(run.id);
+      // On the persisted record, not only the in-memory one.
+      expect((await loadRun(henchDir, run.id))?.eventsPath).toBe(run.eventsPath);
+
+      // Readable before the agent has produced anything — the brief event is
+      // already there, and it carries the facts the Work tab's first line needs.
+      const [brief] = await readEvents(run.eventsPath!, 1);
+      expect(brief.kind).toBe("brief_loaded");
+      expect(brief.summary).toContain("Test task");
+      expect(brief.counts).toEqual({ criteria: 4 });
+      expect(brief.detail).toContain("acceptEdits");
+      expect(Date.parse(brief.at)).not.toBeNaN();
+    });
+
+    it("opens a stream even when no project directory was given", async () => {
+      // Unlike the run log, which needs a project root for `.run-logs/`: this
+      // file lives beside the record, which every run has.
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+      const { run } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        vendor: "claude",
+      });
+
+      expect(run.logPath).toBeUndefined();
+      expect(run.eventsPath).toBeDefined();
+    });
+
+    it("appends as the run progresses, and ends with run_finished", async () => {
+      const { initRunRecord, finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");
+      const { emitRunEvent } = await import("../../../src/store/run-events.js");
+
+      const { run, memoryCtx } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        projectDir,
+        vendor: "claude",
+      });
+
+      emitRunEvent("file_edited", "Edited src/a.ts (+3 −1)", {
+        turn: 1,
+        counts: { linesAdded: 3, linesRemoved: 1 },
+      });
+
+      // Visible mid-run, which is what a tailing reader depends on.
+      const live = await readEvents(run.eventsPath!, 2);
+      expect(live.map((e) => e.kind)).toEqual(["brief_loaded", "file_edited"]);
+
+      run.status = "completed";
+      await finalizeRun({ run, henchDir, projectDir, memoryCtx });
+
+      const finished = await readEvents(run.eventsPath!, 3);
+      // Appended to, never rewritten: what the tail already read is still the
+      // start of the finished file.
+      expect(finished.slice(0, 2).map((e) => e.kind)).toEqual(["brief_loaded", "file_edited"]);
+      const last = finished[finished.length - 1];
+      expect(last.kind).toBe("run_finished");
+      // Whatever verdict finalizeRun settled on, the closing event reports it —
+      // the point being that a reader never has to infer the outcome from the
+      // file simply stopping, which is also what a crash looks like.
+      expect(last.summary).toBe(`Run ${run.status}`);
+      expect(last.ok).toBe(run.status === "completed");
+      // That the event carries a duration, not how long this run happened to
+      // take — a bound on the latter would be a clock deciding the verdict.
+      expect(Object.keys(last.counts ?? {})).toContain("durationMs");
+      expect(typeof last.counts?.durationMs).toBe("number");
+    });
+
+    it("stops routing events once the run has finalized", async () => {
+      const { initRunRecord, finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");
+      const { emitRunEvent } = await import("../../../src/store/run-events.js");
+
+      const { run, memoryCtx } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        projectDir,
+        vendor: "claude",
+      });
+      await finalizeRun({ run, henchDir, projectDir, memoryCtx });
+
+      const afterFinalize = (await readFile(run.eventsPath!, "utf-8")).length;
+      // A stray emit between runs must not land in the finished run's file.
+      emitRunEvent("gate", "a gate from nowhere");
+      expect((await readFile(run.eventsPath!, "utf-8")).length).toBe(afterFinalize);
+    });
+
+    it("does not print the events it records", async () => {
+      // The stream is a side channel. Verbose output is whatever it was before
+      // this existed, which is what keeps `--verbose` unchanged.
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+      const { emitRunEvent } = await import("../../../src/store/run-events.js");
+      const { getCapturedLines } = await import("../../../src/types/output.js");
+
+      await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        projectDir,
+        vendor: "claude",
+      });
+
+      const before = getCapturedLines().length;
+      const printedBefore = consoleLog.mock.calls.length;
+      emitRunEvent("gate", "Test gate passed", { ok: true });
+
+      expect(getCapturedLines().length).toBe(before);
+      expect(consoleLog.mock.calls.length).toBe(printedBefore);
+    });
+
+    it("loads a run record written before eventsPath existed", async () => {
+      const { RunRecordSchema } = await import("../../../src/schema/validate.js");
+
+      const parsed = RunRecordSchema.safeParse({
+        id: "run-legacy",
+        taskId: "task-1",
+        taskTitle: "old task",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        status: "completed",
+        turns: 1,
+        tokenUsage: { input: 10, output: 5 },
+        toolCalls: [],
+        model: "sonnet",
+      });
+
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data.eventsPath).toBeUndefined();
     });
   });
 });
