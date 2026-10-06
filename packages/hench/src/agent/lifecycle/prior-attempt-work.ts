@@ -19,7 +19,7 @@ import { taskRunsNewestFirst } from "./gate-only-retry.js";
 export interface PriorAttemptWork {
   /** Short ids of the earlier runs of this task, oldest first. */
   runIds: string[];
-  /** Task files (changed by earlier runs) with commits since the first attempt. */
+  /** Files touched by the earlier runs' own commits that are still in HEAD. */
   files: string[];
 }
 
@@ -29,10 +29,10 @@ const BOOKKEEPING_EXCLUDES = [":(exclude).rex", ":(exclude).hench", ":(exclude).
 /**
  * Find the task's files that earlier attempts committed to the current branch.
  *
- * The first attempt is the oldest run of the task whose `startHead` is still
- * an ancestor of HEAD; the task's files are the union of the earlier runs'
- * `structuredSummary.filesChanged`. Returns undefined when there is no such
- * run, no file overlap, or git cannot answer.
+ * Only commits recorded on the task's own earlier runs (`RunRecord.commits`)
+ * that are still ancestors of HEAD count; the files are those the commits
+ * touched. Uncommitted edits and other tasks' commits to the same files never
+ * count. Returns undefined when there is no such commit or git cannot answer.
  */
 export async function findPriorAttemptWork(opts: {
   projectDir: string;
@@ -40,27 +40,24 @@ export async function findPriorAttemptWork(opts: {
   runHistory?: readonly RunRecord[];
 }): Promise<PriorAttemptWork | undefined> {
   const earlier = taskRunsNewestFirst(opts.taskId, opts.runHistory ?? []).reverse();
-  const taskFiles = new Set(earlier.flatMap((r) => r.structuredSummary?.filesChanged ?? []));
-  if (taskFiles.size === 0) return undefined;
+  const shas = new Set(earlier.flatMap((r) => (r.commits ?? []).map((c) => c.sha)));
 
-  let firstHead: string | undefined;
-  for (const run of earlier) {
-    if (run.startHead && (await isAncestorOfHead(opts.projectDir, run.startHead))) {
-      firstHead = run.startHead;
-      break;
+  const files = new Set<string>();
+  for (const sha of shas) {
+    if (!(await isAncestorOfHead(opts.projectDir, sha))) continue;
+    const shown = await exec(
+      "git",
+      ["diff-tree", "--no-commit-id", "--name-only", "-r", "--root", sha, "--", ".", ...BOOKKEEPING_EXCLUDES],
+      { cwd: opts.projectDir, timeout: 10_000 },
+    );
+    if (shown.exitCode !== 0) return undefined;
+    for (const line of shown.stdout.split("\n")) {
+      const file = line.trim();
+      if (file) files.add(file);
     }
   }
-  if (!firstHead) return undefined;
-
-  const diff = await exec("git", ["diff", "--name-only", `${firstHead}..HEAD`, "--", ".", ...BOOKKEEPING_EXCLUDES], {
-    cwd: opts.projectDir,
-    timeout: 10_000,
-  });
-  if (diff.exitCode !== 0) return undefined;
-
-  const files = diff.stdout.split("\n").map((l) => l.trim()).filter((f) => taskFiles.has(f));
-  if (files.length === 0) return undefined;
-  return { runIds: earlier.map((r) => r.id.slice(0, 8)), files };
+  if (files.size === 0) return undefined;
+  return { runIds: earlier.map((r) => r.id.slice(0, 8)), files: [...files] };
 }
 
 /** Diagnostics note recorded when the read-only refusal is suppressed. */

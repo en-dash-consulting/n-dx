@@ -97,8 +97,8 @@ describe("cliLoop — read-only refusal retry", () => {
     };
   };
 
-  /** Seed an earlier failed run of task-1 that started at `startHead` and changed `files`. */
-  async function seedEarlierRun(startHead: string, files: string[]): Promise<RunRecord> {
+  /** Seed an earlier failed run of task-1 that started at `startHead`, changed `files` and recorded `commits`. */
+  async function seedEarlierRun(startHead: string, files: string[], commits?: string[]): Promise<RunRecord> {
     const run = {
       id: randomUUID(),
       taskId: "task-1",
@@ -112,6 +112,7 @@ describe("cliLoop — read-only refusal retry", () => {
       toolCalls: [],
       model: "test-model",
       startHead,
+      ...(commits && { commits: commits.map((sha) => ({ sha, subject: "earlier work" })) }),
       structuredSummary: {
         filesChanged: files,
         filesRead: [],
@@ -124,14 +125,19 @@ describe("cliLoop — read-only refusal retry", () => {
     return run;
   }
 
-  /** An earlier attempt's work, committed to the branch. Returns the HEAD it started from. */
-  function commitEarlierWork(): string {
-    const startHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: projectDir, encoding: "utf-8" }).trim();
-    writeFileSync(join(projectDir, "earlier.ts"), "export const earlier = 1;\n", "utf-8");
-    execFileSync("git", ["add", "earlier.ts"], { cwd: projectDir, stdio: "ignore" });
-    execFileSync("git", ["commit", "-m", "feat: the earlier work"], { cwd: projectDir, stdio: "ignore" });
-    return startHead;
+  const head = () => execFileSync("git", ["rev-parse", "HEAD"], { cwd: projectDir, encoding: "utf-8" }).trim();
+
+  /** Commit `file` to the branch. Returns the HEAD it started from and the new commit. */
+  function commitFile(file: string, message: string): { startHead: string; sha: string } {
+    const startHead = head();
+    writeFileSync(join(projectDir, file), `export const value = ${JSON.stringify(message)};\n`, "utf-8");
+    execFileSync("git", ["add", file], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", message], { cwd: projectDir, stdio: "ignore" });
+    return { startHead, sha: head() };
   }
+
+  /** An earlier attempt's work, committed to the branch. */
+  const commitEarlierWork = () => commitFile("earlier.ts", "feat: the earlier work");
 
   async function runLoop() {
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
@@ -204,7 +210,8 @@ describe("cliLoop — read-only refusal retry", () => {
 
   it("does not re-spawn cold when earlier attempts already committed the task's files", async () => {
     await useForkStrategy();
-    const earlier = await seedEarlierRun(commitEarlierWork(), ["earlier.ts"]);
+    const { startHead, sha } = commitEarlierWork();
+    const earlier = await seedEarlierRun(startHead, ["earlier.ts"], [sha]);
     cli.script(orients, refuses(WORK), commitsWork);
 
     const { run } = await runLoop();
@@ -223,9 +230,11 @@ describe("cliLoop — read-only refusal retry", () => {
     );
   });
 
-  it("still re-spawns cold when the earlier runs' files are not on the branch", async () => {
+  it("re-spawns cold when an attempt only edited a file that another task then committed", async () => {
     await useForkStrategy();
-    await seedEarlierRun(commitEarlierWork(), ["elsewhere.ts"]);
+    const startHead = head();
+    commitFile("shared.ts", "feat: another task's change");
+    await seedEarlierRun(startHead, ["shared.ts"]);
     cli.script(orients, refuses(WORK), commitsWork);
 
     const { run } = await runLoop();
@@ -233,12 +242,13 @@ describe("cliLoop — read-only refusal retry", () => {
     expect(cli.invocations).toHaveLength(3);
     expect(run.status).toBe("completed");
     expect(run.readOnlyRefusal).toBeDefined();
+    expect(run.spawnBreakdown?.["read-only-retry"]).toBe(1);
   });
 
-  it("falls back to the cold re-spawn when the earlier run's start commit cannot be resolved", async () => {
+  it("falls back to the cold re-spawn when the earlier run's commit is not in HEAD", async () => {
     await useForkStrategy();
-    commitEarlierWork();
-    await seedEarlierRun("0".repeat(40), ["earlier.ts"]);
+    const { startHead } = commitEarlierWork();
+    await seedEarlierRun(startHead, ["earlier.ts"], ["0".repeat(40)]);
     cli.script(orients, refuses(WORK), commitsWork);
 
     const { run } = await runLoop();
