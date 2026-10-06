@@ -21,5 +21,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add the v2 node types and fields](./add-the-v2-node-types-and-fields.md) | pending |
+| [Add the v2 node types and fields](./add-the-v2-node-types-and-fields.md) | completed |
 | [Add the v2 validation rules as pure functions](./add-the-v2-validation-rules-as-pure.md) | pending |
+| [v2 schema field coverage is checked against a reconstructed field list, not the design doc's intent/state tables](./v2-schema-field-coverage-is-checked.md) | pending |
