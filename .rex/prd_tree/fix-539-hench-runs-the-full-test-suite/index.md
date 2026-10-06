@@ -28,7 +28,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Absorb gate flakes: re-run only the failed suites once before failing an unattended run](./absorb-gate-flakes-re-run-only-the.md) | completed |
-| [affected mode skips the 2-second root policy tests when a change stays inside one package's src or tests](./affected-mode-skips-the-2-second-root.md) | pending |
+| [affected mode skips the 2-second root policy tests when a change stays inside one package's src or tests](./affected-mode-skips-the-2-second-root.md) | completed |
 | [agentLoop's gate-only retry wiring has no test](./agentloop-s-gate-only-retry-wiring-has.md) | pending |
 | [Gate-only retry: skip the agent when the previous run failed only at the gate with its work committed](./gate-only-retry-skip-the-agent-when.md) | completed |
 | [hench.testGate.command: a gate command template with {base}, recording the suites it selected](./hench-testgate-command-a-gate-command.md) | completed |
