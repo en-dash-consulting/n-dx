@@ -2,7 +2,7 @@
 id: "e23d7835-47cd-4a96-a5e5-a4b86e23a148"
 level: "task"
 title: "Read-only refusal is suppressed by other tasks' commits to files an earlier attempt only edited"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -11,12 +11,17 @@ tags:
   - "read-only-refusal"
   - "539"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-06T22:40:23.559Z"
+completedAt: "2026-10-06T22:51:58.834Z"
+endedAt: "2026-10-06T22:51:58.834Z"
+resolutionType: "code-change"
+resolutionDetail: "findPriorAttemptWork now uses the earlier runs' recorded commits that are ancestors of HEAD, and the files those commits touched. Commit 4c329b7a3."
 acceptanceCriteria:
   - "findPriorAttemptWork reports work only for files touched by commits recorded on the task's own earlier runs that are still ancestors of HEAD."
   - "An earlier attempt that committed nothing, plus another task's commit to a file that attempt edited, no longer suppresses the read-only refusal: the forked no-edit result re-spawns cold (integration test)."
   - "The existing case, where the task's own earlier commits touched its files, still suppresses the refusal and names the earlier runs."
   - "Runs without a commits field and git errors leave today's behaviour unchanged."
 description: "Verdict: should-fix (medium). Recommended for this PR: the defect is in code this PR added (task 5, 8adab30c), and the fix is small.\n\n**Failure scenario.**\n1. Attempt A of task T edits `packages/hench/src/agent/lifecycle/shared.ts`, then fails before committing (livelock, timeout, rollback). Its `structuredSummary.filesChanged` still lists `shared.ts`, because `finalizeRun` builds it from the agent's edit calls when git does not answer for it.\n2. Another task U commits a change to `shared.ts`.\n3. T is retried. A forked session hits the #473 read-only refusal: the orientation turn wins and it never tries to edit.\n4. `findPriorAttemptWork` sees `shared.ts` in `git diff <A.startHead>..HEAD` and treats it as T's committed work. `isReadOnlyRefusal` stands down, so there is no cold re-spawn.\n5. The run fails with \"This task's files were already committed by earlier attempts…\". That is false: T's work was never committed.\n\nOn a hot file this repeats on every retry while forks keep refusing. #473's protection is lost exactly when it is needed.\n\n**Evidence:** `packages/hench/src/agent/lifecycle/prior-attempt-work.ts:43-62`. `taskFiles` comes from `structuredSummary.filesChanged` of every earlier run, whether or not that run committed anything, and is intersected with ALL changes since the first attempt's start commit, whoever made them. I looked for a check that the changes came from T's own commits and found none.\n\n**Reachable:** `ndx work --task=<id>` on a retry, where an earlier attempt edited without committing, another task committed to the same file since, and the session forks (the default `hench.sessionStrategy`). **Covered:** no test builds this case. `read-only-refusal-retry.test.ts` seeds only the task's own commits.\n\n**Options.**\n- **(a) Recommended.** Base the check on the earlier runs' recorded `commits` (`RunRecord.commits`, from `collectRunCommits`).\n  - Keep only commits that are ancestors of HEAD (`isAncestorOfHead`).\n  - Take the files those commits touched (`git show --name-only --format= <sha>`, or one `git diff-tree --no-commit-id --name-only -r <sha>` per commit), with the BOOKKEEPING_EXCLUDES.\n  - The work exists when that set is non-empty; report it as `files`.\n  - Runs without a `commits` field add nothing, which is today's behaviour, and git errors still return undefined.\n  - Cost: about 20 lines; drop the `structuredSummary.filesChanged` intersection.\n- **(b)** Keep the current check, but also require at least one earlier-run commit reachable from HEAD. Cheaper, but a reachable unrelated commit from T plus U's change to a file T only edited still triggers it.\n\n**Tests.** Add an integration case beside `tests/integration/read-only-refusal-retry.test.ts`:\n- an earlier attempt that committed nothing but lists `shared.ts` in filesChanged;\n- a later commit to `shared.ts` by another task;\n- a forked no-edit result.\n\nIt must re-spawn cold. The existing suppression case (the task's own commits) must still suppress.\n\n**Validation.**\n- `pnpm --filter @n-dx/hench exec vitest run tests/unit/agent/read-only-refusal.test.ts tests/integration/read-only-refusal-retry.test.ts <new files>`.\n- The six root policy tests from the epic conventions.\n- `pnpm --filter @n-dx/hench build`.\n- Do not run the full suite."
-lastModified: "2026-10-06T22:01:31.545Z"
+lastModified: "2026-10-06T22:51:59.302Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
