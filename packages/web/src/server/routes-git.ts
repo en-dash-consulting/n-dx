@@ -7,11 +7,13 @@
  * POST /api/git/commit  — stage everything currently dirty and commit
  * POST /api/git/discard — hard-reset tracked changes and remove untracked
  *                         files (git reset --hard HEAD + git clean -fd)
+ * POST /api/git/ignore  — append one untracked path to .gitignore
  *
- * Deliberately narrow: read-only status/diff plus two scoped mutations
- * (stage-all + commit, and discard-all). No branch switching, merge,
- * rebase, partial staging, or conflict resolution here — those carry real
- * destructive-action risk and are better served by a terminal or IDE.
+ * Deliberately narrow: read-only status/diff plus three scoped mutations
+ * (stage-all + commit, discard-all, and ignore-one-path). No branch
+ * switching, merge, rebase, partial staging, or conflict resolution here —
+ * those carry real destructive-action risk and are better served by a
+ * terminal or IDE.
  * Discard in particular is irreversible for untracked files (`git clean`
  * does not go through the reflog) — the route requires the caller to echo
  * back the dirty-file count it is confirming against (a stale-request
@@ -27,8 +29,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, statSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 import { exec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
@@ -106,6 +108,27 @@ function resolveWithinProject(projectDir: string, file: string): string | null {
   const resolved = resolve(projectRoot, file);
   if (resolved !== projectRoot && !resolved.startsWith(projectRoot + sep)) return null;
   return resolved;
+}
+
+const GITIGNORE_NAME = ".gitignore";
+
+/**
+ * Turn a project-relative path into a literal `.gitignore` entry.
+ *
+ * The leading `/` earns its place twice over: it anchors the entry to this
+ * exact path instead of matching the same basename anywhere in the tree,
+ * and it keeps a path beginning with `#` or `!` out of comment/negation
+ * position. Glob metacharacters in the path itself are escaped so a file
+ * literally named `report[1].txt` ignores that file and not a character
+ * class.
+ */
+export function toGitignorePattern(relPath: string): string {
+  const escaped = relPath
+    .split(sep).join("/")
+    .replace(/([*?[\]\\])/g, "\\$1")
+    // A trailing space is stripped from a .gitignore line unless escaped.
+    .replace(/ $/, "\\ ");
+  return `/${escaped}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -283,6 +306,100 @@ async function handleGitDiscard(
   return true;
 }
 
+/**
+ * Append one untracked path to the project's `.gitignore`.
+ *
+ * Scoped to untracked paths on purpose: adding a *tracked* file to
+ * `.gitignore` changes nothing — git keeps tracking what it already tracks
+ * — so the request is refused with that explanation rather than written and
+ * silently ignored. The write itself is a plain append, reversible by
+ * editing the file; `.gitignore` becoming modified is exactly what the
+ * caller sees next in the status list.
+ */
+async function handleGitIgnore(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  let file: string;
+  try {
+    const body = await readBody(req, res);
+    const input = JSON.parse(body) as { file?: string };
+    file = (input.file ?? "").trim();
+  } catch {
+    errorResponse(res, 400, "Invalid JSON body");
+    return true;
+  }
+  if (!file) {
+    errorResponse(res, 400, "file is required");
+    return true;
+  }
+
+  const resolved = resolveWithinProject(ctx.projectDir, file);
+  if (!resolved) {
+    errorResponse(res, 400, "file must resolve within the project directory");
+    return true;
+  }
+  const rel = relative(resolve(ctx.projectDir), resolved);
+  if (!rel) {
+    errorResponse(res, 400, "file must name a path inside the project, not the project root");
+    return true;
+  }
+  const bare = rel.split(sep).join("/");
+  if (bare === GITIGNORE_NAME) {
+    errorResponse(res, 400, ".gitignore cannot ignore itself");
+    return true;
+  }
+
+  // `:(literal)` because a pathspec is glob-matched by default — a file
+  // genuinely named `report[1].txt` would otherwise look absent and be
+  // refused as "not untracked".
+  const fileStatus = await gitCommand(ctx.projectDir, ["status", "--porcelain", "--", `:(literal)${bare}`]);
+  if (!fileStatus.stdout.startsWith("??")) {
+    errorResponse(
+      res, 409,
+      `${bare} is not untracked — .gitignore has no effect on a path git already tracks or already ignores (for a tracked path, run \`git rm --cached\` first).`,
+    );
+    return true;
+  }
+
+  const pattern = toGitignorePattern(rel);
+  const gitignorePath = join(resolve(ctx.projectDir), GITIGNORE_NAME);
+  let existing = "";
+  try {
+    existing = readFileSync(gitignorePath, "utf-8");
+  } catch {
+    // No .gitignore yet — the write below creates it.
+  }
+
+  // Compare against both the anchored pattern and the bare path: an entry a
+  // human wrote by hand is far more likely to be the latter. Reachable even
+  // though an ignored path is never untracked — a later `!` negation line
+  // un-ignores it, and appending a second identical entry wouldn't help.
+  const already = existing
+    .split("\n")
+    .some((line) => line.trim() === pattern || line.trim() === bare);
+
+  if (!already) {
+    const separator = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
+    try {
+      writeFileSync(gitignorePath, `${existing}${separator}${pattern}\n`, "utf-8");
+    } catch (err) {
+      errorResponse(res, 500, `Failed to write .gitignore: ${err instanceof Error ? err.message : String(err)}`);
+      return true;
+    }
+  }
+
+  const status = await gitCommand(ctx.projectDir, ["status", "--porcelain"]);
+  jsonResponse(res, 200, {
+    ok: true,
+    pattern,
+    added: !already,
+    dirty: parsePorcelainStatus(status.stdout).length > 0,
+  });
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
@@ -318,6 +435,10 @@ export async function handleGitRoute(
 
   if (path === "/api/git/discard" && method === "POST") {
     return handleGitDiscard(req, res, ctx);
+  }
+
+  if (path === "/api/git/ignore" && method === "POST") {
+    return handleGitIgnore(req, res, ctx);
   }
 
   return false;

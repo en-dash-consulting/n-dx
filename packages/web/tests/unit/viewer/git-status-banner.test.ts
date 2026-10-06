@@ -227,6 +227,58 @@ describe("GitStatusBanner", () => {
     expect(onCommitted).not.toHaveBeenCalled();
   });
 
+  it("offers Ignore on untracked rows only", () => {
+    const props = { status: DIRTY, onCommitted: vi.fn() };
+    render(h(GitStatusBanner, props), root);
+    (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
+    render(h(GitStatusBanner, props), root);
+
+    const ignoreButtons = root.querySelectorAll(".git-file-ignore-btn");
+    expect(ignoreButtons.length).toBe(1);
+    // b.txt is the untracked one; a.txt is modified and tracked.
+    expect(ignoreButtons[0].closest(".git-file-row")!.textContent).toContain("b.txt");
+  });
+
+  it("adds an untracked file to .gitignore and refreshes without collapsing", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { ok: true, pattern: "/b.txt", added: true, dirty: true }));
+    const onCommitted = vi.fn();
+    const props = { status: DIRTY, onCommitted };
+
+    render(h(GitStatusBanner, props), root);
+    (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
+    render(h(GitStatusBanner, props), root);
+
+    (root.querySelector(".git-file-ignore-btn") as HTMLButtonElement).click();
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/git/ignore", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ file: "b.txt" }),
+    })));
+    await vi.waitFor(() => expect(onCommitted).toHaveBeenCalledTimes(1));
+
+    render(h(GitStatusBanner, props), root);
+    expect(root.querySelector(".git-status-panel")).not.toBeNull();
+    // No diff was requested — the ignore click is not a row toggle.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows an error on the row when the ignore call fails", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(409, { error: "tracked.txt is not untracked" }));
+    const onCommitted = vi.fn();
+    const props = { status: DIRTY, onCommitted };
+
+    render(h(GitStatusBanner, props), root);
+    (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
+    render(h(GitStatusBanner, props), root);
+    (root.querySelector(".git-file-ignore-btn") as HTMLButtonElement).click();
+
+    await vi.waitFor(() => expect(root.querySelector(".git-file-ignore-error")).not.toBeNull());
+    render(h(GitStatusBanner, props), root);
+
+    expect(root.querySelector(".git-file-ignore-error")!.textContent).toContain("not untracked");
+    expect(onCommitted).not.toHaveBeenCalled();
+  });
+
   it("collapses back to the pill when the close button is clicked", () => {
     const props = { status: DIRTY, onCommitted: vi.fn() };
     render(h(GitStatusBanner, props), root);
