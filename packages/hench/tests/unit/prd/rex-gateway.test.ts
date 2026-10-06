@@ -46,6 +46,9 @@ const EXPECTED_EXPORTS = [
   "findActionableTasks",
   "collectCompletedIds",
   "explainSelection",
+  // The subtree-pruning rule the selector applies. Hench reads it to say why
+  // an epic has nothing selectable when its tasks all read "pending".
+  "traversalBlock",
   "matchesAssignee",
   // Cross-worktree task claims
   "openClaimsStore",

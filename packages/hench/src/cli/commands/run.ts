@@ -1,8 +1,9 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
-import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor } from "../../prd/rex-gateway.js";
-import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor, traversalBlock } from "../../prd/rex-gateway.js";
+import type { PRDItem, PRDStore, TraversalBlock } from "../../prd/rex-gateway.js";
+import { collectEpicTaskIds as collectEpicTasks } from "../../agent/planning/brief.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { classifyChangedFiles } from "../../store/file-classifier.js";
 import type { FileCategory } from "../../store/file-classifier.js";
@@ -280,12 +281,66 @@ export interface EpicScopeInfo {
   totalTasks: number;
   /** Number of completed tasks/subtasks. */
   completedTasks: number;
-  /** Number of actionable tasks (pending or in_progress). */
+  /**
+   * How many tasks in this epic the task selector would actually hand back.
+   *
+   * Counted with the selector itself rather than by re-reading each task's
+   * status, because the two disagree. A task is unreachable when anything
+   * above it is blocked, cancelled, deleted, or waiting on an unfinished
+   * `blockedBy` — the selector prunes the whole subtree at that point, while a
+   * per-item status count sees a tree full of pending work.
+   *
+   * That divergence is what made `--epic-by-epic` look like it only validated
+   * epics: it announced "Starting: N actionable task(s)" from the status
+   * count, the selector then found nothing, and the epic was recorded
+   * `no_actionable_tasks` without a single task running. Every epic in the
+   * PRD did this in turn, so the whole invocation printed headers and a
+   * summary and ran no work at all.
+   */
   actionableTasks: number;
   /** True if all tasks are completed (or epic has no tasks). */
   isComplete: boolean;
   /** True if there are actionable tasks to work on. */
   hasActionableTasks: boolean;
+  /**
+   * Why the epic as a whole is unreachable, when it is — the epic item's own
+   * {@link traversalBlock}. Set even if tasks beneath it are pending, which is
+   * exactly the case the operator cannot otherwise explain: every task says
+   * "pending" and nothing runs.
+   */
+  scopeBlock?: TraversalBlock;
+}
+
+/**
+ * Why an epic is being skipped, as the epic-by-epic run says it.
+ *
+ * The old line was `has no actionable tasks (N blocked/deferred)`, derived
+ * from the status counts. When the gate is the epic *itself* — it is blocked,
+ * or waiting on another epic — that sentence is unanswerable: every task under
+ * it reads `pending` in `rex status`, so the operator is told there is no work
+ * in a place that visibly has some, with nothing naming the thing in the way.
+ *
+ * Exported for testing: the explanation is the whole point of the change, and
+ * the loop that prints it needs a live PRD to reach.
+ */
+export function formatEpicSkipLines(scope: EpicScopeInfo): string[] {
+  const remaining = scope.totalTasks - scope.completedTasks;
+  const block = scope.scopeBlock;
+
+  if (block?.cause === "status") {
+    return [
+      `⚠ Epic "${scope.title}" is ${block.status}, so none of its ${remaining} remaining task(s) can be selected.`,
+      `  Set it to pending with 'rex update ${scope.id} --status=pending' to work it.`,
+    ];
+  }
+  if (block?.cause === "blockedBy") {
+    return [
+      `⚠ Epic "${scope.title}" is waiting on ${block.openBlockerIds.join(", ")}, ` +
+        `so none of its ${remaining} remaining task(s) can be selected.`,
+      `  It becomes workable once those complete.`,
+    ];
+  }
+  return [`⚠ Epic "${scope.title}" has no actionable tasks (${remaining} blocked/deferred).`];
 }
 
 /**
@@ -302,13 +357,18 @@ export async function getEpicScopeInfo(
     throw new EpicNotFoundError(epicId, listEpics(doc.items));
   }
   const resolvedEpicId = epic.id;
+  // The epic's own node, for the scope-level block below. `findEpicByIdOrTitle`
+  // answers identity (it accepts a title), not the item.
+  const epicItem = findItem(doc.items, resolvedEpicId)?.item;
+  if (!epicItem) {
+    throw new EpicNotFoundError(epicId, listEpics(doc.items));
+  }
 
   // Walk the tree and count tasks belonging to this epic
   const { walkTree } = await import("../../prd/rex-gateway.js");
 
   let totalTasks = 0;
   let completedTasks = 0;
-  let actionableTasks = 0;
 
   for (const { item, parents } of walkTree(doc.items)) {
     // Check if this item is inside the target epic
@@ -320,17 +380,25 @@ export async function getEpicScopeInfo(
       // Deleted items are excluded from all counts
       if (item.status === "deleted") continue;
       totalTasks++;
-      if (item.status === "completed") {
-        completedTasks++;
-      } else if (item.status === "pending" || item.status === "in_progress" || item.status === "failing") {
-        actionableTasks++;
-      }
-      // deferred and blocked are neither completed nor actionable; failing IS actionable (retry)
+      if (item.status === "completed") completedTasks++;
     }
   }
 
+  // The actionable count comes from the selector, not from a second reading of
+  // each task's status — see the field's doc comment. This is the same
+  // intersection the autonomous epic path computes in `prepareBrief`, so the
+  // number announced before an epic starts is the number the loop will find.
+  // Run-specific exclusions (stuck tasks, tasks another worktree holds) are
+  // deliberately left out: "there is work here, but this run is skipping it"
+  // is a different statement, and the loop reports it separately.
+  const completedIds = collectCompletedIds(doc.items);
+  const epicTaskIds = collectEpicTasks(doc.items, resolvedEpicId);
+  const actionableTasks = findActionable(doc.items, completedIds, Infinity, {})
+    .filter((entry) => epicTaskIds.has(entry.item.id)).length;
+
   const isComplete = totalTasks === 0 || completedTasks === totalTasks;
   const hasActionableTasks = actionableTasks > 0;
+  const scopeBlock = traversalBlock(epicItem, completedIds);
 
   return {
     id: epic.id,
@@ -340,6 +408,7 @@ export async function getEpicScopeInfo(
     actionableTasks,
     isComplete,
     hasActionableTasks,
+    ...(scopeBlock ? { scopeBlock } : {}),
   };
 }
 
@@ -2646,7 +2715,7 @@ async function runEpicByEpic(
       }
 
       if (!freshScope.hasActionableTasks) {
-        info(colorWarn(`⚠ Epic "${epic.title}" has no actionable tasks (${freshScope.totalTasks - freshScope.completedTasks} blocked/deferred).`));
+        for (const line of formatEpicSkipLines(freshScope)) info(colorWarn(line));
         summaries.push({
           id: epic.id,
           title: epic.title,
