@@ -50,6 +50,12 @@ export interface ConfigFieldInfo {
    * is right for the common case. `guard.blockedPaths` and
    * `guard.allowedCommands` differ wholesale rather than in one number, so they
    * record nothing rather than record something wrong.
+   *
+   * The `git.*` rows record nothing for a different reason: the group is absent
+   * from `DEFAULT_HENCH_CONFIG()` entirely, so no value inside it survives a
+   * parse of the defaults. Hench applies those defaults at the use site instead
+   * (`DEFAULT_CHECKPOINT_THRESHOLD`, `DEFAULT_GIT_COMMIT_MESSAGE_SOURCE`), which
+   * is not a surface the contract test can pin a row against.
    */
   defaultValue?: unknown;
 }
@@ -119,7 +125,7 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
   { path: "commitMsgTimeoutMs", label: "Commit Message Timeout (ms)", description: "How long the commit-message generation call may run. 0 means no limit", type: "number", integer: true, category: "git", defaultValue: 300000 },
   { path: "git.checkpointThreshold", label: "Checkpoint Threshold (lines)", description: "Lines changed at/above which the pre-run gate defaults to committing a checkpoint. 0 disables", type: "number", integer: true, category: "git" },
   { path: "git.requireCleanTree", label: "Require Clean Tree", description: "Refuse to start runs against a dirty working tree", type: "boolean", category: "git" },
-  { path: "git.commitMessage", label: "Pre-run Commit Subject", description: "Where the pre-run gate's proposed subject comes from: built from the changed file list, or summarised by a light-tier model", type: "enum", enumValues: ["deterministic", "llm"], category: "git", defaultValue: "deterministic" },
+  { path: "git.commitMessage", label: "Pre-run Commit Subject", description: "Where the pre-run gate's proposed subject comes from: built from the changed file list, or summarised by a light-tier model", type: "enum", enumValues: ["deterministic", "llm"], category: "git" },
 
   // ── Guard rails ──
   { path: "guard.blockedPaths", label: "Blocked Paths", description: "Glob patterns for paths the agent cannot modify", type: "array", category: "guard" },
