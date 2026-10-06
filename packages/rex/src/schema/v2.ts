@@ -5,7 +5,7 @@
  * nothing yet: no runtime module imports this file until the v2 reader and
  * writer land (enforced by tests/unit/schema/v2.test.ts). Validation *rules*
  * (cross-node checks such as "every change amends or touches something")
- * are pure functions added separately; this file only fixes shapes.
+ * are pure functions in `./v2-rules.ts`; this file only fixes shapes.
  *
  * ## Model
  *

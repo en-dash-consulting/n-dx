@@ -299,15 +299,17 @@ describe("field coverage (design intent/state tables)", () => {
 });
 
 describe("isolation", () => {
-  it("no runtime module imports schema/v2 yet", () => {
+  it("no runtime module imports schema/v2 or its rules yet", () => {
     const srcRoot = join(import.meta.dirname, "../../../src");
+    // The v2 schema files may import each other; nothing else may import them.
+    const v2Files = new Set(["schema/v2.ts", "schema/v2-rules.ts"].map((f) => join(srcRoot, f)));
     const offenders: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const p = join(dir, entry.name);
         if (entry.isDirectory()) walk(p);
-        else if (entry.name.endsWith(".ts") && p !== join(srcRoot, "schema/v2.ts")) {
-          if (/from\s+["'][^"']*schema\/v2(\.js)?["']|from\s+["']\.\/v2(\.js)?["']/.test(readFileSync(p, "utf8"))) {
+        else if (entry.name.endsWith(".ts") && !v2Files.has(p)) {
+          if (/from\s+["'][^"']*schema\/v2(-rules)?(\.js)?["']|from\s+["']\.\/v2(-rules)?(\.js)?["']/.test(readFileSync(p, "utf8"))) {
             offenders.push(relative(srcRoot, p));
           }
         }
