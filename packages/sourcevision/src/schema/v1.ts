@@ -951,3 +951,249 @@ export interface ProjectSurface {
   /** What this surface is (free-form label, e.g. "Makefile", "GitHub Actions"). */
   kind: string;
 }
+
+// ── SDLC readiness profile ──────────────────────────────────────────────────
+// Evidence-based CI/CD maturity: what this repository can actually do, each
+// claim tied to the file that proves it. Written to `sdlc-profile.json` by the
+// analyzer and read by the readiness scorecard.
+//
+// The load-bearing rule is that nothing is asserted without proof. Every
+// detection carries a non-empty `evidence` list, and `SdlcEvidenceList` is a
+// non-empty tuple type rather than a plain array, so an evidence-free
+// detection does not compile — the rule is enforced by the type, not by a
+// convention a later analyzer can forget.
+
+/**
+ * How firmly a detection is believed.
+ *
+ * `certain` — the artifact states it outright (a `test` script in
+ * `package.json`, a job named in a workflow file).
+ * `likely` — a strong conventional signal (a migrations directory beside a
+ * known ORM config).
+ * `inferred` — read from indirect evidence (a deploy step guessed from the
+ * arguments of a shell command).
+ */
+export type SdlcConfidence = "certain" | "likely" | "inferred";
+
+/** One artifact that proves a detection. */
+export interface SdlcEvidence {
+  /**
+   * What sort of proof this is — `manifest-script`, `workflow-job`,
+   * `file-present`, `dockerfile-stage`, `config-key`, and so on. Free-form so
+   * the analyzer can name the signal precisely; the scorecard reads
+   * `confidence`, not this.
+   */
+  kind: string;
+  /** Project-relative path to the file that carries the proof. */
+  path: string;
+  /** 1-indexed line within `path`, when the proof is a specific line. */
+  line?: number;
+  /** The proving text, trimmed. Kept short — a line, not a file. */
+  excerpt?: string;
+  confidence: SdlcConfidence;
+}
+
+/**
+ * A detection's proof: at least one piece of evidence.
+ *
+ * A tuple with a required first element, so `evidence: []` is a type error.
+ * This is the one place the "nothing without proof" rule is enforced; every
+ * detection below spells its evidence with this type.
+ */
+export type SdlcEvidenceList = [SdlcEvidence, ...SdlcEvidence[]];
+
+/** Everything in the profile is a claim with its proof attached. */
+export interface SdlcDetection {
+  evidence: SdlcEvidenceList;
+}
+
+/**
+ * The six command kinds modelled uniformly.
+ *
+ * Deliberately a closed set: the point of this section is that one consumer
+ * can ask "how do I run the tests here" and get an answer in a fixed shape.
+ */
+export type SdlcCommandKind = "test" | "lint" | "typecheck" | "build" | "deploy" | "migrate";
+
+/**
+ * One runnable command the repository declares.
+ *
+ * This section is the one with a life beyond readiness scoring.
+ * `analyzers/test-command-resolver.ts`, rex's `.rex/config.json` `test` key and
+ * `readme-generator.js`'s `detectCommands` each discover commands their own
+ * way today; this is the shape meant to replace all three later. It is not
+ * wired to them here — adopting it is its own change.
+ *
+ * The manifest or file a command came from is `evidence[0].path`; there is no
+ * second field holding it, so the two can never disagree.
+ */
+export interface SdlcCommand extends SdlcDetection {
+  kind: SdlcCommandKind;
+  /** The command line as declared, e.g. `pnpm test` or `make build`. */
+  command: string;
+  /**
+   * Directory the command must run in, project-relative, when it is not the
+   * project root. A workspace package's own test script sets this.
+   */
+  cwd?: string;
+  /**
+   * The runner the command goes through — `npm`, `pnpm`, `make`, `cargo`,
+   * `gradle`. Lets a consumer decide whether it can invoke the command without
+   * parsing it.
+   */
+  runner?: string;
+}
+
+/** A test framework in use, and how broadly. */
+export interface SdlcTestFramework extends SdlcDetection {
+  /** Lowercase framework name: `vitest`, `jest`, `pytest`, `go-test`, `xctest`. */
+  name: string;
+  /** Project-relative roots the tests of this framework live under. */
+  roots?: string[];
+}
+
+/** A category of test the repository runs. */
+export interface SdlcTestSuite extends SdlcDetection {
+  kind: "unit" | "integration" | "e2e" | "contract" | "performance" | "smoke";
+  /** Number of test files found for this suite, when counted. */
+  fileCount?: number;
+}
+
+/** Coverage measurement, if any is configured. */
+export interface SdlcCoverage extends SdlcDetection {
+  /** The tool producing coverage, e.g. `c8`, `istanbul`, `coverage.py`. */
+  tool: string;
+  /** A configured minimum, as a percentage, when one is enforced. */
+  threshold?: number;
+  /** Whether the threshold fails the build rather than only reporting. */
+  enforced: boolean;
+}
+
+/** A CI pipeline and the jobs it runs. */
+export interface SdlcCiPipeline extends SdlcDetection {
+  /** The CI system: `github-actions`, `gitlab-ci`, `bitbucket-pipelines`, `circleci`. */
+  provider: string;
+  /** Pipeline name as declared. */
+  name: string;
+  /** What triggers it: `push`, `pull_request`, `schedule`, `manual`, `tag`. */
+  triggers: string[];
+  /** Job names in declaration order. */
+  jobs: string[];
+}
+
+/** A deployment target the repository can reach. */
+export interface SdlcDeployment extends SdlcDetection {
+  /** Environment name as declared: `production`, `staging`, a preview slot. */
+  environment: string;
+  /** How it deploys: `github-actions`, `argocd`, `terraform`, `script`. */
+  mechanism: string;
+  /** Whether a human has to approve the deploy. */
+  requiresApproval?: boolean;
+  /** Whether it runs without a human starting it. */
+  automated: boolean;
+}
+
+/** A way to undo a deployment. */
+export interface SdlcRollback extends SdlcDetection {
+  /** `redeploy-previous`, `blue-green`, `feature-flag`, `db-down-migration`, `manual`. */
+  mechanism: string;
+  /** The environment it applies to, when it is environment-specific. */
+  environment?: string;
+}
+
+/** Database or data migrations. */
+export interface SdlcMigration extends SdlcDetection {
+  /** The migration tool: `prisma`, `knex`, `alembic`, `flyway`, `golang-migrate`. */
+  tool: string;
+  /** Project-relative directory holding the migration files. */
+  directory?: string;
+  /** Whether a reverse migration exists for the forward ones found. */
+  reversible?: boolean;
+  /** Whether migrations run as part of a deploy rather than by hand. */
+  automated?: boolean;
+}
+
+/** A feature-flag system. */
+export interface SdlcFeatureFlag extends SdlcDetection {
+  /** The provider: `launchdarkly`, `unleash`, `split`, or `in-house`. */
+  provider: string;
+  /** Flag keys found in code, when they are statically readable. */
+  flags?: string[];
+}
+
+/** A gate that can fail a change before it merges. */
+export interface SdlcQualityGate extends SdlcDetection {
+  kind:
+    | "required-review"
+    | "required-status-check"
+    | "branch-protection"
+    | "pre-commit-hook"
+    | "codeowners"
+    | "signed-commits";
+  /** Whether the gate blocks a merge rather than only warning. */
+  blocking: boolean;
+  /** What it guards, when scoped — a branch pattern or a path. */
+  appliesTo?: string;
+}
+
+/** Instrumentation the repository ships with. */
+export interface SdlcObservability extends SdlcDetection {
+  kind: "logging" | "metrics" | "tracing" | "error-reporting" | "health-check" | "alerting";
+  /** The library or service: `opentelemetry`, `sentry`, `prometheus`, `pino`. */
+  provider: string;
+}
+
+/** A container image the repository builds. */
+export interface SdlcContainer extends SdlcDetection {
+  /** Project-relative path to the Dockerfile or equivalent. */
+  path: string;
+  /** Base images referenced, in declaration order. */
+  baseImages: string[];
+  /** Whether the build is multi-stage. */
+  multiStage: boolean;
+  /** An orchestration manifest that runs it, when one is present. */
+  orchestration?: "compose" | "kubernetes" | "helm" | "ecs" | "nomad";
+}
+
+/** Infrastructure declared as code. */
+export interface SdlcIac extends SdlcDetection {
+  /** The tool: `terraform`, `cloudformation`, `pulumi`, `cdk`, `bicep`. */
+  tool: string;
+  /** Project-relative root of the IaC sources. */
+  root?: string;
+  /** Whether remote state is configured, where the tool has such a concept. */
+  remoteState?: boolean;
+}
+
+/**
+ * Evidence-based CI/CD maturity for one repository.
+ *
+ * Every section is present on a written profile, empty where nothing was
+ * found: an empty array says "the analyzer looked and found none", which a
+ * missing key cannot say. `tests.coverage` is the one optional member, because
+ * absent and "found none" mean the same thing for a single value.
+ */
+export interface SdlcProfile {
+  schemaVersion: string;
+  /**
+   * Absolute project root. Not persisted — stripped when the profile is
+   * serialized to `.sourcevision/sdlc-profile.json`, so the artifact stays
+   * portable across machines, exactly as `ProjectProfile.projectDir` is.
+   */
+  projectDir?: string;
+  commands: SdlcCommand[];
+  tests: {
+    frameworks: SdlcTestFramework[];
+    suites: SdlcTestSuite[];
+    coverage?: SdlcCoverage;
+  };
+  ci: SdlcCiPipeline[];
+  cd: SdlcDeployment[];
+  rollback: SdlcRollback[];
+  migrations: SdlcMigration[];
+  featureFlags: SdlcFeatureFlag[];
+  qualityGates: SdlcQualityGate[];
+  observability: SdlcObservability[];
+  containers: SdlcContainer[];
+  iac: SdlcIac[];
+}

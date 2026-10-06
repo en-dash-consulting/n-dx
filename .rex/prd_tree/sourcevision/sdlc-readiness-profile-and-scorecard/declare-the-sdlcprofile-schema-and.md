@@ -2,7 +2,7 @@
 id: "91327de0-d951-430d-b93b-0b8f26b69000"
 level: "task"
 title: "Declare the SdlcProfile schema and register sdlc-profile.json"
-status: "pending"
+status: "in_progress"
 priority: "high"
 source: "ndx-capture"
 acceptanceCriteria:
@@ -15,4 +15,5 @@ description: "Schema first, so the analyzer and the scorecard are written agains
 assignee: "Sterling H <sterling.h@endash.us>"
 lastModified: "2026-10-07T16:13:26.622Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+startedAt: "2026-10-06T22:02:53.246Z"
 ---
