@@ -86,9 +86,9 @@ Claude uses double-underscore prefixes (`mcp__{server}__{tool}`) to namespace to
 | `get_next_task` | Next actionable task |
 | `claim_task` | Hold a task for this worktree |
 | `release_task` | Give back a claim |
-| `add_item` | Add epic/feature/task/subtask |
+| `add_item` | Add epic/feature/task/subtask (optional `run` block of saved run settings) |
 | `update_task_status` | Update item status |
-| `edit_item` | Edit item content (title, description, priority) |
+| `edit_item` | Edit item content (title, description, priority, tags, `run`). A `run` object replaces the whole saved block; `null` removes it |
 | `get_item` | Get full item details with parent chain |
 | `move_item` | Reparent an item |
 | `merge_items` | Consolidate duplicate items |

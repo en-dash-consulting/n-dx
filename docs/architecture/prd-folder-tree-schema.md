@@ -182,9 +182,33 @@ acceptanceCriteria:   # list    REQUIRED — may be empty list ([])
 loe:                  # number  optional — level of effort in engineer-weeks
 loeRationale:         # string  optional — why that estimate
 loeConfidence:        # string  optional — low | medium | high
+run:                  # object  optional — saved run settings, inline JSON (see below)
 ```
 
 **`loe` is a bare number of engineer-weeks** (e.g. `loe: 0.5`), not a size bucket. Files written earlier may still hold `xs`–`xl` strings or quoted numbers: the parser reads a numeric string as a number and keeps any other string as-is. An invalid `loeConfidence` is dropped on read and write.
+
+**`run` holds the settings saved for running a task.** It is inline JSON in front matter, like every object-valued field, and every key is optional:
+
+```yaml
+run: {"model":"claude-opus-5-5","review":true,"permissionMode":"acceptEdits"}
+```
+
+| Key | Type |
+|-----|------|
+| `model` | string, ≤256 bytes |
+| `provider` | `cli` \| `api` |
+| `permissionMode` | `default` \| `acceptEdits` \| `bypassPermissions` |
+| `review` | boolean |
+| `reviewModel` | string, ≤256 bytes |
+| `reviewOptional` | boolean |
+| `skipTestGate` | boolean (`false` is meaningful: it re-enables a gate hench config skips) |
+| `maxTurns` | integer 1–500 |
+| `tokenBudget` | integer ≥ 0 (`0` = unlimited) |
+| `contextNotes` | string, ≤8 KiB (notes for the agent) |
+
+Validation is strict: an unknown key, a wrong type or an out-of-range value is rejected by one shared validator (`validateRunSettings`). An empty block `{}` is the same as no block and is never written. Loading is lenient — a malformed hand-edited block warns and keeps the PRD readable — but every store write validates the whole document, so writes are refused until the block is fixed. Launch-time options (workspace, allowDirty, fresh, resetDeferred) are chosen per launch and are never saved.
+
+Writers: MCP `add_item` / `edit_item` (an object replaces the whole block, `null` removes it), `rex update --run='<json>'` (`--run=` or `--run=null` clears it), and, from PR 4, the dashboard's Prepare task Save. `PATCH /api/rex/items/:id` does **not** write `run`.
 
 ---
 
@@ -868,6 +892,7 @@ The parser (folder tree → PRD) must:
 | `loe` (engineer-weeks, number) | — | optional | optional | — | — |
 | `loeRationale` | — | optional | optional | — | — |
 | `loeConfidence` (`low`, `medium`, `high`) | — | optional | optional | — | — |
+| `run` (saved run settings, inline JSON) | — | optional | optional | — | — |
 | `priority` | optional | optional | optional | optional | optional |
 | `tags` | optional | optional | optional | — | — |
 | `source` | optional | optional | optional | — | — |
