@@ -112,18 +112,18 @@ async function readBoundPort(dir) {
 /**
  * Poll `read` until it yields a value, rather than reading once.
  *
- * `ndx start --background` returns as soon as the parent has handed off; the
- * detached server writes its pid and port files a moment later. Reading either
- * one immediately is a race that an idle machine hides and a loaded one loses.
- * It lost inside the full root suite (twice, while the same file passed alone):
- * `readBoundPort` returned null, and every later assertion then blamed the
- * product for a file that simply had not been written yet — `expected null to
- * be type of 'number'`, then `No dashboard answered on :null`. Worse, a missed
- * pid file also keeps that server out of `startedPids`, so afterAll cannot reap
- * it. Project A's readiness was already awaited through `waitForStatus`; this
- * gives the files both projects write the same guarantee.
+ * The port file is the one that races. `ndx start --background` waits up to 5s
+ * for the detached server to write it (`waitForPortFile` in packages/core/web.js);
+ * on a loaded machine the server is slower than that, so the parent takes its
+ * fallback branch, writes the pid file itself and exits 0 while the port file is
+ * still to come. Reading it once at that moment lost inside the full root suite
+ * (twice, while the same file passed alone): `readBoundPort` returned null, and
+ * every later assertion blamed the product for a file not yet written —
+ * `expected null to be type of 'number'`, then `No dashboard answered on :null`.
  *
- * Failing here names the missing file, which is the fact worth reporting.
+ * The pid file does not race — the parent writes it before every exit-0 path —
+ * so polling it costs one read. It goes through the same helper anyway so a
+ * missing one fails here, by name, instead of as a null pid further down.
  */
 async function waitForWrittenValue(read, what, timeoutMs = 15_000) {
   const deadline = Date.now() + timeoutMs;

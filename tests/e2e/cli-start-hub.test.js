@@ -66,8 +66,9 @@ function findAvailablePort() {
  *
  * Only the transport is retried. Any response that arrives — including the 409
  * the ambiguous-root case asserts — is returned as-is, so no status assertion is
- * softened by this. A hub that is genuinely down therefore costs the full
- * budget before throwing; the one such call is in afterAll's best-effort sweep.
+ * softened by this. A port that is genuinely closed therefore costs the full
+ * budget before throwing, so a caller that expects one — afterAll's sweep, which
+ * runs after the hub has stopped — passes `timeoutMs = 0` for a single attempt.
  */
 async function getJson(url, timeoutMs = 10_000) {
   const deadline = Date.now() + timeoutMs;
@@ -164,7 +165,10 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
     const pids = [];
     if (hubPort) {
       try {
-        const { body } = await getJson(`http://127.0.0.1:${hubPort}/api/hub/projects`);
+        // One attempt, no retry budget: on a green run the last test has already
+        // stopped the hub, so this call meets a closed port every time and a
+        // retry would only add getJson's whole budget to the suite.
+        const { body } = await getJson(`http://127.0.0.1:${hubPort}/api/hub/projects`, 0);
         for (const p of body?.projects ?? []) if (typeof p.pid === "number") pids.push(p.pid);
       } catch {
         // hub not answering — nothing registered to collect
