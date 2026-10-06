@@ -28,7 +28,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Go Fixture Enhancement](./go-fixture-enhancement/index.md) | completed |
 | [Go Import Parser](./go-import-parser/index.md) | completed |
 | [Import Analyzer Language Dispatch](./import-analyzer-language-dispatch/index.md) | completed |
-| [Isometric map: single source of truth, declared architecture, dashboard view](./isometric-map-single-source-of-truth/index.md) | completed |
+| [Isometric map: single source of truth, declared architecture, dashboard view](./isometric-map-single-source-of-truth/index.md) | pending |
 | [Jev-backed judgments in sourcevision](./jev-backed-judgments-in-sourcevision/index.md) | pending |
 | [Landing page for n-dx](./landing-page-for-n-dx/index.md) | completed |
 | [Live PR Markdown in SourceVision UI](./live-pr-markdown-in-sourcevision-ui/index.md) | completed |
