@@ -239,6 +239,12 @@ export interface ReviewPromptContext {
    * reviewer is a headless session that could never receive their selection.
    */
   autonomous: boolean;
+  /**
+   * True when hench's test gate runs right after this review (not
+   * `--skip-test-gate`). The reviewer then runs scoped checks only and leaves
+   * the full suite to the gate and CI (#539).
+   */
+  testGateFollows: boolean;
 }
 
 /**
@@ -349,7 +355,9 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "decide necessity (Pass 2). Its severity scale and verdict set are the ones",
     "this report uses.",
     "",
-    "Two deviations from the skill's default flow, because this run is automated:",
+    ctx.testGateFollows
+      ? "Three deviations from the skill's default flow, because this run is automated:"
+      : "Two deviations from the skill's default flow, because this run is automated:",
     "",
   );
 
@@ -374,8 +382,17 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
   lines.push(
     "- **Write the machine-readable report** described under Output below. This",
     "  is in addition to whatever you print for the human, not instead of it.",
-    "",
   );
+  if (ctx.testGateFollows) {
+    lines.push(
+      "- **Scoped checks only.** Step 2 of the skill runs only the scoped checks",
+      "  for the files in the diff, plus the static checks. Do not run the full",
+      "  suite: hench's test gate runs right after this review, and CI runs",
+      "  everything. Name the full suite in your report as what was not",
+      "  exercised — that is Step 4's input.",
+    );
+  }
+  lines.push("");
 
   lines.push("## What to do with each finding");
   lines.push("");
@@ -425,7 +442,9 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "  up by that commit. Do not run `git commit`, `git reset`, `git checkout`,",
     "  `git clean`, or anything else that rewrites history or discards work.",
     "- **Do not change the task's status.** The run owns that transition.",
-    "- **Read-only project checks only.** Tests, typecheck, and lint are fine.",
+    ctx.testGateFollows
+      ? "- **Read-only project checks only.** Scoped tests, typecheck, and lint are fine."
+      : "- **Read-only project checks only.** Tests, typecheck, and lint are fine.",
     "  Never run `ndx ci`, `ndx plan`, `ndx analyze`, `ndx refresh`, formatters",
     "  in write mode, codegen, migrations, or snapshot updates (`-u`) — they",
     "  rewrite state this run is concurrently writing.",

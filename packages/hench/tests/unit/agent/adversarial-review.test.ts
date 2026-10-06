@@ -48,6 +48,7 @@ const BASE_CTX: ReviewPromptContext = {
   reportPath: "/proj/.hench/reviews/run-1.json",
   resumed: true,
   autonomous: true,
+  testGateFollows: false,
 };
 
 function finding(over: Partial<ReviewFinding> = {}): ReviewFinding {
@@ -164,6 +165,26 @@ describe("buildReviewBrief", () => {
     // though it captures automatically — `action`/`itemId` carry accept vs
     // decline, not `disposition`.
     expect(brief).toMatch(/`should-fix`.*`captured`.*`offered`/);
+  });
+
+  it("tells the reviewer to run scoped checks only when the test gate follows", () => {
+    const brief = buildReviewBrief({ ...BASE_CTX, testGateFollows: true });
+
+    expect(brief).toContain("Three deviations from the skill's default flow");
+    expect(brief).toContain("**Scoped checks only.**");
+    expect(brief).toMatch(/Do not run the full\s+suite/);
+    expect(brief).toMatch(/test gate runs right after this review, and CI runs\s+everything/);
+    expect(brief).toMatch(/what was not\s+exercised/);
+    expect(brief).toContain("Scoped tests, typecheck, and lint are fine.");
+  });
+
+  it("leaves the brief unchanged when no test gate follows", () => {
+    const brief = buildReviewBrief({ ...BASE_CTX, testGateFollows: false });
+
+    expect(brief).toContain("Two deviations from the skill's default flow");
+    expect(brief).not.toContain("Scoped checks only");
+    expect(brief).not.toMatch(/test gate/);
+    expect(brief).toContain("Tests, typecheck, and lint are fine.");
   });
 
   it("forbids the state-mutating operations that would collide with the run", () => {

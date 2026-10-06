@@ -1324,6 +1324,8 @@ export interface ReviewPassContext {
   permissionMode: PermissionMode;
   /** True when no human is attached — the reviewer applies the verdict policy itself. */
   autonomous: boolean;
+  /** True when `finalizeRun` will run the test gate right after the review. */
+  testGateFollows: boolean;
   taskTitle: string;
   /**
    * Run-scoped MCP config the reviewer must use. The reviewer resumes the work
@@ -1446,6 +1448,7 @@ async function runAdversarialReviewPass(
     reportPath,
     resumed: !!resumeSessionId,
     autonomous: ctx.autonomous,
+    testGateFollows: ctx.testGateFollows,
   });
 
   const envelope = createPromptEnvelope([
@@ -2120,6 +2123,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // describe a fix is the interactive workflow, not this one.
         permissionMode: "acceptEdits",
         autonomous: autonomous || opts.yes === true || process.stdin.isTTY !== true,
+        testGateFollows: config.skipFullTestGate !== true,
         taskTitle: brief.task.title,
         mcpConfigPath,
         pidHolder: liveProgress,
