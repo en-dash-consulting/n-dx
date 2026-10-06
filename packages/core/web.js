@@ -59,23 +59,48 @@ import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
 
 const DEFAULT_PORT = 3117;
-const PID_FILE = ".n-dx-web.pid";
-const PORT_FILE = ".n-dx-web.port";
 
 // ── Preview mode ─────────────────────────────────────────────────────────────
 // `ndx start --preview` runs a second, stateless server that serves a static UI
 // layout document (packages/web/src/preview/index.html) with live reload. It is
 // meant to run *alongside* a real dashboard, so it keeps its own port and its own
-// pid/port files: sharing `.n-dx-web.pid` would make either server's stop command
-// kill the other one.
+// pid/port files: sharing the dashboard's pid file would make either server's
+// stop command kill the other one.
 const DEFAULT_PREVIEW_PORT = 3118;
 const PREVIEW_PID_FILE = ".n-dx-preview.pid";
 const PREVIEW_PORT_FILE = ".n-dx-preview.port";
 
-/** State-file names for the dashboard server. */
-const DASHBOARD_FILES = { pid: PID_FILE, port: PORT_FILE };
-/** State-file names for the preview server — deliberately disjoint from the above. */
-const PREVIEW_FILES = { pid: PREVIEW_PID_FILE, port: PREVIEW_PORT_FILE };
+/**
+ * A server's state-file paths in a project.
+ *
+ * A function of the project rather than a pair of names, because the
+ * dashboard's markers moved into `.ndx/` with everything else: where they live
+ * is the resolver's answer, and only it knows which layout `dir` is on. The
+ * `files` parameter threaded through the functions below selects *which*
+ * server's markers, not where they sit.
+ *
+ * @callback ServerFiles
+ * @param {string} dir  Project root.
+ * @returns {{pid: string, port: string}}  Absolute paths.
+ */
+
+/** @type {ServerFiles} State-file paths for the dashboard server. */
+const DASHBOARD_FILES = (dir) => {
+  const { webPidFile, webPortFile } = resolveLayout(dir);
+  return { pid: webPidFile, port: webPortFile };
+};
+
+/**
+ * @type {ServerFiles} State-file paths for the preview server — deliberately
+ * disjoint from the dashboard's. The preview writes nothing under `.rex/` or
+ * `.sourcevision/` and is not part of a project's n-dx state, so its two
+ * markers stay at the project root under both layouts and the resolver does
+ * not own them.
+ */
+const PREVIEW_FILES = (dir) => ({
+  pid: join(dir, PREVIEW_PID_FILE),
+  port: join(dir, PREVIEW_PORT_FILE),
+});
 
 // Mirrors the server's own fallback allocator (PORT_RANGE_START / PORT_RANGE_END
 // in packages/web/src/server/port.ts). Duplicated rather than imported: this is
@@ -118,10 +143,10 @@ async function fileExists(path) {
 }
 
 /**
- * Load the project .n-dx.json and return the web.port if configured.
+ * Load the project config and return the web.port if configured.
  */
 async function loadConfigPort(dir) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = resolveLayout(dir).configFile;
   if (!(await fileExists(configPath))) return undefined;
   try {
     const raw = await readFile(configPath, "utf-8");
@@ -608,7 +633,7 @@ export async function killPortOccupant(port) {
  * Returns the actual port number or null.
  */
 async function readPortFile(dir, files = DASHBOARD_FILES) {
-  const portPath = join(dir, files.port);
+  const portPath = files(dir).port;
   if (!(await fileExists(portPath))) return null;
   try {
     const raw = await readFile(portPath, "utf-8");
@@ -623,7 +648,7 @@ async function readPortFile(dir, files = DASHBOARD_FILES) {
  * Remove the port file.
  */
 export async function removePortFile(dir, files = DASHBOARD_FILES) {
-  const portPath = join(dir, files.port);
+  const portPath = files(dir).port;
   try {
     await unlink(portPath);
   } catch {
@@ -653,7 +678,7 @@ export async function waitForPortFile(dir, timeoutMs = 5000, intervalMs = 100, f
  * Returns { pid, port } or null.
  */
 export async function readPidFile(dir, files = DASHBOARD_FILES) {
-  const pidPath = join(dir, files.pid);
+  const pidPath = files(dir).pid;
   if (!(await fileExists(pidPath))) return null;
   try {
     const raw = await readFile(pidPath, "utf-8");
@@ -668,7 +693,7 @@ export async function readPidFile(dir, files = DASHBOARD_FILES) {
  * Write PID file with process info.
  */
 async function writePidFile(dir, pid, port, files = DASHBOARD_FILES) {
-  const pidPath = join(dir, files.pid);
+  const pidPath = files(dir).pid;
   await writeFile(
     pidPath,
     JSON.stringify({ pid, port, startedAt: new Date().toISOString() }, null, 2) + "\n",
@@ -679,16 +704,17 @@ async function writePidFile(dir, pid, port, files = DASHBOARD_FILES) {
 /**
  * Write the marker files a hub-served directory keeps for compatibility.
  *
- * `.n-dx-web.port` carries the HUB's port, so `ndx refresh --live-server`
+ * The port marker carries the HUB's port, so `ndx refresh --live-server`
  * (which reads only that file and POSTs /api/reload to it) keeps working: the
- * hub forwards the signal to this project's server. `.n-dx-web.pid` records
+ * hub forwards the signal to this project's server. The pid marker records
  * the hub's pid tagged `via: "hub"` so every reader of that file — `stop`,
  * `status`, refresh's conflict detection — can tell a hub registration from a
  * single-project server and must not kill the hub for it.
  */
 export async function writeHubMarkerFiles(dir, { hubPid, hubPort, projectId }) {
+  const { pid: pidPath, port: portPath } = DASHBOARD_FILES(dir);
   await writeFile(
-    join(dir, PID_FILE),
+    pidPath,
     JSON.stringify(
       { pid: hubPid, port: hubPort, startedAt: new Date().toISOString(), via: "hub", projectId },
       null,
@@ -696,7 +722,7 @@ export async function writeHubMarkerFiles(dir, { hubPid, hubPort, projectId }) {
     ) + "\n",
     "utf-8",
   );
-  await writeFile(join(dir, PORT_FILE), String(hubPort) + "\n", "utf-8");
+  await writeFile(portPath, String(hubPort) + "\n", "utf-8");
 }
 
 /** True when a pid file records a hub registration rather than a server of its own. */
@@ -708,7 +734,7 @@ export function isHubMarker(info) {
  * Remove PID file.
  */
 export async function removePidFile(dir, files = DASHBOARD_FILES) {
-  const pidPath = join(dir, files.pid);
+  const pidPath = files(dir).pid;
   try {
     await unlink(pidPath);
   } catch {
@@ -1076,12 +1102,12 @@ export function slugifyProjectId(name) {
 }
 
 /**
- * The project's display name: `.rex/config.json` "project", else the
+ * The project's display name: rex's `config.json` "project", else the
  * repository directory's basename.
  */
 async function loadProjectName(repoRoot) {
   try {
-    const raw = await readFile(join(repoRoot, ".rex", "config.json"), "utf-8");
+    const raw = await readFile(join(resolveLayout(repoRoot).rexDir, "config.json"), "utf-8");
     const project = JSON.parse(raw)?.project;
     if (typeof project === "string" && project.trim()) return project.trim();
   } catch {

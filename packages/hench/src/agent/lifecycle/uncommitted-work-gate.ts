@@ -31,7 +31,7 @@ import {
   TREE_META_FILENAME,
 } from "../../prd/rex-gateway.js";
 import { relativeToRoot, resolveLayout, type LayoutMode } from "../../prd/llm-gateway.js";
-import { resolveHenchPaths } from "../../store/paths.js";
+import { resolveHenchPaths, stateDirNameUnder } from "../../store/paths.js";
 import {
   excludeHenchRuntimeArtifacts,
   matchesProjectPath,
@@ -56,7 +56,7 @@ interface PrdWritePath {
    * Path relative to rex's own state directory — forward slashes, no leading
    * or trailing slash. The directory it hangs off (`.rex` or `.ndx/rex`) comes
    * from the layout resolver, never from a literal here: see
-   * {@link rexDirNameUnder}.
+   * `stateDirNameUnder` in `store/paths.ts`.
    */
   path: string;
   /** A directory: the gate's discount covers everything beneath it. */
@@ -105,28 +105,13 @@ const PRD_WRITE_PATHS: readonly PrdWritePath[] = [
   { path: PRD_CACHE_DIRNAME, isDirectory: true, stagedBy: "ephemeral" },
 ];
 
-/**
- * Rex's state directory under a named layout, spelled the way a git pathspec
- * has to spell it — `.rex` or `.ndx/rex`.
- *
- * `"."` as the root is not a lookup: an explicit `mode` skips detection
- * entirely, so nothing touches the disk and the result is purely the name.
- * The point is that neither spelling is written out in this module — both come
- * from the resolver, so a rename there reaches these patterns too. The twin of
- * `henchDirNameUnder` in `store/artifacts.ts`, for the same reason.
- */
-function rexDirNameUnder(mode: LayoutMode): string {
-  const layout = resolveLayout(".", { mode });
-  return relativeToRoot(layout, layout.rexDir);
-}
-
 /** One layout's spelling of the definition's paths, as git pathspecs. */
 function prdPathsUnder(
   mode: LayoutMode,
   predicate: (entry: PrdWritePath) => boolean,
   { trailingSlash = false }: { trailingSlash?: boolean } = {},
 ): string[] {
-  const rexDirName = rexDirNameUnder(mode);
+  const rexDirName = stateDirNameUnder("rex", mode);
   return PRD_WRITE_PATHS.filter(predicate).map((entry) => {
     const path = `${rexDirName}/${entry.path}`;
     return trailingSlash && entry.isDirectory ? `${path}/` : path;
@@ -416,8 +401,14 @@ export async function listOperatorOwnedPrdDirt(projectDir: string): Promise<stri
  * Printed after a completion commit when {@link listOperatorOwnedPrdDirt}
  * found something — the log is never staged by hench, so silence here is what
  * turned a tracked log into a permanent pre-run-gate refusal.
+ *
+ * `rexDir` is required rather than defaulted. It used to fall back to `.rex`,
+ * which on a `.ndx/` project printed a remedy naming a directory the operator
+ * does not have: the advice was to gitignore a path that is never written, so
+ * following it left the tree dirty and the next run still refused. Callers
+ * pass {@link rexDirName}, which resolves the project's own layout.
  */
-export function formatOperatorPrdLeftovers(paths: string[], rexDir = ".rex"): string {
+export function formatOperatorPrdLeftovers(paths: string[], rexDir: string): string {
   return (
     `note: ${paths.length} PRD bookkeeping file(s) hench never commits are uncommitted:\n` +
     `${renderPaths(paths)}\n` +

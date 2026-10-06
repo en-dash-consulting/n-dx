@@ -3,7 +3,7 @@
 Every production source file that still spells out where n-dx keeps its files,
 instead of asking the resolver.
 
-**149 literals across 65 files.** That number is the debt, and it may only go
+**56 literals across 37 files.** That number is the debt, and it may only go
 down.
 
 ## Why this file exists
@@ -83,27 +83,49 @@ the total at the top of this file.
 ## When this file goes away
 
 The acceptance criterion behind the rule is absolute: *no* literal outside the
-resolver and the migration command. PR B3 (#453) took the first cut — 193
-sites down to 160 — but it routed **hench and web only**, where the task it
-serves (`c64f053e`) reads "hench, web *and core*". Core was never in it, and
-hench and web are not finished either. What is left:
+resolver and the migration command. Two cuts have landed:
+
+- **PR B3 (#453)** took 193 sites to 160, but it routed **hench and web only**,
+  where the task it serves (`c64f053e`) reads "hench, web *and core*".
+- **PR 1 (`d31d9aa8`)** took 149 to 56: all of core, hench's git-bookkeeping
+  classifiers, and the hench and web files that task enumerates.
+
+What is left:
 
 | Package | Literals |
 |---|---|
-| core | 54 |
-| web | 52 |
-| hench | 25 |
+| web | 29 |
 | rex | 12 |
+| hench | 7 |
 | llm-client | 6 |
 | sourcevision | 2 |
 
-So 131 of the remaining 149 sit in the three packages that sweep was meant to
-clear. That is the number this file exists to keep honest: without it the task
-reads as done because a PR with its name on it merged.
+Two shapes account for nearly all of it, and neither was in PR 1's scope:
+
+- **Project-config readers** that spell `.n-dx.json` / `.n-dx.local.json`
+  instead of taking `configFile` from the resolver. They are spread across
+  llm-client, hench, and web's routes, and they are the exact defect the second
+  story at the top of this file describes.
+- **Viewer copy and heuristics** — `files.ts` and the `views/*` rows — which
+  name a directory in text shown to a person rather than to open it. Those need
+  the resolved name threaded to the browser, or rewording; the hench-config
+  view took the rewording route in PR 1 and is a worked example.
 
 When the sweep really finishes, this file is deleted and the exemption table
 above stands on its own — the rule as originally specified, with no change to
 the detector.
+
+## A note on the counts
+
+These numbers are the detector's, and until PR 1 the detector could not see
+through a glob. Its comment blanker read the `/*` inside `".hench/**"` as the
+start of a block comment and blanked the rest of the file, so fourteen sites in
+seven files — every `blockedPaths` entry in hench's guard defaults among them —
+were silently exempt and the total read lower than the truth. PR 1 fixed the
+blanker and cleared most of what it exposed; the two rows it exposed outside
+that PR's scope, `packages/llm-client/src/repo-trust.ts` and
+`packages/web/src/server/routes-token-usage.ts`, were fixed and recorded
+respectively.
 
 ---
 
@@ -113,42 +135,13 @@ Counts are ceilings. A file may hold fewer than its number; it may not hold
 more.
 
 
-### core
-
-| File | Literals | Names |
-|---|---|---|
-| `packages/core/ci.js` | 14 | .hench, .rex, .sourcevision |
-| `packages/core/export.js` | 7 | .hench, .rex, .sourcevision |
-| `packages/core/pair-programming.js` | 6 | .n-dx*, .rex, .sourcevision |
-| `packages/core/web.js` | 5 | .n-dx*, .rex |
-| `packages/core/readme-generator.js` | 3 | .hench, .rex, .sourcevision |
-| `packages/core/stale-check.js` | 3 | .hench, .rex, .sourcevision |
-| `packages/core/claude-integration.js` | 2 | .hench, .n-dx* |
-| `packages/core/config.js` | 2 | .hench, .rex |
-| `packages/core/narration-status.js` | 2 | .sourcevision |
-| `packages/core/refresh-validate.js` | 2 | .sourcevision |
-| `packages/core/run-summary.js` | 2 | .rex, .sourcevision |
-| `packages/core/sample-app.js` | 2 | .rex |
-| `packages/core/assistant-assets.js` | 1 | .rex |
-| `packages/core/cli.js` | 1 | .n-dx* |
-| `packages/core/refresh-artifacts.js` | 1 | .sourcevision |
-| `packages/core/self-heal-confirm.js` | 1 | .n-dx* |
-
 ### hench
 
 | File | Literals | Names |
 |---|---|---|
-| `packages/hench/src/agent/lifecycle/shared.ts` | 6 | .n-dx*, .rex |
-| `packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts` | 4 | .rex |
-| `packages/hench/src/agent/lifecycle/cli-loop.ts` | 2 | .hench, .rex |
-| `packages/hench/src/validation/changed-files.ts` | 2 | .hench, .rex |
 | `packages/hench/src/agent/analysis/adversarial-review.ts` | 1 | .rex |
 | `packages/hench/src/agent/planning/cli-identity.ts` | 1 | .n-dx* |
-| `packages/hench/src/cli/commands/config.ts` | 1 | .hench |
-| `packages/hench/src/cli/commands/template.ts` | 1 | .hench |
-| `packages/hench/src/cli/help.ts` | 1 | .hench |
 | `packages/hench/src/quota/claude-quota.ts` | 1 | .n-dx* |
-| `packages/hench/src/store/file-classifier.ts` | 1 | .rex |
 | `packages/hench/src/store/run-archiver.ts` | 1 | .n-dx* |
 | `packages/hench/src/store/run-retention-scheduler.ts` | 1 | .n-dx* |
 | `packages/hench/src/store/run-retention.ts` | 1 | .n-dx* |
@@ -181,18 +174,15 @@ more.
 
 | File | Literals | Names |
 |---|---|---|
-| `packages/web/src/server/routes-hench.ts` | 10 | .hench, .rex |
-| `packages/web/src/server/routes-adaptive.ts` | 6 | .hench |
-| `packages/web/src/server/routes-workflow.ts` | 5 | .hench |
 | `packages/web/src/viewer/views/files.ts` | 3 | .hench, .rex, .sourcevision |
 | `packages/web/src/server/routes-config.ts` | 2 | .n-dx* |
 | `packages/web/src/server/routes-llm.ts` | 2 | .n-dx* |
 | `packages/web/src/server/routes-sourcevision-ask.ts` | 2 | .n-dx* |
+| `packages/web/src/server/routes-token-usage.ts` | 2 | .n-dx* |
 | `packages/web/src/server/routes-worktrees.ts` | 2 | .n-dx* |
 | `packages/web/src/hub/children.ts` | 1 | .n-dx* |
 | `packages/web/src/server/cli-name.ts` | 1 | .n-dx* |
 | `packages/web/src/server/dashboard-usage.ts` | 1 | .n-dx* |
-| `packages/web/src/server/merge-history.ts` | 1 | .rex |
 | `packages/web/src/server/routes-cli-timeout.ts` | 1 | .n-dx* |
 | `packages/web/src/server/routes-features.ts` | 1 | .n-dx* |
 | `packages/web/src/server/routes-project-settings.ts` | 1 | .n-dx* |
@@ -201,19 +191,8 @@ more.
 | `packages/web/src/server/task-usage/usage-cleanup-scheduler.ts` | 1 | .n-dx* |
 | `packages/web/src/viewer/views/ask.ts` | 1 | .sourcevision |
 | `packages/web/src/viewer/views/cli-timeout.ts` | 1 | .n-dx* |
-| `packages/web/src/viewer/views/hench-config.ts` | 1 | .hench |
 | `packages/web/src/viewer/views/hench-runs.ts` | 1 | .rex |
 | `packages/web/src/viewer/views/hench-templates.ts` | 1 | .hench |
 | `packages/web/src/viewer/views/iso-map.ts` | 1 | .sourcevision |
 | `packages/web/src/viewer/views/notion-config.ts` | 1 | .rex |
 | `packages/web/src/viewer/views/workflow-optimization.ts` | 1 | .hench |
-
-### Registered ahead of merge
-
-Files that gain their first literal from a branch still in review, registered
-so the rule can merge at any point in the queue. A row here becomes an ordinary
-row when its branch lands; if the branch is abandoned, delete it.
-
-| File | Literals | Names | Arrives with |
-|---|---|---|---|
-| `packages/web/src/server/hench-config-fields.ts` | 1 | .hench | A7 |

@@ -97,30 +97,90 @@ const LAYOUT_LITERAL =
 /**
  * Blank out comment bodies, preserving newlines so line numbers still line up
  * with the file on disk — the failure message has to be able to point at one.
+ *
+ * ## Why this is line-by-line, and why it tracks quotes
+ *
+ * A glob is full of characters that look like comment delimiters: `".hench/**"`
+ * contains `/*`. The first version of this scanned for delimiters without
+ * knowing whether it was inside a string, so that glob opened a comment which
+ * ran to the next `*\/` — in practice most of the rest of the file. Fourteen
+ * sites across seven files were silently exempt, among them every
+ * `blockedPaths` entry in hench's guard defaults and the whole config-secrets
+ * section of `ci.js`. That is the vacuous-detector failure the self-test above
+ * is written against, arriving through the blanking pass rather than the
+ * pattern.
+ *
+ * Tracking quotes fixes that but introduces the mirror failure, because this
+ * is not a JavaScript parser: an apostrophe in prose (`// Don't`) or a quote
+ * inside a regex literal (`/["']/`) opens a string that never closes, and
+ * everything after it is misread. Resetting the quote state at every newline
+ * is what bounds that. A line this cannot parse costs one line of accuracy
+ * instead of a file, and no construct in this repository spans a line *and*
+ * hides a layout literal.
  */
 function blankComments(src) {
-  let out = "";
-  let i = 0;
-  const n = src.length;
-  while (i < n) {
-    const c = src[i];
-    const d = src[i + 1];
-    if (c === "/" && d === "*") {
-      const end = src.indexOf("*/", i + 2);
-      const stop = end === -1 ? n : end + 2;
-      for (; i < stop; i++) out += src[i] === "\n" ? "\n" : " ";
-      continue;
+  const lines = src.split("\n");
+  let inBlockComment = false;
+
+  const blanked = lines.map((line) => {
+    let out = "";
+    let i = 0;
+    const n = line.length;
+
+    while (i < n) {
+      if (inBlockComment) {
+        const end = line.indexOf("*/", i);
+        if (end === -1) {
+          out += " ".repeat(n - i);
+          i = n;
+        } else {
+          out += " ".repeat(end + 2 - i);
+          i = end + 2;
+          inBlockComment = false;
+        }
+        continue;
+      }
+
+      const c = line[i];
+      const d = line[i + 1];
+
+      if (c === "/" && d === "*") {
+        inBlockComment = true;
+        continue;
+      }
+      if (c === "/" && d === "/") {
+        out += " ".repeat(n - i);
+        i = n;
+        continue;
+      }
+      if (c === '"' || c === "'" || c === "`") {
+        const quote = c;
+        out += c;
+        i++;
+        while (i < n) {
+          if (line[i] === "\\") {
+            out += line[i] + (line[i + 1] ?? "");
+            i += 2;
+            continue;
+          }
+          out += line[i];
+          if (line[i] === quote) {
+            i++;
+            break;
+          }
+          i++;
+        }
+        continue;
+      }
+
+      out += c;
+      i++;
     }
-    if (c === "/" && d === "/") {
-      const end = src.indexOf("\n", i);
-      const stop = end === -1 ? n : end;
-      for (; i < stop; i++) out += " ";
-      continue;
-    }
-    out += c;
-    i++;
-  }
-  return out;
+
+    return out;
+  });
+
+  return blanked.join("\n");
 }
 
 function walkSourceFiles(dir, files = []) {
@@ -254,6 +314,23 @@ describe("layout-literal policy", () => {
     expect([...code.matchAll(LAYOUT_LITERAL)]).toEqual([]);
     // Blanking must not move any line.
     expect(code.split("\n").length).toBe(3);
+  });
+
+  it("does not read a glob's slash-star as the start of a comment", () => {
+    // The blanking pass used to scan for `/*` without knowing it was inside a
+    // string, so the `/**` in a blockedPaths glob opened a comment that ran to
+    // the next `*/` — in practice, most of the rest of the file. Fourteen
+    // sites across seven files were silently exempt, including the two this
+    // asserts on.
+    const code = blankComments(
+      ['const blocked = [".hench/**", ".rex/**"];', 'const after = ".sourcevision/zones.json";'].join("\n"),
+    );
+
+    expect([...code.matchAll(LAYOUT_LITERAL)].map((m) => m[0])).toEqual([
+      '".hench/**"',
+      '".rex/**"',
+      '".sourcevision/zones.json"',
+    ]);
   });
 
   it("ignores prose that merely names a folder", () => {

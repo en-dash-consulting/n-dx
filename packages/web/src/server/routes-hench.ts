@@ -51,6 +51,7 @@ import { readFileSync, readdirSync, writeFileSync, existsSync, realpathSync, wat
 import type { FSWatcher } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join, basename } from "node:path";
+import { henchDirIn } from "./paths.js";
 import { execFileSync } from "node:child_process";
 import { loadavg, cpus, hostname } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -61,6 +62,7 @@ import {
   killWithFallback,
   listWorktrees,
   getWorktreeRoot,
+  guardBaselineForLanguage,
   resolveLayout,
   getAvailableMemory,
   readAvailableMemory,
@@ -185,7 +187,7 @@ function stateFor(runsDir: string): HenchWorkspaceState {
 }
 
 function runsDirOf(ctx: Pick<ServerContext, "projectDir">): string {
-  return join(ctx.projectDir, ".hench", "runs");
+  return join(henchDirIn(ctx.projectDir), "runs");
 }
 
 function stateForCtx(ctx: ServerContext): HenchWorkspaceState {
@@ -970,7 +972,7 @@ export function handleHenchRoute(
     req,
     res,
     ctx,
-    runsDir: join(ctx.projectDir, ".hench", "runs"),
+    runsDir: join(henchDirIn(ctx.projectDir), "runs"),
     broadcast,
     onStatusInvalidate: options?.onStatusInvalidate,
   };
@@ -1107,6 +1109,24 @@ interface WorkflowTemplateData {
 }
 
 /**
+ * What the strict-safety template blocks.
+ *
+ * Both copies of the template — this one and hench's `schema/templates.ts` —
+ * now build the list from `guardBaselineForLanguage`, which is in
+ * `@n-dx/llm-client` and so is reachable from both. That is the one part of
+ * the duplication below that no longer has to be kept in step by hand, and it
+ * is the part that most needed not to be: as two hand-written lists they had
+ * already drifted from the baseline in two ways, dropping half its credential
+ * patterns and naming `.rex`/`.hench` in a spelling a `.ndx/` project does not
+ * use. Keep the two derivations identical.
+ */
+export const STRICT_BLOCKED_PATHS: string[] = [
+  ...guardBaselineForLanguage().blockedPaths,
+  "**/secrets/**",
+  "**/credentials/**",
+];
+
+/**
  * Built-in templates — a hand-kept copy of hench/src/schema/templates.ts.
  *
  * Web does not depend on `@n-dx/hench`, so there is no gateway to import these
@@ -1149,7 +1169,7 @@ const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
     description: "Maximum guard rails for sensitive codebases and production-adjacent work",
     useCases: ["Production infrastructure changes", "Security-sensitive code modifications", "Regulated environments requiring audit trails"],
     tags: ["safety", "security", "production"],
-    config: { maxTurns: 30, maxFailedAttempts: 2, guard: { blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**", ".env*", "*.pem", "*.key", "**/secrets/**", "**/credentials/**"], allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"], commandTimeout: 15000, maxFileSize: 524288 } },
+    config: { maxTurns: 30, maxFailedAttempts: 2, guard: { blockedPaths: STRICT_BLOCKED_PATHS, allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"], commandTimeout: 15000, maxFileSize: 524288 } },
     builtIn: true,
   },
   {
@@ -1167,7 +1187,7 @@ const TEMPLATES_FILE = "templates.json";
 
 /** Load user-defined templates from .hench/templates.json. */
 function loadUserTemplates(projectDir: string): WorkflowTemplateData[] {
-  const filePath = join(projectDir, ".hench", TEMPLATES_FILE);
+  const filePath = join(henchDirIn(projectDir), TEMPLATES_FILE);
   try {
     if (!existsSync(filePath)) return [];
     const raw = readFileSync(filePath, "utf-8");
@@ -1331,7 +1351,7 @@ async function handleTemplateCreate(
   };
 
   // Load, update, and write back
-  const filePath = join(ctx.projectDir, ".hench", TEMPLATES_FILE);
+  const filePath = join(henchDirIn(ctx.projectDir), TEMPLATES_FILE);
   const existing = loadUserTemplates(ctx.projectDir);
   const idx = existing.findIndex((t) => t.id === id);
   if (idx >= 0) {
@@ -1416,7 +1436,7 @@ async function handleTemplateDelete(
     return true;
   }
 
-  const filePath = join(ctx.projectDir, ".hench", TEMPLATES_FILE);
+  const filePath = join(henchDirIn(ctx.projectDir), TEMPLATES_FILE);
   const existing = loadUserTemplates(ctx.projectDir);
   const filtered = existing.filter((t) => t.id !== id);
 
@@ -2780,7 +2800,7 @@ export function startConcurrencyMonitor(
   const CONCURRENCY_BROADCAST_MS = 10_000; // 10 seconds
 
   const timer = setInterval(() => {
-    const henchDir = join(ctx.projectDir, ".hench");
+    const henchDir = henchDirIn(ctx.projectDir);
     const locksDir = join(henchDir, "locks");
     const runsDir = join(henchDir, "runs");
 
@@ -3359,7 +3379,7 @@ export function concurrencyLevelOf(inUse: number, max: number): ConcurrencyLevel
 /** The concurrency status of one workspace, as `GET /api/hench/concurrency` answers it. */
 export function collectConcurrencyStatus(ctx: ServerContext): ConcurrencyStatus {
   const { activeExecutions } = stateForCtx(ctx);
-  const runsDir = join(ctx.projectDir, ".hench", "runs");
+  const runsDir = join(henchDirIn(ctx.projectDir), "runs");
   const slots = readConcurrencySlots(ctx);
 
   // Count dashboard-triggered executions

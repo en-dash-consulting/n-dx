@@ -323,6 +323,54 @@ describe("layout resolver: core twin matches the foundation implementation", () 
     expect(fromFoundation).toEqual([...LAYOUT_FIELDS].sort());
   });
 
+  it("lists the same both-layout state names from both copies", () => {
+    // `layoutStateNames` is what the classifiers use — the scans and filters
+    // that are handed a path and have to say whether n-dx owns it, which means
+    // recognising both spellings rather than resolving one. Two copies of that
+    // list drift exactly like two copies of the resolver.
+    expect(core.layoutStateNames()).toEqual(foundation.layoutStateNames());
+  });
+
+  it("gives classifiers the container, and path-matchers its children", () => {
+    const { dirNames, statePaths } = core.layoutStateNames();
+
+    // A walk tests one directory entry at a time, so `.ndx` alone has to stand
+    // in for all three of its children — listing `.ndx/rex` there would never
+    // match an entry name and the walk would descend into n-dx's own state.
+    expect(dirNames).toEqual([".rex", ".hench", ".sourcevision", ".ndx"]);
+
+    // A path matcher compares whole root-relative paths, so it needs both
+    // layouts spelled out and the bare container is no use to it.
+    expect(statePaths).toEqual([
+      ".rex",
+      ".hench",
+      ".sourcevision",
+      ".ndx/rex",
+      ".ndx/hench",
+      ".ndx/sourcevision",
+    ]);
+
+    // Forward slashes, for the same reason relativeToRoot uses them.
+    for (const name of [...dirNames, ...statePaths]) {
+      expect(name).not.toContain("\\");
+    }
+  });
+
+  it("answers without reading the disk, so a scan's verdict is not location-dependent", () => {
+    // The names come from an explicit mode, never from detection. If they were
+    // detected, the same source file would be n-dx state or not depending on
+    // which checkout the scan ran in.
+    const cwd = process.cwd();
+    try {
+      process.chdir(ndxRoot);
+      const fromNdx = core.layoutStateNames();
+      process.chdir(legacyRoot);
+      expect(core.layoutStateNames()).toEqual(fromNdx);
+    } finally {
+      process.chdir(cwd);
+    }
+  });
+
   it("names the per-user directory and its overrides identically", () => {
     expect(core.NDX_HOME_DIRNAME).toBe(foundation.NDX_HOME_DIRNAME);
     expect(core.LEGACY_NDX_HOME_DIRNAME).toBe(foundation.LEGACY_NDX_HOME_DIRNAME);

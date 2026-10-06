@@ -23,4 +23,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add an architecture-policy rule that rejects new literal .rex/, .hench/ and .sourcevision/ paths](./add-an-architecture-policy-rule-that.md) | pending |
-| [Route core and the remaining hench and web file access through the resolver](./route-core-and-the-remaining-hench-and.md) | pending |
+| [Route core and the remaining hench and web file access through the resolver](./route-core-and-the-remaining-hench-and.md) | in_progress |
