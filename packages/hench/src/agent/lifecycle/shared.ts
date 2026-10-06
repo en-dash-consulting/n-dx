@@ -19,6 +19,7 @@ import { trustSummaryForRun } from "../../store/trust.js";
 import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
@@ -951,15 +952,19 @@ function isUnattendedGate(yes?: boolean, autonomous?: boolean): boolean {
  *
  * Only prompts in interactive TTY mode; in CI/autonomous mode defaults to abort.
  */
-async function promptTestGateFailure(
+export async function promptTestGateFailure(
   testGate: TestGateResult,
   yes?: boolean,
   autonomous?: boolean,
+  /** Test seam: replaces the imported `createInterface` and the TTY check. */
+  deps: { createInterface?: typeof createInterface; isTty?: boolean } = {},
 ): Promise<TestGateFailureAction> {
   // In non-interactive mode (CI, --yes, --auto), default to abort
-  if (isUnattendedGate(yes, autonomous)) {
+  const isTty = deps.isTty ?? Boolean(process.stdin.isTTY);
+  if (!isTty || yes || autonomous) {
     return "abort";
   }
+  const makeInterface = deps.createInterface ?? createInterface;
 
   const failedPackages = testGate.packages
     .filter((p) => !p.passed)
@@ -984,9 +989,7 @@ async function promptTestGateFailure(
 
   try {
     const answer = await new Promise<string>((resolve) => {
-      // Dynamically import readline at runtime
-      const { createInterface } = require("node:readline");
-      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const rl = makeInterface({ input: process.stdin, output: process.stdout });
 
       // Suspend outer SIGINT handlers while the prompt is open
       const savedListeners = process.listeners("SIGINT") as Array<(...args: unknown[]) => void>;
