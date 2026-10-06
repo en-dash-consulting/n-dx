@@ -31,8 +31,9 @@
  * |   dependsOn                                      | appliedIn, shippedIn, prs, issues (changes)  |
  * | constraint: statement, requirements, appliesTo   | commits, links*                              |
  * | change: intent, amends, touches, plannedRelease, | assignee, ready, needsPlacement              |
- * |   spike, priority, requirements                  | lastModified, lastModifiedBy                 |
- * | task/subtask: description, acceptanceCriteria    |                                              |
+ * |   spike, priority, loe, requirements             | lastModified, lastModifiedBy                 |
+ * | task/subtask: description, acceptanceCriteria;   |                                              |
+ * |   task also requirements, priority, loe          |                                              |
  *
  * `*` reserved with no shape: `hypotheses` waits for the Hypothesis Layer,
  * `links` for the tracker bridge. Every object schema passes unknown keys
@@ -130,6 +131,8 @@ export const WorkRefSchema = z.string().refine(isWorkRef, {
 const ItemStatusSchema = z.enum([...VALID_STATUSES] as [ItemStatus, ...ItemStatus[]]);
 const PrioritySchema = z.enum([...VALID_PRIORITIES] as [Priority, ...Priority[]]);
 const ReservedSchema = z.unknown();
+/** Engineer-weeks. Frontmatter scalars may arrive as strings ("1.5"), so coerce. */
+const LoeSchema = z.coerce.number().positive().optional();
 
 /** One acceptance criterion with a stable id (`c1`…`cn`) that deltas address. */
 export interface Criterion {
@@ -244,6 +247,8 @@ export interface ChangeIntent extends BaseIntent {
   plannedRelease?: string;
   spike?: boolean;
   priority?: Priority;
+  /** Level of effort in engineer-weeks. */
+  loe?: number;
   requirements?: Requirement[];
 }
 
@@ -253,6 +258,8 @@ export interface TaskIntent extends BaseIntent {
   acceptanceCriteria?: string[];
   requirements?: Requirement[];
   priority?: Priority;
+  /** Level of effort in engineer-weeks. */
+  loe?: number;
 }
 
 export interface SubtaskIntent extends BaseIntent {
@@ -311,6 +318,7 @@ export const ChangeIntentSchema = z
     plannedRelease: z.string().optional(),
     spike: z.boolean().optional(),
     priority: PrioritySchema.optional(),
+    loe: LoeSchema,
     requirements: z.array(RequirementSchema).optional(),
   })
   .passthrough();
@@ -323,6 +331,7 @@ export const TaskIntentSchema = z
     acceptanceCriteria: z.array(z.string()).optional(),
     requirements: z.array(RequirementSchema).optional(),
     priority: PrioritySchema.optional(),
+    loe: LoeSchema,
   })
   .passthrough();
 

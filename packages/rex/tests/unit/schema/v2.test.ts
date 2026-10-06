@@ -169,6 +169,16 @@ describe("per-type intent", () => {
     expect(SubtaskIntentSchema.safeParse({ ...common, type: "subtask" }).success).toBe(true);
   });
 
+  it("types loe as engineer-weeks, accepting the string form frontmatter yields", () => {
+    const task = { id: ID, type: "task", title: "T", slug: "t" };
+    expect(TaskIntentSchema.parse({ ...task, loe: 1.5 }).loe).toBe(1.5);
+    expect(TaskIntentSchema.parse({ ...task, loe: "2" }).loe).toBe(2);
+    expect(ChangeIntentSchema.parse({ ...task, type: "change", loe: 0.5 }).loe).toBe(0.5);
+    for (const bad of ["lots", "", 0, -1]) {
+      expect(TaskIntentSchema.safeParse({ ...task, loe: bad }).success, String(bad)).toBe(false);
+    }
+  });
+
   it("dispatches on type in the union", () => {
     const r = NodeIntentSchema.safeParse({ id: ID, type: "constraint", title: "C", slug: "c", appliesTo: "nope" });
     expect(r.success).toBe(false);
@@ -265,8 +275,8 @@ describe("field coverage (design intent/state tables)", () => {
     ["area", AreaIntentSchema, ["stewards"]],
     ["capability", CapabilityIntentSchema, ["statement", "criteria", "requirements", "dependsOn"]],
     ["constraint", ConstraintIntentSchema, ["statement", "requirements", "appliesTo"]],
-    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "requirements"]],
-    ["task", TaskIntentSchema, ["description", "acceptanceCriteria", "requirements", "priority"]],
+    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "loe", "requirements"]],
+    ["task", TaskIntentSchema, ["description", "acceptanceCriteria", "requirements", "priority", "loe"]],
     ["subtask", SubtaskIntentSchema, ["description", "acceptanceCriteria"]],
   ];
   for (const [type, schema, fields] of cases) {
