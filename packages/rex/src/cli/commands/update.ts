@@ -1,7 +1,6 @@
 import { join } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 
-import { syncFolderTree } from "./folder-tree-sync.js";
 import { parseCsvList } from "../parse-utils.js";
 import { CLIError, requireRexDir } from "../errors.js";
 import { info, result } from "../output.js";
@@ -105,8 +104,6 @@ export async function cmdUpdate(
         itemId: resolvedId,
         detail: `Deleted ${existing.level}: ${existing.title} (${deletedIds.length} item(s) removed)`,
       });
-
-      await syncFolderTree(rexDir, store);
 
       if (flags.format === "json") {
         result(JSON.stringify({ deleted: deletedIds }, null, 2));
@@ -233,8 +230,6 @@ export async function cmdUpdate(
       autoCompleted.push(item);
     }
   }
-
-  await syncFolderTree(rexDir, store);
 
   if (flags.format === "json") {
     const updated = await store.getItem(resolvedId);

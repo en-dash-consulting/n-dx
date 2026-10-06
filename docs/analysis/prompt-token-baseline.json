@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 22499,
-    "uniqueTokens": 13996,
+    "perCallTokens": 22494,
+    "uniqueTokens": 13991,
     "skills": 13,
     "skillTokens": 17511
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4279,
-      "uniqueTokens": 4279
+      "perCallTokens": 4274,
+      "uniqueTokens": 4274
     },
     "core": {
       "surfaces": 1,
@@ -727,11 +727,11 @@
       "builder": "buildSystemPrompt",
       "purpose": "The agent's system prompt — role, rules, workflow, error handling.",
       "inline": false,
-      "literals": 69,
+      "literals": 68,
       "constants": {},
-      "ownTokens": 1005,
-      "fixedChars": 4019,
-      "fixedTokens": 1005
+      "ownTokens": 1000,
+      "fixedChars": 3998,
+      "fixedTokens": 1000
     },
     {
       "pkg": "hench",
@@ -930,9 +930,9 @@
           "tokens": 167
         }
       ],
-      "fixedTokens": 1242,
+      "fixedTokens": 1237,
       "branchConditional": true,
-      "unreachedTokens": 428
+      "unreachedTokens": 423
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -987,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "ab386a6559cd89a5",
-  "recordedAt": "2026-10-02T03:20:14.037Z",
-  "commit": "358c54c8a662",
+  "contentHash": "87fa1c8458803cb2",
+  "recordedAt": "2026-10-05T16:21:54.740Z",
+  "commit": "b73b06162cb2",
   "dirty": false
 }

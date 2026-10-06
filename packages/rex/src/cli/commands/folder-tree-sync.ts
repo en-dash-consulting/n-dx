@@ -1,8 +1,26 @@
 /**
  * Folder-tree sync and read helpers.
  *
- * `syncFolderTree` — called after every PRD write mutation to re-serialize the
- * in-memory store to the `.rex/prd_tree/` folder structure.
+ * `syncFolderTree` — re-serialize the whole store to `.rex/prd_tree/`.
+ * **No longer part of any write path**, and not to be added back to one.
+ * It dates from a store that persisted JSON with the tree as a derived
+ * mirror; since the tree became the backend, `FileStore.writeFolderTree`
+ * has written it inside the same locked span as the mutation, so the 18
+ * `await syncFolderTree(...)` calls that used to follow every mutation were
+ * re-reading and re-writing a tree that was already correct — ~1.2 s per
+ * mutation on a 431-item PRD, for no byte of change.
+ *
+ * They were also the *weaker* of the two writes. `writeFolderTree` also
+ * records `tree-meta.json` and passes `loadedAt`/`loadedFiles` to the
+ * serializer, which arms the stale-save guard; this function passes no
+ * options, so `removeStaleEntries` returns early and the guard is off. A
+ * second, unguarded full-tree rewrite immediately after a guarded one could
+ * delete exactly what the guard had just refused to.
+ *
+ * It is kept because it is still the right tool for a deliberate, operator-
+ * initiated full rebuild of the tree from the store, and its locking
+ * behaviour is pinned by `concurrent-write-lost-update.test.ts` and
+ * `write-path-parity.test.ts`.
  *
  * `loadItemsPreferFolderTree` — canonical read path for status, next, and
  * validate. Reads items from the required `.rex/prd_tree/` folder tree; throws if
@@ -10,10 +28,10 @@
  */
 
 import { join } from "node:path";
-import { serializeFolderTree, parseFolderTree, PRD_TREE_DIRNAME, prdLockPath, withLock, assertSlugRuleWritable } from "../../store/index.js";
+import { serializeFolderTree, parseFolderTree, PRD_TREE_DIRNAME, prdLockPath, withLock, assertSlugRuleWritable, readPerfFlags } from "../../store/index.js";
 import { walkTree } from "../../core/tree.js";
 import type { PRDStore } from "../../store/index.js";
-import type { PRDItem } from "../../schema/index.js";
+import type { PRDItem, PRDDocument } from "../../schema/index.js";
 
 /**
  * Subdirectory name within `.rex/` that holds the folder tree.
@@ -83,7 +101,25 @@ export async function syncFolderTree(rexDir: string, store: PRDStore): Promise<v
 export async function loadItemsPreferFolderTree(
   rexDir: string,
   store: PRDStore,
+  loaded?: PRDDocument,
 ): Promise<PRDItem[]> {
+  // Fast path (`performance.fastReads`): skip straight to the items.
+  //
+  // The merge below exists to reattach fields the *store* held and the tree
+  // could not represent. That was true of a JSON-backed store; it has not
+  // been true since the folder tree became the backend, because
+  // `FileStore.loadDocument` reads the tree — so the merge is now
+  // `{...x, ...x}` over two parses of the same directory, and the caller has
+  // usually parsed it a third time before calling here.
+  //
+  // Equivalence holds on the legacy paths too: with no tree,
+  // `parseFolderTree` yields nothing and the merge returns the store's items
+  // unchanged, which is exactly what the fast path returns.
+  // `fast-read-equivalence.test.ts` pins both against the slow path.
+  if (readPerfFlags(rexDir).fastReads) {
+    return (loaded ?? (await store.loadDocument())).items;
+  }
+
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
 
   const [{ items: treeItems }, doc] = await Promise.all([
