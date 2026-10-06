@@ -84,6 +84,7 @@
     "resolve-existing-dir.js",
     "command-effects.js",
     "layout.js",
+    "init-summary.js",
     "migrate-layout.js",
     "run-summary.js"
   ],
