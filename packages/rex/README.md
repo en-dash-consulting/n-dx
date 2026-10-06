@@ -252,7 +252,7 @@ Start an MCP (Model Context Protocol) server on stdio. This is how AI agents int
 
 ## MCP server
 
-The MCP server exposes seventeen tools and three resources.
+The MCP server exposes eighteen tools and three resources.
 
 ### Tools
 
@@ -261,6 +261,8 @@ The MCP server exposes seventeen tools and three resources.
 | `get_prd_status` | PRD title, overall stats, per-epic breakdown |
 | `get_next_task` | Next actionable task with parent chain |
 | `update_task_status` | Change item status (`id`, `status`) |
+| `claim_task` | Hold a task for this worktree so other worktrees skip it |
+| `release_task` | Give back a claim without changing the task's status |
 | `add_item` | Create a new PRD item with full metadata |
 | `get_item` | Get item details and parent chain by ID |
 | `edit_item` | Edit item content (title, description, priority, tags) |

@@ -210,7 +210,6 @@ ndx config llm.codex.cli_path codex .
 | `ndx status [dir]` | Show PRD status (`--format=json`, `--since`, `--until`) |
 | `ndx refresh [dir]` | Refresh dashboard artifacts (`--ui-only`, `--data-only`, `--no-build`) |
 | `ndx usage [dir]` | Token usage analytics (`--format=json`, `--group=day\|week\|month`) |
-| `ndx sync [dir]` | Sync local PRD with remote adapter (`--push`, `--pull`) |
 | `ndx dev [dir]` | Start dev server with live reload |
 | `ndx ci [dir]` | Run analysis pipeline and validate PRD health |
 | `ndx config [key] [value]` | View and edit settings (`--json`, `--help`) |
@@ -254,7 +253,7 @@ Codex reads `.codex/config.toml` automatically — no manual registration requir
 
 ### Tools
 
-**Rex:** `get_prd_status`, `get_next_task`, `add_item`, `update_task_status`, `edit_item`, `get_item`, `move_item`, `merge_items`, `get_recommendations`, `verify_criteria`, `reorganize`, `health`, `facets`, `append_log`, `sync_with_remote`, `get_capabilities`
+**Rex:** `get_prd_status`, `get_next_task`, `add_item`, `update_task_status`, `edit_item`, `get_item`, `move_item`, `merge_items`, `get_recommendations`, `verify_criteria`, `reorganize`, `health`, `facets`, `append_log`, `get_capabilities`
 
 **SourceVision:** `get_overview`, `get_next_steps`, `get_zone`, `get_findings`, `get_file_info`, `search_files`, `get_imports`, `get_classifications`, `set_file_archetype`, `get_route_tree`
 
