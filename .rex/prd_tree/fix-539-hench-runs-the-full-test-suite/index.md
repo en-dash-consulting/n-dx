@@ -31,5 +31,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [isReadOnlyRefusal returns false when earlier attempts already committed the task's files](./isreadonlyrefusal-returns-false-when.md) | pending |
 | [Opt this repo into the scoped gate and flake re-run; document the test-gate templates; changeset](./opt-this-repo-into-the-scoped-gate-and.md) | pending |
 | [run-all-tests.mjs runs git through win-spawn's execFileSyncCli, not node:child_process](./run-all-tests-mjs-runs-git-through-win.md) | completed |
-| [run-all-tests.mjs selects suites by label and by affected change since a base ref](./run-all-tests-mjs-selects-suites-by.md) | pending |
+| [run-all-tests.mjs selects suites by label and by affected change since a base ref](./run-all-tests-mjs-selects-suites-by.md) | completed |
 | [Tell the agent and the in-hench reviewer to run scoped checks; the gate and CI run the rest](./tell-the-agent-and-the-in-hench.md) | pending |
