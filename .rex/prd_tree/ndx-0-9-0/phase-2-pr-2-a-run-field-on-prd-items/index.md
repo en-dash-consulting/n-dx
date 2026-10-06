@@ -19,4 +19,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Declare the run field on PRD items: strict schema, shared validator, round-trip](./declare-the-run-field-on-prd-items.md) | completed |
 | [Docs and changesets for PR 2: the run field and its writers](./docs-and-changesets-for-pr-2-the-run.md) | pending |
-| [Write run through MCP add_item/edit_item and rex update --run, and allow-list PATCH /api/rex/items/:id](./write-run-through-mcp-add-item-edit.md) | pending |
+| [Write run through MCP add_item/edit_item and rex update --run, and allow-list PATCH /api/rex/items/:id](./write-run-through-mcp-add-item-edit.md) | in_progress |

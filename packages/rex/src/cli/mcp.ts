@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { resolveRemoteStore, SyncEngine } from "../store/index.js";
 import { TOOL_VERSION } from "./commands/constants.js";
 import { getAllLevels } from "../schema/index.js";
+import { RunSettingsSchema } from "../schema/validate.js";
 import { openRexWorkspace, WorkspaceBinding, type RexWorkspace } from "./mcp-workspace.js";
 import {
   handleGetPrdStatus,
@@ -182,13 +183,14 @@ export async function createRexMcpServer(
       tags: z.array(z.string()).optional().describe("Tags"),
       source: z.string().optional().describe("Source of this item"),
       blockedBy: z.array(z.string()).optional().describe("IDs of blocking items"),
+      run: RunSettingsSchema.optional().describe("Saved run settings for this item. Keys (all optional, unknown keys rejected): model, provider, permissionMode, review, reviewModel, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
     },
     withWorkspace("write", (ws, args) => handleAddItem(ws.store, ws.projectDir, ws.rexDir, args)),
   );
 
   server.tool(
     "edit_item",
-    "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags). Use for content changes — use update_task_status for status/lifecycle transitions.",
+    "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
     {
       id: z.string().describe("Item ID"),
       title: z.string().optional().describe("New title"),
@@ -199,6 +201,7 @@ export async function createRexMcpServer(
       tags: z.array(z.string()).optional().describe("New tags"),
       source: z.string().optional().describe("New source"),
       blockedBy: z.array(z.string()).optional().describe("New blocked-by IDs"),
+      run: RunSettingsSchema.nullable().optional().describe("Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Keys: model, provider, permissionMode, review, reviewModel, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
     },
     withWorkspace("write", (ws, args) => handleEditItem(ws.store, ws.projectDir, args)),
   );

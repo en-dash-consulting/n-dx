@@ -26,6 +26,7 @@ import { detectReorganizations } from "../core/reorganize.js";
 import { applyProposals } from "../core/reorganize-executor.js";
 import { computeHealthScore } from "../core/health.js";
 import { computeFacetDistribution, suggestFacets, getItemFacets } from "../core/facets.js";
+import { validateRunSettings } from "../schema/validate.js";
 import { parseIntList } from "./parse-utils.js";
 import {
   aggregateItemTokenUsage,
@@ -425,9 +426,13 @@ export async function handleAddItem(
     tags?: string[];
     source?: string;
     blockedBy?: string[];
+    run?: unknown;
   },
 ): Promise<McpResult> {
   try {
+    const runCheck = validateRunSettings(args.run);
+    if (!runCheck.ok) return textResult(`Invalid run settings: ${runCheck.error}`, true);
+
     if (!args.parentId && store instanceof FileStore) {
       const resolution = await resolvePRDFile(rexDir, projectDir);
       store.setCurrentBranchFile(resolution.filename);
@@ -446,6 +451,7 @@ export async function handleAddItem(
     if (args.tags) item.tags = args.tags;
     if (args.source) item.source = args.source;
     if (args.blockedBy) item.blockedBy = args.blockedBy;
+    if (runCheck.value) item.run = runCheck.value;
 
     // Validate dependencies before persisting
     if (item.blockedBy && item.blockedBy.length > 0) {
@@ -881,6 +887,8 @@ export async function handleEditItem(
     tags?: string[];
     source?: string;
     blockedBy?: string[];
+    /** Object replaces the whole block; `null` (or `{}`) removes it. */
+    run?: unknown;
   },
 ): Promise<McpResult> {
   try {
@@ -906,6 +914,12 @@ export async function handleEditItem(
     }
     if (args.tags !== undefined) updates.tags = args.tags;
     if (args.source !== undefined) updates.source = args.source;
+    if (args.run !== undefined) {
+      const runCheck = validateRunSettings(args.run);
+      if (!runCheck.ok) return textResult(`Invalid run settings: ${runCheck.error}`, true);
+      // Undefined removes the block: the serializer skips an absent `run`.
+      updates.run = runCheck.value;
+    }
     if (args.blockedBy !== undefined) {
       // Validate dependencies before persisting
       const doc = await store.loadDocument();
@@ -929,7 +943,7 @@ export async function handleEditItem(
 
     if (Object.keys(updates).length === 0) {
       return textResult(
-        "No fields to update. Provide at least one field (title, description, acceptanceCriteria, priority, tags, source, blockedBy).",
+        "No fields to update. Provide at least one field (title, description, acceptanceCriteria, priority, tags, source, blockedBy, run).",
         true,
       );
     }

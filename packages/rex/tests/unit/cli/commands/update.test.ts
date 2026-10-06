@@ -483,4 +483,46 @@ describe("cmdUpdate", () => {
       expect(remaining.length).toBe(0);
     });
   });
+
+  describe("--run", () => {
+    // The test reader returns raw front matter, where `run` is inline JSON.
+    const runOf = () => {
+      const raw = (readPRD(tmp).items[0] as { run?: unknown }).run;
+      return typeof raw === "string" ? JSON.parse(raw) : raw;
+    };
+
+    it("sets, replaces and clears the block", async () => {
+      await cmdUpdate(tmp, itemId, { run: '{"model":"m1","review":true}', quiet: "true" });
+      expect(runOf()).toEqual({ model: "m1", review: true });
+
+      await cmdUpdate(tmp, itemId, { run: '{"maxTurns":7}', quiet: "true" });
+      expect(runOf()).toEqual({ maxTurns: 7 });
+
+      await cmdUpdate(tmp, itemId, { run: "null", quiet: "true" });
+      expect(runOf()).toBeUndefined();
+
+      await cmdUpdate(tmp, itemId, { run: '{"model":"m1"}', quiet: "true" });
+      await cmdUpdate(tmp, itemId, { run: "", quiet: "true" });
+      expect(runOf()).toBeUndefined();
+    });
+
+    it("rejects invalid JSON, naming the valid keys", async () => {
+      const err = await cmdUpdate(tmp, itemId, { run: "{nope" }).catch((e) => e);
+      expect(err).toBeInstanceOf(CLIError);
+      expect(err.message).toMatch(/not valid JSON/);
+      expect(err.suggestion).toContain("contextNotes");
+      expect(runOf()).toBeUndefined();
+    });
+
+    it("rejects an unknown key or bad value, naming the valid keys", async () => {
+      const unknown = await cmdUpdate(tmp, itemId, { run: '{"bogus":1}' }).catch((e) => e);
+      expect(unknown).toBeInstanceOf(CLIError);
+      expect(unknown.suggestion).toContain("permissionMode");
+
+      const bad = await cmdUpdate(tmp, itemId, { run: '{"maxTurns":0}' }).catch((e) => e);
+      expect(bad).toBeInstanceOf(CLIError);
+      expect(bad.message).toContain("run.maxTurns");
+      expect(runOf()).toBeUndefined();
+    });
+  });
 });

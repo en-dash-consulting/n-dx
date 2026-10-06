@@ -14,7 +14,8 @@ import { findItem, resolveItem } from "../../core/tree.js";
 import { deleteItem, cleanBlockedByRefs } from "../../core/delete.js";
 import { openClaimsStore, resolveClaimHolder } from "../../store/index.js";
 import { holdCompletionForRun, describeHeldCompletion } from "../completion-hold.js";
-import { VALID_STATUSES, VALID_PRIORITIES, isItemStatus, isPriority } from "../../schema/index.js";
+import { VALID_STATUSES, VALID_PRIORITIES, RUN_SETTING_KEYS, isItemStatus, isPriority } from "../../schema/index.js";
+import { validateRunSettings } from "../../schema/validate.js";
 import type {PRDItem, ItemStatus} from "../../schema/index.js";
 export async function cmdUpdate(
   dir: string,
@@ -153,6 +154,30 @@ export async function cmdUpdate(
     }
   }
 
+  if (flags.run !== undefined) {
+    // Replaces the whole block; empty or `null` removes it (undefined is not serialized).
+    const raw = flags.run.trim();
+    let parsed: unknown = null;
+    if (raw !== "" && raw !== "null") {
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err) {
+        throw new CLIError(
+          `--run is not valid JSON: ${(err as Error).message}`,
+          `Pass an object, e.g. --run='{"model":"..."}'. Valid keys: ${RUN_SETTING_KEYS.join(", ")}.`,
+        );
+      }
+    }
+    const check = validateRunSettings(parsed);
+    if (!check.ok) {
+      throw new CLIError(
+        `Invalid --run: ${check.error}`,
+        `Valid keys: ${RUN_SETTING_KEYS.join(", ")}.`,
+      );
+    }
+    updates.run = check.value;
+  }
+
   if (heldCompletion && Object.keys(updates).length === 0) {
     if (flags.format === "json") {
       result(JSON.stringify({ id: resolvedId, status: existing.status, completionHeld: true, message: heldCompletion }, null, 2));
@@ -165,7 +190,7 @@ export async function cmdUpdate(
   if (Object.keys(updates).length === 0) {
     throw new CLIError(
       "No updates specified.",
-      "Use --status, --priority, --title, --description, --blockedBy, or --reason (with --status=failing).",
+      "Use --status, --priority, --title, --description, --blockedBy, --run, or --reason (with --status=failing).",
     );
   }
 

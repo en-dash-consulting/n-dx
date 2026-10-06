@@ -116,6 +116,23 @@ describe("MCP write tools — folder tree state", () => {
     expect(epics[0].level).toBe("epic");
   });
 
+  it("add_item persists a run block in the tree and rejects an invalid one", async () => {
+    const { rexDir, store } = await setupRexDir(tmpDir);
+
+    const bad = await handleAddItem(store, tmpDir, rexDir, {
+      title: "Bad", level: "epic", run: { nope: true },
+    });
+    expect(bad.isError).toBe(true);
+    expect(await treeEpics(rexDir)).toHaveLength(0);
+
+    const res = await handleAddItem(store, tmpDir, rexDir, {
+      title: "With run", level: "epic", run: { model: "m1", skipTestGate: false },
+    });
+    expect(res.isError).toBeFalsy();
+    const epics = await treeEpics(rexDir);
+    expect(epics[0].run).toEqual({ model: "m1", skipTestGate: false });
+  });
+
   it("add_item epic → feature → task produces 3-level nesting", async () => {
     const { rexDir, store } = await setupRexDir(tmpDir);
 

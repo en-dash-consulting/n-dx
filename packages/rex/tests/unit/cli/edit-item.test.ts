@@ -216,6 +216,37 @@ describe("handleEditItem", () => {
     expect(text).toContain("Invalid dependencies");
   });
 
+  // ── Saved run settings ──────────────────────────────────────────
+
+  it("sets, replaces and removes the run block", async () => {
+    let result = await handleEditItem(store, tmpDir, {
+      id: "item-1",
+      run: { model: "m1", review: true },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(parseResult(result).item.run).toEqual({ model: "m1", review: true });
+
+    // An object replaces the whole block.
+    result = await handleEditItem(store, tmpDir, { id: "item-1", run: { maxTurns: 5 } });
+    expect(parseResult(result).item.run).toEqual({ maxTurns: 5 });
+
+    // null removes it.
+    result = await handleEditItem(store, tmpDir, { id: "item-1", run: null });
+    expect(result.isError).toBeFalsy();
+    expect(parseResult(result).updatedFields).toEqual(["run"]);
+    expect((await store.getItem("item-1"))?.run).toBeUndefined();
+  });
+
+  it("rejects an invalid run block without writing", async () => {
+    const result = await handleEditItem(store, tmpDir, {
+      id: "item-1",
+      run: { model: "m1", bogus: 1 },
+    });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain("Invalid run settings");
+    expect((await store.getItem("item-1"))?.run).toBeUndefined();
+  });
+
   // ── Logging ─────────────────────────────────────────────────────
 
   it("appends an item_edited log entry", async () => {
