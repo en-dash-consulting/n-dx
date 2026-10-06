@@ -20,8 +20,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [.claude/rules accepts any new policy file with a table; only *-injection-seams.md names are blocked](./claude-rules-accepts-any-new-policy.md) | pending |
+| [Codex drops most of packages/web/AGENTS.md: root plus nested AGENTS.md exceeds its 32 KiB combined project-doc budget](./codex-drops-most-of-packages-web.md) | pending |
 | [Codex never sees the per-package governance or the path-scoped rules, because they live only in Claude-loaded files](./codex-never-sees-the-per-package.md) | pending |
-| [Give every package CLAUDE.md an AGENTS.md counterpart](./give-every-package-claude-md-an-agents.md) | in_progress |
+| [Give every package CLAUDE.md an AGENTS.md counterpart](./give-every-package-claude-md-an-agents.md) | completed |
 | [Move vendor-neutral sections from the Claude addendum into the shared guidance](./move-vendor-neutral-sections-from-the.md) | completed |
 | [Nothing stops AGENTS.md growing past Codex's 32 KiB project-doc limit, where Codex silently drops the tail](./nothing-stops-agents-md-growing-past.md) | pending |
 | [Reduce the three .claude/rules files to pointers, removing the second copy of each registry](./reduce-the-three-claude-rules-files-to.md) | pending |
