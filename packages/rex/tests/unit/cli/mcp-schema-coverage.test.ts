@@ -45,6 +45,10 @@ const FIELD_COVERAGE: Record<string, string[]> = {
   mergedProposals: ["managed"],
   children: ["managed"],
 
+  // Saved run settings — not yet writable through MCP; add_item/edit_item
+  // take it in the next PR 2 task, which moves this to ["add", "edit"].
+  run: ["managed"],
+
   // Complex nested type — known gap
   requirements: ["complex"],
 };

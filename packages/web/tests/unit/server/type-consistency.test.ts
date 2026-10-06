@@ -23,6 +23,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import type { PRDItemData, RunSettingsData } from "../../../src/viewer/components/prd-tree/types.js";
 
 // Canonical definitions from Rex
 import {
@@ -39,6 +40,8 @@ import {
   isItemStatus as canonicalIsItemStatus,
   isRequirementCategory as canonicalIsReqCategory,
   isValidationType as canonicalIsValidationType,
+  RUN_SETTING_KEYS as CANONICAL_RUN_SETTING_KEYS,
+  type RunSettings,
   type Priority,
   type ItemLevel,
   type ItemStatus,
@@ -224,6 +227,29 @@ describe("Viewer type mirrors match canonical definitions", () => {
     expect(priorities).toHaveLength(4);
     expect(categories).toHaveLength(6);
     expect(validationTypes).toHaveLength(3);
+  });
+
+  it("RunSettingsData mirrors RunSettings exactly", () => {
+    // Compile-time: each type must be assignable to the other (tsconfig.test.json).
+    type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+    const same: Same<RunSettingsData, RunSettings> = true;
+    const sameOnItem: Same<NonNullable<PRDItemData["run"]>, RunSettings> = true;
+    expect(same && sameOnItem).toBe(true);
+
+    // Runtime: a value carrying every viewer key names exactly RUN_SETTING_KEYS.
+    const full: Required<RunSettingsData> = {
+      model: "m",
+      provider: "cli",
+      permissionMode: "default",
+      review: true,
+      reviewModel: "r",
+      reviewOptional: false,
+      skipTestGate: false,
+      maxTurns: 1,
+      tokenBudget: 0,
+      contextNotes: "",
+    };
+    expect(Object.keys(full).sort()).toEqual([...CANONICAL_RUN_SETTING_KEYS].sort());
   });
 });
 

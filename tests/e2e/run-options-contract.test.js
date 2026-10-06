@@ -15,6 +15,10 @@
  *   `--resolve` does not list it.
  *
  * `permissionMode` drops `plan`: an autonomous run in plan mode stalls.
+ *
+ * Rex's `RUN_SETTING_KEYS` (the `run` block saved on a task) is pinned here
+ * too: hench's task-scope options plus `contextNotes`, i.e. the dashboard's
+ * options minus the launch-time ones, with the same per-key bounds.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -30,9 +34,12 @@ const { RUN_OPTION_SPECS, runOptionArgs, checkRunOptions } = await import(
   join(ROOT, "packages/web/src/shared/run-options.ts")
 );
 const { TIER_MODELS } = await import(join(ROOT, "packages/llm-client/dist/public.js"));
+const { RUN_SETTING_KEYS, validateRunSettings } = await import(join(ROOT, "packages/rex/dist/public.js"));
 
 const HENCH_ONLY = new Set(["resetDeferred"]);
 const DASHBOARD_ONLY = new Set(["contextNotes"]);
+/** Chosen per launch, never saved in a task's `run` block. */
+const LAUNCH_ONLY = new Set(["fresh", "allowDirty"]);
 const EXCLUDED_VALUES = { permissionMode: ["plan"] };
 
 function git(cwd, ...args) {
@@ -111,6 +118,41 @@ describe("run options contract: dashboard allow-list vs ndx work --resolve", () 
     }
     expect(resolved.maxTurns.value).toBe(9);
     expect(resolved.reviewModel.value).toBe(TIER_MODELS.claude.standard);
+  });
+
+  describe("rex's saved run block", () => {
+    it("holds hench's task-scope options plus contextNotes", () => {
+      const taskScope = henchOptions.filter((o) => o.scope === "task").map((o) => o.key);
+      expect(taskScope.length).toBeGreaterThan(0);
+      expect([...RUN_SETTING_KEYS]).toEqual([...taskScope, "contextNotes"]);
+    });
+
+    it("holds the dashboard's options apart from launch-time ones", () => {
+      const dashboard = RUN_OPTION_SPECS.map((s) => s.key).filter((k) => !LAUNCH_ONLY.has(k));
+      expect([...RUN_SETTING_KEYS]).toEqual(dashboard);
+    });
+
+    it("accepts and refuses exactly what the dashboard does at each bound", () => {
+      for (const spec of RUN_OPTION_SPECS.filter((s) => !LAUNCH_ONLY.has(s.key))) {
+        const cases = [];
+        if (spec.type === "integer") cases.push(spec.min, spec.max, spec.min - 1, spec.max + 1, spec.min + 0.5);
+        if (spec.type === "string") cases.push("a".repeat(spec.maxBytes), "a".repeat(spec.maxBytes + 1), 1);
+        if (spec.type === "boolean") cases.push(true, false, "true");
+        if (spec.type === "enum") cases.push(...spec.values, "plan", "other");
+        // The dashboard refuses reviewModel / reviewOptional without review
+        // for one launch; a saved block may omit review because config can
+        // supply it, so only per-key rules are compared.
+        const base = spec.key === "reviewModel" || spec.key === "reviewOptional" ? { review: true } : {};
+        for (const value of cases) {
+          const input = { ...base, [spec.key]: value };
+          expect({ key: spec.key, value, ok: validateRunSettings(input).ok }).toEqual({
+            key: spec.key,
+            value,
+            ok: checkRunOptions(input).ok,
+          });
+        }
+      }
+    });
   });
 
   describe("integer bounds", () => {

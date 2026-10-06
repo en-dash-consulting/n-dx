@@ -290,6 +290,54 @@ export interface ActiveInterval {
   end?: string;
 }
 
+/**
+ * Run settings saved on a task: how `ndx work` should run it. Every key is
+ * optional; an absent key falls back to `hench.*`, then `llm.*`, then the
+ * default, and a CLI flag overrides any of them. Keys match hench's task-scope
+ * run options (plus `contextNotes`) and the dashboard's `RunOptions`, pinned by
+ * `tests/e2e/run-options-contract.test.js`.
+ *
+ * Launch-time options (workspace, allowDirty, fresh, resetDeferred) are chosen
+ * per launch and are never saved here. Validate with `validateRunSettings`.
+ */
+export interface RunSettings {
+  /** Model id, at most {@link RUN_SETTING_MODEL_MAX_BYTES} UTF-8 bytes. */
+  model?: string;
+  provider?: "cli" | "api";
+  permissionMode?: "default" | "acceptEdits" | "bypassPermissions";
+  review?: boolean;
+  /** Reviewer model id, at most {@link RUN_SETTING_MODEL_MAX_BYTES} UTF-8 bytes. */
+  reviewModel?: string;
+  reviewOptional?: boolean;
+  /** `false` is meaningful: it re-enables a gate hench config skips. */
+  skipTestGate?: boolean;
+  /** Integer, {@link RUN_SETTING_MAX_TURNS_MIN}..{@link RUN_SETTING_MAX_TURNS_MAX}. */
+  maxTurns?: number;
+  /** Non-negative safe integer; 0 means unlimited. */
+  tokenBudget?: number;
+  /** Notes for the agent, at most {@link RUN_SETTING_CONTEXT_NOTES_MAX_BYTES} UTF-8 bytes. */
+  contextNotes?: string;
+}
+
+/** Every key a {@link RunSettings} block may hold, in hench's command-line order. */
+export const RUN_SETTING_KEYS = [
+  "model",
+  "provider",
+  "permissionMode",
+  "review",
+  "reviewModel",
+  "reviewOptional",
+  "skipTestGate",
+  "maxTurns",
+  "tokenBudget",
+  "contextNotes",
+] as const satisfies ReadonlyArray<keyof RunSettings>;
+
+export const RUN_SETTING_MODEL_MAX_BYTES = 256;
+export const RUN_SETTING_CONTEXT_NOTES_MAX_BYTES = 8 * 1024;
+export const RUN_SETTING_MAX_TURNS_MIN = 1;
+export const RUN_SETTING_MAX_TURNS_MAX = 500;
+
 export interface PRDItem {
   id: string;
   title: string;
@@ -367,6 +415,11 @@ export interface PRDItem {
    * GitHub #368), and `unknown` made that read a cast.
    */
   lastModifiedBy?: string;
+  /**
+   * Saved run settings for this item. Never `{}`: an empty block is the
+   * same as none and is not written.
+   */
+  run?: RunSettings;
   children?: PRDItem[];
   [key: string]: unknown;
 }

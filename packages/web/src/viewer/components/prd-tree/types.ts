@@ -66,6 +66,22 @@ export interface ActiveIntervalData {
   end?: string;
 }
 
+/**
+ * @see packages/rex/src/schema/v1.ts — RunSettings
+ */
+export interface RunSettingsData {
+  model?: string;
+  provider?: "cli" | "api";
+  permissionMode?: "default" | "acceptEdits" | "bypassPermissions";
+  review?: boolean;
+  reviewModel?: string;
+  reviewOptional?: boolean;
+  skipTestGate?: boolean;
+  maxTurns?: number;
+  tokenBudget?: number;
+  contextNotes?: string;
+}
+
 export interface PRDItemData {
   id: string;
   title: string;
@@ -87,6 +103,8 @@ export interface PRDItemData {
   branch?: string | null;
   /** @see packages/rex/src/schema/v1.ts — PRDItem.sourceFile */
   sourceFile?: string | null;
+  /** @see packages/rex/src/schema/v1.ts — PRDItem.run */
+  run?: RunSettingsData;
   children?: PRDItemData[];
 }
 
