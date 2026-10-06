@@ -39,6 +39,7 @@ plannedRelease: "1.0.0"
 | [Read and write the v2 folder trees](./read-and-write-the-v2-folder-trees/index.md) | pending |
 | [Recommendations become changes](./recommendations-become-changes/index.md) | pending |
 | [Remove the unused tracker integrations](./remove-the-unused-tracker-integrations/index.md) | pending |
+| [Review follow-ups for the product layer work](./review-follow-ups-for-the-product/index.md) | pending |
 | [Route remaining state paths through the layout resolver](./route-remaining-state-paths-through/index.md) | pending |
 | [Select and complete work on changes](./select-and-complete-work-on-changes/index.md) | pending |
 | [Shared assistant guidance for every vendor](./shared-assistant-guidance-for-every/index.md) | pending |
@@ -47,4 +48,3 @@ plannedRelease: "1.0.0"
 | [Stamp shippedIn from any CI](./stamp-shippedin-from-any-ci/index.md) | pending |
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | pending |
 | [User docs and docs.n-dx.dev for the v2 model](./user-docs-and-docs-n-dx-dev-for-the-v2/index.md) | pending |
-| [Review follow-ups for the product layer work](./review-follow-ups-for-the-product/index.md) | pending |
