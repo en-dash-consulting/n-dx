@@ -148,31 +148,24 @@ export {
 } from "./store/ensure-legacy-prd-migrated.js";
 export type { LegacyPrdMigrationResult } from "./store/ensure-legacy-prd-migrated.js";
 
-// ---- Integration schema system ----------------------------------------------
+// ---- Integration credentials on disk -----------------------------------------
 
 export {
-  validateField,
-  validateConfig,
-  registerIntegrationSchema,
-  getIntegrationSchema,
-  listIntegrationSchemas,
-  toAdapterConfigSchema,
-} from "./store/integration-schema.js";
+  isSensitiveField,
+  envVarName,
+  redactValue,
+  isRedactedField,
+  resolveRedactedConfig,
+  loadAdapterConfigs,
+  getAdapterConfig,
+  saveAdapterConfig,
+  removeAdapterConfig,
+} from "./store/adapter-config.js";
 export type {
-  FieldInputType,
-  FieldValidationRule,
-  FieldSelectOption,
-  IntegrationFieldSchema,
-  IntegrationSchema,
-  IntegrationFieldGroup,
-  FieldValidationResult,
-} from "./store/integration-schema.js";
-export {
-  registerBuiltInSchemas,
-  ensureSchemas,
-} from "./store/integration-schemas/index.js";
-export { notionIntegrationSchema } from "./store/integration-schemas/notion.js";
-export { jiraIntegrationSchema } from "./store/integration-schemas/jira.js";
+  AdapterConfig,
+  AdapterConfigField,
+  RedactedField,
+} from "./store/adapter-config.js";
 
 // ---- Schema types & constants -----------------------------------------------
 

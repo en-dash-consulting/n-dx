@@ -161,13 +161,6 @@ const COMMAND_REGISTRY = [
     related: ["work", "status"],
   },
   {
-    name: "sync",
-    category: "Orchestration",
-    summary: "Sync local PRD with remote adapter (e.g. Notion)",
-    keywords: ["remote", "Notion", "push", "pull", "bidirectional", "adapter"],
-    related: ["status"],
-  },
-  {
     name: "start",
     category: "Orchestration",
     summary: "Start dashboard and MCP server",
@@ -242,7 +235,7 @@ const COMMAND_REGISTRY = [
     category: "Orchestration",
     summary: "Export or import the PRD as a portable bundle",
     keywords: ["prd", "bundle", "export", "import", "portable", "transport", "move", "machine", "backup"],
-    related: ["export", "sync", "status"],
+    related: ["export", "status"],
   },
   {
     name: "trust",
@@ -442,16 +435,14 @@ const SUBCOMMAND_REGISTRY = {
     { name: "prune", parent: "rex", category: "Rex", summary: "Remove completed subtrees", keywords: ["clean", "archive", "completed", "consolidate"], related: ["reshape", "status"] },
     { name: "validate", parent: "rex", category: "Rex", summary: "Check PRD integrity (DAG, schema)", keywords: ["check", "integrity", "schema", "DAG", "health"], related: ["fix", "report"] },
     { name: "fix", parent: "rex", category: "Rex", summary: "Auto-fix common PRD issues", keywords: ["repair", "timestamps", "references", "auto-fix"], related: ["validate"] },
-    { name: "sync", parent: "rex", category: "Rex", summary: "Sync PRD with remote adapter", keywords: ["remote", "Notion", "push", "pull"], related: ["adapter"] },
     { name: "usage", parent: "rex", category: "Rex", summary: "Token usage analytics", keywords: ["tokens", "cost", "analytics"], related: ["status"] },
     { name: "report", parent: "rex", category: "Rex", summary: "Generate JSON health report", keywords: ["health", "CI", "JSON", "dashboard"], related: ["validate"] },
     { name: "verify", parent: "rex", category: "Rex", summary: "Run tests for acceptance criteria", keywords: ["test", "acceptance", "criteria", "coverage"], related: ["status"] },
     { name: "log", parent: "rex", category: "Rex", summary: "Append an execution-log entry (non-MCP route to append_log)", keywords: ["log", "append_log", "execution-log", "MCP"], related: ["status"] },
     { name: "recommend", parent: "rex", category: "Rex", summary: "Get SourceVision-based recommendations", keywords: ["recommendations", "suggestions", "sourcevision"], related: ["analyze"] },
     { name: "analyze", parent: "rex", category: "Rex", summary: "Build PRD from project analysis", keywords: ["scan", "codebase", "proposals", "LLM", "import"], related: ["add", "recommend"] },
-    { name: "export", parent: "rex", category: "Rex", summary: "Write the PRD to a portable JSON bundle", keywords: ["bundle", "portable", "transport", "backup", "move"], related: ["import-bundle", "sync"] },
-    { name: "import-bundle", parent: "rex", category: "Rex", summary: "Rebuild the PRD tree from a portable JSON bundle", keywords: ["bundle", "portable", "restore", "merge", "replace"], related: ["export", "sync"] },
-    { name: "adapter", parent: "rex", category: "Rex", summary: "Manage store adapters (list, add, remove, show)", keywords: ["Notion", "remote", "configure"], related: ["sync"] },
+    { name: "export", parent: "rex", category: "Rex", summary: "Write the PRD to a portable JSON bundle", keywords: ["bundle", "portable", "transport", "backup", "move"], related: ["import-bundle"] },
+    { name: "import-bundle", parent: "rex", category: "Rex", summary: "Rebuild the PRD tree from a portable JSON bundle", keywords: ["bundle", "portable", "restore", "merge", "replace"], related: ["export"] },
     { name: "mcp", parent: "rex", category: "Rex", summary: "Start MCP server for AI tool integration", keywords: ["MCP", "Claude", "AI", "tools"], related: [] },
   ],
   hench: [
@@ -787,7 +778,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     summary: "export or import the PRD — as a portable bundle or a prose document",
     description:
       "Carries a PRD between machines as a single JSON file, without sharing the\n" +
-      "repo or configuring a remote adapter (see 'ndx sync' for that).\n" +
+      "repo.\n" +
       "\n" +
       "  ndx prd export   spawns 'rex export'         — write the bundle\n" +
       "  ndx prd import   spawns 'rex import-bundle'  — rebuild the tree from it\n" +
@@ -843,7 +834,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx prd import --in=./prd-bundle.json .", description: "Merge a bundle into the local PRD" },
       { command: "ndx prd import --in=./prd-bundle.json --replace --yes .", description: "Replace the local PRD outright" },
     ],
-    related: ["export", "sync", "status"],
+    related: ["export", "status"],
   },
   init: {
     summary: "initialize all tools",
@@ -1056,23 +1047,6 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx usage", description: "Show total token usage" },
       { command: "ndx usage --group=week", description: "Usage grouped by week" },
       { command: "ndx usage --format=json .", description: "Machine-readable output" },
-    ],
-    related: ["status"],
-  },
-  sync: {
-    summary: "sync local PRD with remote adapter",
-    description: "Bidirectional sync between local .rex/prd.json and a remote service.\nDelegates to 'rex sync'.",
-    usage: "ndx sync [options] [dir]",
-    options: [
-      { flag: "--push", description: "Push local changes to remote only" },
-      { flag: "--pull", description: "Pull remote changes to local only" },
-      { flag: "--adapter=<name>", description: "Adapter name (default: notion)" },
-      { flag: "--dry-run", description: "Preview sync without writing" },
-    ],
-    examples: [
-      { command: "ndx sync", description: "Full bidirectional sync" },
-      { command: "ndx sync --push .", description: "Push local changes to Notion" },
-      { command: "ndx sync --pull .", description: "Pull remote changes down" },
     ],
     related: ["status"],
   },
@@ -1852,7 +1826,6 @@ export function formatMainHelp() {
 
   section("TRACK", [
     ["usage [dir]", "Token usage analytics (--group=day|week|month)"],
-    ["sync [dir]", "Sync local PRD with remote adapter (--push, --pull)"],
     ["ci [dir]", "Run analysis pipeline and validate PRD health"],
   ], pad);
 

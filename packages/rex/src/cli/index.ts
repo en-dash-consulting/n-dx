@@ -95,7 +95,6 @@ const VALUE_KEYS = new Set([
   "chunk",
   "chunk-size",
   "acknowledge",
-  "adapter",
   "direction",
   "output",
   "out",
@@ -334,24 +333,6 @@ async function dispatchRemove(
   await cmdRemove(removeDir, removeId, removeLevel, flags);
 }
 
-/**
- * Strip trailing directory argument from positional args for the adapter command.
- */
-function resolveAdapterPositional(positional: string[]): string[] {
-  const adapterPositional = [...positional];
-  if (adapterPositional.length > 0) {
-    const last = adapterPositional[adapterPositional.length - 1];
-    try {
-      if (existsSync(last) && statSync(last).isDirectory()) {
-        adapterPositional.pop();
-      }
-    } catch {
-      // Not a directory — keep it
-    }
-  }
-  return adapterPositional;
-}
-
 /** Dispatch a parsed CLI command to its handler. */
 async function dispatchCommand(
   command: string,
@@ -471,11 +452,6 @@ async function dispatchCommand(
       await cmdFix(resolveDir(positional), flags);
       break;
     }
-    case "sync": {
-      const { cmdSync } = await import("./commands/sync.js");
-      await cmdSync(resolveDir(positional), flags);
-      break;
-    }
     case "usage": {
       const { cmdUsage } = await import("./commands/usage.js");
       await cmdUsage(resolveDir(positional), flags);
@@ -534,12 +510,6 @@ async function dispatchCommand(
         ? positional.slice(2)
         : positional.slice(1);
       await cmdClaim(resolveDir(dirArgs), positional, flags);
-      break;
-    }
-    case "adapter": {
-      const dir = resolveDir(positional);
-      const { cmdAdapter } = await import("./commands/adapter.js");
-      await cmdAdapter(dir, resolveAdapterPositional(positional), flags);
       break;
     }
     case "reorganize": {
@@ -613,8 +583,8 @@ async function dispatchCommand(
 
       const REX_COMMANDS = [
         "init", "status", "tree", "tree-diff", "next", "add", "update", "move", "remove", "reshape",
-        "prune", "restore", "validate", "fix", "sync", "usage", "report", "verify", "ready", "log",
-        "recommend", "analyze", "import", "export", "import-bundle", "adapter",
+        "prune", "restore", "validate", "fix", "usage", "report", "verify", "ready", "log",
+        "recommend", "analyze", "import", "export", "import-bundle",
         "reorganize", "health", "mcp",
         "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "parse-md",
         "backfill-commit-attribution",

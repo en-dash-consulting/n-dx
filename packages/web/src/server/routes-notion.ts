@@ -1,11 +1,11 @@
 /**
  * Notion integration configuration API routes.
  *
- * Manages Notion API credentials (token + database ID) through the
- * adapter registry, validates connection health, validates the database
+ * Manages Notion API credentials (token + database ID) in
+ * `.rex/adapters.json`, validates connection health, validates the database
  * schema, and provides configuration endpoints for the dashboard UI.
  *
- * Credentials are stored via the adapter registry's redaction mechanism:
+ * Credentials are stored through rex's redaction helpers:
  * sensitive fields (token) are replaced with `{ __redacted, envVar, hint }`
  * in `.rex/adapters.json`, and the real value must be provided via
  * environment variable at runtime.
@@ -100,9 +100,9 @@ interface ConnectionTestResult {
 /**
  * Expected database properties for PRD mapping.
  *
- * Mirrors DATABASE_SCHEMA from rex's notion-map.ts. Defined here locally
- * to avoid a compile-time import (rex is dynamically imported only for
- * the adapter registry).
+ * Mirrored from the DATABASE_SCHEMA that rex's notion-map.ts used to hold.
+ * That module went with the Notion store adapter, so this is now the only
+ * copy rather than a local one kept to avoid a compile-time import.
  */
 const REQUIRED_PROPERTIES: Record<string, string> = {
   Name: "title",
@@ -505,26 +505,30 @@ async function testNotionConnection(
 }
 
 // ---------------------------------------------------------------------------
-// Adapter registry interaction (dynamic import to avoid coupling)
+// Credential persistence (dynamic import to avoid coupling)
 // ---------------------------------------------------------------------------
 
 /**
- * Dynamically load the adapter registry from the rex package.
+ * Dynamically load rex's integration-credential helpers.
  *
  * This avoids a hard compile-time dependency on rex from the web package.
  * The web package's gateway (domain-gateway.ts) handles MCP server factories;
  * for adapter config we use a lightweight dynamic import.
+ *
+ * The module used to be `store/adapter-registry.js`, which also held the
+ * Notion/Jira/Asana/GitHub store adapters. Those are gone; what this route
+ * needs — `.rex/adapters.json` persistence and credential redaction — stayed
+ * behind in `store/adapter-config.js` as plain functions, so there is no
+ * registry to ask for them any more.
  */
-async function loadRegistry(): Promise<{
-  getDefaultRegistry: () => {
-    getAdapterConfig: (rexDir: string, name: string) => Promise<{ name: string; config: Record<string, unknown> } | null>;
-    saveAdapterConfig: (rexDir: string, entry: { name: string; config: Record<string, unknown> }) => Promise<void>;
-    removeAdapterConfig: (rexDir: string, name: string) => Promise<void>;
-  };
+async function loadCredentialHelpers(): Promise<{
+  getAdapterConfig: (rexDir: string, name: string) => Promise<{ name: string; config: Record<string, unknown> } | null>;
+  saveAdapterConfig: (rexDir: string, entry: { name: string; config: Record<string, unknown> }) => Promise<void>;
+  removeAdapterConfig: (rexDir: string, name: string) => Promise<void>;
   isRedactedField: (v: unknown) => v is { __redacted: true; envVar: string; hint: string };
 }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mod = await import("@n-dx/rex/dist/store/adapter-registry.js") as any;
+  const mod = await import("@n-dx/rex/dist/store/adapter-config.js") as any;
   return mod;
 }
 
@@ -556,9 +560,9 @@ export async function handleNotionRoute(
 
   if (method === "GET" && url === "/api/notion/config") {
     try {
-      const { getDefaultRegistry, isRedactedField } = await loadRegistry();
-      const registry = getDefaultRegistry();
-      const adapterConfig = await registry.getAdapterConfig(ctx.rexDir, "notion");
+      const creds = await loadCredentialHelpers();
+      const { isRedactedField } = creds;
+      const adapterConfig = await creds.getAdapterConfig(ctx.rexDir, "notion");
 
       if (!adapterConfig) {
         jsonResponse(res, 200, {
@@ -627,17 +631,16 @@ export async function handleNotionRoute(
       }
 
       // Load existing config and merge
-      const { getDefaultRegistry } = await loadRegistry();
-      const registry = getDefaultRegistry();
-      const existing = await registry.getAdapterConfig(ctx.rexDir, "notion");
+      const creds = await loadCredentialHelpers();
+      const existing = await creds.getAdapterConfig(ctx.rexDir, "notion");
       const existingConfig = existing?.config ?? {};
 
       const newConfig: Record<string, unknown> = { ...existingConfig };
       if (data.token !== undefined) newConfig.token = data.token.trim();
       if (data.databaseId !== undefined) newConfig.databaseId = data.databaseId.trim().replace(/-/g, "");
 
-      // Save via adapter registry (handles redaction automatically)
-      await registry.saveAdapterConfig(ctx.rexDir, {
+      // Redaction of the token happens inside saveAdapterConfig.
+      await creds.saveAdapterConfig(ctx.rexDir, {
         name: "notion",
         config: newConfig as Record<string, unknown>,
       });
@@ -657,9 +660,8 @@ export async function handleNotionRoute(
 
   if (method === "DELETE" && url === "/api/notion/config") {
     try {
-      const { getDefaultRegistry } = await loadRegistry();
-      const registry = getDefaultRegistry();
-      await registry.removeAdapterConfig(ctx.rexDir, "notion");
+      const creds = await loadCredentialHelpers();
+      await creds.removeAdapterConfig(ctx.rexDir, "notion");
 
       jsonResponse(res, 200, { removed: true });
     } catch (err) {
@@ -681,9 +683,9 @@ export async function handleNotionRoute(
 
       if (!token || !databaseId) {
         // Try to load from config + env
-        const { getDefaultRegistry, isRedactedField } = await loadRegistry();
-        const registry = getDefaultRegistry();
-        const existing = await registry.getAdapterConfig(ctx.rexDir, "notion");
+        const creds = await loadCredentialHelpers();
+        const { isRedactedField } = creds;
+        const existing = await creds.getAdapterConfig(ctx.rexDir, "notion");
 
         if (existing) {
           if (!token) {
@@ -739,9 +741,9 @@ export async function handleNotionRoute(
       let databaseId = data.databaseId?.trim();
 
       if (!token || !databaseId) {
-        const { getDefaultRegistry, isRedactedField } = await loadRegistry();
-        const registry = getDefaultRegistry();
-        const existing = await registry.getAdapterConfig(ctx.rexDir, "notion");
+        const creds = await loadCredentialHelpers();
+        const { isRedactedField } = creds;
+        const existing = await creds.getAdapterConfig(ctx.rexDir, "notion");
 
         if (existing) {
           if (!token) {
@@ -808,9 +810,9 @@ export async function handleNotionRoute(
       let databaseId = data.databaseId?.trim();
 
       if (!token || !databaseId) {
-        const { getDefaultRegistry, isRedactedField } = await loadRegistry();
-        const registry = getDefaultRegistry();
-        const existing = await registry.getAdapterConfig(ctx.rexDir, "notion");
+        const creds = await loadCredentialHelpers();
+        const { isRedactedField } = creds;
+        const existing = await creds.getAdapterConfig(ctx.rexDir, "notion");
 
         if (existing) {
           if (!token) {

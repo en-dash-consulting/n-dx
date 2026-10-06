@@ -63,178 +63,59 @@ export {
   LegacyPrdMigrationError,
 } from "./ensure-legacy-prd-migrated.js";
 export type { LegacyPrdMigrationResult } from "./ensure-legacy-prd-migrated.js";
-export { NotionStore, ensureNotionRexDir } from "./notion-adapter.js";
-export type { NotionClient, NotionAdapterConfig } from "./notion-client.js";
-export { LiveNotionClient } from "./notion-client.js";
-export { AsanaStore, ensureAsanaRexDir } from "./asana-adapter.js";
-export type {
-  AsanaClient,
-  AsanaAdapterConfig,
-  AsanaTask,
-  AsanaCreateParams,
-  AsanaUpdateParams,
-  AsanaExternal,
-} from "./asana-client.js";
-export { LiveAsanaClient } from "./asana-client.js";
-export { GitHubProjectsStore, ensureGitHubProjectsRexDir } from "./github-projects-adapter.js";
-export type {
-  GitHubProjectsClient,
-  GitHubProjectsAdapterConfig,
-  GitHubProjectItem,
-  DraftContent,
-} from "./github-projects-client.js";
-export { LiveGitHubProjectsClient } from "./github-projects-client.js";
-export { JiraStore, ensureJiraRexDir } from "./jira-adapter.js";
-export type {
-  JiraClient,
-  JiraAdapterConfig,
-  JiraIssue,
-  JiraCreateParams,
-  JiraUpdateParams,
-} from "./jira-client.js";
-export { LiveJiraClient } from "./jira-client.js";
-export { SyncEngine } from "../core/sync-engine.js";
-export type { SyncDirection, SyncReport, SyncOptions } from "../core/sync-engine.js";
+// ---- Integration credentials on disk -----------------------------------------
+// All that remains of the adapter registry: `.rex/adapters.json` persistence
+// plus credential redaction and environment resolution. See adapter-config.ts.
 export {
-  AdapterRegistry,
-  getDefaultRegistry,
-  resetDefaultRegistry,
+  isSensitiveField,
+  envVarName,
+  redactValue,
   isRedactedField,
-} from "./adapter-registry.js";
+  resolveRedactedConfig,
+  loadAdapterConfigs,
+  getAdapterConfig,
+  saveAdapterConfig,
+  removeAdapterConfig,
+} from "./adapter-config.js";
 export type {
-  AdapterDefinition,
-  AdapterFactory,
   AdapterConfig,
   AdapterConfigField,
-  AdapterInfo,
-} from "./adapter-registry.js";
-
-// ---- Integration schema system -----------------------------------------------
-export {
-  validateField,
-  validateConfig,
-  registerIntegrationSchema,
-  getIntegrationSchema,
-  listIntegrationSchemas,
-  resetIntegrationSchemas,
-  toAdapterConfigSchema,
-} from "./integration-schema.js";
-export type {
-  FieldInputType,
-  FieldValidationRule,
-  FieldSelectOption,
-  IntegrationFieldSchema,
-  IntegrationSchema,
-  IntegrationFieldGroup,
-  FieldValidationResult,
-} from "./integration-schema.js";
-export {
-  registerBuiltInSchemas,
-  ensureSchemas,
-} from "./integration-schemas/index.js";
-export { notionIntegrationSchema } from "./integration-schemas/notion.js";
-export { jiraIntegrationSchema } from "./integration-schemas/jira.js";
-export { asanaIntegrationSchema } from "./integration-schemas/asana.js";
-export { githubIntegrationSchema } from "./integration-schemas/github.js";
+  RedactedField,
+} from "./adapter-config.js";
 
 import { FileStore, PRD_FILENAME } from "./file-adapter.js";
-import { NotionStore } from "./notion-adapter.js";
-import { LiveNotionClient } from "./notion-client.js";
-import { AsanaStore } from "./asana-adapter.js";
-import { LiveAsanaClient } from "./asana-client.js";
-import { GitHubProjectsStore } from "./github-projects-adapter.js";
-import { LiveGitHubProjectsClient } from "./github-projects-client.js";
-import { JiraStore } from "./jira-adapter.js";
-import { LiveJiraClient } from "./jira-client.js";
-import { getDefaultRegistry } from "./adapter-registry.js";
 import { dirname } from "node:path";
 import { resolveGitBranch } from "./branch-naming.js";
 import { findPRDFileForBranch } from "./prd-discovery.js";
 import { PRD_MARKDOWN_FILENAME } from "./prd-md-migration.js";
 import type { PRDStore } from "./contracts.js";
-import type { NotionAdapterConfig } from "./notion-client.js";
-import type { AsanaAdapterConfig } from "./asana-client.js";
-import type { GitHubProjectsAdapterConfig } from "./github-projects-client.js";
-import type { JiraAdapterConfig } from "./jira-client.js";
 
 /**
- * Create a PRDStore for the given adapter name.
+ * The only store backend rex has.
  *
- * Uses the default {@link AdapterRegistry} to resolve the adapter.
- * For adapters that require configuration (e.g. Notion), pass additional
- * config via `createStoreWithConfig` or use the registry directly.
+ * Kept as a named constant rather than inlined so the one place that still
+ * takes a backend name has something to compare against.
+ */
+const FILE_ADAPTER = "file";
+
+/**
+ * Create a PRDStore for the given backend name.
+ *
+ * `"file"` is the only backend. The parameter survives the removal of the
+ * Notion, Jira, Asana and GitHub Projects adapters because callers across rex
+ * and hench pass it explicitly, and a name that is silently ignored is worse
+ * than one that is checked — a caller asking for a backend that no longer
+ * exists should hear so rather than quietly get the local store.
+ *
+ * @throws If `adapter` is anything other than `"file"`.
  */
 export function createStore(adapter: string, rexDir: string): PRDStore {
-  return getDefaultRegistry().create(adapter, rexDir, {});
-}
-
-/**
- * Create a PRDStore with explicit adapter configuration.
- *
- * Validates config against the adapter's schema before creating the store.
- */
-export function createStoreWithConfig(
-  adapter: string,
-  rexDir: string,
-  config: Record<string, unknown>,
-): PRDStore {
-  return getDefaultRegistry().create(adapter, rexDir, config);
-}
-
-/**
- * Create a Notion-backed store.
- *
- * Requires a NotionAdapterConfig with token and databaseId.
- * The rexDir is still used for config, logs, and workflow files.
- */
-export function createNotionStore(
-  rexDir: string,
-  config: NotionAdapterConfig,
-): PRDStore {
-  const client = new LiveNotionClient(config.token);
-  return new NotionStore(rexDir, client, config);
-}
-
-/**
- * Create an Asana-backed store.
- *
- * Requires an AsanaAdapterConfig with token and projectId.
- * The rexDir is still used for config, logs, and workflow files.
- */
-export function createAsanaStore(
-  rexDir: string,
-  config: AsanaAdapterConfig,
-): PRDStore {
-  const client = new LiveAsanaClient(config.token);
-  return new AsanaStore(rexDir, client, config);
-}
-
-/**
- * Create a GitHub Projects-backed store.
- *
- * Requires a GitHubProjectsAdapterConfig with token and projectId.
- * The rexDir is still used for config, logs, and workflow files.
- */
-export function createGitHubProjectsStore(
-  rexDir: string,
-  config: GitHubProjectsAdapterConfig,
-): PRDStore {
-  const client = new LiveGitHubProjectsClient(config.token);
-  return new GitHubProjectsStore(rexDir, client, config);
-}
-
-/**
- * Create a Jira-backed store.
- *
- * Requires a JiraAdapterConfig with domain, email, apiToken, and projectKey.
- * The rexDir is still used for config, logs, and workflow files.
- */
-export function createJiraStore(
-  rexDir: string,
-  config: JiraAdapterConfig,
-): PRDStore {
-  const client = new LiveJiraClient(config.domain, config.email, config.apiToken);
-  return new JiraStore(rexDir, client, config);
+  if (adapter !== FILE_ADAPTER) {
+    throw new Error(
+      `Unknown store adapter "${adapter}". The only adapter is "${FILE_ADAPTER}".`,
+    );
+  }
+  return new FileStore(rexDir);
 }
 
 /**
@@ -249,9 +130,6 @@ export function createJiraStore(
  *
  * CLI commands that write new root items should call {@link resolvePRDFile}
  * before writing to ensure the branch file exists and the store targets it.
- *
- * Remote adapters (e.g. Notion) are accessed only during explicit sync
- * operations via {@link resolveRemoteStore}.
  *
  * @param rexDir  Path to the rex state directory. Resolve it with
  *                {@link resolveRexPaths} rather than joining a directory name
@@ -271,23 +149,4 @@ export async function resolveStore(rexDir: string): Promise<PRDStore> {
   return new FileStore(rexDir, {
     currentBranchFile: currentBranchFile ?? PRD_FILENAME,
   });
-}
-
-/**
- * Resolve a remote PRDStore for sync operations.
- *
- * Reads the adapter configuration from `adapters.json` via the adapter
- * registry. If no adapter name is provided, defaults to `"notion"`.
- *
- * @param rexDir       Path to the `.rex/` directory.
- * @param adapterName  Adapter to resolve (default: `"notion"`).
- * @returns A PRDStore instance for the remote adapter.
- * @throws If the adapter is not configured or unknown.
- */
-export async function resolveRemoteStore(
-  rexDir: string,
-  adapterName: string = "notion",
-): Promise<PRDStore> {
-  const registry = getDefaultRegistry();
-  return registry.createFromConfig(rexDir, adapterName);
 }

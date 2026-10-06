@@ -2320,14 +2320,6 @@ async function handleClaim(rest) {
   exitWithCleanup(0);
 }
 
-async function handleSync(rest) {
-  const dir = resolveDir(rest);
-  requireInit(dir, ["rex"]);
-  const flags = extractFlags(rest);
-  await runOrDie(tools.rex, ["sync", ...flags, dir]);
-  exitWithCleanup(0);
-}
-
 async function handleCI(rest) {
   const dir = resolveDir(rest);
   const flags = extractFlags(rest);
@@ -3258,7 +3250,6 @@ const COMMAND_DISPATCH = new Map([
   ["status",            handleStatus],
   ["trust",             handleTrust],
   ["usage",             handleUsage],
-  ["sync",              handleSync],
   ["claim",             handleClaim],
   ["ci",                handleCI],
   ["dev",               handleDev],

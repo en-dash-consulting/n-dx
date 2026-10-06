@@ -34,7 +34,7 @@ describe("help.js", () => {
   });
 
   describe("suggestCommands", () => {
-    const commands = ["init", "plan", "refresh", "work", "status", "usage", "sync", "start", "dev", "web", "ci", "config"];
+    const commands = ["init", "plan", "refresh", "work", "status", "usage", "start", "dev", "web", "ci", "config"];
 
     it("suggests 'status' for 'statis'", () => {
       const suggestions = suggestCommands("statis", commands);
@@ -119,8 +119,8 @@ describe("help.js", () => {
     });
 
     it("scores exact name match higher than keyword match", () => {
-      const results = searchHelp("sync");
-      // The top result should be 'sync' (exact name match) not a keyword-only match
+      const results = searchHelp("usage");
+      // The top result should be 'usage' (exact name match) not a keyword-only match
       expect(results[0].score).toBeGreaterThan(0);
       if (results.length > 1) {
         expect(results[0].score).toBeGreaterThanOrEqual(results[1].score);

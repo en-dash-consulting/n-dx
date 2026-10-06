@@ -45,7 +45,6 @@ import { handleHubAbsentRoute } from "./routes-hub-absent.js";
 import { handleConfigRoute } from "./routes-config.js";
 import { handleSearchRoute } from "./routes-search.js";
 import { handleNotionRoute } from "./routes-notion.js";
-import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
 import { handleTrustRoute } from "./routes-trust.js";
 import { evaluateRepoTrust, formatRepoTrustReport } from "@n-dx/llm-client";
@@ -792,7 +791,6 @@ async function handleApiRoutes(
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleTrustRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleIntegrationRoute(req, res, ctx))) return true;
   if (await handleFeaturesRoute(req, res, ctx)) return true;
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
   if (await handleLlmRoute(req, res, ctx)) return true;
