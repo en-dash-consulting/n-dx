@@ -102,9 +102,8 @@ Three cuts have landed:
 - **PR 1b (`9a09a196`)** took 53 to 29 by clearing the last of the three tool
   directories, which is what turned that half into a wall: rex's sourcevision
   artifact attributions and its canonical PRD bucket key, sourcevision's PRD
-  reader (a real `.ndx/`-only defect — it reported an empty PRD for a full
-  one) and its static help text, hench's reviewer brief, and the eight viewer
-  sites.
+  reader (in a helper nothing calls yet) and its static help text, hench's
+  reviewer brief, and the eight viewer sites.
 
 What is left is one shape: **project-config readers** that spell `.n-dx.json` /
 `.n-dx.local.json` instead of taking `configFile` from the resolver. They are

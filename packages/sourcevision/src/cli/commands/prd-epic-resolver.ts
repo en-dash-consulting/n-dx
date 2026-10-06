@@ -9,10 +9,11 @@ import { execFileSyncCli } from "../../util/exec-cli.js";
  *
  * Sourcevision reads rex's files here without importing rex — the two domain
  * packages never import each other — but *where* they are is still the
- * resolver's answer, not `.rex` unconditionally. On a `.ndx/` project the
- * fixed name read three files that do not exist, and every failure here is a
- * silent `catch` returning "no PRD", so the command reported an empty PRD for
- * a project with a full one.
+ * resolver's answer, not `.rex` unconditionally: on a `.ndx/` project the
+ * fixed name points at files that do not exist, and every failure here is a
+ * silent `catch` returning "no PRD". Only the currently uncalled
+ * `resolveWorkedEpicTitlesForRange` reaches it, so this is about not handing a
+ * future caller that bug.
  */
 function rexDirFor(projectDir: string): string {
   return resolveLayout(projectDir).rexDir;

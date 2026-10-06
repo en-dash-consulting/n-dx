@@ -14,16 +14,14 @@ second time in a file that has no idea which layout it is running under, and it
 fails *silently*: the wrong path is simply a path nothing wrote to, which is
 indistinguishable from a project that has nothing to show.
 
-One of the twenty-four sites cleared here was a live defect of exactly that
-shape. `sv pr-markdown` read the PRD through a fixed `.rex`, and every failure
-on that route is a `catch` that returns "no PRD" — so on a migrated project it
-reported an empty PRD for a full one and wrote a PR summary with no completed
-work in it. Three more were attributions rather than reads: `rex analyze`
-stamped every proposal it derived from an analysis with
-`.sourcevision/zones.json`, naming a file the project does not have, and
-hench's reviewer was told to list `.rex/prd_tree/` before capturing a finding —
-a listing that came back empty, so every finding looked new and duplicates got
-filed.
+Two of the sites cleared here were live defects of exactly that shape, both on
+a migrated project: `rex analyze` stamped every proposal it derived from an
+analysis with `.sourcevision/zones.json`, naming a file the project does not
+have, and hench's reviewer was told to list `.rex/prd_tree/` before capturing a
+finding — a listing that came back empty, so every finding looked new and
+duplicates got filed. A third, sourcevision's `prd-epic-resolver`, built its
+paths from a fixed `.rex` too, but in a helper nothing calls; it now asks the
+resolver so the literal is gone, and no command's behaviour changes.
 
 The rest were display copy and one bucket key. Viewer text that names a
 directory now names the command or the tool instead (`Make sure hench is
