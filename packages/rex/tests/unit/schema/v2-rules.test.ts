@@ -48,7 +48,7 @@ describe("rule table", () => {
 
   it("ignores deleted nodes", () => {
     const tree = { changes: [node("change", { status: "deleted", title: "Ship 0.8.0" })] };
-    expect(checkV2Rules({ map: [], ...tree }, { now: NOW })).toEqual([]);
+    expect(checkV2Rules({ map: [], ...tree }, { now: NOW, releases: ["0.8.0"] })).toEqual([]);
   });
 });
 
@@ -71,25 +71,49 @@ describe("change-has-target", () => {
 });
 
 describe("title-release-token", () => {
+  const RELEASES = ["0.8.0", "1.2.3", "1.0.0-beta.1", "1.0.0"];
+
   it.each(["0.8.0 release audit", "Ship v1.2.3", "Cut 1.0.0-beta.1", "Patch the 0.8.x line", "Prepare v1.0", "PR 12 follow-up", "Land PR #12", "pr-12 fixes", "Review pull request 7"])(
     "flags %j",
     (title) => {
-      expect(titleReleaseToken(title)).toBeDefined();
+      expect(titleReleaseToken(title, RELEASES)).toBeDefined();
     },
   );
 
-  it.each(["Add the v2 node types and fields", "Dashboard landing page", "Keep cohesion above 0.5", "Fix issue #12", "PRD storage", "Python 3.12 support"])(
-    "accepts %j",
-    (title) => {
-      expect(titleReleaseToken(title)).toBeUndefined();
-    },
-  );
+  it.each([
+    "Add the v2 node types and fields",
+    "Dashboard landing page",
+    "Keep cohesion above 0.5",
+    "Fix issue #12",
+    "PRD storage",
+    "Python 3.12 support",
+    "Upgrade zod to 3.25.76",
+    "Support Node 22.0.0",
+    "Bump vite from 0.7.9 to 6.4.3",
+  ])("accepts %j", (title) => {
+    expect(titleReleaseToken(title, RELEASES)).toBeUndefined();
+  });
 
-  it("checks every node in both layers", () => {
+  it("finds our release after a dependency version in the same title", () => {
+    expect(titleReleaseToken("Upgrade zod to 3.25.76 for 0.8.0", RELEASES)).toBe("0.8.0");
+  });
+
+  it("matches a release recorded with a leading v", () => {
+    expect(titleReleaseToken("Ship 2.0.0", ["v2.0.0"])).toBe("2.0.0");
+  });
+
+  it("flags no version without known releases, but still flags PR tokens", () => {
+    expect(titleReleaseToken("0.8.0 release audit")).toBeUndefined();
+    expect(titleReleaseToken("PR 12 follow-up")).toBe("PR 12");
+  });
+
+  it("checks every node in both layers against options.releases", () => {
     const capability = cap({ title: "PR 12 capability" });
     const task = node("task", { title: "Prep 0.8.0" });
+    const dependency = node("task", { title: "Upgrade zod to 3.25.76" });
     const plain = cap({ title: "Plain" });
-    const findings = check("title-release-token", { map: [node("area", {}, [capability, plain])], changes: [node("change", { touches: ["x"] }, [task])] });
+    const tree: V2Tree = { map: [node("area", {}, [capability, plain])], changes: [node("change", { touches: ["x"] }, [task, dependency])] };
+    const findings = checkV2Rules(tree, { now: NOW, releases: RELEASES }, ["title-release-token"]);
     expect(ids(findings)).toEqual([capability.id, task.id]);
     expect(findings[0].message).toContain('"PR 12"');
   });

@@ -33,6 +33,12 @@ export interface RuleOptions {
   now: Date;
   /** Days a map node may stay revised before `long-revised` warns. Default 14. */
   longRevisedDays?: number;
+  /**
+   * This project's releases, for `title-release-token`: the package version
+   * line plus every `plannedRelease` and `shippedIn` in the tree. A title
+   * version token is flagged only when it names one of these. Default none.
+   */
+  releases?: readonly string[];
 }
 
 export type RuleSeverity = "error" | "warning";
@@ -122,17 +128,37 @@ function finding(rule: V2RuleId, node: RuleNode, message: string): RuleFinding {
 // ── Title lint ───────────────────────────────────────────────────
 
 /** `0.8.0`, `v1.2.3`, `1.0.0-beta.1`, `0.8.x`, `v1.0`. A bare `0.8` is a number, not a release. */
-const VERSION_TOKEN = /\b(?:v?\d+\.\d+\.(?:\d+|x)(?:-[0-9A-Za-z.]+)?|v\d+\.\d+)\b/i;
+const VERSION_TOKEN = /\b(?:v?\d+\.\d+\.(?:\d+|x)(?:-[0-9A-Za-z.]+)?|v\d+\.\d+)\b/gi;
 /** `PR 12`, `PR #12`, `PR-12`, `PR12`, `pull request 12`. A bare `#12` is too ambiguous to flag. */
 const PR_TOKEN = /\b(?:PR|pull request)\s*[#-]?\s*\d+\b/i;
+
+const normalizeVersion = (version: string): string => version.trim().toLowerCase().replace(/^v/, "");
+
+/**
+ * Whether a version token names one of `releases`. A full version must equal
+ * a release; a line (`0.8.x`, `v1.0`) names every release in it.
+ */
+function namesRelease(token: string, releases: ReadonlySet<string>): boolean {
+  const version = normalizeVersion(token);
+  const line = /^(\d+\.\d+)(?:\.x)?$/.exec(version)?.[1];
+  if (!line) return releases.has(version);
+  for (const release of releases) if (release.startsWith(`${line}.`)) return true;
+  return false;
+}
 
 /**
  * The release or PR token a title carries, if any. Releases are fields on a
  * change (`plannedRelease`, `shippedIn`) and PRs are state (`prs`); a title
  * that names one is using the node as a container.
+ *
+ * Only this project's own `releases` count: "Upgrade zod to 3.25.76" names a
+ * dependency, not a release. With no releases, no version token is flagged.
+ * PR tokens are always flagged.
  */
-export function titleReleaseToken(title: string): string | undefined {
-  return (VERSION_TOKEN.exec(title) ?? PR_TOKEN.exec(title))?.[0];
+export function titleReleaseToken(title: string, releases: readonly string[] = []): string | undefined {
+  const known = new Set(releases.map(normalizeVersion));
+  const release = [...title.matchAll(VERSION_TOKEN)].find(([token]) => namesRelease(token, known));
+  return (release ?? PR_TOKEN.exec(title))?.[0];
 }
 
 // ── Spec hash ────────────────────────────────────────────────────
@@ -160,9 +186,9 @@ const changeHasTarget: Rule = ({ entries }) =>
     return [finding("change-has-target", node, `Change "${node.title}" neither amends nor touches a map node; mark it a spike or name its target`)];
   });
 
-const titleReleaseTokenRule: Rule = ({ entries }) =>
+const titleReleaseTokenRule: Rule = ({ entries }, { releases }) =>
   entries.flatMap(({ node }) => {
-    const token = titleReleaseToken(node.title);
+    const token = titleReleaseToken(node.title, releases);
     return token
       ? [finding("title-release-token", node, `Title "${node.title}" names "${token}"; use plannedRelease, shippedIn or prs instead`)]
       : [];
