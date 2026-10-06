@@ -25,7 +25,7 @@ plannedRelease: "1.0.0"
 | [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | pending |
 | [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | pending |
 | [Dashboard on the v2 model](./dashboard-on-the-v2-model/index.md) | pending |
-| [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | pending |
+| [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | completed |
 | [Derived status, health and computed edges](./derived-status-health-and-computed-edges/index.md) | pending |
 | [Docs, skills and policies for the v2 model](./docs-skills-and-policies-for-the-v2/index.md) | pending |
 | [Every n-dx commit carries an item trailer](./every-n-dx-commit-carries-an-item/index.md) | pending |
