@@ -1,0 +1,25 @@
+---
+id: "6ae69b1a-5f7b-4306-a411-30a1fe7908f3"
+level: "task"
+title: "Title lint rejects dependency versions such as \"Upgrade zod to 3.25.76\" as release tokens"
+status: "completed"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "rex"
+  - "pr-07"
+source: "ndx-adversarial-review"
+startedAt: "2026-10-06T16:12:45.221Z"
+completedAt: "2026-10-06T16:45:27.028Z"
+endedAt: "2026-10-06T16:45:27.028Z"
+resolutionType: "code-change"
+resolutionDetail: "title-release-token flags a version only when it names a release passed in RuleOptions.releases; PR tokens unchanged"
+acceptanceCriteria:
+  - "titleReleaseToken (or the rule) accepts \"Upgrade zod to 3.25.76\" and \"Support Node 22.0.0\""
+  - "\"0.8.0 release audit\" and \"PR 12 follow-up\" are still flagged"
+  - "Unit tests for both cases exist in packages/rex/tests/unit/schema/v2-rules.test.ts"
+description: "Verdict: should-fix (medium).\n\nScenario: a change titled \"Upgrade zod to 3.25.76\" or \"Support Node 22.0.0\" fails title-release-token as an ERROR. The rule exists so that titles do not name the project's own release (for example \"0.8.0 release audit\"). A dependency version is not that, but VERSION_TOKEN matches any three-part number.\n\nEvidence: packages/rex/src/schema/v2-rules.ts, VERSION_TOKEN `\\b(?:v?\\d+\\.\\d+\\.(?:\\d+|x)(?:-[0-9A-Za-z.]+)?|v\\d+\\.\\d+)\\b`. The tests in v2-rules.test.ts cover only release-style titles.\n\nReachable: once health rules run as errors (E7) on the change layer. Dependency bump changes, such as dependabot-style PRs captured as changes, are common.\n\nOptions:\n1. Flag only versions that are not preceded by a dependency-ish context word (to, from, bump, upgrade, a package name). This is heuristic and fragile.\n2. Flag only versions equal to a known release: the project's package version line, or any `plannedRelease`/`shippedIn` in the tree. Precise, but the rule then needs the release list passed in through RuleOptions. Recommended.\n3. Keep matching broadly, but report dependency-like matches as warnings rather than errors.\n\nDecision for the owner: whether the lint means \"names any version\" or \"names one of our releases\".\n\nDecision (Ryan, 2026-10-06): option 2. The title lint rejects only n-dx's own release numbers, never arbitrary version strings. The rule takes the known releases through RuleOptions (e.g. `releases: string[]`, which callers fill from the package version line and every plannedRelease/shippedIn in the tree), and flags a title only when a version token in it equals one of those releases. PR-number tokens (\"PR 12\", \"#512\") stay flagged as before. With no releases supplied, no version token is flagged."
+lastModified: "2026-10-06T16:45:28.973Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
