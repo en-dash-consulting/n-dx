@@ -13,6 +13,14 @@
  *   4. AGENTS.md includes Codex-specific operational sections
  *   5. Both files are generated from the same template (source equivalence)
  *   6. CODEX.md is retired (no longer present)
+ *   7. No vendor-neutral section lives only in `claude-addendum.md`
+ *
+ * (7) is the guard that matters most when editing the assets. Anything placed
+ * in `claude-addendum.md` renders into CLAUDE.md and nowhere else, so a section
+ * about the *codebase* parked there is silently invisible to Codex. That is how
+ * the gateway rules and the PRD write invariant went missing from AGENTS.md for
+ * several releases. `CLAUDE_ONLY_HEADINGS` below is the allowlist; grow it only
+ * for guidance about Claude Code's own behaviour.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -90,11 +98,9 @@ describe("shared guidance equivalence", () => {
   });
 
   it("both files list the same orchestration commands", () => {
-    // "ndx plan"/"ndx status"/"ndx start" only appear in CLAUDE.md's
-    // Claude-only Concurrency contract section — narrowed to the commands
-    // that genuinely appear in the shared project-guidance.md prose (the
-    // "Assistant Instruction Files" intro and the "ndx work" Gotcha note).
-    const commands = ["ndx init", "ndx work"];
+    // "ndx plan"/"ndx status"/"ndx start" come from the concurrency contract,
+    // which is shared guidance now rather than a Claude-only section.
+    const commands = ["ndx init", "ndx work", "ndx start", "ndx plan", "ndx status"];
     for (const cmd of commands) {
       expect(claudeContent, `CLAUDE.md missing cmd: ${cmd}`).toContain(cmd);
       expect(agentsContent, `AGENTS.md missing cmd: ${cmd}`).toContain(cmd);
@@ -102,14 +108,14 @@ describe("shared guidance equivalence", () => {
   });
 
   it("both files include the same key files", () => {
-    // ".rex/workflow.md" (Codex-only Workflow section) and
-    // ".hench/config.json" (Claude-only Spawn-exempt/Concurrency notes)
-    // each appear in only one file by design — narrowed to paths genuinely
-    // shared between both.
+    // ".rex/workflow.md" appears in the Codex-only Workflow section by
+    // design. ".hench/config.json" reaches both files through the
+    // spawn-exempt note and the concurrency contract, which are shared.
     const keyFiles = [
       ".sourcevision/CONTEXT.md",
       ".rex/prd.json",
       ".n-dx.json",
+      ".hench/config.json",
     ];
     for (const file of keyFiles) {
       expect(claudeContent, `CLAUDE.md missing: ${file}`).toContain(file);
@@ -121,24 +127,12 @@ describe("shared guidance equivalence", () => {
 // ── Vendor-specific content ──────────────────────────────────────────────────
 
 describe("Claude-specific content", () => {
-  it("CLAUDE.md includes zone fragility governance", () => {
-    expect(claudeContent).toContain("zone fragility governance");
-  });
-
-  it("CLAUDE.md includes Gateway modules detail", () => {
-    expect(claudeContent).toContain("### Gateway modules");
-  });
-
   it("CLAUDE.md includes injection seam registry references", () => {
     // The inline "### Injection seam registry" section was later replaced by
     // a pointer sentence to the path-scoped rule files that now hold this
     // content (.claude/rules/*-injection-seams.md) — check for those instead.
     expect(claudeContent).toContain(".claude/rules/web-injection-seams.md");
     expect(claudeContent).toContain(".claude/rules/core-injection-seams.md");
-  });
-
-  it("CLAUDE.md includes Concurrency contract", () => {
-    expect(claudeContent).toContain("### Concurrency contract");
   });
 
   it("CLAUDE.md includes MCP Servers section", () => {
@@ -149,10 +143,93 @@ describe("Claude-specific content", () => {
     expect(claudeContent).not.toContain("## Codex Troubleshooting");
   });
 
-  it("AGENTS.md does NOT include Claude-specific deep sections", () => {
-    expect(agentsContent).not.toContain("zone fragility governance");
-    expect(agentsContent).not.toContain("Injection seam registry");
-    expect(agentsContent).not.toContain("Concurrency contract");
+  it("CLAUDE.md points at the per-directory CLAUDE.md files", () => {
+    // The one thing that genuinely cannot be shared: Claude Code loads a
+    // package's own CLAUDE.md when work happens under that directory. Codex
+    // has no equivalent, so the pointers stay in the addendum.
+    expect(claudeContent).toContain("packages/web/CLAUDE.md");
+    expect(agentsContent).not.toContain("packages/web/CLAUDE.md");
+  });
+});
+
+// ── Vendor-neutral sections must reach every assistant ───────────────────────
+
+/**
+ * Sections that describe the architecture itself rather than how Claude Code
+ * loads files. All four used to live only in `claude-addendum.md`, which left
+ * Codex — and any future assistant — without the gateway rules, the
+ * spawn-versus-gateway decision rule and the PRD write invariant. They now
+ * live in `project-guidance.md`, so both surfaces carry them.
+ *
+ * If you are adding a section to `claude-addendum.md`, ask first whether it is
+ * about Claude Code's own behaviour. If it describes the codebase, it belongs
+ * in `project-guidance.md` instead.
+ */
+const VENDOR_NEUTRAL_SECTIONS = [
+  "Monorepo-wide zone fragility governance",
+  "Gateway modules",
+  "Tier boundary crossing: spawn vs gateway",
+  "Concurrency contract",
+];
+
+/**
+ * Headings `claude-addendum.md` is allowed to own. Anything else in that file
+ * is invisible to AGENTS.md, which is the drift this list exists to catch.
+ */
+const CLAUDE_ONLY_HEADINGS = ["Claude-specific guidance files"];
+
+describe("vendor-neutral sections reach every assistant", () => {
+  for (const heading of VENDOR_NEUTRAL_SECTIONS) {
+    it(`"${heading}" lives in the shared guidance, not the Claude addendum`, () => {
+      expect(
+        getProjectGuidance(),
+        `project-guidance.md is missing "${heading}"`,
+      ).toContain(heading);
+      expect(
+        getClaudeAddendum(),
+        `"${heading}" is vendor-neutral but sits in claude-addendum.md, so ` +
+          `AGENTS.md never sees it. Move it into project-guidance.md.`,
+      ).not.toContain(heading);
+    });
+
+    it(`both instruction files include "${heading}"`, () => {
+      expect(claudeContent, `CLAUDE.md missing: ${heading}`).toContain(heading);
+      expect(agentsContent, `AGENTS.md missing: ${heading}`).toContain(heading);
+    });
+  }
+
+  it("claude-addendum.md owns only Claude-specific headings", () => {
+    const headings = getClaudeAddendum()
+      .split("\n")
+      .filter((line) => /^#{2,6} /.test(line))
+      .map((line) => line.replace(/^#+\s*/, "").trim());
+
+    const unexpected = headings.filter((h) => !CLAUDE_ONLY_HEADINGS.includes(h));
+    expect(
+      unexpected,
+      `claude-addendum.md renders into CLAUDE.md only. A section here is ` +
+        `invisible to AGENTS.md. Move anything that describes the codebase ` +
+        `into project-guidance.md, or add it to CLAUDE_ONLY_HEADINGS if it ` +
+        `genuinely describes Claude Code's own behaviour.`,
+    ).toEqual([]);
+  });
+
+  it("AGENTS.md carries the gateway rules", () => {
+    expect(agentsContent).toContain("One gateway per source package");
+    expect(agentsContent).toContain("Re-export only");
+    expect(agentsContent).toContain("Type imports through gateway");
+    expect(agentsContent).toContain("New cross-package imports");
+    // The gateway table itself, not just the rules.
+    expect(agentsContent).toContain("src/prd/rex-gateway.ts");
+    expect(agentsContent).toContain("src/server/domain-gateway.ts");
+  });
+
+  it("AGENTS.md carries the PRD write invariant", () => {
+    expect(agentsContent).toContain("**PRD invariant.**");
+    expect(agentsContent).toContain(
+      "The sole writable PRD surface is the folder tree",
+    );
+    expect(agentsContent).toContain("Avoid parallel writers.");
   });
 });
 

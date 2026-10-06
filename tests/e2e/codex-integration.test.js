@@ -91,10 +91,20 @@ describe("renderAgentsMd", () => {
     expect(content).toContain("## Key Files");
   });
 
-  it("excludes Claude-specific deep sections from shared guidance", () => {
-    expect(content).not.toContain("zone fragility governance");
-    expect(content).not.toContain("Injection seam registry");
-    expect(content).not.toContain("Concurrency contract");
+  it("includes the architecture governance sections", () => {
+    // These four used to be Claude-only, which left Codex without the gateway
+    // rules and the PRD write invariant. They are shared guidance now.
+    expect(content).toContain("zone fragility governance");
+    expect(content).toContain("### Gateway modules");
+    expect(content).toContain("### Tier boundary crossing: spawn vs gateway");
+    expect(content).toContain("### Concurrency contract");
+  });
+
+  it("excludes Claude-specific content from shared guidance", () => {
+    // Claude Code loads a package's own CLAUDE.md under that directory;
+    // Codex has no equivalent, so those pointers stay out of AGENTS.md.
+    expect(content).not.toContain("### Claude-specific guidance files");
+    expect(content).not.toContain("packages/web/CLAUDE.md");
     expect(content).not.toContain("<!-- ADDENDUM -->");
   });
 

@@ -20,4 +20,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Move vendor-neutral sections from the Claude addendum into the shared guidance](./move-vendor-neutral-sections-from-the.md) | pending |
+| [Move vendor-neutral sections from the Claude addendum into the shared guidance](./move-vendor-neutral-sections-from-the.md) | in_progress |

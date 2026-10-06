@@ -64,8 +64,6 @@ Then filter `.sourcevision/zones.json` on the threshold above. A zone named in a
 
 **Directory policies outlive zone detection.** Rules tied to a directory (barrel imports, framework-agnostic constraints, CLI-only content) stay in force whether or not Louvain currently emits a zone for it, because they are enforced by tests rather than by the analyser. Correct a stale metric; do not delete a policy just because its zone stopped appearing.
 
-Package-specific zone governance for `web`, `rex`, and `hench` now lives in each package's own `CLAUDE.md` (`packages/web/CLAUDE.md`, `packages/rex/CLAUDE.md`, `packages/hench/CLAUDE.md`), which loads only when working under that directory.
-
 > **Spawn-exempt exception:** `config.js` directly reads/writes package config files (`.rex/config.json`, `.hench/config.json`, `.sourcevision/manifest.json`, `.n-dx.json`) rather than delegating to spawned CLIs. This is intentional — config operations require cross-package reads, atomic merges, and validation logic that cannot be expressed as a single CLI spawn. It is the only orchestration-tier script that breaks the spawn-only rule.
 
 ### Gateway modules
@@ -136,6 +134,10 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **Narrative carve-out.** `ndx prd export --format=narrative` writes prose Markdown to an operator-chosen path outside `.rex/`, under the same refusal. It is a *report*, not a transport artifact: deliberately lossy and one-way, with ids, folder slugs and status/priority values omitted by construction. Nothing imports it — the JSON bundle is the only round-trip surface. Do not add a narrative parser.
 
+### Claude-specific guidance files
+
+Package-specific zone governance for `web`, `rex`, and `hench` now lives in each package's own `CLAUDE.md` (`packages/web/CLAUDE.md`, `packages/rex/CLAUDE.md`, `packages/hench/CLAUDE.md`), which loads only when working under that directory.
+
 HTTP-request concurrency notes for the web server live in `packages/web/CLAUDE.md`.
 
 
@@ -152,11 +154,13 @@ HTTP-request concurrency notes for the web server live in `packages/web/CLAUDE.m
 
 | File | Role | Generated from |
 |------|------|----------------|
-| `AGENTS.md` | **Canonical shared guidance surface.** Read by Codex and any future assistants. Contains project docs, workflow, skill inventory, and MCP tool reference derived from the asset manifest. | `project-guidance.md` (filtered) + manifest-derived sections + `codex-troubleshooting.md` |
-| `CLAUDE.md` | **Claude-facing bridge.** Read by Claude Code on startup. Imports the same shared guidance plus Claude-specific deep sections (zone governance, gateway details, concurrency contract). | `project-guidance.md` + `claude-addendum.md` |
+| `AGENTS.md` | **Canonical shared guidance surface.** Read by Codex and any future assistants. Contains project docs, zone governance, gateway rules, the concurrency contract, workflow, skill inventory, and MCP tool reference derived from the asset manifest. | `project-guidance.md` (filtered) + manifest-derived sections + `codex-troubleshooting.md` |
+| `CLAUDE.md` | **Claude-facing bridge.** Read by Claude Code on startup. Imports the same shared guidance plus the pointers to Claude's own per-directory instruction files. | `project-guidance.md` + `claude-addendum.md` |
 | `.codex/config.toml` | **Codex MCP configuration.** Auto-read by Codex — no manual registration required. | Manifest MCP server descriptors |
 
 **Design invariant:** Both `AGENTS.md` and `CLAUDE.md` derive their base project documentation (Packages, Architecture, Commands, Key Files) from `project-guidance.md`. Vendor-specific additions are layered on top — never inlined into the shared template. This prevents instruction drift between assistant surfaces.
+
+**What goes in `claude-addendum.md`:** only guidance about Claude Code's own behaviour — today, that it loads a package's `CLAUDE.md` when work happens under that directory. Anything describing the *codebase* (zone governance, gateway rules, the concurrency contract and PRD invariant) belongs in `project-guidance.md`, because a section placed in the addendum never reaches `AGENTS.md`. `tests/e2e/instruction-alignment.test.js` fails on an addendum heading that is not on its Claude-only allowlist.
 
 Re-run `ndx init` to regenerate all instruction files after changes to `packages/core/assistant-assets/`.
 
