@@ -26,7 +26,7 @@ import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { exec, getCurrentHead, execStdout } from "../../process/exec.js";
-import { execGitMutation } from "../../process/git-mutation.js";
+import { execCheckedGit, execGitMutation } from "../../process/git-mutation.js";
 import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
@@ -73,7 +73,6 @@ import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
 import {
   PRD_COMMIT_PATHS,
-  PRD_STAGE_PATHS,
   deletedAmong,
   findUncommittedWork,
   formatOperatorPrdLeftovers,
@@ -83,6 +82,8 @@ import {
   listDirtyPaths,
   listOperatorOwnedPrdDirt,
   partitionDirtyPaths,
+  prdStagePaths,
+  rexDirName,
   prepareRecoveryPathspecs,
   renderPaths,
 } from "./uncommitted-work-gate.js";
@@ -130,6 +131,8 @@ export interface SharedLoopOptions {
   henchDir: string;
   taskId?: string;
   dryRun?: boolean;
+  /** See {@link AssembleBriefOptions.wouldResetIds}. */
+  wouldResetIds?: ReadonlySet<string>;
   model?: string;
   /**
    * Show the diff and prompt for approval before finalizing (`--approve-diff`).
@@ -1729,8 +1732,11 @@ const PRE_RUN_COMMIT_DIFF_CHAR_LIMIT = 12_000;
 /** Deterministic message used when the LLM is unavailable or errors. */
 const PRE_RUN_COMMIT_FALLBACK_MESSAGE = "chore: commit local changes before hench run";
 
-export type PreRunCommitChoice = "commit" | "stop" | "proceed";
+export type PreRunCommitChoice = "commit" | "stash" | "discard" | "stop" | "proceed";
 export type PreRunCommitGateResult = "proceed" | "stop";
+
+/** Stash label prefix, so `git stash list` says where the entry came from. */
+const PRE_RUN_STASH_PREFIX = "hench pre-run";
 
 /**
  * How the pre-run prompt should present its choices.
@@ -1750,6 +1756,10 @@ export interface PreRunPromptOptions {
  * the default: "proceed" normally, "commit" when escalated or when proceeding
  * is disallowed. A "proceed" answer while disallowed re-resolves to the
  * default rather than sneaking past requireCleanTree. Exported for tests.
+ *
+ * `s` stays bound to "stop" — it has meant that since the gate shipped, and
+ * silently repointing a one-key answer at `stash` would make muscle memory
+ * start a run the operator meant to abort. Stash takes `t`, discard `d`.
  */
 export function resolvePreRunCommitAnswer(
   answer: string | null,
@@ -1759,24 +1769,43 @@ export function resolvePreRunCommitAnswer(
   const fallback: PreRunCommitChoice = escalate || !allowProceed ? "commit" : "proceed";
   const trimmed = answer.trim().toLowerCase();
   if (trimmed === "c" || trimmed === "commit") return "commit";
+  if (trimmed === "t" || trimmed === "stash") return "stash";
+  if (trimmed === "d" || trimmed === "discard") return "discard";
   if (trimmed === "s" || trimmed === "stop") return "stop";
   if ((trimmed === "p" || trimmed === "proceed") && allowProceed) return "proceed";
   return fallback;
 }
 
 /**
- * Three-way prompt for the pre-run commit gate. Bare Enter takes the least
- * dangerous default (proceed normally, commit when escalated); Ctrl-C stops
- * (treat an interrupt as "don't start the run"). Built on the same
- * SIGINT-suspended readline core as the yes/no prompt.
+ * Prompt for the pre-run commit gate. Bare Enter takes the least dangerous
+ * default (proceed normally, commit when escalated); Ctrl-C stops (treat an
+ * interrupt as "don't start the run"). Built on the same SIGINT-suspended
+ * readline core as the yes/no prompt.
+ *
+ * `discard` is never a default and never reachable by a bare Enter — the
+ * caller confirms it separately before anything is removed.
  */
 async function promptPreRunCommitChoice(opts: PreRunPromptOptions): Promise<PreRunCommitChoice> {
   const def = opts.escalate || !opts.allowProceed ? "commit" : "proceed";
-  const choices = opts.allowProceed ? "[c]ommit / [s]top / [p]roceed" : "[c]ommit / [s]top";
+  const choices = opts.allowProceed
+    ? "[c]ommit / s[t]ash / [d]iscard / [s]top / [p]roceed"
+    : "[c]ommit / s[t]ash / [d]iscard / [s]top";
   const answer = await readLineWithSuspendedSigint(
-    `\nCommit these changes first? ${choices} (default: ${def}) `,
+    `\nWhat should happen to these changes? ${choices} (default: ${def}) `,
   );
   return resolvePreRunCommitAnswer(answer, opts);
+}
+
+/**
+ * Confirm a discard. Defaults to No: of the five answers this is the only one
+ * that destroys work, so it is the only one that costs a second keystroke.
+ */
+async function confirmPreRunDiscard(fileCount: number): Promise<boolean> {
+  return askYesNoWithSuspendedSigint(
+    `\nDiscard ${fileCount} uncommitted file(s)? Tracked changes are reverted and ` +
+      `untracked files are deleted. [y/N] `,
+    { interruptMode: "hold-then-exit", defaultYes: false },
+  );
 }
 
 /**
@@ -1840,6 +1869,79 @@ async function commitPreRunChanges(projectDir: string, message: string): Promise
   await execGitMutation(projectDir, ["add", "-A"], 30_000);
   const trailers = `N-DX: pre-run commit gate\n${buildCoAuthoredByTrailerLine()}`;
   await execGitMutation(projectDir, ["commit", "-m", message, "-m", trailers], 30_000);
+}
+
+/**
+ * Set the pre-existing changes aside under the same generated message the
+ * commit option would have used, prefixed so `git stash list` says where the
+ * entry came from.
+ *
+ * `--include-untracked` matters: the gate counts untracked files as dirty, so
+ * a stash that left them behind would hand the run a tree the gate had just
+ * reported as handled. Ignored files stay put (no `--all`) — `.hench/`,
+ * `node_modules/` and the rest are not the operator's work.
+ */
+async function stashPreRunChanges(projectDir: string, message: string): Promise<void> {
+  await execGitMutation(
+    projectDir,
+    ["stash", "push", "--include-untracked", "-m", `${PRE_RUN_STASH_PREFIX}: ${message}`],
+    60_000,
+  );
+}
+
+/**
+ * Discard the pre-existing changes: revert tracked files to HEAD and remove
+ * untracked ones.
+ *
+ * Done as a stash that is immediately dropped, rather than
+ * `git reset --hard` + `git clean -fd`. Both remove the same files, but the
+ * stash leaves a commit behind: dropping it only unlinks the ref, so the
+ * operator who answers `d` and then remembers what was in there has a sha to
+ * recover from (`git stash store <sha>` then `git stash pop`) until git gc
+ * reaps it. `git stash create` was the obvious way to snapshot first and is
+ * the wrong one — it has no `--include-untracked`, so the half of the discard
+ * that deletes new files would not have been in the snapshot at all.
+ *
+ * Ignored files are never touched (no `--all`, and no `git clean -x` anywhere
+ * in this path): `.hench/`, build output and tool state are not the changes
+ * this gate is about.
+ *
+ * Returns the dropped stash's sha, or undefined when git made no stash (an
+ * already-clean tree) — in which case nothing is dropped either. The drop is
+ * conditional on the subject matching the marker written moments earlier, so
+ * a pre-existing `stash@{0}` belonging to the operator can never be the entry
+ * this removes.
+ */
+async function discardPreRunChanges(projectDir: string): Promise<string | undefined> {
+  const marker = `${PRE_RUN_STASH_PREFIX} discard ${Date.now()}`;
+  await execGitMutation(
+    projectDir,
+    ["stash", "push", "--include-untracked", "-m", marker],
+    60_000,
+  );
+
+  let snapshot: string | undefined;
+  try {
+    const top = await execCheckedGit(
+      projectDir,
+      ["log", "-1", "--format=%H%x00%s", "refs/stash"],
+      15_000,
+    );
+    const [sha, subject = ""] = top.stdout.trim().split("\0");
+    if (sha && subject.includes(marker)) snapshot = sha;
+  } catch {
+    // No stash ref at all — nothing was stashed, so nothing to drop.
+  }
+  if (!snapshot) return undefined;
+
+  try {
+    await execGitMutation(projectDir, ["stash", "drop"], 15_000);
+  } catch {
+    // The entry stays in the stash list. The changes are still out of the
+    // working tree, which is what was asked for; the operator sees it in
+    // `git stash list` rather than losing it.
+  }
+  return snapshot;
 }
 
 /**
@@ -1979,7 +2081,7 @@ async function isGitIgnored(projectDir: string, relativePath: string): Promise<b
  * gitignored, and should be staged by a commit that lands a PRD write.
  *
  * One helper for both staging sites — {@link commitPrdTreeIfStaged} and the
- * commit prompt — and its candidates come from {@link PRD_STAGE_PATHS}, the
+ * commit prompt — and its candidates come from {@link prdStagePaths}, the
  * same definition the uncommitted-work gate's discount derives from. The two
  * sets drifted twice when they were maintained by hand: `tree-meta.json` was
  * discounted by nobody and staged by nobody, so every completion was refused;
@@ -2003,12 +2105,13 @@ export async function prdPathsToStage(
 ): Promise<string[]> {
   const { join } = await import("node:path");
   const { existsSync } = await import("node:fs");
+  const rexDir = rexDirName(projectDir);
   const candidates = [
-    ...PRD_STAGE_PATHS,
+    ...prdStagePaths(projectDir),
     // Prompt-only legacy extra: read-only for years, never written by a PRD
     // mutation, so it is neither staged by the completion commit nor
     // discounted by the gate — a dirty prd.md is operator work.
-    ...(opts.includeLegacyMarkdown ? [`.rex/${PRD_MARKDOWN_FILENAME}`] : []),
+    ...(opts.includeLegacyMarkdown ? [`${rexDir}/${PRD_MARKDOWN_FILENAME}`] : []),
   ];
   const existing = candidates.filter((relativePath) => existsSync(join(projectDir, relativePath)));
 
@@ -2062,8 +2165,9 @@ async function scopePrdPathsToReport(
   // forward slashes on every platform. Compare on the forward-slash form —
   // git accepts it on Windows too.
   const allowedRoots = new Set(rootPaths.map((p) => p.split(sep).join("/")));
-  const treePrefix = `.rex/${PRD_TREE_DIRNAME}/`;
-  const treeAllowed = allowedRoots.has(`.rex/${PRD_TREE_DIRNAME}`);
+  const rexDir = rexDirName(projectDir);
+  const treePrefix = `${rexDir}/${PRD_TREE_DIRNAME}/`;
+  const treeAllowed = allowedRoots.has(`${rexDir}/${PRD_TREE_DIRNAME}`);
 
   const scoped: string[] = [];
   const seen = new Set<string>();
@@ -2088,7 +2192,7 @@ async function scopePrdPathsToReport(
     }
   }
 
-  const metaPath = `.rex/${TREE_META_FILENAME}`;
+  const metaPath = `${rexDir}/${TREE_META_FILENAME}`;
   if (allowedRoots.has(metaPath)) push(metaPath);
 
   return scoped;
@@ -2158,7 +2262,7 @@ async function commitPrdTreeIfStaged(
     return { staged: 0, error: err as Error, paths: prdPaths };
   }
 
-  const staged = await countStagedFiles(projectDir, [".rex/"]);
+  const staged = await countStagedFiles(projectDir, [`${rexDirName(projectDir)}/`]);
   if (staged === 0) {
     return { staged: 0, paths: prdPaths };
   }
@@ -2234,7 +2338,7 @@ async function commitCompletionMetadata(
   // permanently dirty and the next autonomous run refused at the pre-run gate.
   const operatorDirt = await listOperatorOwnedPrdDirt(projectDir);
   if (operatorDirt.length > 0) {
-    info(`\n${formatOperatorPrdLeftovers(operatorDirt)}`);
+    info(`\n${formatOperatorPrdLeftovers(operatorDirt, rexDirName(projectDir))}`);
   }
   return result;
 }
@@ -2245,8 +2349,8 @@ async function commitCompletionMetadata(
  *
  * WHY THIS EXISTS (GitHub #365). `--reset-deferred` resets deferred/failing
  * tasks to pending by writing the PRD tree, and moments later the pre-run
- * commit gate ({@link performPreRunCommitGateIfNeeded}) refuses an autonomous
- * run against *any* dirty tree — including the dirt the reset itself just
+ * commit gate ({@link performPreRunCommitGateIfNeeded}) stops — or, on a TTY,
+ * interrogates — an autonomous run against *any* dirty tree — including the dirt the reset itself just
  * produced. That made the flag deadlock against itself on the exact case it
  * exists for (resuming after an interruption), and the refusal exited 0, so
  * an unattended caller read it as success and the tasks stayed deferred.
@@ -2329,7 +2433,10 @@ export interface PreRunCommitGateOptions {
     collectDiff?: (dir: string) => Promise<ReviewDiff>;
     proposeMessage?: (diff: ReviewDiff, henchDir: string, model?: string) => Promise<string>;
     promptChoice?: (promptOpts: PreRunPromptOptions) => Promise<PreRunCommitChoice>;
+    confirmDiscard?: (fileCount: number) => Promise<boolean>;
     commit?: (dir: string, message: string) => Promise<void>;
+    stash?: (dir: string, message: string) => Promise<void>;
+    discard?: (dir: string) => Promise<string | undefined>;
     checkOrigin?: (dir: string, origin: RunGitOrigin | undefined) => string | undefined;
     isTTY?: boolean;
   };
@@ -2339,15 +2446,25 @@ export interface PreRunCommitGateOptions {
  * One-time pre-run git gate. Runs once per `hench run` invocation, before the
  * work loop begins (never per iteration). When the working tree carries
  * pre-existing uncommitted changes and the session is interactive, it shows
- * the diff stat plus a proposed commit message and asks whether to commit,
- * stop, or proceed. Clean trees always proceed without prompting.
+ * the diff stat plus a proposed message and asks what to do with them:
  *
- * Autonomous runs (--auto/--loop/--epic-by-epic) can't prompt without stalling
- * an unattended loop, so a dirty tree makes them *abort* by default rather than
- * silently absorb the pre-existing changes — pass `--allow-dirty` (allowDirty)
- * to proceed anyway. Other non-interactive runs (e.g. --yes, piped) proceed
- * unless `hench.git.requireCleanTree` is set (then they stop too, again
- * unless --allow-dirty).
+ * - `commit` — stage everything and commit under the generated message.
+ * - `stash`  — `git stash push -u` under the same generated message.
+ * - `discard` — revert tracked files and delete untracked ones, after a
+ *   second confirmation defaulting to No. A `git stash create` snapshot is
+ *   taken first, and its sha reported, so the answer is still recoverable.
+ * - `stop` / `proceed` — as before.
+ *
+ * Clean trees always proceed without prompting.
+ *
+ * Autonomous runs (--auto/--loop/--epic-by-epic) must not silently fold
+ * pre-existing changes into hench's own commits. On a TTY they get the same
+ * prompt — it runs once, before the loop, so it cannot stall an iteration —
+ * with the escalated default (commit) and an explicit `proceed` standing in
+ * for `--allow-dirty`. Without a TTY they abort as before. Other
+ * non-interactive runs (--yes, piped) proceed unless
+ * `hench.git.requireCleanTree` is set (then they stop too, again unless
+ * --allow-dirty).
  *
  * The gate is size-aware: when the uncommitted changes reach the checkpoint
  * threshold (`hench.git.checkpointThreshold` lines changed, default
@@ -2367,7 +2484,10 @@ export async function performPreRunCommitGateIfNeeded(
   const collectDiff = deps.collectDiff ?? ((dir: string) => collectReviewDiff(dir));
   const proposeMessage = deps.proposeMessage ?? proposePreRunCommitMessage;
   const promptChoice = deps.promptChoice ?? promptPreRunCommitChoice;
+  const confirmDiscard = deps.confirmDiscard ?? confirmPreRunDiscard;
   const commit = deps.commit ?? commitPreRunChanges;
+  const stash = deps.stash ?? stashPreRunChanges;
+  const discard = deps.discard ?? discardPreRunChanges;
   const checkOrigin = deps.checkOrigin ?? checkRunGitOrigin;
   const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
   const checkpointThreshold = opts.checkpointThreshold ?? DEFAULT_CHECKPOINT_THRESHOLD;
@@ -2383,12 +2503,23 @@ export async function performPreRunCommitGateIfNeeded(
 
   const magnitude = await measureMagnitude(projectDir);
   const magnitudeLabel = `${dirty.length} uncommitted file(s), ${magnitude.linesChanged} line(s) changed`;
+  // An autonomous run that would otherwise have refused is itself an
+  // escalation: the prompt must not let a bare Enter proceed into the loop
+  // with someone else's changes in the tree, so the default becomes "commit"
+  // exactly as it does above the checkpoint threshold.
+  const autonomousDirty = Boolean(autonomous) && !allowDirty;
   const escalate =
-    !allowDirty && checkpointThreshold > 0 && magnitude.linesChanged >= checkpointThreshold;
+    autonomousDirty ||
+    (!allowDirty && checkpointThreshold > 0 && magnitude.linesChanged >= checkpointThreshold);
 
-  // Only prompt in an attended TTY session. Autonomous (--auto/--loop/
-  // --epic-by-epic) and --yes runs can't prompt without stalling.
-  const isInteractive = isTTY && !yes && !autonomous;
+  // Only prompt in an attended TTY session. Autonomous runs are included, but
+  // only where they would otherwise have been refused outright: this gate runs
+  // once per invocation, before the work loop starts, so a prompt here cannot
+  // stall an iteration mid-flight — and refusing to start was the worse
+  // outcome when someone was sitting there able to answer. `--allow-dirty` is
+  // the operator saying "just go", so it keeps the silent autonomous path;
+  // --yes and non-TTY runs still can't prompt and keep the fail-fast below.
+  const isInteractive = isTTY && !yes && (!autonomous || autonomousDirty);
   if (!isInteractive) {
     // Autonomous runs must not fold a pre-existing dirty tree into hench's own
     // commits. They can't prompt (that would hang an unattended loop), so fail
@@ -2419,7 +2550,12 @@ export async function performPreRunCommitGateIfNeeded(
   section("Uncommitted changes detected");
   subsection("Changes");
   info(diff.stat || `${dirty.length} file(s)`);
-  if (escalate) {
+  if (autonomousDirty) {
+    info(
+      `⚠ An autonomous run would fold ${magnitudeLabel} into its own commits. ` +
+        `Deal with them first, or choose proceed to accept that (same as --allow-dirty).`,
+    );
+  } else if (escalate) {
     info(
       `⚠ Large uncommitted change: ${magnitudeLabel} (threshold: ${checkpointThreshold}). ` +
         `Committing a checkpoint before the run is strongly recommended.`,
@@ -2431,27 +2567,54 @@ export async function performPreRunCommitGateIfNeeded(
   subsection("Proposed commit message");
   info(proposed);
 
-  const choice = await promptChoice({ escalate, allowProceed: !requireCleanTree });
+  const allowProceed = !requireCleanTree;
+  const choice = await promptChoice({ escalate, allowProceed });
   if (choice === "stop") return "stop";
-  if (choice === "commit") {
-    // Between capture and here the operator answered a prompt, which is long
-    // enough for another process to move the checkout. The changes stay in
-    // the tree and the caller must not start a run that could absorb them.
-    const drift = checkOrigin(projectDir, opts.origin);
-    if (drift) {
-      info(
-        `⚠ Refusing to commit pre-existing changes: ${drift}. ` +
-          `They remain in the working tree.`,
-      );
-      return "proceed";
-    }
-    try {
+  if (choice === "proceed") return "proceed";
+
+  // Leaving the changes where they are: honest when the operator was free to
+  // proceed anyway, wrong when the run was only allowed to start because they
+  // were going to be dealt with.
+  const leaveInPlace = (): PreRunCommitGateResult =>
+    allowProceed && !autonomousDirty ? "proceed" : "stop";
+
+  if (choice === "discard" && !(await confirmDiscard(dirty.length))) {
+    info("Discard cancelled — changes left in the working tree.");
+    return leaveInPlace();
+  }
+
+  // Between capture and here the operator answered a prompt, which is long
+  // enough for another process to move the checkout. The changes stay in the
+  // tree and the caller must not start a run that could absorb them.
+  const drift = checkOrigin(projectDir, opts.origin);
+  if (drift) {
+    info(
+      `⚠ Refusing to ${choice} pre-existing changes: ${drift}. ` +
+        `They remain in the working tree.`,
+    );
+    return leaveInPlace();
+  }
+
+  try {
+    if (choice === "commit") {
       await commit(projectDir, proposed);
       info("Committed pre-existing changes. Starting run…");
-    } catch (err) {
-      info(`⚠ Pre-run commit failed: ${(err as Error).message} — stopping before work starts.`);
-      return "stop";
+    } else if (choice === "stash") {
+      await stash(projectDir, proposed);
+      info("Stashed pre-existing changes (git stash pop to restore). Starting run…");
+    } else {
+      const snapshot = await discard(projectDir);
+      info(
+        snapshot
+          ? `Discarded pre-existing changes. Recoverable until git gc: git stash store ${snapshot}`
+          : "Discarded pre-existing changes.",
+      );
     }
+  } catch (err) {
+    info(
+      `⚠ Pre-run ${choice} failed: ${(err as Error).message} — stopping before work starts.`,
+    );
+    return "stop";
   }
   return "proceed";
 }
@@ -2511,6 +2674,26 @@ export async function updateCompletedTaskStatus(
 }
 
 /**
+ * What {@link performCommitPromptIfNeeded} did, so the caller knows whether the
+ * PRD completion record still needs a commit of its own.
+ *
+ * Only `declined` is a reason not to make one. A human who said no owns the
+ * working tree from that point, and landing PRD state they just refused to
+ * commit would take the decision back off them. Every other outcome leaves the
+ * record with no owner, which is the leak this type exists to close.
+ */
+export type CommitPromptOutcome =
+  /** autoCommit, or the run did not complete — the prompt never applied. */
+  | "not-applicable"
+  /** The prompt committed; the PRD paths rode along in that commit. */
+  | "committed"
+  /** A human declined at the prompt. Their tree, their call. */
+  | "declined"
+  /** The prompt bowed out: no message file, an empty one, an empty index, or
+   *  the watcher had already committed. Nothing of the PRD was committed. */
+  | "no-commit";
+
+/**
  * When the agent wrote a pending commit message, show it to the user and
  * prompt them to approve the commit. Runs `git commit -F <file>` on accept,
  * deletes the sentinel on both accept and decline.
@@ -2536,8 +2719,8 @@ export async function performCommitPromptIfNeeded(
   store?: PRDStore,
   taskId?: string,
   commitWatcher?: CommitMsgWatcher,
-): Promise<void> {
-  if (autoCommit || run.status !== "completed") return;
+): Promise<CommitPromptOutcome> {
+  if (autoCommit || run.status !== "completed") return "not-applicable";
 
   const { join } = await import("node:path");
   const { readFileSync, existsSync, unlinkSync } = await import("node:fs");
@@ -2548,20 +2731,20 @@ export async function performCommitPromptIfNeeded(
   // this point, the file may be gone. Check the watcher's flag to detect this case.
   if (commitWatcher?.didAutoCommit()) {
     detail("Auto-commit: timer-expiry auto-commit acknowledged — proceeding to next task.");
-    return;
+    return "no-commit";
   }
 
-  if (!existsSync(msgPath)) return;
+  if (!existsSync(msgPath)) return "no-commit";
 
   let message = "";
   try {
     message = readFileSync(msgPath, "utf-8").trim();
   } catch {
-    return;
+    return "no-commit";
   }
   if (!message) {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "no-commit";
   }
 
   // Reviewer repairs ride the same commit as the executor's work; the
@@ -2577,14 +2760,14 @@ export async function performCommitPromptIfNeeded(
       await withdrawCompletionClaim(store, run, run.error);
     }
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "no-commit";
   }
 
   const stagedCount = await countStagedFiles(projectDir);
   if (stagedCount === 0) {
     info("\nPending commit message found but no staged changes — skipping commit.");
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "no-commit";
   }
 
   subsection("Proposed Commit");
@@ -2604,7 +2787,7 @@ export async function performCommitPromptIfNeeded(
   if (!confirmed) {
     info(`Commit declined — ${stagedCount} file(s) left staged.`);
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "declined";
   }
 
   // Task completion criteria gate: verify code-classified tasks have code file changes.
@@ -2618,7 +2801,7 @@ export async function performCommitPromptIfNeeded(
       run.error = gateResult.reason;
       info(`\n${gateResult.reason}`);
       try { unlinkSync(msgPath); } catch { /* ignore */ }
-      return;
+      return "no-commit";
     }
   }
 
@@ -2667,7 +2850,7 @@ export async function performCommitPromptIfNeeded(
         info(`\n${run.error}`);
         await withdrawCompletionClaim(store, run, run.error);
         try { unlinkSync(msgPath); } catch { /* ignore */ }
-        return;
+        return "no-commit";
       }
     } catch (err) {
       // Best-effort: if PRD update fails, proceed with commit anyway
@@ -2838,6 +3021,10 @@ export async function performCommitPromptIfNeeded(
   } finally {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
   }
+
+  // Reached only by falling out of the commit block above: the commit ran,
+  // or it threw and the catch already marked the run failed.
+  return "committed";
 }
 
 // ---------------------------------------------------------------------------
@@ -3757,7 +3944,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // staged alongside code changes and included in the same commit.
   // The commitWatcher is checked to detect if the timer-expiry auto-commit
   // already fired and committed changes.
-  await performCommitPromptIfNeeded(
+  const commitPrompt = await performCommitPromptIfNeeded(
     run,
     projectDir,
     opts.autoCommit === true,
@@ -3768,13 +3955,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     opts.commitWatcher,
   );
 
-  // On the autoCommit path performCommitPromptIfNeeded is a no-op, so the
-  // completion metadata written by updateCompletedTaskStatus would otherwise
-  // be left uncommitted. Commit it now in a small dedicated second commit.
-  // Review repairs go first: the executor committed its own work before the
-  // review pass ran and the reviewer is barred from committing, so without
-  // this commit its must-fix repairs would be orphaned in the working tree
-  // and swept into whatever commit happens next.
+  // Review repairs: only the autoCommit path needs them swept here. The
+  // executor committed its own work before the review pass ran and the
+  // reviewer is barred from committing, so without this commit its must-fix
+  // repairs would be orphaned in the working tree and swept into whatever
+  // commit happens next. On the prompt path `stageReviewRepairs` already put
+  // them in that commit, and when neither owns them
+  // `commitOrphanedReviewRepairs` ran back at the gate (#483).
   if (opts.autoCommit === true && run.status === "completed" && run.taskId) {
     try {
       await commitReviewRepairsIfNeeded(projectDir, run);
@@ -3788,6 +3975,33 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       }
     }
 
+  }
+
+  // The PRD completion record gets a commit of its own on EVERY path that
+  // would otherwise leave it uncommitted — not just autoCommit, which was
+  // the whole of what this used to cover.
+  //
+  // `updateCompletedTaskStatus` writes the tree a few lines above, and on
+  // the prompt path the commit-attribution write lands *after* the commit it
+  // records. Either way the tree is dirty once the task is done. The
+  // autoCommit path had this second commit; the prompt path only ever got
+  // one by reaching its own `git commit`, and it bows out before that
+  // whenever the executor already committed for itself — no message file, an
+  // empty one, an empty index, or the watcher having fired first. All four
+  // are ordinary endings for a task where the agent commits as it goes, and
+  // every one of them left `prd_tree/` dirty with the task marked completed.
+  // The next autonomous run's pre-run gate then refused to start over a
+  // write hench had made itself: the task was done and the queue was stuck
+  // behind it.
+  //
+  // `declined` is the one exception. A human who said no at the prompt owns
+  // the working tree from that point, and landing PRD state they just
+  // refused to commit would take the decision back off them.
+  //
+  // Safe after a prompt that *did* commit: those PRD paths rode in that
+  // commit, so there is nothing left to stage — except the attribution
+  // write, which is exactly what this should pick up.
+  if (run.taskId && commitPrompt !== "declined") {
     if (run.status === "completed") {
       // Drained here, at the commit point, so the pathspec covers every PRD
       // save this run made since the last commit — not just the last one.

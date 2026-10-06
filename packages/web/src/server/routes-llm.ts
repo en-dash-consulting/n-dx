@@ -808,13 +808,42 @@ function cloudVendorModels(vendor: LLMVendor): string[] {
 }
 
 /**
+ * Refuse a per-run model the active vendor's catalog does not offer — the
+ * check behind an execute request's `options.model` / `options.reviewModel`.
+ * The catalog is GET /api/llm/catalog's: the built-in list, plus the live
+ * list. The live list is fetched (through the catalog's cache) only when the
+ * built-in list misses, so a built-in model never waits on a vendor API —
+ * while a live-only model the modal offered still passes once the cache has
+ * expired, which a peek at the cache alone would refuse. `local` runs
+ * whatever its server has loaded, so any id passes there, as it does for a
+ * config write. Returns an error, or null.
+ */
+export async function validateCatalogModel(
+  projectDir: string,
+  vendor: string | null,
+  model: string,
+): Promise<string | null> {
+  if (vendor === LLM_VENDOR.LOCAL) return null;
+  if (vendor !== LLM_VENDOR.CLAUDE && vendor !== LLM_VENDOR.CODEX && vendor !== LLM_VENDOR.GOOGLE) {
+    return `No LLM vendor is configured (llm.vendor), so model "${model}" cannot be checked.`;
+  }
+  if (!isModelCompatibleWithVendor(vendor, model)) return `Model "${model}" is not a ${vendor} model.`;
+  if (cloudVendorModels(vendor).includes(model)) return null;
+  if (vendor !== LLM_VENDOR.GOOGLE) {
+    const live = await getLiveVendorProbe(vendor, projectDir);
+    if (live.listing.ok && live.listing.models.includes(model)) return null;
+  }
+  return `Model "${model}" is not in the ${vendor} catalog.`;
+}
+
+/**
  * Build the vendor/model/provider catalog: cloud-vendor models from
  * llm-client's catalog, local models from a live probe of the configured
  * local server, and provider choices from {@link VENDOR_PROVIDERS} — the
  * literal pinned against hench's own table by the cross-package contract
  * test (see that file's doc comment for why web keeps a copy at all).
  */
-async function buildLlmCatalog(projectDir: string, refresh: boolean): Promise<LlmCatalogResponse> {
+export async function buildLlmCatalog(projectDir: string, refresh: boolean): Promise<LlmCatalogResponse> {
   const config = readEffectiveNdxConfig(projectDir);
   const llmConfig = await loadLLMConfig(projectDir);
   // The model `ndx work` would run with no `hench.models.<vendor>` — resolved

@@ -97,6 +97,7 @@ import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, V
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
+  NDX_CONTAINER_DIRNAME,
   type ExecutionPolicy,
   type RuntimeEvent,
   type PromptSection,
@@ -1576,7 +1577,10 @@ async function runAdversarialReviewPass(
     try {
       const postReviewState = await snapshotDirtyState(inv.projectDir);
       repairedFiles = diffDirtyState(preReviewState, postReviewState).filter(
-        (path) => !path.startsWith(".rex/") && !path.startsWith(".hench/"),
+        (path) =>
+          !path.startsWith(".rex/") &&
+          !path.startsWith(".hench/") &&
+          !path.startsWith(`${NDX_CONTAINER_DIRNAME}/`),
       );
     } catch {
       repairedFiles = undefined;
@@ -1965,7 +1969,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Shared: assemble brief, format, build system prompt + envelope, display task info
   const { brief, taskId, briefText, systemPrompt, envelope: baseEnvelope } = await prepareBrief(
     store, config, opts.taskId,
-    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, projectDir, claims: opts.claims },
+    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, projectDir, claims: opts.claims, wouldResetIds: opts.wouldResetIds },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
     opts.extraContext,
   );

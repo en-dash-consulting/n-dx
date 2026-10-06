@@ -65,6 +65,19 @@ export function appUrl(path: string): string {
 }
 
 /**
+ * `history.pushState` / `replaceState` for a root-relative app path. Every
+ * viewer history write goes through these so the `/p/<id>` and `/w/<key>`
+ * prefix survives a reload; history-guard.test.ts fails on a direct call.
+ */
+export function pushAppHistory(state: unknown, path: string): void {
+  history.pushState(state, "", appUrl(path));
+}
+
+export function replaceAppHistory(state: unknown, path: string): void {
+  history.replaceState(state, "", appUrl(path));
+}
+
+/**
  * The hub's project chooser, for a link out of this dashboard.
  *
  * Deliberately not `appUrl(HUB_PATH)`, which the shape of every neighbouring

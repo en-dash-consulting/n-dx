@@ -52,8 +52,11 @@ export type {
   AdmissionReason,
   AdmissionGateOptions,
   AdmitResult,
+  DroppedEntry,
+  ExecuteRefusal,
   QueueEntry,
   QueueSnapshot,
+  StartOutcome,
 } from "./admission.js";
 export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 export type { ProxyDecision } from "./proxy.js";

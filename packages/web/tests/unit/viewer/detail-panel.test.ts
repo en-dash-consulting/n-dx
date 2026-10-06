@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { DetailPanel } from "../../../src/viewer/components/detail-panel.js";
@@ -63,6 +63,19 @@ describe("DetailPanel", () => {
     expect(root.textContent).toContain("Core business logic");
     expect(root.textContent).toContain("0.85");
     expect(root.textContent).toContain("0.20");
+  });
+
+  it("closes on Escape unless another handler already took it", () => {
+    const onClose = vi.fn();
+    const root = renderToDiv(h(DetailPanel, { detail: { type: "generic" as const, title: "T" }, onClose }));
+    act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true })); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    const taken = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+    taken.preventDefault();
+    act(() => { document.dispatchEvent(taken); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    act(() => { render(null, root); });
   });
 
   it("renders close button", () => {

@@ -6,7 +6,12 @@ import {
   sameQueueEntry,
   type AdmissionLimits,
   type QueueEntry,
+  type StartOutcome,
+  type AdmissionGateOptions,
+  MAX_DROPPED_ENTRIES,
 } from "../../../src/hub/admission.js";
+
+const STARTED: StartOutcome = { started: true };
 
 /**
  * The admission policy and the queue that holds what it turns away.
@@ -90,6 +95,52 @@ describe("AdmissionQueue", () => {
     expect(queue.length).toBe(2);
   });
 
+  it("takes the re-ask's run mode, not the one already queued", () => {
+    // The replacement is built field by field, so anything not listed there is
+    // dropped on the second ask. That turned a re-ask carrying `mode: "loop"`
+    // into a single-task entry whose 202 had just said "until done".
+    const queue = new AdmissionQueue();
+    queue.enqueue(entry({ taskId: "a" }));
+    queue.enqueue(entry({ taskId: "a", mode: "loop" }));
+
+    expect(queue.length).toBe(1);
+    expect(queue.list()[0]).toMatchObject({ taskId: "a", mode: "loop" });
+  });
+
+  it("takes the re-ask's new iterations count", () => {
+    const queue = new AdmissionQueue();
+    queue.enqueue(entry({ taskId: "a", mode: "iterations", iterations: 3 }));
+    queue.enqueue(entry({ taskId: "a", mode: "iterations", iterations: 9 }));
+
+    expect(queue.list()[0]).toMatchObject({ mode: "iterations", iterations: 9 });
+  });
+
+  it("drops a mode the re-ask no longer carries, as it does an option", () => {
+    // The re-ask replaces rather than merges: the operator went back to one
+    // task, and a loop surviving that would run work they stopped asking for.
+    const queue = new AdmissionQueue();
+    queue.enqueue(entry({ taskId: "a", mode: "iterations", iterations: 5, options: { fresh: true } }));
+    queue.enqueue(entry({ taskId: "a" }));
+
+    const replaced = queue.list()[0];
+    expect(replaced.mode).toBeUndefined();
+    expect(replaced.iterations).toBeUndefined();
+    expect(replaced.options).toBeUndefined();
+  });
+
+  it("keeps its place and its enqueue time when the mode changes", () => {
+    const queue = new AdmissionQueue();
+    queue.enqueue(entry({ taskId: "a", enqueuedAt: "2026-09-16T10:00:00.000Z" }));
+    queue.enqueue(entry({ taskId: "b" }));
+
+    expect(queue.enqueue(entry({ taskId: "a", mode: "loop" }))).toEqual({ position: 1, added: false });
+    expect(queue.list()[0]).toMatchObject({
+      taskId: "a",
+      mode: "loop",
+      enqueuedAt: "2026-09-16T10:00:00.000Z",
+    });
+  });
+
   it("tells apart the same task in different workspaces and projects", () => {
     const queue = new AdmissionQueue();
     queue.enqueue(entry({ taskId: "t1", workspace: null }));
@@ -135,7 +186,8 @@ describe("AdmissionGate", () => {
     running?: number;
     freeMemory?: number | null;
     limits?: AdmissionLimits;
-    start?: (entry: QueueEntry) => Promise<boolean>;
+    start?: (entry: QueueEntry) => Promise<StartOutcome>;
+    validate?: AdmissionGateOptions["validate"];
   } = {}) {
     const state = {
       running: opts.running ?? 0,
@@ -146,7 +198,8 @@ describe("AdmissionGate", () => {
       limits: opts.limits ?? LIMITS,
       countRunning: async () => state.running,
       freeMemory: () => state.freeMemory,
-      start: opts.start ?? (async (e) => { started.push(e); state.running++; return true; }),
+      start: opts.start ?? (async (e) => { started.push(e); state.running++; return STARTED; }),
+      validate: opts.validate,
       drainIntervalMs: 10_000, // tests drain explicitly
     });
     return { gate, state, started };
@@ -247,7 +300,10 @@ describe("AdmissionGate", () => {
   });
 
   it("drops a queued run its server will not accept, rather than retrying forever", async () => {
-    const { gate, state } = makeGate({ running: 2, start: async () => false });
+    const { gate, state } = makeGate({
+      running: 2,
+      start: async () => ({ started: false, status: 409, error: "Task is blocked by X." }),
+    });
     await gate.admit({ projectId: "gone", workspace: null, taskId: "a" });
     await gate.admit({ projectId: "alpha", workspace: null, taskId: "b" });
 
@@ -257,7 +313,39 @@ describe("AdmissionGate", () => {
     expect(gate.queue.length).toBe(0);
   });
 
-  it("drops a run whose start throws, for the same reason", async () => {
+  it("keeps what it dropped, with the server's status and reason, in the snapshot", async () => {
+    const onChange = vi.fn();
+    const state = { running: 2 };
+    const gate = new AdmissionGate({
+      limits: LIMITS,
+      countRunning: async () => state.running,
+      freeMemory: () => 8 * GIB,
+      start: async () => ({ started: false, status: 400, error: 'Run option "model": not in the catalog.' }),
+      drainIntervalMs: 10_000,
+      onChange,
+    });
+    await gate.admit({ projectId: "alpha", workspace: "feat", taskId: "a", options: { model: "m" } });
+
+    state.running = 0;
+    await gate.drain();
+    const { dropped, entries } = gate.snapshot();
+    expect(entries).toEqual([]);
+    expect(dropped).toHaveLength(1);
+    expect(dropped[0]).toMatchObject({
+      projectId: "alpha",
+      workspace: "feat",
+      taskId: "a",
+      options: { model: "m" },
+      status: 400,
+      error: 'Run option "model": not in the catalog.',
+    });
+    expect(Date.parse(dropped[0].droppedAt)).not.toBeNaN();
+    // The reporter hears about the drop, not only the snapshot reader.
+    expect(onChange.mock.calls.at(-1)![0].dropped).toHaveLength(1);
+    gate.stop();
+  });
+
+  it("drops a run whose start throws, recording no status", async () => {
     const { gate, state } = makeGate({
       running: 2,
       start: async () => { throw new Error("connect ECONNREFUSED"); },
@@ -267,6 +355,86 @@ describe("AdmissionGate", () => {
     state.running = 0;
     expect(await gate.drain()).toBe(0);
     expect(gate.queue.length).toBe(0);
+    expect(gate.snapshot().dropped[0]).toMatchObject({ taskId: "a", status: null, error: "connect ECONNREFUSED" });
+  });
+
+  it("forgets a dropped record when the same task is asked for again", async () => {
+    let refuse = true;
+    const { gate, state } = makeGate({
+      running: 2,
+      start: async () => refuse ? { started: false, status: 409, error: "busy" } : STARTED,
+    });
+    await gate.admit({ projectId: "alpha", workspace: null, taskId: "a" });
+    state.running = 0;
+    await gate.drain();
+    expect(gate.snapshot().dropped).toHaveLength(1);
+
+    // Re-queued: the old refusal no longer describes it.
+    state.running = 2;
+    await gate.admit({ projectId: "alpha", workspace: null, taskId: "a" });
+    expect(gate.snapshot().dropped).toEqual([]);
+
+    // Admitted straight through clears it too.
+    refuse = false;
+    state.running = 0;
+    await gate.drain();
+    refuse = true;
+    state.running = 2;
+    await gate.admit({ projectId: "alpha", workspace: null, taskId: "b" });
+    state.running = 0;
+    await gate.drain();
+    expect(gate.snapshot().dropped.map((d) => d.taskId)).toEqual(["b"]);
+    expect(await gate.admit({ projectId: "alpha", workspace: null, taskId: "b" }))
+      .toEqual({ admitted: true, position: 0 });
+    expect(gate.snapshot().dropped).toEqual([]);
+    gate.stop();
+  });
+
+  it("remembers only the newest dropped entries", async () => {
+    const { gate, state } = makeGate({
+      running: 2,
+      start: async () => ({ started: false, status: 404, error: "gone" }),
+    });
+    for (let i = 0; i < MAX_DROPPED_ENTRIES + 3; i++) {
+      await gate.admit({ projectId: "alpha", workspace: null, taskId: `t${i}` });
+    }
+    state.running = 0;
+    await gate.drain();
+    const dropped = gate.snapshot().dropped;
+    expect(dropped).toHaveLength(MAX_DROPPED_ENTRIES);
+    expect(dropped.at(-1)!.taskId).toBe(`t${MAX_DROPPED_ENTRIES + 2}`);
+    expect(dropped[0].taskId).toBe("t3");
+    gate.stop();
+  });
+
+  it("answers the server's refusal instead of queuing a request it would refuse", async () => {
+    const validate = vi.fn(async () => ({ status: 409, body: { error: "Task is blocked by X.", taskId: "a" } }));
+    const { gate } = makeGate({ running: 2, validate });
+    const result = await gate.admit({ projectId: "alpha", workspace: null, taskId: "a", options: { fresh: true } });
+    expect(result).toEqual({
+      admitted: false,
+      position: 0,
+      refused: { status: 409, body: { error: "Task is blocked by X.", taskId: "a" } },
+    });
+    expect(validate).toHaveBeenCalledWith({ projectId: "alpha", workspace: null, taskId: "a", options: { fresh: true } });
+    expect(gate.queue.length).toBe(0);
+    gate.stop();
+  });
+
+  it("queues as before when there is no verdict, and never asks for a run it admits", async () => {
+    const validate = vi.fn(async () => null);
+    const { gate, state } = makeGate({ running: 2, validate });
+    expect(await gate.admit({ projectId: "alpha", workspace: null, taskId: "a" }))
+      .toEqual({ admitted: false, position: 1, reason: "at-capacity" });
+
+    state.running = 0;
+    await gate.drain();
+    validate.mockClear();
+    // Admitted runs go to the server directly, which judges them itself.
+    expect(await gate.admit({ projectId: "alpha", workspace: null, taskId: "b" }))
+      .toEqual({ admitted: true, position: 0 });
+    expect(validate).not.toHaveBeenCalled();
+    gate.stop();
   });
 
   it("forgets what was queued for an unregistered project", async () => {
@@ -300,7 +468,7 @@ describe("AdmissionGate", () => {
       limits: LIMITS,
       countRunning: async () => 2,
       freeMemory: () => 8 * GIB,
-      start: async () => true,
+      start: async () => STARTED,
       onChange,
     });
     await gate.admit({ projectId: "alpha", workspace: null, taskId: "a" });
@@ -314,7 +482,7 @@ describe("AdmissionGate", () => {
       limits: LIMITS,
       countRunning: async () => { throw new Error("children unreachable"); },
       freeMemory: () => 8 * GIB,
-      start: async () => true,
+      start: async () => STARTED,
     });
     expect(await gate.admit({ projectId: "alpha", workspace: null, taskId: "a" }))
       .toEqual({ admitted: true, position: 0 });
