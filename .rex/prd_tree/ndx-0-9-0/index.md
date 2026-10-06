@@ -19,7 +19,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Phase 2 PR 1: keep the LoE data the LLM already produces (R0)](./phase-2-pr-1-keep-the-loe-data-the-llm/index.md) | completed |
-| [Phase 2 PR 2: a run field on PRD items, writable through MCP and rex update, with PATCH locked to an allow-list](./phase-2-pr-2-a-run-field-on-prd-items/index.md) | pending |
+| [Phase 2 PR 2: a run field on PRD items, writable through MCP and rex update, with PATCH locked to an allow-list](./phase-2-pr-2-a-run-field-on-prd-items/index.md) | completed |
 | [Phase 2 PR 3: ndx work honours run settings saved on a task](./phase-2-pr-3-ndx-work-honours-run/index.md) | pending |
 | [Phase 2 PR 4: save run settings from the Prepare task modal](./phase-2-pr-4-save-run-settings-from/index.md) | pending |
 | [Prepare task: run one task from Work with every ndx work option visible](./prepare-task-run-one-task-from-work/index.md) | completed |

@@ -28,6 +28,8 @@
  * @module rex/schema/v1
  */
 
+import type { LLMVendor, TaskWeight } from "@n-dx/llm-client";
+
 /**
  * The schema version string embedded in every PRD document.
  *
@@ -290,6 +292,76 @@ export interface ActiveInterval {
   end?: string;
 }
 
+/**
+ * Run settings saved on a task: how `ndx work` should run it. Every key is
+ * optional; an absent key falls back to `hench.*`, then `llm.*`, then the
+ * default, and a CLI flag overrides any of them. Keys match hench's task-scope
+ * run options (plus `contextNotes`), with `model` split into `tier` + `models`
+ * and `reviewModel` into `reviewTier` + `reviewModels`; pinned by
+ * `tests/e2e/run-options-contract.test.js`.
+ *
+ * Vendor-agnostic: a task may be saved under one vendor and run under another,
+ * so model intent is a portable tier plus optional exact pins per vendor,
+ * never a bare model id. On vendor V `ndx work` applies (PR 3) the agent model
+ * as CLI flag > `models[V]` > `tier` (`llm.tiers.V.<tier>`, then the built-in
+ * tier table) > `hench.models.V` > `llm.*` > default, and the reviewer as
+ * `--review-model` > `reviewModels[V]` > `reviewTier` > `llm.V.reviewModel` /
+ * `llm.reviewModel` > vendor default.
+ *
+ * Launch-time options (workspace, allowDirty, fresh, resetDeferred) are chosen
+ * per launch and are never saved here. Validate with `validateRunSettings`.
+ */
+export interface RunSettings {
+  /** Portable model weight, resolved to a model per vendor at run time. */
+  tier?: RunSettingTier;
+  /** Exact agent model per vendor; each id at most {@link RUN_SETTING_MODEL_MAX_BYTES} UTF-8 bytes. */
+  models?: RunSettingModels;
+  provider?: "cli" | "api";
+  permissionMode?: "default" | "acceptEdits" | "bypassPermissions";
+  review?: boolean;
+  /** Portable model weight for the reviewer. */
+  reviewTier?: RunSettingTier;
+  /** Exact reviewer model per vendor; same bounds as `models`. */
+  reviewModels?: RunSettingModels;
+  reviewOptional?: boolean;
+  /** `false` is meaningful: it re-enables a gate hench config skips. */
+  skipTestGate?: boolean;
+  /** Integer, {@link RUN_SETTING_MAX_TURNS_MIN}..{@link RUN_SETTING_MAX_TURNS_MAX}. */
+  maxTurns?: number;
+  /** Non-negative safe integer; 0 means unlimited. */
+  tokenBudget?: number;
+  /** Notes for the agent, at most {@link RUN_SETTING_CONTEXT_NOTES_MAX_BYTES} UTF-8 bytes. */
+  contextNotes?: string;
+}
+
+/** The portable tiers: llm-client's `TaskWeight` values. */
+export const RUN_SETTING_TIERS = ["light", "standard", "heavy"] as const satisfies ReadonlyArray<TaskWeight>;
+export type RunSettingTier = (typeof RUN_SETTING_TIERS)[number];
+
+/** Model ids keyed by vendor name (`LLM_VENDORS`); at least one entry when present. */
+export type RunSettingModels = Partial<Record<LLMVendor, string>>;
+
+/** Every key a {@link RunSettings} block may hold, in command-line-ish order. */
+export const RUN_SETTING_KEYS = [
+  "tier",
+  "models",
+  "provider",
+  "permissionMode",
+  "review",
+  "reviewTier",
+  "reviewModels",
+  "reviewOptional",
+  "skipTestGate",
+  "maxTurns",
+  "tokenBudget",
+  "contextNotes",
+] as const satisfies ReadonlyArray<keyof RunSettings>;
+
+export const RUN_SETTING_MODEL_MAX_BYTES = 256;
+export const RUN_SETTING_CONTEXT_NOTES_MAX_BYTES = 8 * 1024;
+export const RUN_SETTING_MAX_TURNS_MIN = 1;
+export const RUN_SETTING_MAX_TURNS_MAX = 500;
+
 export interface PRDItem {
   id: string;
   title: string;
@@ -367,6 +439,11 @@ export interface PRDItem {
    * GitHub #368), and `unknown` made that read a cast.
    */
   lastModifiedBy?: string;
+  /**
+   * Saved run settings for this item. Never `{}`: an empty block is the
+   * same as none and is not written.
+   */
+  run?: RunSettings;
   children?: PRDItem[];
   [key: string]: unknown;
 }

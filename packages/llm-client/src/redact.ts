@@ -11,8 +11,9 @@
  * Two kinds of rule, applied in order:
  *
  * 1. **Well-known token shapes** — vendor prefixes (`sk-ant-…`, `ghp_…`,
- *    `AKIA…`, `xoxb-…`), JWTs, private-key blocks, bearer headers and URL
- *    userinfo. These need no key to be recognised.
+ *    `AKIA…`, `xoxb-…`, `ATBB…`), JWTs, private-key blocks, `Bearer` and
+ *    `Basic` headers, `-u user:password` flags and URL userinfo. These need no
+ *    key to be recognised.
  * 2. **Credential-shaped assignments** — `KEY=value`, `key: value` or
  *    `"key": "value"` where the key *ends* in a sensitive word (`token`,
  *    `secret`, `password`, `api_key`, `access_key`, …). The key is kept, the
@@ -23,6 +24,16 @@
  * Redaction is best-effort by nature — a secret split across two output
  * chunks or encoded unusually will slip through — so it is a floor, not a
  * guarantee, and callers should still treat run records as sensitive.
+ *
+ * Credentials with no distinctive shape are reached only by rule 2. A
+ * Bitbucket app password issued before the `ATBB` prefix, or a Bitbucket Data
+ * Center token issued before `BBDC-`, is an unbroken run of alphanumerics
+ * indistinguishable from a commit SHA or a content hash; matching bare runs of
+ * that shape would redact a large part of a normal run record, so it is not
+ * done. Such a credential is caught when it appears behind a key
+ * (`BITBUCKET_APP_PASSWORD=…`), in URL userinfo, behind `-u`, or inside a
+ * `Basic` header — which covers how one is actually used — and not when it is
+ * printed bare.
  */
 
 export const REDACTED_TOKEN = "[redacted:token]";
@@ -67,6 +78,16 @@ const RULES: readonly Rule[] = [
         "ya29\\.[A-Za-z0-9_-]{20,}",
         "npm_[A-Za-z0-9]{36}",
         "hf_[A-Za-z0-9]{30,}",
+        // Atlassian stamps a fixed prefix on each credential kind: ATBB on a
+        // Bitbucket Cloud app password, ATCTT on a scoped Bitbucket access
+        // token (repository, project or workspace), ATATT on an Atlassian API
+        // token — the credential that is replacing app passwords for the
+        // Bitbucket Cloud API — and BBDC- on a Bitbucket Data Center HTTP
+        // access token. The newer ones end in `=` plus a checksum, so `=` is
+        // part of the body.
+        "ATBB[A-Za-z0-9]{20,}",
+        "AT(?:CT|AT)T[A-Za-z0-9_=-]{20,}",
+        "BBDC-[A-Za-z0-9]{20,}",
         "eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}",
       ].join("|"),
       "g",
@@ -77,6 +98,37 @@ const RULES: readonly Rule[] = [
     kind: "bearer",
     pattern: /\b(Bearer\s+)[A-Za-z0-9._~+/=-]{16,}/g,
     replace: (_m: string, prefix: string) => `${prefix}${REDACTED_TOKEN}`,
+  },
+  {
+    // `Authorization: Basic <base64(user:password)>` — how Bitbucket Cloud's
+    // own documentation sends an app password, and the one place a credential
+    // travels with no recognisable shape of its own. Nothing else looks inside
+    // a Basic header, so without this the app password lands in the log whole.
+    //
+    // The floor is 20 and the body must hold an uppercase letter or a digit:
+    // base64 of any realistic `user:password` clears both easily, while the
+    // long all-lowercase word that follows "Basic " in prose — "Basic
+    // internationalization support" — clears neither.
+    kind: "basic-auth",
+    pattern: /\b(Basic\s+)(?=[A-Za-z0-9+/]*[A-Z0-9+/])[A-Za-z0-9+/]{20,}={0,2}/g,
+    replace: (_m: string, prefix: string) => `${prefix}${REDACTED_TOKEN}`,
+  },
+  {
+    // `curl -u user:password`, the form Bitbucket's API docs use. An app
+    // password issued before the ATBB prefix has no shape of its own, and
+    // here it sits behind no key the assignment rules would recognise, so
+    // this flag is the only thing marking it as a credential.
+    //
+    // The password must be 8+ characters and hold a letter, which is what
+    // separates a credential from `docker run -u 1000:1000`. It must not
+    // start with a slash either: `git push -u https://…` and
+    // `diff -u C:\…` put a colon after the flag too, and what follows is a
+    // URL or a path. The user is kept, as in a URL — it is usually a service
+    // account name.
+    kind: "user-password",
+    pattern: /(^|\s)(-u|--user)([=\s]+)([^\s:=]{1,64}):((?!\[redacted:)(?![/\\])(?=\S*[A-Za-z])\S{8,})/g,
+    replace: (_m: string, lead: string, flag: string, sep: string, user: string) =>
+      `${lead}${flag}${sep}${user}:${REDACTED_PASSWORD}`,
   },
   {
     // user:password@host in a URL. The user is kept — it is often a service
@@ -150,7 +202,9 @@ export function redactSecretsDetailed(text: string): RedactionResult {
     });
     if (fired > 0) {
       count += fired;
-      kinds.push(rule.kind);
+      // A kind may span several rules — `assignment` is the quoted and the
+      // unquoted form — and this list is documented as naming each one once.
+      if (!kinds.includes(rule.kind)) kinds.push(rule.kind);
     }
   }
   return { text: out, count, kinds };

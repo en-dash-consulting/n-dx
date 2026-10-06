@@ -16,7 +16,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "ndx migrate --apply <plan> moves the layout, then the schema, in one transaction. Run with the strongest model tier and --review.\n\nRoadmap PR 23 · wave 3 · lane migration."
-lastModified: "2026-10-06T04:20:19.143Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:35.186Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

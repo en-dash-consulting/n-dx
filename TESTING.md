@@ -95,15 +95,27 @@ Integration tests for gateways should verify:
 
 ### Co-evolution Rule: Seam Registry and Gateway Table
 
-CLAUDE.md maintains two manually-maintained governance tables documenting
-cross-zone seams — the **injection seam registry** and the **gateway table**.
-These tables have no automated exhaustiveness check (see the governance list
-completeness audit in CLAUDE.md), so correspondence with integration tests can
-only be maintained through discipline.
+Two manually-maintained governance tables document cross-zone seams — the
+**injection seam registry** and the **gateway table**. These tables have no
+automated exhaustiveness check (see the governance list completeness audit in
+CLAUDE.md), so correspondence with integration tests can only be maintained
+through discipline.
 
-**Rule:** Every new row added to either table in CLAUDE.md requires a
-corresponding integration test in the same PR. Never widen the gap between table
-entries and tests.
+**Where a table lives.** Repo-wide tables stay in the root instruction files,
+which are generated — edit `packages/core/assistant-assets/` and regenerate both
+CLAUDE.md and AGENTS.md with `ndx init`, never one alone. A **package-level**
+seam registry goes in that package's `AGENTS.md`, with its `CLAUDE.md` reduced to
+`@AGENTS.md` (the Claude Code import) plus at most a one-line pointer. Codex and
+other assistants read nested `AGENTS.md` files but not `CLAUDE.md`, so a registry
+written only to `CLAUDE.md` is invisible to most of the agents it governs — and a
+registry copied into both drifts. `packages/llm-client/` is the reference pair,
+and `tests/e2e/instruction-alignment.test.js` fails any package that keeps the
+two files side by side without the import. Path-scoped rules that Claude Code
+alone consumes still belong in `.claude/rules/`.
+
+**Rule:** Every new row added to either table requires a corresponding
+integration test in the same PR. Never widen the gap between table entries and
+tests.
 
 For **injection seam entries** the test must verify:
 

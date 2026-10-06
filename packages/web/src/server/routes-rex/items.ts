@@ -20,9 +20,7 @@ import { getIndexMarkdown } from "./index-markdown.js";
 import {
   type PRDItem,
   type ItemLevel,
-  type ItemStatus,
   type TreeEntry,
-  computeTimestampUpdates,
   LEVEL_HIERARCHY,
   CHILD_LEVEL,
   isPriority,
@@ -108,6 +106,55 @@ export function routeItems(
   return false;
 }
 
+/**
+ * The fields the viewer edits through `PATCH /api/rex/items/:id`. Anything else
+ * is refused — in particular `run`, which only the version-checked
+ * `PUT /api/hench/prep/:taskId` may write, and the system-managed fields
+ * (id, level, timestamps, blockedBy, children).
+ */
+const PATCHABLE_FIELDS = new Set([
+  "status", "failureReason", "priority", "tags", "title",
+  "description", "acceptanceCriteria", "requirements",
+]);
+
+const isStringArray = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((s) => typeof s === "string");
+
+/** Returns a message naming the first problem, or null when the patch is acceptable. */
+function validateItemPatch(body: unknown): string | null {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return "Request body must be a JSON object";
+  }
+  const patch = body as Record<string, unknown>;
+  for (const key of Object.keys(patch)) {
+    if (!PATCHABLE_FIELDS.has(key)) {
+      return `Field "${key}" cannot be changed through this route. Allowed: ${[...PATCHABLE_FIELDS].join(", ")}`;
+    }
+  }
+  if (patch.status !== undefined
+    && !(typeof patch.status === "string" && API_SETTABLE_STATUSES.has(patch.status))) {
+    return `Invalid status: ${String(patch.status)}`;
+  }
+  if (patch.priority !== undefined
+    && !(typeof patch.priority === "string" && isPriority(patch.priority))) {
+    return `Invalid priority: ${String(patch.priority)}`;
+  }
+  for (const key of ["title", "description", "failureReason"] as const) {
+    if (patch[key] !== undefined && typeof patch[key] !== "string") return `"${key}" must be a string`;
+  }
+  if (patch.title !== undefined && (patch.title as string).trim() === "") return `"title" must not be empty`;
+  for (const key of ["tags", "acceptanceCriteria"] as const) {
+    if (patch[key] !== undefined && !isStringArray(patch[key])) return `"${key}" must be an array of strings`;
+  }
+  // Requirement objects are validated by the store's document check on write.
+  if (patch.requirements !== undefined && !Array.isArray(patch.requirements)) {
+    return `"requirements" must be an array`;
+  }
+  return null;
+}
+
+class ItemNotFoundError extends Error {}
+
 /** Handle PATCH /api/rex/items/:id */
 async function handleItemPatch(
   req: IncomingMessage,
@@ -116,39 +163,33 @@ async function handleItemPatch(
   itemId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
+  let updates: Record<string, unknown>;
   try {
-    const body = await readBody(req, res);
-    const updates = JSON.parse(body) as Record<string, unknown>;
+    updates = JSON.parse(await readBody(req, res)) as Record<string, unknown>;
+  } catch (err) {
+    errorResponse(res, 400, `Invalid JSON body: ${String(err)}`);
+    return true;
+  }
+  const problem = validateItemPatch(updates);
+  if (problem) {
+    errorResponse(res, 400, problem);
+    return true;
+  }
 
-    // Use the PRDStore so writes go to the correct backend (prd_tree/ or prd.md)
-    // rather than always writing to prd.md via savePRDSync.
+  try {
+    // The store, not savePRDSync, so writes reach the right backend; the whole
+    // read-modify-write sits inside the lock so a concurrent writer's item is
+    // not dropped. `updateInTree` applies startedAt/completedAt on a status change.
     const store = await resolveStore(ctx.rexDir);
-    const existing = await store.getItem(itemId);
-    if (!existing) {
-      errorResponse(res, 404, `Item "${itemId}" not found`);
-      return true;
-    }
-
-    // Validate status if provided (same rule as bulk update)
-    if (updates.status && !API_SETTABLE_STATUSES.has(updates.status as string)) {
-      errorResponse(res, 400, `Invalid status: ${updates.status}`);
-      return true;
-    }
-
-    // Auto-apply timestamp transitions (startedAt/completedAt) on status change,
-    // matching the bulk-update path's updateInTree wrapper.
-    if (updates.status && existing.status !== updates.status) {
-      Object.assign(
-        updates,
-        computeTimestampUpdates(existing.status, updates.status as ItemStatus, existing),
-      );
-    }
-
-    await store.updateItem(itemId, updates as Partial<import("../rex-gateway.js").PRDItem>);
+    const updatedDoc = await store.withTransaction(async (doc) => {
+      if (!updateInTree(doc.items, itemId, updates as Partial<PRDItem>)) {
+        throw new ItemNotFoundError(`Item "${itemId}" not found`);
+      }
+      return doc;
+    });
 
     // Refresh the in-process cache immediately so subsequent loadPRDSync calls
     // see the change before the folder-tree watcher fires.
-    const updatedDoc = await store.loadDocument();
     refreshPRDCache(ctx.rexDir, updatedDoc);
 
     // Broadcast change to connected WebSocket clients
@@ -163,7 +204,15 @@ async function handleItemPatch(
 
     jsonResponse(res, 200, { ok: true });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    if (err instanceof ItemNotFoundError) {
+      errorResponse(res, 404, message);
+    } else if (message.includes("Could not acquire PRD lock")) {
+      // Names the holder's PID — pass it through rather than retrying.
+      errorResponse(res, 409, message);
+    } else {
+      errorResponse(res, 400, message);
+    }
   }
   return true;
 }

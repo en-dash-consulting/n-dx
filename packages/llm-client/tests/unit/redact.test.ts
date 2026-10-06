@@ -14,6 +14,14 @@ const GITHUB = "ghp_" + "b".repeat(36);
 const AWS = "AKIA" + "C".repeat(16);
 const JWT = `eyJ${"a".repeat(10)}.${"b".repeat(20)}.${"c".repeat(20)}`;
 
+// Atlassian stamps a fixed prefix on each credential kind and ends the newer
+// ones with `=` plus an 8-character checksum. The rules key on the prefix, so
+// the filler here only has to clear the length floor.
+const BB_APP_PASSWORD = "ATBB" + "k".repeat(28) + "A1B2C3D4";
+const BB_ACCESS_TOKEN = "ATCTT3xFfGF0" + "m".repeat(40) + "=9F8E7D6C";
+const ATLASSIAN_API_TOKEN = "ATATT3xFfGF0" + "n".repeat(40) + "=1A2B3C4D";
+const BB_DC_TOKEN = "BBDC-" + "p".repeat(40);
+
 describe("redactSecrets — well-known shapes", () => {
   it("replaces vendor tokens wherever they appear", () => {
     const text = `export ANTHROPIC_API_KEY=${ANTHROPIC}\ncurl -H "x: ${GITHUB}" ; aws ${AWS} ; jwt ${JWT}`;
@@ -34,6 +42,99 @@ describe("redactSecrets — well-known shapes", () => {
   it("drops the password from a URL but keeps the user and host", () => {
     expect(redactSecrets("DATABASE_URL=postgres://app:hunter2secret@db.example:5432/x"))
       .toBe(`DATABASE_URL=postgres://app:${REDACTED_PASSWORD}@db.example:5432/x`);
+  });
+});
+
+describe("redactSecrets — Bitbucket and Atlassian credentials", () => {
+  it("replaces prefixed Bitbucket Cloud and Data Center credentials wherever they appear", () => {
+    for (const secret of [BB_APP_PASSWORD, BB_ACCESS_TOKEN, ATLASSIAN_API_TOKEN, BB_DC_TOKEN]) {
+      const out = redactSecrets(`remote: rejected\nusing ${secret} for bitbucket.org`);
+      expect(out).not.toContain(secret);
+      expect(out).toBe(`remote: rejected\nusing ${REDACTED_TOKEN} for bitbucket.org`);
+    }
+  });
+
+  it("redacts the assignment forms a pipeline uses", () => {
+    // A prefixed credential is recognised by shape before the assignment rule
+    // reaches it, so it reports as a token — the same way `ANTHROPIC_API_KEY=`
+    // already does. Either marker means the secret is gone.
+    expect(redactSecrets(`BITBUCKET_APP_PASSWORD=${BB_APP_PASSWORD}`)).toBe(
+      `BITBUCKET_APP_PASSWORD=${REDACTED_TOKEN}`,
+    );
+    expect(redactSecrets(`BITBUCKET_ACCESS_TOKEN=${BB_ACCESS_TOKEN}`)).toBe(
+      `BITBUCKET_ACCESS_TOKEN=${REDACTED_TOKEN}`,
+    );
+    // An app password predating the ATBB prefix has no shape of its own; the
+    // key is the only thing that gives it away.
+    expect(redactSecrets("bitbucket_app_password: 7sRk2mQp9vLx3nTw")).toBe(
+      `bitbucket_app_password: ${REDACTED_VALUE}`,
+    );
+  });
+
+  it("redacts an app password sent as a Basic auth header", () => {
+    // base64("ryan:s3cr3tpassword") — how Bitbucket Cloud's own docs send an
+    // app password. No other rule looks inside a Basic header.
+    expect(redactSecrets("Authorization: Basic cnlhbjpzM2NyM3RwYXNzd29yZA==")).toBe(
+      `Authorization: Basic ${REDACTED_TOKEN}`,
+    );
+    expect(redactSecrets("curl -H 'Authorization: Basic cnlhbjpzM2NyM3RwYXNzd29yZA==' https://api.bitbucket.org/2.0/user")).toBe(
+      `curl -H 'Authorization: Basic ${REDACTED_TOKEN}' https://api.bitbucket.org/2.0/user`,
+    );
+  });
+
+  it("redacts a curl -u credential, keeping the username", () => {
+    expect(redactSecrets("curl -u ryan:s3cr3tpassword https://api.bitbucket.org/2.0/user")).toBe(
+      `curl -u ryan:${REDACTED_PASSWORD} https://api.bitbucket.org/2.0/user`,
+    );
+    // The unprefixed app password is the case this rule exists for — nothing
+    // else marks it as a credential.
+    expect(redactSecrets("git clone --user bot:7sRk2mQp9vLx3nTw repo")).toBe(
+      `git clone --user bot:${REDACTED_PASSWORD} repo`,
+    );
+    // A prefixed one is already gone by the time this rule runs, and the
+    // marker left behind must not be redacted a second time.
+    expect(redactSecrets(`git clone --user bot:${BB_APP_PASSWORD} repo`)).toBe(
+      `git clone --user bot:${REDACTED_TOKEN} repo`,
+    );
+  });
+
+  it("drops an app password embedded in a Bitbucket clone URL", () => {
+    expect(redactSecrets(`git remote add origin https://ryan:${BB_APP_PASSWORD}@bitbucket.org/w/r.git`)).toBe(
+      `git remote add origin https://ryan:${REDACTED_PASSWORD}@bitbucket.org/w/r.git`,
+    );
+  });
+
+  it("leaves Bitbucket prose, identifiers and lookalike flags alone", () => {
+    const prose = [
+      "Basic authentication is required for the Bitbucket API",
+      "Basic internationalization support landed",
+      "docker run -u 1000:1000 alpine",
+      "psql -u postgres localhost",
+      // A URL or a Windows path after the flag holds a colon too, but what
+      // follows it starts with a slash — never a password. Real userinfo in a
+      // URL is the url-password rule's job.
+      "pip install --user git+https://github.com/org/repo.git",
+      "git push -u https://github.com/org/repo.git main",
+      "diff -u C:\\Users\\ryan\\a.txt C:\\Users\\ryan\\b.txt",
+      "See bitbucket-pipelines.yml for the ATBB migration notes",
+    ].join("\n");
+    expect(redactSecrets(prose)).toBe(prose);
+  });
+
+  it("is idempotent over every Bitbucket form", () => {
+    const text = [
+      `token ${BB_APP_PASSWORD}`,
+      "Authorization: Basic cnlhbjpzM2NyM3RwYXNzd29yZA==",
+      "curl -u ryan:s3cr3tpassword https://api.bitbucket.org",
+      `https://ryan:${BB_DC_TOKEN}@bitbucket.example/w/r.git`,
+    ].join("\n");
+    const r = redactSecretsDetailed(text);
+    expect(r.kinds).toEqual(["token", "basic-auth", "user-password", "url-password"]);
+    const once = r.text;
+    expect(once).not.toContain(BB_APP_PASSWORD);
+    expect(once).not.toContain(BB_DC_TOKEN);
+    expect(once).not.toContain("s3cr3tpassword");
+    expect(redactSecrets(once)).toBe(once);
   });
 });
 
@@ -103,6 +204,14 @@ describe("redactSecretsDetailed and redactDeep", () => {
     expect(r.count).toBe(2);
     expect(r.kinds).toEqual(["token", "assignment"]);
     expect(redactSecretsDetailed("nothing here").count).toBe(0);
+  });
+
+  it("names each kind once however many rules of that kind fired", () => {
+    // `assignment` is two rules — quoted and unquoted — and `kinds` is
+    // documented as naming a kind once. Both firing used to list it twice.
+    const r = redactSecretsDetailed('api_key="abcdefghij"\ntoken=abcdefghijkl');
+    expect(r.count).toBe(2);
+    expect(r.kinds).toEqual(["assignment"]);
   });
 
   it("walks objects and arrays, redacting string leaves only", () => {

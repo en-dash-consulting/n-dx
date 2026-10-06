@@ -208,6 +208,74 @@ describe("Rex API routes", () => {
     expect(res.status).toBe(404);
   });
 
+  describe("PATCH /api/rex/items/:id allow-list", () => {
+    const patch = (id: string, body: unknown) =>
+      fetch(`http://127.0.0.1:${port}/api/rex/items/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const read = async (id: string) =>
+      (await fetch(`http://localhost:${port}/api/rex/items/${id}`)).json();
+
+    it.each([
+      ["run", { run: { model: "m" } }],
+      ["id", { id: "other" }],
+      ["level", { level: "epic" }],
+      ["blockedBy", { blockedBy: ["task-1"] }],
+    ])("rejects %s with a 400 naming the key, writing nothing", async (key, body) => {
+      const res = await patch("task-2", { title: "Should not land", ...body });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toContain(`"${key}"`);
+      expect((await read("task-2")).title).not.toBe("Should not land");
+    });
+
+    it.each([
+      ["status", { status: "bogus" }],
+      ["priority", { priority: "urgent" }],
+      ["tags", { tags: "a,b" }],
+      ["acceptanceCriteria", { acceptanceCriteria: [1] }],
+      ["title", { title: "  " }],
+      ["description", { description: 5 }],
+      ["requirements", { requirements: {} }],
+    ])("rejects an invalid %s", async (_key, body) => {
+      expect((await patch("task-2", body)).status).toBe(400);
+    });
+
+    it("rejects a non-object body", async () => {
+      expect((await patch("task-2", ["status"])).status).toBe(400);
+    });
+
+    it("accepts each allowed key", async () => {
+      const requirement = {
+        id: "req-1", title: "Must be fast", category: "performance", validationType: "metric",
+        acceptanceCriteria: ["p95 under 200ms"],
+      };
+      const res = await patch("task-2", {
+        status: "failing",
+        failureReason: "broke",
+        priority: "critical",
+        tags: ["x", "y"],
+        title: "Renamed",
+        description: "New description",
+        acceptanceCriteria: ["one", "two"],
+        requirements: [requirement],
+      });
+      expect(res.status).toBe(200);
+      const item = await read("task-2");
+      expect(item).toMatchObject({
+        status: "failing",
+        failureReason: "broke",
+        priority: "critical",
+        tags: ["x", "y"],
+        title: "Renamed",
+        description: "New description",
+        acceptanceCriteria: ["one", "two"],
+      });
+      expect(item.requirements).toHaveLength(1);
+    });
+  });
+
   it("GET /api/rex/log returns empty entries when no log exists", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/rex/log`);
     expect(res.status).toBe(200);
