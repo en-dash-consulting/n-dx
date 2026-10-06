@@ -35,6 +35,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [isReadOnlyRefusal returns false when earlier attempts already committed the task's files](./isreadonlyrefusal-returns-false-when.md) | completed |
 | [Opt this repo into the scoped gate and flake re-run; document the test-gate templates; changeset](./opt-this-repo-into-the-scoped-gate-and.md) | completed |
 | [Read-only refusal is suppressed by other tasks' commits to files an earlier attempt only edited](./read-only-refusal-is-suppressed-by.md) | pending |
+| [.rex/workflow.md: a pre-existing failure introduced on this branch is fixed here; one already on main becomes its own task](./rex-workflow-md-a-pre-existing-failure.md) | pending |
 | [run-all-tests.mjs comment reads "gives to give us" after the execFileSyncCli change](./run-all-tests-mjs-comment-reads-gives.md) | pending |
 | [run-all-tests.mjs runs git through win-spawn's execFileSyncCli, not node:child_process](./run-all-tests-mjs-runs-git-through-win.md) | completed |
 | [run-all-tests.mjs selects suites by label and by affected change since a base ref](./run-all-tests-mjs-selects-suites-by.md) | completed |
