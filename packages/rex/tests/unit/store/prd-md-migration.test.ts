@@ -7,8 +7,21 @@ import { SCHEMA_VERSION, type PRDDocument } from "../../../src/schema/index.js";
 import {
   migrateJsonPrdToMarkdown,
   PRD_MARKDOWN_FILENAME,
+  CANONICAL_MARKDOWN_SOURCE_PATH,
+  toMarkdownSourcePath,
 } from "../../../src/store/prd-md-migration.js";
+import { PRD_FILENAME } from "../../../src/store/file-adapter.js";
 import { parseDocument } from "../../../src/store/markdown-parser.js";
+
+describe("CANONICAL_MARKDOWN_SOURCE_PATH", () => {
+  it("is the attribution path toMarkdownSourcePath gives the canonical PRD", () => {
+    // It is composed from this module's own constants rather than by calling
+    // toMarkdownSourcePath at module scope: file-adapter.ts imports from
+    // prd-md-migration.ts, so reading PRD_FILENAME there hits its temporal
+    // dead zone and every rex command dies on import. This is that call.
+    expect(CANONICAL_MARKDOWN_SOURCE_PATH).toBe(toMarkdownSourcePath(PRD_FILENAME));
+  });
+});
 
 describe("migrateJsonPrdToMarkdown", () => {
   let tmpDir: string;

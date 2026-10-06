@@ -93,7 +93,8 @@ import {
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
-import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
+import { PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
 import { BOOKKEEPING_DIR_PREFIXES } from "../../store/paths.js";
 import {
   createPromptEnvelope,
@@ -1432,6 +1433,7 @@ async function runAdversarialReviewPass(
   await rm(reportPath, { force: true }).catch(() => { /* best effort */ });
   await mkdir(dirname(reportPath), { recursive: true });
 
+  const layout = resolveLayout(inv.projectDir);
   const brief = buildReviewBrief({
     taskId: inv.taskId,
     taskTitle: ctx.taskTitle,
@@ -1439,6 +1441,7 @@ async function runAdversarialReviewPass(
     reportPath,
     resumed: !!resumeSessionId,
     autonomous: ctx.autonomous,
+    prdTreeDir: `${relativeToRoot(layout, layout.rexDir)}/${PRD_TREE_DIRNAME}/`,
   });
 
   const envelope = createPromptEnvelope([

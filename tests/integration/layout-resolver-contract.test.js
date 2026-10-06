@@ -26,6 +26,8 @@ let foundation;
 let isoBundle;
 /** @type {Record<string, any>} */
 let isoDeclared;
+/** @type {Record<string, any>} */
+let viewerStatePaths;
 
 /** A project on the legacy layout — three dot-dirs, no container. */
 let legacyRoot;
@@ -54,6 +56,7 @@ beforeAll(async () => {
   foundation = await import("../../packages/llm-client/dist/public.js");
   isoBundle = await import("../../packages/sourcevision/dist/export/iso-sources.js");
   isoDeclared = await import("../../packages/sourcevision/dist/export/iso-declared.js");
+  viewerStatePaths = await import("../../packages/web/dist/viewer/state-paths.js");
 
   legacyRoot = mkdtempSync(join(tmpdir(), "ndx-layout-legacy-"));
   mkdirSync(join(legacyRoot, ".rex"), { recursive: true });
@@ -460,5 +463,48 @@ describe("layout resolver: iso bundle twin matches the foundation implementation
     expect(isoDeclared.projectConfigFor(missing)).toBe(
       foundation.resolveLayout(missing).configFile,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The viewer carries a fourth copy, because a browser bundle cannot read a disk
+// ---------------------------------------------------------------------------
+
+describe("layout resolver: viewer twin matches the foundation implementation", () => {
+  // `packages/web/src/viewer/state-paths.ts` is the browser-safe restatement of
+  // `layoutStateNames().statePaths`. The viewer cannot import the resolver —
+  // `layout.ts` reaches for `node:fs` at module scope — but it classifies the
+  // same paths: the Files view hides n-dx's own directories, and the Hench Runs
+  // view calls a PRD write bookkeeping rather than work. Both have to recognise
+  // *both* layouts, which is exactly what the canonical list answers.
+  it("lists the same state directories as layoutStateNames", () => {
+    expect(
+      [...viewerStatePaths.ALL_STATE_DIRS].sort(),
+      "packages/web/src/viewer/state-paths.ts and packages/llm-client/src/layout.ts disagree",
+    ).toEqual([...foundation.layoutStateNames().statePaths].sort());
+  });
+
+  it("groups them by tool the way the resolver resolves them", () => {
+    for (const [dirs, field] of [
+      [viewerStatePaths.REX_STATE_DIRS, "rexDir"],
+      [viewerStatePaths.HENCH_STATE_DIRS, "henchDir"],
+      [viewerStatePaths.SOURCEVISION_STATE_DIRS, "sourcevisionDir"],
+    ]) {
+      const expected = ["legacy", "ndx"].map((mode) => {
+        const layout = foundation.resolveLayout(".", { mode });
+        return foundation.relativeToRoot(layout, layout[field]);
+      });
+      expect([...dirs], `${field} twin disagrees`).toEqual(expected);
+    }
+  });
+
+  it("gives prefixes that match a path's leading segment, not a bare name", () => {
+    // The consumers match `${dir}/`, so a run that touched `.rexy/thing` must
+    // not be classified as PRD bookkeeping.
+    const prefixes = viewerStatePaths.stateDirPrefixes(viewerStatePaths.REX_STATE_DIRS);
+
+    expect(prefixes).toEqual([".rex/", ".ndx/rex/"]);
+    expect(prefixes.some((p) => ".rexy/thing".startsWith(p))).toBe(false);
+    expect(prefixes.some((p) => ".ndx/rex/prd_tree/x".startsWith(p))).toBe(true);
   });
 });

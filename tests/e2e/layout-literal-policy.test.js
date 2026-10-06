@@ -21,18 +21,24 @@
  *
  * Both were found by review, not by a test, which is what this file is for.
  *
- * ## What it can and cannot promise today
+ * ## A wall for the directories, a ratchet for the config files
  *
- * The acceptance criterion this rule serves is absolute — *no* literal outside
- * the resolver and the migration command — and that is not reachable yet: the
- * sweep it depends on (`c64f053e`, routing hench, web and core through their
- * paths modules) has not run, and 160 sites across 68 files are still waiting
- * for it. So the rule is a ratchet rather than a wall: every one of those
- * files is named in `tests/layout-literal-inventory.md` with the count it is
- * allowed, a **new** file fails, and an existing file that grows fails. When
- * the sweep lands, the inventory is deleted and the allow-list below stands
- * alone — which is the rule as originally specified, with no change to the
- * detector.
+ * The acceptance criterion this rule serves is absolute — *no* literal
+ * `.rex/`, `.hench/` or `.sourcevision/` outside the resolver and the
+ * migration command — and for those three names it is now met. They are a
+ * **wall**: any site outside {@link ALLOWED} fails, and there is no inventory
+ * to register one in. Adding a literal back means editing the allow-list and
+ * saying why.
+ *
+ * The `.n-dx*` config files are still a **ratchet**. The resolver owns those
+ * paths too, and the config-reader defect below was `.n-dx.json`, so a rule
+ * that ignored them would not catch the bug that prompted the rule — but 29
+ * sites across llm-client, hench and web's routes have not been swept yet.
+ * Each is named in `tests/layout-literal-inventory.md` with the count it is
+ * allowed: a **new** file fails, an existing file that grows fails, and a file
+ * that reaches zero has to leave the list. When that sweep lands, the
+ * inventory is deleted and the two halves collapse into one wall, with no
+ * change to the detector.
  *
  * ## Why the detector looks the way it does
  *
@@ -77,6 +83,17 @@ const ALLOWED = [
   // lands.
   "packages/rex/src/cli/commands/migrate-layout.ts",
   "packages/core/migrate-layout.js",
+  // The viewer's twin. The viewer is a browser bundle and cannot import
+  // `layout.ts`, which reaches for `node:fs` at module scope. Pinned to
+  // `layoutStateNames()` by the same contract test as the copies above.
+  "packages/web/src/viewer/state-paths.ts",
+  // `LEGACY_SOURCE_FILE_PREFIX`, the `.rex/` prefix carried by `sourceFile`
+  // attributions written by the flat `prd.md`/`prd.json` backends. It is a
+  // value in data already on disk, not a path this process constructs, and
+  // those backends only ever existed under `.rex/` — resolving it would
+  // orphan every attribution already recorded. The file's own docstring
+  // carries the argument.
+  "packages/rex/src/store/prd-md-migration.ts",
 ];
 
 /** A paths module answers the resolver's question for one package. */
@@ -93,6 +110,23 @@ const PATHS_MODULE = /\/src\/(?:[^/]+\/)?paths\.ts$/;
  */
 const LAYOUT_LITERAL =
   /(["'`])(\.(?:rex|hench|sourcevision)(?:\/[^"'`\s]*)?|\.n-dx(?:\.local)?\.json|\.n-dx-web[^"'`\s]*)\1/g;
+
+/**
+ * The three tool directories, which are a wall rather than a ratchet.
+ *
+ * Matched against a site's captured text, so it sees the literal with its
+ * quotes: `".rex/prd_tree/"` is a directory site, `".n-dx.json"` is not.
+ */
+const DIRECTORY_LITERAL = /^(["'`])\.(?:rex|hench|sourcevision)(?:\/|\1)/;
+
+/** Split a file's sites into the two halves the rule treats differently. */
+function partition(sites) {
+  const directories = sites.filter((s) => DIRECTORY_LITERAL.test(s.text));
+  return {
+    directories,
+    configs: sites.filter((s) => !DIRECTORY_LITERAL.test(s.text)),
+  };
+}
 
 /**
  * Blank out comment bodies, preserving newlines so line numbers still line up
@@ -214,6 +248,23 @@ function toPosixRelative(file) {
   return relative(ROOT, file).split(sep).join("/");
 }
 
+/**
+ * Every production file the rule applies to, exemptions included.
+ *
+ * Separate from {@link findLayoutLiterals} so the self-test can assert the
+ * walker actually reached the tree. A floor on the *findings* cannot do that
+ * job any more: the directory half is at zero by design, and the config half
+ * is meant to reach zero too, so a walker that silently collected nothing
+ * would read as the sweep succeeding.
+ */
+export function scanProductionFiles() {
+  const seen = new Set();
+  for (const root of collectScanRoots()) {
+    for (const file of walkSourceFiles(root)) seen.add(toPosixRelative(file));
+  }
+  return [...seen];
+}
+
 /** Every flagged file, with the line and text of each literal in it. */
 export function findLayoutLiterals() {
   const found = new Map();
@@ -268,29 +319,49 @@ function readInventory() {
 }
 
 describe("layout-literal policy", () => {
-  it("still finds the literals it is meant to find (detector self-test)", () => {
-    const found = findLayoutLiterals();
-    const sites = [...found.values()].flat();
-
-    // A detector that silently matches nothing turns every check below
+  it("reaches the whole production tree (walker self-test)", () => {
+    // A walker that silently collects nothing turns every check below
     // vacuously green — which has happened on this lane before, to a scan
     // whose filter read `\+` as a quantifier and dropped every line.
     //
-    // Deliberately not anchored to a named file. The first version asserted
-    // that `packages/core/cli.js` held more than ten literals; A6 then routed
-    // it through the resolver and took it from 50 to 1, so the self-test
-    // failed on the sweep *working*. A floor on the whole scan says the same
-    // thing about the detector without betting on which file is still dirty,
-    // and it relaxes on its own as the debt falls — the inventory's own total
-    // is the number that has to come down, and the rows below check that.
-    expect(found.size).toBeGreaterThan(20);
-    expect(sites.length).toBeGreaterThan(50);
+    // This used to be a floor on the *findings*, which worked only while the
+    // debt was large: the directory half is now zero by design and the config
+    // half is meant to follow it, so a findings floor would fail on the sweep
+    // succeeding, exactly as an earlier version did when A6 took `cli.js` from
+    // 50 literals to 1. A floor on the files *visited* says the same thing
+    // about the scan and never has to be relaxed again.
+    const scanned = scanProductionFiles();
 
+    expect(scanned.length).toBeGreaterThan(500);
+    // Reached inside the packages, not just their top level.
+    expect(scanned).toContain("packages/llm-client/src/layout.ts");
+    expect(scanned).toContain("packages/web/src/viewer/views/files.ts");
+    expect(scanned).toContain("packages/core/cli.js");
+  });
+
+  it("still matches a literal when it sees one (detector self-test)", () => {
+    // The pattern half of the same guard, on a fixture rather than the tree,
+    // so it keeps its teeth once the inventory is empty.
+    const code = blankComments(
+      [
+        'const a = join(dir, ".rex/prd_tree");',
+        'const b = ".n-dx.json";',
+        'const c = resolveLayout(root).henchDir;',
+      ].join("\n"),
+    );
+    const sites = [...code.matchAll(LAYOUT_LITERAL)].map((m) => ({
+      line: code.slice(0, m.index).split("\n").length,
+      text: m[0],
+    }));
+
+    expect(sites.map((s) => s.text)).toEqual(['".rex/prd_tree"', '".n-dx.json"']);
+    expect(partition(sites).directories.map((s) => s.text)).toEqual(['".rex/prd_tree"']);
+    expect(partition(sites).configs.map((s) => s.text)).toEqual(['".n-dx.json"']);
     // Every site carries a line number, so a failure can point at one.
     for (const site of sites) expect(site.line).toBeGreaterThan(0);
   });
 
-  it("does not flag the resolver, the paths modules or the iso twins", () => {
+  it("does not flag the resolver, the paths modules or the twins", () => {
     const found = findLayoutLiterals();
 
     for (const allowed of [
@@ -299,6 +370,7 @@ describe("layout-literal policy", () => {
       "packages/llm-client/src/project-dirs.ts",
       "packages/rex/src/store/paths.ts",
       "packages/sourcevision/src/export/iso-sources.ts",
+      "packages/web/src/viewer/state-paths.ts",
     ]) {
       expect(found.has(allowed), `${allowed} should be exempt`).toBe(false);
     }
@@ -341,40 +413,67 @@ describe("layout-literal policy", () => {
     expect([...path.matchAll(LAYOUT_LITERAL)]).toHaveLength(1);
   });
 
-  it("names no file that is not in the inventory", () => {
-    const { ceilings } = readInventory();
-    const unlisted = [...findLayoutLiterals().entries()]
-      .filter(([file]) => !ceilings.has(file))
-      .map(([file, sites]) => `  ${file}:${sites[0].line}  ${sites[0].text}`);
+  it("allows no literal .rex/, .hench/ or .sourcevision/ path at all", () => {
+    // The wall. There is no inventory for these — the sweep is finished, so a
+    // site here is a new one, and the only way to add one back is to edit
+    // ALLOWED above and say why.
+    const offenders = [];
+    for (const [file, sites] of findLayoutLiterals()) {
+      for (const site of partition(sites).directories) {
+        offenders.push(`  ${file}:${site.line}  ${site.text}`);
+      }
+    }
 
     expect(
-      unlisted,
-      `New literal layout path(s). Ask the resolver instead:\n` +
-        `${unlisted.join("\n")}\n\n` +
+      offenders,
+      `Literal layout path(s). Ask the resolver instead:\n` +
+        `${offenders.join("\n")}\n\n` +
         `  import { resolveLayout } from "@n-dx/llm-client";\n` +
-        `  const { rexDir, henchDir, sourcevisionDir, configFile } = resolveLayout(root);\n\n` +
+        `  const { rexDir, henchDir, sourcevisionDir } = resolveLayout(root);\n\n` +
         `A package with a paths module (rex, sourcevision, hench, web) asks that\n` +
-        `instead. If the file genuinely owns the layout decision, add it to\n` +
-        `ALLOWED in ${toPosixRelative(join(ROOT, "tests/e2e/layout-literal-policy.test.js"))}\n` +
-        `and say why. See tests/layout-literal-inventory.md.`,
+        `instead. Display copy that cannot reach a resolver — viewer text, static\n` +
+        `help — names the command or the tool rather than the directory; see\n` +
+        `packages/web/src/viewer/views/hench-config.ts for the worked example.\n` +
+        `If the file genuinely owns the layout decision, add it to ALLOWED in\n` +
+        `${toPosixRelative(join(ROOT, "tests/e2e/layout-literal-policy.test.js"))} and say why.`,
     ).toEqual([]);
   });
 
-  it("holds every file at or below its recorded count", () => {
+  it("names no .n-dx* file that is not in the inventory", () => {
+    const { ceilings } = readInventory();
+    const unlisted = [...findLayoutLiterals().entries()]
+      .map(([file, sites]) => [file, partition(sites).configs])
+      .filter(([file, configs]) => configs.length > 0 && !ceilings.has(file))
+      .map(([file, configs]) => `  ${file}:${configs[0].line}  ${configs[0].text}`);
+
+    expect(
+      unlisted,
+      `New literal config path(s). Ask the resolver instead:\n` +
+        `${unlisted.join("\n")}\n\n` +
+        `  import { resolveLayout } from "@n-dx/llm-client";\n` +
+        `  const { configFile, localConfigFile } = resolveLayout(root);\n\n` +
+        `These are still a ratchet rather than a wall only because the config\n` +
+        `sweep has not run. A file not already in tests/layout-literal-inventory.md\n` +
+        `does not get a row — route it.`,
+    ).toEqual([]);
+  });
+
+  it("holds every .n-dx* file at or below its recorded count", () => {
     const { ceilings } = readInventory();
     const grown = [];
     for (const [file, sites] of findLayoutLiterals()) {
+      const configs = partition(sites).configs;
       const ceiling = ceilings.get(file);
-      if (ceiling === undefined || sites.length <= ceiling) continue;
+      if (ceiling === undefined || configs.length <= ceiling) continue;
       grown.push(
-        `  ${file}: ${sites.length} literals, inventory allows ${ceiling}\n` +
-          sites.slice(ceiling).map((s) => `      ${file}:${s.line}  ${s.text}`).join("\n"),
+        `  ${file}: ${configs.length} literals, inventory allows ${ceiling}\n` +
+          configs.slice(ceiling).map((s) => `      ${file}:${s.line}  ${s.text}`).join("\n"),
       );
     }
 
     expect(
       grown,
-      `File(s) added a literal layout path:\n${grown.join("\n")}\n\n` +
+      `File(s) added a literal config path:\n${grown.join("\n")}\n\n` +
         `These files are already carrying layout debt, which is why they are in\n` +
         `tests/layout-literal-inventory.md — but the count may only go down.\n` +
         `Route the new call through the resolver or the package's paths module.`,
@@ -397,7 +496,7 @@ describe("layout-literal policy", () => {
     const { ceilings, pending } = readInventory();
     const stale = [...ceilings.keys()]
       .filter((file) => !pending.has(file))
-      .filter((file) => !found.has(file));
+      .filter((file) => partition(found.get(file) ?? []).configs.length === 0);
 
     expect(
       stale,

@@ -2,6 +2,7 @@ import { h } from "preact";
 import { useState, useMemo, useEffect, useRef, useCallback } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { FileEntry } from "../external.js";
+import { ALL_STATE_DIRS, stateDirPrefixes } from "../state-paths.js";
 import { buildFileToZoneMap, getZoneColorByIndex } from "../visualization/index.js";
 import { basename } from "../utils.js";
 import { BrandedHeader, LanguageAnalysisStrip, GlossaryLine, InfoTip } from "../components/index.js";
@@ -21,8 +22,8 @@ interface FilesViewProps {
 type SortKey = "path" | "size" | "language" | "lineCount" | "role" | "category";
 type SortDir = "asc" | "desc";
 
-/** Internal tool directories hidden from the file list by default */
-const INTERNAL_DIR_PREFIXES = [".hench/", ".rex/", ".sourcevision/"];
+/** Internal tool directories hidden from the file list by default. */
+const INTERNAL_DIR_PREFIXES = stateDirPrefixes(ALL_STATE_DIRS);
 
 const ROLE_TAG_CLASS: Record<string, string> = {
   source: "tag-source",
