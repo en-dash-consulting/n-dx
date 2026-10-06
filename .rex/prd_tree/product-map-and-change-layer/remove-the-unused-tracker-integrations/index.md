@@ -24,5 +24,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Delete the rex tracker adapters, rex sync, rex adapter and the sync_with_remote tool](./delete-the-rex-tracker-adapters-rex.md) | completed |
-| [Remove the dashboard's Notion and integration routes, flags and setup views](./remove-the-dashboard-s-notion-and.md) | in_progress |
+| [Remove the dashboard's Notion and integration routes, flags and setup views](./remove-the-dashboard-s-notion-and.md) | completed |
 | [Remove the tracker integration docs and record the removal](./remove-the-tracker-integration-docs.md) | pending |
+| [rex exports adapters.json persistence and credential helpers with no remaining consumer](./rex-exports-adapters-json-persistence.md) | pending |
