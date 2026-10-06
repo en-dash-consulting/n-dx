@@ -119,6 +119,7 @@ import {
   formatModelLabel,
 } from "./shared.js";
 import type { SharedLoopOptions } from "./shared.js";
+import { executeGateOnlyRetry, planGateOnlyRetry } from "./gate-only-retry.js";
 import type { VendorAdapter, SpawnConfig } from "./vendor-adapter.js";
 import { resolveVendorAdapter } from "./adapters/index.js";
 import { EventAccumulator } from "./event-accumulator.js";
@@ -2104,6 +2105,43 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Snapshot everything already dirty, so the run's own work can be told
   // apart from the operator's at commit time (see stageRunWork).
   const baselineDirty = await captureBaselineDirty(projectDir);
+
+  // The previous run failed only at the test gate with its work committed:
+  // re-run the gate instead of an agent session (#539). No heartbeat, warm
+  // parent or spawn — there is nothing for an agent to do.
+  const gateOnly = await planGateOnlyRetry({ projectDir, taskId, runHistory: opts.runHistory, claims: opts.claims });
+  if (gateOnly) {
+    await executeGateOnlyRetry({
+      plan: gateOnly,
+      run,
+      memoryCtx,
+      review: reviewPassContext
+        ? async (base) => {
+            await runAdversarialReviewPass(reviewPassContext, {
+              run, taskId, projectDir, startingHead: base, sessionId: undefined,
+            });
+          }
+        : undefined,
+      finalize: {
+        claims: opts.claims,
+        henchDir,
+        projectDir,
+        config,
+        testCommand: brief.project.testCommand,
+        selfHeal: config.selfHeal,
+        rollbackOnFailure: opts.rollbackOnFailure,
+        yes: opts.yes,
+        autonomous,
+        store,
+        autoCommit: config.autoCommit === true,
+        skipFullTestGate: config.skipFullTestGate,
+        baselineUntracked,
+        baselineDirty,
+        reviewOptional: opts.reviewOptional,
+      },
+    });
+    return { run };
+  }
 
   const retryConfig: RetryConfig = config.retry ?? {
     maxRetries: 3,

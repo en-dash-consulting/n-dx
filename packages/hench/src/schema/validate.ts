@@ -365,6 +365,8 @@ const RunReviewRecordSchema = z
     failed: z.string().optional(),
     detail: z.string().optional(),
     gated: z.boolean().optional(),
+    // Gate-only retry: the run this review was copied from.
+    inheritedFrom: z.string().optional(),
   })
   .passthrough();
 
@@ -475,6 +477,11 @@ export const RunRecordSchema = z.object({
   testGate: OpaqueRunSectionSchema.optional(),
   dependencyAudit: OpaqueRunSectionSchema.optional(),
   cleanupTransformations: OpaqueRunSectionSchema.optional(),
+  // Read back by the next retry's loop guard: a gate-only retry is never
+  // followed by another one, so stripping this would loop.
+  gateOnlyRetry: z
+    .object({ sourceRunId: z.string(), base: z.string(), commits: z.array(RunCommitRecordSchema) })
+    .optional(),
 });
 
 export function validateConfig(

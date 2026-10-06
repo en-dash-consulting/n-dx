@@ -1370,6 +1370,13 @@ export type RunReviewRecord =
        * writing its report and was resumed once to write it.
        */
       backgroundResumed?: boolean;
+      /**
+       * Run id this review was copied from. Set by a gate-only retry whose
+       * source run's review passed on the same HEAD: the work under review is
+       * unchanged, so the earlier verdict still holds. See
+       * `agent/lifecycle/gate-only-retry.ts`.
+       */
+      inheritedFrom?: string;
       failed?: undefined;
     }
   | {
@@ -1792,6 +1799,25 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   completionHold?: RunCompletionHold;
+  /**
+   * Set when this run skipped the agent: the task's previous run failed only
+   * at the test gate, with its work committed and its completion held, so
+   * this run re-ran the gate and applied that held completion on green.
+   * See `agent/lifecycle/gate-only-retry.ts`.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  gateOnlyRetry?: RunGateOnlyRetry;
+}
+
+/** See {@link RunRecord.gateOnlyRetry}. */
+export interface RunGateOnlyRetry {
+  /** The failed run whose work and held completion this run gated. */
+  sourceRunId: string;
+  /** Commit the gate diffed from: the earliest still-reachable start commit of the task's runs. */
+  base: string;
+  /** The source run's commits, all contained in HEAD when this run started. */
+  commits: RunCommitRecord[];
 }
 
 /**
