@@ -23,7 +23,7 @@ plannedRelease: "1.0.0"
 | [Capture the product map roadmap](./capture-the-product-map-roadmap/index.md) | completed |
 | [CLI for the map and changes](./cli-for-the-map-and-changes/index.md) | pending |
 | [Dashboard on the v2 model](./dashboard-on-the-v2-model/index.md) | pending |
-| [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | pending |
+| [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | completed |
 | [Derived status, health and computed edges](./derived-status-health-and-computed-edges/index.md) | pending |
 | [Docs, skills and policies for the v2 model](./docs-skills-and-policies-for-the-v2/index.md) | pending |
 | [Every n-dx commit carries an item trailer](./every-n-dx-commit-carries-an-item/index.md) | pending |
