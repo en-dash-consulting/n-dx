@@ -404,7 +404,6 @@ After `ndx init`, add the following block to your `.gitignore` before the first 
 .rex/pending-proposals.json
 .rex/acknowledged-findings.json
 .rex/execution-log*.jsonl
-.rex/adapters.json
 .rex/n-dx_workflow.md
 .n-dx-web.pid
 .n-dx-web.port

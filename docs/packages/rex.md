@@ -34,7 +34,6 @@ rex reshape .                        # LLM-powered PRD restructuring
 rex prune .                          # remove completed subtrees
 rex validate .                       # check PRD integrity
 rex fix .                            # auto-fix common PRD issues
-rex sync .                           # sync with remote adapter
 rex usage .                          # token usage analytics
 rex report .                         # JSON health report for CI
 rex verify .                         # run acceptance criteria tests
@@ -43,7 +42,6 @@ rex recommend .                      # show SourceVision recommendations
 rex recommend --accept .             # add recommendations to PRD
 rex reorganize .                     # detect and fix structural issues
 rex health .                         # PRD structure health score
-rex adapter list .                   # manage store adapters
 rex mcp .                            # start MCP server (stdio)
 ```
 
@@ -114,6 +112,5 @@ Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes 
 | `health` | PRD structure health score |
 | `facets` | List configured facets with distribution |
 | `append_log` | Write structured log entry |
-| `sync_with_remote` | Sync with remote adapter (e.g. Notion) |
 | `get_token_usage` | Roll up hench run token totals per PRD item |
 | `get_capabilities` | Server capabilities and configuration, plus the `workspace` block (resolved project dir, source, refusal) |

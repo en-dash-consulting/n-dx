@@ -131,7 +131,7 @@ Files pinned to eliminate phantom cross-zone edges from Louvain misclassificatio
 - `packages/web/src/server/routes-token-usage.ts` → `web-server`
 - `packages/web/src/server/aggregation-cache.ts` → `web-server`
 - `packages/web/src/server/routes-rex/` (all files) → `web-server`
-- `packages/web/src/server/routes-{cli-timeout,adaptive,config,data,features,hench,integrations,notion,project,search,sourcevision,static,status,validation,workflow}.ts` → `web-server`
+- `packages/web/src/server/routes-{cli-timeout,adaptive,config,data,features,hench,project,search,sourcevision,static,status,validation,workflow}.ts` → `web-server`
 - `packages/web/src/server/{concurrent-execution-metrics,index,port,pr-markdown-refresh-diagnostics,prd-io,process-memory-tracker,search-index,start,types,websocket}.ts` → `web-server`
 - `packages/web/tests/helpers/server-route-test-support.ts` → `web-server` — Test helper; keeps server test metrics separate from viewer zone
 - `packages/web/tests/unit/server/routes-{hench-execute,sourcevision}.test.ts` → `web-server`

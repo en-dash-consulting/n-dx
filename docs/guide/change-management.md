@@ -273,78 +273,6 @@ This is safe — the old PRD goes to archive, and you start fresh with a clean a
 2. If resolved: run `ndx recommend --acknowledge .` and mark the finding as acknowledged
 3. If not resolved: add the finding to the PRD as a task that didn't get picked up in earlier cycles, or acknowledge that you're living with the anti-pattern deliberately (sometimes acceptable for non-blocking patterns)
 
-## Using `ndx sync` for team-backed PRDs
-
-If your team uses Notion, GitHub discussions, or another external system as the source of truth for your PRD, `ndx sync` keeps your local `.rex/prd.json` in sync with that system.
-
-### Setting up sync
-
-First, configure an adapter:
-
-```sh
-ndx config rex.adapter notion .          # or github, airtable, etc.
-ndx config rex.adapterUrl https://notion.so/... .
-ndx config rex.adapterAuthToken <token> .
-```
-
-Adapters vary by platform. Check `ndx config --help` for your platform's required fields.
-
-### Two-way sync
-
-Once configured, sync in either direction:
-
-**Pull from remote (remote is source of truth):**
-
-```sh
-ndx sync --pull .
-```
-
-Your local PRD is overwritten with what's in the remote system.
-
-**Push to remote (local is source of truth):**
-
-```sh
-ndx sync --push .
-```
-
-Your local `.rex/prd.json` is pushed to the remote system.
-
-**Full bidirectional sync (latest wins, conflict resolution by timestamp):**
-
-```sh
-ndx sync .
-```
-
-Items that changed locally and remotely are resolved by timestamp — the latest change wins. Items unique to one side are merged.
-
-### Team workflow with sync
-
-**Scenario 1: You and your team use Notion as the PRD source**
-
-1. Team edits items in Notion (titles, descriptions, priorities)
-2. You pull changes locally: `ndx sync --pull .`
-3. You run `ndx analyze . && ndx recommend .` based on the updated Notion items
-4. You execute with `ndx work .`
-5. Task completion and agent runs update your local PRD
-6. Push completion back to Notion: `ndx sync --push .`
-
-**Scenario 2: Local CLI for execution, Notion for discussion**
-
-1. Team discusses features in Notion; comments, linked docs, decision history
-2. You sync locally to get the latest decisions: `ndx sync --pull .`
-3. You execute locally and add your own PRD items from findings: `ndx analyze . && ndx recommend --accept .`
-4. Push your PRD additions back to Notion for team visibility: `ndx sync --push .`
-
-### Conflict resolution
-
-If a field was changed both locally and remotely since the last sync, `ndx sync` will:
-
-1. Show the conflict
-2. Ask you to resolve it (keep local, keep remote, or merge manually)
-3. Apply the resolution to both sides
-
-For large teams, this is rare if you establish a pattern: typically one person (a team lead or tech lead) runs the weekly pruning and sync, and the team makes PRD comments via Notion rather than direct edits.
-
 ## Archive management
 
 Every time you run `rex remove <item-id>`, the item goes into `.rex/archive.json`. The archive serves as an audit trail — you can recover items if you change your mind, and you can see what you decided not to pursue.
@@ -445,11 +373,6 @@ You acknowledged a finding, but `ndx recommend` keeps proposing it.
 - [ ] `ndx status .` — confirm the PRD is healthy
 - [ ] `git commit -m "PRD maintenance: full cycle re-analysis and acknowledgment"`
 
-**If using external adapters (Notion, GitHub, etc.):**
-- [ ] Run the above locally
-- [ ] `ndx sync --push .` — push local changes to remote
-- [ ] Notify team if significant PRD changes (new epics, priorities changed)
-
 **Quarterly (if PRD is heavily drifted):**
 - [ ] `ndx ci .` — full health report
 - [ ] Review drift patterns from the report
@@ -461,7 +384,6 @@ Once your PRD is healthy:
 
 - **Run `ndx work --auto --iterations=N .`** to execute a full sprint autonomously
 - **Schedule a recurring maintenance task** with `ndx schedule` to remind yourself to prune monthly
-- **Set up `ndx sync`** if your team uses an external system for backlog management
 - **Use `ndx self-heal`** for ongoing improvement between full maintenance cycles
 
 ## Skills used in this guide
@@ -474,7 +396,6 @@ Each skill below is invoked during the maintenance cycles described in this guid
 | `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](./skills#ndx-plan) | Monthly cycle: re-analyzes the codebase and proposes items for persistent or newly surfaced findings |
 | `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](./skills#ndx-reshape) | Quarterly: restructures a drifted PRD — regroups epics, adjusts levels, merges overlapping items |
 | `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](./skills#ndx-capture) | Throughout: adds newly surfaced requirements to the right place in the PRD hierarchy |
-| `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](./skills#ndx-config) | Sync setup: configures the external adapter (`rex.adapter`, `rex.adapterUrl`, `rex.adapterAuthToken`) |
 
 Related guides: [Workflow](./workflow) (the normal development loop this guide maintains), [Self-Heal Loop](./self-heal) (automates the analyze → recommend cycle between full maintenance passes).
 

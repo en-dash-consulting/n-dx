@@ -271,7 +271,6 @@ The MCP server exposes seventeen tools and three resources.
 | `reorganize` | Detect and fix structural issues |
 | `health` | PRD structure health score |
 | `facets` | List configured facets with distribution |
-| `sync_with_remote` | Sync with a remote adapter (e.g. Notion) |
 | `get_token_usage` | Roll up hench run token totals per PRD item |
 | `append_log` | Write to the execution log |
 | `get_capabilities` | Schema version, adapter info, feature flags |
