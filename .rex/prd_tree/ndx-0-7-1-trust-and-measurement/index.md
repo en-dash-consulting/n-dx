@@ -26,7 +26,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Autonomous review capture](./autonomous-review-capture/index.md) | completed |
 | [Autonomous runs finish their session](./autonomous-runs-finish-their-session/index.md) | completed |
 | [Claims hardening](./claims-hardening/index.md) | completed |
-| [Cost measurement lands](./cost-measurement-lands/index.md) | pending |
+| [Cost measurement lands](./cost-measurement-lands/index.md) | completed |
 | [Hench commit hygiene](./hench-commit-hygiene/index.md) | pending |
 | [PRD write guards](./prd-write-guards/index.md) | completed |
 | [Prompt cache, prune and budget configuration](./prompt-cache-prune-and-budget/index.md) | completed |
