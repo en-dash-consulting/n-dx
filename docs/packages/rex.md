@@ -94,7 +94,7 @@ This prevents existing code from appearing as a wall of pending tasks.
 
 ## MCP Tools
 
-Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes these as `mcp__rex__{tool}`; Codex uses bare names.
+Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes these as `mcp__rex__{tool}`; Codex uses bare names. The stdio server follows the client's MCP roots, so a worktree session writes its own tree; `get_capabilities` reports the resolved `workspace` (`source`, `projectDir`, `refused`). See [MCP integration](/guide/mcp#worktree-sessions).
 
 | Tool | Description |
 |------|-------------|
@@ -116,4 +116,4 @@ Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes 
 | `append_log` | Write structured log entry |
 | `sync_with_remote` | Sync with remote adapter (e.g. Notion) |
 | `get_token_usage` | Roll up hench run token totals per PRD item |
-| `get_capabilities` | Server capabilities and configuration |
+| `get_capabilities` | Server capabilities and configuration, plus the `workspace` block (resolved project dir, source, refusal) |
