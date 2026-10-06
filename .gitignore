@@ -66,8 +66,7 @@ packages/web/playwright/.cache/
 
 # Vendor CLI invocation log (packages/*/cli-log.*) and its rotated generation.
 # Local operational history — never committed.
-claude_commands.log
-claude_commands.log.1
+claude_commands.log*
 
 # NOTE: `claude.args` / `codex.args` were ignored here until the e2e fake-CLI
 # shims were given an absolute capture path (task 76a37b38). They wrote via

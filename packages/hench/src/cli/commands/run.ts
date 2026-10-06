@@ -1,10 +1,10 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
-import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor } from "../../prd/rex-gateway.js";
-import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor, traversalBlock } from "../../prd/rex-gateway.js";
+import type { PRDItem, PRDStore, TraversalBlock } from "../../prd/rex-gateway.js";
+import { collectEpicTaskIds as collectEpicTasks } from "../../agent/planning/brief.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
-import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
 import { classifyChangedFiles } from "../../store/file-classifier.js";
 import type { FileCategory } from "../../store/file-classifier.js";
 import { loadConfig } from "../../store/config.js";
@@ -31,7 +31,7 @@ import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
-import { safeParseInt, safeParseNonNegInt } from "./constants.js";
+import { safeParseInt } from "./constants.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
@@ -49,7 +49,16 @@ import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../sto
 import type { LLMVendor } from "../../prd/llm-gateway.js";
 import { LLM_VENDOR, printVendorModelHeader, resolveModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, createSpinner } from "../../prd/llm-gateway.js";
 import { resolveAgentModel } from "./agent-model.js";
-import { isProviderSupported } from "./provider-support.js";
+import {
+  parseBudgetFlags,
+  parsePermissionModeFlag,
+  parseReviewOptions,
+  resolveRunPermissionMode,
+  resolveRunProvider,
+  reviewProviderError,
+  selectCliModelOverride,
+} from "./run-settings.js";
+import type { ReviewOptions } from "./run-settings.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
 import { formatQueueStatus } from "../../queue/format.js";
 import { resolveSchedulingPriority } from "../../queue/priority-scheduler.js";
@@ -78,29 +87,7 @@ export interface AttemptTracker {
   hasReachedMaxAttempts(taskId: string): boolean;
 }
 
-/**
- * The two independent review controls, bundled so the run functions keep a
- * single positional slot for them.
- *
- * They are genuinely independent and may both be on. The adversarial pass runs
- * first, so its must-fix repairs are already in the tree when the diff gate
- * shows a human what they are approving.
- */
-export interface ReviewOptions {
-  /** `--approve-diff` — show the diff and prompt before finalizing. */
-  approveDiff: boolean;
-  /** `--review` — run the adversarial review pass after validation. */
-  reviewPass: boolean;
-  /** `--review-model` — override the model the reviewer runs on. */
-  reviewModel?: string;
-  /**
-   * `--review-optional` — downgrade the missing-review gate to a warning.
-   *
-   * Off by default: `--review` is an opt-in gate, and a gate that silently
-   * no-ops when its reviewer cannot start is worse than no gate at all.
-   */
-  reviewOptional: boolean;
-}
+export type { ReviewOptions } from "./run-settings.js";
 
 const MAX_TASK_ATTEMPTS = 3;
 
@@ -294,12 +281,66 @@ export interface EpicScopeInfo {
   totalTasks: number;
   /** Number of completed tasks/subtasks. */
   completedTasks: number;
-  /** Number of actionable tasks (pending or in_progress). */
+  /**
+   * How many tasks in this epic the task selector would actually hand back.
+   *
+   * Counted with the selector itself rather than by re-reading each task's
+   * status, because the two disagree. A task is unreachable when anything
+   * above it is blocked, cancelled, deleted, or waiting on an unfinished
+   * `blockedBy` — the selector prunes the whole subtree at that point, while a
+   * per-item status count sees a tree full of pending work.
+   *
+   * That divergence is what made `--epic-by-epic` look like it only validated
+   * epics: it announced "Starting: N actionable task(s)" from the status
+   * count, the selector then found nothing, and the epic was recorded
+   * `no_actionable_tasks` without a single task running. Every epic in the
+   * PRD did this in turn, so the whole invocation printed headers and a
+   * summary and ran no work at all.
+   */
   actionableTasks: number;
   /** True if all tasks are completed (or epic has no tasks). */
   isComplete: boolean;
   /** True if there are actionable tasks to work on. */
   hasActionableTasks: boolean;
+  /**
+   * Why the epic as a whole is unreachable, when it is — the epic item's own
+   * {@link traversalBlock}. Set even if tasks beneath it are pending, which is
+   * exactly the case the operator cannot otherwise explain: every task says
+   * "pending" and nothing runs.
+   */
+  scopeBlock?: TraversalBlock;
+}
+
+/**
+ * Why an epic is being skipped, as the epic-by-epic run says it.
+ *
+ * The old line was `has no actionable tasks (N blocked/deferred)`, derived
+ * from the status counts. When the gate is the epic *itself* — it is blocked,
+ * or waiting on another epic — that sentence is unanswerable: every task under
+ * it reads `pending` in `rex status`, so the operator is told there is no work
+ * in a place that visibly has some, with nothing naming the thing in the way.
+ *
+ * Exported for testing: the explanation is the whole point of the change, and
+ * the loop that prints it needs a live PRD to reach.
+ */
+export function formatEpicSkipLines(scope: EpicScopeInfo): string[] {
+  const remaining = scope.totalTasks - scope.completedTasks;
+  const block = scope.scopeBlock;
+
+  if (block?.cause === "status") {
+    return [
+      `⚠ Epic "${scope.title}" is ${block.status}, so none of its ${remaining} remaining task(s) can be selected.`,
+      `  Set it to pending with 'rex update ${scope.id} --status=pending' to work it.`,
+    ];
+  }
+  if (block?.cause === "blockedBy") {
+    return [
+      `⚠ Epic "${scope.title}" is waiting on ${block.openBlockerIds.join(", ")}, ` +
+        `so none of its ${remaining} remaining task(s) can be selected.`,
+      `  It becomes workable once those complete.`,
+    ];
+  }
+  return [`⚠ Epic "${scope.title}" has no actionable tasks (${remaining} blocked/deferred).`];
 }
 
 /**
@@ -316,13 +357,18 @@ export async function getEpicScopeInfo(
     throw new EpicNotFoundError(epicId, listEpics(doc.items));
   }
   const resolvedEpicId = epic.id;
+  // The epic's own node, for the scope-level block below. `findEpicByIdOrTitle`
+  // answers identity (it accepts a title), not the item.
+  const epicItem = findItem(doc.items, resolvedEpicId)?.item;
+  if (!epicItem) {
+    throw new EpicNotFoundError(epicId, listEpics(doc.items));
+  }
 
   // Walk the tree and count tasks belonging to this epic
   const { walkTree } = await import("../../prd/rex-gateway.js");
 
   let totalTasks = 0;
   let completedTasks = 0;
-  let actionableTasks = 0;
 
   for (const { item, parents } of walkTree(doc.items)) {
     // Check if this item is inside the target epic
@@ -334,17 +380,25 @@ export async function getEpicScopeInfo(
       // Deleted items are excluded from all counts
       if (item.status === "deleted") continue;
       totalTasks++;
-      if (item.status === "completed") {
-        completedTasks++;
-      } else if (item.status === "pending" || item.status === "in_progress" || item.status === "failing") {
-        actionableTasks++;
-      }
-      // deferred and blocked are neither completed nor actionable; failing IS actionable (retry)
+      if (item.status === "completed") completedTasks++;
     }
   }
 
+  // The actionable count comes from the selector, not from a second reading of
+  // each task's status — see the field's doc comment. This is the same
+  // intersection the autonomous epic path computes in `prepareBrief`, so the
+  // number announced before an epic starts is the number the loop will find.
+  // Run-specific exclusions (stuck tasks, tasks another worktree holds) are
+  // deliberately left out: "there is work here, but this run is skipping it"
+  // is a different statement, and the loop reports it separately.
+  const completedIds = collectCompletedIds(doc.items);
+  const epicTaskIds = collectEpicTasks(doc.items, resolvedEpicId);
+  const actionableTasks = findActionable(doc.items, completedIds, Infinity, {})
+    .filter((entry) => epicTaskIds.has(entry.item.id)).length;
+
   const isComplete = totalTasks === 0 || completedTasks === totalTasks;
   const hasActionableTasks = actionableTasks > 0;
+  const scopeBlock = traversalBlock(epicItem, completedIds);
 
   return {
     id: epic.id,
@@ -354,6 +408,7 @@ export async function getEpicScopeInfo(
     actionableTasks,
     isComplete,
     hasActionableTasks,
+    ...(scopeBlock ? { scopeBlock } : {}),
   };
 }
 
@@ -581,6 +636,30 @@ export interface ResetDeferredOptions {
 }
 
 /**
+ * The deferred and failing items `--reset-deferred` returns to pending,
+ * scoped to `assignee` (by the item's own field or an ancestor's) when given.
+ */
+export function collectResettableTasks(
+  items: PRDItem[],
+  assignee?: string,
+): Array<{ id: string; title: string }> {
+  const found: Array<{ id: string; title: string }> = [];
+  const walk = (level: PRDItem[], parents: PRDItem[]) => {
+    for (const item of level) {
+      if (
+        (item.status === "deferred" || item.status === "failing") &&
+        (!assignee || matchesAssignee(item, parents, assignee))
+      ) {
+        found.push({ id: item.id, title: item.title });
+      }
+      if (item.children) walk(item.children, [...parents, item]);
+    }
+  };
+  walk(items, []);
+  return found;
+}
+
+/**
  * Reset deferred and failing tasks to pending so they can be retried.
  *
  * Used by --reset-deferred to let the user restart a run where all tasks
@@ -592,22 +671,7 @@ export async function resetDeferredTasks(
   store: PRDStore,
   opts: ResetDeferredOptions = {},
 ): Promise<number> {
-  const doc = await store.loadDocument();
-  const toReset: Array<{ id: string; title: string }> = [];
-  const assignee = opts.assignee;
-
-  const walk = (items: PRDItem[], parents: PRDItem[]) => {
-    for (const item of items) {
-      if (
-        (item.status === "deferred" || item.status === "failing") &&
-        (!assignee || matchesAssignee(item, parents, assignee))
-      ) {
-        toReset.push({ id: item.id, title: item.title });
-      }
-      if (item.children) walk(item.children, [...parents, item]);
-    }
-  };
-  walk(doc.items, []);
+  const toReset = collectResettableTasks((await store.loadDocument()).items, opts.assignee);
 
   if (!opts.dryRun) {
     for (const t of toReset) {
@@ -1286,6 +1350,7 @@ async function runOne(
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
   assignee?: string,
+  wouldResetIds?: ReadonlySet<string>,
 ): Promise<{ status: string; taskTitle: string; selectedTaskId?: string }> {
   // First statement in the task: a tree this build would re-slug stops the task
   // before the claim below is taken and before any token is spent. The tree can
@@ -1355,6 +1420,7 @@ async function runOne(
         runNumber,
         permissionMode,
         claims,
+        wouldResetIds,
       })
     : await agentLoop({
         config: effectiveConfig as typeof config & { provider: "api" },
@@ -1380,6 +1446,7 @@ async function runOne(
         extraContext,
         runNumber,
         claims,
+        wouldResetIds,
       });
   } finally {
     await claims.releaseAll();
@@ -1523,6 +1590,8 @@ export async function cmdRun(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  // `--resolve` never reaches here: the CLI dispatches it to cmdResolve
+  // (run-resolve.ts), which reports this function's decisions without acting.
   const henchDir = resolveHenchPaths(dir).henchDir;
   // An invalid field in hench's config.json must not refuse the whole run —
   // fall back to that field's default and say so, so a bad edit (often made
@@ -1535,22 +1604,11 @@ export async function cmdRun(
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
 
-  // The CLI flag accepts both the vendor-neutral `--model` and the
-  // vendor-specific `--claude-model` / `--codex-model` (the latter pair is
-  // also recognized by `ndx init`; supporting them here means
-  // `ndx work --claude-model=…` works end-to-end).
-  const cliModelOverride =
-    flags.model
-    ?? (llmVendor === LLM_VENDOR.CLAUDE
-      ? flags["claude-model"]
-      : llmVendor === LLM_VENDOR.CODEX
-        ? flags["codex-model"]
-        : flags["google-model"]);
   // Resolution chain and the vendor-compatibility check both live in
   // agent-model.ts: --model > hench.models.<vendor> > llm.* > vendor default.
   const { model: resolvedModel, source: modelSource } = resolveAgentModel({
     vendor: llmVendor,
-    cliModelOverride,
+    cliModelOverride: selectCliModelOverride(flags, llmVendor).value,
     henchModels: config.models,
     llmConfig,
   });
@@ -1569,38 +1627,9 @@ export async function cmdRun(
   // consistent with how --quiet suppresses info() output.
   if (flags.format === "json") setQuiet(true);
 
-  let provider = (flags.provider as "cli" | "api") ?? config.provider;
+  let provider: "cli" | "api" = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
-  // `--review` now selects the adversarial review pass. The interactive
-  // diff-approval gate that used to own this flag moved to `--approve-diff`.
-  const reviewPass = flags.review === "true";
-  const approveDiff = flags["approve-diff"] === "true";
-  const reviewModelFlag = flags["review-model"];
-  if (reviewModelFlag !== undefined && !reviewModelFlag.trim()) {
-    throw new CLIError(
-      "--review-model requires a model id.",
-      "Example: --review-model=claude-opus-5-5. Omit the flag to use the recommended default for your vendor.",
-    );
-  }
-  if (reviewModelFlag && !reviewPass) {
-    throw new CLIError(
-      "--review-model was passed without --review.",
-      "The review model only applies to the adversarial review pass. Add --review, or drop --review-model.",
-    );
-  }
-  const reviewOptional = flags["review-optional"] === "true";
-  if (reviewOptional && !reviewPass) {
-    throw new CLIError(
-      "--review-optional was passed without --review.",
-      "It only relaxes the gate the review pass installs. Add --review, or drop --review-optional.",
-    );
-  }
-  const reviewOpts: ReviewOptions = {
-    approveDiff,
-    reviewPass,
-    reviewModel: reviewModelFlag?.trim() || undefined,
-    reviewOptional,
-  };
+  const reviewOpts: ReviewOptions = parseReviewOptions(flags);
   // --no-rollback always wins; otherwise read config (defaults to true).
   // Note: the failure rollback is prompt-only — it never runs without an
   // interactive confirmation, so this flag only governs whether that prompt
@@ -1632,13 +1661,7 @@ export async function cmdRun(
   // --permission-mode: validate against the four supported Claude CLI modes.
   // Resolution order (flag > config > runtime default) is computed below
   // after `autonomous` is derived, since the autonomous default depends on it.
-  const permissionModeFlag = flags["permission-mode"];
-  if (permissionModeFlag !== undefined && !isPermissionMode(permissionModeFlag)) {
-    throw new CLIError(
-      `Invalid --permission-mode value "${permissionModeFlag}".`,
-      `Use one of: ${PERMISSION_MODES.join(", ")}.`,
-    );
-  }
+  const permissionModeFlag = parsePermissionModeFlag(flags);
   let tagsFilter = flags["tags"]
     ? (flags["tags"] as string).split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
@@ -1673,35 +1696,14 @@ export async function cmdRun(
   }
   const assignee = mine ? await resolveActor(dir) : undefined;
 
-  // VENDOR_PROVIDERS (provider-support.ts) is the single source of truth:
-  // claude accepts cli or api; codex only cli (no API loop); google and local
-  // only api (no CLI binary exists). A vendor that rejects "cli" always
-  // accepts "api" instead, so an unsupported "cli" auto-switches silently —
-  // ndx config / ndx init persist hench.provider=api automatically when
-  // local or google is selected as the vendor, so this branch is a safety
-  // net for projects configured outside of those flows. An unsupported "api"
-  // (codex only) has no such fallback and fails loudly instead.
-  if (!dryRun && !isProviderSupported(llmVendor, provider)) {
-    if (provider === "cli") {
-      provider = "api";
-    } else {
-      throw new CLIError(
-        "Hench API provider is only supported for vendor=claude or vendor=google.",
-        "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
-      );
-    }
-  }
-
-  // The adversarial review pass spawns a second vendor CLI session, so it
-  // exists only on the CLI provider. Fail loudly rather than accepting the
-  // flag and doing nothing: a silent no-op here would report "reviewed" runs
-  // that were never reviewed, which is worse than not offering the flag.
-  if (reviewOpts.reviewPass && provider === "api" && !dryRun) {
-    throw new CLIError(
-      `--review requires the CLI provider, but this run resolved to provider="api"` +
-        `${llmVendor === LLM_VENDOR.GOOGLE || llmVendor === LLM_VENDOR.LOCAL ? ` (vendor="${llmVendor}" has no CLI binary)` : ""}.`,
-      "Switch with 'ndx config hench.provider cli' on a vendor that has a CLI (claude, codex), or drop --review.",
-    );
+  // Provider support per vendor, and the review pass's need for the CLI
+  // provider, are decided in run-settings.ts — shared with --resolve.
+  if (!dryRun) {
+    const resolvedProvider = resolveRunProvider(provider, llmVendor);
+    if (resolvedProvider.error) throw resolvedProvider.error;
+    provider = resolvedProvider.provider;
+    const reviewError = reviewOpts.reviewPass ? reviewProviderError(llmVendor, provider) : undefined;
+    if (reviewError) throw reviewError;
   }
 
   if (reviewOpts.reviewPass) {
@@ -1774,9 +1776,16 @@ export async function cmdRun(
   // reason the interactive offer is: the run that follows will only work this
   // operator's items, so resetting everyone else's — and committing that under
   // this operator's name — is never what the pair of flags asked for.
+  //
+  // A dry run writes nothing, so its brief reads the tasks the reset would
+  // have returned to pending as pending — the brief a real run would build.
+  let wouldResetIds: ReadonlySet<string> | undefined;
   if (flags["reset-deferred"] === "true") {
     const store = await resolveStore(rexDir);
     await resetDeferredAndCommit(store, dir, { dryRun, ...(assignee ? { assignee } : {}) });
+    if (dryRun) {
+      wouldResetIds = new Set(collectResettableTasks((await store.loadDocument()).items, assignee).map((t) => t.id));
+    }
   }
 
   // Fail fast if CLI provider selected but vendor CLI binary not available.
@@ -1840,8 +1849,7 @@ export async function cmdRun(
   }
 
   const iterations = flags.iterations ? safeParseInt(flags.iterations, "iterations") : 1;
-  const maxTurns = flags["max-turns"] ? safeParseInt(flags["max-turns"], "max-turns") : undefined;
-  const tokenBudget = flags["token-budget"] != null ? safeParseNonNegInt(flags["token-budget"], "token-budget") : undefined;
+  const { maxTurns, tokenBudget } = parseBudgetFlags(flags);
   const pauseMs = flags["loop-pause"]
     ? safeParseInt(flags["loop-pause"], "loop-pause")
     : config.loopPauseMs;
@@ -2033,23 +2041,24 @@ export async function cmdRun(
       for (const line of formatTrustWarningForRun(repoTrust, config.provider)) warn(line);
     }
 
-    // Resolve the effective permission mode for the spawned Claude session.
-    // Precedence: --permission-mode flag > config.permissionMode > autonomous
-    // default ("acceptEdits") > undefined (Claude CLI's built-in default).
-    // Codex spawns ignore this — warn the user that the value will be dropped.
-    let effectivePermissionMode: PermissionMode | undefined =
-      (permissionModeFlag as PermissionMode | undefined) ??
-      config.permissionMode ??
-      (autonomous ? "acceptEdits" : undefined);
+    // The effective permission mode for the spawned Claude session (see
+    // resolveRunPermissionMode for the precedence). Other vendors have no such
+    // setting — warn that the value is dropped.
+    const permission = resolveRunPermissionMode({
+      flag: permissionModeFlag,
+      configured: config.permissionMode,
+      autonomous,
+      vendor: llmVendor,
+    });
+    if (permission.dropped) {
+      info(
+        `⚠ --permission-mode is a Claude CLI feature; ignoring "${permission.dropped}" for vendor=${llmVendor}.`,
+      );
+    }
+    let effectivePermissionMode: PermissionMode | undefined = permission.value;
     if (repoTrust.restricted && effectivePermissionMode === "bypassPermissions") {
       warn("Lowering --permission-mode bypassPermissions to acceptEdits: this repository's execution config is not trusted.");
       effectivePermissionMode = "acceptEdits";
-    }
-    if (effectivePermissionMode && llmVendor !== LLM_VENDOR.CLAUDE) {
-      info(
-        `⚠ --permission-mode is a Claude CLI feature; ignoring "${effectivePermissionMode}" for vendor=${llmVendor}.`,
-      );
-      effectivePermissionMode = undefined;
     }
 
     // The checkout this invocation belongs to. Captured before the gate can
@@ -2090,13 +2099,19 @@ export async function cmdRun(
     // any task runs. Clearing per task instead would make every task in a
     // loop re-orient, which is the opposite of what the flag is for — the
     // first task then re-orients on the cache miss and the rest reuse it.
+    // A dry run writes nothing (the dashboard's brief preview forwards
+    // --fresh so the preview reflects the setting), so it only reports.
     if (fresh) {
-      await clearSessionCache(henchDir);
-      detail("Discarded the cached orientation session (--fresh)");
+      if (dryRun) {
+        detail("Would discard the cached orientation session (--fresh)");
+      } else {
+        await clearSessionCache(henchDir);
+        detail("Discarded the cached orientation session (--fresh)");
+      }
     }
 
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
+      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, wouldResetIds);
       return;
     }
 
@@ -2110,9 +2125,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee);
+      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds);
     } else {
-      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee);
+      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds);
     }
   } finally {
     await limiter.release();
@@ -2199,6 +2214,7 @@ async function runIterations(
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
   assignee?: string,
+  wouldResetIds?: ReadonlySet<string>,
 ): Promise<void> {
   // Track attempt counts per task ID within this run invocation
   const attemptTracker = createAttemptTracker();
@@ -2244,6 +2260,7 @@ async function runIterations(
       permissionMode,
       skipTestGate,
       assignee,
+      wouldResetIds,
     );
 
     // Track attempt count for the selected task
@@ -2311,6 +2328,7 @@ async function runLoop(
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
   assignee?: string,
+  wouldResetIds?: ReadonlySet<string>,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -2410,6 +2428,7 @@ async function runLoop(
             permissionMode,
             skipTestGate,
             assignee,
+            wouldResetIds,
           );
           status = result.status;
 
@@ -2602,6 +2621,7 @@ async function runEpicByEpic(
   autonomous?: boolean,
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
+  wouldResetIds?: ReadonlySet<string>,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -2696,7 +2716,7 @@ async function runEpicByEpic(
       }
 
       if (!freshScope.hasActionableTasks) {
-        info(colorWarn(`⚠ Epic "${epic.title}" has no actionable tasks (${freshScope.totalTasks - freshScope.completedTasks} blocked/deferred).`));
+        for (const line of formatEpicSkipLines(freshScope)) info(colorWarn(line));
         summaries.push({
           id: epic.id,
           title: epic.title,
@@ -2760,6 +2780,7 @@ async function runEpicByEpic(
               permissionMode,
               skipTestGate,
               undefined, // assignee — --mine is refused with --epic-by-epic
+              wouldResetIds,
             );
             status = result.status;
             tasksStarted++;

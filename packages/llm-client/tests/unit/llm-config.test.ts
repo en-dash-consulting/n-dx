@@ -326,4 +326,37 @@ describe("loadLLMConfig", () => {
     expect(cfg.effort).toBeUndefined();
     expect(cfg.escalation).toBeUndefined();
   });
+
+  it("keeps reviewModel for every vendor block and at the top level", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          vendor: "codex",
+          reviewModel: "gpt-5.4",
+          claude: { reviewModel: "opus" },
+          codex: { reviewModel: "gpt-5.4" },
+          google: { reviewModel: "gemini-pro" },
+        },
+      }),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.claude?.reviewModel).toBe("opus");
+    expect(cfg.google?.reviewModel).toBe("gemini-pro");
+    expect(cfg.codex?.reviewModel).toBeTruthy();
+    expect(cfg.reviewModel).toBeTruthy();
+  });
+
+  it("ignores an empty or non-string reviewModel", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ llm: { reviewModel: "", claude: { reviewModel: 7 } } }),
+      "utf-8",
+    );
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.reviewModel).toBeUndefined();
+    expect(cfg.claude).toBeUndefined();
+  });
 });

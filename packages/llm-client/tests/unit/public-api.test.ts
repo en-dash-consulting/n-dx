@@ -143,6 +143,7 @@ import {
   getWorktreeRoot,
   getGitCommonDir,
   listWorktrees,
+  resolveWorkspaceFromRoots,
   isExecutableOnPath,
   spawnTool,
   spawnManaged,
@@ -365,6 +366,10 @@ describe("public API — process execution exports", () => {
 
   it("exports listWorktrees as a function", () => {
     expect(typeof listWorktrees).toBe("function");
+  });
+
+  it("exports resolveWorkspaceFromRoots as a function", () => {
+    expect(typeof resolveWorkspaceFromRoots).toBe("function");
   });
 
   it("exports hasPosixShell as a function", () => {

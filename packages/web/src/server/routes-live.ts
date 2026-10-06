@@ -171,6 +171,9 @@ export interface LiveJob {
 export interface LiveNextTask {
   id: string;
   title: string;
+  /** `in_progress` offers Resume; the start offer reads it. */
+  status: string;
+  blockedBy?: string[];
   priority: string | null;
   epicChain: LiveChainLink[];
 }
@@ -377,6 +380,8 @@ function nextTasks(index: PrdIndex, excluded: ReadonlySet<string>): LiveNextTask
     next.push({
       id: entry.item.id,
       title: entry.item.title,
+      status: entry.item.status,
+      ...(entry.item.blockedBy?.length ? { blockedBy: entry.item.blockedBy } : {}),
       priority: entry.item.priority ?? null,
       epicChain: entry.parents.map((p) => ({ id: p.id, title: p.title, level: p.level })),
     });

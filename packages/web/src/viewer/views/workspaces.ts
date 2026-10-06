@@ -39,7 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks"
 import type { ViewId } from "../types.js";
 import { detectBasePath } from "../external.js";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
-import { ElapsedTime, StartTaskButton, GlossaryLine } from "../components/index.js";
+import { ElapsedTime, TaskStartControl, GlossaryLine } from "../components/index.js";
 import { formatSince } from "../utils/format.js";
 
 // ---------------------------------------------------------------------------
@@ -106,6 +106,8 @@ export interface MemoryStatus {
 export interface NextTask {
   id: string;
   title: string;
+  status: string;
+  blockedBy?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +243,11 @@ export function workspaceViewUrl(card: Pick<WorkspaceCard, "key" | "isAnchor">, 
   const project = detectBasePath(pathname);
   const slot = card.isAnchor ? "" : `/w/${encodeURIComponent(card.key)}`;
   return `${project}${slot}/${view}`;
+}
+
+/** A workspace's Live page for one task — a full-navigation URL (see {@link workspaceViewUrl}). */
+export function workspaceLiveTaskUrl(card: Pick<WorkspaceCard, "key" | "isAnchor">, taskId: string, pathname: string): string {
+  return `${workspaceViewUrl(card, "live", pathname)}/task/${encodeURIComponent(taskId)}`;
 }
 
 /** "1.2 GB", "840 MB" — byte counts for the memory tile. An unknown reading is a dash. */
@@ -525,12 +532,17 @@ function WorkspaceCardView({ card, doFetch, onChanged }: {
       }, "Open workspace"),
       card.live || !card.nextTask
         ? null
-        : h(StartTaskButton, {
-            taskId: card.nextTask.id,
+        : h(TaskStartControl, {
+            task: card.nextTask,
             workspace: card.key,
             label: "Start working",
             ariaLabel: `Start working in ${card.key} on ${card.nextTask.title}`,
             onStarted: onChanged,
+            // The viewer's own workspace opens Live in-app; any other card's run
+            // is only visible under that workspace's own URL.
+            liveHref: card.isCurrent
+              ? undefined
+              : (id: string) => workspaceLiveTaskUrl(card, id, currentPathname()),
           }),
     ),
   );

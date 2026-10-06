@@ -38,6 +38,7 @@
 
 import { useState, useCallback, useEffect } from "preact/hooks";
 import { usePolling } from "../views/use-polling.js";
+import type { RunOptions } from "../external.js";
 
 /** Mirrors QueueEntry in server-side hub/admission.ts. */
 export interface HubQueueEntry {
@@ -46,12 +47,27 @@ export interface HubQueueEntry {
   workspace: string | null;
   taskId: string;
   enqueuedAt: string;
+  /** The run options it was queued with, minus `contextNotes` (see `hasNotes`). Absent when it had none. */
+  options?: Omit<RunOptions, "contextNotes">;
+  /** It carries notes for the agent, which the hub does not send. */
+  hasNotes?: true;
+}
+
+/** Mirrors DroppedEntry in hub/admission.ts: a queued run whose server refused it at its turn. */
+export interface HubDroppedEntry extends HubQueueEntry {
+  droppedAt: string;
+  /** The server's HTTP status, or null when it could not be reached. */
+  status: number | null;
+  /** Why, in the server's words. */
+  error: string;
 }
 
 /** Mirrors QueueSnapshot in hub/admission.ts, as `GET /api/hub/queue` returns it. */
 export interface HubQueueSnapshot {
   /** This project's queued runs, oldest first. */
   entries: HubQueueEntry[];
+  /** This project's queued runs that were refused when their turn came. Absent from an older hub. */
+  dropped?: HubDroppedEntry[];
   /** Queued across every project on the machine, when `entries` is this project's. */
   queuedTotal?: number;
   /** Dashboard-started runs in flight across every project. */
@@ -92,6 +108,20 @@ export function entriesForWorkspace(
 export function queuePositionOf(snapshot: HubQueueSnapshot | null, taskId: string): number {
   if (!snapshot) return 0;
   return snapshot.entries.findIndex((entry) => entry.taskId === taskId) + 1;
+}
+
+/**
+ * The hub's record of a task's queued run being refused at its turn, or null.
+ * `workspace` narrows to one worktree when known; undefined matches any.
+ */
+export function droppedEntryOf(
+  snapshot: HubQueueSnapshot | null,
+  taskId: string,
+  workspace?: string | null,
+): HubDroppedEntry | null {
+  if (!snapshot?.dropped) return null;
+  return snapshot.dropped.find((entry) =>
+    entry.taskId === taskId && (workspace === undefined || entry.workspace === workspace)) ?? null;
 }
 
 export function useHubQueue(): {

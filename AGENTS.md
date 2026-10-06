@@ -104,7 +104,7 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `OPEN_SOURCE_SCOPE.md` | Licensing boundaries, included/excluded components, and contribution expectations |
 
-> **PRD file layout.** Subtasks are encoded as sections within the parent task's `index.md` (not separate directories). `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running — do not read it from code outside the web server. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
+> **PRD file layout.** Subtasks are encoded as sections within the parent task's `index.md` (not separate directories). `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running — do not read it from code outside the web server, and never commit it (`rex init` gitignores it; hench's completion gate discounts it, so a run made while the dashboard is up is not refused over the watcher's rewrite). See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
 
 ## Workflow
 

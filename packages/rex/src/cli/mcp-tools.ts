@@ -1034,13 +1034,24 @@ export async function handleGetTokenUsage(
   }
 }
 
-export async function handleGetCapabilities(store: PRDStore): Promise<McpResult> {
+/** Which directory a server is serving and why (see mcp-workspace.ts). */
+export interface WorkspaceInfo {
+  projectDir: string;
+  rexDir: string;
+  source: "roots" | "startup";
+  startupDir: string;
+  /** Present while writes are refused on behalf of an unservable client root. */
+  refused?: string;
+}
+
+export async function handleGetCapabilities(store: PRDStore, workspace?: WorkspaceInfo): Promise<McpResult> {
   try {
     const config = await store.loadConfig();
     const caps = store.capabilities();
     return textResult(
       JSON.stringify(
         {
+          ...(workspace ? { workspace } : {}),
           schemaVersion: SCHEMA_VERSION,
           toolVersion: TOOL_VERSION,
           adapter: caps.adapter,

@@ -32,7 +32,7 @@ const KNOWN_UNDEFINED = new Set([
   "--color-text-primary", "--color-text-secondary",
   "--radius", "--space-0-5", "--spacing-lg", "--spacing-md", "--spacing-sm",
   "--spacing-xl", "--spacing-xs", "--text-dim-2", "--text-primary",
-  "--text-secondary", "--yellow",
+  "--yellow",
   // Set inline per-element from analysis data rather than in a stylesheet.
   "--zone-color",
 ]);
@@ -65,6 +65,24 @@ function unguardedUses(sheets: ReturnType<typeof stylesheets>): Array<{ file: st
   return uses;
 }
 
+/**
+ * Every `var(--x)`, with or without a fallback. A fallback hides the defect
+ * rather than fixing it: `var(--text-secondary, #9ca3af)` rendered 2.5:1 grey
+ * on the light theme because the token existed in neither theme.
+ */
+function allUses(css: string): string[] {
+  return [...css.matchAll(/var\(\s*(--[a-z0-9-]+)\s*[,)]/g)].map((m) => m[1]);
+}
+
+/**
+ * Stylesheets with no undefined-token backlog. Fallback-guarded uses are
+ * checked here too; add a new sheet to this list rather than the allowlist.
+ */
+const STRICT_SHEETS = ["prepare-task.css"];
+
+/** Names that were undefined, are now replaced by theme tokens, and must stay gone. */
+const RETIRED = ["--text-secondary", "--danger"];
+
 describe("viewer design tokens", () => {
   it("defines every token used without a fallback, except a known backlog", () => {
     const sheets = stylesheets();
@@ -81,6 +99,21 @@ describe("viewer design tokens", () => {
     const offenders = stylesheets()
       .filter(({ css }) => REPAIRED.some((t) => css.includes(`var(${t})`)))
       .map(({ file }) => file);
+    expect(offenders).toEqual([]);
+  });
+
+  it("uses only defined tokens in strict stylesheets, fallbacks included", () => {
+    const sheets = stylesheets();
+    const defined = definedProperties(sheets);
+    const undefinedUses = sheets
+      .filter(({ file }) => STRICT_SHEETS.includes(file))
+      .flatMap(({ file, css }) => allUses(css).filter((n) => !defined.has(n)).map((n) => `${file}: var(${n})`));
+    expect([...new Set(undefinedUses)].sort()).toEqual([]);
+  });
+
+  it("does not reintroduce retired token names, with or without a fallback", () => {
+    const offenders = stylesheets()
+      .flatMap(({ file, css }) => allUses(css).filter((n) => RETIRED.includes(n)).map((n) => `${file}: var(${n})`));
     expect(offenders).toEqual([]);
   });
 
