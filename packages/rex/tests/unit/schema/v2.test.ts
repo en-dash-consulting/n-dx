@@ -210,6 +210,7 @@ describe("state", () => {
       resolutionType: "code-change",
       resolutionDetail: "y",
       metAt: "sha256:abc",
+      revisedAt: "2026-10-06T01:00:00.000Z",
       specReviewed: true,
       checks: [{ requirementId: "r1", result: "pass", at: "2026-10-06T01:00:00.000Z" }],
       appliedIn: "e3d7052fe",
@@ -296,7 +297,7 @@ describe("field coverage (design intent/state tables)", () => {
     const STATE = [
       "status", "startedAt", "completedAt", "endedAt", "activeIntervals",
       "failureReason", "resolutionType", "resolutionDetail",
-      "metAt", "specReviewed", "checks",
+      "metAt", "revisedAt", "specReviewed", "checks",
       "appliedIn", "shippedIn", "prs", "issues", "commits", "links",
       "assignee", "ready", "needsPlacement",
       "lastModified", "lastModifiedBy",

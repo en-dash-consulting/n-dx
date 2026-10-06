@@ -256,8 +256,10 @@ const DAY_MS = 86_400_000;
  * A map node is revised when its spec no longer hashes to `metAt` and no open
  * change amends it (an amended one is "changing" instead). A node never met
  * (`metAt` absent) is proposed, not revised. Age is measured from
- * `lastModified`, the stamp the writer sets on the spec edit; without one the
- * age is unknown and nothing is reported.
+ * `revisedAt`, which the state writer stamps when a spec edit first makes the
+ * hash differ from `metAt`. It is not measured from `lastModified`, because
+ * every state write (checks, specReviewed) re-stamps that. Without
+ * `revisedAt` the age is unknown and nothing is reported.
  */
 const longRevised: Rule = ({ entries, resolve }, { now, longRevisedDays = DEFAULT_LONG_REVISED_DAYS }) => {
   const amended = new Set<RuleNode>();
@@ -272,9 +274,9 @@ const longRevised: Rule = ({ entries, resolve }, { now, longRevisedDays = DEFAUL
     if (node.type !== "capability" && node.type !== "constraint") return [];
     if (!node.metAt || amended.has(node)) return [];
     if (specHash(node.type === "capability" ? node : { statement: node.statement }) === node.metAt) return [];
-    const modified = node.lastModified ? Date.parse(node.lastModified) : Number.NaN;
-    if (Number.isNaN(modified)) return [];
-    const days = Math.floor((now.getTime() - modified) / DAY_MS);
+    const revised = node.revisedAt ? Date.parse(node.revisedAt) : Number.NaN;
+    if (Number.isNaN(revised)) return [];
+    const days = Math.floor((now.getTime() - revised) / DAY_MS);
     if (days <= longRevisedDays) return [];
     return [finding("long-revised", node, `${node.type} "${node.title}" has been revised for ${days} days with no change open; draft one or re-stamp it`)];
   });

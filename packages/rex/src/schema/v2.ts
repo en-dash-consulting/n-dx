@@ -27,8 +27,9 @@
  * | id, type, title, slug, displayId, aliases        | status, startedAt, completedAt, endedAt      |
  * | tags, source, blockedBy, body, hypotheses*       | activeIntervals                              |
  * | area: summary, stewards                          | failureReason, resolutionType/Detail         |
- * | capability: statement, criteria, requirements,   | metAt, specReviewed, checks (map nodes)      |
- * |   dependsOn                                      | appliedIn, shippedIn, prs, issues (changes)  |
+ * | capability: statement, criteria, requirements,   | metAt, revisedAt, specReviewed, checks       |
+ * |   dependsOn                                      |   (map nodes)                                |
+ * |                                                  | appliedIn, shippedIn, prs, issues (changes)  |
  * | constraint: statement, requirements, appliesTo   | commits, links*                              |
  * | change: intent, amends, touches, plannedRelease, | assignee, ready, needsPlacement              |
  * |   spike, priority, loe, requirements             | lastModified, lastModifiedBy                 |
@@ -401,6 +402,13 @@ export interface ItemState {
   resolutionDetail?: string;
   /** Map nodes: hash of statement + criteria when an applied change last satisfied it. */
   metAt?: string;
+  /**
+   * Map nodes: when the spec became revised. The state writer stamps it when a
+   * spec edit first makes the spec hash differ from `metAt`, and keeps it
+   * across later edits and state writes. It clears it when `metAt` is
+   * re-stamped. `long-revised` measures age from it, not from `lastModified`.
+   */
+  revisedAt?: string;
   /** Map nodes: a person reviewed the spec text. */
   specReviewed?: boolean;
   /** Map nodes: last result per requirement check. */
@@ -438,6 +446,7 @@ export const ItemStateSchema = z
     resolutionType: z.enum(["code-change", "config-override", "acknowledgment", "deferred", "unclassified"]).optional(),
     resolutionDetail: z.string().optional(),
     metAt: z.string().optional(),
+    revisedAt: z.string().optional(),
     specReviewed: z.boolean().optional(),
     checks: z.array(CheckResultSchema).optional(),
     appliedIn: z.string().optional(),

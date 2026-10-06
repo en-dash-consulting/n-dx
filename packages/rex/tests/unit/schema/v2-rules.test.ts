@@ -215,13 +215,14 @@ describe("specHash", () => {
 describe("long-revised", () => {
   const met = { statement: "Old", criteria: [{ id: "c1", text: "It works" }] };
   const revised = (fields: Record<string, unknown> = {}) =>
-    cap({ id: "r", metAt: specHash(met), lastModified: "2026-09-01T00:00:00Z", ...fields });
+    cap({ id: "r", metAt: specHash(met), revisedAt: "2026-09-01T00:00:00Z", ...fields });
 
   it("passes met, proposed, recently revised, and amended nodes", () => {
     const map = [
-      cap({ ...met, metAt: specHash(met), lastModified: "2026-01-01T00:00:00Z" }),
-      cap({ lastModified: "2026-01-01T00:00:00Z" }),
-      cap({ metAt: specHash(met), lastModified: "2026-10-01T00:00:00Z" }),
+      cap({ ...met, metAt: specHash(met), revisedAt: "2026-01-01T00:00:00Z" }),
+      cap({ revisedAt: "2026-01-01T00:00:00Z" }),
+      cap({ metAt: specHash(met), revisedAt: "2026-10-01T00:00:00Z" }),
+      cap({ metAt: specHash(met), lastModified: "2026-01-01T00:00:00Z" }),
       cap({ metAt: specHash(met) }),
     ];
     expect(check("long-revised", { map })).toEqual([]);
@@ -236,8 +237,15 @@ describe("long-revised", () => {
     expect(findings[0].message).toContain("35 days");
   });
 
+  it("measures age from revisedAt, not a later state write's lastModified", () => {
+    const checked = revised({ revisedAt: "2026-08-07T00:00:00Z", lastModified: "2026-10-05T00:00:00Z" });
+    const findings = check("long-revised", { map: [checked] });
+    expect(ids(findings)).toEqual(["r"]);
+    expect(findings[0].message).toContain("60 days");
+  });
+
   it("covers constraints and honours the threshold option", () => {
-    const constraint = node("constraint", { statement: "New", metAt: specHash({ statement: "Old" }), lastModified: "2026-10-01T00:00:00Z" });
+    const constraint = node("constraint", { statement: "New", metAt: specHash({ statement: "Old" }), revisedAt: "2026-10-01T00:00:00Z" });
     const tree = { map: [constraint], changes: [] };
     expect(checkV2Rules(tree, { now: NOW }, ["long-revised"])).toEqual([]);
     expect(ids(checkV2Rules(tree, { now: NOW, longRevisedDays: 3 }, ["long-revised"]))).toEqual([constraint.id]);
