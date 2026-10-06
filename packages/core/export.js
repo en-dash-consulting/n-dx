@@ -666,8 +666,6 @@ export async function runExport(args) {
       "rex.autoComplete": { enabled: true },
       "rex.showTokenBudget": { enabled: true },
       "rex.budgetEnforcement": { enabled: false },
-      "rex.notionSync": { enabled: false },
-      "rex.integrations": { enabled: false },
       "hench.autoRetry": { enabled: true },
       "hench.guardRails": { enabled: true },
       "hench.adaptiveWorkflow": { enabled: true },

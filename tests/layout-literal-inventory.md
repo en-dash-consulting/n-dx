@@ -3,7 +3,7 @@
 Every production source file that still spells out where n-dx keeps its files,
 instead of asking the resolver.
 
-**149 literals across 65 files.** That number is the debt, and it may only go
+**148 literals across 64 files.** That number is the debt, and it may only go
 down.
 
 ## Why this file exists
@@ -205,7 +205,6 @@ more.
 | `packages/web/src/viewer/views/hench-runs.ts` | 1 | .rex |
 | `packages/web/src/viewer/views/hench-templates.ts` | 1 | .hench |
 | `packages/web/src/viewer/views/iso-map.ts` | 1 | .sourcevision |
-| `packages/web/src/viewer/views/notion-config.ts` | 1 | .rex |
 | `packages/web/src/viewer/views/workflow-optimization.ts` | 1 | .hench |
 
 ### Registered ahead of merge

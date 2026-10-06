@@ -44,7 +44,6 @@ import { handleStatusRoute, clearStatusCache, buildServerInfo } from "./routes-s
 import { handleHubAbsentRoute } from "./routes-hub-absent.js";
 import { handleConfigRoute } from "./routes-config.js";
 import { handleSearchRoute } from "./routes-search.js";
-import { handleNotionRoute } from "./routes-notion.js";
 import { handleFeaturesRoute } from "./routes-features.js";
 import { handleTrustRoute } from "./routes-trust.js";
 import { evaluateRepoTrust, formatRepoTrustReport } from "@n-dx/llm-client";
@@ -736,9 +735,9 @@ function handleReloadSignalEndpoint(
  * the promise was neither awaited nor cancelled, so the handler ran on, wrote
  * to a response the 404 fall-through in {@link handleApiRoutes} had already
  * finished, and threw ERR_HTTP_HEADERS_SENT from an unawaited promise —
- * terminating the process. `/api/notion/*` and `/api/merge-graph` were
- * reachable that way; the rest escaped only by not accepting POST on the paths
- * probed, which is luck rather than a guard.
+ * terminating the process. `/api/merge-graph` was reachable that way; the rest
+ * escaped only by not accepting POST on the paths probed, which is luck rather
+ * than a guard.
  *
  * Passing an already-invoked handler is now a type error, so the mistake
  * cannot be reintroduced one call site at a time.
@@ -790,7 +789,6 @@ async function handleApiRoutes(
   if (handleHubAbsentRoute(req, res)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleTrustRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
   if (await handleFeaturesRoute(req, res, ctx)) return true;
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
   if (await handleLlmRoute(req, res, ctx)) return true;

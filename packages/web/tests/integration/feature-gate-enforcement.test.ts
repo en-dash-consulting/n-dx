@@ -42,8 +42,6 @@ const SERVER_ENTRY_URL = pathToFileURL(SERVER_ENTRY).href;
 const PROBES: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/rex/capture-ask", "sourcevision.ask"],
   ["/api/sv/pr-markdown", "sourcevision.prMarkdown"],
-  ["/api/notion/config", "rex.notionSync"],
-  ["/api/integrations", "rex.integrations"],
 ];
 
 interface Probe {
