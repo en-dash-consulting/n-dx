@@ -25,7 +25,7 @@ import type {
 import { gitCommand, isGitWorkTree, readOriginUrl, remoteToWebUrl } from "../util/git-remote.js";
 import { asKind } from "./iso-model.js";
 import { scanProject } from "./iso-scan.js";
-import { loadDeclaredArchitecture, ndxContainer } from "./iso-declared.js";
+import { loadDeclaredArchitecture, ndxContainer, readInfrastructure } from "./iso-declared.js";
 import type { DeclaredInfra, DeclaredSeam } from "./iso-declared.js";
 import type {
   CallGraph,
@@ -515,7 +515,16 @@ export function loadFromSourcevision(root: string, options: LoadOptions = {}): I
   }
 
   const zoneIds = new Set(zones.map((z) => z.id));
-  const declared = loadDeclaredArchitecture(root, [...files.keys()]);
+  // Infrastructure was discovered at analyze time and written to
+  // infrastructure.json; read it rather than walking the tree again. An
+  // analysis made before that file existed reads as `null`, and
+  // loadDeclaredArchitecture falls back to discovering it.
+  const declared = loadDeclaredArchitecture(
+    root,
+    [...files.keys()],
+    undefined,
+    readInfrastructure(svDir),
+  );
   const seamResolution = resolveSeams(declared.seams, zoneIds, zoneOfFile, callGraph);
   extraGaps.push(...seamGaps(seamResolution));
 

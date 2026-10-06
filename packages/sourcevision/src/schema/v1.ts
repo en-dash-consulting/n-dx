@@ -992,6 +992,69 @@ export interface ProjectSurface {
   kind: string;
 }
 
+// ── Infrastructure ──────────────────────────────────────────────────────────
+// What the import graph structurally cannot show: runtime infrastructure (a
+// queue, bucket, cache or database has no import signature) and injection
+// seams (where the import points one way and the runtime call points the
+// other). Discovered at analyze time by `analyzers/infrastructure.ts` and
+// written to `infrastructure.json`.
+
+/** A runtime control-flow edge that inverts, or has no, import. */
+export interface InfraSeam {
+  /** Zone id, or a file path that resolves to one. */
+  from: string;
+  /** Zone id, or a file path that resolves to one. */
+  to: string;
+  /** The callbacks or events crossing the seam. */
+  callbacks?: string[];
+  /** Why this seam exists. */
+  note?: string;
+}
+
+/** One piece of runtime infrastructure, declared or discovered from IaC. */
+export interface InfraResource {
+  id: string;
+  name: string;
+  /** Coarse category: bucket, queue, topic, database, cache, stream, scheduler, secrets, compute. */
+  kind: string;
+  /** `"config"` when a person declared it, otherwise the IaC file that did. */
+  origin: string;
+  note?: string;
+  /**
+   * Name literals to match against source when attributing the resource to
+   * zones — the IaC local name plus any `name`-ish attribute.
+   */
+  literals?: string[];
+}
+
+/**
+ * One attribution of a resource to code.
+ *
+ * Kept apart from the resource rather than stored on it: a use is a claim
+ * about the relationship, not a property of the thing, and `evidence` says
+ * how firmly it was established.
+ */
+export interface InfraLink {
+  resourceId: string;
+  /** A zone id or a project-relative path. Config declarations may use either. */
+  target: string;
+  /**
+   * `config` — a person declared this use.
+   * `name-literal` — source mentions the resource by name. A string match, not
+   * a resolution: weaker than an import edge, and consumers say so.
+   */
+  evidence: "config" | "name-literal";
+}
+
+/** `infrastructure.json` — the full discovery for one analysis. */
+export interface InfrastructureData {
+  resources: InfraResource[];
+  seams: InfraSeam[];
+  links: InfraLink[];
+  /** True when IaC files were found, whether or not anything was linked. */
+  sawIaC: boolean;
+}
+
 // ── SDLC readiness profile ──────────────────────────────────────────────────
 // Evidence-based CI/CD maturity: what this repository can actually do, each
 // claim tied to the file that proves it. Written to `sdlc-profile.json` by the

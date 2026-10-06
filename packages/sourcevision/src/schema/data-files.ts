@@ -8,6 +8,7 @@ export const DATA_FILES = {
   callGraph: "callgraph.json",
   projectProfile: "project-profile.json",
   sdlcProfile: "sdlc-profile.json",
+  infrastructure: "infrastructure.json",
 } as const;
 
 export const ALL_DATA_FILES = Object.values(DATA_FILES);

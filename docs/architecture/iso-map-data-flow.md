@@ -158,7 +158,26 @@ reference map that inspired this feature had first-class nodes for an S3 bucket,
 two SQS queues and a dead-letter queue; none of those could be derived here.
 
 **Closed, by declaration and by IaC.** Infrastructure now comes from two places
-and is drawn as its own trailing column:
+and is drawn as its own trailing column.
+
+**Discovery happens at analyze time, not at export time.** `sv analyze` runs
+`analyzers/infrastructure.ts` and writes `infrastructure.json` beside the other
+data files; the export reads that file rather than walking the tree again. This
+is what makes the knowledge usable: it used to exist only inside a rendered
+iso-map page, so nothing else could read it. The export still carries the
+discovery code and falls back to it when there is no file — a repository
+scanned with no analysis, which is how the standalone skill runs on an
+arbitrary repo, and an analysis produced before the file existed.
+
+The persisted shape keeps links apart from resources
+(`{ resources, seams, links, sawIaC }`), because a use is a claim about a
+relationship rather than a property of the resource; each link carries
+`evidence` — `config` where a person declared it, `name-literal` where source
+names the resource. Neither array is re-sorted on the way to disk: discovery
+emits config-declared resources before IaC ones and a config `usedBy` list in
+the order it was written, so sorting would reorder the map's nodes relative to
+a fresh discovery. Byte-stability across runs comes from discovery being
+deterministic plus canonical key ordering, not from sorting.
 
 1. **Infrastructure-as-code.** `.tf` files are scanned for
    `resource "type" "name"` blocks; `.yaml`/`.yml` files are scanned for
