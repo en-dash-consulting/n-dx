@@ -715,7 +715,7 @@ describe("gateway export auto-detection", () => {
     const testedSymbols = new Set([
       ...["resolveStore", "takeSaveFileReport", "isCompatibleSchema", "assertSchemaVersion",
         "findItem", "walkTree", "findNextTask", "findActionableTasks",
-        "collectCompletedIds", "explainSelection", "matchesAssignee",
+        "collectCompletedIds", "explainSelection", "matchesAssignee", "traversalBlock",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates",
         "findAutoCompletions", "reconcileAutoCompletions", "findParentResets",

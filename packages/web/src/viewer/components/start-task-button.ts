@@ -13,6 +13,23 @@
  * not a start: Start now shows the position and the reason, and does not call
  * `onStarted`.
  *
+ * ## Run modes
+ *
+ * With `runModes`, the button carries a mode picker: one task, a fixed number
+ * of tasks, or a loop that runs until the queue is empty. These are the
+ * `--iterations` and `--loop` flags `hench run` has always had — the dashboard
+ * simply had no way to reach them, so working through a queue meant leaving
+ * the dashboard for a terminal.
+ *
+ * Deliberately opt-in rather than always on. The Workspaces board renders one
+ * of these per worktree row, where the question is "start this worktree", not
+ * "how much work should this click commit to"; a picker on every row would be
+ * offering a decision nobody is making there.
+ *
+ * The mode is a property of the *click*, not of the component: it resets to
+ * `single` after a successful start, so a loop is never launched by a stale
+ * selection the operator set minutes ago and forgot.
+ *
  * It also carries the dashboard half of the PRD tree's slug-rule gate. A tree
  * this build would re-slug answers 412, and when the server says a migration
  * would fix it, this offers to run one — as a *second*, explicit request, which
@@ -29,6 +46,8 @@ import { appUrl } from "../base-path.js";
 import { PrepareTaskModal } from "./prepare-task-modal.js";
 import { QueuedNotice } from "./queued-notice.js";
 import type { QueuedReply } from "./prepare-task-model.js";
+import { MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "../external.js";
+import type { RunMode } from "../external.js";
 
 export interface StartTaskButtonProps {
   taskId: string;
@@ -57,15 +76,32 @@ export interface StartTaskButtonProps {
    * Live opens in-app.
    */
   liveHref?: (taskId: string) => string;
+  /**
+   * Offer the run-mode picker beside the button (one task / N tasks / loop).
+   *
+   * For the "start the next actionable task" entry points. Off by default so
+   * callers that mean one specific task keep a single unambiguous button.
+   *
+   * The picker governs "Start now", not the Prepare task modal: the modal
+   * configures one run of one task in detail, while the mode says how many
+   * tasks the click works through. Keeping them apart is why the modal's
+   * printed command line stays the command the modal itself would start.
+   */
+  runModes?: boolean;
 }
 
-export function StartTaskButton({ taskId, onStarted, label = "Start Task", workspace, ariaLabel, navigateTo, liveHref }: StartTaskButtonProps) {
+/** Default task count when the operator picks "a set number" without typing one. */
+const DEFAULT_ITERATIONS = 3;
+
+export function StartTaskButton({ taskId, onStarted, label = "Start Task", workspace, ariaLabel, navigateTo, liveHref, runModes = false }: StartTaskButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Set when the server reported a refusal `rex migrate-slugs` would fix. */
   const [canMigrate, setCanMigrate] = useState(false);
   const [migrating, setMigrating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [mode, setMode] = useState<RunMode>("single");
+  const [iterations, setIterations] = useState(DEFAULT_ITERATIONS);
   /** The hub's 202 for a Start now it queued; the notice then follows the hub queue. */
   const [queued, setQueued] = useState<{ reply: QueuedReply; taskId: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -110,7 +146,13 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     setQueued(null);
     setCanMigrate(false);
     try {
-      const { ok, status, data } = await post({});
+      const { ok, status, data } = await post(
+        mode === "single"
+          ? {}
+          : mode === "iterations"
+            ? { mode, iterations }
+            : { mode },
+      );
       if (!ok) {
         const message = (data.error as string) || `Failed (${status})`;
         // A refusal with a fix attached must stay on screen until it is acted
@@ -124,6 +166,11 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
         }
         throw new Error(message);
       }
+      // The picker is per-click, not a sticky preference: leaving it on "loop"
+      // would turn the next unrelated click into another loop. Reset before the
+      // queued branch below returns — a queued run is still a spent click, and
+      // the hub will start it with the mode it was queued with.
+      setMode("single");
       // 202 from the hub's queue: accepted, not started. Say where it stands.
       if (data.queued === true) {
         setQueued({ reply: data as unknown as QueuedReply, taskId });
@@ -136,7 +183,7 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     } finally {
       setLoading(false);
     }
-  }, [post, onStarted, taskId]);
+  }, [post, onStarted, taskId, mode, iterations]);
 
   const handleMigrate = useCallback(async (e: Event) => {
     e.stopPropagation();
@@ -169,6 +216,19 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
     else window.location.assign(appUrl(`/live/task/${encodeURIComponent(id)}`));
   }, [navigateTo, liveHref, onStarted]);
 
+  // What Start now commits to, said on the menu item itself. A picker that only
+  // changes hidden behaviour is how someone launches a queue-long run believing
+  // they started one task.
+  const startNowLabel =
+    mode === "loop" ? "Start now · until done" :
+    mode === "iterations" ? `Start now · ${iterations} tasks` :
+    "Start now";
+
+  const startNowAriaLabel =
+    mode === "loop" ? "Run tasks continuously until the queue is empty, starting with this one" :
+    mode === "iterations" ? `Run ${iterations} tasks in a row, starting with this one` :
+    undefined;
+
   const busy = loading || migrating;
   return h("div", { class: "start-task-wrapper" },
     h("div", { class: "ready-split" },
@@ -189,10 +249,65 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
       }, "▾"),
       menuOpen
         ? h("div", { class: "ready-menu", id: menuId, role: "menu" },
-            h("button", { type: "button", role: "menuitem", onClick: handleStartNow }, "Start now"),
+            h("button", {
+              type: "button",
+              role: "menuitem",
+              onClick: handleStartNow,
+              ...(startNowAriaLabel ? { "aria-label": startNowAriaLabel } : {}),
+            }, startNowLabel),
           )
         : null,
     ),
+    // The picker rides with Start now, not with the Prepare task modal: the
+    // modal configures one run of one task and prints the command line for it,
+    // while the mode says how many tasks the click works through.
+    runModes
+      ? h("div", { class: "start-task-row" },
+          h("label", { class: "start-task-mode" },
+            h("span", { class: "sr-only" }, "How many tasks to run"),
+            h("select", {
+              class: "start-task-mode-select",
+              value: mode,
+              disabled: busy,
+              onClick: (e: Event) => e.stopPropagation(),
+              onChange: (e: Event) => {
+                setMode((e.target as HTMLSelectElement).value as RunMode);
+              },
+            },
+              h("option", { value: "single" }, "This task"),
+              h("option", { value: "iterations" }, "A set number"),
+              h("option", { value: "loop" }, "Until done"),
+            ),
+          ),
+          mode === "iterations"
+            ? h("label", { class: "start-task-mode" },
+                h("span", { class: "sr-only" }, "How many tasks"),
+                h("input", {
+                  class: "start-task-iterations",
+                  type: "number",
+                  min: MIN_DASHBOARD_ITERATIONS,
+                  max: MAX_DASHBOARD_ITERATIONS,
+                  step: 1,
+                  value: iterations,
+                  disabled: busy,
+                  onClick: (e: Event) => e.stopPropagation(),
+                  onInput: (e: Event) => {
+                    const next = Number((e.target as HTMLInputElement).value);
+                    // The server refuses anything outside 2..MAX with a 400, so
+                    // the input is clamped rather than allowed to submit a value
+                    // that can only come back as an error.
+                    if (!Number.isFinite(next)) return;
+                    setIterations(Math.min(MAX_DASHBOARD_ITERATIONS, Math.max(MIN_DASHBOARD_ITERATIONS, Math.trunc(next))));
+                  },
+                }),
+              )
+            : null,
+        )
+      : null,
+    runModes && mode === "loop"
+      ? h("div", { class: "start-task-mode-hint" },
+          "Runs task after task until nothing is actionable. Stop it from the run's page.")
+      : null,
     error
       ? h("div", { class: "start-task-error", role: "alert" }, error)
       : null,

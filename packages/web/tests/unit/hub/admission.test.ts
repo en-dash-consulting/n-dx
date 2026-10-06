@@ -95,6 +95,52 @@ describe("AdmissionQueue", () => {
     expect(queue.length).toBe(2);
   });
 
+  it("takes the re-ask's run mode, not the one already queued", () => {
+    // The replacement is built field by field, so anything not listed there is
+    // dropped on the second ask. That turned a re-ask carrying `mode: "loop"`
+    // into a single-task entry whose 202 had just said "until done".
+    const queue = new AdmissionQueue();
+    queue.enqueue(entry({ taskId: "a" }));
+    queue.enqueue(entry({ taskId: "a", mode: "loop" }));
+
+    expect(queue.length).toBe(1);
+    expect(queue.list()[0]).toMatchObject({ taskId: "a", mode: "loop" });
+  });
+
+  it("takes the re-ask's new iterations count", () => {
+    const queue = new AdmissionQueue();
+    queue.enqueue(entry({ taskId: "a", mode: "iterations", iterations: 3 }));
+    queue.enqueue(entry({ taskId: "a", mode: "iterations", iterations: 9 }));
+
+    expect(queue.list()[0]).toMatchObject({ mode: "iterations", iterations: 9 });
+  });
+
+  it("drops a mode the re-ask no longer carries, as it does an option", () => {
+    // The re-ask replaces rather than merges: the operator went back to one
+    // task, and a loop surviving that would run work they stopped asking for.
+    const queue = new AdmissionQueue();
+    queue.enqueue(entry({ taskId: "a", mode: "iterations", iterations: 5, options: { fresh: true } }));
+    queue.enqueue(entry({ taskId: "a" }));
+
+    const replaced = queue.list()[0];
+    expect(replaced.mode).toBeUndefined();
+    expect(replaced.iterations).toBeUndefined();
+    expect(replaced.options).toBeUndefined();
+  });
+
+  it("keeps its place and its enqueue time when the mode changes", () => {
+    const queue = new AdmissionQueue();
+    queue.enqueue(entry({ taskId: "a", enqueuedAt: "2026-09-16T10:00:00.000Z" }));
+    queue.enqueue(entry({ taskId: "b" }));
+
+    expect(queue.enqueue(entry({ taskId: "a", mode: "loop" }))).toEqual({ position: 1, added: false });
+    expect(queue.list()[0]).toMatchObject({
+      taskId: "a",
+      mode: "loop",
+      enqueuedAt: "2026-09-16T10:00:00.000Z",
+    });
+  });
+
   it("tells apart the same task in different workspaces and projects", () => {
     const queue = new AdmissionQueue();
     queue.enqueue(entry({ taskId: "t1", workspace: null }));

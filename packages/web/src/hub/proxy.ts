@@ -46,8 +46,9 @@ import {
   projectIdFromBasePath,
   stripBasePath,
   stripWorkspaceSlot,
+  checkRunMode,
 } from "../shared/index.js";
-import type { RunOptions } from "../shared/index.js";
+import type { RunMode, RunOptions } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { homedir } from "node:os";
@@ -468,8 +469,15 @@ async function handleExecuteAdmission(
   let taskId: string | null = null;
   let options: RunOptions | undefined;
   let optionsValid = true;
+  let mode: RunMode | undefined;
+  let iterations: number | undefined;
   try {
-    const parsed = JSON.parse(body.toString("utf-8") || "{}") as { taskId?: unknown; options?: unknown };
+    const parsed = JSON.parse(body.toString("utf-8") || "{}") as {
+      taskId?: unknown;
+      options?: unknown;
+      mode?: unknown;
+      iterations?: unknown;
+    };
     if (typeof parsed.taskId === "string" && parsed.taskId) taskId = parsed.taskId;
     const checked = checkRunOptions(parsed.options);
     if (checked.ok) {
@@ -477,11 +485,24 @@ async function handleExecuteAdmission(
     } else {
       optionsValid = false;
     }
+    // The same validator the execute route and `execute/check` use, so a mode
+    // this forwards is a mode they accept. Judging it here by hand is what let
+    // `{ mode: "looop" }` be queued as a single-task run on a busy machine and
+    // 400'd on an idle one.
+    const checkedMode = checkRunMode(parsed);
+    if (checkedMode.ok) {
+      if (checkedMode.mode !== "single") mode = checkedMode.mode;
+      iterations = checkedMode.iterations;
+    } else {
+      // Forwarded, not queued — see the comment below the catch.
+      optionsValid = false;
+    }
   } catch {
     // not JSON — forward and let the server say so
   }
-  // Rejected options are forwarded too: queuing them would turn the server's
-  // 400 into a run silently dropped minutes later, when its turn came.
+  // A rejected option or run mode is forwarded too: queuing it would turn the
+  // server's 400 into a run silently dropped minutes later, when its turn came
+  // — or, worse for a mode, into a run that starts and does less than it said.
   if (!taskId || !optionsValid) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
     return true;
@@ -496,6 +517,8 @@ async function handleExecuteAdmission(
     workspace,
     taskId,
     ...(options ? { options } : {}),
+    ...(mode && mode !== "single" ? { mode } : {}),
+    ...(iterations !== undefined ? { iterations } : {}),
   });
   if (result.admitted) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
@@ -516,6 +539,8 @@ async function handleExecuteAdmission(
     projectId: decision.project.id,
     workspace,
     ...(options ? { options } : {}),
+    ...(mode && mode !== "single" ? { mode } : {}),
+    ...(iterations !== undefined ? { iterations } : {}),
     queueLength: snapshot.entries.length,
     running: snapshot.running,
     limits: snapshot.limits,

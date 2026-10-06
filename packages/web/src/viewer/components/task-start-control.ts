@@ -30,9 +30,17 @@ export interface TaskStartControlProps {
    * (see `StartTaskButtonProps.liveHref`). Also the target of the live link.
    */
   liveHref?: (taskId: string) => string;
+  /**
+   * Offer the run-mode picker on the start button (one task / N tasks / loop).
+   *
+   * Passed straight through to {@link StartTaskButton}; see its `runModes` for
+   * why it is opt-in. Only the `start` offer can carry it — a live run already
+   * has its own page, and a blocked task has nothing to start.
+   */
+  runModes?: boolean;
 }
 
-export function TaskStartControl({ task, titleOf, label, onStarted, workspace, ariaLabel, navigateTo, liveHref }: TaskStartControlProps) {
+export function TaskStartControl({ task, titleOf, label, onStarted, workspace, ariaLabel, navigateTo, liveHref, runModes }: TaskStartControlProps) {
   const live = useLive();
   const hasLiveRun = !!live?.runs.some((run) => run.taskId === task.id && countsAsLive(run));
   const offer = startOffer(task, hasLiveRun, titleOf);
@@ -47,6 +55,9 @@ export function TaskStartControl({ task, titleOf, label, onStarted, workspace, a
         ariaLabel,
         navigateTo,
         liveHref,
+        // Not on a Resume: the picker says how many tasks to work through, and
+        // resuming is about finishing the one already started.
+        runModes: runModes && !offer.resume,
       });
     case "live":
       return h("a", {
