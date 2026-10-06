@@ -1284,11 +1284,13 @@ describe("serializeFolderTree: loe fields and object encoding", () => {
 
 describe("serializeFolderTree: run settings", () => {
   const FULL_RUN = {
-    model: "claude-opus-5-5",
+    tier: "heavy",
+    models: { claude: "claude-opus-5-5", codex: "gpt-5.6-sol" },
     provider: "api",
     permissionMode: "acceptEdits",
     review: false,
-    reviewModel: "claude-sonnet-5",
+    reviewTier: "standard",
+    reviewModels: { claude: "claude-sonnet-5" },
     reviewOptional: false,
     skipTestGate: false,
     maxTurns: 40,

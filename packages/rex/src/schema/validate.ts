@@ -11,7 +11,10 @@ import {
   RUN_SETTING_CONTEXT_NOTES_MAX_BYTES,
   RUN_SETTING_MAX_TURNS_MIN,
   RUN_SETTING_MAX_TURNS_MAX,
+  RUN_SETTING_TIERS,
+  RUN_SETTING_KEYS,
 } from "./v1.js";
+import { LLM_VENDORS } from "@n-dx/llm-client";
 import type { RunSettings } from "./v1.js";
 
 export type ValidationResult<T> =
@@ -82,6 +85,31 @@ function boundedString(maxBytes: number) {
   });
 }
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+const RunTierSchema =z.enum(RUN_SETTING_TIERS);
+
+/**
+ * Exact model ids keyed by vendor: known vendor names only (an unknown one is
+ * rejected with the valid list), each id non-empty and bounded. An empty
+ * object is stripped by {@link validateRunSettings}.
+ */
+const RunModelsSchema = z
+  .record(z.string(), boundedString(RUN_SETTING_MODEL_MAX_BYTES).refine((s) => s.length > 0, { message: "must not be empty" }))
+  .superRefine((models, ctx) => {
+    for (const vendor of Object.keys(models)) {
+      if (!(LLM_VENDORS as readonly string[]).includes(vendor)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [vendor],
+          message: `unknown vendor "${vendor}"; valid vendors: ${LLM_VENDORS.join(", ")}`,
+        });
+      }
+    }
+  });
+
 /**
  * A saved `run` block: known keys only, each with the dashboard's bounds.
  *
@@ -93,11 +121,13 @@ function boundedString(maxBytes: number) {
  */
 export const RunSettingsSchema = z
   .object({
-    model: boundedString(RUN_SETTING_MODEL_MAX_BYTES).optional(),
+    tier: RunTierSchema.optional(),
+    models: RunModelsSchema.optional(),
     provider: z.enum(["cli", "api"]).optional(),
     permissionMode: z.enum(["default", "acceptEdits", "bypassPermissions"]).optional(),
     review: z.boolean().optional(),
-    reviewModel: boundedString(RUN_SETTING_MODEL_MAX_BYTES).optional(),
+    reviewTier: RunTierSchema.optional(),
+    reviewModels: RunModelsSchema.optional(),
     reviewOptional: z.boolean().optional(),
     skipTestGate: z.boolean().optional(),
     maxTurns: z.number().int().min(RUN_SETTING_MAX_TURNS_MIN).max(RUN_SETTING_MAX_TURNS_MAX).optional(),
@@ -115,7 +145,8 @@ export type RunSettingsCheck =
  *
  * `value` is `undefined` for "no block": `{}`, `undefined` and `null` all mean
  * the item carries no saved settings. Keys whose value is `undefined` are
- * dropped. `error` names the first offending key.
+ * dropped, and an empty `models`/`reviewModels` object counts as absent.
+ * `error` names the first offending key; an unknown key lists the valid ones.
  */
 export function validateRunSettings(input: unknown): RunSettingsCheck {
   if (input === undefined || input === null) return { ok: true, value: undefined };
@@ -123,10 +154,18 @@ export function validateRunSettings(input: unknown): RunSettingsCheck {
   if (!result.success) {
     const issue = result.error.issues[0];
     const path = ["run", ...issue.path].join(".");
+    if (issue.code === "unrecognized_keys") {
+      return {
+        ok: false,
+        error: `${path}: unknown key ${issue.keys.map((k) => `"${k}"`).join(", ")}; valid keys: ${RUN_SETTING_KEYS.join(", ")}`,
+      };
+    }
     return { ok: false, error: `${path}: ${issue.message}` };
   }
   const value = Object.fromEntries(
-    Object.entries(result.data).filter(([, v]) => v !== undefined),
+    Object.entries(result.data).filter(
+      ([, v]) => v !== undefined && !(isPlainObject(v) && Object.keys(v).length === 0),
+    ),
   ) as RunSettings;
   return { ok: true, value: Object.keys(value).length === 0 ? undefined : value };
 }

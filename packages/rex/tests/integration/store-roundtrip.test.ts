@@ -158,11 +158,13 @@ describe("Store roundtrip integration", () => {
 
   describe("run settings", () => {
     const FULL_RUN = {
-      model: "claude-opus-5-5",
+      tier: "heavy" as const,
+      models: { claude: "claude-opus-5-5", codex: "gpt-5.6-sol" },
       provider: "cli" as const,
       permissionMode: "default" as const,
       review: true,
-      reviewModel: "claude-sonnet-5",
+      reviewTier: "standard" as const,
+      reviewModels: { claude: "claude-sonnet-5" },
       reviewOptional: false,
       skipTestGate: false,
       maxTurns: 500,

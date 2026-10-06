@@ -238,11 +238,13 @@ describe("Viewer type mirrors match canonical definitions", () => {
 
     // Runtime: a value carrying every viewer key names exactly RUN_SETTING_KEYS.
     const full: Required<RunSettingsData> = {
-      model: "m",
+      tier: "heavy",
+      models: { claude: "m" },
       provider: "cli",
       permissionMode: "default",
       review: true,
-      reviewModel: "r",
+      reviewTier: "light",
+      reviewModels: { codex: "r" },
       reviewOptional: false,
       skipTestGate: false,
       maxTurns: 1,

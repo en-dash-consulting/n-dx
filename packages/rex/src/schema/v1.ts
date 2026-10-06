@@ -28,6 +28,8 @@
  * @module rex/schema/v1
  */
 
+import type { LLMVendor, TaskWeight } from "@n-dx/llm-client";
+
 /**
  * The schema version string embedded in every PRD document.
  *
@@ -294,20 +296,33 @@ export interface ActiveInterval {
  * Run settings saved on a task: how `ndx work` should run it. Every key is
  * optional; an absent key falls back to `hench.*`, then `llm.*`, then the
  * default, and a CLI flag overrides any of them. Keys match hench's task-scope
- * run options (plus `contextNotes`) and the dashboard's `RunOptions`, pinned by
+ * run options (plus `contextNotes`), with `model` split into `tier` + `models`
+ * and `reviewModel` into `reviewTier` + `reviewModels`; pinned by
  * `tests/e2e/run-options-contract.test.js`.
+ *
+ * Vendor-agnostic: a task may be saved under one vendor and run under another,
+ * so model intent is a portable tier plus optional exact pins per vendor,
+ * never a bare model id. On vendor V `ndx work` applies (PR 3) the agent model
+ * as CLI flag > `models[V]` > `tier` (`llm.tiers.V.<tier>`, then the built-in
+ * tier table) > `hench.models.V` > `llm.*` > default, and the reviewer as
+ * `--review-model` > `reviewModels[V]` > `reviewTier` > `llm.V.reviewModel` /
+ * `llm.reviewModel` > vendor default.
  *
  * Launch-time options (workspace, allowDirty, fresh, resetDeferred) are chosen
  * per launch and are never saved here. Validate with `validateRunSettings`.
  */
 export interface RunSettings {
-  /** Model id, at most {@link RUN_SETTING_MODEL_MAX_BYTES} UTF-8 bytes. */
-  model?: string;
+  /** Portable model weight, resolved to a model per vendor at run time. */
+  tier?: RunSettingTier;
+  /** Exact agent model per vendor; each id at most {@link RUN_SETTING_MODEL_MAX_BYTES} UTF-8 bytes. */
+  models?: RunSettingModels;
   provider?: "cli" | "api";
   permissionMode?: "default" | "acceptEdits" | "bypassPermissions";
   review?: boolean;
-  /** Reviewer model id, at most {@link RUN_SETTING_MODEL_MAX_BYTES} UTF-8 bytes. */
-  reviewModel?: string;
+  /** Portable model weight for the reviewer. */
+  reviewTier?: RunSettingTier;
+  /** Exact reviewer model per vendor; same bounds as `models`. */
+  reviewModels?: RunSettingModels;
   reviewOptional?: boolean;
   /** `false` is meaningful: it re-enables a gate hench config skips. */
   skipTestGate?: boolean;
@@ -319,13 +334,22 @@ export interface RunSettings {
   contextNotes?: string;
 }
 
-/** Every key a {@link RunSettings} block may hold, in hench's command-line order. */
+/** The portable tiers: llm-client's `TaskWeight` values. */
+export const RUN_SETTING_TIERS = ["light", "standard", "heavy"] as const satisfies ReadonlyArray<TaskWeight>;
+export type RunSettingTier = (typeof RUN_SETTING_TIERS)[number];
+
+/** Model ids keyed by vendor name (`LLM_VENDORS`); at least one entry when present. */
+export type RunSettingModels = Partial<Record<LLMVendor, string>>;
+
+/** Every key a {@link RunSettings} block may hold, in command-line-ish order. */
 export const RUN_SETTING_KEYS = [
-  "model",
+  "tier",
+  "models",
   "provider",
   "permissionMode",
   "review",
-  "reviewModel",
+  "reviewTier",
+  "reviewModels",
   "reviewOptional",
   "skipTestGate",
   "maxTurns",

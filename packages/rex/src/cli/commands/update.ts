@@ -161,7 +161,7 @@ export async function cmdUpdate(
       } catch (err) {
         throw new CLIError(
           `--run is not valid JSON: ${(err as Error).message}`,
-          `Pass an object, e.g. --run='{"model":"..."}'. Valid keys: ${RUN_SETTING_KEYS.join(", ")}.`,
+          `Pass an object, e.g. --run='{"tier":"heavy"}'. Valid keys: ${RUN_SETTING_KEYS.join(", ")}.`,
         );
       }
     }

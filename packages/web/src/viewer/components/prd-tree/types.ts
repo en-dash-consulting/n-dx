@@ -70,11 +70,13 @@ export interface ActiveIntervalData {
  * @see packages/rex/src/schema/v1.ts — RunSettings
  */
 export interface RunSettingsData {
-  model?: string;
+  tier?: "light" | "standard" | "heavy";
+  models?: Partial<Record<"claude" | "codex" | "google" | "local", string>>;
   provider?: "cli" | "api";
   permissionMode?: "default" | "acceptEdits" | "bypassPermissions";
   review?: boolean;
-  reviewModel?: string;
+  reviewTier?: "light" | "standard" | "heavy";
+  reviewModels?: Partial<Record<"claude" | "codex" | "google" | "local", string>>;
   reviewOptional?: boolean;
   skipTestGate?: boolean;
   maxTurns?: number;

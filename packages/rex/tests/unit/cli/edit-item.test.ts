@@ -221,10 +221,10 @@ describe("handleEditItem", () => {
   it("sets, replaces and removes the run block", async () => {
     let result = await handleEditItem(store, tmpDir, {
       id: "item-1",
-      run: { model: "m1", review: true },
+      run: { tier: "heavy", review: true },
     });
     expect(result.isError).toBeFalsy();
-    expect(parseResult(result).item.run).toEqual({ model: "m1", review: true });
+    expect(parseResult(result).item.run).toEqual({ tier: "heavy", review: true });
 
     // An object replaces the whole block.
     result = await handleEditItem(store, tmpDir, { id: "item-1", run: { maxTurns: 5 } });
@@ -240,7 +240,7 @@ describe("handleEditItem", () => {
   it("rejects an invalid run block without writing", async () => {
     const result = await handleEditItem(store, tmpDir, {
       id: "item-1",
-      run: { model: "m1", bogus: 1 },
+      run: { tier: "heavy", bogus: 1 },
     });
     expect(result.isError).toBe(true);
     expect((result.content[0] as { text: string }).text).toContain("Invalid run settings");

@@ -156,6 +156,7 @@ describe("renderAgentsMd", () => {
   it("tells assistants a task can carry saved run settings", () => {
     expect(content).toContain("`run` block");
     expect(content).toContain("`null` removes it");
+    expect(content).toContain("portable model tier plus optional per-vendor model pins");
   });
 
   it("includes Codex Troubleshooting section", () => {

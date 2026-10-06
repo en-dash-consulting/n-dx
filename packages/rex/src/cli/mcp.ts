@@ -183,7 +183,7 @@ export async function createRexMcpServer(
       tags: z.array(z.string()).optional().describe("Tags"),
       source: z.string().optional().describe("Source of this item"),
       blockedBy: z.array(z.string()).optional().describe("IDs of blocking items"),
-      run: RunSettingsSchema.optional().describe("Saved run settings for this item. Keys (all optional, unknown keys rejected): model, provider, permissionMode, review, reviewModel, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
+      run: RunSettingsSchema.optional().describe("Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
     },
     withWorkspace("write", (ws, args) => handleAddItem(ws.store, ws.projectDir, ws.rexDir, args)),
   );
@@ -201,7 +201,7 @@ export async function createRexMcpServer(
       tags: z.array(z.string()).optional().describe("New tags"),
       source: z.string().optional().describe("New source"),
       blockedBy: z.array(z.string()).optional().describe("New blocked-by IDs"),
-      run: RunSettingsSchema.nullable().optional().describe("Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Keys: model, provider, permissionMode, review, reviewModel, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
+      run: RunSettingsSchema.nullable().optional().describe("Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Vendor-agnostic keys: tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id}), provider, permissionMode, review, reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
     },
     withWorkspace("write", (ws, args) => handleEditItem(ws.store, ws.projectDir, args)),
   );

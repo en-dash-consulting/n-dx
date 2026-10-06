@@ -492,8 +492,8 @@ describe("cmdUpdate", () => {
     };
 
     it("sets, replaces and clears the block", async () => {
-      await cmdUpdate(tmp, itemId, { run: '{"model":"m1","review":true}', quiet: "true" });
-      expect(runOf()).toEqual({ model: "m1", review: true });
+      await cmdUpdate(tmp, itemId, { run: '{"tier":"heavy","models":{"claude":"m1"},"review":true}', quiet: "true" });
+      expect(runOf()).toEqual({ tier: "heavy", models: { claude: "m1" }, review: true });
 
       await cmdUpdate(tmp, itemId, { run: '{"maxTurns":7}', quiet: "true" });
       expect(runOf()).toEqual({ maxTurns: 7 });
@@ -501,7 +501,7 @@ describe("cmdUpdate", () => {
       await cmdUpdate(tmp, itemId, { run: "null", quiet: "true" });
       expect(runOf()).toBeUndefined();
 
-      await cmdUpdate(tmp, itemId, { run: '{"model":"m1"}', quiet: "true" });
+      await cmdUpdate(tmp, itemId, { run: '{"tier":"light"}', quiet: "true" });
       await cmdUpdate(tmp, itemId, { run: "", quiet: "true" });
       expect(runOf()).toBeUndefined();
     });

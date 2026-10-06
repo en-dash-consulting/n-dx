@@ -23,5 +23,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Declare the run field on PRD items: strict schema, shared validator, round-trip](./declare-the-run-field-on-prd-items.md) | completed |
 | [Docs and changesets for PR 2: the run field and its writers](./docs-and-changesets-for-pr-2-the-run.md) | completed |
 | [One malformed or newer run block on any item blocks every PRD write in the workspace](./one-malformed-or-newer-run-block-on.md) | completed |
-| [Saved run settings name a Claude model id, so a task saved under Claude loses its model choice when run on Codex](./saved-run-settings-name-a-claude-model.md) | pending |
+| [Saved run settings name a Claude model id, so a task saved under Claude loses its model choice when run on Codex](./saved-run-settings-name-a-claude-model.md) | in_progress |
 | [Write run through MCP add_item/edit_item and rex update --run, and allow-list PATCH /api/rex/items/:id](./write-run-through-mcp-add-item-edit.md) | completed |

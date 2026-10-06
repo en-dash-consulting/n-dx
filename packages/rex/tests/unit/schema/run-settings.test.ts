@@ -4,11 +4,13 @@ import { RUN_SETTING_KEYS, SCHEMA_VERSION } from "../../../src/schema/v1.js";
 import * as rexPublic from "../../../src/public.js";
 
 const FULL = {
-  model: "claude-opus-5-5",
+  tier: "heavy",
+  models: { claude: "claude-opus-5-5", codex: "gpt-5.6-sol", google: "g", local: "l" },
   provider: "api",
   permissionMode: "bypassPermissions",
   review: false,
-  reviewModel: "claude-sonnet-5",
+  reviewTier: "light",
+  reviewModels: { codex: "gpt-5.6-mini" },
   reviewOptional: true,
   skipTestGate: false,
   maxTurns: 1,
@@ -28,7 +30,7 @@ describe("validateRunSettings", () => {
     expect(rexPublic.RUN_SETTING_KEYS).toBe(RUN_SETTING_KEYS);
   });
 
-  it("knows exactly the ten run keys", () => {
+  it("knows exactly the twelve run keys", () => {
     expect([...RUN_SETTING_KEYS].sort()).toEqual(Object.keys(FULL).sort());
   });
 
@@ -41,7 +43,7 @@ describe("validateRunSettings", () => {
   });
 
   it("normalises {}, undefined, null and all-undefined keys to no block", () => {
-    for (const input of [{}, undefined, null, { model: undefined }]) {
+    for (const input of [{}, undefined, null, { tier: undefined }, { models: {} }, { reviewModels: {} }]) {
       expect(validateRunSettings(input)).toEqual({ ok: true, value: undefined });
     }
   });
@@ -51,6 +53,32 @@ describe("validateRunSettings", () => {
       const r = validateRunSettings({ [key]: true });
       expect(r.ok, key).toBe(false);
     }
+  });
+
+  it("rejects the removed model and reviewModel keys, naming the valid keys", () => {
+    for (const key of ["model", "reviewModel"]) {
+      const r = validateRunSettings({ [key]: "claude-opus-5-5" });
+      expect(r.ok, key).toBe(false);
+      if (!r.ok) {
+        expect(r.error).toContain(`"${key}"`);
+        expect(r.error).toContain("tier, models,");
+      }
+    }
+  });
+
+  it("rejects an unknown vendor, naming the valid vendors", () => {
+    for (const key of ["models", "reviewModels"]) {
+      const r = validateRunSettings({ [key]: { openai: "gpt-x" } });
+      expect(r.ok, key).toBe(false);
+      if (!r.ok) {
+        expect(r.error).toContain(`run.${key}.openai`);
+        expect(r.error).toContain("claude, codex, google, local");
+      }
+    }
+  });
+
+  it("drops an empty models object but keeps the rest of the block", () => {
+    expect(validateRunSettings({ tier: "light", models: {} })).toEqual({ ok: true, value: { tier: "light" } });
   });
 
   it("rejects wrong types and out-of-range values", () => {
@@ -64,13 +92,17 @@ describe("validateRunSettings", () => {
     rejects({ maxTurns: 2.5 }, "maxTurns");
     rejects({ tokenBudget: -1 }, "tokenBudget");
     rejects({ tokenBudget: Number.MAX_SAFE_INTEGER + 2 }, "tokenBudget");
-    rejects({ model: 42 }, "model");
+    rejects({ tier: "huge" }, "tier");
+    rejects({ reviewTier: "free" }, "reviewTier");
+    rejects({ models: { claude: 42 } }, "models.claude");
+    rejects({ models: { claude: "" } }, "models.claude");
+    rejects({ models: "claude-opus-5-5" }, "models");
   });
 
   it("measures string limits in UTF-8 bytes", () => {
-    expect(validateRunSettings({ model: "a".repeat(256) }).ok).toBe(true);
-    rejects({ model: "a".repeat(257) }, "model");
-    rejects({ reviewModel: "é".repeat(129) }, "reviewModel");
+    expect(validateRunSettings({ models: { claude: "a".repeat(256) } }).ok).toBe(true);
+    rejects({ models: { claude: "a".repeat(257) } }, "models.claude");
+    rejects({ reviewModels: { codex: "é".repeat(129) } }, "reviewModels.codex");
     expect(validateRunSettings({ contextNotes: "a".repeat(8192) }).ok).toBe(true);
     rejects({ contextNotes: "€".repeat(2731) }, "contextNotes");
   });
