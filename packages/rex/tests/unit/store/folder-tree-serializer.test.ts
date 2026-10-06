@@ -1217,3 +1217,67 @@ describe("writtenPaths and deletedPaths", () => {
     expect(result.directoriesRemoved).toBe(1);
   });
 });
+
+// ── LoE fields and object encoding ────────────────────────────────────────────
+
+describe("serializeFolderTree: loe fields and object encoding", () => {
+  async function roundTrip(extra: Record<string, unknown>) {
+    const task = makeTask("55555555-0000-0000-0000-000000000000", "LoE Task", extra as Partial<PRDItem>);
+    await serializeFolderTree([task], testDir);
+    const files = await collectFiles(testDir);
+    const file = files.find((f) => f.endsWith(".md"))!;
+    const content = await readFile(file, "utf-8");
+    const parsed = await parseFolderTree(testDir);
+    return { content, item: parsed.items[0] as Record<string, unknown> };
+  }
+
+  it("writes loe as a bare number and reads it back as a number", async () => {
+    const { content, item } = await roundTrip({
+      loe: 2.5,
+      loeRationale: "Touches two stores",
+      loeConfidence: "medium",
+    });
+    expect(content).toContain("loe: 2.5\n");
+    expect(content).toContain('loeRationale: "Touches two stores"');
+    expect(content).toContain('loeConfidence: "medium"');
+    expect(item["loe"]).toBe(2.5);
+    expect(item["loeRationale"]).toBe("Touches two stores");
+    expect(item["loeConfidence"]).toBe("medium");
+  });
+
+  it("reads a numeric loe string back as a number", async () => {
+    const { item } = await roundTrip({ loe: "3" });
+    expect(item["loe"]).toBe(3);
+  });
+
+  it("preserves a legacy non-numeric loe string", async () => {
+    const { content, item } = await roundTrip({ loe: "m" });
+    expect(content).toContain('loe: "m"');
+    expect(item["loe"]).toBe("m");
+  });
+
+  it("drops an invalid loeConfidence", async () => {
+    const { content, item } = await roundTrip({ loe: 1, loeConfidence: "certain" });
+    expect(content).not.toContain("loeConfidence");
+    expect(item["loeConfidence"]).toBeUndefined();
+  });
+
+  it("writes class instances, null-prototype objects and objects in arrays as JSON", async () => {
+    class Meta {
+      constructor(public a: number) {}
+    }
+    const bare = Object.create(null) as Record<string, unknown>;
+    bare.b = "x";
+    const { content, item } = await roundTrip({
+      classy: new Meta(1),
+      bare,
+      list: [new Meta(2), ["nested"]],
+    });
+    expect(content).not.toContain("[object Object]");
+    expect(content).toContain('classy: {"a":1}');
+    expect(content).toContain('bare: {"b":"x"}');
+    expect(item["classy"]).toEqual({ a: 1 });
+    expect(item["bare"]).toEqual({ b: "x" });
+    expect(item["list"]).toEqual([{ a: 2 }, ["nested"]]);
+  });
+});
