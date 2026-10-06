@@ -32,7 +32,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import type { PRDDocument } from "./rex-gateway.js";
-import { SCHEMA_VERSION, isCompatibleSchema, serializeDocument, parseDocument, PRD_TREE_DIRNAME } from "./rex-gateway.js";
+import { SCHEMA_VERSION, isCompatibleSchema, serializeDocument, parseDocument, PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME } from "./rex-gateway.js";
 
 /** Primary Markdown PRD file. */
 const PRD_MD_FILENAME = "prd.md";
@@ -40,8 +40,16 @@ const PRD_MD_FILENAME = "prd.md";
 /** Pattern for branch-scoped Markdown PRD companion files. */
 const BRANCH_MD_PRD_RE = /^prd_(.+)_(\d{4}-\d{2}-\d{2})\.md$/;
 
-/** Subdirectory for ephemeral server-generated artifacts. */
-export const PRD_CACHE_DIR = ".cache";
+/**
+ * Subdirectory for ephemeral server-generated artifacts.
+ *
+ * Re-exported from rex rather than spelled again here. It names a folder
+ * inside *rex's* directory, and two things outside this package depend on
+ * agreeing with it: `rex init` gitignores it, and hench's completion gate
+ * discounts it. A second literal is how the watcher's rewrite came to be
+ * counted as an agent run's own leaked work.
+ */
+export const PRD_CACHE_DIR = PRD_CACHE_DIRNAME;
 
 /** Path to the ephemeral JSON cache inside the rex directory. */
 export const PRD_CACHE_JSON = "prd.json";

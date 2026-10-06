@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import { TIER_MODELS } from "@n-dx/llm-client";
-import { handleLlmRoute } from "../../../src/server/routes-llm.js";
+import { handleLlmRoute, validateCatalogModel } from "../../../src/server/routes-llm.js";
 import { CATALOG_CACHE_TTL_MS } from "../../../src/server/llm-catalog.js";
 
 // The CLI probe spawns `<binary> --version`; stub it so no test depends on a
@@ -339,5 +339,33 @@ describe("GET /api/llm/catalog — defaultModel", () => {
     const body = await getCatalog();
     expect(body.codex.defaultModel).toBe("gpt-pinned");
     expect(body.claude.defaultModel).toBe("claude-legacy-pinned");
+  });
+});
+
+describe("validateCatalogModel — the execute route's per-run model check", () => {
+  it("still accepts a live-only model the modal offered after the catalog cache expires", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    vendorFetch.mockImplementation(async () => jsonOk({ data: [{ id: "claude-live-model-9" }] }));
+
+    // The modal read the catalog, then the operator took longer than its cache lives.
+    expect((await getCatalog()).claude.models).toContain("claude-live-model-9");
+    vi.advanceTimersByTime(CATALOG_CACHE_TTL_MS + 1000);
+
+    expect(await validateCatalogModel(projectDir, "claude", "claude-live-model-9")).toBeNull();
+    expect(vendorCalls("anthropic")).toBe(2);
+  });
+
+  it("never waits on the vendor API for a built-in model", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    expect(await validateCatalogModel(projectDir, "claude", TIER_MODELS.claude.standard)).toBeNull();
+    expect(vendorFetch).not.toHaveBeenCalled();
+  });
+
+  it("refuses a model in neither list", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    vendorFetch.mockImplementation(async () => jsonOk({ data: [{ id: "claude-live-model-9" }] }));
+    expect(await validateCatalogModel(projectDir, "claude", "claude-made-up-1"))
+      .toBe('Model "claude-made-up-1" is not in the claude catalog.');
   });
 });

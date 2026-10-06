@@ -157,6 +157,30 @@ describe("Sourcevision MCP server factory", () => {
     await server.close();
   });
 
+  it.each([
+    ["/a/b", "b"],
+    ["C:\\Users\\runner\\Temp\\b", "b"],
+    ["C:\\x\\b\\", "b"],
+  ])("get_overview project is the last segment of targetPath %s", async (targetPath, expected) => {
+    await writeFile(
+      join(svDir, DATA_FILES.manifest),
+      JSON.stringify({ ...minimalManifest(), targetPath }),
+      "utf-8",
+    );
+    const server = createSourcevisionMcpServer(tmpDir);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const result = await client.callTool({ name: "get_overview", arguments: {} });
+    const content = result.content as Array<{ type: string; text: string }>;
+    expect(JSON.parse(content[0].text).project).toBe(expected);
+
+    await client.close();
+    await server.close();
+  });
+
   it("can connect multiple transports sequentially (stdio then HTTP pattern)", async () => {
     // First connection (simulating stdio)
     const server1 = createSourcevisionMcpServer(tmpDir);

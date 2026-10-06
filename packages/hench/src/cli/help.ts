@@ -52,6 +52,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--priority=<level>", description: "Override task scheduling priority (critical|high|medium|low)" },
       { flag: "--reset-deferred", description: "Reset all deferred/failing tasks to pending before running" },
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
+      { flag: "--resolve", description: "With --task: print the settings the run would use, where each came from, and why it would refuse, as JSON. Runs nothing (see below)" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
       { flag: "--review-optional", description: "Accept a best-effort review: warn instead of refusing the completion when the reviewer cannot start" },
@@ -60,7 +61,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },
       { flag: "--model=<model>", description: "Override the Claude model" },
       { flag: "--permission-mode=<mode>", description: "Claude permission posture: default | acceptEdits | bypassPermissions | plan (autonomous runs default to acceptEdits)" },
-      { flag: "--allow-dirty", description: "Start with an uncommitted working tree: autonomous runs (--auto/--loop/--epic-by-epic) abort by default, and this flag also overrides hench.git.requireCleanTree and hench.git.checkpointThreshold escalation" },
+      { flag: "--allow-dirty", description: "Start with an uncommitted working tree: autonomous runs (--auto/--loop/--epic-by-epic) prompt to commit/stash/discard on a TTY and abort without one, and this flag also overrides hench.git.requireCleanTree and hench.git.checkpointThreshold escalation" },
       { flag: "--skip-test-gate", description: "Skip the mandatory full test suite gate before commit for this invocation (persistent equivalent: hench.skipFullTestGate config)" },
       { flag: "--fresh", description: "Discard the cached orientation session and orient again before forking task spawns (see hench.sessionStrategy)" },
     ],
@@ -106,9 +107,35 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "hench.git.requireCleanTree=true, dirty runs must commit or stop.\n" +
           "Precedence: --allow-dirty flag > hench.git.* config > defaults.",
       },
+      {
+        title: "Resolve (--resolve)",
+        content:
+          "hench run --task=<id> --resolve [flags] [dir] reads the same config and\n" +
+          "parses the same flags as a run, resolved as an autonomous (--auto) run,\n" +
+          "and prints one JSON object on stdout:\n" +
+          "  task       id, title, status, level, blockedBy, claimedBy\n" +
+          "  workspace  root, branch, isAnchor, dirty\n" +
+          "  resolved   vendor, model, provider, permissionMode, review,\n" +
+          "             reviewModel, skipTestGate, maxTurns, tokenBudget, fresh,\n" +
+          "             allowDirty, resetDeferred — each {value, source}, where\n" +
+          "             source is the key that supplied it (cli-flag,\n" +
+          "             hench.models.<vendor>, llm.routes, llm.tiers.<vendor>.<tier>,\n" +
+          "             llm.model, llm.<vendor>.model, vendor-default, hench.<key>,\n" +
+          "             autonomous-default, built-in)\n" +
+          "  options    the per-run options, with flag, type, values and scope\n" +
+          "  refusals   [{code, message}] for each reason the run would not start:\n" +
+          "             prd-unreadable (task is null), task-not-found, not-actionable, claimed-elsewhere,\n" +
+          "             tree-not-conformant, vendor-unset, vendor-cli-missing,\n" +
+          "             provider-unsupported, model-vendor-mismatch, dirty-tree\n" +
+          "  command    the equivalent ndx work command line\n" +
+          "\n" +
+          "Exits 0 when it reports refusals. Takes no claim, writes nothing (no\n" +
+          "--reset-deferred, no commit), and starts no vendor CLI or LLM call.",
+      },
     ],
     examples: [
       { command: "hench run", description: "Run next task (interactive selection)" },
+      { command: "hench run --task=abc123 --resolve --review .", description: "Show what a reviewed run of abc123 would use, without running it" },
       { command: "hench run --task=abc123", description: "Run a specific task" },
       { command: "hench run --epic=\"Auth\" --auto", description: "Auto-run tasks in the Auth epic" },
       { command: "hench run --loop --epic-by-epic", description: "Continuously process epics in order" },

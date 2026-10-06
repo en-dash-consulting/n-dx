@@ -319,6 +319,8 @@ Rex and SourceVision expose MCP servers for any MCP-compatible assistant (Claude
 
 If `ndx` isn't on `PATH`, run the CLI through npx instead: `npx -y @n-dx/core rex mcp .` / `npx -y @n-dx/core sv mcp .`. Alternatively, `ndx init --mcp-scope=local` registers via the older `claude mcp add --scope local` path (per-machine, absolute server path) instead of writing `.mcp.json`. The project directory it records is cwd-relative, like `.mcp.json`'s — an absolute one would pin every worktree of the repository to a single checkout, because Claude Code applies a repository's local-scope entry to sessions started in its linked worktrees.
 
+**Worktree sessions.** Claude desktop starts a worktree session's project servers in the main checkout (`.` resolves there) while the session itself runs in `<repo>/.claude/worktrees/<name>`. The stdio rex and sourcevision servers, and `ndx mcp <server>` when it bridges to the hub, therefore resolve their workspace from the client's MCP roots (`roots/list`) and rebind on `roots/list_changed`, so writes land in the session's own `.rex/prd_tree/`. A root outside the repository, or one that can't be served, refuses writes with an error rather than misrouting them. To verify a session's write target, call rex `get_capabilities` and read its `workspace` block: `source` is `roots` when the client's root was used (`startup` means the launch directory), `projectDir` is the tree being written, and `refused` is set while writes are refused.
+
 Codex reads `.codex/config.toml` automatically — no manual registration required.
 
 ### HTTP transport — through the hub

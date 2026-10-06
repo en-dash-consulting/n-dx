@@ -103,7 +103,7 @@ export { SCHEMA_VERSION, isCompatibleSchema, assertSchemaVersion } from "@n-dx/r
 export { resolveStore } from "@n-dx/rex";
 
 // ---- Folder-tree storage path -----------------------------------------------
-export { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "@n-dx/rex";
+export { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "@n-dx/rex";
 
 // ---- Save file report ---------------------------------------------------------
 // What the last PRD save(s) actually wrote and deleted, project-relative.
@@ -124,7 +124,13 @@ export { checkTreeConformance } from "@n-dx/rex";
 export { findItem, walkTree } from "@n-dx/rex";
 
 // ---- Task selection ---------------------------------------------------------
-export { findNextTask, findActionableTasks, collectCompletedIds, explainSelection } from "@n-dx/rex";
+export {
+  findNextTask,
+  findActionableTasks,
+  collectCompletedIds,
+  explainSelection,
+  traversalBlock,
+} from "@n-dx/rex";
 
 // `matchesAssignee` is selection's own `--mine` rule (own field, or inherited
 // from any ancestor). Anything hench scopes to `--mine` that is *not* selection
@@ -176,4 +182,4 @@ export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "@n-dx/re
 // All type imports from rex must flow through this gateway to prevent
 // type-import promotion erosion (a type import can be promoted to a
 // runtime import during refactoring, silently bypassing the gateway).
-export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason, SaveFileReport } from "@n-dx/rex";
+export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason, SaveFileReport, TraversalBlock } from "@n-dx/rex";
