@@ -438,7 +438,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                         )
                       : null,
                   ),
-                  h(TaskStartControl, { task: nextTask, onStarted: fetchDashboard, navigateTo }),
+                  h(TaskStartControl, { task: nextTask, onStarted: fetchDashboard, runModes: true, navigateTo }),
                 ),
                 h(RexTaskLink, {
                   task: { id: nextTask.id, title: nextTask.title, status: nextTask.status, level: nextTask.level, priority: nextTask.priority },
