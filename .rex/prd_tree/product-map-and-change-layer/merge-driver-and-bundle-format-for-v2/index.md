@@ -15,7 +15,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Parallel branches both write state.yaml; the bundle carries both layers.\n\nRoadmap PR 15 · wave 1 · lane rex-store."
-lastModified: "2026-10-06T04:19:41.917Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:26.151Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

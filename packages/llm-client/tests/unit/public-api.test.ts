@@ -688,3 +688,37 @@ describe("public API — refactoring regression guards", () => {
     expect(TIER_MODELS.claude[standard]).toBeDefined();
   });
 });
+
+// ── Jev client and judgment cache ──────────────────────────────────────────
+// Moved down from sourcevision so rex can ask judgments too. The surface is
+// what a consumer calls, plus the observer contract — not the cache's
+// internals. lookupJudgments/storeJudgments are a two-step protocol whose keys
+// must pair; exposed, they let a consumer write the cache around askJev.
+
+describe("public API — Jev client and judgment cache", () => {
+  it("exports what a consumer calls and the observer contract", async () => {
+    const api: Record<string, unknown> = await import("../../src/public.js");
+    for (const name of ["askJev", "choice", "noul", "score", "setJevObserver", "configureJudgmentCache"]) {
+      expect(typeof api[name], name).toBe("function");
+    }
+    expect(api.JEV_VENDOR).toBe("typesafe");
+  });
+
+  it("keeps the judgment cache's internals and the client's wire constants private", async () => {
+    const api: Record<string, unknown> = await import("../../src/public.js");
+    const internal = [
+      "lookupJudgments",
+      "storeJudgments",
+      "isJudgmentCacheConfigured",
+      "judgmentKey",
+      "canonicalJSON",
+      "referencedPaths",
+      "resolvePath",
+      "JUDGMENT_CACHE_FILE",
+      "JUDGMENT_CACHE_MAX_ENTRIES",
+      "JEV_ENDPOINT",
+      "JEV_MODEL",
+    ];
+    expect(internal.filter((name) => name in api)).toEqual([]);
+  });
+});
