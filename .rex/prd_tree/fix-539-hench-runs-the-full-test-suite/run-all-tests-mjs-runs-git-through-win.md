@@ -2,7 +2,7 @@
 id: "e511ac94-963f-4e5b-af3a-c33f71f61aef"
 level: "task"
 title: "run-all-tests.mjs runs git through win-spawn's execFileSyncCli, not node:child_process"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "test-gate"
@@ -10,11 +10,16 @@ tags:
   - "539"
   - "follow-up"
 source: "ndx-capture"
+startedAt: "2026-10-06T17:42:29.572Z"
+completedAt: "2026-10-06T17:47:08.055Z"
+endedAt: "2026-10-06T17:47:08.055Z"
+resolutionType: "code-change"
+resolutionDetail: "run-all-tests.mjs git helper uses execFileSyncCli from win-spawn; node:child_process import removed."
 acceptanceCriteria:
   - "scripts/run-all-tests.mjs no longer imports node:child_process; its git calls go through execFileSyncCli from packages/core/win-spawn.js."
   - "tests/e2e/architecture-policy.test.js passes without adding the script to its ALLOWED list."
   - "The unresolvable-base-ref fallback still warns and selects all suites, and affected/--list output is unchanged."
 description: "Follow-up to task 1 (a785ca5d, commit 924106d8f, run c3d7edc2). Run it before task 2.\n\nTask 1 added `import { execFileSync } from \"node:child_process\"` to `scripts/run-all-tests.mjs` (l.40) and uses it for git in one helper (l.172; a comment at l.103 refers to it). The root suite fails on it: `tests/e2e/architecture-policy.test.js` › \"architecture policy: process execution\" › \"no direct child_process imports outside allowed files\" reports `Violations: scripts/run-all-tests.mjs`.\n\nFix:\n- Use `execFileSyncCli(binary, args, options)` from `packages/core/win-spawn.js`. The script already imports `spawnCli` from there. Remove the `node:child_process` import.\n- Do NOT add the script to the policy's ALLOWED list. The exception is not legitimate, because win-spawn already provides the call.\n- Keep the behaviour the helper relies on: it throws on a non-zero exit, which the unresolvable-base-ref fallback depends on (see the l.103 comment), and it returns utf-8 stdout.\n- Check that win-spawn's options pass through `cwd`, `encoding` and `stdio`. If one does not, adapt the call rather than changing win-spawn.\n\nThe integration test `tests/integration/run-all-tests-selection.test.js` imports `spawnSync` from node:child_process. That is fine, because the policy skips test files. Leave it.\n\nValidation (the work tree is built):\n- `node_modules/.bin/vitest run tests/e2e/architecture-policy.test.js tests/unit/select-suites.test.js tests/integration/run-all-tests-selection.test.js`.\n- `node scripts/run-all-tests.mjs affected main --list` and `node scripts/run-all-tests.mjs affected not-a-ref --list` (the fallback warning).\n- Do not run the full suite. hench's gate runs it after you, and that gate run also validates task 1's work."
-lastModified: "2026-10-06T17:29:50.210Z"
+lastModified: "2026-10-06T17:47:08.487Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
