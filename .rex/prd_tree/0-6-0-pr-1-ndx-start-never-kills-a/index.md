@@ -30,7 +30,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [classifyPortOccupant compares paths lexically, so a symlinked project path starts a second dashboard on the same PRD tree](./classifyportoccupant-compares-paths.md) | completed |
 | [E2E test: two project directories start dashboards concurrently without killing each other](./e2e-test-two-project-directories-start.md) | completed |
 | [killPortOccupant SIGKILLs any process holding a socket on the port, not just the listener](./killportoccupant-sigkills-any-process.md) | completed |
-| [ndx start runs a second dashboard instead of restarting this directory's own token-protected server when its PID file is gone](./ndx-start-runs-a-second-dashboard.md) | pending |
+| [ndx start runs a second dashboard instead of restarting this directory's own token-protected server when its PID file is gone](./ndx-start-runs-a-second-dashboard.md) | in_progress |
 | [Peer relocation ignores an explicitly requested port outside 3117–3200](./peer-relocation-ignores-an-explicitly.md) | completed |
 | [Probe the port occupant before killing it and fall back to a free port when it is another n-dx server](./probe-the-port-occupant-before-killing.md) | completed |
 | [readWebVersion memoizes its own failure, pinning the reported version to "unknown"](./readwebversion-memoizes-its-own.md) | completed |

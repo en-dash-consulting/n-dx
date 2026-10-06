@@ -293,7 +293,8 @@ export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS, path = "
  * {@link probeStatusEndpoint} returns null and {@link probeHubEndpoint} finds
  * no hub — which used to send it down the kill path. A dashboard started under
  * another home's token (another user, another N_DX_HOME, a parallel test) is
- * never this invocation's to kill.
+ * not this invocation's to kill unless {@link findOwnDashboardOnPort} shows it
+ * is this directory's own server.
  *
  * @param {number} port
  * @param {number} [timeoutMs]
@@ -462,6 +463,74 @@ export function listenerPidsOnPort(port) {
     return [];
   }
   return [...pids];
+}
+
+/**
+ * The project directory a dashboard process was told to serve, read from its
+ * command line, or null when the line is not a dashboard's.
+ *
+ * runWeb launches the server as `<web cli> serve --port=N <absDir>`, optionally
+ * followed by `--token-file=<path>` and `--debug`/`--verbose` (see serveArgs
+ * there). `ps` joins argv with spaces, so a directory containing spaces is
+ * recovered by anchoring on that known tail rather than by splitting.
+ *
+ * @param {string} commandLine  Space-joined argv, as `ps -o args=` prints it.
+ * @returns {string | null}
+ */
+export function servedDirFromCommandLine(commandLine) {
+  const m = /(?:^|\s)serve --port=\d+ (.+?)(?: --token-file=.*?)?(?: --(?:debug|verbose))?$/.exec(commandLine.trim());
+  return m ? m[1] : null;
+}
+
+/**
+ * Owner uid and command line of `pid`, or null where they cannot be read.
+ *
+ * POSIX only, through `ps` (macOS and Linux both accept these flags; `-ww`
+ * stops the line being cut at the terminal width). Windows returns null: its
+ * command-line query differs per release, and null means "unidentified",
+ * which leaves the occupant running.
+ *
+ * @param {number} pid
+ * @returns {{ uid: number, commandLine: string } | null}
+ */
+function readProcessIdentity(pid) {
+  if (process.platform === "win32") return null;
+  try {
+    const out = execFileSyncCli("ps", ["-ww", "-o", "uid=", "-o", "args=", "-p", String(pid)], {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+    const m = /^\s*(\d+)\s+(.*)$/s.exec(out.replace(/\n+$/, ""));
+    return m ? { uid: Number(m[1]), commandLine: m[2] } : null;
+  } catch {
+    // ps exits non-zero when the pid is gone.
+    return null;
+  }
+}
+
+/**
+ * Is the server listening on `port` this user's own dashboard for `absDir`?
+ *
+ * Asked only of a token-protected n-dx server, which answers every token-less
+ * probe 401 and so cannot say which directory it serves. Its PID file can be
+ * gone while it keeps running (`git clean -fdx`, or a start from another
+ * checkout of the tree), and `ndx start` restarts its own untracked server by
+ * contract. Identification is by process, never by sending the per-user token
+ * to whoever holds the port: the sole listener must be owned by this uid and
+ * have been launched to serve this directory. Anything less is unidentified.
+ *
+ * @param {number} port
+ * @param {string} absDir
+ * @returns {{ pid: number } | null}  The listener, when it is ours.
+ */
+export function findOwnDashboardOnPort(port, absDir) {
+  const target = selectKillTarget(listenerPidsOnPort(port));
+  if (target.refuse) return null;
+  const identity = readProcessIdentity(target.pid);
+  if (!identity || identity.uid !== process.getuid?.()) return null;
+  const served = servedDirFromCommandLine(identity.commandLine);
+  if (!served) return null;
+  return canonicalizePath(served) === canonicalizePath(absDir) ? { pid: target.pid } : null;
 }
 
 /**
@@ -1692,16 +1761,19 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       const hub = await probeHubEndpoint(port);
       const occupant = hub ? null : classifyPortOccupant(await probeStatusEndpoint(port), absDir);
       const protectedNdx = occupant?.kind === "unknown" && (await probeTokenProtectedNdx(port));
+      // A protected server answers 401 to every probe, so it can only be
+      // recognised as this directory's own by its process.
+      const ownProtected = protectedNdx ? findOwnDashboardOnPort(port, absDir) : null;
 
       // Three occupants must be left alone, and the answer for each is to move:
       // the hub, which supervises other projects' servers; a peer dashboard
       // serving a different directory; and an n-dx server whose token we lack,
-      // which cannot be attributed and so cannot be assumed to be ours.
+      // unless its process shows it is this directory's own.
       const leaveAlone = hub
         ? `The n-dx hub (PID ${hub.pid}) is on :${port} serving ${hub.projects} project(s)`
         : occupant.kind === "peer"
           ? `n-dx dashboard for ${occupant.projectDir} is already on :${port}`
-          : protectedNdx
+          : protectedNdx && !ownProtected
             ? `A token-protected n-dx server is already on :${port}`
             : null;
 
@@ -1720,7 +1792,9 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
         // Not identifiable as the hub or a peer — either a stranger, or this
         // directory's own untracked server, which `ndx start` restarts by
         // contract.
-        log(`Port ${port} is in use by another process — clearing it…`);
+        log(ownProtected
+          ? `This directory's ${label} (PID ${ownProtected.pid}) is on :${port} without a PID file — restarting it…`
+          : `Port ${port} is in use by another process — clearing it…`);
         const freed = await killPortOccupant(port);
         if (!freed) {
           console.error(`Port ${port} is occupied and could not be cleared. Choose a different port with --port=N or set web.port in .n-dx.json`);
