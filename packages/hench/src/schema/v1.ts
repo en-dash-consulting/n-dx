@@ -265,6 +265,14 @@ export interface TestGateConfig {
    * `testGate.scopeFallback`.
    */
   command?: string;
+  /**
+   * Re-run template for an unattended gate failure. `{suites}` is replaced
+   * with the labels on the gate's `test-gate: failed-suites=<list>` line,
+   * comma-joined, and the command runs once. A pass absorbs the flake
+   * (`testGate.flakyRerun`); a failure fails the run as before. Absent means
+   * no re-run.
+   */
+  rerunCommand?: string;
 }
 
 export interface HenchConfig {
@@ -1070,6 +1078,47 @@ export interface TestGateResult {
    * instead (the template needs `{base}` and no valid base was known).
    */
   scopeFallback?: string;
+  /**
+   * Suites that failed and then passed on the `hench.testGate.rerunCommand`
+   * re-run — flakes absorbed. `firstFailure` is one line naming what failed
+   * the first time. Present only when the re-run passed.
+   */
+  flakyRerun?: TestGateFlakyRerun[];
+  /**
+   * The first attempt of a gate that was re-run. When the re-run passed, the
+   * top-level fields describe the re-run and this keeps the original verdict.
+   */
+  firstAttempt?: TestGateFirstAttempt;
+  /** The one `hench.testGate.rerunCommand` re-run of the failed suites, if any. */
+  rerun?: TestGateRerun;
+  /**
+   * Why `hench.testGate.rerunCommand` did not run after this gate failed
+   * (no failed-suites line, an unsafe label, no `{suites}` placeholder).
+   */
+  rerunSkipped?: string;
+}
+
+/** One absorbed flake. See {@link TestGateResult.flakyRerun}. */
+export interface TestGateFlakyRerun {
+  suite: string;
+  firstFailure: string;
+}
+
+/** See {@link TestGateResult.firstAttempt}. */
+export interface TestGateFirstAttempt {
+  command?: string;
+  totalDurationMs?: number;
+  failedSuites: string[];
+}
+
+/** See {@link TestGateResult.rerun}. */
+export interface TestGateRerun {
+  command: string;
+  suites: string[];
+  passed: boolean;
+  totalDurationMs?: number;
+  /** Why the re-run gave no verdict (timed out, never launched). */
+  error?: string;
 }
 
 export interface DependencyVulnerability {

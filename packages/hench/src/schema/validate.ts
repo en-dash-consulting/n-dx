@@ -184,6 +184,7 @@ export const HenchConfigSchema = z.object({
   testGate: z
     .object({
       command: z.string().optional(),
+      rerunCommand: z.string().optional(),
     })
     .optional(),
   promptCache: z.boolean().optional(),

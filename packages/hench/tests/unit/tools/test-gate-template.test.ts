@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyGateTemplate, isGateBase, parseSelectedSuites } from "../../../src/tools/test-gate-template.js";
+import { applyGateTemplate, isGateBase, parseFailedSuites, parseSelectedSuites, planRerun } from "../../../src/tools/test-gate-template.js";
 
 const SHA = "1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b";
 
@@ -67,5 +67,46 @@ describe("parseSelectedSuites", () => {
 
   it("ignores the marker inside a longer line", () => {
     expect(parseSelectedSuites("echo test-gate: selected-suites=a")).toBeUndefined();
+  });
+});
+
+describe("parseFailedSuites", () => {
+  it("reads the last failed-suites line", () => {
+    expect(parseFailedSuites("test-gate: failed-suites=a\nx\ntest-gate: failed-suites=rex, root\n")).toEqual(["rex", "root"]);
+  });
+
+  it("is undefined without the line and [] for an empty list", () => {
+    expect(parseFailedSuites("FAIL x")).toBeUndefined();
+    expect(parseFailedSuites("test-gate: failed-suites=")).toEqual([]);
+  });
+});
+
+describe("planRerun", () => {
+  const T = "node scripts/run-all-tests.mjs {suites}";
+
+  it("fills {suites} with the failed labels, comma-joined", () => {
+    expect(planRerun(T, "test-gate: failed-suites=rex,@n-dx/web,root")).toEqual({
+      ok: true,
+      command: "node scripts/run-all-tests.mjs rex,@n-dx/web,root",
+      suites: ["rex", "@n-dx/web", "root"],
+    });
+  });
+
+  it.each([
+    ["no line", "FAIL x", /no failed suites/],
+    ["an empty list", "test-gate: failed-suites=", /no failed suites/],
+    ["a shell separator", "test-gate: failed-suites=rex,a;rm", /"a;rm" is not safe/],
+    ["a substitution", "test-gate: failed-suites=rex,$(id)", /not safe/],
+  ])("refuses %s", (_name, output, reason) => {
+    const plan = planRerun(T, output);
+    expect(plan.ok).toBe(false);
+    if (!plan.ok) expect(plan.reason).toMatch(reason);
+  });
+
+  it("refuses a template without {suites}", () => {
+    expect(planRerun("pnpm test", "test-gate: failed-suites=rex")).toEqual({
+      ok: false,
+      reason: "the template has no {suites}",
+    });
   });
 });

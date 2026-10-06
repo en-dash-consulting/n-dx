@@ -169,6 +169,7 @@ describe("dashboard hench-config gate agrees with hench's schema", () => {
       "prune.transcriptMessageChars": 4000,
       fullTestCommand: "pnpm test",
       "testGate.command": "node scripts/run-all-tests.mjs affected {base}",
+      "testGate.rerunCommand": "node scripts/run-all-tests.mjs {suites}",
       fullTestTimeoutMs: 0,
       rollbackOnFailure: false,
       autoCommit: true,

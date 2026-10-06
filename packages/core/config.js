@@ -1876,6 +1876,14 @@ Hench test-gate settings (mandatory full-suite gate before commit):
                                      testGate.scopeFallback. A template without {base} runs as
                                      written. A "test-gate: selected-suites=a,b" line in its
                                      output is recorded as testGate.suites.
+  hench.testGate.rerunCommand
+                           string    Re-run template for unattended runs (--auto, --yes, no TTY).
+                                     When the gate fails and its output has a
+                                     "test-gate: failed-suites=a,b" line, {suites} is replaced
+                                     with those labels and the command runs once, e.g.
+                                     "node scripts/run-all-tests.mjs {suites}". A pass counts and
+                                     is recorded as testGate.flakyRerun; a failure fails the run.
+                                     No re-run after a timeout or on an interactive terminal.
   hench.fullTestTimeoutMs  number    How long that command may run before it is killed and the
                                      run fails (default: 900000 — 15 minutes; 0 means no limit).
                                      Raise it for a large monorepo: the gate runs while an agent

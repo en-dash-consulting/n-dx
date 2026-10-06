@@ -934,6 +934,15 @@ export async function runReviewGate(
 export type TestGateFailureAction = "rerun" | "abort" | "skip";
 
 /**
+ * A gate failure nobody will be asked about: it aborts at once. Only these
+ * gates get the `hench.testGate.rerunCommand` re-run — an operator at the
+ * prompt already has [r]erun.
+ */
+function isUnattendedGate(yes?: boolean, autonomous?: boolean): boolean {
+  return !process.stdin.isTTY || Boolean(yes) || Boolean(autonomous);
+}
+
+/**
  * Handle test gate failure: display summary and prompt for user action.
  * Offers three options: rerun tests, abort (skip commit), or skip gate via flag.
  *
@@ -948,7 +957,7 @@ async function promptTestGateFailure(
   autonomous?: boolean,
 ): Promise<TestGateFailureAction> {
   // In non-interactive mode (CI, --yes, --auto), default to abort
-  if (!process.stdin.isTTY || yes || autonomous) {
+  if (isUnattendedGate(yes, autonomous)) {
     return "abort";
   }
 
@@ -3333,6 +3342,34 @@ async function reportCompletionNotApplied(
 }
 
 /**
+ * A gate that passed only on its re-run absorbed a flake. It counts as a pass,
+ * but the flake must stay visible: warn, and log it on the task.
+ */
+async function reportFlakyRerun(
+  testGate: TestGateResult,
+  run: RunRecord,
+  store: PRDStore | undefined,
+): Promise<void> {
+  const flakes = testGate.flakyRerun ?? [];
+  const summary = flakes.map((f) => `${f.suite} (first failure: ${f.firstFailure})`).join("; ");
+  stream("Test Gate", `⚠ Flaky: ${flakes.map((f) => f.suite).join(", ")} failed, then passed on a re-run`);
+  for (const f of flakes) detail(`${f.suite}: ${f.firstFailure}`);
+  emitRunEvent("gate", "Test gate passed on a re-run of the failed suites", {
+    ok: true,
+    detail: summary,
+  });
+  if (!store || !run.taskId) return;
+  try {
+    await toolRexAppendLog(store, run.taskId, {
+      event: "test_gate_flaky_rerun",
+      detail: `Test gate passed on a re-run: ${summary}`,
+    });
+  } catch (err) {
+    detail(`Warning: could not log the flaky re-run: ${(err as Error).message}`);
+  }
+}
+
+/**
  * Tidy up after the test gate fails, before anything else looks at the tree.
  *
  * - A completion that bypassed the hold (see {@link readCompletionHold}) is
@@ -3660,6 +3697,9 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         filesChanged: run.structuredSummary.filesChanged,
         testCommand: resolvedTestCommand,
         timeout: testGateTimeoutMs,
+        // At most one re-run per gate, inside this attempt, and only where a
+        // failure would otherwise abort without asking anyone.
+        rerunTemplate: isUnattendedGate(yes, autonomous) ? config?.testGate?.rerunCommand : undefined,
       });
 
       run.testGate = {
@@ -3669,6 +3709,14 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       };
       if (testGate.suites) {
         detail(`Test gate selected: ${testGate.suites.join(", ") || "(none)"}`);
+      }
+      if (testGate.rerunSkipped) {
+        detail(`Test gate re-run skipped: ${testGate.rerunSkipped}`);
+      }
+      if (testGate.flakyRerun) {
+        await reportFlakyRerun(testGate, run, opts.store);
+      } else if (testGate.rerun) {
+        detail(`Re-ran ${testGate.rerun.suites.join(", ")}: failed again`);
       }
 
       // Persist the gate's own output tail (last 200 lines of combined
@@ -3780,11 +3828,15 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             run.status = "failed";
             // `error` wins when set: it carries the specific diagnosis (a
             // timeout and its duration), which the package list cannot express.
-            const reason =
+            const firstReason =
               testGate.error ??
               (failedPackages.length > 0
                 ? failedPackages.join(", ")
                 : "no per-package results were parsed");
+            const reason = testGate.rerun
+              ? `${firstReason}; ${testGate.rerun.suites.join(", ")} failed again on a re-run` +
+                (testGate.rerun.error ? ` (${testGate.rerun.error})` : "")
+              : firstReason;
             // Name the command too — the reason alone ("timed out after 5m0s")
             // is meaningless without knowing which command hung.
             const commandNote = testGate.command ? ` [command: ${testGate.command}]` : "";
