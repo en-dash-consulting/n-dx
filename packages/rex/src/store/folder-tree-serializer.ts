@@ -826,8 +826,13 @@ const ORDERED_FIELDS: ReadonlyArray<string> = [
   "id", "level", "title", "status", "priority", "tags", "blockedBy", "ready", "source",
   "startedAt", "completedAt", "endedAt",
   "resolutionType", "resolutionDetail", "failureReason",
-  "acceptanceCriteria", "loe", "loeRationale", "loeConfidence", "description",
+  "acceptanceCriteria", "loe", "loeRationale", "loeConfidence", "run", "description",
 ];
+
+/** An empty `run` block means "no saved settings" and is never written. */
+function isEmptyObject(value: unknown): boolean {
+  return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0;
+}
 
 /**
  * PRDItem fields that are storage/routing metadata — intentionally excluded
@@ -868,6 +873,7 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
     // loeConfidence is an enum; an out-of-range value is dropped, not stored.
     emitted.add(key);
     if (key === "loeConfidence" && !isLoeConfidence(value)) continue;
+    if (key === "run" && isEmptyObject(value)) continue;
     emitYamlField(lines, key, value);
   }
 

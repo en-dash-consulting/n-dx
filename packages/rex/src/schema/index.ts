@@ -37,6 +37,7 @@ export {
   isRequirementCategory,
   isValidationType,
   DEFAULT_CONFIG,
+  RUN_SETTING_KEYS,
 } from "./v1.js";
 
 export type {
@@ -63,6 +64,7 @@ export type {
   LogEntry,
   TokenUsage,
   AnalyzeTokenUsage,
+  RunSettings,
 } from "./v1.js";
 
 export {

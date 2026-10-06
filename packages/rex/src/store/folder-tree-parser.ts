@@ -27,6 +27,7 @@ import type {
   Priority,
   ResolutionType,
 } from "../schema/index.js";
+import { validateRunSettings } from "../schema/validate.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -884,11 +885,29 @@ function buildItem(
     (item as Record<string, unknown>).loeConfidence = loeConfidence;
   }
 
+  // run: kept whenever it is a non-empty plain object, even one that fails
+  // RunSettingsSchema, so a hand-edited block never makes the PRD unreadable
+  // or vanishes on the next save (this also keeps keys from newer versions).
+  // Writers validate their own input; `ndx work` ignores an invalid block.
+  const run = fm["run"];
+  if (isPlainObject(run)) {
+    if (Object.keys(run).length > 0) {
+      (item as Record<string, unknown>).run = run;
+      const check = validateRunSettings(run);
+      if (!check.ok) {
+        warnings.push({ path: filePath, message: `Invalid ${check.error} (item id=${id}); ndx work ignores this block until it is fixed` });
+      }
+    }
+  } else if (run !== null && run !== undefined) {
+    warnings.push({ path: filePath, message: `Ignoring run on item id=${id}: expected a JSON object` });
+  }
+
   // Preserve unknown fields (forward-compat: round-trip fidelity for future extensions)
   const knownKeys = new Set([
     "id", "level", "title", "status", "description", "priority", "tags", "blockedBy", "ready",
     "source", "startedAt", "completedAt", "endedAt", "resolutionType",
     "resolutionDetail", "failureReason", "acceptanceCriteria", "loe", "loeRationale", "loeConfidence",
+    "run",
   ]);
   for (const [k, v] of Object.entries(fm)) {
     if (!knownKeys.has(k) && v !== null && v !== undefined) {
@@ -1355,6 +1374,10 @@ function asLoe(v: unknown): number | string | null {
   const s = asString(v);
   if (s === null) return null;
   return /^-?(\d+\.?\d*|\.\d+)$/.test(s.trim()) ? Number(s) : s;
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
 /**
