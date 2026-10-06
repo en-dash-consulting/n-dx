@@ -1261,6 +1261,12 @@ export interface FinalizeRunOptions {
    */
   startingHead?: string;
   /**
+   * Commit `{base}` in `hench.testGate.command` is replaced with. Defaults to
+   * {@link startingHead}; a gate-only retry sets it to an earlier run's start
+   * commit, so the gate covers that run's work and not just this one's.
+   */
+  gateBase?: string;
+  /**
    * Accept a best-effort adversarial review (`--review-optional`).
    *
    * Default (false) enforces the missing-review gate: a run whose reviewer
@@ -3584,6 +3590,8 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   let testGateSkipped = false;
   let testGateFailed = false;
   let resolvedTestCommand: string | undefined;
+  let gateBase: string | undefined;
+  let gateScopeFallback: string | undefined;
 
   if (run.status === "completed" && !skipFullTestGate && run.structuredSummary) {
     // Resolve test command first (before attempting gate)
@@ -3594,12 +3602,26 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
           projectDir,
           henchDir,
           config,
+          base: opts.gateBase ?? opts.startingHead,
         },
         autonomous,
       );
       resolvedTestCommand = resolution.command;
+      gateBase = resolution.base;
+      gateScopeFallback = resolution.scopeFallback;
 
-      if (resolution.persisted) {
+      if (resolution.scopeFallback) {
+        detail(
+          `Test gate: hench.testGate.command not used (${resolution.scopeFallback}); ` +
+          `running ${resolution.command}`,
+        );
+      } else if (resolution.source === "test-gate-template") {
+        detail(
+          resolution.base
+            ? `Test gate: affected since ${resolution.base.slice(0, 7)} → ${resolution.command}`
+            : `Test gate: ${resolution.command}`,
+        );
+      } else if (resolution.persisted) {
         detail(`Test command persisted to config: ${resolution.command}`);
       } else if (resolution.source !== "config") {
         detail(`Using test command from ${resolution.source}: ${resolution.command}`);
@@ -3640,7 +3662,14 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         timeout: testGateTimeoutMs,
       });
 
-      run.testGate = testGate;
+      run.testGate = {
+        ...testGate,
+        ...(gateBase ? { base: gateBase } : {}),
+        ...(gateScopeFallback ? { scopeFallback: gateScopeFallback } : {}),
+      };
+      if (testGate.suites) {
+        detail(`Test gate selected: ${testGate.suites.join(", ") || "(none)"}`);
+      }
 
       // Persist the gate's own output tail (last 200 lines of combined
       // stdout/stderr) to the run log and to run.diagnostics, so a timeout,

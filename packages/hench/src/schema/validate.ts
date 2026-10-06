@@ -180,6 +180,12 @@ export const HenchConfigSchema = z.object({
       commitMessage: z.enum(["deterministic", "llm"]).optional(),
     })
     .optional(),
+  // All members optional, no defaults: absent means today's gate command.
+  testGate: z
+    .object({
+      command: z.string().optional(),
+    })
+    .optional(),
   promptCache: z.boolean().optional(),
   promptCacheTtl: z.enum(["5m", "1h"]).optional(),
 });

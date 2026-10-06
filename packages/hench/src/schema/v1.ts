@@ -253,6 +253,20 @@ export function isPermissionMode(value: unknown): value is PermissionMode {
  */
 export type HenchAgentModels = Partial<Record<LLMVendor, string>>;
 
+/** `hench.testGate.*` — see {@link HenchConfig.testGate}. */
+export interface TestGateConfig {
+  /**
+   * Gate command template. When set it outranks `fullTestCommand` and
+   * auto-detection. `{base}` is replaced with the commit the run's diff is
+   * measured from (a hex SHA), so a project can gate only what the run
+   * touched. Without `{base}` the template is used as written. When it
+   * contains `{base}` and no valid base is known, the gate falls back to the
+   * command it would have run without the template and records
+   * `testGate.scopeFallback`.
+   */
+  command?: string;
+}
+
 export interface HenchConfig {
   schema: string;
   provider: Provider;
@@ -497,6 +511,11 @@ export interface HenchConfig {
    * See {@link GitSafetyConfig} for field semantics and defaults.
    */
   git?: GitSafetyConfig;
+  /**
+   * Opt-in test-gate templates. Absent leaves the gate exactly as
+   * `fullTestCommand` / auto-detection resolve it.
+   */
+  testGate?: TestGateConfig;
   /**
    * Whether the Anthropic API loop marks `cache_control` breakpoints on the
    * request (see `agent/lifecycle/prompt-cache.ts`). Default: true.
@@ -1035,6 +1054,22 @@ export interface TestGateResult {
    * `extractFailureDigest` in tools/test-runner.ts.
    */
   failureDigest?: string;
+  /**
+   * The commit `{base}` was replaced with in `hench.testGate.command`.
+   * Absent when no template was used (or it had no `{base}`).
+   */
+  base?: string;
+  /**
+   * Suites the gate command said it selected, parsed from a
+   * `test-gate: selected-suites=<comma list>` line in its whole output.
+   * Absent when the output carried no such line.
+   */
+  suites?: string[];
+  /**
+   * Why the templated command was not used and the untemplated one ran
+   * instead (the template needs `{base}` and no valid base was known).
+   */
+  scopeFallback?: string;
 }
 
 export interface DependencyVulnerability {

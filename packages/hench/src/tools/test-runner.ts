@@ -335,6 +335,7 @@ function goPackagePaths(testFiles: string[]): string[] {
 // ---------------------------------------------------------------------------
 
 import { execShellCmd } from "../process/exec.js";
+import { parseSelectedSuites } from "./test-gate-template.js";
 
 // ---------------------------------------------------------------------------
 // Main entry point
@@ -913,6 +914,7 @@ export async function runTestGate(
     const partial = truncateOutput(combined, "", RAW_OUTPUT_CHARS);
     // A suite that failed before it hung has already said what failed.
     const digest = combined ? extractFailureDigest(combined) : undefined;
+    const suites = parseSelectedSuites(combined);
     return {
       ran: true,
       passed: false,
@@ -937,11 +939,13 @@ export async function runTestGate(
       }),
       outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
       ...(digest ? { failureDigest: digest } : {}),
+      ...(suites ? { suites } : {}),
     };
   }
 
   const overallPassed = exitCode === 0;
   const packages = parseVitestOutput(stdout, stderr, overallPassed);
+  const suites = parseSelectedSuites(combineStreams(stdout, stderr));
   // No post-mortem for a green gate — attaching output to a pass is noise, and
   // it matches parseVitestOutput's own rule for the same case.
   const combined = overallPassed ? "" : combineStreams(stdout, stderr);
@@ -955,6 +959,7 @@ export async function runTestGate(
     totalDurationMs,
     outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
     ...(digest ? { failureDigest: digest } : {}),
+    ...(suites ? { suites } : {}),
   };
 }
 

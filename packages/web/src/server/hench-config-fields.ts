@@ -116,6 +116,7 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
 
   // ── Test gate ──
   { path: "fullTestCommand", label: "Full Test Command", description: "Command that runs the whole suite before a commit. Auto-detected when unset", type: "string", category: "test-gate" },
+  { path: "testGate.command", label: "Test Gate Command Template", description: "Gate command template; {base} becomes the run's start commit. Takes precedence over fullTestCommand", type: "string", category: "test-gate" },
   { path: "fullTestTimeoutMs", label: "Full Test Timeout (ms)", description: "How long the test gate may run before it is killed. 0 means no limit", type: "number", integer: true, category: "test-gate", defaultValue: 900000 },
 
   // ── Git safety ──
