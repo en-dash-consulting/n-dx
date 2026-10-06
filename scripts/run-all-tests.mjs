@@ -37,11 +37,10 @@
  * hench to parse.
  */
 
-import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, existsSync, mkdirSync, createWriteStream } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnCli } from "../packages/core/win-spawn.js";
+import { execFileSyncCli, spawnCli } from "../packages/core/win-spawn.js";
 import { ROOT_LABEL, parsePorcelainZ, resolveLabels, selectAffected, validLabels } from "./lib/select-suites.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -100,7 +99,7 @@ function runSuite(label, binary, args) {
     }
 
     // A spawn that never starts is a failed suite, not an absent one — the
-    // behaviour `execFileSync` used to give us by throwing.
+    // behaviour `execFileSyncCli` gives to give us by throwing.
     child.on("error", (err) => {
       const message = `\nFailed to start ${label}: ${err.message}\n`;
       process.stderr.write(message);
@@ -169,7 +168,7 @@ function suiteFor(label, manifests) {
 }
 
 function git(gitArgs) {
-  return execFileSync("git", gitArgs, { cwd: ROOT, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+  return execFileSyncCli("git", gitArgs, { cwd: ROOT, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
 }
 
 /** Files changed since `baseRef`, plus uncommitted and untracked ones; null if git cannot say. */
