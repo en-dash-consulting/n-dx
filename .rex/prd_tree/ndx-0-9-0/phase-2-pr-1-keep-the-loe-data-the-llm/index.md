@@ -23,4 +23,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Front matter keeps loe as a number, keeps loeRationale and loeConfidence, and never writes [object Object]](./front-matter-keeps-loe-as-a-number.md) | completed |
 | [R0: keep loe, loeRationale and loeConfidence on every proposal accept path](./r0-keep-loe-loerationale-and.md) | completed |
 | [Schema doc says every scalar except loe is written quoted, but booleans such as ready are written bare](./schema-doc-says-every-scalar-except.md) | pending |
-| [The dashboard's LoE pass-through in Smart Add, batch import and the proposal editor has no test, so dropping it would go unnoticed](./the-dashboard-s-loe-pass-through-in.md) | pending |
+| [The dashboard's LoE pass-through in Smart Add, batch import and the proposal editor has no test, so dropping it would go unnoticed](./the-dashboard-s-loe-pass-through-in.md) | completed |
