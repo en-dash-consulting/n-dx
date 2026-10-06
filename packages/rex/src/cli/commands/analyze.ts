@@ -9,7 +9,6 @@ import { randomUUID } from "node:crypto";
 import { resolveStore, ensureLegacyPrdMigrated, withSelfHealTag, resolveRexPaths } from "../../store/index.js";
 import { stampModified } from "../../core/sync.js";
 
-import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { parseIntSafe } from "../validate-input.js";
 import { info, warn, result, startSpinner, withCommandProgressReporter } from "../output.js";
@@ -414,7 +413,6 @@ async function acceptProposals(
 
   await clearPending(dir);
   await clearSentinel(dir);
-  await syncFolderTree(rexDir, store);
 
   // Show formatted summary when batch record is available, else simple message
   if (batchRecord) {

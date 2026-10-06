@@ -13,7 +13,6 @@ import { validateDAG } from "../../core/dag.js";
 import { migrateToFolderPerTask } from "../../core/folder-per-task-migration.js";
 import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
 
-import { syncFolderTree } from "./folder-tree-sync.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 import { parseCsvList } from "../parse-utils.js";
 import { CLIError } from "../errors.js";
@@ -209,7 +208,6 @@ export async function cmdAdd(
   });
 
   // Persist the updated tree to the folder structure.
-  await syncFolderTree(rexDir, store);
 
   // Run scoped hash-suffix consolidation pass on siblings of the new item.
   // Skipped when --no-reshape is set or a full ndx reshape is in progress.

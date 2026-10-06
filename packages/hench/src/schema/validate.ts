@@ -1,5 +1,5 @@
 import { z, ZodError } from "zod";
-import { DEFAULT_HENCH_CONFIG, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MIN_PRUNE_PAIRS } from "./v1.js";
+import { DEFAULT_HENCH_CONFIG, DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MIN_PRUNE_PAIRS } from "./v1.js";
 import type { HenchConfig } from "./v1.js";
 
 export type ValidationResult<T> =
@@ -165,11 +165,19 @@ export const HenchConfigSchema = z.object({
   // rationale for 15 minutes.
   fullTestTimeoutMs: z.number().int().nonnegative().optional().default(900_000),
   permissionMode: z.enum(["default", "acceptEdits", "bypassPermissions", "plan"]).optional(),
-  commitMsgTimeoutMs: z.number().int().nonnegative().optional().default(300_000),
+  // Materialised rather than left undefined: agent/planning/prompt.ts applies
+  // the same constant with `??`, and the dashboard's "differs from default"
+  // marker is pinned against what parsing a default config yields.
+  promptAgentToMarkInProgress: z
+    .boolean()
+    .optional()
+    .default(DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS),
+  commitMsgTimeoutMs: z.number().int().nonnegative().optional().default(0),
   git: z
     .object({
       checkpointThreshold: z.number().int().nonnegative().optional(),
       requireCleanTree: z.boolean().optional(),
+      commitMessage: z.enum(["deterministic", "llm"]).optional(),
     })
     .optional(),
   promptCache: z.boolean().optional(),

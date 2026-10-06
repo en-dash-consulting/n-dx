@@ -4,7 +4,6 @@ import { access, readFile } from "node:fs/promises";
 import { resolveLayout } from "@n-dx/llm-client";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
 
-import { syncFolderTree } from "./folder-tree-sync.js";
 import { parseIntList } from "../parse-utils.js";
 import { info, result, withCommandProgressReporter } from "../output.js";
 import type { ItemLevel } from "../../schema/index.js";
@@ -764,7 +763,6 @@ async function acceptRecommendations(
   }
 
   reportCreationResults(creationResult, selectedTasks, conflictStrategy);
-  await syncFolderTree(rexDir, store);
 }
 
 // ── Main command entry point ────────────────────────────────────────────

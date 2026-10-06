@@ -48,6 +48,7 @@ import {
   API_SESSION_DECISION,
   captureStartingHead,
   captureBaselineUntracked,
+  captureBaselineDirty,
   runReviewGate,
   finalizeRun,
   recordClaimLoss,
@@ -709,6 +710,8 @@ interface GeminiToolLoopParams {
   startingHead: string | undefined;
   /** Untracked files present before the run, for scoped rollback (#303). */
   baselineUntracked: string[];
+  /** Everything dirty before the run, so stageRunWork leaves it alone. */
+  baselineDirty: string[];
   /** Resolved LLM config — routes the prune summary to its own tier. */
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>;
   opts: AgentLoopOptions;
@@ -736,7 +739,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   const {
     provider, config, model, systemPrompt, briefText, taskTitle, testCommand,
     taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead,
-    baselineUntracked, llmConfig, opts,
+    baselineUntracked, baselineDirty, llmConfig, opts,
   } = params;
 
   const hasToolCalling =
@@ -944,6 +947,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
     baselineUntracked,
+    baselineDirty,
     startingHead,
   });
 
@@ -1297,13 +1301,14 @@ async function runLocalToolLoop(params: {
   tokenBudget: number | undefined;
   startingHead: string | undefined;
   baselineUntracked: string[];
+  baselineDirty: string[];
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>;
   opts: AgentLoopOptions;
 }): Promise<AgentLoopResult> {
   const {
     provider, config, model, systemPrompt, briefText, taskTitle, testCommand,
     taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead,
-    baselineUntracked, llmConfig, opts,
+    baselineUntracked, baselineDirty, llmConfig, opts,
   } = params;
 
   // Resolve the base URL from config
@@ -1712,6 +1717,7 @@ async function runLocalToolLoop(params: {
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
     baselineUntracked,
+    baselineDirty,
     startingHead,
   });
 
@@ -1759,6 +1765,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Snapshot untracked files before the agent runs, so a rollback removes only
   // the files the agent creates — never the user's pre-existing work (#303).
   const baselineUntracked = await captureBaselineUntracked(projectDir);
+  // Snapshot everything already dirty, so the run's own work can be told
+  // apart from the operator's at commit time (see stageRunWork).
+  const baselineDirty = await captureBaselineDirty(projectDir);
 
   // Resolve provider — registry or legacy path based on config flag
   const llmConfig = await loadLLMConfig(henchDir);
@@ -1798,6 +1807,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       tokenBudget,
       startingHead,
       baselineUntracked,
+      baselineDirty,
       llmConfig,
       opts,
     });
@@ -1821,6 +1831,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       tokenBudget,
       startingHead,
       baselineUntracked,
+      baselineDirty,
       llmConfig,
       opts,
     });
@@ -2113,6 +2124,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
     baselineUntracked,
+    baselineDirty,
     startingHead,
   });
 
