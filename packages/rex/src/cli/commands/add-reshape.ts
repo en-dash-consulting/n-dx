@@ -22,7 +22,6 @@ import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal, MergeAction, GroupAction } from "../../core/reshape.js";
 import type { PRDItem, ItemLevel } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
-import { syncFolderTree } from "./folder-tree-sync.js";
 import { appendArchiveBatch } from "../../core/archive.js";
 import type { RenameAuditEntry } from "../../core/archive.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
@@ -704,7 +703,6 @@ export async function runScopedConsolidationPass(
     }
 
     // Persist renames and sync folder tree
-    await syncFolderTree(rexDir, store);
 
     // Archive the rename audit trail
     await appendArchiveBatch(rexDir, {
@@ -810,7 +808,6 @@ async function applyMergePhase(
 
   // Persist
   await store.saveDocument(doc);
-  await syncFolderTree(rexDir, store);
 
   // Archive removed items
   if (reshapeResult.archivedItems.length > 0) {

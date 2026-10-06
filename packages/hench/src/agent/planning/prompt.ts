@@ -1,4 +1,5 @@
 import type { HenchConfig, TaskBrief, TaskBriefProject } from "../../schema/index.js";
+import { DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS } from "../../schema/index.js";
 import type { PromptEnvelope } from "../../prd/llm-gateway.js";
 import { createPromptEnvelope } from "../../prd/llm-gateway.js";
 import { buildBriefSections } from "./brief.js";
@@ -132,13 +133,30 @@ export function buildSystemPrompt(
     lines.push(`4. ${commitStep}`);
     lines.push("5. Provide a summary of what you did\n");
   } else {
-    lines.push("1. Mark task as in_progress using rex_update_status");
-    lines.push(`2. ${exploreStep}`);
-    lines.push("3. Implement the changes");
-    lines.push(`4. ${testStep}`);
-    lines.push(`5. ${commitStep}`);
-    lines.push("6. Mark task as completed using rex_update_status");
-    lines.push("7. Log a summary of what you did\n");
+    // The `in_progress` transition is hench's, not the agent's: both loops
+    // call `transitionToInProgress` before this prompt is ever sent, so the
+    // task is already `in_progress` on disk by the time the agent reads
+    // step 1. Asking for it again costs a tool round-trip and writes the
+    // PRD a second time with the value it already holds, which also dirties
+    // `.rex/prd_tree/` ahead of the uncommitted-work gate. Restore the step
+    // with `hench.promptAgentToMarkInProgress`.
+    //
+    // The completion step below is not the same case and is not optional:
+    // that call is a *request*, parked on the task claim by rex rather than
+    // written, and it carries the resolution hench applies once the test
+    // gate passes.
+    const steps: string[] = [];
+    if (config.promptAgentToMarkInProgress ?? DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS) {
+      steps.push("Mark task as in_progress using rex_update_status");
+    }
+    steps.push(exploreStep);
+    steps.push("Implement the changes");
+    steps.push(testStep);
+    steps.push(commitStep);
+    steps.push("Mark task as completed using rex_update_status");
+    steps.push("Log a summary of what you did");
+    steps.forEach((step, i) => lines.push(`${i + 1}. ${step}`));
+    lines.push("");
   }
 
   if (config.selfHeal) {

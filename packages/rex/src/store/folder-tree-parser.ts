@@ -54,6 +54,22 @@ export interface FolderParseResult {
    * being overwritten by the stale copy.
    */
   fileDigests: Map<string, string>;
+  /**
+   * Where each item actually came from: item id → resolved absolute path of
+   * the `.md` file its frontmatter was read from.
+   *
+   * This is observed, not derived. The serializer can compute where an item
+   * *ought* to live from its title and its siblings, but a real tree also
+   * holds legacy `<title>.md` folder items, flattened single-children and
+   * items mid-relocation, whose actual path is not that. A targeted
+   * single-item write (`performance.fastWrites`) uses this as the ground
+   * truth and declines the fast path when the two disagree.
+   *
+   * Legacy `## Subtask:` sections are deliberately absent: they live inside
+   * their parent's file, so writing one means rewriting the parent, which is
+   * not a targeted write.
+   */
+  itemFiles: Map<string, string>;
 }
 
 /**
@@ -80,16 +96,19 @@ export async function parseFolderTree(treeRoot: string): Promise<FolderParseResu
   const warnings: ParseWarning[] = [];
   const items: PRDItem[] = [];
   const digests = new Map<string, string>();
+  const itemFiles = new Map<string, string>();
 
   const rootExists = await isDirectory(treeRoot);
   if (!rootExists) {
     warnings.push({ path: treeRoot, message: "Tree root directory does not exist" });
-    return { items, warnings, fileDigests: digests };
+    return { items, warnings, fileDigests: digests, itemFiles };
   }
 
-  for (const childDir of await listSubdirs(treeRoot)) {
-    const item = await parseDirRecursive(join(treeRoot, childDir), 1, warnings, digests);
-    if (item) items.push(item);
+  const rootListing = await readDirListing(treeRoot);
+  for (const item of await parseSubdirsInOrder(
+    treeRoot, 1, warnings, digests, itemFiles, false, rootListing?.subdirs ?? [],
+  )) {
+    items.push(item);
   }
 
   // Discover bare-leaf `.md` files at treeRoot. The canonical schema places
@@ -97,12 +116,12 @@ export async function parseFolderTree(treeRoot: string): Promise<FolderParseResu
   // but a malformed PRD that puts a non-epic item at root must still
   // round-trip — `validate` is designed to detect that misplacement and to
   // surface duplicate ids, so we do not deduplicate here.
-  const rootLeaves = await discoverLeafChildMarkdownFiles(treeRoot, "", 1, warnings, digests);
+  const rootLeaves = await discoverLeafChildMarkdownFiles(treeRoot, "", 1, warnings, digests, itemFiles, rootListing);
   for (const leaf of rootLeaves) {
     items.push(leaf);
   }
 
-  return { items, warnings, fileDigests: digests };
+  return { items, warnings, fileDigests: digests, itemFiles };
 }
 
 /**
@@ -126,12 +145,15 @@ async function parseDirRecursive(
   depth: number,
   warnings: ParseWarning[],
   digests: Map<string, string>,
+  itemFiles: Map<string, string>,
   fromReconstructedParent: boolean = false,
 ): Promise<PRDItem | null> {
-  const itemFile = await discoverItemFile(dir, warnings);
+  // One read for every scan this directory gets below.
+  const listing = await readDirListing(dir);
+  const itemFile = await discoverItemFile(dir, warnings, listing);
   if (!itemFile) return null;
 
-  const item = await parseItemFileFromFrontmatter(itemFile, depth, warnings, digests, fromReconstructedParent);
+  const item = await parseItemFileFromFrontmatter(itemFile, depth, warnings, digests, itemFiles, fromReconstructedParent);
   if (!item) return null;
 
   // Check for single-child reconstruction: if this item has __parentId,
@@ -149,11 +171,9 @@ async function parseDirRecursive(
       // with its parent epic, the feature's children are still attached correctly.
       // Since this item was reconstructed from a parent (single-child optimization),
       // pass fromReconstructedParent=true to suppress depth mismatch warnings for children.
-      const childItems: PRDItem[] = [];
-      for (const childDir of await listSubdirs(dir)) {
-        const child = await parseDirRecursive(join(dir, childDir), depth + 1, warnings, digests, true);
-        if (child) childItems.push(child);
-      }
+      const childItems: PRDItem[] = await parseSubdirsInOrder(
+        dir, depth + 1, warnings, digests, itemFiles, true, listing?.subdirs ?? [],
+      );
       // Tasks may also carry legacy `## Subtask:` sections if this is a task item.
       if (current.level === "task") {
         const legacySubtasks = await readLegacySubtasksIfTask(itemFile, warnings, digests);
@@ -193,7 +213,7 @@ async function parseDirRecursive(
 
   // Single-child optimization: check for orphaned children in the current directory
   // (items flattened from a subdirectory due to single-child optimization)
-  const orphanedChild = await findOrphanedChildInCurrentDir(dir, itemFile, warnings, digests);
+  const orphanedChild = await findOrphanedChildInCurrentDir(dir, itemFile, warnings, digests, itemFiles, listing);
   if (orphanedChild) {
     // Recursively reconstruct the parent chain (in case of nested single-children)
     let parent = reconstructParentFromChildMetadata(orphanedChild, warnings);
@@ -227,9 +247,10 @@ async function parseDirRecursive(
       const childItems: PRDItem[] = [parent];
 
       // Still check for subdirectories in case there are non-single-child items
-      for (const childDir of await listSubdirs(dir)) {
-        const child = await parseDirRecursive(join(dir, childDir), depth + 1, warnings, digests);
-        if (child) childItems.push(child);
+      for (const child of await parseSubdirsInOrder(
+        dir, depth + 1, warnings, digests, itemFiles, false, listing?.subdirs ?? [],
+      )) {
+        childItems.push(child);
       }
 
       if (childItems.length > 0) item.children = childItems;
@@ -238,17 +259,15 @@ async function parseDirRecursive(
   }
 
   // Recursively parse subdirectories as children (branch subtasks and lower).
-  const childItems: PRDItem[] = [];
-  for (const childDir of await listSubdirs(dir)) {
-    const child = await parseDirRecursive(join(dir, childDir), depth + 1, warnings, digests);
-    if (child) childItems.push(child);
-  }
+  const childItems: PRDItem[] = await parseSubdirsInOrder(
+    dir, depth + 1, warnings, digests, itemFiles, false, listing?.subdirs ?? [],
+  );
 
   // Discover leaf-subtask `.md` files at this level (Rule 1b).
   // Skip the item's own file (`index.md` or a legacy `<title>.md`) and any
   // file we already loaded as an orphaned-child shim above.
   const seenIds = new Set(childItems.map((c) => c.id));
-  const leafChildren = await discoverLeafChildMarkdownFiles(dir, itemFile, depth + 1, warnings, digests);
+  const leafChildren = await discoverLeafChildMarkdownFiles(dir, itemFile, depth + 1, warnings, digests, itemFiles, listing);
   for (const leaf of leafChildren) {
     if (!seenIds.has(leaf.id)) {
       childItems.push(leaf);
@@ -287,13 +306,11 @@ async function discoverLeafChildMarkdownFiles(
   depth: number,
   warnings: ParseWarning[],
   digests: Map<string, string>,
+  itemFiles: Map<string, string>,
+  listing: DirListing | null,
 ): Promise<PRDItem[]> {
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch {
-    return [];
-  }
+  if (!listing) return [];
+  const entries = listing.names;
 
   const found: PRDItem[] = [];
   for (const entry of entries) {
@@ -317,7 +334,7 @@ async function discoverLeafChildMarkdownFiles(
     // warning by reusing the reconstructed-parent flag — leaves and
     // reconstructed children share the same property: the depth-to-level
     // mapping does not apply to them.
-    const item = await parseItemFileFromFrontmatter(filePath, depth, warnings, digests, true);
+    const item = await parseItemFileFromFrontmatter(filePath, depth, warnings, digests, itemFiles, true);
     if (item) found.push(item);
   }
 
@@ -482,13 +499,11 @@ async function findOrphanedChildInCurrentDir(
   itemFile: string,
   warnings: ParseWarning[],
   digests: Map<string, string>,
+  itemFiles: Map<string, string>,
+  listing: DirListing | null,
 ): Promise<PRDItem | null> {
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch {
-    return null;
-  }
+  if (!listing) return null;
+  const entries = listing.names;
 
   // Find all .md files except the main item file
   const markdownFiles = entries.filter(
@@ -507,7 +522,7 @@ async function findOrphanedChildInCurrentDir(
     if (fm.__parentId !== undefined) {
       // Parse this as a PRDItem
       const depth = (await isDirectory(dir)) ? 1 : 0; // Rough depth estimate
-      const item = await parseItemFileFromFrontmatter(filePath, depth, warnings, digests);
+      const item = await parseItemFileFromFrontmatter(filePath, depth, warnings, digests, itemFiles);
       if (item) return item;
     }
   }
@@ -539,19 +554,134 @@ async function isDirectory(p: string): Promise<boolean> {
   }
 }
 
+/**
+ * Ceiling on filesystem operations in flight across the whole parse.
+ *
+ * Sibling subtrees are parsed concurrently ({@link parseSubdirsInOrder}),
+ * which is where nearly all of this parser's speed comes from — a tree of
+ * 1,853 item files takes ~205 ms walked one file at a time and ~37 ms with
+ * siblings overlapped. Unbounded, though, a wide tree opens a file handle
+ * per leaf at once and a constrained `ulimit -n` turns that into EMFILE.
+ * Measured flat from 8 to 128 on that tree, so the bound costs nothing and
+ * the low number is the safe one to pick.
+ */
+const PARSE_CONCURRENCY = 64;
+
+/**
+ * Admission gate for the bound above. Shared process-wide rather than per
+ * parse, so two concurrent `parseFolderTree` calls — which the read path
+ * does make — share one budget instead of each claiming the whole of it.
+ */
+function createGate(max: number): <T>(fn: () => Promise<T>) => Promise<T> {
+  let active = 0;
+  const waiting: Array<() => void> = [];
+  const release = () => {
+    active--;
+    waiting.shift()?.();
+  };
+  return async <T>(fn: () => Promise<T>): Promise<T> => {
+    if (active >= max) await new Promise<void>((resolve) => waiting.push(resolve));
+    active++;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  };
+}
+
+const gate = createGate(PARSE_CONCURRENCY);
+
+/** One directory's entries, read once and shared by every scan of that directory. */
+export interface DirListing {
+  /** Every entry name, in the order the OS reported them. */
+  names: string[];
+  /** Subdirectory names, sorted — the traversal order for children. */
+  subdirs: string[];
+}
+
+/**
+ * Read a directory's entries once.
+ *
+ * Returns the entry names *and* which of them are directories from a single
+ * `readdir(…, { withFileTypes: true })`. Both halves used to cost extra
+ * syscalls: the four scans a single directory gets (item file, orphaned
+ * child, subdirectories, leaf children) each issued their own `readdir`, and
+ * identifying subdirectories issued a `stat` per entry on top. Callers now
+ * take this listing as a parameter, so one directory means one syscall.
+ *
+ * Returns null when the directory cannot be read — each caller keeps the
+ * behaviour it had for that case, which is not the same behaviour (the item
+ * scan warns, the others stay quiet).
+ */
+async function readDirListing(dir: string): Promise<DirListing | null> {
+  try {
+    const entries = await gate(() => readdir(dir, { withFileTypes: true }));
+    const names: string[] = [];
+    const subdirs: string[] = [];
+    for (const entry of entries) {
+      names.push(entry.name);
+      if (entry.isDirectory()) subdirs.push(entry.name);
+    }
+    return { names, subdirs: subdirs.sort() };
+  } catch {
+    return null;
+  }
+}
+
 /** Return direct subdirectory names of `dir` in alphabetical order. */
 async function listSubdirs(dir: string): Promise<string[]> {
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch {
-    return [];
+  return (await readDirListing(dir))?.subdirs ?? [];
+}
+
+/**
+ * Parse every subdirectory of `dir` as a child item, concurrently, and
+ * return them in the order a one-at-a-time walk would have produced.
+ *
+ * Order is the whole difficulty here. `warnings` and `digests` are
+ * accumulators threaded through the recursion, and appending to them from
+ * overlapping branches would interleave by completion time — making the
+ * warning list, and the digest map's insertion order, depend on disk timing.
+ * So each branch fills its own pair and they are merged back in sibling
+ * order once all have settled, which reproduces depth-first order exactly.
+ * `parse-order-equivalence.test.ts` pins that against the sequential walk.
+ */
+async function parseSubdirsInOrder(
+  dir: string,
+  depth: number,
+  warnings: ParseWarning[],
+  digests: Map<string, string>,
+  itemFiles: Map<string, string>,
+  fromReconstructedParent: boolean,
+  subdirs: string[],
+): Promise<PRDItem[]> {
+  if (subdirs.length === 0) return [];
+
+  const branches = await Promise.all(
+    subdirs.map(async (childDir) => {
+      const branchWarnings: ParseWarning[] = [];
+      const branchDigests = new Map<string, string>();
+      const branchItemFiles = new Map<string, string>();
+      const item = await parseDirRecursive(
+        join(dir, childDir),
+        depth,
+        branchWarnings,
+        branchDigests,
+        branchItemFiles,
+        fromReconstructedParent,
+      );
+      return { item, branchWarnings, branchDigests, branchItemFiles };
+    }),
+  );
+
+  const items: PRDItem[] = [];
+  for (const branch of branches) {
+    for (const warning of branch.branchWarnings) warnings.push(warning);
+    for (const [path, digest] of branch.branchDigests) digests.set(path, digest);
+    for (const [id, path] of branch.branchItemFiles) itemFiles.set(id, path);
+    if (branch.item) items.push(branch.item);
   }
-  const dirs: string[] = [];
-  for (const entry of entries) {
-    if (await isDirectory(join(dir, entry))) dirs.push(entry);
-  }
-  return dirs.sort();
+  return items;
 }
 
 /**
@@ -571,22 +701,19 @@ async function listSubdirs(dir: string): Promise<string[]> {
 async function discoverItemFile(
   dir: string,
   warnings: ParseWarning[],
+  listing: DirListing | null,
 ): Promise<string | null> {
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch {
+  if (!listing) {
     warnings.push({ path: dir, message: "Directory not readable" });
     return null;
   }
+  const entries = listing.names;
 
-  // Prefer `index.md` if it exists (canonical layout).
-  const indexPath = join(dir, "index.md");
-  try {
-    await stat(indexPath);
-    return indexPath;
-  } catch {
-    // Fall through to legacy <title>.md fallback.
+  // Prefer `index.md` if it exists (canonical layout). Presence in the
+  // directory listing is the same test the previous `stat` made — it
+  // succeeded for an `index.md` of any type, directory included.
+  if (entries.includes("index.md")) {
+    return join(dir, "index.md");
   }
 
   const markdownFiles = entries.filter(
@@ -617,6 +744,7 @@ async function parseItemFileFromFrontmatter(
   depth: number,
   warnings: ParseWarning[],
   digests: Map<string, string>,
+  itemFiles: Map<string, string>,
   fromReconstructedParent: boolean = false,
 ): Promise<PRDItem | null> {
   const text = await readIndexFile(filePath, warnings, digests);
@@ -624,6 +752,10 @@ async function parseItemFileFromFrontmatter(
 
   const fm = parseFrontmatter(text, filePath, warnings);
   if (fm === null) return null;
+
+  if (typeof fm.id === "string" && fm.id) {
+    itemFiles.set(fm.id, resolve(filePath));
+  }
 
   return buildItem(fm, filePath, depth, warnings, fromReconstructedParent);
 }
@@ -641,7 +773,9 @@ async function readIndexFile(
     // block-style key like `tags:` into `tags:\r`, which silently aborts the
     // frontmatter mapping and DROPS every remaining field — a data-loss bug on
     // the next parse→save round trip, not just a cosmetic one.
-    const raw = await readFile(filePath, "utf8");
+    // Through the gate for the same reason as readdir: with sibling subtrees
+    // overlapping, a wide tree would otherwise hold one open handle per leaf.
+    const raw = await gate(() => readFile(filePath, "utf8"));
     // Identity of the exact bytes this parse consumed, keyed the way the
     // serializer will look the file up. Recorded before normalization so it
     // matches a later digest of the file as it sits on disk.
