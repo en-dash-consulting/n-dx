@@ -181,7 +181,37 @@ export interface GitSafetyConfig {
    * run. Default: false.
    */
   requireCleanTree?: boolean;
+  /**
+   * How the pre-run commit gate proposes a subject for the operator's
+   * pre-existing changes.
+   *
+   * `"deterministic"` (default) builds it from the dirty file list — see
+   * `pre-run-commit-subject.ts`. `"llm"` restores the previous behaviour:
+   * a light-tier model call summarising the diff, sanitised by
+   * `extractCommitSubject`, falling back to a fixed string when no
+   * provider, no credentials, or unusable output.
+   *
+   * Only ever reached on the attended path: the gate prompts, and so
+   * proposes a subject, solely in an interactive TTY session.
+   */
+  commitMessage?: GitCommitMessageSource;
 }
+
+/** Values for {@link GitSafetyConfig.commitMessage}. */
+export type GitCommitMessageSource = "deterministic" | "llm";
+
+/** Default {@link GitSafetyConfig.commitMessage}. */
+export const DEFAULT_GIT_COMMIT_MESSAGE_SOURCE: GitCommitMessageSource = "deterministic";
+
+/**
+ * Default {@link HenchConfig.promptAgentToMarkInProgress}.
+ *
+ * False: hench performs the `in_progress` transition itself before the
+ * agent starts (`transitionToInProgress`), so instructing the agent to
+ * repeat it buys a tool round-trip and a second write of a value already on
+ * disk. Set the flag to restore the instruction.
+ */
+export const DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS = false;
 
 /**
  * Default {@link GitSafetyConfig.checkpointThreshold}: escalate the pre-run
@@ -297,6 +327,24 @@ export interface HenchConfig {
    * the user to approve the commit before running `git commit -F <file>`.
    */
   autoCommit?: boolean;
+  /**
+   * Keep the workflow step telling the agent to mark its task `in_progress`
+   * through `rex_update_status`.
+   *
+   * Off by default, and the instruction is gone with it, because hench has
+   * already made that transition before the agent is given the prompt —
+   * `transitionToInProgress` runs in both the API and CLI loops, ahead of
+   * the first turn. What the instruction bought was a tool round-trip and a
+   * second write of a value already on disk, which also leaves
+   * `.rex/prd_tree/` dirty at a moment the uncommitted-work gate inspects.
+   *
+   * This governs the `in_progress` step only. The *completion* step stays
+   * regardless: the agent's `rex_update_status(completed)` call does not
+   * write the PRD — rex parks it on the task claim and hench applies it
+   * after the test gate — and it carries the `resolutionType` and
+   * `resolutionDetail` nothing else can supply.
+   */
+  promptAgentToMarkInProgress?: boolean;
   /**
    * When true, runs are in autonomous mode (non-interactive) without passing
    * --auto/--loop/--epic-by-epic on every invocation. In this mode:

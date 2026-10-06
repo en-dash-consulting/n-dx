@@ -13,7 +13,6 @@ import {
  resolveRexPaths } from "../../store/index.js";
 import { findItem } from "../../core/tree.js";
 import { getFolderTreePath } from "../folder-tree-path.js";
-import { syncFolderTree } from "./folder-tree-sync.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 
 import { CLIError } from "../errors.js";
@@ -1076,7 +1075,6 @@ async function acceptProposals(
   await clearPending(dir);
 
   // Persist the updated tree to the folder structure.
-  await syncFolderTree(rexDir, store);
 
   // Resolve folder-tree paths for newly added items. Items removed by the
   // empty-container cleanup above are naturally excluded since they're no

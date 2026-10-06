@@ -6,6 +6,8 @@ export {
   PERMISSION_MODES,
   isPermissionMode,
   DEFAULT_CHECKPOINT_THRESHOLD,
+  DEFAULT_GIT_COMMIT_MESSAGE_SOURCE,
+  DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS,
   DEFAULT_PRUNE_CONFIG,
   MIN_PRUNE_PAIRS,
 } from "./v1.js";
@@ -16,6 +18,7 @@ export type {
   RetryConfig,
   PruneConfig,
   GitSafetyConfig,
+  GitCommitMessageSource,
   HenchConfig,
   Provider,
   PermissionMode,
