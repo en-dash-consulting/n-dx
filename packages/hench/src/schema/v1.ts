@@ -430,9 +430,18 @@ export interface HenchConfig {
    * Milliseconds to wait after `.hench-commit-msg.txt` is first detected with
    * non-empty content before automatically committing staged changes.
    *
-   * This is a safety net for runs that terminate abnormally (timeout, crash)
-   * after the agent has staged its work but before n-dx processes the commit
-   * prompt. Set to 0 to disable auto-commit entirely. Default: 300000 (5 min).
+   * **Default 0 — disabled.** This commits mid-run, before the test gate,
+   * the uncommitted-work gate and the completion write have had their say,
+   * and it commits only what happens to be staged at that moment: no PRD
+   * paths, no review repairs, and nothing the agent staged afterwards. It
+   * then suppresses the real commit path, so the completion write never
+   * reaches a commit either.
+   *
+   * It was a safety net for runs that die after the agent staged its work
+   * but before finalization. That case is now covered without committing
+   * anything unverified: the uncommitted-work gate refuses to record the
+   * task done, and the next run's pre-run commit gate offers the leftovers
+   * as a checkpoint. A positive value restores the timer.
    */
   commitMsgTimeoutMs?: number;
   /**
