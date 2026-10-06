@@ -99,8 +99,8 @@ function runSuite(label, binary, args) {
       });
     }
 
-    // A spawn that never starts is a failed suite, not an absent one — the
-    // behaviour `execFileSyncCli` gives us by throwing.
+    // A spawn that never starts is a failed suite, not an absent one, just as
+    // a throwing synchronous spawn would be.
     child.on("error", (err) => {
       const message = `\nFailed to start ${label}: ${err.message}\n`;
       process.stderr.write(message);
