@@ -89,9 +89,14 @@ describe("validateDocument: run", () => {
     items: [{ id: "a", title: "A", status: "pending", level: "task", run }],
   });
 
-  it("accepts a valid block and rejects a malformed one", () => {
+  it("accepts any plain-object block (writers validate, the document stays lenient)", () => {
     expect(validateDocument(doc({ review: true })).ok).toBe(true);
-    expect(validateDocument(doc({ review: "yes" })).ok).toBe(false);
-    expect(validateDocument(doc({ extra: 1 })).ok).toBe(false);
+    expect(validateDocument(doc({ review: "yes" })).ok).toBe(true);
+    expect(validateDocument(doc({ vendor: "codex" })).ok).toBe(true);
+  });
+
+  it("still rejects a run that is not an object", () => {
+    expect(validateDocument(doc("fast")).ok).toBe(false);
+    expect(validateDocument(doc([1])).ok).toBe(false);
   });
 });

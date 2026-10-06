@@ -174,6 +174,13 @@ describe("fastWrites equivalence", () => {
     expect(await bothWays((s) => s.updateItem("t1", { status: "completed" }))).toEqual([]);
   });
 
+  it("agrees on a status change to an item carrying a malformed or newer run block", async () => {
+    expect(await bothWays(async (s) => {
+      await s.updateItem("t1", { run: { vendor: "codex", reviw: true } as never });
+      await s.updateItem("t1", { status: "completed" });
+    })).toEqual([]);
+  });
+
   it("agrees on a status change to a nested subtask", async () => {
     expect(await bothWays((s) => s.updateItem("s2", { status: "completed" }))).toEqual([]);
   });

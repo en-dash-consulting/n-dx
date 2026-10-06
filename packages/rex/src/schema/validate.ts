@@ -85,11 +85,11 @@ function boundedString(maxBytes: number) {
 /**
  * A saved `run` block: known keys only, each with the dashboard's bounds.
  *
- * Load vs write: the folder-tree parser keeps any plain-object `run` as
- * written (warning when it fails this schema), so one hand-edited block never
- * makes the PRD unreadable. Every store write validates the whole document
- * against {@link PRDItemSchema}, so a malformed block is refused on write
- * until it is fixed.
+ * Writers validate, the document stays lenient: {@link validateRunSettings}
+ * gates every writer that accepts `run` from a caller (MCP, `rex update`, web).
+ * The document schema ({@link PRDItemSchema}) accepts any plain object, so one
+ * hand-edited or newer-version block never blocks writes to other items; the
+ * store round-trips it unchanged and `ndx work` ignores an invalid block.
  */
 export const RunSettingsSchema = z
   .object({
@@ -174,7 +174,7 @@ export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
         mergedAt: z.string(),
         source: z.literal("smart-add"),
       }).strict()).optional(),
-      run: RunSettingsSchema.optional(),
+      run: z.record(z.string(), z.unknown()).optional(),
       children: z.array(PRDItemSchema).optional(),
     })
     .passthrough(),

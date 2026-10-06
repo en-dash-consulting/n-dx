@@ -887,15 +887,15 @@ function buildItem(
 
   // run: kept whenever it is a non-empty plain object, even one that fails
   // RunSettingsSchema, so a hand-edited block never makes the PRD unreadable
-  // or vanishes on the next save. The store's write-time document validation
-  // refuses it until it is fixed; the warning names the problem.
+  // or vanishes on the next save (this also keeps keys from newer versions).
+  // Writers validate their own input; `ndx work` ignores an invalid block.
   const run = fm["run"];
   if (isPlainObject(run)) {
     if (Object.keys(run).length > 0) {
       (item as Record<string, unknown>).run = run;
       const check = validateRunSettings(run);
       if (!check.ok) {
-        warnings.push({ path: filePath, message: `Invalid ${check.error} (item id=${id}); writes are refused until it is fixed` });
+        warnings.push({ path: filePath, message: `Invalid ${check.error} (item id=${id}); ndx work ignores this block until it is fixed` });
       }
     }
   } else if (run !== null && run !== undefined) {

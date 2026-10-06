@@ -194,22 +194,26 @@ describe("Store roundtrip integration", () => {
       expect((await store.getItem("e-empty"))?.run).toBeUndefined();
     });
 
-    it("refuses to write an unknown key or a wrong type", async () => {
-      await store.addItem({ id: "e-bad", title: "Epic", status: "pending", level: "epic" });
-      await expect(
-        store.updateItem("e-bad", { run: { colour: "blue" } as never }),
-      ).rejects.toThrow(/run/);
-      await expect(
-        store.updateItem("e-bad", { run: { maxTurns: 501 } }),
-      ).rejects.toThrow(/run/);
-      await expect(
-        store.saveDocument({
-          schema: SCHEMA_VERSION,
-          title: "T",
-          items: [{ id: "x", title: "X", status: "pending", level: "epic", run: { review: "yes" } as never }],
-        }),
-      ).rejects.toThrow(/run/);
-      expect((await store.getItem("e-bad"))?.run).toBeUndefined();
+    it("leaves run validation to the writers: the store keeps any plain-object block", async () => {
+      await store.addItem({ id: "e-lenient", title: "Epic", status: "pending", level: "epic" });
+      await store.updateItem("e-lenient", { run: { colour: "blue" } as never });
+      expect((await store.getItem("e-lenient"))?.run).toEqual({ colour: "blue" });
+    });
+
+    it("keeps writing other items, and keeps the block unchanged, when one run is malformed or newer", async () => {
+      await store.addItem({ id: "e-a", title: "A", status: "pending", level: "epic", run: { review: true } });
+      await store.addItem({ id: "e-b", title: "B", status: "pending", level: "epic" });
+      const file = await taskFile("e-a");
+      const raw = await readFile(file, "utf-8");
+      const bad = '{"reviw":true,"vendor":"codex","maxTurns":"x"}';
+      await writeFile(file, raw.replace('run: {"review":true}', "run: " + bad), "utf-8");
+
+      await store.updateItem("e-b", { priority: "high" });
+      await store.updateItem("e-a", { priority: "low" });
+
+      expect((await store.getItem("e-b"))?.priority).toBe("high");
+      expect((await store.getItem("e-a"))?.run).toEqual(JSON.parse(bad));
+      expect(await readFile(await taskFile("e-a"), "utf-8")).toContain("run: " + bad);
     });
 
     it("still loads the PRD when one item's run was hand-edited into a malformed block", async () => {

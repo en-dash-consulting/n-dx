@@ -206,7 +206,7 @@ run: {"model":"claude-opus-5-5","review":true,"permissionMode":"acceptEdits"}
 | `tokenBudget` | integer ≥ 0 (`0` = unlimited) |
 | `contextNotes` | string, ≤8 KiB (notes for the agent) |
 
-Validation is strict: an unknown key, a wrong type or an out-of-range value is rejected by one shared validator (`validateRunSettings`). An empty block `{}` is the same as no block and is never written. Loading is lenient — a malformed hand-edited block warns and keeps the PRD readable — but every store write validates the whole document, so writes are refused until the block is fixed. Launch-time options (workspace, allowDirty, fresh, resetDeferred) are chosen per launch and are never saved.
+Validation is strict: an unknown key, a wrong type or an out-of-range value is rejected by one shared validator (`validateRunSettings`). An empty block `{}` is the same as no block and is never written. Writers reject bad input; the store itself is lenient. A malformed hand-edited block, or one with keys from a newer ndx, warns on load, round-trips through saves unchanged and never blocks writes to other items; `ndx work` ignores an invalid block with a warning until it is fixed. Launch-time options (workspace, allowDirty, fresh, resetDeferred) are chosen per launch and are never saved.
 
 Writers: MCP `add_item` / `edit_item` (an object replaces the whole block, `null` removes it), `rex update --run='<json>'` (`--run=` or `--run=null` clears it), and, from PR 4, the dashboard's Prepare task Save. `PATCH /api/rex/items/:id` does **not** write `run`.
 
