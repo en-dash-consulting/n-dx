@@ -37,7 +37,7 @@ plannedRelease: "1.0.0"
 | [Placement engine for changes](./placement-engine-for-changes/index.md) | pending |
 | [Read and write the v2 folder trees](./read-and-write-the-v2-folder-trees/index.md) | pending |
 | [Recommendations become changes](./recommendations-become-changes/index.md) | pending |
-| [Remove the unused tracker integrations](./remove-the-unused-tracker-integrations/index.md) | pending |
+| [Remove the unused tracker integrations](./remove-the-unused-tracker-integrations/index.md) | completed |
 | [Route remaining state paths through the layout resolver](./route-remaining-state-paths-through/index.md) | pending |
 | [Select and complete work on changes](./select-and-complete-work-on-changes/index.md) | pending |
 | [Shared assistant guidance for every vendor](./shared-assistant-guidance-for-every/index.md) | pending |
