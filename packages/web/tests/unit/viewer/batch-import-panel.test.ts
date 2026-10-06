@@ -300,6 +300,49 @@ describe("BatchImportPanel", () => {
     });
   });
 
+  // ── LoE pass-through ──────────────────────────────────────────────
+
+  describe("accepting proposals", () => {
+    it("posts loe, loeRationale and loeConfidence from the proposal", async () => {
+      const proposals = [{
+        epic: { title: "E", source: "batch", description: "d" },
+        features: [{
+          title: "F", source: "batch", description: "d",
+          tasks: [{
+            title: "T", source: "batch", sourceFile: "", description: "d",
+            priority: "high", tags: [],
+            loe: 1.5, loeRationale: "Two providers, one callback", loeConfidence: "medium",
+          }],
+        }],
+      }];
+      fetchSpy.mockImplementation(async (url: string) => ({
+        ok: true,
+        json: () => Promise.resolve(url === "/api/rex/batch-import" ? { proposals, confidence: 80 } : {}),
+      }));
+
+      const root = renderToDiv(h(BatchImportPanel, { onPrdChanged: vi.fn() }));
+      root.querySelector<HTMLButtonElement>(".batch-import-add-text-btn")?.click();
+      await flush();
+      const textarea = root.querySelector<HTMLTextAreaElement>(".batch-import-item-textarea")!;
+      const inputEvent = new Event("input", { bubbles: true });
+      Object.defineProperty(inputEvent, "target", { value: { value: "Add user auth" } });
+      textarea.dispatchEvent(inputEvent);
+      await flush();
+      root.querySelector<HTMLButtonElement>(".batch-import-process-btn")?.click();
+      for (let i = 0; i < 5; i++) await flush();
+
+      root.querySelector<HTMLButtonElement>(".smart-add-btn-accept")!.click();
+      for (let i = 0; i < 5; i++) await flush();
+
+      const call = fetchSpy.mock.calls.find((c) => c[0] === "/api/rex/proposals/accept-edited");
+      expect(call).toBeTruthy();
+      const task = JSON.parse(call![1].body).proposals[0].features[0].tasks[0];
+      expect(task.loe).toBe(1.5);
+      expect(task.loeRationale).toBe("Two providers, one callback");
+      expect(task.loeConfidence).toBe("medium");
+    });
+  });
+
   // ── Progress indicator ────────────────────────────────────────────
 
   describe("processing progress indicator", () => {
