@@ -441,8 +441,8 @@ function reconstructParentFromChildMetadata(
     parent.acceptanceCriteria = parentAcceptanceCriteria;
   }
 
-  const parentLoe = childRecord.__parentLoe as string | undefined;
-  if (parentLoe !== undefined) {
+  const parentLoe = asLoe(childRecord.__parentLoe);
+  if (parentLoe !== null) {
     (parent as Record<string, unknown>).loe = parentLoe;
   }
 
@@ -872,14 +872,23 @@ function buildItem(
     item.acceptanceCriteria = [];
   }
 
-  const loe = asString(fm["loe"]);
-  if (loe !== null) (item as PRDItem & { loe: string }).loe = loe;
+  // loe is engineer-weeks (number); a legacy non-numeric string (e.g. "m") is kept as-is.
+  const loe = asLoe(fm["loe"]);
+  if (loe !== null) (item as Record<string, unknown>).loe = loe;
+
+  const loeRationale = asString(fm["loeRationale"]);
+  if (loeRationale !== null) (item as Record<string, unknown>).loeRationale = loeRationale;
+
+  const loeConfidence = asString(fm["loeConfidence"]);
+  if (loeConfidence === "low" || loeConfidence === "medium" || loeConfidence === "high") {
+    (item as Record<string, unknown>).loeConfidence = loeConfidence;
+  }
 
   // Preserve unknown fields (forward-compat: round-trip fidelity for future extensions)
   const knownKeys = new Set([
     "id", "level", "title", "status", "description", "priority", "tags", "blockedBy", "ready",
     "source", "startedAt", "completedAt", "endedAt", "resolutionType",
-    "resolutionDetail", "failureReason", "acceptanceCriteria", "loe",
+    "resolutionDetail", "failureReason", "acceptanceCriteria", "loe", "loeRationale", "loeConfidence",
   ]);
   for (const [k, v] of Object.entries(fm)) {
     if (!knownKeys.has(k) && v !== null && v !== undefined) {
@@ -1338,6 +1347,14 @@ function asString(v: unknown): string | null {
   if (typeof v === "string") return v;
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   return null;
+}
+
+/** Coerce a number or numeric string to a number; other strings pass through. */
+function asLoe(v: unknown): number | string | null {
+  if (typeof v === "number") return Number.isFinite(v) ? v : String(v);
+  const s = asString(v);
+  if (s === null) return null;
+  return /^-?(\d+\.?\d*|\.\d+)$/.test(s.trim()) ? Number(s) : s;
 }
 
 /**

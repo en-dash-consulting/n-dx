@@ -257,6 +257,45 @@ describe("ProposalEditor", () => {
     });
   });
 
+  // ─── LoE pass-through ──────────────────────────────────────────────
+
+  describe("LoE pass-through", () => {
+    it("posts loe, loeRationale and loeConfidence, also after the task title is edited", async () => {
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const proposal = makeProposal("E", [{ tasks: [{ title: "Original" }] }]);
+      Object.assign(proposal.features[0].tasks[0], {
+        loe: 1.5,
+        loeRationale: "Two providers, one callback",
+        loeConfidence: "medium",
+      });
+      renderEditor([proposal]);
+
+      act(() => {
+        root.querySelector<HTMLButtonElement>(".proposal-editor-feature .proposal-editor-expand")!.click();
+        vi.advanceTimersByTime(0);
+      });
+      const titleInput = root.querySelector<HTMLInputElement>(".proposal-editor-task .proposal-editor-input-title")!;
+      act(() => {
+        titleInput.value = "Renamed";
+        titleInput.dispatchEvent(new Event("input", { bubbles: true }));
+        vi.advanceTimersByTime(0);
+      });
+      await act(async () => {
+        root.querySelector<HTMLButtonElement>(".proposal-editor-btn-accept")!.click();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith("/api/rex/proposals/accept-edited", expect.anything());
+      const task = JSON.parse(fetchSpy.mock.calls[0][1].body).proposals[0].features[0].tasks[0];
+      expect(task.title).toBe("Renamed");
+      expect(task.loe).toBe(1.5);
+      expect(task.loeRationale).toBe("Two providers, one callback");
+      expect(task.loeConfidence).toBe("medium");
+    });
+  });
+
   // ─── Expand/collapse ──────────────────────────────────────────────
 
   describe("expand/collapse", () => {

@@ -1,4 +1,5 @@
 import { similarity } from "../../analyze/dedupe.js";
+import { pickLoEFields } from "../../analyze/index.js";
 import { walkTree } from "../../core/tree.js";
 import { parsePRDFileDate } from "../../store/index.js";
 import type {
@@ -187,6 +188,7 @@ export function attachDuplicateReasonsToProposals(
               acceptanceCriteria: task.acceptanceCriteria,
               priority: task.priority,
               tags: task.tags,
+              ...pickLoEFields(task),
               ...(taskReason ? { duplicateReason: taskReason } : {}),
             };
           }),

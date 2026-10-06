@@ -826,7 +826,7 @@ const ORDERED_FIELDS: ReadonlyArray<string> = [
   "id", "level", "title", "status", "priority", "tags", "blockedBy", "ready", "source",
   "startedAt", "completedAt", "endedAt",
   "resolutionType", "resolutionDetail", "failureReason",
-  "acceptanceCriteria", "loe", "description",
+  "acceptanceCriteria", "loe", "loeRationale", "loeConfidence", "description",
 ];
 
 /**
@@ -845,8 +845,12 @@ const ORDERED_FIELDS: ReadonlyArray<string> = [
 const STORAGE_FIELDS = new Set([
   "children", "branch", "sourceFile",
   "activeIntervals", "mergedProposals",
-  "tokenUsage", "duration", "loeRationale", "loeConfidence",
+  "tokenUsage", "duration",
 ]);
+
+function isLoeConfidence(value: unknown): boolean {
+  return value === "low" || value === "medium" || value === "high";
+}
 
 /**
  * Emit YAML frontmatter lines for `item` into `lines`.
@@ -861,8 +865,10 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
   for (const key of ORDERED_FIELDS) {
     const value = (item as Record<string, unknown>)[key];
     if (value === undefined || value === null) continue;
-    emitYamlField(lines, key, value);
+    // loeConfidence is an enum; an out-of-range value is dropped, not stored.
     emitted.add(key);
+    if (key === "loeConfidence" && !isLoeConfidence(value)) continue;
+    emitYamlField(lines, key, value);
   }
 
   // Emit unknown extra fields alphabetically (round-trip fidelity), but
@@ -896,8 +902,9 @@ export function emitYamlField(lines: string[], key: string, value: unknown): voi
     } else {
       lines.push(`${key}:`);
       for (const item of value) {
-        if (item !== null && typeof item === "object" && !Array.isArray(item)) {
-          // Object items emit as inline JSON (valid YAML flow mapping).
+        if (item !== null && typeof item === "object") {
+          // Any object item (plain, class instance, null-prototype, nested
+          // array) emits as inline JSON — never `String(item)`.
           lines.push(`  - ${JSON.stringify(item)}`);
         } else {
           lines.push(`  - ${JSON.stringify(String(item))}`);
@@ -905,9 +912,14 @@ export function emitYamlField(lines: string[], key: string, value: unknown): voi
       }
     }
   } else if (value !== null && typeof value === "object") {
-    // Plain objects emit as inline JSON (valid YAML flow mapping).
+    // Any object emits as inline JSON (valid YAML flow mapping), including
+    // class instances and null-prototype objects; `String(value)` would
+    // write "[object Object]".
     lines.push(`${key}: ${JSON.stringify(value)}`);
   } else if (typeof value === "boolean") {
+    lines.push(`${key}: ${value}`);
+  } else if (key === "loe" && typeof value === "number" && Number.isFinite(value)) {
+    // loe is engineer-weeks: a bare number reads back as a number.
     lines.push(`${key}: ${value}`);
   } else {
     lines.push(`${key}: ${JSON.stringify(String(value))}`);
