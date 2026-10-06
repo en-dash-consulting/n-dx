@@ -42,7 +42,7 @@ The web package forms a hub topology with `web-viewer` at the centre:
 
 `web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `src/shared/`, while also receiving imports from sub-directories such as `crash/`. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `src/shared/` is the foundation layer with zero upward dependencies, enforced by `boundary-check.test.ts`.
 
-Measured zone metrics are not reproduced here — they change with every analysis. Run `ndx analyze --deep .` and read `.sourcevision/zones.json`; per-package policies live in `packages/*/CLAUDE.md`.
+Measured zone metrics are not reproduced here — they change with every analysis. Run `ndx analyze --deep .` and read `.sourcevision/zones.json`; per-package policies live in `packages/*/AGENTS.md`.
 
 ##### Monorepo-wide zone fragility governance
 
@@ -140,7 +140,7 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 Claude Code loads a package's own `CLAUDE.md` when work happens under that directory — `packages/web/CLAUDE.md`, `packages/rex/CLAUDE.md`, `packages/hench/CLAUDE.md`, `packages/core/CLAUDE.md`, `packages/llm-client/CLAUDE.md`. Each is a one-line `@AGENTS.md` import; the guidance itself is in the sibling `AGENTS.md`, so edit it there.
 
-`.claude/rules/` narrows a package's guidance to the directory you are editing (`packages/core/**`, `packages/web/src/server/**`, `packages/web/src/viewer/**`). Only Claude Code reads it, so it is for pointers, not content: do not add a registry or a policy table here, because it would be invisible to every other assistant. Its three current files still carry a full copy of sections that also live in `packages/core/AGENTS.md` and `packages/web/AGENTS.md` — edit the AGENTS.md copy, which is the canonical one; `tests/e2e/instruction-alignment.test.js` fails if the two diverge.
+`.claude/rules/` narrows a package's guidance to the directory you are editing (`packages/core/**`, `packages/web/src/server/**`, `packages/web/src/viewer/**`). Only Claude Code reads it, so it is for pointers, not content: do not add a registry or a policy table here, because it would be invisible to every other assistant. Its three current files still carry a full copy of sections that also live in `packages/core/AGENTS.md` and `packages/web/AGENTS.md` — the AGENTS.md copy is the canonical one, so edit it first and then make the same edit in the rule file. `tests/e2e/instruction-alignment.test.js` fails when the two copies' table rows differ in either direction; it does not compare their prose.
 
 
 ### Package conventions

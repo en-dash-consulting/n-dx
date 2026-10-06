@@ -99,9 +99,11 @@ beyond core and web. Those two, plus `web-gateway-boundary.md`, still hold a
 full second copy of content that now also lives in `packages/core/AGENTS.md` and
 `packages/web/AGENTS.md`: `.claude/` is a protected path, so reducing them to
 pointers needs an interactive approval and has not happened yet. Until it does,
-the test pins every table row in a rule file to the AGENTS.md that owns it, so
-the two copies cannot become two different registries. **Edit the AGENTS.md
-copy** — it is the one every assistant reads.
+the test requires each rule file's table rows to match its section in the owning
+AGENTS.md row for row, in both directions, so a seam added to one copy fails
+until it is added to the other. Prose is not compared. **Edit the AGENTS.md
+copy first** — it is the one every assistant reads — and make the same edit in
+the rule file.
 
 **Rule:** Every new row added to either table requires a corresponding
 integration test in the same PR. Never widen the gap between table entries and

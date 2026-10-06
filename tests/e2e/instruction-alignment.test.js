@@ -215,6 +215,13 @@ describe("vendor-neutral sections reach every assistant", () => {
     ).toEqual([]);
   });
 
+  it("AGENTS.md never sends its reader to a package CLAUDE.md", () => {
+    // Codex cannot load CLAUDE.md, and every package CLAUDE.md is now only an
+    // @AGENTS.md import. A pointer at one — even a glob like
+    // packages/*/CLAUDE.md — sends Codex to a file it will never read.
+    expect(agentsContent).not.toMatch(/packages\/[^\s`]*\/CLAUDE\.md/);
+  });
+
   it("AGENTS.md carries the gateway rules", () => {
     expect(agentsContent).toContain("One gateway per source package");
     expect(agentsContent).toContain("Re-export only");
@@ -474,8 +481,9 @@ describe("package instruction surfaces", () => {
  * only an interactive approval can write, so the migration that moved these
  * registries into AGENTS.md could not also rewrite them. Until that follow-up
  * lands there are two copies, and the drift guard below is what keeps them from
- * becoming two *different* registries — every table row in a rule file must
- * appear verbatim in the package AGENTS.md that now owns it.
+ * becoming two *different* registries — a rule file's table rows must match the
+ * rows of its section in the owning AGENTS.md, in both directions. It compares
+ * tables only; prose in the two copies can still drift.
  *
  * When the rule files are reduced to pointers, delete `pinnedAgainstDrift` and
  * assert instead that each file contains no table row at all.
@@ -529,20 +537,43 @@ describe("path-scoped injection seam rules", () => {
   );
 
   it.each(pinnedAgainstDrift)(
-    "$rule has not drifted from packages/$pkg/AGENTS.md",
+    "$rule has the same table rows as its section in packages/$pkg/AGENTS.md",
     ({ rule, pkg }) => {
-      const ruleRows = readFileSync(join(RULES_DIR, rule), "utf-8")
+      // Both directions, and scoped to the owning section. The docs tell
+      // authors to edit the AGENTS.md copy, so the drift that actually happens
+      // is a row added there and not here: a one-way "rule ⊆ AGENTS" check
+      // stays green on exactly that edit, while Claude Code — which loads both
+      // copies under these paths — reads two registries that disagree.
+      // Prose (rules lists, exemptions) is not compared; only table rows are.
+      const ruleText = readFileSync(join(RULES_DIR, rule), "utf-8");
+      const title = ruleText
         .split("\n")
-        .filter((line) => line.startsWith("| ") && !/^\|[\s|-]+\|$/.test(line));
+        .find((line) => line.startsWith("# "))
+        .slice(2)
+        .trim();
       const agents = readFileSync(join(ROOT, "packages", pkg, "AGENTS.md"), "utf-8");
+      const start = agents.indexOf(`## ${title}`);
+      const next = agents.indexOf("\n## ", start + 1);
+      const section = agents.slice(start, next === -1 ? undefined : next);
 
-      const missing = ruleRows.filter((row) => !agents.includes(row));
+      const rowsOf = (text) =>
+        text
+          .split("\n")
+          .filter((line) => line.startsWith("| ") && !/^\|[\s|-]+\|$/.test(line));
+      const ruleRows = rowsOf(ruleText);
+      const agentsRows = rowsOf(section);
+
+      const fix =
+        `.claude/rules/${rule} still holds a second copy of this table, so the ` +
+        `two must match row for row until it is reduced to a pointer (task ` +
+        `f2d64d8a). Make the same edit in both files.`;
       expect(
-        missing,
-        `.claude/rules/${rule} still holds a second copy of this registry, and ` +
-          `these rows are no longer in packages/${pkg}/AGENTS.md — the copy ` +
-          `every assistant other than Claude Code reads. Update the AGENTS.md ` +
-          `copy too, or finish reducing the rule file to a pointer.`,
+        ruleRows.filter((row) => !agentsRows.includes(row)),
+        `rows in .claude/rules/${rule} missing from packages/${pkg}/AGENTS.md. ${fix}`,
+      ).toEqual([]);
+      expect(
+        agentsRows.filter((row) => !ruleRows.includes(row)),
+        `rows in packages/${pkg}/AGENTS.md missing from .claude/rules/${rule}. ${fix}`,
       ).toEqual([]);
     },
   );
