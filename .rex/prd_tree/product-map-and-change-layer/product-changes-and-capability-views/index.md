@@ -23,4 +23,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Build the Product page, Changes view and capability page from fixtures](./build-the-product-page-changes-view.md) | pending |
+| [Build the Product page, Changes view and capability page from fixtures](./build-the-product-page-changes-view.md) | in_progress |
