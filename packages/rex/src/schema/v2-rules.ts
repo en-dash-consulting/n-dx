@@ -257,7 +257,8 @@ const DAY_MS = 86_400_000;
  * change amends it (an amended one is "changing" instead). A node never met
  * (`metAt` absent) is proposed, not revised. Age is measured from
  * `revisedAt`, which the state writer stamps when a spec edit first makes the
- * hash differ from `metAt`. It is not measured from `lastModified`, because
+ * hash differ from `metAt` and clears whenever the hash equals `metAt` again
+ * (see `ItemState.revisedAt`). It is not measured from `lastModified`, because
  * every state write (checks, specReviewed) re-stamps that. Without
  * `revisedAt` the age is unknown and nothing is reported.
  */

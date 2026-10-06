@@ -405,8 +405,10 @@ export interface ItemState {
   /**
    * Map nodes: when the spec became revised. The state writer stamps it when a
    * spec edit first makes the spec hash differ from `metAt`, and keeps it
-   * across later edits and state writes. It clears it when `metAt` is
-   * re-stamped. `long-revised` measures age from it, not from `lastModified`.
+   * across later edits and state writes. It clears it whenever the hash equals
+   * `metAt` again: `metAt` is re-stamped, or the spec is reverted to its met
+   * text. Otherwise a later revision would inherit the earlier one's age.
+   * `long-revised` measures age from it, not from `lastModified`.
    */
   revisedAt?: string;
   /** Map nodes: a person reviewed the spec text. */
