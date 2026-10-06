@@ -78,6 +78,34 @@ export interface NarrationState {
   reason?: string;
 }
 
+/**
+ * Who a repository is, recorded on its analysis manifest.
+ *
+ * Read once by `util/git-remote.ts`; the iso export reads the same remote for
+ * its source links, so the two cannot disagree about what it says. Every
+ * remote field is nullable rather than optional: `null` says the analyser
+ * looked and there was no remote, which an absent key cannot say.
+ */
+export interface RepoIdentity {
+  /**
+   * The repository's name: the last segment of the remote path when there is
+   * a remote, and the analysed directory's own name when there is not.
+   */
+  name: string;
+  /** The `origin` remote as configured, or `null` when there is none. */
+  remoteUrl: string | null;
+  /** Host serving the remote (`github.com`, `bitbucket.org`), or `null`. */
+  remoteHost: string | null;
+  /** Path on that host (`owner/repo`), or `null`. */
+  remotePath: string | null;
+  /**
+   * Default branch, read locally from `origin/HEAD`. `null` when it is unset
+   * — a fresh or `--single-branch` clone — because a guessed default branch
+   * is worse than an absent one.
+   */
+  defaultBranch: string | null;
+}
+
 export interface Manifest {
   schemaVersion: string;
   toolVersion: string;
@@ -94,6 +122,18 @@ export interface Manifest {
    */
   analysisFingerprint?: string;
   targetPath: string;
+  /**
+   * Who this repository is, independent of where it happens to sit on disk.
+   *
+   * `targetPath` is a local path, so two analyses cannot be told apart or
+   * correlated once they leave their own directory — which is what cross-repo
+   * work needs. Optional, because an analysis produced before this field
+   * existed has none; `analyzers/manifest.ts` populates it on every run from
+   * then on, including for a directory with no git remote.
+   *
+   * @see util/git-remote.ts — the one reader of the remote
+   */
+  repo?: RepoIdentity;
   modules: Record<string, ModuleInfo>;
   /** Aggregate token usage from the most recent analyze run. */
   tokenUsage?: AnalyzeTokenUsage;

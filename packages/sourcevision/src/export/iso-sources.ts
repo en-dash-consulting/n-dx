@@ -15,7 +15,6 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { join, basename, resolve } from "node:path";
-import { execFileSync } from "node:child_process";
 import type {
   IsoFileInput,
   IsoKind,
@@ -23,6 +22,7 @@ import type {
   IsoSeamVerification,
   IsoZoneInput,
 } from "./iso-model.js";
+import { gitCommand, isGitWorkTree, readOriginUrl, remoteToWebUrl } from "../util/git-remote.js";
 import { asKind } from "./iso-model.js";
 import { scanProject } from "./iso-scan.js";
 import { loadDeclaredArchitecture, ndxContainer } from "./iso-declared.js";
@@ -81,40 +81,21 @@ interface GitInfo {
   webUrl?: string;
 }
 
-function git(root: string, args: string[]): string | undefined {
-  try {
-    return execFileSync("git", args, {
-      cwd: root,
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "ignore"],
-      timeout: 5000,
-    }).trim();
-  } catch {
-    return undefined;
-  }
-}
-
 /**
- * Normalize a git remote to a browsable base URL.
- * Handles `git@host:owner/repo.git` and `https://host/owner/repo.git`.
+ * Re-exported so the iso export's own callers keep importing it from here,
+ * while there is still only one implementation (`util/git-remote.ts`). The
+ * analysis manifest reads the same remote for the repository's identity, and
+ * the two must not disagree about what it says.
  */
-export function remoteToWebUrl(remote: string): string | undefined {
-  const cleaned = remote.trim().replace(/\.git$/, "");
-  const ssh = cleaned.match(/^[\w.-]+@([\w.-]+):(.+)$/);
-  if (ssh) return `https://${ssh[1]}/${ssh[2]}`;
-  const https = cleaned.match(/^https?:\/\/(?:[^@/]+@)?([\w.-]+\/.+)$/);
-  if (https) return `https://${https[1]}`;
-  return undefined;
-}
+export { remoteToWebUrl };
 
 export function readGitInfo(root: string): GitInfo {
-  const inside = git(root, ["rev-parse", "--is-inside-work-tree"]);
-  if (inside !== "true") return {};
-  const remote = git(root, ["config", "--get", "remote.origin.url"]);
+  if (!isGitWorkTree(root)) return {};
+  const remote = readOriginUrl(root);
   return {
-    sha: git(root, ["rev-parse", "HEAD"]),
-    branch: git(root, ["rev-parse", "--abbrev-ref", "HEAD"]),
-    committedAt: git(root, ["log", "-1", "--format=%cI"]),
+    sha: gitCommand(root, ["rev-parse", "HEAD"]),
+    branch: gitCommand(root, ["rev-parse", "--abbrev-ref", "HEAD"]),
+    committedAt: gitCommand(root, ["log", "-1", "--format=%cI"]),
     webUrl: remote ? remoteToWebUrl(remote) : undefined,
   };
 }

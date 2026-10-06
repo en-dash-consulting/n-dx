@@ -2049,7 +2049,36 @@ refresh(false);
 // packages/sourcevision/src/export/iso-sources.ts
 import { readFileSync as readFileSync3, existsSync as existsSync3 } from "node:fs";
 import { join as join3, basename as basename2, resolve as resolve2 } from "node:path";
+
+// packages/sourcevision/src/util/git-remote.ts
 import { execFileSync } from "node:child_process";
+function gitCommand(root, args) {
+  try {
+    return execFileSync("git", args, {
+      cwd: root,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5e3
+    }).trim();
+  } catch {
+    return void 0;
+  }
+}
+function isGitWorkTree(root) {
+  return gitCommand(root, ["rev-parse", "--is-inside-work-tree"]) === "true";
+}
+function readOriginUrl(root) {
+  const url = gitCommand(root, ["config", "--get", "remote.origin.url"]);
+  return url ? url : void 0;
+}
+function remoteToWebUrl(remote) {
+  const cleaned = remote.trim().replace(/\.git$/, "");
+  const ssh = cleaned.match(/^[\w.-]+@([\w.-]+):(.+)$/);
+  if (ssh) return `https://${ssh[1]}/${ssh[2]}`;
+  const https = cleaned.match(/^https?:\/\/(?:[^@/]+@)?([\w.-]+\/.+)$/);
+  if (https) return `https://${https[1]}`;
+  return void 0;
+}
 
 // packages/sourcevision/src/export/iso-scan.ts
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
@@ -2946,34 +2975,13 @@ var ARCHETYPE_KIND = {
   config: "support",
   "test-helper": "support"
 };
-function git(root, args) {
-  try {
-    return execFileSync("git", args, {
-      cwd: root,
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "ignore"],
-      timeout: 5e3
-    }).trim();
-  } catch {
-    return void 0;
-  }
-}
-function remoteToWebUrl(remote) {
-  const cleaned = remote.trim().replace(/\.git$/, "");
-  const ssh = cleaned.match(/^[\w.-]+@([\w.-]+):(.+)$/);
-  if (ssh) return `https://${ssh[1]}/${ssh[2]}`;
-  const https = cleaned.match(/^https?:\/\/(?:[^@/]+@)?([\w.-]+\/.+)$/);
-  if (https) return `https://${https[1]}`;
-  return void 0;
-}
 function readGitInfo(root) {
-  const inside = git(root, ["rev-parse", "--is-inside-work-tree"]);
-  if (inside !== "true") return {};
-  const remote = git(root, ["config", "--get", "remote.origin.url"]);
+  if (!isGitWorkTree(root)) return {};
+  const remote = readOriginUrl(root);
   return {
-    sha: git(root, ["rev-parse", "HEAD"]),
-    branch: git(root, ["rev-parse", "--abbrev-ref", "HEAD"]),
-    committedAt: git(root, ["log", "-1", "--format=%cI"]),
+    sha: gitCommand(root, ["rev-parse", "HEAD"]),
+    branch: gitCommand(root, ["rev-parse", "--abbrev-ref", "HEAD"]),
+    committedAt: gitCommand(root, ["log", "-1", "--format=%cI"]),
     webUrl: remote ? remoteToWebUrl(remote) : void 0
   };
 }

@@ -53,6 +53,14 @@ const AnalysisRunSchema = z.object({
   partition: PartitionReviewSchema.extend({ reused: z.boolean() }).optional(),
 });
 
+const RepoIdentitySchema = z.object({
+  name: z.string().min(1),
+  remoteUrl: z.string().nullable(),
+  remoteHost: z.string().nullable(),
+  remotePath: z.string().nullable(),
+  defaultBranch: z.string().nullable(),
+});
+
 export const ManifestSchema = z.object({
   schemaVersion: z.string(),
   toolVersion: z.string(),
@@ -61,6 +69,10 @@ export const ManifestSchema = z.object({
   gitBranch: z.string().optional(),
   analysisFingerprint: z.string().optional(),
   targetPath: z.string(),
+  // Optional, so a manifest written before repo identity existed still
+  // validates; nullable inside, so "looked and found no remote" is a thing
+  // the artifact can say.
+  repo: RepoIdentitySchema.optional(),
   modules: z.record(z.string(), ModuleInfoSchema),
   lastAnalysis: AnalysisRunSchema.optional(),
   narration: z.object({
