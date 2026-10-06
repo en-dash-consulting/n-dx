@@ -43,8 +43,8 @@ import { generatePrMarkdownFile } from "./pr-markdown.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
-import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger } from "../../analyzers/run-ledger.js";
-import { configureJudgmentCache } from "../../analyzers/judgment-cache.js";
+import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
+import { configureJudgmentCache, setJevObserver } from "@n-dx/llm-client";
 import {
   startAnalyzeProgress,
   finishAnalyzeProgress,
@@ -148,6 +148,9 @@ export async function initAndLoadLLMConfig(absDir: string): Promise<{
   setLLMConfig(llmConfig);
   setProjectDir(absDir);
   configureJudgmentCache({ svDir: resolveSourcevisionPaths(absDir).svDir });
+  // The Jev client is foundation-tier and cannot import the run ledger, so the
+  // accounting is handed to it here — once, beside the cache it also owns.
+  setJevObserver({ onCall: recordLLMCall, onCacheStats: recordJudgmentCache });
   const vendor = getLLMVendor();
   if (vendor) {
     printVendorModelHeader(vendor, llmConfig);

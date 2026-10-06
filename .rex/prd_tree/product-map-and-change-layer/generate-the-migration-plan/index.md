@@ -16,7 +16,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "ndx migrate --plan writes a reviewable plan and moves nothing. It reads the v1 tree only, so it can run early and feed the area review.\n\nRoadmap PR 13 · wave 1 · lane migration."
-lastModified: "2026-10-06T04:19:32.857Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:24.007Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

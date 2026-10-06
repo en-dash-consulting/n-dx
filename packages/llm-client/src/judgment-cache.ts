@@ -19,11 +19,14 @@
  *
  * ## Storage
  *
+ * `<svDir>/.cache/judgments.json` — in practice
  * `.sourcevision/.cache/judgments.json`, machine-local, bounded by
  * {@link JUDGMENT_CACHE_MAX_ENTRIES} (oldest dropped), written atomically.
- * Safe to delete; the next run simply re-asks.
+ * Safe to delete; the next run simply re-asks. The caller names the directory
+ * through {@link configureJudgmentCache}, so this module holds no opinion
+ * about where a consumer keeps its state.
  *
- * @module sourcevision/analyzers/judgment-cache
+ * @module llm-client/judgment-cache
  */
 
 import { createHash } from "node:crypto";

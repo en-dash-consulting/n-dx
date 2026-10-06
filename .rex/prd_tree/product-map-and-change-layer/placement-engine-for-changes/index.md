@@ -16,7 +16,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Decides which capabilities a new change amends or touches. Three tiers: rules, the configured text model, Jev. Jev is optional.\n\nRoadmap PR 12 · wave 1 · lane rex-domain."
-lastModified: "2026-10-06T04:19:29.207Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:22.136Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
