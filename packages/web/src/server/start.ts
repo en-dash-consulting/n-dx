@@ -17,6 +17,7 @@ import { handleSourcevisionAskRoute } from "./routes-sourcevision-ask.js";
 import { handleIsoMapRoute } from "./routes-iso-map.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
+import { settleContextNotesRemovals, sweepStaleContextNotes } from "./run-options.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, closeWorktreeRunWatchers, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
 import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
@@ -31,6 +32,7 @@ import { handleGitRoute } from "./routes-git.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
 import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
 import { handleLiveTaskRoute } from "./routes-live-task.js";
+import { handleHenchPrepRoute } from "./routes-hench-prep.js";
 import { handleLiveAnalyzeRoute } from "./routes-live-analyze.js";
 import { watchAnalyzeProgress } from "./analyze-progress-watcher.js";
 import { stopRunTailWatches } from "./run-tail.js";
@@ -157,6 +159,8 @@ export function registerShutdownHandlers(
       shutdownActiveExecutions(),
       shutdownRexExecution(),
     ]);
+    // Runs that just ended remove their notes file from a `.finally`; wait for it.
+    await settleContextNotesRemovals();
     componentStatus.push({ component: "hench-executions", ok: henchResult.failed === 0 });
     componentStatus.push({
       component: "rex-execution",
@@ -813,6 +817,7 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, broadcast))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchPrepRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, broadcast, { onStatusInvalidate: invalidateRunCaches }))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleWorkflowRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleAdaptiveRoute(req, res, ctx))) return true;
@@ -1122,6 +1127,9 @@ export async function startServer(
   const anchorBroadcast = tagBroadcaster(ws.broadcast, workspaceTagOf(ctx));
   const everyWorkspaceBroadcast = tagBroadcaster(ws.broadcast, BROADCAST_ALL_WORKSPACES);
   if (isInScope(scope, "hench")) {
+    sweepStaleContextNotes().catch((err: unknown) => {
+      console.warn(`[hench] stale context-file sweep failed: ${(err as Error).message}`);
+    });
     startHeartbeatMonitor(watcherHandles.henchRunsDir, anchorBroadcast);
     startConcurrencyMonitor(ctx, anchorBroadcast);
     startMemoryMonitor(everyWorkspaceBroadcast, watcherHandles.henchRunsDir);

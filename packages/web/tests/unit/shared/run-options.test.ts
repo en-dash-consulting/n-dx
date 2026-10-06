@@ -1,0 +1,222 @@
+import { describe, it, expect } from "vitest";
+import {
+  RUN_OPTION_SPECS,
+  checkRunOptions,
+  checkRunMode,
+  runOptionArgs,
+  workCommandArgs,
+  MAX_DASHBOARD_ITERATIONS,
+  MIN_DASHBOARD_ITERATIONS,
+} from "../../../src/shared/index.js";
+
+describe("run options", () => {
+  it("treats absent options as none", () => {
+    expect(checkRunOptions(undefined)).toEqual({ ok: true, options: {} });
+    expect(runOptionArgs({})).toEqual([]);
+  });
+
+  it("refuses a leading '-' in every option whose value reaches the command line", () => {
+    for (const spec of RUN_OPTION_SPECS.filter((s) => s.type === "string" && s.via !== "file")) {
+      const input = spec.key === "reviewModel" ? { review: true, reviewModel: "-x" } : { [spec.key]: "-x" };
+      expect(checkRunOptions(input)).toMatchObject({ ok: false, key: spec.key });
+    }
+  });
+
+  it("writes every flag as one --flag or --flag=value word", () => {
+    const args = runOptionArgs(
+      { model: "m", maxTurns: 3, review: true, reviewModel: "r", contextNotes: "notes" },
+      "/tmp/ctx.md",
+    );
+    expect(args).toEqual(["--model=m", "--review", "--review-model=r", "--max-turns=3", "--context-file=/tmp/ctx.md"]);
+    for (const arg of args) expect(arg).toMatch(/^--[a-z-]+(=\S+)?$/);
+  });
+
+  it("leaves contextNotes off the command line until the server has written its file", () => {
+    expect(runOptionArgs({ contextNotes: "notes" })).toEqual([]);
+  });
+});
+
+describe("run options: values the command line must never carry", () => {
+  const flagStrings = RUN_OPTION_SPECS.filter((s) => s.type === "string" && s.via !== "file");
+  const optionsFor = (key: string, value: unknown) =>
+    key === "reviewModel" ? { review: true, reviewModel: value } : { [key]: value };
+
+  it.each([
+    ["a space", "a b"],
+    ["a tab", "a\tb"],
+    ["a newline", "a\nb"],
+    ["a carriage return", "a\rb"],
+    ["a NUL", "a\u0000b"],
+    ["an escape", "a\u001bb"],
+    ["DEL", "a\u007fb"],
+    ["a C1 control", "a\u0085b"],
+    ["a line separator", "a b"],
+    ["nothing", ""],
+  ])("refuses %s in every flag-valued string", (_name, value) => {
+    for (const spec of flagStrings) {
+      expect(checkRunOptions(optionsFor(spec.key, value)), spec.key).toMatchObject({ ok: false, key: spec.key });
+    }
+  });
+
+  it("accepts an ordinary model id in every flag-valued string", () => {
+    for (const spec of flagStrings) {
+      expect(checkRunOptions(optionsFor(spec.key, "claude-sonnet-4.5")), spec.key).toMatchObject({ ok: true });
+    }
+  });
+
+  it("lets contextNotes carry newlines and a leading '-', since its text goes to a file", () => {
+    expect(checkRunOptions({ contextNotes: "- a\n\tb" })).toMatchObject({ ok: true });
+  });
+
+  it.each(["__proto__", "constructor", "prototype", "toString", "hasOwnProperty"])(
+    "refuses %s as a key",
+    (key) => {
+      // JSON.parse makes "__proto__" an own property; an object literal would set the prototype.
+      const parsed = JSON.parse(`{"${key}": {"model": "m"}}`);
+      expect(checkRunOptions(parsed)).toMatchObject({ ok: false, key });
+    },
+  );
+
+  it("does not let a __proto__ key pollute anything", () => {
+    const result = checkRunOptions(JSON.parse('{"model": "m", "__proto__": {"review": true}}'));
+    expect(result).toMatchObject({ ok: false, key: "__proto__" });
+    expect(({} as Record<string, unknown>).review).toBeUndefined();
+  });
+
+  it.each([
+    ["maxTurns", "40"],
+    ["tokenBudget", "1000"],
+    ["review", "true"],
+    ["fresh", "false"],
+    ["allowDirty", 1],
+    ["skipTestGate", "yes"],
+    ["maxTurns", null],
+    ["model", 5],
+    ["provider", ["cli"]],
+  ])("refuses %s given as %j", (key, value) => {
+    expect(checkRunOptions({ [key]: value })).toMatchObject({ ok: false, key });
+  });
+
+  it("refuses non-object options", () => {
+    for (const bad of [null, "x", 3, true, []]) {
+      expect(checkRunOptions(bad)).toMatchObject({ ok: false, key: "options" });
+    }
+  });
+
+  it("refuses an unknown key even beside valid ones", () => {
+    expect(checkRunOptions({ model: "m", extra: 1 })).toMatchObject({ ok: false, key: "extra" });
+  });
+});
+
+describe("run options: integer bounds", () => {
+  const integers = RUN_OPTION_SPECS.filter((s) => s.type === "integer");
+
+  it("covers maxTurns 1..500 and tokenBudget 0..MAX_SAFE_INTEGER", () => {
+    expect(integers.map((s) => [s.key, s.min, s.max])).toEqual([
+      ["maxTurns", 1, 500],
+      ["tokenBudget", 0, Number.MAX_SAFE_INTEGER],
+    ]);
+  });
+
+  it("accepts each bound and refuses one past it", () => {
+    for (const spec of integers) {
+      expect(checkRunOptions({ [spec.key]: spec.min }), `${spec.key} min`).toMatchObject({ ok: true });
+      expect(checkRunOptions({ [spec.key]: spec.max }), `${spec.key} max`).toMatchObject({ ok: true });
+      expect(checkRunOptions({ [spec.key]: spec.min! - 1 }), `${spec.key} below`).toMatchObject({ ok: false, key: spec.key });
+      expect(checkRunOptions({ [spec.key]: spec.max! + 1 }), `${spec.key} above`).toMatchObject({ ok: false, key: spec.key });
+    }
+  });
+
+  it.each([1.5, NaN, Infinity, -Infinity, 1e21])("refuses %s", (value) => {
+    for (const spec of integers) {
+      expect(checkRunOptions({ [spec.key]: value }), spec.key).toMatchObject({ ok: false, key: spec.key });
+    }
+  });
+});
+
+describe("run modes in the command line", () => {
+  const base = { taskId: "t-1", options: {}, dir: "/repo" } as const;
+
+  it("adds nothing for a single run, so the argv is the one it always was", () => {
+    const always = workCommandArgs(base);
+    expect(workCommandArgs({ ...base, mode: "single" })).toEqual(always);
+    expect(always).toEqual(["work", "--task=t-1", "--auto", "/repo"]);
+  });
+
+  it("turns loop and iterations into the flags hench has always taken", () => {
+    expect(workCommandArgs({ ...base, mode: "loop" }))
+      .toEqual(["work", "--task=t-1", "--auto", "--loop", "/repo"]);
+    expect(workCommandArgs({ ...base, mode: "iterations", iterations: 7 }))
+      .toEqual(["work", "--task=t-1", "--auto", "--iterations=7", "/repo"]);
+  });
+
+  it("ignores a count outside the mode that uses it", () => {
+    expect(workCommandArgs({ ...base, mode: "loop", iterations: 7 })).not.toContain("--iterations=7");
+    expect(workCommandArgs({ ...base, mode: "single", iterations: 7 })).not.toContain("--iterations=7");
+  });
+
+  it("omits the flag rather than emitting a countless --iterations", () => {
+    // The server refuses `iterations` with no count; if one ever reached here
+    // the argv must not say `--iterations=undefined`.
+    expect(workCommandArgs({ ...base, mode: "iterations" }))
+      .toEqual(["work", "--task=t-1", "--auto", "/repo"]);
+  });
+
+  it("keeps the mode beside the run options and --reset-deferred", () => {
+    expect(workCommandArgs({
+      ...base,
+      mode: "iterations",
+      iterations: 3,
+      options: { model: "m" },
+      taskStatus: "deferred",
+    })).toEqual([
+      "work", "--task=t-1", "--auto", "--iterations=3", "--model=m", "--reset-deferred", "/repo",
+    ]);
+  });
+});
+
+describe("checkRunMode", () => {
+  it("reads an absent mode as single, the historical behaviour", () => {
+    expect(checkRunMode({})).toEqual({ ok: true, mode: "single" });
+    expect(checkRunMode({ mode: undefined })).toEqual({ ok: true, mode: "single" });
+    expect(checkRunMode({ mode: null })).toEqual({ ok: true, mode: "single" });
+  });
+
+  it("refuses a mode it does not recognise rather than falling back to single", () => {
+    // The fallback is the defect: a saturated hub queued `{ mode: "looop" }`
+    // as one task and ran it, where the direct route answered 400. A client
+    // that misspelled its mode asked for something, and one task is not it.
+    for (const mode of ["looop", "LOOP", "", "all", 3, true, {}]) {
+      expect(checkRunMode({ mode }), String(mode)).toMatchObject({ ok: false });
+    }
+    expect(checkRunMode({ mode: "looop" })).toEqual({
+      ok: false,
+      error: "mode must be one of: single, iterations, loop",
+    });
+  });
+
+  it("accepts loop with no count", () => {
+    expect(checkRunMode({ mode: "loop" })).toEqual({ ok: true, mode: "loop" });
+  });
+
+  it("requires a count inside the bounds for iterations", () => {
+    expect(checkRunMode({ mode: "iterations", iterations: 4 }))
+      .toEqual({ ok: true, mode: "iterations", iterations: 4 });
+    expect(checkRunMode({ mode: "iterations", iterations: MIN_DASHBOARD_ITERATIONS }))
+      .toMatchObject({ ok: true });
+    expect(checkRunMode({ mode: "iterations", iterations: MAX_DASHBOARD_ITERATIONS }))
+      .toMatchObject({ ok: true });
+
+    for (const iterations of [
+      undefined, MIN_DASHBOARD_ITERATIONS - 1, MAX_DASHBOARD_ITERATIONS + 1, 2.5, NaN, Infinity, "3",
+    ]) {
+      expect(checkRunMode({ mode: "iterations", iterations }), String(iterations))
+        .toMatchObject({ ok: false });
+    }
+  });
+
+  it("ignores a count the mode does not use", () => {
+    expect(checkRunMode({ mode: "loop", iterations: 99 })).toEqual({ ok: true, mode: "loop" });
+    expect(checkRunMode({ mode: "single", iterations: 99 })).toEqual({ ok: true, mode: "single" });
+  });
+});

@@ -12,6 +12,24 @@ import { deepMerge, loadProjectOverrideSources, mergeWithOverrides } from "./pro
 import type { ProjectOverrideSource } from "./project-config.js";
 import type { HenchConfig, ProjectLanguage } from "../schema/index.js";
 
+/**
+ * The top-level hench keys written in `.hench/config.json` or a project
+ * override (`.n-dx.json` / `.n-dx.local.json` `hench` section), as opposed to
+ * filled in by schema defaults during {@link loadConfig}. Lets a caller say a
+ * value came from `hench.<key>` rather than being built in.
+ */
+export async function loadConfiguredHenchKeys(henchDir: string): Promise<Set<string>> {
+  const keys = new Set<string>();
+  const data: unknown = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    for (const key of Object.keys(data)) keys.add(key);
+  }
+  for (const source of await loadProjectOverrideSources(henchDir, "hench")) {
+    for (const key of Object.keys(source.data)) keys.add(key);
+  }
+  return keys;
+}
+
 export async function ensureHenchDir(henchDir: string): Promise<void> {
   await mkdir(henchDir, { recursive: true });
   await mkdir(join(henchDir, "runs"), { recursive: true });

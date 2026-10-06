@@ -27,7 +27,9 @@ export {
 } from "./base-path.js";
 export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
 export { HUB_ADMISSION_HEADER, formatHubAdmissionHeader, parseHubAdmissionHeader } from "./hub-admission.js";
-export type { HubAdmissionHeader } from "./hub-admission.js";
+export type { HubAdmissionHeader, HubMemoryPressure } from "./hub-admission.js";
+export { RUN_OPTION_SPECS, CONTEXT_NOTES_MAX_BYTES, checkRunOptions, resetsDeferred, runOptionArgs, workCommandArgs, checkRunMode, RUN_MODES, MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "./run-options.js";
+export type { RunOptionSpec, RunOptions, RunOptionKey, RunOptionsCheck, WorkCommand, RunMode, RunModeCheck } from "./run-options.js";
 export {
   AUTH_COOKIE_NAME,
   AUTH_HEADER_NAME,

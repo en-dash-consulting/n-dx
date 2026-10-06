@@ -1526,6 +1526,22 @@ describe("commands route — self-heal stop", () => {
     expect(String(body.error)).toMatch(/not running|no self-heal/i);
   });
 
+  it("spawns ndx self-heal with --auto (no TTY to confirm on)", async () => {
+    stubManagedChild();
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/self-heal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ iterations: 2 }),
+    });
+    expect(res.status).toBe(202);
+
+    const args = spawnManagedMock.mock.calls[0][1] as string[];
+    expect(args).toContain("self-heal");
+    expect(args).toContain("--auto");
+    expect(args.indexOf("--auto")).toBeLessThan(args.indexOf(tmpDir));
+  });
+
   it("kills the running loop and records it as stopped", async () => {
     // The child exits on the SIGTERM the stop endpoint sends (a signal
     // death surfaces as a non-zero/null exit code, never exit 0).

@@ -229,6 +229,86 @@
   gap: var(--space-1);
 }
 
+/* The run-mode picker's row, under the split Start button it qualifies. Its
+   controls wrap together rather than the count dropping away from the mode it
+   belongs to. */
+.start-task-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.start-task-mode {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Secondary to the button by design: the picker qualifies the action, it is
+   not the action. Same height so the pair reads as one control. */
+.start-task-mode-select,
+.start-task-iterations {
+  font-size: var(--font-xs);
+  font-family: inherit;
+  color: var(--text-dim);
+  background: var(--bg-elevated, transparent);
+  border: 1px solid var(--border, #374151);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-1-5);
+  cursor: pointer;
+}
+
+.start-task-iterations {
+  width: 4.5rem;
+  cursor: text;
+}
+
+.start-task-mode-select:disabled,
+.start-task-iterations:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.start-task-mode-select:focus-visible,
+.start-task-iterations:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Shown only for the loop mode, which is the one choice whose end condition
+   is not obvious from its label. */
+.start-task-mode-hint {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  max-width: 260px;
+  text-align: center;
+}
+
+/* Split button: the primary opens Prepare task, the caret's menu holds Start now.
+   The container and menu are the shared .ready-split / .ready-menu rules. */
+.start-task-primary {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.start-task-caret {
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.task-live-link,
+.task-blockers {
+  font-size: var(--font-sm);
+}
+
+.task-blockers {
+  color: var(--text-dim);
+}
+
 .start-task-error {
   font-size: var(--font-xs);
   color: var(--red, #ef4444);
@@ -247,7 +327,7 @@
    rename and then stops, so it must not read as the obvious next click. */
 .start-task-migrate-btn {
   font-size: var(--font-xs);
-  color: var(--text-secondary, #9ca3af);
+  color: var(--text-dim);
   background: transparent;
   border: 1px solid var(--border, #374151);
   padding: var(--space-1) var(--space-2);
@@ -258,8 +338,8 @@
 }
 
 .start-task-migrate-btn:hover {
-  color: var(--text-primary, #e5e7eb);
-  border-color: var(--text-secondary, #9ca3af);
+  color: var(--text);
+  border-color: var(--text-dim);
 }
 
 .start-task-migrate-btn:disabled {
@@ -269,7 +349,7 @@
 
 .start-task-notice {
   font-size: var(--font-xs);
-  color: var(--text-secondary, #9ca3af);
+  color: var(--text-dim);
   max-width: 220px;
   text-align: center;
 }

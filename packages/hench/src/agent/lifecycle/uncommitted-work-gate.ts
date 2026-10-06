@@ -25,7 +25,12 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { execStdout } from "../../process/exec.js";
-import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
+import {
+  PRD_CACHE_DIRNAME,
+  PRD_TREE_DIRNAME,
+  TREE_META_FILENAME,
+} from "../../prd/rex-gateway.js";
+import { relativeToRoot, resolveLayout, type LayoutMode } from "../../prd/llm-gateway.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import {
   excludeHenchRuntimeArtifacts,
@@ -37,9 +42,9 @@ import {
 
 /**
  * One entry in the single definition of the PRD paths hench's own writes
- * touch. `PRD_STAGE_PATHS` and `PRD_COMMIT_PATHS` both derive from the list
- * below — the staged set and the discounted set have drifted twice, in both
- * directions, and each drift was invisible until a project hit it:
+ * touch. {@link prdStagePaths} and `PRD_COMMIT_PATHS` both derive from the
+ * list below — the staged set and the discounted set have drifted twice, in
+ * both directions, and each drift was invisible until a project hit it:
  * `tree-meta.json` was once discounted by nobody and staged by nobody, so
  * every completion was refused; then the execution log was staged by nobody
  * but still discounted, so in a project that tracks it every completion left
@@ -47,18 +52,27 @@ import {
  * start.
  */
 interface PrdWritePath {
-  /** Project-relative path, forward slashes, no trailing slash. */
+  /**
+   * Path relative to rex's own state directory — forward slashes, no leading
+   * or trailing slash. The directory it hangs off (`.rex` or `.ndx/rex`) comes
+   * from the layout resolver, never from a literal here: see
+   * {@link rexDirNameUnder}.
+   */
   path: string;
   /** A directory: the gate's discount covers everything beneath it. */
   isDirectory: boolean;
   /**
-   * Who lands the write. `"hench"`: the completion/reset commits stage it.
-   * `"operator"`: hench never stages it — the append-only execution log is
-   * gitignored by `rex init`, and in a repository that tracks it anyway the
-   * operator owns committing it; the completion path *reports* it
-   * ({@link listOperatorOwnedPrdDirt}) rather than leaving it silently dirty.
+   * Who lands the write.
+   *
+   * - `"hench"` — the completion/reset commits stage it.
+   * - `"operator"` — hench never stages it; the append-only execution log is
+   *   gitignored by `rex init`, and in a repository that tracks it anyway the
+   *   operator owns committing it, so the completion path *reports* it
+   *   ({@link listOperatorOwnedPrdDirt}) rather than leaving it silently dirty.
+   * - `"ephemeral"` — derived state with no author at all. Nobody stages it
+   *   and nobody is told about it; it is discounted and otherwise ignored.
    */
-  stagedBy: "hench" | "operator";
+  stagedBy: "hench" | "operator" | "ephemeral";
 }
 
 /**
@@ -70,38 +84,107 @@ interface PrdWritePath {
  * store save rewrites; in a project whose committed copy predated the schema
  * marker the rewrite changed its bytes, and as neither a runtime artifact nor
  * a tree path it once refused every task forever. The execution-log entries
- * carry each status transition's audit line. The legacy `.rex/prd.md` is
- * absent because no PRD mutation writes it any more (the commit prompt still
- * stages it when present, as a prompt-only legacy extra).
+ * carry each status transition's audit line. The legacy `prd.md` is absent
+ * because no PRD mutation writes it any more (the commit prompt still stages
+ * it when present, as a prompt-only legacy extra).
+ *
+ * `.cache/` is the dashboard's derived PRD snapshot (`.cache/prd.json`,
+ * rewritten by the `ndx start` file watcher on every tree write). It is
+ * nobody's work: `rex init` did not gitignore it until this entry's sibling
+ * change, so in a project that had the dashboard running during a run, the
+ * watcher's rewrite landed in the dirty tree and the completion gate counted
+ * a regenerable cache file as leaked work. `"ephemeral"` rather than
+ * `"operator"` because reporting it would only tell the operator to commit a
+ * file that must never be committed.
  */
 const PRD_WRITE_PATHS: readonly PrdWritePath[] = [
-  { path: `.rex/${PRD_TREE_DIRNAME}`, isDirectory: true, stagedBy: "hench" },
-  { path: `.rex/${TREE_META_FILENAME}`, isDirectory: false, stagedBy: "hench" },
-  { path: ".rex/execution-log.jsonl", isDirectory: false, stagedBy: "operator" },
-  { path: ".rex/execution-log.1.jsonl", isDirectory: false, stagedBy: "operator" },
+  { path: PRD_TREE_DIRNAME, isDirectory: true, stagedBy: "hench" },
+  { path: TREE_META_FILENAME, isDirectory: false, stagedBy: "hench" },
+  { path: "execution-log.jsonl", isDirectory: false, stagedBy: "operator" },
+  { path: "execution-log.1.jsonl", isDirectory: false, stagedBy: "operator" },
+  { path: PRD_CACHE_DIRNAME, isDirectory: true, stagedBy: "ephemeral" },
 ];
 
 /**
- * What the completion and reset-deferred commits stage (after per-path
- * existence and gitignore filtering — see `prdPathsToStage` in shared.ts).
+ * Rex's state directory under a named layout, spelled the way a git pathspec
+ * has to spell it — `.rex` or `.ndx/rex`.
+ *
+ * `"."` as the root is not a lookup: an explicit `mode` skips detection
+ * entirely, so nothing touches the disk and the result is purely the name.
+ * The point is that neither spelling is written out in this module — both come
+ * from the resolver, so a rename there reaches these patterns too. The twin of
+ * `henchDirNameUnder` in `store/artifacts.ts`, for the same reason.
  */
-export const PRD_STAGE_PATHS: readonly string[] = PRD_WRITE_PATHS
-  .filter((entry) => entry.stagedBy === "hench")
-  .map((entry) => entry.path);
+function rexDirNameUnder(mode: LayoutMode): string {
+  const layout = resolveLayout(".", { mode });
+  return relativeToRoot(layout, layout.rexDir);
+}
 
-/** PRD writes hench never stages; dirty ones are the operator's, and are said so. */
-export const OPERATOR_PRD_PATHS: readonly string[] = PRD_WRITE_PATHS
-  .filter((entry) => entry.stagedBy === "operator")
-  .map((entry) => entry.path);
+/** One layout's spelling of the definition's paths, as git pathspecs. */
+function prdPathsUnder(
+  mode: LayoutMode,
+  predicate: (entry: PrdWritePath) => boolean,
+  { trailingSlash = false }: { trailingSlash?: boolean } = {},
+): string[] {
+  const rexDirName = rexDirNameUnder(mode);
+  return PRD_WRITE_PATHS.filter(predicate).map((entry) => {
+    const path = `${rexDirName}/${entry.path}`;
+    return trailingSlash && entry.isDirectory ? `${path}/` : path;
+  });
+}
 
 /**
- * What the completion gate discounts: every PRD write path, staged-by-hench
- * or not. A trailing slash marks a directory prefix for
- * {@link findUncommittedWork}'s matcher.
+ * What the completion and reset-deferred commits stage in `projectDir`, before
+ * the per-path existence and gitignore filtering `prdPathsToStage` in
+ * shared.ts applies.
+ *
+ * A *writer*, so it resolves the project's actual layout: staging both
+ * spellings would hand `git add` a path that does not exist, which is an
+ * error, and writing the wrong one stages nothing at all. That is the bug this
+ * function replaced a constant to fix — the constant said `.rex/…`, so on a
+ * `.ndx/` project `prdPathsToStage` existence-checked a path nothing writes
+ * to, found none, and the completion commit landed empty while the gate (see
+ * {@link PRD_COMMIT_PATHS}) refused the task over the very writes it had just
+ * declined to stage.
  */
-export const PRD_COMMIT_PATHS: readonly string[] = PRD_WRITE_PATHS.map((entry) =>
-  entry.isDirectory ? `${entry.path}/` : entry.path,
-);
+export function prdStagePaths(projectDir: string): string[] {
+  return prdPathsUnder(resolveLayout(projectDir).mode, (e) => e.stagedBy === "hench");
+}
+
+/** Rex's state directory in `projectDir`, relative to it, with forward slashes. */
+export function rexDirName(projectDir: string): string {
+  const layout = resolveLayout(projectDir);
+  return relativeToRoot(layout, layout.rexDir);
+}
+
+/**
+ * PRD writes hench never stages; dirty ones are the operator's, and are said
+ * so. A *classifier* — see {@link PRD_COMMIT_PATHS} on why it covers both
+ * layouts rather than resolving one.
+ */
+export const OPERATOR_PRD_PATHS: readonly string[] = [
+  ...prdPathsUnder("legacy", (e) => e.stagedBy === "operator"),
+  ...prdPathsUnder("ndx", (e) => e.stagedBy === "operator"),
+];
+
+/**
+ * What the completion gate discounts: every PRD write path, whoever stages it.
+ * A trailing slash marks a directory prefix for {@link findUncommittedWork}'s
+ * matcher.
+ *
+ * Deliberately covers *both* layouts, like `HENCH_RUNTIME_GITIGNORE_ENTRIES`
+ * in `store/artifacts.ts` and for the same reason: this is a classifier, not a
+ * path constructor. It answers "is this line hench's own PRD bookkeeping?"
+ * about a path git handed it, and `.ndx/rex/prd_tree/…` is hench's PRD
+ * bookkeeping whoever is asking. No project has both shapes — `.ndx/` present
+ * *is* the new layout — so accepting both is not a false positive waiting to
+ * happen, and it spares the several call sites from threading a project root
+ * down to a string match.
+ */
+export const PRD_COMMIT_PATHS: readonly string[] = [
+  ...prdPathsUnder("legacy", () => true, { trailingSlash: true }),
+  ...prdPathsUnder("ndx", () => true, { trailingSlash: true }),
+];
 
 /** How many paths the refusal message lists before it truncates. */
 const MAX_REPORTED_PATHS = 20;
@@ -334,11 +417,11 @@ export async function listOperatorOwnedPrdDirt(projectDir: string): Promise<stri
  * found something — the log is never staged by hench, so silence here is what
  * turned a tracked log into a permanent pre-run-gate refusal.
  */
-export function formatOperatorPrdLeftovers(paths: string[]): string {
+export function formatOperatorPrdLeftovers(paths: string[], rexDir = ".rex"): string {
   return (
     `note: ${paths.length} PRD bookkeeping file(s) hench never commits are uncommitted:\n` +
     `${renderPaths(paths)}\n` +
-    `The execution log is yours to commit — or add .rex/execution-log*.jsonl to ` +
+    `The execution log is yours to commit — or add ${rexDir}/execution-log*.jsonl to ` +
     `.gitignore (rex init does), so PRD writes stop dirtying the tree.`
   );
 }

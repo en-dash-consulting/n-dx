@@ -76,5 +76,5 @@
 
 .repo-trust-strip__error {
   margin-top: var(--space-2);
-  color: var(--danger, #b3261e);
+  color: var(--red);
 }
