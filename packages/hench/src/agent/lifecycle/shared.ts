@@ -2557,6 +2557,26 @@ export async function updateCompletedTaskStatus(
 }
 
 /**
+ * What {@link performCommitPromptIfNeeded} did, so the caller knows whether the
+ * PRD completion record still needs a commit of its own.
+ *
+ * Only `declined` is a reason not to make one. A human who said no owns the
+ * working tree from that point, and landing PRD state they just refused to
+ * commit would take the decision back off them. Every other outcome leaves the
+ * record with no owner, which is the leak this type exists to close.
+ */
+export type CommitPromptOutcome =
+  /** autoCommit, or the run did not complete — the prompt never applied. */
+  | "not-applicable"
+  /** The prompt committed; the PRD paths rode along in that commit. */
+  | "committed"
+  /** A human declined at the prompt. Their tree, their call. */
+  | "declined"
+  /** The prompt bowed out: no message file, an empty one, an empty index, or
+   *  the watcher had already committed. Nothing of the PRD was committed. */
+  | "no-commit";
+
+/**
  * When the agent wrote a pending commit message, show it to the user and
  * prompt them to approve the commit. Runs `git commit -F <file>` on accept,
  * deletes the sentinel on both accept and decline.
@@ -2582,8 +2602,8 @@ export async function performCommitPromptIfNeeded(
   store?: PRDStore,
   taskId?: string,
   commitWatcher?: CommitMsgWatcher,
-): Promise<void> {
-  if (autoCommit || run.status !== "completed") return;
+): Promise<CommitPromptOutcome> {
+  if (autoCommit || run.status !== "completed") return "not-applicable";
 
   const { join } = await import("node:path");
   const { readFileSync, existsSync, unlinkSync } = await import("node:fs");
@@ -2594,20 +2614,20 @@ export async function performCommitPromptIfNeeded(
   // this point, the file may be gone. Check the watcher's flag to detect this case.
   if (commitWatcher?.didAutoCommit()) {
     detail("Auto-commit: timer-expiry auto-commit acknowledged — proceeding to next task.");
-    return;
+    return "no-commit";
   }
 
-  if (!existsSync(msgPath)) return;
+  if (!existsSync(msgPath)) return "no-commit";
 
   let message = "";
   try {
     message = readFileSync(msgPath, "utf-8").trim();
   } catch {
-    return;
+    return "no-commit";
   }
   if (!message) {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "no-commit";
   }
 
   // Reviewer repairs ride the same commit as the executor's work; the
@@ -2623,14 +2643,14 @@ export async function performCommitPromptIfNeeded(
       await withdrawCompletionClaim(store, run, run.error);
     }
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "no-commit";
   }
 
   const stagedCount = await countStagedFiles(projectDir);
   if (stagedCount === 0) {
     info("\nPending commit message found but no staged changes — skipping commit.");
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "no-commit";
   }
 
   subsection("Proposed Commit");
@@ -2650,7 +2670,7 @@ export async function performCommitPromptIfNeeded(
   if (!confirmed) {
     info(`Commit declined — ${stagedCount} file(s) left staged.`);
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "declined";
   }
 
   // Task completion criteria gate: verify code-classified tasks have code file changes.
@@ -2664,7 +2684,7 @@ export async function performCommitPromptIfNeeded(
       run.error = gateResult.reason;
       info(`\n${gateResult.reason}`);
       try { unlinkSync(msgPath); } catch { /* ignore */ }
-      return;
+      return "no-commit";
     }
   }
 
@@ -2713,7 +2733,7 @@ export async function performCommitPromptIfNeeded(
         info(`\n${run.error}`);
         await withdrawCompletionClaim(store, run, run.error);
         try { unlinkSync(msgPath); } catch { /* ignore */ }
-        return;
+        return "no-commit";
       }
     } catch (err) {
       // Best-effort: if PRD update fails, proceed with commit anyway
@@ -2884,6 +2904,10 @@ export async function performCommitPromptIfNeeded(
   } finally {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
   }
+
+  // Reached only by falling out of the commit block above: the commit ran,
+  // or it threw and the catch already marked the run failed.
+  return "committed";
 }
 
 // ---------------------------------------------------------------------------
@@ -3772,7 +3796,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // staged alongside code changes and included in the same commit.
   // The commitWatcher is checked to detect if the timer-expiry auto-commit
   // already fired and committed changes.
-  await performCommitPromptIfNeeded(
+  const commitPrompt = await performCommitPromptIfNeeded(
     run,
     projectDir,
     opts.autoCommit === true,
@@ -3783,13 +3807,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     opts.commitWatcher,
   );
 
-  // On the autoCommit path performCommitPromptIfNeeded is a no-op, so the
-  // completion metadata written by updateCompletedTaskStatus would otherwise
-  // be left uncommitted. Commit it now in a small dedicated second commit.
-  // Review repairs go first: the executor committed its own work before the
-  // review pass ran and the reviewer is barred from committing, so without
-  // this commit its must-fix repairs would be orphaned in the working tree
-  // and swept into whatever commit happens next.
+  // Review repairs: only the autoCommit path needs them swept here. The
+  // executor committed its own work before the review pass ran and the
+  // reviewer is barred from committing, so without this commit its must-fix
+  // repairs would be orphaned in the working tree and swept into whatever
+  // commit happens next. On the prompt path `stageReviewRepairs` already put
+  // them in that commit, and when neither owns them
+  // `commitOrphanedReviewRepairs` ran back at the gate (#483).
   if (opts.autoCommit === true && run.status === "completed" && run.taskId) {
     try {
       await commitReviewRepairsIfNeeded(projectDir, run);
@@ -3803,6 +3827,33 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       }
     }
 
+  }
+
+  // The PRD completion record gets a commit of its own on EVERY path that
+  // would otherwise leave it uncommitted — not just autoCommit, which was
+  // the whole of what this used to cover.
+  //
+  // `updateCompletedTaskStatus` writes the tree a few lines above, and on
+  // the prompt path the commit-attribution write lands *after* the commit it
+  // records. Either way the tree is dirty once the task is done. The
+  // autoCommit path had this second commit; the prompt path only ever got
+  // one by reaching its own `git commit`, and it bows out before that
+  // whenever the executor already committed for itself — no message file, an
+  // empty one, an empty index, or the watcher having fired first. All four
+  // are ordinary endings for a task where the agent commits as it goes, and
+  // every one of them left `prd_tree/` dirty with the task marked completed.
+  // The next autonomous run's pre-run gate then refused to start over a
+  // write hench had made itself: the task was done and the queue was stuck
+  // behind it.
+  //
+  // `declined` is the one exception. A human who said no at the prompt owns
+  // the working tree from that point, and landing PRD state they just
+  // refused to commit would take the decision back off them.
+  //
+  // Safe after a prompt that *did* commit: those PRD paths rode in that
+  // commit, so there is nothing left to stage — except the attribution
+  // write, which is exactly what this should pick up.
+  if (run.taskId && commitPrompt !== "declined") {
     if (run.status === "completed") {
       // Drained here, at the commit point, so the pathspec covers every PRD
       // save this run made since the last commit — not just the last one.

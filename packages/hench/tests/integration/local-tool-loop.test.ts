@@ -216,7 +216,11 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     expect(result.run.turns).toBe(4);
     expect(result.run.toolCalls.length).toBeGreaterThanOrEqual(1);
     expect(result.run.toolCalls[0].tool).toBe("write_file");
-    expect(execFileSync("git", ["show", "--format=", "--name-only", "HEAD"], {
+    // This completed through the real git-derived path, not a mocked verdict.
+    // Asked of the file's own history rather than of HEAD: the PRD completion
+    // record is committed after the work, so HEAD is that record and the work
+    // is HEAD~1. Which commit it landed in is not what this test is about.
+    expect(execFileSync("git", ["log", "--format=", "--name-only", "--", "local-output.ts"], {
       cwd: projectDir,
       encoding: "utf-8",
     })).toContain("local-output.ts");

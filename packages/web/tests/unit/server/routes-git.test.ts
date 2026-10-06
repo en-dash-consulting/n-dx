@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { execSync, execFileSync } from "node:child_process";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleGitRoute, parsePorcelainStatus } from "../../../src/server/routes-git.js";
+import { handleGitRoute, parsePorcelainStatus, toGitignorePattern } from "../../../src/server/routes-git.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function initGitRepo(dir: string): void {
@@ -60,6 +60,22 @@ describe("parsePorcelainStatus", () => {
 
   it("returns an empty array for empty output", () => {
     expect(parsePorcelainStatus("")).toEqual([]);
+  });
+});
+
+describe("toGitignorePattern", () => {
+  it("anchors the entry at the repository root", () => {
+    expect(toGitignorePattern("src/scratch.txt")).toBe("/src/scratch.txt");
+  });
+
+  it("escapes glob metacharacters so the path is matched literally", () => {
+    expect(toGitignorePattern("report[1].txt")).toBe("/report\\[1\\].txt");
+    expect(toGitignorePattern("what?.log")).toBe("/what\\?.log");
+    expect(toGitignorePattern("star*.tmp")).toBe("/star\\*.tmp");
+  });
+
+  it("escapes a trailing space, which git would otherwise strip", () => {
+    expect(toGitignorePattern("trailing ")).toBe("/trailing\\ ");
   });
 });
 
@@ -303,6 +319,129 @@ describe("/api/git routes", () => {
 
       const ignored = await readFile(join(tmpDir, "ignored.txt"), "utf-8");
       expect(ignored).toBe("secret\n");
+    });
+  });
+
+  describe("POST /api/git/ignore", () => {
+    async function postIgnore(file: unknown): Promise<Response> {
+      return fetch(`http://127.0.0.1:${port}/api/git/ignore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file }),
+      });
+    }
+
+    it("requires a file", async () => {
+      initGitRepo(tmpDir);
+      expect((await postIgnore("  ")).status).toBe(400);
+    });
+
+    it("rejects a path that escapes the project directory", async () => {
+      initGitRepo(tmpDir);
+      expect((await postIgnore("../../etc/passwd")).status).toBe(400);
+    });
+
+    it("refuses to ignore .gitignore itself", async () => {
+      initGitRepo(tmpDir);
+      expect((await postIgnore(".gitignore")).status).toBe(400);
+    });
+
+    it("creates .gitignore and drops the file out of the dirty list", async () => {
+      initGitRepo(tmpDir);
+      await writeFile(join(tmpDir, "README.md"), "hello\n");
+      commitAll(tmpDir, "init");
+      await writeFile(join(tmpDir, "scratch.log"), "noise\n");
+
+      const res = await postIgnore("scratch.log");
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toMatchObject({ ok: true, pattern: "/scratch.log", added: true });
+
+      expect(await readFile(join(tmpDir, ".gitignore"), "utf-8")).toBe("/scratch.log\n");
+
+      // The file itself survives — only git's view of it changes.
+      expect(await readFile(join(tmpDir, "scratch.log"), "utf-8")).toBe("noise\n");
+
+      const status = await fetch(`http://127.0.0.1:${port}/api/git/status`);
+      const paths = (await status.json()).files.map((f: { path: string }) => f.path);
+      expect(paths).not.toContain("scratch.log");
+      // .gitignore is itself new, so the tree stays dirty — correctly so.
+      expect(paths).toContain(".gitignore");
+    });
+
+    it("ignores a path inside a subdirectory, anchored at the root", async () => {
+      initGitRepo(tmpDir);
+      await writeFile(join(tmpDir, "README.md"), "hello\n");
+      commitAll(tmpDir, "init");
+      await mkdir(join(tmpDir, "build"));
+      await writeFile(join(tmpDir, "build", "out.js"), "x\n");
+
+      const res = await postIgnore("build/out.js");
+      expect(res.status).toBe(200);
+      expect((await res.json()).pattern).toBe("/build/out.js");
+      expect(await readFile(join(tmpDir, ".gitignore"), "utf-8")).toBe("/build/out.js\n");
+    });
+
+    it("appends to an existing .gitignore that has no trailing newline", async () => {
+      initGitRepo(tmpDir);
+      await writeFile(join(tmpDir, ".gitignore"), "node_modules");
+      commitAll(tmpDir, "init");
+      await writeFile(join(tmpDir, "scratch.log"), "noise\n");
+
+      expect((await postIgnore("scratch.log")).status).toBe(200);
+      expect(await readFile(join(tmpDir, ".gitignore"), "utf-8")).toBe("node_modules\n/scratch.log\n");
+    });
+
+    it("refuses a path that is already ignored", async () => {
+      initGitRepo(tmpDir);
+      await writeFile(join(tmpDir, ".gitignore"), "# junk\nscratch.log\n");
+      commitAll(tmpDir, "init");
+      await writeFile(join(tmpDir, "scratch.log"), "noise\n");
+
+      // Already ignored, so git never reports it as untracked.
+      expect((await postIgnore("scratch.log")).status).toBe(409);
+      expect(await readFile(join(tmpDir, ".gitignore"), "utf-8")).toBe("# junk\nscratch.log\n");
+    });
+
+    it("does not duplicate an entry a human already wrote by hand", async () => {
+      initGitRepo(tmpDir);
+      // The negation makes the path untracked again, so the route runs —
+      // and finds its own entry already there.
+      await writeFile(join(tmpDir, ".gitignore"), "scratch.log\n!scratch.log\n");
+      commitAll(tmpDir, "init");
+      await writeFile(join(tmpDir, "scratch.log"), "noise\n");
+
+      const res = await postIgnore("scratch.log");
+      expect(res.status).toBe(200);
+      expect((await res.json()).added).toBe(false);
+      expect(await readFile(join(tmpDir, ".gitignore"), "utf-8")).toBe("scratch.log\n!scratch.log\n");
+    });
+
+    it("refuses a tracked file, where .gitignore would do nothing", async () => {
+      initGitRepo(tmpDir);
+      await writeFile(join(tmpDir, "tracked.txt"), "v1\n");
+      commitAll(tmpDir, "init");
+      await writeFile(join(tmpDir, "tracked.txt"), "v2\n");
+
+      const res = await postIgnore("tracked.txt");
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toContain("not untracked");
+      await expect(readFile(join(tmpDir, ".gitignore"))).rejects.toThrow();
+    });
+
+    it("writes a literal entry for a path containing glob metacharacters", async () => {
+      initGitRepo(tmpDir);
+      await writeFile(join(tmpDir, "README.md"), "hello\n");
+      commitAll(tmpDir, "init");
+      await writeFile(join(tmpDir, "report[1].txt"), "noise\n");
+
+      const res = await postIgnore("report[1].txt");
+      expect(res.status).toBe(200);
+      expect(await readFile(join(tmpDir, ".gitignore"), "utf-8")).toBe("/report\\[1\\].txt\n");
+
+      const status = await fetch(`http://127.0.0.1:${port}/api/git/status`);
+      const paths = (await status.json()).files.map((f: { path: string }) => f.path);
+      expect(paths).not.toContain("report[1].txt");
     });
   });
 });

@@ -279,7 +279,7 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
     expect(dirty).toHaveLength(0);
   });
 
-  it("does not commit metadata on non-autoCommit path (no double-commit)", async () => {
+  it("commits the record on the non-autoCommit path when nothing else will", async () => {
     const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
 
     const mockStore = {
@@ -299,22 +299,72 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
 
     const run = buildCompletedRun(taskId);
 
-    // On the non-autoCommit path there is no pending commit file, so
-    // performCommitPromptIfNeeded is a no-op (existsSync returns false).
-    // commitCompletionMetadata must NOT be called — the test verifies there
-    // is exactly one commit (the initial one) after finalizeRun.
+    // The reported failure, and what this test used to assert the opposite of.
+    // There is no pending commit file, so the commit prompt bows out before it
+    // reaches its own `git commit` - the ordinary ending when the executor
+    // commits its own work as it goes. The record commit used to be gated on
+    // autoCommit, so on this path the completion write was left in the tree
+    // with the task marked completed, and the next autonomous run's pre-run
+    // gate refused to start over it.
     await (finalizeRun as Function)({
       run,
       henchDir,
       projectDir,
-      autoCommit: false,   // non-autoCommit path
+      autoCommit: false,
       skipFullTestGate: true,
       store: mockStore,
     });
 
     const { stdout: log } = await execAsync("git log --oneline", { cwd: projectDir });
-    // Only the initial commit: commitCompletionMetadata must not create a commit
-    expect(log.trim().split("\n")).toHaveLength(1);
+    expect(log.trim().split("\n")).toHaveLength(2);
+
+    // And the point of committing it: the tree is clean, so the next run starts.
+    expect(await getRexDirtyLines(projectDir)).toHaveLength(0);
+  });
+
+  it("makes no duplicate commit when the prompt already landed the record", async () => {
+    // The guarantee the previous version of this test was named for. Once the
+    // prompt has swept the PRD paths into its own commit there is nothing left
+    // to stage, so the record commit is a no-op rather than a duplicate.
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+
+    const mockStore = {
+      getItem: vi.fn(async (id: string) => {
+        if (id !== taskId) return null;
+        return { id: taskId, status: "in_progress", title: "Test task", level: "task" };
+      }),
+      updateItem: vi.fn(async (id: string, updates: Record<string, unknown>) => {
+        if (id === taskId && updates.status === "completed") {
+          const current = readFileSync(taskIndexPath, "utf-8").replace(/\r\n/g, "\n");
+          await writeFile(taskIndexPath, current.replace("status: in_progress", "status: completed"), "utf-8");
+        }
+      }),
+      appendLog: vi.fn(async () => {}),
+      loadDocument: vi.fn(async () => ({ items: [] })),
+    };
+
+    // A real commit handoff: a staged code change plus the message sentinel.
+    await writeFile(join(projectDir, "feature.ts"), "export const x = 1;\n", "utf-8");
+    await execAsync("git add feature.ts", { cwd: projectDir });
+    await writeFile(join(projectDir, ".hench-commit-msg.txt"), "feat: add x\n", "utf-8");
+
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(taskId),
+      henchDir,
+      projectDir,
+      autoCommit: false,
+      yes: true,
+      autonomous: true,
+      skipFullTestGate: true,
+      store: mockStore,
+    });
+
+    const { stdout: log } = await execAsync("git log --oneline", { cwd: projectDir });
+    // Baseline + the prompt's commit, and at most one more for the attribution
+    // write the prompt makes *after* committing. Never a duplicate of the
+    // record the prompt already carried.
+    expect(log.trim().split("\n").length).toBeLessThanOrEqual(3);
+    expect(await getRexDirtyLines(projectDir)).toHaveLength(0);
   });
 });
 
