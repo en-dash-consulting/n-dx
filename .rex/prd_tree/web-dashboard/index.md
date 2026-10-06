@@ -6,7 +6,7 @@ status: "pending"
 startedAt: "2026-03-24T05:27:03.754Z"
 endedAt: "2026-09-10T17:46:28.941Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
-lastModified: "2026-10-01T00:17:53.366Z"
+lastModified: "2026-10-01T21:41:25.141Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -49,3 +49,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-before.md) | completed |
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-contract-in.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-hench.md) | completed |
+
