@@ -3,7 +3,7 @@
 Every production source file that still spells out where n-dx keeps its files,
 instead of asking the resolver.
 
-**56 literals across 37 files.** That number is the debt, and it may only go
+**53 literals across 35 files.** That number is the debt, and it may only go
 down.
 
 ## Why this file exists
@@ -87,14 +87,17 @@ resolver and the migration command. Two cuts have landed:
 
 - **PR B3 (#453)** took 193 sites to 160, but it routed **hench and web only**,
   where the task it serves (`c64f053e`) reads "hench, web *and core*".
-- **PR 1 (`d31d9aa8`)** took 149 to 56: all of core, hench's git-bookkeeping
-  classifiers, and the hench and web files that task enumerates.
+- **PR 1 (`d31d9aa8`)** took 149 to 53: all of core, hench's git-bookkeeping
+  classifiers, and the hench and web files that task enumerates — plus the
+  web side of the dashboard's port and pid markers (`server/start.ts`'s
+  write, the Workspaces board and the hub's reads), which had to move in the
+  same change as core's reads or the two would name different files.
 
 What is left:
 
 | Package | Literals |
 |---|---|
-| web | 29 |
+| web | 26 |
 | rex | 12 |
 | hench | 7 |
 | llm-client | 6 |
@@ -179,8 +182,6 @@ more.
 | `packages/web/src/server/routes-llm.ts` | 2 | .n-dx* |
 | `packages/web/src/server/routes-sourcevision-ask.ts` | 2 | .n-dx* |
 | `packages/web/src/server/routes-token-usage.ts` | 2 | .n-dx* |
-| `packages/web/src/server/routes-worktrees.ts` | 2 | .n-dx* |
-| `packages/web/src/hub/children.ts` | 1 | .n-dx* |
 | `packages/web/src/server/cli-name.ts` | 1 | .n-dx* |
 | `packages/web/src/server/dashboard-usage.ts` | 1 | .n-dx* |
 | `packages/web/src/server/routes-cli-timeout.ts` | 1 | .n-dx* |
