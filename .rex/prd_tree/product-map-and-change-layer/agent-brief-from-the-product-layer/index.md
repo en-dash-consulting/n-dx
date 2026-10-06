@@ -1,7 +1,7 @@
 ---
 id: "20d12416-3fa3-4bec-aa2d-0fb00a0fbf93"
 level: "feature"
-title: "Map-based agent brief"
+title: "Agent brief from the product layer"
 status: "pending"
 priority: "medium"
 tags:
@@ -16,7 +16,7 @@ source: "roadmap"
 acceptanceCriteria: []
 description: "The brief carries the capability being changed, its constraints and where it lives in code, not a release title. Same for every vendor.\n\nRoadmap PR 19 · wave 2 · lane hench."
 assignee: "Sterling H <sterling.h@endash.us>"
-lastModified: "2026-10-06T15:51:46.209Z"
+lastModified: "2026-10-06T16:54:33.740Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

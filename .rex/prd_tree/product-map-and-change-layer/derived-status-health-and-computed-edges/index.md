@@ -24,5 +24,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Compute edges, derived kind and alias resolution](./compute-edges-derived-kind-and-alias.md) | pending |
-| [Compute intent status and health for map nodes](./compute-intent-status-and-health-for.md) | pending |
+| [Compute intent status and health for product nodes](./compute-intent-status-and-health-for.md) | pending |
 | [Work out when a change landed from git history](./work-out-when-a-change-landed-from-git.md) | pending |

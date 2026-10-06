@@ -23,4 +23,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Emit recommendations as changes and show the map delta in PR markdown](./emit-recommendations-as-changes-and.md) | pending |
+| [Emit recommendations as changes and show the product layer delta in PR markdown](./emit-recommendations-as-changes-and.md) | pending |

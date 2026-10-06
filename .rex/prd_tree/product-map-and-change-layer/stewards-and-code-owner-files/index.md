@@ -14,9 +14,9 @@ blockedBy:
   - "16a680ad-40ec-43d6-a8ea-2eedbc3e0e77"
 source: "roadmap"
 acceptanceCriteria: []
-description: "Stewards are declared on the map and enforced through each host's code-owner file. Git email is the identity.\n\nRoadmap PR 25 · wave 3 · lane core-docs."
+description: "Stewards are declared in the product layer and enforced through each host's code-owner file. Git email is the identity.\n\nRoadmap PR 25 · wave 3 · lane core-docs."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-06T15:51:38.602Z"
+lastModified: "2026-10-06T16:54:37.619Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -24,4 +24,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Read stewards from the map and generate code-owner files per host](./read-stewards-from-the-map-and.md) | pending |
+| [Read stewards from the product layer and generate code-owner files per host](./read-stewards-from-the-product-layer.md) | pending |
