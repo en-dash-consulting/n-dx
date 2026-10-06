@@ -75,7 +75,32 @@ interface EditedProposalTask {
   acceptanceCriteria?: string[];
   priority?: string;
   tags?: string[];
+  /** LoE estimate fields from the proposal; carried through unedited. */
+  loe?: number;
+  loeRationale?: string;
+  loeConfidence?: string;
   selected: boolean;
+}
+
+/** The LoE fields a proposal task may carry onto the accepted item. */
+interface ProposalLoEFields {
+  loe?: number;
+  loeRationale?: string;
+  loeConfidence?: string;
+}
+
+/**
+ * Valid LoE fields from a proposal task: `loe` a positive finite number,
+ * `loeRationale` a string, `loeConfidence` low/medium/high. Anything else is
+ * dropped. Mirrors rex's `pickLoEFields`, which the gateway does not export.
+ */
+function pickLoEFields(task: ProposalLoEFields): Partial<PRDItem> {
+  const out: Record<string, unknown> = {};
+  if (typeof task.loe === "number" && Number.isFinite(task.loe) && task.loe > 0) out.loe = task.loe;
+  if (typeof task.loeRationale === "string") out.loeRationale = task.loeRationale;
+  const c = task.loeConfidence;
+  if (c === "low" || c === "medium" || c === "high") out.loeConfidence = c;
+  return out;
 }
 
 interface EditedProposalFeature {
@@ -639,6 +664,9 @@ async function handleAcceptProposals(
           acceptanceCriteria?: string[];
           priority?: string;
           tags?: string[];
+          loe?: number;
+          loeRationale?: string;
+          loeConfidence?: string;
         }>;
       }>;
     }>;
@@ -698,6 +726,7 @@ async function handleAcceptProposals(
           if (t.acceptanceCriteria) taskItem.acceptanceCriteria = t.acceptanceCriteria;
           if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
           if (t.tags) taskItem.tags = t.tags;
+          Object.assign(taskItem, pickLoEFields(t));
           await store.addItem(taskItem, featureId);
           addedCount++;
         }
@@ -853,6 +882,7 @@ async function handleAcceptEditedProposals(
           if (t.acceptanceCriteria?.length) taskItem.acceptanceCriteria = t.acceptanceCriteria;
           if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
           if (t.tags?.length) taskItem.tags = t.tags;
+          Object.assign(taskItem, pickLoEFields(t));
           await store.addItem(taskItem, featureId);
           knownIds.add(taskId);
           parentsToCascade.add(featureId);
