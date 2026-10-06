@@ -15,7 +15,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "shippedIn is stamped by a CLI step any CI can run (GitHub Actions, Bitbucket Pipelines), with release tags as the fallback.\n\nRoadmap PR 22 · wave 2 · lane core-docs."
-lastModified: "2026-10-06T04:20:15.503Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:33.409Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

@@ -17,7 +17,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Critical path. Task selection and completion over the change layer. Run with the strongest model tier and --review.\n\nRoadmap PR 16 · wave 2 · lane rex-domain."
-lastModified: "2026-10-06T04:19:44.129Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:27.964Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

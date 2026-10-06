@@ -1,5 +1,5 @@
 /**
- * TypeSafe Jev bridge — sourcevision's client for judgment-shaped calls.
+ * TypeSafe Jev bridge — the foundation client for judgment-shaped calls.
  *
  * Jev is a System One model: it answers typed questions over a state object
  * with calibrated probabilities and generates no text. That makes it the
@@ -15,13 +15,22 @@
  * onto `ClaudeClientError` reasons so the classify pass's existing handling
  * (stop on `auth`, degrade on anything else) applies unchanged.
  *
+ * ## Why it lives in the foundation tier
+ *
+ * Judgment calls are not sourcevision's alone — rex needs them for placement
+ * and cannot import sourcevision, because the two are sibling domain packages.
+ * So the client sits below both. What it gave up to get here is the direct
+ * import of sourcevision's run ledger: a foundation module cannot import an
+ * upper tier, so the per-call accounting is inverted into
+ * {@link setJevObserver} and wired by whichever consumer keeps a ledger.
+ *
  * @see https://docs.typesafe.ai/api
- * @module sourcevision/analyzers/jev-client
+ * @module llm-client/jev-client
  */
 
-import { ClaudeClientError, TYPESAFE_API_KEY_ENV } from "@n-dx/llm-client";
-import type { TokenUsage } from "../schema/index.js";
-import { recordLLMCall, recordJudgmentCache } from "./run-ledger.js";
+import { TYPESAFE_API_KEY_ENV } from "./config.js";
+import { ClaudeClientError } from "./types.js";
+import type { TokenUsage } from "./types.js";
 import { isJudgmentCacheConfigured, lookupJudgments, storeJudgments } from "./judgment-cache.js";
 
 export const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
@@ -33,6 +42,57 @@ const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_ATTEMPTS = 3;
 /** Backoff base; doubles per attempt unless the server sends Retry-After. */
 const BACKOFF_BASE_MS = 500;
+
+/** The vendor name this client records calls under. */
+export const JEV_VENDOR = "typesafe";
+
+// ── Observation ──────────────────────────────────────────────────────────────
+
+/** One Jev call, as the client that made it saw it. */
+export interface JevCallRecord {
+  /** Task class the call site declared; `unclassed` when it declared none. */
+  taskClass: string;
+  /** Always {@link JEV_VENDOR} — present so a consumer's ledger can take this
+   *  record verbatim alongside records from other vendors. */
+  vendor: string;
+  /** The concrete model that answered, e.g. `jev-1.13.0`. */
+  model: string;
+  tokenUsage?: TokenUsage;
+  durationMs: number;
+}
+
+/**
+ * Per-call accounting, supplied by the consumer.
+ *
+ * This is an injection seam, not a convenience. `askJev` used to call
+ * sourcevision's `run-ledger` directly; that import is impossible from the
+ * foundation tier, and an observer is the inversion that keeps the accounting
+ * exact without the client knowing what a ledger is. Both methods are
+ * optional, and an observer that implements neither is as valid as none at
+ * all — a consumer with no ledger simply never registers one.
+ */
+export interface JevObserver {
+  /** A call that returned answers. Failed calls are not reported. */
+  onCall?(record: JevCallRecord): void;
+  /**
+   * Cache hits and misses for one request. Only called while the judgment
+   * cache is configured — an unconfigured cache reports every question as a
+   * miss it never stores, which is not a measurement worth recording.
+   */
+  onCacheStats?(hits: number, misses: number): void;
+}
+
+let _observer: JevObserver | null = null;
+
+/**
+ * Register the observer for every subsequent {@link askJev} call, or clear it
+ * with `null`. Module-level and last-writer-wins, matching
+ * `configureJudgmentCache`: both are wired once at CLI startup, and tests that
+ * set one are expected to clear it again.
+ */
+export function setJevObserver(observer: JevObserver | null): void {
+  _observer = observer;
+}
 
 // ── Questions ────────────────────────────────────────────────────────────────
 
@@ -188,7 +248,7 @@ export async function askJev(
   const lookup = lookupJudgments(request.state, request.questions, JEV_MODEL);
   const hitCount = Object.keys(lookup.hits).length;
   const missCount = Object.keys(lookup.misses).length;
-  if (isJudgmentCacheConfigured()) recordJudgmentCache(hitCount, missCount);
+  if (isJudgmentCacheConfigured()) _observer?.onCacheStats?.(hitCount, missCount);
   if (missCount === 0) {
     return { model: lookup.model ?? JEV_MODEL, answers: lookup.hits };
   }
@@ -228,11 +288,11 @@ export async function askJev(
 
     if (res.ok) {
       const parsed = parseResponse(await res.json(), lookup.misses);
-      recordLLMCall({
+      _observer?.onCall?.({
         taskClass: opts.taskClass ?? "unclassed",
-        vendor: "typesafe",
+        vendor: JEV_VENDOR,
         model: parsed.model,
-        tokenUsage: parsed.tokenUsage,
+        ...(parsed.tokenUsage ? { tokenUsage: parsed.tokenUsage } : {}),
         durationMs: Date.now() - startedAt,
       });
       storeJudgments(lookup.keys, parsed.answers, parsed.model);
