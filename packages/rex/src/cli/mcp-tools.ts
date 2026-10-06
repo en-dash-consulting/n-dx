@@ -26,6 +26,7 @@ import { detectReorganizations } from "../core/reorganize.js";
 import { applyProposals } from "../core/reorganize-executor.js";
 import { computeHealthScore } from "../core/health.js";
 import { computeFacetDistribution, suggestFacets, getItemFacets } from "../core/facets.js";
+import { validateRunSettings } from "../schema/validate.js";
 import { parseIntList } from "./parse-utils.js";
 import {
   aggregateItemTokenUsage,
@@ -39,7 +40,6 @@ import {
 import { join } from "node:path";
 import { TOOL_VERSION } from "./commands/constants.js";
 import { FileStore, resolvePRDFile, resolveRexPaths } from "../store/index.js";
-import { syncFolderTree } from "./commands/folder-tree-sync.js";
 import { holdCompletionForRun, describeHeldCompletion } from "./completion-hold.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
 import type { PRDStore, ClaimsStore, TaskClaim } from "../store/index.js";
@@ -265,8 +265,6 @@ export async function handleUpdateTaskStatus(
         detail: `Deleted ${existing.level}: ${existing.title} (${deletedIds.length} item(s) removed)`,
       });
 
-      await syncFolderTree(resolveRexPaths(projectDir).rexDir, store);
-
       return textResult(
         JSON.stringify({
           id,
@@ -334,8 +332,6 @@ export async function handleUpdateTaskStatus(
         autoCompleted.push(item);
       }
     }
-
-    await syncFolderTree(resolveRexPaths(projectDir).rexDir, store);
 
     return textResult(
       JSON.stringify({
@@ -425,9 +421,13 @@ export async function handleAddItem(
     tags?: string[];
     source?: string;
     blockedBy?: string[];
+    run?: unknown;
   },
 ): Promise<McpResult> {
   try {
+    const runCheck = validateRunSettings(args.run);
+    if (!runCheck.ok) return textResult(`Invalid run settings: ${runCheck.error}`, true);
+
     if (!args.parentId && store instanceof FileStore) {
       const resolution = await resolvePRDFile(rexDir, projectDir);
       store.setCurrentBranchFile(resolution.filename);
@@ -446,6 +446,7 @@ export async function handleAddItem(
     if (args.tags) item.tags = args.tags;
     if (args.source) item.source = args.source;
     if (args.blockedBy) item.blockedBy = args.blockedBy;
+    if (runCheck.value) item.run = runCheck.value;
 
     // Validate dependencies before persisting
     if (item.blockedBy && item.blockedBy.length > 0) {
@@ -474,8 +475,6 @@ export async function handleAddItem(
       itemId: id,
       detail: `Added ${args.level}: ${args.title}`,
     });
-
-    await syncFolderTree(rexDir, store);
 
     return textResult(JSON.stringify({ id, level: args.level, title: args.title, resetItems }));
   } catch (err) {
@@ -516,8 +515,6 @@ export async function handleMoveItem(
       itemId: id,
       detail: `Moved ${result.item.level} "${result.item.title}" from ${fromLabel} to ${toLabel}`,
     });
-
-    await syncFolderTree(rexDir, store);
 
     return textResult(
       JSON.stringify({
@@ -585,8 +582,6 @@ export async function handleMergeItems(
       itemId: targetId,
       detail: `Merged ${sourceIds.length} items into "${targetId}". Absorbed: ${absorbedTitles}. ${result.reparentedChildIds.length} children reparented, ${result.rewrittenDependencyCount} dependency references rewritten.`,
     });
-
-    await syncFolderTree(rexDir, store);
 
     return textResult(JSON.stringify(result, null, 2));
   } catch (err) {
@@ -881,6 +876,8 @@ export async function handleEditItem(
     tags?: string[];
     source?: string;
     blockedBy?: string[];
+    /** Object replaces the whole block; `null` (or `{}`) removes it. */
+    run?: unknown;
   },
 ): Promise<McpResult> {
   try {
@@ -906,6 +903,12 @@ export async function handleEditItem(
     }
     if (args.tags !== undefined) updates.tags = args.tags;
     if (args.source !== undefined) updates.source = args.source;
+    if (args.run !== undefined) {
+      const runCheck = validateRunSettings(args.run);
+      if (!runCheck.ok) return textResult(`Invalid run settings: ${runCheck.error}`, true);
+      // Undefined removes the block: the serializer skips an absent `run`.
+      updates.run = runCheck.value;
+    }
     if (args.blockedBy !== undefined) {
       // Validate dependencies before persisting
       const doc = await store.loadDocument();
@@ -929,7 +932,7 @@ export async function handleEditItem(
 
     if (Object.keys(updates).length === 0) {
       return textResult(
-        "No fields to update. Provide at least one field (title, description, acceptanceCriteria, priority, tags, source, blockedBy).",
+        "No fields to update. Provide at least one field (title, description, acceptanceCriteria, priority, tags, source, blockedBy, run).",
         true,
       );
     }
@@ -943,8 +946,6 @@ export async function handleEditItem(
       itemId: args.id,
       detail: `Edited ${existing.level} "${existing.title}": ${changedFields.join(", ")}`,
     });
-
-    await syncFolderTree(resolveRexPaths(projectDir).rexDir, store);
 
     const updated = await store.getItem(args.id);
     return textResult(

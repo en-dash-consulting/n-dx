@@ -50,6 +50,10 @@ The server exposes MCP over Streamable HTTP:
 
 See [MCP Integration](/guide/mcp) for setup instructions.
 
+## PRD item routes
+
+`PATCH /api/rex/items/:id` accepts only these fields: `status`, `failureReason`, `priority`, `tags`, `title`, `description`, `acceptanceCriteria` and `requirements`. Any other key (including `run`) is a `400` naming it. The update runs inside the PRD lock for the request's workspace and answers `409` when another process holds it. Saved run settings are written through MCP `edit_item` or `rex update --run`, not this route.
+
 ## Static Export
 
 ```sh

@@ -157,11 +157,9 @@ describe("scheduler startup integration", { timeout: 120_000 }, () => {
 
         activeTimers.push(handle);
 
-        // Wait for at least 2 cycles
-        await new Promise((resolve) => setTimeout(resolve, 180));
-
-        // The scheduler should have fired multiple times
-        expect(cycleCount).toBeGreaterThanOrEqual(2);
+        // Poll for at least 2 cycles rather than sleeping a fixed span: on a
+        // loaded machine timers fire late, and a fixed 180ms saw only one.
+        await vi.waitFor(() => expect(cycleCount).toBeGreaterThanOrEqual(2), { timeout: 10_000, interval: 25 });
 
         clearInterval(handle);
       } finally {

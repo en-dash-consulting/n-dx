@@ -9,7 +9,6 @@ import { randomUUID } from "node:crypto";
 import { resolveStore, ensureLegacyPrdMigrated, withSelfHealTag, resolveRexPaths } from "../../store/index.js";
 import { stampModified } from "../../core/sync.js";
 
-import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { parseIntSafe } from "../validate-input.js";
 import { info, warn, result, startSpinner, withCommandProgressReporter } from "../output.js";
@@ -39,6 +38,7 @@ import {
   getLLMVendor,
   applyDecompositionPass,
   applyConsolidationGuard,
+  pickLoEFields,
 } from "../../analyze/index.js";
 import type { ScanResult, Proposal } from "../../analyze/index.js";
 import type {PRDItem, AnalyzeTokenUsage, LoEConfig} from "../../schema/index.js";import { LOE_DEFAULTS } from "../../schema/index.js";
@@ -313,9 +313,7 @@ export async function buildAcceptedItems(proposals: Proposal[]): Promise<{
           priority: t.priority as PRDItem["priority"],
           tags: t.tags,
           // LoE fields — optional, present when the LLM included estimates
-          ...(t.loe !== undefined && { loe: t.loe }),
-          ...(t.loeRationale !== undefined && { loeRationale: t.loeRationale }),
-          ...(t.loeConfidence !== undefined && { loeConfidence: t.loeConfidence }),
+          ...pickLoEFields(t),
           ...(taskStatus === "completed" && { completedAt: new Date().toISOString() }),
         }));
         count(taskStatus);
@@ -414,7 +412,6 @@ async function acceptProposals(
 
   await clearPending(dir);
   await clearSentinel(dir);
-  await syncFolderTree(rexDir, store);
 
   // Show formatted summary when batch record is available, else simple message
   if (batchRecord) {

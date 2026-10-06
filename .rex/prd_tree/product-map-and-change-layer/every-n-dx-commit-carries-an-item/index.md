@@ -15,7 +15,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "The evidence layer and the realized-by edge need commits tied to items. Today only hench auto-commits carry N-DX-Item, and its value is a dashboard URL (usually localhost). The trailer format freezes at 1.0.0, so its value becomes the item id.\n\nRoadmap PR 5 · wave 0 · lane hench."
-lastModified: "2026-10-06T04:19:19.632Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-06T15:51:42.405Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

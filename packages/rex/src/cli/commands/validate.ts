@@ -142,7 +142,7 @@ export async function cmdValidate(
   // Falls back to the Markdown-loaded items on any error so existing checks still run.
   if (doc && store) {
     try {
-      doc.items = await loadItemsPreferFolderTree(rexDir, store);
+      doc.items = await loadItemsPreferFolderTree(rexDir, store, doc);
     } catch {
       // Tree load failed: structural checks will use items already in doc.
     }

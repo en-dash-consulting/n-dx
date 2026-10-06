@@ -128,8 +128,53 @@ describe("buildSystemPrompt", () => {
       const config = { ...DEFAULT_HENCH_CONFIG(), provider: "api" as const };
       const prompt = buildSystemPrompt(project, config);
       expect(prompt).toContain("rex_update_status");
-      expect(prompt).toContain("in_progress");
       expect(prompt).toContain("completed");
+    });
+
+    it("does not ask the agent to mark the task in_progress", () => {
+      // hench has already made that transition (transitionToInProgress runs
+      // in both loops before the prompt is sent), so the step would be a
+      // tool round-trip that rewrites a value already on disk.
+      const config = { ...DEFAULT_HENCH_CONFIG(), provider: "api" as const };
+      const prompt = buildSystemPrompt(project, config);
+      expect(prompt).not.toContain("Mark task as in_progress");
+    });
+
+    it("restores the in_progress step when promptAgentToMarkInProgress is set", () => {
+      const config = {
+        ...DEFAULT_HENCH_CONFIG(),
+        provider: "api" as const,
+        promptAgentToMarkInProgress: true,
+      };
+      const prompt = buildSystemPrompt(project, config);
+      expect(prompt).toContain("1. Mark task as in_progress using rex_update_status");
+    });
+
+    it("keeps the completion step either way, and numbers the steps in sequence", () => {
+      // The completion call is a request rex parks on the task claim, not a
+      // PRD write, and it carries the resolution - it is not redundant.
+      for (const promptAgentToMarkInProgress of [false, true]) {
+        const prompt = buildSystemPrompt(project, {
+          ...DEFAULT_HENCH_CONFIG(),
+          provider: "api" as const,
+          promptAgentToMarkInProgress,
+        });
+        expect(prompt).toContain("Mark task as completed using rex_update_status");
+
+        // Just the Workflow section: other sections carry numbers too.
+        const section = prompt.slice(prompt.indexOf("## Workflow"));
+        const nextHeading = section.indexOf("## ", "## Workflow".length);
+        const workflow = nextHeading === -1 ? section : section.slice(0, nextHeading);
+        const numbers = workflow
+          .split(/\r?\n/)
+          .map((line) => /^(\d+)\. /.exec(line))
+          .filter((m): m is RegExpExecArray => m !== null)
+          .map((m) => Number(m[1]));
+
+        expect(numbers).toEqual(
+          Array.from({ length: promptAgentToMarkInProgress ? 7 : 6 }, (_, i) => i + 1),
+        );
+      }
     });
 
     it("distinguishes blocked from deferred in guidance", () => {

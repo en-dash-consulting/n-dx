@@ -29,8 +29,8 @@ import type {
 } from "../schema/index.js";
 import { dirname } from "node:path";
 import { ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
-import { askJev, choice, noul, score } from "./jev-client.js";
-import type { JevQuestion, JevResponse, JsonValue } from "./jev-client.js";
+import { askJev, choice, noul, score } from "@n-dx/llm-client";
+import type { JevQuestion, JevResponse, JsonValue } from "@n-dx/llm-client";
 import { collectFileHeaders } from "./file-headers.js";
 import { markBatch } from "./analyze-progress.js";
 

@@ -156,6 +156,81 @@ describe("Store roundtrip integration", () => {
     expect(item.customList).toEqual([{ a: 1 }, { a: 2 }]);
   });
 
+  describe("run settings", () => {
+    const FULL_RUN = {
+      tier: "heavy" as const,
+      models: { claude: "claude-opus-5-5", codex: "gpt-5.6-sol" },
+      provider: "cli" as const,
+      permissionMode: "default" as const,
+      review: true,
+      reviewTier: "standard" as const,
+      reviewModels: { claude: "claude-sonnet-5" },
+      reviewOptional: false,
+      skipTestGate: false,
+      maxTurns: 500,
+      tokenBudget: 0,
+      contextNotes: "Prefer the existing helper.\nKeep it small.",
+    };
+
+    async function taskFile(id: string): Promise<string> {
+      const { readdir } = await import("node:fs/promises");
+      const entries = await readdir(join(rexDir, "prd_tree"), { recursive: true, withFileTypes: true });
+      for (const e of entries) {
+        if (!e.isFile() || !e.name.endsWith(".md")) continue;
+        const path = join(e.parentPath, e.name);
+        if ((await readFile(path, "utf-8")).includes(`id: "${id}"`)) return path;
+      }
+      throw new Error(`no file for ${id}`);
+    }
+
+    it("round-trips a run block with every key and its types", async () => {
+      await store.addItem({ id: "e-run", title: "Epic", status: "pending", level: "epic" });
+      await store.addItem({ id: "t-run", title: "Task", status: "pending", level: "task", run: FULL_RUN }, "e-run");
+      const reloaded = await store.getItem("t-run");
+      expect(reloaded?.run).toStrictEqual(FULL_RUN);
+    });
+
+    it("does not write an empty run block", async () => {
+      await store.addItem({ id: "e-empty", title: "Epic", status: "pending", level: "epic", run: {} });
+      expect(await readFile(await taskFile("e-empty"), "utf-8")).not.toMatch(/^run:/m);
+      expect((await store.getItem("e-empty"))?.run).toBeUndefined();
+    });
+
+    it("leaves run validation to the writers: the store keeps any plain-object block", async () => {
+      await store.addItem({ id: "e-lenient", title: "Epic", status: "pending", level: "epic" });
+      await store.updateItem("e-lenient", { run: { colour: "blue" } as never });
+      expect((await store.getItem("e-lenient"))?.run).toEqual({ colour: "blue" });
+    });
+
+    it("keeps writing other items, and keeps the block unchanged, when one run is malformed or newer", async () => {
+      await store.addItem({ id: "e-a", title: "A", status: "pending", level: "epic", run: { review: true } });
+      await store.addItem({ id: "e-b", title: "B", status: "pending", level: "epic" });
+      const file = await taskFile("e-a");
+      const raw = await readFile(file, "utf-8");
+      const bad = '{"reviw":true,"vendor":"codex","maxTurns":"x"}';
+      await writeFile(file, raw.replace('run: {"review":true}', "run: " + bad), "utf-8");
+
+      await store.updateItem("e-b", { priority: "high" });
+      await store.updateItem("e-a", { priority: "low" });
+
+      expect((await store.getItem("e-b"))?.priority).toBe("high");
+      expect((await store.getItem("e-a"))?.run).toEqual(JSON.parse(bad));
+      expect(await readFile(await taskFile("e-a"), "utf-8")).toContain("run: " + bad);
+    });
+
+    it("still loads the PRD when one item's run was hand-edited into a malformed block", async () => {
+      await store.addItem({ id: "e-hand", title: "Epic", status: "pending", level: "epic", run: { review: true } });
+      await store.addItem({ id: "e-other", title: "Other", status: "pending", level: "epic" });
+      const file = await taskFile("e-hand");
+      const raw = await readFile(file, "utf-8");
+      await writeFile(file, raw.replace('run: {"review":true}', 'run: {"review":"yes"}'), "utf-8");
+
+      const doc = await store.loadDocument();
+      expect(doc.items.map((i) => i.id).sort()).toEqual(["e-hand", "e-other"]);
+      expect(doc.items.find((i) => i.id === "e-hand")?.run).toEqual({ review: "yes" });
+    });
+  });
+
   it("persists overrideMarker through round-trip", async () => {
     // overrideMarker is a defined schema field (DuplicateOverrideMarker) and
     // round-trips losslessly through the folder tree.

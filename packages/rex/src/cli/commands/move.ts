@@ -2,7 +2,6 @@ import { join } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { validateMove, moveItem } from "../../core/move.js";
 
-import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
@@ -45,8 +44,6 @@ export async function cmdMove(
     itemId: id,
     detail: `Moved ${moveResult.item.level} "${moveResult.item.title}" from ${fromLabel} to ${toLabel}`,
   });
-
-  await syncFolderTree(rexDir, store);
 
   if (flags.format === "json") {
     result(JSON.stringify({

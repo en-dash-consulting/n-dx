@@ -1,7 +1,7 @@
 ---
 id: "17a8312b-14b6-45c8-8908-a51dad483249"
 level: "task"
-title: "Apply added, modified and removed amendments to the map"
+title: "Apply added, modified and removed amendments to the product layer"
 status: "pending"
 priority: "high"
 tags:
@@ -12,8 +12,8 @@ source: "roadmap"
 acceptanceCriteria:
   - "Each delta kind has tests including replace and remove by criterion id"
   - "Editing a capability's prose body does not change its hash"
-  - "Applying a touches-only change leaves map/ untouched"
-description: "added creates the capability under its target area or capability; modified adds, replaces or removes criteria by id, or writes the reviewed proposed statement and criteria when present; removed retires the node. Append a History line, stamp metAt (hash of statement plus criteria only, never the body) and appliedIn. A touches-only change writes nothing under map/."
-lastModified: "2026-10-06T04:17:01.879Z"
+  - "Applying a touches-only change leaves product/ untouched"
+description: "added creates the capability under its target area or capability; modified adds, replaces or removes criteria by id, or writes the reviewed proposed statement and criteria when present; removed retires the node. Append a History line, stamp metAt (hash of statement plus criteria only, never the body) and appliedIn. A touches-only change writes nothing under product/."
+lastModified: "2026-10-06T16:54:28.894Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

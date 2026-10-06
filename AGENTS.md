@@ -283,6 +283,7 @@ Two MCP servers provide structured access to project data. They are configured i
 - Find out what to work on next (`get_next_task`)
 - Read task details and acceptance criteria (`get_item`)
 - Update task status as you work (`update_task_status`)
+- Save how a task should run — a portable model tier plus optional per-vendor model pins (`tier`, `models`), provider, review, permission mode, test gate, turn and token budgets, notes for the agent (`add_item` / `edit_item` with a `run` block; an object replaces the whole block, `null` removes it)
 - Log what you did (`append_log`)
 - Check overall project progress (`get_prd_status`)
 
