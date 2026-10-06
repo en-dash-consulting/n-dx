@@ -20,4 +20,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Move each rex MCP tool handler into its own module behind a registry](./move-each-rex-mcp-tool-handler-into.md) | pending |
+| [Move each rex MCP tool handler into its own module behind a registry](./move-each-rex-mcp-tool-handler-into.md) | in_progress |

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, openClaimsStore, resolveClaimHolder, resolveRexPaths } from "../../store/index.js";
-import { collectForeignClaims } from "../mcp-tools.js";
+import { collectForeignClaims } from "../mcp-tools/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { findNextTask, collectCompletedIds, explainSelection } from "../../core/next-task.js";
 

@@ -1322,7 +1322,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   // Core — lazy-loads utilities
   ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers when the vendor changes, plus the shared auth-failure guidance and the cli-brand color palette on the preflight-failure error path"],
   ["packages/core/cli.js", "Lazy-loads cli-ink.js (Ink + React TUI renderer) only during `ndx init` when stdout is a TTY and --quiet is unset — avoids React/Ink import cost on every CLI invocation and in non-interactive environments"],
-  ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
+  ["packages/rex/src/cli/mcp-tools/reorganize.ts", "Lazy-loads the LLM reshape reasoner and its config only when reorganize runs in full mode"],
   ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
   // Sourcevision — lazy-loads analyzers and heavy dependencies
   ["packages/sourcevision/src/cli/index.ts", "CLI command dispatch — lazy-loads analyzers"],

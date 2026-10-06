@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { handleEditItem } from "../../../src/cli/mcp-tools.js";
+import { handleEditItem } from "../../../src/cli/mcp-tools/index.js";
 import { FileStore, ensureRexDir } from "../../../src/store/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
 import { SCHEMA_VERSION } from "../../../src/schema/v1.js";
