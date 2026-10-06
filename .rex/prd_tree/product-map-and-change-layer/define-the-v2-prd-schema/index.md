@@ -1,0 +1,25 @@
+---
+id: "dc3b80c1-4d3c-486f-ba03-0b6bbe9fd50d"
+level: "feature"
+title: "Define the v2 PRD schema"
+status: "pending"
+priority: "high"
+tags:
+  - "product-map"
+  - "pr-07"
+  - "lane-rex-store"
+  - "rex"
+  - "critical-path"
+source: "roadmap"
+acceptanceCriteria: []
+description: "Critical path. Land every v2 type, field and validation rule at once, wired to nothing, so no later PR edits the schema files. Run with the strongest model tier and --review.\n\nRoadmap PR 7 · wave 0 · lane rex-store."
+lastModified: "2026-10-06T04:16:51.264Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Add the v2 node types and fields](./add-the-v2-node-types-and-fields.md) | pending |
+| [Add the v2 validation rules as pure functions](./add-the-v2-validation-rules-as-pure.md) | pending |

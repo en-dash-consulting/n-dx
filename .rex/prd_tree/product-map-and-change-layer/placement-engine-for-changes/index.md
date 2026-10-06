@@ -1,0 +1,28 @@
+---
+id: "51527b42-cc67-4a5a-83b3-61179298dfaf"
+level: "feature"
+title: "Placement engine for changes"
+status: "pending"
+priority: "medium"
+tags:
+  - "product-map"
+  - "pr-12"
+  - "lane-rex-domain"
+  - "rex"
+  - "llm-client"
+blockedBy:
+  - "dc3b80c1-4d3c-486f-ba03-0b6bbe9fd50d"
+  - "001478c3-fa5a-45eb-bd4c-6b3161abccd2"
+source: "roadmap"
+acceptanceCriteria: []
+description: "Decides which capabilities a new change amends or touches. Three tiers: rules, the configured text model, Jev. Jev is optional.\n\nRoadmap PR 12 · wave 1 · lane rex-domain."
+lastModified: "2026-10-06T04:19:29.207Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Add Jev placement and the autoAccept setting](./add-jev-placement-and-the-autoaccept.md) | pending |
+| [Rank placement candidates with rules and the text model](./rank-placement-candidates-with-rules.md) | pending |
