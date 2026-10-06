@@ -18,7 +18,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, symlink } from "node:fs/promises";
+import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync, realpathSync } from "node:fs";
 import { tmpdir, platform } from "node:os";
 import { join, resolve } from "node:path";
@@ -29,6 +29,8 @@ import {
   classifyPortOccupant,
   probeHubEndpoint,
   probeStatusEndpoint,
+  probeTokenProtectedNdx,
+  waitForPortFile,
   findFreePortInRange,
   findRelocationPort,
   isPortInUse,
@@ -107,6 +109,18 @@ function startFakeHub({ pid = 4242, projects = 1, aliasTo = null } = {}) {
     }
     res.writeHead(404);
     res.end();
+  });
+}
+
+/**
+ * Start a server that answers every request the way a token-protected n-dx
+ * server answers a caller without the token (request-security.ts / hub
+ * request-guard.ts `rejectUnauthenticated`).
+ */
+function startTokenProtectedNdx() {
+  return startServer((_req, res) => {
+    res.writeHead(401, { "content-type": "application/json", "www-authenticate": 'Bearer realm="n-dx"' });
+    res.end(JSON.stringify({ error: "Authentication required" }));
   });
 }
 
@@ -405,6 +419,32 @@ describe("probeStatusEndpoint", () => {
   });
 });
 
+describe("probeTokenProtectedNdx", () => {
+  it("recognises the 401 a token-protected n-dx server answers", async () => {
+    const { port } = await startTokenProtectedNdx();
+    expect(await probeTokenProtectedNdx(port)).toBe(true);
+  });
+
+  it("does not claim a 401 from another service's realm", async () => {
+    const { port } = await startServer((_req, res) => {
+      res.writeHead(401, { "www-authenticate": 'Basic realm="router"' });
+      res.end();
+    });
+    expect(await probeTokenProtectedNdx(port)).toBe(false);
+  });
+
+  it("does not claim an open server", async () => {
+    const { port } = await startFakeDashboard(PROJECT_B);
+    expect(await probeTokenProtectedNdx(port)).toBe(false);
+  });
+
+  it("returns false when nothing is listening", async () => {
+    const { server, port } = await startServer(() => {});
+    await new Promise((res) => server.close(() => res()));
+    expect(await probeTokenProtectedNdx(port, 500)).toBe(false);
+  });
+});
+
 describe("the probe decision, end to end", () => {
   it("classifies a live dashboard for another directory as a peer", async () => {
     const { port } = await startFakeDashboard(PROJECT_B);
@@ -580,6 +620,20 @@ describe("runWeb, on a busy port", () => {
     expect(served).toBe(peer.port + 1);
   }, 20_000);
 
+  it("relocates instead of killing when a token-protected n-dx server holds the port", async () => {
+    // Without the token every probe gets 401, so the occupant cannot be
+    // attributed — but it is an n-dx server (another project's dashboard, or a
+    // hub on another home's token) and must not be SIGKILLed.
+    dir = await mkdtemp(join(tmpdir(), "ndx-start-protected-"));
+    const occupant = await startTokenProtectedNdx();
+
+    const { code, serveArgs } = await captureServeArgs(dir, [`--port=${occupant.port}`]);
+
+    expect(code).toBe(0);
+    expect(occupant.server.listening).toBe(true);
+    expect(Number(serveArgs[1].replace("--port=", ""))).toBe(occupant.port + 1);
+  }, 20_000);
+
   it("passes the requested port straight through when it is free", async () => {
     dir = await mkdtemp(join(tmpdir(), "ndx-start-free-"));
     // Bind and release to get a port that is almost certainly free.
@@ -613,6 +667,28 @@ describe("runWeb, on a busy port", () => {
     // sent by the next command's hub probes.
     expect(existsSync(join(ndxHome, "auth.token"))).toBe(false);
   }, 20_000);
+});
+
+describe("waitForPortFile", () => {
+  const PORT_FILES = { port: ".n-dx-web.port" };
+  let portDir;
+  afterEach(async () => {
+    if (portDir) await rm(portDir, { recursive: true, force: true });
+    portDir = null;
+  });
+
+  it("returns the port once a live server writes it", async () => {
+    portDir = await mkdtemp(join(tmpdir(), "ndx-port-wait-"));
+    setTimeout(() => writeFile(join(portDir, PORT_FILES.port), "4321\n"), 100);
+    expect(await waitForPortFile(portDir, 2_000, 10, PORT_FILES, () => true)).toBe(4321);
+  });
+
+  it("gives up as soon as the server is gone instead of running out the clock", async () => {
+    portDir = await mkdtemp(join(tmpdir(), "ndx-port-wait-"));
+    const started = Date.now();
+    expect(await waitForPortFile(portDir, 10_000, 10, PORT_FILES, () => false)).toBeNull();
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
 });
 
 describe("findFreePortInRange", () => {
