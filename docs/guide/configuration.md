@@ -207,6 +207,8 @@ ndx config hench.maxTokens 100000 . # token budget per task
 
 Configuration is stored in `.hench/config.json`.
 
+The test gate can be scoped and its flakes absorbed with `hench.testGate.command` (with `{base}`) and `hench.testGate.rerunCommand` (with `{suites}`). Set them in `.n-dx.json`; see [Completion Waits for the Test Gate](../packages/hench.md#completion-waits-for-the-test-gate).
+
 ## Web Server
 
 ```sh

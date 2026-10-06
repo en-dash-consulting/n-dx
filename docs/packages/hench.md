@@ -88,6 +88,62 @@ A task is never marked `completed` before hench's full test gate passes. The age
 
 Outside a hench run nothing holds a completion, so interactive MCP use and the rex CLI behave as before. A failed gate's record also carries a failure digest (`testGate.failureDigest`): the FAIL lines, the first assertion blocks and the per-suite summary, taken from the whole output so that a long stream of stderr cannot push them out.
 
+### Scoped gate and flake re-run (opt-in)
+
+Two config templates let a project gate less than its whole suite. Both are absent by default, and a repo without them behaves exactly as before. Set them in `.n-dx.json` so they travel with the repo.
+
+```json
+"hench": {
+  "testGate": {
+    "command": "node scripts/run-all-tests.mjs affected {base}",
+    "rerunCommand": "node scripts/run-all-tests.mjs {suites}"
+  }
+}
+```
+
+- **`hench.testGate.command`** replaces the gate command. It outranks `hench.fullTestCommand` and auto-detection. `{base}` becomes the commit the run started from (a hex SHA), so the project can test only what the run changed. A template without `{base}` runs as written. If it has `{base}` and no valid start commit is known, hench runs the command it would have run without the template and records `testGate.scopeFallback`.
+- **`hench.testGate.rerunCommand`** applies to unattended runs only (`--auto`, `--yes`, no TTY). When the gate fails and its output names the failed suites, hench runs this command once with `{suites}` replaced by those labels, comma-joined. A pass counts as a gate pass and is recorded as a flake; a failure fails the run. There is no re-run after a timeout, when the output names no failed suites, or on an interactive terminal (which offers rerun/abort/skip instead).
+
+**Output-line protocol.** The project's runner tells hench what it did with lines in its output. `scripts/run-all-tests.mjs` emits both:
+
+```
+test-gate: selected-suites=root,hench
+test-gate: failed-suites=hench
+```
+
+Labels are comma-separated. Hench reads the last line of each kind from the whole output. A runner that prints neither line still works: it just gets no suite record and no re-run.
+
+**Run-record fields** (`testGate` in `run.json`):
+
+| Field | Meaning |
+|-------|---------|
+| `base` | The commit `{base}` was replaced with |
+| `suites` | Suites the gate selected (`selected-suites=` line) |
+| `scopeFallback` | Why the templated command was not used |
+| `flakyRerun` | Suites that failed, then passed on the re-run, each with a one-line `firstFailure`. Present only when the re-run passed |
+| `firstAttempt` | The original verdict (command, duration, failed suites, selected suites) when the gate was re-run. After a passing re-run the top-level fields describe the re-run |
+| `rerun` | The one re-run: command, suites, `passed`, duration, and `error` when it gave no verdict |
+| `rerunSkipped` | Why no re-run happened after a failure (no failed-suites line, unsafe label, no `{suites}` placeholder) |
+
+### Gate-only retry
+
+When the task's previous run failed *only* at the test gate, retrying it no longer starts an agent session. `ndx work --task=<id>` skips the agent, re-records the held completion, re-runs the gate, and applies the completion on green. All of these must hold, otherwise the normal agent path runs:
+
+- the previous run failed, ran the gate and failed it, and holds a completion (`completionHold`);
+- it recorded a start commit and committed work, its last commit is in `HEAD`, and the checkout is on the same branch;
+- the working tree has nothing dirty beyond PRD bookkeeping and hench artifacts;
+- the previous run was not itself a gate-only retry. This is the loop guard: a second gate failure is probably real, so the agent gets to fix it.
+
+The gate diffs from the oldest start commit of the task's runs that is still in `HEAD`, so earlier attempts' work is covered. The run record carries `gateOnlyRetry` (`sourceRunId`, `base`, `commits`). **Review inheritance:** if the source run's review passed with no unrepaired must-fix findings and `HEAD` is still the commit it ended on, the review is copied to the new run with `review.inheritedFrom` set to the source run id. Otherwise review runs as usual.
+
+### Read-only refusal after prior commits
+
+`isReadOnlyRefusal` no longer fires when earlier attempts already committed the task's files. Without this, a retry of committed work hit the refusal and re-spawned the agent cold. When it is suppressed, the rejection names the earlier runs and the two ways forward (retry for a gate-only run, or `ndx rex update <id> --status=completed` after verifying), and diagnostics record `read_only_refusal_suppressed`. If the files are not found in earlier commits, or the earlier start commit cannot be resolved, the refusal fires as before.
+
+### Scoped checks inside a run
+
+The agent brief and the in-hench reviewer are told that the test gate runs after them and CI runs everything, so they run only scoped checks (the package or test files for the diff) and say what they did not run.
+
 ## Stuck Detection
 
 If a task fails repeatedly (default threshold: 3 consecutive failures including completion rejections), stuck detection kicks in and moves to the next task. This prevents infinite loops on unfixable tasks.
