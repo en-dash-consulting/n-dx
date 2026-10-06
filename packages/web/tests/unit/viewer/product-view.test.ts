@@ -114,9 +114,11 @@ describe("ProductView", () => {
     expect(broken?.textContent).toContain("Autonomous task runs");
   });
 
+  // Counted from the fixture by hand, not from productTotals: asserting the
+  // view against the same function the view calls would pass for any value
+  // that function returned, including a wrong one.
   it("summarises the map above the areas", () => {
     const el = mount(h(ProductView, { map: PRODUCT_MAP_FIXTURE }));
-    const totals = productTotals(PRODUCT_MAP_FIXTURE);
 
     const labels = [...el.querySelectorAll(".pm-totals .metric-card")]
       .map((card) => [
@@ -124,11 +126,17 @@ describe("ProductView", () => {
         card.querySelector(".metric-value")?.textContent,
       ]);
 
-    expect(labels).toContainEqual(["Capabilities", String(totals.capabilities)]);
-    expect(labels).toContainEqual(["Revised", String(totals.revised)]);
-    expect(labels).toContainEqual(["Defective", String(totals.defective)]);
-    // Two capabilities list CH-161, but it is one open change.
-    expect(labels).toContainEqual(["Open changes", String(totals.openChanges)]);
+    expect(labels).toEqual([
+      ["Capabilities", "6"],
+      ["Met", "2"],
+      // Only "Autonomous task runs".
+      ["Revised", "1"],
+      // Two capabilities plus the Cross-OS parity constraint.
+      ["Defective", "3"],
+      // Six open-change listings across the map, but CH-161 appears on two
+      // capabilities, so five distinct changes are open.
+      ["Open changes", "5"],
+    ]);
   });
 
   it("opens the capability page from a row when a handler is given", () => {
@@ -179,6 +187,38 @@ describe("capability ordering", () => {
     ]).map((r) => r.id);
 
     expect(sorted).toEqual(["defective", "proposed", "met-a", "met-b"]);
+  });
+
+  it("counts a change open against two capabilities once", () => {
+    const shared = {
+      id: "ch-1", title: "Shared change", stage: "ready" as const,
+    };
+    const totals = productTotals({
+      areas: [{
+        id: "a", title: "A", capabilities: [
+          row({ id: "one", title: "One", openChanges: [shared] }),
+          row({ id: "two", title: "Two", openChanges: [shared, { ...shared, id: "ch-2" }] }),
+        ],
+      }],
+      constraints: [],
+    });
+
+    expect(totals.openChanges).toBe(2);
+    expect(totals.capabilities).toBe(2);
+  });
+
+  it("counts defective constraints alongside defective capabilities", () => {
+    const totals = productTotals({
+      areas: [{ id: "a", title: "A", capabilities: [row({ health: "defective" })] }],
+      constraints: [
+        { id: "c1", title: "C1", health: "defective", appliesTo: "all" },
+        { id: "c2", title: "C2", health: "ok", appliesTo: "all" },
+      ],
+    });
+
+    expect(totals.defective).toBe(2);
+    // The capability count stays a capability count.
+    expect(totals.capabilities).toBe(1);
   });
 
   it("treats revised or defective as needing attention", () => {

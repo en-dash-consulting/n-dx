@@ -55,7 +55,22 @@ export const CAPABILITY_HEALTH_LABELS: Readonly<Record<CapabilityHealth, string>
 
 // ── Change stage ─────────────────────────────────────────────────────
 
-/** A change's position in its own lifecycle. Computed from its state. */
+/**
+ * A change's position in its own lifecycle. Computed from its state.
+ *
+ * **Provisional — this vocabulary is not yet fixed by the schema.** The v2
+ * schema has no stage field and no stage concept (grep `stage` over
+ * `rex/schema/v2.ts`: nothing), and these five values do not line up with
+ * `VALID_STATUSES` either. They are this view's reading of "work grouped by
+ * planned release and stage", chosen so a change's state fields map onto them
+ * — `ready` from `ready`, `applied` from `appliedIn`, `shipped` from
+ * `shippedIn`.
+ *
+ * The engine that computes derived status, health and edges owns the real
+ * vocabulary. When it lands it must either adopt these values or update this
+ * type, the three views and their fixtures together: nothing else pins them,
+ * so the drift would otherwise be silent.
+ */
 export type ChangeStage = "proposed" | "ready" | "in-progress" | "applied" | "shipped";
 
 /** Display order within a release group: earliest stage first. */
@@ -106,6 +121,12 @@ export interface CapabilityRow {
   health: CapabilityHealth;
   /** A person has read the spec text. */
   specReviewed?: boolean;
+  /**
+   * How many criteria the capability has. A count rather than the criteria
+   * themselves because the Product page lists every capability and never
+   * renders their text; the capability page carries the array instead and
+   * drops this field, so the two can never disagree.
+   */
   criteriaCount: number;
   openChanges: OpenChangeOverlay[];
 }
@@ -206,8 +227,15 @@ export interface CodeSite {
   role?: string;
 }
 
-/** Everything the capability page renders. */
-export interface CapabilityDetail extends CapabilityRow {
+/**
+ * Everything the capability page renders.
+ *
+ * Carries `criteria` in place of `CapabilityRow`'s `criteriaCount` — the page
+ * renders the criteria and counts them from the array, so a separate count
+ * would be a second place to hold one number and a way for the heading to
+ * contradict the list below it.
+ */
+export interface CapabilityDetail extends Omit<CapabilityRow, "criteriaCount"> {
   areaId: string;
   areaTitle: string;
   criteria: CapabilityCriterion[];
@@ -233,13 +261,32 @@ export interface ReleaseGroup {
   changeCount: number;
 }
 
+/** A release segment that may be read as a number: digits and nothing else. */
+const NUMERIC_SEGMENT = /^\d+$/;
+
+/**
+ * Order two release labels.
+ *
+ * Compared segment by segment as numbers only when *every* segment of both
+ * labels is digits, so `0.9.0` precedes `0.10.0`. Testing each segment matters
+ * more than it looks: `Number.parseInt` stops at the first non-digit, so a
+ * parse-and-check-for-NaN guard reads `2026-Q4` as the number 2026 — two
+ * quarters then compare equal and fall back to whatever order they arrived in.
+ *
+ * Anything else is ordered as text. That orders quarters and codenames
+ * sensibly; it does *not* give a prerelease its semver precedence, so `1.0.0`
+ * sorts before `1.0.0-rc.1` rather than after it. Encoding prerelease
+ * precedence means a semver parser, and `plannedRelease` is a free-text field
+ * with no validation behind it — a parser would be guessing at input nothing
+ * constrains.
+ */
 function compareReleases(a: string, b: string): number {
-  const partsOf = (v: string) => v.split(".").map((p) => Number.parseInt(p, 10));
-  const left = partsOf(a);
-  const right = partsOf(b);
-  if (left.some(Number.isNaN) || right.some(Number.isNaN)) return a.localeCompare(b);
+  const left = a.split(".");
+  const right = b.split(".");
+  const numeric = (parts: string[]) => parts.every((p) => NUMERIC_SEGMENT.test(p));
+  if (!numeric(left) || !numeric(right)) return a.localeCompare(b);
   for (let i = 0; i < Math.max(left.length, right.length); i++) {
-    const diff = (left[i] ?? 0) - (right[i] ?? 0);
+    const diff = Number(left[i] ?? 0) - Number(right[i] ?? 0);
     if (diff !== 0) return diff;
   }
   return 0;

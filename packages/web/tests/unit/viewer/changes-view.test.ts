@@ -157,6 +157,31 @@ describe("groupChangesByRelease", () => {
     expect(groups.map((g) => g.label)).toEqual(["2026-Q4", "next"]);
   });
 
+  // Number.parseInt stops at the first non-digit, so a guard that parsed and
+  // checked for NaN would read both of these as 2026, compare them equal, and
+  // leave them in arrival order — Q4 above Q1.
+  it("orders quarter labels as text rather than reading them as numbers", () => {
+    const groups = groupChangesByRelease([
+      change({ id: "a", plannedRelease: "2026-Q4" }),
+      change({ id: "b", plannedRelease: "2026-Q1" }),
+      change({ id: "c", plannedRelease: "2026-Q2" }),
+    ]);
+    expect(groups.map((g) => g.label)).toEqual(["2026-Q1", "2026-Q2", "2026-Q4"]);
+  });
+
+  it("does not read a prerelease suffix as another version segment", () => {
+    const groups = groupChangesByRelease([
+      change({ id: "a", plannedRelease: "1.0.0-rc.1" }),
+      change({ id: "b", plannedRelease: "1.0.0" }),
+      change({ id: "c", plannedRelease: "2.0.0" }),
+    ]);
+    // "1.0.0-rc.1" is not all-numeric, so it is ordered as text — which keeps
+    // it next to 1.0.0 rather than letting a parsed trailing 1 push it past
+    // 1.0.0 as a fourth segment. Semver prerelease precedence (rc *before*
+    // 1.0.0) is deliberately not implemented; see compareReleases.
+    expect(groups.map((g) => g.label)).toEqual(["1.0.0", "1.0.0-rc.1", "2.0.0"]);
+  });
+
   it("counts every change in a release across its stages", () => {
     const groups = groupChangesByRelease([
       change({ id: "a", plannedRelease: "1.0.0", stage: "ready" }),

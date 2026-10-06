@@ -6,6 +6,8 @@
  * capability status and both health values appear at least once, changes span
  * two planned releases plus an unscheduled backlog, and one capability is both
  * revised and defective so the attention path is exercised by a real row.
+ * One change (CH-161) is open against two capabilities, so a total that
+ * counted listings rather than distinct changes would be visibly wrong.
  *
  * These stand in for the v2 reader, which is a separate piece of work. When it
  * lands, the routes feed the same shapes and these fixtures keep testing the
@@ -128,6 +130,15 @@ export const PRODUCT_MAP_FIXTURE: ProductMap = {
               title: "Fix usage-cursor drift across forked sessions",
               stage: "ready",
               delta: "modified",
+            },
+            // Also open against "Autonomous task runs" above. One change
+            // listed on two capabilities, so a total that counted listings
+            // rather than changes would overcount here.
+            {
+              id: "change-forked-sessions",
+              displayId: "CH-161",
+              title: "Forked sessions recover from read-only refusal",
+              stage: "in-progress",
             },
           ],
         },
@@ -258,7 +269,12 @@ export const CHANGES_FIXTURE: ChangeRow[] = [
     priority: "high",
     spike: true,
     amends: [],
-    touches: [{ id: "cap-autonomous-runs", title: "Autonomous task runs" }],
+    // Touches two capabilities, which is why it shows as an open change on
+    // both of their rows in PRODUCT_MAP_FIXTURE.
+    touches: [
+      { id: "cap-autonomous-runs", title: "Autonomous task runs" },
+      { id: "cap-token-accounting", title: "Per-task token accounting" },
+    ],
     taskCount: 1,
     completedTaskCount: 0,
   },
@@ -285,7 +301,6 @@ export const CAPABILITY_DETAIL_FIXTURE: CapabilityDetail = {
   status: "revised",
   health: "defective",
   specReviewed: false,
-  criteriaCount: 4,
   areaId: "area-execute",
   areaTitle: "Execute the work",
   openChanges: [
