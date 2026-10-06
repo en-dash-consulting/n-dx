@@ -148,25 +148,6 @@ export {
 } from "./store/ensure-legacy-prd-migrated.js";
 export type { LegacyPrdMigrationResult } from "./store/ensure-legacy-prd-migrated.js";
 
-// ---- Integration credentials on disk -----------------------------------------
-
-export {
-  isSensitiveField,
-  envVarName,
-  redactValue,
-  isRedactedField,
-  resolveRedactedConfig,
-  loadAdapterConfigs,
-  getAdapterConfig,
-  saveAdapterConfig,
-  removeAdapterConfig,
-} from "./store/adapter-config.js";
-export type {
-  AdapterConfig,
-  AdapterConfigField,
-  RedactedField,
-} from "./store/adapter-config.js";
-
 // ---- Schema types & constants -----------------------------------------------
 
 export type {

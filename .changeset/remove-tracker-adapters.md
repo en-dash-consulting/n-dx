@@ -24,10 +24,10 @@ their help entries, and the `sync_with_remote` MCP tool. Gone from core: the
 Two dashboard surfaces went with them, because they could not outlive what they
 called: `routes-integrations.ts`, whose every handler began by importing the
 deleted integration-schema modules, and `POST /api/commands/sync`, which spawned
-the deleted CLI command. `routes-notion.ts` is unaffected — it reads and writes
-`.rex/adapters.json` through the credential helpers below, which stayed. The
-Notion wizard, the feature toggles and the remaining viewer views are a separate
-change.
+the deleted CLI command. `routes-notion.ts` survived this step — it reads and writes
+`.rex/adapters.json` through the credential helpers below — and is removed by the
+dashboard change that follows. The Notion wizard, the feature toggles and the
+remaining viewer views are a separate change.
 
 What stayed, and why:
 
@@ -36,11 +36,11 @@ What stayed, and why:
   bookkeeping module (`stampModified`, `isModifiedSinceSync`,
   `ITEM_BOOKKEEPING_FIELDS`), and the folder-tree store, the bundle exporter and
   `rex analyze` all depend on it.
-- **Credential redaction and environment resolution**, now in
-  `src/store/adapter-config.ts` as plain functions rather than registry methods.
-  A secret handed to rex still never reaches `.rex/adapters.json`; a
-  `{ __redacted, envVar, hint }` marker goes there and the real value is read
-  from the environment.
+- **Credential redaction and environment resolution**, moved at this step into
+  `src/store/adapter-config.ts` as plain functions rather than registry methods,
+  so that `routes-notion.ts` kept working. They did not survive the release:
+  deleting that route left them without a caller, and a later change in this
+  same release removes the module. See the entry for that change.
 - **`WorkItemLink` in the schema.** Items may still record a link to an external
   system; nothing in rex writes one now. Removing the field is a schema change,
   not an adapter removal.

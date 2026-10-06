@@ -63,25 +63,6 @@ export {
   LegacyPrdMigrationError,
 } from "./ensure-legacy-prd-migrated.js";
 export type { LegacyPrdMigrationResult } from "./ensure-legacy-prd-migrated.js";
-// ---- Integration credentials on disk -----------------------------------------
-// All that remains of the adapter registry: `.rex/adapters.json` persistence
-// plus credential redaction and environment resolution. See adapter-config.ts.
-export {
-  isSensitiveField,
-  envVarName,
-  redactValue,
-  isRedactedField,
-  resolveRedactedConfig,
-  loadAdapterConfigs,
-  getAdapterConfig,
-  saveAdapterConfig,
-  removeAdapterConfig,
-} from "./adapter-config.js";
-export type {
-  AdapterConfig,
-  AdapterConfigField,
-  RedactedField,
-} from "./adapter-config.js";
 
 import { FileStore, PRD_FILENAME } from "./file-adapter.js";
 import { dirname } from "node:path";
