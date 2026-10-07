@@ -1,0 +1,664 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
+"[
+  {
+    "name": "get_prd_status",
+    "description": "Get PRD title, overall stats, and per-epic stats. Use to understand project scope and progress.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_next_task",
+    "description": "Get the next actionable task based on priority and dependencies, with explanation of why it was selected. Use when the user asks what to work on next.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only return tasks that have at least one of these tags. Omit to return any task regardless of tags."
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "update_task_status",
+    "description": "Update the status of a PRD item. Use when starting work (in_progress), finishing (completed), or encountering blockers.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Item ID"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failing",
+            "deferred",
+            "blocked",
+            "cancelled",
+            "deleted"
+          ],
+          "description": "New status"
+        },
+        "force": {
+          "type": "boolean",
+          "description": "Force the transition even if it violates transition rules (e.g. completed → pending)"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Failure reason (used when status is 'failing')"
+        },
+        "resolutionType": {
+          "type": "string",
+          "enum": [
+            "code-change",
+            "config-override",
+            "acknowledgment",
+            "deferred",
+            "unclassified"
+          ],
+          "description": "How the task was resolved (required when status is 'completed')"
+        },
+        "resolutionDetail": {
+          "type": "string",
+          "description": "Brief description of how the resolution was achieved"
+        }
+      },
+      "required": [
+        "id",
+        "status"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "claim_task",
+    "description": "Claim a task for this worktree so other worktrees' agents skip it. Use right after selecting a task, before planning or editing. Claims are released by update_task_status when the task reaches a terminal status, or by release_task.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Task ID to claim"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "release_task",
+    "description": "Release this worktree's claim on a task without changing its status. Use when abandoning a task you claimed but did not finish.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Task ID to release"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "add_item",
+    "description": "Add a new item to the PRD. Use when the user discusses a new feature, requirement, or work item that should be tracked.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Item title"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "epic",
+            "feature",
+            "task",
+            "subtask"
+          ],
+          "description": "Item level"
+        },
+        "parentId": {
+          "type": "string",
+          "description": "Parent item ID"
+        },
+        "description": {
+          "type": "string",
+          "description": "Item description"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ],
+          "description": "Priority"
+        },
+        "acceptanceCriteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Acceptance criteria"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of this item"
+        },
+        "blockedBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IDs of blocking items"
+        },
+        "run": {
+          "type": "object",
+          "properties": {
+            "tier": {
+              "type": "string",
+              "enum": [
+                "light",
+                "standard",
+                "heavy"
+              ]
+            },
+            "models": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "provider": {
+              "type": "string",
+              "enum": [
+                "cli",
+                "api"
+              ]
+            },
+            "permissionMode": {
+              "type": "string",
+              "enum": [
+                "default",
+                "acceptEdits",
+                "bypassPermissions"
+              ]
+            },
+            "review": {
+              "type": "boolean"
+            },
+            "reviewTier": {
+              "$ref": "#/properties/run/properties/tier"
+            },
+            "reviewModels": {
+              "$ref": "#/properties/run/properties/models"
+            },
+            "reviewOptional": {
+              "type": "boolean"
+            },
+            "skipTestGate": {
+              "type": "boolean"
+            },
+            "maxTurns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "tokenBudget": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "contextNotes": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."
+        }
+      },
+      "required": [
+        "title",
+        "level"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "edit_item",
+    "description": "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Item ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "New title"
+        },
+        "description": {
+          "type": "string",
+          "description": "New description"
+        },
+        "acceptanceCriteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "New acceptance criteria"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ],
+          "description": "New priority"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "epic",
+            "feature",
+            "task",
+            "subtask"
+          ],
+          "description": "New level (epic, feature, task, subtask)"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "New tags"
+        },
+        "source": {
+          "type": "string",
+          "description": "New source"
+        },
+        "blockedBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "New blocked-by IDs"
+        },
+        "run": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "tier": {
+                  "type": "string",
+                  "enum": [
+                    "light",
+                    "standard",
+                    "heavy"
+                  ]
+                },
+                "models": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "provider": {
+                  "type": "string",
+                  "enum": [
+                    "cli",
+                    "api"
+                  ]
+                },
+                "permissionMode": {
+                  "type": "string",
+                  "enum": [
+                    "default",
+                    "acceptEdits",
+                    "bypassPermissions"
+                  ]
+                },
+                "review": {
+                  "type": "boolean"
+                },
+                "reviewTier": {
+                  "$ref": "#/properties/run/anyOf/0/properties/tier"
+                },
+                "reviewModels": {
+                  "$ref": "#/properties/run/anyOf/0/properties/models"
+                },
+                "reviewOptional": {
+                  "type": "boolean"
+                },
+                "skipTestGate": {
+                  "type": "boolean"
+                },
+                "maxTurns": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                },
+                "tokenBudget": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "contextNotes": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Vendor-agnostic keys: tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id}), provider, permissionMode, review, reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "move_item",
+    "description": "Move an item to a different parent in the PRD tree (reparent). Use to reorganize items that are under the wrong epic or feature.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Item ID to move"
+        },
+        "parentId": {
+          "type": "string",
+          "description": "New parent ID (omit to move to root)"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "merge_items",
+    "description": "Consolidate multiple sibling items into one, combining descriptions, acceptance criteria, and tags. Use when duplicate or overlapping items are found.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sourceIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IDs of items to merge (must be siblings at the same level)"
+        },
+        "targetId": {
+          "type": "string",
+          "description": "ID of the item that survives (must be in sourceIds)"
+        },
+        "preview": {
+          "type": "boolean",
+          "description": "If true, return a preview without executing the merge"
+        },
+        "title": {
+          "type": "string",
+          "description": "New title for the merged item (default: keep target's title)"
+        },
+        "description": {
+          "type": "string",
+          "description": "New description (default: combine all descriptions)"
+        }
+      },
+      "required": [
+        "sourceIds",
+        "targetId"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_item",
+    "description": "Get full details of a PRD item including parent chain. Use to understand task context before starting work.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Item ID"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "append_log",
+    "description": "Append a structured log entry to the execution log",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string",
+          "description": "Event name"
+        },
+        "itemId": {
+          "type": "string",
+          "description": "Related item ID"
+        },
+        "detail": {
+          "type": "string",
+          "description": "Event details"
+        }
+      },
+      "required": [
+        "event"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_recommendations",
+    "description": "Get SourceVision-based recommendations for PRD items. Use alongside get_findings for data-driven planning.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "verify_criteria",
+    "description": "Map acceptance criteria to test files, and optionally run the repository's test command against them. Tests run only when runTests is true AND the repository's execution config is trusted (see \`ndx trust\`); the mapping is always returned.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task ID to verify (omit for all tasks)"
+        },
+        "runTests": {
+          "type": "boolean",
+          "description": "Execute the test command from .rex/config.json (default: false). Ignored, with a note in the result, while the repository is not trusted."
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "reorganize",
+    "description": "Detect structural issues in the PRD and propose reorganizations (merge, move, delete, prune, collapse, split). Runs both programmatic detectors and LLM analysis by default.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accept": {
+          "type": "string",
+          "description": "Apply proposals: 'low-risk' (default when set), 'all', or comma-separated IDs like '1,3'"
+        },
+        "includeCompleted": {
+          "type": "boolean",
+          "description": "Include completed items in similarity analysis (default: false)"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "fast",
+            "full"
+          ],
+          "description": "Analysis mode: 'fast' (programmatic only) or 'full' (programmatic + LLM, default)"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "health",
+    "description": "Get structure health score with dimensional breakdown (depth, balance, granularity, completeness, staleness)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "facets",
+    "description": "List configured facets with distribution, or suggest facets for an item",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string",
+          "description": "Item ID to get facet suggestions for (omit for overview)"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_token_usage",
+    "description": "Roll up hench run token usage and work duration across every PRD item. Returns \`{ tokens, duration }\` per item, where tokens is self+descendants+total counts and duration is { totalMs, runningMs, isRunning }. Completed subtrees report stable totalMs; running subtrees update on each call. Orphan runs (whose itemId is no longer in the PRD) are reported separately. Pass \`id\` to narrow to a single item.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Optional: only return rollup for this item"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_capabilities",
+    "description": "Get Rex server capabilities and configuration",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  }
+]"
+`;

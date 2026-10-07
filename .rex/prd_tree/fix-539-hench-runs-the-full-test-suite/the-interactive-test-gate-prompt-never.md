@@ -1,0 +1,26 @@
+---
+id: "84896fd7-cde4-4a4b-88a1-a8df4505c9ad"
+level: "task"
+title: "The interactive test-gate prompt never appears: require() in an ESM module aborts it silently"
+status: "completed"
+priority: "high"
+tags:
+  - "test-gate"
+  - "hench"
+  - "bug"
+  - "539"
+source: "adversarial review of run 0a504fc7 (deferred finding), confirmed by the operator session"
+startedAt: "2026-10-06T18:34:16.798Z"
+completedAt: "2026-10-06T18:39:57.053Z"
+endedAt: "2026-10-06T18:39:57.053Z"
+resolutionType: "code-change"
+resolutionDetail: "Static readline import in promptTestGateFailure with injectable factory; tests and bare-require guard added (2bc7fac85)."
+acceptanceCriteria:
+  - "promptTestGateFailure no longer calls require(); the built dist/agent/lifecycle/shared.js contains no require(\"node:readline\")."
+  - "On an interactive TTY run without --yes/--auto, a failed gate shows the rerun/abort/skip question, and the answers map as before."
+  - "A test fails on the old require()-based code even under vitest (injected readline factory and/or a no-bare-require guard over hench src)."
+  - "Task 3's unattended flake re-run gating and its interactive-path test still pass."
+description: "This is a bug that predates the epic. The reviewer of task 3 found it (run 0a504fc7, `.hench/reviews/0a504fc7-25ed-45a7-aff6-4c09f46585ae.json`, medium/out-of-scope). The operator chose to fix it in this PR because it decides what a failed gate does on an interactive run.\n\n**The bug.**\n- `promptTestGateFailure` (packages/hench/src/agent/lifecycle/shared.ts, ~945; the call is at :988) builds its readline interface inside a Promise executor with `const { createInterface } = require(\"node:readline\");`.\n- `@n-dx/hench` is `\"type\": \"module\"`, and the built `dist/agent/lifecycle/shared.js` (~:638) keeps the bare `require`. In Node ESM `require` is undefined, so the executor throws, the surrounding catch returns \"abort\", and the operator never sees the `[r]erun tests, [a]bort …, or [s]kip gate …?` question.\n- So on an interactive TTY run without `--yes` or `--auto`, rerun and skip cannot be reached. A failed gate always aborts and rolls back. Both failed runs on this branch (c3d7edc2, 0a504fc7) went straight to the rollback prompt without it.\n- Under vitest `require` is provided, which hides the bug from the existing tests.\n\n**Fix.**\n- Use a static `import { createInterface } from \"node:readline\";`, as `agent/analysis/review.ts`, `cli/commands/run.ts` and `agent/lifecycle/plan-mode-prompt.ts` already do. `shared.ts:1341` uses `await import(\"node:readline\")`; either form is fine, as long as no bare `require` remains.\n- Keep the prompt's behaviour otherwise identical: suspending SIGINT listeners, Ctrl-C defaulting to abort, and the answer mapping.\n- An audit of `packages/*/src` found this to be the only bare `require(` call in ESM code. `packages/sourcevision/src/util/debug-stopwatch.ts:34-35` uses `require` inside a worker source string run with `{ eval: true }`, which is CommonJS on purpose. Leave it.\n\n**Tests.** They must fail on today's code under vitest. So do not rely on vitest's `require`. Do one or both of:\n- (a) Give `promptTestGateFailure` an optional injected readline factory, following `plan-mode-prompt.ts` (its \"Optional injection point for tests\"). Assert that the default path uses the module's imported `createInterface`, and that the question is written and an \"r\" answer maps to rerun.\n- (b) A small guard test that reads the hench `src/**/*.ts` sources and fails on a bare `require(` call outside comments and string literals. Keep it simple, and exempt only with a written reason.\n\nAlso add a unit test that the TTY path, with no `--yes` and not autonomous, reaches the question rather than returning \"abort\" from the catch.\n\n**Interaction with task 3.**\n- Task 3's flake re-run runs only when the failure would auto-abort (`!isTTY || yes || autonomous`). Keep that.\n- With the prompt fixed, an interactive operator gets rerun/abort/skip as before. Confirm task 3's \"interactive TTY path unchanged\" test still holds, and update it if it encoded the broken behaviour.\n\n**Validation.**\n- `pnpm --filter @n-dx/hench exec vitest run <your files> tests/integration/test-gate-flaky-rerun.test.ts tests/integration/test-gate.test.ts`.\n- The six root policy tests named in the epic conventions. A new test that imports `tools/test-runner` or `lifecycle/shared` may need a row in tests/shell-spawn-inventory.md.\n- `pnpm --filter @n-dx/hench build`, then `grep -n 'require(\"node:readline\")' packages/hench/dist/agent/lifecycle/shared.js` must find nothing.\n- Do not run the full suite."
+lastModified: "2026-10-06T18:39:57.497Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

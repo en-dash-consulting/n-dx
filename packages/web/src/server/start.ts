@@ -44,8 +44,6 @@ import { handleStatusRoute, clearStatusCache, buildServerInfo } from "./routes-s
 import { handleHubAbsentRoute } from "./routes-hub-absent.js";
 import { handleConfigRoute } from "./routes-config.js";
 import { handleSearchRoute } from "./routes-search.js";
-import { handleNotionRoute } from "./routes-notion.js";
-import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
 import { handleTrustRoute } from "./routes-trust.js";
 import { evaluateRepoTrust, formatRepoTrustReport } from "@n-dx/llm-client";
@@ -59,12 +57,16 @@ import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { ALL_DATA_FILES, stripWorkspaceSlot, urlWithToken } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
+import { resolveWebPaths } from "./paths.js";
 import { handleRequestSecurity } from "./request-security.js";
 
 /**
- * File written by the server process to communicate the actual port it bound to.
- * Used by the orchestrator (web.js) to discover the port in background mode,
- * where the server's stdout is not available.
+ * The port marker's name on the legacy layout.
+ *
+ * Kept as public API, but no longer where the server writes: the marker
+ * moved into `.ndx/` with the rest of the layout, so the write site asks
+ * `resolveWebPaths` (`./paths.ts`), which answers this name on a legacy
+ * project and `.ndx/web.port` on a migrated one.
  */
 export const PORT_FILE = ".n-dx-web.port";
 const LOOPBACK_HOST = "127.0.0.1";
@@ -737,9 +739,9 @@ function handleReloadSignalEndpoint(
  * the promise was neither awaited nor cancelled, so the handler ran on, wrote
  * to a response the 404 fall-through in {@link handleApiRoutes} had already
  * finished, and threw ERR_HTTP_HEADERS_SENT from an unawaited promise —
- * terminating the process. `/api/notion/*` and `/api/merge-graph` were
- * reachable that way; the rest escaped only by not accepting POST on the paths
- * probed, which is luck rather than a guard.
+ * terminating the process. `/api/merge-graph` was reachable that way; the rest
+ * escaped only by not accepting POST on the paths probed, which is luck rather
+ * than a guard.
  *
  * Passing an already-invoked handler is now a type error, so the mistake
  * cannot be reintroduced one call site at a time.
@@ -791,8 +793,6 @@ async function handleApiRoutes(
   if (handleHubAbsentRoute(req, res)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleTrustRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleIntegrationRoute(req, res, ctx))) return true;
   if (await handleFeaturesRoute(req, res, ctx)) return true;
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
   if (await handleLlmRoute(req, res, ctx)) return true;
@@ -1204,7 +1204,11 @@ export async function startServer(
     server.listen(actualPort, LOOPBACK_HOST, async () => {
       // Write port file so the orchestrator can discover the actual port
       // (especially important in background mode where stdout is unavailable).
-      const portFilePath = join(absDir, PORT_FILE);
+      // Resolved, not `PORT_FILE` joined to the root: core's `web.js` waits on
+      // the resolver's answer, so on a `.ndx/` project a root-level file is
+      // one nobody reads — `ndx start --background` then times out and
+      // reports the requested port instead of the one actually bound.
+      const portFilePath = resolveWebPaths(absDir).portFile;
       try {
         await writeFile(portFilePath, String(actualPort) + "\n", "utf-8");
       } catch {

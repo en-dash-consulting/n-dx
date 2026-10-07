@@ -21,7 +21,7 @@ import { cmdValidate } from "../../src/cli/commands/validate.js";
 import { cmdUpdate } from "../../src/cli/commands/update.js";
 
 // Import MCP tools
-import { handleGetPrdStatus, handleAddItem } from "../../src/cli/mcp-tools.js";
+import { handleGetPrdStatus, handleAddItem } from "../../src/cli/mcp-tools/index.js";
 import { createRexMcpServer } from "../../src/cli/mcp.js";
 
 // Import store functions

@@ -54,6 +54,7 @@
     "mcp-shim.js",
     "help.js",
     "gateway-rules.json",
+    "child-process-allowlist.json",
     "refresh-plan.js",
     "refresh-artifacts.js",
     "export.js",

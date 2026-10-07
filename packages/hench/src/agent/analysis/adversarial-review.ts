@@ -226,6 +226,16 @@ export interface ReviewPromptContext {
   /** Absolute path the reviewer must write its JSON report to. */
   reportPath: string;
   /**
+   * Project-relative PRD folder tree, with a trailing slash — `.rex/prd_tree/`
+   * or `.ndx/rex/prd_tree/`.
+   *
+   * The duplicate check tells the reviewer to list this directory before
+   * capturing a finding. Spelled out as `.rex/prd_tree/` it named nothing on a
+   * `.ndx/` project, so the listing came back empty and the reviewer filed a
+   * duplicate of an item that was already there.
+   */
+  prdTreeDir: string;
+  /**
    * True when the reviewer is resuming the session that did the work. Changes
    * the brief substantially: a resumed reviewer already holds the context, so
    * the brief spends its length on posture rather than re-explaining the task.
@@ -239,6 +249,12 @@ export interface ReviewPromptContext {
    * reviewer is a headless session that could never receive their selection.
    */
   autonomous: boolean;
+  /**
+   * True when hench's test gate runs right after this review (not
+   * `--skip-test-gate`). The reviewer then runs scoped checks only and leaves
+   * the full suite to the gate and CI (#539).
+   */
+  testGateFollows: boolean;
 }
 
 /**
@@ -349,7 +365,9 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "decide necessity (Pass 2). Its severity scale and verdict set are the ones",
     "this report uses.",
     "",
-    "Two deviations from the skill's default flow, because this run is automated:",
+    ctx.testGateFollows
+      ? "Three deviations from the skill's default flow, because this run is automated:"
+      : "Two deviations from the skill's default flow, because this run is automated:",
     "",
   );
 
@@ -374,8 +392,17 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
   lines.push(
     "- **Write the machine-readable report** described under Output below. This",
     "  is in addition to whatever you print for the human, not instead of it.",
-    "",
   );
+  if (ctx.testGateFollows) {
+    lines.push(
+      "- **Scoped checks only.** Step 2 of the skill runs only the scoped checks",
+      "  for the files in the diff, plus the static checks. Do not run the full",
+      "  suite: hench's test gate runs right after this review, and CI runs",
+      "  everything. Name the full suite in your report as what was not",
+      "  exercised — that is Step 4's input.",
+    );
+  }
+  lines.push("");
 
   lines.push("## What to do with each finding");
   lines.push("");
@@ -401,7 +428,7 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "decision behind. Record what you actually did and let it park the rest.",
     "",
     "Before creating any PRD item, check whether one already tracks the same",
-    "defect: list the directories under `.rex/prd_tree/` and read the `index.md`",
+    `defect: list the directories under \`${ctx.prdTreeDir}\` and read the \`index.md\``,
     "of any whose slug is plausibly related. Match on the defect, not the",
     "wording. If it is already tracked, record the finding as `captured` with the",
     "existing item's id and say so in `note` — do not create a duplicate.",
@@ -425,7 +452,9 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "  up by that commit. Do not run `git commit`, `git reset`, `git checkout`,",
     "  `git clean`, or anything else that rewrites history or discards work.",
     "- **Do not change the task's status.** The run owns that transition.",
-    "- **Read-only project checks only.** Tests, typecheck, and lint are fine.",
+    ctx.testGateFollows
+      ? "- **Read-only project checks only.** Scoped tests, typecheck, and lint are fine."
+      : "- **Read-only project checks only.** Tests, typecheck, and lint are fine.",
     "  Never run `ndx ci`, `ndx plan`, `ndx analyze`, `ndx refresh`, formatters",
     "  in write mode, codegen, migrations, or snapshot updates (`-u`) — they",
     "  rewrite state this run is concurrently writing.",

@@ -12,6 +12,7 @@
 
 import { join } from "node:path";
 import { loadConfig, saveConfig } from "../../store/config.js";
+import { resolveHenchPaths } from "../../store/paths.js";
 import { validateConfig, formatValidationErrors } from "../../schema/index.js";
 import { DEFAULT_HENCH_CONFIG } from "../../schema/v1.js";
 import type {HenchConfig, Provider} from "../../schema/v1.js";import { CLIError } from "../errors.js";import { info, result } from "../output.js";
@@ -324,6 +325,22 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     type: "string",
     category: "test-gate",
     impact: (v) => `Test gate will run "${v}"`,
+  },
+  {
+    path: "testGate.command",
+    label: "Test Gate Command Template",
+    description: "Gate command template; {base} becomes the run's start commit. Takes precedence over fullTestCommand",
+    type: "string",
+    category: "test-gate",
+    impact: (v) => `Test gate will run "${v}", with {base} replaced by the run's start commit`,
+  },
+  {
+    path: "testGate.rerunCommand",
+    label: "Test Gate Re-run Template",
+    description: "Unattended runs re-run only the failed suites once; {suites} becomes their comma-joined labels",
+    type: "string",
+    category: "test-gate",
+    impact: (v) => `An unattended gate failure will re-run its failed suites once with "${v}"`,
   },
   {
     path: "fullTestTimeoutMs",
@@ -921,7 +938,7 @@ export async function cmdConfig(
   positional: string[],
   flags: Record<string, string>,
 ): Promise<void> {
-  const henchDir = join(dir, ".hench");
+  const { henchDir } = resolveHenchPaths(dir);
 
   // Interactive mode
   if (flags.interactive === "true") {

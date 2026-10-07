@@ -1758,7 +1758,8 @@ Hench settings (.hench/config.json):
   hench.maxTokens          number    Max tokens per API request (default: 8192)
   hench.tokenBudget        number    Total tokens per run, input+cached+output (default: 0 —
                                      unlimited). A run stops once it crosses this.
-  hench.rexDir             string    Path to .rex directory (default: ".rex")
+  hench.rexDir             string    Path to the rex PRD directory (default: the project's
+                                     resolved rex directory — .rex, or .ndx/rex on the new layout)
   hench.apiKeyEnv          string    Env variable for API key (default: "ANTHROPIC_API_KEY")
   hench.claudePath         string    Path to the Claude Code binary. Falls back to "claude" on
                                      PATH. Prefer claude.cli_path, which is shared across packages.
@@ -1867,6 +1868,23 @@ Hench test-gate settings (mandatory full-suite gate before commit):
                                      then .n-dx.json hench.fullTestCommand, then auto-detected
                                      from the project (Makefile validate target, package.json
                                      test:all/test, swift/cargo/go/pytest), then prompted for.
+  hench.testGate.command   string    Gate command template. Outranks hench.fullTestCommand and
+                                     auto-detection. {base} is replaced with the commit the run
+                                     started from (a hex SHA), e.g.
+                                     "node scripts/run-all-tests.mjs affected {base}". If the
+                                     template has {base} and no start commit is known, the gate
+                                     falls back to the untemplated command and records
+                                     testGate.scopeFallback. A template without {base} runs as
+                                     written. A "test-gate: selected-suites=a,b" line in its
+                                     output is recorded as testGate.suites.
+  hench.testGate.rerunCommand
+                           string    Re-run template for unattended runs (--auto, --yes, no TTY).
+                                     When the gate fails and its output has a
+                                     "test-gate: failed-suites=a,b" line, {suites} is replaced
+                                     with those labels and the command runs once, e.g.
+                                     "node scripts/run-all-tests.mjs {suites}". A pass counts and
+                                     is recorded as testGate.flakyRerun; a failure fails the run.
+                                     No re-run after a timeout or on an interactive terminal.
   hench.fullTestTimeoutMs  number    How long that command may run before it is killed and the
                                      run fails (default: 900000 — 15 minutes; 0 means no limit).
                                      Raise it for a large monorepo: the gate runs while an agent
@@ -2126,7 +2144,6 @@ Feature toggles (.n-dx.json — managed via web UI or ndx config):
   features.rex.showTokenBudget      boolean   Show token budget on task items (default: false)
   features.rex.autoComplete         boolean   Auto-complete parents when children done (default: true)
   features.rex.budgetEnforcement    boolean   Enforce token/cost budgets (default: false)
-  features.rex.notionSync           boolean   Enable Notion two-way sync (default: false)
   features.sourcevision.callGraph   boolean   Enable call graph extraction (default: false)
   features.sourcevision.enrichment  boolean   AI enrichment passes (default: true)
   features.sourcevision.componentCatalog
@@ -2800,7 +2817,7 @@ async function handleSetProjectSection(
   // Automatically persist hench.provider=api so `ndx work` never emits the
   // "vendor=local requires API mode — To persist: ndx config hench.provider api" hint.
   if (pkg === "llm" && settingPath === "vendor" && (coerced === LLM_VENDOR.LOCAL || coerced === LLM_VENDOR.GOOGLE)) {
-    const henchConfigPath = join(dir, ".hench", "config.json");
+    const henchConfigPath = join(resolveLayout(dir).henchDir, "config.json");
     try {
       if (await fileExists(henchConfigPath)) {
         const henchConfig = await loadJSON(henchConfigPath);

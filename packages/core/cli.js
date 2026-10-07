@@ -917,7 +917,6 @@ const REFRESH_STEP_ORDER = {
   "sourcevision-pr-markdown": 3,
   "web-build": 4,
 };
-const WEB_PORT_FILE = ".n-dx-web.port";
 
 function printRefreshStepTransition(kind, status, detail) {
   const prefix = `${cyan("[refresh]")} ${bold(kind)} ->`;
@@ -951,7 +950,7 @@ function printRefreshStepSummary(stepStatuses) {
 }
 
 function readRunningServerPort(dir) {
-  const portPath = join(dir, WEB_PORT_FILE);
+  const portPath = resolveLayout(dir).webPortFile;
   if (!existsSync(portPath)) return null;
   try {
     const raw = readFileSync(portPath, "utf-8");
@@ -2328,14 +2327,6 @@ async function handleClaim(rest) {
   exitWithCleanup(0);
 }
 
-async function handleSync(rest) {
-  const dir = resolveDir(rest);
-  requireInit(dir, ["rex"]);
-  const flags = extractFlags(rest);
-  await runOrDie(tools.rex, ["sync", ...flags, dir]);
-  exitWithCleanup(0);
-}
-
 async function handleCI(rest) {
   const dir = resolveDir(rest);
   const flags = extractFlags(rest);
@@ -3266,7 +3257,6 @@ const COMMAND_DISPATCH = new Map([
   ["status",            handleStatus],
   ["trust",             handleTrust],
   ["usage",             handleUsage],
-  ["sync",              handleSync],
   ["claim",             handleClaim],
   ["ci",                handleCI],
   ["dev",               handleDev],

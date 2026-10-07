@@ -25,5 +25,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Parse the v1 tree and the v2 map and changes roots into one model](./parse-the-v1-tree-and-the-v2-map-and.md) | pending |
+| [Parse the v1 tree and the v2 product and changes roots into one model](./parse-the-v1-tree-and-the-v2-product.md) | pending |
 | [Write the v2 trees with frozen slugs and no Children tables](./write-the-v2-trees-with-frozen-slugs.md) | pending |

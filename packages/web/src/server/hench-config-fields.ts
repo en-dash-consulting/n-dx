@@ -13,6 +13,8 @@
  * cannot drift, and `validateConfigKeyValue` gives them one gate.
  */
 
+import { PROJECT_DIRS } from "@n-dx/llm-client";
+
 /**
  * Config field metadata for the UI and for write validation.
  *
@@ -102,7 +104,7 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
 
   // ── Task selection ──
   { path: "maxFailedAttempts", label: "Max Failed Attempts", description: "Consecutive failures before a task is considered stuck", type: "number", integer: true, positive: true, category: "task-selection", defaultValue: 3 },
-  { path: "rexDir", label: "Rex Directory", description: "Path to the .rex directory for task data", type: "string", category: "task-selection", defaultValue: ".rex" },
+  { path: "rexDir", label: "Rex Directory", description: "Path to the rex PRD directory for task data", type: "string", category: "task-selection", defaultValue: PROJECT_DIRS.REX },
 
   // ── Retry policy ──
   { path: "retry.maxRetries", label: "Max Retries", description: "Number of retry attempts for transient API errors", type: "number", integer: true, category: "retry", defaultValue: 3 },
@@ -116,6 +118,8 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
 
   // ── Test gate ──
   { path: "fullTestCommand", label: "Full Test Command", description: "Command that runs the whole suite before a commit. Auto-detected when unset", type: "string", category: "test-gate" },
+  { path: "testGate.command", label: "Test Gate Command Template", description: "Gate command template; {base} becomes the run's start commit. Takes precedence over fullTestCommand", type: "string", category: "test-gate" },
+  { path: "testGate.rerunCommand", label: "Test Gate Re-run Template", description: "Unattended runs re-run only the failed suites once; {suites} becomes their comma-joined labels", type: "string", category: "test-gate" },
   { path: "fullTestTimeoutMs", label: "Full Test Timeout (ms)", description: "How long the test gate may run before it is killed. 0 means no limit", type: "number", integer: true, category: "test-gate", defaultValue: 900000 },
 
   // ── Git safety ──

@@ -62,3 +62,25 @@ export function resolveWebPaths(
     usageFile: layout.webUsageFile,
   };
 }
+
+/**
+ * Hench's state directory in a project — `.ndx/hench` or `.hench`.
+ *
+ * The dashboard reads hench's config, run records, templates and the adaptive
+ * and workflow suggestion files, and it is the one tool directory it reaches
+ * for that does *not* arrive through a gateway: `@n-dx/web` does not depend on
+ * `@n-dx/hench` (see its `package.json`), so there is no hench gateway to
+ * route through and hench's own `store/paths.ts` is out of reach. Asking the
+ * resolver directly is the same move `resolveWebPaths` above makes, and for
+ * the same reason — foundation-tier imports are gated only in hench.
+ *
+ * Rex and sourcevision are different: those packages *are* dependencies, so
+ * their directories reach web through `rex-gateway.ts` and
+ * `domain-gateway.ts`.
+ *
+ * @param root     Absolute project root.
+ * @param options  Forwarded to {@link resolveLayout}.
+ */
+export function henchDirIn(root: string, options?: ResolveLayoutOptions): string {
+  return resolveLayout(root, options).henchDir;
+}

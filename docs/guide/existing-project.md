@@ -87,7 +87,6 @@ See [.gitignore for ndx projects](./gitignore) for the full reference — what e
 .rex/pending-proposals.json
 .rex/acknowledged-findings.json
 .rex/execution-log*.jsonl
-.rex/adapters.json
 .rex/n-dx_workflow.md
 
 # Server runtime
@@ -190,7 +189,7 @@ For teammates: after they pull the repo, they only need `pnpm add -g @n-dx/core`
 
 - **Build a mental model of the codebase**: [Codebase Onboarding](./onboarding) — using MCP tools and the dashboard to explore zones interactively
 - **Heavier cleanup pass**: [Cleaning Up a Vibe-Coded App](./vibe-cleanup) — when the repo needs more than one self-heal iteration
-- **Keep the PRD aligned over time**: [Change Management](./change-management) — drift detection, post-sprint pruning, sync with external trackers
+- **Keep the PRD aligned over time**: [Change Management](./change-management) — drift detection, post-sprint pruning, archive management
 - **The self-heal loop in depth**: [Self-Heal Loop](./self-heal) — finding lifecycle, fuzzy acknowledgment, regression guards
 - **All commands and flags**: [Commands](./commands)
 - **Day-to-day workflow**: [Workflow](./workflow)

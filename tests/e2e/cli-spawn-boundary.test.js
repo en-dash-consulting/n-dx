@@ -98,7 +98,6 @@ const REX_SUBCOMMANDS = [
   "analyze",  // ndx plan → rex analyze
   "status",   // ndx status → rex status
   "usage",    // ndx usage → rex usage
-  "sync",     // ndx sync → rex sync
 ];
 
 const SOURCEVISION_SUBCOMMANDS = [

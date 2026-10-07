@@ -26,6 +26,70 @@ describe("resolveTestCommand", () => {
   // Config precedence tests
   // ---------------------------------------------------------------------------
 
+  describe("testGate.command template", () => {
+    const SHA = "1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b";
+    const template = "node scripts/run-all-tests.mjs affected {base}";
+
+    it("beats fullTestCommand and fills {base}", async () => {
+      const result = await resolveTestCommand({
+        projectDir,
+        henchDir,
+        config: { fullTestCommand: "pnpm test", testGate: { command: template } },
+        base: SHA,
+      });
+
+      expect(result).toEqual({
+        command: `node scripts/run-all-tests.mjs affected ${SHA}`,
+        source: "test-gate-template",
+        base: SHA,
+      });
+    });
+
+    it("beats .n-dx.json fullTestCommand", async () => {
+      await writeFile(
+        join(projectDir, ".n-dx.json"),
+        JSON.stringify({ hench: { fullTestCommand: "npm run test:all" } }),
+      );
+      const result = await resolveTestCommand({
+        projectDir, henchDir, config: { testGate: { command: template } }, base: SHA,
+      });
+
+      expect(result.source).toBe("test-gate-template");
+    });
+
+    it("uses a template without {base} as written", async () => {
+      const result = await resolveTestCommand({
+        projectDir, henchDir, config: { testGate: { command: "make check" } },
+      });
+
+      expect(result).toEqual({ command: "make check", source: "test-gate-template" });
+    });
+
+    it("falls back to what it would have returned, with the reason, when {base} has no valid base", async () => {
+      for (const base of [undefined, "main"]) {
+        const result = await resolveTestCommand({
+          projectDir,
+          henchDir,
+          config: { fullTestCommand: "pnpm test", testGate: { command: template } },
+          base,
+        });
+
+        expect(result.command).toBe("pnpm test");
+        expect(result.source).toBe("config");
+        expect(result.base).toBeUndefined();
+        expect(result.scopeFallback).toEqual(expect.any(String));
+      }
+    });
+
+    it("leaves today's precedence alone when no template is set", async () => {
+      const result = await resolveTestCommand({
+        projectDir, henchDir, config: { fullTestCommand: "pnpm test" }, base: SHA,
+      });
+
+      expect(result).toEqual({ command: "pnpm test", source: "config" });
+    });
+  });
+
   describe("config precedence", () => {
     it("uses fullTestCommand from hench config (highest priority)", async () => {
       const result = await resolveTestCommand({

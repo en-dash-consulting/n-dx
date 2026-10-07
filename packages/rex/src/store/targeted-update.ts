@@ -47,10 +47,10 @@
  * @module rex/store/targeted-update
  */
 
-import { mkdir, writeFile, rename } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import type { PRDItem } from "../schema/index.js";
-import { atomicWriteTempPath } from "./atomic-write.js";
+import { atomicWrite } from "./atomic-write.js";
 import { renderItemIndexMd, resolveSiblingSlugs } from "./folder-tree-serializer.js";
 import { digestItemFile } from "./folder-tree-parser.js";
 
@@ -138,9 +138,7 @@ function chainTo(
 
 async function atomicWriteFile(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  const temp = atomicWriteTempPath(path);
-  await writeFile(temp, content, "utf-8");
-  await rename(temp, path);
+  await atomicWrite(path, content);
 }
 
 /**

@@ -327,29 +327,6 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["validate"],
   },
-  sync: {
-    tool: "rex",
-    command: "sync",
-    summary: "synchronize PRD with a remote adapter",
-    usage: "rex sync [options] [dir]",
-    description:
-      "Bidirectional sync between the local .rex/prd.json and a remote service\n" +
-      "(e.g. Notion). By default performs a full sync; use --push or --pull\n" +
-      "for one-way operations.",
-    options: [
-      { flag: "--push", description: "Push local changes to remote only" },
-      { flag: "--pull", description: "Pull remote changes to local only" },
-      { flag: "--adapter=<name>", description: "Adapter name (default: notion)" },
-      { flag: "--dry-run", description: "Preview sync without writing" },
-      { flag: "--format=json", description: "Machine-readable output" },
-    ],
-    examples: [
-      { command: "rex sync", description: "Full bidirectional sync" },
-      { command: "rex sync --push", description: "Push local changes to Notion" },
-      { command: "rex sync --pull --adapter=notion", description: "Pull remote changes down" },
-    ],
-    related: ["adapter"],
-  },
   usage: {
     tool: "rex",
     command: "usage",
@@ -568,7 +545,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex export --format=narrative --out=./prd.md", description: "Write a stakeholder document" },
       { command: "rex export --format=narrative --item=checkout-overhaul --out=./checkout.md", description: "Document one epic" },
     ],
-    related: ["import-bundle", "sync"],
+    related: ["import-bundle"],
   },
   "import-bundle": {
     tool: "rex",
@@ -603,7 +580,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex import-bundle --in=./prd-bundle.json", description: "Merge a bundle into the local PRD" },
       { command: "rex import-bundle --in=./prd-bundle.json --replace --yes", description: "Replace the local PRD outright" },
     ],
-    related: ["export", "sync"],
+    related: ["export"],
   },
   "tree-diff": {
     tool: "rex",
@@ -635,32 +612,6 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex tree-diff --json", description: "JSON for a CI summary or the dashboard" },
     ],
     related: ["status", "validate", "export"],
-  },
-  adapter: {
-    tool: "rex",
-    command: "adapter",
-    summary: "manage store adapters",
-    usage: "rex adapter <subcommand> [name] [options] [dir]",
-    sections: [
-      {
-        title: "Subcommands",
-        content:
-          "list                List registered adapters and their status\n" +
-          "add <name>          Configure an adapter (e.g. notion)\n" +
-          "remove <name>       Remove adapter configuration\n" +
-          "show <name>         Show adapter configuration details",
-      },
-    ],
-    options: [
-      { flag: "--key=<value>", description: "Set adapter config values (for add)" },
-      { flag: "--format=json", description: "Machine-readable output (for list, show)" },
-    ],
-    examples: [
-      { command: "rex adapter list", description: "Show all adapters" },
-      { command: "rex adapter add notion --token=secret_xxx", description: "Configure Notion adapter" },
-      { command: "rex adapter show notion", description: "Show Notion config" },
-    ],
-    related: ["sync"],
   },
   reorganize: {
     tool: "rex",
@@ -787,7 +738,6 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   prune: ["reshape", "status"],
   validate: ["fix", "report"],
   fix: ["validate"],
-  sync: ["adapter"],
   usage: ["status"],
   report: ["validate"],
   verify: ["status"],
@@ -796,7 +746,6 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   recommend: ["analyze", "status"],
   analyze: ["add", "recommend"],
   import: ["add", "recommend"],
-  adapter: ["sync"],
   reorganize: ["health", "prune", "reshape"],
   health: ["reorganize", "report", "validate"],
   "migrate-to-md": ["init", "validate", "status"],

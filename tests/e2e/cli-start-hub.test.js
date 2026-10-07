@@ -84,6 +84,39 @@ async function getJson(url, timeoutMs = 10_000) {
   }
 }
 
+/**
+ * Like {@link getJson}, but tolerates a server that is spawned and not yet listening.
+ *
+ * WHY. `ndx start --background` waits for the child's port file via
+ * `waitForPortFile`, whose budget is 5s (packages/core/web.js). If the dashboard
+ * takes longer than that to boot, the CLI deliberately falls through to its
+ * "process is alive but port file not written yet" branch: it still exits 0 and
+ * still prints the requested port, because the server is coming up, just not
+ * ready yet. That is correct CLI behaviour, but it means a caller cannot assume
+ * the port answers the instant the command returns.
+ *
+ * Under the full monorepo suite the 5s budget is reachable — this test failed
+ * exactly once that way, with ECONNREFUSED on the port the CLI had just printed,
+ * and passed standalone every time. Polling removes the dependence on an
+ * arbitrary boot budget without weakening the assertion: the server must still
+ * answer on the requested port, or the test fails on the deadline.
+ */
+async function getJsonWhenListening(url, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+  for (;;) {
+    try {
+      return await getJson(url);
+    } catch (error) {
+      lastError = error;
+      if (Date.now() >= deadline) {
+        throw new Error(`${url} never answered within ${timeoutMs}ms: ${lastError}`, { cause: lastError });
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+}
+
 function isAlive(pid) {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
@@ -280,7 +313,7 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
     const result = runStart(["--here", "--background", `--port=${herePort}`, repoB]);
     expect(result.code, result.stderr + result.stdout).toBe(0);
     try {
-      const status = await getJson(`http://127.0.0.1:${herePort}/api/status`);
+      const status = await getJsonWhenListening(`http://127.0.0.1:${herePort}/api/status`);
       expect(status.status).toBe(200);
       expect(status.body.projectDir).toBe(repoB);
       expect(result.stdout).toContain(`http://localhost:${herePort}`);

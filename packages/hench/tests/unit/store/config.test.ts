@@ -123,6 +123,12 @@ describe("loadConfig", () => {
       expect(config.maxTurns).toBe(12);
     });
 
+    it("keeps the nested hench.testGate.command through the merge and the schema", async () => {
+      await writeProjectConfig({ hench: { testGate: { command: "run affected {base}" } } });
+      const config = await loadConfig(henchDir);
+      expect(config.testGate).toEqual({ command: "run affected {base}" });
+    });
+
     it("reverts an invalid override to the base value and warns, naming the field and file", async () => {
       await writeProjectConfig({ hench: { maxTurns: -5 } });
       const warnings: string[] = [];

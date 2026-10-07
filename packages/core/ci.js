@@ -25,6 +25,7 @@ import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
 import { findSharedSecrets, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel } from "./config.js";
 import { isGitTracked } from "./gitignore.js";
+import { layoutStateNames, relativeToRoot, resolveLayout } from "./layout.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -39,6 +40,11 @@ const MONOREPO_ROOT = resolve(__dir, "../..");
  *   child process.  Callers pass a tracked wrapper so the child is
  *   registered with the global cleanup gate and terminated on SIGINT/SIGTERM.
  */
+/** Directory entry names a source scan must not descend into. */
+function sourceScanSkipDirs() {
+  return new Set(["node_modules", "dist", ".git", ...layoutStateNames().dirNames]);
+}
+
 function runCapture(script, args, spawnFn) {
   return new Promise((res) => {
     const child = spawnFn(
@@ -463,10 +469,11 @@ export async function runCI(dir, flags, { run, tools, spawnTracked = spawn }) {
   const isJSON = flags.some((f) => f === "--format=json");
 
   // ── Pre-flight: check required directories ──────────────────────────────
-  const requiredDirs = [".rex", ".sourcevision"];
-  const missingDirs = requiredDirs.filter((d) => !existsSync(join(dir, d)));
+  const layout = resolveLayout(dir);
+  const requiredDirs = [layout.rexDir, layout.sourcevisionDir];
+  const missingDirs = requiredDirs.filter((d) => !existsSync(d));
   if (missingDirs.length > 0) {
-    const error = `Missing ${missingDirs.join(", ")} in ${dir}`;
+    const error = `Missing ${missingDirs.map((d) => relativeToRoot(layout, d)).join(", ")} in ${dir}`;
     const hint = `Run 'ndx init${dir === process.cwd() ? "" : " " + dir}' to set up the project.`;
     if (isJSON) {
       console.log(JSON.stringify({ timestamp: new Date().toISOString(), ok: false, error, hint, steps: [] }, null, 2));
@@ -621,7 +628,7 @@ function isPhantomZone(zone) {
  * are excluded from health checks to prevent false-positive violations.
  */
 function checkZoneHealth(dir) {
-  const zonesPath = join(dir, ".sourcevision", "zones.json");
+  const zonesPath = join(resolveLayout(dir).sourcevisionDir, "zones.json");
   if (!existsSync(zonesPath)) {
     return { ok: true, checked: 0, violations: [], phantomSkipped: 0 };
   }
@@ -714,8 +721,9 @@ function zoneIdToDirName(id) {
  * Only checks top-level zones (sub-zones live inside their parent's directory).
  */
 function checkZoneIdConsistency(dir) {
-  const zonesJsonPath = join(dir, ".sourcevision", "zones.json");
-  const zonesDir = join(dir, ".sourcevision", "zones");
+  const layout = resolveLayout(dir);
+  const zonesJsonPath = join(layout.sourcevisionDir, "zones.json");
+  const zonesDir = join(layout.sourcevisionDir, "zones");
 
   if (!existsSync(zonesJsonPath) || !existsSync(zonesDir)) {
     return { ok: true, checked: 0, mismatches: [] };
@@ -763,7 +771,7 @@ function checkZoneIdConsistency(dir) {
   for (const dirName of actualDirs) {
     if (!expectedDirs.has(dirName)) {
       mismatches.push(
-        `directory "${dirName}" exists in .sourcevision/zones/ but has no matching zone in zones.json`,
+        `directory "${dirName}" exists in ${relativeToRoot(layout, zonesDir)}/ but has no matching zone in zones.json`,
       );
     }
   }
@@ -954,43 +962,17 @@ function checkGatewayImports(dir) {
 // ── Architecture policy (redundant enforcement) ──────────────────────────────
 
 /**
- * Files allowed to import from node:child_process directly.
- * Mirrors architecture-policy.test.js ALLOWED set for redundant enforcement.
+ * Files allowed to import from node:child_process directly, and directories
+ * the scan leaves out — loaded from child-process-allowlist.json.
  *
- * This list is intentionally maintained separately from the test file to
- * provide independent verification — if either list drifts, the stricter
- * one catches the violation.
+ * The JSON file is shared with architecture-policy.test.js. Each used to keep
+ * its own list; ci.js's fell 26 files behind and the step failed on every run.
+ * The scanners stay separate implementations, and a parity test in
+ * architecture-policy.test.js checks that they reach the same verdict.
  */
-const CHILD_PROCESS_ALLOWED = new Set([
-  // Foundation abstraction
-  "packages/llm-client/src/exec.ts",
-  // CLI streaming providers
-  "packages/llm-client/src/cli-provider.ts",
-  "packages/llm-client/src/codex-cli-provider.ts",
-  "packages/hench/src/agent/lifecycle/cli-loop.ts",
-  // Orchestration layer
-  "cli.js",
-  "ci.js",
-  "web.js",
-  "config.js",
-  "pr-check.js",
-  // Development scripts
-  "packages/web/dev.js",
-  // System monitoring
-  "packages/hench/src/process/memory-monitor.ts",
-  // Git operations
-  "packages/sourcevision/src/analyzers/branch-work-collector.ts",
-  "packages/sourcevision/src/analyzers/branch-work-filter.ts",
-  "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
-  "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
-  // Web server routes
-  "packages/web/src/server/routes-hench.ts",
-  "packages/web/src/server/routes-sourcevision.ts",
-  // NOTE: claude-integration.js was listed here for its `claude mcp add`
-  // execSync calls. It now routes through win-spawn.js and imports no
-  // child_process API directly, so the permission was removed rather than
-  // left permitted-but-unused.
-]);
+const _childProcessPolicy = JSON.parse(readFileSync(join(__dir, "child-process-allowlist.json"), "utf-8"));
+const CHILD_PROCESS_ALLOWED = new Set(_childProcessPolicy.allowed.map((e) => e.path));
+const CHILD_PROCESS_EXCLUDED_DIRS = new Set(Object.keys(_childProcessPolicy.excludeDirs));
 
 /**
  * Check that no source files import from node:child_process outside the
@@ -999,12 +981,14 @@ const CHILD_PROCESS_ALLOWED = new Set([
  *
  * If the test file is ever skipped, broken, or omitted from a CI run,
  * this check still catches violations.
+ *
+ * Exported for that parity test.
  */
-function checkArchitecturePolicy(dir) {
+export function checkArchitecturePolicy(dir) {
   const violations = [];
   let checked = 0;
 
-  const skipDirs = new Set(["node_modules", "dist", ".git", ".hench", ".rex", ".sourcevision"]);
+  const skipDirs = sourceScanSkipDirs();
   const childProcessPattern = /(?:from\s+["'](?:node:)?child_process["']|require\(["'](?:node:)?child_process["']\))/;
 
   function walkSrc(d) {
@@ -1024,7 +1008,7 @@ function checkArchitecturePolicy(dir) {
         continue;
       }
       if (st.isDirectory()) {
-        walkSrc(full);
+        if (!CHILD_PROCESS_EXCLUDED_DIRS.has(relative(dir, full).replace(/\\/g, "/"))) walkSrc(full);
       } else if (/\.(ts|js|mjs)$/.test(entry) && !entry.endsWith(".d.ts")) {
         const rel = relative(dir, full).replace(/\\/g, "/");
 
@@ -1060,12 +1044,17 @@ function checkArchitecturePolicy(dir) {
 // ── Data-layer contract ───────────────────────────────────────────────────────
 
 /**
- * Data directories that must never be imported as modules.
+ * Data directories that must never be imported as modules, in both layouts.
  * These directories contain JSON state files managed via CLI or filesystem I/O.
  * Direct module imports (import/require) would create fragile coupling between
  * source code and on-disk state layout.
+ *
+ * See `layoutStateNames` in `layout.js` for why both spellings are matched
+ * rather than the project's own.
  */
-const DATA_DIRECTORIES = [".rex", ".sourcevision", ".hench"];
+function dataDirectories() {
+  return layoutStateNames().statePaths;
+}
 
 /**
  * Check that no source files contain import/require paths resolving into
@@ -1085,7 +1074,8 @@ function checkDataLayerContract(dir) {
   const violations = [];
   let checked = 0;
 
-  const skipDirs = new Set(["node_modules", "dist", ".git", ".hench", ".rex", ".sourcevision"]);
+  const skipDirs = sourceScanSkipDirs();
+  const dataDirs = dataDirectories();
 
   // Match import/require paths that resolve into data directories.
   // Catches patterns like:
@@ -1094,8 +1084,8 @@ function checkDataLayerContract(dir) {
   //   require("./.rex/prd.json")
   //   from "../../.hench/config.json"
   // Does NOT match filesystem reads (readFileSync, fs.readFile, etc.)
-  const dataImportPatterns = DATA_DIRECTORIES.map((d) => {
-    const escaped = d.replace(".", "\\.");
+  const dataImportPatterns = dataDirs.map((d) => {
+    const escaped = d.replace(/\./g, "\\.");
     return new RegExp(
       `(?:from\\s+["'][^"']*\\/${escaped}\\/|from\\s+["']${escaped}\\/|require\\(["'][^"']*\\/${escaped}\\/|require\\(["']${escaped}\\/)`,
     );
@@ -1145,7 +1135,7 @@ function checkDataLayerContract(dir) {
               violations.push({
                 file: rel,
                 line: i + 1,
-                message: `module import resolves into ${DATA_DIRECTORIES[p]}/ — use filesystem I/O (readFileSync/writeFileSync) instead of import/require`,
+                message: `module import resolves into ${dataDirs[p]}/ — use filesystem I/O (readFileSync/writeFileSync) instead of import/require`,
               });
             }
           }

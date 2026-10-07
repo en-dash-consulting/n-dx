@@ -25,7 +25,7 @@ import {
   handleUpdateTaskStatus,
   handleMoveItem,
   handleMergeItems,
-} from "../../src/cli/mcp-tools.js";
+} from "../../src/cli/mcp-tools/index.js";
 import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
 import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 

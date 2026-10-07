@@ -12,11 +12,12 @@ tags:
 blockedBy:
   - "dc3b80c1-4d3c-486f-ba03-0b6bbe9fd50d"
 source: "roadmap"
-acceptanceCriteria: []
+acceptanceCriteria:
+  - "The derived change-stage vocabulary is defined in one place in rex and the web viewer's `ChangeStage` either imports it or is updated to match in the same change; `packages/web/src/viewer/views/product-model.ts`, the Product/Changes/capability views and `packages/web/tests/fixtures/v2-product-map.ts` carry no stage value the engine does not emit."
 description: "Capability status and health are derived, never set. Computed edges are cached, never committed.\n\nRoadmap PR 11 · wave 1 · lane rex-domain."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-06T15:51:20.104Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T21:23:49.812Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -25,4 +26,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Compute edges, derived kind and alias resolution](./compute-edges-derived-kind-and-alias.md) | pending |
 | [Compute intent status and health for product nodes](./compute-intent-status-and-health-for.md) | pending |
+| [Warn when a capability's criteria grow past a threshold](./warn-when-a-capability-s-criteria-grow.md) | pending |
 | [Work out when a change landed from git history](./work-out-when-a-change-landed-from-git.md) | pending |

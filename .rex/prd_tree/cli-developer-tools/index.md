@@ -2,13 +2,12 @@
 id: "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6"
 level: "epic"
 title: "CLI & Developer Tools"
-status: "completed"
+status: "pending"
 startedAt: "2026-04-02T17:55:36.327Z"
-completedAt: "2026-09-17T03:54:48.313Z"
 endedAt: "2026-09-17T03:54:48.313Z"
 description: "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline."
-lastModified: "2026-09-17T03:54:48.319Z"
-lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+lastModified: "2026-10-06T06:08:58.545Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -53,11 +52,15 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Verbose TypeScript and Boilerplate Pattern Simplification](./verbose-typescript-and-boilerplate/index.md) | completed |
 | [Web UI Design and User Experience Enhancement](./web-ui-design-and-user-experience/index.md) | completed |
 | [Workflow Use Case Guides](./workflow-use-case-guides/index.md) | completed |
+| [A usage mark taken inside another mark's window makes both records claim the overlap](./a-usage-mark-taken-inside-another-mark.md) | pending |
 | [`date -Is`, the timestamp example in every recording skill, fails on macOS (BSD date)](./date-is-the-timestamp-example-in-every.md) | completed |
 | [Diagnose why the auto-commit step does not fire after MCP-driven PRD mutations in Claude Code skills](./diagnose-why-the-auto-commit-step-does.md) | completed |
 | [hench init must gitignore .hench/locks/ or the first autonomous run self-blocks](./hench-init-must-gitignore-hench-locks.md) | completed |
 | [`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record](./hench-record-no-tokens-leaves-the.md) | completed |
 | [`hench record` with no usage window silently claims the entire session transcript](./hench-record-with-no-usage-window.md) | completed |
+| [`ndx ci` architecture-policy step always fails: ci.js child_process allowlist has drifted from the e2e test's](./ndx-ci-architecture-policy-step-always.md) | completed |
+| [`ndx ci` fails any user project that imports child_process: its allowlist only names n-dx's own files and cannot be configured](./ndx-ci-fails-any-user-project-that.md) | pending |
+| [`node packages/core/ci.js .` is a silent no-op, yet `pnpm verify` and CONTRIBUTING.md run the CI gate that way](./node-packages-core-ci-js-is-a-silent.md) | pending |
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-carries.md) | completed |
 | [Pre-dispatch project-dir resolution still lets a directory shadow a config key](./pre-dispatch-project-dir-resolution.md) | completed |
 | [resolveDir treats a tool subcommand as the project directory, so `ndx hench record` checks the wrong path](./resolvedir-treats-a-tool-subcommand-as.md) | completed |

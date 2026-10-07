@@ -1,0 +1,316 @@
+/*
+ * Product page, Changes view and capability page (v2 product and change layers).
+ *
+ * Two visual jobs beyond the shared table and tag styles: mark the rows that
+ * need attention (revised spec, defective build) so they are found without
+ * reading every row, and draw open changes as overlays — visibly not-yet-true
+ * against the capability they will amend.
+ */
+
+/* ── Shared status and health tags ─────────────────────────────── */
+
+.pm-status,
+.pm-health {
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  font-size: var(--font-xs);
+}
+
+.pm-status-met { color: var(--green); border-color: var(--green); }
+.pm-status-revised { color: var(--orange); border-color: var(--orange); }
+.pm-status-changing { color: var(--accent); border-color: var(--accent); }
+.pm-status-proposed { color: var(--text-muted); }
+.pm-status-retired { color: var(--text-muted); text-decoration: line-through; }
+
+.pm-health-ok { color: var(--green); border-color: var(--green); }
+.pm-health-defective { color: var(--red); border-color: var(--red); }
+
+/* ── Product page ──────────────────────────────────────────────── */
+
+.pm-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.pm-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pm-display-id {
+  margin-left: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.pm-statement {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  line-height: var(--leading-normal);
+}
+
+.pm-stewards {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+}
+
+.pm-table .pm-cell-criteria {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+/* The two rows a reader is looking for: spec ahead of build, or broken now. */
+.pm-row-attention {
+  background: var(--bg-hover);
+  box-shadow: inset 3px 0 0 var(--orange);
+}
+
+.pm-metric-revised .metric-value { color: var(--orange); }
+.pm-metric-defective .metric-value { color: var(--red); }
+
+/* ── Open-change overlays ──────────────────────────────────────── */
+
+.pm-overlays {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.pm-overlay {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  font-size: var(--font-xs);
+}
+
+.pm-overlay-id {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.pm-overlay-stage {
+  color: var(--text-dim);
+  text-transform: lowercase;
+}
+
+.pm-overlay-delta,
+.ch-delta,
+.cap-delta {
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+}
+
+.pm-delta-added, .ch-delta-added, .cap-delta-added { color: var(--green); }
+.pm-delta-modified, .ch-delta-modified, .cap-delta-modified { color: var(--orange); }
+.pm-delta-removed, .ch-delta-removed, .cap-delta-removed { color: var(--red); }
+.ch-delta-touches, .cap-delta-touches { color: var(--text-muted); }
+
+.pm-overlay-none {
+  color: var(--text-muted);
+}
+
+.pm-capability-link,
+.ch-change-link,
+.cap-back {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-align: left;
+}
+
+.pm-capability-link:hover,
+.ch-change-link:hover,
+.cap-back:hover {
+  text-decoration: underline;
+}
+
+/* ── Changes view ──────────────────────────────────────────────── */
+
+.ch-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.ch-release {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ch-release-count,
+.ch-stage-count {
+  margin-left: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.ch-stage-header {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-dim);
+}
+
+.ch-change-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ch-change {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.ch-change-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.ch-display-id,
+.cap-display-id {
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.ch-change-title {
+  font-weight: var(--weight-medium);
+}
+
+.ch-intent {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  line-height: var(--leading-normal);
+}
+
+.ch-map-links {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--font-xs);
+}
+
+.ch-map-none,
+.ch-progress-empty {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.ch-change-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+}
+
+.ch-needs-placement { color: var(--orange); border-color: var(--orange); }
+.ch-spike { color: var(--purple); border-color: var(--purple); }
+
+/* ── Capability page ───────────────────────────────────────────── */
+
+.cap-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.cap-container-attention .view-title {
+  box-shadow: inset 0 -2px 0 var(--orange);
+}
+
+.cap-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+}
+
+.cap-breadcrumb-sep { color: var(--text-muted); }
+
+.cap-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cap-spec-unreviewed { color: var(--text-muted); }
+
+.cap-statement-text {
+  margin: 0;
+  line-height: var(--leading-relaxed);
+}
+
+.cap-criteria-list,
+.cap-depends-list,
+.cap-code-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  line-height: var(--leading-normal);
+}
+
+.cap-code-list { list-style: none; padding-left: 0; }
+
+.cap-criterion-inherited { color: var(--text-dim); }
+
+.cap-inherited {
+  margin-left: var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.cap-code-site {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cap-code-path {
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
+}
+
+.cap-code-role {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}

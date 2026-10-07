@@ -148,32 +148,6 @@ export {
 } from "./store/ensure-legacy-prd-migrated.js";
 export type { LegacyPrdMigrationResult } from "./store/ensure-legacy-prd-migrated.js";
 
-// ---- Integration schema system ----------------------------------------------
-
-export {
-  validateField,
-  validateConfig,
-  registerIntegrationSchema,
-  getIntegrationSchema,
-  listIntegrationSchemas,
-  toAdapterConfigSchema,
-} from "./store/integration-schema.js";
-export type {
-  FieldInputType,
-  FieldValidationRule,
-  FieldSelectOption,
-  IntegrationFieldSchema,
-  IntegrationSchema,
-  IntegrationFieldGroup,
-  FieldValidationResult,
-} from "./store/integration-schema.js";
-export {
-  registerBuiltInSchemas,
-  ensureSchemas,
-} from "./store/integration-schemas/index.js";
-export { notionIntegrationSchema } from "./store/integration-schemas/notion.js";
-export { jiraIntegrationSchema } from "./store/integration-schemas/jira.js";
-
 // ---- Schema types & constants -----------------------------------------------
 
 export type {
@@ -582,7 +556,7 @@ export { createRexMcpServer } from "./cli/mcp.js";
 
 // ---- MCP tool handlers (for direct invocation by web/gateway) ---------------
 
-export { handleEditItem } from "./cli/mcp-tools.js";
+export { handleEditItem } from "./cli/mcp-tools/index.js";
 
 // ---- Execution log -----------------------------------------------------------
 // Shared writer behind `append_log` (MCP) and `rex log` / `ndx log` (CLI).

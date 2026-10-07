@@ -121,6 +121,29 @@ describe("File Classifier", () => {
         expect(classifyFile(".rex/prd_tree/task-1/index.md")).toBe("metadata");
         expect(classifyFile(".rex/prd.md")).toBe("metadata");
       });
+
+      it("classifies the same files as metadata on the .ndx/ layout", () => {
+        // Only the legacy spelling was recognised, and `.ndx/rex/…` does not
+        // contain `.rex/`, so on a migrated project every PRD write fell
+        // through to the extension rules — `index.md` reported as a docs
+        // change, `tree-meta.json` as a config change — and the run summary
+        // described PRD bookkeeping as work.
+        expect(classifyFile(".ndx/rex/prd_tree/task-1/index.md")).toBe("metadata");
+        expect(classifyFile(".ndx/rex/tree-meta.json")).toBe("metadata");
+      });
+
+      it("classifies a nested project's PRD writes as metadata on both layouts", () => {
+        // Git reports paths relative to the repository root, so a project
+        // below it is reached through a prefix. The check is a substring
+        // match for that reason.
+        expect(classifyFile("sub/.rex/prd_tree/task-1/index.md")).toBe("metadata");
+        expect(classifyFile("sub/.ndx/rex/prd_tree/task-1/index.md")).toBe("metadata");
+      });
+
+      it("does not mistake an ordinary rex-named directory for the PRD", () => {
+        expect(classifyFile("src/rex/client.ts")).toBe("code");
+        expect(classifyFile("docs/rex/overview.md")).toBe("docs");
+      });
     });
   });
 

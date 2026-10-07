@@ -17,7 +17,7 @@ vi.mock("node:fs", async (importOriginal) => {
 });
 
 import { existsSync } from "node:fs";
-import { checkProjectStaleness, formatStalenessNotice, REQUIRED_DIRS } from "../../packages/core/stale-check.js";
+import { checkProjectStaleness, formatStalenessNotice, requiredDirs } from "../../packages/core/stale-check.js";
 
 const DIR = "/project";
 
@@ -88,11 +88,33 @@ describe("checkProjectStaleness", () => {
   });
 });
 
-// ── REQUIRED_DIRS export ───────────────────────────────────────────────────────
+// ── requiredDirs export ───────────────────────────────────────────────────────
 
-describe("REQUIRED_DIRS", () => {
-  it("contains exactly the three expected tool directories", () => {
-    expect(REQUIRED_DIRS).toEqual([".sourcevision", ".rex", ".hench"]);
+describe("requiredDirs", () => {
+  it("names the three tool directories a legacy project must have", () => {
+    expect(requiredDirs(DIR)).toEqual([".sourcevision", ".rex", ".hench"]);
+  });
+
+  it("names the container's three on a project that has migrated", async () => {
+    // The staleness probe is a *reader* of one project, so it resolves that
+    // project's layout rather than accepting both. It used to be a constant,
+    // which meant a `.ndx/` project was told on every command that all three
+    // of its tool directories were missing and that it should re-run
+    // `ndx init` — on a project that was already complete.
+    const { mkdtempSync, mkdirSync: realMkdir, rmSync } = await vi.importActual("node:fs");
+    const { tmpdir } = await import("node:os");
+
+    const root = mkdtempSync(join(tmpdir(), "ndx-stale-ndx-"));
+    try {
+      realMkdir(join(root, ".ndx"), { recursive: true });
+      expect(requiredDirs(root)).toEqual([
+        ".ndx/sourcevision",
+        ".ndx/rex",
+        ".ndx/hench",
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

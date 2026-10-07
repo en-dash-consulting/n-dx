@@ -31,6 +31,8 @@ The Dashboard Trigger Controls feature closed five of the previous Tier 1–3 ga
 
 One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` proposal review) are no longer reachable — see [Orphaned UI surface](#orphaned-ui-surface).
 
+`ndx sync` is kept in the table above as a record of what shipped at the time. The command, the `sync_with_remote` MCP tool and the tracker adapters behind them were removed before 1.0.0, so they no longer appear in the inventories below.
+
 ---
 
 <!-- BEGIN GENERATED: command-effects (scripts/build-cli-ui-gap.mjs) -->
@@ -54,7 +56,6 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `ndx status` | nothing (read-only) | none | none | seconds |
 | `ndx usage` | nothing (read-only) | none | none | seconds |
 | `ndx claim` | `<git-common-dir>/ndx/claims.json` (only on release) | none | none | seconds |
-| `ndx sync` | `{rex}/prd_tree/` (only without --push)<br>`{rex}/execution-log.jsonl`<br>the remote tracker (only without --pull or --dry-run) | none | remote | seconds to a minute |
 | `ndx start` | `{webPid} and {webPort}`<br>`~/.ndx/hub.json`<br>`~/.ndx/auth.token` | none | localhost | long-running server; hub mode returns once registered |
 | `ndx install-sample` | `sample-app/`<br>`{rex}/prd_tree/sample-app-improvements/` | none | none | seconds |
 | `ndx destroy-sample` | `sample-app/`<br>`{rex}/prd_tree/` | none | none | seconds |
@@ -102,7 +103,6 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 |---------|----------|--------|-------|
 | `ndx work` | **full** | high | Per-task Execute button (task detail), "Start" on next-task card, epic-by-epic panel with pause/resume, terminate + throttle/emergency-stop controls |
 | `ndx analyze` | **full** | high | "Run Analysis" on Overview (lite/full); `--deep` not exposed |
-| `ndx sync` | **full** | high | Push/pull/sync triggers + Notion config, connection test, schema wizard |
 | `ndx recommend` | **full** | high | Suggestions view + refresh trigger |
 | `ndx plan` / `--accept` | **partial** | high | **Regression:** smart-add preview + accept-edited work (SmartAddInput), but the proposal-review panel (`AnalyzePanel` → `/api/rex/analyze`, `/api/rex/proposals*`) is only mounted by the orphaned `views/analysis.ts` |
 | `ndx add` | full | high | Smart-add input with debounced preview, accept-edited flow |
@@ -112,7 +112,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `ndx self-heal` | **full** | medium | Trigger, status poll, iteration/phase display, and a Stop control that cancels the running loop |
 | `ndx export` | partial | medium | Export trigger exists; deploy flow not exposed |
 | `ndx ci` | **full** | medium | Run-CI-check action in the Validation view with structured results from `--format=json` |
-| `ndx config` | full | medium | Three settings pages: Robot Wrangler (vendor, provider and model), Workflow (work settings, templates, CLI timeouts) and Project (analyze/plan settings, feature flags, Notion, integrations) |
+| `ndx config` | full | medium | Three settings pages: Robot Wrangler (vendor, provider and model), Workflow (work settings, templates, CLI timeouts) and Project (analyze/plan settings, feature flags) |
 | `ndx auth` | **full** | low | Credential status chip on Robot Wrangler (GET `/api/commands/auth`), with re-check |
 | `ndx install-sample` / `ndx destroy-sample` | **full** | low | Sample App panel in Commands view (`packages/web/src/viewer/views/commands.ts`) — Install/Destroy buttons, live status polling via GET `/api/commands/sample-status`, POST `/api/commands/install-sample` and `/api/commands/destroy-sample` |
 | `ndx pair-programming` / `bicker` | none | low | Experimental; not yet a dashboard workflow |
@@ -143,8 +143,6 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `rex verify` | **full** | medium | Requirements page renders coverage + traceability matrix (per-item CRUD deferred to the task detail panel) |
 | `rex analyze` / `import` | partial | medium | Same orphaned-panel regression as `ndx plan` |
 | `rex usage` | full | medium | Same coverage as `ndx usage` |
-| `rex sync` | full | medium | Via sync triggers |
-| `rex adapter` | partial | low | The Project settings page provides schema-driven config for registered adapters; no add/remove |
 | `rex report` | none | low | JSON for CI; health view covers interactive use |
 | `rex facets` (MCP `facets`) | partial | low | **Deferred by decision (2026-08-14).** Facet filters exist in the PRD tree. A distribution view was scoped and skipped: `facets` is MCP-only (no CLI command), no facets are configured in this project, and the panel would render an empty state for most users. Revisit if facet configuration becomes common. |
 | `rex migrate-to-md` / `migrate-folder-tree-filenames` / `backfill-commit-attribution` | n/a | — | One-time migrations; terminal-only by design |
@@ -176,7 +174,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `hench record` | n/a | — | Plumbing for the assisted-run skills (`/ndx-work`, `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-config`); reads its token usage from the Claude Code session transcript |
 | `hench init` | n/a | — | Covered by `ndx init` |
 
-## Rex MCP tools (17)
+## Rex MCP tools (16)
 
 MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Coverage below records whether an equivalent human surface exists, since a capability reachable by agents but invisible to humans is an observability gap.
 
@@ -196,7 +194,6 @@ MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Cover
 | `health` | Health gauge | full |
 | `facets` | Facet filters (no distribution view) | partial |
 | `append_log` | Activity view (REX → Activity) renders the log | full |
-| `sync_with_remote` | Sync triggers | full |
 | `get_token_usage` | Token Usage view (utilization only) | partial |
 | `get_capabilities` | — | n/a (protocol handshake) |
 

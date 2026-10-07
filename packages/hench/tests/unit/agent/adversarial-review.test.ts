@@ -48,6 +48,8 @@ const BASE_CTX: ReviewPromptContext = {
   reportPath: "/proj/.hench/reviews/run-1.json",
   resumed: true,
   autonomous: true,
+  testGateFollows: false,
+  prdTreeDir: ".rex/prd_tree/",
 };
 
 function finding(over: Partial<ReviewFinding> = {}): ReviewFinding {
@@ -126,6 +128,17 @@ describe("buildReviewBrief", () => {
     expect(resumed).not.toMatch(/You do not have that agent's context/);
   });
 
+  it("sends the reviewer to the PRD tree the project actually has", () => {
+    // The duplicate check is a directory listing, so a fixed `.rex/prd_tree/`
+    // listed nothing on a `.ndx/` project and every finding looked new.
+    const legacy = buildReviewBrief(BASE_CTX);
+    const ndx = buildReviewBrief({ ...BASE_CTX, prdTreeDir: ".ndx/rex/prd_tree/" });
+
+    expect(legacy).toContain("list the directories under `.rex/prd_tree/`");
+    expect(ndx).toContain("list the directories under `.ndx/rex/prd_tree/`");
+    expect(ndx).not.toContain("`.rex/prd_tree/`");
+  });
+
   it("applies the verdict policy itself when no human is attached", () => {
     const brief = buildReviewBrief(BASE_CTX);
 
@@ -164,6 +177,26 @@ describe("buildReviewBrief", () => {
     // though it captures automatically — `action`/`itemId` carry accept vs
     // decline, not `disposition`.
     expect(brief).toMatch(/`should-fix`.*`captured`.*`offered`/);
+  });
+
+  it("tells the reviewer to run scoped checks only when the test gate follows", () => {
+    const brief = buildReviewBrief({ ...BASE_CTX, testGateFollows: true });
+
+    expect(brief).toContain("Three deviations from the skill's default flow");
+    expect(brief).toContain("**Scoped checks only.**");
+    expect(brief).toMatch(/Do not run the full\s+suite/);
+    expect(brief).toMatch(/test gate runs right after this review, and CI runs\s+everything/);
+    expect(brief).toMatch(/what was not\s+exercised/);
+    expect(brief).toContain("Scoped tests, typecheck, and lint are fine.");
+  });
+
+  it("leaves the brief unchanged when no test gate follows", () => {
+    const brief = buildReviewBrief({ ...BASE_CTX, testGateFollows: false });
+
+    expect(brief).toContain("Two deviations from the skill's default flow");
+    expect(brief).not.toContain("Scoped checks only");
+    expect(brief).not.toMatch(/test gate/);
+    expect(brief).toContain("Tests, typecheck, and lint are fine.");
   });
 
   it("forbids the state-mutating operations that would collide with the run", () => {

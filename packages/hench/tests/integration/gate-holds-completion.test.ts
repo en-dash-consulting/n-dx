@@ -25,7 +25,7 @@ import {
   SLUG_RULE_VERSION,
 } from "@n-dx/rex";
 import type { PRDItem, PRDStore } from "@n-dx/rex";
-import { handleUpdateTaskStatus } from "@n-dx/rex/dist/cli/mcp-tools.js";
+import { handleUpdateTaskStatus } from "@n-dx/rex/dist/cli/mcp-tools/index.js";
 import { initConfig } from "../../src/store/config.js";
 import { TaskClaims } from "../../src/process/task-claims.js";
 import { rexToolHandlers } from "../../src/tools/rex.js";
@@ -115,12 +115,26 @@ function buildRun(): RunRecord {
   };
 }
 
+/** A gate that failed `rex` once and passed on the re-run (hench.testGate.rerunCommand). */
+const FLAKY_PASS = {
+  ran: true,
+  passed: true,
+  packages: [{ name: "workspace", passed: true }],
+  command: "node scripts/run-all-tests.mjs rex",
+  totalDurationMs: 5,
+  flakyRerun: [{ suite: "rex", firstFailure: "FAIL  tests/unit/store.test.ts > saves" }],
+  firstAttempt: { command: "npm run test", totalDurationMs: 9, failedSuites: ["rex"] },
+  rerun: { command: "node scripts/run-all-tests.mjs rex", suites: ["rex"], passed: true, totalDurationMs: 5 },
+};
+
 /** finalizeRun with the gate's verdict fixed; everything else real. */
-async function finalizeWithGate(passed: boolean) {
+async function finalizeWithGate(passed: boolean | "flaky") {
   vi.resetModules();
   vi.doMock("../../src/tools/test-runner.js", async (importOriginal) => ({
     ...(await importOriginal<typeof import("../../src/tools/test-runner.js")>()),
-    runTestGate: async () => passed
+    runTestGate: async () => passed === "flaky"
+      ? FLAKY_PASS
+      : passed
       ? { ran: true, passed: true, packages: [{ name: "workspace", passed: true }], command: "npm run test", totalDurationMs: 5 }
       : {
           ran: true,
@@ -230,6 +244,26 @@ describe("the gate passes", () => {
     const subjects = git(projectDir, "log", "--format=%s", `${workCommit}..HEAD`);
     expect(subjects).toMatch(/chore\(prd\).*task-c2 completed/);
     expect(git(projectDir, "status", "--porcelain", "--", ".rex/prd_tree").trim()).toBe("");
+  });
+
+  it("applies the held resolution when the gate passed only on a re-run, and logs the flake", async () => {
+    await agentCompletesThroughMcp("Fixed config parsing");
+    await agentCommitsEverything();
+
+    const finalizeRun = await finalizeWithGate("flaky");
+    const run = buildRun();
+    await finalizeRun({
+      run, henchDir, projectDir, store, claims,
+      autoCommit: true, autonomous: true, rollbackOnFailure: false, startingHead: baseline,
+    });
+
+    expect(run.status).toBe("completed");
+    expect(run.completionHold?.outcome).toBe("applied");
+    const item = await (await resolveStore(join(projectDir, ".rex"))).getItem(TASK);
+    expect(item?.status).toBe("completed");
+    expect(item?.resolutionDetail).toBe("Fixed config parsing");
+    expect(run.testGate?.flakyRerun).toEqual(FLAKY_PASS.flakyRerun);
+    expect(await executionLog()).toMatch(/test_gate_flaky_rerun.*rex \(first failure: FAIL  tests\/unit\/store\.test\.ts > saves\)/);
   });
 
   it("applies the latest completion when a resumed session asks again", async () => {
