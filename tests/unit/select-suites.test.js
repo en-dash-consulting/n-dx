@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
@@ -6,6 +6,7 @@ import {
   ROOT_DRIFT_TEST_FILES,
   ROOT_POLICY_TEST_FILES,
   ROOT_SUBSET_TEST_FILES,
+  VALIDATED_ARTIFACTS,
   parsePorcelainZ,
   resolveLabels,
   selectAffected,
@@ -54,6 +55,37 @@ describe("selectAffected", () => {
 
   it("selects nothing for docs-only changes", () => {
     expect(select("docs/guide/x.md", "README.md", "packages/rex/README.md", "packages/web/docs/a.png").suites).toEqual([]);
+  });
+
+  // #546 review finding F2: the Markdown/docs short-circuit ran before the
+  // ROOT_PREFIXES check, so an artifact a root test validates, changed on its
+  // own, selected no suite at all.
+  it.each([
+    ["tests/shell-spawn-inventory.md", "root-policy"],
+    ["tests/wall-clock-assertion-inventory.md", "root-policy"],
+    ["tests/layout-literal-inventory.md", "root-policy"],
+    ["docs/analysis/prompt-token-baseline.md", "root-drift"],
+    ["docs/analysis/prompt-token-baseline.json", "root-drift"],
+  ])("selects the subset that validates %s, and only that subset", (file, label) => {
+    const { suites, reasons } = select(file);
+    expect(suites).toEqual([label]);
+    expect(reasons[label]).toBe(file);
+  });
+
+  it("still selects nothing for a plain docs or prose edit with no validated artifact", () => {
+    expect(select("docs/guide/skills.md").suites).toEqual([]);
+    expect(select("docs/analysis/AUDIT-2026-09.md").suites).toEqual([]);
+    // Lives beside the policed inventories but no test reads it.
+    expect(select("tests/unit-test-constant-inventory.md").suites).toEqual([]);
+  });
+
+  it("keeps a validated artifact under tests/ off the full root suite", () => {
+    const { suites } = select("tests/shell-spawn-inventory.md", "docs/analysis/prompt-token-baseline.json");
+    expect(suites).toEqual(["root-policy", "root-drift"]);
+  });
+
+  it("lets a code change in the same batch still supersede a validated artifact", () => {
+    expect(select("tests/shell-spawn-inventory.md", "tests/e2e/a.test.js").suites).toEqual(["root"]);
   });
 
   it("selects nothing for PRD, run and analysis state", () => {
@@ -230,6 +262,25 @@ describe("root subset test files", () => {
       "tests/e2e/hench-config-gate-contract.test.js",
       "tests/e2e/instruction-alignment.test.js",
     ]);
+  });
+});
+
+describe("validated artifacts", () => {
+  // Derives the map rather than trusting it: each artifact must name a test
+  // that exists, mentions its path, and is actually run by the mapped subset.
+  it("maps each artifact to a subset that runs a test which reads it", () => {
+    for (const [artifact, { label, test }] of Object.entries(VALIDATED_ARTIFACTS)) {
+      expect(existsSync(resolve(ROOT, artifact)), artifact).toBe(true);
+      expect(existsSync(resolve(ROOT, test)), test).toBe(true);
+      expect(readFileSync(resolve(ROOT, test), "utf8"), `${test} should read ${artifact}`).toContain(artifact);
+      expect(ROOT_SUBSET_TEST_FILES[label], `${label} should run ${test}`).toContain(test);
+    }
+  });
+
+  it("lists only paths the Markdown/docs short-circuit would otherwise drop", () => {
+    for (const artifact of Object.keys(VALIDATED_ARTIFACTS)) {
+      expect(artifact.endsWith(".md") || artifact.startsWith("docs/"), artifact).toBe(true);
+    }
   });
 });
 

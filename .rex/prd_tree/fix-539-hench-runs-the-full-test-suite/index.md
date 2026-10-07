@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [a validated test or docs artifact changed on its own selects the suite that checks it](./a-validated-test-or-docs-artifact.md) | pending |
+| [a validated test or docs artifact changed on its own selects the suite that checks it](./a-validated-test-or-docs-artifact.md) | in_progress |
 | [Absorb gate flakes: re-run only the failed suites once before failing an unattended run](./absorb-gate-flakes-re-run-only-the.md) | completed |
 | [affected mode never runs run-options-contract, catalog-runtime-contract or prd-slug-conformance for the package-source change they police](./affected-mode-never-runs-run-options.md) | pending |
 | [affected mode runs the root drift tests when a package source changes](./affected-mode-runs-the-root-drift.md) | completed |

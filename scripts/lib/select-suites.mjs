@@ -75,6 +75,51 @@ export const ROOT_SUBSET_TEST_FILES = {
 /** The root-subset labels, in run order. */
 export const ROOT_SUBSET_LABELS = Object.keys(ROOT_SUBSET_TEST_FILES);
 
+/**
+ * Checked-in artifacts that a root test parses and validates, each mapped to
+ * the root subset that runs that test and to the test itself.
+ *
+ * `selectAffected` short-circuits Markdown and `docs/` before the
+ * `ROOT_PREFIXES` check, because a prose edit should run nothing. But a few
+ * files under `tests/` and `docs/` are not prose: a root test reads them and
+ * fails when they disagree with the code. Changed on their own — the only case
+ * where this bites, since any code in the same change selects the suite anyway —
+ * they selected no suite at all, so the gate went green on a change CI fails
+ * (#546 review finding F2).
+ *
+ * This is an explicit list rather than a `tests/*-inventory.md` glob so it can
+ * be *checked* rather than assumed: a unit test requires each `test` to exist,
+ * to mention the artifact's path, and to be a file the mapped subset runs.
+ * `tests/unit-test-constant-inventory.md` is absent deliberately — no test reads
+ * it, so editing it alone still selects nothing.
+ *
+ * The map is an exception to the short-circuit, not an override of the rules
+ * above it: entries select one subset, never full `root`, so a prose edit to an
+ * inventory does not cost the whole root suite.
+ */
+export const VALIDATED_ARTIFACTS = {
+  "tests/shell-spawn-inventory.md": {
+    label: ROOT_POLICY_LABEL,
+    test: "tests/e2e/shell-spawn-inventory-policy.test.js",
+  },
+  "tests/wall-clock-assertion-inventory.md": {
+    label: ROOT_POLICY_LABEL,
+    test: "tests/e2e/wall-clock-inventory-policy.test.js",
+  },
+  "tests/layout-literal-inventory.md": {
+    label: ROOT_POLICY_LABEL,
+    test: "tests/e2e/layout-literal-policy.test.js",
+  },
+  "docs/analysis/prompt-token-baseline.md": {
+    label: ROOT_DRIFT_LABEL,
+    test: "tests/e2e/prompt-census.test.js",
+  },
+  "docs/analysis/prompt-token-baseline.json": {
+    label: ROOT_DRIFT_LABEL,
+    test: "tests/e2e/prompt-census.test.js",
+  },
+};
+
 /** A change to any of these can alter every suite, so every suite runs. */
 export const RUN_EVERYTHING_FILES = [
   "pnpm-lock.yaml",
@@ -208,6 +253,13 @@ export function selectAffected(changedFiles, manifests) {
   for (const file of changedFiles) {
     if (isInstructionSurface(file)) {
       mark(ROOT_LABEL, file);
+      continue;
+    }
+    // An exact path a root test validates. Checked here, with the other exact
+    // paths, so the Markdown/docs short-circuit below cannot swallow it.
+    const validated = VALIDATED_ARTIFACTS[file];
+    if (validated) {
+      mark(validated.label, file);
       continue;
     }
     if (STATE_PREFIXES.some((p) => file.startsWith(p))) continue;

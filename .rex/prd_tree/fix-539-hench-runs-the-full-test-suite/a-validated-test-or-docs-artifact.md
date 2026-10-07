@@ -2,10 +2,11 @@
 id: "e51ab955-ced4-46c3-83af-5974d289535a"
 level: "task"
 title: "a validated test or docs artifact changed on its own selects the suite that checks it"
-status: "pending"
+status: "in_progress"
 priority: "medium"
+startedAt: "2026-10-07T16:37:53.771Z"
 acceptanceCriteria: []
 description: "Source: adversarial review of fix/539-scoped-test-gate (#546) by Hal, posted on #530 on 2026-10-07. Finding F2, severity medium. Approach corrected after task c1e6e68c (F1) landed: F1 measured the drift tests at 11.9 s and put them in a separate root-drift label (scripts/lib/select-suites.mjs ROOT_DRIFT_TEST_FILES), so prompt-census lives in root-drift, not root-policy.\n\nFailure: the Markdown/docs short-circuit in scripts/lib/select-suites.mjs runs before the ROOT_PREFIXES check, so a change made only of Markdown or docs/ files selects no suite, even when a root test validates that file. Measured before F1: [tests/shell-spawn-inventory.md] selects []; [docs/analysis/prompt-token-baseline.json] selects []. tests/e2e/shell-spawn-inventory-policy.test.js checks the first and tests/e2e/prompt-census.test.js checks the second. Only bites when such a file is the whole change.\n\nApproach: a small validated-artifact path map, each artifact selecting the root subset that holds the test which reads it:\n- tests/*-inventory.md (the inventories read by the policy tests in ROOT_POLICY_TEST_FILES, such as shell-spawn-inventory-policy, wall-clock-inventory-policy and layout-literal-policy) select root-policy;\n- docs/analysis/prompt-token-baseline.{md,json} select root-drift (prompt-census).\nDerive or check the map against the test files that actually read each artifact, rather than assuming. Do not reorder the checks so that every tests/ Markdown edit selects full root.\n\nAcceptance criteria:\n- selectAffected([tests/shell-spawn-inventory.md]) selects root-policy (the subset that runs shell-spawn-inventory-policy), pinned by a unit test.\n- selectAffected([docs/analysis/prompt-token-baseline.json]) selects root-drift (the subset that runs prompt-census), pinned by a unit test.\n- A plain docs edit with no validated artifact (docs/guide/skills.md) still selects nothing, pinned by a unit test.\n- TESTING.md's Markdown rule is corrected to name the exception and which subset each artifact selects."
-lastModified: "2026-10-07T16:37:35.474Z"
+lastModified: "2026-10-07T16:37:53.992Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
