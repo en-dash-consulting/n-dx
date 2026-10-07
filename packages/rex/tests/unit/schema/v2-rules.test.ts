@@ -34,7 +34,7 @@ describe("rule table", () => {
   it("errors precede warnings and every rule has a severity", () => {
     const severities = V2_RULE_IDS.map((id) => RULE_SEVERITY[id]);
     expect(severities.indexOf("warning")).toBe(severities.lastIndexOf("error") + 1);
-    expect(V2_RULE_IDS).toHaveLength(11);
+    expect(V2_RULE_IDS).toHaveLength(12);
   });
 
   it("a healthy tree has no findings", () => {
@@ -305,6 +305,35 @@ describe("area-balance", () => {
   it("counts a sub-area's capabilities toward the sub-area only", () => {
     const parent = node("area", {}, [cap(), cap(), area(2)]);
     expect(check("area-balance", { product: [parent, area(2), area(2)] })).toEqual([]);
+  });
+});
+
+describe("run-settings", () => {
+  it("passes valid run blocks on changes and tasks", () => {
+    const tree = { changes: [node("change", { run: { tier: "light" } }, [node("task", { run: { review: true, maxTurns: 40 } })])] };
+    expect(check("run-settings", tree)).toEqual([]);
+  });
+
+  it("warns, never errors, on a malformed or newer-version block and leaves the rest of the tree clean", () => {
+    const bad = node("task", { run: { tier: "gigantic" } });
+    const newer = node("task", { run: { tier: "heavy", futureKey: 1 } });
+    const healthy = node("task", { run: { tier: "heavy" } });
+    const tree: V2Tree = { product: [], changes: [node("change", { touches: ["x"] }, [bad, newer, healthy])] };
+    const findings = checkV2Rules(tree, { now: NOW });
+    expect(findings.map((f) => [f.rule, f.severity, f.nodeId])).toEqual([
+      ["run-settings", "warning", bad.id],
+      ["run-settings", "warning", newer.id],
+    ]);
+    expect(findings[0].message).toContain('run.tier: ');
+    expect(findings[1].message).toContain('unknown key "futureKey"');
+  });
+
+  it("warns on a run block a subtask or product node carries", () => {
+    const subtask = node("subtask", { run: { tier: "heavy" } });
+    const capability = cap({ run: {} });
+    const findings = checkV2Rules({ product: [node("area", {}, [capability, cap()]), node("area", {}, [cap(), cap()])], changes: [node("change", { touches: ["x"] }, [node("task", {}, [subtask])])] }, { now: NOW }, ["run-settings"]);
+    expect(ids(findings)).toEqual([capability.id, subtask.id]);
+    expect(findings[1].message).toContain("only changes and tasks");
   });
 });
 

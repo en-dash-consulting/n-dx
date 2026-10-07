@@ -24,7 +24,10 @@ import {
   ChangeIntentSchema,
   TaskIntentSchema,
   SubtaskIntentSchema,
+  type TaskIntent,
 } from "../../../src/schema/v2.js";
+import { RUN_SETTING_KEYS, type PRDItem } from "../../../src/schema/v1.js";
+import { PRDItemSchema, validateRunSettings } from "../../../src/schema/validate.js";
 
 const ID = "0b5f0c9e-1111-4222-8333-444455556666";
 
@@ -212,6 +215,42 @@ describe("per-type intent", () => {
     }
   });
 
+  it("declares run on change and task with RUN_SETTING_KEYS as its known keys", () => {
+    for (const schema of [ChangeIntentSchema, TaskIntentSchema]) {
+      expect(Object.keys(schema.shape.run.unwrap().shape)).toEqual([...RUN_SETTING_KEYS]);
+    }
+  });
+
+  it("keeps run loose: a malformed or newer-version block round-trips unchanged", () => {
+    const malformed = { tier: "gigantic", maxTurns: -4, models: { acme: "" }, futureKey: { nested: true } };
+    for (const type of ["change", "task"]) {
+      const node = { id: ID, type, title: "T", slug: "t", run: malformed };
+      const parsed = NodeIntentSchema.parse(node) as Record<string, unknown>;
+      expect(parsed.run, type).toEqual(malformed);
+      // The strict check stays at writers.
+      expect(validateRunSettings(parsed.run).ok).toBe(false);
+    }
+  });
+
+  it("refuses a run that is not an object", () => {
+    for (const bad of ["heavy", [{ tier: "heavy" }], 3]) {
+      expect(TaskIntentSchema.safeParse({ id: ID, type: "task", title: "T", slug: "t", run: bad }).success, JSON.stringify(bad)).toBe(false);
+    }
+  });
+
+  it("maps a v1 task's run block to a v2 task unchanged", () => {
+    const v1Task = {
+      id: ID,
+      title: "T",
+      status: "pending",
+      level: "task",
+      run: { tier: "heavy", models: { claude: "claude-opus-5-5" }, review: true, maxTurns: 40, contextNotes: "Keep it small." },
+    } satisfies PRDItem;
+    expect(PRDItemSchema.safeParse(v1Task).success).toBe(true);
+    const v2Task: TaskIntent = { id: v1Task.id, type: "task", title: v1Task.title, slug: "t", run: v1Task.run };
+    expect(TaskIntentSchema.parse(v2Task).run).toEqual(v1Task.run);
+  });
+
   it("dispatches on type in the union", () => {
     const r = NodeIntentSchema.safeParse({ id: ID, type: "constraint", title: "C", slug: "c", appliesTo: "nope" });
     expect(r.success).toBe(false);
@@ -318,8 +357,8 @@ describe("field coverage (design intent/state tables)", () => {
     ["area", AreaIntentSchema, ["summary", "stewards"]],
     ["capability", CapabilityIntentSchema, ["statement", "criteria", "requirements", "dependsOn"]],
     ["constraint", ConstraintIntentSchema, ["statement", "requirements", "appliesTo"]],
-    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "loe", "loeRationale", "loeConfidence", "effort", "requirements", "discoveredFrom"]],
-    ["task", TaskIntentSchema, ["description", "acceptanceCriteria", "requirements", "priority", "loe", "loeRationale", "loeConfidence", "effort"]],
+    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "loe", "loeRationale", "loeConfidence", "effort", "requirements", "discoveredFrom", "run"]],
+    ["task", TaskIntentSchema, ["description", "acceptanceCriteria", "requirements", "priority", "loe", "loeRationale", "loeConfidence", "effort", "run"]],
     ["subtask", SubtaskIntentSchema, ["description", "acceptanceCriteria"]],
   ];
   for (const [type, schema, fields] of cases) {

@@ -15,6 +15,7 @@
 
 import { createHash } from "node:crypto";
 import type { ItemStatus } from "./v1.js";
+import { validateRunSettings } from "./validate.js";
 import { layerOf, type Criterion, type Layer, type V2Node } from "./v2.js";
 
 // ── Inputs and findings ──────────────────────────────────────────
@@ -54,7 +55,8 @@ export type V2RuleId =
   | "capability-criteria"
   | "long-revised"
   | "area-balance"
-  | "unreviewed-spec";
+  | "unreviewed-spec"
+  | "run-settings";
 
 export interface RuleFinding {
   rule: V2RuleId;
@@ -119,6 +121,7 @@ export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "long-revised": "warning",
   "area-balance": "warning",
   "unreviewed-spec": "warning",
+  "run-settings": "warning",
 };
 
 function finding(rule: V2RuleId, node: RuleNode, message: string): RuleFinding {
@@ -338,6 +341,23 @@ const unreviewedSpec: Rule = ({ entries }) =>
     .filter(({ node }) => (node.type === "capability" || node.type === "constraint") && node.specReviewed !== true)
     .map(({ node }) => finding("unreviewed-spec", node, `${node.type} "${node.title}" has a spec no person has reviewed`));
 
+/**
+ * A saved `run` block that `ndx work` ignores: invalid by `validateRunSettings`
+ * (malformed, or holding a newer version's key), or carried by a node other
+ * than a change or task. A warning, never an error: the schema keeps `run`
+ * loose so one bad block cannot refuse writes to the rest of the tree.
+ */
+const runSettings: Rule = ({ entries }) =>
+  entries.flatMap(({ node }) => {
+    if (node.run === undefined) return [];
+    if (node.type !== "change" && node.type !== "task") {
+      return [finding("run-settings", node, `${node.type} "${node.title}" carries a run block; only changes and tasks hold saved run settings`)];
+    }
+    const check = validateRunSettings(node.run);
+    if (check.ok) return [];
+    return [finding("run-settings", node, `Invalid ${check.error} on ${node.type} "${node.title}"; ndx work ignores this block until it is fixed`)];
+  });
+
 /** Every rule, errors first, in the order findings are reported. */
 const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "change-has-target": changeHasTarget,
@@ -351,6 +371,7 @@ const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "long-revised": longRevised,
   "area-balance": areaBalance,
   "unreviewed-spec": unreviewedSpec,
+  "run-settings": runSettings,
 };
 
 export const V2_RULE_IDS = Object.keys(RULES) as V2RuleId[];
