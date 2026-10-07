@@ -25,7 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A null or non-object run in v2 frontmatter fails the whole node's intent parse](./a-null-or-non-object-run-in-v2.md) | in_progress |
+| [A null or non-object run in v2 frontmatter fails the whole node's intent parse](./a-null-or-non-object-run-in-v2.md) | completed |
 | [Parse the v1 tree and the v2 product and changes roots into one model](./parse-the-v1-tree-and-the-v2-product.md) | completed |
 | [Schema-skew write refusal on v2 trees depends on writers calling assertPrdModelWritable](./schema-skew-write-refusal-on-v2-trees.md) | pending |
 | [v2 reader lets state fields written in frontmatter (status, completedAt…) stand in for state.yaml](./v2-reader-lets-state-fields-written-in.md) | pending |
