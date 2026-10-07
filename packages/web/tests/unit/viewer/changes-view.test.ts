@@ -202,6 +202,50 @@ describe("groupChangesByRelease", () => {
     expect(groups[0].stages.map((s) => s.stage)).toEqual([...CHANGE_STAGE_ORDER]);
   });
 
+  // The v2 schema only requires plannedRelease to be a string, so a blank one
+  // reaches here as "" or "   ". Bucketing it by value gave the backlog a
+  // nameless heading of its own instead of folding it into Unscheduled.
+  it("treats an empty planned release as unscheduled", () => {
+    const groups = groupChangesByRelease([
+      change({ id: "a", plannedRelease: "" }),
+      change({ id: "b", plannedRelease: "next" }),
+    ]);
+    expect(groups.map((g) => g.label)).toEqual(["next", UNSCHEDULED_RELEASE_LABEL]);
+    expect(groups[1].changeCount).toBe(1);
+  });
+
+  it("treats a whitespace-only planned release as unscheduled", () => {
+    const groups = groupChangesByRelease([
+      change({ id: "a", plannedRelease: "   " }),
+      change({ id: "b", plannedRelease: "\t\n" }),
+      change({ id: "c", plannedRelease: "next" }),
+    ]);
+    expect(groups.map((g) => g.label)).toEqual(["next", UNSCHEDULED_RELEASE_LABEL]);
+    expect(groups[1].changeCount).toBe(2);
+  });
+
+  it("groups blank and missing planned releases together", () => {
+    const groups = groupChangesByRelease([
+      change({ id: "a" }),
+      change({ id: "b", plannedRelease: "" }),
+      change({ id: "c", plannedRelease: " " }),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe(UNSCHEDULED_RELEASE_LABEL);
+    expect(groups[0].changeCount).toBe(3);
+  });
+
+  it("trims surrounding whitespace so a padded label is the same release", () => {
+    const groups = groupChangesByRelease([
+      change({ id: "a", plannedRelease: " 1.0.0 " }),
+      change({ id: "b", plannedRelease: "1.0.0" }),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe("1.0.0");
+    expect(groups[0].release).toBe("1.0.0");
+    expect(groups[0].changeCount).toBe(2);
+  });
+
   it("returns no groups for no changes", () => {
     expect(groupChangesByRelease([])).toEqual([]);
   });

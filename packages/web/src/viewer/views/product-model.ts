@@ -300,19 +300,26 @@ function compareReleases(a: string, b: string): number {
  * group is always last: it is a backlog, not the next release. Stages keep
  * `CHANGE_STAGE_ORDER` and empty stages are dropped, so a release heading
  * shows only the stages it actually has.
+ *
+ * `plannedRelease` is free text the schema only requires to be a string, so a
+ * blank or whitespace-only value is as unscheduled as a missing one — all
+ * three land in the backlog rather than under a nameless heading. Surrounding
+ * whitespace is trimmed before bucketing too, so `1.0` and ` 1.0 ` are one
+ * release and not two headings that read identically.
  */
 export function groupChangesByRelease(changes: readonly ChangeRow[]): ReleaseGroup[] {
   const byRelease = new Map<string, ChangeRow[]>();
   const unscheduled: ChangeRow[] = [];
 
   for (const change of changes) {
-    if (change.plannedRelease === undefined) {
+    const release = change.plannedRelease?.trim();
+    if (!release) {
       unscheduled.push(change);
       continue;
     }
-    const bucket = byRelease.get(change.plannedRelease);
+    const bucket = byRelease.get(release);
     if (bucket) bucket.push(change);
-    else byRelease.set(change.plannedRelease, [change]);
+    else byRelease.set(release, [change]);
   }
 
   const toStages = (rows: ChangeRow[]): StageGroup[] =>
