@@ -1,5 +1,5 @@
 /**
- * Rex schema v2 — the product map and the change layer.
+ * Rex schema v2 — the product layer and the change layer.
  *
  * Types and Zod schemas for every v2 node, field and stored file. Wired to
  * nothing yet: no runtime module imports this file until the v2 reader and
@@ -9,7 +9,7 @@
  *
  * ## Model
  *
- * Two layers. The **map** (area, capability, constraint) describes the
+ * Two layers. The **product layer** (area, capability, constraint) describes the
  * product as built, in present tense. The **change layer** (change, task,
  * subtask) is linear work that closes. `type` replaces v1's `level`; a spike
  * is a change with `spike: true`, not a type. Releases are fields on a change
@@ -28,7 +28,7 @@
  * | tags, source, blockedBy, body, hypotheses*       | activeIntervals                              |
  * | area: summary, stewards                          | failureReason, resolutionType/Detail         |
  * | capability: statement, criteria, requirements,   | metAt, revisedAt, specReviewed, checks       |
- * |   dependsOn                                      |   (map nodes)                                |
+ * |   dependsOn                                      |   (product nodes)                            |
  * |                                                  | appliedIn, shippedIn, prs, issues (changes)  |
  * | constraint: statement, requirements, appliesTo   | commits, links*                              |
  * | change: intent, amends, touches, plannedRelease, | assignee, ready, needsPlacement              |
@@ -77,29 +77,29 @@ const V2StampSchema = z.string().refine(isV2Schema, {
 
 // ── Node types ───────────────────────────────────────────────────
 
-export type MapNodeType = "area" | "capability" | "constraint";
+export type ProductNodeType = "area" | "capability" | "constraint";
 export type ChangeNodeType = "change" | "task" | "subtask";
-export type NodeType = MapNodeType | ChangeNodeType;
-export type Layer = "map" | "changes";
+export type NodeType = ProductNodeType | ChangeNodeType;
+export type Layer = "product" | "changes";
 
-export const MAP_NODE_TYPES: ReadonlySet<MapNodeType> = new Set<MapNodeType>(["area", "capability", "constraint"]);
+export const PRODUCT_NODE_TYPES: ReadonlySet<ProductNodeType> = new Set<ProductNodeType>(["area", "capability", "constraint"]);
 export const CHANGE_NODE_TYPES: ReadonlySet<ChangeNodeType> = new Set<ChangeNodeType>(["change", "task", "subtask"]);
-/** The closed node set, map layer first. */
-export const NODE_TYPES: ReadonlySet<NodeType> = new Set<NodeType>([...MAP_NODE_TYPES, ...CHANGE_NODE_TYPES]);
+/** The closed node set, product layer first. */
+export const NODE_TYPES: ReadonlySet<NodeType> = new Set<NodeType>([...PRODUCT_NODE_TYPES, ...CHANGE_NODE_TYPES]);
 
 export function isNodeType(value: string | undefined): value is NodeType {
   return value !== undefined && NODE_TYPES.has(value as NodeType);
 }
 
 export function layerOf(type: NodeType): Layer {
-  return MAP_NODE_TYPES.has(type as MapNodeType) ? "map" : "changes";
+  return PRODUCT_NODE_TYPES.has(type as ProductNodeType) ? "product" : "changes";
 }
 
 // ── Display ids ──────────────────────────────────────────────────
 
 /**
  * Human-facing ids beside the UUID: `CH-142` for a change (`CH-142.2` for
- * its children) and `A4` / `A4.3` for map nodes. The UUID stays the key.
+ * its children) and `A4` / `A4.3` for product nodes. The UUID stays the key.
  */
 const DISPLAY_ID_PATTERN = /^(?:CH-\d+|A\d+)(?:\.\d+)*$/;
 
@@ -157,7 +157,7 @@ export interface CriteriaDelta {
 }
 
 /**
- * One map edit a change carries. `target` is the node id (or display id) it
+ * One product-layer edit a change carries. `target` is the node id (or display id) it
  * edits; for `added` it names the node to create, placed `under` a parent
  * with `title`. Either `criteria` (deterministic delta) or `proposed`
  * (replacement text) describes the edit.
@@ -192,7 +192,7 @@ export const AmendmentSchema = z
   })
   .passthrough();
 
-/** Who stewards a map scope: git emails / identities, or team handles (`@org/team`). */
+/** Who stewards a product scope: git emails / identities, or team handles (`@org/team`). */
 export type Steward = string;
 
 // ── Intent ───────────────────────────────────────────────────────
@@ -236,7 +236,7 @@ export interface ConstraintIntent extends BaseIntent {
   type: "constraint";
   statement?: string;
   requirements?: Requirement[];
-  /** `"all"` or the ids of the map nodes the constraint binds. */
+  /** `"all"` or the ids of the product nodes the constraint binds. */
   appliesTo?: "all" | string[];
 }
 
@@ -245,7 +245,7 @@ export interface ChangeIntent extends BaseIntent {
   /** Why the change exists. */
   intent?: string;
   amends?: Amendment[];
-  /** Map node ids the change works on without amending them. */
+  /** Product node ids the change works on without amending them. */
   touches?: string[];
   plannedRelease?: string;
   spike?: boolean;
@@ -400,10 +400,10 @@ export interface ItemState {
   failureReason?: string;
   resolutionType?: ResolutionType;
   resolutionDetail?: string;
-  /** Map nodes: hash of statement + criteria when an applied change last satisfied it. */
+  /** Product nodes: hash of statement + criteria when an applied change last satisfied it. */
   metAt?: string;
   /**
-   * Map nodes: when the spec became revised. The state writer stamps it when a
+   * Product nodes: when the spec became revised. The state writer stamps it when a
    * spec edit first makes the spec hash differ from `metAt`, and keeps it
    * across later edits and state writes. It clears it whenever the hash equals
    * `metAt` again: `metAt` is re-stamped, or the spec is reverted to its met
@@ -411,11 +411,11 @@ export interface ItemState {
    * `long-revised` measures age from it, not from `lastModified`.
    */
   revisedAt?: string;
-  /** Map nodes: a person reviewed the spec text. */
+  /** Product nodes: a person reviewed the spec text. */
   specReviewed?: boolean;
-  /** Map nodes: last result per requirement check. */
+  /** Product nodes: last result per requirement check. */
   checks?: CheckResult[];
-  /** Changes: commit in which the change's amendments were applied to the map. */
+  /** Changes: commit in which the change's amendments were applied to the product layer. */
   appliedIn?: string;
   /** Changes: release version the change shipped in. */
   shippedIn?: string;
@@ -430,7 +430,7 @@ export interface ItemState {
   assignee?: string;
   /** Changes and tasks: informational readiness. */
   ready?: boolean;
-  /** Changes: placement on the map still needs a decision (blocks autonomous selection only). */
+  /** Changes: placement on the product layer still needs a decision (blocks autonomous selection only). */
   needsPlacement?: boolean;
   lastModified?: string;
   lastModifiedBy?: string;
@@ -478,7 +478,7 @@ export const StateFileSchema = z
   .object({ schema: V2StampSchema, items: z.record(z.string(), ItemStateSchema) })
   .passthrough();
 
-/** Root `index.md` frontmatter of the map: project title, stamp, project-wide requirements, stewards. */
+/** Root `index.md` frontmatter of the product layer: project title, stamp, project-wide requirements, stewards. */
 export interface RootHeader {
   title: string;
   schema: string;
