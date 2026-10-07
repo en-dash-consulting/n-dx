@@ -16,6 +16,7 @@ import {
   WorkRefSchema,
   NodeIntentSchema,
   ItemStateSchema,
+  RETIRED_STATE_FIELDS,
   StateFileSchema,
   RootHeaderSchema,
   AreaIntentSchema,
@@ -291,7 +292,6 @@ describe("state", () => {
       shippedIn: "1.0.0",
       prs: ["https://github.com/o/r/pull/1"],
       issues: ["WM-1"],
-      commits: [{ hash: "a".repeat(40), author: "R", authorEmail: "r@x", timestamp: "2026-10-06T01:00:00.000Z" }],
       links: [{ anything: "goes" }],
       assignee: "Ryan Keith <ryan.k@endash.us>",
       ready: true,
@@ -300,6 +300,15 @@ describe("state", () => {
       lastModifiedBy: "Ryan Keith <ryan.k@endash.us>",
     });
     expect(r.success).toBe(true);
+  });
+
+  it("declares no commits field: commits are computed from N-DX-Item trailers", () => {
+    expect(ItemStateSchema.shape).not.toHaveProperty("commits");
+    expect(RETIRED_STATE_FIELDS).toHaveProperty("commits");
+    // An old entry that still carries commits passes through untouched.
+    const commits = [{ hash: "a".repeat(40), author: "R", authorEmail: "r@x", timestamp: "2026-10-06T01:00:00.000Z" }];
+    const r = ItemStateSchema.safeParse({ status: "completed", commits });
+    expect(r.success && r.data.commits).toEqual(commits);
   });
 
   it("allows an empty entry (absent status reads as pending)", () => {
@@ -372,7 +381,7 @@ describe("field coverage (design intent/state tables)", () => {
       "status", "startedAt", "completedAt", "endedAt", "activeIntervals",
       "failureReason", "resolutionType", "resolutionDetail",
       "metAt", "revisedAt", "specReviewed", "checks",
-      "appliedIn", "shippedIn", "prs", "issues", "commits", "links",
+      "appliedIn", "shippedIn", "prs", "issues", "links",
       "assignee", "ready", "needsPlacement",
       "lastModified", "lastModifiedBy",
     ];

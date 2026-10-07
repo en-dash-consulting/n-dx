@@ -30,7 +30,7 @@
  * | capability: statement, criteria, requirements,   | metAt, revisedAt, specReviewed, checks       |
  * |   dependsOn                                      |   (product nodes)                            |
  * |                                                  | appliedIn, shippedIn, prs, issues (changes)  |
- * | constraint: statement, requirements, appliesTo   | commits, links*                              |
+ * | constraint: statement, requirements, appliesTo   | links*                                       |
  * | change: intent, amends, touches, plannedRelease, | assignee, ready, needsPlacement              |
  * |   spike, priority, requirements, loe,            | lastModified, lastModifiedBy                 |
  * |   loeRationale, loeConfidence, effort*,          |                                              |
@@ -45,8 +45,10 @@
  * writer's fields survive an older reader's save.
  *
  * Derived values (capability health, openAmendments, "bound by" edges,
- * change kind) are computed and cached outside the tree; they have no field
- * here on purpose.
+ * change kind, a change's commits) are computed and cached outside the tree;
+ * they have no field here on purpose. A change's commits come from its
+ * `N-DX-Item` trailers (`core/change-commits.ts`): a rebase or squash rewrites
+ * a SHA but keeps the trailer.
  *
  * @module rex/schema/v2
  */
@@ -61,9 +63,8 @@ import {
   type Requirement,
   type ResolutionType,
   type ActiveInterval,
-  type CommitAttribution,
 } from "./v1.js";
-import { RequirementSchema, CommitAttributionSchema } from "./validate.js";
+import { RequirementSchema } from "./validate.js";
 
 // ── Schema stamp ─────────────────────────────────────────────────
 
@@ -492,7 +493,6 @@ export interface ItemState {
   prs?: string[];
   /** Changes: issue references (full URLs or tracker keys). */
   issues?: string[];
-  commits?: CommitAttribution[];
   /** Reserved for the tracker bridge; no shape yet. */
   links?: unknown;
   /** Changes and tasks. "Name <email>" identity. */
@@ -524,7 +524,6 @@ export const ItemStateSchema = z
     shippedIn: z.string().optional(),
     prs: z.array(WorkRefSchema).optional(),
     issues: z.array(WorkRefSchema).optional(),
-    commits: z.array(CommitAttributionSchema).optional(),
     links: ReservedSchema,
     assignee: z.string().optional(),
     ready: z.boolean().optional(),
@@ -533,6 +532,16 @@ export const ItemStateSchema = z
     lastModifiedBy: z.string().optional(),
   })
   .passthrough();
+
+/**
+ * State keys an earlier v2 draft declared and this schema dropped, each with
+ * the reason reported when one is found. Being undeclared, the state writer
+ * keeps them as unknown keys, so an old `state.yaml` still loads and
+ * round-trips; nothing reads them, and the `retired-state-field` rule warns.
+ */
+export const RETIRED_STATE_FIELDS: Readonly<Record<string, string>> = {
+  commits: "a change's commits are computed from its N-DX-Item trailers, because a rebase or squash rewrites stored SHAs",
+};
 
 // ── Stored files ─────────────────────────────────────────────────
 

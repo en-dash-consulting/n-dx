@@ -34,7 +34,7 @@ describe("rule table", () => {
   it("errors precede warnings and every rule has a severity", () => {
     const severities = V2_RULE_IDS.map((id) => RULE_SEVERITY[id]);
     expect(severities.indexOf("warning")).toBe(severities.lastIndexOf("error") + 1);
-    expect(V2_RULE_IDS).toHaveLength(12);
+    expect(V2_RULE_IDS).toHaveLength(13);
   });
 
   it("a healthy tree has no findings", () => {
@@ -334,6 +334,17 @@ describe("run-settings", () => {
     const findings = checkV2Rules({ product: [node("area", {}, [capability, cap()]), node("area", {}, [cap(), cap()])], changes: [node("change", { touches: ["x"] }, [node("task", {}, [subtask])])] }, { now: NOW }, ["run-settings"]);
     expect(ids(findings)).toEqual([capability.id, subtask.id]);
     expect(findings[1].message).toContain("only changes and tasks");
+  });
+});
+
+describe("retired-state-field", () => {
+  it("warns on a node that still carries stored commits, naming why they are ignored", () => {
+    const stale = node("task", { commits: [{ hash: "a".repeat(40), author: "R", authorEmail: "r@x", timestamp: "t" }] });
+    const tree: V2Tree = { product: [], changes: [node("change", { touches: ["x"] }, [stale, node("task")])] };
+    const findings = checkV2Rules(tree, { now: NOW });
+    expect(findings.map((f) => [f.rule, f.severity, f.nodeId])).toEqual([["retired-state-field", "warning", stale.id]]);
+    expect(findings[0].message).toContain('"commits"');
+    expect(findings[0].message).toContain("N-DX-Item");
   });
 });
 

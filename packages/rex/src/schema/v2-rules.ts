@@ -16,7 +16,7 @@
 import { createHash } from "node:crypto";
 import type { ItemStatus } from "./v1.js";
 import { validateRunSettings } from "./validate.js";
-import { layerOf, type Criterion, type Layer, type V2Node } from "./v2.js";
+import { layerOf, RETIRED_STATE_FIELDS, type Criterion, type Layer, type V2Node } from "./v2.js";
 
 // ── Inputs and findings ──────────────────────────────────────────
 
@@ -56,7 +56,8 @@ export type V2RuleId =
   | "long-revised"
   | "area-balance"
   | "unreviewed-spec"
-  | "run-settings";
+  | "run-settings"
+  | "retired-state-field";
 
 export interface RuleFinding {
   rule: V2RuleId;
@@ -122,6 +123,7 @@ export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "area-balance": "warning",
   "unreviewed-spec": "warning",
   "run-settings": "warning",
+  "retired-state-field": "warning",
 };
 
 function finding(rule: V2RuleId, node: RuleNode, message: string): RuleFinding {
@@ -358,6 +360,19 @@ const runSettings: Rule = ({ entries }) =>
     return [finding("run-settings", node, `Invalid ${check.error} on ${node.type} "${node.title}"; ndx work ignores this block until it is fixed`)];
   });
 
+/**
+ * A state key the schema retired (`RETIRED_STATE_FIELDS`) still on a node. The
+ * file loads and keeps the key, but nothing reads it; the warning says why.
+ */
+const retiredStateField: Rule = ({ entries }) =>
+  entries.flatMap(({ node }) =>
+    Object.entries(RETIRED_STATE_FIELDS)
+      .filter(([key]) => node[key] !== undefined)
+      .map(([key, reason]) =>
+        finding("retired-state-field", node, `${node.type} "${node.title}" still carries "${key}", which is ignored: ${reason}`),
+      ),
+  );
+
 /** Every rule, errors first, in the order findings are reported. */
 const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "change-has-target": changeHasTarget,
@@ -372,6 +387,7 @@ const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "area-balance": areaBalance,
   "unreviewed-spec": unreviewedSpec,
   "run-settings": runSettings,
+  "retired-state-field": retiredStateField,
 };
 
 export const V2_RULE_IDS = Object.keys(RULES) as V2RuleId[];

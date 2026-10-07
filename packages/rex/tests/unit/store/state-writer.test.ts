@@ -19,7 +19,7 @@ import {
   serializeStateYaml,
   type ProductSpec,
 } from "../../../src/store/state-writer.js";
-import { specHash } from "../../../src/schema/v2-rules.js";
+import { checkV2Rules, specHash, type RuleNode } from "../../../src/schema/v2-rules.js";
 import { SCHEMA_VERSION_V2, type StateFile } from "../../../src/schema/v2.js";
 import { FileStore } from "../../../src/store/file-adapter.js";
 import { FolderTreeStore, ensureFolderTreeRexDir } from "../../../src/store/folder-tree-store.js";
@@ -119,13 +119,25 @@ describe("round-trip", () => {
           specReviewed: true,
           checks: [{ requirementId: "r1", result: "pass", at: "2026-10-02T00:00:00.000Z" }],
           prs: ["https://github.com/o/r/pull/1"],
-          commits: [{ hash: "deadbeef", author: "A", authorEmail: "a@x", timestamp: "2026-10-02T00:00:00.000Z" }],
           ready: false,
           resolutionDetail: "line one\nline \"two\": # not a comment",
         },
       },
     };
     expect(parseStateYaml(serializeStateYaml(file))).toEqual(file);
+  });
+
+  it("loads a state.yaml that still carries retired commits, keeps the line, and reports it", async () => {
+    const commitsLine = `    commits: [{"hash": "deadbeef", "author": "A", "authorEmail": "a@x", "timestamp": "2026-10-02T00:00:00.000Z"}]`;
+    await writeFile(join(folder, STATE_FILE_NAME), [`schema: "rex/v2"`, `items:`, `  "${ID_A}":`, commitsLine, `    status: "in_progress"`, ``].join("\n"), "utf-8");
+    const file = await loadStateFile(folder);
+    file.items[ID_A].status = "completed";
+    await save(file);
+    expect((await readState()).split("\n")).toContain(commitsLine);
+
+    const task = { id: ID_A, type: "task", title: "T", slug: "t", ...file.items[ID_A] } as RuleNode;
+    const findings = checkV2Rules({ product: [], changes: [{ id: "c", type: "change", title: "C", slug: "c", touches: ["x"], children: [task] } as RuleNode] }, { now: new Date() });
+    expect(findings.map((f) => [f.rule, f.nodeId])).toEqual([["retired-state-field", ID_A]]);
   });
 
   it("reads CRLF files and a missing file as empty", async () => {

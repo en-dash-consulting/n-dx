@@ -47,10 +47,11 @@ export const TREE_META_FILENAME = "tree-meta.json";
 /**
  * Name of the derived-state directory inside `.rex/`.
  *
- * Nothing in rex writes it. The dashboard's file watcher regenerates
- * `<PRD_CACHE_DIRNAME>/prd.json` from the folder tree on every tree write, as
- * a read fast path for the web server — so it is machine-local, disposable,
- * and must never be committed.
+ * Everything in it is computed and rebuilt when missing, so it is
+ * machine-local, disposable, and must never be committed. The dashboard's file
+ * watcher regenerates `<PRD_CACHE_DIRNAME>/prd.json` from the folder tree on
+ * every tree write, as a read fast path for the web server; rex's own
+ * `core/change-commits.ts` caches its `N-DX-Item` trailer scan here.
  *
  * It lives here rather than in the web package because it names a folder
  * *inside* rex's directory, and this module is the only place rex names one.
