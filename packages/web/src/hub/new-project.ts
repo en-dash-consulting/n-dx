@@ -250,7 +250,7 @@ export function writeHubMarkerFiles(
   // Asked for, not spelled out: where these two files live is the layout's
   // answer, the same one `packages/web/src/server/paths.ts` gives the project
   // server. (`registry.ts` reaches the foundation tier directly too — see
-  // packages/web/CLAUDE.md on the hub zone's import surface.)
+  // packages/web/AGENTS.md on the hub zone's import surface.)
   const layout = resolveLayout(dir);
   try {
     writeFileSync(

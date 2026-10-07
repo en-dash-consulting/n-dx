@@ -17,6 +17,7 @@ acceptanceCriteria:
   - "A fixture of two tiny members under `packages/sourcevision/tests/fixtures/` — A calling B over HTTP via an env var, both reading one Terraform SQS queue — yields all three edge sources with evidence, asserted in a test beside `workspace-*.test.ts`."
   - "No second aggregator is introduced; all edge derivation stays in `workspace-crossings.ts`."
 description: "`analyzers/workspace-crossings.ts` today derives cross-repo `ZoneCrossing`s from one signal: an npm import matching a sibling member's package name. Add two more edge sources beside it, in the same aggregator:\n\n(a) **http** — an outbound http target whose host, or whose env-var name, matches another member's `serverRoutes` or its declared base URL in config.\n(b) **infra** — two members referencing the same infrastructure resource id, or the same queue/topic/bucket name.\n\nEvery crossing carries `source: \"npm\" | \"http\" | \"infra\"` plus the evidence that produced it. `sv workspace --status` prints edge counts broken down by source.\n\nOpen questions to settle here: how to match env-var names to producers reliably (name conventions differ between caller and callee), and what confidence threshold a crossing must clear before it is emitted at all."
-lastModified: "2026-10-05T17:36:01.172Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-06T22:01:02.234Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

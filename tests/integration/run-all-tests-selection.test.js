@@ -37,11 +37,25 @@ describe("run-all-tests.mjs suite selection", () => {
     expect(packages).not.toMatch(/selected-suites=root/);
   });
 
+  // hench's rerunCommand feeds failed suite shorts straight back in, so every
+  // label the runner can print must also be a label it accepts.
+  it("accepts each root subset as a label, and drops them when root is also asked for", () => {
+    expect(run("root-policy", "--list").stdout.trim()).toBe("test-gate: selected-suites=root-policy");
+    expect(run("root-drift", "--list").stdout.trim()).toBe("test-gate: selected-suites=root-drift");
+    expect(run("root-policy,root-drift", "--list").stdout.trim()).toBe(
+      "test-gate: selected-suites=root-policy,root-drift",
+    );
+    expect(run("root-drift,root", "--list").stdout.trim()).toBe("test-gate: selected-suites=root");
+  });
+
   it("falls back to every suite, with a warning, for an unresolvable base ref", () => {
     const result = run("affected", "no-such-ref-for-test-gate", "--list");
     expect(result.status).toBe(0);
     expect(result.stderr).toContain("falling back to running ALL suites");
     expect(result.stdout).toMatch(/selected-suites=root,.*rex.*web/);
+    // root runs their files already; the fallback must not run them twice.
+    expect(result.stdout).not.toContain("root-policy");
+    expect(result.stdout).not.toContain("root-drift");
   });
 
   it("prints a reason per suite in affected mode", () => {

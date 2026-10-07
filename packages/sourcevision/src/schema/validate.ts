@@ -53,6 +53,14 @@ const AnalysisRunSchema = z.object({
   partition: PartitionReviewSchema.extend({ reused: z.boolean() }).optional(),
 });
 
+const RepoIdentitySchema = z.object({
+  name: z.string().min(1),
+  remoteUrl: z.string().nullable(),
+  remoteHost: z.string().nullable(),
+  remotePath: z.string().nullable(),
+  defaultBranch: z.string().nullable(),
+});
+
 export const ManifestSchema = z.object({
   schemaVersion: z.string(),
   toolVersion: z.string(),
@@ -61,6 +69,10 @@ export const ManifestSchema = z.object({
   gitBranch: z.string().optional(),
   analysisFingerprint: z.string().optional(),
   targetPath: z.string(),
+  // Optional, so a manifest written before repo identity existed still
+  // validates; nullable inside, so "looked and found no remote" is a thing
+  // the artifact can say.
+  repo: RepoIdentitySchema.optional(),
   modules: z.record(z.string(), ModuleInfoSchema),
   lastAnalysis: AnalysisRunSchema.optional(),
   narration: z.object({
@@ -470,6 +482,146 @@ export const BranchWorkRecordSchema = z.object({
   metadata: BranchWorkRecordMetadataSchema.optional(),
 });
 
+// ── SDLC readiness profile ──────────────────────────────────────────────────
+
+const SdlcConfidenceSchema = z.enum(["certain", "likely", "inferred"]);
+
+const SdlcEvidenceSchema = z.object({
+  kind: z.string().min(1),
+  path: z.string().min(1),
+  line: z.number().int().positive().optional(),
+  excerpt: z.string().optional(),
+  confidence: SdlcConfidenceSchema,
+});
+
+/**
+ * Proof for one detection: at least one piece of evidence.
+ *
+ * `nonempty()` is what makes the "nothing asserted without proof" rule hold at
+ * the boundary. The TypeScript tuple in `v1.ts` stops a detection with no
+ * evidence from being written in our own code; this stops one from being read
+ * out of a file some other writer produced.
+ */
+const SdlcEvidenceListSchema = z.array(SdlcEvidenceSchema).nonempty();
+
+const SdlcCommandSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  kind: z.enum(["test", "lint", "typecheck", "build", "deploy", "migrate"]),
+  command: z.string().min(1),
+  cwd: z.string().optional(),
+  runner: z.string().optional(),
+});
+
+const SdlcTestFrameworkSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  name: z.string().min(1),
+  roots: z.array(z.string()).optional(),
+});
+
+const SdlcTestSuiteSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  kind: z.enum(["unit", "integration", "e2e", "contract", "performance", "smoke"]),
+  fileCount: z.number().int().nonnegative().optional(),
+});
+
+const SdlcCoverageSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  tool: z.string().min(1),
+  threshold: z.number().min(0).max(100).optional(),
+  enforced: z.boolean(),
+});
+
+const SdlcCiPipelineSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  provider: z.string().min(1),
+  name: z.string(),
+  triggers: z.array(z.string()),
+  jobs: z.array(z.string()),
+});
+
+const SdlcDeploymentSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  environment: z.string().min(1),
+  mechanism: z.string().min(1),
+  requiresApproval: z.boolean().optional(),
+  automated: z.boolean(),
+});
+
+const SdlcRollbackSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  mechanism: z.string().min(1),
+  environment: z.string().optional(),
+});
+
+const SdlcMigrationSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  tool: z.string().min(1),
+  directory: z.string().optional(),
+  reversible: z.boolean().optional(),
+  automated: z.boolean().optional(),
+});
+
+const SdlcFeatureFlagSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  provider: z.string().min(1),
+  flags: z.array(z.string()).optional(),
+});
+
+const SdlcQualityGateSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  kind: z.enum([
+    "required-review",
+    "required-status-check",
+    "branch-protection",
+    "pre-commit-hook",
+    "codeowners",
+    "signed-commits",
+  ]),
+  blocking: z.boolean(),
+  appliesTo: z.string().optional(),
+});
+
+const SdlcObservabilitySchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  kind: z.enum(["logging", "metrics", "tracing", "error-reporting", "health-check", "alerting"]),
+  provider: z.string().min(1),
+});
+
+const SdlcContainerSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  path: z.string().min(1),
+  baseImages: z.array(z.string()),
+  multiStage: z.boolean(),
+  orchestration: z.enum(["compose", "kubernetes", "helm", "ecs", "nomad"]).optional(),
+});
+
+const SdlcIacSchema = z.object({
+  evidence: SdlcEvidenceListSchema,
+  tool: z.string().min(1),
+  root: z.string().optional(),
+  remoteState: z.boolean().optional(),
+});
+
+export const SdlcProfileSchema = z.object({
+  schemaVersion: z.string(),
+  projectDir: z.string().optional(),
+  commands: z.array(SdlcCommandSchema),
+  tests: z.object({
+    frameworks: z.array(SdlcTestFrameworkSchema),
+    suites: z.array(SdlcTestSuiteSchema),
+    coverage: SdlcCoverageSchema.optional(),
+  }),
+  ci: z.array(SdlcCiPipelineSchema),
+  cd: z.array(SdlcDeploymentSchema),
+  rollback: z.array(SdlcRollbackSchema),
+  migrations: z.array(SdlcMigrationSchema),
+  featureFlags: z.array(SdlcFeatureFlagSchema),
+  qualityGates: z.array(SdlcQualityGateSchema),
+  observability: z.array(SdlcObservabilitySchema),
+  containers: z.array(SdlcContainerSchema),
+  iac: z.array(SdlcIacSchema),
+});
+
 // ── Validation helpers ──────────────────────────────────────────────────────
 
 export type ValidationResult<T> =
@@ -507,6 +659,8 @@ export function validateModule(
       return validate(ComponentsSchema, data);
     case "callGraph":
       return validate(CallGraphSchema, data);
+    case "sdlcProfile":
+      return validate(SdlcProfileSchema, data);
     default:
       return {
         ok: false,

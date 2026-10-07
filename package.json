@@ -16,7 +16,7 @@
     "deps:check": "node scripts/check-dependency-drift.mjs",
     "test": "node scripts/run-all-tests.mjs",
     "validate": "pnpm -r run validate",
-    "verify": "pnpm security:obfuscation && vitest run tests/e2e && node packages/core/ci.js .",
+    "verify": "pnpm security:obfuscation && vitest run tests/e2e && node packages/core/cli.js ci .",
     "security:obfuscation": "node scripts/check-obfuscated-code.mjs",
     "prompt-census": "node scripts/prompt-census.mjs",
     "preview:export": "node scripts/export-preview-demo.mjs",
