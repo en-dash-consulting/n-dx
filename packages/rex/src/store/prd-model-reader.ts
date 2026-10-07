@@ -80,6 +80,12 @@ export interface PrdModel {
   /** The stamp the tree was written at. */
   schema: string;
   title: string;
+  /**
+   * v2 only: the root `product/index.md` frontmatter as read (title, schema,
+   * slugRule, requirements, stewards, unknown keys) and its Markdown `body`.
+   * The writer takes `title` and `schema` from the fields above, not from here.
+   */
+  header?: Record<string, unknown>;
   tree: V2Tree;
   warnings: ParseWarning[];
   /** Set when the tree was read past a schema refusal; every write must be refused. */
@@ -179,6 +185,7 @@ export async function loadPrdModel(rexDir: string, options: LoadPrdModelOptions 
     layout: v2 ? "v2" : "v1",
     schema: header.schema ?? (v2 ? NEWEST_SCHEMA : SCHEMA_VERSION),
     title: header.title,
+    ...(header.fields ? { header: header.fields } : {}),
     tree,
     warnings,
     ...(readOnly ? { readOnly } : {}),
@@ -190,6 +197,8 @@ interface Header {
   schema: string | undefined;
   source: string;
   warnings: ParseWarning[];
+  /** v2: the root frontmatter and `body`. */
+  fields?: Record<string, unknown>;
 }
 
 async function readV2Header(productDir: string): Promise<Header> {
@@ -203,7 +212,9 @@ async function readV2Header(productDir: string): Promise<Header> {
   if (!parsed.success && isV2Schema(schema)) {
     warnings.push({ path: source, message: `Invalid root header: ${issues(parsed.error.issues)}` });
   }
-  return { title: typeof fm?.title === "string" ? fm.title : "PRD", schema, source, warnings };
+  const body = text === null ? undefined : bodyOf(text);
+  const fields = { ...fm, ...(body ? { body } : {}) };
+  return { title: typeof fm?.title === "string" ? fm.title : "PRD", schema, source, warnings, fields };
 }
 
 async function readV1Header(rexDir: string): Promise<Header> {

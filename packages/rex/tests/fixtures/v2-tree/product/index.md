@@ -1,6 +1,7 @@
 ---
 title: "Fixture shop"
 schema: "rex/v2"
+slugRule: 2
 stewards:
   - "@shop/core"
 ---
