@@ -42,6 +42,7 @@ import type { AnalyzeContext } from "./analyze-phases.js";
 import { generatePrMarkdownFile } from "./pr-markdown.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { computeInfrastructure, toInfrastructureData } from "../../analyzers/infrastructure.js";
+import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../analyzers/sdlc-profile.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
@@ -718,6 +719,16 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
           ),
         ),
       ),
+    );
+
+    // SDLC readiness — commands, CI, deployment, quality gates and the rest,
+    // each claim carrying the file that proves it. Its own bounded walk,
+    // because the inventory's codeOnly filter drops the YAML, TOML and
+    // Dockerfiles this reads. Deterministic: no LLM call and no network.
+    const sdlcProfile = await buildSdlcProfile(ctx.absDir);
+    writeFileSync(
+      join(ctx.svDir, DATA_FILES.sdlcProfile),
+      toCanonicalJSON(stripSdlcProfileForDisk(sdlcProfile)),
     );
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);

@@ -39,6 +39,7 @@ function emptyProfile(): SdlcProfile {
     observability: [],
     containers: [],
     iac: [],
+    parseFailures: [],
   };
 }
 
@@ -58,7 +59,22 @@ function fullProfile(): SdlcProfile {
     },
     ci: [{
       evidence: [EVIDENCE], provider: "github-actions", name: "ci",
-      triggers: ["push", "pull_request"], jobs: ["build", "test"],
+      triggers: ["push", "pull_request"],
+      jobs: [
+        {
+          name: "build",
+          steps: [
+            { uses: "actions/checkout@v4", kind: "checkout" },
+            { name: "Build", run: "pnpm build", kind: "build" },
+          ],
+        },
+        {
+          name: "deploy",
+          needs: ["build"],
+          condition: "github.ref == 'refs/heads/main'",
+          steps: [{ name: "Ship", run: "./deploy.sh", kind: "deploy" }],
+        },
+      ],
     }],
     cd: [{
       evidence: [EVIDENCE], environment: "production", mechanism: "github-actions",
@@ -180,6 +196,60 @@ describe("commands section", () => {
     const profile = fullProfile();
     profile.commands[0] = { evidence: [EVIDENCE], kind: "publish" as never, command: "x" };
     expect(validate(SdlcProfileSchema, profile).ok).toBe(false);
+  });
+});
+
+describe("CI jobs and steps", () => {
+  it("accepts a job with steps, needs and a condition", () => {
+    expect(validate(SdlcProfileSchema, fullProfile()).ok).toBe(true);
+  });
+
+  it("rejects a step whose kind is outside the closed set", () => {
+    const profile = fullProfile();
+    profile.ci[0].jobs[0].steps[0] = { run: "x", kind: "frobnicate" as never };
+    expect(validate(SdlcProfileSchema, profile).ok).toBe(false);
+  });
+
+  it("rejects a job with no name", () => {
+    const profile = fullProfile();
+    profile.ci[0].jobs[0] = { name: "", steps: [] };
+    expect(validate(SdlcProfileSchema, profile).ok).toBe(false);
+  });
+
+  it("accepts a job with no steps — a pipeline can declare an empty job", () => {
+    const profile = fullProfile();
+    profile.ci[0].jobs = [{ name: "noop", steps: [] }];
+    expect(validate(SdlcProfileSchema, profile).ok).toBe(true);
+  });
+});
+
+describe("parse failures", () => {
+  // "No CI configured" and "CI configured but unreadable" are opposite facts;
+  // an empty ci array asserts the first, so the second needs its own place.
+  it("accepts a profile that parsed nothing but found something", () => {
+    const profile = emptyProfile();
+    profile.parseFailures = [
+      { path: ".github/workflows/ci.yml", kind: "github-actions", reason: "merge keys are not supported (line 4)" },
+    ];
+    expect(validate(SdlcProfileSchema, profile).ok).toBe(true);
+  });
+
+  it("requires every parse failure to carry its path, kind and reason", () => {
+    for (const bad of [
+      { kind: "github-actions", reason: "x" },
+      { path: "a.yml", reason: "x" },
+      { path: "a.yml", kind: "github-actions" },
+      { path: "", kind: "github-actions", reason: "x" },
+    ]) {
+      const profile = emptyProfile();
+      profile.parseFailures = [bad as never];
+      expect(validate(SdlcProfileSchema, profile).ok, JSON.stringify(bad)).toBe(false);
+    }
+  });
+
+  it("requires the section to be present, not optional", () => {
+    const { parseFailures: _omitted, ...without } = emptyProfile();
+    expect(validate(SdlcProfileSchema, without).ok).toBe(false);
   });
 });
 
