@@ -17,6 +17,12 @@ export const ROOT_LABEL = "root";
 export const ROOT_POLICY_LABEL = "root-policy";
 
 /**
+ * Label of the root tests that compare a package source against a checked-in
+ * artifact generated from it. Also a subset of `root`.
+ */
+export const ROOT_DRIFT_LABEL = "root-drift";
+
+/**
  * The root tests that police package sources and tests (spawn-only, gateways,
  * shell/wall-clock/layout inventories, obfuscation). About 2 s together. A
  * package-only change still has to run them: without them only CI catches a
@@ -30,6 +36,44 @@ export const ROOT_POLICY_TEST_FILES = [
   "tests/e2e/layout-literal-policy.test.js",
   "tests/e2e/obfuscated-code-policy.test.js",
 ];
+
+/**
+ * The root tests that read a package source and fail when a checked-in artifact
+ * generated from it has not been regenerated: the prompt census registry, the
+ * bundled iso-map skill, the dashboard's hench-config gate against hench's own
+ * schema, and the generated CLAUDE.md/AGENTS.md pair.
+ *
+ * They are a separate label from {@link ROOT_POLICY_TEST_FILES} rather than
+ * more entries in it because they cost about 12 s against that set's 2 s —
+ * six times the whole policy suite. Folding them in would have made
+ * `root-policy` a twelve-second thing still documented as a two-second one, and
+ * the cheap gate is worth being able to run on its own. Both are selected by
+ * the same condition (a change under `packages/<dir>/src/`), so a source change
+ * runs both; `root` supersedes both.
+ *
+ * Without them a change to a package source outside `src/cli/` never ran a
+ * drift test at the gate: the gate went green, hench committed, and CI went red
+ * after the run (#546 review finding F1).
+ */
+export const ROOT_DRIFT_TEST_FILES = [
+  "tests/e2e/prompt-census.test.js",
+  "tests/e2e/iso-skill-drift.test.js",
+  "tests/e2e/hench-config-gate-contract.test.js",
+  "tests/e2e/instruction-alignment.test.js",
+];
+
+/**
+ * Every label that runs a subset of `root`'s files, mapped to those files, in
+ * run order. `root` supersedes all of them, and `all` / `packages` leave them
+ * out. A unit test fails if a listed file is missing or appears twice.
+ */
+export const ROOT_SUBSET_TEST_FILES = {
+  [ROOT_POLICY_LABEL]: ROOT_POLICY_TEST_FILES,
+  [ROOT_DRIFT_LABEL]: ROOT_DRIFT_TEST_FILES,
+};
+
+/** The root-subset labels, in run order. */
+export const ROOT_SUBSET_LABELS = Object.keys(ROOT_SUBSET_TEST_FILES);
 
 /** A change to any of these can alter every suite, so every suite runs. */
 export const RUN_EVERYTHING_FILES = [
@@ -74,12 +118,12 @@ function isInstructionSurface(file) {
  */
 
 /**
- * Canonical labels, in run order: root, root-policy, then packages in manifest
- * order. `all` and run-everything selections leave out root-policy, which root
- * already covers.
+ * Canonical labels, in run order: root, the root subsets, then packages in
+ * manifest order. `all` and run-everything selections leave out the subsets,
+ * which root already covers.
  */
 export function validLabels(manifests) {
-  return [ROOT_LABEL, ROOT_POLICY_LABEL, ...manifests.filter((m) => m.hasTest).map((m) => m.dir)];
+  return [ROOT_LABEL, ...ROOT_SUBSET_LABELS, ...manifests.filter((m) => m.hasTest).map((m) => m.dir)];
 }
 
 /**
@@ -90,7 +134,7 @@ export function validLabels(manifests) {
  */
 export function resolveLabels(tokens, manifests) {
   const valid = validLabels(manifests);
-  const packageLabels = valid.filter((l) => l !== ROOT_LABEL && l !== ROOT_POLICY_LABEL);
+  const packageLabels = valid.filter((l) => l !== ROOT_LABEL && !ROOT_SUBSET_LABELS.includes(l));
   const byName = new Map(manifests.filter((m) => m.hasTest).map((m) => [m.name, m.dir]));
   const wanted = new Set();
   const unknown = [];
@@ -105,8 +149,8 @@ export function resolveLabels(tokens, manifests) {
     else unknown.push(token);
   }
   if (unknown.length > 0) return { unknown, valid };
-  // root runs the policy tests already; never run them twice.
-  if (wanted.has(ROOT_LABEL)) wanted.delete(ROOT_POLICY_LABEL);
+  // root runs every subset's files already; never run them twice.
+  if (wanted.has(ROOT_LABEL)) ROOT_SUBSET_LABELS.forEach((l) => wanted.delete(l));
   return { labels: valid.filter((l) => wanted.has(l)) };
 }
 
@@ -144,7 +188,7 @@ export function selectAffected(changedFiles, manifests) {
   const dirs = new Set(manifests.map((m) => m.dir));
   const testable = validLabels(manifests);
   const finish = () => {
-    if (reasons.has(ROOT_LABEL)) reasons.delete(ROOT_POLICY_LABEL);
+    if (reasons.has(ROOT_LABEL)) ROOT_SUBSET_LABELS.forEach((l) => reasons.delete(l));
     const suites = testable.filter((l) => reasons.has(l));
     return { suites, reasons: Object.fromEntries(suites.map((l) => [l, reasons.get(l)])) };
   };
@@ -179,12 +223,19 @@ export function selectAffected(changedFiles, manifests) {
         mark(ROOT_LABEL, file);
       } else if (rest.startsWith("tests/")) {
         mark(dir, file);
+        // Policy only: a test file is policed (shell/wall-clock inventories),
+        // but no checked-in artifact is generated from one, so not root-drift.
         mark(ROOT_POLICY_LABEL, file);
       } else if (rest.startsWith("docs/") || isMarkdown(rest)) {
         // docs only: nothing to test
       } else {
         markPackage(dir, file);
-        if (rest.startsWith("src/")) mark(ROOT_POLICY_LABEL, file);
+        if (rest.startsWith("src/")) {
+          // A source change can violate a static policy and can leave a
+          // generated artifact stale, so both root subsets run.
+          mark(ROOT_POLICY_LABEL, file);
+          mark(ROOT_DRIFT_LABEL, file);
+        }
         if (rest.startsWith("src/cli/")) mark(ROOT_LABEL, file);
       }
       continue;

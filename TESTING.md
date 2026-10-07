@@ -59,11 +59,13 @@ Test-file pointers for the scenarios added above:
 
 ### Running a subset of suites
 
-`node scripts/run-all-tests.mjs` runs every suite. Suites are labelled `root`, `root-policy` (a subset of `root`) plus each package directory that has a `test` script (`rex`, `hench`, `web`, …). `core` has no suite of its own; its tests are in `root`.
+`node scripts/run-all-tests.mjs` runs every suite. Suites are labelled `root`, the two root subsets `root-policy` and `root-drift`, plus each package directory that has a `test` script (`rex`, `hench`, `web`, …). `core` has no suite of its own; its tests are in `root`.
 
 ```sh
 node scripts/run-all-tests.mjs                       # root + every package
 node scripts/run-all-tests.mjs rex,web               # named suites (labels, @n-dx/ names, "packages", "all")
+node scripts/run-all-tests.mjs root-policy           # static policy tests only (~2 s)
+node scripts/run-all-tests.mjs root-drift            # generated-artifact drift tests only (~15 s)
 node scripts/run-all-tests.mjs affected <baseRef>    # only suites the change since <baseRef> touches
 node scripts/run-all-tests.mjs affected <baseRef> --list   # print the selection and why; run nothing
 ```
@@ -71,7 +73,9 @@ node scripts/run-all-tests.mjs affected <baseRef> --list   # print the selection
 `affected` compares the working tree to `<baseRef>` (committed, staged, unstaged and untracked files). Rules live in `scripts/lib/select-suites.mjs`:
 
 - A change to a package's sources selects that package and every workspace package that depends on it. A change under `src/cli/` also selects `root`, whose e2e tests spawn the CLIs. Tests-only changes select that package; docs and Markdown select nothing.
-- Any change under `packages/<dir>/src/` or `packages/<dir>/tests/` also selects `root-policy` unless `root` is selected (root includes it, so the two never run together). `root-policy` is the ~2 s set of static root tests that police package sources and tests: `architecture-policy`, `domain-isolation`, `shell-spawn-inventory-policy`, `wall-clock-inventory-policy`, `layout-literal-policy` and `obfuscated-code-policy` (`ROOT_POLICY_TEST_FILES` in `scripts/lib/select-suites.mjs`). Run it alone with `node scripts/run-all-tests.mjs root-policy`. `all` and `packages` do not include it.
+- Any change under `packages/<dir>/src/` or `packages/<dir>/tests/` also selects `root-policy`. `root-policy` is the ~2 s set of static root tests that police package sources and tests: `architecture-policy`, `domain-isolation`, `shell-spawn-inventory-policy`, `wall-clock-inventory-policy`, `layout-literal-policy` and `obfuscated-code-policy` (`ROOT_POLICY_TEST_FILES` in `scripts/lib/select-suites.mjs`). Run it alone with `node scripts/run-all-tests.mjs root-policy`.
+- A change under `packages/<dir>/src/` *also* selects `root-drift` — the ~15 s set of root tests that read a package source and fail when a checked-in artifact generated from it is stale: `prompt-census`, `iso-skill-drift`, `hench-config-gate-contract` and `instruction-alignment` (`ROOT_DRIFT_TEST_FILES`). It is a separate label from `root-policy` because it costs six times as much; keeping them apart means the cheap policy gate stays cheap and can still be run on its own with `node scripts/run-all-tests.mjs root-drift`. A `tests/`-only change does not select it: no checked-in artifact is generated from a test file.
+- Both subsets are dropped when `root` is selected (root runs their files already, so they never run twice), and `all` and `packages` do not include either.
 - `scripts/`, `tests/`, `.github/`, other top-level files, `packages/core/` (non-Markdown) and instruction surfaces (`AGENTS.md`, `CLAUDE.md`, `.claude/`, `.agents/`, `.codex/`, `.mcp.json`, `.rex/workflow.md`, `packages/core/assistant-assets/`) select `root`.
 - Run-everything triggers: `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `vitest.config.js`, `scripts/run-all-tests.mjs`, `scripts/run-vitest-bind-aware.mjs`.
 - Machine-written state (`.rex/prd_tree/`, `.hench/`, `.sourcevision/`) selects nothing.

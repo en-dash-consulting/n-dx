@@ -29,8 +29,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [a validated test or docs artifact changed on its own selects the suite that checks it](./a-validated-test-or-docs-artifact.md) | pending |
 | [Absorb gate flakes: re-run only the failed suites once before failing an unattended run](./absorb-gate-flakes-re-run-only-the.md) | completed |
-| [affected mode runs the root drift tests when a package source changes](./affected-mode-runs-the-root-drift.md) | pending |
+| [affected mode runs the root drift tests when a package source changes](./affected-mode-runs-the-root-drift.md) | in_progress |
 | [affected mode skips the 2-second root policy tests when a change stays inside one package's src or tests](./affected-mode-skips-the-2-second-root.md) | completed |
+| [agent brief stops forbidding the full suite when the test gate is skipped](./agent-brief-stops-forbidding-the-full.md) | pending |
 | [agentLoop's gate-only retry wiring has no test](./agentloop-s-gate-only-retry-wiring-has.md) | completed |
 | [Gate-only retry: skip the agent when the previous run failed only at the gate with its work committed](./gate-only-retry-skip-the-agent-when.md) | completed |
 | [hench.testGate.command: a gate command template with {base}, recording the suites it selected](./hench-testgate-command-a-gate-command.md) | completed |
@@ -44,4 +45,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Task 3 follow-ups: shell-spawn inventory row, and keep the gate's suite selection after a flaky pass](./task-3-follow-ups-shell-spawn.md) | completed |
 | [Tell the agent and the in-hench reviewer to run scoped checks; the gate and CI run the rest](./tell-the-agent-and-the-in-hench.md) | completed |
 | [The interactive test-gate prompt never appears: require() in an ESM module aborts it silently](./the-interactive-test-gate-prompt-never.md) | completed |
-| [agent brief stops forbidding the full suite when the test gate is skipped](./agent-brief-stops-forbidding-the-full.md) | pending |

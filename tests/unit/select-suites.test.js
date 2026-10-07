@@ -3,7 +3,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import {
+  ROOT_DRIFT_TEST_FILES,
   ROOT_POLICY_TEST_FILES,
+  ROOT_SUBSET_TEST_FILES,
   parsePorcelainZ,
   resolveLabels,
   selectAffected,
@@ -30,15 +32,15 @@ const MANIFESTS = [
   pkg("web", ["llm-client", "rex", "sourcevision"]),
 ];
 
-/** Every suite `all` and run-everything selections run: root-policy is inside root. */
-const everySuite = validLabels(MANIFESTS).filter((l) => l !== "root-policy");
+/** Every suite `all` and run-everything selections run: the root subsets are inside root. */
+const everySuite = validLabels(MANIFESTS).filter((l) => l !== "root-policy" && l !== "root-drift");
 
 const select = (...files) => selectAffected(files, MANIFESTS);
 
 describe("selectAffected", () => {
-  it("selects an llm-client src change plus every dependent and root-policy, but not root", () => {
+  it("selects an llm-client src change plus every dependent and both root subsets, but not root", () => {
     const { suites, reasons } = select("packages/llm-client/src/foo.ts");
-    expect(suites).toEqual(["root-policy", "hench", "llm-client", "rex", "sourcevision", "web"]);
+    expect(suites).toEqual(["root-policy", "root-drift", "hench", "llm-client", "rex", "sourcevision", "web"]);
     expect(reasons["llm-client"]).toBe("packages/llm-client/src/foo.ts");
     expect(reasons.rex).toBe("dependent of llm-client");
     expect(reasons.hench).toBe("dependent of llm-client");
@@ -46,7 +48,7 @@ describe("selectAffected", () => {
 
   it("follows dependents transitively", () => {
     const { suites, reasons } = select("packages/rex/src/x.ts");
-    expect(suites).toEqual(["root-policy", "hench", "rex", "web"]);
+    expect(suites).toEqual(["root-policy", "root-drift", "hench", "rex", "web"]);
     expect(reasons.hench).toBe("dependent of rex");
   });
 
@@ -80,22 +82,35 @@ describe("selectAffected", () => {
     expect(reasons.web).toContain(file);
   });
 
-  it("selects the package and root-policy for a test-only change in it", () => {
+  it("selects the package and root-policy, but not root-drift, for a test-only change in it", () => {
     expect(select("packages/llm-client/tests/unit/a.test.ts").suites).toEqual(["root-policy", "llm-client"]);
     const hench = select("packages/hench/tests/unit/tools/new.test.ts");
     expect(hench.suites).toEqual(["root-policy", "hench"]);
     expect(hench.reasons["root-policy"]).toBe("packages/hench/tests/unit/tools/new.test.ts");
   });
 
-  it("selects root-policy for a hench src change outside src/cli", () => {
-    expect(select("packages/hench/src/agent/lifecycle/foo.ts").suites).toEqual(["root-policy", "hench"]);
+  it("selects both root subsets for a hench src change outside src/cli", () => {
+    expect(select("packages/hench/src/agent/lifecycle/foo.ts").suites).toEqual(["root-policy", "root-drift", "hench"]);
   });
 
-  it("selects root-policy for a web src change", () => {
-    expect(select("packages/web/src/server/routes-hench.ts").suites).toEqual(["root-policy", "web"]);
+  it("selects both root subsets for a web src change", () => {
+    expect(select("packages/web/src/server/routes-hench.ts").suites).toEqual(["root-policy", "root-drift", "web"]);
   });
 
-  it("never selects root-policy together with root", () => {
+  // The three selections measured in the #546 review that went green at the
+  // gate and red in CI: each edits a package source that a root drift test
+  // reads, and none of them is under src/cli/, so full root is not selected.
+  it.each([
+    ["packages/hench/src/agent/planning/prompt.ts", ["root-policy", "root-drift", "hench"]],
+    ["packages/sourcevision/src/export/iso-map.ts", ["root-policy", "root-drift", "sourcevision", "web"]],
+    ["packages/hench/src/schema/validate.ts", ["root-policy", "root-drift", "hench"]],
+  ])("selects root-drift for %s", (file, expected) => {
+    const { suites, reasons } = select(file);
+    expect(suites).toEqual(expected);
+    expect(reasons["root-drift"]).toBe(file);
+  });
+
+  it("never selects a root subset together with root", () => {
     for (const files of [
       ["packages/hench/src/cli/run.ts"],
       ["packages/hench/src/a.ts", "scripts/x.mjs"],
@@ -105,10 +120,11 @@ describe("selectAffected", () => {
       const { suites } = selectAffected(files, MANIFESTS);
       expect(suites).toContain("root");
       expect(suites).not.toContain("root-policy");
+      expect(suites).not.toContain("root-drift");
     }
   });
 
-  it("does not select root-policy for docs, state or core-only changes", () => {
+  it("does not select a root subset for docs, state or core-only changes", () => {
     expect(select("packages/hench/README.md", ".rex/prd_tree/a/index.md", "packages/core/cli.js").suites).toEqual(["root"]);
   });
 
@@ -175,10 +191,13 @@ describe("resolveLabels", () => {
     expect(resolveLabels(["packages"], MANIFESTS).labels).toEqual(["hench", "llm-client", "rex", "sourcevision", "web"]);
   });
 
-  it("accepts root-policy, and drops it when root is also wanted", () => {
+  it("accepts the root subsets, and drops them when root is also wanted", () => {
     expect(validLabels(MANIFESTS)).toContain("root-policy");
+    expect(validLabels(MANIFESTS)).toContain("root-drift");
     expect(resolveLabels(["root-policy"], MANIFESTS).labels).toEqual(["root-policy"]);
-    expect(resolveLabels(["root-policy,root", "rex"], MANIFESTS).labels).toEqual(["root", "rex"]);
+    expect(resolveLabels(["root-drift"], MANIFESTS).labels).toEqual(["root-drift"]);
+    expect(resolveLabels(["root-policy,root-drift"], MANIFESTS).labels).toEqual(["root-policy", "root-drift"]);
+    expect(resolveLabels(["root-policy,root-drift,root", "rex"], MANIFESTS).labels).toEqual(["root", "rex"]);
   });
 
   it("reports unknown labels with the valid set; core has no suite", () => {
@@ -189,11 +208,28 @@ describe("resolveLabels", () => {
   });
 });
 
-describe("ROOT_POLICY_TEST_FILES", () => {
+describe("root subset test files", () => {
   it("lists only files that exist", () => {
-    for (const file of ROOT_POLICY_TEST_FILES) {
-      expect(existsSync(resolve(ROOT, file)), file).toBe(true);
+    for (const [label, files] of Object.entries(ROOT_SUBSET_TEST_FILES)) {
+      for (const file of files) {
+        expect(existsSync(resolve(ROOT, file)), `${label}: ${file}`).toBe(true);
+      }
     }
+  });
+
+  it("covers both subsets and never runs the same file twice", () => {
+    expect(Object.values(ROOT_SUBSET_TEST_FILES)).toEqual([ROOT_POLICY_TEST_FILES, ROOT_DRIFT_TEST_FILES]);
+    const all = Object.values(ROOT_SUBSET_TEST_FILES).flat();
+    expect(new Set(all).size).toBe(all.length);
+  });
+
+  it("runs the drift tests that read a package source and compare it to a checked-in artifact", () => {
+    expect(ROOT_DRIFT_TEST_FILES).toEqual([
+      "tests/e2e/prompt-census.test.js",
+      "tests/e2e/iso-skill-drift.test.js",
+      "tests/e2e/hench-config-gate-contract.test.js",
+      "tests/e2e/instruction-alignment.test.js",
+    ]);
   });
 });
 
