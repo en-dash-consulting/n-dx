@@ -162,8 +162,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "what accumulated after that mark — the difference between two positions\n" +
       "in the transcript, computed here, per token class. Without a mark it\n" +
       "falls back to the spend since the previous record for the session (a\n" +
-      "warning names the mark command). Marks and the watermark live in\n" +
-      ".hench/usage-cursors/.\n" +
+      "warning names the mark command). Marks and the watermark live in the\n" +
+      "usage-cursors directory inside hench's own state directory.\n" +
       "\n" +
       "Precedence: explicit --*-tokens flags, then the mark, then the session\n" +
       "watermark, then zeros. A missing transcript never fails the record — an\n" +

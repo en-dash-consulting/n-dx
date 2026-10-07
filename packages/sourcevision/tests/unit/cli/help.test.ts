@@ -105,10 +105,15 @@ describe("sourcevision CLI help", () => {
       expect(output).toContain("--output");
     });
 
-    it("pr-markdown help includes output location", () => {
+    it("pr-markdown help names the output file without fixing its directory", () => {
       showCommandHelp("pr-markdown");
       const output = logSpy.mock.calls[0][0] as string;
-      expect(output).toContain(".sourcevision/pr-markdown.md");
+
+      expect(output).toContain("pr-markdown.md");
+      // The analysis directory is `.ndx/sourcevision` on the new layout, and
+      // this help table is static — it has no project root to resolve. Naming
+      // the folder sent operators looking for one they do not have.
+      expect(output).not.toContain(".sourcevision/pr-markdown.md");
     });
   });
 });

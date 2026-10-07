@@ -14,7 +14,7 @@ import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { handleClaimTask, handleReleaseTask, handleUpdateTaskStatus } from "../../src/cli/mcp-tools.js";
+import { handleClaimTask, handleReleaseTask, handleUpdateTaskStatus } from "../../src/cli/mcp-tools/index.js";
 import { cmdUpdate } from "../../src/cli/commands/update.js";
 import { openClaimsStore, resolveClaimHolder, claimsStorePath } from "../../src/store/claims.js";
 import {

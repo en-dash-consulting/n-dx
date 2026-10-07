@@ -72,7 +72,7 @@ function writeCodexConfig(dir) {
  */
 function writeAgentsMd(dir) {
   const agentsPath = join(dir, "AGENTS.md");
-  const content = renderAgentsMd();
+  const content = renderAgentsMd(dir);
   writeFileSync(agentsPath, content);
   return { written: true, path: agentsPath };
 }

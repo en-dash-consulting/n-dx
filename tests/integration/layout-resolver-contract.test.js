@@ -26,6 +26,8 @@ let foundation;
 let isoBundle;
 /** @type {Record<string, any>} */
 let isoDeclared;
+/** @type {Record<string, any>} */
+let viewerStatePaths;
 
 /** A project on the legacy layout — three dot-dirs, no container. */
 let legacyRoot;
@@ -54,6 +56,7 @@ beforeAll(async () => {
   foundation = await import("../../packages/llm-client/dist/public.js");
   isoBundle = await import("../../packages/sourcevision/dist/export/iso-sources.js");
   isoDeclared = await import("../../packages/sourcevision/dist/export/iso-declared.js");
+  viewerStatePaths = await import("../../packages/web/dist/viewer/state-paths.js");
 
   legacyRoot = mkdtempSync(join(tmpdir(), "ndx-layout-legacy-"));
   mkdirSync(join(legacyRoot, ".rex"), { recursive: true });
@@ -323,6 +326,54 @@ describe("layout resolver: core twin matches the foundation implementation", () 
     expect(fromFoundation).toEqual([...LAYOUT_FIELDS].sort());
   });
 
+  it("lists the same both-layout state names from both copies", () => {
+    // `layoutStateNames` is what the classifiers use — the scans and filters
+    // that are handed a path and have to say whether n-dx owns it, which means
+    // recognising both spellings rather than resolving one. Two copies of that
+    // list drift exactly like two copies of the resolver.
+    expect(core.layoutStateNames()).toEqual(foundation.layoutStateNames());
+  });
+
+  it("gives classifiers the container, and path-matchers its children", () => {
+    const { dirNames, statePaths } = core.layoutStateNames();
+
+    // A walk tests one directory entry at a time, so `.ndx` alone has to stand
+    // in for all three of its children — listing `.ndx/rex` there would never
+    // match an entry name and the walk would descend into n-dx's own state.
+    expect(dirNames).toEqual([".rex", ".hench", ".sourcevision", ".ndx"]);
+
+    // A path matcher compares whole root-relative paths, so it needs both
+    // layouts spelled out and the bare container is no use to it.
+    expect(statePaths).toEqual([
+      ".rex",
+      ".hench",
+      ".sourcevision",
+      ".ndx/rex",
+      ".ndx/hench",
+      ".ndx/sourcevision",
+    ]);
+
+    // Forward slashes, for the same reason relativeToRoot uses them.
+    for (const name of [...dirNames, ...statePaths]) {
+      expect(name).not.toContain("\\");
+    }
+  });
+
+  it("answers without reading the disk, so a scan's verdict is not location-dependent", () => {
+    // The names come from an explicit mode, never from detection. If they were
+    // detected, the same source file would be n-dx state or not depending on
+    // which checkout the scan ran in.
+    const cwd = process.cwd();
+    try {
+      process.chdir(ndxRoot);
+      const fromNdx = core.layoutStateNames();
+      process.chdir(legacyRoot);
+      expect(core.layoutStateNames()).toEqual(fromNdx);
+    } finally {
+      process.chdir(cwd);
+    }
+  });
+
   it("names the per-user directory and its overrides identically", () => {
     expect(core.NDX_HOME_DIRNAME).toBe(foundation.NDX_HOME_DIRNAME);
     expect(core.LEGACY_NDX_HOME_DIRNAME).toBe(foundation.LEGACY_NDX_HOME_DIRNAME);
@@ -412,5 +463,48 @@ describe("layout resolver: iso bundle twin matches the foundation implementation
     expect(isoDeclared.projectConfigFor(missing)).toBe(
       foundation.resolveLayout(missing).configFile,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The viewer carries a fourth copy, because a browser bundle cannot read a disk
+// ---------------------------------------------------------------------------
+
+describe("layout resolver: viewer twin matches the foundation implementation", () => {
+  // `packages/web/src/viewer/state-paths.ts` is the browser-safe restatement of
+  // `layoutStateNames().statePaths`. The viewer cannot import the resolver —
+  // `layout.ts` reaches for `node:fs` at module scope — but it classifies the
+  // same paths: the Files view hides n-dx's own directories, and the Hench Runs
+  // view calls a PRD write bookkeeping rather than work. Both have to recognise
+  // *both* layouts, which is exactly what the canonical list answers.
+  it("lists the same state directories as layoutStateNames", () => {
+    expect(
+      [...viewerStatePaths.ALL_STATE_DIRS].sort(),
+      "packages/web/src/viewer/state-paths.ts and packages/llm-client/src/layout.ts disagree",
+    ).toEqual([...foundation.layoutStateNames().statePaths].sort());
+  });
+
+  it("groups them by tool the way the resolver resolves them", () => {
+    for (const [dirs, field] of [
+      [viewerStatePaths.REX_STATE_DIRS, "rexDir"],
+      [viewerStatePaths.HENCH_STATE_DIRS, "henchDir"],
+      [viewerStatePaths.SOURCEVISION_STATE_DIRS, "sourcevisionDir"],
+    ]) {
+      const expected = ["legacy", "ndx"].map((mode) => {
+        const layout = foundation.resolveLayout(".", { mode });
+        return foundation.relativeToRoot(layout, layout[field]);
+      });
+      expect([...dirs], `${field} twin disagrees`).toEqual(expected);
+    }
+  });
+
+  it("gives prefixes that match a path's leading segment, not a bare name", () => {
+    // The consumers match `${dir}/`, so a run that touched `.rexy/thing` must
+    // not be classified as PRD bookkeeping.
+    const prefixes = viewerStatePaths.stateDirPrefixes(viewerStatePaths.REX_STATE_DIRS);
+
+    expect(prefixes).toEqual([".rex/", ".ndx/rex/"]);
+    expect(prefixes.some((p) => ".rexy/thing".startsWith(p))).toBe(false);
+    expect(prefixes.some((p) => ".ndx/rex/prd_tree/x".startsWith(p))).toBe(true);
   });
 });

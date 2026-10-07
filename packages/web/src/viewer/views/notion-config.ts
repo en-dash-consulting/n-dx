@@ -431,12 +431,11 @@ export function NotionSection({ form }: { form: NotionForm }) {
   if (form.loadError && !config) {
     return h("div", { class: "notion-config-error-state" },
       h("p", null, form.loadError),
+      // Names the command rather than the directory — see hench-config.ts.
       h("p", { class: "notion-config-error-hint" },
-        "Make sure ",
-        h("code", null, ".rex/"),
-        " exists. Run ",
+        "Make sure rex is initialized for this project. Run ",
         h("code", null, "rex init"),
-        " to create it.",
+        " to create its state directory.",
       ),
     );
   }

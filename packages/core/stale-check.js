@@ -15,14 +15,29 @@
  */
 
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+
+import { relativeToRoot, resolveLayout } from "./layout.js";
 
 // ── Required directories ──────────────────────────────────────────────────────
 
-/** The three tool directories that must exist for a fully-initialized project. */
-const REQUIRED_DIRS = [".sourcevision", ".rex", ".hench"];
-
-export { REQUIRED_DIRS };
+/**
+ * The three tool directories that must exist for a fully-initialized project,
+ * named the way `dir`'s own layout spells them.
+ *
+ * A *reader* of one project, so it resolves that project's layout rather than
+ * accepting both: a `.ndx/` project is not missing `.sourcevision/`, and
+ * reporting it as such would tell the operator to re-run `ndx init` on a
+ * project that is already complete.
+ *
+ * @param {string} dir  Project root directory.
+ * @returns {string[]}  Root-relative directory names, forward slashes.
+ */
+export function requiredDirs(dir) {
+  const layout = resolveLayout(dir);
+  return [layout.sourcevisionDir, layout.rexDir, layout.henchDir].map((p) =>
+    relativeToRoot(layout, p),
+  );
+}
 
 // ── Main detection ────────────────────────────────────────────────────────────
 
@@ -41,9 +56,10 @@ export function checkProjectStaleness(dir) {
   /** @type {StaleDetail[]} */
   const details = [];
   try {
-    for (const sub of REQUIRED_DIRS) {
-      if (!existsSync(join(dir, sub))) {
-        details.push({ kind: "missing-dir", dir: sub });
+    const layout = resolveLayout(dir);
+    for (const sub of [layout.sourcevisionDir, layout.rexDir, layout.henchDir]) {
+      if (!existsSync(sub)) {
+        details.push({ kind: "missing-dir", dir: relativeToRoot(layout, sub) });
       }
     }
   } catch { /* outer safety net */ }

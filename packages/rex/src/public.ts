@@ -582,7 +582,7 @@ export { createRexMcpServer } from "./cli/mcp.js";
 
 // ---- MCP tool handlers (for direct invocation by web/gateway) ---------------
 
-export { handleEditItem } from "./cli/mcp-tools.js";
+export { handleEditItem } from "./cli/mcp-tools/index.js";
 
 // ---- Execution log -----------------------------------------------------------
 // Shared writer behind `append_log` (MCP) and `rex log` / `ndx log` (CLI).

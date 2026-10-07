@@ -1,9 +1,23 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { resolveLayout } from "@n-dx/llm-client";
 import { execFileSyncCli } from "../../util/exec-cli.js";
 
-const REX_DIR = ".rex";
+/**
+ * Where rex keeps its state for this project.
+ *
+ * Sourcevision reads rex's files here without importing rex — the two domain
+ * packages never import each other — but *where* they are is still the
+ * resolver's answer, not `.rex` unconditionally: on a `.ndx/` project the
+ * fixed name points at files that do not exist, and every failure here is a
+ * silent `catch` returning "no PRD". Only the currently uncalled
+ * `resolveWorkedEpicTitlesForRange` reaches it, so this is about not handing a
+ * future caller that bug.
+ */
+function rexDirFor(projectDir: string): string {
+  return resolveLayout(projectDir).rexDir;
+}
 
 interface PRDItemLike {
   id: string;
@@ -70,8 +84,9 @@ function readJSONFile<T>(path: string): T | null {
  * by spawning `rex parse-md --stdin` so we never import rex at the code level.
  */
 function readPRDDocument(projectDir: string): PRDDocumentLike | null {
-  const mdPath = join(projectDir, REX_DIR, "prd.md");
-  const jsonPath = join(projectDir, REX_DIR, "prd.json");
+  const rexDir = rexDirFor(projectDir);
+  const mdPath = join(rexDir, "prd.md");
+  const jsonPath = join(rexDir, "prd.json");
 
   try {
     const md = readFileSync(mdPath, "utf-8");
@@ -305,7 +320,7 @@ function resolveWorkedEpicTitlesForRange(projectDir: string, comparisonRange: st
     };
   }
 
-  const logPath = join(projectDir, REX_DIR, "execution-log.jsonl");
+  const logPath = join(rexDirFor(projectDir), "execution-log.jsonl");
   const prd = readPRDDocument(projectDir);
   if (!prd?.items) {
     return {

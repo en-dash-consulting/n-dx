@@ -23,7 +23,72 @@
 
 import { join } from "node:path";
 
-import { resolveLayout, type ResolveLayoutOptions } from "../prd/llm-gateway.js";
+import {
+  NDX_CONTAINER_DIRNAME,
+  relativeToRoot,
+  resolveLayout,
+  type LayoutMode,
+  type ResolveLayoutOptions,
+} from "../prd/llm-gateway.js";
+
+/** Which tool's state directory {@link stateDirNameUnder} is asked about. */
+export type StateDirKey = "rex" | "hench" | "sourcevision";
+
+/**
+ * One tool's state directory under a *named* layout, spelled the way a git
+ * pathspec has to spell it — `.hench` or `.ndx/hench`, `.rex` or `.ndx/rex`.
+ *
+ * For the **classifiers**: the lists that answer "is this path hench's own
+ * bookkeeping?" about a line git handed them, and so have to recognise both
+ * layouts rather than resolve one (see `HENCH_RUNTIME_GITIGNORE_ENTRIES` in
+ * `store/artifacts.ts` and `PRD_COMMIT_PATHS` in the uncommitted-work gate).
+ * Anything that writes a path, or reads one known file, calls
+ * {@link resolveHenchPaths} or the resolver directly instead: a writer has to
+ * pick one layout, and naming the other one stages nothing at all.
+ *
+ * `"."` as the root is not a lookup — an explicit `mode` skips detection
+ * entirely, so nothing touches the disk and the result is purely the name. The
+ * point is that no spelling is written out at the call sites: all of them come
+ * from the resolver, so a rename there reaches every pattern built from this.
+ *
+ * It lives here, rather than once per consumer, because it had been copied
+ * three times (`henchDirNameUnder` in `store/artifacts.ts`, `rexDirNameUnder`
+ * in the gate, and an inline pair in `validation/changed-files.ts`) and a
+ * fourth copy was about to be written.
+ */
+export function stateDirNameUnder(which: StateDirKey, mode: LayoutMode): string {
+  const layout = resolveLayout(".", { mode });
+  const dir =
+    which === "rex" ? layout.rexDir : which === "hench" ? layout.henchDir : layout.sourcevisionDir;
+  return relativeToRoot(layout, dir);
+}
+
+/**
+ * Where hench's and rex's state sits, in **both** layouts, as path prefixes
+ * with a trailing slash — `.rex/`, `.hench/`, `.ndx/`.
+ *
+ * A path under one of these is bookkeeping rather than work: the agent's own
+ * `rex_update_status` write, hench's completion commit, a run record, a
+ * reviewer report. Two gates ask that question — `validation/changed-files.ts`
+ * (is the full-suite gate worth running?) and the reviewer-diff filter in
+ * `agent/lifecycle/cli-loop.ts` (did the reviewer repair anything?) — and
+ * before this list was shared they each spelled the three prefixes out, so the
+ * two could disagree about what counts as work.
+ *
+ * One entry covers the new layout: everything n-dx owns is inside the
+ * container, so `.ndx/` subsumes `.ndx/rex` and `.ndx/hench` both.
+ *
+ * Deliberately **not** including sourcevision. Analysis output is not hench's
+ * bookkeeping, and on the legacy layout a run that rewrote `.sourcevision/`
+ * has changed something the gates should see. (The container entry does sweep
+ * `.ndx/sourcevision` in with the rest on the new layout — an asymmetry that
+ * predates this constant and is not changed here.)
+ */
+export const BOOKKEEPING_DIR_PREFIXES: readonly string[] = [
+  `${stateDirNameUnder("rex", "legacy")}/`,
+  `${stateDirNameUnder("hench", "legacy")}/`,
+  `${NDX_CONTAINER_DIRNAME}/`,
+];
 
 /** Hench's config file inside its state directory. */
 export const HENCH_CONFIG_FILENAME = "config.json";

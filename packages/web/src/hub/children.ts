@@ -9,9 +9,10 @@
  * ## Lifecycle
  *
  * - **start** — spawn `<ndxBin> serve --port=0 <repoRoot>`, then wait for the
- *   port the child bound. The child writes it to `<repoRoot>/.n-dx-web.port`
- *   (see PORT_FILE in server/start.ts); that file is the contract, so the
- *   stale one from a previous run is removed before spawning.
+ *   port the child bound. The child writes it to the layout's port marker
+ *   (`.n-dx-web.port`, or `.ndx/web.port` on a migrated project — see
+ *   {@link portFilePath}); that file is the contract, so the stale one from a
+ *   previous run is removed before spawning.
  * - **attach** — on hub restart, a project whose recorded pid is alive and
  *   whose port answers `GET /api/status` for the right directory is adopted
  *   as-is. The hub has no child handle for it, so stopping goes through
@@ -26,14 +27,11 @@
  */
 
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { resolveLayout } from "@n-dx/llm-client";
 import { killWithFallback, spawnManaged } from "./exec-gateway.js";
 import type { ManagedChild } from "./exec-gateway.js";
 import { isPidAlive } from "./registry.js";
 import type { ProjectRecord } from "./registry.js";
-
-/** The project server writes its bound port here — same constant as server/start.ts. */
-const PORT_FILE = ".n-dx-web.port";
 
 export type ChildState =
   /** Spawned; waiting for the port file or the first health check. */
@@ -119,9 +117,21 @@ export async function checkProjectHealth(
   }
 }
 
+/**
+ * Where the child publishes its port for `repoRoot`.
+ *
+ * Asked of the resolver rather than joined to the root, because the child
+ * (`server/start.ts`) writes it there: `.n-dx-web.port` on a legacy project,
+ * `.ndx/web.port` on a migrated one. Reading a fixed name would wait out the
+ * whole port-file timeout on every migrated project and mark it unreachable.
+ */
+function portFilePath(repoRoot: string): string {
+  return resolveLayout(repoRoot).webPortFile;
+}
+
 function readPortFile(repoRoot: string): number | null {
   try {
-    const port = parseInt(readFileSync(join(repoRoot, PORT_FILE), "utf-8").trim(), 10);
+    const port = parseInt(readFileSync(portFilePath(repoRoot), "utf-8").trim(), 10);
     return Number.isInteger(port) && port > 0 ? port : null;
   } catch {
     return null;
@@ -130,7 +140,7 @@ function readPortFile(repoRoot: string): number | null {
 
 function removePortFile(repoRoot: string): void {
   try {
-    const path = join(repoRoot, PORT_FILE);
+    const path = portFilePath(repoRoot);
     if (existsSync(path)) unlinkSync(path);
   } catch {
     // The child overwrites it anyway; this only shortens the stale window.

@@ -12,6 +12,7 @@
 
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { henchDirIn } from "./paths.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
@@ -102,7 +103,7 @@ interface HenchConfigData {
 // ── Data loading helpers ─────────────────────────────────────────────
 
 function loadRuns(projectDir: string): RunData[] {
-  const runsDir = join(projectDir, ".hench", "runs");
+  const runsDir = join(henchDirIn(projectDir), "runs");
   let files: string[];
   try {
     files = readdirSync(runsDir);
@@ -128,7 +129,7 @@ function loadRuns(projectDir: string): RunData[] {
 
 function loadConfig(projectDir: string): HenchConfigData | null {
   try {
-    const raw = readFileSync(join(projectDir, ".hench", "config.json"), "utf-8");
+    const raw = readFileSync(join(henchDirIn(projectDir), "config.json"), "utf-8");
     return JSON.parse(raw) as HenchConfigData;
   } catch {
     return null;
@@ -136,7 +137,7 @@ function loadConfig(projectDir: string): HenchConfigData | null {
 }
 
 function loadSuggestionHistory(projectDir: string): SuggestionHistory {
-  const path = join(projectDir, ".hench", "suggestions.json");
+  const path = join(henchDirIn(projectDir), "suggestions.json");
   try {
     if (!existsSync(path)) return { records: [] };
     const raw = readFileSync(path, "utf-8");
@@ -150,7 +151,7 @@ function loadSuggestionHistory(projectDir: string): SuggestionHistory {
 
 function saveSuggestionHistory(projectDir: string, history: SuggestionHistory): void {
   writeFileSync(
-    join(projectDir, ".hench", "suggestions.json"),
+    join(henchDirIn(projectDir), "suggestions.json"),
     JSON.stringify(history, null, 2) + "\n",
     "utf-8",
   );
@@ -662,7 +663,7 @@ async function handleApplySuggestion(
   // Preview mode: show what would change without applying
   const preview = body.preview === true;
 
-  const configPath = join(ctx.projectDir, ".hench", "config.json");
+  const configPath = join(henchDirIn(ctx.projectDir), "config.json");
   let config: Record<string, unknown>;
   try {
     config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;

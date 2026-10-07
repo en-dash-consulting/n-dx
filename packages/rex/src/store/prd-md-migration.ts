@@ -45,6 +45,24 @@ export function toMarkdownSourcePath(jsonFilename: string): string {
   return `${LEGACY_SOURCE_FILE_PREFIX}${jsonToMarkdownFilename(jsonFilename)}`;
 }
 
+/**
+ * Attribution path for the canonical legacy PRD — `.rex/prd.md`.
+ *
+ * `rex status` groups items into per-PRD sections keyed by `sourceFile`, and
+ * the bucket it creates for unattributed items has to be the *same string*
+ * {@link toMarkdownSourcePath} produces for `PRD_FILENAME`, or the canonical
+ * section splits in two. It was spelled out separately at both call sites, so
+ * the two agreed only by eye.
+ *
+ * Composed from this module's own constants rather than by calling
+ * `toMarkdownSourcePath(PRD_FILENAME)`: `file-adapter.ts` imports from here, so
+ * evaluating `PRD_FILENAME` at module scope hits its temporal dead zone and
+ * every `rex` command dies on import. `prd-md-migration.test.ts` asserts the
+ * two agree, which is the check that call would have been.
+ */
+export const CANONICAL_MARKDOWN_SOURCE_PATH =
+  `${LEGACY_SOURCE_FILE_PREFIX}${PRD_MARKDOWN_FILENAME}`;
+
 type MarkdownMigrationSkipReason = "markdown-exists" | "json-missing";
 
 export interface MarkdownMigrationResult {

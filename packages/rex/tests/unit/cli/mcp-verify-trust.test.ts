@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { handleVerifyCriteria } from "../../../src/cli/mcp-tools.js";
+import { handleVerifyCriteria } from "../../../src/cli/mcp-tools/index.js";
 import type { PRDStore } from "../../../src/store/contracts.js";
 
 let repo: string;

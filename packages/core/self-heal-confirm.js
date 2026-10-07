@@ -17,8 +17,9 @@
  * can drive it without a real TTY.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
+
+import { resolveLayout } from "./layout.js";
 
 /**
  * Parse `rex recommend --actionable-only --format=json` output into a
@@ -100,14 +101,14 @@ export function formatQueuedTaskSummary({ summary, currentIteration, totalIterat
 }
 
 /**
- * Read `selfHeal.autoConfirm` from `.n-dx.json`. Missing file or invalid JSON
- * yields `false` (prompt-on by default).
+ * Read `selfHeal.autoConfirm` from the project config. Missing file or invalid
+ * JSON yields `false` (prompt-on by default).
  *
  * @param {string} dir Project root.
  * @returns {boolean}
  */
 export function readSelfHealAutoConfirm(dir) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = resolveLayout(dir).configFile;
   if (!existsSync(configPath)) return false;
   try {
     const data = JSON.parse(readFileSync(configPath, "utf-8"));

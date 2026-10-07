@@ -26,8 +26,9 @@ src/
     propose.ts      Group scan results into epic/feature/task hierarchy
   cli/
     index.ts        Arg parser and command dispatch (switch + dynamic import)
-    mcp.ts          MCP server (17 tools, 3 resources, stdio + HTTP transport)
-    mcp-tools.ts    Tool definitions and handlers
+    mcp.ts          MCP server (19 tools, 3 resources, stdio + HTTP transport)
+    mcp-tools/      One module per tool, plus registry.ts listing them in
+                    registration order; mcp.ts registers whatever it lists
     commands/       One file per command, each exports cmdX(dir, flags)
   workflow/
     default.ts      Default agent workflow text

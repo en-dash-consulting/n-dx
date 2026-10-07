@@ -493,12 +493,11 @@ export function WorkflowOptimizationView() {
       h(BrandedHeader, { product: "hench", title: "Workflow Optimization" }),
       h("div", { class: "wf-error" },
         h("p", null, error),
+        // Names the command rather than the directory — see hench-config.ts.
         h("p", { class: "wf-error-hint" },
-          "Make sure ",
-          h("code", null, ".hench/runs/"),
-          " exists with run data. Run ",
+          "Make sure this project has recorded run data. Run ",
           h("code", null, "hench run"),
-          " to generate data.",
+          " to generate some.",
         ),
       ),
     );
