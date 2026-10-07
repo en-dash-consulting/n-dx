@@ -1,0 +1,14 @@
+---
+id: "3de83fd7-d18f-4391-846a-bee80a974669"
+level: "task"
+title: "Make the v2 reader and writer tests pass on a Windows CRLF checkout"
+status: "completed"
+priority: "critical"
+startedAt: "2026-10-07T20:13:29.399Z"
+completedAt: "2026-10-07T20:23:57.338Z"
+endedAt: "2026-10-07T20:23:57.338Z"
+acceptanceCriteria: []
+description: "CLI Smoke (Windows) fails on #565 and #567 with 7 v2 tests: prd-model-reader.test.ts (a hand-edited run that is not an object, both cases; state fields written in frontmatter, warn once per state key; schema skew, names a missing v2 stamp) and prd-model-writer.test.ts (round-trips the v2 fixture byte-identically; writes nothing when the tree is unchanged; keeps every path when titles change). Example run: https://github.com/en-dash-consulting/n-dx/actions/runs/37673567942/job/112971833618 . Cause: the runner checks out with core.autocrlf=true, and nothing in .gitattributes pins packages/rex/tests/fixtures/v2-tree/** (or the future v2 roots under .ndx/rex/) to LF, so the fixture files arrive with CRLF line endings. The writer emits LF, so byte-identity fails; test helpers that edit fixture text match on a bare line feed (for example the regex that strips the schema line uses a dot, which does not match a carriage return), so the stamp is never removed and the edits never land. parseFrontmatter itself already splits CRLF. The repo already pins rex-written files to LF for the same reason (.gitattributes, issue #283). Fix: (1) pin the v2 test fixtures and the v2 PRD roots (.ndx/rex/product and .ndx/rex/changes, Markdown and state.yaml) to text eol=lf in .gitattributes, next to the existing rex entries; (2) make the reader and writer tests independent of the checkout line endings, so they also pass when a fixture file has CRLF; (3) make sure a CRLF copy of the v2 fixture loads into the same model as the LF fixture, and that writePrdModel with an unchanged model does not rewrite a file whose only difference is CRLF line endings (no line-ending churn, the #283 rule). Acceptance criteria: (1) git check-attr reports eol lf for the v2 fixture files and for paths under .ndx/rex/product and .ndx/rex/changes; (2) a test converts a copy of the v2 fixture to CRLF and gets the same loaded model, with no warnings beyond the LF case; (3) a test writes an unchanged model over a CRLF copy and no file is rewritten; (4) the seven tests above pass on a CRLF copy as well as on LF; (5) the rex package suite and the six root policy tests pass; (6) CLI Smoke (Windows) passes on the pushed branch."
+lastModified: "2026-10-07T20:23:57.561Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

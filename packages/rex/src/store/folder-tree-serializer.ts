@@ -621,6 +621,27 @@ function escapeForRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** DOS device names, reserved whatever the case or extension (`con`, `NUL.md`, `com1.txt`). */
+const WINDOWS_RESERVED_STEM = /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])$/i;
+/** Path separators, characters Windows refuses in a name, and control characters. */
+const WINDOWS_INVALID_CHAR = /[<>:"/\\|?*\u0000-\u001f]/;
+
+/**
+ * Whether `segment` can be a single file or folder name on Windows: non-empty,
+ * no separator or Windows-invalid character, no trailing dot or space, and no
+ * device name as its stem (`con`, `aux.md`, `lpt9 .txt`).
+ *
+ * Not part of the slug rule: {@link slugifyTitle} never consults it, so it does
+ * not move {@link SLUG_RULE_VERSION}. It exists for code that creates or
+ * accepts slugs outside that rule (the v2 writer, v2 slug creation).
+ */
+export function isWindowsSafeSegment(segment: string): boolean {
+  if (segment === "" || WINDOWS_INVALID_CHAR.test(segment)) return false;
+  if (segment.endsWith(".") || segment.endsWith(" ")) return false;
+  const stem = segment.split(".")[0].trimEnd();
+  return !WINDOWS_RESERVED_STEM.test(stem);
+}
+
 /**
  * Version of the slug rule implemented below.
  *
