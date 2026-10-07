@@ -25,7 +25,7 @@ import {
   SLUG_RULE_VERSION,
 } from "@n-dx/rex";
 import type { PRDItem, PRDStore } from "@n-dx/rex";
-import { handleUpdateTaskStatus } from "@n-dx/rex/dist/cli/mcp-tools.js";
+import { handleUpdateTaskStatus } from "@n-dx/rex/dist/cli/mcp-tools/index.js";
 import { initConfig } from "../../src/store/config.js";
 import { TaskClaims } from "../../src/process/task-claims.js";
 import { rexToolHandlers } from "../../src/tools/rex.js";

@@ -48,6 +48,7 @@ const BASE_CTX: ReviewPromptContext = {
   reportPath: "/proj/.hench/reviews/run-1.json",
   resumed: true,
   autonomous: true,
+  prdTreeDir: ".rex/prd_tree/",
 };
 
 function finding(over: Partial<ReviewFinding> = {}): ReviewFinding {
@@ -124,6 +125,17 @@ describe("buildReviewBrief", () => {
     expect(fresh).toMatch(/get_item/);
     expect(resumed).toMatch(/task you were just working on/);
     expect(resumed).not.toMatch(/You do not have that agent's context/);
+  });
+
+  it("sends the reviewer to the PRD tree the project actually has", () => {
+    // The duplicate check is a directory listing, so a fixed `.rex/prd_tree/`
+    // listed nothing on a `.ndx/` project and every finding looked new.
+    const legacy = buildReviewBrief(BASE_CTX);
+    const ndx = buildReviewBrief({ ...BASE_CTX, prdTreeDir: ".ndx/rex/prd_tree/" });
+
+    expect(legacy).toContain("list the directories under `.rex/prd_tree/`");
+    expect(ndx).toContain("list the directories under `.ndx/rex/prd_tree/`");
+    expect(ndx).not.toContain("`.rex/prd_tree/`");
   });
 
   it("applies the verdict policy itself when no human is attached", () => {

@@ -8,11 +8,11 @@
  *
  * @see tests/e2e/domain-isolation.test.js — cross-package gateway enforcement
  * @see packages/web/tests/integration/boundary-check.test.ts — intra-package server/viewer boundary
- * @see tests/e2e/layout-literal-policy.test.js — no new literal `.rex/`, `.hench/`,
- *   `.sourcevision/` or `.n-dx*` paths outside the layout resolver. It lives in
- *   its own file rather than here because it needs a standing inventory of the
- *   sites the path sweep has not reached, the way
- *   `shell-spawn-inventory-policy` and `wall-clock-inventory-policy` do.
+ * @see tests/e2e/layout-literal-policy.test.js — no literal `.rex/`, `.hench/` or
+ *   `.sourcevision/` path outside the layout resolver, and no *new* `.n-dx*` one.
+ *   It lives in its own file rather than here because the `.n-dx*` half still
+ *   needs a standing inventory of the sites the config sweep has not reached,
+ *   the way `shell-spawn-inventory-policy` and `wall-clock-inventory-policy` do.
  *
  * These test files together enforce the full architectural guardrail suite.
  * Changes to one should be reviewed against the others for consistency.
@@ -1322,7 +1322,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   // Core — lazy-loads utilities
   ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers when the vendor changes, plus the shared auth-failure guidance and the cli-brand color palette on the preflight-failure error path"],
   ["packages/core/cli.js", "Lazy-loads cli-ink.js (Ink + React TUI renderer) only during `ndx init` when stdout is a TTY and --quiet is unset — avoids React/Ink import cost on every CLI invocation and in non-interactive environments"],
-  ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
+  ["packages/rex/src/cli/mcp-tools/reorganize.ts", "Lazy-loads the LLM reshape reasoner and its config only when reorganize runs in full mode"],
   ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
   // Sourcevision — lazy-loads analyzers and heavy dependencies
   ["packages/sourcevision/src/cli/index.ts", "CLI command dispatch — lazy-loads analyzers"],

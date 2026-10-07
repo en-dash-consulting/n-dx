@@ -752,7 +752,7 @@ describe("runWeb, on a busy port", () => {
 });
 
 describe("waitForPortFile", () => {
-  const PORT_FILES = { port: ".n-dx-web.port" };
+  const PORT_FILES = (dir) => ({ port: join(dir, ".n-dx-web.port") });
   let portDir;
   afterEach(async () => {
     if (portDir) await rm(portDir, { recursive: true, force: true });
@@ -761,7 +761,7 @@ describe("waitForPortFile", () => {
 
   it("returns the port once a live server writes it", async () => {
     portDir = await mkdtemp(join(tmpdir(), "ndx-port-wait-"));
-    setTimeout(() => writeFile(join(portDir, PORT_FILES.port), "4321\n"), 100);
+    setTimeout(() => writeFile(PORT_FILES(portDir).port, "4321\n"), 100);
     expect(await waitForPortFile(portDir, 2_000, 10, PORT_FILES, () => true)).toBe(4321);
   });
 

@@ -1758,7 +1758,8 @@ Hench settings (.hench/config.json):
   hench.maxTokens          number    Max tokens per API request (default: 8192)
   hench.tokenBudget        number    Total tokens per run, input+cached+output (default: 0 —
                                      unlimited). A run stops once it crosses this.
-  hench.rexDir             string    Path to .rex directory (default: ".rex")
+  hench.rexDir             string    Path to the rex PRD directory (default: the project's
+                                     resolved rex directory — .rex, or .ndx/rex on the new layout)
   hench.apiKeyEnv          string    Env variable for API key (default: "ANTHROPIC_API_KEY")
   hench.claudePath         string    Path to the Claude Code binary. Falls back to "claude" on
                                      PATH. Prefer claude.cli_path, which is shared across packages.
@@ -2800,7 +2801,7 @@ async function handleSetProjectSection(
   // Automatically persist hench.provider=api so `ndx work` never emits the
   // "vendor=local requires API mode — To persist: ndx config hench.provider api" hint.
   if (pkg === "llm" && settingPath === "vendor" && (coerced === LLM_VENDOR.LOCAL || coerced === LLM_VENDOR.GOOGLE)) {
-    const henchConfigPath = join(dir, ".hench", "config.json");
+    const henchConfigPath = join(resolveLayout(dir).henchDir, "config.json");
     try {
       if (await fileExists(henchConfigPath)) {
         const henchConfig = await loadJSON(henchConfigPath);

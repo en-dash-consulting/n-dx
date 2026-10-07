@@ -154,6 +154,45 @@ export function relativeToRoot(layout, path) {
   return relative(layout.root, path).split(sep).join("/");
 }
 
+/**
+ * What {@link layoutStateNames} answers with.
+ *
+ * @typedef {object} LayoutStateNames
+ * @property {string[]} dirNames    Single path segments: `.ndx`, `.rex`,
+ *   `.hench`, `.sourcevision`. The container alone stands in for all three of
+ *   its children, because skipping it skips them.
+ * @property {string[]} statePaths  Full root-relative paths: `.ndx/rex`,
+ *   `.ndx/hench`, `.ndx/sourcevision` and the three legacy directories.
+ */
+
+/**
+ * Every root-relative name n-dx keeps state under, in **both** layouts.
+ *
+ * For *classifiers* rather than path constructors — code handed a path by git,
+ * by `readdir` or by a source file's import specifier, which has to answer "is
+ * this n-dx's own state?". Resolving the one layout the project happens to be
+ * on would make the answer depend on where the scan runs. Anything that writes,
+ * or reads one known file, uses {@link resolveLayout} instead.
+ *
+ * The reasoning is on the llm-client twin; read that one first.
+ *
+ * @returns {LayoutStateNames}
+ */
+export function layoutStateNames() {
+  const legacy = resolveLayout(".", { mode: "legacy" });
+  const ndx = resolveLayout(".", { mode: "ndx" });
+  const legacyDirs = [legacy.rexDir, legacy.henchDir, legacy.sourcevisionDir].map((p) =>
+    relativeToRoot(legacy, p),
+  );
+  const ndxDirs = [ndx.rexDir, ndx.henchDir, ndx.sourcevisionDir].map((p) =>
+    relativeToRoot(ndx, p),
+  );
+  return {
+    dirNames: [...legacyDirs, NDX_CONTAINER_DIRNAME],
+    statePaths: [...legacyDirs, ...ndxDirs],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // The per-user directory
 // ---------------------------------------------------------------------------

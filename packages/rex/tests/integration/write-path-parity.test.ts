@@ -19,7 +19,7 @@
  *      ancestors. Catches whole-tree churn even when both paths churn *the
  *      same way*, which parity alone would happily accept.
  *
- * @see packages/rex/src/cli/mcp-tools.ts — handleUpdateTaskStatus
+ * @see packages/rex/src/cli/mcp-tools/update-task-status.ts — handleUpdateTaskStatus
  * @see packages/rex/src/cli/commands/folder-tree-sync.ts — syncFolderTree
  */
 
@@ -28,7 +28,7 @@ import { mkdtemp, rm, mkdir, writeFile, readFile, readdir, stat } from "node:fs/
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { FileStore } from "../../src/store/file-adapter.js";
-import { handleUpdateTaskStatus } from "../../src/cli/mcp-tools.js";
+import { handleUpdateTaskStatus } from "../../src/cli/mcp-tools/index.js";
 import { syncFolderTree } from "../../src/cli/commands/folder-tree-sync.js";
 import { computeTimestampUpdates } from "../../src/core/timestamps.js";
 import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
