@@ -31,6 +31,8 @@ import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
+import { readPerfFlags } from "./perf-flags.js";
+import { preImageOf, tryTargetedItemWrite } from "./targeted-update.js";
 import type { PRDStore, StoreCapabilities, WriteOptions, SaveFileReport } from "./contracts.js";
 import { buildSaveFileReport, mergeSaveFileReports } from "./contracts.js";
 
@@ -50,6 +52,15 @@ export class FileStore implements PRDStore {
    * last load or save left on disk — see FolderTreeStore.loadedFiles.
    */
   private loadedFiles: ReadonlyMap<string, string> = new Map();
+  /**
+   * Item id → the resolved path the last load actually read it from.
+   *
+   * Only the targeted write path (`performance.fastWrites`) uses it, as the
+   * ground truth for where an item lives. Empty until the first tree load;
+   * a targeted write declines on a miss, so an empty map simply means every
+   * write takes the full path.
+   */
+  private loadedItemFiles: ReadonlyMap<string, string> = new Map();
   /** Files written/deleted by saves since the last {@link takeSaveFileReport}. */
   private pendingSaveReport: SaveFileReport | null = null;
   private itemToFile: Map<string, string> = new Map();
@@ -270,18 +281,83 @@ export class FileStore implements PRDStore {
   private async withFileTransaction<T>(
     _filename: string,
     fn: (doc: PRDDocument) => Promise<T>,
+    targetedId?: string,
   ): Promise<T> {
     const folderTreeLockPath = prdLockPath(this.rexDir);
     return withLock(folderTreeLockPath, async () => {
       const doc = await this.loadDocument();
+
+      // Shape of the targeted item *before* the mutation. Taken here because
+      // `fn` mutates in place, so after it runs there is nothing left to
+      // compare against — and the comparison is what decides whether the
+      // change can move a file.
+      const targeted =
+        targetedId !== undefined && readPerfFlags(this.rexDir).fastWrites
+          ? findItem(doc.items, targetedId)
+          : null;
+      const before = targeted ? preImageOf(targeted.item as PRDItem) : null;
+
       const result = await fn(doc);
       const valid = validateDocument(doc);
       if (!valid.ok) {
         throw new Error(`Invalid document after mutation: ${valid.errors.message}`);
       }
+
+      if (before && targetedId !== undefined) {
+        const outcome = await tryTargetedItemWrite(
+          this.treeRoot, doc.items, targetedId, before, this.loadedItemFiles,
+        );
+        if (outcome.kind === "written") {
+          await this.recordTargetedWrite(doc, outcome.files);
+          return result;
+        }
+      }
+
       await this.writeFolderTree(doc);
       return result;
     });
+  }
+
+  /**
+   * Bring this instance's view of the tree up to date after a targeted write.
+   *
+   * Mirrors the tail of {@link writeFolderTree} exactly, minus the parts that
+   * only a full write earns: `tree-meta.json` is untouched because a
+   * field-only update changes nothing in it, and no entry can have become
+   * stale because no item moved.
+   *
+   * `loadedFiles` is amended rather than replaced — the full write gets a
+   * fresh digest map for the whole tree from the serializer, while this
+   * knows only the one or two files it wrote and must keep the rest of the
+   * load's map intact for the next save's stale-save guard.
+   */
+  private async recordTargetedWrite(
+    doc: PRDDocument,
+    writtenFiles: ReadonlyMap<string, string>,
+  ): Promise<void> {
+    const digests = new Map(this.loadedFiles);
+    let maxMtimeMs = 0;
+    for (const [path, digest] of writtenFiles) {
+      digests.set(path, digest);
+      try {
+        maxMtimeMs = Math.max(maxMtimeMs, (await stat(path)).mtimeMs);
+      } catch {
+        // Unreadable right after writing it is not worth failing the save
+        // over; Date.now() below is then the only clock we have.
+      }
+    }
+    // Same guard against a file clock running ahead of Date.now() that the
+    // full write documents — on Windows the skew exceeds the tolerance.
+    this.loadedAt = Math.max(Date.now(), maxMtimeMs);
+    this.loadedFiles = digests;
+    this.pendingSaveReport = mergeSaveFileReports(
+      this.pendingSaveReport,
+      buildSaveFileReport(
+        { writtenPaths: [...writtenFiles.keys()], deletedPaths: [] },
+        dirname(this.rexDir),
+      ),
+    );
+    this.rebuildOwnershipFromItems(doc);
   }
 
   private async loadDocumentFromJsonSources(): Promise<PRDDocument> {
@@ -446,8 +522,9 @@ export class FileStore implements PRDStore {
 
     // Parse items from the folder tree
     try {
-      const { items, fileDigests } = await parseFolderTree(this.treeRoot);
+      const { items, fileDigests, itemFiles } = await parseFolderTree(this.treeRoot);
       this.loadedFiles = fileDigests;
+      this.loadedItemFiles = itemFiles;
       if (items.length === 0 && !treeMetaPresent && (await this.hasLegacySource())) {
         return this.loadLegacyDocument();
       }
@@ -676,7 +753,7 @@ export class FileStore implements PRDStore {
       if (!updateInTree(doc.items, id, stampedUpdates)) {
         throw new Error(`Item "${id}" not found`);
       }
-    });
+    }, id);
   }
 
   async removeItem(id: string): Promise<void> {

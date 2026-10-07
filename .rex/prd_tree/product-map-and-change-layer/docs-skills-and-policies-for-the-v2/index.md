@@ -16,7 +16,8 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Critical path. Everything an assistant or a person reads describes the v2 model, for every vendor.\n\nRoadmap PR 24 · wave 3 · lane core-docs."
-lastModified: "2026-10-06T04:20:28.479Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-06T15:51:36.831Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -24,5 +25,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Layout-literal wall lets a hardcoded .ndx/rex, .ndx/hench or .ndx/sourcevision path through](./layout-literal-wall-lets-a-hardcoded.md) | pending |
 | [Rewrite the guidance, schema doc, public surface and policies](./rewrite-the-guidance-schema-doc-public.md) | pending |
 | [Rewrite the PRD skills for the v2 model for every vendor](./rewrite-the-prd-skills-for-the-v2.md) | pending |

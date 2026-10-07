@@ -299,6 +299,36 @@ describe("SmartAddInput", () => {
     expect(root.textContent).toContain("Accept All");
   });
 
+  it("Accept All posts loe, loeRationale and loeConfidence from the proposal", async () => {
+    const withLoe = structuredClone(sampleProposals);
+    Object.assign(withLoe[0].features[0].tasks[0], {
+      loe: 1.5,
+      loeRationale: "Two providers, one callback",
+      loeConfidence: "medium",
+    });
+    fetchSpy.mockImplementation(async (url: string) =>
+      url === "/api/rex/proposals/accept-edited"
+        ? { ok: true, json: () => Promise.resolve({}) }
+        : { ok: true, json: () => Promise.resolve({ proposals: withLoe, confidence: 78, qualityIssues: [] }) },
+    );
+
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
+    await vi.runAllTimersAsync();
+    await flush();
+
+    root.querySelector<HTMLButtonElement>(".smart-add-btn-accept")!.click();
+    await vi.runAllTimersAsync();
+    await flush();
+
+    const call = fetchSpy.mock.calls.find((c) => c[0] === "/api/rex/proposals/accept-edited");
+    expect(call).toBeTruthy();
+    const task = JSON.parse(call![1].body).proposals[0].features[0].tasks[0];
+    expect(task.loe).toBe(1.5);
+    expect(task.loeRationale).toBe("Two providers, one callback");
+    expect(task.loeConfidence).toBe("medium");
+  });
+
   it("shows priority badges on tasks", async () => {
     fetchSpy.mockResolvedValue(mockSuccessResponse());
 

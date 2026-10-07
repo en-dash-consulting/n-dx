@@ -49,10 +49,39 @@ function findAvailablePort() {
   });
 }
 
-async function getJson(url) {
-  const res = await fetch(url);
-  const text = await res.text();
-  return { status: res.status, body: text ? JSON.parse(text) : null };
+/**
+ * GET a JSON endpoint, retrying only a connection-level failure.
+ *
+ * `fetch` pools keep-alive sockets. The hub closes an idle connection on its own
+ * schedule, and reusing one it has already closed surfaces as `TypeError: fetch
+ * failed` / `ECONNRESET` — not a product result, just a dead socket from an
+ * earlier test in this file. That is what failed the two-project registration
+ * case inside the full root suite while it passed alone, and it is the same
+ * hazard tests/e2e/cli-start-two-projects.test.js's `getStatus` avoids by
+ * declining to use `fetch` at all.
+ *
+ * It also covers the other transport-level race in this file: `--background`
+ * returns before the detached server has finished binding, so the first GET can
+ * arrive at a closed port.
+ *
+ * Only the transport is retried. Any response that arrives — including the 409
+ * the ambiguous-root case asserts — is returned as-is, so no status assertion is
+ * softened by this. A port that is genuinely closed therefore costs the full
+ * budget before throwing, so a caller that expects one — afterAll's sweep, which
+ * runs after the hub has stopped — passes `timeoutMs = 0` for a single attempt.
+ */
+async function getJson(url, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      const res = await fetch(url);
+      const text = await res.text();
+      return { status: res.status, body: text ? JSON.parse(text) : null };
+    } catch (err) {
+      if (!(err instanceof TypeError) || Date.now() >= deadline) throw err;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
 }
 
 /**
@@ -169,7 +198,10 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
     const pids = [];
     if (hubPort) {
       try {
-        const { body } = await getJson(`http://127.0.0.1:${hubPort}/api/hub/projects`);
+        // One attempt, no retry budget: on a green run the last test has already
+        // stopped the hub, so this call meets a closed port every time and a
+        // retry would only add getJson's whole budget to the suite.
+        const { body } = await getJson(`http://127.0.0.1:${hubPort}/api/hub/projects`, 0);
         for (const p of body?.projects ?? []) if (typeof p.pid === "number") pids.push(p.pid);
       } catch {
         // hub not answering — nothing registered to collect

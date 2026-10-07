@@ -588,12 +588,15 @@ export function HenchConfigSection({ form, robotWranglerLink }: {
     return h("div", { class: "hench-config-container" },
       h("div", { class: "hench-config-error-state" },
         h("p", null, form.loadError ?? "Failed to load configuration"),
+        // Deliberately names the command rather than the directory: where
+        // hench keeps its state depends on the project's layout, and the
+        // viewer runs in a browser with no resolver to ask. Naming `.hench/`
+        // here sent operators on the new layout looking for a directory they
+        // do not have.
         h("p", { class: "hench-config-error-hint" },
-          "Make sure ",
-          h("code", null, ".hench/"),
-          " exists. Run ",
+          "Make sure hench is initialized for this project. Run ",
           h("code", null, "hench init"),
-          " to create it.",
+          " to create its state directory.",
         ),
       ),
     );

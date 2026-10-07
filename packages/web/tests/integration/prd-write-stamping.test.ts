@@ -26,10 +26,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resolveStore } from "@n-dx/rex";
+import { prdLockPath } from "@n-dx/rex/dist/store/paths.js";
 import type { ServerContext } from "../../src/server/types.js";
 import { handleRexRoute } from "../../src/server/routes-rex/index.js";
 import {
@@ -166,6 +168,37 @@ describe("dashboard PRD writes stamp lastModified", () => {
     await expectModifiedSinceSync("task-a");
     await expectModifiedSinceSync("task-b");
   });
+
+  it("single-item PATCH leaves only that item newer than its last sync", async () => {
+    const { status } = await request("/api/rex/items/task-a", "PATCH", {
+      status: "in_progress",
+      title: "Renamed through PATCH",
+    });
+    expect(status).toBe(200);
+
+    expect((await readItem("task-a")).title).toBe("Renamed through PATCH");
+    await expectModifiedSinceSync("task-a");
+    expect((await readItem("task-b")).lastModified).toBe(SYNCED_AT);
+  });
+
+  it("single-item PATCH answers 409 naming the holder when another process holds the lock", async () => {
+    // A real foreign process: a same-process holder would queue and succeed.
+    const holder = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+    try {
+      await writeFile(
+        prdLockPath(rexDir),
+        JSON.stringify({ pid: holder.pid, token: "held-elsewhere", timestamp: new Date().toISOString() }),
+        "utf-8",
+      );
+      const { status, json } = await request("/api/rex/items/task-a", "PATCH", { title: "Never written" });
+      expect(status).toBe(409);
+      expect(String(json.error)).toContain(`PID ${holder.pid}`);
+    } finally {
+      holder.kill();
+    }
+    expect((await readItem("task-a")).title).toBe("Add the Ask panel");
+    // withTransaction takes no LockOptions, so this outlasts rex's 10s acquire timeout.
+  }, 25_000);
 
   it("merge leaves the surviving item newer than its last sync", async () => {
     // The target is one of the source ids — validateMerge requires the set it

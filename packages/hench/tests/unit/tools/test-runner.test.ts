@@ -116,7 +116,7 @@ describe("findRelevantTests", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   it("finds co-located test file for a source file", async () => {
@@ -440,7 +440,7 @@ describe("runPostTaskTests", () => {
   });
 
   afterEach(async () => {
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   it("returns ran=false when no test command configured", async () => {
@@ -533,7 +533,7 @@ describe("runTestGate", () => {
   });
 
   afterEach(async () => {
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   it("skips gate when no files changed", async () => {
@@ -623,7 +623,7 @@ describe("runTestGate — launched vs failed", () => {
   afterEach(async () => {
     vi.doUnmock("../../../src/process/exec.js");
     vi.resetModules();
-    await rm(projectDir, { recursive: true, force: true });
+    await rm(projectDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   /** Load runTestGate with execShellCmd stubbed to a fixed ExecResult. */

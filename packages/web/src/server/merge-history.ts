@@ -468,22 +468,27 @@ export function flattenPrdItems(doc: PRDDocument, rexDir?: string): {
   const nodes: PrdNode[] = [];
   const knownIds = new Set<string>();
   const shortIdIndex = new Map<string, string>();
-  // Map of item ID to its folder path for shape classification
-  const idToFolderPath = new Map<string, string>();
 
   const walk = (items: PRDItem[], parentId?: string, parentPath?: string): void => {
     for (const item of items) {
       knownIds.add(item.id.toLowerCase());
       shortIdIndex.set(item.id.slice(0, 8).toLowerCase(), item.id);
 
-      // Compute folder path for this item
+      // The item's folder on disk, which only exists to be read by
+      // `classifyNodeShape` — so without a `rexDir` to anchor it there is
+      // nothing to compute. It used to fall back to a literal `.rex`, which
+      // named a directory this function was explicitly told it did not have,
+      // and on a `.ndx/` project named one that does not exist at all. The
+      // value was then stored in a map nothing read.
       const slug = itemToSlug(item);
-      const itemPath = parentPath ? join(parentPath, slug) : join(rexDir ?? ".rex", "prd_tree", slug);
-      idToFolderPath.set(item.id, itemPath);
+      const itemPath = parentPath
+        ? join(parentPath, slug)
+        : rexDir
+          ? join(rexDir, "prd_tree", slug)
+          : undefined;
 
-      // Classify shape based on folder structure if rexDir is provided
       let shape: string | undefined;
-      if (rexDir) {
+      if (rexDir && itemPath) {
         try {
           shape = classifyNodeShape(item.id, itemPath);
         } catch {

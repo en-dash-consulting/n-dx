@@ -26,6 +26,7 @@ import { fileURLToPath, pathToFileURL } from "url";
 import { execFileSyncCli } from "./win-spawn.js";
 import { buildCommitMessage } from "./commit-trailers.js";
 import { ensureGitignoreEntry, isGitTracked } from "./gitignore.js";
+import { relativeToRoot, resolveLayout } from "./layout.js";
 import { createInterface } from "node:readline/promises";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -360,8 +361,9 @@ export function buildDeployManifest(dir, opts = {}) {
   try {
     remote = execFileSyncCli("git", ["remote", "get-url", "origin"], { cwd: dir, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).toString().trim() || null;
   } catch { /* no remote / not a repo */ }
-  const runCount = countFilesUnder(join(dir, ".hench", "runs"), (f) => f.endsWith(".json"));
-  const itemCount = countFilesUnder(join(dir, ".rex", "prd_tree"), (f) => f.endsWith(".md"));
+  const { henchDir, rexDir } = resolveLayout(dir);
+  const runCount = countFilesUnder(join(henchDir, "runs"), (f) => f.endsWith(".json"));
+  const itemCount = countFilesUnder(join(rexDir, "prd_tree"), (f) => f.endsWith(".md"));
   return { remote, branch: "n-dx-dashboard", runCount, itemCount, includeTranscripts: !!opts.includeTranscripts };
 }
 
@@ -433,15 +435,16 @@ export async function confirmGithubDeploy({ dir, includeTranscripts, yes, isTTY,
 
 export async function runExport(args) {
   const { outDir, basePath, cname, deploy, includeTranscripts, yes, dir } = parseExportArgs(args);
-  const svDir = join(dir, ".sourcevision");
-  const rexDir = join(dir, ".rex");
-  const henchDir = join(dir, ".hench");
+  const layout = resolveLayout(dir);
+  const svDir = layout.sourcevisionDir;
+  const rexDir = layout.rexDir;
+  const henchDir = layout.henchDir;
 
   // ── Validate prerequisites ─────────────────────────────────────────────
   const missing = [];
-  if (!existsSync(svDir)) missing.push(".sourcevision");
+  if (!existsSync(svDir)) missing.push(relativeToRoot(layout, svDir));
   const prdTreePath = join(rexDir, "prd_tree");
-  if (!existsSync(prdTreePath)) missing.push(".rex/prd_tree");
+  if (!existsSync(prdTreePath)) missing.push(relativeToRoot(layout, prdTreePath));
   if (missing.length > 0) {
     console.error(`Error: Missing ${missing.join(", ")} in ${dir}`);
     console.error("Hint: Run 'ndx init' and 'ndx plan' first.");

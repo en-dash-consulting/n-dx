@@ -38,10 +38,10 @@
  * (`hench/src/prd/ops.ts`) to keep the cross-package surface explicit
  * and auditable.
  *
- * Validation functions (Zod schemas) are NOT exported here. Consumers
- * that need runtime validation should import directly from
- * `rex/src/schema/validate.js` to avoid forcing Zod as a transitive
- * dependency on type-only consumers.
+ * Zod schemas are NOT exported here. Consumers that need document
+ * validation should import directly from `rex/src/schema/validate.js`.
+ * The exception is `validateRunSettings`, a plain function every `run`
+ * writer must share so the rules cannot fork.
  *
  * @module rex/public
  */
@@ -153,7 +153,7 @@ export type { LegacyPrdMigrationResult } from "./store/ensure-legacy-prd-migrate
 export type {
   PRDItem, PRDDocument, ItemLevel, ItemStatus, Priority, ResolutionType, RexConfig,
   RequirementCategory, RequirementValidationType, Requirement,
-  FacetDefinition, LoEConfig, ActiveInterval,
+  FacetDefinition, LoEConfig, ActiveInterval, RunSettings,
 } from "./schema/v1.js";
 export {
   SCHEMA_VERSION,
@@ -174,7 +174,12 @@ export {
   isRequirementCategory,
   isValidationType,
   DEFAULT_CONFIG,
+  RUN_SETTING_KEYS,
 } from "./schema/v1.js";
+
+// The one `run` validator every writer shares (MCP, CLI, web, hench).
+export { validateRunSettings } from "./schema/validate.js";
+export type { RunSettingsCheck } from "./schema/validate.js";
 
 // ---- Schema: level helpers --------------------------------------------------
 

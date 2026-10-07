@@ -169,7 +169,9 @@ No additional fields. Epics are containers; detail lives in descendants.
 ```yaml
 acceptanceCriteria:   # list    REQUIRED — may be empty list ([])
   - "Criterion text"
-loe:                  # string  optional — xs | s | m | l | xl (level of effort)
+loe:                  # number  optional — level of effort in engineer-weeks
+loeRationale:         # string  optional — why that estimate
+loeConfidence:        # string  optional — low | medium | high
 ```
 
 ### Task-Level Fields (additional)
@@ -177,10 +179,42 @@ loe:                  # string  optional — xs | s | m | l | xl (level of effor
 ```yaml
 acceptanceCriteria:   # list    REQUIRED — may be empty list ([])
   - "Criterion text"
-loe:                  # string  optional — xs | s | m | l | xl
+loe:                  # number  optional — level of effort in engineer-weeks
+loeRationale:         # string  optional — why that estimate
+loeConfidence:        # string  optional — low | medium | high
+run:                  # object  optional — saved run settings, inline JSON (see below)
 ```
 
-**`loe` values:** `xs` = < 1 day, `s` = 1–3 days, `m` = 3–5 days, `l` = 1–2 weeks, `xl` = > 2 weeks.
+**`loe` is a bare number of engineer-weeks** (e.g. `loe: 0.5`), not a size bucket. Files written earlier may still hold `xs`–`xl` strings or quoted numbers: the parser reads a numeric string as a number and keeps any other string as-is. An invalid `loeConfidence` is dropped on read and write.
+
+**`run` holds the settings saved for running a task.** It is inline JSON in front matter, like every object-valued field, and every key is optional:
+
+```yaml
+run: {"tier":"heavy","models":{"claude":"claude-opus-5-5","codex":"gpt-5.6-sol"},"review":true,"reviewTier":"standard"}
+```
+
+| Key | Type |
+|-----|------|
+| `tier` | `light` \| `standard` \| `heavy` (llm-client `TaskWeight`) — portable intent, resolved per vendor at run time |
+| `models` | object keyed by vendor (`claude`, `codex`, `google`, `local`), each a model id string ≤256 bytes; at least one entry (an empty object is dropped). An exact pin for that vendor only |
+| `provider` | `cli` \| `api` |
+| `permissionMode` | `default` \| `acceptEdits` \| `bypassPermissions` |
+| `review` | boolean |
+| `reviewTier` | same values as `tier`, for the reviewer |
+| `reviewModels` | same shape as `models`, for the reviewer |
+| `reviewOptional` | boolean |
+| `skipTestGate` | boolean (`false` is meaningful: it re-enables a gate hench config skips) |
+| `maxTurns` | integer 1–500 |
+| `tokenBudget` | integer ≥ 0 (`0` = unlimited) |
+| `contextNotes` | string, ≤8 KiB (notes for the agent) |
+
+**Why a tier and not a model id.** Saved settings are vendor-agnostic: a task is often created while connected to one vendor and run under another, and a bare `claude-opus-5-5` means nothing to Codex. So the block carries a portable `tier` plus optional exact `models` pins per vendor. There is no `model` or `reviewModel` key; writers reject them as unknown keys. (The dashboard's launch-time `RunOptions` still carry an explicit model id, because a launch knows its vendor.)
+
+**How `ndx work` will apply it** (resolution lands in PR 3; nothing reads `run` yet). On vendor V the agent model is: CLI `--model` / `--V-model` > `run.models[V]` > `run.tier` (via `llm.tiers.V.<tier>`, then the built-in tier table) > `hench.models.V` > `llm.*` > default. The reviewer: `--review-model` > `run.reviewModels[V]` > `run.reviewTier` > `llm.V.reviewModel` / `llm.reviewModel` > vendor default. `permissionMode`, `provider` and `maxTurns` apply only when the active vendor supports them and are otherwise skipped with a one-line note.
+
+Validation is strict: an unknown key, an unknown vendor name in `models`/`reviewModels`, a wrong type or an out-of-range value is rejected by one shared validator (`validateRunSettings`). An empty block `{}` is the same as no block and is never written. Writers reject bad input; the store itself is lenient. A malformed hand-edited block, or one with keys from a newer ndx, warns on load, round-trips through saves unchanged and never blocks writes to other items; `ndx work` ignores an invalid block with a warning until it is fixed. Launch-time options (workspace, allowDirty, fresh, resetDeferred) are chosen per launch and are never saved.
+
+Writers: MCP `add_item` / `edit_item` (an object replaces the whole block, `null` removes it), `rex update --run='<json>'` (`--run=` or `--run=null` clears it), and, from PR 4, the dashboard's Prepare task Save. `PATCH /api/rex/items/:id` does **not** write `run`.
 
 ---
 
@@ -264,7 +298,7 @@ resolutionDetail: >-
 acceptanceCriteria:
   - "After rebuilding rex or sourcevision, the HTTP MCP server serves updated tool schemas without manual restart"
   - "No impact on active MCP sessions (new sessions get new schemas, existing sessions continue)"
-loe: m
+loe: 1
 description: >-
   The HTTP MCP server holds tool schemas in memory from startup. When rex or
   sourcevision are rebuilt, the running server still serves old schemas. Users
@@ -344,7 +378,7 @@ resolutionDetail: >-
 acceptanceCriteria:
   - "Token Usage is reachable from global nav without being scoped to Rex"
   - "Routing and UI metadata are consistent with other global dashboard sections"
-loe: s
+loe: 0.5
 description: >-
   Make Token Usage a first-class global dashboard destination instead of a
   Rex-scoped view so routing and UI metadata remain consistent across sections.
@@ -822,7 +856,8 @@ The serializer (PRD → folder tree) must:
 13. **Subtasks:** For task items with leaf subtasks, do not generate `## Subtask:` sections. Subtasks are serialized as sibling files/folders, not as sections.
 14. Write atomically: build the entire tree into a temp directory, then rename it into place to prevent partial states.
 15. Preserve unknown frontmatter fields (round-trip fidelity for future extensions).
-16. **Uniqueness enforcement:** Verify that no two sibling items (at any level) have the same slug. If a slug collision is detected, append the item's `-{id6}` suffix (or positional suffix if needed) to resolve it.
+16. **Value encoding:** Strings and other scalars are written as quoted strings; booleans are written bare (`true`/`false`, e.g. `ready: true`); `loe` is written as a bare number. Object-valued fields (plain objects, class instances, null-prototype objects, and objects inside lists) are written as inline JSON, never as `[object Object]`.
+17. **Uniqueness enforcement:** Verify that no two sibling items (at any level) have the same slug. If a slug collision is detected, append the item's `-{id6}` suffix (or positional suffix if needed) to resolve it.
 
 ---
 
@@ -860,7 +895,10 @@ The parser (folder tree → PRD) must:
 | `status` | required | required | required | required | required |
 | `description` | required | required | required | optional | optional |
 | `acceptanceCriteria` | — | required | required | optional | optional |
-| `loe` | — | optional | optional | — | — |
+| `loe` (engineer-weeks, number) | — | optional | optional | — | — |
+| `loeRationale` | — | optional | optional | — | — |
+| `loeConfidence` (`low`, `medium`, `high`) | — | optional | optional | — | — |
+| `run` (saved run settings, inline JSON) | — | optional | optional | — | — |
 | `priority` | optional | optional | optional | optional | optional |
 | `tags` | optional | optional | optional | — | — |
 | `source` | optional | optional | optional | — | — |

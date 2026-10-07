@@ -50,8 +50,24 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, sep } from "node:path";
-import { resolveLayout, resolveNdxHome, type ResolveNdxHomeOptions } from "./layout.js";
+import {
+  NDX_CONTAINER_DIRNAME,
+  relativeToRoot,
+  resolveLayout,
+  resolveNdxHome,
+  type ResolveNdxHomeOptions,
+} from "./layout.js";
 import { toCanonicalJSON } from "./json.js";
+
+/**
+ * The legacy layout's paths, resolved once by name.
+ *
+ * `"."` as the root is not a lookup — an explicit `mode` skips detection, so
+ * nothing touches the disk and what comes back is purely the names. Used only
+ * to spell the two directories in {@link CORE_BLOCKED} without writing them
+ * out here.
+ */
+const LEGACY_LAYOUT = resolveLayout(".", { mode: "legacy" });
 
 // ── Baseline ────────────────────────────────────────────────────────────────
 
@@ -91,8 +107,24 @@ export const GIT_SUBCOMMAND_BASELINE: readonly string[] = [
   "branch", "checkout", "stash", "show", "rev-parse",
 ];
 
-/** Project-state directories every baseline keeps the agent out of. */
-const CORE_BLOCKED = [".hench/**", ".rex/**", ".git/**"];
+/**
+ * Project-state directories every baseline keeps the agent out of.
+ *
+ * Both layouts, because this is matched against whatever path the agent asks
+ * to write: the legacy directories, and the container that holds all three on
+ * a migrated project. Only the legacy spellings were listed before, so on a
+ * `.ndx/` project the guard let the agent write n-dx's own state — the PRD
+ * tree included — which is the one thing every baseline is supposed to forbid.
+ *
+ * `.git/**` stays spelled out: it is git's directory, not one the layout
+ * resolver owns.
+ */
+const CORE_BLOCKED = [
+  `${relativeToRoot(LEGACY_LAYOUT, LEGACY_LAYOUT.henchDir)}/**`,
+  `${relativeToRoot(LEGACY_LAYOUT, LEGACY_LAYOUT.rexDir)}/**`,
+  ".git/**",
+  `${NDX_CONTAINER_DIRNAME}/**`,
+];
 
 const LANGUAGE_BASELINES: Record<string, Pick<GuardBaseline, "allowedCommands"> & { extraBlocked: string[] }> = {
   typescript: {

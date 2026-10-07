@@ -97,8 +97,8 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 - `claim_task` — hold a task for this worktree so other worktrees skip it
 - `release_task` — give back a claim without changing the task's status
 - `update_task_status` — update item status
-- `add_item` — add epic/feature/task/subtask
-- `edit_item` — edit item content (title, description, priority, tags)
+- `add_item` — add epic/feature/task/subtask (optional `run` block of saved run settings: a portable `tier` plus optional per-vendor `models` pins)
+- `edit_item` — edit item content (title, description, priority, tags, `run` — an object replaces the whole saved run block, `null` removes it; tier/models, never a bare model id)
 - `get_item` — full item details with parent chain
 - `move_item` — reparent an item in the PRD tree
 - `merge_items` — consolidate duplicate sibling items

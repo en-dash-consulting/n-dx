@@ -93,11 +93,12 @@ import {
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
-import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
+import { PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
+import { BOOKKEEPING_DIR_PREFIXES } from "../../store/paths.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
-  NDX_CONTAINER_DIRNAME,
   type ExecutionPolicy,
   type RuntimeEvent,
   type PromptSection,
@@ -111,6 +112,7 @@ import {
   initRunRecord,
   captureStartingHead,
   captureBaselineUntracked,
+  captureBaselineDirty,
   runReviewGate,
   finalizeRun,
   recordClaimLoss,
@@ -1431,6 +1433,7 @@ async function runAdversarialReviewPass(
   await rm(reportPath, { force: true }).catch(() => { /* best effort */ });
   await mkdir(dirname(reportPath), { recursive: true });
 
+  const layout = resolveLayout(inv.projectDir);
   const brief = buildReviewBrief({
     taskId: inv.taskId,
     taskTitle: ctx.taskTitle,
@@ -1438,6 +1441,7 @@ async function runAdversarialReviewPass(
     reportPath,
     resumed: !!resumeSessionId,
     autonomous: ctx.autonomous,
+    prdTreeDir: `${relativeToRoot(layout, layout.rexDir)}/${PRD_TREE_DIRNAME}/`,
   });
 
   const envelope = createPromptEnvelope([
@@ -1567,19 +1571,17 @@ async function runAdversarialReviewPass(
     );
   }
 
-  // What the reviewer actually changed, from the snapshot pair. `.rex/` is
-  // the completion-metadata commit's territory and `.hench/` holds the report
-  // itself; neither is a repair. Computed even when the report claims
-  // `fixesApplied: false` — the tree, not the report, is the authority.
+  // What the reviewer actually changed, from the snapshot pair. Rex's state is
+  // the completion-metadata commit's territory and hench's holds the report
+  // itself; neither is a repair — see `BOOKKEEPING_DIR_PREFIXES`. Computed even
+  // when the report claims `fixesApplied: false` — the tree, not the report, is
+  // the authority.
   let repairedFiles: string[] | undefined;
   if (preReviewState) {
     try {
       const postReviewState = await snapshotDirtyState(inv.projectDir);
       repairedFiles = diffDirtyState(preReviewState, postReviewState).filter(
-        (path) =>
-          !path.startsWith(".rex/") &&
-          !path.startsWith(".hench/") &&
-          !path.startsWith(`${NDX_CONTAINER_DIRNAME}/`),
+        (path) => !BOOKKEEPING_DIR_PREFIXES.some((prefix) => path.startsWith(prefix)),
       );
     } catch {
       repairedFiles = undefined;
@@ -2100,6 +2102,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Snapshot untracked files before the agent runs, so a rollback removes only
   // the files the agent creates — never the user's pre-existing work (#303).
   const baselineUntracked = await captureBaselineUntracked(projectDir);
+  // Snapshot everything already dirty, so the run's own work can be told
+  // apart from the operator's at commit time (see stageRunWork).
+  const baselineDirty = await captureBaselineDirty(projectDir);
 
   const retryConfig: RetryConfig = config.retry ?? {
     maxRetries: 3,
@@ -2137,11 +2142,24 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     else delete run.vendorPid;
   });
 
-  // Start the commit-message watcher. If the agent writes `.hench-commit-msg.txt`
-  // and the run terminates before the normal commit-prompt flow can process it
-  // (timeout, crash), the timer fires and auto-commits the staged changes.
-  // The watcher is cancelled before finalizeRun so the two paths cannot race.
-  const commitMsgTimeoutMs = config.commitMsgTimeoutMs ?? 300_000;
+  // Start the commit-message watcher.
+  //
+  // Off by default (`hench.commitMsgTimeoutMs` 0), and the default is the
+  // whole point. Armed, this timer fires mid-run and commits whatever is
+  // staged at that instant — before the test gate, before the
+  // uncommitted-work gate, before the completion is written. That is a
+  // commit made ahead of any verification that the task is done, and it
+  // stages nothing itself: not the PRD paths, not the review repairs. Worse,
+  // `didAutoCommit()` then short-circuits performCommitPromptIfNeeded, so
+  // the completion write never reaches a commit at all and the next run's
+  // pre-run gate inherits it.
+  //
+  // What it was for was a run that dies after the agent staged its work but
+  // before finalization. That case is covered without committing early: the
+  // uncommitted-work gate refuses to record the task done, and the next
+  // run's pre-run commit gate offers the leftovers as a checkpoint. Set a
+  // positive timeout to restore the timer, knowing it commits unverified.
+  const commitMsgTimeoutMs = config.commitMsgTimeoutMs ?? 0;
   const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher({
     projectDir,
     timeoutMs: commitMsgTimeoutMs,
@@ -2764,6 +2782,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     skipFullTestGate: config.skipFullTestGate,
     commitWatcher,
     baselineUntracked,
+    baselineDirty,
     startingHead,
     reviewOptional: opts.reviewOptional,
   });

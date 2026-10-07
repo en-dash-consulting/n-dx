@@ -198,6 +198,70 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
             "type": "string"
           },
           "description": "IDs of blocking items"
+        },
+        "run": {
+          "type": "object",
+          "properties": {
+            "tier": {
+              "type": "string",
+              "enum": [
+                "light",
+                "standard",
+                "heavy"
+              ]
+            },
+            "models": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "provider": {
+              "type": "string",
+              "enum": [
+                "cli",
+                "api"
+              ]
+            },
+            "permissionMode": {
+              "type": "string",
+              "enum": [
+                "default",
+                "acceptEdits",
+                "bypassPermissions"
+              ]
+            },
+            "review": {
+              "type": "boolean"
+            },
+            "reviewTier": {
+              "$ref": "#/properties/run/properties/tier"
+            },
+            "reviewModels": {
+              "$ref": "#/properties/run/properties/models"
+            },
+            "reviewOptional": {
+              "type": "boolean"
+            },
+            "skipTestGate": {
+              "type": "boolean"
+            },
+            "maxTurns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "tokenBudget": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "contextNotes": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."
         }
       },
       "required": [
@@ -213,7 +277,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
   },
   {
     "name": "edit_item",
-    "description": "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags). Use for content changes — use update_task_status for status/lifecycle transitions.",
+    "description": "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -273,6 +337,77 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
             "type": "string"
           },
           "description": "New blocked-by IDs"
+        },
+        "run": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "tier": {
+                  "type": "string",
+                  "enum": [
+                    "light",
+                    "standard",
+                    "heavy"
+                  ]
+                },
+                "models": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "provider": {
+                  "type": "string",
+                  "enum": [
+                    "cli",
+                    "api"
+                  ]
+                },
+                "permissionMode": {
+                  "type": "string",
+                  "enum": [
+                    "default",
+                    "acceptEdits",
+                    "bypassPermissions"
+                  ]
+                },
+                "review": {
+                  "type": "boolean"
+                },
+                "reviewTier": {
+                  "$ref": "#/properties/run/anyOf/0/properties/tier"
+                },
+                "reviewModels": {
+                  "$ref": "#/properties/run/anyOf/0/properties/models"
+                },
+                "reviewOptional": {
+                  "type": "boolean"
+                },
+                "skipTestGate": {
+                  "type": "boolean"
+                },
+                "maxTurns": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                },
+                "tokenBudget": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "contextNotes": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Vendor-agnostic keys: tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id}), provider, permissionMode, review, reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."
         }
       },
       "required": [

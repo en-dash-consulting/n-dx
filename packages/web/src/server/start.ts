@@ -57,12 +57,16 @@ import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { ALL_DATA_FILES, stripWorkspaceSlot, urlWithToken } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
+import { resolveWebPaths } from "./paths.js";
 import { handleRequestSecurity } from "./request-security.js";
 
 /**
- * File written by the server process to communicate the actual port it bound to.
- * Used by the orchestrator (web.js) to discover the port in background mode,
- * where the server's stdout is not available.
+ * The port marker's name on the legacy layout.
+ *
+ * Kept as public API, but no longer where the server writes: the marker
+ * moved into `.ndx/` with the rest of the layout, so the write site asks
+ * `resolveWebPaths` (`./paths.ts`), which answers this name on a legacy
+ * project and `.ndx/web.port` on a migrated one.
  */
 export const PORT_FILE = ".n-dx-web.port";
 const LOOPBACK_HOST = "127.0.0.1";
@@ -1200,7 +1204,11 @@ export async function startServer(
     server.listen(actualPort, LOOPBACK_HOST, async () => {
       // Write port file so the orchestrator can discover the actual port
       // (especially important in background mode where stdout is unavailable).
-      const portFilePath = join(absDir, PORT_FILE);
+      // Resolved, not `PORT_FILE` joined to the root: core's `web.js` waits on
+      // the resolver's answer, so on a `.ndx/` project a root-level file is
+      // one nobody reads — `ndx start --background` then times out and
+      // reports the requested port instead of the one actually bound.
+      const portFilePath = resolveWebPaths(absDir).portFile;
       try {
         await writeFile(portFilePath, String(actualPort) + "\n", "utf-8");
       } catch {

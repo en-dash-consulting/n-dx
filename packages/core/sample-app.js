@@ -2,6 +2,7 @@ import { join, resolve } from "node:path";
 import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync, statSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { dim, cyan, green } from "./cli-brand.js";
+import { resolveLayout } from "./layout.js";
 
 // Helper to write a file, creating its parent directories if needed
 function writeFileEnsureDir(filePath, content) {
@@ -148,7 +149,7 @@ function generatePrdMarkdown(item) {
 export async function handleInstallSample(rest) {
   const targetDir = rest[0] ? resolve(process.cwd(), rest[0]) : process.cwd();
   const sampleDir = join(targetDir, "sample-app");
-  const prdTreeDir = join(targetDir, ".rex", "prd_tree");
+  const prdTreeDir = join(resolveLayout(targetDir).rexDir, "prd_tree");
 
   console.log(`\n${cyan("n-dx")} installing sample app into ${dim(sampleDir)}...`);
 
@@ -219,7 +220,7 @@ export async function handleInstallSample(rest) {
 export async function handleDestroySample(rest) {
   const targetDir = rest[0] ? resolve(process.cwd(), rest[0]) : process.cwd();
   const sampleDir = join(targetDir, "sample-app");
-  const prdTreeDir = join(targetDir, ".rex", "prd_tree");
+  const prdTreeDir = join(resolveLayout(targetDir).rexDir, "prd_tree");
 
   console.log(`\n${cyan("n-dx")} destroying sample app...`);
 

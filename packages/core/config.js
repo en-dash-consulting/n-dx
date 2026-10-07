@@ -1721,6 +1721,21 @@ Rex settings (.rex/config.json):
   rex.sourcevision         string    Sourcevision integration mode (default: "auto")
   rex.model                string    LLM model for analysis (optional)
 
+Rex performance settings (both default false — the previous path stays the
+default until the faster one is chosen deliberately; override either for a
+single command with REX_FAST_READS / REX_FAST_WRITES):
+  rex.performance.fastReads   boolean  Read the PRD once per command instead of
+                                       three times. The extra parses came from a
+                                       merge written when the store and the folder
+                                       tree were different backends; they are the
+                                       same parse now (default: false)
+  rex.performance.fastWrites  boolean  Write only the files a single-item update
+                                       changes — the item's index.md and its
+                                       parent's children table — instead of
+                                       re-serializing the whole tree. Falls back to
+                                       the full write whenever the change could move
+                                       a file, such as a retitle (default: false)
+
 Rex budget settings (token/cost usage limits):
   rex.budget.tokens        number    Max total tokens (input+output), 0 = unlimited
   rex.budget.cost          number    Max estimated cost in USD, 0 = unlimited
@@ -1743,7 +1758,8 @@ Hench settings (.hench/config.json):
   hench.maxTokens          number    Max tokens per API request (default: 8192)
   hench.tokenBudget        number    Total tokens per run, input+cached+output (default: 0 —
                                      unlimited). A run stops once it crosses this.
-  hench.rexDir             string    Path to .rex directory (default: ".rex")
+  hench.rexDir             string    Path to the rex PRD directory (default: the project's
+                                     resolved rex directory — .rex, or .ndx/rex on the new layout)
   hench.apiKeyEnv          string    Env variable for API key (default: "ANTHROPIC_API_KEY")
   hench.claudePath         string    Path to the Claude Code binary. Falls back to "claude" on
                                      PATH. Prefer claude.cli_path, which is shared across packages.
@@ -1858,8 +1874,20 @@ Hench test-gate settings (mandatory full-suite gate before commit):
                                      is also using the machine, and a timeout aborts a task whose
                                      work is already done. Prefer raising this over skipping the
                                      gate.
-  hench.commitMsgTimeoutMs number    How long the commit-message generation call may run before it
-                                     is killed (default: 300000 — 5 minutes; 0 means no limit)
+  hench.commitMsgTimeoutMs number    Mid-run auto-commit timer, armed when the agent writes
+                                     .hench-commit-msg.txt. On expiry it commits whatever is
+                                     staged at that moment — before the test gate, the
+                                     uncommitted-work gate, or the completion write. Default 0
+                                     (disabled), so the only commit happens after the task is
+                                     verified complete.
+  hench.promptAgentToMarkInProgress
+                           boolean   Keep the workflow step telling the agent to mark its task
+                                     in_progress via rex_update_status (default: false). Hench
+                                     makes that transition itself before the agent starts, so
+                                     the step costs a tool round trip and rewrites a value
+                                     already on disk. The completion step is unaffected — that
+                                     call is a request rex parks on the task claim, and it
+                                     carries the resolution hench applies after the test gate.
 
 Hench git-safety settings (pre-run commit gate):
   hench.git.checkpointThreshold  number    Lines-changed threshold at/above which the pre-run
@@ -1872,6 +1900,14 @@ Hench git-safety settings (pre-run commit gate):
                                            non-interactive runs abort (default: false)
                                            The --allow-dirty flag overrides both settings for
                                            one run (flag > config > defaults).
+  hench.git.commitMessage        string    Where the gate's proposed commit subject comes
+                                           from: "deterministic" (default) builds it from the
+                                           dirty file list, e.g.
+                                           "chore(rex,web): pre-run checkpoint, 12 files,
+                                           340 lines"; "llm" asks a light-tier model to
+                                           summarise the diff instead. Only reached on the
+                                           attended path — the gate prompts, and so proposes
+                                           a subject, solely in an interactive TTY session.
 
 Hench guard settings (security boundaries):
   hench.guard.blockedPaths       string[]  Glob patterns for blocked file paths
@@ -2764,7 +2800,7 @@ async function handleSetProjectSection(
   // Automatically persist hench.provider=api so `ndx work` never emits the
   // "vendor=local requires API mode — To persist: ndx config hench.provider api" hint.
   if (pkg === "llm" && settingPath === "vendor" && (coerced === LLM_VENDOR.LOCAL || coerced === LLM_VENDOR.GOOGLE)) {
-    const henchConfigPath = join(dir, ".hench", "config.json");
+    const henchConfigPath = join(resolveLayout(dir).henchDir, "config.json");
     try {
       if (await fileExists(henchConfigPath)) {
         const henchConfig = await loadJSON(henchConfigPath);

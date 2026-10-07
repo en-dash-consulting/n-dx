@@ -13,6 +13,8 @@
  * cannot drift, and `validateConfigKeyValue` gives them one gate.
  */
 
+import { PROJECT_DIRS } from "@n-dx/llm-client";
+
 /**
  * Config field metadata for the UI and for write validation.
  *
@@ -50,6 +52,12 @@ export interface ConfigFieldInfo {
    * is right for the common case. `guard.blockedPaths` and
    * `guard.allowedCommands` differ wholesale rather than in one number, so they
    * record nothing rather than record something wrong.
+   *
+   * The `git.*` rows record nothing for a different reason: the group is absent
+   * from `DEFAULT_HENCH_CONFIG()` entirely, so no value inside it survives a
+   * parse of the defaults. Hench applies those defaults at the use site instead
+   * (`DEFAULT_CHECKPOINT_THRESHOLD`, `DEFAULT_GIT_COMMIT_MESSAGE_SOURCE`), which
+   * is not a surface the contract test can pin a row against.
    */
   defaultValue?: unknown;
 }
@@ -96,7 +104,7 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
 
   // ── Task selection ──
   { path: "maxFailedAttempts", label: "Max Failed Attempts", description: "Consecutive failures before a task is considered stuck", type: "number", integer: true, positive: true, category: "task-selection", defaultValue: 3 },
-  { path: "rexDir", label: "Rex Directory", description: "Path to the .rex directory for task data", type: "string", category: "task-selection", defaultValue: ".rex" },
+  { path: "rexDir", label: "Rex Directory", description: "Path to the rex PRD directory for task data", type: "string", category: "task-selection", defaultValue: PROJECT_DIRS.REX },
 
   // ── Retry policy ──
   { path: "retry.maxRetries", label: "Max Retries", description: "Number of retry attempts for transient API errors", type: "number", integer: true, category: "retry", defaultValue: 3 },
@@ -115,9 +123,11 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
   // ── Git safety ──
   { path: "rollbackOnFailure", label: "Rollback on Failure", description: "Revert uncommitted changes when a run fails", type: "boolean", category: "git" },
   { path: "autoCommit", label: "Auto Commit", description: "Let the agent commit itself at the end of a run", type: "boolean", category: "git", defaultValue: false },
-  { path: "commitMsgTimeoutMs", label: "Commit Message Timeout (ms)", description: "How long the commit-message generation call may run. 0 means no limit", type: "number", integer: true, category: "git", defaultValue: 300000 },
+  { path: "promptAgentToMarkInProgress", label: "Agent Marks In Progress", description: "Keep the workflow step asking the agent to set in_progress. Hench already does it before the agent starts, so the step is a duplicate write", type: "boolean", category: "execution", defaultValue: false },
+  { path: "commitMsgTimeoutMs", label: "Mid-run Auto-commit Timer (ms)", description: "Commits whatever is staged this long after the agent writes its commit message, before the task is verified complete. 0 (default) disables it", type: "number", integer: true, category: "git", defaultValue: 0 },
   { path: "git.checkpointThreshold", label: "Checkpoint Threshold (lines)", description: "Lines changed at/above which the pre-run gate defaults to committing a checkpoint. 0 disables", type: "number", integer: true, category: "git" },
   { path: "git.requireCleanTree", label: "Require Clean Tree", description: "Refuse to start runs against a dirty working tree", type: "boolean", category: "git" },
+  { path: "git.commitMessage", label: "Pre-run Commit Subject", description: "Where the pre-run gate's proposed subject comes from: built from the changed file list, or summarised by a light-tier model", type: "enum", enumValues: ["deterministic", "llm"], category: "git" },
 
   // ── Guard rails ──
   { path: "guard.blockedPaths", label: "Blocked Paths", description: "Glob patterns for paths the agent cannot modify", type: "array", category: "guard" },

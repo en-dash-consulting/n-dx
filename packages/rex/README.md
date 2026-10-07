@@ -265,7 +265,7 @@ The MCP server exposes eighteen tools and three resources.
 | `release_task` | Give back a claim without changing the task's status |
 | `add_item` | Create a new PRD item with full metadata |
 | `get_item` | Get item details and parent chain by ID |
-| `edit_item` | Edit item content (title, description, priority, tags) |
+| `edit_item` | Edit item content (title, description, priority, tags, `run`); a `run` object replaces the whole saved block, `null` removes it |
 | `move_item` | Reparent an item in the PRD tree |
 | `merge_items` | Consolidate duplicate sibling items |
 | `get_recommendations` | SourceVision-based recommendations |

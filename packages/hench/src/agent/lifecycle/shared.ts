@@ -16,13 +16,14 @@
 
 import { randomUUID } from "node:crypto";
 import { trustSummaryForRun } from "../../store/trust.js";
-import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
+import { evaluateRepoTrust, resolveLayout } from "../../prd/llm-gateway.js";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
-import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
+import { DEFAULT_CHECKPOINT_THRESHOLD, DEFAULT_GIT_COMMIT_MESSAGE_SOURCE } from "../../schema/index.js";
+import type { GitCommitMessageSource } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { exec, getCurrentHead, execStdout } from "../../process/exec.js";
@@ -36,7 +37,12 @@ import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
 import type { PromptEnvelope } from "../../prd/llm-gateway.js";
-import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
+import {
+  excludeHenchRuntimeArtifacts,
+  matchesProjectPath,
+  parsePorcelainPath,
+  repoRelativePrefix,
+} from "../../store/artifacts.js";
 import { saveRun } from "../../store/runs.js";
 import { ensureRunLogsIgnored, openRunLog, persistRunLog, type RunLogWriter } from "../../store/run-log.js";
 import {
@@ -54,6 +60,7 @@ import { commitReviewRepairs } from "../analysis/review-repairs.js";
 import { formatMissingReviewRefusal, reviewNeverRan } from "../analysis/adversarial-review.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
+import { buildPreRunCommitSubject } from "./pre-run-commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS, OUTPUT_TAIL_LINES } from "../../tools/test-runner.js";
@@ -736,6 +743,107 @@ export async function captureBaselineUntracked(projectDir: string): Promise<stri
   return listUntrackedPaths(projectDir);
 }
 
+/**
+ * Capture every dirty path present BEFORE the agent runs.
+ *
+ * This is the "not mine" list for {@link stageRunWork}: a path already dirty
+ * when the run started is the operator's, not the run's, and staging it would
+ * fold their unfinished work into the task's commit. Usually empty — the
+ * pre-run commit gate refuses to start an autonomous run against a dirty tree
+ * — but `--allow-dirty` and `hench.git.requireCleanTree: false` both permit
+ * it, and those are exactly the cases where getting this wrong costs someone
+ * their work.
+ *
+ * Paths are repository-relative, as `git status --porcelain` reports them.
+ * Returns `[]` when the tree is clean or git is unavailable; an empty baseline
+ * correctly means "everything dirty at the end is the run's".
+ */
+export async function captureBaselineDirty(projectDir: string): Promise<string[]> {
+  const lines = await excludeHenchRuntimeArtifacts(await listDirtyPaths(projectDir), projectDir);
+  return lines.map(parsePorcelainPath);
+}
+
+/** What {@link stageRunWork} did, for the caller to report or fail on. */
+export interface StageRunWorkResult {
+  /** Repository-relative paths newly staged by this call. */
+  staged: string[];
+  /** Set when a `git add` failed; the caller decides whether that is fatal. */
+  error?: Error;
+}
+
+/**
+ * Stage the work this run produced, so the commit contains all of it.
+ *
+ * WHY THIS EXISTS. The commit only ever contained what the *agent* had
+ * staged: the prompt tells it to `git add -- <path...>` naming each path, and
+ * any file it forgot was simply absent from the commit. The uncommitted-work
+ * gate downstream would then refuse the completion and fail a run whose work
+ * was finished and correct — or, when something committed ahead of the gate,
+ * the task was recorded complete with files left behind. Asking the agent to
+ * enumerate its own side effects correctly, every time, is the part that does
+ * not hold; the filesystem already knows the answer.
+ *
+ * WHAT IT WILL NOT STAGE, and why each exclusion is load-bearing:
+ *
+ * - **Anything dirty before the run started** (`baselineDirty`). That is the
+ *   operator's work in progress. This is the one rule that keeps "stage the
+ *   rest" from meaning `git add -A`, which is explicitly what the agent is
+ *   told never to do.
+ * - **Hench's own runtime artifacts**, including `.hench-commit-msg.txt`
+ *   itself — committing the sentinel would be absurd, and the run-logs are
+ *   gitignored by `hench init` anyway.
+ * - **The PRD paths.** `performCommitPromptIfNeeded` stages those itself
+ *   after writing the completion, so that the status transition and the code
+ *   land together. Staging them here would capture the PRD as it was
+ *   *before* the completion was written.
+ *
+ * Deliberately additive: it never unstages anything, so work the agent did
+ * stage is untouched and this only ever closes the gap.
+ *
+ * @param projectDir     The run's working directory.
+ * @param baselineDirty  Dirty paths from {@link captureBaselineDirty}.
+ *                       Undefined means no baseline was captured, and nothing
+ *                       is staged — an unknown baseline cannot distinguish
+ *                       the run's work from the operator's.
+ */
+export async function stageRunWork(
+  projectDir: string,
+  baselineDirty: string[] | undefined,
+): Promise<StageRunWorkResult> {
+  if (baselineDirty === undefined) return { staged: [] };
+
+  const dirtyNow = await excludeHenchRuntimeArtifacts(
+    await listDirtyPaths(projectDir),
+    projectDir,
+  );
+  if (dirtyNow.length === 0) return { staged: [] };
+
+  const preexisting = new Set(baselineDirty);
+  const repoPrefix = await repoRelativePrefix(projectDir);
+
+  const candidates = dirtyNow
+    .map(parsePorcelainPath)
+    .filter((path) => !preexisting.has(path))
+    .filter((path) => !matchesProjectPath(path, PRD_COMMIT_PATHS, repoPrefix));
+
+  if (candidates.length === 0) return { staged: [] };
+
+  try {
+    // One `git add` per path, pathspec-literal: a path is a path here, never
+    // a glob, and a file genuinely named with a bracket or star must stage as
+    // itself. `--` additionally stops a leading-dash filename reading as a
+    // flag. Deletions stage as deletions, which is what `git add` does for a
+    // missing file given explicitly.
+    for (const path of candidates) {
+      await execGitMutation(projectDir, ["add", "--", `:(literal)${path}`], 15_000);
+    }
+  } catch (err) {
+    return { staged: [], error: err as Error };
+  }
+
+  return { staged: candidates };
+}
+
 // ---------------------------------------------------------------------------
 // Review gate (identical in both loops)
 // ---------------------------------------------------------------------------
@@ -1132,6 +1240,17 @@ export interface FinalizeRunOptions {
    * an untracked file that was already there is the user's, not the run's.
    */
   baselineUntracked?: string[];
+  /**
+   * Every path dirty before the run started (via
+   * {@link captureBaselineDirty}).
+   *
+   * The "not mine" list for {@link stageRunWork}: anything already dirty is
+   * the operator's and is never staged into the task's commit. Omitting it
+   * disables that staging entirely — an unknown baseline cannot tell the
+   * run's work from the operator's, and guessing is how someone's
+   * work-in-progress ends up inside a task commit.
+   */
+  baselineDirty?: string[];
   /**
    * Commit the run started from (via {@link captureStartingHead}).
    *
@@ -1679,6 +1798,27 @@ async function promptPreRunCommitChoice(opts: PreRunPromptOptions): Promise<PreR
   return resolvePreRunCommitAnswer(answer, opts);
 }
 
+/** What the deterministic subject builder needs from the gate. */
+export interface PreRunSubjectContext {
+  /** Project-relative paths of every dirty file, runtime artifacts already discounted. */
+  paths: readonly string[];
+  /** Lines changed against HEAD, from the same measurement the gate reports. */
+  counts?: { linesChanged: number };
+  /** The `hench.git.commitMessage` setting, when the caller passed one. */
+  source?: GitCommitMessageSource | undefined;
+}
+
+/**
+ * Which subject source to use. Absent config means the default, which is
+ * deterministic — the switch exists to restore the model call, not to
+ * enable it.
+ */
+function resolveCommitMessageSource(
+  source: GitCommitMessageSource | undefined,
+): GitCommitMessageSource {
+  return source ?? DEFAULT_GIT_COMMIT_MESSAGE_SOURCE;
+}
+
 /**
  * Confirm a discard. Defaults to No: of the five answers this is the only one
  * that destroys work, so it is the only one that costs a second keystroke.
@@ -1709,7 +1849,23 @@ export async function proposePreRunCommitMessage(
   diff: ReviewDiff,
   henchDir: string,
   model?: string,
+  context?: PreRunSubjectContext,
 ): Promise<string> {
+  // Default path: compute the subject from the file list. No provider, no
+  // credentials, no round trip before the prompt can be shown. See
+  // `pre-run-commit-subject.ts` for why a model adds nothing here that is
+  // worth those costs.
+  if (resolveCommitMessageSource(context?.source) === "deterministic") {
+    const paths = context?.paths ?? [];
+    if (paths.length > 0) {
+      return buildPreRunCommitSubject(paths, context?.counts);
+    }
+    // No path list to describe — only happens through an injected test seam
+    // or a caller predating `context`. The generic message is still better
+    // than an empty subject.
+    return PRE_RUN_COMMIT_FALLBACK_MESSAGE;
+  }
+
   try {
     const llmConfig = await loadLLMConfig(henchDir);
     const provider = defaultRegistry.getActiveProvider(llmConfig);
@@ -2303,6 +2459,13 @@ export interface PreRunCommitGateOptions {
    */
   requireCleanTree?: boolean;
   /**
+   * Where the proposed commit subject comes from, from
+   * `hench.git.commitMessage`. Omitted means the default, which is
+   * {@link DEFAULT_GIT_COMMIT_MESSAGE_SOURCE} — computed from the dirty
+   * file list rather than asked of a model.
+   */
+  commitMessageSource?: GitCommitMessageSource;
+  /**
    * Checkout the invocation started in, captured by the caller immediately
    * before this gate runs. The gate refuses to commit when the working tree
    * has moved to another branch or worktree since. Omitted (or empty, outside
@@ -2314,7 +2477,7 @@ export interface PreRunCommitGateOptions {
     listDirty?: (dir: string) => Promise<string[]>;
     measureMagnitude?: (dir: string) => Promise<ChangeMagnitude>;
     collectDiff?: (dir: string) => Promise<ReviewDiff>;
-    proposeMessage?: (diff: ReviewDiff, henchDir: string, model?: string) => Promise<string>;
+    proposeMessage?: (diff: ReviewDiff, henchDir: string, model?: string, context?: PreRunSubjectContext) => Promise<string>;
     promptChoice?: (promptOpts: PreRunPromptOptions) => Promise<PreRunCommitChoice>;
     confirmDiscard?: (fileCount: number) => Promise<boolean>;
     commit?: (dir: string, message: string) => Promise<void>;
@@ -2428,7 +2591,11 @@ export async function performPreRunCommitGateIfNeeded(
   }
 
   const diff = await collectDiff(projectDir);
-  const proposed = await proposeMessage(diff, henchDir, model);
+  const proposed = await proposeMessage(diff, henchDir, model, {
+    paths: dirty,
+    counts: { linesChanged: magnitude.linesChanged },
+    source: opts.commitMessageSource,
+  });
 
   section("Uncommitted changes detected");
   subsection("Changes");
@@ -2790,7 +2957,7 @@ export async function performCommitPromptIfNeeded(
       // Load project config to get public URL
       let publicUrl = "http://localhost:3117"; // default fallback
       try {
-        const configPath = join(projectDir, ".n-dx.json");
+        const configPath = resolveLayout(projectDir).configFile;
         if (pathExists(configPath)) {
           const configContent = readConfigFile(configPath, "utf-8");
           const config = JSON.parse(configContent) as Record<string, unknown>;
@@ -3693,6 +3860,37 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   //   work with no message file is the #363 leak wearing an `A ` prefix.
   //
   // Anything else is finished work with no owner.
+  // Stage the run's own work before the gate inspects the tree.
+  //
+  // Order matters and is the whole point. The gate's job is to refuse a
+  // completion claim while finished work sits uncommitted; it is not to
+  // punish the agent for an incomplete `git add`. Staging first means the
+  // gate sees the run's work as staged — so it passes, and the commit below
+  // carries all of it — while anything that is *not* the run's work (the
+  // operator's pre-existing edits, which `stageRunWork` excludes by
+  // baseline) is still dirty and still refused, exactly as before.
+  //
+  // Only on the commit-prompt path: with autoCommit the agent has already
+  // committed, and staging more here would hand the next commit files the
+  // executor deliberately left out.
+  if (run.status === "completed" && opts.autoCommit !== true) {
+    const staged = await stageRunWork(projectDir, opts.baselineDirty);
+    if (staged.error) {
+      // Not fatal on its own. The gate below is about to look at the same
+      // tree and will refuse if this failure actually left work behind, with
+      // a message that names the paths — which beats failing here with a git
+      // error and no list.
+      detail(`Warning: could not stage the run's work: ${staged.error.message}`);
+      if (run.diagnostics) {
+        run.diagnostics.notes.push(`stage_run_work_failed: ${staged.error.message}`);
+      }
+    } else if (staged.staged.length > 0) {
+      detail(
+        `Staged ${staged.staged.length} file(s) the run changed but the agent had not staged`,
+      );
+    }
+  }
+
   let uncommittedWorkRefused = false;
   if (run.status === "completed") {
     const autoCommit = opts.autoCommit === true;

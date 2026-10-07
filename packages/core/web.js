@@ -59,23 +59,48 @@ import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
 
 const DEFAULT_PORT = 3117;
-const PID_FILE = ".n-dx-web.pid";
-const PORT_FILE = ".n-dx-web.port";
 
 // ── Preview mode ─────────────────────────────────────────────────────────────
 // `ndx start --preview` runs a second, stateless server that serves a static UI
 // layout document (packages/web/src/preview/index.html) with live reload. It is
 // meant to run *alongside* a real dashboard, so it keeps its own port and its own
-// pid/port files: sharing `.n-dx-web.pid` would make either server's stop command
-// kill the other one.
+// pid/port files: sharing the dashboard's pid file would make either server's
+// stop command kill the other one.
 const DEFAULT_PREVIEW_PORT = 3118;
 const PREVIEW_PID_FILE = ".n-dx-preview.pid";
 const PREVIEW_PORT_FILE = ".n-dx-preview.port";
 
-/** State-file names for the dashboard server. */
-const DASHBOARD_FILES = { pid: PID_FILE, port: PORT_FILE };
-/** State-file names for the preview server — deliberately disjoint from the above. */
-const PREVIEW_FILES = { pid: PREVIEW_PID_FILE, port: PREVIEW_PORT_FILE };
+/**
+ * A server's state-file paths in a project.
+ *
+ * A function of the project rather than a pair of names, because the
+ * dashboard's markers moved into `.ndx/` with everything else: where they live
+ * is the resolver's answer, and only it knows which layout `dir` is on. The
+ * `files` parameter threaded through the functions below selects *which*
+ * server's markers, not where they sit.
+ *
+ * @callback ServerFiles
+ * @param {string} dir  Project root.
+ * @returns {{pid: string, port: string}}  Absolute paths.
+ */
+
+/** @type {ServerFiles} State-file paths for the dashboard server. */
+const DASHBOARD_FILES = (dir) => {
+  const { webPidFile, webPortFile } = resolveLayout(dir);
+  return { pid: webPidFile, port: webPortFile };
+};
+
+/**
+ * @type {ServerFiles} State-file paths for the preview server — deliberately
+ * disjoint from the dashboard's. The preview writes nothing under `.rex/` or
+ * `.sourcevision/` and is not part of a project's n-dx state, so its two
+ * markers stay at the project root under both layouts and the resolver does
+ * not own them.
+ */
+const PREVIEW_FILES = (dir) => ({
+  pid: join(dir, PREVIEW_PID_FILE),
+  port: join(dir, PREVIEW_PORT_FILE),
+});
 
 // Mirrors the server's own fallback allocator (PORT_RANGE_START / PORT_RANGE_END
 // in packages/web/src/server/port.ts). Duplicated rather than imported: this is
@@ -88,6 +113,9 @@ const MAX_PORT = 65535;
 
 /** Ceiling on the port probe: a dashboard answers /api/status in single-digit ms. */
 const PROBE_TIMEOUT_MS = 1_500;
+
+/** Ceiling on waiting for a --background server to listen; cut short if it dies. */
+const BACKGROUND_READY_TIMEOUT_MS = 30_000;
 
 /** Cap on the probe response we will buffer — the real payload is a few KB. */
 const PROBE_MAX_BYTES = 256 * 1024;
@@ -115,10 +143,10 @@ async function fileExists(path) {
 }
 
 /**
- * Load the project .n-dx.json and return the web.port if configured.
+ * Load the project config and return the web.port if configured.
  */
 async function loadConfigPort(dir) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = resolveLayout(dir).configFile;
   if (!(await fileExists(configPath))) return undefined;
   try {
     const raw = await readFile(configPath, "utf-8");
@@ -282,6 +310,44 @@ export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS, path = "
 }
 
 /**
+ * Does `port` answer like an n-dx server that wants a token we do not have?
+ *
+ * Both the dashboard and the hub refuse a token-less request with 401 and
+ * `WWW-Authenticate: Bearer realm="n-dx"` (request-security.ts and
+ * hub/request-guard.ts). Such a server answers every probe 401, so
+ * {@link probeStatusEndpoint} returns null and {@link probeHubEndpoint} finds
+ * no hub — which used to send it down the kill path. A dashboard started under
+ * another home's token (another user, another N_DX_HOME, a parallel test) is
+ * not this invocation's to kill unless {@link findOwnDashboardOnPort} shows it
+ * is this directory's own server.
+ *
+ * @param {number} port
+ * @param {number} [timeoutMs]
+ * @returns {Promise<boolean>}
+ */
+export function probeTokenProtectedNdx(port, timeoutMs = PROBE_TIMEOUT_MS) {
+  return new Promise((res) => {
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      res(value);
+    };
+    const req = httpGet({ host: "127.0.0.1", port, path: "/api/status", timeout: timeoutMs }, (response) => {
+      const challenge = String(response.headers["www-authenticate"] ?? "");
+      response.resume();
+      req.destroy();
+      done(response.statusCode === 401 && /realm="n-dx"/.test(challenge));
+    });
+    req.on("timeout", () => {
+      req.destroy();
+      done(false);
+    });
+    req.on("error", () => done(false));
+  });
+}
+
+/**
  * Who is on the port, according to its /api/status response.
  *
  * @typedef {{ kind: "peer", projectDir: string }
@@ -425,6 +491,74 @@ export function listenerPidsOnPort(port) {
 }
 
 /**
+ * The project directory a dashboard process was told to serve, read from its
+ * command line, or null when the line is not a dashboard's.
+ *
+ * runWeb launches the server as `<web cli> serve --port=N <absDir>`, optionally
+ * followed by `--token-file=<path>` and `--debug`/`--verbose` (see serveArgs
+ * there). `ps` joins argv with spaces, so a directory containing spaces is
+ * recovered by anchoring on that known tail rather than by splitting.
+ *
+ * @param {string} commandLine  Space-joined argv, as `ps -o args=` prints it.
+ * @returns {string | null}
+ */
+export function servedDirFromCommandLine(commandLine) {
+  const m = /(?:^|\s)serve --port=\d+ (.+?)(?: --token-file=.*?)?(?: --(?:debug|verbose))?$/.exec(commandLine.trim());
+  return m ? m[1] : null;
+}
+
+/**
+ * Owner uid and command line of `pid`, or null where they cannot be read.
+ *
+ * POSIX only, through `ps` (macOS and Linux both accept these flags; `-ww`
+ * stops the line being cut at the terminal width). Windows returns null: its
+ * command-line query differs per release, and null means "unidentified",
+ * which leaves the occupant running.
+ *
+ * @param {number} pid
+ * @returns {{ uid: number, commandLine: string } | null}
+ */
+function readProcessIdentity(pid) {
+  if (process.platform === "win32") return null;
+  try {
+    const out = execFileSyncCli("ps", ["-ww", "-o", "uid=", "-o", "args=", "-p", String(pid)], {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+    const m = /^\s*(\d+)\s+(.*)$/s.exec(out.replace(/\n+$/, ""));
+    return m ? { uid: Number(m[1]), commandLine: m[2] } : null;
+  } catch {
+    // ps exits non-zero when the pid is gone.
+    return null;
+  }
+}
+
+/**
+ * Is the server listening on `port` this user's own dashboard for `absDir`?
+ *
+ * Asked only of a token-protected n-dx server, which answers every token-less
+ * probe 401 and so cannot say which directory it serves. Its PID file can be
+ * gone while it keeps running (`git clean -fdx`, or a start from another
+ * checkout of the tree), and `ndx start` restarts its own untracked server by
+ * contract. Identification is by process, never by sending the per-user token
+ * to whoever holds the port: the sole listener must be owned by this uid and
+ * have been launched to serve this directory. Anything less is unidentified.
+ *
+ * @param {number} port
+ * @param {string} absDir
+ * @returns {{ pid: number } | null}  The listener, when it is ours.
+ */
+export function findOwnDashboardOnPort(port, absDir) {
+  const target = selectKillTarget(listenerPidsOnPort(port));
+  if (target.refuse) return null;
+  const identity = readProcessIdentity(target.pid);
+  if (!identity || identity.uid !== process.getuid?.()) return null;
+  const served = servedDirFromCommandLine(identity.commandLine);
+  if (!served) return null;
+  return canonicalizePath(served) === canonicalizePath(absDir) ? { pid: target.pid } : null;
+}
+
+/**
  * Decide which of `pids` to SIGKILL, or why not to.
  *
  * Pure, so the whom-to-kill decision is assertable without a process holding a
@@ -499,7 +633,7 @@ export async function killPortOccupant(port) {
  * Returns the actual port number or null.
  */
 async function readPortFile(dir, files = DASHBOARD_FILES) {
-  const portPath = join(dir, files.port);
+  const portPath = files(dir).port;
   if (!(await fileExists(portPath))) return null;
   try {
     const raw = await readFile(portPath, "utf-8");
@@ -514,7 +648,7 @@ async function readPortFile(dir, files = DASHBOARD_FILES) {
  * Remove the port file.
  */
 export async function removePortFile(dir, files = DASHBOARD_FILES) {
-  const portPath = join(dir, files.port);
+  const portPath = files(dir).port;
   try {
     await unlink(portPath);
   } catch {
@@ -524,13 +658,16 @@ export async function removePortFile(dir, files = DASHBOARD_FILES) {
 
 /**
  * Wait for the server process to write its port file, polling at intervals.
- * Returns the actual port or null if the timeout expires.
+ * Returns the actual port, or null if the timeout expires or `isAlive` reports
+ * the server gone.
  */
-async function waitForPortFile(dir, timeoutMs = 5000, intervalMs = 100, files = DASHBOARD_FILES) {
+export async function waitForPortFile(dir, timeoutMs = 5000, intervalMs = 100, files = DASHBOARD_FILES, isAlive = () => true) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const port = await readPortFile(dir, files);
     if (port !== null) return port;
+    // A dead server will never write it; stop waiting rather than run out the clock.
+    if (!isAlive()) return null;
     await new Promise((r) => setTimeout(r, intervalMs));
   }
   return null;
@@ -541,7 +678,7 @@ async function waitForPortFile(dir, timeoutMs = 5000, intervalMs = 100, files = 
  * Returns { pid, port } or null.
  */
 export async function readPidFile(dir, files = DASHBOARD_FILES) {
-  const pidPath = join(dir, files.pid);
+  const pidPath = files(dir).pid;
   if (!(await fileExists(pidPath))) return null;
   try {
     const raw = await readFile(pidPath, "utf-8");
@@ -556,7 +693,7 @@ export async function readPidFile(dir, files = DASHBOARD_FILES) {
  * Write PID file with process info.
  */
 async function writePidFile(dir, pid, port, files = DASHBOARD_FILES) {
-  const pidPath = join(dir, files.pid);
+  const pidPath = files(dir).pid;
   await writeFile(
     pidPath,
     JSON.stringify({ pid, port, startedAt: new Date().toISOString() }, null, 2) + "\n",
@@ -567,16 +704,17 @@ async function writePidFile(dir, pid, port, files = DASHBOARD_FILES) {
 /**
  * Write the marker files a hub-served directory keeps for compatibility.
  *
- * `.n-dx-web.port` carries the HUB's port, so `ndx refresh --live-server`
+ * The port marker carries the HUB's port, so `ndx refresh --live-server`
  * (which reads only that file and POSTs /api/reload to it) keeps working: the
- * hub forwards the signal to this project's server. `.n-dx-web.pid` records
+ * hub forwards the signal to this project's server. The pid marker records
  * the hub's pid tagged `via: "hub"` so every reader of that file — `stop`,
  * `status`, refresh's conflict detection — can tell a hub registration from a
  * single-project server and must not kill the hub for it.
  */
 export async function writeHubMarkerFiles(dir, { hubPid, hubPort, projectId }) {
+  const { pid: pidPath, port: portPath } = DASHBOARD_FILES(dir);
   await writeFile(
-    join(dir, PID_FILE),
+    pidPath,
     JSON.stringify(
       { pid: hubPid, port: hubPort, startedAt: new Date().toISOString(), via: "hub", projectId },
       null,
@@ -584,7 +722,7 @@ export async function writeHubMarkerFiles(dir, { hubPid, hubPort, projectId }) {
     ) + "\n",
     "utf-8",
   );
-  await writeFile(join(dir, PORT_FILE), String(hubPort) + "\n", "utf-8");
+  await writeFile(portPath, String(hubPort) + "\n", "utf-8");
 }
 
 /** True when a pid file records a hub registration rather than a server of its own. */
@@ -596,7 +734,7 @@ export function isHubMarker(info) {
  * Remove PID file.
  */
 export async function removePidFile(dir, files = DASHBOARD_FILES) {
-  const pidPath = join(dir, files.pid);
+  const pidPath = files(dir).pid;
   try {
     await unlink(pidPath);
   } catch {
@@ -964,12 +1102,12 @@ export function slugifyProjectId(name) {
 }
 
 /**
- * The project's display name: `.rex/config.json` "project", else the
+ * The project's display name: rex's `config.json` "project", else the
  * repository directory's basename.
  */
 async function loadProjectName(repoRoot) {
   try {
-    const raw = await readFile(join(repoRoot, ".rex", "config.json"), "utf-8");
+    const raw = await readFile(join(resolveLayout(repoRoot).rexDir, "config.json"), "utf-8");
     const project = JSON.parse(raw)?.project;
     if (typeof project === "string" && project.trim()) return project.trim();
   } catch {
@@ -1648,15 +1786,22 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       // it. Relocating is the same answer as for a peer.
       const hub = await probeHubEndpoint(port);
       const occupant = hub ? null : classifyPortOccupant(await probeStatusEndpoint(port), absDir);
+      const protectedNdx = occupant?.kind === "unknown" && (await probeTokenProtectedNdx(port));
+      // A protected server answers 401 to every probe, so it can only be
+      // recognised as this directory's own by its process.
+      const ownProtected = protectedNdx ? findOwnDashboardOnPort(port, absDir) : null;
 
-      // Two occupants must be left alone, and the answer for both is to move:
-      // the hub, which supervises other projects' servers, and a peer
-      // dashboard serving a different directory.
+      // Three occupants must be left alone, and the answer for each is to move:
+      // the hub, which supervises other projects' servers; a peer dashboard
+      // serving a different directory; and an n-dx server whose token we lack,
+      // unless its process shows it is this directory's own.
       const leaveAlone = hub
         ? `The n-dx hub (PID ${hub.pid}) is on :${port} serving ${hub.projects} project(s)`
         : occupant.kind === "peer"
           ? `n-dx dashboard for ${occupant.projectDir} is already on :${port}`
-          : null;
+          : protectedNdx && !ownProtected
+            ? `A token-protected n-dx server is already on :${port}`
+            : null;
 
       if (leaveAlone) {
         const next = await findRelocationPort(port);
@@ -1673,7 +1818,9 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
         // Not identifiable as the hub or a peer — either a stranger, or this
         // directory's own untracked server, which `ndx start` restarts by
         // contract.
-        log(`Port ${port} is in use by another process — clearing it…`);
+        log(ownProtected
+          ? `This directory's ${label} (PID ${ownProtected.pid}) is on :${port} without a PID file — restarting it…`
+          : `Port ${port} is in use by another process — clearing it…`);
         const freed = await killPortOccupant(port);
         if (!freed) {
           console.error(`Port ${port} is occupied and could not be cleared. Choose a different port with --port=N or set web.port in .n-dx.json`);
@@ -1720,7 +1867,18 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     // Wait for the server to write its port file with the actual bound port.
     // This handles dynamic port allocation — the actual port may differ from
     // the requested port if the requested port was already in use.
-    const actualPort = await waitForPortFile(absDir, undefined, undefined, files);
+    //
+    // The port file is written only once the server is listening, so this is
+    // also the readiness signal: returning earlier hands the caller a URL that
+    // refuses connections. A loaded machine can take well over 5s to get there,
+    // so wait as long as the server is alive, up to a generous ceiling.
+    const actualPort = await waitForPortFile(
+      absDir,
+      BACKGROUND_READY_TIMEOUT_MS,
+      undefined,
+      files,
+      () => isProcessRunning(child.pid),
+    );
 
     if (actualPort === null) {
       // Server may have failed to start. Check if process is still running.

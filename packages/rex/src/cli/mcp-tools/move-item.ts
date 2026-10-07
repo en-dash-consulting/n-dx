@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { validateMove, moveItem } from "../../core/move.js";
-import { syncFolderTree } from "../commands/folder-tree-sync.js";
 import type { PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
@@ -38,8 +37,6 @@ export async function handleMoveItem(
       itemId: id,
       detail: `Moved ${result.item.level} "${result.item.title}" from ${fromLabel} to ${toLabel}`,
     });
-
-    await syncFolderTree(rexDir, store);
 
     return textResult(
       JSON.stringify({

@@ -14,6 +14,8 @@ import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from 
 import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 
+import { relativeToRoot, resolveLayout } from "./layout.js";
+
 const __dir = dirname(fileURLToPath(import.meta.url));
 // Colocated with this module so the directory ships inside the published tarball.
 const ASSET_DIR = resolve(__dir, "assistant-assets");
@@ -415,9 +417,22 @@ export function renderClaudeMd() {
 // ── AGENTS.md rendering ─────────────────────────────────────────────────────
 
 /**
+ * Render `AGENTS.md` for a project.
+ *
+ * `projectDir` exists because the workflow pointer below names a file inside
+ * rex's state directory, and where that is depends on the project's layout —
+ * `.rex/workflow.md` or `.ndx/rex/workflow.md`. Generating the legacy spelling
+ * into a `.ndx/` project would send every Codex session to a file that is not
+ * there. It defaults to the working directory so the drift and parity tests,
+ * which render without a project in hand, keep reading the repository's own
+ * layout.
+ *
+ * @param {string} [projectDir]  Project root the generated file is written to.
  * @returns {string}
  */
-export function renderAgentsMd() {
+export function renderAgentsMd(projectDir = process.cwd()) {
+  const layout = resolveLayout(projectDir);
+  const rexDirName = relativeToRoot(layout, layout.rexDir);
   const manifest = getManifest();
   const skills = manifest.skills;
   const servers = manifest.mcpServers;
@@ -440,7 +455,7 @@ export function renderAgentsMd() {
   sections.push(
     "## Workflow",
     "",
-    "Follow `.rex/workflow.md` for task execution discipline. Key steps:",
+    `Follow \`${rexDirName}/workflow.md\` for task execution discipline. Key steps:`,
     "",
     "1. Run the project's validation command to ensure a clean state.",
     "2. Call `get_next_task` to pick up an actionable task, then `claim_task` so another worktree's agent skips it.",
@@ -507,6 +522,7 @@ export function renderAgentsMd() {
     "- Find out what to work on next (`get_next_task`)",
     "- Read task details and acceptance criteria (`get_item`)",
     "- Update task status as you work (`update_task_status`)",
+    "- Save how a task should run — a portable model tier plus optional per-vendor model pins (`tier`, `models`), provider, review, permission mode, test gate, turn and token budgets, notes for the agent (`add_item` / `edit_item` with a `run` block; an object replaces the whole block, `null` removes it)",
     "- Log what you did (`append_log`)",
     "- Check overall project progress (`get_prd_status`)",
     "",
