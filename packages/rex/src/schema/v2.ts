@@ -34,10 +34,10 @@
  * | change: intent, amends, touches, plannedRelease, | assignee, ready, needsPlacement              |
  * |   spike, priority, requirements, loe,            | lastModified, lastModifiedBy                 |
  * |   loeRationale, loeConfidence, effort*,          |                                              |
- * |   discoveredFrom { item?, run? }                 |                                              |
+ * |   discoveredFrom { item?, run? }, run            |                                              |
  * | task/subtask: description, acceptanceCriteria;   |                                              |
  * |   task also requirements, priority, loe,         |                                              |
- * |   loeRationale, loeConfidence, effort*           |                                              |
+ * |   loeRationale, loeConfidence, effort*, run      |                                              |
  *
  * `*` reserved with no shape: `hypotheses` waits for the Hypothesis Layer,
  * `links` for the tracker bridge, `effort` for the task-prep recommender's
@@ -55,6 +55,7 @@ import { z } from "zod";
 import {
   VALID_STATUSES,
   VALID_PRIORITIES,
+  RUN_SETTING_KEYS,
   type ItemStatus,
   type Priority,
   type Requirement,
@@ -159,6 +160,26 @@ const effortIntentShape = {
   loeConfidence: z.enum(LOE_CONFIDENCES).optional(),
   effort: ReservedSchema,
 };
+
+/** A key of a saved run block (`RUN_SETTING_KEYS`). */
+export type RunSettingKey = (typeof RUN_SETTING_KEYS)[number];
+
+/**
+ * Saved run settings (`run`): how `ndx work` runs a change or task. Authored
+ * intent, so it lives in frontmatter, not `state.yaml`.
+ *
+ * Loose on purpose, as in v1: known keys come from `RUN_SETTING_KEYS` with
+ * any value, and unknown keys pass through. Only writers check strictly, with
+ * `validateRunSettings`, which also turns `{}` into "no block" so an empty
+ * block is never written. A strict schema here would let one malformed or
+ * newer-version block refuse every PRD write; the `run-settings` rule warns
+ * instead.
+ */
+export type SavedRunSettings = { [K in RunSettingKey]?: unknown };
+
+export const SavedRunSettingsSchema = z
+  .object(Object.fromEntries(RUN_SETTING_KEYS.map((key) => [key, z.unknown()])) as Record<RunSettingKey, z.ZodUnknown>)
+  .passthrough();
 
 /** One acceptance criterion with a stable id (`c1`…`cn`) that deltas address. */
 export interface Criterion {
@@ -297,6 +318,8 @@ export interface ChangeIntent extends BaseIntent, EffortIntent {
   priority?: Priority;
   requirements?: Requirement[];
   discoveredFrom?: DiscoveredFrom;
+  /** A change with no tasks is itself the unit of work `ndx work` runs. */
+  run?: SavedRunSettings;
 }
 
 export interface TaskIntent extends BaseIntent, EffortIntent {
@@ -305,6 +328,7 @@ export interface TaskIntent extends BaseIntent, EffortIntent {
   acceptanceCriteria?: string[];
   requirements?: Requirement[];
   priority?: Priority;
+  run?: SavedRunSettings;
 }
 
 export interface SubtaskIntent extends BaseIntent {
@@ -370,6 +394,7 @@ export const ChangeIntentSchema = z
     priority: PrioritySchema.optional(),
     requirements: z.array(RequirementSchema).optional(),
     discoveredFrom: DiscoveredFromSchema.optional(),
+    run: SavedRunSettingsSchema.optional(),
     ...effortIntentShape,
   })
   .passthrough();
@@ -382,6 +407,7 @@ export const TaskIntentSchema = z
     acceptanceCriteria: z.array(z.string()).optional(),
     requirements: z.array(RequirementSchema).optional(),
     priority: PrioritySchema.optional(),
+    run: SavedRunSettingsSchema.optional(),
     ...effortIntentShape,
   })
   .passthrough();
