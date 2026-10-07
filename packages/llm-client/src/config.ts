@@ -523,6 +523,9 @@ export const DEFAULT_ROUTES: Record<string, TaskTier> = {
   "prd.spec": "standard",
   "prd.smart-add": "standard",
   "prd.restructure": "standard",
+  // Placement of a change on the product layer; uncalibrated, so its pick only
+  // auto-accepts when it agrees with the rules.
+  "prd.place": "standard",
   // sourcevision
   "code.classify": "light",
   "zone.enrich-scan": "light",
