@@ -48,7 +48,6 @@ Add this block to your project's `.gitignore`:
 .rex/pending-proposals.json
 .rex/acknowledged-findings.json
 .rex/execution-log*.jsonl
-.rex/adapters.json
 .rex/n-dx_workflow.md
 
 # Server runtime
@@ -84,7 +83,6 @@ If you want to commit `.sourcevision/` as a shared analysis baseline, remove tha
 | `.rex/pending-proposals.json` | Unreviewed proposals from `ndx plan` | Per-session interactive state |
 | `.rex/acknowledged-findings.json` | Findings you've chosen to suppress | Personal triage notes; per-developer |
 | `.rex/execution-log*.jsonl` | Append-only structured activity log | Grows unboundedly; not useful in git |
-| `.rex/adapters.json` | Remote sync adapter state | Local-only integration state |
 | `.rex/n-dx_workflow.md` | Human-readable workflow state snapshot | Derived display artifact |
 | `.n-dx-web.pid` / `.n-dx-web.port` | Web server PID and port files | Auto-managed by `ndx start`/`stop` |
 | `.run-logs/` | External run log output | CI/debug artifacts |

@@ -1277,8 +1277,6 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   // Init LLM selection — lazy-loads enquirer prompt library
   ["packages/core/init-llm.js", "Lazy-loads enquirer for interactive provider/model selection"],
   // Web server — lazy-loads route handlers
-  ["packages/web/src/server/routes-integrations.ts", "Lazy-loads integration handlers on demand"],
-  ["packages/web/src/server/routes-notion.ts", "Lazy-loads Notion integration on demand"],
   ["packages/web/src/server/routes-rex/health.ts", "Lazy-loads health check analysis on demand"],
   // Core orchestrator — dynamic import of rex public API for export pre-rendering
   ["packages/core/export.js", "Lazy-loads rex functions for static export pre-rendering"],

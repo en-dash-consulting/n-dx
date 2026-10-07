@@ -25,7 +25,6 @@ const EXPECTED_TOOLS = [
   "merge_items",
   "get_item",
   "append_log",
-  "sync_with_remote",
   "get_recommendations",
   "verify_criteria",
   "reorganize",
