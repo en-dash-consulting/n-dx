@@ -75,14 +75,14 @@ export const AREA_MIN_CAPABILITIES = 2;
 
 // ── Tree index ───────────────────────────────────────────────────
 
-interface Entry {
+export interface Entry {
   node: RuleNode;
   parent?: RuleNode;
   /** The layer root the node was loaded under. */
   root: Layer;
 }
 
-interface TreeIndex {
+export interface TreeIndex {
   /** Every non-deleted node, depth first, product layer first. */
   entries: Entry[];
   /** Resolves an id, display id or alias to its node. */
@@ -93,7 +93,8 @@ function isDeleted(node: RuleNode): boolean {
   return node.status === "deleted";
 }
 
-function indexTree(tree: V2Tree): TreeIndex {
+/** Index a loaded tree for lookup by id, display id or alias; when two nodes claim a ref, the first one visited wins. */
+export function indexTree(tree: V2Tree): TreeIndex {
   const entries: Entry[] = [];
   const byRef = new Map<string, RuleNode>();
   const visit = (node: RuleNode, parent: RuleNode | undefined, root: Layer): void => {

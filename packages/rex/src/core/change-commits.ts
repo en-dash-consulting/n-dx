@@ -20,7 +20,10 @@
  * `<rexDir>/.cache/{@link CHANGE_COMMITS_CACHE_FILENAME}` (`.ndx/rex/.cache`
  * on the `.ndx` layout; `rex init` gitignores the directory). It is keyed by
  * the ref's tip SHA, so a moved ref, a missing or unreadable file, or a
- * format change rebuilds it.
+ * format change rebuilds it. The files each commit changed are cached beside
+ * it in {@link COMMIT_FILES_CACHE_FILENAME}, keyed by commit SHA: a commit's
+ * diff never changes, so that file needs no tip check and is rebuilt only
+ * when missing or unreadable.
  *
  * @module rex/core/change-commits
  */
@@ -31,6 +34,7 @@ import { exec } from "@n-dx/llm-client";
 import { atomicWrite } from "../store/atomic-write.js";
 
 export const CHANGE_COMMITS_CACHE_FILENAME = "trailer-commits.json";
+export const COMMIT_FILES_CACHE_FILENAME = "commit-files.json";
 export const DEFAULT_MAIN_REF = "main";
 export const ITEM_TRAILER_KEY = "N-DX-Item";
 
@@ -144,6 +148,59 @@ export async function scanTrailerCommits(repoDir: string, tip: string): Promise<
   return commits;
 }
 
+interface CommitFilesCache {
+  version: number;
+  files: Record<string, string[]>;
+}
+
+/** Hashes per `git log` call, which keeps the command line far below any argv limit. */
+const FILES_BATCH = 500;
+
+/**
+ * The files each commit changed, by commit SHA. A merge commit lists what it
+ * brought in (its diff against the first parent), so a merged branch's files
+ * are credited to the merge. Reads only commits missing from the cache.
+ */
+export async function loadCommitFiles(
+  repoDir: string,
+  cacheDir: string,
+  hashes: Iterable<string>,
+): Promise<Map<string, string[]>> {
+  const path = join(cacheDir, COMMIT_FILES_CACHE_FILENAME);
+  const cache = await readJsonCache<CommitFilesCache>(path, (c) => typeof c.files === "object" && c.files !== null);
+  const files = cache?.files ?? {};
+  const wanted = [...new Set(hashes)];
+  const missing = wanted.filter((hash) => !Object.hasOwn(files, hash));
+  for (let i = 0; i < missing.length; i += FILES_BATCH) {
+    Object.assign(files, await scanCommitFiles(repoDir, missing.slice(i, i + FILES_BATCH)));
+  }
+  if (missing.length > 0) {
+    await mkdir(cacheDir, { recursive: true });
+    await atomicWrite(path, JSON.stringify({ version: CACHE_VERSION, files }) + "\n");
+  }
+  return new Map(wanted.map((hash) => [hash, files[hash]]));
+}
+
+async function scanCommitFiles(repoDir: string, hashes: string[]): Promise<Record<string, string[]>> {
+  // --no-walk=unsorted lists exactly these commits. -m --first-parent gives a
+  // merge its diff against the first parent instead of an empty combined diff.
+  // quotePath=false keeps non-ASCII names literal (a name with a newline,
+  // quote or backslash is still quoted by git, and is returned as git prints it).
+  const stdout = await git(repoDir, [
+    "-c", "core.quotePath=false",
+    "log", "--no-show-signature", "--no-walk=unsorted", "-m", "--first-parent", "--name-only",
+    "--format=%x1e%H", ...hashes, "--",
+  ]);
+  const out: Record<string, string[]> = {};
+  for (const record of stdout.split(RS)) {
+    const [hash, ...paths] = record.split("\n");
+    if (!hash?.trim()) continue;
+    out[hash.trim()] = paths.filter((p) => p !== "");
+  }
+  for (const hash of hashes) out[hash] ??= [];
+  return out;
+}
+
 async function resolveCommit(repoDir: string, ref: string): Promise<string> {
   return (await git(repoDir, ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`])).trim();
 }
@@ -157,11 +214,16 @@ async function git(repoDir: string, args: string[]): Promise<string> {
   return result.stdout;
 }
 
+function readCache(path: string): Promise<TrailerCommitCache | null> {
+  return readJsonCache<TrailerCommitCache>(path, (c) => typeof c.tip === "string" && Array.isArray(c.commits));
+}
+
 /**
  * The cache file, or null when it must be rebuilt: missing, not valid JSON,
- * or written in another format version. Any other read error propagates.
+ * written in another format version, or failing `valid`. Any other read
+ * error propagates.
  */
-async function readCache(path: string): Promise<TrailerCommitCache | null> {
+async function readJsonCache<T extends { version: number }>(path: string, valid: (cache: T) => boolean): Promise<T | null> {
   let text: string;
   try {
     text = await readFile(path, "utf-8");
@@ -175,7 +237,6 @@ async function readCache(path: string): Promise<TrailerCommitCache | null> {
   } catch {
     return null; // A torn or hand-edited cache is rebuilt from git, its source of truth.
   }
-  const cache = parsed as Partial<TrailerCommitCache> | null;
-  if (cache?.version !== CACHE_VERSION || typeof cache.tip !== "string" || !Array.isArray(cache.commits)) return null;
-  return cache as TrailerCommitCache;
+  const cache = parsed as T | null;
+  return cache?.version === CACHE_VERSION && valid(cache) ? cache : null;
 }
