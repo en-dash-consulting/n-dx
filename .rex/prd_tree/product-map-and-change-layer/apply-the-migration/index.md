@@ -29,3 +29,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Apply an approved plan in one transaction, re-runnable against a newer tree](./apply-an-approved-plan-in-one.md) | pending |
 | [Chain layout and schema steps in ndx migrate and refuse legacy projects](./chain-layout-and-schema-steps-in-ndx.md) | pending |
 | [Convert stray v1 files and warn on unreachable apply commits](./convert-stray-v1-files-and-warn-on.md) | pending |
+| [Remove the prd.md and prd.json read fallbacks and the old migrate commands](./remove-the-prd-md-and-prd-json-read.md) | pending |
