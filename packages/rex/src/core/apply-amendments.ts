@@ -210,14 +210,14 @@ const APPLY: Readonly<Record<Amendment["delta"], DeltaApply>> = {
 // ── Helpers ──────────────────────────────────────────────────────
 
 /** Record that the node's current spec is met: `metAt` is its hash, and it is no longer revised. */
-function stampMet(node: RuleNode): void {
+export function stampMet(node: RuleNode): void {
   if (node.type === "capability") node.metAt = specHash({ statement: node.statement, criteria: node.criteria });
   else if (node.type === "constraint") node.metAt = specHash({ statement: node.statement });
   delete node.revisedAt;
 }
 
 /** The first live node in `nodes` (depth first; retired ones too with `includeDeleted`) whose id, display id or alias is `ref`. */
-function resolve(nodes: readonly RuleNode[], ref: string, { includeDeleted = false } = {}): RuleNode | undefined {
+export function resolve(nodes: readonly RuleNode[], ref: string, { includeDeleted = false } = {}): RuleNode | undefined {
   for (const node of nodes) {
     if (node.status === "deleted" && !includeDeleted) continue;
     if (node.id === ref || node.displayId === ref || node.aliases?.includes(ref)) return node;
@@ -233,7 +233,7 @@ function resolve(nodes: readonly RuleNode[], ref: string, { includeDeleted = fal
  * the writer does, which refuses any clash left). Existing siblings keep their
  * frozen slugs.
  */
-function freeSlug(title: string, id: string, siblings: readonly RuleNode[]): string {
+export function freeSlug(title: string, id: string, siblings: readonly RuleNode[]): string {
   const taken = new Set(siblings.map((s) => s.slug.toLowerCase()));
   const base = slugifyTitle(title);
   if (!taken.has(base)) return base;
