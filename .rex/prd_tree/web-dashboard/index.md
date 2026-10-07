@@ -50,3 +50,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-before.md) | completed |
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-contract-in.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-hench.md) | completed |
+| [Make the Live route's run-liveness check correct on Windows](./make-the-live-route-s-run-liveness.md) | pending |
