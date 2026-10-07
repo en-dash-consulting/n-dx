@@ -282,8 +282,10 @@ export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = 
               h("option", { key: source, value: source }, ISO_MAP_SOURCE_LABELS[source]),
             ),
           ),
+          // Names the analysis rather than the directory it lands in — see
+          // views/hench-config.ts.
           h("p", { class: "cmd-panel-hint" },
-            "Auto prefers ", h("code", null, ".sourcevision"), " analysis and falls back to a direct scan.",
+            "Auto prefers an existing sourcevision analysis and falls back to a direct scan.",
           ),
         ),
 

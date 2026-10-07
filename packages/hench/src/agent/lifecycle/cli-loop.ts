@@ -93,11 +93,12 @@ import {
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
-import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
+import { PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
+import { BOOKKEEPING_DIR_PREFIXES } from "../../store/paths.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
-  NDX_CONTAINER_DIRNAME,
   type ExecutionPolicy,
   type RuntimeEvent,
   type PromptSection,
@@ -1441,6 +1442,7 @@ async function runAdversarialReviewPass(
   await rm(reportPath, { force: true }).catch(() => { /* best effort */ });
   await mkdir(dirname(reportPath), { recursive: true });
 
+  const layout = resolveLayout(inv.projectDir);
   const brief = buildReviewBrief({
     taskId: inv.taskId,
     taskTitle: ctx.taskTitle,
@@ -1449,6 +1451,7 @@ async function runAdversarialReviewPass(
     resumed: !!resumeSessionId,
     autonomous: ctx.autonomous,
     testGateFollows: ctx.testGateFollows,
+    prdTreeDir: `${relativeToRoot(layout, layout.rexDir)}/${PRD_TREE_DIRNAME}/`,
   });
 
   const envelope = createPromptEnvelope([
@@ -1578,19 +1581,17 @@ async function runAdversarialReviewPass(
     );
   }
 
-  // What the reviewer actually changed, from the snapshot pair. `.rex/` is
-  // the completion-metadata commit's territory and `.hench/` holds the report
-  // itself; neither is a repair. Computed even when the report claims
-  // `fixesApplied: false` — the tree, not the report, is the authority.
+  // What the reviewer actually changed, from the snapshot pair. Rex's state is
+  // the completion-metadata commit's territory and hench's holds the report
+  // itself; neither is a repair — see `BOOKKEEPING_DIR_PREFIXES`. Computed even
+  // when the report claims `fixesApplied: false` — the tree, not the report, is
+  // the authority.
   let repairedFiles: string[] | undefined;
   if (preReviewState) {
     try {
       const postReviewState = await snapshotDirtyState(inv.projectDir);
       repairedFiles = diffDirtyState(preReviewState, postReviewState).filter(
-        (path) =>
-          !path.startsWith(".rex/") &&
-          !path.startsWith(".hench/") &&
-          !path.startsWith(`${NDX_CONTAINER_DIRNAME}/`),
+        (path) => !BOOKKEEPING_DIR_PREFIXES.some((prefix) => path.startsWith(prefix)),
       );
     } catch {
       repairedFiles = undefined;

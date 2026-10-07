@@ -36,6 +36,7 @@ import {
   renderClaudeMd,
 } from "./assistant-assets.js";
 import { getCliName } from "./cli-identity.js";
+import { resolveLayout } from "./layout.js";
 import { homedir } from "os";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -479,7 +480,7 @@ function writeMcpJson(dir) {
 function readConfiguredClaudePath(dir) {
   if (!dir) return undefined;
   try {
-    const raw = readFileSync(join(dir, ".n-dx.json"), "utf-8");
+    const raw = readFileSync(resolveLayout(dir).configFile, "utf-8");
     const cfg = JSON.parse(raw);
     const p = cfg?.cli?.claudePath;
     return typeof p === "string" && p.length > 0 ? p : undefined;
@@ -495,7 +496,7 @@ function readConfiguredClaudePath(dir) {
  */
 function persistDiscoveredClaudePath(dir, resolvedPath) {
   if (!dir) return;
-  const configPath = join(dir, ".hench", "config.json");
+  const configPath = join(resolveLayout(dir).henchDir, "config.json");
   if (!existsSync(configPath)) return;
   try {
     const config = JSON.parse(readFileSync(configPath, "utf-8"));

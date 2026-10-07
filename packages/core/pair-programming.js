@@ -25,6 +25,7 @@ import { terminateTree, treeKillSpawnOptions } from "./child-lifecycle.js";
 import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
+import { relativeToRoot, resolveLayout } from "./layout.js";
 
 // ---------------------------------------------------------------------------
 // NDX context assembly
@@ -49,7 +50,7 @@ const PRIMER_FINGERPRINT_PREFIX = "<!-- sourcevision-primer fingerprint:";
  */
 export function sourcevisionAnalysisFingerprint(dir) {
   try {
-    const raw = readFileSync(join(dir, ".sourcevision", "manifest.json"), "utf-8");
+    const raw = readFileSync(join(resolveLayout(dir).sourcevisionDir, "manifest.json"), "utf-8");
     const manifest = JSON.parse(raw);
     if (typeof manifest?.analysisFingerprint === "string" && manifest.analysisFingerprint) {
       return manifest.analysisFingerprint;
@@ -119,7 +120,8 @@ export function readPrimerFingerprint(primer) {
  * @returns {{ content: string | null; warning?: string; source?: "primer" | "context" }}
  */
 export function readContextMd(dir) {
-  const primerPath = join(dir, ".sourcevision", "PRIMER.md");
+  const layout = resolveLayout(dir);
+  const primerPath = join(layout.sourcevisionDir, "PRIMER.md");
   if (existsSync(primerPath)) {
     try {
       const content = readFileSync(primerPath, "utf-8");
@@ -133,14 +135,15 @@ export function readContextMd(dir) {
     }
   }
 
-  const contextPath = join(dir, ".sourcevision", "CONTEXT.md");
+  const contextPath = join(layout.sourcevisionDir, "CONTEXT.md");
+  const contextLabel = relativeToRoot(layout, contextPath);
   if (!existsSync(contextPath)) {
-    return { content: null, warning: "CONTEXT.md not found in .sourcevision/ — skipping codebase context" };
+    return { content: null, warning: `${contextLabel} not found — skipping codebase context` };
   }
   try {
     return { content: readFileSync(contextPath, "utf-8"), source: "context" };
   } catch (err) {
-    return { content: null, warning: `Could not read .sourcevision/CONTEXT.md: ${err.message}` };
+    return { content: null, warning: `Could not read ${contextLabel}: ${err.message}` };
   }
 }
 
@@ -154,7 +157,7 @@ export function readContextMd(dir) {
  * @returns {{ content: string | null; warning?: string }}
  */
 export function buildPrdStatusExcerpt(dir) {
-  const rexDir = join(dir, ".rex");
+  const { rexDir } = resolveLayout(dir);
   const prdTreePath = join(rexDir, "prd_tree");
   const jsonPath = join(rexDir, "prd.json");
 
@@ -255,7 +258,7 @@ export function writeNdxContextFile(text) {
  * @returns {string | undefined}
  */
 export function readRexTestCommand(dir) {
-  const configPath = join(dir, ".rex", "config.json");
+  const configPath = join(resolveLayout(dir).rexDir, "config.json");
   if (!existsSync(configPath)) return undefined;
   try {
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
@@ -291,7 +294,7 @@ export function resolveReviewerVendor(primaryVendor) {
  * @returns {string}  CLI binary path or name.
  */
 export function resolveVendorCliPath(dir, vendor) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = resolveLayout(dir).configFile;
   try {
     if (existsSync(configPath)) {
       const data = JSON.parse(readFileSync(configPath, "utf-8"));

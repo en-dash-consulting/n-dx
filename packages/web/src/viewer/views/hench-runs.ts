@@ -12,6 +12,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { replaceAppHistory } from "../base-path.js";
+import { REX_STATE_DIRS, stateDirPrefixes } from "../state-paths.js";
 import { MetricCard } from "../visualization/index.js";
 import {
   BrandedHeader,
@@ -357,6 +358,9 @@ function isStaleRun(run: RunSummary): boolean {
 
 // ── File change classification ───────────────────────────────────────
 
+/** Rex's state directory, in both layouts, as a path fragment. */
+const PRD_DIR_PREFIXES = stateDirPrefixes(REX_STATE_DIRS);
+
 type FileCategory = "code" | "docs" | "config" | "metadata" | "test" | "other";
 
 interface FileChangeEntry {
@@ -366,8 +370,12 @@ interface FileChangeEntry {
 }
 
 function classifyFilePath(filePath: string): FileCategory {
-  // Metadata (PRD-related)
-  if (filePath.includes(".rex/") || filePath === "prd.json") return "metadata";
+  // Metadata (PRD-related). Matched as a substring rather than a prefix
+  // because a run can touch a nested project's tree, and both layouts are
+  // accepted because the path comes from a run record rather than a resolver.
+  if (PRD_DIR_PREFIXES.some((prefix) => filePath.includes(prefix)) || filePath === "prd.json") {
+    return "metadata";
+  }
 
   // Tests (path or extension)
   if (filePath.includes(".test.") || filePath.includes(".spec.") ||

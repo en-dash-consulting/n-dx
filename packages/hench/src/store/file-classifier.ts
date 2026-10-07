@@ -9,6 +9,7 @@
  */
 
 import type { ToolCallRecord } from "../schema/index.js";
+import { stateDirNameUnder } from "./paths.js";
 
 // ---------------------------------------------------------------------------
 // Type definitions
@@ -16,6 +17,21 @@ import type { ToolCallRecord } from "../schema/index.js";
 
 /** File category for classification purposes. */
 export type FileCategory = "code" | "test" | "docs" | "config" | "metadata";
+
+/**
+ * Where a PRD file sits, in both layouts — `.rex/` and `.ndx/rex/`.
+ *
+ * A classifier over paths something else produced, so it recognises both
+ * spellings rather than resolving one; see `stateDirNameUnder`. Only the
+ * legacy spelling was checked before, and `.ndx/rex/prd_tree/…` does not
+ * contain `.rex/`, so on the new layout every PRD write was classified by its
+ * extension instead — `index.md` as "docs", `tree-meta.json` as "config" —
+ * and the run summary reported PRD bookkeeping as documentation changes.
+ */
+const PRD_DIR_PREFIXES = [
+  `${stateDirNameUnder("rex", "legacy")}/`,
+  `${stateDirNameUnder("rex", "ndx")}/`,
+];
 
 // ---------------------------------------------------------------------------
 // Classification logic
@@ -25,7 +41,7 @@ export type FileCategory = "code" | "test" | "docs" | "config" | "metadata";
  * Classify a file path into a category based on its extension and name.
  *
  * Classification precedence (first match wins):
- * 1. PRD metadata files (.rex/) → "metadata"
+ * 1. PRD metadata files (rex's state directory) → "metadata"
  * 2. Test files (.test.ts, .spec.js, __tests__/, tests/) → "test"
  * 3. Documentation (.md, .txt, .rst) → "docs"
  * 4. Config files (.json, .yaml, .toml, .ini, .env, .config.js) → "config"
@@ -36,7 +52,9 @@ export type FileCategory = "code" | "test" | "docs" | "config" | "metadata";
  */
 export function classifyFile(filePath: string): FileCategory {
   // PRD metadata files
-  if (filePath.endsWith("prd.json") || filePath.includes(".rex/")) return "metadata";
+  if (filePath.endsWith("prd.json") || PRD_DIR_PREFIXES.some((p) => filePath.includes(p))) {
+    return "metadata";
+  }
 
   // Test files
   if (/\.test\.[jt]sx?$/.test(filePath) || /\.spec\.[jt]sx?$/.test(filePath) ||

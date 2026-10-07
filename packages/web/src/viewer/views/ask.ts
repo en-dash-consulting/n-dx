@@ -797,10 +797,11 @@ export function AskView({ seed = null, jobs }: AskViewProps) {
   // query resolve to the container instead of the card.
   return h("div", { class: `sv-ask-container sv-ask-state-${state.status}` },
     header,
+    // Names the analysis rather than the directory it lands in — see
+    // views/hench-config.ts.
     h("p", { class: "section-sub" },
-      "Answers come from this project's ",
-      h("code", null, ".sourcevision"),
-      " analysis. Run an analysis first for anything it does not yet cover.",
+      "Answers come from this project's sourcevision analysis. ",
+      "Run an analysis first for anything it does not yet cover.",
     ),
 
     // The panel's one live region, mounted on every render with empty text

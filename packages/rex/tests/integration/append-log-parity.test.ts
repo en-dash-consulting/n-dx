@@ -5,7 +5,7 @@
  * execution-log entry indistinguishable from one written by the MCP tool.
  *
  * @see packages/rex/src/core/execution-log.ts — the shared writer
- * @see packages/rex/src/cli/mcp-tools.ts#handleAppendLog — MCP route
+ * @see packages/rex/src/cli/mcp-tools/append-log.ts#handleAppendLog — MCP route
  * @see packages/rex/src/cli/commands/log.ts#cmdLog — CLI route
  */
 
@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { ensureRexDir } from "../../src/store/file-adapter.js";
 import { resolveStore } from "../../src/store/index.js";
-import { handleAppendLog } from "../../src/cli/mcp-tools.js";
+import { handleAppendLog } from "../../src/cli/mcp-tools/index.js";
 import { cmdLog } from "../../src/cli/commands/log.js";
 import type { LogEntry } from "../../src/schema/index.js";
 

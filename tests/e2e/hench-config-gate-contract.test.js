@@ -48,6 +48,16 @@ const { DEFAULT_HENCH_CONFIG, MIN_PRUNE_PAIRS } = await import(
 const { CONFIG_FIELDS } = await import(
   join(ROOT, "packages/hench/dist/cli/commands/config.js")
 );
+const { guardBaselineForLanguage } = await import(
+  join(ROOT, "packages/llm-client/dist/public.js")
+);
+const {
+  BUILT_IN_TEMPLATES: HENCH_BUILT_IN_TEMPLATES,
+  STRICT_BLOCKED_PATHS: HENCH_STRICT_BLOCKED_PATHS,
+} = await import(join(ROOT, "packages/hench/dist/schema/templates.js"));
+const { STRICT_BLOCKED_PATHS: WEB_STRICT_BLOCKED_PATHS } = await import(
+  join(ROOT, "packages/web/dist/server/routes-hench.js")
+);
 const { HELP_TEXT } = await import(join(ROOT, "packages/core/config.js"));
 
 /** A config hench accepts, used as the base every probe is applied to. */
@@ -417,6 +427,57 @@ describe("hench, the dashboard and ndx config offer the same settings", () => {
         ).not.toBeUndefined();
       }
     });
+  });
+});
+
+/**
+ * The built-in workflow templates exist twice — hench's `schema/templates.ts`
+ * and the dashboard's `routes-hench.ts` — because web cannot import hench.
+ * Most of each copy is numbers that have to be kept in step by hand, and that
+ * is still true. The strict-safety template's blocked paths are the exception:
+ * both copies now derive them from `guardBaselineForLanguage`, which lives in
+ * `@n-dx/llm-client` and so is reachable from both, and this is what holds
+ * them there.
+ *
+ * It is the part that most needed pinning. As two hand-written lists they had
+ * drifted from the baseline in two directions at once: they named `.rex/**`
+ * and `.hench/**` in a spelling a `.ndx/` project does not use, so the
+ * template billed as "maximum guard rails" blocked none of n-dx's own state
+ * there; and their credential patterns were a strict *subset* of the baseline
+ * every other template gets, so choosing strict-safety made a project less
+ * protected than leaving it alone.
+ */
+describe("the strict-safety template's blocked paths", () => {
+  it("is the same list in hench and in the dashboard", () => {
+    expect(WEB_STRICT_BLOCKED_PATHS).toEqual(HENCH_STRICT_BLOCKED_PATHS);
+  });
+
+  it("is what the strict-safety template actually carries", () => {
+    // The constant is only worth pinning if the template uses it.
+    const strict = HENCH_BUILT_IN_TEMPLATES.find((t) => t.id === "strict-safety");
+    expect(strict.config.guard.blockedPaths).toEqual(HENCH_STRICT_BLOCKED_PATHS);
+  });
+
+  it("is the shared guard baseline plus what strict adds", () => {
+    expect(HENCH_STRICT_BLOCKED_PATHS).toEqual([
+      ...guardBaselineForLanguage().blockedPaths,
+      "**/secrets/**",
+      "**/credentials/**",
+    ]);
+  });
+
+  it("is never narrower than the baseline it starts from", () => {
+    // The direction that matters: a project that selects the strictest
+    // template must not thereby lose a protection it had by default.
+    for (const pattern of guardBaselineForLanguage().blockedPaths) {
+      expect(HENCH_STRICT_BLOCKED_PATHS, pattern).toContain(pattern);
+    }
+  });
+
+  it("keeps the agent out of n-dx's state under both layouts", () => {
+    expect(HENCH_STRICT_BLOCKED_PATHS).toContain(".rex/**");
+    expect(HENCH_STRICT_BLOCKED_PATHS).toContain(".hench/**");
+    expect(HENCH_STRICT_BLOCKED_PATHS).toContain(".ndx/**");
   });
 });
 

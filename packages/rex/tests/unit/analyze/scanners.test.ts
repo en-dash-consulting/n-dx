@@ -418,6 +418,55 @@ describe("scanSourceVision", () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
+  it("attributes proposals to the analysis directory the project actually has", async () => {
+    // A fixed `.sourcevision/…` named a file a `.ndx/` project does not have.
+    const zones = JSON.stringify({
+      zones: [{ id: "a", name: "A", description: "d", files: [], insights: [] }],
+      findings: [],
+    });
+    const inventory = JSON.stringify({ files: [{ path: "src/a.ts", category: "core" }] });
+    const imports = JSON.stringify({ summary: { circulars: [] }, circularDependencies: [{ from: "x", to: "y" }] });
+
+    for (const [svRel, extraDirs] of [
+      [".sourcevision", [] as string[]],
+      [".ndx/sourcevision", [".ndx"]],
+    ] as const) {
+      const root = await mkdtemp(join(tmpdir(), "rex-scan-sv-layout-"));
+      try {
+        for (const d of extraDirs) await mkdir(join(root, d), { recursive: true });
+        const svDir = join(root, ...svRel.split("/"));
+        await mkdir(svDir, { recursive: true });
+        await writeFile(join(svDir, "zones.json"), zones);
+        await writeFile(join(svDir, "inventory.json"), inventory);
+        await writeFile(join(svDir, "imports.json"), imports);
+
+        const { results } = await scanSourceVision(root);
+        const sourceFiles = new Set(results.map((r) => r.sourceFile));
+
+        expect(sourceFiles).toEqual(
+          new Set([`${svRel}/zones.json`, `${svRel}/inventory.json`, `${svRel}/imports.json`]),
+        );
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("attributes legacy-format zones to the resolved analysis directory", async () => {
+    await mkdir(join(tempDir, ".ndx", "sourcevision"), { recursive: true });
+    await writeFile(
+      join(tempDir, ".ndx", "sourcevision", "zones.json"),
+      JSON.stringify([{ name: "Legacy", description: "d", findings: [{ message: "m", severity: "info" }] }]),
+    );
+
+    const { results } = await scanSourceVision(tempDir);
+
+    expect(results.map((r) => r.sourceFile)).toEqual([
+      ".ndx/sourcevision/zones.json",
+      ".ndx/sourcevision/zones.json",
+    ]);
+  });
+
   it("reads zone data and maps to features with file counts", async () => {
     await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
     await writeFile(

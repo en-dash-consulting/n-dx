@@ -2,18 +2,18 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 22716,
-    "uniqueTokens": 14213,
+    "perCallTokens": 22490,
+    "uniqueTokens": 13987,
     "skills": 13,
-    "skillTokens": 17604
+    "skillTokens": 17511
   },
   "skills": [
     {
       "name": "ndx-adversarial-review",
       "file": "packages/core/assistant-assets/skills/ndx-adversarial-review.md",
       "shipped": true,
-      "chars": 20921,
-      "tokens": 5231
+      "chars": 20552,
+      "tokens": 5138
     },
     {
       "name": "iso-map",
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4496,
-      "uniqueTokens": 4496
+      "perCallTokens": 4270,
+      "uniqueTokens": 4270
     },
     "core": {
       "surfaces": 1,
@@ -727,11 +727,11 @@
       "builder": "buildSystemPrompt",
       "purpose": "The agent's system prompt — role, rules, workflow, error handling.",
       "inline": false,
-      "literals": 75,
+      "literals": 68,
       "constants": {},
-      "ownTokens": 1102,
-      "fixedChars": 4407,
-      "fixedTokens": 1102
+      "ownTokens": 1000,
+      "fixedChars": 3998,
+      "fixedTokens": 1000
     },
     {
       "pkg": "hench",
@@ -775,11 +775,11 @@
       "builder": "buildReviewBrief",
       "purpose": "Brief handed to the reviewer — what to attack and where to report.",
       "inline": false,
-      "literals": 149,
+      "literals": 142,
       "constants": {},
-      "ownTokens": 1835,
-      "fixedChars": 7337,
-      "fixedTokens": 1835
+      "ownTokens": 1711,
+      "fixedChars": 6844,
+      "fixedTokens": 1711
     },
     {
       "pkg": "hench",
@@ -916,13 +916,13 @@
     "hench": {
       "surface": "buildPromptEnvelope",
       "describe": "Full agent envelope (system + brief) for a CLI-provider run.",
-      "chars": 3662,
-      "tokens": 916,
+      "chars": 3253,
+      "tokens": 814,
       "sections": [
         {
           "name": "system",
-          "chars": 2992,
-          "tokens": 748
+          "chars": 2583,
+          "tokens": 646
         },
         {
           "name": "brief",
@@ -930,7 +930,7 @@
           "tokens": 167
         }
       ],
-      "fixedTokens": 1339,
+      "fixedTokens": 1237,
       "branchConditional": true,
       "unreachedTokens": 423
     },
@@ -987,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "2c60fa9b2b968f79",
-  "recordedAt": "2026-10-06T19:52:22.609Z",
-  "commit": "4af62c33ba4d",
+  "contentHash": "69ab63b2c9d4bb3b",
+  "recordedAt": "2026-10-06T21:58:27.117Z",
+  "commit": "f038e27a192b",
   "dirty": false
 }

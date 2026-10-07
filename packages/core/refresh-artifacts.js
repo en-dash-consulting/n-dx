@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, statSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 
+import { resolveLayout } from "./layout.js";
+
 export const DASHBOARD_ARTIFACT_FILENAME = "dashboard-artifacts.json";
 
 const SOURCEVISION_DASHBOARD_INPUT_FILES = [
@@ -18,7 +20,7 @@ const SOURCEVISION_DASHBOARD_INPUT_FILES = [
  */
 export function refreshSourcevisionDashboardArtifacts(projectDir) {
   const absDir = resolve(projectDir);
-  const svDir = join(absDir, ".sourcevision");
+  const svDir = resolveLayout(absDir).sourcevisionDir;
   mkdirSync(svDir, { recursive: true });
 
   const refreshedAt = new Date().toISOString();

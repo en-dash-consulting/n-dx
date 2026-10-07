@@ -46,7 +46,7 @@ import {
   repoRelativePrefix,
   splitPorcelainLines,
 } from "../store/artifacts.js";
-import { NDX_CONTAINER_DIRNAME } from "../prd/llm-gateway.js";
+import { BOOKKEEPING_DIR_PREFIXES } from "../store/paths.js";
 
 const GIT_TIMEOUT = 10_000;
 
@@ -70,7 +70,7 @@ const GIT_TIMEOUT = 10_000;
  * status write alone, which is exactly the vacuous gate this list exists to
  * prevent.
  */
-const BOOKKEEPING_PREFIXES = [".rex/", ".hench/", `${NDX_CONTAINER_DIRNAME}/`];
+const BOOKKEEPING_PREFIXES = BOOKKEEPING_DIR_PREFIXES;
 
 /**
  * Decide, for one repository, whether a path is hench's own bookkeeping.
