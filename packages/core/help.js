@@ -1016,6 +1016,29 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx work --review --review-model=claude-fable-5-1 .", description: "Review on a specific model" },
       { command: "ndx work --task=abc123 --no-review .", description: "Run abc123 once without the review pass it saved" },
     ],
+    sections: [
+      {
+        title: "Settings saved on a task",
+        content:
+          "A PRD item can carry a `run` block saying how it should be run,\n" +
+          "written by the rex MCP tools, `rex update --run`, or the dashboard's\n" +
+          "Prepare task modal. Each setting resolves as:\n" +
+          "\n" +
+          "  CLI flag > the task's run block > hench.* > llm.* > the default\n" +
+          "\n" +
+          "Resolution happens per task, after selection, so in --loop,\n" +
+          "--iterations and --epic-by-epic every task runs with its own saved\n" +
+          "settings -- a saved provider even chooses the cli or api loop for\n" +
+          "that task alone. An explicit flag applies to every task in the loop.\n" +
+          "\n" +
+          "--no-review and --no-skip-test-gate turn a saved setting off for one\n" +
+          "run. Passing a flag with its own negation is an error.\n" +
+          "\n" +
+          "A saved value this vendor cannot honour is skipped with a warning and\n" +
+          "never stops a loop; a malformed block is ignored whole. Preview any of\n" +
+          "it with --resolve, which names the key behind every setting.",
+      },
+    ],
     related: ["plan", "status"],
   },
   status: {
