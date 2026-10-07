@@ -34,6 +34,40 @@ describe("run options", () => {
   it("leaves contextNotes off the command line until the server has written its file", () => {
     expect(runOptionArgs({ contextNotes: "notes" })).toEqual([]);
   });
+
+  describe("negated booleans", () => {
+    // A task can save `review` and `skipTestGate`, so for those an explicit
+    // `false` means "off for this run even though the task saved it on" —
+    // which only a negation flag can say. An absent key still says nothing, so
+    // the decision stays with the task and the config.
+    it("emits the negation for an explicit false", () => {
+      expect(runOptionArgs({ review: false })).toEqual(["--no-review"]);
+      expect(runOptionArgs({ skipTestGate: false })).toEqual(["--no-skip-test-gate"]);
+      expect(runOptionArgs({ review: false, skipTestGate: false })).toEqual([
+        "--no-review",
+        "--no-skip-test-gate",
+      ]);
+    });
+
+    it("emits nothing for an absent key", () => {
+      expect(runOptionArgs({ maxTurns: 3 })).toEqual(["--max-turns=3"]);
+    });
+
+    it("leaves a boolean with no negation saying nothing when false", () => {
+      // `fresh`, `allowDirty` and `reviewOptional` are launch-time or
+      // companion settings nothing can save, so their absence already reads
+      // as off and a negation would add no information.
+      expect(runOptionArgs({ fresh: false, allowDirty: false })).toEqual([]);
+      expect(runOptionArgs({ review: true, reviewOptional: false })).toEqual(["--review"]);
+    });
+
+    it("gives exactly the saveable booleans a negation", () => {
+      expect(RUN_OPTION_SPECS.filter((s) => s.negatedFlag).map((s) => s.key)).toEqual([
+        "review",
+        "skipTestGate",
+      ]);
+    });
+  });
 });
 
 describe("run options: values the command line must never carry", () => {

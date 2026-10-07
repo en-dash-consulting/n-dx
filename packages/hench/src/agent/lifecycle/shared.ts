@@ -138,6 +138,15 @@ export interface SharedLoopOptions {
   wouldResetIds?: ReadonlySet<string>;
   model?: string;
   /**
+   * The tier {@link model} belongs to, and the setting that chose it, as the
+   * caller's own resolver computed them (cli/commands/run-settings.ts). The
+   * loops cannot derive either: by the time they run, the model is a bare
+   * string with its provenance lost, which is why every run record used to
+   * claim the routed tier regardless of what was actually sent.
+   */
+  modelWeight?: string;
+  modelSource?: string;
+  /**
    * Show the diff and prompt for approval before finalizing (`--approve-diff`).
    *
    * Renamed from `review` when `--review` was reassigned to the adversarial
@@ -428,8 +437,14 @@ export interface InitRunOptions {
   parseMode?: string;
   /** Invocation context: "cli" for CLI invocation, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
-  /** Task weight / tier ("light" | "standard"). Used for task-weight-aware model selection. */
+  /**
+   * The tier of the model this run actually uses — see {@link RunRecord.weight}.
+   * Every loop passes it; the default below is the floor for a caller that
+   * cannot compute one, not a routing decision.
+   */
   weight?: string;
+  /** Which setting supplied the model — see {@link RunRecord.modelSource}. */
+  modelSource?: string;
   /**
    * The session-cache decision, when the caller has already made one.
    *
@@ -630,6 +645,7 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     invocationContext: opts.invocationContext,
     vendor: opts.vendor,
     weight: opts.weight ?? "standard",
+    modelSource: opts.modelSource,
     session: opts.session,
     ...(opts.reviewPlan ? { reviewPlan: opts.reviewPlan } : {}),
     actor: await resolveActor(opts.projectDir ?? "."),

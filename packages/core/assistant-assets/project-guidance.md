@@ -205,6 +205,8 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 - `get_token_usage` — roll up hench run token totals per PRD item (self/descendants/total) with orphans surfaced separately
 - `get_capabilities` — server capabilities and configuration, plus the `workspace` block (`projectDir`, `source`, `refused`) naming the tree this session writes
 
+> **`ndx work` applies a saved `run` block.** Precedence per setting: CLI flag > the task's `run` > `hench.*` > `llm.*` > default, resolved per task after selection — so in `--loop` / `--iterations` / `--epic-by-epic` each task uses its own saved settings, while an explicit flag applies to every task in the loop. A saved `provider` picks the cli or api loop for that task. `--no-review` and `--no-skip-test-gate` turn a saved setting off for one run. A saved value the active vendor cannot honour is skipped with a warning and never stops a loop; a malformed block is ignored whole. `ndx work --task=<id> --resolve .` prints every setting with the key that supplied it (`task.run` when the saved block won), the `saved` block itself, and each saved setting's `fallback`.
+
 ### Sourcevision MCP tools
 
 - `get_overview` — project summary statistics
