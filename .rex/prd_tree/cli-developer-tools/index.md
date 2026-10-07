@@ -58,7 +58,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [hench init must gitignore .hench/locks/ or the first autonomous run self-blocks](./hench-init-must-gitignore-hench-locks.md) | completed |
 | [`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record](./hench-record-no-tokens-leaves-the.md) | completed |
 | [`hench record` with no usage window silently claims the entire session transcript](./hench-record-with-no-usage-window.md) | completed |
-| [`ndx ci` architecture-policy step always fails: ci.js child_process allowlist has drifted from the e2e test's](./ndx-ci-architecture-policy-step-always.md) | pending |
+| [`ndx ci` architecture-policy step always fails: ci.js child_process allowlist has drifted from the e2e test's](./ndx-ci-architecture-policy-step-always.md) | completed |
+| [`ndx ci` fails any user project that imports child_process: its allowlist only names n-dx's own files and cannot be configured](./ndx-ci-fails-any-user-project-that.md) | pending |
 | [`node packages/core/ci.js .` is a silent no-op, yet `pnpm verify` and CONTRIBUTING.md run the CI gate that way](./node-packages-core-ci-js-is-a-silent.md) | pending |
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-carries.md) | completed |
 | [Pre-dispatch project-dir resolution still lets a directory shadow a config key](./pre-dispatch-project-dir-resolution.md) | completed |

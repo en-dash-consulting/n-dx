@@ -291,5 +291,11 @@
   },
   "claude": {
     "model": "claude-opus-5"
+  },
+  "hench": {
+    "testGate": {
+      "command": "node scripts/run-all-tests.mjs affected {base}",
+      "rerunCommand": "node scripts/run-all-tests.mjs {suites}"
+    }
   }
 }

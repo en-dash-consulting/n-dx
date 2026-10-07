@@ -196,7 +196,21 @@ export function buildSystemPrompt(
     lines.push("## Foreground Invariant");
     lines.push("Run validation and tests in the foreground and wait for them to exit. Never background one.");
     lines.push("Never end your turn waiting for a notification, a scheduled wake-up, or a later check-back — nothing will resume this session, so the run ends with your work uncommitted and the task reset.");
-    lines.push(`The full suite is run again after you finish, by ${cliName} itself — finishing is not skipping validation, and re-running the whole suite to double-check only spends the run's time twice.\n`);
+    lines.push("");
+
+    // Scoped validation (GitHub #539): agents ran the whole repository suite
+    // several times per run, minutes each, although the gate runs it after
+    // them. Generic on purpose — the project's own commands and costs live in
+    // its Workflow section. Must not spell the configured test/typecheck
+    // commands (prompt-non-redundancy.test.ts). CLI provider only: the api
+    // provider has no foreground-wait hazard and its loop is budgeted per turn.
+    lines.push("## Validation");
+    lines.push("- Run the tests for the files you changed, or the one package suite that covers them.");
+    lines.push("- Build only the package you changed.");
+    lines.push(`- Do not run the whole repository suite. ${cliName} runs its test gate after you finish, and CI runs everything. A full pass of a large suite costs many minutes of the run's time per invocation.`);
+    lines.push("- Finishing is not skipping validation: the gate still runs, so your scoped checks need only show your change works.");
+    lines.push("- If a scoped run fails in a way that needs wider evidence, widening is fine.");
+    lines.push("- The project's own commands and costs are in the Workflow section.\n");
   }
 
   if (!isCli) {

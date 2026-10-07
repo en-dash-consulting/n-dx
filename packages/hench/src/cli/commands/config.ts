@@ -327,6 +327,22 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     impact: (v) => `Test gate will run "${v}"`,
   },
   {
+    path: "testGate.command",
+    label: "Test Gate Command Template",
+    description: "Gate command template; {base} becomes the run's start commit. Takes precedence over fullTestCommand",
+    type: "string",
+    category: "test-gate",
+    impact: (v) => `Test gate will run "${v}", with {base} replaced by the run's start commit`,
+  },
+  {
+    path: "testGate.rerunCommand",
+    label: "Test Gate Re-run Template",
+    description: "Unattended runs re-run only the failed suites once; {suites} becomes their comma-joined labels",
+    type: "string",
+    category: "test-gate",
+    impact: (v) => `An unattended gate failure will re-run its failed suites once with "${v}"`,
+  },
+  {
     path: "fullTestTimeoutMs",
     label: "Full Test Timeout (ms)",
     description: "How long the test gate may run before it is killed. 0 means no limit",

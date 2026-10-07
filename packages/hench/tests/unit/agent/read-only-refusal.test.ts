@@ -27,6 +27,18 @@ describe("isReadOnlyRefusal", () => {
     expect(isReadOnlyRefusal({ forked: true, noChanges: false, toolNames: READS })).toBe(false);
   });
 
+  it("is not a refusal when earlier attempts already committed the task's files", () => {
+    expect(
+      isReadOnlyRefusal({ forked: true, noChanges: true, toolNames: READS, priorAttemptWorkOnBranch: true }),
+    ).toBe(false);
+  });
+
+  it("is still a refusal when the prior-work flag is false", () => {
+    expect(
+      isReadOnlyRefusal({ forked: true, noChanges: true, toolNames: READS, priorAttemptWorkOnBranch: false }),
+    ).toBe(true);
+  });
+
   it("ignores the agent's wording", () => {
     // Structural only: no summary input exists to sway the decision.
     expect(countFileEditCalls(["Read", "Edit", "edit"])).toBe(2);

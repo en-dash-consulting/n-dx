@@ -120,9 +120,16 @@ import {
   formatModelLabel,
 } from "./shared.js";
 import type { SharedLoopOptions } from "./shared.js";
+import { executeGateOnlyRetry, planGateOnlyRetry } from "./gate-only-retry.js";
 import type { VendorAdapter, SpawnConfig } from "./vendor-adapter.js";
 import { resolveVendorAdapter } from "./adapters/index.js";
 import { EventAccumulator } from "./event-accumulator.js";
+import {
+  describePriorAttemptWork,
+  findPriorAttemptWork,
+  suppressionNote,
+  type PriorAttemptWork,
+} from "./prior-attempt-work.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
 import type { PromptSectionDiagnostic, PersistedRuntimeEvent } from "../../schema/index.js";
 import { handlePlanModeStall, formatPlanModeAppendix } from "./plan-mode-prompt.js";
@@ -1318,6 +1325,8 @@ export interface ReviewPassContext {
   permissionMode: PermissionMode;
   /** True when no human is attached — the reviewer applies the verdict policy itself. */
   autonomous: boolean;
+  /** True when `finalizeRun` will run the test gate right after the review. */
+  testGateFollows: boolean;
   taskTitle: string;
   /**
    * Run-scoped MCP config the reviewer must use. The reviewer resumes the work
@@ -1441,6 +1450,7 @@ async function runAdversarialReviewPass(
     reportPath,
     resumed: !!resumeSessionId,
     autonomous: ctx.autonomous,
+    testGateFollows: ctx.testGateFollows,
     prdTreeDir: `${relativeToRoot(layout, layout.rexDir)}/${PRD_TREE_DIRNAME}/`,
   });
 
@@ -1739,6 +1749,8 @@ interface SuccessContext {
    * used its one read-only-refusal retry.
    */
   readOnlyRetryAvailable?: boolean;
+  /** Task files earlier attempts already committed to the branch (#539). */
+  priorAttemptWork?: PriorAttemptWork;
 }
 
 /**
@@ -1835,6 +1847,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
       forked: ctx.readOnlyRetryAvailable === true,
       noChanges: !validation.hasChanges,
       toolNames: result.toolCalls.map((c) => c.tool),
+      priorAttemptWorkOnBranch: ctx.priorAttemptWork !== undefined,
     })
   ) {
     // A fork that never tried to edit: the inherited orientation turn won.
@@ -1849,12 +1862,32 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     return "read-only-retry";
   } else {
     // Completion rejected — no meaningful changes
+    const prior = ctx.priorAttemptWork;
+    // The refusal check stood down only because earlier attempts own the work.
+    const suppressed =
+      prior !== undefined &&
+      isReadOnlyRefusal({
+        forked: ctx.readOnlyRetryAvailable === true,
+        noChanges: !validation.hasChanges,
+        toolNames: result.toolCalls.map((c) => c.tool),
+      });
+    const explanation = suppressed ? describePriorAttemptWork(prior, taskId) : undefined;
     run.status = "failed";
     run.summary = result.summary;
-    run.error = validation.reason;
-    info(`\nCompletion rejected: ${validation.reason}`);
+    run.error = explanation ? `${validation.reason} ${explanation}` : validation.reason;
+    info(`\nCompletion rejected: ${run.error}`);
     info(formatValidationResult(validation));
-    await handleRunFailure(store, taskId, "pending", "completion_rejected", formatValidationResult(validation));
+    if (suppressed) {
+      run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: "unknown", notes: [] };
+      run.diagnostics.notes.push(suppressionNote(prior));
+    }
+    await handleRunFailure(
+      store,
+      taskId,
+      "pending",
+      "completion_rejected",
+      explanation ? `${formatValidationResult(validation)}\n${explanation}` : formatValidationResult(validation),
+    );
   }
 
   return "break";
@@ -2091,6 +2124,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // describe a fix is the interactive workflow, not this one.
         permissionMode: "acceptEdits",
         autonomous: autonomous || opts.yes === true || process.stdin.isTTY !== true,
+        testGateFollows: config.skipFullTestGate !== true,
         taskTitle: brief.task.title,
         mcpConfigPath,
         pidHolder: liveProgress,
@@ -2105,6 +2139,43 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Snapshot everything already dirty, so the run's own work can be told
   // apart from the operator's at commit time (see stageRunWork).
   const baselineDirty = await captureBaselineDirty(projectDir);
+
+  // The previous run failed only at the test gate with its work committed:
+  // re-run the gate instead of an agent session (#539). No heartbeat, warm
+  // parent or spawn — there is nothing for an agent to do.
+  const gateOnly = await planGateOnlyRetry({ projectDir, taskId, runHistory: opts.runHistory, claims: opts.claims });
+  if (gateOnly) {
+    await executeGateOnlyRetry({
+      plan: gateOnly,
+      run,
+      memoryCtx,
+      review: reviewPassContext
+        ? async (base) => {
+            await runAdversarialReviewPass(reviewPassContext, {
+              run, taskId, projectDir, startingHead: base, sessionId: undefined,
+            });
+          }
+        : undefined,
+      finalize: {
+        claims: opts.claims,
+        henchDir,
+        projectDir,
+        config,
+        testCommand: brief.project.testCommand,
+        selfHeal: config.selfHeal,
+        rollbackOnFailure: opts.rollbackOnFailure,
+        yes: opts.yes,
+        autonomous,
+        store,
+        autoCommit: config.autoCommit === true,
+        skipFullTestGate: config.skipFullTestGate,
+        baselineUntracked,
+        baselineDirty,
+        reviewOptional: opts.reviewOptional,
+      },
+    });
+    return { run };
+  }
 
   const retryConfig: RetryConfig = config.retry ?? {
     maxRetries: 3,
@@ -2331,6 +2402,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // orientation as still in force (#473). The parent is not broken, so the
   // cache stays; this run stops forking and re-spawns cold once, again
   // without charging retry budget.
+  // Task files earlier attempts already committed: an empty diff over them is
+  // finished work, not a read-only refusal (#539). Computed once per run.
+  const priorAttemptWork = await findPriorAttemptWork({ projectDir, taskId, runHistory: opts.runHistory });
   let readOnlyRetryUsed = false;
   /** True for the one cold spawn that follows a read-only refusal. */
   let readOnlyRetryPending = false;
@@ -2680,6 +2754,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           attemptAccumulator,
           runAccumulator,
           readOnlyRetryAvailable: lastSpawnForked && !readOnlyRetryUsed,
+          priorAttemptWork,
         });
         if (action === "read-only-retry") {
           // Stop forking for the rest of the run but keep the cache entry:

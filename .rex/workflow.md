@@ -2,18 +2,16 @@ This codebase will outlive you. Every shortcut you take becomes someone else's b
 Fight entropy. Leave the codebase better than you found it. Use as few words as is necessary
 to describe changes, and thoughts.
 
-0. Run the project's validation command to ensure a clean state.
-   Fix and commit if anything fails.
-1. Call get_next_task. If no actionable task exists, report COMPLETE and exit.
-2. Read the task's full context: parent chain, description, acceptance criteria.
-3. If you enter Plan mode, execute your recommended steps without waiting for input.
-   If the plan requires splitting the task, use add_item to create subtasks and
-   proceed with the first one.
-4. Implement using TDD where possible: failing test -> green -> refactor.
-5. Run validation and full test suite. If test failures are pre-existing, fix them anyway.
-6. Call update_task_status to mark the task complete.
-7. Call append_log with what was done, decisions made, and issues encountered.
-8. Commit changes.
-9. If ending in plan mode, use add_item to break down remaining work with enough
-   detail that the next session won't need to re-plan. Then exit.
-10. Exit after one task. One task per execution, no exceptions.
+## n-dx repo rules
+
+Validate with scoped commands. Do not run the whole repository suite.
+
+- Package test file: `pnpm --filter @n-dx/<pkg> exec vitest run <file>`
+- Package suite: `pnpm --filter @n-dx/<pkg> exec vitest run`
+- Root test file: `node_modules/.bin/vitest run tests/<path>`
+- Build only what you changed: `pnpm --filter @n-dx/<pkg> build`. Root e2e tests spawn built CLIs, so rebuild a changed package before running them.
+- Do not prefix commands with `cd … &&`; use `--filter`.
+
+Cost: one full pass (`pnpm test`, `run-all-tests.mjs`) takes ~9 min quiet, ~14 min loaded; the root suite alone 2.5–6 min. hench's gate runs the affected suites after you finish, and CI runs everything on three OSes. Widen only when a scoped failure needs it.
+
+**Pre-existing failures.** A failing test you did not cause still blocks this branch's PR, because CI runs every suite. If the failing test or the code it covers changed on this branch (`git log main..HEAD -- <paths>`), it is this branch's defect: fix it here. If it is not, do not fix it inside this task: record it with `append_log` and in your summary so it becomes its own task. Never skip, weaken or delete a test to get green.
