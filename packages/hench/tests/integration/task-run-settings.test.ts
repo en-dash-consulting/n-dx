@@ -95,6 +95,49 @@ describe("precedence: CLI flag > task run > hench.* > llm.* > default", () => {
     expect(r.model.value).toBe(TIER_MODELS.claude.heavy);
   });
 
+  it("normalizes a saved pin with the active vendor's own rules, not Claude's alone", () => {
+    // A Claude alias expands, as it always did …
+    expect(resolveFor({ item: task({ models: { claude: "opus" } }) }).model.value).toBe(
+      resolveModel("opus"),
+    );
+    // … and a Codex id retired by OpenAI remaps to its replacement. Resolving
+    // the pin with `resolveModel` alone knew only Claude's aliases, so this was
+    // sent to Codex unchanged and the run failed on a withdrawn model.
+    const codex = resolveFor({
+      vendor: "codex",
+      llm: { vendor: "codex" },
+      item: task({ models: { codex: "gpt-5.4" } }),
+    });
+    expect(codex.model).toMatchObject({ value: NEWEST_MODELS.codex, source: "task.run.models" });
+    expect(codex.warnings).toEqual([]);
+  });
+
+  it("maps a retired Codex pin to the tier its replacement belongs to", () => {
+    // The weight follows the model that will actually run, not the id typed.
+    const light = resolveFor({
+      vendor: "codex",
+      llm: { vendor: "codex" },
+      item: task({ models: { codex: "gpt-5.4-mini" } }),
+    });
+
+    expect(light.model.value).toBe(TIER_MODELS.codex.light);
+    expect(light.model.weight).toBe("light");
+  });
+
+  it("judges vendor compatibility on the normalized id, not the one that was typed", () => {
+    // A Claude model saved under `codex` is still refused — normalization is
+    // not a way for an incompatible pin to slip through.
+    const r = resolveFor({
+      vendor: "codex",
+      llm: { vendor: "codex" },
+      item: task({ models: { codex: TIER_MODELS.claude.heavy } }, "Claude pin under codex"),
+    });
+
+    expect(r.model.source).not.toBe("task.run.models");
+    expect(r.warnings.map((w) => w.code)).toEqual(["saved-model-incompatible"]);
+    expect(r.warnings[0].message).toContain(TIER_MODELS.claude.heavy);
+  });
+
   it("resolves the same saved tier to the vendor the run is actually on", () => {
     const r = resolveFor({
       item: task({ tier: "heavy", models: { claude: TIER_MODELS.claude.heavy } }),

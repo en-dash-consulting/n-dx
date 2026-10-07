@@ -8,6 +8,8 @@
 
 Settings are resolved **per task, after selection** rather than once per invocation, so inside `--loop`, `--iterations` and `--epic-by-epic` each task runs with its own — including a saved `provider`, which now chooses the CLI or API loop for that task alone. An explicit CLI flag still applies to every task in the loop. One resolver serves both the run path and `ndx work --resolve`, so the preview cannot report settings the run would not use.
 
+A saved exact model pin is normalized with the active vendor's own rules before it is used or checked, so a Codex id OpenAI has retired (`gpt-5.4`, `gpt-5-codex`) remaps to its replacement rather than being sent to a withdrawn model — and the compatibility check judges the id that will actually be sent.
+
 A saved value that cannot be honoured never wedges a loop: a model, provider, review request or permission mode the active vendor cannot serve is skipped with a warning naming the task, and a block that fails validation is ignored whole with one warning. `--review` keeps refusing on the API provider rather than reporting an unreviewed run as reviewed — a saved `provider` that would make the review impossible loses to the flag.
 
 Run records are honest about the model: `weight` is the tier of the model that actually ran rather than the tier `agent.execute` routes to — so a run an explicit `--model`, a `hench.models` pin or a saved block put on the heavy-tier model no longer records as `standard` — and the new `modelSource` field names the setting that chose it.

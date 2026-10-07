@@ -12,7 +12,6 @@ import {
   LLM_VENDOR,
   REVIEW_MODELS,
   isModelCompatibleWithVendor,
-  resolveModel,
   resolveReviewModel,
   resolveTaskModel,
 } from "../../prd/llm-gateway.js";
@@ -511,7 +510,18 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // -- Model ---------------------------------------------------------------
   const routed = resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor });
   const cliModel = selectCliModelOverride(flags, vendor).value;
-  const savedModel = saved?.models?.[vendor]?.trim();
+  const savedModelRaw = saved?.models?.[vendor]?.trim();
+  // Normalized the way every other model in the chain is: through
+  // `resolveTaskModel`, which applies the active vendor's own rules — Claude's
+  // aliases expand, and Codex's retired ids (`gpt-5.4`, `gpt-5-codex`, …) remap
+  // to the replacements OpenAI names. `resolveModel` alone knows only Claude's
+  // aliases, so a saved `gpt-5.4` passed the vendor check unchanged and the run
+  // was sent to a model Codex has withdrawn. Normalizing *before* the
+  // compatibility check also means the check judges the id that will actually
+  // be sent, not the one that was typed.
+  const savedModel = savedModelRaw
+    ? resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor, model: savedModelRaw }).model
+    : undefined;
   // A pin saved under this vendor's name that this vendor cannot run is the
   // one saved value that must never wedge a loop: warn, skip it, carry on down
   // the chain. `local` serves whatever LM Studio has loaded, so every string
@@ -520,11 +530,11 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     savedModel !== undefined
     && savedModel.length > 0
     && (vendor === LLM_VENDOR.LOCAL || isModelCompatibleWithVendor(vendor, savedModel));
-  if (savedModel !== undefined && savedModel.length > 0 && !savedModelUsable) {
+  if (savedModelRaw !== undefined && savedModelRaw.length > 0 && !savedModelUsable) {
     warnings.push({
       code: "saved-model-incompatible",
       message:
-        `The model "${savedModel}" saved on "${item?.title}" cannot run on vendor="${vendor}" — ` +
+        `The model "${savedModelRaw}" saved on "${item?.title}" cannot run on vendor="${vendor}" — ` +
         `falling back to this project's configured model.`,
     });
   }
@@ -553,7 +563,7 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
       headerSource: agentModel.source,
     };
   } else if (savedModelUsable) {
-    const value = resolveModel(savedModel as string);
+    const value = savedModel as string;
     model = { value, source: "task.run.models", weight: weightOf(value, false), headerSource: "configured" };
   } else if (savedTierModel) {
     model = {
