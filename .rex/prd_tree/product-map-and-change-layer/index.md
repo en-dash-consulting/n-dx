@@ -44,7 +44,7 @@ plannedRelease: "1.0.0"
 | [Route the remaining .n-dx config readers through the resolver](./route-the-remaining-n-dx-config/index.md) | pending |
 | [Select and complete work on changes](./select-and-complete-work-on-changes/index.md) | pending |
 | [Shared assistant guidance for every vendor](./shared-assistant-guidance-for-every/index.md) | pending |
-| [Single state writer for state.yaml](./single-state-writer-for-state-yaml/index.md) | pending |
+| [Single state writer for state.yaml](./single-state-writer-for-state-yaml/index.md) | completed |
 | [Split the rex MCP tools into one module per tool](./split-the-rex-mcp-tools-into-one/index.md) | completed |
 | [Stamp shippedIn from any CI](./stamp-shippedin-from-any-ci/index.md) | pending |
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | pending |
