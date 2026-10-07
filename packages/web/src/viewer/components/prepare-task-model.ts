@@ -22,6 +22,14 @@ import type { HubMemoryPressure, RunOptionKey, RunOptions } from "../external.js
 export interface PrepResolved<T> {
   value: T;
   source: string;
+  /**
+   * What this setting would be without the task's saved block — this
+   * project's own default. Present only when a saved value is what won (its
+   * `source` starts with `task.run`), so the modal can show "project default:
+   * X from llm.model" beside it and know what Save would change. Absent from a
+   * hench that predates it.
+   */
+  fallback?: { value: T; source: string };
 }
 
 export interface PrepRefusal {
@@ -37,6 +45,16 @@ export interface PrepWarning {
   code: string;
   message: string;
 }
+
+/**
+ * A task's saved `run` block, as rex stores and validates it.
+ *
+ * Deliberately not `RunOptions`: a saved block is vendor-agnostic, so model
+ * intent is a portable `tier` plus optional exact pins per vendor, where one
+ * launch's options carry a single model id. Keys are open here because the
+ * viewer only displays them — rex owns the schema.
+ */
+export type PrepSavedSettings = Record<string, unknown>;
 
 export interface PrepResolvedSettings {
   vendor: PrepResolved<string>;
@@ -65,6 +83,11 @@ export interface PrepResponse {
     dirty: boolean;
     liveRun: boolean;
   };
+  /**
+   * The task's own saved run settings, or null when it carries none. Absent
+   * from a hench that predates them.
+   */
+  saved?: PrepSavedSettings | null;
   resolved: PrepResolvedSettings;
   options: Array<{ key: string; values?: readonly string[] }>;
   refusals: PrepRefusal[];

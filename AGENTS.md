@@ -284,9 +284,11 @@ Two MCP servers provide structured access to project data. They are configured i
 - Find out what to work on next (`get_next_task`)
 - Read task details and acceptance criteria (`get_item`)
 - Update task status as you work (`update_task_status`)
-- Save how a task should run — a portable model tier plus optional per-vendor model pins (`tier`, `models`), provider, review, permission mode, test gate, turn and token budgets, notes for the agent (`add_item` / `edit_item` with a `run` block; an object replaces the whole block, `null` removes it)
+- Save how a task should run — a portable model tier plus optional per-vendor model pins (`tier`, `models`), provider, review, permission mode, test gate, turn and token budgets, notes for the agent (`add_item` / `edit_item` with a `run` block; an object replaces the whole block, `null` removes it). `ndx work` applies the block per task — CLI flag > task `run` > `hench.*` > `llm.*` > default — so each task in a `--loop` uses its own, while an explicit flag applies to every task; `--no-review` and `--no-skip-test-gate` turn a saved setting off for one run
 - Log what you did (`append_log`)
 - Check overall project progress (`get_prd_status`)
+
+> **`ndx work` applies a saved `run` block.** Precedence per setting: CLI flag > the task's `run` > `hench.*` > `llm.*` > default, resolved per task after selection — so in `--loop` / `--iterations` / `--epic-by-epic` each task uses its own saved settings, while an explicit flag applies to every task in the loop. A saved `provider` picks the cli or api loop for that task. `--no-review` and `--no-skip-test-gate` turn a saved setting off for one run. A saved value the active vendor cannot honour is skipped with a warning and never stops a loop; a malformed block is ignored whole. `ndx work --task=<id> --resolve .` prints every setting with the key that supplied it (`task.run` when the saved block won), the `saved` block itself, and each saved setting's `fallback`.
 
 **Sourcevision** — Codebase analysis. Use sourcevision tools when you need to:
 
