@@ -32,6 +32,7 @@ import { exec, getWorktreeRoot, listWorktrees, resolveLayout } from "@n-dx/llm-c
 import type { GitWorktree } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
+import { resolveWebPaths } from "./paths.js";
 import { ensureWorktreeRunWatcher, pruneWorktreeRunWatchers } from "./routes-hench.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 
@@ -118,9 +119,6 @@ export const WORKTREES_CACHE_TTL_MS = 5_000;
 
 /** `git status` per worktree — a metadata read; anything slower is a stuck git. */
 const GIT_STATUS_TIMEOUT_MS = 5_000;
-
-const PID_FILE = ".n-dx-web.pid";
-const PORT_FILE = ".n-dx-web.port";
 
 interface WorktreesCache {
   projectDir: string;
@@ -371,14 +369,22 @@ function summariseRuns(worktreePath: string): WorktreeRunsSummary {
   return { total, running, lastFinishedAt, latest };
 }
 
-/** Read the server marker files `ndx start` leaves in a served directory. */
+/**
+ * Read the server marker files `ndx start` leaves in a served directory.
+ *
+ * Resolved per worktree, because each worktree is on its own layout: core's
+ * `web.js` writes the pid marker and the server writes the port marker at the
+ * resolver's answer for that directory, so reading the legacy names here
+ * showed every migrated worktree as having no server.
+ */
 function readServerPresence(worktreePath: string): WorktreeServerPresence {
+  const { pidFile: pidPath, portFile: portPath } = resolveWebPaths(worktreePath);
   let pidFile = false;
   let pid: number | null = null;
   let port: number | null = null;
 
   try {
-    const raw = JSON.parse(readFileSync(join(worktreePath, PID_FILE), "utf-8")) as Record<string, unknown>;
+    const raw = JSON.parse(readFileSync(pidPath, "utf-8")) as Record<string, unknown>;
     pidFile = true;
     if (typeof raw.pid === "number") pid = raw.pid;
     if (typeof raw.port === "number") port = raw.port;
@@ -387,7 +393,7 @@ function readServerPresence(worktreePath: string): WorktreeServerPresence {
   }
 
   try {
-    const parsed = parseInt(readFileSync(join(worktreePath, PORT_FILE), "utf-8").trim(), 10);
+    const parsed = parseInt(readFileSync(portPath, "utf-8").trim(), 10);
     if (!Number.isNaN(parsed)) port = parsed;
   } catch {
     // Port file is written by the server itself; absence means not listening.

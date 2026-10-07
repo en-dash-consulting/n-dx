@@ -8,11 +8,11 @@
  *
  * @see tests/e2e/domain-isolation.test.js — cross-package gateway enforcement
  * @see packages/web/tests/integration/boundary-check.test.ts — intra-package server/viewer boundary
- * @see tests/e2e/layout-literal-policy.test.js — no new literal `.rex/`, `.hench/`,
- *   `.sourcevision/` or `.n-dx*` paths outside the layout resolver. It lives in
- *   its own file rather than here because it needs a standing inventory of the
- *   sites the path sweep has not reached, the way
- *   `shell-spawn-inventory-policy` and `wall-clock-inventory-policy` do.
+ * @see tests/e2e/layout-literal-policy.test.js — no literal `.rex/`, `.hench/` or
+ *   `.sourcevision/` path outside the layout resolver, and no *new* `.n-dx*` one.
+ *   It lives in its own file rather than here because the `.n-dx*` half still
+ *   needs a standing inventory of the sites the config sweep has not reached,
+ *   the way `shell-spawn-inventory-policy` and `wall-clock-inventory-policy` do.
  *
  * These test files together enforce the full architectural guardrail suite.
  * Changes to one should be reviewed against the others for consistency.

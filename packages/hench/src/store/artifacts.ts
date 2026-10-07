@@ -43,13 +43,13 @@
 import { relative as relativePath } from "node:path";
 import { realpath } from "node:fs/promises";
 import { execStdout } from "../process/exec.js";
-import { relativeToRoot, resolveLayout, type LayoutMode } from "../prd/llm-gateway.js";
 import {
   AGENT_MCP_DIRNAME,
   LOCKS_DIRNAME,
   RECOVERY_DIRNAME,
   REVIEWS_DIRNAME,
   RUNS_DIRNAME,
+  stateDirNameUnder,
   USAGE_CURSORS_DIRNAME,
 } from "./paths.js";
 
@@ -112,26 +112,12 @@ export function henchRuntimeGitignoreEntries(henchDirName: string): string[] {
  * writing the other one's ignore lines into `.gitignore` is noise at best.
  */
 export const HENCH_RUNTIME_GITIGNORE_ENTRIES: readonly string[] = [
-  ...henchRuntimeGitignoreEntries(henchDirNameUnder("legacy")),
+  ...henchRuntimeGitignoreEntries(stateDirNameUnder("hench", "legacy")),
   // Root-relative entries are the same on both layouts, so only the ones
   // inside the state directory are repeated.
-  ...henchRuntimeGitignoreEntries(henchDirNameUnder("ndx"))
+  ...henchRuntimeGitignoreEntries(stateDirNameUnder("hench", "ndx"))
     .filter((entry) => !RUNTIME_ENTRIES_AT_ROOT.includes(entry)),
 ];
-
-/**
- * Hench's state directory under a named layout, spelled the way a git pattern
- * has to spell it.
- *
- * `"."` as the root is not a lookup — an explicit `mode` skips detection
- * entirely, so nothing touches the disk and the result is purely the name. The
- * point is that neither `.hench` nor `.ndx/hench` is written out here: both
- * come from the resolver, so a rename there reaches these patterns too.
- */
-function henchDirNameUnder(mode: LayoutMode): string {
-  const layout = resolveLayout(".", { mode });
-  return relativeToRoot(layout, layout.henchDir);
-}
 
 /** Normalize a path for comparison: forward slashes, no leading `./`. */
 function normalize(path: string): string {

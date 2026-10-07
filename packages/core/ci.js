@@ -25,6 +25,7 @@ import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
 import { findSharedSecrets, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel } from "./config.js";
 import { isGitTracked } from "./gitignore.js";
+import { layoutStateNames, relativeToRoot, resolveLayout } from "./layout.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -39,6 +40,11 @@ const MONOREPO_ROOT = resolve(__dir, "../..");
  *   child process.  Callers pass a tracked wrapper so the child is
  *   registered with the global cleanup gate and terminated on SIGINT/SIGTERM.
  */
+/** Directory entry names a source scan must not descend into. */
+function sourceScanSkipDirs() {
+  return new Set(["node_modules", "dist", ".git", ...layoutStateNames().dirNames]);
+}
+
 function runCapture(script, args, spawnFn) {
   return new Promise((res) => {
     const child = spawnFn(
@@ -463,10 +469,11 @@ export async function runCI(dir, flags, { run, tools, spawnTracked = spawn }) {
   const isJSON = flags.some((f) => f === "--format=json");
 
   // ── Pre-flight: check required directories ──────────────────────────────
-  const requiredDirs = [".rex", ".sourcevision"];
-  const missingDirs = requiredDirs.filter((d) => !existsSync(join(dir, d)));
+  const layout = resolveLayout(dir);
+  const requiredDirs = [layout.rexDir, layout.sourcevisionDir];
+  const missingDirs = requiredDirs.filter((d) => !existsSync(d));
   if (missingDirs.length > 0) {
-    const error = `Missing ${missingDirs.join(", ")} in ${dir}`;
+    const error = `Missing ${missingDirs.map((d) => relativeToRoot(layout, d)).join(", ")} in ${dir}`;
     const hint = `Run 'ndx init${dir === process.cwd() ? "" : " " + dir}' to set up the project.`;
     if (isJSON) {
       console.log(JSON.stringify({ timestamp: new Date().toISOString(), ok: false, error, hint, steps: [] }, null, 2));
@@ -621,7 +628,7 @@ function isPhantomZone(zone) {
  * are excluded from health checks to prevent false-positive violations.
  */
 function checkZoneHealth(dir) {
-  const zonesPath = join(dir, ".sourcevision", "zones.json");
+  const zonesPath = join(resolveLayout(dir).sourcevisionDir, "zones.json");
   if (!existsSync(zonesPath)) {
     return { ok: true, checked: 0, violations: [], phantomSkipped: 0 };
   }
@@ -714,8 +721,9 @@ function zoneIdToDirName(id) {
  * Only checks top-level zones (sub-zones live inside their parent's directory).
  */
 function checkZoneIdConsistency(dir) {
-  const zonesJsonPath = join(dir, ".sourcevision", "zones.json");
-  const zonesDir = join(dir, ".sourcevision", "zones");
+  const layout = resolveLayout(dir);
+  const zonesJsonPath = join(layout.sourcevisionDir, "zones.json");
+  const zonesDir = join(layout.sourcevisionDir, "zones");
 
   if (!existsSync(zonesJsonPath) || !existsSync(zonesDir)) {
     return { ok: true, checked: 0, mismatches: [] };
@@ -763,7 +771,7 @@ function checkZoneIdConsistency(dir) {
   for (const dirName of actualDirs) {
     if (!expectedDirs.has(dirName)) {
       mismatches.push(
-        `directory "${dirName}" exists in .sourcevision/zones/ but has no matching zone in zones.json`,
+        `directory "${dirName}" exists in ${relativeToRoot(layout, zonesDir)}/ but has no matching zone in zones.json`,
       );
     }
   }
@@ -1004,7 +1012,7 @@ function checkArchitecturePolicy(dir) {
   const violations = [];
   let checked = 0;
 
-  const skipDirs = new Set(["node_modules", "dist", ".git", ".hench", ".rex", ".sourcevision"]);
+  const skipDirs = sourceScanSkipDirs();
   const childProcessPattern = /(?:from\s+["'](?:node:)?child_process["']|require\(["'](?:node:)?child_process["']\))/;
 
   function walkSrc(d) {
@@ -1060,12 +1068,17 @@ function checkArchitecturePolicy(dir) {
 // ── Data-layer contract ───────────────────────────────────────────────────────
 
 /**
- * Data directories that must never be imported as modules.
+ * Data directories that must never be imported as modules, in both layouts.
  * These directories contain JSON state files managed via CLI or filesystem I/O.
  * Direct module imports (import/require) would create fragile coupling between
  * source code and on-disk state layout.
+ *
+ * See `layoutStateNames` in `layout.js` for why both spellings are matched
+ * rather than the project's own.
  */
-const DATA_DIRECTORIES = [".rex", ".sourcevision", ".hench"];
+function dataDirectories() {
+  return layoutStateNames().statePaths;
+}
 
 /**
  * Check that no source files contain import/require paths resolving into
@@ -1085,7 +1098,8 @@ function checkDataLayerContract(dir) {
   const violations = [];
   let checked = 0;
 
-  const skipDirs = new Set(["node_modules", "dist", ".git", ".hench", ".rex", ".sourcevision"]);
+  const skipDirs = sourceScanSkipDirs();
+  const dataDirs = dataDirectories();
 
   // Match import/require paths that resolve into data directories.
   // Catches patterns like:
@@ -1094,8 +1108,8 @@ function checkDataLayerContract(dir) {
   //   require("./.rex/prd.json")
   //   from "../../.hench/config.json"
   // Does NOT match filesystem reads (readFileSync, fs.readFile, etc.)
-  const dataImportPatterns = DATA_DIRECTORIES.map((d) => {
-    const escaped = d.replace(".", "\\.");
+  const dataImportPatterns = dataDirs.map((d) => {
+    const escaped = d.replace(/\./g, "\\.");
     return new RegExp(
       `(?:from\\s+["'][^"']*\\/${escaped}\\/|from\\s+["']${escaped}\\/|require\\(["'][^"']*\\/${escaped}\\/|require\\(["']${escaped}\\/)`,
     );
@@ -1145,7 +1159,7 @@ function checkDataLayerContract(dir) {
               violations.push({
                 file: rel,
                 line: i + 1,
-                message: `module import resolves into ${DATA_DIRECTORIES[p]}/ — use filesystem I/O (readFileSync/writeFileSync) instead of import/require`,
+                message: `module import resolves into ${dataDirs[p]}/ — use filesystem I/O (readFileSync/writeFileSync) instead of import/require`,
               });
             }
           }

@@ -31,6 +31,7 @@ export {
   PRDMarkdownMigrationError,
   jsonToMarkdownFilename,
   toMarkdownSourcePath,
+  CANONICAL_MARKDOWN_SOURCE_PATH,
 } from "./prd-md-migration.js";
 export type { MarkdownMigrationResult } from "./prd-md-migration.js";
 export { serializeDocument } from "./markdown-serializer.js";

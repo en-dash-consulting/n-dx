@@ -18,6 +18,7 @@
 
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { henchDirIn } from "./paths.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
@@ -132,7 +133,7 @@ interface HenchConfigData {
 // ── Data loading helpers ─────────────────────────────────────────────
 
 function loadRuns(projectDir: string): RunData[] {
-  const runsDir = join(projectDir, ".hench", "runs");
+  const runsDir = join(henchDirIn(projectDir), "runs");
   let files: string[];
   try {
     files = readdirSync(runsDir);
@@ -158,7 +159,7 @@ function loadRuns(projectDir: string): RunData[] {
 
 function loadConfig(projectDir: string): HenchConfigData | null {
   try {
-    const raw = readFileSync(join(projectDir, ".hench", "config.json"), "utf-8");
+    const raw = readFileSync(join(henchDirIn(projectDir), "config.json"), "utf-8");
     return JSON.parse(raw) as HenchConfigData;
   } catch {
     return null;
@@ -175,7 +176,7 @@ function defaultSettings(): AdaptiveSettings {
 }
 
 function loadAdaptiveState(projectDir: string): AdaptiveState {
-  const path = join(projectDir, ".hench", "adaptive.json");
+  const path = join(henchDirIn(projectDir), "adaptive.json");
   try {
     if (!existsSync(path)) return { settings: defaultSettings(), history: [], overrides: {} };
     const raw = readFileSync(path, "utf-8");
@@ -195,7 +196,7 @@ function loadAdaptiveState(projectDir: string): AdaptiveState {
 
 function saveAdaptiveState(projectDir: string, state: AdaptiveState): void {
   writeFileSync(
-    join(projectDir, ".hench", "adaptive.json"),
+    join(henchDirIn(projectDir), "adaptive.json"),
     JSON.stringify(state, null, 2) + "\n",
     "utf-8",
   );
@@ -716,7 +717,7 @@ async function handleApplyAdjustment(
   }
 
   // Read and modify config
-  const configPath = join(ctx.projectDir, ".hench", "config.json");
+  const configPath = join(henchDirIn(ctx.projectDir), "config.json");
   let config: Record<string, unknown>;
   try {
     config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
@@ -851,7 +852,7 @@ async function handleSetOverride(
   }
 
   // Also apply the override to the actual config
-  const configPath = join(ctx.projectDir, ".hench", "config.json");
+  const configPath = join(henchDirIn(ctx.projectDir), "config.json");
   try {
     const config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
     const previousValue = getNestedValue(config, key);

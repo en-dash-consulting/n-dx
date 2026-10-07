@@ -16,7 +16,7 @@
 
 import { randomUUID } from "node:crypto";
 import { trustSummaryForRun } from "../../store/trust.js";
-import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
+import { evaluateRepoTrust, resolveLayout } from "../../prd/llm-gateway.js";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
@@ -2957,7 +2957,7 @@ export async function performCommitPromptIfNeeded(
       // Load project config to get public URL
       let publicUrl = "http://localhost:3117"; // default fallback
       try {
-        const configPath = join(projectDir, ".n-dx.json");
+        const configPath = resolveLayout(projectDir).configFile;
         if (pathExists(configPath)) {
           const configContent = readConfigFile(configPath, "utf-8");
           const config = JSON.parse(configContent) as Record<string, unknown>;

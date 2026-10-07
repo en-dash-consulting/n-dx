@@ -33,7 +33,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { execFile } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -55,9 +55,14 @@ const SERVER_ENTRY_URL = pathToFileURL(SERVER_ENTRY).href;
  * read races that cleanup. Reading it while the server is still listening is
  * also when the orchestrator actually reads it.
  */
-function driverScript(projectDir: string, requestedPort: number): string {
+function driverScript(
+  projectDir: string,
+  requestedPort: number,
+  portFileSegments: string[],
+  probeSegments: string[] | null,
+): string {
   return `
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { startServer } from ${JSON.stringify(SERVER_ENTRY_URL)};
 
@@ -65,12 +70,15 @@ const result = await startServer(${JSON.stringify(projectDir)}, ${requestedPort}
 
 let portFile = null;
 try {
-  portFile = readFileSync(join(${JSON.stringify(projectDir)}, ".n-dx-web.port"), "utf-8").trim();
+  portFile = readFileSync(join(${JSON.stringify(projectDir)}, ...${JSON.stringify(portFileSegments)}), "utf-8").trim();
 } catch (err) {
   portFile = "UNREADABLE: " + err.message;
 }
 
-console.log("NDX_RESULT=" + JSON.stringify({ ...result, portFile }));
+const probe = ${JSON.stringify(probeSegments)};
+const probeExists = probe ? existsSync(join(${JSON.stringify(projectDir)}, ...probe)) : null;
+
+console.log("NDX_RESULT=" + JSON.stringify({ ...result, portFile, probeExists }));
 process.exit(0);
 `;
 }
@@ -79,14 +87,20 @@ interface DriverResult {
   stdout: string;
   port: number;
   isFallback: boolean;
-  /** Contents of `.n-dx-web.port`, read by the child while the server was up. */
+  /** Contents of the port file, read by the child while the server was up. */
   portFile: string | null;
+  /** Whether the probe path existed while the server was up, when one was given. */
+  probeExists: boolean | null;
   exitCode: number;
 }
 
-async function boot(projectDir: string, requestedPort: number): Promise<DriverResult> {
+async function boot(
+  projectDir: string,
+  requestedPort: number,
+  { portFile = [".n-dx-web.port"], probe = null }: { portFile?: string[]; probe?: string[] | null } = {},
+): Promise<DriverResult> {
   const scriptPath = join(projectDir, "driver.mjs");
-  await writeFile(scriptPath, driverScript(projectDir, requestedPort), "utf-8");
+  await writeFile(scriptPath, driverScript(projectDir, requestedPort, portFile, probe), "utf-8");
 
   const { stdout, exitCode } = await new Promise<{ stdout: string; exitCode: number }>(
     (resolvePromise) => {
@@ -110,7 +124,12 @@ async function boot(projectDir: string, requestedPort: number): Promise<DriverRe
 
   const match = /NDX_RESULT=(.+)/.exec(stdout);
   const parsed = match
-    ? JSON.parse(match[1]) as { port: number; isFallback: boolean; portFile: string | null }
+    ? JSON.parse(match[1]) as {
+        port: number;
+        isFallback: boolean;
+        portFile: string | null;
+        probeExists: boolean | null;
+      }
     : null;
 
   return {
@@ -118,6 +137,7 @@ async function boot(projectDir: string, requestedPort: number): Promise<DriverRe
     port: parsed?.port ?? -1,
     isFallback: parsed?.isFallback ?? false,
     portFile: parsed?.portFile ?? null,
+    probeExists: parsed?.probeExists ?? null,
     exitCode,
   };
 }
@@ -168,6 +188,32 @@ describe("what the server reports about the port it bound", () => {
         Number(result.portFile),
         `the port file must still carry the real ephemeral port (got ${result.portFile})`,
       ).toBe(result.port);
+    } finally {
+      await removeTempDir(dir);
+    }
+  }, 90_000);
+
+  it("publishes the port where the orchestrator looks for it on a .ndx/ project", async () => {
+    // Core's `web.js` waits on the resolver's port marker — `.ndx/web.port`
+    // on a migrated project. The server used to write `.n-dx-web.port` at the
+    // root regardless, so `ndx start --background` timed out on every
+    // migrated project and printed the requested port rather than the one it
+    // got, `ndx refresh --live-server` reloaded nothing, and the hub marked
+    // the project unreachable. The two sides have to name the same file.
+    const dir = await mkdtemp(join(tmpdir(), "ndx-port-ndx-layout-"));
+    try {
+      await mkdir(join(dir, ".ndx"), { recursive: true });
+      const result = await boot(dir, 0, {
+        portFile: [".ndx", "web.port"],
+        probe: [".n-dx-web.port"],
+      });
+
+      expect(result.exitCode, `server exited non-zero:\n${result.stdout}`).toBe(0);
+      expect(
+        Number(result.portFile),
+        `.ndx/web.port must carry the bound port (got ${result.portFile})`,
+      ).toBe(result.port);
+      expect(result.probeExists, "no legacy marker at the root of a .ndx/ project").toBe(false);
     } finally {
       await removeTempDir(dir);
     }

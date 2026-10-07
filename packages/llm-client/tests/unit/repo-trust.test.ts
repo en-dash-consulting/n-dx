@@ -51,6 +51,20 @@ describe("guardBaselineForLanguage", () => {
     expect(guardBaselineForLanguage("go").allowedCommands).toContain("go");
     expect(guardBaselineForLanguage("cobol").allowedCommands).toEqual(guardBaselineForLanguage("typescript").allowedCommands);
   });
+
+  it("keeps the agent out of n-dx's own state on both layouts", () => {
+    // Only `.hench/**` and `.rex/**` were listed, so on a migrated project
+    // the baseline every guard is clamped to let the agent write n-dx's own
+    // state — the PRD tree included. This is a classifier over whatever path
+    // the agent asks for, so it has to recognise both spellings; the
+    // container entry covers all three of its children at once.
+    for (const lang of ["typescript", "go", "swift", undefined]) {
+      const { blockedPaths } = guardBaselineForLanguage(lang);
+      expect(blockedPaths, lang ?? "default").toContain(".hench/**");
+      expect(blockedPaths, lang ?? "default").toContain(".rex/**");
+      expect(blockedPaths, lang ?? "default").toContain(".ndx/**");
+    }
+  });
 });
 
 describe("clampGuardToBaseline", () => {
