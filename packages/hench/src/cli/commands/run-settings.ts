@@ -57,6 +57,15 @@ export interface ReviewOptions {
    * no-ops when its reviewer cannot start is worse than no gate at all.
    */
   reviewOptional: boolean;
+  /**
+   * `--no-review` — no review pass for this run, whatever the task saved.
+   *
+   * Distinct from the absence of `--review`: absence says nothing and lets a
+   * task's `run.review` decide, while this overrules it. Saved `reviewModel`
+   * and `reviewOptional` go with it — there is no reviewer for them to
+   * configure.
+   */
+  noReview: boolean;
 }
 
 /**
@@ -90,12 +99,28 @@ export function selectCliModelOverride(
  */
 export function parseReviewOptions(flags: Record<string, string>): ReviewOptions {
   const reviewPass = flags.review === "true";
+  const noReview = flags["no-review"] === "true";
   const approveDiff = flags["approve-diff"] === "true";
+  // Asking for a review and refusing one in the same breath has no reading
+  // that is obviously right, and guessing either way silently gives the
+  // operator the opposite of half their command line.
+  if (reviewPass && noReview) {
+    throw new CLIError(
+      "--review and --no-review were both passed.",
+      "Keep whichever one you meant: --review runs the adversarial pass, --no-review suppresses one the task saved.",
+    );
+  }
   const reviewModelFlag = flags["review-model"];
   if (reviewModelFlag !== undefined && !reviewModelFlag.trim()) {
     throw new CLIError(
       "--review-model requires a model id.",
       "Example: --review-model=claude-opus-5-5. Omit the flag to use the recommended default for your vendor.",
+    );
+  }
+  if (reviewModelFlag && noReview) {
+    throw new CLIError(
+      "--review-model was passed with --no-review.",
+      "There is no review pass to give a model to. Drop one of the two.",
     );
   }
   if (reviewModelFlag && !reviewPass) {
@@ -105,6 +130,12 @@ export function parseReviewOptions(flags: Record<string, string>): ReviewOptions
     );
   }
   const reviewOptional = flags["review-optional"] === "true";
+  if (reviewOptional && noReview) {
+    throw new CLIError(
+      "--review-optional was passed with --no-review.",
+      "It only relaxes a gate the review pass installs, and there is no pass. Drop one of the two.",
+    );
+  }
   if (reviewOptional && !reviewPass) {
     throw new CLIError(
       "--review-optional was passed without --review.",
@@ -114,6 +145,7 @@ export function parseReviewOptions(flags: Record<string, string>): ReviewOptions
   return {
     approveDiff,
     reviewPass,
+    noReview,
     reviewModel: reviewModelFlag?.trim() || undefined,
     reviewOptional,
   };
@@ -150,6 +182,31 @@ export function parseBudgetFlags(flags: Record<string, string>): {
     tokenBudget:
       flags["token-budget"] != null ? safeParseNonNegInt(flags["token-budget"], "token-budget") : undefined,
   };
+}
+
+/**
+ * `--skip-test-gate` and its negation.
+ *
+ * The gate is on by default, so the flag has always been one-directional.
+ * Once `hench.skipFullTestGate` or a task's `run.skipTestGate` can turn it
+ * off, a single run needs a way to put it back — which is what
+ * `--no-skip-test-gate` is for. Neither flag means "leave it to config".
+ *
+ * @throws {CLIError} When both are passed.
+ */
+export function parseTestGateFlags(flags: Record<string, string>): {
+  skip: boolean;
+  noSkip: boolean;
+} {
+  const skip = flags["skip-test-gate"] === "true";
+  const noSkip = flags["no-skip-test-gate"] === "true";
+  if (skip && noSkip) {
+    throw new CLIError(
+      "--skip-test-gate and --no-skip-test-gate were both passed.",
+      "Keep whichever one you meant: --skip-test-gate suppresses the full-suite gate, --no-skip-test-gate forces it to run.",
+    );
+  }
+  return { skip, noSkip };
 }
 
 /** Which input supplied the effective permission mode. */
@@ -395,6 +452,7 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   const reviewOpts = parseReviewOptions(flags);
   const permissionModeFlag = parsePermissionModeFlag(flags);
   const budgets = parseBudgetFlags(flags);
+  const testGate = parseTestGateFlags(flags);
 
   // The saved block, or nothing. `validateRunSettings` is rex's — the same one
   // every writer gates on — so "what hench honours" cannot drift from "what
@@ -543,6 +601,7 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // caller refuses the flag case; this only decides the saved one.
   const savedReviewUnsupported =
     !reviewOpts.reviewPass
+    && !reviewOpts.noReview
     && saved?.review === true
     && reviewProviderError(vendor, resolvedProvider.provider) !== undefined;
   if (savedReviewUnsupported) {
@@ -553,11 +612,13 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   }
   const review: Resolved<boolean> = reviewOpts.reviewPass
     ? { value: true, source: "cli-flag" }
-    : savedReviewUnsupported
-      ? { value: false, source: "vendor-unsupported" }
-      : saved?.review !== undefined
-        ? { value: saved.review, source: "task.run" }
-        : { value: false, source: "built-in" };
+    : reviewOpts.noReview
+      ? { value: false, source: "cli-flag" }
+      : savedReviewUnsupported
+        ? { value: false, source: "vendor-unsupported" }
+        : saved?.review !== undefined
+          ? { value: saved.review, source: "task.run" }
+          : { value: false, source: "built-in" };
   const vendorDefault = REVIEW_MODELS[vendor] ?? "";
   const savedReviewModel = saved?.reviewModels?.[vendor]?.trim();
   const savedReviewTierModel = saved?.reviewTier
@@ -608,17 +669,23 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     },
     review,
     reviewModel,
+    // `--no-review` carries the saved companion settings with it: there is no
+    // reviewer left for them to relax.
     reviewOptional: reviewOpts.reviewOptional
       ? { value: true, source: "cli-flag" }
-      : saved?.reviewOptional !== undefined
-        ? { value: saved.reviewOptional, source: "task.run" }
-        : { value: false, source: "built-in" },
+      : reviewOpts.noReview
+        ? { value: false, source: "cli-flag" }
+        : saved?.reviewOptional !== undefined
+          ? { value: saved.reviewOptional, source: "task.run" }
+          : { value: false, source: "built-in" },
     // `false` is a meaningful saved value: it re-enables a gate
-    // `hench.skipFullTestGate` turns off. Only the flag's `true` outranks it —
-    // there is no `--no-skip-test-gate`, so an absent flag says nothing.
-    skipTestGate:
-      flags["skip-test-gate"] === "true"
-        ? { value: true, source: "cli-flag" }
+    // `hench.skipFullTestGate` turns off. Either flag outranks it; an absent
+    // flag says nothing, which is why the pair exists rather than one flag
+    // with two readings.
+    skipTestGate: testGate.skip
+      ? { value: true, source: "cli-flag" }
+      : testGate.noSkip
+        ? { value: false, source: "cli-flag" }
         : saved?.skipTestGate !== undefined
           ? { value: saved.skipTestGate, source: "task.run" }
           : config.skipFullTestGate !== undefined

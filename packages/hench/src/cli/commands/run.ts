@@ -1791,10 +1791,10 @@ export async function cmdRun(
   const loop = flags.loop === "true";
   const selfHeal = flags["self-heal"] === "true";
   const skipDeps = flags["skip-deps"] === "true";
-  // --skip-test-gate: skip the mandatory full test suite gate before commit
-  // for this invocation only. The persistent equivalent is the
-  // hench.skipFullTestGate config field; the flag wins for the current run.
-  const skipTestGate = flags["skip-test-gate"] === "true";
+  // The full-suite gate for this invocation, from the shared resolver: the
+  // `--skip-test-gate` / `--no-skip-test-gate` pair, then hench.skipFullTestGate.
+  // A task that saved its own `skipTestGate` overrides it per task in runOne.
+  const skipTestGate = invocationSettings.skipTestGate.value;
 
   let tagsFilter = flags["tags"]
     ? (flags["tags"] as string).split(",").map((s) => s.trim()).filter(Boolean)

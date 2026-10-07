@@ -253,6 +253,24 @@ describe("each task in a loop runs with its own saved settings", () => {
     expect(warnings.join(String.fromCharCode(10))).toContain("First");
   });
 
+  it("lets --no-review suppress the review every task in the loop saved", async () => {
+    // The negations are CLI flags, so they apply to the whole invocation the
+    // way --model does -- not per task.
+    await setup(doc({ review: true }, { review: true }));
+
+    await cmdRun(projectDir, { auto: "true", iterations: "2", "no-review": "true" });
+
+    expect(calls.map((c) => c.reviewPass)).toEqual([false, false]);
+  });
+
+  it("lets --no-skip-test-gate run the gate every task in the loop asked to skip", async () => {
+    await setup(doc({ skipTestGate: true }, { skipTestGate: true }));
+
+    await cmdRun(projectDir, { auto: "true", iterations: "2", "no-skip-test-gate": "true" });
+
+    expect(calls.map((c) => c.skipFullTestGate)).toEqual([false, false]);
+  });
+
   it("records the honest weight for a model an explicit --model pinned", async () => {
     await setup(doc(null, null));
 

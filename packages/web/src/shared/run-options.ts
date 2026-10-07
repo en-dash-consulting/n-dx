@@ -18,6 +18,14 @@ export interface RunOptionSpec {
   key: RunOptionKey;
   /** The `ndx work` flag, without the leading `--`. Always written `--flag` or `--flag=value`. */
   flag: string;
+  /**
+   * The flag that turns this option off for one run, without the leading
+   * `--`. Only booleans a task can save have one: an explicit `false` then
+   * means "off for this run", which is different from the key being absent
+   * (which means "leave it to the task and the config"). Mirrors hench's
+   * `negatedFlag`; the contract test pins the two together.
+   */
+  negatedFlag?: string;
   type: "enum" | "boolean" | "integer" | "string";
   /** Allowed values, for `enum`. */
   values?: readonly string[];
@@ -65,10 +73,10 @@ export const RUN_OPTION_SPECS: readonly RunOptionSpec[] = [
   { key: "model", flag: "model", type: "string", maxBytes: MODEL_ID_MAX_BYTES },
   { key: "provider", flag: "provider", type: "enum", values: ["cli", "api"] },
   { key: "permissionMode", flag: "permission-mode", type: "enum", values: ["default", "acceptEdits", "bypassPermissions"] },
-  { key: "review", flag: "review", type: "boolean" },
+  { key: "review", flag: "review", negatedFlag: "no-review", type: "boolean" },
   { key: "reviewModel", flag: "review-model", type: "string", maxBytes: MODEL_ID_MAX_BYTES },
   { key: "reviewOptional", flag: "review-optional", type: "boolean" },
-  { key: "skipTestGate", flag: "skip-test-gate", type: "boolean" },
+  { key: "skipTestGate", flag: "skip-test-gate", negatedFlag: "no-skip-test-gate", type: "boolean" },
   { key: "maxTurns", flag: "max-turns", type: "integer", min: 1, max: 500 },
   { key: "tokenBudget", flag: "token-budget", type: "integer", min: 0, max: Number.MAX_SAFE_INTEGER },
   { key: "fresh", flag: "fresh", type: "boolean" },
@@ -153,10 +161,18 @@ export function checkRunOptions(input: unknown): RunOptionsCheck {
 }
 
 /**
- * The `ndx work` flags for checked options, in table order. `false` booleans
- * add nothing. `contextFile` is the path the server wrote `contextNotes` to;
- * without it, `contextNotes` adds nothing (a viewer showing the command line
- * substitutes its own placeholder).
+ * The `ndx work` flags for checked options, in table order.
+ *
+ * A `false` boolean emits the option's `negatedFlag` when it has one, and
+ * nothing when it does not. The distinction matters because a task can save
+ * `review` and `skipTestGate`: for those, an explicit `false` from the
+ * dashboard means "off for this run even though the task saved it on", which
+ * only a negation flag can say. An absent key still emits nothing — that is
+ * how a request leaves the decision to the task and the config.
+ *
+ * `contextFile` is the path the server wrote `contextNotes` to; without it,
+ * `contextNotes` adds nothing (a viewer showing the command line substitutes
+ * its own placeholder).
  */
 export function runOptionArgs(options: RunOptions, contextFile?: string): string[] {
   const args: string[] = [];
@@ -167,6 +183,7 @@ export function runOptionArgs(options: RunOptions, contextFile?: string): string
       if (contextFile !== undefined && value !== "") args.push(`--${spec.flag}=${contextFile}`);
     } else if (spec.type === "boolean") {
       if (value === true) args.push(`--${spec.flag}`);
+      else if (spec.negatedFlag) args.push(`--${spec.negatedFlag}`);
     } else {
       args.push(`--${spec.flag}=${String(value)}`);
     }
