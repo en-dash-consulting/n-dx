@@ -2,8 +2,8 @@
  * Rex schema v2 — the product layer and the change layer.
  *
  * Types and Zod schemas for every v2 node, field and stored file. Wired to
- * nothing yet: no runtime module imports this file until the v2 reader and
- * writer land (enforced by tests/unit/schema/v2.test.ts). Validation *rules*
+ * nothing yet: only `store/state-writer.ts` (itself unwired) imports this
+ * file until the v2 store lands (enforced by tests/unit/schema/v2.test.ts). Validation *rules*
  * (cross-node checks such as "every change amends or touches something")
  * are pure functions in `./v2-rules.ts`; this file only fixes shapes.
  *
