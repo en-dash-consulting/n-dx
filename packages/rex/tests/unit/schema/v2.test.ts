@@ -186,6 +186,17 @@ describe("per-type intent", () => {
     }
   });
 
+  it("declares loeRationale and loeConfidence beside loe on change and task", () => {
+    for (const type of ["change", "task"]) {
+      const base = { id: ID, type, title: "T", slug: "t", loe: 1 };
+      const ok = NodeIntentSchema.parse({ ...base, loeRationale: "Bounded scope.", loeConfidence: "medium" }) as Record<string, unknown>;
+      expect(ok.loeRationale).toBe("Bounded scope.");
+      expect(ok.loeConfidence).toBe("medium");
+      expect(NodeIntentSchema.safeParse({ ...base, loeConfidence: "certain" }).success, type).toBe(false);
+      expect(NodeIntentSchema.safeParse({ ...base, loeRationale: 3 }).success, type).toBe(false);
+    }
+  });
+
   it("dispatches on type in the union", () => {
     const r = NodeIntentSchema.safeParse({ id: ID, type: "constraint", title: "C", slug: "c", appliesTo: "nope" });
     expect(r.success).toBe(false);
@@ -194,6 +205,15 @@ describe("per-type intent", () => {
   it("reserves hypotheses without a shape", () => {
     for (const hypotheses of [[{ any: 1 }], { h1: "x" }, "free text"]) {
       expect(NodeIntentSchema.safeParse({ id: ID, type: "capability", title: "C", slug: "c", hypotheses }).success).toBe(true);
+    }
+  });
+
+  it("reserves effort without a shape on change and task", () => {
+    const planned = { tier: "strong", loe: 1, confidence: "high", reasons: ["r"], source: "recommender", at: "2026-10-07T00:00:00.000Z" };
+    for (const type of ["change", "task"]) {
+      for (const effort of [planned, "free text", 3]) {
+        expect(NodeIntentSchema.safeParse({ id: ID, type, title: "T", slug: "t", effort }).success, type).toBe(true);
+      }
     }
   });
 });
@@ -283,8 +303,8 @@ describe("field coverage (design intent/state tables)", () => {
     ["area", AreaIntentSchema, ["summary", "stewards"]],
     ["capability", CapabilityIntentSchema, ["statement", "criteria", "requirements", "dependsOn"]],
     ["constraint", ConstraintIntentSchema, ["statement", "requirements", "appliesTo"]],
-    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "loe", "requirements"]],
-    ["task", TaskIntentSchema, ["description", "acceptanceCriteria", "requirements", "priority", "loe"]],
+    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "loe", "loeRationale", "loeConfidence", "effort", "requirements"]],
+    ["task", TaskIntentSchema, ["description", "acceptanceCriteria", "requirements", "priority", "loe", "loeRationale", "loeConfidence", "effort"]],
     ["subtask", SubtaskIntentSchema, ["description", "acceptanceCriteria"]],
   ];
   for (const [type, schema, fields] of cases) {
