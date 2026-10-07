@@ -73,6 +73,10 @@ const EXPECTED_EXPORTS = [
   "acknowledgeFinding",
   // Actor identity
   "resolveActor",
+  // Saved run settings — the `run` block a task carries, validated with the
+  // same validator every writer (MCP, `rex update --run`, the dashboard) gates
+  // on, so what `ndx work` honours cannot drift from what may be saved.
+  "validateRunSettings",
 ] as const;
 
 describe("rex-gateway compatibility", () => {

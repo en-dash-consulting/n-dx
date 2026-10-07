@@ -3,11 +3,11 @@ import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor, traversalBlock } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore, TraversalBlock } from "../../prd/rex-gateway.js";
-import { collectEpicTaskIds as collectEpicTasks } from "../../agent/planning/brief.js";
+import { collectEpicTaskIds as collectEpicTasks, selectTaskEntry } from "../../agent/planning/brief.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { classifyChangedFiles } from "../../store/file-classifier.js";
 import type { FileCategory } from "../../store/file-classifier.js";
-import { loadConfig } from "../../store/config.js";
+import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
 import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
@@ -46,19 +46,15 @@ import {
   MAX_CONTEXT_FILE_CHARS,
 } from "../../agent/planning/context-caps.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import type { LLMVendor } from "../../prd/llm-gateway.js";
+import type { LLMConfig, LLMVendor } from "../../prd/llm-gateway.js";
 import { LLM_VENDOR, printVendorModelHeader, resolveModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, createSpinner } from "../../prd/llm-gateway.js";
-import { resolveAgentModel } from "./agent-model.js";
 import {
   parseBudgetFlags,
-  parsePermissionModeFlag,
   parseReviewOptions,
-  resolveRunPermissionMode,
-  resolveRunProvider,
+  resolveTaskRunSettings,
   reviewProviderError,
-  selectCliModelOverride,
 } from "./run-settings.js";
-import type { ReviewOptions } from "./run-settings.js";
+import type { ReviewOptions, TaskRunSettings } from "./run-settings.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
 import { formatQueueStatus } from "../../queue/format.js";
 import { resolveSchedulingPriority } from "../../queue/priority-scheduler.js";
@@ -88,6 +84,27 @@ export interface AttemptTracker {
 }
 
 export type { ReviewOptions } from "./run-settings.js";
+
+/**
+ * The inputs `runOne` resolves each task's settings from.
+ *
+ * Carried as one object rather than as yet more positional arguments, and
+ * deliberately holding *inputs* rather than decisions: a task's saved `run`
+ * block can change the model, the provider, the permission mode and the
+ * budgets, so the decision cannot be made once per invocation and handed down.
+ * `cmdRun` resolves the same inputs with no task to get the invocation's
+ * defaults — same function, so the header and the run cannot disagree.
+ */
+export interface TaskRunContext {
+  flags: Record<string, string>;
+  /** Top-level keys present in hench's config files, for `hench.<key>` sources. */
+  configuredHenchKeys: ReadonlySet<string>;
+  llmConfig: LLMConfig;
+  vendor: LLMVendor;
+  autonomous: boolean;
+  /** `--context-file` text, already read and trimmed; replaces saved notes. */
+  contextFileText?: string;
+}
 
 const MAX_TASK_ATTEMPTS = 3;
 
@@ -1325,6 +1342,40 @@ export function formatSystemMemory(stats: NonNullable<RunRecord["memoryStats"]>)
     : `system: available memory unknown / ${totalGB}`;
 }
 
+/**
+ * The settings line printed once per task, naming only what the task itself
+ * decided.
+ *
+ * A loop resolves per task now, so the one vendor/model header at the top of
+ * the invocation no longer describes every run underneath it. Printing the
+ * whole table per task would bury the transcript, so this says what the saved
+ * block changed and nothing else — silent for a task with no `run` block,
+ * which is almost all of them.
+ */
+export function formatTaskSettingsLines(taskTitle: string, settings: TaskRunSettings): string[] {
+  const fromTask = (source: string): boolean => source.startsWith("task.run");
+  const changed: string[] = [];
+  if (fromTask(settings.model.source)) changed.push(`model ${settings.model.value} (${settings.model.weight} tier)`);
+  if (fromTask(settings.provider.source)) changed.push(`provider ${settings.provider.value}`);
+  if (fromTask(settings.permissionMode.source)) changed.push(`permission-mode ${settings.permissionMode.value}`);
+  if (fromTask(settings.review.source)) changed.push(`review ${settings.review.value}`);
+  if (settings.review.value && fromTask(settings.reviewModel.source)) {
+    changed.push(`review-model ${settings.reviewModel.value}`);
+  }
+  if (fromTask(settings.reviewOptional.source)) changed.push(`review-optional ${settings.reviewOptional.value}`);
+  if (fromTask(settings.skipTestGate.source)) changed.push(`skip-test-gate ${settings.skipTestGate.value}`);
+  if (fromTask(settings.maxTurns.source)) changed.push(`max-turns ${settings.maxTurns.value}`);
+  if (fromTask(settings.tokenBudget.source)) changed.push(`token-budget ${settings.tokenBudget.value}`);
+  if (fromTask(settings.contextNotes.source)) changed.push("context notes");
+  if (changed.length === 0) return [];
+  return [`Run settings saved on "${taskTitle}": ${changed.join(", ")}`];
+}
+
+/** Print {@link formatTaskSettingsLines}, if the task saved anything. */
+function printTaskSettings(taskTitle: string, settings: TaskRunSettings): void {
+  for (const line of formatTaskSettingsLines(taskTitle, settings)) info(line);
+}
+
 async function runOne(
   dir: string,
   henchDir: string,
@@ -1351,7 +1402,8 @@ async function runOne(
   skipTestGate?: boolean,
   assignee?: string,
   wouldResetIds?: ReadonlySet<string>,
-): Promise<{ status: string; taskTitle: string; selectedTaskId?: string }> {
+  settingsCtx?: TaskRunContext,
+): Promise<{ status: string; taskTitle: string; selectedTaskId?: string; model?: string }> {
   // First statement in the task: a tree this build would re-slug stops the task
   // before the claim below is taken and before any token is spent. The tree can
   // have changed since the previous task finished.
@@ -1373,14 +1425,6 @@ async function runOne(
   // Load run history for prior attempt display if not provided
   const runs = runHistory ?? await listRuns(henchDir);
 
-  // Apply CLI overrides (--token-budget, --skip-test-gate) to config
-  const effectiveConfig = {
-    ...trusted.config,
-    provider,
-    ...(tokenBudget != null ? { tokenBudget } : {}),
-    ...(skipTestGate ? { skipFullTestGate: true } : {}),
-  };
-
   // Cross-worktree claims: the loop claims the task it selects (before the
   // brief and any LLM turn) so other worktrees pass over it, refreshes it for
   // as long as the run lasts, and releases it on the way out — completed,
@@ -1394,16 +1438,97 @@ async function runOne(
   claims.startRenewal();
   let result: Awaited<ReturnType<typeof cliLoop>> | Awaited<ReturnType<typeof agentLoop>>;
   try {
+  // Settings a task saved on itself can change which loop runs it, so the task
+  // has to be known before the loop is chosen — which means selecting here
+  // rather than inside `prepareBrief`. `selectTaskEntry` is the brief's own
+  // selector and claims what it picks, so the brief, the claim and the settings
+  // all refer to the same item; the explicit id handed down below then re-claims
+  // a claim this worktree already holds, which the store treats as a renewal.
+  //
+  // Its "No actionable tasks" error is the sentinel `--loop` reads as "done",
+  // and is deliberately left to propagate exactly as it did from the brief.
+  const selected = await selectTaskEntry((await store.loadDocument()).items, {
+    ...(taskId ? { taskId } : {}),
+    ...(excludeTaskIds ? { excludeTaskIds } : {}),
+    ...(epicId ? { epicId } : {}),
+    ...(tags ? { tags } : {}),
+    ...(assignee ? { assignee } : {}),
+    ...(wouldResetIds ? { wouldResetIds } : {}),
+    claims,
+  });
+
+  // The task's own settings, resolved by the same function `cmdRun` resolved
+  // the invocation's defaults with. Without a context (a caller that has not
+  // been taught to pass one) the arguments stand as they were.
+  const settings = settingsCtx
+    ? resolveTaskRunSettings({
+        flags: settingsCtx.flags,
+        config,
+        configuredHenchKeys: settingsCtx.configuredHenchKeys,
+        llmConfig: settingsCtx.llmConfig,
+        vendor: settingsCtx.vendor,
+        autonomous: autonomous === true,
+        item: selected.item,
+        clampPermissionMode: (mode) => applyRepoTrust(config, dir, mode).permissionMode,
+        ...(settingsCtx.contextFileText !== undefined
+          ? { contextFileText: settingsCtx.contextFileText }
+          : {}),
+      })
+    : undefined;
+  if (settings && settingsCtx) {
+    for (const warning of settings.warnings) warn(warning.message);
+    if (settings.model.mismatch) throw settings.model.mismatch;
+    const reviewPass = settings.review.value;
+    // A dry run spawns nothing, so it previews an unsupported combination
+    // rather than refusing it — the same split `cmdRun` makes.
+    if (!dryRun) {
+      if (settings.provider.error) throw settings.provider.error;
+      if (reviewPass) {
+        const reviewError = reviewProviderError(settingsCtx.vendor, settings.provider.value);
+        if (reviewError) throw reviewError;
+      }
+    }
+    provider = settings.provider.value;
+    model = settings.model.value;
+    spawnModel = settings.model.value;
+    maxTurns = settings.maxTurns.value;
+    tokenBudget = settings.tokenBudget.value;
+    permissionMode = settings.permissionMode.value ?? undefined;
+    skipTestGate = settings.skipTestGate.value;
+    extraContext = settings.contextNotes.value ?? undefined;
+    reviewOpts = {
+      ...reviewOpts,
+      reviewPass,
+      ...(reviewPass ? { reviewModel: settings.reviewModel.value } : {}),
+      reviewOptional: reviewPass && settings.reviewOptional.value,
+    };
+    printTaskSettings(selected.item.title, settings);
+  }
+
+  // Apply CLI overrides (--token-budget, --skip-test-gate) to config
+  const effectiveConfig = {
+    ...trusted.config,
+    provider,
+    ...(tokenBudget != null ? { tokenBudget } : {}),
+    ...(skipTestGate ? { skipFullTestGate: true } : {}),
+    // `run.skipTestGate: false` is a saved value with meaning: it re-enables a
+    // gate `hench.skipFullTestGate` turns off. Only an explicit `false` from
+    // the resolver may lower the config's `true`, so an absent setting still
+    // leaves the config alone.
+    ...(settings && settings.skipTestGate.value === false ? { skipFullTestGate: false } : {}),
+  };
+
   result = provider === "cli"
     ? await cliLoop({
         config: effectiveConfig as typeof config & { provider: "cli" },
         store,
         projectDir: dir,
         henchDir,
-        taskId,
+        taskId: selected.item.id,
         dryRun,
         model,
         spawnModel,
+        ...(settings ? { modelWeight: settings.model.weight, modelSource: settings.model.source } : {}),
         approveDiff: reviewOpts.approveDiff,
         reviewPass: reviewOpts.reviewPass,
         reviewModel: reviewOpts.reviewModel,
@@ -1427,11 +1552,12 @@ async function runOne(
         store,
         projectDir: dir,
         henchDir,
-        taskId,
+        taskId: selected.item.id,
         dryRun,
         maxTurns,
         tokenBudget,
         model,
+        ...(settings ? { modelWeight: settings.model.weight, modelSource: settings.model.source } : {}),
         approveDiff: reviewOpts.approveDiff,
         reviewPass: reviewOpts.reviewPass,
         reviewModel: reviewOpts.reviewModel,
@@ -1515,7 +1641,7 @@ async function runOne(
   const errorLine = formatRunErrorLine(run);
   if (errorLine) output(errorLine);
 
-  return { status: run.status, taskTitle: run.taskTitle, selectedTaskId: run.taskId };
+  return { status: run.status, taskTitle: run.taskTitle, selectedTaskId: run.taskId, ...(model ? { model } : {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -1604,14 +1730,24 @@ export async function cmdRun(
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
 
-  // Resolution chain and the vendor-compatibility check both live in
-  // agent-model.ts: --model > hench.models.<vendor> > llm.* > vendor default.
-  const { model: resolvedModel, source: modelSource } = resolveAgentModel({
-    vendor: llmVendor,
-    cliModelOverride: selectCliModelOverride(flags, llmVendor).value,
-    henchModels: config.models,
+  // The invocation's defaults: the same resolver each task re-runs against its
+  // own saved `run` block, called here with no task. The header below therefore
+  // describes a run of a task that saved nothing, and `runOne` says per task
+  // when a saved block moved any of it.
+  const configuredHenchKeys = await loadConfiguredHenchKeys(henchDir).catch(() => new Set<string>());
+  const autonomousInvocation =
+    flags.auto === "true" || flags.loop === "true" || flags["epic-by-epic"] === "true";
+  const invocationSettings = resolveTaskRunSettings({
+    flags,
+    config,
+    configuredHenchKeys,
     llmConfig,
+    vendor: llmVendor,
+    autonomous: autonomousInvocation,
   });
+  if (invocationSettings.model.mismatch) throw invocationSettings.model.mismatch;
+  const resolvedModel = invocationSettings.model.value;
+  const modelSource = invocationSettings.model.headerSource;
 
   // Surface vendor/model at command start for operator visibility.
   // Reads the most recent run artifact (if any) to detect model changes.
@@ -1627,7 +1763,9 @@ export async function cmdRun(
   // consistent with how --quiet suppresses info() output.
   if (flags.format === "json") setQuiet(true);
 
-  let provider: "cli" | "api" = (flags.provider as "cli" | "api") ?? config.provider;
+  // Already narrowed to one this vendor supports (run-settings.ts); a task
+  // that saved its own provider overrides it per task inside runOne.
+  const provider: "cli" | "api" = invocationSettings.provider.value;
   const dryRun = flags["dry-run"] === "true";
   const reviewOpts: ReviewOptions = parseReviewOptions(flags);
   // --no-rollback always wins; otherwise read config (defaults to true).
@@ -1653,15 +1791,11 @@ export async function cmdRun(
   const loop = flags.loop === "true";
   const selfHeal = flags["self-heal"] === "true";
   const skipDeps = flags["skip-deps"] === "true";
-  // --skip-test-gate: skip the mandatory full test suite gate before commit
-  // for this invocation only. The persistent equivalent is the
-  // hench.skipFullTestGate config field; the flag wins for the current run.
-  const skipTestGate = flags["skip-test-gate"] === "true";
+  // The full-suite gate for this invocation, from the shared resolver: the
+  // `--skip-test-gate` / `--no-skip-test-gate` pair, then hench.skipFullTestGate.
+  // A task that saved its own `skipTestGate` overrides it per task in runOne.
+  const skipTestGate = invocationSettings.skipTestGate.value;
 
-  // --permission-mode: validate against the four supported Claude CLI modes.
-  // Resolution order (flag > config > runtime default) is computed below
-  // after `autonomous` is derived, since the autonomous default depends on it.
-  const permissionModeFlag = parsePermissionModeFlag(flags);
   let tagsFilter = flags["tags"]
     ? (flags["tags"] as string).split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
@@ -1697,11 +1831,12 @@ export async function cmdRun(
   const assignee = mine ? await resolveActor(dir) : undefined;
 
   // Provider support per vendor, and the review pass's need for the CLI
-  // provider, are decided in run-settings.ts — shared with --resolve.
+  // provider, are decided in run-settings.ts — shared with --resolve. A dry run
+  // reports rather than refuses, so it skips both: it spawns nothing, and a
+  // preview that cannot be previewed is less use than one that says what the
+  // real run would be.
   if (!dryRun) {
-    const resolvedProvider = resolveRunProvider(provider, llmVendor);
-    if (resolvedProvider.error) throw resolvedProvider.error;
-    provider = resolvedProvider.provider;
+    if (invocationSettings.provider.error) throw invocationSettings.provider.error;
     const reviewError = reviewOpts.reviewPass ? reviewProviderError(llmVendor, provider) : undefined;
     if (reviewError) throw reviewError;
   }
@@ -2041,21 +2176,17 @@ export async function cmdRun(
       for (const line of formatTrustWarningForRun(repoTrust, config.provider)) warn(line);
     }
 
-    // The effective permission mode for the spawned Claude session (see
+    // The invocation's permission mode for the spawned Claude session (see
     // resolveRunPermissionMode for the precedence). Other vendors have no such
-    // setting — warn that the value is dropped.
-    const permission = resolveRunPermissionMode({
-      flag: permissionModeFlag,
-      configured: config.permissionMode,
-      autonomous,
-      vendor: llmVendor,
-    });
-    if (permission.dropped) {
+    // setting — warn that the value is dropped. A task that saved its own
+    // permissionMode overrides this inside `runOne`.
+    const invocationPermission = invocationSettings.permissionMode;
+    if (invocationPermission.dropped) {
       info(
-        `⚠ --permission-mode is a Claude CLI feature; ignoring "${permission.dropped}" for vendor=${llmVendor}.`,
+        `⚠ --permission-mode is a Claude CLI feature; ignoring "${invocationPermission.dropped}" for vendor=${llmVendor}.`,
       );
     }
-    let effectivePermissionMode: PermissionMode | undefined = permission.value;
+    let effectivePermissionMode: PermissionMode | undefined = invocationPermission.value ?? undefined;
     if (repoTrust.restricted && effectivePermissionMode === "bypassPermissions") {
       warn("Lowering --permission-mode bypassPermissions to acceptEdits: this repository's execution config is not trusted.");
       effectivePermissionMode = "acceptEdits";
@@ -2110,8 +2241,20 @@ export async function cmdRun(
       }
     }
 
+    // What each task's own settings are resolved from. The values here are the
+    // inputs the resolver reads; the decisions are made per task inside runOne,
+    // because a saved `run` block can move any of them.
+    const settingsCtx: TaskRunContext = {
+      flags,
+      configuredHenchKeys,
+      llmConfig,
+      vendor: llmVendor,
+      autonomous,
+      ...(extraContext !== undefined ? { contextFileText: extraContext } : {}),
+    };
+
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, wouldResetIds);
+      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, wouldResetIds, settingsCtx);
       return;
     }
 
@@ -2125,9 +2268,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds);
+      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds, settingsCtx);
     } else {
-      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds);
+      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds, settingsCtx);
     }
   } finally {
     await limiter.release();
@@ -2215,6 +2358,7 @@ async function runIterations(
   skipTestGate?: boolean,
   assignee?: string,
   wouldResetIds?: ReadonlySet<string>,
+  settingsCtx?: TaskRunContext,
 ): Promise<void> {
   // Track attempt counts per task ID within this run invocation
   const attemptTracker = createAttemptTracker();
@@ -2261,6 +2405,7 @@ async function runIterations(
       skipTestGate,
       assignee,
       wouldResetIds,
+      settingsCtx,
     );
 
     // Track attempt count for the selected task
@@ -2329,6 +2474,7 @@ async function runLoop(
   skipTestGate?: boolean,
   assignee?: string,
   wouldResetIds?: ReadonlySet<string>,
+  settingsCtx?: TaskRunContext,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -2429,6 +2575,7 @@ async function runLoop(
             skipTestGate,
             assignee,
             wouldResetIds,
+            settingsCtx,
           );
           status = result.status;
 
@@ -2457,7 +2604,11 @@ async function runLoop(
           // Close the banner opened by the lifecycle loop. Mirrors the
           // start banner's format so each run is visually bracketed in
           // long --loop transcripts.
-          section(`Agent Run #${completed}${model ? ` (${model})` : ""} end`);
+          // The model this task actually ran on — a saved `run` block can
+          // make it differ from the invocation's, and a banner naming the
+          // invocation's model would be reporting a run that did not happen.
+          const ranOn = result.model ?? model;
+          section(`Agent Run #${completed}${ranOn ? ` (${ranOn})` : ""} end`);
         } finally {
           // Release the queue slot after the task completes
           if (queue) queue.release();
@@ -2622,6 +2773,7 @@ async function runEpicByEpic(
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
   wouldResetIds?: ReadonlySet<string>,
+  settingsCtx?: TaskRunContext,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -2781,6 +2933,7 @@ async function runEpicByEpic(
               skipTestGate,
               undefined, // assignee — --mine is refused with --epic-by-epic
               wouldResetIds,
+              settingsCtx,
             );
             status = result.status;
             tasksStarted++;

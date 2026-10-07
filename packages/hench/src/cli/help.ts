@@ -56,6 +56,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
       { flag: "--review-optional", description: "Accept a best-effort review: warn instead of refusing the completion when the reviewer cannot start" },
+      { flag: "--no-review", description: "No review pass for this run, even when the task saved review:true. Refused with --review, --review-model or --review-optional" },
       { flag: "--approve-diff", description: "Show proposed changes and prompt for approval (was --review before the review pass took that flag)" },
       { flag: "--max-turns=<n>", description: "Override max agent turns per task" },
       { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },
@@ -63,6 +64,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--permission-mode=<mode>", description: "Claude permission posture: default | acceptEdits | bypassPermissions | plan (autonomous runs default to acceptEdits)" },
       { flag: "--allow-dirty", description: "Start with an uncommitted working tree: autonomous runs (--auto/--loop/--epic-by-epic) prompt to commit/stash/discard on a TTY and abort without one, and this flag also overrides hench.git.requireCleanTree and hench.git.checkpointThreshold escalation" },
       { flag: "--skip-test-gate", description: "Skip the mandatory full test suite gate before commit for this invocation (persistent equivalent: hench.skipFullTestGate config)" },
+      { flag: "--no-skip-test-gate", description: "Run the full test suite gate even when the task saved skipTestGate:true or hench.skipFullTestGate is set. Refused with --skip-test-gate" },
       { flag: "--fresh", description: "Discard the cached orientation session and orient again before forking task spawns (see hench.sessionStrategy)" },
     ],
     sections: [
@@ -108,6 +110,33 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "Precedence: --allow-dirty flag > hench.git.* config > defaults.",
       },
       {
+        title: "Settings saved on a task",
+        content:
+          "A PRD item can carry a `run` block saying how it should be run.\n" +
+          "Each setting resolves as:\n" +
+          "\n" +
+          "  CLI flag > the task's run block > hench.* > llm.* > the default\n" +
+          "\n" +
+          "Resolution happens per task, after selection, so in --loop,\n" +
+          "--iterations and --epic-by-epic every task runs with its own saved\n" +
+          "settings, and a saved provider chooses the cli or api loop for that\n" +
+          "task alone. An explicit flag applies to every task in the loop.\n" +
+          "\n" +
+          "Model intent is portable, since a task saved under one vendor may run\n" +
+          "under another: the block carries a tier (light|standard|heavy) plus\n" +
+          "optional exact model pins per vendor. On vendor V the agent model is\n" +
+          "--model > models[V] > tier > hench.models.V > llm.* > default.\n" +
+          "\n" +
+          "--no-review and --no-skip-test-gate turn a saved setting off for one\n" +
+          "run; a flag passed with its own negation is an error.\n" +
+          "\n" +
+          "A saved value this vendor cannot honour -- an incompatible model, a\n" +
+          "provider with no loop, a review the provider cannot spawn, a\n" +
+          "permission mode outside Claude -- is skipped with a warning naming the\n" +
+          "task, and a block that fails validation is ignored whole. None of them\n" +
+          "stops a run: one task's saved value must not strand a whole loop.",
+      },
+      {
         title: "Resolve (--resolve)",
         content:
           "hench run --task=<id> --resolve [flags] [dir] reads the same config and\n" +
@@ -115,19 +144,35 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "and prints one JSON object on stdout:\n" +
           "  task       id, title, status, level, blockedBy, claimedBy\n" +
           "  workspace  root, branch, isAnchor, dirty\n" +
+          "  saved      the task's own run block, as rex validated it, or null\n" +
+          "             when it carries none — also null when a malformed block\n" +
+          "             was ignored, which is reported in warnings\n" +
           "  resolved   vendor, model, provider, permissionMode, review,\n" +
           "             reviewModel, skipTestGate, maxTurns, tokenBudget, fresh,\n" +
           "             allowDirty, resetDeferred — each {value, source}, where\n" +
-          "             source is the key that supplied it (cli-flag,\n" +
+          "             source is the key that supplied it (cli-flag, task.run\n" +
+          "             and its task.run.tier / task.run.models /\n" +
+          "             task.run.reviewTier / task.run.reviewModels forms,\n" +
           "             hench.models.<vendor>, llm.routes, llm.tiers.<vendor>.<tier>,\n" +
           "             llm.model, llm.<vendor>.model, vendor-default, hench.<key>,\n" +
-          "             autonomous-default, built-in)\n" +
+          "             autonomous-default, repository-trust, vendor-unsupported,\n" +
+          "             built-in). A setting a saved value won also carries\n" +
+          "             fallback {value, source}: what it would resolve to\n" +
+          "             without the saved block — this project's own default\n" +
           "  options    the per-run options, with flag, type, values and scope\n" +
           "  refusals   [{code, message}] for each reason the run would not start:\n" +
           "             prd-unreadable (task is null), task-not-found, not-actionable, claimed-elsewhere,\n" +
           "             tree-not-conformant, vendor-unset, vendor-cli-missing,\n" +
           "             provider-unsupported, model-vendor-mismatch, dirty-tree\n" +
-          "  command    the equivalent ndx work command line\n" +
+          "  warnings   [{code, message}] for a condition that does not stop the\n" +
+          "             run: untrusted-repository, or a saved setting that could\n" +
+          "             not be applied as written (saved-settings-ignored,\n" +
+          "             saved-model-incompatible, saved-provider-unavailable,\n" +
+          "             saved-provider-overridden, saved-review-unsupported,\n" +
+          "             saved-permission-mode-dropped)\n" +
+          "  command    the equivalent ndx work command line. Built from flags\n" +
+          "             alone: a task's saved settings apply to the run but are\n" +
+          "             never written into it, so the command is what you typed\n" +
           "\n" +
           "Exits 0 when it reports refusals. Takes no claim, writes nothing (no\n" +
           "--reset-deferred, no commit), and starts no vendor CLI or LLM call.",

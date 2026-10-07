@@ -994,6 +994,9 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
       { flag: "--review-optional", description: "Accept a best-effort review: warn instead of refusing the completion when the reviewer cannot start" },
+      { flag: "--no-review", description: "No review pass for this run, even when the task saved review:true. Refused with --review, --review-model or --review-optional" },
+      { flag: "--skip-test-gate", description: "Skip the mandatory full test suite gate before commit for this run (persistent equivalent: hench.skipFullTestGate)" },
+      { flag: "--no-skip-test-gate", description: "Run the full test suite gate even when the task saved skipTestGate:true or hench.skipFullTestGate is set. Refused with --skip-test-gate" },
       { flag: "--approve-diff", description: "Show proposed changes and prompt for approval (was --review before the review pass took that flag)" },
       { flag: "--max-turns=<n>", description: "Override max agent turns per task" },
       { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },
@@ -1011,6 +1014,30 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx work --dry-run .", description: "Preview the brief without execution" },
       { command: "ndx work --auto --review .", description: "Auto-run with an adversarial review pass after each task" },
       { command: "ndx work --review --review-model=claude-fable-5-1 .", description: "Review on a specific model" },
+      { command: "ndx work --task=abc123 --no-review .", description: "Run abc123 once without the review pass it saved" },
+    ],
+    sections: [
+      {
+        title: "Settings saved on a task",
+        content:
+          "A PRD item can carry a `run` block saying how it should be run,\n" +
+          "written by the rex MCP tools, `rex update --run`, or the dashboard's\n" +
+          "Prepare task modal. Each setting resolves as:\n" +
+          "\n" +
+          "  CLI flag > the task's run block > hench.* > llm.* > the default\n" +
+          "\n" +
+          "Resolution happens per task, after selection, so in --loop,\n" +
+          "--iterations and --epic-by-epic every task runs with its own saved\n" +
+          "settings -- a saved provider even chooses the cli or api loop for\n" +
+          "that task alone. An explicit flag applies to every task in the loop.\n" +
+          "\n" +
+          "--no-review and --no-skip-test-gate turn a saved setting off for one\n" +
+          "run. Passing a flag with its own negation is an error.\n" +
+          "\n" +
+          "A saved value this vendor cannot honour is skipped with a warning and\n" +
+          "never stops a loop; a malformed block is ignored whole. Preview any of\n" +
+          "it with --resolve, which names the key behind every setting.",
+      },
     ],
     related: ["plan", "status"],
   },

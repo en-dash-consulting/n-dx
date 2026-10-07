@@ -759,6 +759,9 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     parseMode: hasToolCalling ? "gemini-tools" : "provider-api",
     invocationContext: "api",
     session: API_SESSION_DECISION,
+    // The tier of the model actually sent; see RunRecord.weight.
+    ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
+    ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
   });
 
   section(
@@ -1359,6 +1362,9 @@ async function runLocalToolLoop(params: {
     parseMode: "openai-tools",
     invocationContext: "api",
     session: API_SESSION_DECISION,
+    // The tier of the model actually sent; see RunRecord.weight.
+    ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
+    ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
   });
 
   section(
@@ -1792,6 +1798,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       parseMode: "api-sdk",
       invocationContext: "api",
       session: API_SESSION_DECISION,
+      // The tier of the model actually sent; see RunRecord.weight.
+      ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
+      ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
     });
     await executeGateOnlyRetry({
       plan: gateOnly,
@@ -1900,6 +1909,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     parseMode: "api-sdk",
     invocationContext: "api",
     session: API_SESSION_DECISION,
+    // The tier of the model actually sent; see RunRecord.weight.
+    ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
+    ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
   });
 
   const messages: Anthropic.MessageParam[] = [
