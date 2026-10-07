@@ -28,8 +28,8 @@
  *   node scripts/run-all-tests.mjs            # root + every package
  *   node scripts/run-all-tests.mjs root       # root suites only
  *   node scripts/run-all-tests.mjs packages   # workspace packages only
- *   node scripts/run-all-tests.mjs root-policy # the six static root policy tests (~2 s)
- *   node scripts/run-all-tests.mjs root-drift  # the four generated-artifact drift tests (~12 s)
+ *   node scripts/run-all-tests.mjs root-policy # the static root policy tests (~2 s)
+ *   node scripts/run-all-tests.mjs root-drift  # the source-vs-twin drift tests (~14 s)
  *   node scripts/run-all-tests.mjs rex,web   # named suites (root, or a package dir name)
  *   node scripts/run-all-tests.mjs affected <baseRef>   # only suites the change touches
  *   add --list to print the selection and exit without running anything
@@ -48,7 +48,7 @@ import { ROOT_LABEL, ROOT_SUBSET_LABELS, ROOT_SUBSET_TEST_FILES, parsePorcelainZ
 /** Human-readable name for each root-subset suite, shown in the per-suite summary. */
 const ROOT_SUBSET_NAMES = {
   "root-policy": "root policy (static)",
-  "root-drift": "root drift (generated artifacts)",
+  "root-drift": "root drift (artifacts and cross-package twins)",
 };
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));

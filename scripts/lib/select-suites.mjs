@@ -18,15 +18,16 @@ export const ROOT_POLICY_LABEL = "root-policy";
 
 /**
  * Label of the root tests that compare a package source against a checked-in
- * artifact generated from it. Also a subset of `root`.
+ * artifact generated from it, or against a copy of it kept in another package.
+ * Also a subset of `root`.
  */
 export const ROOT_DRIFT_LABEL = "root-drift";
 
 /**
  * The root tests that police package sources and tests (spawn-only, gateways,
- * shell/wall-clock/layout inventories, obfuscation). About 2 s together. A
- * package-only change still has to run them: without them only CI catches a
- * violation. A unit test fails if a listed file is missing.
+ * shell/wall-clock/layout inventories, obfuscation, integration-tier growth).
+ * About 2 s together. A package-only change still has to run them: without them
+ * only CI catches a violation. A unit test fails if a listed file is missing.
  */
 export const ROOT_POLICY_TEST_FILES = [
   "tests/e2e/architecture-policy.test.js",
@@ -35,31 +36,66 @@ export const ROOT_POLICY_TEST_FILES = [
   "tests/e2e/wall-clock-inventory-policy.test.js",
   "tests/e2e/layout-literal-policy.test.js",
   "tests/e2e/obfuscated-code-policy.test.js",
+  // Reads the gateway paths out of hench/src and web/src, so renaming a gateway
+  // breaks it from a package-source change alone. 0.2 s.
+  "tests/e2e/integration-coverage-policy.test.js",
 ];
 
 /**
- * The root tests that read a package source and fail when a checked-in artifact
- * generated from it has not been regenerated: the prompt census registry, the
- * bundled iso-map skill, the dashboard's hench-config gate against hench's own
- * schema, and the generated CLAUDE.md/AGENTS.md pair.
+ * The root tests whose failure a package-source change can cause on its own,
+ * because they assert that two definitions agree rather than that code behaves.
+ * Two shapes, both drift:
+ *
+ * - a checked-in artifact generated from a source (the prompt census registry,
+ *   the bundled iso-map skill, the generated CLAUDE.md/AGENTS.md pair, the
+ *   committed `.rex/prd_tree` against rex's slug rule);
+ * - a definition deliberately duplicated across a tier boundary, where neither
+ *   side may import the other (core's layout resolver and llm-client's, web's
+ *   run-option table and hench's, core's task-class list and llm-client's
+ *   registry, a gateway's re-export surface and its upstream public API).
  *
  * They are a separate label from {@link ROOT_POLICY_TEST_FILES} rather than
- * more entries in it because they cost about 12 s against that set's 2 s —
- * six times the whole policy suite. Folding them in would have made
- * `root-policy` a twelve-second thing still documented as a two-second one, and
- * the cheap gate is worth being able to run on its own. Both are selected by
- * the same condition (a change under `packages/<dir>/src/`), so a source change
- * runs both; `root` supersedes both.
+ * more entries in it because they cost about 14 s against that set's 2 s, and
+ * the cheap gate is worth being able to run on its own. The fifteen entries
+ * added after the first four cost about 2 s of that: `prompt-census` dominates
+ * the label and the rest fill the other workers beside it. Both labels are
+ * selected by the same condition (a change under `packages/<dir>/src/`), so a
+ * source change runs both; `root` supersedes both.
  *
  * Without them a change to a package source outside `src/cli/` never ran a
  * drift test at the gate: the gate went green, hench committed, and CI went red
- * after the run (#546 review finding F1).
+ * after the run (#546 review finding F1, and its recurrence in the review of
+ * the task that closed F1 for only the four files it named).
+ *
+ * Membership rule, applied in the audit recorded in TESTING.md: a root test
+ * belongs here when it reads a package source — or two packages' definitions of
+ * one thing — and fails on a mismatch. A root test that drives a package
+ * through its public API and asserts behaviour does not: its regressions are
+ * the package suite's job, and running them all here would be running `root`.
  */
 export const ROOT_DRIFT_TEST_FILES = [
+  // A checked-in artifact generated from a package source.
   "tests/e2e/prompt-census.test.js",
   "tests/e2e/iso-skill-drift.test.js",
   "tests/e2e/hench-config-gate-contract.test.js",
   "tests/e2e/instruction-alignment.test.js",
+  "tests/e2e/prd-slug-conformance.test.js",
+  "tests/e2e/assistant-parity-smoke.test.js",
+  "tests/e2e/skill-commit-isolation.test.js",
+  // One definition, duplicated across a tier boundary.
+  "tests/e2e/run-options-contract.test.js",
+  "tests/e2e/catalog-runtime-contract.test.js",
+  "tests/e2e/run-liveness-parity.test.js",
+  "tests/integration/layout-resolver-contract.test.js",
+  "tests/integration/task-class-sync.test.js",
+  "tests/integration/task-class-registry.test.js",
+  "tests/integration/primer-fingerprint-contract.test.js",
+  "tests/integration/effective-agent-config-contract.test.js",
+  "tests/integration/prd-delta-cli-agreement.test.js",
+  "tests/integration/command-effects-manifest-contract.test.js",
+  // A gateway's re-export surface against the upstream public API.
+  "tests/integration/cross-package-contracts.test.js",
+  "tests/integration/web-server-viewer-boundary.test.js",
 ];
 
 /**

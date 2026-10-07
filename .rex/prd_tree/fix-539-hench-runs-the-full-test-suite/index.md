@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [a new artifact read by a root-subset test but missing from VALIDATED_ARTIFACTS is not detected](./a-new-artifact-read-by-a-root-subset.md) | pending |
 | [a validated test or docs artifact changed on its own selects the suite that checks it](./a-validated-test-or-docs-artifact.md) | completed |
 | [Absorb gate flakes: re-run only the failed suites once before failing an unattended run](./absorb-gate-flakes-re-run-only-the.md) | completed |
-| [affected mode never runs run-options-contract, catalog-runtime-contract or prd-slug-conformance for the package-source change they police](./affected-mode-never-runs-run-options.md) | pending |
+| [affected mode never runs run-options-contract, catalog-runtime-contract or prd-slug-conformance for the package-source change they police](./affected-mode-never-runs-run-options.md) | in_progress |
 | [affected mode runs the root drift tests when a package source changes](./affected-mode-runs-the-root-drift.md) | completed |
 | [affected mode skips the 2-second root policy tests when a change stays inside one package's src or tests](./affected-mode-skips-the-2-second-root.md) | completed |
 | [agent brief stops forbidding the full suite when the test gate is skipped](./agent-brief-stops-forbidding-the-full.md) | completed |

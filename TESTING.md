@@ -65,7 +65,7 @@ Test-file pointers for the scenarios added above:
 node scripts/run-all-tests.mjs                       # root + every package
 node scripts/run-all-tests.mjs rex,web               # named suites (labels, @n-dx/ names, "packages", "all")
 node scripts/run-all-tests.mjs root-policy           # static policy tests only (~2 s)
-node scripts/run-all-tests.mjs root-drift            # generated-artifact drift tests only (~15 s)
+node scripts/run-all-tests.mjs root-drift            # source-vs-twin drift tests only (~14 s)
 node scripts/run-all-tests.mjs affected <baseRef>    # only suites the change since <baseRef> touches
 node scripts/run-all-tests.mjs affected <baseRef> --list   # print the selection and why; run nothing
 ```
@@ -74,14 +74,60 @@ node scripts/run-all-tests.mjs affected <baseRef> --list   # print the selection
 
 - A change to a package's sources selects that package and every workspace package that depends on it. A change under `src/cli/` also selects `root`, whose e2e tests spawn the CLIs. Tests-only changes select that package; docs and Markdown select nothing, **except for the checked-in artifacts a root test validates** (next rule).
 - Some Markdown and JSON under `tests/` and `docs/` is not prose — a root test parses it and fails when it disagrees with the code. The files whose test runs in a root subset are listed in `VALIDATED_ARTIFACTS` (`scripts/lib/select-suites.mjs`) against that subset, and select only it: the three inventories `tests/shell-spawn-inventory.md`, `tests/wall-clock-assertion-inventory.md` and `tests/layout-literal-inventory.md` select `root-policy`; `docs/analysis/prompt-token-baseline.md` and `.json` select `root-drift` (`prompt-census`). It is an explicit list, not a `tests/*-inventory.md` glob, so a unit test can check each entry against the test that actually reads it; `tests/unit-test-constant-inventory.md` is absent because no test reads it. **Not yet covered:** docs read only by full-`root` tests — `README.md` and `docs/guide/commands.md` (`command-docs-parity`), the other `docs/guide/*.md` pages (`docs-skill-refs`), `docs/cli-ui-gap.md` (`cli-ui-gap-drift`) — still select nothing when changed on their own, so a docs-only edit can pass the gate and fail CI. Before this, such a file changed on its own selected no suite at all and the gate went green on a change CI fails (#546 review finding F2).
-- Any change under `packages/<dir>/src/` or `packages/<dir>/tests/` also selects `root-policy`. `root-policy` is the ~2 s set of static root tests that police package sources and tests: `architecture-policy`, `domain-isolation`, `shell-spawn-inventory-policy`, `wall-clock-inventory-policy`, `layout-literal-policy` and `obfuscated-code-policy` (`ROOT_POLICY_TEST_FILES` in `scripts/lib/select-suites.mjs`). Run it alone with `node scripts/run-all-tests.mjs root-policy`.
-- A change under `packages/<dir>/src/` *also* selects `root-drift` — the ~15 s set of root tests that read a package source and fail when a checked-in artifact generated from it is stale: `prompt-census`, `iso-skill-drift`, `hench-config-gate-contract` and `instruction-alignment` (`ROOT_DRIFT_TEST_FILES`). It is a separate label from `root-policy` because it costs six times as much; keeping them apart means the cheap policy gate stays cheap and can still be run on its own with `node scripts/run-all-tests.mjs root-drift`. A `tests/`-only change does not select it: no checked-in artifact is generated from a test file.
+- Any change under `packages/<dir>/src/` or `packages/<dir>/tests/` also selects `root-policy`. `root-policy` is the ~2 s set of static root tests that police package sources and tests: `architecture-policy`, `domain-isolation`, `shell-spawn-inventory-policy`, `wall-clock-inventory-policy`, `layout-literal-policy`, `obfuscated-code-policy` and `integration-coverage-policy` (`ROOT_POLICY_TEST_FILES` in `scripts/lib/select-suites.mjs`). Run it alone with `node scripts/run-all-tests.mjs root-policy`.
+- A change under `packages/<dir>/src/` *also* selects `root-drift` — the ~14 s set of root tests a package-source change can break on its own, because they assert that two definitions agree rather than that code behaves (`ROOT_DRIFT_TEST_FILES`). Its members and the audit that chose them are in [Root-drift membership](#root-drift-membership) below. It is a separate label from `root-policy` because it costs seven times as much; keeping them apart means the cheap policy gate stays cheap and can still be run on its own with `node scripts/run-all-tests.mjs root-drift`. A `tests/`-only change does not select it: no checked-in artifact is generated from a test file.
 - Both subsets are dropped when `root` is selected (root runs their files already, so they never run twice), and `all` and `packages` do not include either.
 - `scripts/`, `tests/`, `.github/`, other top-level files, `packages/core/` (non-Markdown) and instruction surfaces (`AGENTS.md`, `CLAUDE.md`, `.claude/`, `.agents/`, `.codex/`, `.mcp.json`, `.rex/workflow.md`, `packages/core/assistant-assets/`) select `root`.
 - Run-everything triggers: `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `vitest.config.js`, `scripts/run-all-tests.mjs`, `scripts/run-vitest-bind-aware.mjs`.
 - Machine-written state (`.rex/prd_tree/`, `.hench/`, `.sourcevision/`) selects nothing.
 
 The runner prints `test-gate: selected-suites=…` and, on failure, `test-gate: failed-suites=…`. Hench reads these for `hench.testGate.command` / `rerunCommand` (see [`docs/packages/hench.md`](docs/packages/hench.md)). This repo opts in through `.n-dx.json`. CI still runs everything.
+
+### Root-drift membership
+
+**Admission rule.** A root test belongs in `root-drift` when it reads a package source — or two packages' definitions of one thing — and fails on a *mismatch*. A root test that drives a package through its public API and asserts *behaviour* does not: those regressions are the package suite's job, and running them all here would be running `root`.
+
+Measured together: **~14 s** for the nineteen files below (`prompt-census` alone is ~12 s of it; the other eighteen fill the remaining workers beside it). `root-policy` is ~2 s for seven.
+
+A checked-in artifact generated from a package source:
+
+| Test | Source it reads |
+|---|---|
+| `tests/e2e/prompt-census.test.js` | hench/rex prompt sources vs `docs/analysis/prompt-token-baseline.*` |
+| `tests/e2e/iso-skill-drift.test.js` | `sourcevision/src/export/` vs the bundled `/iso-map` skill script |
+| `tests/e2e/hench-config-gate-contract.test.js` | hench's config schema vs web's `hench-config-fields.ts` |
+| `tests/e2e/instruction-alignment.test.js` | `assistant-assets/` vs the generated `AGENTS.md` / `CLAUDE.md` |
+| `tests/e2e/prd-slug-conformance.test.js` | `rex/src/store/folder-tree-serializer.ts` vs the committed `.rex/prd_tree` |
+| `tests/e2e/assistant-parity-smoke.test.js` | `web/src/server/start.ts`, core help and guidance vs the parity wording |
+| `tests/e2e/skill-commit-isolation.test.js` | `hench/src/agent/lifecycle/shared.ts` vs the skills' commit steps |
+
+One definition, duplicated across a tier boundary where neither side may import the other:
+
+| Test | The two sides |
+|---|---|
+| `tests/e2e/run-options-contract.test.js` | `web/src/shared/run-options.ts` vs hench's run-option table (and rex's `RUN_SETTING_KEYS`) |
+| `tests/e2e/catalog-runtime-contract.test.js` | `core/llm-model-catalog.js` vs llm-client's `DEFAULT_CLAUDE_MODEL` / `DEFAULT_CODEX_MODEL` |
+| `tests/e2e/run-liveness-parity.test.js` | `hench/src/process/run-liveness.ts` vs `web/src/server/run-liveness.ts` |
+| `tests/integration/layout-resolver-contract.test.js` | `core/layout.js`, `llm-client/src/layout.ts`, sourcevision's iso bundle, web's `state-paths.ts` |
+| `tests/integration/task-class-sync.test.js` | `core/config.js`'s task-class list vs llm-client's `DEFAULT_ROUTES` |
+| `tests/integration/task-class-registry.test.js` | every package's `src/` task-class literals vs `DEFAULT_ROUTES` |
+| `tests/integration/primer-fingerprint-contract.test.js` | the primer fingerprint in sourcevision, core and hench |
+| `tests/integration/effective-agent-config-contract.test.js` | `web/src/server/effective-agent-config.ts` vs hench's own resolution |
+| `tests/integration/prd-delta-cli-agreement.test.js` | `web/src/server/prd-delta.ts` vs `rex`'s `tree-diff` |
+| `tests/integration/command-effects-manifest-contract.test.js` | `core/command-effects.js` vs the dashboard's command manifest |
+
+A gateway's re-export surface against the upstream public API:
+
+| Test | Gateways |
+|---|---|
+| `tests/integration/cross-package-contracts.test.js` | hench's `rex-gateway` / `llm-gateway`, web's `rex-gateway` / `domain-gateway` |
+| `tests/integration/web-server-viewer-boundary.test.js` | web's server gateways and the `register-scheduler` facade, from `dist/` |
+
+**Audited and deliberately left out.** Every other root test that loads a non-`core` package drives it through its public API and asserts behaviour, so a failure is an ordinary regression the package's own suite and CI already cover: `gateway-pipeline`, `hench-rex-gateway-pipeline`, `scheduler-startup`, `llm-client-adapter`, `exec-interrupt-forwarding`, `light-tier-routes`, `llm-routing-config-roundtrip`, `claude-config-validation`, `codex-config-validation`, `google-config-validation`, `skill-commit-behavior`, `pair-programming`, `sv-pr-markdown-folder-tree`, `mcp-transport`, `mcp-transport-hub`, and the `cli-*` suites. Tests that load only `packages/core/*.js` are out for a different reason: a `core` change selects full `root`, which runs them anyway.
+
+`integration-coverage-policy` was moved into **`root-policy`**, not here — it polices package sources (it reads the gateway paths out of `hench/src` and `web/src`, so a gateway rename breaks it) and costs 0.2 s, which is the shape of that label rather than this one.
+
+`tests/unit/select-suites.test.js` pins each pair: it requires the named test to exist, to name the source path, and to be run by some suite the source's own change selects — so a renamed source or a relabelled subset fails rather than silently stops covering.
 
 ### Gateway Admission Criterion
 
