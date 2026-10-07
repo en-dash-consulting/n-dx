@@ -235,10 +235,7 @@ export const DiscoveredFromSchema = z
     item: z.string().min(1).optional(),
     run: z.string().min(1).optional(),
   })
-  .passthrough()
-  .refine((d) => d.item !== undefined || d.run !== undefined, {
-    message: "discoveredFrom needs an item id, a run id, or both",
-  });
+  .passthrough();
 
 /** Who stewards a product scope: git emails / identities, or team handles (`@org/team`). */
 export type Steward = string;

@@ -204,7 +204,10 @@ describe("per-type intent", () => {
     expect(both.discoveredFrom).toEqual({ item: ID, run: "run-42" });
     expect(ChangeIntentSchema.safeParse({ ...change, discoveredFrom: { item: ID } }).success).toBe(true);
     expect(ChangeIntentSchema.safeParse({ ...change, discoveredFrom: { run: "run-42" } }).success).toBe(true);
-    for (const bad of [ID, {}, { item: 3 }, { run: "" }, { item: "" }]) {
+    // A newer writer's provenance key without item or run must survive an older reader.
+    const newer = ChangeIntentSchema.parse({ ...change, discoveredFrom: { session: "s1" } });
+    expect(newer.discoveredFrom).toEqual({ session: "s1" });
+    for (const bad of [ID, { item: 3 }, { run: "" }, { item: "" }]) {
       expect(ChangeIntentSchema.safeParse({ ...change, discoveredFrom: bad }).success, JSON.stringify(bad)).toBe(false);
     }
   });
