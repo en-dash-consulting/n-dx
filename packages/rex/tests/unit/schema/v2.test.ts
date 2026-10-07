@@ -381,17 +381,19 @@ describe("field coverage (design intent/state tables)", () => {
 });
 
 describe("isolation", () => {
-  it("no runtime module imports schema/v2 or its rules yet", () => {
+  it("no runtime module imports the v2 modules yet", () => {
     const srcRoot = join(import.meta.dirname, "../../../src");
-    // The v2 schema files may import each other; nothing else may import them.
-    const v2Files = new Set(["schema/v2.ts", "schema/v2-rules.ts"].map((f) => join(srcRoot, f)));
+    // The v2 modules (schema, rules, state writer) may import each other;
+    // nothing else may import them until the v2 store wires them in.
+    const v2Files = new Set(["schema/v2.ts", "schema/v2-rules.ts", "store/state-writer.ts"].map((f) => join(srcRoot, f)));
+    const v2Import = /from\s+["'][^"']*(?:schema\/v2(?:-rules)?|\/state-writer)(?:\.js)?["']|from\s+["']\.\/v2(?:-rules)?(?:\.js)?["']/;
     const offenders: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const p = join(dir, entry.name);
         if (entry.isDirectory()) walk(p);
         else if (entry.name.endsWith(".ts") && !v2Files.has(p)) {
-          if (/from\s+["'][^"']*schema\/v2(-rules)?(\.js)?["']|from\s+["']\.\/v2(-rules)?(\.js)?["']/.test(readFileSync(p, "utf8"))) {
+          if (v2Import.test(readFileSync(p, "utf8"))) {
             offenders.push(relative(srcRoot, p));
           }
         }
