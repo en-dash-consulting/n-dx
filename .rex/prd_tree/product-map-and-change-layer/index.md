@@ -49,3 +49,4 @@ plannedRelease: "1.0.0"
 | [Stamp shippedIn from any CI](./stamp-shippedin-from-any-ci/index.md) | pending |
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | pending |
 | [User docs and docs.n-dx.dev for the v2 model](./user-docs-and-docs-n-dx-dev-for-the-v2/index.md) | pending |
+| [Web Product view still shows "map node" wording after decision N1](./web-product-view-still-shows-map-node.md) | pending |
