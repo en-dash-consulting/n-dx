@@ -34,3 +34,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Schema-skew write refusal on v2 trees depends on writers calling assertPrdModelWritable](./schema-skew-write-refusal-on-v2-trees.md) | completed |
 | [v2 reader lets state fields written in frontmatter (status, completedAt…) stand in for state.yaml](./v2-reader-lets-state-fields-written-in.md) | completed |
 | [Write the v2 trees with frozen slugs and no Children tables](./write-the-v2-trees-with-frozen-slugs.md) | completed |
+| [Make the v2 reader and writer tests pass on a Windows CRLF checkout](./make-the-v2-reader-and-writer-tests.md) | pending |
