@@ -213,11 +213,15 @@ describe("hench.testGate.rerunCommand", () => {
   });
 
   itNeedsPosixShell("does not re-run a gate that timed out", async () => {
-    const gate = await fakeGate({ second: "pass", firstSleep: 10 });
-    const run = await finalize(configWith(gate, RERUN(gate), { fullTestTimeoutMs: 1000 }));
+    // The gate logs its call on its first line, so the timeout must land in the
+    // sleep, not before the shell starts: a loaded Windows runner took over 1 s
+    // to start sh, the gate was killed unlogged, and calls() came back empty
+    // (#564). 5 s leaves headroom for startup; the 30 s sleep outlasts it.
+    const gate = await fakeGate({ second: "pass", firstSleep: 30 });
+    const run = await finalize(configWith(gate, RERUN(gate), { fullTestTimeoutMs: 5000 }));
 
     expect(run.status).toBe("failed");
-    expect(run.testGate?.error).toMatch(/did not finish within 1s/);
+    expect(run.testGate?.error).toMatch(/did not finish within 5s/);
     expect(run.testGate).not.toHaveProperty("rerun");
     expect(await calls()).toHaveLength(1);
   });
