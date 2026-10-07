@@ -8,6 +8,7 @@ import { getCurrentHead, getCurrentBranch } from "@n-dx/llm-client";
 import type { Manifest, ModuleStatus } from "../schema/index.js";
 import { TOOL_VERSION } from "../constants.js";
 import { resolveSourcevisionPaths } from "../paths.js";
+import { readRepoIdentity } from "../util/git-remote.js";
 
 function getGitInfo(dir: string): { sha?: string; branch?: string } {
   return {
@@ -33,6 +34,7 @@ export function readManifest(dir: string): Manifest {
     ...(git.sha ? { gitSha: git.sha } : {}),
     ...(git.branch ? { gitBranch: git.branch } : {}),
     targetPath: absDir,
+    repo: readRepoIdentity(absDir),
     modules: {},
   };
 }
@@ -57,9 +59,15 @@ export function updateManifestModule(
   // Refresh git info at the start of each analysis run so history snapshots
   // reflect the actual code state being analyzed, not the init-time state.
   if (status === "running") {
-    const git = getGitInfo(resolve(dir));
+    const absDir = resolve(dir);
+    const git = getGitInfo(absDir);
     if (git.sha) manifest.gitSha = git.sha;
     if (git.branch) manifest.gitBranch = git.branch;
+    // Refreshed alongside the git info, and unconditionally: a manifest read
+    // from an analysis produced before this field existed has none, and a
+    // repository that gained, lost or re-pointed its remote since the last run
+    // must not keep reporting the old identity.
+    manifest.repo = readRepoIdentity(absDir);
   }
 
   if (!manifest.modules[moduleName]) {

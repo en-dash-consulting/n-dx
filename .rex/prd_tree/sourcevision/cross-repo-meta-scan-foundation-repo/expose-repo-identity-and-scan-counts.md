@@ -18,6 +18,7 @@ acceptanceCriteria:
   - "Every sourcevision type and value web uses is re-exported through `src/server/domain-gateway.ts` with no logic added, and `tests/e2e/domain-isolation.test.js` passes."
   - "Card assertions are added under `packages/web/tests/unit/hub` and `packages/web/tests/integration/hub-*.test.ts`."
 description: "The hub fans out to every child's `/api/status` via `fetchChildSnapshot` and never reads `.sourcevision/` directly. Keep it that way: the new analysis data reaches the hub only through the child's HTTP API.\n\nAdd `repo` (from the manifest) and summary counts to the sv section of `GET /api/status` in `packages/web/src/server/routes-status.ts` — `outbound`, `infrastructure`, and `readiness.overall` when that field exists from the readiness feature, `null` when it does not. Extend `ChildSnapshot` and `ProjectCard` in `packages/web/src/hub/overview.ts` and show repo name and remote host on the card in `hub/home.ts`. Nothing else in the hub UI changes — the portfolio view is a separate, later piece of work.\n\nEvery sourcevision type consumed here passes through `packages/web/src/server/domain-gateway.ts` as a re-export with no logic."
-lastModified: "2026-10-05T17:36:03.918Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-06T22:01:02.234Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

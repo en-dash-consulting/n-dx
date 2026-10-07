@@ -2049,7 +2049,41 @@ refresh(false);
 // packages/sourcevision/src/export/iso-sources.ts
 import { readFileSync as readFileSync3, existsSync as existsSync3 } from "node:fs";
 import { join as join3, basename as basename2, resolve as resolve2 } from "node:path";
+
+// packages/sourcevision/src/util/git-remote.ts
 import { execFileSync } from "node:child_process";
+function gitCommand(root, args) {
+  try {
+    return execFileSync("git", args, {
+      cwd: root,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5e3
+    }).trim();
+  } catch {
+    return void 0;
+  }
+}
+function isGitWorkTree(root) {
+  return gitCommand(root, ["rev-parse", "--is-inside-work-tree"]) === "true";
+}
+function stripRemoteCredentials(remote) {
+  const trimmed = remote.trim();
+  const match = trimmed.match(/^([A-Za-z][A-Za-z0-9+.\-]*:\/\/)(?:[^/@]*@)?(.*)$/s);
+  return match ? `${match[1]}${match[2]}` : trimmed;
+}
+function readOriginUrl(root) {
+  const url = gitCommand(root, ["config", "--get", "remote.origin.url"]);
+  return url ? stripRemoteCredentials(url) : void 0;
+}
+function remoteToWebUrl(remote) {
+  const cleaned = remote.trim().replace(/\.git$/, "");
+  const ssh = cleaned.match(/^[\w.-]+@([\w.-]+):(.+)$/);
+  if (ssh) return `https://${ssh[1]}/${ssh[2]}`;
+  const https = cleaned.match(/^https?:\/\/(?:[^@/]+@)?([\w.-]+\/.+)$/);
+  if (https) return `https://${https[1]}`;
+  return void 0;
+}
 
 // packages/sourcevision/src/export/iso-scan.ts
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
@@ -2650,9 +2684,26 @@ function scanProject(root) {
   };
 }
 
-// packages/sourcevision/src/export/iso-declared.ts
+// packages/sourcevision/src/analyzers/infrastructure.ts
 import { readFileSync as readFileSync2, existsSync as existsSync2, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
 import { join as join2, relative as relative2, extname as extname2, sep as sep2 } from "node:path";
+
+// packages/sourcevision/src/schema/data-files.ts
+var DATA_FILES = {
+  manifest: "manifest.json",
+  inventory: "inventory.json",
+  imports: "imports.json",
+  classifications: "classifications.json",
+  zones: "zones.json",
+  components: "components.json",
+  callGraph: "callgraph.json",
+  projectProfile: "project-profile.json",
+  sdlcProfile: "sdlc-profile.json",
+  infrastructure: "infrastructure.json"
+};
+var ALL_DATA_FILES = Object.values(DATA_FILES);
+
+// packages/sourcevision/src/analyzers/infrastructure.ts
 function ndxContainer(root) {
   const container = join2(root, ".ndx");
   try {
@@ -2904,7 +2955,7 @@ function linkInfrastructure(infrastructure, filePaths, readFile) {
     return { ...infra, usedBy: [...found].sort() };
   });
 }
-function loadDeclaredArchitecture(root, filePaths, readFile) {
+function computeInfrastructure(root, filePaths, readFile) {
   const config = readDeclaredConfig(root);
   const iac = discoverFromIaC(root);
   const read = readFile ?? ((path) => {
@@ -2922,6 +2973,36 @@ function loadDeclaredArchitecture(root, filePaths, readFile) {
     read
   );
   return { seams: config.seams, infrastructure, sawIaC: iac.sawIaC };
+}
+function fromInfrastructureData(data) {
+  const byResource = /* @__PURE__ */ new Map();
+  for (const link of data.links) {
+    const existing = byResource.get(link.resourceId);
+    if (existing) existing.push(link.target);
+    else byResource.set(link.resourceId, [link.target]);
+  }
+  const infrastructure = data.resources.map((resource) => ({
+    id: resource.id,
+    name: resource.name,
+    kind: resource.kind,
+    usedBy: byResource.get(resource.id) ?? [],
+    ...resource.note === void 0 ? {} : { note: resource.note },
+    origin: resource.origin,
+    ...resource.literals === void 0 ? {} : { literals: resource.literals }
+  }));
+  return { seams: data.seams, infrastructure, sawIaC: data.sawIaC };
+}
+function readInfrastructure(svDir) {
+  const data = readJson(join2(svDir, DATA_FILES.infrastructure));
+  if (!data || !Array.isArray(data.resources) || !Array.isArray(data.links)) return null;
+  if (!Array.isArray(data.seams)) return null;
+  return data;
+}
+
+// packages/sourcevision/src/export/iso-declared.ts
+function loadDeclaredArchitecture(root, filePaths, readFile, persisted) {
+  if (persisted) return fromInfrastructureData(persisted);
+  return computeInfrastructure(root, filePaths, readFile);
 }
 
 // packages/sourcevision/src/export/iso-sources.ts
@@ -2946,34 +3027,13 @@ var ARCHETYPE_KIND = {
   config: "support",
   "test-helper": "support"
 };
-function git(root, args) {
-  try {
-    return execFileSync("git", args, {
-      cwd: root,
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "ignore"],
-      timeout: 5e3
-    }).trim();
-  } catch {
-    return void 0;
-  }
-}
-function remoteToWebUrl(remote) {
-  const cleaned = remote.trim().replace(/\.git$/, "");
-  const ssh = cleaned.match(/^[\w.-]+@([\w.-]+):(.+)$/);
-  if (ssh) return `https://${ssh[1]}/${ssh[2]}`;
-  const https = cleaned.match(/^https?:\/\/(?:[^@/]+@)?([\w.-]+\/.+)$/);
-  if (https) return `https://${https[1]}`;
-  return void 0;
-}
 function readGitInfo(root) {
-  const inside = git(root, ["rev-parse", "--is-inside-work-tree"]);
-  if (inside !== "true") return {};
-  const remote = git(root, ["config", "--get", "remote.origin.url"]);
+  if (!isGitWorkTree(root)) return {};
+  const remote = readOriginUrl(root);
   return {
-    sha: git(root, ["rev-parse", "HEAD"]),
-    branch: git(root, ["rev-parse", "--abbrev-ref", "HEAD"]),
-    committedAt: git(root, ["log", "-1", "--format=%cI"]),
+    sha: gitCommand(root, ["rev-parse", "HEAD"]),
+    branch: gitCommand(root, ["rev-parse", "--abbrev-ref", "HEAD"]),
+    committedAt: gitCommand(root, ["log", "-1", "--format=%cI"]),
     webUrl: remote ? remoteToWebUrl(remote) : void 0
   };
 }
@@ -3228,7 +3288,12 @@ function loadFromSourcevision(root, options = {}) {
     );
   }
   const zoneIds = new Set(zones.map((z) => z.id));
-  const declared = loadDeclaredArchitecture(root, [...files.keys()]);
+  const declared = loadDeclaredArchitecture(
+    root,
+    [...files.keys()],
+    void 0,
+    readInfrastructure(svDir)
+  );
   const seamResolution = resolveSeams(declared.seams, zoneIds, zoneOfFile, callGraph);
   extraGaps.push(...seamGaps(seamResolution));
   return {
