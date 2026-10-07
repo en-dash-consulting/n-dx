@@ -31,7 +31,10 @@
  * touched. That keeps a node the reader skipped (invalid intent) from being
  * erased by the next save. Dotfiles and non-Markdown files are left alone.
  *
- * Must run under the PRD lock, like every state write. Wired to nothing yet:
+ * Must run under the PRD lock, like every state write. Under it, the root
+ * stamp is re-read from disk and a non-v2 tree is refused, so a caller holding
+ * a model read before a newer ndx restamped the tree cannot write into it.
+ * Wired to nothing yet:
  * the v2 store calls it when it lands.
  *
  * @module rex/store/prd-model-writer
@@ -60,7 +63,7 @@ import { isLockHeld } from "./file-lock.js";
 import { parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
 import { SLUG_RULE_VERSION } from "./folder-tree-serializer.js";
 import { prdLockPath } from "./paths.js";
-import { CHANGES_DIRNAME, PRODUCT_DIRNAME, assertPrdModelWritable, type PrdModel } from "./prd-model-reader.js";
+import { CHANGES_DIRNAME, PRODUCT_DIRNAME, assertPrdModelWritable, assertV2TreeWritable, type PrdModel } from "./prd-model-reader.js";
 import { STATE_FILE_NAME, emptyStateFile, loadStateFile, saveStateFile, type ProductSpec } from "./state-writer.js";
 
 export interface WritePrdModelOptions {
@@ -122,6 +125,8 @@ export async function writePrdModel(
   if (!isLockHeld(prdLockPath(rexDir))) {
     throw new Error(`PRD writes must run inside store.withTransaction: the PRD lock for ${rexDir} is not held`);
   }
+  // The model's own stamp is not enough: the tree may have been restamped since it was read.
+  await assertV2TreeWritable(rexDir);
   const stamp = model.layout === "v2" && isV2Schema(model.schema) ? model.schema : SCHEMA_VERSION_V2;
   const plan: Plan = { files: new Map(), states: [], dirs: new Set(), stale: [] };
 

@@ -156,6 +156,21 @@ export function assertPrdModelWritable(model: PrdModel): void {
   }
 }
 
+/**
+ * Throw {@link SchemaSkewError} unless the v2 tree on disk under `rexDir` is
+ * stamped v2, by the same rule {@link loadPrdModel} reads it under. Reads the
+ * root `product/index.md`, not a model, so a tree restamped by a newer ndx
+ * after it was read is refused even when its `state.yaml` stamps still say v2.
+ * Run it under the PRD lock, before writing anything. No `product/` (a first
+ * write) passes.
+ */
+export async function assertV2TreeWritable(rexDir: string): Promise<void> {
+  const productDir = join(rexDir, PRODUCT_DIRNAME);
+  if (!(await isDirectory(productDir))) return;
+  const header = await readV2Header(productDir);
+  if (!isV2Schema(header.schema)) throw new SchemaSkewError(header.schema, header.source);
+}
+
 // ── Entry point ──────────────────────────────────────────────────
 
 /** Load the PRD under `rexDir` as one model, from whichever layout it uses. */

@@ -296,4 +296,30 @@ describe("writePrdModel", () => {
     const skewed = await loadPrdModel(rexDir, { ...quiet, ignoreSchemaSkew: true });
     await expect(write(rexDir, skewed)).rejects.toThrow(/Writes are refused/);
   });
+
+  it("refuses a tree restamped past v2 since it was read, whatever its state.yaml files say", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    find(all(model), CHANGE).title = "Changed";
+    (find(all(model), TASK) as Record<string, unknown>).status = "completed";
+    // A newer ndx restamps the root; the folders' state.yaml stamps still say rex/v2.
+    const root = join(rexDir, "product/index.md");
+    await writeFile(root, (await readFile(root, "utf-8")).replace('schema: "rex/v2"', 'schema: "rex/v3"'));
+    const before = await snapshot(rexDir);
+    expect(Object.entries(before).some(([p, t]) => p.endsWith("state.yaml") && t.includes("rex/v2"))).toBe(true);
+
+    await expect(write(rexDir, model)).rejects.toThrow(
+      /PRD schema is rex\/v3 \(.*index\.md\), this ndx understands up to rex\/v2: upgrade ndx/,
+    );
+    expect(await snapshot(rexDir)).toEqual(before);
+  });
+
+  it("refuses a product folder whose root index.md has gone, as the reader does", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    await rm(join(rexDir, "product/index.md"));
+    const before = await snapshot(rexDir);
+    await expect(write(rexDir, model)).rejects.toThrow(/PRD schema is missing/);
+    expect(await snapshot(rexDir)).toEqual(before);
+  });
 });
