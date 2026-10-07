@@ -452,7 +452,7 @@ describe("layout resolver: iso bundle twin matches the foundation implementation
 
       expect(
         isoDeclared.projectConfigFor(root),
-        "packages/sourcevision/src/export/iso-declared.ts and packages/llm-client/src/layout.ts disagree",
+        "packages/sourcevision/src/analyzers/infrastructure.ts and packages/llm-client/src/layout.ts disagree",
       ).toBe(foundation.resolveLayout(root).configFile);
     });
   }

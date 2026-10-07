@@ -134,8 +134,8 @@
       "reason": "Git operations — need execFileSync/execFile for git CLI calls"
     },
     {
-      "path": "packages/sourcevision/src/export/iso-sources.ts",
-      "reason": "Iso map — reads the HEAD commit time and origin remote so the rendered page is reproducible (timestamp) and can link to source. Bundled verbatim into the generated skill script below."
+      "path": "packages/sourcevision/src/util/git-remote.ts",
+      "reason": "Git remote reader — the one implementation, shared by the iso map (which reads the HEAD commit time and origin remote so the rendered page is reproducible and can link to source) and the analysis manifest (which records the repository's identity). It cannot route through llm-client's exec(): it is bundled verbatim into the generated skill script below, which has to stay dependency-free, so only node: builtins may appear. Replaces the former packages/sourcevision/src/export/iso-sources.ts entry, whose git reading moved here."
     },
     {
       "path": ".claude/skills/iso-map/scripts/iso-map.mjs",
