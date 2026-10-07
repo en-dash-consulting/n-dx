@@ -20,7 +20,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Drift guard reads rule files with CRLF line endings](./drift-guard-reads-rule-files-with-crlf.md) | in_progress |
+| [Drift guard reads rule files with CRLF line endings](./drift-guard-reads-rule-files-with-crlf.md) | completed |
 | [Give every package CLAUDE.md an AGENTS.md counterpart](./give-every-package-claude-md-an-agents.md) | completed |
 | [Move vendor-neutral sections from the Claude addendum into the shared guidance](./move-vendor-neutral-sections-from-the.md) | completed |
 | [Reduce the three .claude/rules files to pointers, removing the second copy of each registry](./reduce-the-three-claude-rules-files-to.md) | pending |
