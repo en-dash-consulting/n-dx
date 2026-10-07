@@ -35,7 +35,12 @@ import { atomicWrite } from "../store/atomic-write.js";
 
 export const CHANGE_COMMITS_CACHE_FILENAME = "trailer-commits.json";
 export const COMMIT_FILES_CACHE_FILENAME = "commit-files.json";
-export const DEFAULT_MAIN_REF = "main";
+/**
+ * Refs tried, in order, when the caller names none; the first that resolves
+ * wins. A remote-tracking ref comes first because a CI checkout has no local
+ * `main` and a long-lived clone's local `main` may be behind what was merged.
+ */
+export const DEFAULT_MAIN_REFS = ["origin/HEAD", "origin/main", "main"] as const;
 export const ITEM_TRAILER_KEY = "N-DX-Item";
 
 /** Bumped when the cached shape changes, so an older file is rebuilt rather than misread. */
@@ -63,7 +68,7 @@ export interface ChangeCommitsOptions {
   repoDir: string;
   /** Rex's derived-state directory (`RexPaths.cacheDir`). */
   cacheDir: string;
-  /** The branch commits must be reachable from. Default {@link DEFAULT_MAIN_REF}. */
+  /** The branch commits must be reachable from. Default: the first of {@link DEFAULT_MAIN_REFS} that exists. An explicit ref is never substituted. */
   ref?: string;
 }
 
@@ -99,8 +104,9 @@ export async function computeChangeCommits(
 
 /** Every trailer commit reachable from the ref, newest first, from the cache when it is current. */
 export async function loadTrailerCommits(options: ChangeCommitsOptions): Promise<TrailerCommit[]> {
-  const ref = options.ref ?? DEFAULT_MAIN_REF;
-  const tip = await resolveCommit(options.repoDir, ref);
+  const { ref, tip } = options.ref !== undefined
+    ? { ref: options.ref, tip: await resolveCommit(options.repoDir, options.ref) }
+    : await resolveDefaultRef(options.repoDir);
   const path = join(options.cacheDir, CHANGE_COMMITS_CACHE_FILENAME);
   const cached = await readCache(path);
   if (cached && cached.ref === ref && cached.tip === tip) return cached.commits;
@@ -199,6 +205,17 @@ async function scanCommitFiles(repoDir: string, hashes: string[]): Promise<Recor
   }
   for (const hash of hashes) out[hash] ??= [];
   return out;
+}
+
+async function resolveDefaultRef(repoDir: string): Promise<{ ref: string; tip: string }> {
+  for (const ref of DEFAULT_MAIN_REFS) {
+    try {
+      return { ref, tip: await resolveCommit(repoDir, ref) };
+    } catch {
+      // Absent from this checkout; the next candidate is tried, and the loop's end throws.
+    }
+  }
+  throw new Error(`git rev-parse failed in ${repoDir}: none of ${DEFAULT_MAIN_REFS.join(", ")} resolves; pass a ref`);
 }
 
 async function resolveCommit(repoDir: string, ref: string): Promise<string> {

@@ -175,6 +175,61 @@ describe("computeChangeCommits", () => {
     expect(hashes(commits)).toEqual([second, first]);
   });
 
+  describe("default ref", () => {
+    const landedMessage = `Part A\n\nN-DX-Item: ${CHANGE}\n`;
+
+    /** A clone of `repo` (the origin). */
+    function cloneOrigin(): string {
+      const dir = join(repo, "..", "clone");
+      execFileSync("git", ["clone", "-q", repo, dir]);
+      return dir;
+    }
+    const inClone = (dir: string, ...args: string[]) =>
+      execFileSync("git", args, { cwd: dir, encoding: "utf-8" }).trim();
+
+    it("reads origin/main when the checkout has no local main", async () => {
+      await commit("base.txt", "Initial commit");
+      const landed = await commit("a.txt", landedMessage);
+      const dir = cloneOrigin();
+      inClone(dir, "checkout", "-q", "--detach", "origin/main");
+      inClone(dir, "branch", "-D", "main");
+      expect(() => inClone(dir, "rev-parse", "--verify", "main")).toThrow();
+
+      const commits = await computeChangeCommits([CHANGE], { repoDir: dir, cacheDir });
+      expect(hashes(commits)).toEqual([landed]);
+    });
+
+    it("prefers origin/main over a local main that is behind it", async () => {
+      await commit("base.txt", "Initial commit");
+      const dir = cloneOrigin();
+      const landed = await commit("a.txt", landedMessage);
+      inClone(dir, "fetch", "-q", "origin");
+      expect(inClone(dir, "rev-parse", "main")).not.toBe(landed);
+
+      expect(hashes(await computeChangeCommits([CHANGE], { repoDir: dir, cacheDir }))).toEqual([landed]);
+    });
+
+    it("falls back to a local main when there is no remote", async () => {
+      await commit("base.txt", "Initial commit");
+      const landed = await commit("a.txt", landedMessage);
+      expect(hashes(await computeChangeCommits([CHANGE], { repoDir: repo, cacheDir }))).toEqual([landed]);
+    });
+
+    it("lets an explicit ref override the default", async () => {
+      await commit("base.txt", "Initial commit");
+      const dir = cloneOrigin();
+      const landed = await commit("a.txt", landedMessage);
+      inClone(dir, "fetch", "-q", "origin");
+
+      expect(await computeChangeCommits([CHANGE], { repoDir: dir, cacheDir, ref: "main" })).toEqual([]);
+      expect(hashes(await computeChangeCommits([CHANGE], { repoDir: dir, cacheDir, ref: "origin/main" }))).toEqual([landed]);
+    });
+
+    it("names the candidates when none resolves", async () => {
+      await expect(computeChangeCommits([CHANGE], { repoDir: repo, cacheDir })).rejects.toThrow(/origin\/HEAD, origin\/main, main/);
+    });
+  });
+
   it("names the ref when it does not resolve", async () => {
     await commit("base.txt", "Initial commit");
     await expect(computeChangeCommits([CHANGE], { repoDir: repo, cacheDir, ref: "no-such-branch" })).rejects.toThrow(/git rev-parse failed/);
