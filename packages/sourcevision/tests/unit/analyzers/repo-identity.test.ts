@@ -4,8 +4,9 @@
  * `targetPath` is a local path, so it cannot tell two analyses apart once they
  * leave their own directory. `manifest.repo` is what can. The rules under test:
  * the identity is always populated, `name` falls back to the directory when
- * there is no remote, and the remote is read by exactly one helper — the same
- * one the iso export uses for its source links.
+ * there is no remote, the remote is read by exactly one helper — the same one
+ * the iso export uses for its source links — and a credential embedded in
+ * that remote never reaches the manifest.
  *
  * Real git repositories in a temp directory rather than a mocked `execFileSync`:
  * the thing being tested is what git actually reports, and a mock would only
@@ -24,6 +25,7 @@ import {
   parseRemote,
   readRepoIdentity,
   remoteToWebUrl,
+  stripRemoteCredentials,
 } from "../../../src/util/git-remote.js";
 import { readManifest } from "../../../src/analyzers/manifest.js";
 import { ManifestSchema } from "../../../src/schema/validate.js";
@@ -36,6 +38,11 @@ let withRemote: string;
 let withoutRemote: string;
 /** A plain directory that was never `git init`ed. */
 let notGit: string;
+/** A git repo whose origin is an https remote with a token baked into it. */
+let withCredentialedRemote: string;
+
+/** The secret in `withCredentialedRemote`'s origin; must reach no artifact. */
+const SECRET = "ghp-do-not-commit-me";
 
 function git(dir: string, args: string[]): void {
   execFileSync("git", args, { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
@@ -55,6 +62,16 @@ beforeAll(async () => {
 
   notGit = join(root, "just-a-folder");
   await mkdir(notGit);
+
+  withCredentialedRemote = join(root, "checkout-with-token");
+  await mkdir(withCredentialedRemote);
+  git(withCredentialedRemote, ["init", "-q"]);
+  git(withCredentialedRemote, [
+    "remote",
+    "add",
+    "origin",
+    `https://sterling:${SECRET}@github.com/acme/widget.git`,
+  ]);
 });
 
 afterAll(async () => {
@@ -144,6 +161,66 @@ describe("one implementation of the remote reader", () => {
     // a second copy, these stop being the same function.
     const isoSources = await import("../../../src/export/iso-sources.js");
     expect(isoSources.remoteToWebUrl).toBe(remoteToWebUrl);
+  });
+});
+
+describe("a credentialed remote never reaches the artifact", () => {
+  // .sourcevision/manifest.json is designed to be committed, so a token in
+  // the configured origin must not survive the read. parseRemote already
+  // dropped userinfo for host/path; remoteUrl used to carry it through.
+  it("stores the remote with its userinfo removed", () => {
+    const repo = readRepoIdentity(withCredentialedRemote);
+    expect(repo.remoteUrl).toBe("https://github.com/acme/widget.git");
+  });
+
+  it("leaves no trace of the credential anywhere in the identity", () => {
+    const repo = readRepoIdentity(withCredentialedRemote);
+    expect(JSON.stringify(repo)).not.toContain(SECRET);
+    expect(JSON.stringify(repo)).not.toContain("sterling");
+  });
+
+  it("still names the repository and its host from the remote", () => {
+    const repo = readRepoIdentity(withCredentialedRemote);
+    expect(repo.name).toBe("widget");
+    expect(repo.remoteHost).toBe("github.com");
+    expect(repo.remotePath).toBe("acme/widget");
+  });
+
+  it("keeps the credential out of the manifest that gets committed", () => {
+    const manifest = readManifest(withCredentialedRemote);
+    expect(JSON.stringify(manifest)).not.toContain(SECRET);
+    expect(manifest.repo?.remoteUrl).toBe("https://github.com/acme/widget.git");
+  });
+});
+
+describe("stripRemoteCredentials", () => {
+  const CASES: Array<[string, string]> = [
+    ["https://user:token@github.com/acme/widget.git", "https://github.com/acme/widget.git"],
+    ["https://token@github.com/acme/widget.git", "https://github.com/acme/widget.git"],
+    ["ssh://git@github.com/acme/widget.git", "ssh://github.com/acme/widget.git"],
+    ["https://oauth2:tok@git.internal.example:8443/g/sub/widget.git",
+      "https://git.internal.example:8443/g/sub/widget.git"],
+    // No userinfo to drop — unchanged.
+    ["https://github.com/acme/widget.git", "https://github.com/acme/widget.git"],
+    // scp-like syntax has no password field; "git@" is the recognizable form
+    // of an ssh remote, not a secret, so it is left alone.
+    ["git@github.com:acme/widget.git", "git@github.com:acme/widget.git"],
+    // Not a URL at all: a redactor, not a validator.
+    ["../sibling-repo", "../sibling-repo"],
+    ["", ""],
+  ];
+
+  for (const [input, expected] of CASES) {
+    it(`redacts ${input || "(empty)"}`, () => {
+      expect(stripRemoteCredentials(input)).toBe(expected);
+    });
+  }
+
+  it("is applied by readRepoIdentity, not only exported", () => {
+    // Guards against the redactor drifting out of the read path.
+    expect(readRepoIdentity(withCredentialedRemote).remoteUrl).toBe(
+      stripRemoteCredentials(`https://sterling:${SECRET}@github.com/acme/widget.git`)
+    );
   });
 });
 

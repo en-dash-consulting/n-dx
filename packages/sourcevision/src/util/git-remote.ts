@@ -11,6 +11,9 @@
  * `origin`, or has no git binary on PATH: they answer `undefined` or `null`
  * rather than throwing. Discovering identity must never fail an analysis.
  *
+ * A credentialed remote never leaves this module: `readOriginUrl` redacts the
+ * URL userinfo, so neither the manifest nor the iso export can record a token.
+ *
  * @module sourcevision/util/git-remote
  */
 
@@ -43,10 +46,35 @@ export function isGitWorkTree(root: string): boolean {
   return gitCommand(root, ["rev-parse", "--is-inside-work-tree"]) === "true";
 }
 
-/** The `origin` remote URL as configured, or `undefined`. */
+/**
+ * Drop the userinfo from a scheme-bearing remote URL.
+ *
+ * A remote such as `https://user:token@github.com/acme/widget.git` carries a
+ * live credential, and `.sourcevision/manifest.json` is meant to be committed
+ * — so the token must not survive the read. Only URLs with a scheme are
+ * touched: scp-like `git@github.com:acme/widget.git` is a bare username with
+ * no secret in it, and stripping it would leave a remote nobody recognizes.
+ *
+ * Anything that is not a URL is returned unchanged; this is a redactor, not a
+ * validator.
+ */
+export function stripRemoteCredentials(remote: string): string {
+  const trimmed = remote.trim();
+  const match = trimmed.match(/^([A-Za-z][A-Za-z0-9+.\-]*:\/\/)(?:[^/@]*@)?(.*)$/s);
+  return match ? `${match[1]}${match[2]}` : trimmed;
+}
+
+/**
+ * The `origin` remote URL, with any embedded credentials removed.
+ *
+ * Redaction happens here rather than at each call site so no caller can hold
+ * the credentialed form by accident. Nothing downstream performs a git
+ * operation with this value — it is recorded and displayed — so losing the
+ * userinfo costs nothing.
+ */
 export function readOriginUrl(root: string): string | undefined {
   const url = gitCommand(root, ["config", "--get", "remote.origin.url"]);
-  return url ? url : undefined;
+  return url ? stripRemoteCredentials(url) : undefined;
 }
 
 /**
@@ -109,6 +137,9 @@ export function readDefaultBranch(root: string): string | null {
  * at all, still gets a `name` from its own directory name with the remote
  * fields `null` — a consumer can then tell "no remote" from "not analysed"
  * without a second lookup.
+ *
+ * `remoteUrl` is the redacted remote, not the raw config value: the manifest
+ * is a committed artifact and must not carry a credential.
  */
 export function readRepoIdentity(root: string): RepoIdentity {
   const absRoot = resolve(root);

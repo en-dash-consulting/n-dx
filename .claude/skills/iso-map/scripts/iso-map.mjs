@@ -2067,9 +2067,14 @@ function gitCommand(root, args) {
 function isGitWorkTree(root) {
   return gitCommand(root, ["rev-parse", "--is-inside-work-tree"]) === "true";
 }
+function stripRemoteCredentials(remote) {
+  const trimmed = remote.trim();
+  const match = trimmed.match(/^([A-Za-z][A-Za-z0-9+.\-]*:\/\/)(?:[^/@]*@)?(.*)$/s);
+  return match ? `${match[1]}${match[2]}` : trimmed;
+}
 function readOriginUrl(root) {
   const url = gitCommand(root, ["config", "--get", "remote.origin.url"]);
-  return url ? url : void 0;
+  return url ? stripRemoteCredentials(url) : void 0;
 }
 function remoteToWebUrl(remote) {
   const cleaned = remote.trim().replace(/\.git$/, "");
