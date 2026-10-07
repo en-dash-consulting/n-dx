@@ -55,8 +55,42 @@ describe("readNarrationState", () => {
 
   it("returns the manifest's narration field", () => {
     mkdirSync(join(dir, ".sourcevision"));
-    const narration = { status: "pending", zones: ["a"], startedAt: started };
+    const narration = { status: "pending", zones: ["a"], startedAt: started, log: "somewhere/else.log" };
     writeFileSync(join(dir, ".sourcevision", "manifest.json"), JSON.stringify({ narration }));
     expect(readNarrationState(dir)).toEqual(narration);
+  });
+
+  it("fills the log from the project's own layout when the manifest omits it", () => {
+    // A manifest written before sourcevision recorded the log's location has
+    // no `log`. The fallback belongs here rather than in the formatter,
+    // because this is the only side that knows the project root — and so the
+    // only side that can tell which layout the project is on.
+    mkdirSync(join(dir, ".sourcevision"));
+    const narration = { status: "pending", zones: ["a"], startedAt: started };
+    writeFileSync(join(dir, ".sourcevision", "manifest.json"), JSON.stringify({ narration }));
+
+    expect(readNarrationState(dir).log).toBe(".sourcevision/.cache/narration.log");
+  });
+
+  it("names the container's cache on a .ndx/ project", () => {
+    mkdirSync(join(dir, ".ndx", "sourcevision"), { recursive: true });
+    const narration = { status: "pending", zones: ["a"], startedAt: started };
+    writeFileSync(join(dir, ".ndx", "sourcevision", "manifest.json"), JSON.stringify({ narration }));
+
+    expect(readNarrationState(dir).log).toBe(".ndx/sourcevision/.cache/narration.log");
+  });
+
+  it("says nothing about a log when there is none to name", () => {
+    // Guards the formatter's half: given a state with no `log` — which only a
+    // direct caller can produce, since readNarrationState always fills one —
+    // it must leave the clause off rather than invent a path the operator
+    // would fail to open.
+    const line = formatNarrationStatus(
+      { status: "pending", zones: ["a"], startedAt: started, pid: 1 },
+      { now, isAlive: () => true },
+    );
+
+    expect(line).toContain("running for 5m");
+    expect(line).not.toContain("log:");
   });
 });

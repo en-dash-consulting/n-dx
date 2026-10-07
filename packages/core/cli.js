@@ -916,7 +916,6 @@ const REFRESH_STEP_ORDER = {
   "sourcevision-pr-markdown": 3,
   "web-build": 4,
 };
-const WEB_PORT_FILE = ".n-dx-web.port";
 
 function printRefreshStepTransition(kind, status, detail) {
   const prefix = `${cyan("[refresh]")} ${bold(kind)} ->`;
@@ -950,7 +949,7 @@ function printRefreshStepSummary(stepStatuses) {
 }
 
 function readRunningServerPort(dir) {
-  const portPath = join(dir, WEB_PORT_FILE);
+  const portPath = resolveLayout(dir).webPortFile;
   if (!existsSync(portPath)) return null;
   try {
     const raw = readFileSync(portPath, "utf-8");

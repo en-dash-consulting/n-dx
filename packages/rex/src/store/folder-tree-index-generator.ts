@@ -207,6 +207,7 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
     "loe",
     "loeRationale",
     "loeConfidence",
+    "run",
     "description",
   ];
 
@@ -228,6 +229,7 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
     if (value === undefined || value === null) continue;
     emitted.add(key);
     if (key === "loeConfidence" && !["low", "medium", "high"].includes(value as string)) continue;
+    if (key === "run" && typeof value === "object" && Object.keys(value as object).length === 0) continue;
     emitYamlField(lines, key, value);
   }
 

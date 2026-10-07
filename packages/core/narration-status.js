@@ -15,6 +15,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { relativeToRoot, resolveLayout } from "./layout.js";
 
 /**
  * @typedef {{ status: "pending"|"done"|"failed", zones: string[], names?: string[], startedAt: string, finishedAt?: string, pid?: number, log?: string, reason?: string }} NarrationState
@@ -41,14 +42,24 @@ function formatAge(ms) {
 
 /**
  * Read the narration state, or null when there is none.
+ *
+ * A manifest written before sourcevision recorded the log's location has no
+ * `log` field. Filling it here rather than in {@link formatNarrationStatus} is
+ * what keeps the fallback honest: this function knows the project root, so it
+ * can ask the resolver where the cache actually lives, where the formatter
+ * holds only the state object and would have to guess a layout.
+ *
  * @param {string} dir project root
  * @returns {NarrationState | null}
  */
 export function readNarrationState(dir) {
-  const path = join(dir, ".sourcevision", "manifest.json");
+  const layout = resolveLayout(dir);
+  const path = join(layout.sourcevisionDir, "manifest.json");
   if (!existsSync(path)) return null;
   try {
-    return JSON.parse(readFileSync(path, "utf-8")).narration ?? null;
+    const narration = JSON.parse(readFileSync(path, "utf-8")).narration ?? null;
+    if (!narration || narration.log) return narration;
+    return { ...narration, log: relativeToRoot(layout, join(layout.sourcevisionDir, ".cache", "narration.log")) };
   } catch {
     return null;
   }
@@ -68,14 +79,18 @@ export function formatNarrationStatus(narration, opts = {}) {
   const isAlive = opts.isAlive ?? pidAlive;
   const count = new Set([...(narration.zones ?? []), ...(narration.names ?? [])]).size;
   const what = `${count} zone${count === 1 ? "" : "s"}`;
-  const log = narration.log ?? ".sourcevision/.cache/narration.log";
+  // No invented fallback: `readNarrationState` fills `log` from the resolver
+  // when the manifest omits it, and a state that reached here without one has
+  // no log to name. Guessing a path the caller would then fail to open is
+  // worse than leaving the clause off.
+  const logClause = narration.log ? ` — log: ${narration.log}` : "";
 
   if (narration.status === "pending") {
     if (narration.pid !== undefined && !isAlive(narration.pid)) {
       return `SourceVision narration: narrator exited without finishing (${what}) — the next 'ndx analyze' re-queues it, or run 'sv narrate .'`;
     }
     const age = formatAge(now - Date.parse(narration.startedAt));
-    return `SourceVision narration: running for ${age} (${what}) — log: ${log}`;
+    return `SourceVision narration: running for ${age} (${what})${logClause}`;
   }
   return `SourceVision narration: failed — ${narration.reason ?? "unknown reason"} (${what}); run 'sv narrate .' or 'ndx analyze .'`;
 }

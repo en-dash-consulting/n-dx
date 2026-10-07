@@ -45,6 +45,10 @@ const FIELD_COVERAGE: Record<string, string[]> = {
   mergedProposals: ["managed"],
   children: ["managed"],
 
+  // Saved run settings — add_item sets the block; edit_item replaces it
+  // (an object) or removes it (null).
+  run: ["add", "edit"],
+
   // Complex nested type — known gap
   requirements: ["complex"],
 };
