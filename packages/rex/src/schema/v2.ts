@@ -32,13 +32,16 @@
  * |                                                  | appliedIn, shippedIn, prs, issues (changes)  |
  * | constraint: statement, requirements, appliesTo   | commits, links*                              |
  * | change: intent, amends, touches, plannedRelease, | assignee, ready, needsPlacement              |
- * |   spike, priority, loe, requirements             | lastModified, lastModifiedBy                 |
+ * |   spike, priority, requirements, loe,            | lastModified, lastModifiedBy                 |
+ * |   loeRationale, loeConfidence, effort*           |                                              |
  * | task/subtask: description, acceptanceCriteria;   |                                              |
- * |   task also requirements, priority, loe          |                                              |
+ * |   task also requirements, priority, loe,         |                                              |
+ * |   loeRationale, loeConfidence, effort*           |                                              |
  *
  * `*` reserved with no shape: `hypotheses` waits for the Hypothesis Layer,
- * `links` for the tracker bridge. Every object schema passes unknown keys
- * through, so a newer writer's fields survive an older reader's save.
+ * `links` for the tracker bridge, `effort` for the task-prep recommender's
+ * effort object. Every object schema passes unknown keys through, so a newer
+ * writer's fields survive an older reader's save.
  *
  * Derived values (capability health, openAmendments, "bound by" edges,
  * change kind) are computed and cached outside the tree; they have no field
@@ -134,6 +137,27 @@ const PrioritySchema = z.enum([...VALID_PRIORITIES] as [Priority, ...Priority[]]
 const ReservedSchema = z.unknown();
 /** Engineer-weeks. Frontmatter scalars may arrive as strings ("1.5"), so coerce. */
 const LoeSchema = z.coerce.number().positive().optional();
+
+export const LOE_CONFIDENCES = ["low", "medium", "high"] as const;
+export type LoeConfidence = (typeof LOE_CONFIDENCES)[number];
+
+/** Level-of-effort fields shared by change and task intent. */
+interface EffortIntent {
+  /** Level of effort in engineer-weeks. */
+  loe?: number;
+  /** Why the estimate is what it is. */
+  loeRationale?: string;
+  loeConfidence?: LoeConfidence;
+  /** Reserved for the task-prep recommender's effort object; no shape yet. */
+  effort?: unknown;
+}
+
+const effortIntentShape = {
+  loe: LoeSchema,
+  loeRationale: z.string().optional(),
+  loeConfidence: z.enum(LOE_CONFIDENCES).optional(),
+  effort: ReservedSchema,
+};
 
 /** One acceptance criterion with a stable id (`c1`…`cn`) that deltas address. */
 export interface Criterion {
@@ -240,7 +264,7 @@ export interface ConstraintIntent extends BaseIntent {
   appliesTo?: "all" | string[];
 }
 
-export interface ChangeIntent extends BaseIntent {
+export interface ChangeIntent extends BaseIntent, EffortIntent {
   type: "change";
   /** Why the change exists. */
   intent?: string;
@@ -250,19 +274,15 @@ export interface ChangeIntent extends BaseIntent {
   plannedRelease?: string;
   spike?: boolean;
   priority?: Priority;
-  /** Level of effort in engineer-weeks. */
-  loe?: number;
   requirements?: Requirement[];
 }
 
-export interface TaskIntent extends BaseIntent {
+export interface TaskIntent extends BaseIntent, EffortIntent {
   type: "task";
   description?: string;
   acceptanceCriteria?: string[];
   requirements?: Requirement[];
   priority?: Priority;
-  /** Level of effort in engineer-weeks. */
-  loe?: number;
 }
 
 export interface SubtaskIntent extends BaseIntent {
@@ -326,8 +346,8 @@ export const ChangeIntentSchema = z
     plannedRelease: z.string().optional(),
     spike: z.boolean().optional(),
     priority: PrioritySchema.optional(),
-    loe: LoeSchema,
     requirements: z.array(RequirementSchema).optional(),
+    ...effortIntentShape,
   })
   .passthrough();
 
@@ -339,7 +359,7 @@ export const TaskIntentSchema = z
     acceptanceCriteria: z.array(z.string()).optional(),
     requirements: z.array(RequirementSchema).optional(),
     priority: PrioritySchema.optional(),
-    loe: LoeSchema,
+    ...effortIntentShape,
   })
   .passthrough();
 
