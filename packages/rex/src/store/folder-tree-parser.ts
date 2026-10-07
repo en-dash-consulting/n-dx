@@ -1343,6 +1343,15 @@ function parseScalar(s: string): unknown {
     }
   }
   if (s.startsWith('"') && s.endsWith('"') && s.length >= 2) {
+    // Both writers quote with JSON.stringify, so JSON.parse decodes every
+    // escape in one pass. Sequential replaces cannot: they read the `\\n` of
+    // `C:\new` as a newline and never decode `\r` or `\uXXXX`. The replace
+    // chain remains only for hand-written escapes JSON lacks, e.g. `\x`.
+    try {
+      return JSON.parse(s) as string;
+    } catch {
+      // Not valid JSON — decode the common escapes below.
+    }
     return s.slice(1, -1)
       .replace(/\\"/g, '"')
       .replace(/\\\\/g, "\\")

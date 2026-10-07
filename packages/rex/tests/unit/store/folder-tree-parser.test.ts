@@ -14,7 +14,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseFolderTree } from "../../../src/store/folder-tree-parser.js";
+import { parseFolderTree, parseFrontmatter, type ParseWarning } from "../../../src/store/folder-tree-parser.js";
+import { emitYamlField } from "../../../src/store/folder-tree-serializer.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 
 // No BUDGET_MULTIPLIER here. The perf assertion below guards complexity, and it
@@ -1093,4 +1094,35 @@ describe("parseFolderTree: performance", () => {
     }
     return epics;
   }
+});
+
+describe("parseFrontmatter: double-quoted escapes", () => {
+  // emitYamlField writes strings with JSON.stringify, so the parser must decode
+  // every JSON escape in one pass. Sequential replaces read a literal backslash
+  // before `n` back as a newline, and each later save compounds the change.
+  const values = [
+    "C:\\new dir",
+    "C:\\\\server\\tmp",
+    "ends with backslash\\",
+    'say "hi"',
+    "line\nbreak\r\nand\ttab",
+    "control\u0001char",
+  ];
+
+  for (const value of values) {
+    it(`round-trips ${JSON.stringify(value)} through emitYamlField`, () => {
+      const lines: string[] = [];
+      emitYamlField(lines, "title", value);
+      emitYamlField(lines, "tags", [value]);
+      const warnings: ParseWarning[] = [];
+      const fm = parseFrontmatter(`---\n${lines.join("\n")}\n---\n`, "index.md", warnings);
+      expect(warnings).toEqual([]);
+      expect(fm).toEqual({ title: value, tags: [value] });
+    });
+  }
+
+  it("still reads a hand-written escape JSON lacks", () => {
+    const fm = parseFrontmatter('---\ntitle: "a\\x b"\n---\n', "index.md", []);
+    expect(fm).toEqual({ title: "a\\x b" });
+  });
 });
