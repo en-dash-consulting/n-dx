@@ -20,8 +20,9 @@
  *   sidecar has no v2 counterpart and is never written.
  *
  * Output depends on content alone: frontmatter keys in a fixed order per type
- * (unknown keys after, by name), files rewritten only when their bytes change.
- * A tree read and written back unchanged is byte-identical.
+ * (unknown keys after, by name), files rewritten only when their content
+ * changes. A tree read and written back unchanged is byte-identical; a file
+ * that differs only by CRLF line endings counts as unchanged and is left alone.
  *
  * ## Stale entries
  *
@@ -64,7 +65,7 @@ import { parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
 import { SLUG_RULE_VERSION } from "./folder-tree-serializer.js";
 import { prdLockPath } from "./paths.js";
 import { CHANGES_DIRNAME, PRODUCT_DIRNAME, assertPrdModelWritable, assertV2TreeWritable, type PrdModel } from "./prd-model-reader.js";
-import { STATE_FILE_NAME, emptyStateFile, loadStateFile, saveStateFile, type ProductSpec } from "./state-writer.js";
+import { STATE_FILE_NAME, emptyStateFile, loadStateFile, sameTextOnDisk, saveStateFile, type ProductSpec } from "./state-writer.js";
 
 export interface WritePrdModelOptions {
   /**
@@ -144,7 +145,7 @@ export async function writePrdModel(
   const rel = (path: string): string => relative(rexDir, path).split("\\").join("/");
   for (const dir of plan.dirs) await mkdir(dir, { recursive: true });
   for (const [path, text] of plan.files) {
-    if ((await readIfExists(path)) === text) continue;
+    if (sameTextOnDisk(await readIfExists(path), text)) continue;
     await atomicWrite(path, text);
     result.written.push(rel(path));
   }

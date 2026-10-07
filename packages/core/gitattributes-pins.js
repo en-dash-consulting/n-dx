@@ -29,7 +29,8 @@ import { relativeToRoot, resolveLayout } from "./layout.js";
  * this module's — see {@link gitattributesEolRules}.
  */
 const EOL_TOOL_SUFFIXES = {
-  rexDir: ["md", "json", "jsonl"],
+  // `yaml`: the v2 trees' per-folder `state.yaml` under `<rexDir>/product` and `<rexDir>/changes`.
+  rexDir: ["md", "json", "jsonl", "yaml"],
   henchDir: ["md", "json"],
   sourcevisionDir: ["md", "json", "txt"],
 };

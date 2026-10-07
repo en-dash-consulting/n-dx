@@ -374,8 +374,8 @@ function dropStateFields(fm: Record<string, unknown>, path: string, warnings: Pa
 
 /** Markdown below the frontmatter, without the blank line after `---`. */
 function bodyOf(text: string): string | undefined {
-  const match = /^\s*---\r?\n[\s\S]*?\r?\n---[^\S\r\n]*(?:\r?\n|$)/.exec(text);
-  const body = match ? text.slice(match[0].length).replace(/^(?:\r?\n)+/, "").trimEnd() : "";
+  const match = /^\s*---\n[\s\S]*?\n---[^\S\n]*(?:\n|$)/.exec(text);
+  const body = match ? text.slice(match[0].length).replace(/^\n+/, "").trimEnd() : "";
   return body === "" ? undefined : body;
 }
 
@@ -394,9 +394,14 @@ async function isDirectory(path: string): Promise<boolean> {
   }
 }
 
+/**
+ * A tree file's text with CRLF read as LF: a Windows checkout without the
+ * eol=lf pins hands it over as CRLF, which must load into the same model
+ * (bodies included) as the LF file the writer produces.
+ */
 async function readIfExists(path: string): Promise<string | null> {
   try {
-    return await readFile(path, "utf-8");
+    return (await readFile(path, "utf-8")).replace(/\r\n/g, "\n");
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ENOENT" || code === "EISDIR") return null;

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -25,10 +25,10 @@ import { PRD_TREE_DIRNAME, prdLockPath } from "../../../src/store/paths.js";
 import { loadStateFile, saveStateFile } from "../../../src/store/state-writer.js";
 import type { RuleNode } from "../../../src/schema/v2-rules.js";
 import type { PRDItem } from "../../../src/schema/index.js";
+import { EOLS, copyV2Fixture, editText, type Eol } from "../../helpers/v2-fixture.js";
 
 const REPO_REX_DIR = resolve(import.meta.dirname, "../../../../../.rex");
 const V1_FIXTURE = resolve(import.meta.dirname, "../../fixtures/folder-tree/known-prd");
-const V2_FIXTURE = resolve(import.meta.dirname, "../../fixtures/v2-tree");
 const AREA = "a0000000-0000-4000-8000-000000000001";
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
@@ -54,15 +54,13 @@ function find(model: PrdModel, id: string): RuleNode {
   return hit.node;
 }
 
-async function copyFixture(): Promise<string> {
-  const rexDir = join(tmp, ".rex");
-  await cp(V2_FIXTURE, rexDir, { recursive: true });
-  return rexDir;
+/** The v2 fixture under `tmp` with `eol` line endings: a Windows checkout may hand it over as CRLF. */
+function copyFixture(eol: Eol, name = ".rex"): Promise<string> {
+  return copyV2Fixture(join(tmp, name), eol);
 }
 
-async function restamp(file: string, stamp: string): Promise<void> {
-  const text = await readFile(file, "utf-8");
-  await writeFile(file, text.replace(/^schema: .*$/m, `schema: "${stamp}"`));
+function restamp(file: string, stamp: string): Promise<void> {
+  return editText(file, (text) => text.replace(/^schema: .*$/m, `schema: "${stamp}"`));
 }
 
 describe("v1 tree", () => {
@@ -100,9 +98,16 @@ describe("v1 tree", () => {
   });
 });
 
-describe("v2 trees", () => {
+it("reads a CRLF copy of the v2 fixture into the same model as the LF fixture", async () => {
+  const lf = await loadPrdModel(await copyFixture("lf", "lf"), quiet);
+  const crlf = await loadPrdModel(await copyFixture("crlf", "crlf"), quiet);
+  expect(crlf.warnings).toEqual(lf.warnings);
+  expect(crlf).toEqual(lf);
+});
+
+describe.each(EOLS)("v2 trees (%s)", (eol) => {
   it("reads product and changes with intent and state merged", async () => {
-    const model = await loadPrdModel(V2_FIXTURE, quiet);
+    const model = await loadPrdModel(await copyFixture(eol), quiet);
 
     expect(model).toMatchObject({ layout: "v2", schema: "rex/v2", title: "Fixture shop", warnings: [] });
     expect(model.readOnly).toBeUndefined();
@@ -137,9 +142,8 @@ describe("v2 trees", () => {
   });
 
   it("skips an invalid node and reports orphan state rows", async () => {
-    const rexDir = await copyFixture();
-    const leaf = join(rexDir, "changes/add-apple-pay/wire-the-button.md");
-    await writeFile(leaf, (await readFile(leaf, "utf-8")).replace('type: "task"', 'level: "task"'));
+    const rexDir = await copyFixture(eol);
+    await editText(join(rexDir, "changes/add-apple-pay/wire-the-button.md"), (text) => text.replace('type: "task"', 'level: "task"'));
 
     const model = await loadPrdModel(rexDir, quiet);
     expect(find(model, CHANGE).children).toBeUndefined();
@@ -155,9 +159,9 @@ describe("v2 trees", () => {
 
   describe("a hand-edited run that is not an object", () => {
     async function withTaskRun(runLines: string): Promise<string> {
-      const rexDir = await copyFixture();
+      const rexDir = await copyFixture(eol);
       const leaf = join(rexDir, "changes/add-apple-pay/wire-the-button.md");
-      await writeFile(leaf, (await readFile(leaf, "utf-8")).replace('slug: "wire-the-button"\n', `slug: "wire-the-button"\n${runLines}`));
+      await editText(leaf, (text) => text.replace('slug: "wire-the-button"\n', `slug: "wire-the-button"\n${runLines}`));
       return rexDir;
     }
 
@@ -200,9 +204,8 @@ describe("v2 trees", () => {
     const CHANGE_FILE = "changes/add-apple-pay/index.md";
 
     async function withFrontmatter(file: string, lines: string): Promise<string> {
-      const rexDir = await copyFixture();
-      const path = join(rexDir, file);
-      await writeFile(path, (await readFile(path, "utf-8")).replace(/^slug: .*\n/m, (slug) => `${slug}${lines}`));
+      const rexDir = await copyFixture(eol);
+      await editText(join(rexDir, file), (text) => text.replace(/^slug: .*\n/m, (slug) => `${slug}${lines}`));
       return rexDir;
     }
 
@@ -233,15 +236,15 @@ describe("v2 trees", () => {
   });
 
   it("refuses a malformed state.yaml rather than reading its nodes as pending", async () => {
-    const rexDir = await copyFixture();
+    const rexDir = await copyFixture(eol);
     await writeFile(join(rexDir, "product/checkout/state.yaml"), `schema: "rex/v2"\nitems:\n  "x":\n    status: "nope"\n`);
     await expect(loadPrdModel(rexDir, quiet)).rejects.toThrow(/state\.yaml/);
   });
 });
 
 describe("schema skew", () => {
-  it("refuses an unknown major, naming both versions and the fix", async () => {
-    const rexDir = await copyFixture();
+  it.each(EOLS)("refuses an unknown major, naming both versions and the fix (%s)", async (eol) => {
+    const rexDir = await copyFixture(eol);
     await restamp(join(rexDir, "product/index.md"), "rex/v3");
 
     const err = await loadPrdModel(rexDir, quiet).catch((e: unknown) => e);
@@ -261,10 +264,9 @@ describe("schema skew", () => {
     await expect(loadPrdModel(rexDir, quiet)).rejects.toThrow("PRD schema is rex/v7");
   });
 
-  it("names a missing v2 stamp and how to add it", async () => {
-    const rexDir = await copyFixture();
-    const root = join(rexDir, "product/index.md");
-    await writeFile(root, (await readFile(root, "utf-8")).replace(/^schema: .*\n/m, ""));
+  it.each(EOLS)("names a missing v2 stamp and how to add it (%s)", async (eol) => {
+    const rexDir = await copyFixture(eol);
+    await editText(join(rexDir, "product/index.md"), (text) => text.replace(/^schema: .*\n/m, ""));
     await expect(loadPrdModel(rexDir, quiet)).rejects.toThrow('PRD schema is missing');
     await expect(loadPrdModel(rexDir, quiet)).rejects.toThrow('stamp it with schema: "rex/v2"');
   });
@@ -284,8 +286,8 @@ describe("schema skew", () => {
   });
 
   describe("with the override", () => {
-    it("reads a newer v2 tree with a warning on stderr and refuses every write", async () => {
-      const rexDir = await copyFixture();
+    it.each(EOLS)("reads a newer v2 tree with a warning on stderr and refuses every write (%s)", async (eol) => {
+      const rexDir = await copyFixture(eol);
       await restamp(join(rexDir, "product/index.md"), "rex/v3");
       await restamp(join(rexDir, "changes/add-apple-pay/state.yaml"), "rex/v3");
       const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);

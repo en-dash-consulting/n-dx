@@ -4,8 +4,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { loadPrdModel, type PrdModel } from "../../../src/store/prd-model-reader.js";
 import { writePrdModel, type WritePrdModelOptions } from "../../../src/store/prd-model-writer.js";
@@ -13,8 +13,7 @@ import { withLock } from "../../../src/store/file-lock.js";
 import { prdLockPath } from "../../../src/store/paths.js";
 import { SLUG_RULE_VERSION } from "../../../src/store/folder-tree-serializer.js";
 import type { RuleNode } from "../../../src/schema/v2-rules.js";
-
-const V2_FIXTURE = resolve(import.meta.dirname, "../../fixtures/v2-tree");
+import { EOLS, copyV2Fixture, type Eol } from "../../helpers/v2-fixture.js";
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
 const TASK = "c0000000-0000-4000-8000-000000000002";
@@ -29,10 +28,9 @@ afterEach(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
 
-async function copyFixture(): Promise<string> {
-  const rexDir = join(tmp, ".rex");
-  await cp(V2_FIXTURE, rexDir, { recursive: true });
-  return rexDir;
+/** The v2 fixture under `tmp` with `eol` line endings: a Windows checkout may hand it over as CRLF. */
+function copyFixture(eol: Eol = "lf", name = ".rex"): Promise<string> {
+  return copyV2Fixture(join(tmp, name), eol);
 }
 
 function write(rexDir: string, model: PrdModel, options?: WritePrdModelOptions) {
@@ -75,24 +73,26 @@ function all(model: PrdModel): RuleNode[] {
   return [...model.tree.product, ...model.tree.changes];
 }
 
-describe("writePrdModel", () => {
-  it("round-trips the v2 fixture byte-identically", async () => {
-    const model = await loadPrdModel(V2_FIXTURE, quiet);
+describe.each(EOLS)("writePrdModel on a %s checkout", (eol) => {
+  it("round-trips the v2 fixture byte-identically, in LF", async () => {
+    const model = await loadPrdModel(await copyFixture(eol), quiet);
     expect(model.warnings).toEqual([]);
     const rexDir = join(tmp, "fresh");
     await mkdir(rexDir);
     await write(rexDir, model);
-    expect(await snapshot(rexDir)).toEqual(await snapshot(V2_FIXTURE));
+    expect(await snapshot(rexDir)).toEqual(await snapshot(await copyFixture("lf", "lf")));
   });
 
-  it("writes nothing when the tree is unchanged", async () => {
-    const rexDir = await copyFixture();
+  it("writes nothing when the tree is unchanged, leaving every file's bytes alone", async () => {
+    const rexDir = await copyFixture(eol);
+    const before = await snapshot(rexDir);
     const result = await write(rexDir, await loadPrdModel(rexDir, quiet));
     expect(result).toEqual({ written: [], removed: [] });
+    expect(await snapshot(rexDir)).toEqual(before);
   });
 
   it("keeps every path when titles change", async () => {
-    const rexDir = await copyFixture();
+    const rexDir = await copyFixture(eol);
     const before = Object.keys(await snapshot(rexDir)).sort();
     const model = await loadPrdModel(rexDir, quiet);
     find(all(model), CHANGE).title = "Offer wallets at checkout";
@@ -111,6 +111,23 @@ describe("writePrdModel", () => {
     expect(reread.title).toBe("Renamed shop");
   });
 
+  it("keeps CRLF in a file it leaves alone and writes LF to the one it changes", async () => {
+    const rexDir = await copyFixture(eol);
+    const before = await snapshot(rexDir);
+    const model = await loadPrdModel(rexDir, quiet);
+    find(all(model), CHANGE).title = "Retitled";
+
+    expect(await write(rexDir, model)).toEqual({ written: ["changes/add-apple-pay/index.md"], removed: [] });
+    const after = await snapshot(rexDir);
+    expect(after["changes/add-apple-pay/index.md"]).not.toContain("\r");
+    delete after["changes/add-apple-pay/index.md"];
+    delete before["changes/add-apple-pay/index.md"];
+    expect(after).toEqual(before);
+  });
+});
+
+/** The remaining cases edit and compare text in LF terms, so they run on an LF copy whatever the checkout. */
+describe("writePrdModel", () => {
   it("never writes a Children table", async () => {
     const rexDir = await copyFixture();
     const model = await loadPrdModel(rexDir, quiet);

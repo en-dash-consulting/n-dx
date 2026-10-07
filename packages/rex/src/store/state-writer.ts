@@ -127,7 +127,7 @@ export async function saveStateFile(folderDir: string, file: StateFile, options:
   reconcileRevisedAt(file, options.specs, (options.now ?? (() => new Date()))());
   assertValid(file, path);
   const text = serializeStateYaml(file);
-  if ((await readIfExists(path)) === text) return false;
+  if (sameTextOnDisk(await readIfExists(path), text)) return false;
   await atomicWrite(path, text);
   return true;
 }
@@ -294,6 +294,15 @@ function assertValid(file: StateFile, source: string): void {
   if (result.success) return;
   const issues = result.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
   throw new Error(`${source}: invalid ${STATE_FILE_NAME}: ${issues}`);
+}
+
+/**
+ * Whether `onDisk` already holds `text` (LF), counting a CRLF copy as the same.
+ * A Windows checkout without the eol=lf pins hands every file over with CRLF;
+ * rewriting it to LF when nothing else changed is line-ending churn (#283).
+ */
+export function sameTextOnDisk(onDisk: string | null, text: string): boolean {
+  return onDisk !== null && (onDisk === text || onDisk.replace(/\r\n/g, "\n") === text);
 }
 
 async function readIfExists(path: string): Promise<string | null> {

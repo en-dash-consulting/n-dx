@@ -5,6 +5,7 @@
 .rex/**/*.md    text eol=lf
 .rex/**/*.json  text eol=lf
 .rex/**/*.jsonl text eol=lf
+.rex/**/*.yaml  text eol=lf
 
 # Same class: every other tracked file that n-dx tools write with LF
 # (hench run records/config, sourcevision hints, ndx config, and the
@@ -62,3 +63,13 @@ packages/core/export.js     text eol=lf
 # work is uncommitted, so a phantom-dirty snapshot aborts an autonomous run
 # whose work was already finished and committed. Same class as the pins above.
 *.snap                      text eol=lf
+
+# The v2 PRD roots for when this repo moves to the `.ndx/` layout (the
+# injector pins `.ndx/rex/**` only in projects already on it), and the v2 test
+# fixture, which the writer tests compare byte-for-byte with the writer's LF
+# output. Same class as #283.
+.ndx/rex/product/**/*.md    text eol=lf
+.ndx/rex/product/**/*.yaml  text eol=lf
+.ndx/rex/changes/**/*.md    text eol=lf
+.ndx/rex/changes/**/*.yaml  text eol=lf
+packages/rex/tests/fixtures/v2-tree/** text eol=lf
