@@ -26,7 +26,7 @@ import { spawn } from "node:child_process";
 import { FileStore } from "../../src/store/file-adapter.js";
 import { FolderTreeStore } from "../../src/store/folder-tree-store.js";
 import { acquireLock } from "../../src/store/file-lock.js";
-import { handleMoveItem, handleUpdateTaskStatus } from "../../src/cli/mcp-tools.js";
+import { handleMoveItem, handleUpdateTaskStatus } from "../../src/cli/mcp-tools/index.js";
 import { syncFolderTree } from "../../src/cli/commands/folder-tree-sync.js";
 import type { PRDStore } from "../../src/store/contracts.js";
 import type { PRDDocument, PRDItem } from "../../src/schema/index.js";

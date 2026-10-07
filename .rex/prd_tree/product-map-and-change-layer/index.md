@@ -33,7 +33,7 @@ plannedRelease: "1.0.0"
 | [MCP tools for the product layer and changes](./mcp-tools-for-the-product-layer-and/index.md) | pending |
 | [Merge driver and bundle format for v2](./merge-driver-and-bundle-format-for-v2/index.md) | pending |
 | [Migrate this repository and cut 1.0.0](./migrate-this-repository-and-cut-1-0-0/index.md) | pending |
-| [Move the Jev client into llm-client and redact Bitbucket tokens](./move-the-jev-client-into-llm-client/index.md) | pending |
+| [Move the Jev client into llm-client and redact Bitbucket tokens](./move-the-jev-client-into-llm-client/index.md) | completed |
 | [Placement engine for changes](./placement-engine-for-changes/index.md) | pending |
 | [Product, Changes and capability views on fixtures](./product-changes-and-capability-views/index.md) | completed |
 | [Read and write the v2 folder trees](./read-and-write-the-v2-folder-trees/index.md) | pending |
@@ -44,7 +44,7 @@ plannedRelease: "1.0.0"
 | [Select and complete work on changes](./select-and-complete-work-on-changes/index.md) | pending |
 | [Shared assistant guidance for every vendor](./shared-assistant-guidance-for-every/index.md) | pending |
 | [Single state writer for state.yaml](./single-state-writer-for-state-yaml/index.md) | pending |
-| [Split the rex MCP tools into one module per tool](./split-the-rex-mcp-tools-into-one/index.md) | pending |
+| [Split the rex MCP tools into one module per tool](./split-the-rex-mcp-tools-into-one/index.md) | completed |
 | [Stamp shippedIn from any CI](./stamp-shippedin-from-any-ci/index.md) | pending |
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | pending |
 | [User docs and docs.n-dx.dev for the v2 model](./user-docs-and-docs-n-dx-dev-for-the-v2/index.md) | pending |
