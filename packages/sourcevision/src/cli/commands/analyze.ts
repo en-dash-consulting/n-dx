@@ -47,6 +47,7 @@ import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
 import { configureJudgmentCache, setJevObserver } from "@n-dx/llm-client";
 import {
+  isAnalyzeProgressActive,
   startAnalyzeProgress,
   finishAnalyzeProgress,
   markPhaseStarted,
@@ -364,8 +365,10 @@ const STOP_SIGNALS = ["SIGTERM", "SIGINT"] as const;
  * with the manifest's open phase still `running` and the progress file still
  * `running`; with it, the phase is recorded as an error the next analyze
  * overwrites, the progress file says `failed` (its exit listener) and names
- * the signal, and the exit code is the conventional 128 + signal. Returns the
- * function that removes the handlers.
+ * the signal, and the exit code is the conventional 128 + signal. Installed
+ * before the progress file exists, so a signal landing first still exits with
+ * 128 + signal (noteAnalyzeError and openRootPhase are no-ops then). Returns
+ * the function that removes the handlers.
  */
 function installStopHandlers(absDir: string): () => void {
   const installed = STOP_SIGNALS.map((signal) => {
@@ -425,9 +428,12 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   // Publish live progress to .sourcevision/.cache/analyze-progress.json for
   // the dashboard. Same ownership rule as the reporter above: a --deep
   // sub-analysis reports into the outermost run's file (under markScope) and
-  // leaves finishing it to that run.
-  const ownsProgressFile = startAnalyzeProgress(svDir, ["sv analyze", ...extraArgs].join(" "));
+  // leaves finishing it to that run. The stop handlers go in before the file
+  // first says `running`: a signal sent on seeing it must reach them, not the
+  // default disposition (#562).
+  const ownsProgressFile = !isAnalyzeProgressActive();
   const removeStopHandlers = ownsProgressFile ? installStopHandlers(absDir) : null;
+  if (ownsProgressFile) startAnalyzeProgress(svDir, ["sv analyze", ...extraArgs].join(" "));
   let completed = false;
   let phasesDone = false;
 
