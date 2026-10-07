@@ -41,6 +41,7 @@ import {
 import type { AnalyzeContext } from "./analyze-phases.js";
 import { generatePrMarkdownFile } from "./pr-markdown.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
+import { computeInfrastructure, toInfrastructureData } from "../../analyzers/infrastructure.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
@@ -701,6 +702,22 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     writeFileSync(
       join(ctx.svDir, DATA_FILES.projectProfile),
       toCanonicalJSON(stripProjectProfileForDisk(projectProfile)),
+    );
+
+    // Runtime infrastructure and injection seams — the two things the import
+    // graph structurally cannot show. Discovered here rather than inside the
+    // iso export so anything can read it, and written canonically so repeated
+    // runs over an unchanged tree produce a byte-identical file.
+    writeFileSync(
+      join(ctx.svDir, DATA_FILES.infrastructure),
+      toCanonicalJSON(
+        toInfrastructureData(
+          computeInfrastructure(
+            ctx.absDir,
+            (inventory.files as Array<{ path: string }>).map((f) => f.path),
+          ),
+        ),
+      ),
     );
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);
