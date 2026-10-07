@@ -23,6 +23,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Apply added, modified and removed amendments to the product layer](./apply-added-modified-and-removed.md) | in_progress |
+| [A multi-line amendment summary breaks the History section the apply engine writes](./a-multi-line-amendment-summary-breaks.md) | pending |
+| [Apply added, modified and removed amendments to the product layer](./apply-added-modified-and-removed.md) | completed |
 | [Handle direct map edits: editorial re-stamp or revised with a drafted change](./handle-direct-map-edits-editorial-re.md) | pending |
+| [Retiring an area or capability leaves its live descendants hidden from every v2 rule](./retiring-an-area-or-capability-leaves.md) | pending |
 | [Support the rex.applyOn setting: complete, review and release](./support-the-rex-applyon-setting.md) | pending |
