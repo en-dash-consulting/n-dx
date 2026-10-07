@@ -35,10 +35,6 @@
  * decision made by a gate registry. If a toggle is added for them, the
  * completeness test above forces the endpoint entry in the same change.
  *
- * Likewise `/api/commands/sync`: `rex.notionSync` names one adapter and the
- * command syncs with whichever adapter is configured, so the mapping is not
- * one-to-one and guessing it would refuse a sync the toggle never described.
- *
  * @module web/server/route-feature-gates
  * @see routes-features.ts — the toggle registry and `isFeatureEnabled`
  * @see routes-sourcevision-ask.ts — the one self-enforcing gate, and why
@@ -54,9 +50,7 @@ export interface RouteFeatureGate {
   /** Registry key from routes-features.ts, e.g. "sourcevision.ask". */
   feature: string;
   /** Paths this gate covers exactly (query string already stripped). */
-  exact?: readonly string[];
-  /** Path subtree this gate covers — the prefix itself and anything under it. */
-  prefix?: string;
+  exact: readonly string[];
   /** Why these endpoints belong to this toggle. Read by humans, not code. */
   reason: string;
   /**
@@ -94,25 +88,12 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
     exact: ["/api/sv/pr-markdown", "/api/sv/pr-markdown/state"],
     reason: "Reads for the PR Markdown page. Listed exactly so an unrelated subpath is still a 404, not a 403.",
   },
-  {
-    feature: "rex.notionSync",
-    prefix: "/api/notion",
-    reason: "Notion credentials, connection tests and schema writes — the whole Notion settings surface.",
-  },
-  {
-    feature: "rex.integrations",
-    prefix: "/api/integrations",
-    reason: "Integration schemas and saved adapter credentials, including secrets, read and written here.",
-  },
 ];
 
 /** The gate covering `pathname`, or null when the path is ungated. */
 export function findRouteFeatureGate(pathname: string): RouteFeatureGate | null {
   for (const gate of ROUTE_FEATURE_GATES) {
-    if (gate.exact?.includes(pathname)) return gate;
-    if (gate.prefix && (pathname === gate.prefix || pathname.startsWith(`${gate.prefix}/`))) {
-      return gate;
-    }
+    if (gate.exact.includes(pathname)) return gate;
   }
   return null;
 }

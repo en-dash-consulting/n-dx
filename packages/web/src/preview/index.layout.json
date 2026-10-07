@@ -1177,28 +1177,6 @@
           ]
         },
         {
-          "id": "notion-config",
-          "kind": "item",
-          "icon": "🔌",
-          "label": "ndx sync",
-          "flag": true,
-          "content": [
-            {
-              "id": "sec-030",
-              "label": "",
-              "collapsed": false,
-              "panels": [
-                {
-                  "id": "pnl-sync-settings",
-                  "label": "Remote Sync",
-                  "width": 12,
-                  "kind": "blocks"
-                }
-              ]
-            }
-          ]
-        },
-        {
           "id": "commands",
           "kind": "item",
           "icon": "📤",

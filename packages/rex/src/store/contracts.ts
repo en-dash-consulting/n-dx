@@ -1,8 +1,9 @@
 /**
  * Store adapter interface for rex PRD persistence.
  *
- * Every storage backend (local filesystem, Notion, future databases)
- * implements {@link PRDStore}. The interface covers four concerns:
+ * Every storage backend implements {@link PRDStore}. Two do today — the flat
+ * `FileStore` and the `FolderTreeStore` behind `.rex/prd_tree/` — and the
+ * interface covers four concerns:
  *
  * 1. **Document CRUD** — load/save the full PRD tree plus single-item
  *    get/add/update/remove for granular mutations.
@@ -10,8 +11,10 @@
  * 3. **Configuration** — project-level settings (adapter choice, model, etc.).
  * 4. **Workflow** — human-readable workflow state (markdown).
  *
- * Adapters may mix backends: NotionStore keeps the PRD tree in Notion
- * but stores config, logs, and workflow on the local filesystem.
+ * Adapters may mix backends: an adapter is free to keep the PRD tree in one
+ * place and config, logs and workflow on the local filesystem. The removed
+ * tracker adapters all did, which is why those four concerns are separable
+ * here rather than folded into document CRUD.
  *
  * @module store/contracts
  */
@@ -99,7 +102,7 @@ export function takeSaveFileReport(store: PRDStore): SaveFileReport | null {
  * (e.g. optimistic locking when transactions are available).
  */
 export interface StoreCapabilities {
-  /** Adapter identifier (e.g. `"file"`, `"notion"`). */
+  /** Adapter identifier (e.g. `"file"`, `"folder-tree"`). */
   adapter: string;
 
   /** Whether the adapter supports atomic multi-item writes. */

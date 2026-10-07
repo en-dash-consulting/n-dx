@@ -962,43 +962,17 @@ function checkGatewayImports(dir) {
 // ── Architecture policy (redundant enforcement) ──────────────────────────────
 
 /**
- * Files allowed to import from node:child_process directly.
- * Mirrors architecture-policy.test.js ALLOWED set for redundant enforcement.
+ * Files allowed to import from node:child_process directly, and directories
+ * the scan leaves out — loaded from child-process-allowlist.json.
  *
- * This list is intentionally maintained separately from the test file to
- * provide independent verification — if either list drifts, the stricter
- * one catches the violation.
+ * The JSON file is shared with architecture-policy.test.js. Each used to keep
+ * its own list; ci.js's fell 26 files behind and the step failed on every run.
+ * The scanners stay separate implementations, and a parity test in
+ * architecture-policy.test.js checks that they reach the same verdict.
  */
-const CHILD_PROCESS_ALLOWED = new Set([
-  // Foundation abstraction
-  "packages/llm-client/src/exec.ts",
-  // CLI streaming providers
-  "packages/llm-client/src/cli-provider.ts",
-  "packages/llm-client/src/codex-cli-provider.ts",
-  "packages/hench/src/agent/lifecycle/cli-loop.ts",
-  // Orchestration layer
-  "cli.js",
-  "ci.js",
-  "web.js",
-  "config.js",
-  "pr-check.js",
-  // Development scripts
-  "packages/web/dev.js",
-  // System monitoring
-  "packages/hench/src/process/memory-monitor.ts",
-  // Git operations
-  "packages/sourcevision/src/analyzers/branch-work-collector.ts",
-  "packages/sourcevision/src/analyzers/branch-work-filter.ts",
-  "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
-  "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
-  // Web server routes
-  "packages/web/src/server/routes-hench.ts",
-  "packages/web/src/server/routes-sourcevision.ts",
-  // NOTE: claude-integration.js was listed here for its `claude mcp add`
-  // execSync calls. It now routes through win-spawn.js and imports no
-  // child_process API directly, so the permission was removed rather than
-  // left permitted-but-unused.
-]);
+const _childProcessPolicy = JSON.parse(readFileSync(join(__dir, "child-process-allowlist.json"), "utf-8"));
+const CHILD_PROCESS_ALLOWED = new Set(_childProcessPolicy.allowed.map((e) => e.path));
+const CHILD_PROCESS_EXCLUDED_DIRS = new Set(Object.keys(_childProcessPolicy.excludeDirs));
 
 /**
  * Check that no source files import from node:child_process outside the
@@ -1007,8 +981,10 @@ const CHILD_PROCESS_ALLOWED = new Set([
  *
  * If the test file is ever skipped, broken, or omitted from a CI run,
  * this check still catches violations.
+ *
+ * Exported for that parity test.
  */
-function checkArchitecturePolicy(dir) {
+export function checkArchitecturePolicy(dir) {
   const violations = [];
   let checked = 0;
 
@@ -1032,7 +1008,7 @@ function checkArchitecturePolicy(dir) {
         continue;
       }
       if (st.isDirectory()) {
-        walkSrc(full);
+        if (!CHILD_PROCESS_EXCLUDED_DIRS.has(relative(dir, full).replace(/\\/g, "/"))) walkSrc(full);
       } else if (/\.(ts|js|mjs)$/.test(entry) && !entry.endsWith(".d.ts")) {
         const rel = relative(dir, full).replace(/\\/g, "/");
 

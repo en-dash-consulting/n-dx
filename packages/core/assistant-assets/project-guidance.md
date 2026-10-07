@@ -108,7 +108,6 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 - `health` — PRD structure health score
 - `facets` — list configured facets with distribution
 - `append_log` — write structured log entry
-- `sync_with_remote` — sync with remote adapter (e.g. Notion)
 - `get_token_usage` — roll up hench run token totals per PRD item (self/descendants/total) with orphans surfaced separately
 - `get_capabilities` — server capabilities and configuration, plus the `workspace` block (`projectDir`, `source`, `refused`) naming the tree this session writes
 

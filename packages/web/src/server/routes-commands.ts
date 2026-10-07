@@ -9,7 +9,6 @@
  * POST /api/commands/sv-analyze      — re-run sourcevision analyze (full: true → async, see status)
  * GET  /api/commands/sv-analyze/status — check running full-analysis status
  * POST /api/commands/sv-analyze/stop — interrupt the running full analysis
- * POST /api/commands/sync            — rex sync (body: { direction: "push"|"pull"|"sync" })
  * POST /api/commands/recommend       — rex recommend (async, see status)
  * GET  /api/commands/recommend/status — recommend status and recommendation report
  * POST /api/commands/recommend/stop  — interrupt the running recommend pass
@@ -549,60 +548,6 @@ function handleSvAnalyzeStatus(
   ctx: ServerContext,
 ): boolean {
   jsonResponse(res, 200, { ...svAnalyzeSlots.get(ctx).status, progress: readAnalyzeProgress(ctx.svDir) });
-  return true;
-}
-
-/** POST /api/commands/sync — rex sync push/pull */
-async function handleSync(
-  req: IncomingMessage,
-  res: ServerResponse,
-  ctx: ServerContext,
-  broadcast?: WebSocketBroadcaster,
-): Promise<boolean> {
-  let direction: "push" | "pull" | "sync" = "sync";
-  try {
-    const body = await readBody(req, res);
-    if (body) {
-      const input = JSON.parse(body) as { direction?: string };
-      if (input.direction === "push" || input.direction === "pull" || input.direction === "sync") {
-        direction = input.direction;
-      }
-    }
-  } catch {
-    // Use default
-  }
-
-  const { bin, args: prefixArgs } = resolveRexBin(ctx);
-  const cmdArgs = [...prefixArgs, "sync", "--format=json"];
-  if (direction === "push") cmdArgs.push("--push");
-  if (direction === "pull") cmdArgs.push("--pull");
-  cmdArgs.push(ctx.projectDir);
-
-  try {
-    const result = await foundationExec(bin, cmdArgs, {
-      cwd: ctx.projectDir,
-      timeout: 120_000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-
-    if (result.error && !result.stdout) {
-      errorResponse(res, 500, `Sync failed: ${result.stderr || result.error.message}`);
-      return true;
-    }
-
-    if (broadcast) {
-      broadcast({ type: "rex:prd-changed", source: "sync", timestamp: new Date().toISOString() });
-    }
-
-    try {
-      const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
-      jsonResponse(res, 200, { ok: true, ...parsed });
-    } catch {
-      jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
-    }
-  } catch (err) {
-    errorResponse(res, 500, String(err));
-  }
   return true;
 }
 
@@ -1899,7 +1844,6 @@ const COMMAND_MANIFEST: ManifestGroup[] = [
       { name: "add", description: "Add PRD items from freeform descriptions, files, or stdin", requires: "llm" },
       { name: "status", description: "Show the PRD status tree with completion stats", requires: "init" },
       { name: "next", description: "Print the next actionable task", requires: "init" },
-      { name: "sync", description: "Sync the local PRD with a remote adapter (--push, --pull)", requires: "init", trigger: { endpoint: "/api/commands/sync", method: "POST" } },
     ],
   },
   {
@@ -2141,9 +2085,6 @@ export function handleCommandsRoute(
   }
   if (path === "sv-analyze/stop" && method === "POST") {
     return stopJob(res, svAnalyzeSlots.get(ctx), "Analysis");
-  }
-  if (path === "sync" && method === "POST") {
-    return handleSync(req, res, ctx, broadcast);
   }
   if (path === "recommend" && method === "POST") {
     return handleRecommend(req, res, ctx, broadcast);

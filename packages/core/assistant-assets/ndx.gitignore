@@ -39,7 +39,6 @@
 .rex/pending-proposals.json
 .rex/acknowledged-findings.json
 .rex/execution-log*.jsonl
-.rex/adapters.json
 .rex/n-dx_workflow.md
 
 # Server runtime

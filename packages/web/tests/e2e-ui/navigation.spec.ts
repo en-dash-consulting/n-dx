@@ -42,8 +42,6 @@ const VIEWS = Object.keys(VIEW_META);
 const GATED_FEATURES = {
   "sourcevision.prMarkdown": true,
   "sourcevision.ask": true,
-  "rex.notionSync": true,
-  "rex.integrations": true,
 };
 
 test.beforeAll(async () => {

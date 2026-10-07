@@ -66,10 +66,6 @@ const GATED: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/rex/apply-refinements", "sourcevision.ask"],
   ["/api/sv/pr-markdown", "sourcevision.prMarkdown"],
   ["/api/sv/pr-markdown/state", "sourcevision.prMarkdown"],
-  ["/api/notion/config", "rex.notionSync"],
-  ["/api/notion/schema/fix", "rex.notionSync"],
-  ["/api/integrations", "rex.integrations"],
-  ["/api/integrations/notion/config", "rex.integrations"],
 ];
 
 /** A server that answers 200 "reached" for anything the gate lets past. */
@@ -155,11 +151,12 @@ describe("route feature gates", () => {
     expect(res.status).toBe(200);
   });
 
-  it("does not gate a sibling path that merely shares a prefix string", async () => {
-    // `/api/notion` is a subtree gate; `/api/notionary` is not in it.
-    expect(findRouteFeatureGate("/api/notionary")).toBeNull();
-    expect(findRouteFeatureGate("/api/notion")).not.toBeNull();
-    expect(findRouteFeatureGate("/api/notion/config")).not.toBeNull();
+  it("gates listed paths exactly, so a subpath or near-miss is ungated", async () => {
+    // Every gate is an exact list: an unlisted subpath falls through to the
+    // router's own 404 rather than answering 403 for a feature it is not part of.
+    expect(findRouteFeatureGate("/api/sv/pr-markdown")).not.toBeNull();
+    expect(findRouteFeatureGate("/api/sv/pr-markdown/unlisted")).toBeNull();
+    expect(findRouteFeatureGate("/api/sv/pr-markdown-extra")).toBeNull();
   });
 
   it("gates on the path alone, ignoring the query string", async () => {
@@ -171,7 +168,7 @@ describe("route feature gates", () => {
   it("refuses when .n-dx.json is unreadable rather than opening the gate", async () => {
     await writeFile(join(tmpDir, ".n-dx.json"), "{ not json", "utf-8");
 
-    const res = await fetch(`http://127.0.0.1:${port}/api/integrations`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
     expect(res.status).toBe(403);
   });
 

@@ -53,7 +53,7 @@ packages/web/tests/unit/viewer/axe-audit.test.ts
 | Workflow settings (`workflow`) | WorkflowView loading state (work settings, CLI timeouts and templates) |
 | PR Tab (`pr-markdown`) | PRMarkdownView loading state |
 | Ask (`ask`) | AskView idle state, plus the deployed-mode unavailable state |
-| Project settings (`project`) | ProjectView loading state (analyze and plan settings, feature flags, Notion and integrations) |
+| Project settings (`project`) | ProjectView loading state (analyze and plan settings, feature flags) |
 
 Each route is tested in **both light and dark themes** to catch theme-specific structural regressions (missing ARIA labels that only appear in one theme, dynamic class applications, etc.).
 

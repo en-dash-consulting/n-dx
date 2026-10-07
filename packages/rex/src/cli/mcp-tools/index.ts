@@ -33,7 +33,6 @@ export { handleMoveItem } from "./move-item.js";
 export { handleMergeItems } from "./merge-items.js";
 export { handleGetItem } from "./get-item.js";
 export { handleAppendLog } from "./append-log.js";
-export { handleSyncWithRemote } from "./sync-with-remote.js";
 export { handleGetRecommendations } from "./get-recommendations.js";
 export { handleVerifyCriteria } from "./verify-criteria.js";
 export { handleReorganize } from "./reorganize.js";
