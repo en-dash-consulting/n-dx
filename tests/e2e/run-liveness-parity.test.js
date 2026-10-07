@@ -17,6 +17,7 @@ import {
   summarizeLiveness as henchSummarize,
   LOCK_ATTRIBUTION_WINDOW_MS as HENCH_WINDOW_MS,
   RUN_STALE_THRESHOLD_MS as HENCH_STALE_MS,
+  isPidAlive as henchIsPidAlive,
 } from "../../packages/hench/dist/process/run-liveness.js";
 import {
   classifyRunLiveness as webClassify,
@@ -24,6 +25,7 @@ import {
   LOCK_ATTRIBUTION_WINDOW_MS as WEB_WINDOW_MS,
   RUN_STALE_THRESHOLD_MS as WEB_STALE_MS,
 } from "../../packages/web/dist/server/run-liveness.js";
+import { isPidAlive as webIsPidAlive } from "../../packages/web/dist/server/run-staleness.js";
 
 const HOST = "parity-host";
 const NOW = Date.UTC(2026, 0, 15, 12, 0, 0);
@@ -158,5 +160,22 @@ describe("run-liveness parity between hench and web", () => {
   it("agrees on the summary tally", () => {
     const verdicts = CASES.map(({ run, ctx }) => henchClassify(run, full(ctx)));
     expect(webSummarize(verdicts)).toEqual(henchSummarize(verdicts));
+  });
+
+  // The cases above inject the probe; this pins the probes themselves. kill
+  // always succeeds here, as it can on a busy Windows host where OpenProcess
+  // drops a pid's low two bits.
+  it("agrees on the pid probe across platforms", () => {
+    const original = process.kill;
+    process.kill = () => true;
+    try {
+      for (const platform of ["win32", "darwin", "linux"]) {
+        for (const pid of [0, -4, 1.5, 1, 4240, 4242, 2 ** 31 - 2]) {
+          expect(webIsPidAlive(pid, platform), `${platform} pid ${pid}`).toBe(henchIsPidAlive(pid, platform));
+        }
+      }
+    } finally {
+      process.kill = original;
+    }
   });
 });
