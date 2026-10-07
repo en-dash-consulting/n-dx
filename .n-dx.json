@@ -1,9 +1,9 @@
 {
   "llm": {
     "vendor": "claude",
-    "model": "claude-opus-5",
+    "model": "claude-opus-5-5",
     "claude": {
-      "model": "claude-opus-5"
+      "model": "claude-opus-5-5"
     },
     "codex": {}
   },
@@ -290,7 +290,7 @@
     "name": "n-dx"
   },
   "claude": {
-    "model": "claude-opus-5"
+    "model": "claude-opus-5-5"
   },
   "hench": {
     "testGate": {
