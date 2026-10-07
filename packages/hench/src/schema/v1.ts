@@ -1521,12 +1521,26 @@ export interface RunRecord {
    */
   cliPath?: string;
   /**
-   * Task weight / tier selected for this run ("light" | "standard").
-   * Used for task-weight tiering to select cheaper models for simple tasks.
-   * Defaults to "standard" if not specified.
+   * The tier of the model this run actually used — "light", "standard",
+   * "heavy", or "custom" for a model in no tier this project can reach.
+   *
+   * Not the tier `agent.execute` routes to: that is what it used to record,
+   * so every record said "standard" even for a run an explicit `--model` or a
+   * `hench.models` pin put on opus, and `ndx usage` priced them accordingly.
+   * Resolved by `weightOfModel` (cli/commands/run-settings.ts) from the model
+   * that was actually sent. Defaults to "standard" when not specified.
    * v1 additive field — old records without this field load normally.
    */
   weight?: string;
+  /**
+   * Which setting supplied {@link model}: `cli-flag`, `task.run.tier`,
+   * `task.run.models`, `hench.models.<vendor>`, an `llm.*` key, or
+   * `vendor-default`. The same vocabulary `ndx work --resolve` reports, so a
+   * record answers "why did this run use that model" without re-deriving the
+   * chain against config that may since have changed.
+   * v1 additive field — old records without this field load normally.
+   */
+  modelSource?: string;
   /**
    * Orientation session this run's task spawn was forked from, when the
    * warm-parent strategy was active. Its presence is what makes the saving

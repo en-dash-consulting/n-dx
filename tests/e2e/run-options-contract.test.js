@@ -87,6 +87,46 @@ describe("run options contract: dashboard allow-list vs ndx work --resolve", () 
     expect(dashboard).toEqual(hench);
   });
 
+  it("gives the same options a negation flag, spelled the same way", () => {
+    // Only the booleans a task can save have one: for those, an explicit
+    // `false` from the dashboard has to say "off for this run even though the
+    // task saved it on", and nothing but a negation flag can say that.
+    const henchByKey = new Map(henchOptions.map((o) => [o.key, o]));
+    const negated = RUN_OPTION_SPECS.filter((s) => s.negatedFlag).map((s) => s.key);
+    expect(negated).toEqual(["review", "skipTestGate"]);
+    for (const spec of RUN_OPTION_SPECS.filter((s) => !DASHBOARD_ONLY.has(s.key))) {
+      expect({ key: spec.key, negatedFlag: spec.negatedFlag }).toEqual({
+        key: spec.key,
+        negatedFlag: henchByKey.get(spec.key).negatedFlag,
+      });
+    }
+  });
+
+  it("emits a negation only for an explicit false, and nothing for an absent key", () => {
+    expect(runOptionArgs({})).toEqual([]);
+    expect(runOptionArgs({ review: true })).toEqual(["--review"]);
+    expect(runOptionArgs({ review: false })).toEqual(["--no-review"]);
+    expect(runOptionArgs({ skipTestGate: false })).toEqual(["--no-skip-test-gate"]);
+    // A boolean with no negation keeps the old behaviour: false says nothing.
+    expect(runOptionArgs({ fresh: false, allowDirty: false })).toEqual([]);
+    expect(runOptionArgs({ review: true, reviewOptional: false })).toEqual(["--review"]);
+  });
+
+  it("hench reads each negation back as a cli-flag false", () => {
+    for (const [flag, key] of [["no-review", "review"], ["no-skip-test-gate", "skipTestGate"]]) {
+      const r = runResult(["work", "--task=task-2", "--resolve", `--${flag}`, repo]);
+      expect(r.code, `--${flag}: ${r.stderr}`).toBe(0);
+      expect(JSON.parse(r.stdout).resolved[key]).toEqual({ value: false, source: "cli-flag" });
+    }
+  });
+
+  it("hench refuses a flag and its negation together", () => {
+    for (const [on, off] of [["review", "no-review"], ["skip-test-gate", "no-skip-test-gate"]]) {
+      const r = runResult(["work", "--task=task-2", "--resolve", `--${on}`, `--${off}`, repo]);
+      expect(r.code, `--${on} --${off} must be refused`).not.toBe(0);
+    }
+  });
+
   it("maps each key to hench's flag and type, with hench's enum values", () => {
     const henchByKey = new Map(henchOptions.map((o) => [o.key, o]));
     for (const spec of RUN_OPTION_SPECS.filter((s) => !DASHBOARD_ONLY.has(s.key))) {

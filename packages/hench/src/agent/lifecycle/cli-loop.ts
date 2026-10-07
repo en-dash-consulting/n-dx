@@ -2070,9 +2070,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     approvals: policy.approvals,
     parseMode: adapter.parseMode,
     invocationContext: "cli",
-    // The routed tier for the agent loop — "standard" unless llm.routes
-    // reroutes agent.execute — so `ndx usage` can report spend per tier.
-    weight: resolveTaskModel("agent.execute", llmConfig, { vendor }).tier,
+    // The tier of the model actually sent, so `ndx usage` prices the run it
+    // ran. The routed tier is the fallback for a caller that resolved no
+    // settings of its own — it is what this line used to record
+    // unconditionally, which filed every `--model opus` run as "standard".
+    weight: opts.modelWeight ?? resolveTaskModel("agent.execute", llmConfig, { vendor }).tier,
+    ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
     criteriaCount: brief.task.acceptanceCriteria?.length,
     permissionMode: opts.permissionMode,
   });

@@ -19,8 +19,8 @@
 
 import { dirname, join } from "node:path";
 import { resolveStore, findItem, matchesAssignee, resolveActor } from "../../prd/rex-gateway.js";
-import type { PRDItem } from "../../prd/rex-gateway.js";
-import { LLM_VENDOR, REVIEW_MODELS, getGitCommonDir, resolveReviewModel } from "../../prd/llm-gateway.js";
+import type { PRDItem, RunSettings } from "../../prd/rex-gateway.js";
+import { LLM_VENDOR, getGitCommonDir } from "../../prd/llm-gateway.js";
 import type { LLMVendor } from "../../prd/llm-gateway.js";
 import { PERMISSION_MODES } from "../../schema/index.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
@@ -30,33 +30,25 @@ import { resolveHenchPaths } from "../../store/paths.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal } from "../../agent/planning/brief.js";
-import { reviewModelSource } from "../../agent/analysis/adversarial-review.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../process/task-claims.js";
 import { CLIError, requireLLMCLI } from "../errors.js";
 import { result as output, warn } from "../output.js";
-import { checkAgentModel } from "./agent-model.js";
 import { VENDOR_PROVIDERS } from "./provider-support.js";
 import { readTreeConformanceRefusal } from "./run.js";
 import {
   parseBudgetFlags,
   parsePermissionModeFlag,
   parseReviewOptions,
-  resolveRunPermissionMode,
-  resolveRunProvider,
+  resolveTaskRunSettings,
   reviewProviderError,
   selectCliModelOverride,
 } from "./run-settings.js";
+import type { Resolved, SettingWarningCode, TaskRunSettings } from "./run-settings.js";
 
-/** One resolved setting and the config key (or rule) that supplied it. */
-export interface Resolved<T> {
-  value: T;
-  /**
-   * `cli-flag`, `hench.<key>`, `hench.models.<vendor>`, an `llm.*` key,
-   * `vendor-default`, `autonomous-default`, `repository-trust` or `built-in`.
-   */
-  source: string;
-}
+// `Resolved` lives beside the resolver that fills it in (run-settings.ts) and
+// is re-exported here, where the report's shape is defined.
+export type { Resolved } from "./run-settings.js";
 
 /** Why a run with these flags would refuse to start. */
 export type RunRefusalCode =
@@ -71,9 +63,17 @@ export type RunRefusalCode =
   | "model-vendor-mismatch"
   | "dirty-tree";
 
-/** A condition worth showing before the run that does not stop it. */
+/**
+ * A condition worth showing before the run that does not stop it.
+ *
+ * `untrusted-repository` is the run's own; the rest come from the task's saved
+ * `run` block — a value that could not be applied as written. They are
+ * warnings rather than refusals because none of them stops the run, and they
+ * are reported here rather than only on stderr because a run started from the
+ * dashboard has no stderr anyone reads.
+ */
 export interface RunWarning {
-  code: "untrusted-repository";
+  code: "untrusted-repository" | SettingWarningCode;
   message: string;
 }
 
@@ -92,6 +92,13 @@ export interface RunOption {
   key: keyof ResolvedSettings;
   /** The `hench run` / `ndx work` flag, without the leading `--`. */
   flag: string;
+  /**
+   * The flag that turns this option off for one run, without the leading
+   * `--`. Only `boolean` options have one, and only those a task can save:
+   * an option that nothing but the command line can set already reads "off"
+   * from the flag's absence, so a negation would say nothing new.
+   */
+  negatedFlag?: string;
   type: "enum" | "boolean" | "integer" | "string";
   /** Allowed values, for `enum`. */
   values?: readonly string[];
@@ -128,6 +135,13 @@ export interface RunResolution {
     claimedBy: { worktree: string; pid: number; expiresAt: string } | null;
   } | null;
   workspace: { root: string; branch: string | null; isAnchor?: boolean; dirty: boolean };
+  /**
+   * The task's `run` block as stored, once rex's validator has accepted it;
+   * `null` when the task carries none or when the block was ignored (a
+   * `saved-settings-ignored` warning says which). The dashboard reads this to
+   * show what is saved, separately from what this run resolves to.
+   */
+  saved: RunSettings | null;
   resolved: ResolvedSettings;
   options: RunOption[];
   refusals: RunRefusal[];
@@ -156,10 +170,10 @@ const RUN_OPTIONS: readonly RunOption[] = [
   { key: "model", flag: "model", type: "string", scope: "task", description: "Model the agent runs on, overriding hench.models and llm.* for this run." },
   { key: "provider", flag: "provider", type: "enum", values: ["cli", "api"], scope: "task", description: "Drive the vendor CLI or call its API directly." },
   { key: "permissionMode", flag: "permission-mode", type: "enum", values: PERMISSION_MODES, scope: "task", description: "Permission mode for the spawned Claude session (Claude only)." },
-  { key: "review", flag: "review", type: "boolean", scope: "task", description: "Run the adversarial review pass after the task validates, before the commit." },
+  { key: "review", flag: "review", negatedFlag: "no-review", type: "boolean", scope: "task", description: "Run the adversarial review pass after the task validates, before the commit (--no-review suppresses one the task saved)." },
   { key: "reviewModel", flag: "review-model", type: "string", scope: "task", description: "Model the reviewer runs on (requires review)." },
   { key: "reviewOptional", flag: "review-optional", type: "boolean", scope: "task", description: "Downgrade the missing-review gate to a warning when the reviewer cannot start (requires review)." },
-  { key: "skipTestGate", flag: "skip-test-gate", type: "boolean", scope: "task", description: "Skip the full test suite gate before the commit." },
+  { key: "skipTestGate", flag: "skip-test-gate", negatedFlag: "no-skip-test-gate", type: "boolean", scope: "task", description: "Skip the full test suite gate before the commit (--no-skip-test-gate forces it to run)." },
   { key: "maxTurns", flag: "max-turns", type: "integer", scope: "task", description: "Turn limit for the agent loop (API provider)." },
   { key: "tokenBudget", flag: "token-budget", type: "integer", scope: "task", description: "Token budget for the run; 0 means unlimited." },
   { key: "fresh", flag: "fresh", type: "boolean", scope: "launch", description: "Discard the cached orientation session so the run re-orients." },
@@ -188,15 +202,16 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     );
   }
 
-  // Flag parsing a run would throw on, before anything is read.
-  const reviewOpts = parseReviewOptions(flags);
-  const permissionModeFlag = parsePermissionModeFlag(flags);
-  const budgets = parseBudgetFlags(flags);
+  // Flag parsing a run would throw on, before anything is read. The values are
+  // the shared resolver's to compute; these calls exist for the throw, so a
+  // malformed request fails as a bad request rather than as a refusal report.
+  parseReviewOptions(flags);
+  parsePermissionModeFlag(flags);
+  parseBudgetFlags(flags);
 
   const henchDir = resolveHenchPaths(dir).henchDir;
   const config = await loadConfig(henchDir, { onInvalid: "use-defaults", onWarning: (m) => warn(m) });
   const configured = await loadConfiguredHenchKeys(henchDir);
-  const henchSource = (key: string): string => (configured.has(key) ? `hench.${key}` : "built-in");
   const rexDir = join(dir, config.rexDir);
   const llmConfig = await loadLLMConfig(henchDir);
   const vendor = resolveLLMVendor(llmConfig);
@@ -248,7 +263,58 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     refusals.push({ code: "tree-not-conformant", message: treeRefusal.message, migratable: treeRefusal.migratable });
   }
 
-  // ── Vendor and model ────────────────────────────────────────────────────
+  // ── Settings ────────────────────────────────────────────
+  // Every per-task setting, from the same resolver the run itself calls — with
+  // the selected task, so a saved `run` block is reported exactly as `ndx work`
+  // would apply it. Repository trust is applied as a run applies it: while the
+  // checkout's execution config is untrusted, bypassPermissions is lowered to
+  // acceptEdits. A warning, not a refusal — the run still starts.
+  const settings = resolveTaskRunSettings({
+    flags,
+    config,
+    configuredHenchKeys: configured,
+    llmConfig,
+    vendor,
+    autonomous: true,
+    ...(entry ? { item: entry.item } : {}),
+    clampPermissionMode: (mode) => applyRepoTrust(config, dir, mode).permissionMode,
+  });
+
+
+  // What each setting would be if the task had saved nothing. Resolved by the
+  // same function with the item left out, rather than by reading config a
+  // second way — so the "project default" the dashboard shows beside a saved
+  // value is the value a run would really fall back to.
+  const withoutSaved = entry
+    ? resolveTaskRunSettings({
+        flags,
+        config,
+        configuredHenchKeys: configured,
+        llmConfig,
+        vendor,
+        autonomous: true,
+        clampPermissionMode: (mode) => applyRepoTrust(config, dir, mode).permissionMode,
+      })
+    : undefined;
+
+  /**
+   * `setting` plus the project default behind it, when a saved value is what
+   * won. Settings the task did not supply carry no fallback: there is nothing
+   * for the saved block to fall back *from*.
+   */
+  // Generic over the whole entry rather than its value, so `reviewModel` keeps
+  // its `vendorDefault` on the way through. The cast is the price of adding an
+  // optional property to an open type parameter; the shape is exact.
+  const withFallback = <R extends { value: unknown; source: string }>(
+    setting: R,
+    key: keyof TaskRunSettings,
+  ): R => {
+    if (!withoutSaved || !setting.source.startsWith("task.run")) return setting;
+    const base = withoutSaved[key] as { value: unknown; source: string };
+    return { ...setting, fallback: { value: base.value, source: base.source } } as R;
+  };
+
+  // ── Vendor and model ──────────────────────────────────
   if (!llmConfig.vendor) {
     refuse(
       "vendor-unset",
@@ -259,21 +325,14 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     );
   }
   const modelOverride = selectCliModelOverride(flags, vendor);
-  const agentModel = checkAgentModel({
-    vendor,
-    cliModelOverride: modelOverride.value,
-    henchModels: config.models,
-    llmConfig,
-  });
-  if (agentModel.mismatch) refuse("model-vendor-mismatch", agentModel.mismatch);
+  if (settings.model.mismatch) refuse("model-vendor-mismatch", settings.model.mismatch);
 
-  // ── Provider ────────────────────────────────────────────────────────────
-  const requestedProvider = flags.provider ?? config.provider;
-  const provider = resolveRunProvider(requestedProvider, vendor);
+  // ── Provider ──────────────────────────────────────────
+  const provider = settings.provider;
   if (provider.error) refuse("provider-unsupported", provider.error);
-  const reviewError = reviewOpts.reviewPass ? reviewProviderError(vendor, provider.provider) : undefined;
+  const reviewError = settings.review.value ? reviewProviderError(vendor, provider.value) : undefined;
   if (reviewError) refuse("provider-unsupported", reviewError);
-  if (!provider.error && provider.provider === "cli" && vendor !== LLM_VENDOR.GOOGLE && vendor !== LLM_VENDOR.LOCAL) {
+  if (!provider.error && provider.value === "cli" && vendor !== LLM_VENDOR.GOOGLE && vendor !== LLM_VENDOR.LOCAL) {
     // Looks the binary up on disk / PATH; the CLI itself is never started.
     try {
       requireLLMCLI(vendor, resolveVendorCliPath(llmConfig));
@@ -283,7 +342,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     }
   }
 
-  // ── Working tree ────────────────────────────────────────────────────────
+  // ── Working tree ───────────────────────────────────────
   const origin = captureRunGitOrigin(dir);
   const root = origin.worktreeRoot ?? dir;
   const commonDir = getGitCommonDir(dir);
@@ -299,64 +358,38 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     );
   }
 
-  // ── Settings ────────────────────────────────────────────────────────────
-  const permission = resolveRunPermissionMode({
-    flag: permissionModeFlag,
-    configured: config.permissionMode,
-    autonomous: true,
-    vendor,
-  });
-  // Repository trust, applied as a run applies it: while the checkout's
-  // execution config is untrusted, bypassPermissions is lowered to acceptEdits.
-  // A warning, not a refusal — the run still starts.
-  const trust = applyRepoTrust(config, dir, permission.value);
-  const warnings: RunWarning[] = trust.evaluation.restricted
-    ? [{ code: "untrusted-repository", message: formatTrustWarningForRun(trust.evaluation, provider.provider).join("\n") }]
-    : [];
+  // ── Launch-time flags ─────────────────────────────────────
+  // Chosen per launch, so they are the report's own rather than the shared
+  // resolver's: nothing may save them on a task.
+  const trustEvaluation = applyRepoTrust(config, dir, undefined).evaluation;
+  const warnings: RunWarning[] = [
+    ...(trustEvaluation.restricted
+      ? [{
+          code: "untrusted-repository" as const,
+          message: formatTrustWarningForRun(trustEvaluation, provider.value).join("\n"),
+        }]
+      : []),
+    ...settings.warnings,
+  ];
   const flagged = (flag: string): Resolved<boolean> =>
     flags[flag] === "true" ? { value: true, source: "cli-flag" } : { value: false, source: "built-in" };
 
   const resolved: ResolvedSettings = {
     vendor: { value: vendor, source: llmConfig.vendor ? "llm.vendor" : "built-in" },
-    model: { value: agentModel.model, source: agentModel.rung },
-    provider: {
-      value: provider.provider,
-      source: provider.switched ? "vendor-default" : flags.provider !== undefined ? "cli-flag" : henchSource("provider"),
-    },
-    permissionMode: {
-      value: trust.permissionMode ?? null,
-      source:
-        trust.permissionMode !== permission.value
-          ? "repository-trust"
-          : permission.dropped !== undefined || permission.value === undefined
-            ? "built-in"
-            : permission.origin === "config"
-              ? "hench.permissionMode"
-              : permission.origin,
-    },
-    review: flagged("review"),
-    reviewModel: {
-      value: resolveReviewModel(vendor, llmConfig, reviewOpts.reviewModel),
-      source: reviewModelKey(vendor, reviewModelSource(vendor, llmConfig, reviewOpts.reviewModel)),
-      vendorDefault: REVIEW_MODELS[vendor] ?? "",
-    },
-    reviewOptional: reviewOpts.reviewOptional
-      ? { value: true, source: "cli-flag" }
-      : { value: false, source: "built-in" },
-    skipTestGate:
-      flags["skip-test-gate"] === "true"
-        ? { value: true, source: "cli-flag" }
-        : config.skipFullTestGate !== undefined
-          ? { value: config.skipFullTestGate, source: "hench.skipFullTestGate" }
-          : { value: false, source: "built-in" },
-    maxTurns:
-      budgets.maxTurns !== undefined
-        ? { value: budgets.maxTurns, source: "cli-flag" }
-        : { value: config.maxTurns, source: henchSource("maxTurns") },
-    tokenBudget:
-      budgets.tokenBudget !== undefined
-        ? { value: budgets.tokenBudget, source: "cli-flag" }
-        : { value: config.tokenBudget, source: henchSource("tokenBudget") },
+    model: withFallback({ value: settings.model.value, source: settings.model.source }, "model"),
+    provider: withFallback({ value: provider.value, source: provider.source }, "provider"),
+    // `dropped` is the resolver's signal to the caller that prints the warning,
+    // not part of the report: every entry here is {value, source[, fallback]}.
+    permissionMode: withFallback(
+      { value: settings.permissionMode.value, source: settings.permissionMode.source },
+      "permissionMode",
+    ),
+    review: withFallback(settings.review, "review"),
+    reviewModel: withFallback(settings.reviewModel, "reviewModel"),
+    reviewOptional: withFallback(settings.reviewOptional, "reviewOptional"),
+    skipTestGate: withFallback(settings.skipTestGate, "skipTestGate"),
+    maxTurns: withFallback(settings.maxTurns, "maxTurns"),
+    tokenBudget: withFallback(settings.tokenBudget, "tokenBudget"),
     fresh: flagged("fresh"),
     allowDirty: flagged("allow-dirty"),
     resetDeferred: flagged("reset-deferred"),
@@ -370,6 +403,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       ...(commonDir ? { isAnchor: dirname(commonDir) === root } : {}),
       dirty,
     },
+    saved: settings.saved ?? null,
     resolved,
     options: RUN_OPTIONS.map((option) =>
       option.key === "provider" ? { ...option, values: VENDOR_PROVIDERS[vendor] } : { ...option },
@@ -396,14 +430,6 @@ async function wouldBeReset(
   return matchesAssignee(item, parents, await resolveActor(dir));
 }
 
-/** The config key behind each `reviewModelSource` answer. */
-function reviewModelKey(vendor: LLMVendor, source: ReturnType<typeof reviewModelSource>): string {
-  if (source === "flag") return "cli-flag";
-  if (source === "vendor-config") return `llm.${vendor}.reviewModel`;
-  if (source === "shared-config") return "llm.reviewModel";
-  return "vendor-default";
-}
-
 /**
  * Quote a command-line word only when it needs it: single quotes for a POSIX
  * shell, double quotes on win32 (cmd.exe and PowerShell do not read single
@@ -424,6 +450,14 @@ export function shellWord(word: string, platform: NodeJS.Platform = process.plat
  * {@link PASSTHROUGH_FLAGS}. A model
  * given as `--<vendor>-model` is written as `--model`, which it is equivalent
  * to and which outranks it.
+ *
+ * Built from `flags` alone, deliberately: a task's saved `run` settings apply
+ * to the run but must not be written into the command, because the command is
+ * meant to be the operator's own line — copy it, run it, and the task's saved
+ * settings apply again by themselves. Writing them in would also freeze them,
+ * so a command copied today would stop matching the task the moment its saved
+ * block changed. A flag that happens to equal the saved value is still printed:
+ * it was typed.
  */
 function formatRunCommand(
   taskId: string,
@@ -439,6 +473,13 @@ function formatRunCommand(
       if (value === "true") words.push(`--${option.flag}`);
     } else {
       words.push(`--${option.flag}=${shellWord(value)}`);
+    }
+  }
+  // The negations are flags in their own right rather than values of the
+  // options above, so they are read from the command line directly.
+  for (const option of RUN_OPTIONS) {
+    if (option.negatedFlag && flags[option.negatedFlag] === "true") {
+      words.push(`--${option.negatedFlag}`);
     }
   }
   for (const { flag, type } of PASSTHROUGH_FLAGS) {

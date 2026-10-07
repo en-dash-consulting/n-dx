@@ -149,8 +149,24 @@ describe("POST /api/hench/execute — run options", () => {
     expect(checkRunOptions({ tokenBudget: 1e21 })).toMatchObject({ ok: false, key: "tokenBudget" });
   });
 
-  it("adds nothing for false booleans or no options", async () => {
-    const res = await execute({ taskId: "task-1", options: { review: false, fresh: false } });
+  it("negates a false boolean the task could have saved, and adds nothing for the rest", async () => {
+    // `review` and `skipTestGate` are settings a task can carry, so an
+    // explicit `false` from the dashboard means "off for this run even though
+    // the task saved it on" -- which only the negation flag can say. `fresh`
+    // is launch-time and nothing can save it, so its `false` still says
+    // nothing, exactly as before.
+    const res = await execute({
+      taskId: "task-1",
+      options: { review: false, skipTestGate: false, fresh: false },
+    });
+    expect(res.status).toBe(202);
+    expect(spawnedFlags()).toEqual(["--no-review", "--no-skip-test-gate"]);
+  });
+
+  it("adds nothing when the request names no options at all", async () => {
+    // An absent key is how a request leaves the decision to the task and the
+    // config; it must never become a negation.
+    const res = await execute({ taskId: "task-1", options: {} });
     expect(res.status).toBe(202);
     expect(spawnedFlags()).toEqual([]);
   });
