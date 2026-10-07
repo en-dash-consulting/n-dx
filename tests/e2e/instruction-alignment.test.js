@@ -494,6 +494,23 @@ describe("path-scoped injection seam rules", () => {
   /** The only two packages whose seam registry predates the AGENTS.md rule. */
   const ALLOWED_SEAM_RULES = ["core-injection-seams.md", "web-injection-seams.md"];
 
+  /**
+   * The table rows of a Markdown document, for comparing two copies of a table.
+   *
+   * Splits on `\r?\n`, not on a bare line feed. `.gitattributes` pins AGENTS.md
+   * to LF but says nothing about `.claude/rules/`, so a Windows checkout with
+   * `core.autocrlf=true` gets the rule files in CRLF. Splitting on `\n` alone
+   * leaves a trailing `\r` on every rule row, none of which then equals its LF
+   * twin from AGENTS.md — which failed the drift guard on Windows while it
+   * passed everywhere else. The fix belongs here rather than in
+   * `.gitattributes`: the guard reads files it does not control the checkout
+   * of, so it must cope with either line ending.
+   */
+  const rowsOf = (text) =>
+    text
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("| ") && !/^\|[\s|-]+\|$/.test(line));
+
   /** Rule file → the AGENTS.md that holds the canonical copy of its content. */
   const pinnedAgainstDrift = [
     { rule: "core-injection-seams.md", pkg: "core" },
@@ -504,6 +521,18 @@ describe("path-scoped injection seam rules", () => {
   const seamRules = readdirSync(RULES_DIR).filter((name) =>
     name.endsWith("-injection-seams.md"),
   );
+
+  it("reads the same rows from a CRLF rule file as from an LF one", () => {
+    // A Windows checkout hands the drift guard CRLF rule text while AGENTS.md
+    // stays LF, so the two row lists have to come out identical regardless.
+    const lf = ["# Seams", "", "| Target | Seam |", "|---|---|", "| a.js | registerChild |"].join(
+      "\n",
+    );
+    const crlf = lf.replace(/\n/g, "\r\n");
+
+    expect(rowsOf(crlf)).toEqual(rowsOf(lf));
+    expect(rowsOf(crlf)).toEqual(["| Target | Seam |", "| a.js | registerChild |"]);
+  });
 
   it("no package beyond core and web has a .claude/rules seam registry", () => {
     const unexpected = seamRules.filter((name) => !ALLOWED_SEAM_RULES.includes(name));
@@ -556,10 +585,6 @@ describe("path-scoped injection seam rules", () => {
       const next = agents.indexOf("\n## ", start + 1);
       const section = agents.slice(start, next === -1 ? undefined : next);
 
-      const rowsOf = (text) =>
-        text
-          .split("\n")
-          .filter((line) => line.startsWith("| ") && !/^\|[\s|-]+\|$/.test(line));
       const ruleRows = rowsOf(ruleText);
       const agentsRows = rowsOf(section);
 
