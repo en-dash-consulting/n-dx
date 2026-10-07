@@ -52,6 +52,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Verbose TypeScript and Boilerplate Pattern Simplification](./verbose-typescript-and-boilerplate/index.md) | completed |
 | [Web UI Design and User Experience Enhancement](./web-ui-design-and-user-experience/index.md) | completed |
 | [Workflow Use Case Guides](./workflow-use-case-guides/index.md) | completed |
+| [A usage mark taken inside another mark's window makes both records claim the overlap](./a-usage-mark-taken-inside-another-mark.md) | pending |
 | [`date -Is`, the timestamp example in every recording skill, fails on macOS (BSD date)](./date-is-the-timestamp-example-in-every.md) | completed |
 | [Diagnose why the auto-commit step does not fire after MCP-driven PRD mutations in Claude Code skills](./diagnose-why-the-auto-commit-step-does.md) | completed |
 | [hench init must gitignore .hench/locks/ or the first autonomous run self-blocks](./hench-init-must-gitignore-hench-locks.md) | completed |

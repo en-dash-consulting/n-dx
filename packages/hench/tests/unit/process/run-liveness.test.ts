@@ -104,10 +104,53 @@ describe("isPidAlive", () => {
       throw Object.assign(new Error("EPERM"), { code: "EPERM" });
     }) as typeof process.kill;
     try {
-      expect(isPidAlive(1)).toBe(true);
+      expect(isPidAlive(1, "linux")).toBe(true);
     } finally {
       process.kill = original;
     }
+  });
+
+  it("counts a non-positive or non-integer pid as dead without probing", () => {
+    const original = process.kill;
+    let probed = false;
+    process.kill = (() => ((probed = true), true)) as typeof process.kill;
+    try {
+      for (const pid of [0, -1, 1.5, Number.NaN]) expect(isPidAlive(pid, "linux")).toBe(false);
+      expect(probed).toBe(false);
+    } finally {
+      process.kill = original;
+    }
+  });
+
+  describe("on win32", () => {
+    // Simulates a busy Windows host: OpenProcess ignores a pid's low two bits,
+    // so kill(4242, 0) reaches process 4240 and succeeds or reports EPERM.
+    for (const outcome of ["succeeds", "EPERM"] as const) {
+      it(`counts a pid that is not a multiple of 4 as dead when kill ${outcome}`, () => {
+        const original = process.kill;
+        process.kill = (() => {
+          if (outcome === "EPERM") throw Object.assign(new Error("EPERM"), { code: "EPERM" });
+          return true;
+        }) as typeof process.kill;
+        try {
+          for (const pid of [4242, 4241, 4243, 1]) expect(isPidAlive(pid, "win32")).toBe(false);
+          expect(isPidAlive(4240, "win32")).toBe(true);
+        } finally {
+          process.kill = original;
+        }
+      });
+    }
+
+    it("still counts the same pids alive on other platforms", () => {
+      const original = process.kill;
+      process.kill = (() => true) as typeof process.kill;
+      try {
+        expect(isPidAlive(4242, "linux")).toBe(true);
+        expect(isPidAlive(4242, "darwin")).toBe(true);
+      } finally {
+        process.kill = original;
+      }
+    });
   });
 
   it("counts ESRCH as dead", () => {
@@ -116,7 +159,7 @@ describe("isPidAlive", () => {
       throw Object.assign(new Error("ESRCH"), { code: "ESRCH" });
     }) as typeof process.kill;
     try {
-      expect(isPidAlive(1)).toBe(false);
+      expect(isPidAlive(1, "linux")).toBe(false);
     } finally {
       process.kill = original;
     }
