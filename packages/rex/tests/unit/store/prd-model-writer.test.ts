@@ -111,6 +111,19 @@ describe("writePrdModel", () => {
     expect(reread.title).toBe("Renamed shop");
   });
 
+  it("round-trips strings that need JSON escapes", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    const title = 'C:\\new "dir"\twith\r\ncontrol\u0001';
+    const description = "path C:\\new\\tab\\u0001 stays literal";
+    Object.assign(find(all(model), TASK), { title, description, assignee: title });
+    await write(rexDir, model);
+
+    const reread = await loadPrdModel(rexDir, quiet);
+    expect(reread.warnings).toEqual([]);
+    expect(find(all(reread), TASK)).toMatchObject({ title, description, assignee: title });
+  });
+
   it("never writes a Children table", async () => {
     const rexDir = await copyFixture();
     const model = await loadPrdModel(rexDir, quiet);
