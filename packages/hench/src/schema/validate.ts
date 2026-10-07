@@ -467,6 +467,7 @@ export const RunRecordSchema = z.object({
   // fails if a ninth is added the same way.
   vendor: z.string().optional(),
   weight: z.string().optional(),
+  modelSource: z.string().optional(),
   parentSessionId: z.string().optional(),
   session: RunSessionRecordSchema.optional(),
   contextCondensations: z.number().optional(),

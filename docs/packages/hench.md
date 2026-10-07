@@ -20,6 +20,8 @@ hench run --task=abc123 .            # specific task
 hench run --auto --iterations=4 .    # run 4 tasks sequentially
 hench run --dry-run .                # preview brief without executing
 hench run --model=claude-opus-5-5 .        # override model
+hench run --task=abc123 --no-review .      # skip a review the task saved
+hench run --task=abc123 --resolve .        # print the settings a run would use
 hench config .                       # view workflow configuration
 hench config hench.maxTurns 30 .     # edit a config value
 hench template list .                # list workflow templates
@@ -34,6 +36,48 @@ Or through the orchestrator:
 ndx work --auto .
 ndx work --epic="Auth System" --auto --iterations=2 .
 ```
+
+## Settings Saved on a Task
+
+A PRD item can carry a `run` block saying how `ndx work` should run it — written
+by the rex MCP tools (`add_item` / `edit_item`), `rex update --run`, or the
+dashboard's Prepare task modal. Hench applies it.
+
+**Precedence, per setting:** CLI flag > the task's `run` block > `hench.*` >
+`llm.*` > the built-in default.
+
+Resolution happens **per task, after selection**, so inside `--loop`,
+`--iterations` and `--epic-by-epic` each task runs with its own saved settings
+— including a saved `provider`, which chooses the CLI or API loop for that task
+alone. An explicit CLI flag applies to every task in the loop.
+
+Model intent is portable, because a task saved under one vendor may be run under
+another: the block carries a `tier` (`light` / `standard` / `heavy`) plus
+optional exact `models` pins per vendor. On vendor V the agent model resolves as
+`--model` > `models[V]` > `tier` > `hench.models.V` > `llm.*` > default, and the
+reviewer as `--review-model` > `reviewModels[V]` > `reviewTier` >
+`llm.V.reviewModel` / `llm.reviewModel` > the vendor default.
+
+**A saved value that cannot be honoured never stops a run.** It is skipped with
+a warning naming the task, and resolution continues down the chain — a model the
+active vendor cannot run, a `provider` the vendor has no loop for (`api` on
+codex), a `review` the resolved provider cannot spawn a reviewer on, a
+`permissionMode` outside Claude. A block that fails rex's validator is ignored
+whole, with one warning. None of these is a refusal: one task's saved value must
+not strand every other task in a loop.
+
+**Turning a saved setting off for one run:** `--no-review` and
+`--no-skip-test-gate`. Both resolve as CLI flags, so they outrank the saved
+block and `hench.*` alike, and they apply to every task in a loop. `--no-review`
+carries the saved `reviewModel` and `reviewOptional` with it. Passing a flag
+together with its own negation is an error rather than a guess.
+
+**Previewing it:** `ndx work --task=<id> --resolve .` prints every setting with
+the key that supplied it (`task.run` when the saved block won), the task's
+`saved` block, and for each setting the saved block won, the `fallback` the
+project would have used instead. The `command` it prints is built from flags
+alone — saved settings apply to the run but are never written into it, so the
+copied command stays correct as the saved block changes.
 
 ## Agent Tools
 
@@ -155,3 +199,17 @@ Each run is saved to `.hench/runs/<run-id>/`:
 - `run.json` — metadata, outcome, token usage
 - `transcript.jsonl` — full conversation transcript
 - `brief.md` — the brief that was sent to the LLM
+
+Two fields on `run.json` say which model ran and why:
+
+- **`weight`** — the tier of the model actually used: `light`, `standard`,
+  `heavy`, or `custom` for a model in no tier this project can reach. Not the
+  tier `agent.execute` routes to, which is what it recorded before 0.9.0: every
+  record said `standard`, including runs an explicit `--model`, a
+  `hench.models` pin or a task's saved block had put on the heavy-tier model,
+  and `ndx usage` priced them accordingly.
+- **`modelSource`** — the setting that chose the model (`cli-flag`,
+  `task.run.tier`, `task.run.models`, `hench.models.<vendor>`, an `llm.*` key,
+  `vendor-default`), in the same vocabulary `ndx work --resolve` reports. It
+  answers "why did this run use that model" without re-deriving the chain
+  against config that may since have changed.
