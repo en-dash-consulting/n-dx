@@ -155,6 +155,66 @@ describe("writePrdModel", () => {
     expect(await readFile(join(rexDir, "changes/add-apple-pay/index.md"), "utf-8")).not.toContain("futureField");
   });
 
+  describe("a state field this build does not know, on a node whose row changes folder", () => {
+    const APPLE_PAY_STATE = "changes/add-apple-pay/state.yaml";
+    // A row new to its file is serialized afresh, so the hand-written single quotes become double.
+    const MOVED_ROW = `  "${TASK}":\n    status: "in_progress"\n    futureField: "kept"\n`;
+
+    /** Give TASK a state row holding `futureField`; returns the file's original text. */
+    async function addFutureField(rexDir: string): Promise<string> {
+      const path = join(rexDir, APPLE_PAY_STATE);
+      const original = await readFile(path, "utf-8");
+      await writeFile(path, `${original}  "${TASK}":\n    status: "in_progress"\n    futureField: 'kept'\n`);
+      return original;
+    }
+
+    it("keeps it in the destination state.yaml when the node moves to another parent", async () => {
+      const rexDir = await copyFixture();
+      // A second change to move into, written first so it exists on disk.
+      const first = await loadPrdModel(rexDir, quiet);
+      first.tree.changes.push({ id: "c-new", type: "change", title: "Spike: wallets", slug: "spike-wallets" } as RuleNode);
+      await write(rexDir, first);
+      const original = await addFutureField(rexDir);
+
+      const model = await loadPrdModel(rexDir, quiet);
+      const from = find(all(model), CHANGE);
+      const task = find(all(model), TASK);
+      from.children = from.children!.filter((n) => n.id !== TASK);
+      find(all(model), "c-new").children = [task];
+      await write(rexDir, model);
+
+      const dest = await readFile(join(rexDir, "changes/spike-wallets/state.yaml"), "utf-8");
+      expect(dest).toContain(MOVED_ROW);
+      const leaf = await readFile(join(rexDir, "changes/spike-wallets/wire-the-button.md"), "utf-8");
+      expect(leaf).not.toContain("futureField");
+      // The old folder loses the row and nothing else.
+      expect(await readFile(join(rexDir, APPLE_PAY_STATE), "utf-8")).toBe(original);
+
+      const reread = await loadPrdModel(rexDir, quiet);
+      expect(reread.warnings).toEqual([]);
+      expect(find(all(reread), TASK)).toMatchObject({ status: "in_progress", futureField: "kept" });
+    });
+
+    it("keeps it in the new folder's state.yaml when a leaf becomes a folder", async () => {
+      const rexDir = await copyFixture();
+      const original = await addFutureField(rexDir);
+
+      const model = await loadPrdModel(rexDir, quiet);
+      find(all(model), TASK).children = [{ id: "s1", type: "subtask", title: "Hide on Chrome", slug: "hide-on-chrome" } as RuleNode];
+      await write(rexDir, model);
+
+      const dest = await readFile(join(rexDir, "changes/add-apple-pay/wire-the-button/state.yaml"), "utf-8");
+      expect(dest).toContain(MOVED_ROW);
+      const index = await readFile(join(rexDir, "changes/add-apple-pay/wire-the-button/index.md"), "utf-8");
+      expect(index).not.toContain("futureField");
+      expect(await readFile(join(rexDir, APPLE_PAY_STATE), "utf-8")).toBe(original);
+
+      const reread = await loadPrdModel(rexDir, quiet);
+      expect(reread.warnings).toEqual([]);
+      expect(find(all(reread), TASK)).toMatchObject({ status: "in_progress", futureField: "kept" });
+    });
+  });
+
   it("writes a change as a folder even with no tasks", async () => {
     const rexDir = await copyFixture();
     const model = await loadPrdModel(rexDir, quiet);

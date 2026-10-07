@@ -131,11 +131,12 @@ export async function writePrdModel(
   const plan: Plan = { files: new Map(), states: [], dirs: new Set(), stale: [] };
 
   const productDir = join(rexDir, PRODUCT_DIRNAME);
-  plan.files.set(join(productDir, INDEX_FILE), renderRootHeader(model, stamp));
-  await planFolder(productDir, model.tree.product, null, stamp, plan);
   const changesDir = join(rexDir, CHANGES_DIRNAME);
+  const loaded = await loadAllStateFiles([productDir, changesDir]);
+  plan.files.set(join(productDir, INDEX_FILE), renderRootHeader(model, stamp));
+  await planFolder(productDir, model.tree.product, null, stamp, loaded, plan);
   if (model.tree.changes.length > 0 || (await listDir(changesDir)) !== null) {
-    await planFolder(changesDir, model.tree.changes, null, stamp, plan);
+    await planFolder(changesDir, model.tree.changes, null, stamp, loaded, plan);
   }
   await assertStaleRemovable(plan.stale, collectIds(model), options.removed ?? new Set());
 
@@ -174,6 +175,32 @@ interface Plan {
   stale: Array<{ path: string; isDir: boolean }>;
 }
 
+/** Every `state.yaml` on disk, read before planning so a row can follow its node to another folder. */
+interface LoadedState {
+  /** By folder path. */
+  files: Map<string, StateFile>;
+  /** Every row, by node id, whichever folder holds it; the first found wins. */
+  rows: Map<string, ItemState>;
+}
+
+async function loadAllStateFiles(roots: readonly string[]): Promise<LoadedState> {
+  const loaded: LoadedState = { files: new Map(), rows: new Map() };
+  const walk = async (dir: string): Promise<void> => {
+    for (const entry of (await listDir(dir)) ?? []) {
+      if (entry.name.startsWith(".")) continue;
+      if (entry.isDirectory()) {
+        await walk(join(dir, entry.name));
+      } else if (entry.isFile() && entry.name === STATE_FILE_NAME) {
+        const file = await loadStateFile(dir);
+        loaded.files.set(dir, file);
+        for (const [id, row] of Object.entries(file.items)) if (!loaded.rows.has(id)) loaded.rows.set(id, row);
+      }
+    }
+  };
+  for (const root of roots) await walk(root);
+  return loaded;
+}
+
 /**
  * Plan folder `dir`: `owner` (the folder node, or null for a layer root) and
  * `nodes`, its children. Everything is validated here, before any write.
@@ -183,16 +210,17 @@ async function planFolder(
   nodes: readonly RuleNode[],
   owner: RuleNode | null,
   stamp: string,
+  loaded: LoadedState,
   plan: Plan,
 ): Promise<void> {
   plan.dirs.add(dir);
   const entries = (await listDir(dir)) ?? [];
-  const hadState = entries.some((e) => e.isFile() && e.name === STATE_FILE_NAME);
-  const existing = hadState ? await loadStateFile(dir) : { ...emptyStateFile(), schema: stamp };
+  const existing = loaded.files.get(dir) ?? { ...emptyStateFile(), schema: stamp };
   const rows: Record<string, ItemState> = {};
   const specs = new Map<string, ProductSpec>();
   const keep = (node: RuleNode, intent: Record<string, unknown>): void => {
-    const row = splitState(node, existing.items[node.id], intent);
+    // A node that moved here (or flipped leaf to folder) has its row in another folder's file.
+    const row = splitState(node, existing.items[node.id] ?? loaded.rows.get(node.id), intent);
     if (Object.keys(row).length > 0) rows[node.id] = row;
     const spec = productSpec(node);
     if (spec) specs.set(node.id, spec);
@@ -220,7 +248,7 @@ async function planFolder(
     seen.set(key, node.id);
     if (folder) {
       expectedDirs.add(node.slug);
-      await planFolder(join(dir, node.slug), node.children ?? [], node, stamp, plan);
+      await planFolder(join(dir, node.slug), node.children ?? [], node, stamp, loaded, plan);
     } else {
       const intent: Record<string, unknown> = {};
       keep(node, intent);
@@ -268,7 +296,7 @@ function assertSlug(node: RuleNode, folder: boolean, dir: string): void {
 
 /**
  * The row `node` stores in `state.yaml`: known state fields, plus any field
- * the folder's existing row already held (a newer build's state stays state).
+ * its row on disk already held, in whichever folder (a newer build's state stays state).
  * Everything else is copied to `intent`.
  */
 function splitState(node: RuleNode, previous: ItemState | undefined, intent: Record<string, unknown>): ItemState {
