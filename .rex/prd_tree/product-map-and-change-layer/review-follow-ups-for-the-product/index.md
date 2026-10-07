@@ -30,3 +30,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Stop the timed-out test gate test racing its fake gate startup](./stop-the-timed-out-test-gate-test.md) | completed |
 | [sv analyze removes its stop handlers before the progress file stops saying running](./sv-analyze-removes-its-stop-handlers.md) | pending |
 | [Web Product view still shows "map node" wording after decision N1](./web-product-view-still-shows-map-node.md) | pending |
+| [rex usage ignores .n-dx.json rex overrides: token-store passes the wrong dir and key to loadProjectOverrides](./rex-usage-ignores-n-dx-json-rex.md) | pending |
