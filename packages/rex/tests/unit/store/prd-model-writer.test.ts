@@ -300,6 +300,46 @@ describe("writePrdModel", () => {
     await expect(write(rexDir, model)).rejects.toThrow(/no usable slug/);
   });
 
+  describe("a slug Windows cannot create", () => {
+    const WINDOWS_INVALID = ["con", "CON", "aux", "nul", "com1", "lpt9", "con.backup", "ends-in-dot.", "ends-in-space ", "a:b", "why?", "a*b", 'a"b', "a<b", "a|b", "tab\there"];
+
+    it.each(WINDOWS_INVALID)("refuses %j on a leaf, naming the node and the slug", async (slug) => {
+      const rexDir = await copyFixture();
+      const model = await loadPrdModel(rexDir, quiet);
+      find(all(model), TASK).slug = slug;
+      await expect(write(rexDir, model)).rejects.toThrow(`Node ${TASK} in`);
+      await expect(write(rexDir, model)).rejects.toThrow(`slug ${JSON.stringify(slug)}`);
+    });
+
+    it("refuses nul on a folder (nul/index.md)", async () => {
+      const rexDir = await copyFixture();
+      const model = await loadPrdModel(rexDir, quiet);
+      find(all(model), CHANGE).slug = "nul";
+      await expect(write(rexDir, model)).rejects.toThrow(new RegExp(`Node ${CHANGE} .*"nul".*Windows`));
+    });
+
+    it("refuses before writing anything: the tree stays byte-identical", async () => {
+      const rexDir = await copyFixture();
+      const before = await snapshot(rexDir);
+      const model = await loadPrdModel(rexDir, quiet);
+      // Edits that a write would otherwise land first: the root header and the change itself.
+      model.title = "Renamed shop";
+      find(all(model), CHANGE).title = "Renamed change";
+      find(all(model), TASK).slug = "aux";
+      await expect(write(rexDir, model)).rejects.toThrow(/Windows/);
+      expect(await snapshot(rexDir)).toEqual(before);
+    });
+
+    it.each(["console", "auxiliary", "null-handling", "com10", "lpt0x", "prn-report"])("accepts %s", async (slug) => {
+      const rexDir = await copyFixture();
+      const model = await loadPrdModel(rexDir, quiet);
+      find(all(model), TASK).slug = slug;
+      await write(rexDir, model);
+      const reread = await loadPrdModel(rexDir, quiet);
+      expect(find(all(reread), TASK).slug).toBe(slug);
+    });
+  });
+
   it.each(["wire-the-button", "Wire-The-Button"])("refuses a sibling with the slug %s", async (slug) => {
     const rexDir = await copyFixture();
     const model = await loadPrdModel(rexDir, quiet);

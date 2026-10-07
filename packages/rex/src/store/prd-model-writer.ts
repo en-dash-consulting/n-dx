@@ -62,7 +62,7 @@ import type { RuleNode } from "../schema/v2-rules.js";
 import { atomicWrite } from "./atomic-write.js";
 import { isLockHeld } from "./file-lock.js";
 import { parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
-import { SLUG_RULE_VERSION } from "./folder-tree-serializer.js";
+import { SLUG_RULE_VERSION, isWindowsSafeSegment } from "./folder-tree-serializer.js";
 import { prdLockPath } from "./paths.js";
 import { CHANGES_DIRNAME, PRODUCT_DIRNAME, assertPrdModelWritable, assertV2TreeWritable, type PrdModel } from "./prd-model-reader.js";
 import { STATE_FILE_NAME, emptyStateFile, loadStateFile, sameTextOnDisk, saveStateFile, type ProductSpec } from "./state-writer.js";
@@ -281,6 +281,7 @@ function isFolderNode(node: RuleNode): boolean {
   return node.type === "change" || (node.children?.length ?? 0) > 0;
 }
 
+/** Runs in the planning pass, so a bad slug refuses the write before any file changes. */
 function assertSlug(node: RuleNode, folder: boolean, dir: string): void {
   const slug = node.slug;
   const ok =
@@ -292,6 +293,12 @@ function assertSlug(node: RuleNode, folder: boolean, dir: string): void {
     (folder || slug.toLowerCase() !== "index");
   if (!ok) {
     throw new Error(`Node ${node.id} in ${dir} has no usable slug (${JSON.stringify(slug)}); slugs are set once at creation`);
+  }
+  if (!isWindowsSafeSegment(slug)) {
+    throw new Error(
+      `Node ${node.id} in ${dir} has slug ${JSON.stringify(slug)}, which Windows cannot create ` +
+        `(a device name such as CON or NUL, a trailing dot or space, or one of < > : " | ? * or a control character)`,
+    );
   }
 }
 
