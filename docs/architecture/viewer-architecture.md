@@ -113,7 +113,7 @@ The alias is applied in two places that must agree:
 - **Scoped viewer:** that scope's list plus `CROSS_CUTTING_VIEWS` (`home`, the Live views, `workspaces`, `token-usage`, the settings views, `command-reference`). Each scope list includes its own stage page (`analyze`, `plan` or `work`) and no other.
 - **Consequences:** the top nav and stage links show only stages in `validViews`; `stageForView` takes `validViews`, so a view whose stage is absent lights no stage; settings entries and bottom-bar indicators are filtered the same way. The server skips watchers and routes for out-of-scope packages (`isInScope` in `server/start.ts`).
 
-Layering and barrel rules for `src/shared/` and the viewer are in `packages/web/CLAUDE.md`.
+Layering and barrel rules for `src/shared/` and the viewer are in `packages/web/AGENTS.md`.
 
 ## Tests that hold the contract
 
