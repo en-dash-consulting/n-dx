@@ -23,6 +23,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Apply added, modified and removed amendments to the product layer](./apply-added-modified-and-removed.md) | pending |
+| [Apply added, modified and removed amendments to the product layer](./apply-added-modified-and-removed.md) | in_progress |
 | [Handle direct map edits: editorial re-stamp or revised with a drafted change](./handle-direct-map-edits-editorial-re.md) | pending |
 | [Support the rex.applyOn setting: complete, review and release](./support-the-rex-applyon-setting.md) | pending |
