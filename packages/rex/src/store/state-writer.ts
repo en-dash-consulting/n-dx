@@ -95,11 +95,20 @@ export function emptyStateFile(): StateFile {
   return { schema: SCHEMA_VERSION_V2, items: {} };
 }
 
+export interface ParseStateOptions {
+  /**
+   * Accept any `schema` stamp, for read-only inspection of a tree from a
+   * newer major. Rows are still validated; the stamp is kept as read, so
+   * {@link saveStateFile} still refuses the file.
+   */
+  ignoreSchemaStamp?: boolean;
+}
+
 /** Read a folder's `state.yaml`; a missing file reads as empty. */
-export async function loadStateFile(folderDir: string): Promise<StateFile> {
+export async function loadStateFile(folderDir: string, options: ParseStateOptions = {}): Promise<StateFile> {
   const path = stateFilePath(folderDir);
   const text = await readIfExists(path);
-  return text === null ? emptyStateFile() : parseStateYaml(text, path);
+  return text === null ? emptyStateFile() : parseStateYaml(text, path, options);
 }
 
 /**
@@ -141,7 +150,7 @@ function reconcileRevisedAt(file: StateFile, specs: ReadonlyMap<string, ProductS
 // ── Parse ────────────────────────────────────────────────────────────
 
 /** Parse and validate `state.yaml` text. `source` names the file in errors. */
-export function parseStateYaml(text: string, source: string = STATE_FILE_NAME): StateFile {
+export function parseStateYaml(text: string, source: string = STATE_FILE_NAME, options: ParseStateOptions = {}): StateFile {
   const file: Record<string, unknown> = {};
   const items: Record<string, Record<string, unknown>> = {};
   const raw: RawIndex = new Map();
@@ -186,7 +195,7 @@ export function parseStateYaml(text: string, source: string = STATE_FILE_NAME): 
 
   file.items ??= items;
   const parsed = file as StateFile;
-  assertValid(parsed, source);
+  assertValid(options.ignoreSchemaStamp ? { ...parsed, schema: SCHEMA_VERSION_V2 } : parsed, source);
   rawLines.set(parsed, raw);
   return parsed;
 }
