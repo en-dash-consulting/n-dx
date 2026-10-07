@@ -28,9 +28,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A null or non-object run in v2 frontmatter fails the whole node's intent parse](./a-null-or-non-object-run-in-v2.md) | completed |
-| [Keep a moved node's unknown state fields in state.yaml](./keep-a-moved-node-s-unknown-state.md) | pending |
+| [Keep a moved node's unknown state fields in state.yaml](./keep-a-moved-node-s-unknown-state.md) | completed |
 | [Parse the v1 tree and the v2 product and changes roots into one model](./parse-the-v1-tree-and-the-v2-product.md) | completed |
+| [Reject Windows-reserved and Windows-invalid slugs before the v2 writer writes anything](./reject-windows-reserved-and-windows.md) | pending |
 | [Schema-skew write refusal on v2 trees depends on writers calling assertPrdModelWritable](./schema-skew-write-refusal-on-v2-trees.md) | completed |
 | [v2 reader lets state fields written in frontmatter (status, completedAt…) stand in for state.yaml](./v2-reader-lets-state-fields-written-in.md) | completed |
 | [Write the v2 trees with frozen slugs and no Children tables](./write-the-v2-trees-with-frozen-slugs.md) | completed |
-| [Reject Windows-reserved and Windows-invalid slugs before the v2 writer writes anything](./reject-windows-reserved-and-windows.md) | pending |
