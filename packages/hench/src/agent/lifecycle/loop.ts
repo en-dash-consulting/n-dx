@@ -37,6 +37,7 @@ import {
 import type { PruneOutcome, PruneShape } from "./context-prune.js";
 import { parseTokenUsageWithDiagnostic } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
+import { executeGateOnlyRetry, planGateOnlyRetry } from "./gate-only-retry.js";
 import { updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD } from "../analysis/spin.js";
 import { createLivelockDetector } from "../analysis/livelock.js";
 import type { LivelockDetector } from "../analysis/livelock.js";
@@ -1772,6 +1773,50 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Resolve provider — registry or legacy path based on config flag
   const llmConfig = await loadLLMConfig(henchDir);
   const effectiveVendor = resolveLLMVendor(llmConfig);
+
+  // The previous run failed only at the test gate with its work committed:
+  // re-run the gate instead of an agent loop (#539). Placed before provider
+  // resolution, so it covers every API vendor and needs no API client. The API
+  // loop has no review pass, so there is no review to inherit or run.
+  const gateOnly = await planGateOnlyRetry({ projectDir, taskId, runHistory: opts.runHistory, claims: opts.claims });
+  if (gateOnly) {
+    const { run, memoryCtx } = await initRunRecord({
+      taskId,
+      taskTitle: brief.task.title,
+      model,
+      henchDir,
+      projectDir,
+      vendor: effectiveVendor,
+      sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
+      approvals: DEFAULT_EXECUTION_POLICY.approvals,
+      parseMode: "api-sdk",
+      invocationContext: "api",
+      session: API_SESSION_DECISION,
+    });
+    await executeGateOnlyRetry({
+      plan: gateOnly,
+      run,
+      memoryCtx,
+      finalize: {
+        claims: opts.claims,
+        henchDir,
+        projectDir,
+        config,
+        testCommand: brief.project.testCommand,
+        selfHeal: config.selfHeal,
+        rollbackOnFailure: opts.rollbackOnFailure,
+        yes: opts.yes,
+        autonomous: opts.autonomous === true || config.autonomous === true,
+        store,
+        autoCommit: config.autoCommit === true,
+        skipFullTestGate: config.skipFullTestGate,
+        baselineUntracked,
+        baselineDirty,
+      },
+    });
+    return { run };
+  }
+
   let provider: LLMProvider;
 
   if (config.useRegistryProvider || effectiveVendor === "google" || effectiveVendor === "local") {

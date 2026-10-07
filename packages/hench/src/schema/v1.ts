@@ -253,6 +253,28 @@ export function isPermissionMode(value: unknown): value is PermissionMode {
  */
 export type HenchAgentModels = Partial<Record<LLMVendor, string>>;
 
+/** `hench.testGate.*` — see {@link HenchConfig.testGate}. */
+export interface TestGateConfig {
+  /**
+   * Gate command template. When set it outranks `fullTestCommand` and
+   * auto-detection. `{base}` is replaced with the commit the run's diff is
+   * measured from (a hex SHA), so a project can gate only what the run
+   * touched. Without `{base}` the template is used as written. When it
+   * contains `{base}` and no valid base is known, the gate falls back to the
+   * command it would have run without the template and records
+   * `testGate.scopeFallback`.
+   */
+  command?: string;
+  /**
+   * Re-run template for an unattended gate failure. `{suites}` is replaced
+   * with the labels on the gate's `test-gate: failed-suites=<list>` line,
+   * comma-joined, and the command runs once. A pass absorbs the flake
+   * (`testGate.flakyRerun`); a failure fails the run as before. Absent means
+   * no re-run.
+   */
+  rerunCommand?: string;
+}
+
 export interface HenchConfig {
   schema: string;
   provider: Provider;
@@ -497,6 +519,11 @@ export interface HenchConfig {
    * See {@link GitSafetyConfig} for field semantics and defaults.
    */
   git?: GitSafetyConfig;
+  /**
+   * Opt-in test-gate templates. Absent leaves the gate exactly as
+   * `fullTestCommand` / auto-detection resolve it.
+   */
+  testGate?: TestGateConfig;
   /**
    * Whether the Anthropic API loop marks `cache_control` breakpoints on the
    * request (see `agent/lifecycle/prompt-cache.ts`). Default: true.
@@ -1035,6 +1062,65 @@ export interface TestGateResult {
    * `extractFailureDigest` in tools/test-runner.ts.
    */
   failureDigest?: string;
+  /**
+   * The commit `{base}` was replaced with in `hench.testGate.command`.
+   * Absent when no template was used (or it had no `{base}`).
+   */
+  base?: string;
+  /**
+   * Suites the gate command said it selected, parsed from a
+   * `test-gate: selected-suites=<comma list>` line in its whole output.
+   * Absent when the output carried no such line.
+   */
+  suites?: string[];
+  /**
+   * Why the templated command was not used and the untemplated one ran
+   * instead (the template needs `{base}` and no valid base was known).
+   */
+  scopeFallback?: string;
+  /**
+   * Suites that failed and then passed on the `hench.testGate.rerunCommand`
+   * re-run — flakes absorbed. `firstFailure` is one line naming what failed
+   * the first time. Present only when the re-run passed.
+   */
+  flakyRerun?: TestGateFlakyRerun[];
+  /**
+   * The first attempt of a gate that was re-run. When the re-run passed, the
+   * top-level fields describe the re-run and this keeps the original verdict.
+   */
+  firstAttempt?: TestGateFirstAttempt;
+  /** The one `hench.testGate.rerunCommand` re-run of the failed suites, if any. */
+  rerun?: TestGateRerun;
+  /**
+   * Why `hench.testGate.rerunCommand` did not run after this gate failed
+   * (no failed-suites line, an unsafe label, no `{suites}` placeholder).
+   */
+  rerunSkipped?: string;
+}
+
+/** One absorbed flake. See {@link TestGateResult.flakyRerun}. */
+export interface TestGateFlakyRerun {
+  suite: string;
+  firstFailure: string;
+}
+
+/** See {@link TestGateResult.firstAttempt}. */
+export interface TestGateFirstAttempt {
+  command?: string;
+  totalDurationMs?: number;
+  failedSuites: string[];
+  /** Suites the first attempt selected (its own `selected-suites=` line). */
+  suites?: string[];
+}
+
+/** See {@link TestGateResult.rerun}. */
+export interface TestGateRerun {
+  command: string;
+  suites: string[];
+  passed: boolean;
+  totalDurationMs?: number;
+  /** Why the re-run gave no verdict (timed out, never launched). */
+  error?: string;
 }
 
 export interface DependencyVulnerability {
@@ -1284,6 +1370,13 @@ export type RunReviewRecord =
        * writing its report and was resumed once to write it.
        */
       backgroundResumed?: boolean;
+      /**
+       * Run id this review was copied from. Set by a gate-only retry whose
+       * source run's review passed on the same HEAD: the work under review is
+       * unchanged, so the earlier verdict still holds. See
+       * `agent/lifecycle/gate-only-retry.ts`.
+       */
+      inheritedFrom?: string;
       failed?: undefined;
     }
   | {
@@ -1706,6 +1799,25 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   completionHold?: RunCompletionHold;
+  /**
+   * Set when this run skipped the agent: the task's previous run failed only
+   * at the test gate, with its work committed and its completion held, so
+   * this run re-ran the gate and applied that held completion on green.
+   * See `agent/lifecycle/gate-only-retry.ts`.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  gateOnlyRetry?: RunGateOnlyRetry;
+}
+
+/** See {@link RunRecord.gateOnlyRetry}. */
+export interface RunGateOnlyRetry {
+  /** The failed run whose work and held completion this run gated. */
+  sourceRunId: string;
+  /** Commit the gate diffed from: the earliest still-reachable start commit of the task's runs. */
+  base: string;
+  /** The source run's commits, all contained in HEAD when this run started. */
+  commits: RunCommitRecord[];
 }
 
 /**
