@@ -8,6 +8,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 import {
   CHANGE_COMMITS_CACHE_FILENAME,
   computeChangeCommits,
@@ -241,12 +242,26 @@ describe("computeChangeCommits", () => {
     await commit("a.txt", `Part A\n\nN-DX-Item: ${CHANGE}\n`);
     await commit("b.txt", "Later");
     const dir = join(repo, "..", "shallow");
-    execFileSync("git", ["clone", "-q", "--depth", "1", `file://${repo}`, dir]);
+    // --depth is ignored for a plain local path; a file URL makes git honour it.
+    execFileSync("git", ["clone", "-q", "--depth", "1", pathToFileURL(repo).href, dir]);
     await expect(computeChangeCommits([CHANGE], { repoDir: dir, cacheDir })).rejects.toThrow(
       /shallow clone.*git fetch --unshallow.*fetch-depth: 0/s,
     );
     execFileSync("git", ["fetch", "-q", "--unshallow"], { cwd: dir });
     expect(await computeChangeCommits([CHANGE], { repoDir: dir, cacheDir })).toHaveLength(1);
+  });
+
+  it("refuses a clone made shallow after its cache was built, rather than serving the cache", async () => {
+    await commit("base.txt", "Initial commit");
+    await commit("a.txt", `Part A\n\nN-DX-Item: ${CHANGE}\n`);
+    await commit("b.txt", "Later");
+    const dir = join(repo, "..", "full");
+    execFileSync("git", ["clone", "-q", pathToFileURL(repo).href, dir]);
+    expect(await computeChangeCommits([CHANGE], { repoDir: dir, cacheDir })).toHaveLength(1);
+    // Same tip, so the cache still matches; only the history behind it is gone.
+    execFileSync("git", ["fetch", "-q", "--depth", "1", "origin"], { cwd: dir });
+    expect(execFileSync("git", ["rev-parse", "--is-shallow-repository"], { cwd: dir, encoding: "utf-8" }).trim()).toBe("true");
+    await expect(computeChangeCommits([CHANGE], { repoDir: dir, cacheDir })).rejects.toThrow(/shallow clone/);
   });
 
   it("names the ref when it does not resolve", async () => {
