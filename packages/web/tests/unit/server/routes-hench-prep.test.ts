@@ -145,6 +145,20 @@ describe("hench prep routes", () => {
       const body = await (await fetch(`http://127.0.0.1:${port}/api/hench/prep/task-1`)).json();
       expect(body.dir).toBe(tmpDir);
       expect(body.detail).toEqual({ priority: "high", parentChain: ["The epic"], criteriaCount: 2 });
+      // No saved block: "none" is a real version a PUT can send back.
+      expect(body.savedVersion).toBe("none");
+    });
+
+    it("reports the version of the task's saved block, so a save can be made against it", async () => {
+      await writeTasks(ctx, [{
+        id: "task-1", title: "Prep me", level: "task", status: "pending",
+        run: { tier: "heavy", review: true },
+      }]);
+      const port = await open(ctx);
+      const body = await (await fetch(`http://127.0.0.1:${port}/api/hench/prep/task-1`)).json();
+
+      expect(body.savedVersion).not.toBe("none");
+      expect(body.savedVersion).toMatch(/^[0-9a-f]{12}$/);
     });
 
     it("answers detail:null for an id the PRD does not have", async () => {
@@ -590,8 +604,28 @@ describe("hench prep routes", () => {
         tags: ["web", "prep"],
         resume: false,
         liveRun: false,
+        saved: false,
       });
       expect(tasks[1]).toMatchObject({ criteriaCount: 0, tags: [] });
+    });
+
+    it("marks the rows whose task carries its own run settings", async () => {
+      // The list shows a dot beside a task that will not run on the project
+      // defaults, so the reader can tell before opening the modal.
+      await writeTasks(ctx, [
+        task("plain", { priority: "high" }),
+        task("saved", { priority: "critical", run: { tier: "heavy" } }),
+        task("empty", { priority: "medium", run: {} }),
+      ]);
+      const port = await open(ctx);
+      const { tasks } = await ready(port);
+
+      expect(tasks.map((t) => [t.id, t.saved])).toEqual([
+        ["saved", true],
+        ["plain", false],
+        // An empty block is the same as no block, here as everywhere else.
+        ["empty", false],
+      ]);
     });
 
     it("returns the order of repeated findNextTask picks, with dependencies and mixed priorities", async () => {

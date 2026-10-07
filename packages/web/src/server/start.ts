@@ -817,7 +817,7 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, broadcast))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchPrepRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchPrepRoute(req, res, ctx, broadcast))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, broadcast, { onStatusInvalidate: invalidateRunCaches }))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleWorkflowRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleAdaptiveRoute(req, res, ctx))) return true;

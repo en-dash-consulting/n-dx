@@ -19,4 +19,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Docs and changesets for PR 4: saving run settings from the dashboard](./docs-and-changesets-for-pr-4-saving.md) | pending |
 | [Prepare task modal: Save, Reset to defaults, saved-on-task sources, conflict state, off-anchor notice; saved dot on Ready to run](./prepare-task-modal-save-reset-to.md) | pending |
-| [web: PUT /api/hench/prep/:taskId saves run settings on the task with a version check; prep and ready report saved state](./web-put-api-hench-prep-taskid-saves.md) | pending |
+| [web: PUT /api/hench/prep/:taskId saves run settings on the task with a version check; prep and ready report saved state](./web-put-api-hench-prep-taskid-saves.md) | completed |
