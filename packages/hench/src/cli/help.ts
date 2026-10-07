@@ -110,6 +110,33 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "Precedence: --allow-dirty flag > hench.git.* config > defaults.",
       },
       {
+        title: "Settings saved on a task",
+        content:
+          "A PRD item can carry a `run` block saying how it should be run.\n" +
+          "Each setting resolves as:\n" +
+          "\n" +
+          "  CLI flag > the task's run block > hench.* > llm.* > the default\n" +
+          "\n" +
+          "Resolution happens per task, after selection, so in --loop,\n" +
+          "--iterations and --epic-by-epic every task runs with its own saved\n" +
+          "settings, and a saved provider chooses the cli or api loop for that\n" +
+          "task alone. An explicit flag applies to every task in the loop.\n" +
+          "\n" +
+          "Model intent is portable, since a task saved under one vendor may run\n" +
+          "under another: the block carries a tier (light|standard|heavy) plus\n" +
+          "optional exact model pins per vendor. On vendor V the agent model is\n" +
+          "--model > models[V] > tier > hench.models.V > llm.* > default.\n" +
+          "\n" +
+          "--no-review and --no-skip-test-gate turn a saved setting off for one\n" +
+          "run; a flag passed with its own negation is an error.\n" +
+          "\n" +
+          "A saved value this vendor cannot honour -- an incompatible model, a\n" +
+          "provider with no loop, a review the provider cannot spawn, a\n" +
+          "permission mode outside Claude -- is skipped with a warning naming the\n" +
+          "task, and a block that fails validation is ignored whole. None of them\n" +
+          "stops a run: one task's saved value must not strand a whole loop.",
+      },
+      {
         title: "Resolve (--resolve)",
         content:
           "hench run --task=<id> --resolve [flags] [dir] reads the same config and\n" +
