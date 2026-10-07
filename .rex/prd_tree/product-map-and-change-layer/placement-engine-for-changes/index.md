@@ -26,4 +26,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add Jev placement and the autoAccept setting](./add-jev-placement-and-the-autoaccept.md) | pending |
-| [Rank placement candidates with rules and the text model](./rank-placement-candidates-with-rules.md) | pending |
+| [Rank placement candidates with rules and the text model](./rank-placement-candidates-with-rules.md) | completed |
