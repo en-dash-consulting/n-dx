@@ -18,7 +18,9 @@
  *   change is applied); `criteria.remove`, `replace` and `add` edit criteria
  *   by id, in that order.
  * - **removed** retires the node: its status becomes `deleted`, the tombstone
- *   status every v2 rule skips. The file stays, with its History.
+ *   status every v2 rule skips. The file stays, with its History. The rules
+ *   skip a tombstone's whole subtree, so a node with live descendants is
+ *   refused unless the same change removes each of them too.
  *
  * Every amended node gets a History line in its body. Added and modified nodes
  * get `metAt` = {@link specHash} of the new spec (statement and criteria, never
@@ -87,13 +89,15 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   if (UNAPPLIABLE_STATUSES.has(change.status ?? "pending")) problems.push(`it is ${change.status}`);
   if (problems.length > 0) throw new ApplyAmendmentsError(label, problems);
 
+  const amends = change.amends ?? [];
+  const context: ApplyContext = { options, removing: removedIds(next.product, amends) };
   const date = options.now.toISOString().slice(0, 10);
   const applied: AppliedAmendment[] = [];
-  for (const [i, amendment] of (change.amends ?? []).entries()) {
+  for (const [i, amendment] of amends.entries()) {
     const fail = (message: string): void => {
       problems.push(`amendment ${i + 1} (${amendment.delta} ${amendment.target}): ${message}`);
     };
-    const node = APPLY[amendment.delta](next, amendment, options, fail);
+    const node = APPLY[amendment.delta](next, amendment, context, fail);
     if (!node) continue;
     node.body = appendHistory(node.body, `- ${date} ${label} ${amendment.delta}: ${amendment.summary}`);
     applied.push({ delta: amendment.delta, nodeId: node.id, summary: amendment.summary });
@@ -106,15 +110,21 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
 
 // ── Deltas ───────────────────────────────────────────────────────
 
+interface ApplyContext {
+  options: ApplyAmendmentsOptions;
+  /** Ids of the live product nodes this change's removed amendments retire. */
+  removing: ReadonlySet<string>;
+}
+
 /** Applies one amendment to the product layer and returns the node it acted on, or reports through `fail`. */
 type DeltaApply = (
   tree: V2Tree,
   amendment: Amendment,
-  options: ApplyAmendmentsOptions,
+  context: ApplyContext,
   fail: (message: string) => void,
 ) => RuleNode | undefined;
 
-const applyAdded: DeltaApply = ({ product, changes }, amendment, options, fail) => {
+const applyAdded: DeltaApply = ({ product, changes }, amendment, { options }, fail) => {
   // Retired nodes and changes count too: a reused id would share a state.yaml row with them.
   if (resolve([...product, ...changes], amendment.target, { includeDeleted: true })) {
     return void fail("a node in either layer, retired ones included, already has this id");
@@ -193,9 +203,14 @@ const applyModified: DeltaApply = ({ product }, amendment, _options, fail) => {
   return node;
 };
 
-const applyRemoved: DeltaApply = ({ product }, amendment, _options, fail) => {
-  const node = resolve(product, amendment.target);
+const applyRemoved: DeltaApply = ({ product }, amendment, { removing }, fail) => {
+  // An earlier amendment may have retired an ancestor of a target this change also removes.
+  const node = resolve(product, amendment.target, { throughDeleted: true });
   if (!node) return void fail("not a live product node");
+  const kept = liveDescendants(node).filter((d) => !removing.has(d.id));
+  if (kept.length > 0) {
+    return void fail(`live descendants ${kept.map((d) => d.displayId ?? d.id).join(", ")} would be hidden; remove them in this change too`);
+  }
   node.status = "deleted";
   delete node.revisedAt;
   return node;
@@ -216,12 +231,21 @@ export function stampMet(node: RuleNode): void {
   delete node.revisedAt;
 }
 
-/** The first live node in `nodes` (depth first; retired ones too with `includeDeleted`) whose id, display id or alias is `ref`. */
-export function resolve(nodes: readonly RuleNode[], ref: string, { includeDeleted = false } = {}): RuleNode | undefined {
+/**
+ * The first live node in `nodes` (depth first) whose id, display id or alias is
+ * `ref`. `includeDeleted` matches retired nodes too; `throughDeleted` still
+ * skips them but searches their subtrees.
+ */
+export function resolve(
+  nodes: readonly RuleNode[],
+  ref: string,
+  { includeDeleted = false, throughDeleted = false } = {},
+): RuleNode | undefined {
   for (const node of nodes) {
-    if (node.status === "deleted" && !includeDeleted) continue;
-    if (node.id === ref || node.displayId === ref || node.aliases?.includes(ref)) return node;
-    const hit = resolve(node.children ?? [], ref, { includeDeleted });
+    const retired = node.status === "deleted" && !includeDeleted;
+    if (retired && !throughDeleted) continue;
+    if (!retired && (node.id === ref || node.displayId === ref || node.aliases?.includes(ref))) return node;
+    const hit = resolve(node.children ?? [], ref, { includeDeleted, throughDeleted });
     if (hit) return hit;
   }
   return undefined;
@@ -238,6 +262,22 @@ export function freeSlug(title: string, id: string, siblings: readonly RuleNode[
   const base = slugifyTitle(title);
   if (!taken.has(base)) return base;
   return `${base}-${id.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "item"}`;
+}
+
+/** Ids of the live product nodes the removed amendments in `amends` target, resolved before any is applied. */
+function removedIds(product: readonly RuleNode[], amends: readonly Amendment[]): Set<string> {
+  const ids = new Set<string>();
+  for (const amendment of amends) {
+    if (amendment.delta !== "removed") continue;
+    const node = resolve(product, amendment.target, { throughDeleted: true });
+    if (node) ids.add(node.id);
+  }
+  return ids;
+}
+
+/** Every live node below `node`; a retired child's subtree is already hidden. */
+function liveDescendants(node: RuleNode): RuleNode[] {
+  return (node.children ?? []).flatMap((child) => (child.status === "deleted" ? [] : [child, ...liveDescendants(child)]));
 }
 
 function firstDuplicate(values: readonly string[]): string | undefined {

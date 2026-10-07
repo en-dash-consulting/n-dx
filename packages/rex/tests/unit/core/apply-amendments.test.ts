@@ -191,6 +191,42 @@ describe("applyAmendments: removed", () => {
     expect(cap.body).toMatch(/- 2026-10-07 CH-1 removed: Cards go$/);
   });
 
+  it("refuses an area with live descendants, naming them, and leaves the input untouched", () => {
+    const input = tree([{ target: "A1", delta: "removed", summary: "Checkout goes" }]);
+    const before = structuredClone(input);
+    const err = refusal(() => applyAmendments(input, CHANGE, OPTS));
+    expect(err.problems).toEqual([
+      "amendment 1 (removed A1): live descendants A1.1, con-1 would be hidden; remove them in this change too",
+    ]);
+    expect(input).toEqual(before);
+  });
+
+  it("refuses when the change removes only some of the live descendants", () => {
+    const err = refusal(() =>
+      applyAmendments(tree([{ target: "A1", delta: "removed", summary: "a" }, { target: "A1.1", delta: "removed", summary: "c" }]), CHANGE, OPTS),
+    );
+    expect(err.problems[0]).toMatch(/live descendants con-1 would be hidden/);
+  });
+
+  it("retires an area together with every live descendant the change also removes, in either order", () => {
+    const area = { target: "A1", delta: "removed", summary: "a" } as const;
+    const rest = [
+      { target: "A1.1", delta: "removed", summary: "c" },
+      { target: CON, delta: "removed", summary: "p" },
+    ] as const;
+    for (const amends of [[area, ...rest], [...rest, area]]) {
+      const { tree: out } = applyAmendments(tree([...amends]), CHANGE, OPTS);
+      expect([AREA, CAP, CON].map((id) => get(out, id).status)).toEqual(["deleted", "deleted", "deleted"]);
+    }
+  });
+
+  it("ignores descendants that are already retired", () => {
+    const input = tree([{ target: "A1", delta: "removed", summary: "a" }]);
+    get(input, CAP).status = "deleted";
+    get(input, CON).status = "deleted";
+    expect(get(applyAmendments(input, CHANGE, OPTS).tree, AREA).status).toBe("deleted");
+  });
+
   it("refuses a target that is already retired", () => {
     const input = tree([{ target: CAP, delta: "removed", summary: "again" }]);
     get(input, CAP).status = "deleted";
