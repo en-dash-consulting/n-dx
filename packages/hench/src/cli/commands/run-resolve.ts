@@ -20,7 +20,7 @@
 import { dirname, join } from "node:path";
 import { resolveStore, findItem, matchesAssignee, resolveActor } from "../../prd/rex-gateway.js";
 import type { PRDItem } from "../../prd/rex-gateway.js";
-import { LLM_VENDOR, REVIEW_MODELS, getGitCommonDir, resolveReviewModel } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, getGitCommonDir } from "../../prd/llm-gateway.js";
 import type { LLMVendor } from "../../prd/llm-gateway.js";
 import { PERMISSION_MODES } from "../../schema/index.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
@@ -30,33 +30,25 @@ import { resolveHenchPaths } from "../../store/paths.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal } from "../../agent/planning/brief.js";
-import { reviewModelSource } from "../../agent/analysis/adversarial-review.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../process/task-claims.js";
 import { CLIError, requireLLMCLI } from "../errors.js";
 import { result as output, warn } from "../output.js";
-import { checkAgentModel } from "./agent-model.js";
 import { VENDOR_PROVIDERS } from "./provider-support.js";
 import { readTreeConformanceRefusal } from "./run.js";
 import {
   parseBudgetFlags,
   parsePermissionModeFlag,
   parseReviewOptions,
-  resolveRunPermissionMode,
-  resolveRunProvider,
+  resolveTaskRunSettings,
   reviewProviderError,
   selectCliModelOverride,
 } from "./run-settings.js";
+import type { Resolved } from "./run-settings.js";
 
-/** One resolved setting and the config key (or rule) that supplied it. */
-export interface Resolved<T> {
-  value: T;
-  /**
-   * `cli-flag`, `hench.<key>`, `hench.models.<vendor>`, an `llm.*` key,
-   * `vendor-default`, `autonomous-default`, `repository-trust` or `built-in`.
-   */
-  source: string;
-}
+// `Resolved` lives beside the resolver that fills it in (run-settings.ts) and
+// is re-exported here, where the report's shape is defined.
+export type { Resolved } from "./run-settings.js";
 
 /** Why a run with these flags would refuse to start. */
 export type RunRefusalCode =
@@ -188,15 +180,16 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     );
   }
 
-  // Flag parsing a run would throw on, before anything is read.
-  const reviewOpts = parseReviewOptions(flags);
-  const permissionModeFlag = parsePermissionModeFlag(flags);
-  const budgets = parseBudgetFlags(flags);
+  // Flag parsing a run would throw on, before anything is read. The values are
+  // the shared resolver's to compute; these calls exist for the throw, so a
+  // malformed request fails as a bad request rather than as a refusal report.
+  parseReviewOptions(flags);
+  parsePermissionModeFlag(flags);
+  parseBudgetFlags(flags);
 
   const henchDir = resolveHenchPaths(dir).henchDir;
   const config = await loadConfig(henchDir, { onInvalid: "use-defaults", onWarning: (m) => warn(m) });
   const configured = await loadConfiguredHenchKeys(henchDir);
-  const henchSource = (key: string): string => (configured.has(key) ? `hench.${key}` : "built-in");
   const rexDir = join(dir, config.rexDir);
   const llmConfig = await loadLLMConfig(henchDir);
   const vendor = resolveLLMVendor(llmConfig);
@@ -248,7 +241,25 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     refusals.push({ code: "tree-not-conformant", message: treeRefusal.message, migratable: treeRefusal.migratable });
   }
 
-  // ── Vendor and model ────────────────────────────────────────────────────
+  // ── Settings ────────────────────────────────────────────
+  // Every per-task setting, from the same resolver the run itself calls — with
+  // the selected task, so a saved `run` block is reported exactly as `ndx work`
+  // would apply it. Repository trust is applied as a run applies it: while the
+  // checkout's execution config is untrusted, bypassPermissions is lowered to
+  // acceptEdits. A warning, not a refusal — the run still starts.
+  const settings = resolveTaskRunSettings({
+    flags,
+    config,
+    configuredHenchKeys: configured,
+    llmConfig,
+    vendor,
+    autonomous: true,
+    ...(entry ? { item: entry.item } : {}),
+    clampPermissionMode: (mode) => applyRepoTrust(config, dir, mode).permissionMode,
+  });
+  for (const message of settings.warnings) warn(message);
+
+  // ── Vendor and model ──────────────────────────────────
   if (!llmConfig.vendor) {
     refuse(
       "vendor-unset",
@@ -259,21 +270,14 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     );
   }
   const modelOverride = selectCliModelOverride(flags, vendor);
-  const agentModel = checkAgentModel({
-    vendor,
-    cliModelOverride: modelOverride.value,
-    henchModels: config.models,
-    llmConfig,
-  });
-  if (agentModel.mismatch) refuse("model-vendor-mismatch", agentModel.mismatch);
+  if (settings.model.mismatch) refuse("model-vendor-mismatch", settings.model.mismatch);
 
-  // ── Provider ────────────────────────────────────────────────────────────
-  const requestedProvider = flags.provider ?? config.provider;
-  const provider = resolveRunProvider(requestedProvider, vendor);
+  // ── Provider ──────────────────────────────────────────
+  const provider = settings.provider;
   if (provider.error) refuse("provider-unsupported", provider.error);
-  const reviewError = reviewOpts.reviewPass ? reviewProviderError(vendor, provider.provider) : undefined;
+  const reviewError = settings.review.value ? reviewProviderError(vendor, provider.value) : undefined;
   if (reviewError) refuse("provider-unsupported", reviewError);
-  if (!provider.error && provider.provider === "cli" && vendor !== LLM_VENDOR.GOOGLE && vendor !== LLM_VENDOR.LOCAL) {
+  if (!provider.error && provider.value === "cli" && vendor !== LLM_VENDOR.GOOGLE && vendor !== LLM_VENDOR.LOCAL) {
     // Looks the binary up on disk / PATH; the CLI itself is never started.
     try {
       requireLLMCLI(vendor, resolveVendorCliPath(llmConfig));
@@ -283,7 +287,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     }
   }
 
-  // ── Working tree ────────────────────────────────────────────────────────
+  // ── Working tree ───────────────────────────────────────
   const origin = captureRunGitOrigin(dir);
   const root = origin.worktreeRoot ?? dir;
   const commonDir = getGitCommonDir(dir);
@@ -299,64 +303,30 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     );
   }
 
-  // ── Settings ────────────────────────────────────────────────────────────
-  const permission = resolveRunPermissionMode({
-    flag: permissionModeFlag,
-    configured: config.permissionMode,
-    autonomous: true,
-    vendor,
-  });
-  // Repository trust, applied as a run applies it: while the checkout's
-  // execution config is untrusted, bypassPermissions is lowered to acceptEdits.
-  // A warning, not a refusal — the run still starts.
-  const trust = applyRepoTrust(config, dir, permission.value);
-  const warnings: RunWarning[] = trust.evaluation.restricted
-    ? [{ code: "untrusted-repository", message: formatTrustWarningForRun(trust.evaluation, provider.provider).join("\n") }]
+  // ── Launch-time flags ─────────────────────────────────────
+  // Chosen per launch, so they are the report's own rather than the shared
+  // resolver's: nothing may save them on a task.
+  const trustEvaluation = applyRepoTrust(config, dir, undefined).evaluation;
+  const warnings: RunWarning[] = trustEvaluation.restricted
+    ? [{ code: "untrusted-repository", message: formatTrustWarningForRun(trustEvaluation, provider.value).join("\n") }]
     : [];
   const flagged = (flag: string): Resolved<boolean> =>
     flags[flag] === "true" ? { value: true, source: "cli-flag" } : { value: false, source: "built-in" };
 
   const resolved: ResolvedSettings = {
     vendor: { value: vendor, source: llmConfig.vendor ? "llm.vendor" : "built-in" },
-    model: { value: agentModel.model, source: agentModel.rung },
-    provider: {
-      value: provider.provider,
-      source: provider.switched ? "vendor-default" : flags.provider !== undefined ? "cli-flag" : henchSource("provider"),
-    },
+    model: { value: settings.model.value, source: settings.model.source },
+    provider: { value: provider.value, source: provider.source },
     permissionMode: {
-      value: trust.permissionMode ?? null,
-      source:
-        trust.permissionMode !== permission.value
-          ? "repository-trust"
-          : permission.dropped !== undefined || permission.value === undefined
-            ? "built-in"
-            : permission.origin === "config"
-              ? "hench.permissionMode"
-              : permission.origin,
+      value: settings.permissionMode.value,
+      source: settings.permissionMode.source,
     },
-    review: flagged("review"),
-    reviewModel: {
-      value: resolveReviewModel(vendor, llmConfig, reviewOpts.reviewModel),
-      source: reviewModelKey(vendor, reviewModelSource(vendor, llmConfig, reviewOpts.reviewModel)),
-      vendorDefault: REVIEW_MODELS[vendor] ?? "",
-    },
-    reviewOptional: reviewOpts.reviewOptional
-      ? { value: true, source: "cli-flag" }
-      : { value: false, source: "built-in" },
-    skipTestGate:
-      flags["skip-test-gate"] === "true"
-        ? { value: true, source: "cli-flag" }
-        : config.skipFullTestGate !== undefined
-          ? { value: config.skipFullTestGate, source: "hench.skipFullTestGate" }
-          : { value: false, source: "built-in" },
-    maxTurns:
-      budgets.maxTurns !== undefined
-        ? { value: budgets.maxTurns, source: "cli-flag" }
-        : { value: config.maxTurns, source: henchSource("maxTurns") },
-    tokenBudget:
-      budgets.tokenBudget !== undefined
-        ? { value: budgets.tokenBudget, source: "cli-flag" }
-        : { value: config.tokenBudget, source: henchSource("tokenBudget") },
+    review: settings.review,
+    reviewModel: settings.reviewModel,
+    reviewOptional: settings.reviewOptional,
+    skipTestGate: settings.skipTestGate,
+    maxTurns: settings.maxTurns,
+    tokenBudget: settings.tokenBudget,
     fresh: flagged("fresh"),
     allowDirty: flagged("allow-dirty"),
     resetDeferred: flagged("reset-deferred"),
@@ -394,14 +364,6 @@ async function wouldBeReset(
   if (flags["reset-deferred"] !== "true" || item.status !== "deferred") return false;
   if (flags.mine !== "true") return true;
   return matchesAssignee(item, parents, await resolveActor(dir));
-}
-
-/** The config key behind each `reviewModelSource` answer. */
-function reviewModelKey(vendor: LLMVendor, source: ReturnType<typeof reviewModelSource>): string {
-  if (source === "flag") return "cli-flag";
-  if (source === "vendor-config") return `llm.${vendor}.reviewModel`;
-  if (source === "shared-config") return "llm.reviewModel";
-  return "vendor-default";
 }
 
 /**

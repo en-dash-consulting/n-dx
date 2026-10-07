@@ -212,6 +212,111 @@ function getSiblings(entry: TreeEntry, doc: { items: PRDItem[] }): TaskBriefSibl
     }));
 }
 
+/** What {@link selectTaskEntry} needs to pick (and claim) one task. */
+export interface SelectTaskOptions {
+  /** An explicit `--task` id. When absent the selector autoselects. */
+  taskId?: string;
+  /** Task IDs to skip during autoselection (e.g. stuck tasks). */
+  excludeTaskIds?: Set<string>;
+  /** Restrict selection to this epic (ID). */
+  epicId?: string;
+  /** Only select tasks carrying at least one of these tags. */
+  tags?: string[];
+  /** Only select tasks assigned to this identity (`ndx work --mine`). */
+  assignee?: string;
+  /** Cross-worktree claims. The selected task is claimed before it is returned. */
+  claims?: TaskClaims;
+  /** The project's CLI command name, for the refusal's advice. */
+  cliName?: string;
+  /**
+   * Items a dry run's `--reset-deferred` would have returned to pending; they
+   * are read as pending here so selection picks what a real run would.
+   * {@link assembleTaskBrief} applies this to the whole document before it
+   * calls, so it does not pass it twice — `runOne` does, selecting off the
+   * untransformed tree.
+   */
+  wouldResetIds?: ReadonlySet<string>;
+}
+
+/**
+ * The one task a run executes, claimed for this worktree.
+ *
+ * Extracted from {@link assembleTaskBrief} so `runOne` can learn which task it
+ * is about to run *before* it chooses a loop and resolves that task's saved
+ * settings. Both call this; a second selector in run.ts would be free to pick
+ * a different task from the one the brief then builds, and the settings would
+ * belong to neither.
+ *
+ * An explicit id is refused rather than stolen when another worktree holds it.
+ * Autoselection claims as it goes: another worktree may claim the same task
+ * between our read and our claim, so the loser excludes that id and selects
+ * again, bounded so a store that refuses everything ends in an error rather
+ * than a spin.
+ *
+ * @throws {Error} "No actionable tasks found in PRD" / "... in epic" when
+ *   selection comes up empty — the sentinel `--loop` reads as "done".
+ */
+export async function selectTaskEntry(
+  rawItems: PRDItem[],
+  options: SelectTaskOptions = {},
+): Promise<TreeEntry> {
+  const { taskId, excludeTaskIds: excludeIds, epicId, tags, assignee, claims } = options;
+  const cliName = options.cliName ?? DEFAULT_CLI_NAME;
+  const items = options.wouldResetIds?.size ? readAsReset(rawItems, options.wouldResetIds) : rawItems;
+
+  if (taskId) {
+    const entry = findItem(items, taskId);
+    if (!entry) throw new Error(`Task not found: ${taskId}`);
+    const notActionable = explicitTaskRefusal(entry.item, cliName);
+    if (notActionable) throw notActionable;
+    // An explicit task another worktree is working on is refused, not stolen.
+    // Claiming is the check: the store answers atomically under its lock.
+    if (claims) {
+      const refusedBy = await claims.claim(taskId);
+      if (refusedBy) throw new TaskClaimedElsewhereError(taskId, refusedBy, entry.item.title);
+    }
+    return entry;
+  }
+
+  const completedIds = collectCompletedIds(items);
+  // When excluding stuck tasks, treat them as completed so findNextTask skips them.
+  const skipIds = excludeIds ? new Set([...completedIds, ...excludeIds]) : completedIds;
+  // Tasks other worktrees hold are passed over — not folded into skipIds,
+  // which would make their parents look finished.
+  const claimedElsewhere = new Set<string>(claims ? (await claims.foreignClaims()).keys() : []);
+
+  for (let attempt = 0; attempt < MAX_CLAIM_ATTEMPTS; attempt++) {
+    const selectOptions = {
+      ...(tags?.length ? { tags } : {}),
+      ...(assignee ? { assignee } : {}),
+      ...(claimedElsewhere.size > 0 ? { excludeIds: claimedElsewhere } : {}),
+    };
+    let candidate: TreeEntry | null;
+    if (epicId) {
+      // Epic filter active: get all actionable tasks and filter to the epic.
+      const epicTaskIds = collectEpicTaskIds(items, epicId);
+      const allActionable = findActionableTasks(items, skipIds, Infinity, selectOptions);
+      const epicActionable = allActionable.filter(
+        (e) => epicTaskIds.has(e.item.id) && !excludeIds?.has(e.item.id),
+      );
+      if (epicActionable.length === 0) throw new Error("No actionable tasks found in epic");
+      // findActionableTasks already sorts by priority, so first is best.
+      candidate = epicActionable[0];
+    } else {
+      candidate = findNextTask(items, skipIds, selectOptions);
+      if (!candidate) throw new Error("No actionable tasks found in PRD");
+    }
+
+    if (!claims) return candidate;
+    const refusedBy = await claims.claim(candidate.item.id);
+    if (!refusedBy) return candidate;
+    claimedElsewhere.add(candidate.item.id);
+  }
+  throw new Error(
+    `Could not claim a task after ${MAX_CLAIM_ATTEMPTS} attempts — each candidate was claimed by another worktree first.`,
+  );
+}
+
 export async function assembleTaskBrief(
   store: PRDStore,
   taskId?: string,
@@ -228,87 +333,15 @@ export async function assembleTaskBrief(
     ? resolveProjectCliName(options.projectDir)
     : DEFAULT_CLI_NAME;
 
-  const claims = options?.claims;
-  let entry: TreeEntry | null;
-
-  if (taskId) {
-    entry = findItem(doc.items, taskId);
-    if (!entry) {
-      throw new Error(`Task not found: ${taskId}`);
-    }
-    const notActionable = explicitTaskRefusal(entry.item, cliName);
-    if (notActionable) throw notActionable;
-    // An explicit task another worktree is working on is refused, not stolen.
-    // Claiming is the check: the store answers atomically under its lock.
-    if (claims) {
-      const refusedBy = await claims.claim(taskId);
-      if (refusedBy) throw new TaskClaimedElsewhereError(taskId, refusedBy, entry.item.title);
-    }
-  } else {
-    const completedIds = collectCompletedIds(doc.items);
-    // When excluding stuck tasks, treat them as completed so findNextTask skips them
-    const skipIds = excludeIds
-      ? new Set([...completedIds, ...excludeIds])
-      : completedIds;
-    // Tasks other worktrees hold are passed over — not folded into skipIds,
-    // which would make their parents look finished.
-    const claimedElsewhere = new Set<string>(claims ? (await claims.foreignClaims()).keys() : []);
-
-    const epicId = options?.epicId;
-
-    // Select, then claim. Another worktree may claim the same task between
-    // our read and our claim; the store refuses the loser, who excludes that
-    // id and selects again. Bounded so a store that refuses everything ends
-    // in an error rather than a spin.
-    entry = null;
-    for (let attempt = 0; attempt < MAX_CLAIM_ATTEMPTS; attempt++) {
-      const selectOptions = {
-        ...(tags ? { tags } : {}),
-        ...(assignee ? { assignee } : {}),
-        ...(claimedElsewhere.size > 0 ? { excludeIds: claimedElsewhere } : {}),
-      };
-      let candidate: TreeEntry | null;
-      if (epicId) {
-        // Epic filter active: get all actionable tasks and filter to epic
-        const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
-        const allActionable = findActionableTasks(doc.items, skipIds, Infinity, selectOptions);
-
-        // Filter to tasks within the epic and not in excludeIds
-        const epicActionable = allActionable.filter(
-          (e) => epicTaskIds.has(e.item.id) && !excludeIds?.has(e.item.id),
-        );
-
-        if (epicActionable.length === 0) {
-          throw new Error("No actionable tasks found in epic");
-        }
-
-        // findActionableTasks already sorts by priority, so first is best
-        candidate = epicActionable[0];
-      } else {
-        // No epic filter: use standard findNextTask
-        candidate = findNextTask(doc.items, skipIds, selectOptions);
-        if (!candidate) {
-          throw new Error("No actionable tasks found in PRD");
-        }
-      }
-
-      if (!claims) {
-        entry = candidate;
-        break;
-      }
-      const refusedBy = await claims.claim(candidate.item.id);
-      if (!refusedBy) {
-        entry = candidate;
-        break;
-      }
-      claimedElsewhere.add(candidate.item.id);
-    }
-    if (!entry) {
-      throw new Error(
-        `Could not claim a task after ${MAX_CLAIM_ATTEMPTS} attempts — each candidate was claimed by another worktree first.`,
-      );
-    }
-  }
+  const entry = await selectTaskEntry(doc.items, {
+    ...(taskId ? { taskId } : {}),
+    ...(excludeIds ? { excludeTaskIds: excludeIds } : {}),
+    ...(options?.epicId ? { epicId: options.epicId } : {}),
+    ...(tags ? { tags } : {}),
+    ...(assignee ? { assignee } : {}),
+    ...(options?.claims ? { claims: options.claims } : {}),
+    cliName,
+  });
 
   let workflow = "";
   try {
