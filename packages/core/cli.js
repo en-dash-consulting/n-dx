@@ -104,6 +104,7 @@ import {
 import { runExport } from "./export.js";
 import { ensureGitignoreEntry } from "./gitignore.js";
 import { relativeToRoot, resolveLayout } from "./layout.js";
+import { initDirLabels, padInitDirLabel } from "./init-summary.js";
 import { runMigrateLayout } from "./migrate-layout.js";
 import {
   resolveInitLLMSelection,
@@ -1438,16 +1439,22 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
 /**
  * Print the post-init summary to stdout (static / non-TUI path).
  *
- * @param {{ svExists: boolean, rexExists: boolean, henchExists: boolean,
+ * `dirLabel` carries the three tool directories as this project's layout
+ * actually spells them — a fresh init writes `.ndx/rex/`, not `.rex/`.
+ *
+ * @param {{ dirLabel: Record<string, string>, svExists: boolean,
+ *   rexExists: boolean, henchExists: boolean,
  *   llmSkipped: boolean, selectedProvider: string|undefined, selection: object,
  *   providerSource: string, modelSource: string, assistantResults: object }} opts
  */
-function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults, readmeResult, gitResult, gitCommitResult, skillTrackingHints }) {
+function printStaticInitSummary({ dirLabel, svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults, readmeResult, gitResult, gitCommitResult, skillTrackingHints }) {
+  const row = (label, exists) =>
+    `  ${padInitDirLabel(label, dirLabel)}  ${exists ? "already exists (reused)" : "created"}`;
   console.log("");
   console.log("n-dx initialized");
-  console.log(`  .sourcevision/  ${svExists ? "already exists (reused)" : "created"}`);
-  console.log(`  .rex/           ${rexExists ? "already exists (reused)" : "created"}`);
-  console.log(`  .hench/         ${henchExists ? "already exists (reused)" : "created"}`);
+  console.log(row(dirLabel.sourcevision, svExists));
+  console.log(row(dirLabel.rex, rexExists));
+  console.log(row(dirLabel.hench, henchExists));
   console.log("  LLM configuration");
   if (llmSkipped) {
     console.log("    Provider      skipped");
@@ -1572,6 +1579,7 @@ async function handleInit(rest) {
   // where to write. Nothing else is threaded through.
   const layout = establishInitLayout(dir);
 
+  const dirLabel = initDirLabels(layout);
   const svExists = existsSync(layout.sourcevisionDir);
   const rexExists = existsSync(layout.rexDir);
   const henchExists = existsSync(layout.henchDir);
@@ -1644,15 +1652,15 @@ async function handleInit(rest) {
       if (initResult.code !== 0) return initResult;
       return runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir], onData);
     },
-    svExists ? "reused — .sourcevision/ already present" : undefined,
+    svExists ? `reused — ${dirLabel.sourcevision} already present` : undefined,
     quiet);
   await runSubInitPhase("rex",
     () => runInitCapture(tools.rex, ["init", ...flags, dir]),
-    rexExists ? "reused — .rex/ already present" : undefined,
+    rexExists ? `reused — ${dirLabel.rex} already present` : undefined,
     quiet);
   await runSubInitPhase("hench",
     () => runInitCapture(tools.hench, ["init", ...flags, dir]),
-    henchExists ? "reused — .hench/ already present" : undefined,
+    henchExists ? `reused — ${dirLabel.hench} already present` : undefined,
     quiet);
 
   await persistInitLLMConfig(dir, {
@@ -1693,7 +1701,7 @@ async function handleInit(rest) {
     : null;
 
   printStaticInitSummary({
-    svExists, rexExists, henchExists, llmSkipped, selectedProvider,
+    dirLabel, svExists, rexExists, henchExists, llmSkipped, selectedProvider,
     selection, providerSource, modelSource, assistantResults, readmeResult,
     gitResult, gitCommitResult, skillTrackingHints,
   });

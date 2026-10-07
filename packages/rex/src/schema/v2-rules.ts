@@ -8,13 +8,14 @@
  * Errors make a tree invalid. Warnings are health signals for stewards.
  *
  * Every rule ignores `deleted` nodes: they are tombstones kept for history,
- * not part of the map or the plan.
+ * not part of the product layer or the plan.
  *
  * @module rex/schema/v2-rules
  */
 
 import { createHash } from "node:crypto";
 import type { ItemStatus } from "./v1.js";
+import { validateRunSettings } from "./validate.js";
 import { layerOf, type Criterion, type Layer, type V2Node } from "./v2.js";
 
 // ── Inputs and findings ──────────────────────────────────────────
@@ -22,16 +23,16 @@ import { layerOf, type Criterion, type Layer, type V2Node } from "./v2.js";
 /** A loaded node with its children, as the rules walk it. */
 export type RuleNode = V2Node & { children?: RuleNode[] };
 
-/** Both layers' roots: `.ndx/rex/map` and `.ndx/rex/changes`. */
+/** Both layers' roots: `.ndx/rex/product` and `.ndx/rex/changes`. Keys match {@link Layer}. */
 export interface V2Tree {
-  map: RuleNode[];
+  product: RuleNode[];
   changes: RuleNode[];
 }
 
 export interface RuleOptions {
   /** The reference time for age-based warnings. Rules never read the clock. */
   now: Date;
-  /** Days a map node may stay revised before `long-revised` warns. Default 14. */
+  /** Days a product node may stay revised before `long-revised` warns. Default 14. */
   longRevisedDays?: number;
   /**
    * This project's releases, for `title-release-token`: the package version
@@ -54,7 +55,8 @@ export type V2RuleId =
   | "capability-criteria"
   | "long-revised"
   | "area-balance"
-  | "unreviewed-spec";
+  | "unreviewed-spec"
+  | "run-settings";
 
 export interface RuleFinding {
   rule: V2RuleId;
@@ -80,7 +82,7 @@ interface Entry {
 }
 
 interface TreeIndex {
-  /** Every non-deleted node, depth first, map layer first. */
+  /** Every non-deleted node, depth first, product layer first. */
   entries: Entry[];
   /** Resolves an id, display id or alias to its node. */
   resolve(ref: string): RuleNode | undefined;
@@ -101,7 +103,7 @@ function indexTree(tree: V2Tree): TreeIndex {
     }
     for (const child of node.children ?? []) visit(child, node, root);
   };
-  for (const node of tree.map) visit(node, undefined, "map");
+  for (const node of tree.product) visit(node, undefined, "product");
   for (const node of tree.changes) visit(node, undefined, "changes");
   return { entries, resolve: (ref) => byRef.get(ref) };
 }
@@ -119,6 +121,7 @@ export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "long-revised": "warning",
   "area-balance": "warning",
   "unreviewed-spec": "warning",
+  "run-settings": "warning",
 };
 
 function finding(rule: V2RuleId, node: RuleNode, message: string): RuleFinding {
@@ -183,7 +186,7 @@ type Rule = (index: TreeIndex, options: RuleOptions) => RuleFinding[];
 const changeHasTarget: Rule = ({ entries }) =>
   entries.flatMap(({ node }) => {
     if (node.type !== "change" || node.spike || node.amends?.length || node.touches?.length) return [];
-    return [finding("change-has-target", node, `Change "${node.title}" neither amends nor touches a map node; mark it a spike or name its target`)];
+    return [finding("change-has-target", node, `Change "${node.title}" neither amends nor touches a product node; mark it a spike or name its target`)];
   });
 
 const titleReleaseTokenRule: Rule = ({ entries }, { releases }) =>
@@ -199,7 +202,7 @@ const layerNesting: Rule = ({ entries }) =>
     const expected = parent ? layerOf(parent.type) : root;
     if (layerOf(node.type) === expected) return [];
     const where = parent ? `${parent.type} "${parent.title}"` : `the ${root} root`;
-    return [finding("layer-nesting", node, `${node.type} "${node.title}" sits under ${where}; nodes never nest across the map and change layers`)];
+    return [finding("layer-nesting", node, `${node.type} "${node.title}" sits under ${where}; nodes never nest across the product and change layers`)];
   });
 
 const capabilityDepth: Rule = ({ entries }) => {
@@ -244,7 +247,7 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
   return findings;
 };
 
-/** Statuses after which a change no longer acts on the map. */
+/** Statuses after which a change no longer acts on the product layer. */
 const CLOSED_CHANGE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["completed", "cancelled", "deleted"]);
 
 function isOpenChange(node: RuleNode): boolean {
@@ -259,10 +262,10 @@ const removedTargetLive: Rule = ({ entries, resolve }) =>
         .filter((a) => a.delta === "removed")
         .filter((a) => {
           const target = resolve(a.target);
-          return !target || layerOf(target.type) !== "map";
+          return !target || layerOf(target.type) !== "product";
         })
         .map((a) =>
-          finding("removed-target-live", node, `Change "${node.title}" removes "${a.target}", which is not a live map node`),
+          finding("removed-target-live", node, `Change "${node.title}" removes "${a.target}", which is not a live product node`),
         ),
     );
 
@@ -279,7 +282,7 @@ const capabilityCriteria: Rule = ({ entries }) =>
 const DAY_MS = 86_400_000;
 
 /**
- * A map node is revised when its spec no longer hashes to `metAt` and no open
+ * A product node is revised when its spec no longer hashes to `metAt` and no open
  * change amends it (an amended one is "changing" instead). A node never met
  * (`metAt` absent) is proposed, not revised. Age is measured from
  * `revisedAt`, which the state writer stamps when a spec edit first makes the
@@ -338,6 +341,23 @@ const unreviewedSpec: Rule = ({ entries }) =>
     .filter(({ node }) => (node.type === "capability" || node.type === "constraint") && node.specReviewed !== true)
     .map(({ node }) => finding("unreviewed-spec", node, `${node.type} "${node.title}" has a spec no person has reviewed`));
 
+/**
+ * A saved `run` block that `ndx work` ignores: invalid by `validateRunSettings`
+ * (malformed, or holding a newer version's key), or carried by a node other
+ * than a change or task. A warning, never an error: the schema keeps `run`
+ * loose so one bad block cannot refuse writes to the rest of the tree.
+ */
+const runSettings: Rule = ({ entries }) =>
+  entries.flatMap(({ node }) => {
+    if (node.run === undefined) return [];
+    if (node.type !== "change" && node.type !== "task") {
+      return [finding("run-settings", node, `${node.type} "${node.title}" carries a run block; only changes and tasks hold saved run settings`)];
+    }
+    const check = validateRunSettings(node.run);
+    if (check.ok) return [];
+    return [finding("run-settings", node, `Invalid ${check.error} on ${node.type} "${node.title}"; ndx work ignores this block until it is fixed`)];
+  });
+
 /** Every rule, errors first, in the order findings are reported. */
 const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "change-has-target": changeHasTarget,
@@ -351,6 +371,7 @@ const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "long-revised": longRevised,
   "area-balance": areaBalance,
   "unreviewed-spec": unreviewedSpec,
+  "run-settings": runSettings,
 };
 
 export const V2_RULE_IDS = Object.keys(RULES) as V2RuleId[];
