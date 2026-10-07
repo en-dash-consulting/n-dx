@@ -20,11 +20,11 @@
  * @module rex/store/folder-tree-serializer
  */
 
-import { mkdir, readFile, writeFile, readdir, rm, rename, stat } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { PRDItem } from "../schema/index.js";
 import { digestItemFile } from "./folder-tree-parser.js";
-import { atomicWriteTempPath } from "./atomic-write.js";
+import { atomicWrite } from "./atomic-write.js";
 import { TREE_META_FILENAME } from "./paths.js";
 
 /**
@@ -1020,9 +1020,7 @@ async function writeIfChanged(
     // File does not exist — proceed with write
   }
 
-  const tmpPath = atomicWriteTempPath(filePath);
-  await writeFile(tmpPath, content, "utf8");
-  await rename(tmpPath, filePath);
+  await atomicWrite(filePath, content);
   result.filesWritten++;
   result.writtenPaths.push(resolve(filePath));
   try {

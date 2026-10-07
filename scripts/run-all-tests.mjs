@@ -28,12 +28,21 @@
  *   node scripts/run-all-tests.mjs            # root + every package
  *   node scripts/run-all-tests.mjs root       # root suites only
  *   node scripts/run-all-tests.mjs packages   # workspace packages only
+ *   node scripts/run-all-tests.mjs root-policy # the six static root policy tests (~2 s)
+ *   node scripts/run-all-tests.mjs rex,web   # named suites (root, or a package dir name)
+ *   node scripts/run-all-tests.mjs affected <baseRef>   # only suites the change touches
+ *   add --list to print the selection and exit without running anything
+ *
+ * Selection rules live in scripts/lib/select-suites.mjs. Besides the human
+ * summary, the run prints `test-gate: …` lines (selected, reasons, failed) for
+ * hench to parse.
  */
 
 import { readdirSync, readFileSync, existsSync, mkdirSync, createWriteStream } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnCli } from "../packages/core/win-spawn.js";
+import { execFileSyncCli, spawnCli } from "../packages/core/win-spawn.js";
+import { ROOT_LABEL, ROOT_POLICY_LABEL, ROOT_POLICY_TEST_FILES, parsePorcelainZ, resolveLabels, selectAffected, validLabels } from "./lib/select-suites.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -90,8 +99,8 @@ function runSuite(label, binary, args) {
       });
     }
 
-    // A spawn that never starts is a failed suite, not an absent one — the
-    // behaviour `execFileSync` used to give us by throwing.
+    // A spawn that never starts is a failed suite, not an absent one, just as
+    // a throwing synchronous spawn would be.
     child.on("error", (err) => {
       const message = `\nFailed to start ${label}: ${err.message}\n`;
       process.stderr.write(message);
@@ -106,12 +115,12 @@ function runSuite(label, binary, args) {
   });
 }
 
-/** Workspace packages that define a `test` script, in a stable order. */
-function discoverPackageSuites() {
+/** Every workspace package manifest, in a stable order, with its directory name. */
+function readManifests() {
   const packagesDir = join(ROOT, "packages");
   if (!existsSync(packagesDir)) return [];
 
-  const suites = [];
+  const manifests = [];
   for (const entry of readdirSync(packagesDir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     if (!entry.isDirectory()) continue;
     const manifestPath = join(packagesDir, entry.name, "package.json");
@@ -123,40 +132,115 @@ function discoverPackageSuites() {
     } catch {
       continue;
     }
-    if (!manifest?.scripts?.test || !manifest.name) continue;
-
-    suites.push({
-      label: manifest.name,
-      // Delegated to pnpm so each package keeps its own test script semantics
-      // (web and sourcevision wrap vitest in the bind-aware runner). pnpm is a
-      // .cmd shim on Windows, hence spawnCli rather than a raw spawn.
-      binary: "pnpm",
-      args: ["--filter", manifest.name, "run", "test"],
+    if (!manifest?.name) continue;
+    manifests.push({
+      dir: entry.name,
+      name: manifest.name,
+      hasTest: Boolean(manifest.scripts?.test),
+      dependencies: manifest.dependencies,
+      devDependencies: manifest.devDependencies,
     });
   }
-  return suites;
+  return manifests;
 }
 
-/** The root-level tests/** suites, which live outside any package. */
-function rootSuite() {
+/** The runnable suite for a canonical short label. */
+function suiteFor(label, manifests) {
+  if (label === ROOT_LABEL) {
+    // The root-level tests/** suites, which live outside any package.
+    return {
+      short: label,
+      label: "root (tests/**)",
+      // process.execPath avoids the shim question entirely for this one.
+      binary: process.execPath,
+      args: [resolve(ROOT, "scripts/run-vitest-bind-aware.mjs"), "root"],
+    };
+  }
+  if (label === ROOT_POLICY_LABEL) {
+    // Same runner and root vitest config as `root`, restricted to the policy files.
+    return {
+      short: label,
+      label: "root policy (static)",
+      binary: process.execPath,
+      args: [resolve(ROOT, "scripts/run-vitest-bind-aware.mjs"), "root", ...ROOT_POLICY_TEST_FILES],
+    };
+  }
+  const { name } = manifests.find((m) => m.dir === label);
   return {
-    label: "root (tests/**)",
-    // process.execPath avoids the shim question entirely for this one.
-    binary: process.execPath,
-    args: [resolve(ROOT, "scripts/run-vitest-bind-aware.mjs"), "root"],
+    short: label,
+    label: name,
+    // Delegated to pnpm so each package keeps its own test script semantics
+    // (web and sourcevision wrap vitest in the bind-aware runner). pnpm is a
+    // .cmd shim on Windows, hence spawnCli rather than a raw spawn.
+    binary: "pnpm",
+    args: ["--filter", name, "run", "test"],
   };
 }
 
-const scope = process.argv[2] ?? "all";
-if (!["all", "root", "packages"].includes(scope)) {
-  console.error(`Unknown scope "${scope}". Expected: all | root | packages`);
-  process.exit(2);
+function git(gitArgs) {
+  return execFileSyncCli("git", gitArgs, { cwd: ROOT, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
 }
 
-const suites = [
-  ...(scope === "packages" ? [] : [rootSuite()]),
-  ...(scope === "root" ? [] : discoverPackageSuites()),
-];
+/** Files changed since `baseRef`, plus uncommitted and untracked ones; null if git cannot say. */
+function changedFilesSince(baseRef) {
+  try {
+    git(["rev-parse", "--verify", "--quiet", `${baseRef}^{commit}`]);
+    const committed = git(["diff", "--name-only", `${baseRef}...HEAD`]).split("\n").filter(Boolean);
+    const working = parsePorcelainZ(git(["status", "--porcelain", "-z", "--untracked-files=all"]));
+    return [...new Set([...committed, ...working])];
+  } catch (err) {
+    console.warn(`Cannot compute changes since "${baseRef}": ${String(err.message).split("\n")[0]}`);
+    return null;
+  }
+}
+
+const manifests = readManifests();
+const args = process.argv.slice(2);
+const listOnly = args.includes("--list");
+const positional = args.filter((a) => a !== "--list");
+
+/** @type {string[]} */
+let labels;
+/** @type {Record<string, string> | null} */
+let reasons = null;
+
+if (positional[0] === "affected") {
+  const baseRef = positional[1];
+  if (!baseRef) {
+    console.error("Usage: run-all-tests.mjs affected <baseRef>");
+    process.exit(2);
+  }
+  const changed = changedFilesSince(baseRef);
+  if (changed === null) {
+    // Never select nothing by mistake: an unknown change set means everything.
+    console.warn("WARNING: falling back to running ALL suites.");
+    labels = validLabels(manifests).filter((l) => l !== ROOT_POLICY_LABEL);
+  } else {
+    ({ suites: labels, reasons } = selectAffected(changed, manifests));
+  }
+} else {
+  const resolved = resolveLabels(positional.length > 0 ? positional : ["all"], manifests);
+  if (resolved.unknown) {
+    console.error(
+      `Unknown suite "${resolved.unknown.join('", "')}". ` +
+      `Valid: all | packages | ${resolved.valid.join(" | ")} ` +
+      `(comma- or space-separated; @n-dx/<name> also accepted), or: affected <baseRef>`,
+    );
+    process.exit(2);
+  }
+  labels = resolved.labels;
+}
+
+// Machine-readable protocol lines: hench parses these.
+console.log(`test-gate: selected-suites=${labels.join(",")}`);
+for (const label of labels) {
+  if (reasons?.[label]) console.log(`test-gate: reason ${label}: ${reasons[label]}`);
+}
+
+if (listOnly) process.exit(0);
+
+const suites = labels.map((label) => suiteFor(label, manifests));
+if (suites.length === 0) console.log("No suites affected by this change — nothing to run.");
 
 mkdirSync(LOG_DIR, { recursive: true });
 
@@ -166,7 +250,7 @@ for (const suite of suites) {
   // Keep going even when one fails: the whole point is that one red suite must
   // not hide the rest.
   const ok = await runSuite(suite.label, suite.binary, suite.args);
-  results.push({ label: suite.label, ok, logPath: logFileFor(suite.label) });
+  results.push({ label: suite.label, short: suite.short, ok, logPath: logFileFor(suite.label) });
 }
 
 const failed = results.filter((r) => !r.ok);
@@ -184,5 +268,6 @@ console.log(
   `\n${results.length - failed.length}/${results.length} suites passed` +
   (failed.length > 0 ? ` — failed: ${failed.map((f) => f.label).join(", ")}` : ""),
 );
+console.log(`test-gate: failed-suites=${failed.map((f) => f.short).join(",")}`);
 
 process.exit(failed.length > 0 ? 1 : 0);

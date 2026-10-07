@@ -86,10 +86,20 @@ describe("buildSystemPrompt", () => {
       expect(prompt).toContain("nothing will resume this session");
     });
 
-    it("tells the agent the suite is run again afterwards, under the project's own CLI name", () => {
+    it("tells the agent scoped validation applies and the gate follows, under the project's own CLI name", () => {
       const config = { ...DEFAULT_HENCH_CONFIG(), provider: "cli" as const };
       const prompt = buildSystemPrompt({ ...project, cliName: "widget" }, config);
-      expect(prompt).toContain("run again after you finish, by widget itself");
+      expect(prompt).toContain("## Validation");
+      expect(prompt).toContain("Run the tests for the files you changed, or the one package suite that covers them.");
+      expect(prompt).toContain("Build only the package you changed.");
+      expect(prompt).toContain("Do not run the whole repository suite. widget runs its test gate after you finish, and CI runs everything.");
+      expect(prompt).toContain("Finishing is not skipping validation");
+      expect(prompt).toContain("widening is fine");
+    });
+
+    it("api provider does not get the Validation section (pinned choice)", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), provider: "api" as const };
+      expect(buildSystemPrompt(project, config)).not.toContain("## Validation");
     });
 
     it("absent from api provider (it drives its own loop; parking is not expressible)", () => {

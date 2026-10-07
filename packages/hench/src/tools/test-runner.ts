@@ -335,6 +335,7 @@ function goPackagePaths(testFiles: string[]): string[] {
 // ---------------------------------------------------------------------------
 
 import { execShellCmd } from "../process/exec.js";
+import { parseSelectedSuites, planRerun } from "./test-gate-template.js";
 
 // ---------------------------------------------------------------------------
 // Main entry point
@@ -600,6 +601,13 @@ export interface TestGateOptions {
    * legitimately takes is a property of the project, not of this gate.
    */
   timeout?: number;
+  /**
+   * `hench.testGate.rerunCommand`. Pass it only when a failure would abort
+   * unattended: a failed gate then re-runs the suites on its
+   * `test-gate: failed-suites=` line once, inside this call. Never after a
+   * timeout or a command that did not launch.
+   */
+  rerunTemplate?: string;
 }
 
 /**
@@ -815,12 +823,13 @@ function parseVitestOutput(
  * - Runs the configured test command (or "pnpm test --reporter=json" by default)
  * - Aggregates results by package (packages/xyz/...)
  * - Returns per-package pass/fail status and failure counts
+ * - With `rerunTemplate`, re-runs the failed suites once (see TestGateOptions)
  * - Never throws — always returns a structured result
  */
 export async function runTestGate(
   options: TestGateOptions,
 ): Promise<TestGateResult> {
-  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TEST_GATE_TIMEOUT_MS } = options;
+  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TEST_GATE_TIMEOUT_MS, rerunTemplate } = options;
 
   // Skip if no files were modified
   if (filesChanged.length === 0) {
@@ -834,6 +843,110 @@ export async function runTestGate(
 
   // Use provided command or default to pnpm test with JSON reporter
   const command = testCommand || "pnpm test --reporter=json";
+  const first = await runGateCommand(command, projectDir, timeout);
+  if (!rerunTemplate || first.result.passed || !first.result.ran || first.timedOut) {
+    return first.result;
+  }
+
+  const plan = planRerun(rerunTemplate, first.output);
+  if (!plan.ok) return { ...first.result, rerunSkipped: plan.reason };
+
+  // One re-run, same timeout and process-tree kill as the gate itself.
+  const second = await runGateCommand(plan.command, projectDir, timeout);
+  const rerun = {
+    command: plan.command,
+    suites: plan.suites,
+    passed: second.result.passed,
+    totalDurationMs: second.result.totalDurationMs,
+    ...(second.result.error ? { error: second.result.error } : {}),
+  };
+
+  if (second.result.passed) {
+    // The gate's own selection stays top-level; the re-run's labels are the
+    // failed subset and live on `rerun.suites`.
+    const selected = first.result.suites;
+    const { suites: _rerunSuites, ...rerunResult } = second.result;
+    return {
+      ...rerunResult,
+      ...(selected ? { suites: selected } : {}),
+      flakyRerun: plan.suites.map((suite) => ({
+        suite,
+        firstFailure: firstFailureForSuite(first.output, suite, first.result.failureDigest),
+      })),
+      firstAttempt: {
+        command: first.result.command,
+        totalDurationMs: first.result.totalDurationMs,
+        failedSuites: plan.suites,
+        ...(selected ? { suites: selected } : {}),
+      },
+      rerun,
+    };
+  }
+
+  // Failed twice: the gate's verdict stands, with what the re-run said.
+  const { outputTail, failureDigest, packages } = second.result;
+  return {
+    ...first.result,
+    ...(packages.length > 0 ? { packages } : {}),
+    ...(outputTail ? { outputTail } : {}),
+    ...(failureDigest ? { failureDigest } : {}),
+    rerun,
+  };
+}
+
+/** Longest `firstFailure` kept on an absorbed flake. */
+const FIRST_FAILURE_MAX_CHARS = 200;
+
+/** `──────── @n-dx/rex ────────`, printed by scripts/run-all-tests.mjs before each suite. */
+const SUITE_SECTION_HEADER = /^\s*─{3,}\s+(.+?)\s+─{3,}\s*$/;
+
+/** Whether a section header's label (`@n-dx/rex`, `root (tests/**)`) is suite `label`'s. */
+function sectionIsSuite(header: string, label: string): boolean {
+  return header === label || header.endsWith(`/${label}`) || header.startsWith(`${label} `);
+}
+
+/**
+ * One line naming what failed `suite` the first time: the first FAIL line in
+ * that suite's section of the output, else the first in the digest that
+ * mentions it, else the digest's first. Capped at ~200 chars.
+ *
+ * @internal Exported for testing.
+ */
+export function firstFailureForSuite(output: string, suite: string, digest: string | undefined): string {
+  const lines = output.replace(ANSI_SGR, "").split(/\r?\n/);
+  let inSuite = false;
+  let found: string | undefined;
+  for (const line of lines) {
+    const header = SUITE_SECTION_HEADER.exec(line);
+    if (header) {
+      inSuite = sectionIsSuite(header[1], suite);
+      continue;
+    }
+    if (inSuite && FAIL_LINE.test(line)) {
+      found = line.trim();
+      break;
+    }
+  }
+
+  if (!found && digest) {
+    const failLines = digest.split(/\r?\n/).map((l) => l.trim()).filter((l) => FAIL_LINE.test(l));
+    found = failLines.find((l) => l.includes(suite)) ?? failLines[0];
+  }
+
+  const text = found ?? "failed (the output named no failing test)";
+  return text.length > FIRST_FAILURE_MAX_CHARS ? `${text.slice(0, FIRST_FAILURE_MAX_CHARS - 1)}…` : text;
+}
+
+interface GateCommandOutcome {
+  result: TestGateResult;
+  /** Combined stdout and stderr, whole — for the failed-suites line. */
+  output: string;
+  /** Killed at the deadline. */
+  timedOut: boolean;
+}
+
+/** Run one gate command and judge it. Never throws. */
+async function runGateCommand(command: string, projectDir: string, timeout: number): Promise<GateCommandOutcome> {
   const startMs = Date.now();
 
   // The gate's own view of the deadline, beside the one `exec` enforces. Armed
@@ -882,15 +995,19 @@ export async function runTestGate(
   if (!launched) {
     const combined = combineStreams(stdout, stderr);
     return {
-      ran: false,
-      passed: false,
-      packages: [],
-      command,
-      totalDurationMs,
-      error:
-        `Test gate could not be executed — the command was never launched ` +
-        `(${error?.message ?? "spawn failed"})`,
-      outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
+      output: combined,
+      timedOut: false,
+      result: {
+        ran: false,
+        passed: false,
+        packages: [],
+        command,
+        totalDurationMs,
+        error:
+          `Test gate could not be executed — the command was never launched ` +
+          `(${error?.message ?? "spawn failed"})`,
+        outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
+      },
     };
   }
 
@@ -913,48 +1030,61 @@ export async function runTestGate(
     const partial = truncateOutput(combined, "", RAW_OUTPUT_CHARS);
     // A suite that failed before it hung has already said what failed.
     const digest = combined ? extractFailureDigest(combined) : undefined;
+    const suites = parseSelectedSuites(combined);
     return {
-      ran: true,
-      passed: false,
-      packages: [
-        {
-          name: "workspace",
-          passed: false,
-          failureOutput: partial
-            ? failureOutputWithDigest(digest, combined, partial)
-            : "No output was produced before the timeout.",
-        },
-      ],
-      command,
-      totalDurationMs,
-      error: describeTermination({
+      output: combined,
+      timedOut: true,
+      result: {
+        ran: true,
+        passed: false,
+        packages: [
+          {
+            name: "workspace",
+            passed: false,
+            failureOutput: partial
+              ? failureOutputWithDigest(digest, combined, partial)
+              : "No output was produced before the timeout.",
+          },
+        ],
         command,
-        error,
-        timeout,
-        startMs,
-        endMs: startMs + totalDurationMs,
-        deadlineSeenAt,
-      }),
-      outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
-      ...(digest ? { failureDigest: digest } : {}),
+        totalDurationMs,
+        error: describeTermination({
+          command,
+          error,
+          timeout,
+          startMs,
+          endMs: startMs + totalDurationMs,
+          deadlineSeenAt,
+        }),
+        outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
+        ...(digest ? { failureDigest: digest } : {}),
+        ...(suites ? { suites } : {}),
+      },
     };
   }
 
   const overallPassed = exitCode === 0;
   const packages = parseVitestOutput(stdout, stderr, overallPassed);
+  const output = combineStreams(stdout, stderr);
+  const suites = parseSelectedSuites(output);
   // No post-mortem for a green gate — attaching output to a pass is noise, and
   // it matches parseVitestOutput's own rule for the same case.
-  const combined = overallPassed ? "" : combineStreams(stdout, stderr);
+  const combined = overallPassed ? "" : output;
   const digest = combined ? extractFailureDigest(combined) : undefined;
 
   return {
-    ran: true,
-    passed: overallPassed,
-    packages,
-    command,
-    totalDurationMs,
-    outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
-    ...(digest ? { failureDigest: digest } : {}),
+    output,
+    timedOut: false,
+    result: {
+      ran: true,
+      passed: overallPassed,
+      packages,
+      command,
+      totalDurationMs,
+      outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
+      ...(digest ? { failureDigest: digest } : {}),
+      ...(suites ? { suites } : {}),
+    },
   };
 }
 

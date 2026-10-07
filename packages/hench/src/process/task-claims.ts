@@ -250,6 +250,23 @@ export class TaskClaims {
   }
 
   /**
+   * Record a completion on this run's claim as if its agent had asked for it.
+   *
+   * The one caller is a gate-only retry (`agent/lifecycle/gate-only-retry.ts`):
+   * the previous run's agent asked for this completion, the gate refused it,
+   * and a fresh claim starts with nothing held. Re-recording it here lets
+   * `finalizeRun` apply it through the same hold path an agent's request
+   * takes. Returns false when this run does not hold the task.
+   */
+  async recordPendingCompletion(
+    taskId: string,
+    completion: NonNullable<TaskClaim["pendingCompletion"]>,
+  ): Promise<boolean> {
+    if (this.readOnly || !this.held.has(taskId)) return false;
+    return (await this.store.recordPendingCompletion(taskId, this.holder, completion)) !== null;
+  }
+
+  /**
    * What every claim, refresh and re-claim of this run writes. `holdsCompletion`
    * is what makes rex hold the agent's completion for this run to apply after
    * its test gate — the same for Claude CLI, Codex CLI and API-loop runs,

@@ -12,6 +12,7 @@
 
 import { access, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { applyGateTemplate } from "./test-gate-template.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,17 +23,26 @@ export interface TestCommandResolverOptions {
   projectDir: string;
   /** Hench config directory (.hench). */
   henchDir: string;
-  /** Current hench config with potential fullTestCommand field. */
-  config?: { fullTestCommand?: string };
+  /** Current hench config with potential fullTestCommand / testGate.command fields. */
+  config?: { fullTestCommand?: string; testGate?: { command?: string } };
+  /** Commit `{base}` in `testGate.command` is replaced with. */
+  base?: string;
 }
 
 export interface TestCommandResolveResult {
   /** The resolved test command. */
   command: string;
   /** Where the command came from. */
-  source: "config" | "project-config" | "auto-detect" | "user-prompt";
+  source: "test-gate-template" | "config" | "project-config" | "auto-detect" | "user-prompt";
   /** Whether the command was newly persisted to config. */
   persisted?: boolean;
+  /** The SHA substituted for `{base}`, when the template used it. */
+  base?: string;
+  /**
+   * Why `testGate.command` was configured but not used. `command` is then
+   * what the resolver would have returned without the template.
+   */
+  scopeFallback?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +298,30 @@ async function persistTestCommand(
  * without a resolvable command, throws with clear guidance.
  */
 export async function resolveTestCommand(
+  options: TestCommandResolverOptions,
+  autonomous?: boolean,
+): Promise<TestCommandResolveResult> {
+  // 0. hench.testGate.command template — outranks everything below. Its
+  // .n-dx.json form reaches here already merged into `options.config`.
+  const template = options.config?.testGate?.command;
+  let scopeFallback: string | undefined;
+  if (template) {
+    const applied = applyGateTemplate(template, options.base);
+    if (applied.ok) {
+      return {
+        command: applied.command,
+        source: "test-gate-template",
+        ...(applied.base ? { base: applied.base } : {}),
+      };
+    }
+    scopeFallback = applied.reason;
+  }
+
+  const resolved = await resolveUntemplatedTestCommand(options, autonomous);
+  return scopeFallback ? { ...resolved, scopeFallback } : resolved;
+}
+
+async function resolveUntemplatedTestCommand(
   options: TestCommandResolverOptions,
   autonomous?: boolean,
 ): Promise<TestCommandResolveResult> {

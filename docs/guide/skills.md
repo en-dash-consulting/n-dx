@@ -211,7 +211,7 @@ they all share:
 
 **What it does:**
 1. Resolves the target — working diff, branch diff, or a PRD item (clarifying with you when given a name or topic rather than an ID)
-2. Builds ground truth: reads changed files in full, maps callers via sourcevision, then **discovers and runs the project's own checks** — typecheck, tests, lint — from `.rex/workflow.md`, the manifest scripts, or CI config
+2. Builds ground truth: reads changed files in full, maps callers via sourcevision, then **discovers and runs the project's own checks** — typecheck, tests, lint — from `.rex/workflow.md`, the manifest scripts, or CI config. Inside an `ndx work` run whose test gate follows, it runs scoped checks only and notes that the gate covers the rest
 3. **Pass 1 — attack.** Works a fixed rubric (unimagined inputs, failure paths, concurrency, platform, contract drift, test quality, the claim itself). Every finding needs a constructed trigger and a genuine attempt to refute it, or it is dropped
 4. **Pass 2 — necessity.** Judges each survivor on reachability, existing coverage, fix cost, and scope, landing on must-fix / should-fix / not-worth-fixing / out-of-scope
 5. Reports findings with severity, verdict, and proposed solutions — then **stops and asks** which to capture

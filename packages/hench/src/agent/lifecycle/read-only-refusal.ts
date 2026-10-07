@@ -37,6 +37,11 @@ export interface ReadOnlyRefusalInput {
   noChanges: boolean;
   /** Tool names the attempt called. */
   toolNames: readonly string[];
+  /**
+   * True when earlier attempts of the task already committed its files. An
+   * empty diff then means the work is done, not that the fork refused.
+   */
+  priorAttemptWorkOnBranch?: boolean;
 }
 
 /** Number of calls that write to the working tree, in either vendor vocabulary. */
@@ -49,10 +54,17 @@ export function countFileEditCalls(toolNames: readonly string[]): number {
  *
  * All three are required: a cold attempt has no orientation to inherit, and
  * an attempt that called an edit tool was trying to do the task, so its empty
- * diff is an ordinary failure.
+ * diff is an ordinary failure. When earlier attempts already committed the
+ * task's files, the agent finding nothing to do is correct, so that case is
+ * never a refusal either.
  */
 export function isReadOnlyRefusal(input: ReadOnlyRefusalInput): boolean {
-  return input.forked && input.noChanges && countFileEditCalls(input.toolNames) === 0;
+  return (
+    input.forked &&
+    input.noChanges &&
+    !input.priorAttemptWorkOnBranch &&
+    countFileEditCalls(input.toolNames) === 0
+  );
 }
 
 /**
