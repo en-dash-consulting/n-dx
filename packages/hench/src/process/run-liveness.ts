@@ -129,7 +129,12 @@ export interface LivenessSummary {
  * to someone else, so it counts as alive — matching
  * `packages/web/src/server/run-staleness.ts`.
  */
-export function isPidAlive(pid: number): boolean {
+export function isPidAlive(pid: number, platform: NodeJS.Platform = process.platform): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  // Windows process ids are multiples of 4, and OpenProcess ignores a pid's
+  // low two bits, so kill(4242, 0) probes process 4240 and can succeed (or
+  // fail with EPERM) when no process 4242 exists. Such a pid cannot be live.
+  if (platform === "win32" && pid % 4 !== 0) return false;
   try {
     process.kill(pid, 0);
     return true;
