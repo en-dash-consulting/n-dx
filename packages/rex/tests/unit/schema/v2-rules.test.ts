@@ -121,7 +121,7 @@ describe("title-release-token", () => {
 
 describe("layer-nesting", () => {
   it("passes nodes under a parent of their own layer", () => {
-    const product =[node("area", {}, [cap({}, [cap()]), node("constraint")])];
+    const product = [node("area", {}, [cap({}, [cap()]), node("constraint")])];
     const changes = [node("change", {}, [node("task", {}, [node("subtask")])])];
     expect(check("layer-nesting", { product, changes })).toEqual([]);
   });
@@ -242,7 +242,7 @@ describe("long-revised", () => {
     cap({ id: "r", metAt: specHash(met), revisedAt: "2026-09-01T00:00:00Z", ...fields });
 
   it("passes met, proposed, recently revised, and amended nodes", () => {
-    const product =[
+    const product = [
       cap({ ...met, metAt: specHash(met), revisedAt: "2026-01-01T00:00:00Z" }),
       cap({ revisedAt: "2026-01-01T00:00:00Z" }),
       cap({ metAt: specHash(met), revisedAt: "2026-10-01T00:00:00Z" }),
@@ -281,7 +281,7 @@ describe("area-balance", () => {
     node("area", fields, Array.from({ length: n }, () => cap()));
 
   it("passes balanced areas, counting nested capabilities", () => {
-    const product =[area(3), area(3), node("area", {}, [cap({}, [cap()]), cap()])];
+    const product = [area(3), area(3), node("area", {}, [cap({}, [cap()]), cap()])];
     expect(check("area-balance", { product })).toEqual([]);
   });
 
