@@ -19,7 +19,7 @@
 
 import { dirname, join } from "node:path";
 import { resolveStore, findItem, matchesAssignee, resolveActor } from "../../prd/rex-gateway.js";
-import type { PRDItem } from "../../prd/rex-gateway.js";
+import type { PRDItem, RunSettings } from "../../prd/rex-gateway.js";
 import { LLM_VENDOR, getGitCommonDir } from "../../prd/llm-gateway.js";
 import type { LLMVendor } from "../../prd/llm-gateway.js";
 import { PERMISSION_MODES } from "../../schema/index.js";
@@ -44,7 +44,7 @@ import {
   reviewProviderError,
   selectCliModelOverride,
 } from "./run-settings.js";
-import type { Resolved } from "./run-settings.js";
+import type { Resolved, SettingWarningCode, TaskRunSettings } from "./run-settings.js";
 
 // `Resolved` lives beside the resolver that fills it in (run-settings.ts) and
 // is re-exported here, where the report's shape is defined.
@@ -63,9 +63,17 @@ export type RunRefusalCode =
   | "model-vendor-mismatch"
   | "dirty-tree";
 
-/** A condition worth showing before the run that does not stop it. */
+/**
+ * A condition worth showing before the run that does not stop it.
+ *
+ * `untrusted-repository` is the run's own; the rest come from the task's saved
+ * `run` block — a value that could not be applied as written. They are
+ * warnings rather than refusals because none of them stops the run, and they
+ * are reported here rather than only on stderr because a run started from the
+ * dashboard has no stderr anyone reads.
+ */
 export interface RunWarning {
-  code: "untrusted-repository";
+  code: "untrusted-repository" | SettingWarningCode;
   message: string;
 }
 
@@ -127,6 +135,13 @@ export interface RunResolution {
     claimedBy: { worktree: string; pid: number; expiresAt: string } | null;
   } | null;
   workspace: { root: string; branch: string | null; isAnchor?: boolean; dirty: boolean };
+  /**
+   * The task's `run` block as stored, once rex's validator has accepted it;
+   * `null` when the task carries none or when the block was ignored (a
+   * `saved-settings-ignored` warning says which). The dashboard reads this to
+   * show what is saved, separately from what this run resolves to.
+   */
+  saved: RunSettings | null;
   resolved: ResolvedSettings;
   options: RunOption[];
   refusals: RunRefusal[];
@@ -264,7 +279,40 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     ...(entry ? { item: entry.item } : {}),
     clampPermissionMode: (mode) => applyRepoTrust(config, dir, mode).permissionMode,
   });
-  for (const message of settings.warnings) warn(message);
+
+
+  // What each setting would be if the task had saved nothing. Resolved by the
+  // same function with the item left out, rather than by reading config a
+  // second way — so the "project default" the dashboard shows beside a saved
+  // value is the value a run would really fall back to.
+  const withoutSaved = entry
+    ? resolveTaskRunSettings({
+        flags,
+        config,
+        configuredHenchKeys: configured,
+        llmConfig,
+        vendor,
+        autonomous: true,
+        clampPermissionMode: (mode) => applyRepoTrust(config, dir, mode).permissionMode,
+      })
+    : undefined;
+
+  /**
+   * `setting` plus the project default behind it, when a saved value is what
+   * won. Settings the task did not supply carry no fallback: there is nothing
+   * for the saved block to fall back *from*.
+   */
+  // Generic over the whole entry rather than its value, so `reviewModel` keeps
+  // its `vendorDefault` on the way through. The cast is the price of adding an
+  // optional property to an open type parameter; the shape is exact.
+  const withFallback = <R extends { value: unknown; source: string }>(
+    setting: R,
+    key: keyof TaskRunSettings,
+  ): R => {
+    if (!withoutSaved || !setting.source.startsWith("task.run")) return setting;
+    const base = withoutSaved[key] as { value: unknown; source: string };
+    return { ...setting, fallback: { value: base.value, source: base.source } } as R;
+  };
 
   // ── Vendor and model ──────────────────────────────────
   if (!llmConfig.vendor) {
@@ -314,26 +362,34 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   // Chosen per launch, so they are the report's own rather than the shared
   // resolver's: nothing may save them on a task.
   const trustEvaluation = applyRepoTrust(config, dir, undefined).evaluation;
-  const warnings: RunWarning[] = trustEvaluation.restricted
-    ? [{ code: "untrusted-repository", message: formatTrustWarningForRun(trustEvaluation, provider.value).join("\n") }]
-    : [];
+  const warnings: RunWarning[] = [
+    ...(trustEvaluation.restricted
+      ? [{
+          code: "untrusted-repository" as const,
+          message: formatTrustWarningForRun(trustEvaluation, provider.value).join("\n"),
+        }]
+      : []),
+    ...settings.warnings,
+  ];
   const flagged = (flag: string): Resolved<boolean> =>
     flags[flag] === "true" ? { value: true, source: "cli-flag" } : { value: false, source: "built-in" };
 
   const resolved: ResolvedSettings = {
     vendor: { value: vendor, source: llmConfig.vendor ? "llm.vendor" : "built-in" },
-    model: { value: settings.model.value, source: settings.model.source },
-    provider: { value: provider.value, source: provider.source },
-    permissionMode: {
-      value: settings.permissionMode.value,
-      source: settings.permissionMode.source,
-    },
-    review: settings.review,
-    reviewModel: settings.reviewModel,
-    reviewOptional: settings.reviewOptional,
-    skipTestGate: settings.skipTestGate,
-    maxTurns: settings.maxTurns,
-    tokenBudget: settings.tokenBudget,
+    model: withFallback({ value: settings.model.value, source: settings.model.source }, "model"),
+    provider: withFallback({ value: provider.value, source: provider.source }, "provider"),
+    // `dropped` is the resolver's signal to the caller that prints the warning,
+    // not part of the report: every entry here is {value, source[, fallback]}.
+    permissionMode: withFallback(
+      { value: settings.permissionMode.value, source: settings.permissionMode.source },
+      "permissionMode",
+    ),
+    review: withFallback(settings.review, "review"),
+    reviewModel: withFallback(settings.reviewModel, "reviewModel"),
+    reviewOptional: withFallback(settings.reviewOptional, "reviewOptional"),
+    skipTestGate: withFallback(settings.skipTestGate, "skipTestGate"),
+    maxTurns: withFallback(settings.maxTurns, "maxTurns"),
+    tokenBudget: withFallback(settings.tokenBudget, "tokenBudget"),
     fresh: flagged("fresh"),
     allowDirty: flagged("allow-dirty"),
     resetDeferred: flagged("reset-deferred"),
@@ -347,6 +403,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       ...(commonDir ? { isAnchor: dirname(commonDir) === root } : {}),
       dirty,
     },
+    saved: settings.saved ?? null,
     resolved,
     options: RUN_OPTIONS.map((option) =>
       option.key === "provider" ? { ...option, values: VENDOR_PROVIDERS[vendor] } : { ...option },
@@ -393,6 +450,14 @@ export function shellWord(word: string, platform: NodeJS.Platform = process.plat
  * {@link PASSTHROUGH_FLAGS}. A model
  * given as `--<vendor>-model` is written as `--model`, which it is equivalent
  * to and which outranks it.
+ *
+ * Built from `flags` alone, deliberately: a task's saved `run` settings apply
+ * to the run but must not be written into the command, because the command is
+ * meant to be the operator's own line — copy it, run it, and the task's saved
+ * settings apply again by themselves. Writing them in would also freeze them,
+ * so a command copied today would stop matching the task the moment its saved
+ * block changed. A flag that happens to equal the saved value is still printed:
+ * it was typed.
  */
 function formatRunCommand(
   taskId: string,

@@ -19,6 +19,11 @@ export function prepFixture(overrides: Partial<PrepResponse> = {}): PrepResponse
       fresh: { value: false, source: "built-in" },
       allowDirty: { value: false, source: "built-in" },
     },
+    // A task with no saved run block: the common case, and the one every
+    // existing assertion was written against. Pass `saved` in `overrides` to
+    // exercise the saved-settings path, and give the matching `resolved`
+    // entries a `fallback` as hench does.
+    saved: null,
     options: [{ key: "provider", values: ["cli", "api"] }],
     refusals: [],
     dir: "/repo",

@@ -281,8 +281,9 @@ describe("a saved block that cannot be honoured never wedges a run", () => {
     expect(r.model.value).toBe(NEWEST_MODELS.claude);
     expect(r.model.source).toBe("vendor-default");
     expect(r.warnings).toHaveLength(1);
-    expect(r.warnings[0]).toContain("Mispinned task");
-    expect(r.warnings[0]).toContain("gpt-5.6-terra");
+    expect(r.warnings[0].code).toBe("saved-model-incompatible");
+    expect(r.warnings[0].message).toContain("Mispinned task");
+    expect(r.warnings[0].message).toContain("gpt-5.6-terra");
   });
 
   it("still honours the saved tier when the saved exact pin is incompatible", () => {
@@ -304,7 +305,8 @@ describe("a saved block that cannot be honoured never wedges a run", () => {
     expect(r.maxTurns).toEqual({ value: 11, source: "hench.maxTurns" });
     expect(r.saved).toBeUndefined();
     expect(r.warnings).toHaveLength(1);
-    expect(r.warnings[0]).toContain("Hand-edited task");
+    expect(r.warnings[0].code).toBe("saved-settings-ignored");
+    expect(r.warnings[0].message).toContain("Hand-edited task");
   });
 
   it("treats an empty block as no block at all", () => {
@@ -327,7 +329,8 @@ describe("a saved block that cannot be honoured never wedges a run", () => {
     expect(r.provider.source).not.toBe("task.run");
     expect(r.provider.error).toBeUndefined();
     expect(r.warnings).toHaveLength(1);
-    expect(r.warnings[0]).toContain("Mis-saved provider");
+    expect(r.warnings[0].code).toBe("saved-provider-unavailable");
+    expect(r.warnings[0].message).toContain("Mis-saved provider");
   });
 
   it("still switches a saved provider the vendor can only serve the other way, with no warning", () => {
@@ -354,7 +357,8 @@ describe("a saved block that cannot be honoured never wedges a run", () => {
 
     expect(r.review).toEqual({ value: false, source: "vendor-unsupported" });
     expect(r.warnings).toHaveLength(1);
-    expect(r.warnings[0]).toContain("Review-on-google");
+    expect(r.warnings[0].code).toBe("saved-review-unsupported");
+    expect(r.warnings[0].message).toContain("Review-on-google");
   });
 
   it("lets --review outrank a saved provider that would make the review impossible", () => {
@@ -368,7 +372,8 @@ describe("a saved block that cannot be honoured never wedges a run", () => {
     expect(r.provider.value).toBe("cli");
     expect(r.review).toEqual({ value: true, source: "cli-flag" });
     expect(r.warnings).toHaveLength(1);
-    expect(r.warnings[0]).toContain("Api-and-review");
+    expect(r.warnings[0].code).toBe("saved-provider-overridden");
+    expect(r.warnings[0].message).toContain("Api-and-review");
   });
 
   it("says so when a saved permission mode cannot apply to the active vendor", () => {
@@ -380,7 +385,8 @@ describe("a saved block that cannot be honoured never wedges a run", () => {
 
     expect(r.permissionMode.value).toBeNull();
     expect(r.warnings).toHaveLength(1);
-    expect(r.warnings[0]).toContain("Mode-on-codex");
+    expect(r.warnings[0].code).toBe("saved-permission-mode-dropped");
+    expect(r.warnings[0].message).toContain("Mode-on-codex");
   });
 
   it("falls through a saved tier on local, which has no catalog to resolve it against", () => {
@@ -480,6 +486,15 @@ const DOC = {
           run: { models: { claude: TIER_MODELS.claude.heavy }, maxTurns: 12, review: true },
         },
         { id: "t-plain", title: "Task with none", level: "task" as const, status: "pending" as const },
+        {
+          id: "t-broken",
+          title: "Task with a hand-edited block",
+          level: "task" as const,
+          status: "pending" as const,
+          // `tier: "free"` is not one of the portable tiers, so rex's validator
+          // refuses the block whole.
+          run: { tier: "free", maxTurns: 7 },
+        },
       ],
     },
   ],
@@ -509,9 +524,11 @@ describe("ndx work --resolve reports the task's saved settings", () => {
   it("names task.run as the source of each setting the task saved", async () => {
     const r = await resolveRun(projectDir, { task: "t-saved" });
 
-    expect(r.resolved.model).toEqual({ value: TIER_MODELS.claude.heavy, source: "task.run.models" });
-    expect(r.resolved.maxTurns).toEqual({ value: 12, source: "task.run" });
-    expect(r.resolved.review).toEqual({ value: true, source: "task.run" });
+    // Each also carries the project default it would fall back to; that is
+    // asserted on its own below, so match the pair that names the source here.
+    expect(r.resolved.model).toMatchObject({ value: TIER_MODELS.claude.heavy, source: "task.run.models" });
+    expect(r.resolved.maxTurns).toMatchObject({ value: 12, source: "task.run" });
+    expect(r.resolved.review).toMatchObject({ value: true, source: "task.run" });
     expect(r.refusals).toEqual([]);
   });
 
@@ -520,6 +537,70 @@ describe("ndx work --resolve reports the task's saved settings", () => {
 
     expect(r.resolved.model).toEqual({ value: resolveModel(NEWEST_MODELS.claude), source: "vendor-default" });
     expect(r.resolved.review).toEqual({ value: false, source: "built-in" });
+  });
+
+  it("reports the task's saved block verbatim, and null for a task with none", async () => {
+    expect((await resolveRun(projectDir, { task: "t-saved" })).saved).toEqual({
+      models: { claude: TIER_MODELS.claude.heavy },
+      maxTurns: 12,
+      review: true,
+    });
+    expect((await resolveRun(projectDir, { task: "t-plain" })).saved).toBeNull();
+  });
+
+  it("gives every saved setting the project default it would fall back to", async () => {
+    const r = await resolveRun(projectDir, { task: "t-saved" });
+
+    expect(r.resolved.model.fallback).toEqual({
+      value: resolveModel(NEWEST_MODELS.claude),
+      source: "vendor-default",
+    });
+    expect(r.resolved.maxTurns.fallback).toEqual({ value: 50, source: "hench.maxTurns" });
+    expect(r.resolved.review.fallback).toEqual({ value: false, source: "built-in" });
+  });
+
+  it("leaves a setting the task did not supply without a fallback", async () => {
+    // There is nothing for it to fall back *from*: the reported value already
+    // is the project default.
+    const r = await resolveRun(projectDir, { task: "t-saved" });
+
+    expect(r.resolved.provider.source).not.toMatch(/^task\.run/);
+    expect(r.resolved.provider.fallback).toBeUndefined();
+    expect(r.resolved.tokenBudget.fallback).toBeUndefined();
+    expect((await resolveRun(projectDir, { task: "t-plain" })).resolved.model.fallback).toBeUndefined();
+  });
+
+  it("drops the fallback when a flag outranks the saved value", async () => {
+    // The flag won, so `source` is cli-flag and the project default is not
+    // what this run falls back to — the saved value is.
+    const r = await resolveRun(projectDir, { task: "t-saved", "max-turns": "4" });
+
+    expect(r.resolved.maxTurns).toEqual({ value: 4, source: "cli-flag" });
+  });
+
+  it("keeps saved settings out of the printed command, but prints a flag that was typed", async () => {
+    // The command is the operator's own line: copy it, run it, and the task's
+    // saved settings apply again by themselves. Writing them in would freeze
+    // them against a block that can change.
+    const plain = await resolveRun(projectDir, { task: "t-saved" });
+    expect(plain.command).toBe(`ndx work --task=t-saved --auto ${projectDir}`);
+    expect(plain.command).not.toContain(TIER_MODELS.claude.heavy);
+    expect(plain.command).not.toContain("--max-turns");
+    expect(plain.command).not.toContain("--review");
+
+    const typed = await resolveRun(projectDir, { task: "t-saved", "max-turns": "12" });
+    expect(typed.command).toContain("--max-turns=12");
+  });
+
+  it("reports a malformed block as saved null plus a warning, not a refusal", async () => {
+    const r = await resolveRun(projectDir, { task: "t-broken" });
+
+    expect(r.saved).toBeNull();
+    expect(r.refusals).toEqual([]);
+    expect(r.warnings.map((w) => w.code)).toEqual(["saved-settings-ignored"]);
+    expect(r.warnings[0].message).toContain("Task with a hand-edited block");
+    // And it resolves as though the block were absent.
+    expect(r.resolved.maxTurns).toEqual({ value: 50, source: "hench.maxTurns" });
   });
 
   it("reports a CLI flag as the winner over the saved value, as a run would apply it", async () => {

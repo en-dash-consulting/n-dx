@@ -311,6 +311,13 @@ export interface Resolved<T> {
    * `autonomous-default`, `repository-trust` or `built-in`.
    */
   source: string;
+  /**
+   * What this setting would resolve to if the task had saved nothing — the
+   * project's own default. Only `ndx work --resolve` fills it in, and only for
+   * a setting a saved block won, so the dashboard can show "project default: X
+   * from llm.model" beside the saved value and know what Save would change.
+   */
+  fallback?: { value: T; source: string };
 }
 
 /** The portable tiers a saved `run` block may name, heaviest last. */
@@ -379,6 +386,33 @@ function isRouteChainRung(rung: string): boolean {
   return rung !== "cli-flag" && !rung.startsWith("hench.models.");
 }
 
+/**
+ * Why a saved setting was not applied as written.
+ *
+ * Coded rather than prose because the dashboard shows these beside the field
+ * they concern: a run can be started from a browser, where stderr goes
+ * nowhere, and "your saved model cannot run on this vendor" is exactly what
+ * the reader needs before they click Execute.
+ */
+export type SettingWarningCode =
+  /** The whole block failed rex's validator and was ignored. */
+  | "saved-settings-ignored"
+  /** `models[vendor]` names a model this vendor cannot run. */
+  | "saved-model-incompatible"
+  /** `provider` names a loop this vendor does not have. */
+  | "saved-provider-unavailable"
+  /** `provider` lost to `--review`, which needs the CLI provider. */
+  | "saved-provider-overridden"
+  /** `review` cannot run on the provider this task resolved to. */
+  | "saved-review-unsupported"
+  /** `permissionMode` is a Claude-only setting on another vendor. */
+  | "saved-permission-mode-dropped";
+
+export interface SettingWarning {
+  code: SettingWarningCode;
+  message: string;
+}
+
 export interface TaskRunSettings {
   model: Resolved<string> & {
     /** The tier of {@link Resolved.value} — what the run record's `weight` is. */
@@ -409,7 +443,7 @@ export interface TaskRunSettings {
   /** The saved block that was honoured; undefined when absent or ignored. */
   saved?: RunSettings;
   /** Operator-facing notes about the saved block — an ignored or skipped value. */
-  warnings: string[];
+  warnings: SettingWarning[];
 }
 
 export interface TaskRunSettingsInput {
@@ -447,7 +481,7 @@ export interface TaskRunSettingsInput {
  */
 export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSettings {
   const { flags, config, configuredHenchKeys, llmConfig, vendor, autonomous, item } = input;
-  const warnings: string[] = [];
+  const warnings: SettingWarning[] = [];
 
   const reviewOpts = parseReviewOptions(flags);
   const permissionModeFlag = parsePermissionModeFlag(flags);
@@ -463,10 +497,12 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     if (check.ok) {
       saved = check.value;
     } else {
-      warnings.push(
-        `Ignoring the run settings saved on "${item.title}" (${item.id}): ${check.error}. ` +
+      warnings.push({
+        code: "saved-settings-ignored",
+        message:
+          `Ignoring the run settings saved on "${item.title}" (${item.id}): ${check.error}. ` +
           `Running with this project's configured settings instead.`,
-      );
+      });
     }
   }
 
@@ -485,10 +521,12 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     && savedModel.length > 0
     && (vendor === LLM_VENDOR.LOCAL || isModelCompatibleWithVendor(vendor, savedModel));
   if (savedModel !== undefined && savedModel.length > 0 && !savedModelUsable) {
-    warnings.push(
-      `The model "${savedModel}" saved on "${item?.title}" cannot run on vendor="${vendor}" — ` +
+    warnings.push({
+      code: "saved-model-incompatible",
+      message:
+        `The model "${savedModel}" saved on "${item?.title}" cannot run on vendor="${vendor}" — ` +
         `falling back to this project's configured model.`,
-    );
+    });
   }
   // A saved tier is portable, so it resolves per vendor. `local` is excluded:
   // LM Studio serves whichever model is loaded, so every tier there resolves to
@@ -554,15 +592,19 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   const savedProviderUsable =
     savedProviderCheck !== undefined && savedProviderCheck.error === undefined && !savedProviderBlocksReview;
   if (savedProviderCheck?.error) {
-    warnings.push(
-      `The provider "${savedProvider}" saved on "${item?.title}" is not available for ` +
+    warnings.push({
+      code: "saved-provider-unavailable",
+      message:
+        `The provider "${savedProvider}" saved on "${item?.title}" is not available for ` +
         `vendor="${vendor}" — running on this project's configured provider instead.`,
-    );
+    });
   } else if (savedProviderBlocksReview) {
-    warnings.push(
-      `Ignoring the provider "${savedProvider}" saved on "${item?.title}": --review needs the ` +
+    warnings.push({
+      code: "saved-provider-overridden",
+      message:
+        `Ignoring the provider "${savedProvider}" saved on "${item?.title}": --review needs the ` +
         `CLI provider, and the flag outranks a saved setting.`,
-    );
+    });
   }
   const requestedProvider = flags.provider ?? (savedProviderUsable ? savedProvider : config.provider);
   const providerSource =
@@ -586,10 +628,12 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // own mode; a mode that came from the task has no other voice, so it would
   // otherwise vanish without a word.
   if (permission.dropped !== undefined && permission.origin === "task.run") {
-    warnings.push(
-      `The permission mode "${permission.dropped}" saved on "${item?.title}" is a Claude CLI ` +
+    warnings.push({
+      code: "saved-permission-mode-dropped",
+      message:
+        `The permission mode "${permission.dropped}" saved on "${item?.title}" is a Claude CLI ` +
         `feature; ignoring it for vendor="${vendor}".`,
-    );
+    });
   }
 
   // -- Review --------------------------------------------------------------
@@ -605,10 +649,12 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     && saved?.review === true
     && reviewProviderError(vendor, resolvedProvider.provider) !== undefined;
   if (savedReviewUnsupported) {
-    warnings.push(
-      `The review pass saved on "${item?.title}" needs the CLI provider, but this task ` +
+    warnings.push({
+      code: "saved-review-unsupported",
+      message:
+        `The review pass saved on "${item?.title}" needs the CLI provider, but this task ` +
         `resolved to provider="${resolvedProvider.provider}" — running it without a review.`,
-    );
+    });
   }
   const review: Resolved<boolean> = reviewOpts.reviewPass
     ? { value: true, source: "cli-flag" }
