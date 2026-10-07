@@ -84,6 +84,13 @@ export interface RunOption {
   key: keyof ResolvedSettings;
   /** The `hench run` / `ndx work` flag, without the leading `--`. */
   flag: string;
+  /**
+   * The flag that turns this option off for one run, without the leading
+   * `--`. Only `boolean` options have one, and only those a task can save:
+   * an option that nothing but the command line can set already reads "off"
+   * from the flag's absence, so a negation would say nothing new.
+   */
+  negatedFlag?: string;
   type: "enum" | "boolean" | "integer" | "string";
   /** Allowed values, for `enum`. */
   values?: readonly string[];
@@ -148,10 +155,10 @@ const RUN_OPTIONS: readonly RunOption[] = [
   { key: "model", flag: "model", type: "string", scope: "task", description: "Model the agent runs on, overriding hench.models and llm.* for this run." },
   { key: "provider", flag: "provider", type: "enum", values: ["cli", "api"], scope: "task", description: "Drive the vendor CLI or call its API directly." },
   { key: "permissionMode", flag: "permission-mode", type: "enum", values: PERMISSION_MODES, scope: "task", description: "Permission mode for the spawned Claude session (Claude only)." },
-  { key: "review", flag: "review", type: "boolean", scope: "task", description: "Run the adversarial review pass after the task validates, before the commit." },
+  { key: "review", flag: "review", negatedFlag: "no-review", type: "boolean", scope: "task", description: "Run the adversarial review pass after the task validates, before the commit (--no-review suppresses one the task saved)." },
   { key: "reviewModel", flag: "review-model", type: "string", scope: "task", description: "Model the reviewer runs on (requires review)." },
   { key: "reviewOptional", flag: "review-optional", type: "boolean", scope: "task", description: "Downgrade the missing-review gate to a warning when the reviewer cannot start (requires review)." },
-  { key: "skipTestGate", flag: "skip-test-gate", type: "boolean", scope: "task", description: "Skip the full test suite gate before the commit." },
+  { key: "skipTestGate", flag: "skip-test-gate", negatedFlag: "no-skip-test-gate", type: "boolean", scope: "task", description: "Skip the full test suite gate before the commit (--no-skip-test-gate forces it to run)." },
   { key: "maxTurns", flag: "max-turns", type: "integer", scope: "task", description: "Turn limit for the agent loop (API provider)." },
   { key: "tokenBudget", flag: "token-budget", type: "integer", scope: "task", description: "Token budget for the run; 0 means unlimited." },
   { key: "fresh", flag: "fresh", type: "boolean", scope: "launch", description: "Discard the cached orientation session so the run re-orients." },
@@ -401,6 +408,13 @@ function formatRunCommand(
       if (value === "true") words.push(`--${option.flag}`);
     } else {
       words.push(`--${option.flag}=${shellWord(value)}`);
+    }
+  }
+  // The negations are flags in their own right rather than values of the
+  // options above, so they are read from the command line directly.
+  for (const option of RUN_OPTIONS) {
+    if (option.negatedFlag && flags[option.negatedFlag] === "true") {
+      words.push(`--${option.negatedFlag}`);
     }
   }
   for (const { flag, type } of PASSTHROUGH_FLAGS) {

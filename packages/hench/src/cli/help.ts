@@ -56,6 +56,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
       { flag: "--review-optional", description: "Accept a best-effort review: warn instead of refusing the completion when the reviewer cannot start" },
+      { flag: "--no-review", description: "No review pass for this run, even when the task saved review:true. Refused with --review, --review-model or --review-optional" },
       { flag: "--approve-diff", description: "Show proposed changes and prompt for approval (was --review before the review pass took that flag)" },
       { flag: "--max-turns=<n>", description: "Override max agent turns per task" },
       { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },
@@ -63,6 +64,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--permission-mode=<mode>", description: "Claude permission posture: default | acceptEdits | bypassPermissions | plan (autonomous runs default to acceptEdits)" },
       { flag: "--allow-dirty", description: "Start with an uncommitted working tree: autonomous runs (--auto/--loop/--epic-by-epic) prompt to commit/stash/discard on a TTY and abort without one, and this flag also overrides hench.git.requireCleanTree and hench.git.checkpointThreshold escalation" },
       { flag: "--skip-test-gate", description: "Skip the mandatory full test suite gate before commit for this invocation (persistent equivalent: hench.skipFullTestGate config)" },
+      { flag: "--no-skip-test-gate", description: "Run the full test suite gate even when the task saved skipTestGate:true or hench.skipFullTestGate is set. Refused with --skip-test-gate" },
       { flag: "--fresh", description: "Discard the cached orientation session and orient again before forking task spawns (see hench.sessionStrategy)" },
     ],
     sections: [

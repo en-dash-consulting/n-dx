@@ -68,6 +68,25 @@ describe("ndx work --resolve", () => {
     expect(report.resolved.maxTurns).toEqual({ value: 9, source: "cli-flag" });
   });
 
+  it("forwards --no-review and --no-skip-test-gate to hench unchanged", () => {
+    // `ndx work` passes every `-`-prefixed argument through to `hench run`, so
+    // this is really a test that neither flag is swallowed or rewritten on the
+    // way -- the orchestration tier must not need teaching about each one.
+    const result = runResult([
+      "work", "--task=task-2", "--resolve", "--no-review", "--no-skip-test-gate", repo,
+    ]);
+    expect(result.code, result.stderr).toBe(0);
+    const { resolved } = JSON.parse(result.stdout);
+    expect(resolved.review).toEqual({ value: false, source: "cli-flag" });
+    expect(resolved.skipTestGate).toEqual({ value: false, source: "cli-flag" });
+  });
+
+  it("refuses a flag passed together with its negation", () => {
+    const result = runResult(["work", "--task=task-2", "--resolve", "--review", "--no-review", repo]);
+    expect(result.code).not.toBe(0);
+    expect(`${result.stdout}${result.stderr}`).toMatch(/--review and --no-review/);
+  });
+
   it("reports a completed task as a refusal, still exiting 0", () => {
     const result = runResult(["work", "--task=task-1", "--resolve", repo]);
     expect(result.code, result.stderr).toBe(0);

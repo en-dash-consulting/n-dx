@@ -211,6 +211,66 @@ describe("precedence: CLI flag > task run > hench.* > llm.* > default", () => {
   });
 });
 
+describe("--no-review and --no-skip-test-gate turn a saved setting off for one run", () => {
+  it("suppresses a review the task saved, as a cli-flag false", () => {
+    const saved = resolveFor({ item: task({ review: true }) });
+    expect(saved.review).toEqual({ value: true, source: "task.run" });
+
+    const off = resolveFor({ flags: { "no-review": "true" }, item: task({ review: true }) });
+    expect(off.review).toEqual({ value: false, source: "cli-flag" });
+  });
+
+  it("takes the saved reviewOptional with it \u2014 there is no reviewer left to relax", () => {
+    const off = resolveFor({
+      flags: { "no-review": "true" },
+      item: task({ review: true, reviewOptional: true }),
+    });
+
+    expect(off.review.value).toBe(false);
+    expect(off.reviewOptional).toEqual({ value: false, source: "cli-flag" });
+  });
+
+  it("runs the gate the task asked to skip, as a cli-flag false", () => {
+    const saved = resolveFor({ item: task({ skipTestGate: true }) });
+    expect(saved.skipTestGate).toEqual({ value: true, source: "task.run" });
+
+    const off = resolveFor({ flags: { "no-skip-test-gate": "true" }, item: task({ skipTestGate: true }) });
+    expect(off.skipTestGate).toEqual({ value: false, source: "cli-flag" });
+  });
+
+  it("runs the gate hench config skips, too", () => {
+    const off = resolveFor({
+      flags: { "no-skip-test-gate": "true" },
+      config: { skipFullTestGate: true },
+    });
+
+    expect(off.skipTestGate).toEqual({ value: false, source: "cli-flag" });
+  });
+
+  it("refuses a flag and its negation together", () => {
+    expect(() => resolveFor({ flags: { review: "true", "no-review": "true" } })).toThrow(/--review and --no-review/);
+    expect(() =>
+      resolveFor({ flags: { "skip-test-gate": "true", "no-skip-test-gate": "true" } }),
+    ).toThrow(/--skip-test-gate and --no-skip-test-gate/);
+  });
+
+  it("refuses the review companions alongside --no-review", () => {
+    expect(() =>
+      resolveFor({ flags: { "no-review": "true", "review-model": "claude-opus-5-5" } }),
+    ).toThrow(/--review-model was passed with --no-review/);
+    expect(() =>
+      resolveFor({ flags: { "no-review": "true", "review-optional": "true" } }),
+    ).toThrow(/--review-optional was passed with --no-review/);
+  });
+
+  it("leaves a saved setting alone when neither flag is passed", () => {
+    const r = resolveFor({ item: task({ review: true, skipTestGate: true }) });
+
+    expect(r.review.source).toBe("task.run");
+    expect(r.skipTestGate.source).toBe("task.run");
+  });
+});
+
 describe("a saved block that cannot be honoured never wedges a run", () => {
   it("skips a model the active vendor cannot run, warns naming the task, and carries on down the chain", () => {
     const r = resolveFor({
