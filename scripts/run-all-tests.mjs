@@ -28,7 +28,8 @@
  *   node scripts/run-all-tests.mjs            # root + every package
  *   node scripts/run-all-tests.mjs root       # root suites only
  *   node scripts/run-all-tests.mjs packages   # workspace packages only
- *   node scripts/run-all-tests.mjs root-policy # the six static root policy tests (~2 s)
+ *   node scripts/run-all-tests.mjs root-policy # the static root policy tests (~2 s)
+ *   node scripts/run-all-tests.mjs root-drift  # the source-vs-twin drift tests (~14 s)
  *   node scripts/run-all-tests.mjs rex,web   # named suites (root, or a package dir name)
  *   node scripts/run-all-tests.mjs affected <baseRef>   # only suites the change touches
  *   add --list to print the selection and exit without running anything
@@ -42,7 +43,13 @@ import { readdirSync, readFileSync, existsSync, mkdirSync, createWriteStream } f
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSyncCli, spawnCli } from "../packages/core/win-spawn.js";
-import { ROOT_LABEL, ROOT_POLICY_LABEL, ROOT_POLICY_TEST_FILES, parsePorcelainZ, resolveLabels, selectAffected, validLabels } from "./lib/select-suites.mjs";
+import { ROOT_LABEL, ROOT_SUBSET_LABELS, ROOT_SUBSET_TEST_FILES, parsePorcelainZ, resolveLabels, selectAffected, validLabels } from "./lib/select-suites.mjs";
+
+/** Human-readable name for each root-subset suite, shown in the per-suite summary. */
+const ROOT_SUBSET_NAMES = {
+  "root-policy": "root policy (static)",
+  "root-drift": "root drift (artifacts and cross-package twins)",
+};
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -156,13 +163,13 @@ function suiteFor(label, manifests) {
       args: [resolve(ROOT, "scripts/run-vitest-bind-aware.mjs"), "root"],
     };
   }
-  if (label === ROOT_POLICY_LABEL) {
-    // Same runner and root vitest config as `root`, restricted to the policy files.
+  if (ROOT_SUBSET_LABELS.includes(label)) {
+    // Same runner and root vitest config as `root`, restricted to this subset's files.
     return {
       short: label,
-      label: "root policy (static)",
+      label: ROOT_SUBSET_NAMES[label],
       binary: process.execPath,
-      args: [resolve(ROOT, "scripts/run-vitest-bind-aware.mjs"), "root", ...ROOT_POLICY_TEST_FILES],
+      args: [resolve(ROOT, "scripts/run-vitest-bind-aware.mjs"), "root", ...ROOT_SUBSET_TEST_FILES[label]],
     };
   }
   const { name } = manifests.find((m) => m.dir === label);
@@ -214,7 +221,7 @@ if (positional[0] === "affected") {
   if (changed === null) {
     // Never select nothing by mistake: an unknown change set means everything.
     console.warn("WARNING: falling back to running ALL suites.");
-    labels = validLabels(manifests).filter((l) => l !== ROOT_POLICY_LABEL);
+    labels = validLabels(manifests).filter((l) => !ROOT_SUBSET_LABELS.includes(l));
   } else {
     ({ suites: labels, reasons } = selectAffected(changed, manifests));
   }

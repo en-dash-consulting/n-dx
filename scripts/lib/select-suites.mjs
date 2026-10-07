@@ -17,10 +17,17 @@ export const ROOT_LABEL = "root";
 export const ROOT_POLICY_LABEL = "root-policy";
 
 /**
+ * Label of the root tests that compare a package source against a checked-in
+ * artifact generated from it, or against a copy of it kept in another package.
+ * Also a subset of `root`.
+ */
+export const ROOT_DRIFT_LABEL = "root-drift";
+
+/**
  * The root tests that police package sources and tests (spawn-only, gateways,
- * shell/wall-clock/layout inventories, obfuscation). About 2 s together. A
- * package-only change still has to run them: without them only CI catches a
- * violation. A unit test fails if a listed file is missing.
+ * shell/wall-clock/layout inventories, obfuscation, integration-tier growth).
+ * About 2 s together. A package-only change still has to run them: without them
+ * only CI catches a violation. A unit test fails if a listed file is missing.
  */
 export const ROOT_POLICY_TEST_FILES = [
   "tests/e2e/architecture-policy.test.js",
@@ -29,7 +36,125 @@ export const ROOT_POLICY_TEST_FILES = [
   "tests/e2e/wall-clock-inventory-policy.test.js",
   "tests/e2e/layout-literal-policy.test.js",
   "tests/e2e/obfuscated-code-policy.test.js",
+  // Reads the gateway paths out of hench/src and web/src, so renaming a gateway
+  // breaks it from a package-source change alone. 0.2 s.
+  "tests/e2e/integration-coverage-policy.test.js",
 ];
+
+/**
+ * The root tests whose failure a package-source change can cause on its own,
+ * because they assert that two definitions agree rather than that code behaves.
+ * Two shapes, both drift:
+ *
+ * - a checked-in artifact generated from a source (the prompt census registry,
+ *   the bundled iso-map skill, the generated CLAUDE.md/AGENTS.md pair, the
+ *   committed `.rex/prd_tree` against rex's slug rule);
+ * - a definition deliberately duplicated across a tier boundary, where neither
+ *   side may import the other (core's layout resolver and llm-client's, web's
+ *   run-option table and hench's, core's task-class list and llm-client's
+ *   registry, a gateway's re-export surface and its upstream public API).
+ *
+ * They are a separate label from {@link ROOT_POLICY_TEST_FILES} rather than
+ * more entries in it because they cost about 14 s against that set's 2 s, and
+ * the cheap gate is worth being able to run on its own. The fifteen entries
+ * added after the first four cost about 2 s of that: `prompt-census` dominates
+ * the label and the rest fill the other workers beside it. Both labels are
+ * selected by the same condition (a change under `packages/<dir>/src/`), so a
+ * source change runs both; `root` supersedes both.
+ *
+ * Without them a change to a package source outside `src/cli/` never ran a
+ * drift test at the gate: the gate went green, hench committed, and CI went red
+ * after the run (#546 review finding F1, and its recurrence in the review of
+ * the task that closed F1 for only the four files it named).
+ *
+ * Membership rule, applied in the audit recorded in TESTING.md: a root test
+ * belongs here when it reads a package source — or two packages' definitions of
+ * one thing — and fails on a mismatch. A root test that drives a package
+ * through its public API and asserts behaviour does not: its regressions are
+ * the package suite's job, and running them all here would be running `root`.
+ */
+export const ROOT_DRIFT_TEST_FILES = [
+  // A checked-in artifact generated from a package source.
+  "tests/e2e/prompt-census.test.js",
+  "tests/e2e/iso-skill-drift.test.js",
+  "tests/e2e/hench-config-gate-contract.test.js",
+  "tests/e2e/instruction-alignment.test.js",
+  "tests/e2e/prd-slug-conformance.test.js",
+  "tests/e2e/assistant-parity-smoke.test.js",
+  "tests/e2e/skill-commit-isolation.test.js",
+  // One definition, duplicated across a tier boundary.
+  "tests/e2e/run-options-contract.test.js",
+  "tests/e2e/catalog-runtime-contract.test.js",
+  "tests/e2e/run-liveness-parity.test.js",
+  "tests/integration/layout-resolver-contract.test.js",
+  "tests/integration/task-class-sync.test.js",
+  "tests/integration/task-class-registry.test.js",
+  "tests/integration/primer-fingerprint-contract.test.js",
+  "tests/integration/effective-agent-config-contract.test.js",
+  "tests/integration/prd-delta-cli-agreement.test.js",
+  "tests/integration/command-effects-manifest-contract.test.js",
+  // A gateway's re-export surface against the upstream public API.
+  "tests/integration/cross-package-contracts.test.js",
+  "tests/integration/web-server-viewer-boundary.test.js",
+];
+
+/**
+ * Every label that runs a subset of `root`'s files, mapped to those files, in
+ * run order. `root` supersedes all of them, and `all` / `packages` leave them
+ * out. A unit test fails if a listed file is missing or appears twice.
+ */
+export const ROOT_SUBSET_TEST_FILES = {
+  [ROOT_POLICY_LABEL]: ROOT_POLICY_TEST_FILES,
+  [ROOT_DRIFT_LABEL]: ROOT_DRIFT_TEST_FILES,
+};
+
+/** The root-subset labels, in run order. */
+export const ROOT_SUBSET_LABELS = Object.keys(ROOT_SUBSET_TEST_FILES);
+
+/**
+ * Checked-in artifacts that a root test parses and validates, each mapped to
+ * the root subset that runs that test and to the test itself.
+ *
+ * `selectAffected` short-circuits Markdown and `docs/` before the
+ * `ROOT_PREFIXES` check, because a prose edit should run nothing. But a few
+ * files under `tests/` and `docs/` are not prose: a root test reads them and
+ * fails when they disagree with the code. Changed on their own — the only case
+ * where this bites, since any code in the same change selects the suite anyway —
+ * they selected no suite at all, so the gate went green on a change CI fails
+ * (#546 review finding F2).
+ *
+ * This is an explicit list rather than a `tests/*-inventory.md` glob so it can
+ * be *checked* rather than assumed: a unit test requires each `test` to exist,
+ * to mention the artifact's path, and to be a file the mapped subset runs.
+ * `tests/unit-test-constant-inventory.md` is absent deliberately — no test reads
+ * it, so editing it alone still selects nothing.
+ *
+ * The map is an exception to the short-circuit, not an override of the rules
+ * above it: entries select one subset, never full `root`, so a prose edit to an
+ * inventory does not cost the whole root suite.
+ */
+export const VALIDATED_ARTIFACTS = {
+  "tests/shell-spawn-inventory.md": {
+    label: ROOT_POLICY_LABEL,
+    test: "tests/e2e/shell-spawn-inventory-policy.test.js",
+  },
+  "tests/wall-clock-assertion-inventory.md": {
+    label: ROOT_POLICY_LABEL,
+    test: "tests/e2e/wall-clock-inventory-policy.test.js",
+  },
+  "tests/layout-literal-inventory.md": {
+    label: ROOT_POLICY_LABEL,
+    test: "tests/e2e/layout-literal-policy.test.js",
+  },
+  "docs/analysis/prompt-token-baseline.md": {
+    label: ROOT_DRIFT_LABEL,
+    test: "tests/e2e/prompt-census.test.js",
+  },
+  "docs/analysis/prompt-token-baseline.json": {
+    label: ROOT_DRIFT_LABEL,
+    test: "tests/e2e/prompt-census.test.js",
+  },
+};
 
 /** A change to any of these can alter every suite, so every suite runs. */
 export const RUN_EVERYTHING_FILES = [
@@ -74,12 +199,12 @@ function isInstructionSurface(file) {
  */
 
 /**
- * Canonical labels, in run order: root, root-policy, then packages in manifest
- * order. `all` and run-everything selections leave out root-policy, which root
- * already covers.
+ * Canonical labels, in run order: root, the root subsets, then packages in
+ * manifest order. `all` and run-everything selections leave out the subsets,
+ * which root already covers.
  */
 export function validLabels(manifests) {
-  return [ROOT_LABEL, ROOT_POLICY_LABEL, ...manifests.filter((m) => m.hasTest).map((m) => m.dir)];
+  return [ROOT_LABEL, ...ROOT_SUBSET_LABELS, ...manifests.filter((m) => m.hasTest).map((m) => m.dir)];
 }
 
 /**
@@ -90,7 +215,7 @@ export function validLabels(manifests) {
  */
 export function resolveLabels(tokens, manifests) {
   const valid = validLabels(manifests);
-  const packageLabels = valid.filter((l) => l !== ROOT_LABEL && l !== ROOT_POLICY_LABEL);
+  const packageLabels = valid.filter((l) => l !== ROOT_LABEL && !ROOT_SUBSET_LABELS.includes(l));
   const byName = new Map(manifests.filter((m) => m.hasTest).map((m) => [m.name, m.dir]));
   const wanted = new Set();
   const unknown = [];
@@ -105,8 +230,8 @@ export function resolveLabels(tokens, manifests) {
     else unknown.push(token);
   }
   if (unknown.length > 0) return { unknown, valid };
-  // root runs the policy tests already; never run them twice.
-  if (wanted.has(ROOT_LABEL)) wanted.delete(ROOT_POLICY_LABEL);
+  // root runs every subset's files already; never run them twice.
+  if (wanted.has(ROOT_LABEL)) ROOT_SUBSET_LABELS.forEach((l) => wanted.delete(l));
   return { labels: valid.filter((l) => wanted.has(l)) };
 }
 
@@ -144,7 +269,7 @@ export function selectAffected(changedFiles, manifests) {
   const dirs = new Set(manifests.map((m) => m.dir));
   const testable = validLabels(manifests);
   const finish = () => {
-    if (reasons.has(ROOT_LABEL)) reasons.delete(ROOT_POLICY_LABEL);
+    if (reasons.has(ROOT_LABEL)) ROOT_SUBSET_LABELS.forEach((l) => reasons.delete(l));
     const suites = testable.filter((l) => reasons.has(l));
     return { suites, reasons: Object.fromEntries(suites.map((l) => [l, reasons.get(l)])) };
   };
@@ -166,6 +291,13 @@ export function selectAffected(changedFiles, manifests) {
       mark(ROOT_LABEL, file);
       continue;
     }
+    // An exact path a root test validates. Checked here, with the other exact
+    // paths, so the Markdown/docs short-circuit below cannot swallow it.
+    const validated = VALIDATED_ARTIFACTS[file];
+    if (validated) {
+      mark(validated.label, file);
+      continue;
+    }
     if (STATE_PREFIXES.some((p) => file.startsWith(p))) continue;
 
     const match = /^packages\/([^/]+)\/(.*)$/.exec(file);
@@ -179,12 +311,19 @@ export function selectAffected(changedFiles, manifests) {
         mark(ROOT_LABEL, file);
       } else if (rest.startsWith("tests/")) {
         mark(dir, file);
+        // Policy only: a test file is policed (shell/wall-clock inventories),
+        // but no checked-in artifact is generated from one, so not root-drift.
         mark(ROOT_POLICY_LABEL, file);
       } else if (rest.startsWith("docs/") || isMarkdown(rest)) {
         // docs only: nothing to test
       } else {
         markPackage(dir, file);
-        if (rest.startsWith("src/")) mark(ROOT_POLICY_LABEL, file);
+        if (rest.startsWith("src/")) {
+          // A source change can violate a static policy and can leave a
+          // generated artifact stale, so both root subsets run.
+          mark(ROOT_POLICY_LABEL, file);
+          mark(ROOT_DRIFT_LABEL, file);
+        }
         if (rest.startsWith("src/cli/")) mark(ROOT_LABEL, file);
       }
       continue;
