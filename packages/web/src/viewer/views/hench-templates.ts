@@ -376,12 +376,13 @@ export function HenchTemplatesSection({ blocked, onApplied }: {
     return h("div", { class: "hench-templates-container" },
       h("div", { class: "hench-templates-error" },
         h("p", null, error),
+        // Names the command rather than the directory: where hench keeps its
+        // state depends on the project's layout, and the viewer has no
+        // resolver to ask. See views/hench-config.ts for the same change.
         h("p", { class: "hench-templates-error-hint" },
-          "Make sure ",
-          h("code", null, ".hench/"),
-          " exists. Run ",
+          "Make sure hench is initialized for this project. Run ",
           h("code", null, "hench init"),
-          " to create it.",
+          " to create its state directory.",
         ),
       ),
     );

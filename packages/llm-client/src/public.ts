@@ -372,11 +372,13 @@ export {
   detectLayoutMode,
   resolveLayout,
   relativeToRoot,
+  layoutStateNames,
   resolveNdxHome,
 } from "./layout.js";
 export type {
   Layout,
   LayoutMode,
+  LayoutStateNames,
   ResolveLayoutOptions,
   ResolveNdxHomeOptions,
 } from "./layout.js";

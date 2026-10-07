@@ -31,6 +31,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+import { resolveLayout } from "./layout.js";
+
 /**
  * @typedef {Object} RunSummary
  * @property {string[]} filesWritten - Declared write targets whose mtime moved during the run.
@@ -97,7 +99,7 @@ function sourcevisionUsage(manifest, sinceMs) {
  * `plan` that made no model calls would report last week's numbers as its own.
  */
 function rexUsage(dir, sinceMs) {
-  const path = join(dir, ".rex", "execution-log.jsonl");
+  const path = join(resolveLayout(dir).rexDir, "execution-log.jsonl");
   if (!existsSync(path)) return null;
 
   let latest = null;
@@ -218,7 +220,7 @@ export function collectRunSummary(dir, effects, startedAt) {
   // and its summary owes the user the sum, not whichever half it looked at
   // first. Both are scoped to `threshold`, so a command that never ran one of
   // them finds nothing there rather than the last run’s numbers.
-  const manifest = readJSON(join(dir, ".sourcevision", "manifest.json"));
+  const manifest = readJSON(join(resolveLayout(dir).sourcevisionDir, "manifest.json"));
   const usages = [sourcevisionUsage(manifest, threshold), rexUsage(dir, threshold)].filter(Boolean);
 
   let calls = 0, inputTokens = 0, outputTokens = 0, costUsd = null;

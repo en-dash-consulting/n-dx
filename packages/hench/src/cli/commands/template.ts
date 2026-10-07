@@ -12,6 +12,7 @@
 
 import { join } from "node:path";
 import { loadConfig, saveConfig } from "../../store/config.js";
+import { resolveHenchPaths } from "../../store/paths.js";
 import { validateConfig, revertInvalidFields, formatFieldIssues } from "../../schema/index.js";
 import {
   listTemplates,
@@ -273,7 +274,7 @@ export async function cmdTemplate(
   positional: string[],
   flags: Record<string, string>,
 ): Promise<void> {
-  const henchDir = join(dir, ".hench");
+  const { henchDir } = resolveHenchPaths(dir);
   const subcommand = positional[0];
   const format = flags.format ?? "text";
 

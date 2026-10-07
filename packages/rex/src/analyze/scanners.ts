@@ -1,6 +1,6 @@
 import { readFile, readdir, access } from "node:fs/promises";
 import { join, relative, dirname, basename, extname } from "node:path";
-import { PROJECT_DIRS, resolveLayout } from "@n-dx/llm-client";
+import { PROJECT_DIRS, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
 import type { Priority } from "../schema/index.js";
 import { computeFindingHash, loadAcknowledged, isAcknowledged } from "./acknowledge.js";
 import type { AcknowledgedStore } from "./acknowledge.js";
@@ -522,11 +522,40 @@ export interface ScanSourceVisionResult {
   staleCount: number;
 }
 
+/** Analysis artifacts this scanner reads, by basename. */
+const SV_ZONES_FILE = "zones.json";
+const SV_INVENTORY_FILE = "inventory.json";
+const SV_IMPORTS_FILE = "imports.json";
+
+/**
+ * `sourceFile` attributions for the three artifacts, project-relative.
+ *
+ * Every other scanner records `relative(dir, file)`, so these have to be
+ * root-relative too — and resolved, because the analysis directory is
+ * `.ndx/sourcevision` on the new layout. A fixed `.sourcevision/zones.json`
+ * named a file that does not exist there, and the proposals it produced
+ * pointed every reader at it.
+ */
+function sourceFilesFor(dir: string): {
+  zones: string;
+  inventory: string;
+  imports: string;
+} {
+  const layout = resolveLayout(dir);
+  const svRel = relativeToRoot(layout, layout.sourcevisionDir);
+  return {
+    zones: `${svRel}/${SV_ZONES_FILE}`,
+    inventory: `${svRel}/${SV_INVENTORY_FILE}`,
+    imports: `${svRel}/${SV_IMPORTS_FILE}`,
+  };
+}
+
 export async function scanSourceVision(
   dir: string,
   options?: { rexDir?: string },
 ): Promise<ScanSourceVisionResult> {
   const svDir = resolveLayout(dir).sourcevisionDir;
+  const sourceFiles = sourceFilesFor(dir);
   try {
     await access(svDir);
   } catch {
@@ -548,7 +577,7 @@ export async function scanSourceVision(
   // Load inventory file set for staleness validation
   const knownFiles = new Set<string>();
   try {
-    const invRaw = await readFile(join(svDir, "inventory.json"), "utf-8");
+    const invRaw = await readFile(join(svDir, SV_INVENTORY_FILE), "utf-8");
     const invData = JSON.parse(invRaw);
     if (Array.isArray(invData.files)) {
       for (const entry of invData.files) {
@@ -561,12 +590,12 @@ export async function scanSourceVision(
 
   // Read zones.json — supports both canonical (v1) and legacy formats
   try {
-    const raw = await readFile(join(svDir, "zones.json"), "utf-8");
+    const raw = await readFile(join(svDir, SV_ZONES_FILE), "utf-8");
     const parsed = JSON.parse(raw);
 
     if (Array.isArray(parsed)) {
       // Legacy format: flat array of zones with inline findings
-      processLegacyZones(parsed as LegacyZone[], results);
+      processLegacyZones(parsed as LegacyZone[], results, sourceFiles.zones);
     } else {
       // Canonical format: { zones, findings, ... }
       const zonesData = parsed as SVZonesData;
@@ -579,7 +608,7 @@ export async function scanSourceVision(
         results.push({
           name: zone.name,
           source: "sourcevision",
-          sourceFile: ".sourcevision/zones.json",
+          sourceFile: sourceFiles.zones,
           kind: "feature",
           description: fileCount > 0
             ? `${zone.description} (${fileCount} files)`
@@ -629,7 +658,7 @@ export async function scanSourceVision(
 
           // Use first related file as sourceFile, fall back to zones.json
           const primaryFile = finding.related?.[0];
-          const sourceFile = primaryFile ?? ".sourcevision/zones.json";
+          const sourceFile = primaryFile ?? sourceFiles.zones;
 
           // Build acceptance criteria from related file paths and fix suggestions
           const criteria: string[] = [];
@@ -709,7 +738,7 @@ export async function scanSourceVision(
 
   // Read inventory.json for epic groupings — supports canonical and legacy formats
   try {
-    const raw = await readFile(join(svDir, "inventory.json"), "utf-8");
+    const raw = await readFile(join(svDir, SV_INVENTORY_FILE), "utf-8");
     const inventory: SVInventoryData = JSON.parse(raw);
 
     if (inventory.files && inventory.files.length > 0) {
@@ -726,7 +755,7 @@ export async function scanSourceVision(
         results.push({
           name: toTitleCase(category),
           source: "sourcevision",
-          sourceFile: ".sourcevision/inventory.json",
+          sourceFile: sourceFiles.inventory,
           kind: "epic",
           description: `${toTitleCase(category)} (${fileLabel})`,
         });
@@ -737,7 +766,7 @@ export async function scanSourceVision(
         results.push({
           name: toTitleCase(category),
           source: "sourcevision",
-          sourceFile: ".sourcevision/inventory.json",
+          sourceFile: sourceFiles.inventory,
           kind: "epic",
         });
       }
@@ -748,7 +777,7 @@ export async function scanSourceVision(
 
   // Read imports.json for circular dependencies — supports canonical and legacy formats
   try {
-    const raw = await readFile(join(svDir, "imports.json"), "utf-8");
+    const raw = await readFile(join(svDir, SV_IMPORTS_FILE), "utf-8");
     const imports: SVImportsData = JSON.parse(raw);
 
     // Canonical format: summary.circulars[].cycle
@@ -759,7 +788,7 @@ export async function scanSourceVision(
         results.push({
           name: `Resolve circular: ${label}`,
           source: "sourcevision",
-          sourceFile: uniqueFiles[0] ?? ".sourcevision/imports.json",
+          sourceFile: uniqueFiles[0] ?? sourceFiles.imports,
           kind: "task",
           priority: "high",
           tags: ["tech-debt"],
@@ -783,7 +812,7 @@ export async function scanSourceVision(
         results.push({
           name: `Resolve circular: ${dep.from} → ${dep.to}`,
           source: "sourcevision",
-          sourceFile: ".sourcevision/imports.json",
+          sourceFile: sourceFiles.imports,
           kind: "task",
           priority: "high",
           tags: ["tech-debt"],
@@ -798,7 +827,7 @@ export async function scanSourceVision(
         results.push({
           name: `Resolve circular: ${label}`,
           source: "sourcevision",
-          sourceFile: ".sourcevision/imports.json",
+          sourceFile: sourceFiles.imports,
           kind: "task",
           priority: "high",
           tags: ["tech-debt"],
@@ -1093,12 +1122,13 @@ export async function scanGoMod(
 function processLegacyZones(
   zones: LegacyZone[],
   results: ScanResult[],
+  zonesSourceFile: string,
 ): void {
   for (const zone of zones) {
     results.push({
       name: zone.name,
       source: "sourcevision",
-      sourceFile: ".sourcevision/zones.json",
+      sourceFile: zonesSourceFile,
       kind: "feature",
       description: zone.description,
       acceptanceCriteria: zone.insights,
@@ -1115,7 +1145,7 @@ function processLegacyZones(
         results.push({
           name: finding.message,
           source: "sourcevision",
-          sourceFile: finding.file ?? ".sourcevision/zones.json",
+          sourceFile: finding.file ?? zonesSourceFile,
           kind: "task",
           priority,
           tags: [zone.name],
