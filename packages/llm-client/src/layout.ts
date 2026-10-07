@@ -202,6 +202,60 @@ export function relativeToRoot(layout: Layout, path: string): string {
   return relative(layout.root, path).split(sep).join("/");
 }
 
+/** What {@link layoutStateNames} answers with. */
+export interface LayoutStateNames {
+  /**
+   * Single path segments, for a scan that tests one directory entry at a time:
+   * `.ndx`, `.rex`, `.hench`, `.sourcevision`. The container alone stands in
+   * for all three of its children, because skipping it skips them.
+   */
+  dirNames: string[];
+  /**
+   * Full root-relative paths, for matching a path something else produced:
+   * `.ndx/rex`, `.ndx/hench`, `.ndx/sourcevision` and the three legacy
+   * directories.
+   */
+  statePaths: string[];
+}
+
+/**
+ * Every root-relative name n-dx keeps state under, in **both** layouts.
+ *
+ * For *classifiers* rather than path constructors — code that is handed a path
+ * by git, by `readdir` or by a source file's import specifier and has to answer
+ * "is this n-dx's own state?". A classifier that resolved the one layout the
+ * project happens to be on would give a different answer depending on where it
+ * runs: a `.ndx/` checkout would stop recognising a `.rex/` import that is
+ * still wrong, and a legacy checkout would stop recognising `.ndx/rex/`.
+ *
+ * Accepting both is not a false positive waiting to happen — `.ndx/` present
+ * *is* the new layout, so no project has both shapes — and it spares every
+ * call site from threading a project root down to a string match. The same
+ * argument, and the same shape, as `PRD_COMMIT_PATHS` in hench's
+ * uncommitted-work gate and `HENCH_RUNTIME_GITIGNORE_ENTRIES` in its artifact
+ * store.
+ *
+ * Anything that *writes*, or reads one known file, must use
+ * {@link resolveLayout} instead: staging or opening both spellings names a
+ * path that does not exist.
+ *
+ * Forward slashes, for the same reason {@link relativeToRoot} uses them.
+ */
+export function layoutStateNames(): LayoutStateNames {
+  const legacy = resolveLayout(".", { mode: "legacy" });
+  const ndx = resolveLayout(".", { mode: "ndx" });
+  const legacyDirs = [legacy.rexDir, legacy.henchDir, legacy.sourcevisionDir].map((p) =>
+    relativeToRoot(legacy, p),
+  );
+  const ndxDirs = [ndx.rexDir, ndx.henchDir, ndx.sourcevisionDir].map((p) =>
+    relativeToRoot(ndx, p),
+  );
+  return {
+    dirNames: [...legacyDirs, NDX_CONTAINER_DIRNAME],
+    statePaths: [...legacyDirs, ...ndxDirs],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // The per-user directory
 // ---------------------------------------------------------------------------

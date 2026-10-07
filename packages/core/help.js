@@ -1205,8 +1205,8 @@ const ORCHESTRATOR_HELP_DEFS = {
       "The result is renames plus two dotfiles. Tracked paths move with 'git mv'\n" +
       "so 'git log --follow' still reaches their history; ignored and untracked\n" +
       "state moves with them; and the .gitignore and .gitattributes patterns are\n" +
-      "rewritten to name the new paths, because a '.rex/**' eol pin matches\n" +
-      "nothing once the PRD lives in .ndx/rex/.\n\n" +
+      "rewritten to name the new paths, because an eol pin on the old PRD\n" +
+      "directory matches nothing once the PRD lives in .ndx/rex/.\n\n" +
       "The move is then verified — every path arrived, and 'rex validate' gives\n" +
       "the same answer it gave before. A failed check restores the project to\n" +
       "the legacy layout and commits nothing. Running it on a project already on\n" +

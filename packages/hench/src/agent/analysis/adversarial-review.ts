@@ -226,6 +226,16 @@ export interface ReviewPromptContext {
   /** Absolute path the reviewer must write its JSON report to. */
   reportPath: string;
   /**
+   * Project-relative PRD folder tree, with a trailing slash — `.rex/prd_tree/`
+   * or `.ndx/rex/prd_tree/`.
+   *
+   * The duplicate check tells the reviewer to list this directory before
+   * capturing a finding. Spelled out as `.rex/prd_tree/` it named nothing on a
+   * `.ndx/` project, so the listing came back empty and the reviewer filed a
+   * duplicate of an item that was already there.
+   */
+  prdTreeDir: string;
+  /**
    * True when the reviewer is resuming the session that did the work. Changes
    * the brief substantially: a resumed reviewer already holds the context, so
    * the brief spends its length on posture rather than re-explaining the task.
@@ -401,7 +411,7 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "decision behind. Record what you actually did and let it park the rest.",
     "",
     "Before creating any PRD item, check whether one already tracks the same",
-    "defect: list the directories under `.rex/prd_tree/` and read the `index.md`",
+    `defect: list the directories under \`${ctx.prdTreeDir}\` and read the \`index.md\``,
     "of any whose slug is plausibly related. Match on the defect, not the",
     "wording. If it is already tracked, record the finding as `captured` with the",
     "existing item's id and say so in `note` — do not create a duplicate.",
