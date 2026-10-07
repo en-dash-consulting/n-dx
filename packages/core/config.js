@@ -1188,6 +1188,9 @@ export const TASK_CLASSES = {
   // Placement of a change on the product layer; uncalibrated, so its pick only
   // auto-accepts when it agrees with the rules.
   "prd.place": "standard",
+  // Jev placement: additive to prd.place and deliberately not in
+  // DEFAULT_JUDGMENT_ROUTES, so an exported TYPESAFE_API_KEY alone never enables it.
+  "prd.place.judge": "standard",
   // sourcevision
   "code.classify": "light",
   "zone.enrich-scan": "light",
