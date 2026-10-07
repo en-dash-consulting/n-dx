@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { readFile, rm, mkdir } from "node:fs/promises";
+import { readFile, readdir, rename as fsRename, rm, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -7,6 +7,8 @@ import {
   atomicWriteJSON,
   atomicWriteTempPath,
   isAtomicWriteTempPath,
+  renameReplacing,
+  RENAME_RETRY_DELAYS_MS,
 } from "../../../src/store/atomic-write.js";
 
 describe("atomicWriteTempPath / isAtomicWriteTempPath", () => {
@@ -98,5 +100,134 @@ describe("atomicWriteJSON", () => {
     const { readdirSync } = await import("node:fs");
     const files = readdirSync(tmpDir);
     expect(files).toEqual(["test.json"]);
+  });
+});
+
+/** An fs-style error carrying `code`, as `rename` rejects with. */
+function fsError(code: string): NodeJS.ErrnoException {
+  return Object.assign(new Error(`${code}: simulated rename failure`), { code });
+}
+
+/** A rename stub that fails with `codes` in order, then succeeds. */
+function renameFailing(...codes: string[]) {
+  const calls: Array<[string, string]> = [];
+  const rename = async (from: string, to: string): Promise<void> => {
+    calls.push([from, to]);
+    const code = codes[calls.length - 1];
+    if (code) throw fsError(code);
+  };
+  return { rename, calls };
+}
+
+/** Records requested waits instead of sleeping, so the tests run instantly. */
+function recordingSleep() {
+  const waits: number[] = [];
+  const sleep = async (ms: number): Promise<void> => {
+    waits.push(ms);
+  };
+  return { waits, sleep };
+}
+
+describe("renameReplacing", () => {
+  // Windows refuses to replace a file another process holds open (a concurrent
+  // unlocked reader, Defender, the indexer) and Node surfaces that as EPERM,
+  // EACCES or EBUSY. These cases inject the platform, so they simulate win32
+  // on any host.
+  const tmpDir = join(tmpdir(), `rex-rename-replacing-test-${process.pid}`);
+  const target = join(tmpDir, "tree-meta.json");
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  async function tempFileFor(path: string): Promise<string> {
+    await mkdir(tmpDir, { recursive: true });
+    const tmp = atomicWriteTempPath(path);
+    await writeFile(tmp, "{}", "utf-8");
+    return tmp;
+  }
+
+  it("retries a transient win32 EPERM until the rename succeeds", async () => {
+    const { rename, calls } = renameFailing("EPERM", "EPERM");
+    const { waits, sleep } = recordingSleep();
+
+    await renameReplacing("a.tmp", "a", { platform: "win32", rename, sleep });
+
+    expect(calls).toHaveLength(3);
+    expect(waits).toEqual(RENAME_RETRY_DELAYS_MS.slice(0, 2));
+  });
+
+  it.each(["EACCES", "EBUSY"])("retries win32 %s too", async (code) => {
+    const { rename, calls } = renameFailing(code);
+    const { sleep } = recordingSleep();
+
+    await renameReplacing("a.tmp", "a", { platform: "win32", rename, sleep });
+
+    expect(calls).toHaveLength(2);
+  });
+
+  it("rethrows the original code once the bounded retries are spent, and removes the temp file", async () => {
+    const tmp = await tempFileFor(target);
+    const always = RENAME_RETRY_DELAYS_MS.map(() => "EPERM").concat("EPERM");
+    const { rename, calls } = renameFailing(...always);
+    const { waits, sleep } = recordingSleep();
+
+    await expect(
+      renameReplacing(tmp, target, { platform: "win32", rename, sleep }),
+    ).rejects.toMatchObject({ code: "EPERM" });
+
+    expect(calls).toHaveLength(RENAME_RETRY_DELAYS_MS.length + 1);
+    expect(waits).toEqual([...RENAME_RETRY_DELAYS_MS]);
+    const total = waits.reduce((sum, ms) => sum + ms, 0);
+    expect(total).toBeGreaterThan(0);
+    expect(total).toBeLessThanOrEqual(2000);
+    expect(await readdir(tmpDir)).toEqual([]);
+  });
+
+  it("does not retry a win32 error that is not a sharing conflict", async () => {
+    const tmp = await tempFileFor(target);
+    const { rename, calls } = renameFailing("ENOENT");
+    const { waits, sleep } = recordingSleep();
+
+    await expect(
+      renameReplacing(tmp, target, { platform: "win32", rename, sleep }),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+
+    expect(calls).toHaveLength(1);
+    expect(waits).toEqual([]);
+    expect(await readdir(tmpDir)).toEqual([]);
+  });
+
+  it.each(["linux", "darwin"] as const)("does not retry EPERM on %s", async (platform) => {
+    const tmp = await tempFileFor(target);
+    const { rename, calls } = renameFailing("EPERM");
+    const { waits, sleep } = recordingSleep();
+
+    await expect(
+      renameReplacing(tmp, target, { platform, rename, sleep }),
+    ).rejects.toMatchObject({ code: "EPERM" });
+
+    expect(calls).toHaveLength(1);
+    expect(waits).toEqual([]);
+    expect(await readdir(tmpDir)).toEqual([]);
+  });
+
+  it("is what atomicWrite renames through", async () => {
+    await mkdir(tmpDir, { recursive: true });
+    const { rename, calls } = renameFailing("EBUSY");
+    const { sleep } = recordingSleep();
+
+    await atomicWrite(target, "written", {
+      platform: "win32",
+      sleep,
+      rename: async (from, to) => {
+        await rename(from, to);
+        await fsRename(from, to);
+      },
+    });
+
+    expect(calls).toHaveLength(2);
+    expect(await readFile(target, "utf-8")).toBe("written");
+    expect(await readdir(tmpDir)).toEqual(["tree-meta.json"]);
   });
 });
