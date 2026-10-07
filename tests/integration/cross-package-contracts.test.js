@@ -482,6 +482,7 @@ describe("web → rex gateway contract", () => {
     "getAvailableBackups",
     "restoreFromBackup",
     "isValidSnapshotId",
+    "validateRunSettings",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -891,7 +892,7 @@ describe("gateway export auto-detection", () => {
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId",
         "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "CHILD_LEVEL", "PRD_CACHE_DIRNAME",
-        "estimateCostFromTotals"],
+        "estimateCostFromTotals", "validateRunSettings"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance"],
     ]);
 

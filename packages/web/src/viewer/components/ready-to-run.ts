@@ -31,6 +31,11 @@ export interface ReadyTask {
   criteriaCount: number;
   /** In progress with no live run. */
   resume: boolean;
+  /**
+   * The task carries its own run settings, so it will not run on the project
+   * defaults. Absent from a server that predates them.
+   */
+  saved?: boolean;
 }
 
 interface ReadyReply {

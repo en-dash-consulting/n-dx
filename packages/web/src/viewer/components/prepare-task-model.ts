@@ -88,6 +88,13 @@ export interface PrepResponse {
    * from a hench that predates them.
    */
   saved?: PrepSavedSettings | null;
+  /**
+   * A fingerprint of {@link saved}, which a save must send back so the server
+   * can tell "unchanged since I loaded it" from "someone else saved in
+   * between". `"none"` for a task carrying nothing — a real value to hold, not
+   * an absence. Absent from a server that predates saving.
+   */
+  savedVersion?: string;
   resolved: PrepResolvedSettings;
   options: Array<{ key: string; values?: readonly string[] }>;
   refusals: PrepRefusal[];
