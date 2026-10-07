@@ -73,7 +73,6 @@ Code that branches on specific level strings — these are the hardest to genera
 | `rex/src/core/analytics.ts` | 28, 60 | `level === "epic"`, `level === "task" \|\| "subtask"` | Epic-level stats, work-item filtering |
 | `rex/src/core/structural.ts` | 329 | `level === "feature"` | Feature-level structural analysis |
 | `rex/src/core/epic-correlation.ts` | 236 | `level === "epic"` | Epic correlation analysis |
-| `rex/src/core/notion-map.ts` | 603, 646 | `level === "epic"` | Notion database mapping |
 | `rex/src/recommend/create-from-recommendations.ts` | 152 | `level === "subtask"` | Subtask can't be root |
 | `hench/src/cli/commands/run.ts` | 46, 63, 139 | `level === "epic"`, `level === "task" \|\| "subtask"` | Epic listing, work-item selection |
 | `hench/src/agent/planning/brief.ts` | 45 | `level === "task" \|\| "subtask"` | Work-item collection for agent briefs |

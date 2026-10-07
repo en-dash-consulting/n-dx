@@ -72,11 +72,6 @@ const FAQ_SECTIONS: FAQSection[] = [
           "Rex considers priority (critical > high > medium > low), dependency blocking (items with unresolved blockers are skipped), and tree position (earlier items in the tree are preferred).",
         docLink: { label: "Rex Dashboard", hash: "rex-dashboard" },
       },
-      {
-        question: "Can I sync my PRD with Notion?",
-        answer:
-          "Yes. Configure a Notion adapter, then run '{cli} sync .' to bidirectionally sync your local PRD with a Notion database. Use '--push' or '--pull' for one-way sync.",
-      },
     ],
   },
   {

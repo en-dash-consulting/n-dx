@@ -127,7 +127,6 @@ export type { CommandsSheetProps } from "./commands-sheet.js";
 
 export { Guide } from "./guide.js";
 export { GlobalFAQ } from "./faq.js";
-export { NotionSchemaWizard } from "./notion-schema-wizard.js";
 export { ZoneSlideout } from "./zone-slideout.js";
 
 // ── Constants ───────────────────────────────────────────────────────

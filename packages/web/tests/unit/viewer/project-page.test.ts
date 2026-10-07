@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 /**
- * Project: analyze and plan settings, feature flags, Notion and integrations on
- * one SettingsFrame.
+ * Project: analyze and plan settings and feature flags on one SettingsFrame.
  *
  * The page is dirty when any section differs from its saved values. One Save
  * sends each dirty section to its own endpoint; a section that saves becomes
  * clean, one whose write fails stays dirty and the frame names it. Feature
  * flags save on Save, not on click, and are announced only after their write
- * succeeds. Notion and Integrations appear only while their flag is on.
+ * succeeds.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
@@ -38,21 +37,16 @@ function toggle(key: string, label: string, pkg: Toggle["package"], enabled = fa
   };
 }
 
-const NOTION_CONFIG = { configured: false, token: null, databaseId: null, tokenMasked: null, tokenEnvVar: null };
-const VALID_TOKEN = `secret_${"a".repeat(24)}`;
-
 /**
  * Serves every API the page reads. `failures` turns a write to that URL into a
- * 500 with that message. Feature flags the test turns on are returned as
- * already enabled, which is what makes the gated sections appear.
+ * 500 with that message.
  */
-function stubApi(opts: { on?: string[]; failures?: Record<string, string> } = {}) {
+function stubApi(opts: { failures?: Record<string, string> } = {}) {
   const requests: Request[] = [];
   const settings = { port: null as number | null, language: null as string | null, sourcevisionMergeThreshold: null as number | null, sourcevisionPins: {} as Record<string, string> };
   const toggles = [
-    toggle("sourcevision.ask", "Ask", "sourcevision", opts.on?.includes("sourcevision.ask")),
-    toggle("rex.notionSync", "Notion sync", "rex", opts.on?.includes("rex.notionSync")),
-    toggle("rex.integrations", "Integrations", "rex", opts.on?.includes("rex.integrations")),
+    toggle("sourcevision.ask", "Ask", "sourcevision"),
+    toggle("sourcevision.prMarkdown", "PR Markdown", "sourcevision"),
   ];
   const respond = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
 
@@ -77,27 +71,18 @@ function stubApi(opts: { on?: string[]; failures?: Record<string, string> } = {}
           if (t) t.enabled = enabled;
         }
         return respond({ applied: [] });
-      case "GET /api/notion/config":
-        return respond(NOTION_CONFIG);
-      case "PUT /api/notion/config":
-        return respond({ ok: true });
-      case "POST /api/notion/test":
-        return respond({ status: "green", message: "Connected" });
-      case "GET /api/integrations":
-        return respond({ integrations: [] });
       default:
         return respond({});
     }
   }));
-  return { requests, writes: () => requests.filter((r) => r.method !== "GET" && r.url !== "/api/notion/test") };
+  return { requests, writes: () => requests.filter((r) => r.method !== "GET") };
 }
 
 async function settle() {
   // Wait inside act so the state updates fetch resolutions trigger commit
   // synchronously rather than arming preact's after-paint fallback timer.
   // act renders only when it exits, and what that render mounts starts its own
-  // fetches (a flag turning on mounts the Notion section, which loads its
-  // config), so one round is not enough: repeat until nothing new is pending.
+  // fetches, so one round is not enough: repeat until nothing new is pending.
   for (let round = 0; round < 4; round++) {
     await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
   }
@@ -166,29 +151,18 @@ describe("ProjectView", () => {
     expect(root.querySelectorAll(".settings-frame-save")).toHaveLength(1);
     expect(root.querySelector(".project-header-title")!.textContent).toBe("Project");
     expect(root.querySelector(".ps-save-bar")).toBeNull();
-    expect(root.querySelector(".ps-toast, .ft-toast, .notion-config-toast, .intg-toast")).toBeNull();
+    expect(root.querySelector(".ps-toast, .ft-toast")).toBeNull();
   });
 
-  it("shows analyze and plan settings and feature flags, and neither Notion nor Integrations while their flags are off", async () => {
+  it("shows analyze and plan settings and feature flags, and nothing else", async () => {
     stubApi();
     await mount();
 
     expect(titles()).toEqual(["Analyze and plan", "Feature flags"]);
-    expect(root.querySelector("#notion-token")).toBeNull();
-    expect(root.querySelector(".intg-container")).toBeNull();
-  });
-
-  it("adds the Notion and Integrations sections, still in one frame, while their flags are on", async () => {
-    stubApi({ on: ["rex.notionSync", "rex.integrations"] });
-    await mount();
-
-    expect(titles()).toEqual(["Analyze and plan", "Feature flags", "Notion", "Integrations"]);
-    expect(root.querySelectorAll(".settings-frame")).toHaveLength(1);
-    expect(root.querySelector("#notion-token")).not.toBeNull();
   });
 
   it("does not render the export and refresh panels — they stay on Commands", async () => {
-    stubApi({ on: ["rex.notionSync", "rex.integrations"] });
+    stubApi();
     await mount();
 
     const buttons = [...root.querySelectorAll("button")].map((b) => b.textContent ?? "");
@@ -242,16 +216,6 @@ describe("ProjectView", () => {
     expect(indicator()).toBe("All changes saved");
   });
 
-  it("counts a typed Notion token toward the page's dirty state", async () => {
-    stubApi({ on: ["rex.notionSync"] });
-    await mount();
-
-    await type(root.querySelector<HTMLInputElement>("#notion-token")!, VALID_TOKEN);
-    expect(indicator()).toBe("Unsaved changes");
-    await type(root.querySelector<HTMLInputElement>("#notion-token")!, "");
-    expect(indicator()).toBe("All changes saved");
-  });
-
   // ── Save ──────────────────────────────────────────────────────────
 
   it("saves a feature flag on Save, not when it is clicked", async () => {
@@ -266,20 +230,18 @@ describe("ProjectView", () => {
   });
 
   it("sends each dirty section to its own endpoint and ends clean", async () => {
-    const { writes } = stubApi({ on: ["rex.notionSync"] });
+    const { writes } = stubApi();
     const { events, stop } = recordToggleEvents();
     try {
       await mount();
       await type(portInput(), "4000");
       await flip(flag("Ask"));
-      await type(root.querySelector<HTMLInputElement>("#notion-token")!, VALID_TOKEN);
 
       await clickSave();
 
       expect(writes()).toEqual([
         { method: "PUT", url: "/api/project-settings", body: { port: 4000 } },
         { method: "PUT", url: "/api/features", body: { changes: { "sourcevision.ask": true } } },
-        { method: "PUT", url: "/api/notion/config", body: { token: VALID_TOKEN } },
       ]);
       expect(indicator()).toBe("All changes saved");
       expect(frameError()).toBeNull();
@@ -292,7 +254,7 @@ describe("ProjectView", () => {
   });
 
   it("writes only the sections that are dirty", async () => {
-    const { writes } = stubApi({ on: ["rex.notionSync"] });
+    const { writes } = stubApi();
     await mount();
 
     await type(portInput(), "4000");
@@ -331,17 +293,16 @@ describe("ProjectView", () => {
 
   it("names every section that failed", async () => {
     stubApi({
-      on: ["rex.notionSync"],
-      failures: { "/api/project-settings": "Config is read-only", "/api/notion/config": "Notion refused" },
+      failures: { "/api/project-settings": "Config is read-only", "/api/features": "Features are locked" },
     });
     await mount();
     await type(portInput(), "4000");
-    await type(root.querySelector<HTMLInputElement>("#notion-token")!, VALID_TOKEN);
+    await flip(flag("Ask"));
 
     await clickSave();
 
     expect(frameError()).toContain("project settings");
-    expect(frameError()).toContain("Notion");
+    expect(frameError()).toContain("feature flags");
     expect(indicator()).toBe("Unsaved changes");
   });
 
@@ -360,11 +321,10 @@ describe("ProjectView", () => {
   // ── Discard ───────────────────────────────────────────────────────
 
   it("restores every section when the leave prompt's Discard is chosen", async () => {
-    stubApi({ on: ["rex.notionSync"] });
+    stubApi();
     await mount();
     await type(portInput(), "4000");
     await flip(flag("Ask"));
-    await type(root.querySelector<HTMLInputElement>("#notion-token")!, VALID_TOKEN);
 
     const leave = vi.fn();
     await act(async () => { guardedLeave(leave); });
@@ -375,21 +335,5 @@ describe("ProjectView", () => {
     expect(indicator()).toBe("All changes saved");
     expect(portInput().value).toBe("");
     expect(flag("Ask").checked).toBe(false);
-    expect(root.querySelector<HTMLInputElement>("#notion-token")!.value).toBe("");
-  });
-
-  // ── Immediate actions ─────────────────────────────────────────────
-
-  it("keeps Notion's connection test an immediate action that does not change dirty state", async () => {
-    const { requests } = stubApi({ on: ["rex.notionSync"] });
-    await mount();
-
-    const test = [...root.querySelectorAll<HTMLButtonElement>(".notion-config-test-btn")][0]!;
-    await act(async () => { test.click(); });
-    await settle();
-
-    expect(requests.some((r) => r.method === "POST" && r.url === "/api/notion/test")).toBe(true);
-    expect(indicator()).toBe("All changes saved");
-    expect(root.textContent).toContain("Connected");
   });
 });

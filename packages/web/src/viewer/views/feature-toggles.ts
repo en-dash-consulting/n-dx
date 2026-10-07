@@ -27,9 +27,9 @@ const PACKAGE_META: Record<string, { label: string; icon: string; description: s
     description: "Static analysis, file inventory, import graph, and zone detection",
   },
   rex: {
-    label: "{cli} work / {cli} sync",
+    label: "{cli} work",
     icon: "▨",
-    description: "PRD management, task tracking, analysis proposals, and Notion sync",
+    description: "PRD management, task tracking, and analysis proposals",
   },
   hench: {
     label: "{cli} work",

@@ -24,7 +24,6 @@ describe("rex CLI help", () => {
     "prune",
     "validate",
     "fix",
-    "sync",
     "usage",
     "report",
     "verify",
@@ -32,7 +31,6 @@ describe("rex CLI help", () => {
     "recommend",
     "analyze",
     "import",
-    "adapter",
     "migrate-to-md",
     "mcp",
   ];
@@ -129,13 +127,6 @@ describe("rex CLI help", () => {
       const output = logSpy.mock.calls[0][0] as string;
       expect(output).toContain("--accept");
       expect(output).toContain("=1,4,5");
-    });
-
-    it("sync help includes --push and --pull", () => {
-      showCommandHelp("sync");
-      const output = logSpy.mock.calls[0][0] as string;
-      expect(output).toContain("--push");
-      expect(output).toContain("--pull");
     });
 
     it("migrate-to-md help marks command as deprecated and recommends folder-tree", () => {

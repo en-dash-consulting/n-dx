@@ -1,7 +1,6 @@
 /* ── Project settings page ───────────────────────────────────────────
  * The page shell only. Each section keeps its own stylesheet
- * (project-settings.css, feature-toggles.css, notion-config.css,
- * integration-config.css).
+ * (project-settings.css, feature-toggles.css).
  */
 
 .project-container {

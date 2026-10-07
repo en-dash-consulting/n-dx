@@ -58,7 +58,6 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | `ndx reset [dir]` | Remove analysis data and start fresh |
 | `ndx show <run-id> [dir]` | Show details of an agent run |
 | `ndx usage [dir]` | Token usage analytics |
-| `ndx sync [dir]` | Sync PRD with remote adapter |
 | `ndx ci [dir]` | Run analysis pipeline and validate PRD health |
 | `ndx auth [dir]` | Check and configure LLM provider credentials |
 

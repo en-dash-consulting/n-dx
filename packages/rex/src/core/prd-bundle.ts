@@ -505,9 +505,9 @@ export function countItems(items: PRDItem[]): number {
  * collision is what makes `reportOutcome` recommend overwriting the tree, so
  * it has to mean the content differs. It did not: the stamps diverge as a
  * matter of course — the import stamps the local copy with the importing actor
- * and the time it landed, while a local `rex sync` writes `lastSyncedAt` and
- * `remoteId` that the bundle no longer carries at all, since export strips
- * them. Round-tripped items were therefore reported as content collisions and
+ * and the time it landed, while `lastSyncedAt` and `remoteId` (written by the
+ * tracker sync that rex used to ship) are not carried by a bundle at all, since
+ * export strips them. Round-tripped items were therefore reported as content collisions and
  * the operator was pointed at a destructive command over deltas that were not
  * content. Sharing the list with `sync.ts` is what keeps the two notions of
  * "same item" from drifting apart again.
@@ -623,10 +623,12 @@ function assertLegalPlacement(item: PRDItem, parentLevel: ItemLevel | null): voi
  * Reading that silence as "clear them" is what `--replace` used to do, and it
  * cost two things on the same-project export → edit → replace round trip the
  * feature documents. Every item lost `lastSyncedAt`, so `isModifiedSinceSync`
- * went true tree-wide and the next `rex sync` pushed everything and won every
- * field conflict against remote edits made since. And `core/remove-feature.ts`
- * keys its "this item is synced, warn before deleting" prompt on `remoteId`,
- * so `rex remove` silently stopped offering to clean up the remote records.
+ * went true tree-wide and the tracker sync rex shipped at the time pushed
+ * everything and won every field conflict against remote edits made since. And
+ * `core/remove-feature.ts` keys its "this item is synced, warn before deleting"
+ * prompt on `remoteId`, so `rex remove` silently stopped offering to clean up
+ * the remote records — that prompt is still here, and still the reason these
+ * pointers have to survive a replace even though nothing in rex writes them now.
  *
  * So `--replace` replaces content, not the sync relationship. An id the
  * destination knows keeps its pointers; an id it does not know gets none,

@@ -363,21 +363,6 @@ export const COMMAND_EFFECTS = {
     next: "ndx work",
   },
 
-  sync: {
-    command: "sync",
-    summary: "Push and pull PRD items to a remote tracker.",
-    reads: [PRD_READ, "{rex}/adapters.json", "adapter credentials from the environment"],
-    writes: [
-      { path: PRD_TREE, what: "items pulled from the remote", conditional: true, when: "without --push" },
-      EXECUTION_LOG,
-      { path: "the remote tracker", what: "items pushed from the PRD", conditional: true, when: "without --pull or --dry-run" },
-    ],
-    llm: [],
-    network: [{ to: "remote", what: "the configured adapter (Notion by default)" }],
-    duration: "seconds to a minute",
-    next: "ndx status",
-  },
-
   start,
 
   "install-sample": {

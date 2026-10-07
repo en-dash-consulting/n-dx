@@ -98,7 +98,6 @@ Claude uses double-underscore prefixes (`mcp__{server}__{tool}`) to namespace to
 | `facets` | List configured facets |
 | `get_recommendations` | SourceVision-based recommendations |
 | `append_log` | Write to the execution log |
-| `sync_with_remote` | Sync with remote adapter (e.g. Notion) |
 | `get_capabilities` | Server capabilities and configuration, plus the `workspace` block (resolved project dir, source, refusal) |
 
 ## SourceVision MCP Tools
