@@ -138,6 +138,52 @@ describe("sourcevision public API contract", () => {
 });
 
 // ---------------------------------------------------------------------------
+// web ↔ sourcevision data-file mirror
+// ---------------------------------------------------------------------------
+
+/**
+ * `packages/web/src/shared/data-files.ts` restates sourcevision's
+ * `DATA_FILES` rather than importing it, and has to: web reaches sourcevision
+ * only through `server/domain-gateway.ts`, and the viewer is bundled for the
+ * browser, so neither layer can import a Node package for a constant.
+ *
+ * Two copies of one fact drift silently, and this pair did — it sat four
+ * entries behind, so `classifications.json`, `project-profile.json`,
+ * `sdlc-profile.json` and `infrastructure.json` were never mtime-watched (no
+ * live reload when they changed) and were missing from `GET /data`. The viewer
+ * genuinely reads classifications, so that one was a live defect rather than a
+ * latent one.
+ *
+ * Nothing caught it: the existing export checks above assert `DATA_FILES` is
+ * *present*, not that the two agree. This does.
+ */
+describe("web ↔ sourcevision data-file mirror", () => {
+  it("web mirrors sourcevision's DATA_FILES exactly", async () => {
+    const sv = await import("../../packages/sourcevision/dist/schema/data-files.js");
+    const web = await import("../../packages/web/dist/shared/data-files.js");
+
+    expect(
+      web.DATA_FILES,
+      [
+        "packages/web/src/shared/data-files.ts has drifted from",
+        "packages/sourcevision/src/schema/data-files.ts.",
+        "",
+        "A data file missing from the web mirror is never mtime-watched, so the",
+        "dashboard does not live-reload when it changes, and it is absent from",
+        "GET /data. Adding a data file means editing both files in the same change.",
+      ].join("\n"),
+    ).toEqual(sv.DATA_FILES);
+  });
+
+  it("agrees on the supplementary files too", async () => {
+    const sv = await import("../../packages/sourcevision/dist/schema/data-files.js");
+    const web = await import("../../packages/web/dist/shared/data-files.js");
+
+    expect([...web.SUPPLEMENTARY_FILES]).toEqual([...sv.SUPPLEMENTARY_FILES]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // hench → rex gateway contract
 // ---------------------------------------------------------------------------
 

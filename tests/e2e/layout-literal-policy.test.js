@@ -73,11 +73,14 @@ const ALLOWED = [
   "packages/core/layout.js",
   // The single source of truth for the three directory names.
   "packages/llm-client/src/project-dirs.ts",
-  // `src/export/` bundles into the dependency-free standalone skill script and
-  // may import nothing but `node:` builtins, so it carries its own twins.
+  // These bundle into the dependency-free standalone skill script and may
+  // import nothing but `node:` builtins, so they carry their own twins.
   // `tests/integration/layout-resolver-contract.test.js` pins them.
   "packages/sourcevision/src/export/iso-sources.ts",
-  "packages/sourcevision/src/export/iso-declared.ts",
+  // Infrastructure discovery moved out of `src/export/iso-declared.ts` when it
+  // became an analyzer, and the constraint moved with it: it is still bundled
+  // into the skill, so it still cannot reach the resolver in `@n-dx/llm-client`.
+  "packages/sourcevision/src/analyzers/infrastructure.ts",
   // The command whose entire purpose is moving a project between layouts.
   // Listed ahead of its arrival so the rule does not have to be edited when it
   // lands.
