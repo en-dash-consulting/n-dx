@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { cmdNext } from "../../src/cli/commands/next.js";
-import { handleClaimTask, handleGetNextTask, handleReleaseTask, handleUpdateTaskStatus } from "../../src/cli/mcp-tools.js";
+import { handleClaimTask, handleGetNextTask, handleReleaseTask, handleUpdateTaskStatus } from "../../src/cli/mcp-tools/index.js";
 import { openClaimsStore, resolveClaimHolder } from "../../src/store/claims.js";
 import {
   resolveStore,
