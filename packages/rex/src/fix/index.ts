@@ -21,7 +21,7 @@
  * So `fix/` imports the predicates from `core/parent-completion.ts` and shares
  * them verbatim. That is a deliberate upward-facing dependency from the
  * `rex-fix` satellite zone into `rex-core`; it is recorded in
- * `packages/rex/CLAUDE.md`.
+ * `packages/rex/AGENTS.md`.
  *
  * **Decision — cancelled and deleted children keep blocking a parent.** They
  * are not in `SUCCESSFUL_CHILD_STATUSES`, so a completed parent holding one is

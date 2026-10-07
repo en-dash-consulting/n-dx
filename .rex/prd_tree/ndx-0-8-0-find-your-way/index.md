@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Codex cache safety](./codex-cache-safety/index.md) | pending |
 | [Command transparency](./command-transparency/index.md) | pending |
 | [Dashboard request hardening](./dashboard-request-hardening/index.md) | pending |
-| [Layout resolver](./layout-resolver/index.md) | pending |
+| [Layout resolver](./layout-resolver/index.md) | completed |
 | [Machine memory reads true on macOS](./machine-memory-reads-true-on-macos/index.md) | completed |
 | [Navigation and landings](./navigation-and-landings/index.md) | pending |
 | [PRD storage additive](./prd-storage-additive/index.md) | pending |

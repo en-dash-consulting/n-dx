@@ -783,7 +783,7 @@ describe("init establishes the folder layout", () => {
    */
   async function initWithFakeCodex(projectDir, binDir) {
     await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
-    run(["init", "--provider=codex", projectDir], {
+    return run(["init", "--provider=codex", projectDir], {
       timeout: 50_000,
       env: {
         ...process.env,
@@ -793,11 +793,36 @@ describe("init establishes the folder layout", () => {
     });
   }
 
+  /**
+   * The summary's directory rows, as `  <label>  <status>` with the padding
+   * that lines the status column up collapsed away.
+   *
+   * Asserting on the rendered line rather than on `toContain(".ndx/rex/")` is
+   * the point: the bug was a correct created/reused verdict printed against a
+   * hard-coded label, so a test that checks only the label would still pass if
+   * the two were swapped.
+   */
+  function summaryDirRows(output) {
+    const rows = new Map();
+    for (const line of output.split("\n")) {
+      const match = /^ {2}(\S+\/) {2,}(created|already exists \(reused\))\s*$/.exec(line);
+      if (match) rows.set(match[1], match[2]);
+    }
+    return rows;
+  }
+
   it("puts a new project's state under .ndx/ and leaves no loose n-dx paths", async () => {
     const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-layout-new-"));
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-layout-new-bin-"));
     try {
-      await initWithFakeCodex(projectDir, binDir);
+      const output = await initWithFakeCodex(projectDir, binDir);
+
+      // The summary names the directories that now exist, not the legacy ones.
+      expect(summaryDirRows(output)).toEqual(new Map([
+        [".ndx/sourcevision/", "created"],
+        [".ndx/rex/", "created"],
+        [".ndx/hench/", "created"],
+      ]));
 
       // All three tools wrote inside the container...
       for (const entry of ["rex", "hench", "sourcevision", "config.json"]) {
@@ -836,7 +861,15 @@ describe("init establishes the folder layout", () => {
       // re-running init must not turn into a migration nobody asked for.
       await mkdir(join(projectDir, ".rex"), { recursive: true });
 
-      await initWithFakeCodex(projectDir, binDir);
+      const output = await initWithFakeCodex(projectDir, binDir);
+
+      // Legacy names, and the one directory that was already there is the one
+      // reported as reused.
+      expect(summaryDirRows(output)).toEqual(new Map([
+        [".sourcevision/", "created"],
+        [".rex/", "already exists (reused)"],
+        [".hench/", "created"],
+      ]));
 
       expect(
         existsSync(join(projectDir, ".ndx")),

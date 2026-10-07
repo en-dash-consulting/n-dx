@@ -52,3 +52,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-the.md) | completed |
 | [routes-commands ndx-ladder tests leak the ambient NDX_CLI_PATH env var](./routes-commands-ndx-ladder-tests-leak.md) | completed |
 | [Zone cohesion gate silently passes in CI instead of reporting it did not run](./zone-cohesion-gate-silently-passes-in.md) | completed |
+| [ZONES.md points at a "Confirmed zone-level cycles" section that exists in no file](./zones-md-points-at-a-confirmed-zone.md) | pending |

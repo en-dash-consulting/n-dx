@@ -5,7 +5,7 @@ import {
   SCHEMA_VERSION_V2,
   isV2Schema,
   NODE_TYPES,
-  MAP_NODE_TYPES,
+  PRODUCT_NODE_TYPES,
   CHANGE_NODE_TYPES,
   layerOf,
   isNodeType,
@@ -24,7 +24,10 @@ import {
   ChangeIntentSchema,
   TaskIntentSchema,
   SubtaskIntentSchema,
+  type TaskIntent,
 } from "../../../src/schema/v2.js";
+import { RUN_SETTING_KEYS, type PRDItem } from "../../../src/schema/v1.js";
+import { PRDItemSchema, validateRunSettings } from "../../../src/schema/validate.js";
 
 const ID = "0b5f0c9e-1111-4222-8333-444455556666";
 
@@ -42,10 +45,10 @@ describe("schema stamp", () => {
 describe("node types", () => {
   it("is the closed set, split by layer", () => {
     expect([...NODE_TYPES]).toEqual(["area", "capability", "constraint", "change", "task", "subtask"]);
-    expect([...MAP_NODE_TYPES]).toEqual(["area", "capability", "constraint"]);
+    expect([...PRODUCT_NODE_TYPES]).toEqual(["area", "capability", "constraint"]);
     expect([...CHANGE_NODE_TYPES]).toEqual(["change", "task", "subtask"]);
-    expect(layerOf("capability")).toBe("map");
-    expect(layerOf("subtask")).toBe("changes");
+    for (const type of PRODUCT_NODE_TYPES) expect(layerOf(type)).toBe("product");
+    for (const type of CHANGE_NODE_TYPES) expect(layerOf(type)).toBe("changes");
     expect(isNodeType("epic")).toBe(false);
     expect(isNodeType("spike")).toBe(false);
   });
@@ -63,7 +66,7 @@ describe("node types", () => {
 });
 
 describe("display ids", () => {
-  it("accepts change and map forms", () => {
+  it("accepts change and product forms", () => {
     for (const ok of ["CH-1", "CH-142", "A4", "A4.3", "CH-142.2"]) expect(isDisplayId(ok)).toBe(true);
   });
   it("rejects malformed forms", () => {
@@ -186,6 +189,68 @@ describe("per-type intent", () => {
     }
   });
 
+  it("declares loeRationale and loeConfidence beside loe on change and task", () => {
+    for (const type of ["change", "task"]) {
+      const base = { id: ID, type, title: "T", slug: "t", loe: 1 };
+      const ok = NodeIntentSchema.parse({ ...base, loeRationale: "Bounded scope.", loeConfidence: "medium" }) as Record<string, unknown>;
+      expect(ok.loeRationale).toBe("Bounded scope.");
+      expect(ok.loeConfidence).toBe("medium");
+      expect(NodeIntentSchema.safeParse({ ...base, loeConfidence: "certain" }).success, type).toBe(false);
+      expect(NodeIntentSchema.safeParse({ ...base, loeRationale: 3 }).success, type).toBe(false);
+    }
+  });
+
+  it("records an optional discoveredFrom item and run on a change", () => {
+    const change = { id: ID, type: "change", title: "C", slug: "c" };
+    expect(ChangeIntentSchema.parse(change).discoveredFrom).toBeUndefined();
+    const both = ChangeIntentSchema.parse({ ...change, discoveredFrom: { item: ID, run: "run-42" } });
+    expect(both.discoveredFrom).toEqual({ item: ID, run: "run-42" });
+    expect(ChangeIntentSchema.safeParse({ ...change, discoveredFrom: { item: ID } }).success).toBe(true);
+    expect(ChangeIntentSchema.safeParse({ ...change, discoveredFrom: { run: "run-42" } }).success).toBe(true);
+    // A newer writer's provenance key without item or run must survive an older reader.
+    const newer = ChangeIntentSchema.parse({ ...change, discoveredFrom: { session: "s1" } });
+    expect(newer.discoveredFrom).toEqual({ session: "s1" });
+    for (const bad of [ID, { item: 3 }, { run: "" }, { item: "" }]) {
+      expect(ChangeIntentSchema.safeParse({ ...change, discoveredFrom: bad }).success, JSON.stringify(bad)).toBe(false);
+    }
+  });
+
+  it("declares run on change and task with RUN_SETTING_KEYS as its known keys", () => {
+    for (const schema of [ChangeIntentSchema, TaskIntentSchema]) {
+      expect(Object.keys(schema.shape.run.unwrap().shape)).toEqual([...RUN_SETTING_KEYS]);
+    }
+  });
+
+  it("keeps run loose: a malformed or newer-version block round-trips unchanged", () => {
+    const malformed = { tier: "gigantic", maxTurns: -4, models: { acme: "" }, futureKey: { nested: true } };
+    for (const type of ["change", "task"]) {
+      const node = { id: ID, type, title: "T", slug: "t", run: malformed };
+      const parsed = NodeIntentSchema.parse(node) as Record<string, unknown>;
+      expect(parsed.run, type).toEqual(malformed);
+      // The strict check stays at writers.
+      expect(validateRunSettings(parsed.run).ok).toBe(false);
+    }
+  });
+
+  it("refuses a run that is not an object", () => {
+    for (const bad of ["heavy", [{ tier: "heavy" }], 3]) {
+      expect(TaskIntentSchema.safeParse({ id: ID, type: "task", title: "T", slug: "t", run: bad }).success, JSON.stringify(bad)).toBe(false);
+    }
+  });
+
+  it("maps a v1 task's run block to a v2 task unchanged", () => {
+    const v1Task = {
+      id: ID,
+      title: "T",
+      status: "pending",
+      level: "task",
+      run: { tier: "heavy", models: { claude: "claude-opus-5-5" }, review: true, maxTurns: 40, contextNotes: "Keep it small." },
+    } satisfies PRDItem;
+    expect(PRDItemSchema.safeParse(v1Task).success).toBe(true);
+    const v2Task: TaskIntent = { id: v1Task.id, type: "task", title: v1Task.title, slug: "t", run: v1Task.run };
+    expect(TaskIntentSchema.parse(v2Task).run).toEqual(v1Task.run);
+  });
+
   it("dispatches on type in the union", () => {
     const r = NodeIntentSchema.safeParse({ id: ID, type: "constraint", title: "C", slug: "c", appliesTo: "nope" });
     expect(r.success).toBe(false);
@@ -194,6 +259,15 @@ describe("per-type intent", () => {
   it("reserves hypotheses without a shape", () => {
     for (const hypotheses of [[{ any: 1 }], { h1: "x" }, "free text"]) {
       expect(NodeIntentSchema.safeParse({ id: ID, type: "capability", title: "C", slug: "c", hypotheses }).success).toBe(true);
+    }
+  });
+
+  it("reserves effort without a shape on change and task", () => {
+    const planned = { tier: "strong", loe: 1, confidence: "high", reasons: ["r"], source: "recommender", at: "2026-10-07T00:00:00.000Z" };
+    for (const type of ["change", "task"]) {
+      for (const effort of [planned, "free text", 3]) {
+        expect(NodeIntentSchema.safeParse({ id: ID, type, title: "T", slug: "t", effort }).success, type).toBe(true);
+      }
     }
   });
 });
@@ -283,8 +357,8 @@ describe("field coverage (design intent/state tables)", () => {
     ["area", AreaIntentSchema, ["summary", "stewards"]],
     ["capability", CapabilityIntentSchema, ["statement", "criteria", "requirements", "dependsOn"]],
     ["constraint", ConstraintIntentSchema, ["statement", "requirements", "appliesTo"]],
-    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "loe", "requirements"]],
-    ["task", TaskIntentSchema, ["description", "acceptanceCriteria", "requirements", "priority", "loe"]],
+    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "loe", "loeRationale", "loeConfidence", "effort", "requirements", "discoveredFrom", "run"]],
+    ["task", TaskIntentSchema, ["description", "acceptanceCriteria", "requirements", "priority", "loe", "loeRationale", "loeConfidence", "effort", "run"]],
     ["subtask", SubtaskIntentSchema, ["description", "acceptanceCriteria"]],
   ];
   for (const [type, schema, fields] of cases) {
@@ -307,17 +381,19 @@ describe("field coverage (design intent/state tables)", () => {
 });
 
 describe("isolation", () => {
-  it("no runtime module imports schema/v2 or its rules yet", () => {
+  it("no runtime module imports the v2 modules yet", () => {
     const srcRoot = join(import.meta.dirname, "../../../src");
-    // The v2 schema files may import each other; nothing else may import them.
-    const v2Files = new Set(["schema/v2.ts", "schema/v2-rules.ts"].map((f) => join(srcRoot, f)));
+    // The v2 modules (schema, rules, state writer) may import each other;
+    // nothing else may import them until the v2 store wires them in.
+    const v2Files = new Set(["schema/v2.ts", "schema/v2-rules.ts", "store/state-writer.ts"].map((f) => join(srcRoot, f)));
+    const v2Import = /from\s+["'][^"']*(?:schema\/v2(?:-rules)?|\/state-writer)(?:\.js)?["']|from\s+["']\.\/v2(?:-rules)?(?:\.js)?["']/;
     const offenders: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const p = join(dir, entry.name);
         if (entry.isDirectory()) walk(p);
         else if (entry.name.endsWith(".ts") && !v2Files.has(p)) {
-          if (/from\s+["'][^"']*schema\/v2(-rules)?(\.js)?["']|from\s+["']\.\/v2(-rules)?(\.js)?["']/.test(readFileSync(p, "utf8"))) {
+          if (v2Import.test(readFileSync(p, "utf8"))) {
             offenders.push(relative(srcRoot, p));
           }
         }
