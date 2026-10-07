@@ -24,7 +24,7 @@
  * helpers, and start.ts is what constructs this registry. To avoid the cycle
  * the registry receives {@link WorkspaceHooks} — `setup(ctx)` and
  * `teardown(handles)` — rather than importing them. This seam is listed in
- * `.claude/rules/web-injection-seams.md`.
+ * `packages/web/AGENTS.md` under "Web injection seam registry".
  *
  * @module web/server/workspaces
  */

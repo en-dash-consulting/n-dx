@@ -23,7 +23,7 @@ plannedRelease: "1.0.0"
 | [Apply the migration](./apply-the-migration/index.md) | pending |
 | [Capture the product map roadmap](./capture-the-product-map-roadmap/index.md) | completed |
 | [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | pending |
-| [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | pending |
+| [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | completed |
 | [Dashboard on the v2 model](./dashboard-on-the-v2-model/index.md) | pending |
 | [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | completed |
 | [Derived status, health and computed edges](./derived-status-health-and-computed-edges/index.md) | pending |
@@ -44,7 +44,7 @@ plannedRelease: "1.0.0"
 | [Route the remaining .n-dx config readers through the resolver](./route-the-remaining-n-dx-config/index.md) | pending |
 | [Select and complete work on changes](./select-and-complete-work-on-changes/index.md) | pending |
 | [Shared assistant guidance for every vendor](./shared-assistant-guidance-for-every/index.md) | pending |
-| [Single state writer for state.yaml](./single-state-writer-for-state-yaml/index.md) | pending |
+| [Single state writer for state.yaml](./single-state-writer-for-state-yaml/index.md) | completed |
 | [Split the rex MCP tools into one module per tool](./split-the-rex-mcp-tools-into-one/index.md) | completed |
 | [Stamp shippedIn from any CI](./stamp-shippedin-from-any-ci/index.md) | pending |
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | pending |

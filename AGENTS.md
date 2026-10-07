@@ -43,7 +43,99 @@ The web package forms a hub topology with `web-viewer` at the centre:
 
 `web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `src/shared/`, while also receiving imports from sub-directories such as `crash/`. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `src/shared/` is the foundation layer with zero upward dependencies, enforced by `boundary-check.test.ts`.
 
-Measured zone metrics are not reproduced here — they change with every analysis. Run `ndx analyze --deep .` and read `.sourcevision/zones.json`; per-package policies live in `packages/*/CLAUDE.md`.
+Measured zone metrics are not reproduced here — they change with every analysis. Run `ndx analyze --deep .` and read `.sourcevision/zones.json`; per-package policies live in `packages/*/AGENTS.md`.
+
+##### Monorepo-wide zone fragility governance
+
+Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragility zone requiring active governance.
+
+**Do not treat a zone list in this file as current.** Zone IDs and metrics are outputs of Louvain community detection and change between analyses — zones merge, split, and get renamed as the import graph moves. Read the live values instead:
+
+```sh
+ndx analyze --deep .        # refresh .sourcevision/
+ndx zone <zone-id>          # or the /ndx-zone skill for a single zone
+```
+
+Then filter `.sourcevision/zones.json` on the threshold above. A zone named in a governance doc but absent from the current analysis has usually been renamed or merged, not deleted — check the directory before concluding a boundary is gone.
+
+**Universal governance rules** (apply to any zone that meets the threshold):
+- **Two-consumer rule:** A new module must have at least two distinct consumer zones before being added. Single-consumer utilities belong closer to their dominant use site.
+- **Addition review required:** Treat these as risk zones requiring active review on additions. Changes have a wide blast radius.
+- **Cohesion monitoring:** If a zone's cohesion drops below its current value after a change, the change needs explicit justification.
+
+**Directory policies outlive zone detection.** Rules tied to a directory (barrel imports, framework-agnostic constraints, CLI-only content) stay in force whether or not Louvain currently emits a zone for it, because they are enforced by tests rather than by the analyser. Correct a stale metric; do not delete a policy just because its zone stopped appearing.
+
+> **Spawn-exempt exception:** `config.js` directly reads/writes package config files (`.rex/config.json`, `.hench/config.json`, `.sourcevision/manifest.json`, `.n-dx.json`) rather than delegating to spawned CLIs. This is intentional — config operations require cross-package reads, atomic merges, and validation logic that cannot be expressed as a single CLI spawn. It is the only orchestration-tier script that breaks the spawn-only rule.
+
+### Gateway modules
+
+Packages that import from other packages at runtime concentrate **all** cross-package imports into a single gateway module per upstream package. This makes the dependency surface explicit, auditable, and easy to update when upstream APIs change.
+
+| Package | Gateway file | Imports from | Re-exports |
+|---------|-------------|--------------|------------|
+| hench | `src/prd/rex-gateway.ts` | rex | 25 functions + 5 constants + 13 types (schema, store, tree, save-file report, derived-cache dirname, tree conformance, task selection, claims, timestamps, auto-completion, parent reset, requirements, level helpers, finding acknowledgment) |
+| hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | 114 functions + 5 classes + 17 constants + 60 types (config, vendor constants, JSON, output and colour, help, errors, process execution and git worktrees, token parsing, model resolution, Claude API effort, usage formatting, prompt envelope and failure categories, prompt-section costs, Codex policy flags, tool-definition converters, LM Studio, provider registry, folder-layout resolver, credential redaction, repository trust, available-memory reading) |
+| web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants (including the derived-cache dirname), tree utilities |
+| web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory, next-step derivation, archetype override, iso-map builder, analysis artifact schema types, live analyze progress reader, analyze command-line check |
+| web | `src/viewer/external.ts` | `src/viewer/messaging/`, `src/shared/`, `src/schema/` | Schema types (V1), data-file constants, RequestDedup — viewer↔server boundary gateway |
+| web | `src/viewer/api.ts` | `src/viewer/types.ts`, `src/viewer/route-state.ts` | Viewer types (LoadedData, NavigateTo, DetailItem), route-state functions — inbound API contract for sibling zones (crash, route, performance) |
+
+Rules:
+- **One gateway per source package** — all runtime imports from a given upstream package pass through a single gateway. A consumer may have multiple gateways (e.g. web has separate gateways for rex and sourcevision).
+- **Re-export only** — gateways re-export; they contain no logic. Enforced by `domain-isolation.test.js`.
+- **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Package-specific exemptions are documented in the owning package's `AGENTS.md` (e.g. "Web viewer gateway boundary" in `packages/web/AGENTS.md`).
+- **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
+
+See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-package gateway, messaging exemption, and injection-seam registry are in `packages/web/AGENTS.md`; core's injection-seam registry (the `cli.js` → `pair-programming.js` `registerChild` seam) is in `packages/core/AGENTS.md`; `@n-dx/llm-client`'s is in `packages/llm-client/AGENTS.md`.
+
+**Package-level guidance lives in `packages/<pkg>/AGENTS.md`.** Zone policies, seam registries and any other note that governs one package belong there, because every assistant reads a package's `AGENTS.md`. The `CLAUDE.md` beside it is a one-line `@AGENTS.md` import and holds nothing of its own; `tests/e2e/instruction-alignment.test.js` fails a package that breaks either half of that pair.
+
+### Tier boundary crossing: spawn vs gateway
+
+When a new feature requires crossing a tier boundary, use this decision rule:
+
+| Signal | Use spawn (child process) | Use gateway module (direct import) |
+|--------|--------------------------|-----------------------------------|
+| Caller tier | Orchestration (cli.js, ci.js, web.js) | Execution or Domain |
+| Data flow | Fire-and-forget or exit-code only | Structured return values needed in-process |
+| Frequency | Per-command (once per CLI invocation) | Per-request (hot path, many calls per second) |
+| Error handling | Exit code + stderr is sufficient | Caller needs typed errors, retries, or partial results |
+| State sharing | None (each spawn is stateless) | Shared in-memory state (e.g. PRDStore instance) |
+
+**Rules of thumb:**
+- Orchestration-tier scripts **always spawn** — they must not `import` from packages (exception: `config.js` for cross-package config reads).
+- If the consumer is a library (hench, web), use a **gateway module** to keep the import surface explicit and auditable.
+- If in doubt, prefer spawn — it provides stronger isolation and can always be replaced with a gateway later if performance requires it.
+
+### Concurrency contract
+
+The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) share mutable state files on disk. Concurrent execution rules:
+
+| Command pair | Safe? | Notes |
+|-------------|-------|-------|
+| `ndx start` + `ndx status` | ✅ | Status is read-only |
+| `ndx start` + `ndx work` | ✅ | Hench writes to `.hench/runs/`; the server reads the folder tree via `.rex/.cache/prd.json` (refreshed by file watcher) |
+| `ndx start` + `ndx plan` | ⚠️ | Plan rewrites the folder tree; the server's tree watcher refreshes `.rex/.cache/prd.json` automatically, but a restart flushes all in-process caches. |
+| `ndx ci` + `ndx work` | ❌ | Both may write `.sourcevision/` plus the folder tree and sync files concurrently |
+| `ndx plan` + `ndx work` | ❌ | Both write the folder tree (`.rex/prd_tree/`) |
+| `ndx refresh` + any write command | ❌ | Refresh writes `.sourcevision/` and rebuilds web assets |
+| `ndx config` + `ndx config` | ❌ | Concurrent config writes may lose updates (no file locking) |
+
+**General rule:** Commands that write to the PRD backend (`.rex/prd_tree/`), `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
+
+**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) write only to the folder tree (`.rex/prd_tree/`). No JSON files are produced.
+
+**What the code enforces:** the MCP write tools, the dashboard's PRD-writing routes (item CRUD, merge, prune, restore, and the SourceVision Ask panel's `apply-refinements`), and the bulk restructurers `reorganize`, `prune`, and `reshape` perform their read-modify-write inside `store.withTransaction`, which holds the PRD file lock across the whole span — a concurrent writer's item is no longer silently dropped by their full-document save. Their LLM analysis runs on an unlocked snapshot; accepted proposals are re-applied against a freshly loaded document under the lock. `saveDocument` itself always takes the lock, so writes cannot interleave, and a writer that cannot acquire the lock within its timeout fails loudly with an error naming the holder PID rather than proceeding.
+
+**The PRD lock is per workspace, one per `rexDir`.** `prdLockPath(rexDir)` means each worktree's `.rex/` has its own lock, so two worktrees of the same repository write their own trees in parallel without contending — which is the point of worktree workspaces, and also why the lock is no help across them. The dashboard follows the same rule: every PRD-writing route resolves its store from the request's `ctx.rexDir`, so a request made under `/w/<key>/` (or with `X-Ndx-Workspace`) writes *that worktree's* `.rex/prd_tree/` and nothing else. There is no cross-workspace write anywhere in the dashboard — editing the anchor's PRD while viewing a branch means switching workspace through the breadcrumb switcher, which is a full navigation. The PRD view shows a one-line strip naming the workspace whenever it is not the anchor, so the write target is never inferred from the URL alone. MCP sessions follow the same rule: stdio rex/sv servers (and the `ndx mcp` hub bridge) bind to the worktree named by the client's MCP roots, so a desktop worktree session writes its own `.rex/prd_tree/` under its own lock, and a root that cannot be served refuses writes instead of falling back to the launch checkout.
+
+**What remains operator discipline:** other CLI write paths (`analyze`/`plan` imports, `update`, `move`, `remove`, `fix`, and similar) still do their own load→mutate→save — the lock serializes their write but does not merge concurrent changes, so for those commands the last full-document writer still wins. Do not run them concurrently with other PRD writers, and prefer waiting for a background PRD-writing command to finish before making MCP writes: a restructure computed on a stale snapshot can turn individual proposals into no-ops (reported, not silent).
+
+**PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/prd_tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
+
+**Bundle carve-out.** `ndx prd export` (`rex export`) writes the PRD to a single JSON file, and this does not breach the invariant above: the bundle is a *transport artifact*, written only to an operator-chosen path outside `.rex/`, never read as a PRD backend and never a write target for a PRD mutation. `ndx prd import` (`rex import-bundle`) rebuilds the folder tree through the normal store write path, inside `store.withTransaction`. Refusing an output path anywhere inside `.rex/` is enforced in code — the tree is the obvious hazard, but the legacy backend paths `.rex/prd.md` and `.rex/prd.json` would be *read as the PRD* on a checkout without the tree. Note that `ndx export` is a different command — it publishes the static dashboard.
+
+**Narrative carve-out.** `ndx prd export --format=narrative` writes prose Markdown to an operator-chosen path outside `.rex/`, under the same refusal. It is a *report*, not a transport artifact: deliberately lossy and one-way, with ids, folder slugs and status/priority values omitted by construction. Nothing imports it — the JSON bundle is the only round-trip surface. Do not add a narrative parser.
 
 
 ### Package conventions
@@ -59,11 +151,13 @@ Measured zone metrics are not reproduced here — they change with every analysi
 
 | File | Role | Generated from |
 |------|------|----------------|
-| `AGENTS.md` | **Canonical shared guidance surface.** Read by Codex and any future assistants. Contains project docs, workflow, skill inventory, and MCP tool reference derived from the asset manifest. | `project-guidance.md` (filtered) + manifest-derived sections + `codex-troubleshooting.md` |
-| `CLAUDE.md` | **Claude-facing bridge.** Read by Claude Code on startup. Imports the same shared guidance plus Claude-specific deep sections (zone governance, gateway details, concurrency contract). | `project-guidance.md` + `claude-addendum.md` |
+| `AGENTS.md` | **Canonical shared guidance surface.** Read by Codex and any future assistants. Contains project docs, zone governance, gateway rules, the concurrency contract, workflow, skill inventory, and MCP tool reference derived from the asset manifest. | `project-guidance.md` (filtered) + manifest-derived sections + `codex-troubleshooting.md` |
+| `CLAUDE.md` | **Claude-facing bridge.** Read by Claude Code on startup. Imports the same shared guidance plus the pointers to Claude's own per-directory instruction files. | `project-guidance.md` + `claude-addendum.md` |
 | `.codex/config.toml` | **Codex MCP configuration.** Auto-read by Codex — no manual registration required. | Manifest MCP server descriptors |
 
 **Design invariant:** Both `AGENTS.md` and `CLAUDE.md` derive their base project documentation (Packages, Architecture, Commands, Key Files) from `project-guidance.md`. Vendor-specific additions are layered on top — never inlined into the shared template. This prevents instruction drift between assistant surfaces.
+
+**What goes in `claude-addendum.md`:** only guidance about Claude Code's own behaviour — today, that it loads a package's `CLAUDE.md` when work happens under that directory. Anything describing the *codebase* (zone governance, gateway rules, the concurrency contract and PRD invariant) belongs in `project-guidance.md`, because a section placed in the addendum never reaches `AGENTS.md`. `tests/e2e/instruction-alignment.test.js` fails on an addendum heading that is not on its Claude-only allowlist.
 
 Re-run `ndx init` to regenerate all instruction files after changes to `packages/core/assistant-assets/`.
 

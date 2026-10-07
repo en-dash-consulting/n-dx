@@ -91,8 +91,8 @@ about volume at runtime, only about how many call sites exist in the source.
 
 ### 2. Injection seams point the wrong way, or not at all
 
-n-dx uses callback injection at several tier boundaries (see the *Injection seam
-registry* in `CLAUDE.md`). `web/src/server/start.ts` passes `broadcast`,
+n-dx uses callback injection at several tier boundaries (see the *injection seam
+registry* in each owning package's `AGENTS.md`). `web/src/server/start.ts` passes `broadcast`,
 `loadPRD` and friends into `register-scheduler.ts`. Statically, `start.ts`
 imports the scheduler; at runtime, the scheduler calls back into the server. The
 map draws one arrow, in the build-time direction, and no arrow for the

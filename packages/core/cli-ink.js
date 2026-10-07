@@ -14,7 +14,8 @@ import { existsSync } from "fs";
 import { basename, join, dirname } from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
-import { relativeToRoot, resolveLayout } from "./layout.js";
+import { resolveLayout } from "./layout.js";
+import { initDirLabels, padInitDirLabel } from "./init-summary.js";
 import {
   BRAND_NAME,
   TOOL_NAME,
@@ -143,20 +144,6 @@ function PhaseRow({ name, status, detail }) {
 
 // ── Recap ──────────────────────────────────────────────────────────────
 
-/**
- * One directory name in the recap's left column, padded so the status column
- * lines up. Computed rather than hardcoded: `.ndx/sourcevision` is four
- * characters wider than `.sourcevision`, so a fixed pad that looks right on one
- * layout is ragged on the other.
- *
- * @param {string} name  This row's root-relative directory name.
- * @param {Record<string, string>} all  Every row's name, for the column width.
- */
-function padLabel(name, all) {
-  const width = Math.max(...Object.values(all).map((n) => n.length));
-  return `${name}/`.padEnd(width + 1);
-}
-
 function Recap({
   dirLabel,
   sourcevision,
@@ -183,9 +170,9 @@ function Recap({
         <${Text} color="green">◆<//><${Text} bold>Project initialized!<//>
       <//>
       <${Text}> <//>
-      <${Text}>  ${padLabel(dirLabel.sourcevision, dirLabel)}  ${sourcevision}<//>
-      <${Text}>  ${padLabel(dirLabel.rex, dirLabel)}  ${rex}<//>
-      <${Text}>  ${padLabel(dirLabel.hench, dirLabel)}  ${hench}<//>
+      <${Text}>  ${padInitDirLabel(dirLabel.sourcevision, dirLabel)}  ${sourcevision}<//>
+      <${Text}>  ${padInitDirLabel(dirLabel.rex, dirLabel)}  ${rex}<//>
+      <${Text}>  ${padInitDirLabel(dirLabel.hench, dirLabel)}  ${hench}<//>
       <${Text}>  LLM configuration<//>
       ${llmSkipped
         ? html`<${Text}>    Provider      skipped<//>`
@@ -253,11 +240,7 @@ function InitApp({
       // one, so detection here sees the layout the sub-inits are about to
       // write to — the same one their own resolvers will find.
       const layout = resolveLayout(dir);
-      const dirLabel = {
-        sourcevision: relativeToRoot(layout, layout.sourcevisionDir),
-        rex: relativeToRoot(layout, layout.rexDir),
-        hench: relativeToRoot(layout, layout.henchDir),
-      };
+      const dirLabel = initDirLabels(layout);
       const svExists = existsSync(layout.sourcevisionDir);
       const rexExists = existsSync(layout.rexDir);
       const henchExists = existsSync(layout.henchDir);
@@ -299,21 +282,21 @@ function InitApp({
       // Run the programmatic analysis pipeline (inventory, imports, zones, components)
       const svAnalyze = await runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir], onSvData);
       if (svAnalyze.code !== 0) { setPhase("sourcevision", "failed"); onComplete(1, svAnalyze.stderr || svAnalyze.stdout); return; }
-      setPhase("sourcevision", "done", svExists ? `reused — ${dirLabel.sourcevision}/ already present` : undefined);
+      setPhase("sourcevision", "done", svExists ? `reused — ${dirLabel.sourcevision} already present` : undefined);
 
       // rex
       setPhase("rex", "active");
 
       const rx = await runInitCapture(tools.rex, ["init", ...flags, dir]);
       if (rx.code !== 0) { setPhase("rex", "failed"); onComplete(1, rx.stderr || rx.stdout); return; }
-      setPhase("rex", "done", rexExists ? `reused — ${dirLabel.rex}/ already present` : undefined);
+      setPhase("rex", "done", rexExists ? `reused — ${dirLabel.rex} already present` : undefined);
 
       // hench
       setPhase("hench", "active");
 
       const hx = await runInitCapture(tools.hench, ["init", ...flags, dir]);
       if (hx.code !== 0) { setPhase("hench", "failed"); onComplete(1, hx.stderr || hx.stdout); return; }
-      setPhase("hench", "done", henchExists ? `reused — ${dirLabel.hench}/ already present` : undefined);
+      setPhase("hench", "done", henchExists ? `reused — ${dirLabel.hench} already present` : undefined);
 
       // All remaining work runs as child processes — sync file I/O in
       // the main thread freezes Ink's animation no matter what yielding

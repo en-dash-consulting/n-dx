@@ -21,6 +21,8 @@
 
 import {link, mkdir, readFile, rename, rmdir, stat, unlink, writeFile} from "node:fs/promises";
 import {randomUUID} from "node:crypto";
+import {AsyncLocalStorage} from "node:async_hooks";
+import {resolve} from "node:path";
 // ── Constants ────────────────────────────────────────────────────────
 
 /** Delay between lock acquisition retries. */
@@ -383,6 +385,9 @@ export async function acquireLock(lockPath: string, options?: LockOptions): Prom
   }
 }
 
+/** Lock paths held by the current async context's enclosing `withLock` calls. */
+const heldLocks = new AsyncLocalStorage<ReadonlySet<string>>();
+
 /**
  * Execute a function while holding the PRD file lock.
  * The lock is released after the function completes (or throws).
@@ -390,8 +395,22 @@ export async function acquireLock(lockPath: string, options?: LockOptions): Prom
 export async function withLock<T>(lockPath: string, fn: () => Promise<T>, options?: LockOptions): Promise<T> {
   const release = await acquireLock(lockPath, options);
   try {
-    return await fn();
+    const held = new Set(heldLocks.getStore());
+    held.add(resolve(lockPath));
+    return await heldLocks.run(held, fn);
   } finally {
     await release();
   }
+}
+
+/**
+ * True when the calling async context runs inside `withLock(lockPath, …)`.
+ *
+ * Lets a writer that must run under the PRD lock (`state-writer.ts`) refuse
+ * to write without it, instead of taking the lock itself and deadlocking on
+ * the in-process mutex when called from inside `withTransaction`. Locks taken
+ * with bare `acquireLock` are not tracked.
+ */
+export function isLockHeld(lockPath: string): boolean {
+  return heldLocks.getStore()?.has(resolve(lockPath)) ?? false;
 }

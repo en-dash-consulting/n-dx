@@ -148,12 +148,16 @@ describe("GET /api/hench/runs scope", () => {
     // The first repo-scope request is what registers the watcher.
     await fetch(`${server.baseUrl}/api/hench/runs?scope=repo`);
 
-    writeRun(linked, "run-side-2", "2026-09-16T12:00:00.000Z");
-
+    // Written on every attempt, not once: on macOS fs.watch returns before its
+    // FSEvents stream is live, so a write made straight after registration can
+    // go unseen — and under load that gap outlasts the whole wait. Each retry
+    // is another write the armed watcher must report. The interval stays above
+    // the watcher's 500ms debounce, which every write restarts.
     await vi.waitFor(() => {
+      writeRun(linked, "run-side-2", "2026-09-16T12:00:00.000Z");
       expect(broadcast).toHaveBeenCalledWith(
         expect.objectContaining({ type: "hench:run-changed" }),
       );
-    }, { timeout: 4_000, interval: 50 });
+    }, { timeout: 4_000, interval: 1_000 });
   });
 });
