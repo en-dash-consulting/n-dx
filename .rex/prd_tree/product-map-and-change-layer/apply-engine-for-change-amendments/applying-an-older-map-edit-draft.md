@@ -1,0 +1,20 @@
+---
+id: "87c26750-5776-45e5-b922-36547a3b6760"
+level: "task"
+title: "Applying an older map-edit draft reverts a later direct edit to the same node"
+status: "pending"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "pr-10"
+  - "rex"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "Two substantive edits to the same node leave exactly one open map-edit draft for it (test)"
+  - "That draft's proposed statement equals the latest edit and its intent lists both diffs (test)"
+  - "Applying the draft after both edits leaves the node met at the latest spec (test)"
+description: "Verdict: should-fix (real; unreachable until handleMapEdit is wired to a CLI/MCP path).\n\nScenario: a steward edits capability A1.1's statement from A to B. handleMapEdit drafts change 1 with proposed B. A later substantive edit changes B to C, and handleMapEdit drafts a second change with proposed C (packages/rex/src/core/map-edit.ts, the substantive branch: each edit appends a new draft and never looks for an open one). Applying change 1 now writes statement B over C and stamps metAt at B, so the steward's newer intent is silently lost. It comes back only if change 2 is applied too. Cancelling change 2 as a \"duplicate\" loses C for good.\n\nOptions:\n(a) Recommended. When an open, unapplied change with source map-edit already amends the node, refresh its proposed text and append the new diff to its intent instead of drafting a second change. Cheap, and it also gives \"one drafted change per revision\".\n(b) At apply time, refuse a map-edit amendment whose proposed text no longer matches the node's current statement. Safer, but it pushes the problem onto the person applying."
+lastModified: "2026-10-07T23:16:01.640Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
