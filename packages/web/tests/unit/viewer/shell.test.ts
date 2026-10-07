@@ -676,8 +676,8 @@ describe("SettingsOverlay", () => {
     expect(viewGlyph("robot-wrangler")).toBe("\u{1F916}");
   });
 
-  it("lists the same pages whatever the feature toggles are — Notion and Integrations live on Project", async () => {
-    stubApi(["rex.notionSync", "rex.integrations"]);
+  it("lists the same pages whatever the feature toggles are — no toggle adds or removes a settings page", async () => {
+    stubApi(["sourcevision.ask", "sourcevision.prMarkdown"]);
     await mount(overlay("robot-wrangler"));
     expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Commands"]);
   });

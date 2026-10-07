@@ -20,7 +20,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Claude and Codex Config Validation in Gauntlet](./claude-and-codex-config-validation-in/index.md) | completed |
 | [Contributor Page Section Expansion](./contributor-page-section-expansion/index.md) | completed |
 | [Developer Environment Prerequisites Documentation](./developer-environment-prerequisites/index.md) | completed |
-| [Documentation improvements](./documentation-improvements/index.md) | completed |
+| [Documentation improvements](./documentation-improvements/index.md) | pending |
 | [End-User Platform Requirements](./end-user-platform-requirements/index.md) | completed |
 | [Fix MCP server re-registration during ndx init](./fix-mcp-server-re-registration-during/index.md) | completed |
 | [Fix move-file in web-server (1 finding)](./fix-move-file-in-web-server-1-finding/index.md) | completed |

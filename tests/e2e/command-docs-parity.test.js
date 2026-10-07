@@ -69,3 +69,48 @@ describe("command reference parity with the help registry", () => {
     expect(missing).toEqual([]);
   });
 });
+
+/** Every command a table row opens with: `| \`ndx <name>`. */
+function documentedCommands(raw) {
+  return [...norm(raw).matchAll(/^\| `ndx ([a-z][a-z0-9-]*)/gm)].map((m) => m[1]);
+}
+
+/**
+ * The other direction. A removed command left in a reference is worse than a
+ * missing one: the reader runs it and gets "unknown command". packages/core's
+ * README is the npm page of the package users install, so it is held to the
+ * same rule as the repository README and the guide.
+ */
+describe("command references name only registry commands", () => {
+  const all = new Set(getOrchestratorCommands());
+
+  /**
+   * Real commands that cli.js dispatches but COMMAND_REGISTRY does not list, so
+   * getOrchestratorCommands() cannot vouch for them. Each entry is a registry
+   * gap to close, not a permanent exemption; the staleness check below fails
+   * once the command is registered, so the entry has to come out with the fix.
+   */
+  const KNOWN_UNREGISTERED = new Set(["iso"]);
+
+  it("every known-unregistered command is still missing from the registry", () => {
+    for (const name of KNOWN_UNREGISTERED) expect(all.has(name), name).toBe(false);
+  });
+  const references = {
+    "README.md": () => readmeCommandsSection(),
+    "docs/guide/commands.md": () => readFileSync(join(ROOT, "docs/guide/commands.md"), "utf-8"),
+    "packages/core/README.md": () => readFileSync(join(ROOT, "packages/core/README.md"), "utf-8"),
+  };
+
+  for (const [file, read] of Object.entries(references)) {
+    it(`${file} documents no command the registry lacks`, () => {
+      const rows = documentedCommands(read());
+      expect(rows.length, `${file} has no \`ndx <command>\` rows`).toBeGreaterThan(0);
+      expect(rows.filter((name) => !all.has(name) && !KNOWN_UNREGISTERED.has(name))).toEqual([]);
+    });
+  }
+
+  it("flags a row for a command that does not exist", () => {
+    expect(documentedCommands("| `ndx sync [dir]` | Sync |\n| `ndx work` | Run |")).toEqual(["sync", "work"]);
+    expect(all.has("sync")).toBe(false);
+  });
+});

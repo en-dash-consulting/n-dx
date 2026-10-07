@@ -2,10 +2,16 @@
  * PRD-to-work-item linkage model operations.
  *
  * The linkage model (`WorkItemLink`, see `schema/v1.ts`) is the common,
- * system-agnostic surface every work-tracking integration (Notion, Jira,
- * GitHub Projects, Asana, …) uses to record the relationship between a PRD
- * item and its downstream work item. A PRD item may carry several links, one
- * per remote system; each link's identity is the (`system`, `workItemId`) pair.
+ * system-agnostic surface a work-tracking integration uses to record the
+ * relationship between a PRD item and its downstream work item. A PRD item may
+ * carry several links, one per remote system; each link's identity is the
+ * (`system`, `workItemId`) pair.
+ *
+ * Nothing writes a link today — the Notion, Jira, Asana and GitHub Projects
+ * adapters that did were removed, and the work-tracker bridge that replaces
+ * them ships as its own package. The model stays because it is schema, not
+ * adapter: an item in someone's tree may already carry links, and the
+ * serializer round-trips them either way.
  *
  * All operations here are pure: they return a new `PRDItem` and never mutate
  * the input, mirroring the immutable helpers in `core/sync.ts`. Links persist

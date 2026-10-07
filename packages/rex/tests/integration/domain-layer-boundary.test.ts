@@ -173,7 +173,6 @@ describe("rex cli/commands import surface", () => {
     "../../recommend/create-from-recommendations.js",
     "../../schema/index.js",
     "../../schema/validate.js",
-    "../../store/adapter-registry.js",
     "../../store/atomic-write.js",
     // `rex claim` is a CLI over the claims store and nothing else: it lists
     // what the store holds and releases entries from it. Routing it through
@@ -188,6 +187,31 @@ describe("rex cli/commands import surface", () => {
     "../../store/title-to-filename.js",
     "../../workflow/default.js",
   ]);
+
+  /**
+   * The allow-list caps growth; this keeps it honest in the other direction.
+   *
+   * `KNOWN_VIOLATIONS` is only ever read as "is this import permitted", so an
+   * entry whose module has since been deleted is invisible — it permits nothing
+   * and nothing complains. `../../store/adapter-registry.js` sat here after the
+   * tracker adapters were removed, which is how a tracked-surface list comes to
+   * describe a surface that no longer exists: the next reader takes it as a
+   * statement that commands still reach into an adapter registry.
+   *
+   * Pairs with the stale-entry checks in tests/e2e/architecture-policy.test.js.
+   */
+  it("every KNOWN_VIOLATIONS entry names a module that still exists", () => {
+    const stale = [...KNOWN_VIOLATIONS].filter(
+      (imp) => !existsSync(join(REX_SRC, imp.replace(/^\.\.\/\.\.\//, "").replace(/\.js$/, ".ts"))),
+    );
+
+    expect(
+      stale,
+      `Stale KNOWN_VIOLATIONS entries — the module is gone, so the entry permits ` +
+        `nothing and misdescribes the tracked surface. Remove them:\n` +
+        stale.map((s) => `  - ${s}`).join("\n"),
+    ).toEqual([]);
+  });
 
   it("cli/commands/ does not introduce new bypass imports outside the tracked surface", () => {
     const commandsDir = join(REX_SRC, "cli", "commands");
