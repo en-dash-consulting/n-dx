@@ -2,7 +2,7 @@
 id: "650d689b-0168-4252-b133-1bf67f585095"
 level: "task"
 title: "Require a per-user token on the hub, dashboard and preview loopback servers"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "security"
@@ -10,6 +10,11 @@ tags:
   - "follow-up"
   - "multi-user"
 source: "security assessment 2026-10-01 (deferred from feat/repo-trust-and-guard-hardening)"
+startedAt: "2026-10-07T19:29:46.560Z"
+completedAt: "2026-10-07T19:29:46.560Z"
+endedAt: "2026-10-07T19:29:46.560Z"
+resolutionType: "code-change"
+resolutionDetail: "Already shipped on main; the PRD item was stale. Verified all 8 acceptance criteria: packages/web/src/shared/auth.ts (three credential sites, constant-time compare), server/request-security.ts (401 + ?ndx_token redirect), server/websocket.ts (upgrade refusal), hub/children.ts (--token-file to children) and hub/overview.ts (probe header), core/web.js (authTokenPath/readAuthTokenFile/ensureAuthTokenFile), llm-client auth-token.ts (0600 + repairTokenMode), web/src/cli/index.ts (bare `web serve` tokenless without --token-file), README.md:335-340 (--header form) and SECURITY.md:58-67,114. Tests green: tests/e2e/cli-auth.test.js, tests/e2e/cli-start-auth-token.test.js, packages/web/tests/unit/shared/auth.test.ts, packages/web/tests/integration/hub-auth-token.test.ts. No code written."
 acceptanceCriteria:
   - "With a token file configured, the hub, a project server and the preview server answer 401 to GET /api/status (and every other route) when the request carries no token, and 200 when it carries the token as Authorization: Bearer, X-Ndx-Token, or the ndx_token cookie."
   - "A navigation to /?ndx_token=<t> sets the cookie and redirects to the same path without the query string; the printed `ndx start` URL opens the dashboard without a further prompt."
@@ -20,6 +25,6 @@ acceptanceCriteria:
   - "A bare `web serve` without --token-file still runs tokenless, so existing unit and integration tests pass unchanged; `ndx start` enables the token by default."
   - "README and the MCP setup output show the `--header` registration form for HTTP MCP clients, and SECURITY.md's scope section names shared hosts as covered."
 description: "Failure scenario: on a machine with more than one OS account (shared dev box, CI runner, lab host), every account can reach 127.0.0.1:3117. The hub and project servers authenticate nothing: the Host and Origin gates distinguish a browser page from the dashboard, not one local user from another. Another account can GET every registered project (name, absolute repo path, branch, PRD, analysis, run records), call the MCP write tools to edit the PRD, and POST /api/hub/projects with ndxBin set to any executable path, which the hub spawns as the hub owner — a cross-user privilege escalation. Evidence: packages/web/src/hub/hub.ts (loopback bind, no credential), hub/request-guard.ts and server/request-security.ts (Host + Origin only), hub/routes.ts POST /projects → children.ts spawn of ndxBin. Reachability: any process running as another user on the same host; not reachable from a browser (Origin/Host gates hold) and not reachable remotely (loopback bind). Severity high in shared environments, low on a single-user laptop.\n\nOptions:\n(a) Recommended — per-user bearer token. On start, the hub (or `ndx start --here`) creates `<ndx home>/auth.token` (random 32 bytes, mode 0600) if absent. Every request to the hub, a project server or the preview server must carry it as `Authorization: Bearer <t>`, `X-Ndx-Token`, or the `ndx_token` cookie; a navigation with `?ndx_token=` sets the cookie and redirects to strip it, so `ndx start` prints a URL that opens the dashboard once. The hub passes `--token-file` to children and sends the header on health probes; the proxy forwards the header/cookie unchanged. core `hubRequest` and `ndx start status/stop` read the file. MCP registration docs gain `--header \"Authorization: Bearer $(cat ~/.ndx/auth.token)\"`. Cost: web middleware + tests, hub child plumbing, core flags, docs; roughly two days. Risk: every test that fetches a server without the token breaks unless the server runs tokenless when no file is configured — ship `requireToken` default ON for `ndx start`, OFF for a bare `web serve` without `--token-file`, and the test harnesses stay as they are.\n(b) Peer-credential check. Resolve the connecting PID/UID per loopback connection and refuse other UIDs. Not portable in Node (no SO_PEERCRED for TCP; lsof/netstat shelling is racy and slow). Not recommended.\n(c) Document only. State in SECURITY.md that shared hosts are out of scope. Free, leaves the escalation in place. Not recommended beyond the interim.\n\nPrerequisite: the spawned-server e2e suites (hub-proxy, cli-start-two-projects, mcp-transport) fail in the current sandbox on EMFILE watch limits; this change cannot be verified until they run. Found during the 2026-10-01 security assessment that produced the Host-validation fix and the repository-trust work; deferred from that branch so it could ship verified. Verdict: should-fix."
-lastModified: "2026-10-01T19:01:19.968Z"
-lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+lastModified: "2026-10-07T19:29:47.089Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
