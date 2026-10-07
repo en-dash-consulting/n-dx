@@ -122,7 +122,10 @@ const SCAN_FORMAT = [
 
 /** Scan every commit reachable from `tip` (all parents of merges) for `N-DX-Item` trailers. */
 export async function scanTrailerCommits(repoDir: string, tip: string): Promise<TrailerCommit[]> {
-  const stdout = await git(repoDir, ["log", `--format=%x1e${SCAN_FORMAT}`, tip, "--"]);
+  // --no-show-signature: with `log.showSignature` set, git prints signature
+  // checks for signed commits (GitHub signs its web merges) to stdout, which
+  // would land inside the previous record's trailer field and drop its items.
+  const stdout = await git(repoDir, ["log", "--no-show-signature", `--format=%x1e${SCAN_FORMAT}`, tip, "--"]);
   const commits: TrailerCommit[] = [];
   for (const record of stdout.split(RS)) {
     if (record.trim() === "") continue;

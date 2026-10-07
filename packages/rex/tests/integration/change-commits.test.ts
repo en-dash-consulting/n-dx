@@ -140,6 +140,41 @@ describe("computeChangeCommits", () => {
     expect(JSON.parse(await readFile(cacheFile, "utf-8")).tip).toBe(later);
   });
 
+  it("serves a current cache without rescanning git", async () => {
+    const f = await buildFixture();
+    await computeChangeCommits([CHANGE], { repoDir: repo, cacheDir });
+    const cacheFile = join(cacheDir, CHANGE_COMMITS_CACHE_FILENAME);
+    const cached = JSON.parse(await readFile(cacheFile, "utf-8"));
+    // Only a cache hit can return a commit git never produced.
+    const marker = { hash: "f".repeat(40), parents: [], author: "C", authorEmail: "c@x", timestamp: "t", items: [CHANGE] };
+    await writeFile(cacheFile, JSON.stringify({ ...cached, commits: [marker] }), "utf-8");
+    expect(hashes(await computeChangeCommits([CHANGE], { repoDir: repo, cacheDir }))).toEqual([marker.hash]);
+    expect(f.merge).toBe(cached.tip);
+  });
+
+  it("ignores log.showSignature, whose output for signed commits would corrupt the scan", async (ctx) => {
+    await commit("base.txt", "Initial commit");
+    const key = join(repo, "..", "signing-key");
+    try {
+      execFileSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", key], { stdio: "ignore" });
+    } catch {
+      ctx.skip(); // No ssh-keygen: SSH commit signing cannot be set up on this host.
+    }
+    git("config", "gpg.format", "ssh");
+    git("config", "user.signingkey", `${key}.pub`);
+    git("config", "log.showSignature", "true");
+    const signed = async (file: string, id: string) => {
+      await writeFile(join(repo, file), file, "utf-8");
+      git("add", file);
+      git("commit", "-q", "-S", "-m", `Signed\n\nN-DX-Item: ${id}`);
+      return git("rev-parse", "HEAD");
+    };
+    const first = await signed("s1.txt", CHANGE);
+    const second = await signed("s2.txt", TASK);
+    const commits = await computeChangeCommits([CHANGE, TASK], { repoDir: repo, cacheDir });
+    expect(hashes(commits)).toEqual([second, first]);
+  });
+
   it("names the ref when it does not resolve", async () => {
     await commit("base.txt", "Initial commit");
     await expect(computeChangeCommits([CHANGE], { repoDir: repo, cacheDir, ref: "no-such-branch" })).rejects.toThrow(/git rev-parse failed/);
