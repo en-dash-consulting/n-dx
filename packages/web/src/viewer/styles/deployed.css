@@ -62,10 +62,7 @@
   display: none !important;
 }
 
-/* ── Configuration / integration editing ───────────────────────────── */
-.ndx-deployed .notion-config-actions,
-.ndx-deployed .notion-config-remove-btn,
-.ndx-deployed .intg-remove-btn,
+/* ── Configuration editing ─────────────────────────────────────────── */
 .ndx-deployed .hench-config-tag-add-btn,
 .ndx-deployed .hench-config-tag-remove,
 .ndx-deployed .hench-template-delete-btn,

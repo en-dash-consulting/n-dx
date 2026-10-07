@@ -36,7 +36,6 @@ Only the `project` string differs per file; schema and adapter are identical acr
 **Files:**
 - `packages/rex/tests/unit/cli/commands/fix.test.ts` — project: `"test-fix"`
 - `packages/rex/tests/unit/cli/commands/report.test.ts` — project: `"test-report"`
-- `packages/rex/tests/unit/cli/commands/sync.test.ts` — project: `"test-sync"`
 - `packages/rex/tests/unit/cli/commands/validate.test.ts` — project: `"test-validate"`
 - `packages/rex/tests/unit/cli/commands/validate-epicless.test.ts` — project: `"test-epicless"`
 
@@ -112,7 +111,7 @@ The root fields (`schema`, `title`) are identical; the `items` tree differs per 
 
 | Constant | Shape | Files |
 |----------|-------|-------|
-| `EMPTY_PRD` / `MINIMAL_PRD` | `{ schema: "rex/v1", title: "Test Project", items: [] }` | `packages/rex/tests/unit/cli/commands/status.test.ts`, `sync.test.ts`, `usage.test.ts` |
+| `EMPTY_PRD` / `MINIMAL_PRD` | `{ schema: "rex/v1", title: "Test Project", items: [] }` | `packages/rex/tests/unit/cli/commands/status.test.ts`, `usage.test.ts` |
 | `ANSI_PREFIX = "\x1b["` | string | `packages/hench/tests/unit/cli/commands/run-colors.test.ts`, `packages/hench/tests/unit/cli/output.test.ts` |
 | `YELLOW = "\x1b[33m"` | string | same two hench files above |
 

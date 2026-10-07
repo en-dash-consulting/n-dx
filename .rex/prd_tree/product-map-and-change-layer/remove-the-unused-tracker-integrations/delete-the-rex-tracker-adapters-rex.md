@@ -2,7 +2,7 @@
 id: "6202f721-ef9f-4552-82a7-dc7265831bf9"
 level: "task"
 title: "Delete the rex tracker adapters, rex sync, rex adapter and the sync_with_remote tool"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "pr-03"
@@ -10,11 +10,16 @@ tags:
   - "rex"
   - "web"
 source: "roadmap"
+startedAt: "2026-10-06T05:48:33.863Z"
+completedAt: "2026-10-06T06:52:06.052Z"
+endedAt: "2026-10-06T06:52:06.052Z"
+resolutionType: "code-change"
+resolutionDetail: "Deleted the Notion/Jira/Asana/GitHub Projects store adapters, clients and maps, the integration-schema system, AdapterRegistry and SyncEngine, the rex sync and rex adapter CLI commands, the sync_with_remote MCP tool, and the ndx sync orchestration command. Credential redaction and env resolution moved to the neutral src/store/adapter-config.ts. file-adapter.ts untouched. Build, typecheck, pr-check, obfuscation scan and all six suites green (~22,000 tests)."
 acceptanceCriteria:
   - "No adapter for an external tracker remains in rex/src/store"
   - "rex sync, rex adapter and sync_with_remote no longer exist and their help text is gone"
   - "file-adapter.ts and its callers are unchanged and their tests pass"
 description: "Remove notion-adapter, notion-client, notion-map, jira-*, asana-*, github-projects-* and integration-schemas under rex/src/store, the sync engine if only they use it, the sync and adapter CLI commands, and the sync_with_remote MCP tool module. Move any helper still needed (redaction, env resolution) to a neutral module first."
-lastModified: "2026-10-06T04:16:39.570Z"
+lastModified: "2026-10-06T06:52:08.281Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

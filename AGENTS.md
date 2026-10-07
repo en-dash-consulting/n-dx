@@ -256,7 +256,6 @@ Two MCP servers provide structured access to project data. They are configured i
 - `move_item`
 - `merge_items`
 - `append_log`
-- `sync_with_remote`
 - `verify_criteria`
 - `reorganize`
 

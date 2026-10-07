@@ -2144,7 +2144,6 @@ Feature toggles (.n-dx.json — managed via web UI or ndx config):
   features.rex.showTokenBudget      boolean   Show token budget on task items (default: false)
   features.rex.autoComplete         boolean   Auto-complete parents when children done (default: true)
   features.rex.budgetEnforcement    boolean   Enforce token/cost budgets (default: false)
-  features.rex.notionSync           boolean   Enable Notion two-way sync (default: false)
   features.sourcevision.callGraph   boolean   Enable call graph extraction (default: false)
   features.sourcevision.enrichment  boolean   AI enrichment passes (default: true)
   features.sourcevision.componentCatalog

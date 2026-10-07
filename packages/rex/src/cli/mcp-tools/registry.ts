@@ -21,7 +21,6 @@ import { moveItemTool } from "./move-item.js";
 import { mergeItemsTool } from "./merge-items.js";
 import { getItemTool } from "./get-item.js";
 import { appendLogTool } from "./append-log.js";
-import { syncWithRemoteTool } from "./sync-with-remote.js";
 import { getRecommendationsTool } from "./get-recommendations.js";
 import { verifyCriteriaTool } from "./verify-criteria.js";
 import { reorganizeTool } from "./reorganize.js";
@@ -43,7 +42,6 @@ export const REX_MCP_TOOLS: readonly ToolDefinition[] = [
   mergeItemsTool,
   getItemTool,
   appendLogTool,
-  syncWithRemoteTool,
   getRecommendationsTool,
   verifyCriteriaTool,
   reorganizeTool,
