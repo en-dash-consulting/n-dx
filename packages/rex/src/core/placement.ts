@@ -55,7 +55,10 @@ export interface PlacementResult {
   model?: {
     /** What the model picked; null when it declined. */
     pick: string | null;
-    /** The pick is the rules' top candidate. */
+    /**
+     * The pick is the rules' top candidate. False when the top score is tied:
+     * the rules named no single leader, and the id tiebreak is arbitrary.
+     */
     agrees: boolean;
   };
 }
@@ -71,6 +74,11 @@ const WEIGHT_TOKEN = 1;
 
 function normalizePath(p: string): string {
   return p.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "");
+}
+
+/** `fragment` appears in `file` as whole path segments (`src/store` is in `a/src/store/x.ts`, not `a/src/store-utils.ts`). */
+function containsSegments(file: string, fragment: string): boolean {
+  return `/${file}/`.includes(`/${fragment}/`);
 }
 
 function mentions(text: string, needle: string): boolean {
@@ -92,13 +100,13 @@ function scoreCapability(change: PlacementChange, cap: PlacementCapability): Pla
   }
 
   for (const p of (cap.paths ?? []).map(normalizePath).filter(Boolean)) {
-    if (files.some((f) => f.includes(p)) || mentions(text, p)) {
+    if (files.some((f) => containsSegments(f, p)) || mentions(text, p)) {
       score += WEIGHT_PATH_MENTION;
       reasons.push(`path: ${p}`);
     }
   }
 
-  for (const pkg of cap.packages ?? []) {
+  for (const pkg of (cap.packages ?? []).filter(Boolean)) {
     if (mentions(text, pkg)) {
       score += WEIGHT_PACKAGE_MENTION;
       reasons.push(`package: ${pkg}`);
@@ -141,5 +149,7 @@ export async function placeChange(
   if (!options.model || shortlist.length === 0) return { shortlist };
 
   const pick = await options.model({ change, shortlist, capabilities });
-  return { shortlist, model: { pick, agrees: pick !== null && pick === shortlist[0].id } };
+  const [top, runnerUp] = shortlist;
+  const clearLeader = runnerUp === undefined || runnerUp.score < top.score;
+  return { shortlist, model: { pick, agrees: clearLeader && pick === top.id } };
 }

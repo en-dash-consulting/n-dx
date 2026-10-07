@@ -44,6 +44,17 @@ describe("rankPlacementCandidates (rules)", () => {
     expect(rankPlacementCandidates({ title: "shared word" }, many, 3)).toHaveLength(3);
   });
 
+  it("matches a path fragment on whole segments only", () => {
+    const cap: PlacementCapability[] = [{ id: "store", title: "x", paths: ["src/store"] }];
+    expect(rankPlacementCandidates({ title: "y", files: ["packages/web/src/store-utils.ts"] }, cap)).toEqual([]);
+    expect(rankPlacementCandidates({ title: "y", files: ["packages/rex/src/store/lock.ts"] }, cap)).toHaveLength(1);
+  });
+
+  it("ignores an empty package name", () => {
+    const cap: PlacementCapability[] = [{ id: "blank", title: "x", packages: [""] }];
+    expect(rankPlacementCandidates({ title: "Anything at all" }, cap)).toEqual([]);
+  });
+
   it("breaks ties by id", () => {
     const tied: PlacementCapability[] = [{ id: "b", title: "alpha" }, { id: "a", title: "alpha" }];
     expect(rankPlacementCandidates({ title: "alpha" }, tied).map((c) => c.id)).toEqual(["a", "b"]);
@@ -63,6 +74,13 @@ describe("placeChange (rules + text model)", () => {
   it("detects disagreement, including a pick outside the shortlist and a declined pick", async () => {
     expect((await placeChange(change, caps, { model: async () => "cap-zones" })).model).toEqual({ pick: "cap-zones", agrees: false });
     expect((await placeChange(change, caps, { model: async () => null })).model).toEqual({ pick: null, agrees: false });
+  });
+
+  it("never reports agreement when the rules' top score is tied, whichever tied id is picked", async () => {
+    const tied: PlacementCapability[] = [{ id: "a", title: "alpha" }, { id: "b", title: "alpha" }];
+    for (const pick of ["a", "b"]) {
+      expect((await placeChange({ title: "alpha" }, tied, { model: async () => pick })).model?.agrees).toBe(false);
+    }
   });
 
   it("does not call the model when the rules found nothing", async () => {
