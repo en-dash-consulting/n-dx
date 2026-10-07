@@ -18,8 +18,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [.claude/rules accepts any new policy file with a table; only *-injection-seams.md names are blocked](./claude-rules-accepts-any-new-policy.md) | pending |
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | pending |
+| [.claude/rules accepts any new policy file with a table; only *-injection-seams.md names are blocked](./claude-rules-accepts-any-new-policy.md) | pending |
 | [Codex drops most of packages/web/AGENTS.md: root plus nested AGENTS.md exceeds its 32 KiB combined project-doc budget](./codex-drops-most-of-packages-web.md) | pending |
 | [Codex never sees the per-package governance or the path-scoped rules, because they live only in Claude-loaded files](./codex-never-sees-the-per-package.md) | pending |
 | [Defer the PRD timeline view and re-scope it to the Changes view](./defer-the-prd-timeline-view-and-re.md) | pending |
