@@ -236,6 +236,19 @@ describe("computeChangeCommits", () => {
     });
   });
 
+  it("refuses a shallow clone, naming how to deepen it", async () => {
+    await commit("base.txt", "Initial commit");
+    await commit("a.txt", `Part A\n\nN-DX-Item: ${CHANGE}\n`);
+    await commit("b.txt", "Later");
+    const dir = join(repo, "..", "shallow");
+    execFileSync("git", ["clone", "-q", "--depth", "1", `file://${repo}`, dir]);
+    await expect(computeChangeCommits([CHANGE], { repoDir: dir, cacheDir })).rejects.toThrow(
+      /shallow clone.*git fetch --unshallow.*fetch-depth: 0/s,
+    );
+    execFileSync("git", ["fetch", "-q", "--unshallow"], { cwd: dir });
+    expect(await computeChangeCommits([CHANGE], { repoDir: dir, cacheDir })).toHaveLength(1);
+  });
+
   it("names the ref when it does not resolve", async () => {
     await commit("base.txt", "Initial commit");
     await expect(computeChangeCommits([CHANGE], { repoDir: repo, cacheDir, ref: "no-such-branch" })).rejects.toThrow(/git rev-parse failed/);

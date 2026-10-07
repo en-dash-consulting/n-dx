@@ -27,7 +27,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Compute edges, derived kind and alias resolution](./compute-edges-derived-kind-and-alias.md) | completed |
 | [Compute intent status and health for product nodes](./compute-intent-status-and-health-for.md) | pending |
 | [computeChangeCommits defaults to the local main branch, which a CI checkout lacks and a worktree may hold stale](./computechangecommits-defaults-to-the.md) | completed |
-| [computeChangeCommits returns a truncated commit list from a shallow clone without saying so](./computechangecommits-returns-a.md) | pending |
+| [computeChangeCommits returns a truncated commit list from a shallow clone without saying so](./computechangecommits-returns-a.md) | in_progress |
 | [Re-point recorded commit SHAs that a rebase or squash rewrote](./re-point-recorded-commit-shas-that-a.md) | pending |
 | [Warn when a capability's criteria grow past a threshold](./warn-when-a-capability-s-criteria-grow.md) | pending |
 | [Work out a change's commits from its N-DX-Item trailers instead of storing them](./work-out-a-change-s-commits-from-its-n.md) | completed |

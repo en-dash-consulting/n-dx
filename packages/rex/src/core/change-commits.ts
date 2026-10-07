@@ -91,7 +91,8 @@ export function itemIdFromTrailer(value: string): string | undefined {
 /**
  * The commits reachable from the ref whose trailer names any of `itemIds`
  * (pass a change's id and its tasks' ids, plus any aliases), newest first.
- * Throws when the ref does not resolve.
+ * Throws when the ref does not resolve, or when the repository is a shallow
+ * clone (its history is truncated, so a missing commit would read as unlanded).
  */
 export async function computeChangeCommits(
   itemIds: Iterable<string>,
@@ -107,6 +108,8 @@ export async function loadTrailerCommits(options: ChangeCommitsOptions): Promise
   const { ref, tip } = options.ref !== undefined
     ? { ref: options.ref, tip: await resolveCommit(options.repoDir, options.ref) }
     : await resolveDefaultRef(options.repoDir);
+  // Before the cache read: a cache built from a shallow history is truncated too.
+  await assertFullHistory(options.repoDir);
   const path = join(options.cacheDir, CHANGE_COMMITS_CACHE_FILENAME);
   const cached = await readCache(path);
   if (cached && cached.ref === ref && cached.tip === tip) return cached.commits;
@@ -221,6 +224,16 @@ async function resolveDefaultRef(repoDir: string): Promise<{ ref: string; tip: s
   throw new Error(
     `git rev-parse failed in ${repoDir}: none of ${DEFAULT_MAIN_REFS.join(", ")} resolves; pass a ref\n${reasons.join("\n")}`,
   );
+}
+
+/** A shallow clone's log stops at the fetched depth, so older commits would silently read as absent. */
+async function assertFullHistory(repoDir: string): Promise<void> {
+  if ((await git(repoDir, ["rev-parse", "--is-shallow-repository"])).trim() === "true") {
+    throw new Error(
+      `${repoDir} is a shallow clone, so its history is truncated and change commits cannot be worked out. ` +
+        "Deepen it with `git fetch --unshallow`, or set `fetch-depth: 0` on the CI checkout.",
+    );
+  }
 }
 
 async function resolveCommit(repoDir: string, ref: string): Promise<string> {
