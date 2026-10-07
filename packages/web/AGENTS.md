@@ -1,0 +1,298 @@
+## Web package internal zone layering
+
+The web package decomposes into a hub topology with `web-viewer` at the centre:
+
+```
+  web-server          (composition root — Express routes, gateways, MCP handlers)
+       ↓                    ↓ (serves static assets only, no runtime import)
+  web-viewer          (Preact UI hub — components, hooks, views)
+       ↑ ↓                  ↓
+  viewer-message-pipeline  (messaging middleware — coalescer, throttle, rate-limiter, request-dedup)
+       ↓                    ↓
+  src/shared/         (framework-agnostic utilities — data-files, features, view-id, view-routing)
+```
+
+`web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `src/shared/`, while also receiving imports from sub-zones like `crash/`. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `src/shared/` is the foundation layer with zero upward dependencies, enforced by `boundary-check.test.ts`.
+
+Latest analysis (2026-08-24, `main`): `web-viewer` 205 files (cohesion 0.98 / coupling 0.02), `web-server` 62 (0.96 / 0.04), `viewer-message-pipeline` 7 (1.00 / 0.00), `web-composition-layer` 4 (0.65 / 0.35). No web zone currently meets the dual-fragility threshold. Re-run `ndx analyze --deep .` rather than trusting these numbers.
+
+**The sections below are directory policies, not zone policies.** Louvain does not currently emit standalone `web-shared`, `crash`, or `viewer-ui-hub` zones, but the directories exist and the rules are enforced by `boundary-check.test.ts` — so they remain in force. See the root `AGENTS.md` for the threshold definition and universal rules.
+
+## `src/shared/` addition policy
+
+`src/shared/` holds framework-neutral modules behind its `index.ts` barrel (data files, features, view ids and routing, base paths, origin checks, the hub admission header, and the run-option allow-list in `run-options.ts`). Because both server and viewer files import it, Louvain typically absorbs it into `web-viewer` rather than emitting a separate `web-shared` zone — that is a detection artifact, not a boundary violation, and the rules below apply regardless:
+
+- **Framework-agnostic only:** `src/shared/` must not contain Preact/React imports or server-only (`node:*`) imports. If a utility needs framework APIs, it belongs in the consuming zone.
+- **Barrel import enforcement:** Consumers must import through `shared/index.ts` rather than directly from leaf files (`data-files.ts`, `view-id.ts`). Enforced by `boundary-check.test.ts`.
+- **Two-consumer rule (automated):** Every module in `shared/` must have at least two distinct consumer zones. Enforced by the "shared/ modules have at least two consumer zones" assertion in `boundary-check.test.ts`.
+
+## `crash/` proactive governance
+
+`crash/` (`crash-detector.ts` + `index.ts`) is imported unidirectionally by `web-viewer` and reaches into `src/shared/` directly — a documented bypass. Barrel enforcement (imports must enter through `crash/index.ts`) is asserted by `boundary-check.test.ts`. Apply the two-consumer rule proactively to new additions here.
+
+## UI composition governance
+
+The viewer's UI composition layer — the shell (top-nav, stage-links, bottom-bar, settings-overlay, commands-sheet) plus config-footer, faq, logos and theme-toggle — is a composition root: it imports broadly from `web-viewer` while its internal files serve distinct UI concerns. Louvain currently reports this as `web-composition-layer` (4 files, cohesion 0.65 / coupling 0.35); earlier revisions called it `viewer-ui-hub` with different metrics. Low cohesion here is **structurally expected** and not by itself a defect.
+
+- **No domain logic:** This layer must contain only UI composition components and their direct rendering helpers. Data fetching and state management belong in hooks or views.
+- **Monitor fan-out:** Its coupling with the dashboard platform zone is the largest cross-zone relationship in the web package — audit import direction periodically to ensure inbound imports enter through `api.ts` or composition-root wiring rather than ad-hoc leaf reach-ins.
+
+## web-server zone stability
+
+`web-server` (composition root — Express routes, gateways, MCP handlers) is prone to dissolving into `web-viewer` in Louvain analysis because server files import from `packages/web/src/shared/` (required by the barrel-import policy), and shared files are also imported by viewer files, creating a Louvain connectivity bridge. If the zone dissolves:
+
+1. Check `stability.reassignedFiles` in `.sourcevision/zones.json` for `[file, "web-server", "web-viewer"]` entries
+2. Update `.sourcevision/hints.md` with re-analysis guidance
+3. The zone pins in `.n-dx.json` targeting `"web-server"` are no-ops when the zone is absent — they will re-activate if the zone re-appears in Louvain output
+4. The actual server/viewer boundary is enforced by `boundary-check.test.ts` regardless of zone detection — zone dissolution is a metrics artifact, not an architectural violation
+
+## Request gate: Host first, then Origin
+
+Both servers are loopback-only and unauthenticated, so the request gate *is*
+the access control against a web page the operator has open. It has two rules,
+applied in this order, and both live in `src/shared/origin.ts` so the hub
+(`hub/request-guard.ts`) and the project server (`server/request-security.ts`)
+cannot drift:
+
+1. **Host must name loopback on this socket's port** — `localhost`,
+   `127.0.0.1` or `[::1]`, with the exact port, round-tripping through the URL
+   parser unchanged. Anything else is `421 Misdirected Request`, for `GET` as
+   much as `POST`. Behind the hub the proxy rewrites `Host` to
+   `127.0.0.1:<child port>`, so a project server only ever judges requests made
+   to it directly.
+2. **A present `Origin` on a mutation must be this server's own**, compared
+   against the socket port (never `Host`); `Sec-Fetch-Site: cross-site` without
+   an `Origin` is refused too. Safe methods with a foreign `Origin` pass
+   unreflected — the page cannot read them without the CORS header.
+
+Consequences for new code:
+
+- **Every listener gets the gate.** A new `createServer` in this package calls
+  `handleRequestSecurity` (or the hub's `guardHubRequest`) before routing, and
+  its `upgrade` handler applies `isTrustedHost` + the origin check. The
+  dashboard, the hub and the preview server all do.
+- **`GET` must be read-only.** A safe method must not have side effects; a
+  `GET` that writes a file or spawns a process is a bug even on loopback.
+- **Internal clients must use a loopback name.** The hub's health probes and
+  overview fetches use `127.0.0.1:<port>`; a client that reached a server by
+  the machine's hostname or `0.0.0.0` would now get 421. Remote access through
+  a tunnel or devcontainer port-forward is unsupported for the same reason — if
+  it ever becomes a feature it needs an explicit Host allowlist setting, not a
+  relaxed check.
+- **Tests build requests by hand.** `fetch()` will not send a foreign `Host`;
+  use `node:http`'s `request` with `setHost: false` (see
+  `tests/integration/hub-proxy.test.ts`) or the mock request helpers in the
+  unit tests, which default `Host` to the socket so origin tests exercise the
+  origin rule.
+
+## Feature-toggle enforcement
+
+Toggles in `routes-features.ts`'s registry are enforced in the viewer by
+`useFeatureToggle` — the stage pages and the settings overlay read them, and any
+*other* entry point into a gated surface must read the same toggle. The Explain
+button on Problems and Suggestions is the worked example: it is not a stage section,
+so gating the stage pages alone left a default-off feature reachable through a side door
+whose only off switch the toggle itself had hidden. Views that cannot call the hook
+(both of those return early from an enrichment gate before their hooks run) take the
+value as a prop from `main.ts` via `ViewRenderContext`, defaulting to `false`.
+
+**Server-side enforcement is per-toggle, not universal.** Use
+`isFeatureEnabled(projectDir, key)` from `routes-features.ts` when a route must not
+act with its feature off; it reads `.n-dx.json` per call (toggles change while the
+server runs) and fails closed. Today only `sourcevision.ask` is gated this way,
+because each call spends tokens. `sourcevision.prMarkdown` is viewer-gated only —
+it renders from analysis already on disk, so a direct request costs nothing. Decide
+new toggles on that basis rather than by copying whichever neighbour is closest.
+
+## HTTP-request concurrency (web server)
+
+When `ndx start` is running, the web server holds in-process caches (aggregation cache, PRD tree snapshot) that are populated from disk on demand. External CLI commands that write to the same files can cause stale or partial reads:
+
+| Scenario | Risk | Mitigation |
+|----------|------|------------|
+| Dashboard reads PRD while `ndx plan` writes to `.rex/prd_tree/` | Partial aggregate read or stale derived JSON | Restart server after plan (`ndx start stop && ndx start`) |
+| MCP request during `ndx work` PRD update | Momentarily stale status — hench writes are small atomic updates | Acceptable — dashboard polls and self-corrects within seconds |
+| Concurrent dashboard API requests | Safe — Express serializes requests per-connection; no shared mutable state between request handlers | No action needed |
+
+**General rule for HTTP:** most routes treat disk files as read-only. The exception is the PRD: the routes that mutate `.rex/prd_tree/` (item CRUD, merge, prune, reorganize, restore, and the Ask panel's `apply-refinements`) go through `rex-gateway`'s `resolveStore` and hold the PRD file lock for the span of `withTransaction`. That makes the server a first-class PRD writer alongside `ndx work` and the MCP tools, and it is why those routes surface a lock-acquisition failure — which names the holder's PID — rather than retrying or writing anyway.
+
+The folder tree watcher refreshes `.rex/.cache/prd.json` automatically for most PRD mutations; routes that write also call `refreshPRDCache` so their own change is visible to the next read without a restart. Any command that bulk-rewrites `.sourcevision/` (ci, refresh) should be followed by a server restart to flush stale caches.
+
+### Writes are workspace-scoped
+
+Every PRD-writing route resolves its target from `ctx.rexDir` — through
+`resolveStore(ctx.rexDir)` in `routes-rex/items.ts`, `prune.ts`, `health.ts`,
+`refinements.ts` (which is where the Ask panel's accepted proposals land, via
+`POST /api/rex/apply-refinements`), `requirements.ts` and `routes-rex-analysis.ts`;
+and by path in `restore.ts`, which restores from that workspace's `.rex/.backups`.
+Since PR 12 that ctx is whichever workspace the request addressed —
+the `/w/<key>/` slot or `X-Ndx-Workspace` — so a write made while viewing a branch
+worktree rewrites **that worktree's** `.rex/prd_tree/` and leaves the anchor's
+untouched. The PRD lock is per `rexDir` (`prdLockPath`), one per workspace: two
+worktrees write concurrently without contending, and equally, the lock does not
+serialize them against each other. Nothing needs it to — they are different trees.
+
+Two rules follow, and both are load-bearing:
+
+- **No cross-workspace write action.** No route takes a workspace as a parameter,
+  and no UI offers "apply to the anchor instead". Editing the anchor's PRD while
+  viewing a branch requires switching workspace through the breadcrumb switcher,
+  which is a full navigation. A cross-workspace affordance would make the write
+  target a thing the reader has to check rather than a thing the URL states.
+- **The write target is stated, not inferred.** `WorkspaceWriteStrip`
+  (`viewer/components/workspace-write-strip.ts`) renders a one-line strip in the
+  PRD view for a non-anchor workspace only. On the anchor it renders nothing —
+  a permanent banner on the common case is noise.
+
+`tests/integration/workspace-scoped-prd-writes.test.ts` pins this by hashing both
+trees around each write; a route that wrote both would fail it.
+
+### The Workspaces board is the one cross-workspace reader
+
+`viewer/views/workspaces.ts` is the exception to both rules above, deliberately
+and in one direction only. It is *about* the set of worktrees, so it addresses
+each one explicitly with the `X-Ndx-Workspace` header rather than the `/w/<key>/`
+slot — the slot is already spent on whichever workspace the viewer itself is
+mounted under, and the server reads the header ahead of the slot
+(`workspaceFromHeader` in the dispatcher, not the lenient `resolveWorkspace`).
+Four endpoints answer for the whole repository and are fetched plainly
+(`/api/workspaces`, `/api/worktrees`, `/api/hench/memory`, `/api/live`); the
+rest are per workspace. `/api/live` (`routes-live.ts`) is the Live tab's one
+read — every worktree's running runs and jobs, the queue, the machine strip —
+built from the registry's list and the digest cache behind `/api/worktrees`,
+never from `git` per request. Its `live:changed` frame is tagged `"*"`, like
+the memory monitor's.
+
+**A header naming no known worktree is a 404, on reads as much as on writes.**
+Falling back to the anchor would answer under a name the caller did not ask
+for: a write to the wrong tree, or — on the board's per-card polling — the
+anchor's running task painted onto another worktree's card. Refusing is safe
+because only a fetch ever sets this header (`workspaceFetch`,
+`StartTaskButton`), never a navigation, so no page load can 404 on it. The
+dispatcher re-reads the worktree list once before refusing, since the registry
+only rescans every 30s and a worktree created since the last tick would
+otherwise be rejected for no reason. `respondUnknownWorkspaceHeader` answers
+JSON naming the key and the keys that do exist; `StartTaskButton` already
+renders that `error` field.
+
+Two constraints keep this from eroding the rules:
+
+- **No route gained a workspace parameter.** The header is the existing
+  addressing mechanism, not a new one. A request made with it *is* that
+  workspace's request — `ctx` resolves the same way it does for a `/w/<key>/`
+  navigation, so the run it starts has that worktree as its cwd and writes that
+  worktree's tree. Nothing writes across a boundary.
+- **The only cross-workspace action is Start working / Stop.** Starting an agent
+  in another worktree names the worktree on the button
+  (`StartTaskButton`'s `workspace` prop, which sets the header). Editing a PRD
+  item still requires navigating there — the board links, it does not edit.
+
+Because it is about every worktree, it is also the one socket consumer that must
+**not** call `acceptsFrame`: a run progressing in worktree B is exactly what
+should move B's card while the viewer sits on A. It reads the `workspace` tag
+itself (`frameWorkspace`) and refreshes only that workspace's slice, falling back
+to a whole-board reload for a `"*"` frame or an unrecognised key.
+
+## hub zone (`src/hub/`)
+
+`src/hub/` is the 0.7.0 hub daemon (`web hub`): one process per user that owns
+`hub.json` (project registry) and `hub.pid` in the per-user directory, serves
+`/api/hub/*`, and runs one `web serve` child per registered repository on an
+ephemeral loopback port. It is its own zone with a deliberately small import
+surface:
+
+- node built-ins, `src/shared/` through its barrel (the base-path helpers the hub
+  shares with the viewer), and `@n-dx/llm-client`'s **exec helpers only** through
+  `src/hub/exec-gateway.ts` (re-export only, no logic). That gateway exists to
+  keep `node:child_process` out of the hub, not to funnel everything the
+  foundation tier exports — `registry.ts` imports the layout resolver straight
+  from `@n-dx/llm-client`, as `src/server/paths.ts` does, because foundation-tier
+  imports are gated only in hench (`packages/core/gateway-rules.json`).
+- Nothing from `src/server/` or `src/viewer/`. The project servers it spawns are
+  today's `web serve` unchanged; the hub talks to them over HTTP (`GET /api/status`),
+  never by import. The two JSON response helpers in `hub/routes.ts` are local for
+  that reason rather than shared with `server/response-utils.ts`.
+- Consumers import from `src/hub/index.ts`, the barrel.
+
+The per-user directory is `resolveNdxHome`'s answer, not the hub's: `$NDX_HOME`,
+then `$N_DX_HOME`, then whichever of `~/.ndx` and `~/.n-dx` exists, defaulting to
+`~/.ndx`. Tests pass `homeDir` explicitly, which wins over all of it. Core's
+`web.js` spawns the hub (PR 10) with the already-resolved directory in `$NDX_HOME`
+— the orchestration tier still never imports it, and uses its own hand-written
+twin of the resolver in `packages/core/layout.js`.
+
+**Proxy and base path.** `hub/proxy.ts` forwards `/p/<id>/…` to that project's
+server with the prefix stripped (HTTP streamed, WebSocket upgrades piped over
+`node:net`), and aliases the root to the sole registered project; with several
+registered, `/` is a project list and other root paths answer 409 with the ids.
+The viewer derives the same prefix from `location.pathname` at boot
+(`viewer/base-path.ts`): `installBasePathFetch()` prefixes every root-relative
+`fetch`, `getWebSocketUrl()` is the one socket endpoint, and `appUrl()` covers
+hand-built URLs (history entries, share links, the logo). Both sides use
+`src/shared/base-path.ts`, so where the prefix ends is defined once. New viewer
+code must not build `ws://…${location.host}` or `location.origin + "/api/…"` by
+hand — go through those helpers.
+
+**Workspace slot.** The viewer's base path also carries `/w/<key>` when it
+addresses a worktree other than the anchor (`detectViewerBasePath`), so
+`/p/app/w/feature/prd` and `/w/feature/prd` deep-link to that worktree's tree.
+The project server strips the slot in `start.ts` before dispatch
+(`stripWorkspaceSlot`), resolves the workspace in the registry, and answers an
+unknown key with a 404 page linking to the anchor; `X-Ndx-Workspace` does the
+same for non-browser clients. Routes never see the slot.
+
+## Web viewer gateway boundary
+
+> Applies to `src/viewer/`, `src/shared/` and `src/schema/`.
+> `.claude/rules/web-gateway-boundary.md` scopes this section to those paths for
+> Claude Code; the text lives here so every assistant reads it.
+
+Within the web package, `src/viewer/external.ts` concentrates all viewer-side imports
+from `src/viewer/messaging/`, `src/shared/`, and `src/schema/`. `RequestDedup` is
+canonically located in `src/viewer/messaging/request-dedup.ts` and re-exported through
+`external.ts` for viewer consumers.
+
+**Type-import exemption:** the root gateway rule (see the root `AGENTS.md`) requires
+`import type` to flow through gateways too, to prevent type-import promotion erosion.
+Web viewer files are exempt from this because the server/viewer boundary prevents them
+from reaching the server-side gateway.
+
+**Messaging exemption:** `src/viewer/messaging/` files may import directly from
+`src/shared/` without going through `external.ts`. The shared/ directory is neutral
+(neither server nor viewer), and messaging utilities access it directly to avoid
+zone-level dependency inversion. Enforced by `boundary-check.test.ts`. New files added
+to `viewer/messaging/` inherit this exemption — review them to ensure they are genuine
+messaging infrastructure, not general viewer code.
+
+## Web injection seam registry
+
+> Applies to `src/server/`. `.claude/rules/web-injection-seams.md` scopes this
+> section to that path for Claude Code; the text lives here so every assistant
+> reads it.
+
+Some cross-zone dependencies inside the web package use callback injection rather than
+gateway imports. These seams are invisible to static analysis tools
+(`boundary-check.test.ts`, `domain-isolation.test.js`) and must be listed explicitly to
+prevent future contributors from replacing injection with direct imports.
+
+| Injection site | Target module | Injected callbacks | Interface type |
+|----------------|---------------|---------------------|-----------------|
+| `src/server/start.ts` | `src/server/task-usage.ts` (barrel facade — re-exports from `task-usage/register-scheduler.ts`; import through the facade, not the subdirectory file directly) | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
+| `src/server/start.ts` | `src/server/workspaces.ts` (`WorkspaceRegistry`) | `setup(ctx)` → watchers + PRD cache for a worktree, `teardown(handles)` — built by `createWorkspaceHooks` in start.ts, which owns the watcher registration helpers; the registry must not import start.ts | `WorkspaceHooks` |
+| `src/server/start.ts` | `src/server/routes-live.ts` (also passed to `routes-live-analyze.ts`, which imports the type from routes-live) | `listWorkspaces()` → every worktree in the registry, `memoryFloorBytes()` (optional; defaults to the hub config) — built by `liveSourcesOf` in start.ts so the Live routes never import the workspace registry | `LiveSources` |
+
+Rules:
+- **Prefer injection over import** when the target module would otherwise need to import
+  from a higher-tier zone (e.g., scheduler importing from dashboard wiring).
+- **Document the interface type** — every injection seam must have a named TypeScript
+  interface (not inline parameter types) so that refactoring either side triggers a type
+  error.
+- **New seams** require an entry in this table and a named interface type in the target
+  module.
+
+A package other than web or core that grows an injection seam puts its registry in
+that package's own `AGENTS.md`, with its `CLAUDE.md` reduced to the `@AGENTS.md`
+import — `packages/llm-client/` is the reference pair. The pattern itself (and the
+"why" above) is not web-specific; only today's instances are. Do not add a new
+`.claude/rules/` registry: that directory is read by Claude Code and nothing else, so
+a registry parked there is invisible to Codex and every other assistant.

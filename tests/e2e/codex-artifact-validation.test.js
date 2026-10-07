@@ -324,10 +324,19 @@ describe("AGENTS.md format stability", () => {
     expect(agentsContent).toContain("Four-tier dependency hierarchy");
   });
 
-  it("excludes Claude-specific deep sections", () => {
-    expect(agentsContent).not.toContain("zone fragility governance");
-    expect(agentsContent).not.toContain("Injection seam registry");
-    expect(agentsContent).not.toContain("Concurrency contract");
+  it("includes the architecture governance sections", () => {
+    // Formerly asserted absent, back when these lived in claude-addendum.md
+    // and Codex ran without the gateway rules or the PRD write invariant.
+    // See tests/e2e/instruction-alignment.test.js for the guard that keeps
+    // vendor-neutral sections out of the Claude-only addendum.
+    expect(agentsContent).toContain("zone fragility governance");
+    expect(agentsContent).toContain("### Gateway modules");
+    expect(agentsContent).toContain("### Concurrency contract");
+  });
+
+  it("excludes Claude-specific content", () => {
+    expect(agentsContent).not.toContain("### Claude-specific guidance files");
+    expect(agentsContent).not.toContain("packages/web/CLAUDE.md");
   });
 
   it("workflow section references .rex/workflow.md", () => {
