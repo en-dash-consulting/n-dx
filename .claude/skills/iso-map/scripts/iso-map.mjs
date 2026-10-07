@@ -2698,6 +2698,7 @@ var DATA_FILES = {
   components: "components.json",
   callGraph: "callgraph.json",
   projectProfile: "project-profile.json",
+  sdlcProfile: "sdlc-profile.json",
   infrastructure: "infrastructure.json"
 };
 var ALL_DATA_FILES = Object.values(DATA_FILES);
