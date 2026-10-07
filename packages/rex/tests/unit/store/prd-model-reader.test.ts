@@ -195,6 +195,43 @@ describe("v2 trees", () => {
     });
   });
 
+  describe("state fields written in frontmatter", () => {
+    const TASK_FILE = "changes/add-apple-pay/wire-the-button.md";
+    const CHANGE_FILE = "changes/add-apple-pay/index.md";
+
+    async function withFrontmatter(file: string, lines: string): Promise<string> {
+      const rexDir = await copyFixture();
+      const path = join(rexDir, file);
+      await writeFile(path, (await readFile(path, "utf-8")).replace(/^slug: .*\n/m, (slug) => `${slug}${lines}`));
+      return rexDir;
+    }
+
+    it("ignore frontmatter status when the node has no state row", async () => {
+      const rexDir = await withFrontmatter(TASK_FILE, 'status: "completed"\ncompletedAt: "2026-10-02T00:00:00.000Z"\n');
+      const task = find(await loadPrdModel(rexDir, quiet), TASK);
+      expect(task.status).toBe("pending");
+      expect(task).not.toHaveProperty("completedAt");
+    });
+
+    it("warn once per state key, naming the key and the file", async () => {
+      const rexDir = await withFrontmatter(TASK_FILE, 'status: "completed"\nassignee: "someone"\nprs: ["https://x/pull/1"]\n');
+      const path = join(rexDir, TASK_FILE);
+      const model = await loadPrdModel(rexDir, quiet);
+      expect(model.warnings).toEqual(
+        ["status", "assignee", "prs"].map((key) => ({
+          path,
+          message: `Ignoring state field "${key}" in frontmatter on item id=${TASK}: state lives in state.yaml`,
+        })),
+      );
+    });
+
+    it("leave the state row authoritative", async () => {
+      const rexDir = await withFrontmatter(CHANGE_FILE, 'status: "pending"\nstartedAt: "2020-01-01T00:00:00.000Z"\n');
+      const change = find(await loadPrdModel(rexDir, quiet), CHANGE);
+      expect(change).toMatchObject({ status: "in_progress", startedAt: "2026-10-01T09:00:00.000Z" });
+    });
+  });
+
   it("refuses a malformed state.yaml rather than reading its nodes as pending", async () => {
     const rexDir = await copyFixture();
     await writeFile(join(rexDir, "product/checkout/state.yaml"), `schema: "rex/v2"\nitems:\n  "x":\n    status: "nope"\n`);

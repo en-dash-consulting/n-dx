@@ -43,7 +43,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { ItemLevel, PRDItem } from "../schema/index.js";
 import { SCHEMA_VERSION, isCompatibleSchema } from "../schema/index.js";
-import { NodeIntentSchema, RootHeaderSchema, SCHEMA_VERSION_V2, isV2Schema, type NodeType, type StateFile } from "../schema/v2.js";
+import { ItemStateSchema, NodeIntentSchema, RootHeaderSchema, SCHEMA_VERSION_V2, isV2Schema, type NodeType, type StateFile } from "../schema/v2.js";
 import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
 import { parseFolderTree, parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "./paths.js";
@@ -329,6 +329,7 @@ async function readNode(
   const fm = parseFrontmatter(text, path, warnings);
   if (!fm) return null;
   dropNonObjectRun(fm, path, warnings);
+  dropStateFields(fm, path, warnings);
   const body = bodyOf(text);
   const intent = NodeIntentSchema.safeParse(body ? { ...fm, body } : fm);
   if (!intent.success) {
@@ -354,6 +355,19 @@ function dropNonObjectRun(fm: Record<string, unknown>, path: string, warnings: P
   if (run === undefined || (typeof run === "object" && run !== null && !Array.isArray(run))) return;
   delete fm.run;
   if (run !== null) warnings.push({ path, message: `Ignoring run on item id=${String(fm.id)}: expected an object` });
+}
+
+/**
+ * Remove `state.yaml` fields from frontmatter before intent validation. Intent
+ * is passthrough, so a hand-edited `status: completed` would otherwise stand
+ * in for a missing state row; state.yaml stays the only source of state.
+ */
+function dropStateFields(fm: Record<string, unknown>, path: string, warnings: ParseWarning[]): void {
+  for (const key of Object.keys(fm)) {
+    if (!Object.hasOwn(ItemStateSchema.shape, key)) continue;
+    delete fm[key];
+    warnings.push({ path, message: `Ignoring state field "${key}" in frontmatter on item id=${String(fm.id)}: state lives in state.yaml` });
+  }
 }
 
 // ── Shared ───────────────────────────────────────────────────────
