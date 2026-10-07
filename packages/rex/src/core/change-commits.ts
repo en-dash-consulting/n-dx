@@ -208,14 +208,19 @@ async function scanCommitFiles(repoDir: string, hashes: string[]): Promise<Recor
 }
 
 async function resolveDefaultRef(repoDir: string): Promise<{ ref: string; tip: string }> {
+  const reasons: string[] = [];
   for (const ref of DEFAULT_MAIN_REFS) {
     try {
       return { ref, tip: await resolveCommit(repoDir, ref) };
-    } catch {
-      // Absent from this checkout; the next candidate is tried, and the loop's end throws.
+    } catch (err) {
+      // Absent from this checkout: try the next. Keep the reason, so a cause
+      // that is not a missing ref (not a repository, git absent) still surfaces.
+      reasons.push(`${ref}: ${(err as Error).message}`);
     }
   }
-  throw new Error(`git rev-parse failed in ${repoDir}: none of ${DEFAULT_MAIN_REFS.join(", ")} resolves; pass a ref`);
+  throw new Error(
+    `git rev-parse failed in ${repoDir}: none of ${DEFAULT_MAIN_REFS.join(", ")} resolves; pass a ref\n${reasons.join("\n")}`,
+  );
 }
 
 async function resolveCommit(repoDir: string, ref: string): Promise<string> {

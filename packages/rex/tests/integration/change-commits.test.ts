@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -227,6 +227,12 @@ describe("computeChangeCommits", () => {
 
     it("names the candidates when none resolves", async () => {
       await expect(computeChangeCommits([CHANGE], { repoDir: repo, cacheDir })).rejects.toThrow(/origin\/HEAD, origin\/main, main/);
+    });
+
+    it("keeps git's reason when the directory is not a repository", async () => {
+      const notRepo = join(repo, "..", "plain");
+      await mkdir(notRepo);
+      await expect(computeChangeCommits([CHANGE], { repoDir: notRepo, cacheDir })).rejects.toThrow(/not a git repository/i);
     });
   });
 
