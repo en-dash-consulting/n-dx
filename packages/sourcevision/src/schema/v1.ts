@@ -1173,15 +1173,77 @@ export interface SdlcCoverage extends SdlcDetection {
 }
 
 /** A CI pipeline and the jobs it runs. */
+/**
+ * What a CI step does, classified from the command it runs.
+ *
+ * A closed set so a consumer can ask "does this pipeline test" without
+ * pattern-matching shell. `other` is honest rather than a dustbin: a step
+ * whose command is not recognised is not evidence of anything.
+ */
+export type SdlcStepKind =
+  | "checkout"
+  | "setup"
+  | "install"
+  | "build"
+  | "test"
+  | "lint"
+  | "typecheck"
+  | "migrate"
+  | "deploy"
+  | "publish"
+  | "other";
+
+/** One step in a CI job. */
+export interface SdlcCiStep {
+  /** Step name as declared, when it has one. */
+  name?: string;
+  /** The shell command, when the step runs one. */
+  run?: string;
+  /** The action, orb or image the step invokes, when it does. */
+  uses?: string;
+  kind: SdlcStepKind;
+}
+
+/** One job in a CI pipeline. */
+export interface SdlcCiJob {
+  name: string;
+  steps: SdlcCiStep[];
+  /** Jobs this one waits for, as declared. */
+  needs?: string[];
+  /**
+   * A guard on when the job runs, verbatim and unparsed — `if:` on Actions,
+   * `rules:`/`only:` elsewhere. Kept as text because deciding whether a
+   * condition means "only on main" is a judgement, not a parse.
+   */
+  condition?: string;
+}
+
 export interface SdlcCiPipeline extends SdlcDetection {
-  /** The CI system: `github-actions`, `gitlab-ci`, `bitbucket-pipelines`, `circleci`. */
+  /** The CI system: `github-actions`, `gitlab-ci`, `bitbucket-pipelines`, `circleci`, `jenkins`. */
   provider: string;
-  /** Pipeline name as declared. */
+  /** Pipeline name as declared, or the file name when it declares none. */
   name: string;
   /** What triggers it: `push`, `pull_request`, `schedule`, `manual`, `tag`. */
   triggers: string[];
-  /** Job names in declaration order. */
-  jobs: string[];
+  /** Jobs in declaration order, each with its steps. */
+  jobs: SdlcCiJob[];
+}
+
+/**
+ * An artifact that was found and recognised but could not be read.
+ *
+ * The distinction this exists for: "no CI is configured" and "CI is
+ * configured and the analyser could not parse it" are opposite facts about a
+ * repository, and an empty `ci` array says the first. A scorecard that
+ * confused them would mark a well-tested project as having no pipeline.
+ */
+export interface SdlcParseFailure {
+  /** Project-relative path of the file. */
+  path: string;
+  /** What it was recognised as — `github-actions`, `package.json`, `dockerfile`. */
+  kind: string;
+  /** Why it could not be read, in one line. */
+  reason: string;
 }
 
 /** A deployment target the repository can reach. */
@@ -1299,4 +1361,12 @@ export interface SdlcProfile {
   observability: SdlcObservability[];
   containers: SdlcContainer[];
   iac: SdlcIac[];
+  /**
+   * Files that were recognised but could not be read.
+   *
+   * Empty means every artifact found was parsed. It is not the same as a
+   * section being empty, which means the analyser looked and found none — see
+   * `SdlcParseFailure`.
+   */
+  parseFailures: SdlcParseFailure[];
 }
