@@ -36,7 +36,7 @@ plannedRelease: "1.0.0"
 | [Move the Jev client into llm-client and redact Bitbucket tokens](./move-the-jev-client-into-llm-client/index.md) | completed |
 | [Placement engine for changes](./placement-engine-for-changes/index.md) | pending |
 | [Product, Changes and capability views on fixtures](./product-changes-and-capability-views/index.md) | completed |
-| [Read and write the v2 folder trees](./read-and-write-the-v2-folder-trees/index.md) | pending |
+| [Read and write the v2 folder trees](./read-and-write-the-v2-folder-trees/index.md) | completed |
 | [Recommendations become changes](./recommendations-become-changes/index.md) | pending |
 | [Remove the unused tracker integrations](./remove-the-unused-tracker-integrations/index.md) | completed |
 | [Review follow-ups for the product layer work](./review-follow-ups-for-the-product/index.md) | pending |
