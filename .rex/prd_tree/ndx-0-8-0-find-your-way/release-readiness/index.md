@@ -23,7 +23,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Audit the 0.8.0 changesets and run the package vulnerability scan](./audit-the-0-8-0-changesets-and-run-the.md) | pending |
+| [Audit the 0.8.0 changesets and run the package vulnerability scan](./audit-the-0-8-0-changesets-and-run-the.md) | completed |
 | [Lock the README and docs/guide command references to the help registry](./lock-the-readme-and-docs-guide-command.md) | completed |
 | [Make the ci child-cleanup e2e test deterministic under full-suite load](./make-the-ci-child-cleanup-e2e-test.md) | pending |
 | [Make the command-docs parity and cli-ui-gap drift tests pass on Windows CRLF checkouts](./make-the-command-docs-parity-and-cli.md) | completed |
