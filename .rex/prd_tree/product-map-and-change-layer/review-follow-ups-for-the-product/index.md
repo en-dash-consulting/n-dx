@@ -26,3 +26,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Nothing stops AGENTS.md growing past Codex's 32 KiB project-doc limit, where Codex silently drops the tail](./nothing-stops-agents-md-growing-past.md) | pending |
 | [Rex MCP tool access kinds are unpinned, so a write tool can flip to read and escape #499 write refusal](./rex-mcp-tool-access-kinds-are-unpinned.md) | pending |
 | [Web Product view still shows "map node" wording after decision N1](./web-product-view-still-shows-map-node.md) | pending |
+| [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | pending |
