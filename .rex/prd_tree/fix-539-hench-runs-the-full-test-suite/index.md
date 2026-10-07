@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [a new artifact read by a root-subset test but missing from VALIDATED_ARTIFACTS is not detected](./a-new-artifact-read-by-a-root-subset.md) | pending |
 | [a validated test or docs artifact changed on its own selects the suite that checks it](./a-validated-test-or-docs-artifact.md) | completed |
 | [Absorb gate flakes: re-run only the failed suites once before failing an unattended run](./absorb-gate-flakes-re-run-only-the.md) | completed |
-| [affected mode never runs run-options-contract, catalog-runtime-contract or prd-slug-conformance for the package-source change they police](./affected-mode-never-runs-run-options.md) | in_progress |
+| [affected mode never runs run-options-contract, catalog-runtime-contract or prd-slug-conformance for the package-source change they police](./affected-mode-never-runs-run-options.md) | completed |
 | [affected mode runs the root drift tests when a package source changes](./affected-mode-runs-the-root-drift.md) | completed |
 | [affected mode skips the 2-second root policy tests when a change stays inside one package's src or tests](./affected-mode-skips-the-2-second-root.md) | completed |
 | [agent brief stops forbidding the full suite when the test gate is skipped](./agent-brief-stops-forbidding-the-full.md) | completed |
@@ -47,4 +47,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [run-all-tests.mjs selects suites by label and by affected change since a base ref](./run-all-tests-mjs-selects-suites-by.md) | completed |
 | [Task 3 follow-ups: shell-spawn inventory row, and keep the gate's suite selection after a flaky pass](./task-3-follow-ups-shell-spawn.md) | completed |
 | [Tell the agent and the in-hench reviewer to run scoped checks; the gate and CI run the rest](./tell-the-agent-and-the-in-hench.md) | completed |
+| [the affected gate passes a dist-reading drift test on a stale build, so a source-only change it selects still goes green](./the-affected-gate-passes-a-dist.md) | pending |
 | [The interactive test-gate prompt never appears: require() in an ESM module aborts it silently](./the-interactive-test-gate-prompt-never.md) | completed |
