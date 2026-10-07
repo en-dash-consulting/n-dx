@@ -20,6 +20,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [.claude/rules accepts any new policy file with a table; only *-injection-seams.md names are blocked](./claude-rules-accepts-any-new-policy.md) | pending |
 | [Drift guard reads rule files with CRLF line endings](./drift-guard-reads-rule-files-with-crlf.md) | completed |
 | [Give every package CLAUDE.md an AGENTS.md counterpart](./give-every-package-claude-md-an-agents.md) | completed |
 | [Move vendor-neutral sections from the Claude addendum into the shared guidance](./move-vendor-neutral-sections-from-the.md) | completed |
