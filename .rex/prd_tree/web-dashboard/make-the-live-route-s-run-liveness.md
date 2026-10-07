@@ -2,13 +2,18 @@
 id: "2b93e208-5953-45ca-9180-0e4a6cb7b972"
 level: "task"
 title: "Make the Live route's run-liveness check correct on Windows"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "ci"
   - "windows"
   - "live-tab"
 source: "overnight CI-trust session 2026-10-06"
+startedAt: "2026-10-07T02:56:46.843Z"
+completedAt: "2026-10-07T03:11:53.782Z"
+endedAt: "2026-10-07T03:11:53.782Z"
+resolutionType: "code-change"
+resolutionDetail: "isPidAlive (hench canonical + web mirror) rejects non-positive/non-integer pids and, on win32, pids not a multiple of 4 before kill(pid,0); win32 simulated in unit tests; parity test pins the probes. Windows CI still the final check."
 acceptanceCriteria:
   - "The two live-route tests (\"GET /api/live > queues the next actionable task and fills the machine strip\" and \"counts a worktree as having a live run by verdict, not by the record's status\") pass on the CLI Smoke (Windows) CI job"
   - "The liveness verdict for a run record whose pid is dead is \"orphaned\" on every OS (win32, darwin, linux)"
@@ -16,6 +21,6 @@ acceptanceCriteria:
   - "A unit test simulates the win32 path of the pid-liveness probe (platform injected or stubbed, not dependent on the host OS) and proves a pid that cannot be a live Windows process is reported dead"
   - "The web mirror (packages/web/src/server/run-staleness.ts isPidAlive) and the canonical hench probe (packages/hench/src/process/run-liveness.ts isPidAlive) stay identical, so tests/e2e/run-liveness-parity.test.js still passes"
 description: "## Symptom\n`packages/web/tests/integration/live-route.test.ts` fails only on the CLI Smoke (Windows) job (PRs #536, #545, #530; e.g. Actions run 37561490141 job 112599769524). macOS and Linux pass.\n- live-route.test.ts:249 `expected { total: 2, withLiveRun: 2 } to deeply equal { total: 2, withLiveRun: 1 }`\n- live-route.test.ts:262 `expected 'live' to be 'orphaned'` for the run `elsewhere`\nThe run record's process (pid) is treated as alive on Windows.\n\n## What the code does (read-only investigation)\n- The verdict comes from `classifyRunLiveness` in `packages/web/src/server/run-liveness.ts` (a mirror of the canonical `packages/hench/src/process/run-liveness.ts`, pinned by `tests/e2e/run-liveness-parity.test.js`). For a record with a numeric `pid`, a dead pid -> `orphaned`; an alive pid with a fresh heartbeat -> `live`.\n- The probe is `isPidAlive` in `packages/web/src/server/run-staleness.ts`: `process.kill(pid, 0)` -> true; on throw, true only for `EPERM`. No platform handling. Hench's `isPidAlive` is identical.\n- In the test, the `elsewhere` record (linked worktree, `lastActivityAt` 5s ago) is written without an explicit pid, so the `writeRun` fixture defaults it to `pid: 4242`. The test comment says its pid is gone. On macOS/Linux pid 4242 is normally free -> `orphaned`. On Windows it is judged alive -> `live`, which also makes `machine.worktrees.withLiveRun` 2. Both failures come from this one record. The `ghost` record uses `DEAD_PID = 2**31 - 2` and its test passes on Windows, so the probe itself does fail for an out-of-range pid.\n- Likely mechanism on win32: Node's `process.kill(pid, 0)` goes through libuv `uv_kill` -> `OpenProcess(pid)` + `GetExitCodeProcess == STILL_ACTIVE`. Windows process ids are always multiples of 4 and the kernel ignores the low two bits of a pid passed to `OpenProcess`, so `4242` opens process `4240`, which exists on a busy CI runner. `OpenProcess` returning ACCESS_DENIED maps to `EPERM`, which `isPidAlive` also counts as alive. So on win32 a recorded pid can read alive when no process with that exact id exists. This was not reproducible here (macOS); Windows CI is the real check.\n\n## Asked for\n- A fix grounded in the code: make the pid probe correct on win32 (e.g. a pid that is not a positive integer, or on win32 is not a multiple of 4, cannot be a live process and is reported dead before calling `process.kill`), with a comment citing why. Apply it to both the web mirror and the canonical hench probe so the parity test holds (the hub registry `packages/web/src/hub/registry.ts` isPidAlive already guards non-positive ints; other probes in hench limiter/lifecycle and rex file-lock are out of scope unless trivially shared).\n- A unit test that simulates the win32 path (inject or stub `process.platform` / the kill call) so it runs on macOS/Linux CI too.\n- The live-route fixture may make the abandoned record's dead pid explicit, but only in addition to the code fix, never instead of it, and without changing any assertion.\n- Do not skip, `it.skipIf`, or loosen any test."
-lastModified: "2026-10-07T02:56:19.155Z"
+lastModified: "2026-10-07T03:11:54.372Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
