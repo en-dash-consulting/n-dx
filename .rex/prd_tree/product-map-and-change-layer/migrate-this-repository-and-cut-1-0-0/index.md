@@ -23,11 +23,14 @@ blockedBy:
   - "298f7764-ed49-435a-8e4b-ada4c4c6f5a1"
   - "72d599a7-a398-405e-850d-9ae79659b15e"
   - "87adf364-8333-4c6b-b6f4-892481625262"
+  - "a7c0061e-eb80-473b-84b2-861194fbcc47"
+  - "a96f0d51-dc84-4c5b-9ab8-ad3c508b6334"
+  - "23ac07f7-5dc3-48c2-8310-1de6beba5943"
 source: "roadmap"
 acceptanceCriteria: []
 description: "Critical path end. Human review starts as soon as plan generation works; the code part is the final migration commit and the major changeset. After merge, update the ndx-runner install at once: pre-cut builds do not understand the v2 tree.\n\nRoadmap PR 26 · wave 4 · lane migration."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-06T16:54:44.323Z"
+lastModified: "2026-10-07T02:19:43.002Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 

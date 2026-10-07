@@ -26,4 +26,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 |-------|--------|
 | [Compute edges, derived kind and alias resolution](./compute-edges-derived-kind-and-alias.md) | pending |
 | [Compute intent status and health for product nodes](./compute-intent-status-and-health-for.md) | pending |
+| [Warn when a capability's criteria grow past a threshold](./warn-when-a-capability-s-criteria-grow.md) | pending |
 | [Work out when a change landed from git history](./work-out-when-a-change-landed-from-git.md) | pending |
