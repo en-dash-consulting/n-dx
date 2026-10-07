@@ -104,7 +104,7 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
       child.once("exit", (code, signal) => resolveExit({ code, signal }));
     });
     try {
-      // The handlers are installed right after the progress file is created.
+      // The handlers are installed before the progress file first says running (#562).
       await vi.waitFor(() => expect(readAnalyzeProgress(svDir)?.status).toBe("running"), {
         timeout: 20_000,
         interval: 5,
