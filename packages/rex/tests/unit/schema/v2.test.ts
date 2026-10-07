@@ -396,7 +396,7 @@ describe("isolation", () => {
     // writer) may import each other; nothing else may import them until the
     // v2 store wires them in.
     const v2Files = new Set(
-      ["schema/v2.ts", "schema/v2-rules.ts", "store/state-writer.ts", "store/prd-model-reader.ts", "store/prd-model-writer.ts", "core/product-edges.ts"].map(
+      ["schema/v2.ts", "schema/v2-rules.ts", "store/state-writer.ts", "store/prd-model-reader.ts", "store/prd-model-writer.ts", "core/product-edges.ts", "core/product-status.ts"].map(
         (f) => join(srcRoot, f),
       ),
     );

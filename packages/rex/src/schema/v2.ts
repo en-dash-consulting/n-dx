@@ -46,7 +46,8 @@
  *
  * Derived values (capability health, openAmendments, "bound by" edges,
  * change kind, a change's commits) are computed and cached outside the tree;
- * they have no field here on purpose. A change's commits come from its
+ * they have no field here on purpose. Intent status and health of product
+ * nodes are computed by `core/product-status.ts`. A change's commits come from its
  * `N-DX-Item` trailers (`core/change-commits.ts`): a rebase or squash rewrites
  * a SHA but keeps the trailer.
  *

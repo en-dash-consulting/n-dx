@@ -182,6 +182,11 @@ export function specHash(spec: { statement?: string; criteria?: Criterion[] }): 
   return createHash("sha256").update(canonical).digest("hex");
 }
 
+/** The part of a product node {@link specHash} hashes: a constraint has no criteria. */
+export function specOf(node: RuleNode): { statement?: string; criteria?: Criterion[] } {
+  return node.type === "capability" ? node : { statement: node.type === "constraint" ? node.statement : undefined };
+}
+
 // ── Rules ────────────────────────────────────────────────────────
 
 type Rule = (index: TreeIndex, options: RuleOptions) => RuleFinding[];
@@ -253,7 +258,8 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
 /** Statuses after which a change no longer acts on the product layer. */
 const CLOSED_CHANGE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["completed", "cancelled", "deleted"]);
 
-function isOpenChange(node: RuleNode): boolean {
+/** A change still acting on the product layer: its amendments are not applied and it is not closed. */
+export function isOpenChange(node: RuleNode): boolean {
   return node.type === "change" && !node.appliedIn && !CLOSED_CHANGE_STATUSES.has(node.status ?? "pending");
 }
 
@@ -306,7 +312,7 @@ const longRevised: Rule = ({ entries, resolve }, { now, longRevisedDays = DEFAUL
   return entries.flatMap(({ node }) => {
     if (node.type !== "capability" && node.type !== "constraint") return [];
     if (!node.metAt || amended.has(node)) return [];
-    if (specHash(node.type === "capability" ? node : { statement: node.statement }) === node.metAt) return [];
+    if (specHash(specOf(node)) === node.metAt) return [];
     const revised = node.revisedAt ? Date.parse(node.revisedAt) : Number.NaN;
     if (Number.isNaN(revised)) return [];
     const days = Math.floor((now.getTime() - revised) / DAY_MS);
