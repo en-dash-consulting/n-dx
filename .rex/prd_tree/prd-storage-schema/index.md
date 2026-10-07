@@ -2,13 +2,12 @@
 id: "a4992835-70eb-4d9d-a79f-d0577b8927bc"
 level: "epic"
 title: "PRD Storage & Schema"
-status: "completed"
+status: "pending"
 startedAt: "2026-05-06T13:26:50.051Z"
-completedAt: "2026-09-11T22:30:42.632Z"
 endedAt: "2026-09-11T22:30:42.632Z"
 description: "PRD persistence model: folder-tree storage, markdown serialization, schema evolution, visibility/reporting, branch attribution, and the migration history that produced the current single-source-of-truth tree at .rex/prd_tree/."
-lastModified: "2026-09-11T22:30:42.656Z"
-lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-07T03:51:40.830Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -48,3 +47,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Test Suite Updates for Folder-Tree PRD Storage](./test-suite-updates-for-folder-tree-prd/index.md) | completed |
 | [Title-Based PRD Item File Naming Convention](./title-based-prd-item-file-naming/index.md) | completed |
 | [Make finding-derived task titles distinctive at generation time](./make-finding-derived-task-titles.md) | completed |
+| [Retry rex's atomic-write rename on transient Windows EPERM/EACCES/EBUSY](./retry-rex-s-atomic-write-rename-on.md) | pending |
