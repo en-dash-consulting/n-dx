@@ -23,7 +23,7 @@ plannedRelease: "1.0.0"
 | [Apply the migration](./apply-the-migration/index.md) | pending |
 | [Capture the product map roadmap](./capture-the-product-map-roadmap/index.md) | completed |
 | [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | pending |
-| [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | pending |
+| [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | completed |
 | [Dashboard on the v2 model](./dashboard-on-the-v2-model/index.md) | pending |
 | [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | completed |
 | [Derived status, health and computed edges](./derived-status-health-and-computed-edges/index.md) | pending |
