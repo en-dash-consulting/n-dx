@@ -33,7 +33,8 @@
  * | constraint: statement, requirements, appliesTo   | commits, links*                              |
  * | change: intent, amends, touches, plannedRelease, | assignee, ready, needsPlacement              |
  * |   spike, priority, requirements, loe,            | lastModified, lastModifiedBy                 |
- * |   loeRationale, loeConfidence, effort*           |                                              |
+ * |   loeRationale, loeConfidence, effort*,          |                                              |
+ * |   discoveredFrom { item?, run? }                 |                                              |
  * | task/subtask: description, acceptanceCriteria;   |                                              |
  * |   task also requirements, priority, loe,         |                                              |
  * |   loeRationale, loeConfidence, effort*           |                                              |
@@ -216,6 +217,29 @@ export const AmendmentSchema = z
   })
   .passthrough();
 
+/**
+ * Where a change was found: the change or task whose work surfaced it, the
+ * hench run that recorded it, or both. Written by the capture paths (an
+ * agent's add_item during a run, review captures, `rex add --discovered-from`).
+ */
+export interface DiscoveredFrom {
+  /** Id of the change or task being worked when this one was found. */
+  item?: string;
+  /** Hench run id. */
+  run?: string;
+  [key: string]: unknown;
+}
+
+export const DiscoveredFromSchema = z
+  .object({
+    item: z.string().min(1).optional(),
+    run: z.string().min(1).optional(),
+  })
+  .passthrough()
+  .refine((d) => d.item !== undefined || d.run !== undefined, {
+    message: "discoveredFrom needs an item id, a run id, or both",
+  });
+
 /** Who stewards a product scope: git emails / identities, or team handles (`@org/team`). */
 export type Steward = string;
 
@@ -275,6 +299,7 @@ export interface ChangeIntent extends BaseIntent, EffortIntent {
   spike?: boolean;
   priority?: Priority;
   requirements?: Requirement[];
+  discoveredFrom?: DiscoveredFrom;
 }
 
 export interface TaskIntent extends BaseIntent, EffortIntent {
@@ -347,6 +372,7 @@ export const ChangeIntentSchema = z
     spike: z.boolean().optional(),
     priority: PrioritySchema.optional(),
     requirements: z.array(RequirementSchema).optional(),
+    discoveredFrom: DiscoveredFromSchema.optional(),
     ...effortIntentShape,
   })
   .passthrough();

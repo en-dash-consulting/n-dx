@@ -197,6 +197,18 @@ describe("per-type intent", () => {
     }
   });
 
+  it("records an optional discoveredFrom item and run on a change", () => {
+    const change = { id: ID, type: "change", title: "C", slug: "c" };
+    expect(ChangeIntentSchema.parse(change).discoveredFrom).toBeUndefined();
+    const both = ChangeIntentSchema.parse({ ...change, discoveredFrom: { item: ID, run: "run-42" } });
+    expect(both.discoveredFrom).toEqual({ item: ID, run: "run-42" });
+    expect(ChangeIntentSchema.safeParse({ ...change, discoveredFrom: { item: ID } }).success).toBe(true);
+    expect(ChangeIntentSchema.safeParse({ ...change, discoveredFrom: { run: "run-42" } }).success).toBe(true);
+    for (const bad of [ID, {}, { item: 3 }, { run: "" }, { item: "" }]) {
+      expect(ChangeIntentSchema.safeParse({ ...change, discoveredFrom: bad }).success, JSON.stringify(bad)).toBe(false);
+    }
+  });
+
   it("dispatches on type in the union", () => {
     const r = NodeIntentSchema.safeParse({ id: ID, type: "constraint", title: "C", slug: "c", appliesTo: "nope" });
     expect(r.success).toBe(false);
@@ -303,7 +315,7 @@ describe("field coverage (design intent/state tables)", () => {
     ["area", AreaIntentSchema, ["summary", "stewards"]],
     ["capability", CapabilityIntentSchema, ["statement", "criteria", "requirements", "dependsOn"]],
     ["constraint", ConstraintIntentSchema, ["statement", "requirements", "appliesTo"]],
-    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "loe", "loeRationale", "loeConfidence", "effort", "requirements"]],
+    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "loe", "loeRationale", "loeConfidence", "effort", "requirements", "discoveredFrom"]],
     ["task", TaskIntentSchema, ["description", "acceptanceCriteria", "requirements", "priority", "loe", "loeRationale", "loeConfidence", "effort"]],
     ["subtask", SubtaskIntentSchema, ["description", "acceptanceCriteria"]],
   ];
