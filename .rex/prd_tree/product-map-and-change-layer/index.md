@@ -38,7 +38,7 @@ plannedRelease: "1.0.0"
 | [Product, Changes and capability views on fixtures](./product-changes-and-capability-views/index.md) | pending |
 | [Read and write the v2 folder trees](./read-and-write-the-v2-folder-trees/index.md) | pending |
 | [Recommendations become changes](./recommendations-become-changes/index.md) | pending |
-| [Remove the unused tracker integrations](./remove-the-unused-tracker-integrations/index.md) | completed |
+| [Remove the unused tracker integrations](./remove-the-unused-tracker-integrations/index.md) | pending |
 | [Review follow-ups for the product layer work](./review-follow-ups-for-the-product/index.md) | pending |
 | [Route remaining state paths through the layout resolver](./route-remaining-state-paths-through/index.md) | completed |
 | [Select and complete work on changes](./select-and-complete-work-on-changes/index.md) | pending |
