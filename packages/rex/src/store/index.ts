@@ -41,7 +41,7 @@ export {
   slugifyTitle,
   resolveSiblingSlugs,
 } from "./folder-tree-serializer.js";
-export { findNonConformingSlugs, findTreeIdentityFaults, SLUG_RULE_VERSION } from "./folder-tree-serializer.js";
+export { findNonConformingSlugs, findTreeIdentityFaults, isWindowsSafeSegment, SLUG_RULE_VERSION } from "./folder-tree-serializer.js";
 export { assertSlugRuleWritable, assertSlugRuleAdoptable, checkTreeConformance, readSlugRuleMarker, SlugRuleMismatchError, SLUG_RULE_MARKER_MISSING } from "./slug-rule-guard.js";
 export type { TreeConformanceRefusal } from "./slug-rule-guard.js";
 export type { SlugMismatch } from "./folder-tree-serializer.js";

@@ -1,0 +1,7 @@
+schema: "rex/v2"
+items:
+  "a0000000-0000-4000-8000-000000000001":
+    status: "in_progress"
+  "a0000000-0000-4000-8000-000000000002":
+    status: "completed"
+    specReviewed: true

@@ -121,6 +121,15 @@ describe("other n-dx-serialized tracked files are pinned to LF", () => {
     ".agents/skills/ndx-work/SKILL.md",
     ".claude/skills/ndx-work/SKILL.md",
     ".codex/config.toml",
+    // v2 PRD trees: Markdown and state.yaml in both roots, on either layout,
+    // and the fixture the v2 writer tests compare byte-for-byte.
+    ".rex/product/checkout/state.yaml",
+    ".ndx/rex/product/index.md",
+    ".ndx/rex/product/checkout/state.yaml",
+    ".ndx/rex/changes/add-apple-pay/index.md",
+    ".ndx/rex/changes/add-apple-pay/state.yaml",
+    "packages/rex/tests/fixtures/v2-tree/product/index.md",
+    "packages/rex/tests/fixtures/v2-tree/changes/add-apple-pay/state.yaml",
   ];
 
   it.each(surfaces)("git resolves eol=lf for %s", (path) => {

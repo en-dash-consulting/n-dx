@@ -174,7 +174,8 @@ export type RunSettingKey = (typeof RUN_SETTING_KEYS)[number];
  * `validateRunSettings`, which also turns `{}` into "no block" so an empty
  * block is never written. A strict schema here would let one malformed or
  * newer-version block refuse every PRD write; the `run-settings` rule warns
- * instead.
+ * instead. A `run` that is not an object (a bare `run:` reads as null) is
+ * dropped by the reader before this schema sees it, so it cannot fail the node.
  */
 export type SavedRunSettings = { [K in RunSettingKey]?: unknown };
 
