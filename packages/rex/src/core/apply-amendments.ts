@@ -93,7 +93,7 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
     const fail = (message: string): void => {
       problems.push(`amendment ${i + 1} (${amendment.delta} ${amendment.target}): ${message}`);
     };
-    const node = APPLY[amendment.delta](next.product, amendment, options, fail);
+    const node = APPLY[amendment.delta](next, amendment, options, fail);
     if (!node) continue;
     node.body = appendHistory(node.body, `- ${date} ${label} ${amendment.delta}: ${amendment.summary}`);
     applied.push({ delta: amendment.delta, nodeId: node.id, summary: amendment.summary });
@@ -108,14 +108,17 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
 
 /** Applies one amendment to the product layer and returns the node it acted on, or reports through `fail`. */
 type DeltaApply = (
-  product: RuleNode[],
+  tree: V2Tree,
   amendment: Amendment,
   options: ApplyAmendmentsOptions,
   fail: (message: string) => void,
 ) => RuleNode | undefined;
 
-const applyAdded: DeltaApply = (product, amendment, options, fail) => {
-  if (resolve(product, amendment.target)) return void fail("a live product node already has this id");
+const applyAdded: DeltaApply = ({ product, changes }, amendment, options, fail) => {
+  // Retired nodes and changes count too: a reused id would share a state.yaml row with them.
+  if (resolve([...product, ...changes], amendment.target, { includeDeleted: true })) {
+    return void fail("a node in either layer, retired ones included, already has this id");
+  }
   if (!amendment.under) return void fail("an added capability needs under (its parent area or capability)");
   const parent = resolve(product, amendment.under);
   if (!parent || (parent.type !== "area" && parent.type !== "capability")) {
@@ -132,6 +135,9 @@ const applyAdded: DeltaApply = (product, amendment, options, fail) => {
 
   const display = isDisplayId(amendment.target);
   const id = display ? (options.newId ?? randomUUID)() : amendment.target;
+  if (display && resolve([...product, ...changes], id, { includeDeleted: true })) {
+    return void fail(`the new id ${id} is already taken`);
+  }
   const node = {
     id,
     type: "capability",
@@ -147,7 +153,7 @@ const applyAdded: DeltaApply = (product, amendment, options, fail) => {
   return node;
 };
 
-const applyModified: DeltaApply = (product, amendment, _options, fail) => {
+const applyModified: DeltaApply = ({ product }, amendment, _options, fail) => {
   const node = resolve(product, amendment.target);
   if (!node || (node.type !== "capability" && node.type !== "constraint")) {
     return void fail("not a live capability or constraint");
@@ -187,7 +193,7 @@ const applyModified: DeltaApply = (product, amendment, _options, fail) => {
   return node;
 };
 
-const applyRemoved: DeltaApply = (product, amendment, _options, fail) => {
+const applyRemoved: DeltaApply = ({ product }, amendment, _options, fail) => {
   const node = resolve(product, amendment.target);
   if (!node) return void fail("not a live product node");
   node.status = "deleted";
@@ -210,12 +216,12 @@ function stampMet(node: RuleNode): void {
   delete node.revisedAt;
 }
 
-/** The first live node in `nodes` (depth first) whose id, display id or alias is `ref`. */
-function resolve(nodes: readonly RuleNode[], ref: string): RuleNode | undefined {
+/** The first live node in `nodes` (depth first; retired ones too with `includeDeleted`) whose id, display id or alias is `ref`. */
+function resolve(nodes: readonly RuleNode[], ref: string, { includeDeleted = false } = {}): RuleNode | undefined {
   for (const node of nodes) {
-    if (node.status === "deleted") continue;
+    if (node.status === "deleted" && !includeDeleted) continue;
     if (node.id === ref || node.displayId === ref || node.aliases?.includes(ref)) return node;
-    const hit = resolve(node.children ?? [], ref);
+    const hit = resolve(node.children ?? [], ref, { includeDeleted });
     if (hit) return hit;
   }
   return undefined;

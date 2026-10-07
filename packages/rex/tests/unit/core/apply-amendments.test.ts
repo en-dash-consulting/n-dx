@@ -129,6 +129,14 @@ describe("applyAmendments: added", () => {
     expect(refusal(() => applyAmendments(tree([{ ...added, title: " " }]), CHANGE, OPTS)).problems[0]).toMatch(/needs a title/);
     expect(refusal(() => applyAmendments(tree([{ ...added, target: "A1.1" }]), CHANGE, OPTS)).problems[0]).toMatch(/already has this id/);
   });
+
+  it("refuses an id held by a retired node or a change, which would share its state row", () => {
+    const retired = tree([{ ...added, target: CAP }]);
+    get(retired, CAP).status = "deleted";
+    expect(refusal(() => applyAmendments(retired, CHANGE, OPTS)).problems[0]).toMatch(/retired ones included/);
+    expect(refusal(() => applyAmendments(tree([{ ...added, target: CHANGE }]), CHANGE, OPTS)).problems[0]).toMatch(/already has this id/);
+    expect(refusal(() => applyAmendments(tree([added]), CHANGE, { ...OPTS, newId: () => CAP })).problems[0]).toMatch(/new id cap-1 is already taken/);
+  });
 });
 
 describe("applyAmendments: modified", () => {
