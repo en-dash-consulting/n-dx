@@ -81,6 +81,16 @@ describe("ndx work --resolve", () => {
     expect(resolved.skipTestGate).toEqual({ value: false, source: "cli-flag" });
   });
 
+  it("reports saved as null and no fallbacks for a task that saved nothing", () => {
+    const result = runResult(["work", "--task=task-2", "--resolve", repo]);
+    expect(result.code, result.stderr).toBe(0);
+    const report = JSON.parse(result.stdout);
+    expect(report.saved).toBeNull();
+    for (const entry of Object.values(report.resolved)) {
+      expect(entry.fallback).toBeUndefined();
+    }
+  });
+
   it("refuses a flag passed together with its negation", () => {
     const result = runResult(["work", "--task=task-2", "--resolve", "--review", "--no-review", repo]);
     expect(result.code).not.toBe(0);

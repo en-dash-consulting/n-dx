@@ -1476,7 +1476,7 @@ async function runOne(
       })
     : undefined;
   if (settings && settingsCtx) {
-    for (const message of settings.warnings) warn(message);
+    for (const warning of settings.warnings) warn(warning.message);
     if (settings.model.mismatch) throw settings.model.mismatch;
     const reviewPass = settings.review.value;
     // A dry run spawns nothing, so it previews an unsupported combination

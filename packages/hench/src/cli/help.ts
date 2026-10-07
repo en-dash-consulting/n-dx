@@ -117,19 +117,35 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "and prints one JSON object on stdout:\n" +
           "  task       id, title, status, level, blockedBy, claimedBy\n" +
           "  workspace  root, branch, isAnchor, dirty\n" +
+          "  saved      the task's own run block, as rex validated it, or null\n" +
+          "             when it carries none — also null when a malformed block\n" +
+          "             was ignored, which is reported in warnings\n" +
           "  resolved   vendor, model, provider, permissionMode, review,\n" +
           "             reviewModel, skipTestGate, maxTurns, tokenBudget, fresh,\n" +
           "             allowDirty, resetDeferred — each {value, source}, where\n" +
-          "             source is the key that supplied it (cli-flag,\n" +
+          "             source is the key that supplied it (cli-flag, task.run\n" +
+          "             and its task.run.tier / task.run.models /\n" +
+          "             task.run.reviewTier / task.run.reviewModels forms,\n" +
           "             hench.models.<vendor>, llm.routes, llm.tiers.<vendor>.<tier>,\n" +
           "             llm.model, llm.<vendor>.model, vendor-default, hench.<key>,\n" +
-          "             autonomous-default, built-in)\n" +
+          "             autonomous-default, repository-trust, vendor-unsupported,\n" +
+          "             built-in). A setting a saved value won also carries\n" +
+          "             fallback {value, source}: what it would resolve to\n" +
+          "             without the saved block — this project's own default\n" +
           "  options    the per-run options, with flag, type, values and scope\n" +
           "  refusals   [{code, message}] for each reason the run would not start:\n" +
           "             prd-unreadable (task is null), task-not-found, not-actionable, claimed-elsewhere,\n" +
           "             tree-not-conformant, vendor-unset, vendor-cli-missing,\n" +
           "             provider-unsupported, model-vendor-mismatch, dirty-tree\n" +
-          "  command    the equivalent ndx work command line\n" +
+          "  warnings   [{code, message}] for a condition that does not stop the\n" +
+          "             run: untrusted-repository, or a saved setting that could\n" +
+          "             not be applied as written (saved-settings-ignored,\n" +
+          "             saved-model-incompatible, saved-provider-unavailable,\n" +
+          "             saved-provider-overridden, saved-review-unsupported,\n" +
+          "             saved-permission-mode-dropped)\n" +
+          "  command    the equivalent ndx work command line. Built from flags\n" +
+          "             alone: a task's saved settings apply to the run but are\n" +
+          "             never written into it, so the command is what you typed\n" +
           "\n" +
           "Exits 0 when it reports refusals. Takes no claim, writes nothing (no\n" +
           "--reset-deferred, no commit), and starts no vendor CLI or LLM call.",
