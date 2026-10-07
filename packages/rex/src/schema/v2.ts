@@ -1,15 +1,15 @@
 /**
- * Rex schema v2 — the product map and the change layer.
+ * Rex schema v2 — the product layer and the change layer.
  *
  * Types and Zod schemas for every v2 node, field and stored file. Wired to
- * nothing yet: no runtime module imports this file until the v2 reader and
- * writer land (enforced by tests/unit/schema/v2.test.ts). Validation *rules*
+ * nothing yet: only `store/state-writer.ts` (itself unwired) imports this
+ * file until the v2 store lands (enforced by tests/unit/schema/v2.test.ts). Validation *rules*
  * (cross-node checks such as "every change amends or touches something")
  * are pure functions in `./v2-rules.ts`; this file only fixes shapes.
  *
  * ## Model
  *
- * Two layers. The **map** (area, capability, constraint) describes the
+ * Two layers. The **product layer** (area, capability, constraint) describes the
  * product as built, in present tense. The **change layer** (change, task,
  * subtask) is linear work that closes. `type` replaces v1's `level`; a spike
  * is a change with `spike: true`, not a type. Releases are fields on a change
@@ -28,17 +28,21 @@
  * | tags, source, blockedBy, body, hypotheses*       | activeIntervals                              |
  * | area: summary, stewards                          | failureReason, resolutionType/Detail         |
  * | capability: statement, criteria, requirements,   | metAt, revisedAt, specReviewed, checks       |
- * |   dependsOn                                      |   (map nodes)                                |
+ * |   dependsOn                                      |   (product nodes)                            |
  * |                                                  | appliedIn, shippedIn, prs, issues (changes)  |
  * | constraint: statement, requirements, appliesTo   | commits, links*                              |
  * | change: intent, amends, touches, plannedRelease, | assignee, ready, needsPlacement              |
- * |   spike, priority, loe, requirements             | lastModified, lastModifiedBy                 |
+ * |   spike, priority, requirements, loe,            | lastModified, lastModifiedBy                 |
+ * |   loeRationale, loeConfidence, effort*,          |                                              |
+ * |   discoveredFrom { item?, run? }, run            |                                              |
  * | task/subtask: description, acceptanceCriteria;   |                                              |
- * |   task also requirements, priority, loe          |                                              |
+ * |   task also requirements, priority, loe,         |                                              |
+ * |   loeRationale, loeConfidence, effort*, run      |                                              |
  *
  * `*` reserved with no shape: `hypotheses` waits for the Hypothesis Layer,
- * `links` for the tracker bridge. Every object schema passes unknown keys
- * through, so a newer writer's fields survive an older reader's save.
+ * `links` for the tracker bridge, `effort` for the task-prep recommender's
+ * effort object. Every object schema passes unknown keys through, so a newer
+ * writer's fields survive an older reader's save.
  *
  * Derived values (capability health, openAmendments, "bound by" edges,
  * change kind) are computed and cached outside the tree; they have no field
@@ -51,6 +55,7 @@ import { z } from "zod";
 import {
   VALID_STATUSES,
   VALID_PRIORITIES,
+  RUN_SETTING_KEYS,
   type ItemStatus,
   type Priority,
   type Requirement,
@@ -77,29 +82,29 @@ const V2StampSchema = z.string().refine(isV2Schema, {
 
 // ── Node types ───────────────────────────────────────────────────
 
-export type MapNodeType = "area" | "capability" | "constraint";
+export type ProductNodeType = "area" | "capability" | "constraint";
 export type ChangeNodeType = "change" | "task" | "subtask";
-export type NodeType = MapNodeType | ChangeNodeType;
-export type Layer = "map" | "changes";
+export type NodeType = ProductNodeType | ChangeNodeType;
+export type Layer = "product" | "changes";
 
-export const MAP_NODE_TYPES: ReadonlySet<MapNodeType> = new Set<MapNodeType>(["area", "capability", "constraint"]);
+export const PRODUCT_NODE_TYPES: ReadonlySet<ProductNodeType> = new Set<ProductNodeType>(["area", "capability", "constraint"]);
 export const CHANGE_NODE_TYPES: ReadonlySet<ChangeNodeType> = new Set<ChangeNodeType>(["change", "task", "subtask"]);
-/** The closed node set, map layer first. */
-export const NODE_TYPES: ReadonlySet<NodeType> = new Set<NodeType>([...MAP_NODE_TYPES, ...CHANGE_NODE_TYPES]);
+/** The closed node set, product layer first. */
+export const NODE_TYPES: ReadonlySet<NodeType> = new Set<NodeType>([...PRODUCT_NODE_TYPES, ...CHANGE_NODE_TYPES]);
 
 export function isNodeType(value: string | undefined): value is NodeType {
   return value !== undefined && NODE_TYPES.has(value as NodeType);
 }
 
 export function layerOf(type: NodeType): Layer {
-  return MAP_NODE_TYPES.has(type as MapNodeType) ? "map" : "changes";
+  return PRODUCT_NODE_TYPES.has(type as ProductNodeType) ? "product" : "changes";
 }
 
 // ── Display ids ──────────────────────────────────────────────────
 
 /**
  * Human-facing ids beside the UUID: `CH-142` for a change (`CH-142.2` for
- * its children) and `A4` / `A4.3` for map nodes. The UUID stays the key.
+ * its children) and `A4` / `A4.3` for product nodes. The UUID stays the key.
  */
 const DISPLAY_ID_PATTERN = /^(?:CH-\d+|A\d+)(?:\.\d+)*$/;
 
@@ -135,6 +140,47 @@ const ReservedSchema = z.unknown();
 /** Engineer-weeks. Frontmatter scalars may arrive as strings ("1.5"), so coerce. */
 const LoeSchema = z.coerce.number().positive().optional();
 
+export const LOE_CONFIDENCES = ["low", "medium", "high"] as const;
+export type LoeConfidence = (typeof LOE_CONFIDENCES)[number];
+
+/** Level-of-effort fields shared by change and task intent. */
+interface EffortIntent {
+  /** Level of effort in engineer-weeks. */
+  loe?: number;
+  /** Why the estimate is what it is. */
+  loeRationale?: string;
+  loeConfidence?: LoeConfidence;
+  /** Reserved for the task-prep recommender's effort object; no shape yet. */
+  effort?: unknown;
+}
+
+const effortIntentShape = {
+  loe: LoeSchema,
+  loeRationale: z.string().optional(),
+  loeConfidence: z.enum(LOE_CONFIDENCES).optional(),
+  effort: ReservedSchema,
+};
+
+/** A key of a saved run block (`RUN_SETTING_KEYS`). */
+export type RunSettingKey = (typeof RUN_SETTING_KEYS)[number];
+
+/**
+ * Saved run settings (`run`): how `ndx work` runs a change or task. Authored
+ * intent, so it lives in frontmatter, not `state.yaml`.
+ *
+ * Loose on purpose, as in v1: known keys come from `RUN_SETTING_KEYS` with
+ * any value, and unknown keys pass through. Only writers check strictly, with
+ * `validateRunSettings`, which also turns `{}` into "no block" so an empty
+ * block is never written. A strict schema here would let one malformed or
+ * newer-version block refuse every PRD write; the `run-settings` rule warns
+ * instead.
+ */
+export type SavedRunSettings = { [K in RunSettingKey]?: unknown };
+
+export const SavedRunSettingsSchema = z
+  .object(Object.fromEntries(RUN_SETTING_KEYS.map((key) => [key, z.unknown()])) as Record<RunSettingKey, z.ZodUnknown>)
+  .passthrough();
+
 /** One acceptance criterion with a stable id (`c1`…`cn`) that deltas address. */
 export interface Criterion {
   id: string;
@@ -157,7 +203,7 @@ export interface CriteriaDelta {
 }
 
 /**
- * One map edit a change carries. `target` is the node id (or display id) it
+ * One product-layer edit a change carries. `target` is the node id (or display id) it
  * edits; for `added` it names the node to create, placed `under` a parent
  * with `title`. Either `criteria` (deterministic delta) or `proposed`
  * (replacement text) describes the edit.
@@ -192,7 +238,27 @@ export const AmendmentSchema = z
   })
   .passthrough();
 
-/** Who stewards a map scope: git emails / identities, or team handles (`@org/team`). */
+/**
+ * Where a change was found: the change or task whose work surfaced it, the
+ * hench run that recorded it, or both. Written by the capture paths (an
+ * agent's add_item during a run, review captures, `rex add --discovered-from`).
+ */
+export interface DiscoveredFrom {
+  /** Id of the change or task being worked when this one was found. */
+  item?: string;
+  /** Hench run id. */
+  run?: string;
+  [key: string]: unknown;
+}
+
+export const DiscoveredFromSchema = z
+  .object({
+    item: z.string().min(1).optional(),
+    run: z.string().min(1).optional(),
+  })
+  .passthrough();
+
+/** Who stewards a product scope: git emails / identities, or team handles (`@org/team`). */
 export type Steward = string;
 
 // ── Intent ───────────────────────────────────────────────────────
@@ -236,33 +302,33 @@ export interface ConstraintIntent extends BaseIntent {
   type: "constraint";
   statement?: string;
   requirements?: Requirement[];
-  /** `"all"` or the ids of the map nodes the constraint binds. */
+  /** `"all"` or the ids of the product nodes the constraint binds. */
   appliesTo?: "all" | string[];
 }
 
-export interface ChangeIntent extends BaseIntent {
+export interface ChangeIntent extends BaseIntent, EffortIntent {
   type: "change";
   /** Why the change exists. */
   intent?: string;
   amends?: Amendment[];
-  /** Map node ids the change works on without amending them. */
+  /** Product node ids the change works on without amending them. */
   touches?: string[];
   plannedRelease?: string;
   spike?: boolean;
   priority?: Priority;
-  /** Level of effort in engineer-weeks. */
-  loe?: number;
   requirements?: Requirement[];
+  discoveredFrom?: DiscoveredFrom;
+  /** A change with no tasks is itself the unit of work `ndx work` runs. */
+  run?: SavedRunSettings;
 }
 
-export interface TaskIntent extends BaseIntent {
+export interface TaskIntent extends BaseIntent, EffortIntent {
   type: "task";
   description?: string;
   acceptanceCriteria?: string[];
   requirements?: Requirement[];
   priority?: Priority;
-  /** Level of effort in engineer-weeks. */
-  loe?: number;
+  run?: SavedRunSettings;
 }
 
 export interface SubtaskIntent extends BaseIntent {
@@ -326,8 +392,10 @@ export const ChangeIntentSchema = z
     plannedRelease: z.string().optional(),
     spike: z.boolean().optional(),
     priority: PrioritySchema.optional(),
-    loe: LoeSchema,
     requirements: z.array(RequirementSchema).optional(),
+    discoveredFrom: DiscoveredFromSchema.optional(),
+    run: SavedRunSettingsSchema.optional(),
+    ...effortIntentShape,
   })
   .passthrough();
 
@@ -339,7 +407,8 @@ export const TaskIntentSchema = z
     acceptanceCriteria: z.array(z.string()).optional(),
     requirements: z.array(RequirementSchema).optional(),
     priority: PrioritySchema.optional(),
-    loe: LoeSchema,
+    run: SavedRunSettingsSchema.optional(),
+    ...effortIntentShape,
   })
   .passthrough();
 
@@ -400,10 +469,10 @@ export interface ItemState {
   failureReason?: string;
   resolutionType?: ResolutionType;
   resolutionDetail?: string;
-  /** Map nodes: hash of statement + criteria when an applied change last satisfied it. */
+  /** Product nodes: hash of statement + criteria when an applied change last satisfied it. */
   metAt?: string;
   /**
-   * Map nodes: when the spec became revised. The state writer stamps it when a
+   * Product nodes: when the spec became revised. The state writer stamps it when a
    * spec edit first makes the spec hash differ from `metAt`, and keeps it
    * across later edits and state writes. It clears it whenever the hash equals
    * `metAt` again: `metAt` is re-stamped, or the spec is reverted to its met
@@ -411,11 +480,11 @@ export interface ItemState {
    * `long-revised` measures age from it, not from `lastModified`.
    */
   revisedAt?: string;
-  /** Map nodes: a person reviewed the spec text. */
+  /** Product nodes: a person reviewed the spec text. */
   specReviewed?: boolean;
-  /** Map nodes: last result per requirement check. */
+  /** Product nodes: last result per requirement check. */
   checks?: CheckResult[];
-  /** Changes: commit in which the change's amendments were applied to the map. */
+  /** Changes: commit in which the change's amendments were applied to the product layer. */
   appliedIn?: string;
   /** Changes: release version the change shipped in. */
   shippedIn?: string;
@@ -430,7 +499,7 @@ export interface ItemState {
   assignee?: string;
   /** Changes and tasks: informational readiness. */
   ready?: boolean;
-  /** Changes: placement on the map still needs a decision (blocks autonomous selection only). */
+  /** Changes: placement on the product layer still needs a decision (blocks autonomous selection only). */
   needsPlacement?: boolean;
   lastModified?: string;
   lastModifiedBy?: string;
@@ -478,7 +547,7 @@ export const StateFileSchema = z
   .object({ schema: V2StampSchema, items: z.record(z.string(), ItemStateSchema) })
   .passthrough();
 
-/** Root `index.md` frontmatter of the map: project title, stamp, project-wide requirements, stewards. */
+/** Root `index.md` frontmatter of the product layer: project title, stamp, project-wide requirements, stewards. */
 export interface RootHeader {
   title: string;
   schema: string;
