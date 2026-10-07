@@ -8,7 +8,7 @@ startedAt: "2026-10-07T03:30:36.978Z"
 completedAt: "2026-10-07T03:44:27.658Z"
 endedAt: "2026-10-07T03:44:27.658Z"
 resolutionType: "code-change"
-resolutionDetail: "rowsOf in tests/e2e/instruction-alignment.test.js now splits on /\\r?\n/ and is hoisted to describe scope; a new test feeds it CRLF text. Verified by converting the three rule files to CRLF (73 pass) and by reverting the regex (the two Windows failures plus the new test reproduce)."
+resolutionDetail: "rowsOf in tests/e2e/instruction-alignment.test.js now splits on /\\r?\\n/ and is hoisted to describe scope; a new test feeds it CRLF text. Verified by converting the three rule files to CRLF (73 pass) and by reverting the regex (the two Windows failures plus the new test reproduce)."
 acceptanceCriteria:
   - "`rowsOf` splits on CRLF or LF: an optional `\\r` before each line feed (the regex in the task description)"
   - "A test feeds the drift guard CRLF rule text and passes"
