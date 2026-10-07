@@ -15,7 +15,7 @@
  * @see packages/web/src/shared/run-options.ts
  */
 
-import { checkRunOptions, workCommandArgs } from "../external.js";
+import { RUN_OPTION_SPECS, checkRunOptions, workCommandArgs } from "../external.js";
 import type { HubMemoryPressure, RunOptionKey, RunOptions } from "../external.js";
 
 /** One resolved setting and the config key (or rule) that supplied it. */
@@ -157,6 +157,36 @@ export function sourceOf(prep: PrepResponse, key: RunOptionKey): string | null {
   return prep.resolved[key].source;
 }
 
+/**
+ * Is this field's value the task's own, rather than the project's?
+ *
+ * The source strings are hench's: `task.run`, plus the `task.run.tier` /
+ * `task.run.models` forms for the two model fields, where which saved key won
+ * is worth knowing. The prefix is the test so a new form does not read as
+ * "from the project" here.
+ */
+export function isSavedOnTask(prep: PrepResponse, key: RunOptionKey): boolean {
+  return (sourceOf(prep, key) ?? "").startsWith("task.run");
+}
+
+/**
+ * What this field would resolve to without the task's saved block — the
+ * project's own default. Only present for a field a saved value won, which is
+ * the only case where "project default: X" means anything.
+ */
+export function fallbackOf(
+  prep: PrepResponse,
+  key: RunOptionKey,
+): { value: unknown; source: string } | null {
+  if (key === "contextNotes") return null;
+  return prep.resolved[key].fallback ?? null;
+}
+
+/** How many settings the task carries. `contextNotes` counts like any other. */
+export function savedCount(prep: PrepResponse): number {
+  return Object.keys(prep.saved ?? {}).length;
+}
+
 /** The value a field shows: the reader's edit, else the default. */
 export function effective<K extends keyof PrepDefaults>(defaults: PrepDefaults, edits: PrepEdits, key: K): PrepDefaults[K] {
   const edited = edits[key as RunOptionKey];
@@ -190,9 +220,27 @@ export function maxTurnsApplies(defaults: PrepDefaults, edits: PrepEdits): boole
 }
 
 /**
+ * Booleans a task or the config can turn ON, and whose OFF the command line can
+ * express — `--no-review`, `--no-skip-test-gate`. For these a `false` edit is a
+ * real instruction ("not for this run") and must travel; for every other
+ * boolean, `false` is just the default and says nothing.
+ *
+ * Derived from the shared option table rather than listed here, so a flag that
+ * gains a negation gets this behaviour without a second edit.
+ */
+const NEGATABLE: ReadonlySet<string> = new Set(
+  RUN_OPTION_SPECS.filter((spec) => spec.negatedFlag !== undefined).map((spec) => spec.key),
+);
+
+/**
  * The options an execute sends: the changed fields only, minus edits the
  * current state makes meaningless — a review model with review off, max turns
  * on a CLI run, a `false` that no flag can express.
+ *
+ * A `false` is kept only when the field is negatable AND its resolved value is
+ * true: the reader is then switching off something the task or the config
+ * turned on, and the run needs the negation flag to hear it. Keeping every
+ * `false` would put `--no-review` on runs that were never going to review.
  */
 export function runOptionsOf(defaults: PrepDefaults, edits: PrepEdits): RunOptions {
   const options: Record<string, unknown> = { ...edits };
@@ -201,8 +249,81 @@ export function runOptionsOf(defaults: PrepDefaults, edits: PrepEdits): RunOptio
     delete options.reviewOptional;
   } else if (options.reviewModel !== undefined) options.review = true;
   if (!maxTurnsApplies(defaults, edits)) delete options.maxTurns;
-  for (const [key, value] of Object.entries(options)) if (value === false) delete options[key];
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== false) continue;
+    const meaningful = NEGATABLE.has(key) && defaults[key as keyof PrepDefaults] === true;
+    if (!meaningful) delete options[key];
+  }
   return options as RunOptions;
+}
+
+/**
+ * Fields chosen per launch, which a save must never carry: they describe how
+ * this one run starts, not how the task should be run.
+ */
+const LAUNCH_ONLY: ReadonlySet<RunOptionKey> = new Set(["fresh", "allowDirty"] as RunOptionKey[]);
+
+/**
+ * The `run` block a Save writes: what the modal shows now, minus anything the
+ * project would have said anyway.
+ *
+ * Two shapes meet here. The modal edits one launch's options — a `model` is a
+ * single id, because a launch knows its vendor. A saved block is
+ * vendor-agnostic, because the task may later be run under a different one, so
+ * an exact model is written as `models: {<vendor>: <id>}` keyed by the vendor
+ * this project is on today. Nothing is inferred about any other vendor: a pin
+ * saved here says "on claude, use this", and `ndx work` on codex falls through
+ * to its own chain.
+ *
+ * A field equal to its project default is omitted rather than frozen: saving
+ * "the default as it is today" would quietly pin the task against a config
+ * change the reader never intended to opt out of.
+ *
+ * Returns null when nothing is left to save, which is how a Save clears a block.
+ */
+export function saveBodyOf(
+  prep: PrepResponse,
+  defaults: PrepDefaults,
+  edits: PrepEdits,
+): Record<string, unknown> | null {
+  const vendor = prep.resolved.vendor.value;
+  const block: Record<string, unknown> = {};
+
+  /** The value this field would have without the task's block, else its current default. */
+  const projectValue = (key: RunOptionKey): unknown => {
+    const fallback = fallbackOf(prep, key);
+    return fallback ? fallback.value : defaults[key as keyof PrepDefaults];
+  };
+
+  for (const spec of RUN_OPTION_SPECS) {
+    const key = spec.key;
+    if (LAUNCH_ONLY.has(key)) continue;
+    // `effective` reads the edit, else what is resolved now — which already
+    // includes whatever the task had saved, so an untouched saved field is
+    // carried forward rather than dropped.
+    const value = effective(defaults, edits, key as keyof PrepDefaults);
+    if (value === undefined || value === "") continue;
+    if (value === projectValue(key)) continue;
+
+    if (key === "model") block["models"] = { [vendor]: value };
+    else if (key === "reviewModel") block["reviewModels"] = { [vendor]: value };
+    else block[key] = value;
+  }
+
+  // A reviewer pinned with no review to run is not a setting, it is a leftover.
+  if (block["review"] !== true) {
+    delete block["reviewModels"];
+    delete block["reviewOptional"];
+  }
+  return Object.keys(block).length > 0 ? block : null;
+}
+
+/**
+ * How many settings a Save would write — what the confirm and the footer count.
+ * The block's own keys, so a model pin counts once however it is spelled.
+ */
+export function saveCount(prep: PrepResponse, defaults: PrepDefaults, edits: PrepEdits): number {
+  return Object.keys(saveBodyOf(prep, defaults, edits) ?? {}).length;
 }
 
 /** Changed fields that still reach the run — the footer's "N changes". */

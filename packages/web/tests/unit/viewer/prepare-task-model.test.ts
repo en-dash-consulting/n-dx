@@ -13,7 +13,12 @@ import {
   commandWords,
   CONTEXT_FILE_PLACEHOLDER,
   defaultsOf,
+  fallbackOf,
   isChanged,
+  isSavedOnTask,
+  saveBodyOf,
+  saveCount,
+  savedCount,
   optionsProblem,
   runOptionsOf,
   setField,
@@ -150,5 +155,150 @@ describe("prepare task model", () => {
   it("adds --reset-deferred for a deferred task, as the server does", () => {
     const deferred = prepFixture({ task: { id: "task-1", title: "t", status: "deferred", level: "task" } });
     expect(commandWords(deferred, "task-1", defaultsOf(deferred), {})).toContain("--reset-deferred");
+  });
+});
+
+/**
+ * A fixture whose task carries saved settings: the resolved entries name
+ * `task.run` as their source and carry the project default as `fallback`, which
+ * is what hench's `--resolve` reports for a saved field.
+ */
+function savedFixture(): ReturnType<typeof prepFixture> {
+  const prep = prepFixture({
+    saved: { models: { claude: "claude-opus" }, review: true },
+    savedVersion: "abc123def456",
+  });
+  prep.resolved.model = {
+    value: "claude-opus",
+    source: "task.run.models",
+    fallback: { value: "claude-sonnet", source: "llm.claude.model" },
+  };
+  prep.resolved.review = {
+    value: true,
+    source: "task.run",
+    fallback: { value: false, source: "built-in" },
+  };
+  return prep;
+}
+
+describe("settings saved on the task", () => {
+  it("tells a saved field from a project one, and names what it would fall back to", () => {
+    const prep = savedFixture();
+
+    expect(isSavedOnTask(prep, "model")).toBe(true);
+    expect(isSavedOnTask(prep, "review")).toBe(true);
+    expect(isSavedOnTask(prep, "provider")).toBe(false);
+
+    expect(fallbackOf(prep, "model")).toEqual({ value: "claude-sonnet", source: "llm.claude.model" });
+    // A field the project supplied has nothing to fall back *from*.
+    expect(fallbackOf(prep, "provider")).toBeNull();
+    expect(savedCount(prep)).toBe(2);
+  });
+
+  it("counts nothing saved for a task that carries no block", () => {
+    const plain = prepFixture();
+    expect(savedCount(plain)).toBe(0);
+    expect(isSavedOnTask(plain, "model")).toBe(false);
+  });
+
+  describe("the block a Save writes", () => {
+    it("carries saved fields forward untouched, in the vendor-agnostic shape", () => {
+      // An exact model is keyed by the vendor this project is on: a saved block
+      // may later be run under another vendor, where a bare id means nothing.
+      const prep = savedFixture();
+      const body = saveBodyOf(prep, defaultsOf(prep), {});
+
+      expect(body).toEqual({ models: { claude: "claude-opus" }, review: true });
+      expect(saveCount(prep, defaultsOf(prep), {})).toBe(2);
+    });
+
+    it("writes an edit over the saved value", () => {
+      const prep = savedFixture();
+      const d = defaultsOf(prep);
+      const body = saveBodyOf(prep, d, setField(d, {}, "maxTurns", 9));
+
+      expect(body).toMatchObject({ models: { claude: "claude-opus" }, review: true, maxTurns: 9 });
+    });
+
+    it("omits a field equal to the project default rather than freezing it", () => {
+      // Saving "the default as it is today" would pin the task against a config
+      // change the reader never meant to opt out of.
+      const prep = prepFixture();
+      const d = defaultsOf(prep);
+
+      expect(saveBodyOf(prep, d, {})).toBeNull();
+      expect(saveBodyOf(prep, d, setField(d, {}, "provider", d.provider))).toBeNull();
+    });
+
+    it("never carries a launch-time field", () => {
+      const prep = prepFixture();
+      const d = defaultsOf(prep);
+      const edits = setField(d, setField(d, {}, "fresh", true), "allowDirty", true);
+
+      // Those two are real edits for the run …
+      expect(runOptionsOf(d, edits)).toMatchObject({ fresh: true, allowDirty: true });
+      // … and still never saved.
+      expect(saveBodyOf(prep, d, edits)).toBeNull();
+    });
+
+    it("drops a reviewer pin when no review would run", () => {
+      const prep = prepFixture();
+      const d = defaultsOf(prep);
+      const edits = setField(d, {}, "reviewModel", "claude-opus");
+
+      expect(saveBodyOf(prep, d, edits)).toBeNull();
+    });
+
+    it("keeps the reviewer pin when review is on", () => {
+      const prep = prepFixture();
+      const d = defaultsOf(prep);
+      let edits = setField(d, {}, "review", true);
+      edits = setField(d, edits, "reviewModel", "claude-opus");
+
+      expect(saveBodyOf(prep, d, edits)).toEqual({
+        review: true,
+        reviewModels: { claude: "claude-opus" },
+      });
+    });
+
+    it("writes notes as an ordinary saved setting", () => {
+      const prep = prepFixture();
+      const d = defaultsOf(prep);
+
+      expect(saveBodyOf(prep, d, setField(d, {}, "contextNotes", "mind the lock")))
+        .toEqual({ contextNotes: "mind the lock" });
+    });
+  });
+
+  describe("switching off a setting the task or the config turned on", () => {
+    it("sends false so the run gets the negation flag", () => {
+      // `--no-review`: without this the edit would vanish and the run would
+      // review anyway, which is the opposite of what the reader asked for.
+      const prep = savedFixture();
+      const d = defaultsOf(prep);
+      const edits = setField(d, {}, "review", false);
+
+      expect(runOptionsOf(d, edits)).toMatchObject({ review: false });
+      expect(commandLine(prep, "task-1", d, edits)).toContain("--no-review");
+    });
+
+    it("says nothing when the setting was off anyway", () => {
+      // A `false` that matches the default is not an instruction, and
+      // `--no-review` on a run that was never going to review is noise.
+      const prep = prepFixture();
+      const d = defaultsOf(prep);
+
+      expect(runOptionsOf(d, { review: false })).toEqual({});
+      expect(commandLine(prep, "task-1", d, { review: false })).not.toContain("--no-review");
+    });
+
+    it("leaves a non-negatable boolean alone", () => {
+      // `fresh` and `allowDirty` have no negation: their absence already reads
+      // as off, so a false must not start emitting anything.
+      const prep = prepFixture();
+      const d = defaultsOf(prep);
+
+      expect(runOptionsOf(d, { fresh: false, allowDirty: false })).toEqual({});
+    });
   });
 });
