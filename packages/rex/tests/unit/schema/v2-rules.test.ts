@@ -25,7 +25,7 @@ function cap(fields: Record<string, unknown> = {}, children: RuleNode[] = []): R
 }
 
 function check(rule: V2RuleId, tree: Partial<V2Tree>, now = NOW) {
-  return checkV2Rules({ map: [], changes: [], ...tree }, { now }, [rule]);
+  return checkV2Rules({ product: [], changes: [], ...tree }, { now }, [rule]);
 }
 
 const ids = (findings: { nodeId: string }[]) => findings.map((f) => f.nodeId);
@@ -40,7 +40,7 @@ describe("rule table", () => {
   it("a healthy tree has no findings", () => {
     const area = (n: number) => node("area", {}, Array.from({ length: n }, () => cap()));
     const tree: V2Tree = {
-      map: [area(2), area(2), area(2)],
+      product: [area(2), area(2), area(2)],
       changes: [node("change", { touches: ["x"] }, [node("task", {}, [node("subtask")])])],
     };
     expect(checkV2Rules(tree, { now: NOW })).toEqual([]);
@@ -48,7 +48,7 @@ describe("rule table", () => {
 
   it("ignores deleted nodes", () => {
     const tree = { changes: [node("change", { status: "deleted", title: "Ship 0.8.0" })] };
-    expect(checkV2Rules({ map: [], ...tree }, { now: NOW, releases: ["0.8.0"] })).toEqual([]);
+    expect(checkV2Rules({ product: [], ...tree }, { now: NOW, releases: ["0.8.0"] })).toEqual([]);
   });
 });
 
@@ -112,7 +112,7 @@ describe("title-release-token", () => {
     const task = node("task", { title: "Prep 0.8.0" });
     const dependency = node("task", { title: "Upgrade zod to 3.25.76" });
     const plain = cap({ title: "Plain" });
-    const tree: V2Tree = { map: [node("area", {}, [capability, plain])], changes: [node("change", { touches: ["x"] }, [task, dependency])] };
+    const tree: V2Tree = { product: [node("area", {}, [capability, plain])], changes: [node("change", { touches: ["x"] }, [task, dependency])] };
     const findings = checkV2Rules(tree, { now: NOW, releases: RELEASES }, ["title-release-token"]);
     expect(ids(findings)).toEqual([capability.id, task.id]);
     expect(findings[0].message).toContain('"PR 12"');
@@ -121,33 +121,33 @@ describe("title-release-token", () => {
 
 describe("layer-nesting", () => {
   it("passes nodes under a parent of their own layer", () => {
-    const map = [node("area", {}, [cap({}, [cap()]), node("constraint")])];
+    const product =[node("area", {}, [cap({}, [cap()]), node("constraint")])];
     const changes = [node("change", {}, [node("task", {}, [node("subtask")])])];
-    expect(check("layer-nesting", { map, changes })).toEqual([]);
+    expect(check("layer-nesting", { product, changes })).toEqual([]);
   });
 
-  it("fails a change-layer node under a map node, and the reverse", () => {
+  it("fails a change-layer node under a product node, and the reverse", () => {
     const task = node("task");
     const capability = cap();
-    const findings = check("layer-nesting", { map: [node("area", {}, [task])], changes: [node("change", {}, [capability])] });
+    const findings = check("layer-nesting", { product: [node("area", {}, [task])], changes: [node("change", {}, [capability])] });
     expect(ids(findings)).toEqual([task.id, capability.id]);
   });
 
   it("fails a root loaded under the other layer's root", () => {
     const change = node("change");
     const area = node("area");
-    expect(ids(check("layer-nesting", { map: [change], changes: [area] }))).toEqual([change.id, area.id]);
+    expect(ids(check("layer-nesting", { product: [change], changes: [area] }))).toEqual([change.id, area.id]);
   });
 });
 
 describe("capability-depth", () => {
   it("passes one level of capability nesting", () => {
-    expect(check("capability-depth", { map: [node("area", {}, [cap({}, [cap()])])] })).toEqual([]);
+    expect(check("capability-depth", { product: [node("area", {}, [cap({}, [cap()])])] })).toEqual([]);
   });
 
   it("fails a capability two levels deep", () => {
     const deep = cap();
-    expect(ids(check("capability-depth", { map: [node("area", {}, [cap({}, [cap({}, [deep])])])] }))).toEqual([deep.id]);
+    expect(ids(check("capability-depth", { product: [node("area", {}, [cap({}, [cap({}, [deep])])])] }))).toEqual([deep.id]);
   });
 });
 
@@ -156,21 +156,21 @@ describe("depends-on-acyclic", () => {
     const a = cap({ id: "a", displayId: "A1.1" });
     const b = cap({ id: "b", aliases: ["old-b"], dependsOn: ["A1.1"] });
     const c = cap({ id: "c", dependsOn: ["old-b", "a", "missing"] });
-    expect(check("depends-on-acyclic", { map: [node("area", {}, [a, b, c])] })).toEqual([]);
+    expect(check("depends-on-acyclic", { product: [node("area", {}, [a, b, c])] })).toEqual([]);
   });
 
   it("fails a cycle once, naming its path", () => {
     const a = cap({ id: "a", title: "A", dependsOn: ["b"] });
     const b = cap({ id: "b", title: "B", dependsOn: ["c"] });
     const c = cap({ id: "c", title: "C", dependsOn: ["a"] });
-    const findings = check("depends-on-acyclic", { map: [node("area", {}, [a, b, c])] });
+    const findings = check("depends-on-acyclic", { product: [node("area", {}, [a, b, c])] });
     expect(findings).toHaveLength(1);
     expect(findings[0].message).toBe('dependsOn cycle: "A" → "B" → "C" → "A"');
   });
 
   it("fails a self-dependency", () => {
     const a = cap({ id: "a", dependsOn: ["a"] });
-    expect(ids(check("depends-on-acyclic", { map: [a] }))).toEqual(["a"]);
+    expect(ids(check("depends-on-acyclic", { product: [a] }))).toEqual(["a"]);
   });
 });
 
@@ -178,8 +178,8 @@ describe("removed-target-live", () => {
   const removes = (target: string, fields: Record<string, unknown> = {}) =>
     node("change", { amends: [{ target, delta: "removed", summary: "retire" }], ...fields });
 
-  it("passes a removal of a live map node", () => {
-    expect(check("removed-target-live", { map: [cap({ id: "a" })], changes: [removes("a")] })).toEqual([]);
+  it("passes a removal of a live product node", () => {
+    expect(check("removed-target-live", { product: [cap({ id: "a" })], changes: [removes("a")] })).toEqual([]);
   });
 
   it("fails a removal of a missing, deleted or change-layer node", () => {
@@ -188,7 +188,7 @@ describe("removed-target-live", () => {
     const task = node("task", { id: "t" });
     const wrongLayer = removes("t");
     const findings = check("removed-target-live", {
-      map: [cap({ id: "gone", status: "deleted" })],
+      product: [cap({ id: "gone", status: "deleted" })],
       changes: [missing, gone, wrongLayer, node("change", {}, [task])],
     });
     expect(ids(findings)).toEqual([missing.id, gone.id, wrongLayer.id]);
@@ -202,25 +202,25 @@ describe("removed-target-live", () => {
 
 describe("capability-statement", () => {
   it("passes a capability with a statement", () => {
-    expect(check("capability-statement", { map: [cap()] })).toEqual([]);
+    expect(check("capability-statement", { product: [cap()] })).toEqual([]);
   });
 
   it("fails a missing or blank statement", () => {
     const none = cap({ statement: undefined });
     const blank = cap({ statement: "  " });
-    expect(ids(check("capability-statement", { map: [none, blank] }))).toEqual([none.id, blank.id]);
+    expect(ids(check("capability-statement", { product: [none, blank] }))).toEqual([none.id, blank.id]);
   });
 });
 
 describe("capability-criteria", () => {
   it("passes a capability with criteria", () => {
-    expect(check("capability-criteria", { map: [cap()] })).toEqual([]);
+    expect(check("capability-criteria", { product: [cap()] })).toEqual([]);
   });
 
   it("warns on missing or empty criteria", () => {
     const none = cap({ criteria: undefined });
     const empty = cap({ criteria: [] });
-    const findings = check("capability-criteria", { map: [none, empty] });
+    const findings = check("capability-criteria", { product: [none, empty] });
     expect(ids(findings)).toEqual([none.id, empty.id]);
     expect(findings[0].severity).toBe("warning");
   });
@@ -242,35 +242,35 @@ describe("long-revised", () => {
     cap({ id: "r", metAt: specHash(met), revisedAt: "2026-09-01T00:00:00Z", ...fields });
 
   it("passes met, proposed, recently revised, and amended nodes", () => {
-    const map = [
+    const product =[
       cap({ ...met, metAt: specHash(met), revisedAt: "2026-01-01T00:00:00Z" }),
       cap({ revisedAt: "2026-01-01T00:00:00Z" }),
       cap({ metAt: specHash(met), revisedAt: "2026-10-01T00:00:00Z" }),
       cap({ metAt: specHash(met), lastModified: "2026-01-01T00:00:00Z" }),
       cap({ metAt: specHash(met) }),
     ];
-    expect(check("long-revised", { map })).toEqual([]);
+    expect(check("long-revised", { product })).toEqual([]);
     const amending = node("change", { amends: [{ target: "r", delta: "modified", summary: "s" }] });
-    expect(check("long-revised", { map: [revised()], changes: [amending] })).toEqual([]);
+    expect(check("long-revised", { product: [revised()], changes: [amending] })).toEqual([]);
   });
 
   it("warns on a node revised past the threshold with no open change", () => {
     const closed = node("change", { status: "completed", amends: [{ target: "r", delta: "modified", summary: "s" }] });
-    const findings = check("long-revised", { map: [revised()], changes: [closed] });
+    const findings = check("long-revised", { product: [revised()], changes: [closed] });
     expect(ids(findings)).toEqual(["r"]);
     expect(findings[0].message).toContain("35 days");
   });
 
   it("measures age from revisedAt, not a later state write's lastModified", () => {
     const checked = revised({ revisedAt: "2026-08-07T00:00:00Z", lastModified: "2026-10-05T00:00:00Z" });
-    const findings = check("long-revised", { map: [checked] });
+    const findings = check("long-revised", { product: [checked] });
     expect(ids(findings)).toEqual(["r"]);
     expect(findings[0].message).toContain("60 days");
   });
 
   it("covers constraints and honours the threshold option", () => {
     const constraint = node("constraint", { statement: "New", metAt: specHash({ statement: "Old" }), revisedAt: "2026-10-01T00:00:00Z" });
-    const tree = { map: [constraint], changes: [] };
+    const tree = { product: [constraint], changes: [] };
     expect(checkV2Rules(tree, { now: NOW }, ["long-revised"])).toEqual([]);
     expect(ids(checkV2Rules(tree, { now: NOW, longRevisedDays: 3 }, ["long-revised"]))).toEqual([constraint.id]);
   });
@@ -281,41 +281,41 @@ describe("area-balance", () => {
     node("area", fields, Array.from({ length: n }, () => cap()));
 
   it("passes balanced areas, counting nested capabilities", () => {
-    const map = [area(3), area(3), node("area", {}, [cap({}, [cap()]), cap()])];
-    expect(check("area-balance", { map })).toEqual([]);
+    const product =[area(3), area(3), node("area", {}, [cap({}, [cap()]), cap()])];
+    expect(check("area-balance", { product })).toEqual([]);
   });
 
   it("warns on an area with fewer than two capabilities", () => {
     const small = area(1);
     const empty = area(0);
-    expect(ids(check("area-balance", { map: [area(2), area(2), area(2), small, empty] }))).toEqual([small.id, empty.id]);
+    expect(ids(check("area-balance", { product: [area(2), area(2), area(2), small, empty] }))).toEqual([small.id, empty.id]);
   });
 
   it("warns on an area over 40 percent of capabilities", () => {
     const big = area(5);
-    const findings = check("area-balance", { map: [big, area(3), area(2)] });
+    const findings = check("area-balance", { product: [big, area(3), area(2)] });
     expect(ids(findings)).toEqual([big.id]);
     expect(findings[0].message).toContain("50 percent");
   });
 
   it("does not apply the share check with two areas or fewer", () => {
-    expect(check("area-balance", { map: [area(5), area(2)] })).toEqual([]);
+    expect(check("area-balance", { product: [area(5), area(2)] })).toEqual([]);
   });
 
   it("counts a sub-area's capabilities toward the sub-area only", () => {
     const parent = node("area", {}, [cap(), cap(), area(2)]);
-    expect(check("area-balance", { map: [parent, area(2), area(2)] })).toEqual([]);
+    expect(check("area-balance", { product: [parent, area(2), area(2)] })).toEqual([]);
   });
 });
 
 describe("unreviewed-spec", () => {
   it("passes reviewed capabilities and constraints", () => {
-    expect(check("unreviewed-spec", { map: [cap(), node("constraint", { specReviewed: true })] })).toEqual([]);
+    expect(check("unreviewed-spec", { product: [cap(), node("constraint", { specReviewed: true })] })).toEqual([]);
   });
 
   it("warns on an unreviewed capability or constraint", () => {
     const capability = cap({ specReviewed: false });
     const constraint = node("constraint");
-    expect(ids(check("unreviewed-spec", { map: [capability, constraint, node("area")] }))).toEqual([capability.id, constraint.id]);
+    expect(ids(check("unreviewed-spec", { product: [capability, constraint, node("area")] }))).toEqual([capability.id, constraint.id]);
   });
 });

@@ -5,7 +5,7 @@ import {
   SCHEMA_VERSION_V2,
   isV2Schema,
   NODE_TYPES,
-  MAP_NODE_TYPES,
+  PRODUCT_NODE_TYPES,
   CHANGE_NODE_TYPES,
   layerOf,
   isNodeType,
@@ -42,10 +42,10 @@ describe("schema stamp", () => {
 describe("node types", () => {
   it("is the closed set, split by layer", () => {
     expect([...NODE_TYPES]).toEqual(["area", "capability", "constraint", "change", "task", "subtask"]);
-    expect([...MAP_NODE_TYPES]).toEqual(["area", "capability", "constraint"]);
+    expect([...PRODUCT_NODE_TYPES]).toEqual(["area", "capability", "constraint"]);
     expect([...CHANGE_NODE_TYPES]).toEqual(["change", "task", "subtask"]);
-    expect(layerOf("capability")).toBe("map");
-    expect(layerOf("subtask")).toBe("changes");
+    for (const type of PRODUCT_NODE_TYPES) expect(layerOf(type)).toBe("product");
+    for (const type of CHANGE_NODE_TYPES) expect(layerOf(type)).toBe("changes");
     expect(isNodeType("epic")).toBe(false);
     expect(isNodeType("spike")).toBe(false);
   });
@@ -63,7 +63,7 @@ describe("node types", () => {
 });
 
 describe("display ids", () => {
-  it("accepts change and map forms", () => {
+  it("accepts change and product forms", () => {
     for (const ok of ["CH-1", "CH-142", "A4", "A4.3", "CH-142.2"]) expect(isDisplayId(ok)).toBe(true);
   });
   it("rejects malformed forms", () => {
