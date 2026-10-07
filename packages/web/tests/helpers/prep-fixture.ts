@@ -24,6 +24,7 @@ export function prepFixture(overrides: Partial<PrepResponse> = {}): PrepResponse
     // exercise the saved-settings path, and give the matching `resolved`
     // entries a `fallback` as hench does.
     saved: null,
+    savedVersion: "none",
     options: [{ key: "provider", values: ["cli", "api"] }],
     refusals: [],
     dir: "/repo",
